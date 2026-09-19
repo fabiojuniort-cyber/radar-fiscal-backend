@@ -63,6 +63,27 @@ test('parses official act identity, dates, text, DOU and explicit UF mentions', 
   assert.match(publication.content ?? '', /Cláusula primeira/);
 });
 
+test('does not treat CONFAZ signatory states as explicit normative UF mentions', () => {
+  const html = page(
+    'CONVÊNIO ICMS 108/26',
+    `<p>Altera regra nacional sobre combustíveis.</p>
+<p>CONVÊNIO ICMS Nº 108, DE 4 DE SETEMBRO DE 2026</p>
+<p>Publicado no DOU de 09.09.2026.</p>
+<p>Cláusula primeira Fica alterada a regra nacional.</p>
+<p>Cláusula segunda Este convênio entra em vigor na data da sua publicação no Diário Oficial da União.</p>
+<p>Presidente do CONFAZ – Nome, Acre – Pessoa A, Bahia – Pessoa B, Goiás – Pessoa C, São Paulo – Pessoa D.</p>`,
+  );
+
+  const publication = parseConfazPublicationHtml(
+    html,
+    'https://www.confaz.fazenda.gov.br/legislacao/convenios/2026/convenio-icms-108-26',
+    'convenios',
+  );
+
+  assert.equal(publication.metadata?.actDate, '2026-09-04');
+  assert.equal(publication.metadata?.explicitUfMentions, undefined);
+});
+
 test('parses COTEPE wording "Publicação no DOU" with strong act identity fields', () => {
   const html = page(
     'ATO COTEPE/ICMS 86/26',
