@@ -23,10 +23,11 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+const { DATABASE_ADMIN_URL } = parsed.data;
+
 async function run(): Promise<void> {
   const pool = new Pool({
-    connectionString:
-      parsed.data.DATABASE_ADMIN_URL,
+    connectionString: DATABASE_ADMIN_URL,
     max: 1,
   });
 
