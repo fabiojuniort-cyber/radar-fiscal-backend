@@ -1,10 +1,9 @@
-import type {
-  Json,
-  JsonObject,
-} from '../../infrastructure/database/database.types.js';
-import type { DB } from '../../infrastructure/database/database.types.js';
 import type { Transaction } from 'kysely';
 
+import type {
+  DB,
+  Json,
+} from '../../infrastructure/database/database.types.js';
 import type { NormalizedPublication } from './publication.normalizer.js';
 
 export type PublicationDisposition =
@@ -76,6 +75,13 @@ async function upsertCollectionItem(
           'source_item_key',
         ])
         .doUpdateSet({
+          external_id:
+            input.publication.externalId ?? null,
+          source_url:
+            input.publication.officialUrl,
+          raw_metadata: asJson(
+            input.publication.metadata,
+          ),
           updated_at: new Date(),
         }),
     )
@@ -242,7 +248,7 @@ async function getOrCreateVersion(
 }> {
   const existingVersion = await trx
     .selectFrom('publication_versions')
-    .select(['id', 'is_current'])
+    .select('id')
     .where('publication_id', '=', publicationId)
     .where(
       'content_hash',
@@ -356,6 +362,11 @@ async function linkRunPublication(
       'source_item_key',
       '=',
       input.publication.sourceItemKey,
+    )
+    .where(
+      'status',
+      'in',
+      ['DISCOVERED', 'FAILED'],
     )
     .execute();
 }
