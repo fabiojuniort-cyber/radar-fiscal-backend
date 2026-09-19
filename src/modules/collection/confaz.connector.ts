@@ -811,7 +811,7 @@ export function parseConfazPublicationHtml(
         }
       : {}),
     ...(ufMentions.length > 0
-      ? { explicitUfMentions: ufMentions, explicitUfMentionsSource: 'FULL_TEXT_MENTIONS' }
+      ? { explicitUfMentions: ufMentions, explicitUfMentionsSource: 'NORMATIVE_TEXT_MENTIONS' }
       : {}),
     ...(relatedLinks.length > 0 ? { relatedLinks } : {}),
   };
