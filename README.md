@@ -71,3 +71,20 @@ The header selects context only; it never grants access. The authenticated user 
 Tenant-scoped database access must run inside `withRequestTenantContext(...)` / `withTenantContext(...)`. These helpers establish transaction-local PostgreSQL context with `set_config(..., true)`. RLS remains the second isolation barrier.
 
 Do not set persistent tenant context on pooled PostgreSQL connections.
+
+
+## Collection Engine
+
+Phase 3 adds a generic collection runtime with independent connectors, finite retry/backoff, timeout handling, PostgreSQL worker locking, stale-run recovery, conservative publication deduplication/versioning, a standalone Worker, and an idempotent Scheduler.
+
+Runtime commands:
+
+```bash
+npm run start:worker
+npm run start:scheduler
+npm run test:collection-integration
+```
+
+The Worker and Scheduler use the dedicated PostgreSQL role `radar_worker_runtime`. Real government connectors are intentionally not part of this phase.
+
+See [docs/phase-3-collection-engine.md](docs/phase-3-collection-engine.md) for the architecture and handoff decisions.
