@@ -61,6 +61,7 @@ async function run(): Promise<void> {
     const registry = buildConnectorRegistry({
       includeSimulated:
         env.COLLECTION_ENABLE_SIMULATED_CONNECTORS,
+      db,
     });
 
     processLogger.info(
