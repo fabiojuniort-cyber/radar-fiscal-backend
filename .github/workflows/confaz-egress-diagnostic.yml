@@ -1,0 +1,27 @@
+name: CONFAZ Egress Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/confaz-egress
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Resolve CONFAZ
+        run: |
+          set -x
+          getent ahostsv4 www.confaz.fazenda.gov.br || true
+          getent ahostsv6 www.confaz.fazenda.gov.br || true
+
+      - name: HTTPS connectivity
+        run: |
+          set -x
+          curl -v --connect-timeout 10 --max-time 20 \
+            -H 'User-Agent: RadarFiscal/0.1 CONFAZ connectivity diagnostic' \
+            -o /tmp/confaz.html \
+            -w '\nHTTP=%{http_code} CONNECT=%{time_connect} TLS=%{time_appconnect} TOTAL=%{time_total} REMOTE_IP=%{remote_ip}\n' \
+            https://www.confaz.fazenda.gov.br/legislacao/protocolos/2026/2026
+          test -s /tmp/confaz.html
