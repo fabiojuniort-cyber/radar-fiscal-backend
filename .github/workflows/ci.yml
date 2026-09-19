@@ -62,5 +62,8 @@ jobs:
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
+      - name: Collection persistence integration tests
+        run: npm run test:collection-integration
+
       - name: Authentication and RLS integration tests
         run: npm run test:integration
