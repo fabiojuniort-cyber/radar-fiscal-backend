@@ -22,6 +22,18 @@ export interface NormalizedPublicationIdentityBasis {
   sourceKey?: string;
 }
 
+export interface NormalizedPublicationFile {
+  url: string;
+  name?: string;
+  mimeType?: string;
+  externalId?: string;
+  rawSha256?: string;
+  sizeBytes?: number;
+  sourceEtag?: string;
+  sourceLastModified?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface NormalizedPublication {
   title: string;
   agency?: string;
@@ -36,6 +48,7 @@ export interface NormalizedPublication {
   externalId?: string;
   sourceItemKey: string;
   metadata: Record<string, unknown>;
+  files: NormalizedPublicationFile[];
   identityStrength: PublicationIdentityStrength;
   identityBasis: NormalizedPublicationIdentityBasis;
   identityHash: string;
@@ -108,6 +121,93 @@ function normalizeDate(
   }
 
   return value.toISOString().slice(0, 10);
+}
+
+function normalizeFiles(
+  files: ConnectorPublication['files'],
+): NormalizedPublicationFile[] {
+  if (!files) {
+    return [];
+  }
+
+  return files.map((file) => {
+    const url = normalizeRequiredText(
+      file.url,
+      'file.url',
+    );
+    const rawSha256 =
+      normalizeOptionalText(file.rawSha256);
+
+    if (
+      rawSha256 &&
+      !/^[a-fA-F0-9]{64}$/.test(rawSha256)
+    ) {
+      throw new PublicationNormalizationError(
+        'file.rawSha256 must contain 64 hexadecimal characters',
+      );
+    }
+
+    if (
+      file.sizeBytes !== undefined &&
+      (!Number.isSafeInteger(file.sizeBytes) ||
+        file.sizeBytes < 0)
+    ) {
+      throw new PublicationNormalizationError(
+        'file.sizeBytes must be a non-negative safe integer',
+      );
+    }
+
+    return {
+      url,
+      ...(normalizeOptionalText(file.name)
+        ? { name: normalizeOptionalText(file.name)! }
+        : {}),
+      ...(normalizeOptionalText(file.mimeType)
+        ? {
+            mimeType:
+              normalizeOptionalText(file.mimeType)!,
+          }
+        : {}),
+      ...(normalizeOptionalText(file.externalId)
+        ? {
+            externalId:
+              normalizeOptionalText(
+                file.externalId,
+              )!,
+          }
+        : {}),
+      ...(rawSha256
+        ? {
+            rawSha256:
+              rawSha256.toLowerCase(),
+          }
+        : {}),
+      ...(file.sizeBytes !== undefined
+        ? { sizeBytes: file.sizeBytes }
+        : {}),
+      ...(normalizeOptionalText(file.sourceEtag)
+        ? {
+            sourceEtag:
+              normalizeOptionalText(
+                file.sourceEtag,
+              )!,
+          }
+        : {}),
+      ...(normalizeOptionalText(
+        file.sourceLastModified,
+      )
+        ? {
+            sourceLastModified:
+              normalizeOptionalText(
+                file.sourceLastModified,
+              )!,
+          }
+        : {}),
+      ...(file.metadata
+        ? { metadata: file.metadata }
+        : {}),
+    };
+  });
 }
 
 function buildIdentity(
@@ -204,6 +304,9 @@ export function normalizePublication(
   const contentText = normalizeOptionalText(
     input.publication.content,
   );
+  const files = normalizeFiles(
+    input.publication.files,
+  );
 
   const publishedOn = normalizeDate(
     input.publication.publishedAt,
@@ -264,6 +367,13 @@ export function normalizePublication(
       title,
       contentText: contentText ?? null,
       effectiveOn: effectiveOn ?? null,
+      rawFileHashes: files
+        .map((file) => file.rawSha256)
+        .filter(
+          (hash): hash is string =>
+            hash !== undefined,
+        )
+        .sort(),
     }),
   );
 
@@ -280,7 +390,13 @@ export function normalizePublication(
     officialUrl,
     ...(externalId ? { externalId } : {}),
     sourceItemKey: externalId ?? officialUrl,
-    metadata: input.publication.metadata ?? {},
+    metadata: {
+      ...(input.publication.metadata ?? {}),
+      ...(files.length > 0
+        ? { files }
+        : {}),
+    },
+    files,
     identityStrength: identity.strength,
     identityBasis: identity.basis,
     identityHash,
