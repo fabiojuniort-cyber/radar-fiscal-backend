@@ -53,10 +53,16 @@ export async function withTenantContext<T>(
         'tenants.id',
         'tenant_memberships.tenant_id',
       )
+      .innerJoin(
+        'app_users',
+        'app_users.id',
+        'tenant_memberships.user_id',
+      )
       .select('tenant_memberships.role')
       .where('tenant_memberships.user_id', '=', userId)
       .where('tenant_memberships.tenant_id', '=', tenantId)
       .where('tenants.status', '=', 'ACTIVE')
+      .where('app_users.status', '=', 'ACTIVE')
       .executeTakeFirst();
 
     if (!membership) {
