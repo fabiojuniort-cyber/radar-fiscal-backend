@@ -23,7 +23,8 @@
     "db:prepare": "npm run db:migrate && npm run db:provision-runtime-role && npm run db:verify-runtime && npm run db:verify-worker-runtime",
     "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts",
     "test:integration": "tsx --test test/auth.integration.test.ts",
-    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts"
+    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts",
+    "db:ensure-confaz-source": "node dist/infrastructure/database/ensure-confaz-source.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
