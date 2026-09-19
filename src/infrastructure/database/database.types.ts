@@ -52,6 +52,35 @@ export interface AuditLog {
   tenant_id: string | null;
 }
 
+export interface AuthRefreshTokens {
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  family_id: string;
+  id: Generated<string>;
+  metadata: Generated<Json>;
+  parent_token_id: string | null;
+  replaced_by_token_id: string | null;
+  reuse_detected_at: Timestamp | null;
+  revoked_at: Timestamp | null;
+  session_id: string;
+  token_hash: string;
+  used_at: Timestamp | null;
+}
+
+export interface AuthSessions {
+  absolute_expires_at: Timestamp;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  idle_expires_at: Timestamp;
+  ip_address: string | null;
+  last_seen_at: Generated<Timestamp>;
+  metadata: Generated<Json>;
+  revoke_reason: string | null;
+  revoked_at: Timestamp | null;
+  user_agent: string | null;
+  user_id: string;
+}
+
 export interface Cnaes {
   code: string;
   description: string;
@@ -322,6 +351,17 @@ export interface Tenants {
   updated_at: Generated<Timestamp>;
 }
 
+export interface UserCredentials {
+  created_at: Generated<Timestamp>;
+  failed_login_attempts: Generated<number>;
+  locked_until: Timestamp | null;
+  password_algorithm: Generated<string>;
+  password_hash: string;
+  password_updated_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface VSourceMonitoring {
   code: string | null;
   jurisdiction_level: string | null;
@@ -337,6 +377,8 @@ export interface VSourceMonitoring {
 export interface DB {
   app_users: AppUsers;
   audit_log: AuditLog;
+  auth_refresh_tokens: AuthRefreshTokens;
+  auth_sessions: AuthSessions;
   cnaes: Cnaes;
   collection_attempts: CollectionAttempts;
   collection_items: CollectionItems;
@@ -359,5 +401,6 @@ export interface DB {
   sources: Sources;
   tenant_memberships: TenantMemberships;
   tenants: Tenants;
+  user_credentials: UserCredentials;
   v_source_monitoring: VSourceMonitoring;
 }
