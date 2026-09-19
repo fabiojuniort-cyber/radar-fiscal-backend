@@ -10,6 +10,7 @@ import {
 } from './modules/collection/connector-registry.factory.js';
 import {
   assertStandaloneDatabaseConnection,
+  assertWorkerRuntimeConnection,
   createStandaloneDatabase,
 } from './infrastructure/database/standalone-client.js';
 import { processLogger } from './infrastructure/logging/process-logger.js';
@@ -55,6 +56,7 @@ async function run(): Promise<void> {
 
   try {
     await assertStandaloneDatabaseConnection(db);
+    await assertWorkerRuntimeConnection(db);
 
     const registry = buildConnectorRegistry({
       includeSimulated:
