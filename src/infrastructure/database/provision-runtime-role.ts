@@ -12,7 +12,7 @@ const provisionEnvSchema = z.object({
       'DATABASE_ADMIN_URL must be a PostgreSQL URL',
     ),
   DB_RUNTIME_PASSWORD: z.string().min(32),
-  DB_WORKER_RUNTIME_PASSWORD: z.string().min(32),
+  DB_WORKER_RUNTIME_PASSWORD: z.string().min(32).optional(),
 });
 
 const parsed = provisionEnvSchema.safeParse(
@@ -30,8 +30,11 @@ if (!parsed.success) {
 const {
   DATABASE_ADMIN_URL,
   DB_RUNTIME_PASSWORD,
-  DB_WORKER_RUNTIME_PASSWORD,
 } = parsed.data;
+
+const DB_WORKER_RUNTIME_PASSWORD =
+  parsed.data.DB_WORKER_RUNTIME_PASSWORD ??
+  DB_RUNTIME_PASSWORD;
 
 async function setPassword(
   client: PoolClient,
