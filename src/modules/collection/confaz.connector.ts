@@ -1081,18 +1081,43 @@ function decodeResponseBody(buffer: ArrayBuffer, contentType: string | null): st
   }
 }
 
+function networkFailureDetail(error: unknown): string | undefined {
+  if (!(error instanceof Error)) {
+    return typeof error === 'string' ? error : undefined;
+  }
+
+  const details: string[] = [`${error.name}: ${error.message}`];
+  const cause = (error as Error & { cause?: unknown }).cause;
+
+  if (cause instanceof Error) {
+    const code = (cause as Error & { code?: unknown }).code;
+    details.push(
+      `${cause.name}: ${cause.message}${typeof code === 'string' ? ` [${code}]` : ''}`,
+    );
+  } else if (cause !== undefined) {
+    details.push(String(cause));
+  }
+
+  return details.filter(Boolean).join(' <- ');
+}
+
 function networkConnectorError(error: unknown, url: string): ConnectorError {
   if (error instanceof ConnectorError) {
     return error;
   }
 
+  const detail = networkFailureDetail(error);
+
   return new ConnectorError(
-    `CONFAZ network request failed for ${url}`,
+    `CONFAZ network request failed for ${url}${detail ? `: ${detail}` : ''}`,
     {
       kind: 'NETWORK_ERROR',
       code: 'CONFAZ_NETWORK_ERROR',
       retryable: true,
-      metadata: { url },
+      metadata: {
+        url,
+        ...(detail ? { networkFailureDetail: detail } : {}),
+      },
       cause: error,
     },
   );

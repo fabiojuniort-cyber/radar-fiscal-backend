@@ -314,3 +314,32 @@ test('all unavailable indexes produce a retryable source failure', async () => {
     },
   );
 });
+
+
+test('network failures preserve the underlying fetch cause for production diagnostics', async () => {
+  const connector = new ConfazConnector({
+    fetchImpl: (async () => {
+      const cause = Object.assign(new Error('Connect Timeout Error'), {
+        code: 'UND_ERR_CONNECT_TIMEOUT',
+      });
+      throw new TypeError('fetch failed', { cause });
+    }) as typeof fetch,
+    now: () => new Date('2026-09-19T17:00:00Z'),
+    requestSpacingMs: 0,
+  });
+
+  await assert.rejects(
+    () => connector.collect({
+      sourceId: SOURCE_ID,
+      runId: '44444444-4444-4444-8444-444444444444',
+      attemptId: '55555555-5555-4555-8555-555555555555',
+      signal: new AbortController().signal,
+    }),
+    (error: unknown) => {
+      const message = (error as Error).message;
+      assert.match(message, /UND_ERR_CONNECT_TIMEOUT/);
+      assert.match(message, /Connect Timeout Error/);
+      return true;
+    },
+  );
+});
