@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "node dist/infrastructure/database/migrate.js",
-    "db:types": "kysely-codegen --dialect postgres --env-file .env --default-schema=public --out-file src/infrastructure/database/database.types.ts"
+    "db:types": "kysely-codegen --dialect postgres --env-file .env --default-schema=public --out-file src/infrastructure/database/database.types.ts",
+    "db:provision-runtime-role": "node dist/infrastructure/database/provision-runtime-role.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
