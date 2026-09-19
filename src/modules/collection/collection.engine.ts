@@ -327,6 +327,8 @@ export async function processAcquiredCollectionRun(
           attemptNo: attempt.attemptNo,
           status: outcome.status,
           errorCode: outcome.code,
+          errorMessage: outcome.message,
+          errorMetadata: outcome.metadata ?? null,
           durationMs: outcome.durationMs,
           nextAttemptAt:
             nextAttemptAt.toISOString(),
@@ -362,6 +364,8 @@ export async function processAcquiredCollectionRun(
         status,
         attemptStatus: outcome.status,
         errorCode: outcome.code,
+        errorMessage: outcome.message,
+        errorMetadata: outcome.metadata ?? null,
         durationMs: outcome.durationMs,
       },
       'Collection run failed',
