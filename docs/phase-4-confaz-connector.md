@@ -182,3 +182,37 @@ Nenhuma alteração foi feita no algoritmo global nesta frente. Esse ponto deve 
 ## ADRs
 
 Nenhum novo ADR foi criado. A implementação reutiliza a arquitetura existente. Os dois pontos acima são decisões pendentes, não decisões arquiteturais já aprovadas.
+
+
+## Análise específica de identity_hash — evidência oficial
+
+Em 2026-09-19 foi analisado o comportamento editorial real do CONFAZ para atos corrigidos.
+
+Caso oficial: Convênio ICMS 73/25.
+
+A página oficial do ato registra simultaneamente:
+
+- ato: Convênio ICMS nº 73, de 4 de julho de 2025;
+- publicação original no DOU: 08.07.2025;
+- ratificação nacional: 25.07.2025;
+- retificação publicada no DOU: 11.07.2025;
+- seção própria de RETIFICAÇÃO com a correção textual do mesmo ato.
+
+Conclusão operacional para o modelo atual:
+
+- o CONFAZ preserva a data original de publicação do ato;
+- a retificação possui sua própria data de publicação/evento;
+- o ato original não teve o campo de publicação original substituído pela data da retificação;
+- o conector já distingue retificação como documento de origem/actType próprio quando ela aparece como item separado no índice;
+- no caso validado, `publishedOn` mostrou-se estável para a identidade do ato original.
+
+Também foram observados no índice oficial de 2025 múltiplos atos com entradas de retificação separadas, incluindo Convênios 73/25, 92/25, 135/25, 143/25, 176/25 e 172/25, e no índice de 2026 o Convênio 96/26 possui entrada específica de retificação.
+
+Não foi encontrada, na amostra oficial pesquisada, evidência de que o CONFAZ substitua silenciosamente a data original de publicação do mesmo ato por uma nova data mantendo exatamente a mesma representação documental.
+
+Decisão nesta frente:
+
+- manter o algoritmo global de identidade inalterado;
+- não criar nova `identity_version` agora;
+- manter o ponto sob observação durante backfill/amostras futuras;
+- se surgir caso oficial em que a própria data original seja corrigida sem nova identidade editorial de retificação/republicação, retornar ao Gerente Geral antes de qualquer mudança estrutural.
