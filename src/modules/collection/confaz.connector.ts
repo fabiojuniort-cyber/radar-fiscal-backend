@@ -459,27 +459,26 @@ function extractActDate(
   text: string,
   reference: { number: number; year: number },
 ): Date | undefined {
-  const lines = text.split('\n').slice(0, 20);
+  const lines = text.split('\n').slice(0, 25);
 
   for (const line of lines) {
-    const lineReference = parseActReference(line);
+    const match =
+      /(?:N[º°.]?\s*)?(\d{1,3})\s*,\s*DE\s+(\d{1,2}(?:º|°)?\s+DE\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+DE\s+\d{4})/i.exec(
+        line,
+      );
 
-    if (
-      !lineReference ||
-      lineReference.number !== reference.number ||
-      lineReference.year !== reference.year
-    ) {
+    if (!match?.[1] || !match[2]) {
       continue;
     }
 
-    const match = /,\s*DE\s+(\d{1,2}(?:º|°)?\s+DE\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+DE\s+\d{4})/i.exec(line);
+    const number = Number.parseInt(match[1], 10);
+    const parsed = parseLongDate(match[2]);
 
-    if (match?.[1]) {
-      const parsed = parseLongDate(match[1]);
-
-      if (parsed) {
-        return parsed;
-      }
+    if (
+      number === reference.number &&
+      parsed?.getUTCFullYear() === reference.year
+    ) {
+      return parsed;
     }
   }
 
@@ -768,7 +767,12 @@ export function parseConfazPublicationHtml(
   const variant = inferVariantFromPage(heading, indexVariant);
   const files = extractFileLinks(mainHtml, officialUrl);
   const relatedLinks = extractRelatedLinks(mainHtml, officialUrl);
-  const ufMentions = explicitUfMentions(content);
+  // Signatory blocks list nearly every state and must not be interpreted
+  // as normative applicability/mention. Only inspect the normative body.
+  const normativeContent = content.split(
+    /\nPresidente\s+do\s+CONFAZ\b/i,
+  )[0] ?? content;
+  const ufMentions = explicitUfMentions(normativeContent);
   const parsedUrl = new URL(officialUrl);
   const sourcePath = parsedUrl.pathname;
 
