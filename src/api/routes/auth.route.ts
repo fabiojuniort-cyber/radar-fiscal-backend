@@ -169,6 +169,7 @@ export async function authRoutes(
     async (request, reply) => {
       if (!request.auth) {
         clearRefreshCookie(reply);
+
         return reply.status(401).send({
           error: 'unauthorized',
         });
@@ -274,6 +275,88 @@ export async function authRoutes(
       }
 
       return reply.status(200).send(result);
+    },
+  );
+
+  typed.get(
+    '/auth/tenants',
+    {
+      preHandler: app.authenticate,
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({
+          error: 'unauthorized',
+        });
+      }
+
+      const tenants = await withUserContext(
+        app.db,
+        request.auth.userId,
+        async (trx) => {
+          const user = await trx
+            .selectFrom('app_users')
+            .select([
+              'id',
+              'status',
+            ])
+            .where(
+              'id',
+              '=',
+              request.auth!.userId,
+            )
+            .executeTakeFirst();
+
+          if (!user || user.status !== 'ACTIVE') {
+            return null;
+          }
+
+          const memberships = await trx
+            .selectFrom('tenant_memberships')
+            .innerJoin(
+              'tenants',
+              'tenants.id',
+              'tenant_memberships.tenant_id',
+            )
+            .select([
+              'tenant_memberships.tenant_id',
+              'tenant_memberships.role',
+              'tenants.name as tenant_name',
+              'tenants.slug as tenant_slug',
+            ])
+            .where(
+              'tenant_memberships.user_id',
+              '=',
+              user.id,
+            )
+            .where(
+              'tenants.status',
+              '=',
+              'ACTIVE',
+            )
+            .orderBy('tenants.name')
+            .execute();
+
+          return memberships.map(
+            (membership) => ({
+              tenantId: membership.tenant_id,
+              tenantName: membership.tenant_name,
+              tenantSlug: membership.tenant_slug,
+              role: membership.role,
+            }),
+          );
+        },
+      );
+
+      if (!tenants) {
+        return reply.status(401).send({
+          error: 'unauthorized',
+        });
+      }
+
+      return reply.status(200).send({
+        tenants,
+      });
     },
   );
 }
