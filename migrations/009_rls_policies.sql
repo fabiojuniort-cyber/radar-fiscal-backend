@@ -53,6 +53,9 @@ BEGIN
 END;
 $$;
 
+REVOKE CREATE ON SCHEMA public
+FROM PUBLIC;
+
 GRANT USAGE ON SCHEMA public
 TO radar_app, radar_worker;
 
