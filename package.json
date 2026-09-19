@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "node dist/infrastructure/database/migrate.js",
     "db:types": "kysely-codegen --dialect postgres --env-file .env --default-schema=public --out-file src/infrastructure/database/database.types.ts",
-    "db:types:print": "kysely-codegen --dialect postgres --default-schema=public --print"
+    "db:types:print": "kysely-codegen --dialect postgres --default-schema=public --print",
+    "db:types:export": "kysely-codegen --dialect postgres --default-schema=public --out-file /tmp/database.types.ts && base64 -w0 /tmp/database.types.ts"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
