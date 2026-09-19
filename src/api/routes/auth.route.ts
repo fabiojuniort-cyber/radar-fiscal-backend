@@ -1,6 +1,7 @@
 import type {
   FastifyInstance,
   FastifyReply,
+  FastifyRequest,
 } from 'fastify';
 import {
   type ZodTypeProvider,
@@ -26,6 +27,23 @@ const loginBodySchema = z.object({
 
 const REFRESH_COOKIE_MAX_AGE_SECONDS =
   REFRESH_INACTIVITY_DAYS * 24 * 60 * 60;
+
+const CSRF_PROTECTION_HEADER = 'x-csrf-protection';
+const CSRF_PROTECTION_VALUE = '1';
+
+async function requireCsrfProtection(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  if (
+    request.headers[CSRF_PROTECTION_HEADER] !==
+    CSRF_PROTECTION_VALUE
+  ) {
+    await reply.status(403).send({
+      error: 'csrf_protection_required',
+    });
+  }
+}
 
 function setRefreshCookie(
   reply: FastifyReply,
@@ -115,6 +133,9 @@ export async function authRoutes(
 
   typed.post(
     '/auth/refresh',
+    {
+      preHandler: requireCsrfProtection,
+    },
     async (request, reply) => {
       const refreshToken =
         request.cookies[
@@ -164,7 +185,10 @@ export async function authRoutes(
   typed.post(
     '/auth/logout',
     {
-      preHandler: app.authenticate,
+      preHandler: [
+        requireCsrfProtection,
+        app.authenticate,
+      ],
     },
     async (request, reply) => {
       if (!request.auth) {
