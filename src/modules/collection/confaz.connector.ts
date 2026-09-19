@@ -455,17 +455,34 @@ function extractPublishedAt(text: string): Date | undefined {
   return parseDotDate(match[1]) ?? parseLongDate(match[1]);
 }
 
-function extractActDate(text: string): Date | undefined {
-  const lines = text.split('\n').slice(0, 12);
+function extractActDate(
+  text: string,
+  reference: { number: number; year: number },
+): Date | undefined {
+  const lines = text.split('\n').slice(0, 20);
+
   for (const line of lines) {
+    const lineReference = parseActReference(line);
+
+    if (
+      !lineReference ||
+      lineReference.number !== reference.number ||
+      lineReference.year !== reference.year
+    ) {
+      continue;
+    }
+
     const match = /,\s*DE\s+(\d{1,2}(?:º|°)?\s+DE\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+DE\s+\d{4})/i.exec(line);
+
     if (match?.[1]) {
       const parsed = parseLongDate(match[1]);
+
       if (parsed) {
         return parsed;
       }
     }
   }
+
   return undefined;
 }
 
@@ -745,7 +762,7 @@ export function parseConfazPublicationHtml(
   const content = extractContentText(mainHtml, heading);
   const ementa = extractEmenta(mainHtml, content, heading);
   const publishedAt = extractPublishedAt(content);
-  const actDate = extractActDate(content);
+  const actDate = extractActDate(content, reference);
   const ratification = extractRatification(content);
   const effective = extractEffectiveDate(content, publishedAt, ratification);
   const variant = inferVariantFromPage(heading, indexVariant);
