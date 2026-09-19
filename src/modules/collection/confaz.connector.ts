@@ -1302,13 +1302,21 @@ export class ConfazConnector implements CollectionConnector {
     }
 
     if (indexesAttempted > 0 && indexesSucceeded === 0) {
+      const failureSamples = partialFailures.slice(0, 4);
+      const firstFailure = failureSamples[0];
       throw new ConnectorError(
-        'All CONFAZ annual indexes failed in this attempt',
+        firstFailure
+          ? `All CONFAZ annual indexes failed in this attempt. First failure: ${firstFailure.message}`
+          : 'All CONFAZ annual indexes failed in this attempt',
         {
           kind: 'SOURCE_UNAVAILABLE',
           code: 'CONFAZ_ALL_INDEXES_FAILED',
           retryable: true,
-          metadata: { years, indexFailureCount: partialFailures.length },
+          metadata: {
+            years,
+            indexFailureCount: partialFailures.length,
+            failureSamples,
+          },
         },
       );
     }
