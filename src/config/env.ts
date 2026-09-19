@@ -41,6 +41,13 @@ const envSchema = z.object({
 
   DATABASE_ADMIN_URL: databaseUrlSchema.optional(),
 
+  JWT_ACCESS_SECRET: z.string().min(32),
+
+  AUTH_REFRESH_COOKIE_NAME: z
+    .string()
+    .min(1)
+    .default('radar_refresh_token'),
+
   DB_POOL_MAX: z.coerce
     .number()
     .int()
