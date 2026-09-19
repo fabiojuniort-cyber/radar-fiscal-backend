@@ -11,7 +11,31 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      DB_POOL_MAX: 1
 
     steps:
       - name: Checkout
@@ -34,3 +58,9 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      - name: Prepare PostgreSQL test database
+        run: npm run db:prepare
+
+      - name: Authentication and RLS integration tests
+        run: npm run test:integration
