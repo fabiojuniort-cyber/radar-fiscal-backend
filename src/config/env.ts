@@ -8,7 +8,7 @@ const databaseUrlSchema = z
     (value) =>
       value.startsWith('postgres://') ||
       value.startsWith('postgresql://'),
-    'DATABASE_URL must start with postgres:// or postgresql://',
+    'Database URL must start with postgres:// or postgresql://',
   );
 
 const envSchema = z.object({
@@ -38,6 +38,8 @@ const envSchema = z.object({
     .default('info'),
 
   DATABASE_URL: databaseUrlSchema,
+
+  DATABASE_ADMIN_URL: databaseUrlSchema.optional(),
 
   DB_POOL_MAX: z.coerce
     .number()
