@@ -198,3 +198,96 @@ test('federal publications reject UF to avoid ambiguous scope', () => {
     /stateCode must be omitted/,
   );
 });
+
+
+test('raw attachment hash participates in content versioning and metadata preservation', () => {
+  const first = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Ato com anexo',
+      agency: 'Órgão X',
+      sphere: 'FEDERAL',
+      actType: 'Portaria',
+      actNumber: '500/2026',
+      publishedAt: new Date(
+        '2026-09-19T00:00:00Z',
+      ),
+      content: 'Mesmo texto extraído.',
+      officialUrl:
+        'https://example.gov/ato-500',
+      files: [
+        {
+          url: 'https://example.gov/anexo.pdf',
+          name: 'Anexo.pdf',
+          mimeType: 'application/pdf',
+          rawSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          sizeBytes: 1234,
+        },
+      ],
+    },
+  });
+
+  const changed = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Ato com anexo',
+      agency: 'Órgão X',
+      sphere: 'FEDERAL',
+      actType: 'Portaria',
+      actNumber: '500/2026',
+      publishedAt: new Date(
+        '2026-09-19T00:00:00Z',
+      ),
+      content: 'Mesmo texto extraído.',
+      officialUrl:
+        'https://example.gov/ato-500',
+      files: [
+        {
+          url: 'https://example.gov/anexo.pdf',
+          name: 'Anexo.pdf',
+          mimeType: 'application/pdf',
+          rawSha256:
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          sizeBytes: 1234,
+        },
+      ],
+    },
+  });
+
+  assert.equal(
+    first.identityHash,
+    changed.identityHash,
+  );
+  assert.notEqual(
+    first.contentHash,
+    changed.contentHash,
+  );
+  assert.equal(first.files.length, 1);
+  assert.deepEqual(
+    first.metadata.files,
+    first.files,
+  );
+});
+
+test('invalid attachment hashes fail normalization', () => {
+  assert.throws(
+    () =>
+      normalizePublication({
+        sourceId: sourceA,
+        publication: {
+          title: 'Ato com anexo inválido',
+          sphere: 'FEDERAL',
+          officialUrl:
+            'https://example.gov/invalid-file',
+          files: [
+            {
+              url: 'https://example.gov/file.pdf',
+              rawSha256: 'invalid',
+            },
+          ],
+        },
+      }),
+    /64 hexadecimal characters/,
+  );
+});
