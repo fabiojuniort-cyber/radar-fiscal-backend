@@ -16,7 +16,7 @@
     "db:provision-runtime-role": "node dist/infrastructure/database/provision-runtime-role.js",
     "db:prepare": "npm run db:migrate && npm run db:provision-runtime-role && npm run db:verify-runtime",
     "db:verify-runtime": "node dist/infrastructure/database/verify-runtime-role.js",
-    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts",
+    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts",
     "test:integration": "tsx --test test/auth.integration.test.ts"
   },
   "dependencies": {
