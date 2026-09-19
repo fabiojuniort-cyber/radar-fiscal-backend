@@ -71,7 +71,7 @@ async function applyMigration(
 
 async function runMigrations(): Promise<void> {
   const pool = new Pool({
-    connectionString: env.DATABASE_URL,
+    connectionString: env.DATABASE_ADMIN_URL ?? env.DATABASE_URL,
     max: 1,
     idleTimeoutMillis: env.DB_IDLE_TIMEOUT_MS,
     connectionTimeoutMillis: env.DB_CONNECTION_TIMEOUT_MS,
