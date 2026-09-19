@@ -20,8 +20,12 @@ if (!parsed.success) {
     'Invalid runtime database verification configuration.',
     parsed.error.issues,
   );
-  process.exit(1);
+  throw new Error(
+    'Runtime database verification configuration is invalid.',
+  );
 }
+
+const runtimeDatabaseUrl = parsed.data.DATABASE_URL;
 
 const PROTECTED_TABLES = [
   'tenants',
@@ -39,7 +43,7 @@ const PROTECTED_TABLES = [
 
 async function run(): Promise<void> {
   const pool = new Pool({
-    connectionString: parsed.data.DATABASE_URL,
+    connectionString: runtimeDatabaseUrl,
     max: 1,
   });
 
