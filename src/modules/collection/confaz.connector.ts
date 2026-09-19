@@ -956,6 +956,22 @@ function chooseLinksToFetch(
   let skippedPreBaseline = 0;
   let bootstrapLimited = false;
 
+  const knownIndexedActs = links.filter((link) =>
+    knownByUrl.has(officialPath(link.url)),
+  );
+  const highestKnownActNumber = knownIndexedActs.reduce<number | undefined>(
+    (highest, link) =>
+      highest === undefined || link.actNumber > highest
+        ? link.actNumber
+        : highest,
+    undefined,
+  );
+  const recentDiscoveryUrls = new Set(
+    links
+      .slice(0, bootstrapWindowPerFamily)
+      .map((link) => officialPath(link.url)),
+  );
+
   for (const link of links) {
     const key = officialPath(link.url);
     const known = knownByUrl.has(key);
@@ -965,7 +981,23 @@ function chooseLinksToFetch(
       continue;
     }
 
-    if (special || (baseline !== undefined && link.actNumber > baseline)) {
+    const aboveConfiguredBaseline =
+      baseline !== undefined && link.actNumber > baseline;
+    const aboveObservedHighWater =
+      baseline === undefined &&
+      highestKnownActNumber !== undefined &&
+      link.actNumber > highestKnownActNumber;
+    const inRecentDiscoveryWindow =
+      baseline === undefined &&
+      familyKnown.length > 0 &&
+      recentDiscoveryUrls.has(key);
+
+    if (
+      special ||
+      aboveConfiguredBaseline ||
+      aboveObservedHighWater ||
+      inRecentDiscoveryWindow
+    ) {
       selected.set(key, link);
       continue;
     }
