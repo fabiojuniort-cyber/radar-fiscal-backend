@@ -448,7 +448,7 @@ function isoDate(date: Date | undefined): string | undefined {
 }
 
 function extractPublishedAt(text: string): Date | undefined {
-  const match = /Publicado\s+no\s+DOU\s+de\s+((?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4})|(?:\d{1,2}(?:º|°)?\s+de\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+de\s+\d{4}))/i.exec(text);
+  const match = /Publica(?:do|ç(?:ã|a)o)\s+no\s+DOU\s+de\s+((?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4})|(?:\d{1,2}(?:º|°)?\s+de\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+de\s+\d{4}))/i.exec(text);
   if (!match?.[1]) {
     return undefined;
   }
