@@ -213,6 +213,62 @@ test('incremental mode fetches only URLs above the configured baseline', async (
   assert.equal(result.metadata?.indexesSucceeded, 4);
 });
 
+test('incremental mode discovers a new normal act after bootstrap without manual baseline', async () => {
+  const requested: string[] = [];
+  const knownUrl = 'https://www.confaz.fazenda.gov.br/legislacao/protocolos/2026/pt088_26';
+
+  const fakeFetch = (async (input: string | URL | Request) => {
+    const url = input.toString();
+    requested.push(url);
+
+    if (url.endsWith('/legislacao/protocolos/2026/2026')) {
+      return new Response(
+        '<a href="/legislacao/protocolos/2026/pt088_26">PROTOCOLO ICMS 88/26</a>' +
+        '<a href="/legislacao/protocolos/2026/pt089_26">PROTOCOLO ICMS 89/26</a>',
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    }
+
+    if (url.endsWith('/pt089_26')) {
+      return new Response(
+        page(
+          'PROTOCOLO ICMS 89/26',
+          `<p>Altera norma anterior.</p>
+<p>PROTOCOLO ICMS Nº 89, DE 1º DE AGOSTO DE 2026</p>
+<p>Publicado no DOU de 03.08.26.</p>
+<p>Cláusula primeira Fica alterada a norma.</p>`,
+        ),
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    }
+
+    return new Response('<html><body><h1>2026</h1></body></html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }) as typeof fetch;
+
+  const connector = new ConfazConnector({
+    fetchImpl: fakeFetch,
+    readSourceState: async () => ({
+      connectorConfig: {},
+      knownOrigins: [{ officialUrl: knownUrl, lastSeenAt: new Date('2026-08-01T00:00:00Z') }],
+    }),
+    now: () => new Date('2026-09-19T17:00:00Z'),
+    requestSpacingMs: 0,
+  });
+
+  const result = await connector.collect({
+    sourceId: SOURCE_ID,
+    runId: '44444444-4444-4444-8444-444444444444',
+    attemptId: '55555555-5555-4555-8555-555555555555',
+    signal: new AbortController().signal,
+  });
+
+  assert.equal(result.publications.some((publication) => publication.actNumber === '89/2026'), true);
+  assert.equal(requested.some((url) => url.endsWith('/pt089_26')), true);
+});
+
 test('all unavailable indexes produce a retryable source failure', async () => {
   const connector = new ConfazConnector({
     fetchImpl: (async () => new Response('unavailable', {
