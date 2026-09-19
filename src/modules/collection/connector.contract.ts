@@ -76,6 +76,7 @@ export interface CollectionConnector {
    * Não corresponde ao UUID da tabela sources.
    */
   readonly key: string;
+  readonly version?: string;
 
   collect(context: ConnectorExecutionContext): Promise<ConnectorResult>;
 }
