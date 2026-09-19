@@ -75,8 +75,8 @@ export async function loginWithPassword(
   email: string,
   password: string,
   metadata: {
-    ipAddress?: string;
-    userAgent?: string;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
   },
 ): Promise<SessionTokens | null> {
   const normalizedEmail = normalizeEmail(email);
