@@ -80,7 +80,15 @@ async function run(): Promise<void> {
         [DB_RUNTIME_PASSWORD],
       );
 
-      await client.query(formatted.rows[0].command);
+      const passwordCommand = formatted.rows[0]?.command;
+
+      if (!passwordCommand) {
+        throw new Error(
+          'Failed to build runtime role password command.',
+        );
+      }
+
+      await client.query(passwordCommand);
 
       await client.query(`
         GRANT radar_app TO radar_app_runtime
