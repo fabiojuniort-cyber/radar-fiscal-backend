@@ -63,6 +63,32 @@ test('parses official act identity, dates, text, DOU and explicit UF mentions', 
   assert.match(publication.content ?? '', /Cláusula primeira/);
 });
 
+test('parses COTEPE wording "Publicação no DOU" with strong act identity fields', () => {
+  const html = page(
+    'ATO COTEPE/ICMS 86/26',
+    `<p>Altera o Ato COTEPE/ICMS nº 44, de 7 de agosto de 2018, que dispõe sobre a Escrituração Fiscal Digital.</p>
+<p>ATO COTEPE/ICMS Nº 86, DE 9 DE SETEMBRO DE 2026</p>
+<p>Publicação no DOU de 10.09.26.</p>
+<p>Art. 1º O Ato COTEPE/ICMS nº 44 passa a vigorar com nova redação.</p>
+<p>Art. 2º Este ato entra em vigor na data da sua publicação no Diário Oficial da União.</p>`,
+  );
+
+  const publication = parseConfazPublicationHtml(
+    html,
+    'https://www.confaz.fazenda.gov.br/legislacao/atos/2026/ato-cotepe-icms-86-26',
+    'atos',
+  );
+
+  assert.equal(publication.actType, 'ATO COTEPE/ICMS');
+  assert.equal(publication.actNumber, '86/2026');
+  assert.equal(publication.metadata?.actDate, '2026-09-09');
+  assert.equal(publication.publishedAt?.toISOString().slice(0, 10), '2026-09-10');
+  assert.equal(publication.effectiveAt?.toISOString().slice(0, 10), '2026-09-10');
+
+  const normalized = normalizePublication({ sourceId: SOURCE_ID, publication });
+  assert.equal(normalized.identityStrength, 'STRONG');
+});
+
 test('parses ratification and uses it for effective date when official text says so', () => {
   const html = page(
     'CONVÊNIO ICMS 153/20',
