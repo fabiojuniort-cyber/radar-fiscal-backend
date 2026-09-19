@@ -5,6 +5,10 @@ export interface ConnectorFile {
   name?: string;
   mimeType?: string;
   externalId?: string;
+  rawSha256?: string;
+  sizeBytes?: number;
+  sourceEtag?: string;
+  sourceLastModified?: string;
   metadata?: Record<string, unknown>;
 }
 
