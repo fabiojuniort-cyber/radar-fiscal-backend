@@ -13,6 +13,9 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
+const scheduleCron =
+  process.env.CONFAZ_SCHEDULE_CRON?.trim() || '35 * * * *';
+
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 1,
@@ -42,7 +45,7 @@ try {
         'https://www.confaz.fazenda.gov.br',
         'confaz',
         '{}'::jsonb,
-        '35 * * * *',
+        $1,
         'America/Sao_Paulo',
         3,
         TRUE
@@ -60,9 +63,10 @@ try {
         is_active = TRUE,
         updated_at = now()
     `,
+    [scheduleCron],
   );
 
-  console.log('CONFAZ source ensured.');
+  console.log(`CONFAZ source ensured with schedule ${scheduleCron}.`);
 } finally {
   await pool.end();
 }
