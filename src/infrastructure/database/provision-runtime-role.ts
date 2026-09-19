@@ -74,7 +74,7 @@ async function run(): Promise<void> {
         `
           SELECT format(
             'ALTER ROLE radar_app_runtime PASSWORD %L',
-            $1
+            $1::text
           ) AS command
         `,
         [DB_RUNTIME_PASSWORD],
