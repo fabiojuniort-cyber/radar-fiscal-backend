@@ -96,7 +96,9 @@ export async function loginWithPassword(
       'user_credentials.password_hash',
       'user_credentials.locked_until',
     ])
-    .where('app_users.email', '=', normalizedEmail)
+    .where(
+      sql<boolean>`lower(${sql.ref('app_users.email')}) = ${normalizedEmail}`,
+    )
     .executeTakeFirst();
 
   if (!account || account.status !== 'ACTIVE') {

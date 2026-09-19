@@ -4,7 +4,7 @@ Backend cloud service for Radar Fiscal.
 
 ## Stack
 
-- Node.js
+- Node.js 24 LTS
 - TypeScript
 - Fastify
 - PostgreSQL
@@ -20,8 +20,54 @@ Useful commands:
 ```bash
 npm run typecheck
 npm run build
+npm test
 npm run db:migrate
 npm run db:types
 ```
 
 The production service exposes `GET /health` for application and database health checks.
+
+## Authentication
+
+Authentication uses:
+
+- short-lived JWT access tokens (15 minutes);
+- opaque refresh tokens stored only in an HttpOnly cookie;
+- SHA-256 refresh-token hashes in PostgreSQL;
+- refresh-token rotation with reuse detection;
+- server-side sessions with 7-day inactivity expiry and 30-day absolute lifetime;
+- Argon2id password hashing.
+
+Available endpoints:
+
+- `POST /auth/login`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `GET /auth/tenants`
+
+The refresh cookie is host-only because no `Domain` attribute is set. In production it is `Secure`, always `HttpOnly`, uses `SameSite=Strict`, and is scoped to `/auth`.
+
+### CSRF protection
+
+`POST /auth/refresh` and `POST /auth/logout` require this request header:
+
+```text
+X-CSRF-Protection: 1
+```
+
+This custom header is intentionally required in addition to the cookie attributes so browser form submissions and simple cross-origin requests cannot invoke refresh/logout with ambient cookie credentials.
+
+## Multi-tenant request context
+
+The client selects the active tenant on tenant-scoped requests with:
+
+```text
+X-Tenant-Id: <tenant UUID>
+```
+
+The header selects context only; it never grants access. The authenticated user must have a membership for the active tenant, and the tenant must be active.
+
+Tenant-scoped database access must run inside `withRequestTenantContext(...)` / `withTenantContext(...)`. These helpers establish transaction-local PostgreSQL context with `set_config(..., true)`. RLS remains the second isolation barrier.
+
+Do not set persistent tenant context on pooled PostgreSQL connections.

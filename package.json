@@ -15,7 +15,9 @@
     "db:types": "kysely-codegen --dialect postgres --default-schema=public --out-file src/infrastructure/database/database.types.ts",
     "db:provision-runtime-role": "node dist/infrastructure/database/provision-runtime-role.js",
     "db:prepare": "npm run db:migrate && npm run db:provision-runtime-role && npm run db:verify-runtime",
-    "db:verify-runtime": "node dist/infrastructure/database/verify-runtime-role.js"
+    "db:verify-runtime": "node dist/infrastructure/database/verify-runtime-role.js",
+    "test": "tsx --test test/auth.unit.test.ts",
+    "test:integration": "tsx --test test/auth.integration.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

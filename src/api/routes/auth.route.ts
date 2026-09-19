@@ -1,6 +1,7 @@
 import type {
   FastifyInstance,
   FastifyReply,
+  FastifyRequest,
 } from 'fastify';
 import {
   type ZodTypeProvider,
@@ -26,6 +27,23 @@ const loginBodySchema = z.object({
 
 const REFRESH_COOKIE_MAX_AGE_SECONDS =
   REFRESH_INACTIVITY_DAYS * 24 * 60 * 60;
+
+const CSRF_PROTECTION_HEADER = 'x-csrf-protection';
+const CSRF_PROTECTION_VALUE = '1';
+
+async function requireCsrfProtection(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  if (
+    request.headers[CSRF_PROTECTION_HEADER] !==
+    CSRF_PROTECTION_VALUE
+  ) {
+    await reply.status(403).send({
+      error: 'csrf_protection_required',
+    });
+  }
+}
 
 function setRefreshCookie(
   reply: FastifyReply,
@@ -115,6 +133,9 @@ export async function authRoutes(
 
   typed.post(
     '/auth/refresh',
+    {
+      preHandler: requireCsrfProtection,
+    },
     async (request, reply) => {
       const refreshToken =
         request.cookies[
@@ -164,11 +185,15 @@ export async function authRoutes(
   typed.post(
     '/auth/logout',
     {
-      preHandler: app.authenticate,
+      preHandler: [
+        requireCsrfProtection,
+        app.authenticate,
+      ],
     },
     async (request, reply) => {
       if (!request.auth) {
         clearRefreshCookie(reply);
+
         return reply.status(401).send({
           error: 'unauthorized',
         });
@@ -274,6 +299,88 @@ export async function authRoutes(
       }
 
       return reply.status(200).send(result);
+    },
+  );
+
+  typed.get(
+    '/auth/tenants',
+    {
+      preHandler: app.authenticate,
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({
+          error: 'unauthorized',
+        });
+      }
+
+      const tenants = await withUserContext(
+        app.db,
+        request.auth.userId,
+        async (trx) => {
+          const user = await trx
+            .selectFrom('app_users')
+            .select([
+              'id',
+              'status',
+            ])
+            .where(
+              'id',
+              '=',
+              request.auth!.userId,
+            )
+            .executeTakeFirst();
+
+          if (!user || user.status !== 'ACTIVE') {
+            return null;
+          }
+
+          const memberships = await trx
+            .selectFrom('tenant_memberships')
+            .innerJoin(
+              'tenants',
+              'tenants.id',
+              'tenant_memberships.tenant_id',
+            )
+            .select([
+              'tenant_memberships.tenant_id',
+              'tenant_memberships.role',
+              'tenants.name as tenant_name',
+              'tenants.slug as tenant_slug',
+            ])
+            .where(
+              'tenant_memberships.user_id',
+              '=',
+              user.id,
+            )
+            .where(
+              'tenants.status',
+              '=',
+              'ACTIVE',
+            )
+            .orderBy('tenants.name')
+            .execute();
+
+          return memberships.map(
+            (membership) => ({
+              tenantId: membership.tenant_id,
+              tenantName: membership.tenant_name,
+              tenantSlug: membership.tenant_slug,
+              role: membership.role,
+            }),
+          );
+        },
+      );
+
+      if (!tenants) {
+        return reply.status(401).send({
+          error: 'unauthorized',
+        });
+      }
+
+      return reply.status(200).send({
+        tenants,
+      });
     },
   );
 }
