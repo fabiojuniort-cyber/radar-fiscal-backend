@@ -1077,7 +1077,7 @@ export class ConfazConnector implements CollectionConnector {
   readonly version = 'confaz-1.0.0';
 
   private readonly fetchImpl: typeof fetch;
-  private readonly readSourceState?: ConfazSourceStateReader;
+  private readonly readSourceState: ConfazSourceStateReader | undefined;
   private readonly now: () => Date;
   private readonly refreshKnownPerFamily: number;
   private readonly bootstrapWindowPerFamily: number;
