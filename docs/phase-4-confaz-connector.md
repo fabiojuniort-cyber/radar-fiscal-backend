@@ -135,3 +135,50 @@ Configuração operacional inicial:
 - menções de UF representam menções textuais explícitas, não análise jurídica de aplicabilidade;
 - arquivos são descobertos e entregues ao mecanismo existente; download/storage continua sob a infraestrutura genérica já prevista;
 - o backfill histórico completo não é executado automaticamente pela rotina incremental.
+
+
+## Validação real de produção — 2026-09-19
+
+A implementação e o contrato foram validados em CI e no runtime Railway, porém a captura real em produção ficou bloqueada por conectividade de saída entre o Railway e o host oficial do CONFAZ.
+
+Evidências observadas:
+
+- Scheduler cria runs reais para a fonte `confaz`;
+- Worker adquire as runs e inicia attempts normalmente;
+- retry/backoff e limite de 3 attempts funcionam;
+- as falhas são persistidas como `SOURCE_UNAVAILABLE`;
+- a causa de baixo nível foi preservada nos logs: `UND_ERR_CONNECT_TIMEOUT` ao conectar em `www.confaz.fazenda.gov.br:443`, antes de qualquer resposta HTTP;
+- o mesmo comportamento foi reproduzido em três regiões Railway: SFO (US West), IAD (US East) e AMS (EU West);
+- o portal oficial estava acessível externamente durante a mesma janela de validação;
+- por responsabilidade com a fonte, os testes de agenda acelerada foram temporários; a agenda operacional deve permanecer em `35 * * * *`.
+
+Portanto, esta frente não deve ser declarada integralmente concluída enquanto não houver uma execução real bem-sucedida a partir da infraestrutura de produção, persistência dos registros e validação amostral dos registros persistidos.
+
+### Validação manual do parser
+
+A página oficial do Protocolo ICMS 88/26 foi comparada com o parser e os campos esperados coincidem:
+
+- tipo: `PROTOCOLO ICMS`;
+- número normalizado: `88/2026`;
+- data do ato: `2026-07-27`;
+- publicação no DOU: `2026-07-29`;
+- efeitos explícitos: `2026-08-01`;
+- UFs explicitamente mencionadas no corpo normativo: RS e SP;
+- ementa e texto normativo preservados;
+- URL oficial preservada.
+
+### Observação sobre identidade global
+
+O normalizador global atual inclui `publishedOn` na identidade forte, além de esfera, órgão, tipo e número do ato. Para o CONFAZ isso funciona nos casos validados, mas existe um risco arquitetural: se a própria fonte corrigir apenas a data de publicação mantendo o mesmo ato e a mesma origem, o novo `identity_hash` poderá conflitar com o origin já vinculado, em vez de gerar uma nova versão.
+
+Nenhuma alteração foi feita no algoritmo global nesta frente. Esse ponto deve ser avaliado pelo Gerente Geral com evidência adicional de outras fontes antes de qualquer `identity_version` nova.
+
+## Decisões pendentes para o Gerente Geral
+
+1. Definir a estratégia de egress para fontes oficiais que não aceitem a rota padrão do Railway. Railway oferece Static Outbound IPs para planos compatíveis, mas habilitar isso não garante por si só que o CONFAZ aceite o endereço; eventual allowlisting dependeria da fonte.
+2. Se Static Outbound IP não resolver, decidir se será permitido um egress proxy/gateway com IP estável ou um worker de coleta em outro provedor. Isso altera a infraestrutura e não deve ser introduzido silenciosamente nesta frente.
+3. Manter o algoritmo global de identidade como está até haver evidência concreta suficiente para decidir se `publishedOn` deve permanecer na identidade forte ou migrar para outra `identity_version`.
+
+## ADRs
+
+Nenhum novo ADR foi criado. A implementação reutiliza a arquitetura existente. Os dois pontos acima são decisões pendentes, não decisões arquiteturais já aprovadas.
