@@ -536,7 +536,7 @@ function extractEffectiveDate(
     };
   }
 
-  const publicationPhrase = /entra\s+em\s+vigor\s+na\s+data\s+(?:da|de\s+sua)\s+publica(?:ç|c)[aã]o\s+(?:no\s+Di[aá]rio\s+Oficial\s+da\s+Uni[aã]o|no\s+DOU)?/i.exec(text);
+  const publicationPhrase = /entra\s+em\s+vigor\s+na\s+data\s+(?:da(?:\s+sua)?|de\s+sua)\s+publica(?:ç|c)[aã]o\s+(?:no\s+Di[aá]rio\s+Oficial\s+da\s+Uni[aã]o|no\s+DOU)?/i.exec(text);
   if (publicationPhrase && publishedAt) {
     return {
       date: publishedAt,
