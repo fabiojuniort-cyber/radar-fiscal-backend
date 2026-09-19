@@ -136,14 +136,14 @@ test('CONFAZ connector persists, deduplicates and versions through the real coll
 
     const publication = await db
       .selectFrom('publications')
-      .select(['act_type', 'act_number', 'title', 'published_at'])
+      .select(['act_type', 'act_number', 'title', 'published_on'])
       .where('id', '=', origin.publication_id)
       .executeTakeFirstOrThrow();
 
     assert.equal(publication.act_type, 'PROTOCOLO ICMS');
     assert.equal(publication.act_number, '88/2026');
     assert.match(publication.title, /Revoga o Protocolo ICMS/);
-    assert.equal(publication.published_at?.toISOString().slice(0, 10), '2026-07-29');
+    assert.equal(publication.published_on?.toISOString().slice(0, 10), '2026-07-29');
 
     const versions = await db
       .selectFrom('publication_versions')
