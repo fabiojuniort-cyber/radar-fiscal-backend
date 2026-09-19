@@ -406,3 +406,49 @@ export async function persistPublication(
 
   return result;
 }
+
+
+export interface RecordCollectionItemFailureInput {
+  runId: string;
+  attemptId: string;
+  sourceItemKey: string;
+  externalId?: string;
+  sourceUrl?: string;
+  metadata?: Record<string, unknown>;
+  errorCode: string;
+  errorMessage: string;
+}
+
+export async function recordCollectionItemFailure(
+  trx: Transaction<DB>,
+  input: RecordCollectionItemFailureInput,
+): Promise<void> {
+  await trx
+    .insertInto('collection_items')
+    .values({
+      collection_run_id: input.runId,
+      first_attempt_id: input.attemptId,
+      source_item_key: input.sourceItemKey,
+      external_id: input.externalId ?? null,
+      source_url: input.sourceUrl ?? null,
+      status: 'FAILED',
+      error_code: input.errorCode,
+      error_message: input.errorMessage,
+      raw_metadata: asJson(input.metadata ?? {}),
+    })
+    .onConflict((conflict) =>
+      conflict
+        .columns([
+          'collection_run_id',
+          'source_item_key',
+        ])
+        .doUpdateSet({
+          status: 'FAILED',
+          error_code: input.errorCode,
+          error_message: input.errorMessage,
+          raw_metadata: asJson(input.metadata ?? {}),
+          updated_at: new Date(),
+        }),
+    )
+    .execute();
+}
