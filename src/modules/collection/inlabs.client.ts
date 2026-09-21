@@ -56,6 +56,18 @@ function retryAfter(response: Response): number | undefined {
   return Number.isFinite(until) ? Math.max(0, Math.ceil((until - Date.now()) / 1000)) : undefined;
 }
 
+function checkMaintenance(html: string, response: Response): void {
+  const text = html.replace(/<[^>]*>/g, ' ')
+    .replace(/&ccedil;/gi, 'c').replace(/&atilde;/gi, 'a')
+    .replace(/&aacute;/gi, 'a').replace(/&nbsp;/gi, ' ')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+  if (/sistema em manutencao programada|o sistema esta passando por manutencao programada/i.test(text)) {
+    throw fail('INLABS_MAINTENANCE', 'SOURCE_UNAVAILABLE', true,
+      response.status, retryAfter(response));
+  }
+}
+
 /** Transport based on the official INLABS scripts, not a registered collection connector.
  * The caller owns timeout/cancellation and retry via the existing collection executor.
  * Create one client per attempt; session cookies live only in private memory.
@@ -175,7 +187,8 @@ export class InlabsClient {
       await this.#discard(response);
     } else {
       await this.#checkStatus(response);
-      await this.#discard(response);
+      const html = new TextDecoder().decode(await this.#read(response, 2 * 1024 * 1024, signal));
+      checkMaintenance(html, response);
     }
     if (!cookie || !/^[A-Za-z0-9._~%+-]+$/.test(cookie)) {
       throw fail('INLABS_AUTH_FAILED', 'FETCH_ERROR');
@@ -202,6 +215,7 @@ export class InlabsClient {
     const response = await this.#authenticatedGet(`${ORIGIN}/index.php?p=${date}`, signal);
     await this.#checkStatus(response);
     const html = new TextDecoder().decode(await this.#read(response, 2 * 1024 * 1024, signal));
+    checkMaintenance(html, response);
     if (/logar\.php|name\s*=\s*["']password["']/i.test(html)) {
       this.close();
       throw fail('INLABS_AUTH_FAILED', 'FETCH_ERROR');
@@ -244,6 +258,11 @@ export class InlabsClient {
     }
     await this.#checkStatus(response);
     const bytes = await this.#read(response, this.#maxBytes, signal);
+    const valid = kind === 'PDF' ? new TextDecoder().decode(bytes.subarray(0, 5)) === '%PDF-'
+      : bytes[0] === 0x50 && bytes[1] === 0x4b &&
+        ((bytes[2] === 3 && bytes[3] === 4) || (bytes[2] === 5 && bytes[3] === 6));
+    // Inspect only non-binary responses: a real act may itself discuss maintenance.
+    if (!valid) checkMaintenance(new TextDecoder().decode(bytes.subarray(0, 2 * 1024 * 1024)), response);
     const prefix = new TextDecoder().decode(bytes.subarray(0, 1024));
     if (/logar\.php|name\s*=\s*["']password["']/i.test(prefix)) {
       this.close();
@@ -252,9 +271,6 @@ export class InlabsClient {
     if (/requested URL was rejected|access denied|request rejected/i.test(prefix)) {
       throw fail('INLABS_ACCESS_DENIED', 'SOURCE_UNAVAILABLE');
     }
-    const valid = kind === 'PDF' ? prefix.startsWith('%PDF-')
-      : bytes[0] === 0x50 && bytes[1] === 0x4b &&
-        ((bytes[2] === 3 && bytes[3] === 4) || (bytes[2] === 5 && bytes[3] === 6));
     if (!valid) throw fail('INLABS_INVALID_DOWNLOAD', 'PROCESSING_ERROR');
     // Magic validation is transport validation only; ZIP integrity/XML parsing follows
     // in the connector once official samples and decompression limits are established.

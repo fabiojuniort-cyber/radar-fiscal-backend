@@ -142,3 +142,18 @@ Somente depois desses testes e da execução Railway será possível declarar el
 Esta é uma pausa por acesso externo, não encerramento da frente nem retorno final ao Gerente Geral.
 Retomar aqui com a amostra/autenticação; ao satisfazer os gates, consolidar o handoff e recomendar a próxima frente ao Gerente Geral.
 Não iniciar outros conectores neste trabalho.
+
+## Evidência adicional: manutenção no cadastro
+
+O usuário apresentou captura da página `/registrar.php` com o aviso “Sistema em Manutenção Programada”.
+Isso comprova a resposta exibida naquela tentativa de cadastro, não indisponibilidade de todas as rotas nem
+o status HTTP da resposta. A consulta pública de leitura ainda retornou o formulário em `/acessar.php`;
+ela não executou cadastro nem comprovou sua recuperação. O aviso não informa prazo de retorno.
+
+O cliente agora reconhece o texto de manutenção em login, índice e respostas não binárias de download,
+inclusive quando servido com HTTP 200. Classifica como `INLABS_MAINTENANCE` / `SOURCE_UNAVAILABLE`,
+com retry permitido pelo Motor e preservação de `Retry-After` quando recebido. Uma edição 404 seguida de
+índice em manutenção não vira `NOT_AVAILABLE`. PDFs/ZIPs válidos não são classificados pelo texto de manutenção.
+
+Cinco testes de regressão usam HTML sintético baseado no texto visível da captura, sem apresentar esse HTML
+como fixture baixada da fonte. A inspeção do schema XML e os gates reais continuam pendentes.

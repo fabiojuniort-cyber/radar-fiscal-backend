@@ -31,6 +31,65 @@ function code(expected: string) {
   return (error: unknown) => error instanceof ConnectorError && error.code === expected;
 }
 
+// Synthetic HTML reproducing the text visible in the user's official portal screenshot.
+// It is not a downloaded INLABS fixture or proof of the actual HTTP status.
+const maintenanceHtml = `<html>${' '.repeat(2048)}<h2>Sistema em Manutenção Programada</h2>
+  <p>O sistema está passando por manutenção programada.</p></html>`;
+
+function maintenanceError(error: unknown): boolean {
+  assert.ok(error instanceof ConnectorError);
+  assert.equal(error.code, 'INLABS_MAINTENANCE');
+  assert.equal(error.kind, 'SOURCE_UNAVAILABLE');
+  assert.equal(error.retryable, true);
+  return true;
+}
+
+test('maintenance returned as HTTP 200 at login is a retryable outage', async () => {
+  const { client } = stub([new Response(maintenanceHtml, { headers: { 'retry-after': '120' } })]);
+  await assert.rejects(client.login(signal()), error => {
+    maintenanceError(error);
+    assert.equal((error as ConnectorError).retryAfterSeconds, 120);
+    return true;
+  });
+});
+
+test('maintenance at index prevents interpreting an archive 404 as NOT_AVAILABLE', async () => {
+  const { client } = stub([loginResponse(), new Response(null, { status: 404 }),
+    new Response('<html><h2>Sistema em Manuten&ccedil;&atilde;o Programada</h2></html>')]);
+  await client.login(signal());
+  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), maintenanceError);
+});
+
+test('maintenance HTML is recognized in place of both ZIP and PDF downloads', async () => {
+  for (const kind of ['XML', 'PDF']) {
+    const { client } = stub([loginResponse(), new Response(maintenanceHtml)]);
+    await client.login(signal());
+    await assert.rejects(kind === 'XML' ? client.downloadXml('2026-09-18', 'DO1', signal())
+      : client.downloadPdf('2026-09-18', 'do1', signal()), maintenanceError);
+  }
+});
+
+test('maintenance message reaches executor as SOURCE_UNAVAILABLE, not success', async () => {
+  const { client } = stub([new Response(maintenanceHtml)]);
+  const result = await executeConnector({
+    connector: { key: 'inlabs-maintenance-test', collect: async context => {
+      await client.login(context.signal);
+      return { publications: [] };
+    } }, sourceId: 'source', runId: 'run', attemptId: 'attempt', timeoutMs: 1000,
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.status, 'SOURCE_UNAVAILABLE');
+    assert.equal(result.retryable, true);
+  }
+});
+
+test('binary PDF mentioning maintenance remains a valid transport result', async () => {
+  const { client } = stub([loginResponse(), new Response('%PDF-1.7\nSistema em Manutenção Programada')]);
+  await client.login(signal());
+  assert.equal((await client.downloadPdf('2026-09-18', 'do1', signal())).status, 'AVAILABLE');
+});
+
 test('missing credentials fail before HTTP and do not leak secrets', async () => {
   const client = new InlabsClient({ credentials: () => undefined,
     fetch: (async () => { throw new Error('must not fetch'); }) as typeof fetch });
