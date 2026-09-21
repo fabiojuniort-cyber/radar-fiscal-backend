@@ -780,6 +780,21 @@ test(
       );
 
       assert.equal(first.state, 'RETRY_SCHEDULED');
+      assert.ok(first.nextAttemptAt);
+      const delayMs =
+        first.nextAttemptAt!.getTime() - Date.now();
+      assert.ok(
+        delayMs >= 9_000 && delayMs <= 11_000,
+        `expected ~10s retry delay, got ${delayMs}ms`,
+      );
+
+      await db
+        .updateTable('collection_runs')
+        .set({
+          next_attempt_at: new Date(Date.now() - 1_000),
+        })
+        .where('id', '=', runId)
+        .execute();
 
       const secondRun = await acquireNextCollectionRun(
         db,
