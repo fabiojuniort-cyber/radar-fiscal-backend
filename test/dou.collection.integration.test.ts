@@ -96,7 +96,7 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
       }
       await db.deleteFrom('collection_runs').where('id','=',current).execute();
       const backfill = await createCollectionRun(db,{sourceId,scheduledFor:new Date(),triggerType:'BACKFILL'});
-      await assert.rejects(readDouSourceState(db,sourceId,backfill),/DOU_BACKFILL_DATE_BATCH_REQUIRED/);
+      await assert.rejects(readDouSourceState(db,sourceId,backfill),{code:'DOU_BACKFILL_DATE_BATCH_REQUIRED'});
       await db.deleteFrom('collection_runs').where('id','=',backfill).execute();
     });
     await t.test('heartbeat continues while publication persistence waits on a database lock',async()=>{
