@@ -284,6 +284,10 @@ export async function processAcquiredCollectionRun(
     });
 
     if (!outcome.ok) {
+      const persistentDouRetry =
+        run.connectorKey === 'dou' &&
+        outcome.retryable;
+
       const retry = decideRetry(
         {
           attemptNo: attempt.attemptNo,
@@ -291,18 +295,25 @@ export async function processAcquiredCollectionRun(
           // failures keep the same run alive until a successful consultation.
           // Non-retryable failures still terminate immediately.
           maxAttempts:
-            run.connectorKey === 'dou'
+            persistentDouRetry
               ? Number.MAX_SAFE_INTEGER
               : run.maxAttempts,
           retryable: outcome.retryable,
-          ...(outcome.retryAfterSeconds !== undefined
-            ? {
-                retryAfterSeconds:
-                  outcome.retryAfterSeconds,
-              }
-            : {}),
+          ...(persistentDouRetry
+            ? { retryAfterSeconds: 10 }
+            : outcome.retryAfterSeconds !== undefined
+              ? {
+                  retryAfterSeconds:
+                    outcome.retryAfterSeconds,
+                }
+              : {}),
         },
-        options.retryPolicy,
+        persistentDouRetry
+          ? {
+              baseDelayMs: 10_000,
+              maxBackoffMs: 10_000,
+            }
+          : options.retryPolicy,
       );
 
       if (retry.shouldRetry && retry.delayMs !== null) {
