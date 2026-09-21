@@ -343,3 +343,13 @@ test('network failures preserve the underlying fetch cause for production diagno
     },
   );
 });
+
+
+test('rejects unsupported source-specific proxy schemes', () => {
+  assert.throws(
+    () => new ConfazConnector({
+      proxyUrl: 'socks5://proxy.example.test:1080',
+    }),
+    /proxy URL must use http:\/\/ or https:\/\//,
+  );
+});
