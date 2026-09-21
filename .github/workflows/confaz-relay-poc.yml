@@ -1,0 +1,28 @@
+name: CONFAZ Relay POC CI
+
+on:
+  pull_request:
+    paths:
+      - 'poc/confaz-relay/**'
+      - '.github/workflows/confaz-relay-poc.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: poc/confaz-relay
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build container
+        run: docker build -t radar-fiscal-confaz-relay-poc .
