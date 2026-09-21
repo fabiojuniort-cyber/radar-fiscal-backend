@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseDouEntries, readDouZip, classifyDouAct } from '../src/modules/collection/dou.parser.js';
+import { parseDouEntries, readDouZip, classifyDouAct, extractEmbeddedConfazPublications } from '../src/modules/collection/dou.parser.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { fixtureEntries, makeZip, archiveContext } from './dou.fixtures.js';
 
@@ -70,4 +70,93 @@ test('CONFAZ structural taxonomy: synthetic headings only, not a real-world capt
   const r = classifyDouAct('RETIFICAÇÃO','CONFAZ','Retificação'); assert.equal(r.actNumber,undefined);
   const unrelated = classifyDouAct('CONVÊNIO ICMS Nº 12, DE 17 DE SETEMBRO DE 2026','Outro órgão','Convênio');
   assert.equal(unrelated.family,undefined);
+});
+
+
+test('official CONFAZ dispatch headings become child acts while incidental body citations do not', () => {
+  const parent = {
+    title: 'DESPACHO Nº 28, DE 7 DE JULHO DE 2026',
+    agency: 'CONFAZ',
+    sphere: 'FEDERAL' as const,
+    actType: 'DESPACHO',
+    actNumber: '28/2026',
+    publishedAt: new Date('2026-07-08T00:00:00Z'),
+    content: [
+      'Publica os Convênios ICMS celebrados na 202ª reunião ordinária.',
+      'CONVÊNIO ICMS Nº 63, DE 3 DE JULHO DE 2026',
+      'Altera o Convênio ICMS nº 87, de 9 de julho de 2010.',
+      'O Convênio ICMS nº 87, de 9 de julho de 2010, permanece vigente.',
+      'CONVÊNIO ICMS Nº 64, DE 3 DE JULHO DE 2026',
+      'Autoriza as unidades federadas nas condições que especifica.',
+    ].join('\n'),
+    officialUrl: 'https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/07/2026&jornal=515&pagina=109',
+    externalId: '2026-07-08:DO1:126:24113463',
+    metadata: {
+      sourceRole: 'PRIMARY',
+      ingestionChannel: 'INLABS',
+      officialUrlGranularity: 'PAGE',
+      dou: {
+        publicationDate: '2026-07-08',
+        section: 'DO1',
+        edition: '126',
+        officialMatterId: '24113463',
+        agencyPath: 'Ministério da Fazenda/Conselho Nacional de Política Fazendária',
+        unit: 'Conselho Nacional de Política Fazendária',
+        certifiedPageUrls: [
+          'https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/07/2026&jornal=515&pagina=109',
+        ],
+      },
+    },
+  };
+
+  const children = extractEmbeddedConfazPublications(parent);
+  assert.equal(children.length, 2);
+  assert.deepEqual(
+    children.map(child => [child.actType, child.actNumber]),
+    [
+      ['CONVÊNIO ICMS', '63/2026'],
+      ['CONVÊNIO ICMS', '64/2026'],
+    ],
+  );
+  assert.match(children[0]!.content!, /Convênio ICMS nº 87/);
+  assert.doesNotMatch(children[0]!.content!, /CONVÊNIO ICMS Nº 64/);
+  assert.equal((children[0]!.metadata!.dou as any).embeddedAct, true);
+  assert.equal(
+    (children[0]!.metadata!.dou as any).parentMatterExternalId,
+    parent.externalId,
+  );
+
+  const childIdentity = normalizePublication({
+    sourceId: 'dou-source',
+    publication: children[0]!,
+  });
+  const portalIdentity = normalizePublication({
+    sourceId: 'confaz-source',
+    publication: {
+      title: 'Convênio ICMS 63/2026',
+      agency: 'CONFAZ',
+      sphere: 'FEDERAL',
+      actType: 'CONVÊNIO ICMS',
+      actNumber: '63/2026',
+      publishedAt: new Date('2026-07-08T00:00:00Z'),
+      content: 'Conteúdo do portal CONFAZ.',
+      officialUrl: 'https://www.confaz.fazenda.gov.br/legislacao/convenios/2026/CV063_26',
+      externalId: '/legislacao/convenios/2026/CV063_26',
+      metadata: {
+        sourceRole: 'ENRICHMENT',
+        ingestionChannel: 'CONFAZ_PORTAL',
+      },
+    },
+  });
+
+  assert.equal(childIdentity.identityHash, portalIdentity.identityHash);
+
+  assert.deepEqual(
+    extractEmbeddedConfazPublications({
+      ...parent,
+      actType: 'ATO COTEPE/ICMS',
+      title: 'ATO COTEPE/ICMS Nº 72, DE 8 DE JULHO DE 2026',
+    }),
+    [],
+  );
 });
