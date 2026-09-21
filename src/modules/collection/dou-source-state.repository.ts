@@ -17,7 +17,7 @@ export async function readDouSourceState(db: Kysely<DB>, sourceId: string, runId
   const archives: Record<string, string> = {};
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     for (const [name, value] of Object.entries(raw)) {
-      if (/^\d{4}-\d{2}-\d{2}-DO1E?\.zip$/.test(name) && typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) archives[name] = value;
+      if (/^\d{4}-\d{2}-\d{2}-DO[123]E?\.zip$/.test(name) && typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) archives[name] = value;
     }
   }
   return { archives, ...(last?.finished_at ? { lastSuccessAt: last.finished_at } : {}) };
