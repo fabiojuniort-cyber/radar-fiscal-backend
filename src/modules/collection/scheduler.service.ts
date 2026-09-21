@@ -27,6 +27,7 @@ export async function runSchedulerTick(
       'code',
       'schedule_cron',
       'schedule_timezone',
+      'connector_key',
     ])
     .where('is_active', '=', true)
     .where('schedule_cron', 'is not', null)
@@ -52,6 +53,30 @@ export async function runSchedulerTick(
       }
 
       dueSources += 1;
+
+      if (source.connector_key === 'dou') {
+        const activeDouRun = await db
+          .selectFrom('collection_runs')
+          .select('id')
+          .where('source_id', '=', source.id)
+          .where('status', 'in', ['PENDING', 'RUNNING'])
+          .executeTakeFirst();
+
+        if (activeDouRun) {
+          logger?.info(
+            {
+              sourceId: source.id,
+              sourceCode: source.code,
+              activeRunId: activeDouRun.id,
+              scheduledFor:
+                scheduledFor.toISOString(),
+            },
+            'Scheduled DOU run skipped because an active DOU run already exists',
+          );
+
+          continue;
+        }
+      }
 
       const runId = await createCollectionRun(
         db,
