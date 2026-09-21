@@ -96,6 +96,152 @@ export function classifyDouAct(title: string, category: string, sourceType: stri
   };
 }
 
+
+const EMBEDDED_CONFAZ_HEADING =
+  /^(CONVÊNIO ICMS|AJUSTE SINIEF|PROTOCOLO ICMS|ATO COTEPE(?:\/ICMS| ICMS))\s+N[º°O.]?\s*(\d+)(?:\/(\d{2,4}))?\s*,?\s*DE\s+(\d{1,2})(?:º|°)?\s+DE\s+(JANEIRO|FEVEREIRO|MARÇO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s+DE\s+(\d{4})$/;
+
+function embeddedConfazHeading(line: string): {
+  title: string;
+  family: string;
+  actNumber: string;
+  actDate: string;
+} | undefined {
+  const title = line.replace(/\s+/g, ' ').trim();
+  const match = EMBEDDED_CONFAZ_HEADING.exec(title);
+  if (!match?.[1] || !match[2] || !match[6]) return undefined;
+
+  const parsedDate = actDate(title);
+  if (!parsedDate) return undefined;
+
+  const dateYear = Number(parsedDate.slice(0, 4));
+  const rawYear = match[3] ? Number(match[3]) : dateYear;
+  const explicitYear = rawYear < 100 ? 2000 + rawYear : rawYear;
+  if (explicitYear !== dateYear) return undefined;
+
+  const family = match[1] === 'ATO COTEPE ICMS'
+    ? 'ATO COTEPE/ICMS'
+    : match[1];
+
+  return {
+    title,
+    family,
+    actNumber: `${Number(match[2])}/${dateYear}`,
+    actDate: parsedDate,
+  };
+}
+
+function metadataRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+/**
+ * CONFAZ uses a DOU "DESPACHO" as an official publishing envelope for batches
+ * of Convênios ICMS, Ajustes SINIEF and Protocolos ICMS. These headings are
+ * source-level acts, not incidental body citations. Preserve the dispatch and
+ * additionally emit one child publication per explicit all-caps dated heading.
+ */
+export function extractEmbeddedConfazPublications(
+  parent: ConnectorPublication,
+): ConnectorPublication[] {
+  if (
+    parent.agency !== 'CONFAZ' ||
+    parent.actType?.toUpperCase() !== 'DESPACHO' ||
+    !parent.content ||
+    !parent.publishedAt ||
+    !parent.externalId
+  ) {
+    return [];
+  }
+
+  const lines = parent.content
+    .split('\n')
+    .map(line => line.trim());
+
+  const headings = lines
+    .map((line, index) => ({
+      index,
+      parsed: embeddedConfazHeading(line),
+    }))
+    .filter(
+      (item): item is {
+        index: number;
+        parsed: NonNullable<ReturnType<typeof embeddedConfazHeading>>;
+      } => item.parsed !== undefined,
+    );
+
+  const seen = new Set<string>();
+  const children: ConnectorPublication[] = [];
+  const parentDou = metadataRecord(parent.metadata?.dou);
+
+  for (let i = 0; i < headings.length; i++) {
+    const current = headings[i]!;
+    const key = `${current.parsed.family}:${current.parsed.actNumber}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const next = headings[i + 1]?.index ?? lines.length;
+    const content = lines
+      .slice(current.index, next)
+      .join('\n')
+      .trim();
+
+    if (!content) continue;
+
+    children.push({
+      title: current.parsed.title,
+      agency: 'CONFAZ',
+      sphere: 'FEDERAL',
+      actType: current.parsed.family,
+      actNumber: current.parsed.actNumber,
+      publishedAt: new Date(parent.publishedAt),
+      content,
+      officialUrl: parent.officialUrl,
+      externalId:
+        `${parent.externalId}:embedded:${current.parsed.family}:${current.parsed.actNumber}`,
+      metadata: {
+        sourceRole: 'PRIMARY',
+        ingestionChannel: 'INLABS',
+        officialUrlGranularity: 'PAGE',
+        dou: {
+          publicationDate:
+            parentDou?.publicationDate ??
+            parent.publishedAt.toISOString().slice(0, 10),
+          section: parentDou?.section ?? null,
+          edition: parentDou?.edition ?? null,
+          officialMatterId:
+            parentDou?.officialMatterId ?? null,
+          agencyPath: parentDou?.agencyPath ?? null,
+          unit: parentDou?.unit ?? null,
+          sourceActType: current.parsed.family,
+          actDate: current.parsed.actDate,
+          actYear: current.parsed.actDate.slice(0, 4),
+          structuralFamily: current.parsed.family,
+          certifiedPageUrls:
+            parentDou?.certifiedPageUrls ??
+            [parent.officialUrl],
+          officialHtmlUrl: null,
+          archive: parentDou?.archive ?? null,
+          embeddedAct: true,
+          embeddedHeading: current.parsed.title,
+          embeddedIndex: i + 1,
+          parentMatterExternalId: parent.externalId,
+          parentDispatchTitle: parent.title,
+          parentDispatchActNumber:
+            parent.actNumber ?? null,
+        },
+      },
+    });
+  }
+
+  return children;
+}
+
 function publication(parts: Part[], context: DouArchiveContext): ConnectorPublication {
   parts.sort((a, b) => a.part - b.part);
   const first = parts[0]!; const a = first.attrs;
@@ -163,7 +309,13 @@ export function parseDouEntries(entries: DouXmlEntry[], context: DouArchiveConte
   const publications: ConnectorPublication[] = [];
   for (const [key, parts] of groups) {
     if (invalid.has(key)) continue;
-    try { publications.push(publication(parts, context)); }
+    try {
+      const parent = publication(parts, context);
+      publications.push(
+        parent,
+        ...extractEmbeddedConfazPublications(parent),
+      );
+    }
     catch (e) { partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_MATTER', message: 'Matter could not be assembled', itemReference: parts[0]!.entry.name }); }
   }
   return { publications, partialFailures };
