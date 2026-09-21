@@ -1,7 +1,7 @@
 # DOU / INLABS — implementação e evidências
 
 Atualizado em 2026-09-21. Base: `main` em `23c79a4c205399358572cc5833cd10e7bb164dab`.
-PR #16 permanece draft. **Não concluído nem habilitado em produção.** Parser e conector usam XMLs reais enviados pelo titular para DO1/DO1E. O runtime foi ampliado para coletar DO1/DO1E, DO2/DO2E e DO3/DO3E; autenticação automatizada real, validação das Seções 2/3, gate CONFAZ, armazenamento dos originais e validação Railway continuam pendentes.
+PR #16 permanece draft. **Não concluído nem habilitado em produção.** Parser e conector usam XMLs reais enviados pelo titular para DO1/DO1E e já foram validados ao vivo no Railway contra as seis variantes DO1/DO1E, DO2/DO2E e DO3/DO3E. O runtime foi ampliado para coletar as três seções normais e extras; gate CONFAZ, suplementos, armazenamento dos originais e políticas finais de precedência/reconciliação continuam pendentes.
 
 ## Diretrizes preservadas
 
@@ -22,7 +22,7 @@ A captura anterior mostrou manutenção em `/registrar.php`. Depois o titular co
 | Tema | Evidência e implementação |
 | --- | --- |
 | Login | POST HTTPS `/logar.php`, email/password, cookie `inlabs_session_cookie`, header `origem`. Cookie privado em memória por tentativa; sem logs/código contendo credenciais. |
-| XML | `index.php?p=AAAA-MM-DD&dl=AAAA-MM-DD-DOx.zip`; DO1/DO1E verificados nas amostras. O runtime coleta as seis variantes `DO1`, `DO1E`, `DO2`, `DO2E`, `DO3`, `DO3E`; Seções 2/3 ainda exigem evidência live antes de conclusão. |
+| XML | `index.php?p=AAAA-MM-DD&dl=AAAA-MM-DD-DOx.zip`. Em validação live no Railway, 2026-09-18 retornou com sucesso as seis variantes `DO1`, `DO1E`, `DO2`, `DO2E`, `DO3`, `DO3E`, todas sem falha de parsing. |
 | Extra | DO1E contém várias edições: 177-A, B, C e D no mesmo ZIP. Não se assume ZIP = edição. |
 | PDF | Convenção oficial normal `AAAA_MM_DD_ASSINADO_do1.pdf`; extras `..._do1_extra_A.pdf` e letras seguintes. Transporte implementado, sem captura/armazenamento de PDF nesta validação. |
 | Suplementos | Convenção ainda não comprovada. Não inventamos DO1S; metadata informa `supplementsVerified=false`. |
@@ -53,6 +53,21 @@ As 363 matérias produziram 363 hashes de identidade distintos. Medição local 
 Normal: cerca de 4 MB descomprimidos; extra: 184.195 bytes. O volume PostgreSQL observado no Railway era 500 MB configurados, não espaço livre medido. Não extrapolar uma única data para backfill.
 
 Fixtures versionadas: 12 XMLs originais, bytes e hashes preservados, representando dez matérias (incluindo três despachos da Fazenda na mesma página e uma portaria em três partes). Testes também têm alterações sintéticas identificadas para versionamento e cabeçalhos sintéticos CONFAZ; estes **não atendem ao gate de captura CONFAZ real**.
+
+### Validação live Railway — DOU completo em 2026-09-18
+
+Serviço temporário isolado `inlabs-validation`, branch `feat/dou-inlabs`, sem Scheduler e sem persistência PostgreSQL. Credenciais referenciadas a partir do Worker, sem exposição em logs. Login autenticado e índice diário foram aceitos; o índice retornou 12.418 bytes.
+
+| Seção | ZIP bytes | XML | Mídias | Matérias | Falhas | Matérias com candidato textual a CNPJ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| DO1 | 2.409.302 | 358 | 6 | 351 | 0 | 125 |
+| DO1E | 52.506 | 14 | 0 | 12 | 0 | 0 |
+| DO2 | 975.740 | 760 | 0 | 760 | 0 | 5 |
+| DO2E | 3.137 | 3 | 0 | 3 | 0 | 0 |
+| DO3 | 2.819.018 | 2.143 | 2 | 2.139 | 0 | 999 |
+| DO3E | 1.292 | 1 | 0 | 1 | 0 | 0 |
+
+Total live: **3.266 matérias**, **0 falhas de parsing** e **1.129 matérias com candidato textual a CNPJ**. O contador de CNPJ nesta validação é apenas evidência exploratória do valor das Seções 2/3; ainda não é o Motor de Relevância nem um vínculo confirmado com tenant. A DO3 sozinha concentrou 999 candidatos, comprovando que limitar a ingestão à Seção 1 perderia grande parte das citações empresariais oficiais.
 
 ## Necessidade comprovada da migration 010
 
@@ -92,14 +107,14 @@ O snapshot existente expõe estado, última coleta, contagens de publicações/v
 
 80 testes unitários passaram localmente; typecheck passou. Leitura dos dois ZIPs completos passou conforme tabela. Transporte HTTP dos testes é simulado, enquanto os XMLs são reais. CI deve validar instalação limpa, build, migrations, regressões existentes e novo teste PostgreSQL: dez matérias, reprocessamento, uma nova versão, página compartilhada, restrições, Scheduler idempotente, recibos e heartbeat durante bloqueio real de persistência. Resultado final deve ser conferido no PR, não presumido a partir dos testes locais.
 
-Railway: API, Worker, Scheduler e Postgres existentes reportaram deployments SUCCESS na inspeção; isso não valida DOU. Serviços continuam em main, sem credenciais INLABS identificadas. Não houve execução autenticada produtiva ou deploy desta branch.
+Railway: `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no `radar-fiscal-worker`. O Worker produtivo continua em `main` e o conector DOU segue desabilitado por padrão. A branch foi executada apenas em serviço temporário isolado `inlabs-validation`, sem Scheduler e sem persistência, comprovando autenticação, índice e download/parser das seis variantes do DOU.
 
 ## Decisões para o Gerente Geral e bloqueios
 
 1. **Originais:** existe tabela publication_files e descritores, mas não adaptador de storage implementado nesta base. Propor adaptador comum aprovado ou aceitar fase provisória de referência/hash/texto. Não criar storage paralelo nem gravar binários no PostgreSQL. `archivalStorage=NOT_CONFIGURED` é explícito.
 2. **PRIMARY/ENRICHMENT/VALIDATION:** metadata registra PRIMARY/INLABS sem nova coluna; isso não impõe precedência. Persistência atual pode substituir URL/conteúdo corrente por nova versão de enriquecimento. Definir política mínima de preservação da referência DOU e versão vigente antes de habilitar coexistência produtiva. Não alterar a arquitetura silenciosamente.
 3. **Disponibilidade e recuperação:** confirmar que XML com o prazo publicado atende à necessidade de negócio; definir reconciliação completa e interface de backfill controlado após medir volume. Suplementos continuam sem evidência suficiente.
-4. **Acesso:** titular já acessou sua conta. Falta disponibilizar secrets INLABS no Worker para validação automatizada, sem transmitir senha por conversa/GitHub/log. A listagem autenticada real precisa ser inspecionada nesse ambiente antes de ativar o Scheduler.
+4. **Acesso:** fechado para a etapa técnica. Secrets estão ativos no Worker e a sessão autenticada real foi validada no Railway por serviço isolado, incluindo índice e downloads das seis variantes. Isso não autoriza ativar o Scheduler produtivo antes dos demais gates.
 5. **Gate CONFAZ:** localizar e persistir Convênio ICMS, Ajuste SINIEF, Protocolo ICMS e Ato COTEPE/ICMS reais, mais despachos/ratificações relacionados; conferir número/data/ementa/texto/órgão/referência e deduplicação entre fontes. As duas edições enviadas não contêm essas amostras. Não declarar eliminada a dependência crítica do portal CONFAZ.
 
 Manter PR em draft e retornar a estes bloqueios após CI. A frente só termina após gate real e Railway funcional; não iniciar fontes seguintes.
