@@ -78,6 +78,30 @@ function publicationSourceRole(
     : 'UNSPECIFIED';
 }
 
+async function enrichCanonicalPublication(
+  trx: Transaction<DB>,
+  publicationId: string,
+  publication: NormalizedPublication,
+): Promise<void> {
+  if (
+    publicationSourceRole(publication.metadata) !==
+      'ENRICHMENT' ||
+    publication.effectiveOn === undefined
+  ) {
+    return;
+  }
+
+  await trx
+    .updateTable('publications')
+    .set({
+      effective_on: publication.effectiveOn,
+      updated_at: new Date(),
+    })
+    .where('id', '=', publicationId)
+    .where('effective_on', 'is', null)
+    .execute();
+}
+
 async function upsertCollectionItem(
   trx: Transaction<DB>,
   input: PersistPublicationInput,
@@ -345,8 +369,9 @@ async function getOrCreateVersion(
         .updateTable('publications')
         .set({
           title: publication.title,
-          effective_on:
-            publication.effectiveOn ?? null,
+          ...(publication.effectiveOn !== undefined
+            ? { effective_on: publication.effectiveOn }
+            : {}),
           primary_official_url:
             publication.officialUrl,
           last_seen_at: new Date(),
@@ -355,6 +380,12 @@ async function getOrCreateVersion(
         .where('id', '=', publicationId)
         .execute();
     }
+
+    await enrichCanonicalPublication(
+      trx,
+      publicationId,
+      publication,
+    );
 
     return {
       publicationVersionId: existingVersion.id,
@@ -412,8 +443,9 @@ async function getOrCreateVersion(
       .updateTable('publications')
       .set({
         title: publication.title,
-        effective_on:
-          publication.effectiveOn ?? null,
+        ...(publication.effectiveOn !== undefined
+          ? { effective_on: publication.effectiveOn }
+          : {}),
         primary_official_url:
           publication.officialUrl,
         last_seen_at: new Date(),
@@ -422,6 +454,12 @@ async function getOrCreateVersion(
       .where('id', '=', publicationId)
       .execute();
   }
+
+  await enrichCanonicalPublication(
+    trx,
+    publicationId,
+    publication,
+  );
 
   return {
     publicationVersionId: version.id,
