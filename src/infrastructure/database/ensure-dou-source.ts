@@ -28,7 +28,7 @@ if (!process.env.INLABS_EMAIL || !process.env.INLABS_PASSWORD) {
 }
 
 const scheduleCron =
-  process.env.DOU_SCHEDULE_CRON?.trim() || '10 * * * *';
+  process.env.DOU_SCHEDULE_CRON?.trim() || '0 8,12,16,20 * * *';
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -61,7 +61,7 @@ try {
         '{}'::jsonb,
         $1,
         'America/Sao_Paulo',
-        3,
+        6,
         TRUE
       )
       ON CONFLICT (code)
