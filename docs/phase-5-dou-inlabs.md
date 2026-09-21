@@ -52,7 +52,20 @@ Identidade externa composta pelos campos observados `data:seção:edição:idMat
 As 363 matérias produziram 363 hashes de identidade distintos. Medição local de leitura/parsing/normalização: aproximadamente 342 ms normal e 13 ms extra; não inclui rede nem PostgreSQL e não dimensiona produção.
 Normal: cerca de 4 MB descomprimidos; extra: 184.195 bytes. O volume PostgreSQL observado no Railway era 500 MB configurados, não espaço livre medido. Não extrapolar uma única data para backfill.
 
-Fixtures versionadas: 12 XMLs originais, bytes e hashes preservados, representando dez matérias (incluindo três despachos da Fazenda na mesma página e uma portaria em três partes). Testes também têm alterações sintéticas identificadas para versionamento e cabeçalhos sintéticos CONFAZ; estes **não atendem ao gate de captura CONFAZ real**.
+Fixtures versionadas: 12 XMLs originais, bytes e hashes preservados, representando dez matérias (incluindo três despachos da Fazenda na mesma página e uma portaria em três partes). Testes também têm alterações sintéticas identificadas para versionamento e cabeçalhos sintéticos CONFAZ.
+
+### Gate CONFAZ live — evidência parcial
+
+A captura autenticada real no Railway em 2026-09-10, 2026-09-14 e 2026-09-15 comprovou matérias CONFAZ no XML oficial do DOU, com zero falhas de parsing nas edições consultadas. Exemplos capturados:
+- `DESPACHO Nº 41, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `41/2026`;
+- `ATO COTEPE/ICMS Nº 86, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `86/2026`;
+- `ATO COTEPE ICMS Nº 87, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `87/2026`;
+- `ATO COTEPE ICMS Nº 88, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `88/2026`;
+- `ATO COTEPE/ICMS Nº 94, DE 11 DE SETEMBRO DE 2026` e `95/2026`;
+- `ATO COTEPE/ICMS Nº 96, 97 e 98, DE 14 DE SETEMBRO DE 2026`;
+- despachos, atos declaratórios e retificações vinculadas ao CONFAZ.
+
+As referências certificadas `pesquisa.in.gov.br`, data, página, external_id e data de publicação foram preservadas. Tentativas posteriores, destinadas a localizar exemplos reais de Convênio ICMS, Ajuste SINIEF e Protocolo ICMS, receberam HTTP 502 no login do INLABS e foram classificadas como `INLABS_UNAVAILABLE`, `SOURCE_UNAVAILABLE`, `retryable=true`. Esse erro não foi convertido em autenticação inválida nem em ausência de publicação. O gate das três famílias restantes continua pendente exclusivamente por indisponibilidade temporária da fonte.
 
 ### Validação live Railway — DOU completo em 2026-09-18
 
@@ -105,7 +118,7 @@ O snapshot existente expõe estado, última coleta, contagens de publicações/v
 
 ## Validação e limite de aceitação
 
-80 testes unitários passaram localmente; typecheck passou. Leitura dos dois ZIPs completos passou conforme tabela. Transporte HTTP dos testes é simulado, enquanto os XMLs são reais. CI deve validar instalação limpa, build, migrations, regressões existentes e novo teste PostgreSQL: dez matérias, reprocessamento, uma nova versão, página compartilhada, restrições, Scheduler idempotente, recibos e heartbeat durante bloqueio real de persistência. Resultado final deve ser conferido no PR, não presumido a partir dos testes locais.
+CI da branch está verde após a ampliação para DOU completo; a execução #94 passou no commit `31f8af633ce4f5d4f4498fc32323a1bc7d1291d4`, incluindo typecheck, build, testes unitários, migrations, regressões de coleta, integração PostgreSQL/collection engine e autenticação/RLS. As validações live do Railway são adicionais ao CI: usam a sessão real do INLABS e não persistem no banco.
 
 Railway: `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no `radar-fiscal-worker`. O Worker produtivo continua em `main` e o conector DOU segue desabilitado por padrão. A branch foi executada apenas em serviço temporário isolado `inlabs-validation`, sem Scheduler e sem persistência, comprovando autenticação, índice e download/parser das seis variantes do DOU.
 
@@ -115,6 +128,6 @@ Railway: `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no `radar-fiscal-worke
 2. **PRIMARY/ENRICHMENT/VALIDATION:** metadata registra PRIMARY/INLABS sem nova coluna; isso não impõe precedência. Persistência atual pode substituir URL/conteúdo corrente por nova versão de enriquecimento. Definir política mínima de preservação da referência DOU e versão vigente antes de habilitar coexistência produtiva. Não alterar a arquitetura silenciosamente.
 3. **Disponibilidade e recuperação:** confirmar que XML com o prazo publicado atende à necessidade de negócio; definir reconciliação completa e interface de backfill controlado após medir volume. Suplementos continuam sem evidência suficiente.
 4. **Acesso:** fechado para a etapa técnica. Secrets estão ativos no Worker e a sessão autenticada real foi validada no Railway por serviço isolado, incluindo índice e downloads das seis variantes. Isso não autoriza ativar o Scheduler produtivo antes dos demais gates.
-5. **Gate CONFAZ:** localizar e persistir Convênio ICMS, Ajuste SINIEF, Protocolo ICMS e Ato COTEPE/ICMS reais, mais despachos/ratificações relacionados; conferir número/data/ementa/texto/órgão/referência e deduplicação entre fontes. As duas edições enviadas não contêm essas amostras. Não declarar eliminada a dependência crítica do portal CONFAZ.
+5. **Gate CONFAZ:** Ato COTEPE/ICMS, despachos, atos declaratórios e retificações já foram capturados em XML real do DOU no Railway. Faltam exemplos live de Convênio ICMS, Ajuste SINIEF e Protocolo ICMS; tentativas direcionadas foram bloqueadas por HTTP 502 temporário do INLABS. Após a normalização, repetir somente essas datas-alvo e então conferir deduplicação entre DOU e portal CONFAZ. Não declarar eliminada a dependência crítica do portal CONFAZ antes desse fechamento.
 
 Manter PR em draft e retornar a estes bloqueios após CI. A frente só termina após gate real e Railway funcional; não iniciar fontes seguintes.
