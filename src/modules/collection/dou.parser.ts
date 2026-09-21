@@ -1,0 +1,219 @@
+import { createHash } from 'node:crypto';
+import { crc32 } from 'node:zlib';
+import { Parser as HtmlParser } from 'htmlparser2';
+import sax from 'sax';
+import yauzl from 'yauzl';
+import type { ConnectorPublication, ConnectorPartialFailure } from './connector.contract.js';
+import { ConnectorError } from './connector.error.js';
+
+export interface DouXmlEntry { name: string; bytes: Uint8Array }
+export interface DouArchiveContext { date: string; section: string; filename: string; officialUrl: string; rawSha256: string }
+interface Part { attrs: Record<string, string>; fields: Record<string, string>; entry: DouXmlEntry; part: number; journal: string }
+const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const error = (code: string) => new ConnectorError(code, { code, kind: 'PROCESSING_ERROR', retryable: false });
+
+export function douHtmlText(html: string): string {
+  let out = ''; let hidden = 0;
+  const blocks = /^(?:p|div|br|tr|td|th|li|h[1-6]|table)$/;
+  const parser = new HtmlParser({
+    onopentag(name) { if (/^(script|style)$/.test(name)) hidden++; if (!hidden && blocks.test(name)) out += '\n'; },
+    ontext(text) { if (!hidden) out += text; },
+    onclosetag(name) { if (/^(script|style)$/.test(name)) hidden = Math.max(0, hidden - 1); if (!hidden && blocks.test(name)) out += '\n'; },
+  }, { decodeEntities: true });
+  parser.end(html);
+  return out.replace(/[\t \u00a0]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n+/g, '\n').trim();
+}
+
+function parsePart(entry: DouXmlEntry): Part {
+  const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/.exec(entry.name);
+  if (!match) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
+  let xml: string;
+  try { xml = new TextDecoder('utf-8', { fatal: true }).decode(entry.bytes); } catch { throw error('DOU_INVALID_ENCODING'); }
+  const parser = sax.parser(true, { strictEntities: true, xmlns: false } as sax.SAXOptions & { strictEntities: boolean });
+  const stack: string[] = []; const attrs: Record<string, string> = {}; const fields: Record<string, string> = {};
+  let count = 0; let bodyCount = 0; let rootCount = 0;
+  parser.ondoctype = () => { throw error('DOU_XML_DTD_FORBIDDEN'); };
+  parser.onerror = () => { throw error('DOU_INVALID_XML'); };
+  parser.onopentag = node => {
+    if (!stack.length) { rootCount++; if (node.name !== 'xml') throw error('DOU_INVALID_XML_ROOT'); }
+    stack.push(node.name);
+    if (stack.length > 16) throw error('DOU_XML_DEPTH_LIMIT');
+    if (node.name === 'article') {
+      if (stack.join('/') !== 'xml/article' || ++count !== 1) throw error('DOU_INVALID_ARTICLE_COUNT');
+      for (const [key, value] of Object.entries(node.attributes)) attrs[key] = String(value);
+    }
+    if (node.name === 'body') { if (stack.join('/') !== 'xml/article/body' || ++bodyCount !== 1) throw error('DOU_INVALID_BODY'); }
+    if (stack.length === 4 && stack[2] === 'body') {
+      if (fields[node.name] !== undefined) throw error('DOU_DUPLICATE_XML_FIELD');
+      fields[node.name] = '';
+    }
+  };
+  const append = (text: string) => { if (stack.length === 4 && stack[2] === 'body') fields[stack[3]!] += text; };
+  parser.ontext = append; parser.oncdata = append; parser.onclosetag = () => { stack.pop(); };
+  try { parser.write(xml).close(); } catch (e) { if (e instanceof ConnectorError) throw e; throw error('DOU_INVALID_XML'); }
+  if (stack.length) throw error('DOU_INVALID_XML');
+  if (count !== 1 || rootCount !== 1 || bodyCount !== 1 || attrs.idMateria !== match[3]) throw error('DOU_INVALID_XML_STRUCTURE');
+  const date = brazilDate(attrs.pubDate ?? '');
+  if (date.replaceAll('-', '') !== match[2]) throw error('DOU_FILENAME_DATE_MISMATCH');
+  if (!/^\d+$/.test(attrs.id ?? '') || !attrs.editionNumber || !attrs.artCategory || !attrs.pubName) throw error('DOU_MISSING_METADATA');
+  return { attrs, fields, entry, part: Number(match[4] ?? 1), journal: match[1]! };
+}
+
+function brazilDate(input: string): string {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(input);
+  if (!m) throw error('DOU_INVALID_PUBLICATION_DATE');
+  const value = `${m[3]}-${m[2]}-${m[1]}`;
+  if (!Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value) throw error('DOU_INVALID_PUBLICATION_DATE');
+  return value;
+}
+
+function actDate(title: string): string | undefined {
+  const m = /\bDE\s+(\d{1,2})(?:º|°)?\s+DE\s+(JANEIRO|FEVEREIRO|MARÇO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s+DE\s+(\d{4})\b/i.exec(title);
+  if (!m) return undefined;
+  const month = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'].indexOf(m[2]!.toUpperCase()) + 1;
+  try { return brazilDate(`${m[1]!.padStart(2, '0')}/${String(month).padStart(2, '0')}/${m[3]}`); } catch { return undefined; }
+}
+
+export function classifyDouAct(title: string, category: string, sourceType: string): {
+  agency: string; actType: string; actNumber?: string; actDate?: string; family?: string;
+} {
+  const upper = title.replace(/\s+/g, ' ').trim().toUpperCase();
+  const date = actDate(upper);
+  // Only an explicit numbered heading can establish normative identity. Body mentions
+  // of a law/CONFAZ act must not turn a correction or dispatch into the cited act.
+  const numbered = /^(.+?)\s+N[º°o.]?\s*([\d.]+)(?:\/(\d{2,4}))?(?:\s*,|\s+DE\b|$)/i.exec(upper);
+  const confaz = /(?:CONFAZ|CONSELHO NACIONAL DE POL[IÍ]TICA FAZEND[AÁ]RIA)/i.test(category);
+  const family = /^(CONVÊNIO ICMS|AJUSTE SINIEF|PROTOCOLO ICMS|ATO COTEPE\/ICMS)\b/.exec(upper)?.[1];
+  const special = /RETIFICA|REPUBLICA/.test(sourceType.toUpperCase()) || /^(RETIFICA|REPUBLICA)/.test(upper);
+  const year = numbered?.[3]?.length === 4 ? numbered[3] : date?.slice(0, 4);
+  const type = special ? sourceType.toUpperCase() : numbered?.[1]?.trim() || sourceType.toUpperCase();
+  return {
+    agency: confaz ? 'CONFAZ' : category,
+    actType: confaz && family && !special ? family : type,
+    ...(numbered && year && !special ? { actNumber: `${Number(numbered[2]!.replaceAll('.', ''))}/${year}` } : {}),
+    ...(date ? { actDate: date } : {}),
+    ...(confaz && family && !special ? { family } : {}),
+  };
+}
+
+function publication(parts: Part[], context: DouArchiveContext): ConnectorPublication {
+  parts.sort((a, b) => a.part - b.part);
+  const first = parts[0]!; const a = first.attrs;
+  if (parts.some((p, i) => p.part !== i + 1)) throw error('DOU_MISSING_OR_DUPLICATE_PART');
+  const title = douHtmlText(first.fields.Identifica ?? '');
+  if (!title) throw error('DOU_MISSING_TITLE');
+  const date = brazilDate(a.pubDate!);
+  if (date !== context.date || a.pubName !== context.section) throw error('DOU_ARCHIVE_CONTEXT_MISMATCH');
+  const pages: string[] = [];
+  for (const p of parts) {
+    for (const key of ['idMateria', 'pubDate', 'pubName', 'editionNumber', 'artCategory', 'artType']) {
+      if (p.attrs[key] !== a[key]) throw error('DOU_INCONSISTENT_PARTS');
+    }
+    if (p.part > 1 && douHtmlText(p.fields.Identifica ?? '') && douHtmlText(p.fields.Identifica ?? '') !== title) throw error('DOU_INCONSISTENT_TITLE');
+    let url: URL;
+    try { url = new URL(p.attrs.pdfPage!); } catch { throw error('DOU_MISSING_CERTIFIED_REFERENCE'); }
+    if (!['http:', 'https:'].includes(url.protocol) || url.hostname !== 'pesquisa.in.gov.br' || url.username || url.password || url.port ||
+        url.pathname !== '/imprensa/jsp/visualiza/index.jsp' || url.searchParams.get('data') !== a.pubDate ||
+        url.searchParams.get('jornal') !== p.journal || url.searchParams.get('pagina') !== p.attrs.numberPage) throw error('DOU_INVALID_CERTIFIED_REFERENCE');
+    pages.push(p.attrs.pdfPage!);
+  }
+  const structural = classifyDouAct(title, a.artCategory!, a.artType ?? '');
+  const text = parts.map(p => douHtmlText(p.fields.Texto ?? '')).join('\n');
+  if (parts.some(p => !douHtmlText(p.fields.Texto ?? ''))) throw error('DOU_MISSING_CONTENT');
+  return {
+    title, sphere: 'FEDERAL', agency: structural.agency, actType: structural.actType,
+    ...(structural.actNumber ? { actNumber: structural.actNumber } : {}),
+    publishedAt: new Date(`${date}T00:00:00Z`), content: text,
+    officialUrl: pages[0]!,
+    // A composite of observed official fields distinguishes later editorial occurrences
+    // of the same idMateria. The unmodified official ID is also retained below.
+    externalId: `${date}:${a.pubName}:${a.editionNumber}:${a.idMateria}`,
+    metadata: {
+      sourceRole: 'PRIMARY', ingestionChannel: 'INLABS', officialUrlGranularity: 'PAGE',
+      dou: { publicationDate: date, section: a.pubName, edition: a.editionNumber,
+        officialMatterId: a.idMateria, agencyPath: a.artCategory,
+        unit: a.artCategory!.split('/').at(-1), sourceActType: a.artType,
+        actDate: structural.actDate ?? null, actYear: structural.actDate?.slice(0, 4) ?? null,
+        structuralFamily: structural.family ?? null, abstract: douHtmlText(first.fields.Ementa ?? ''),
+        certifiedPageUrls: [...new Set(pages)], officialHtmlUrl: null,
+        archive: context,
+        parts: parts.map(p => ({ filename: p.entry.name, rawSha256: hash(p.entry.bytes), sizeBytes: p.entry.bytes.byteLength,
+          // The dictionary permits base64 images here; do not persist image bytes in PostgreSQL.
+          attributes: Object.fromEntries(Object.entries(p.attrs).filter(([key]) => key !== 'highlightImage')),
+          hasHighlightImage: Boolean(p.attrs.highlightImage),
+        })),
+      },
+    },
+  };
+}
+
+export function parseDouEntries(entries: DouXmlEntry[], context: DouArchiveContext): {
+  publications: ConnectorPublication[]; partialFailures: ConnectorPartialFailure[];
+} {
+  const groups = new Map<string, Part[]>(); const invalid = new Set<string>();
+  const partialFailures: ConnectorPartialFailure[] = [];
+  for (const entry of entries) {
+    // Infer a group only from the validated filename pattern so a broken continuation
+    // prevents a truncated publication from being persisted as a new complete version.
+    const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/.exec(entry.name);
+    const key = filenameGroup ? `${filenameGroup[1]}:${filenameGroup[2]}` : entry.name;
+    try { const p = parsePart(entry); const group = groups.get(key) ?? []; group.push(p); groups.set(key, group); }
+    catch (e) { invalid.add(key); partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_XML', message: 'XML could not be processed', itemReference: entry.name }); }
+  }
+  const publications: ConnectorPublication[] = [];
+  for (const [key, parts] of groups) {
+    if (invalid.has(key)) continue;
+    try { publications.push(publication(parts, context)); }
+    catch (e) { partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_MATTER', message: 'Matter could not be assembled', itemReference: parts[0]!.entry.name }); }
+  }
+  return { publications, partialFailures };
+}
+
+/** Read entries sequentially into bounded memory, without extracting paths to disk. */
+export async function readDouZip(bytes: Uint8Array, signal: AbortSignal): Promise<{ entries: DouXmlEntry[]; mediaCount: number }> {
+  if (bytes.byteLength > 64 * 1024 * 1024) throw error('DOU_ARCHIVE_TOO_LARGE');
+  signal.throwIfAborted();
+  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.fromBuffer(Buffer.from(bytes),
+    { lazyEntries: true, validateEntrySizes: true, strictFileNames: true }, (err, file) => err ? reject(error('DOU_INVALID_ZIP')) : resolve(file)));
+  return new Promise((resolve, reject) => {
+    const entries: DouXmlEntry[] = []; const names = new Set<string>(); let total = 0; let mediaCount = 0; let done = false;
+    let stream: NodeJS.ReadableStream & { destroy(): void } | undefined;
+    const cleanup = () => { signal.removeEventListener('abort', abort); zip.close(); };
+    const fail = (e: unknown) => { if (done) return; done = true; stream?.destroy(); cleanup(); reject(e); };
+    const abort = () => fail(signal.reason ?? error('DOU_CANCELLED'));
+    signal.addEventListener('abort', abort, { once: true });
+    zip.on('error', () => fail(error('DOU_INVALID_ZIP')));
+    zip.on('end', () => { if (done) return; done = true; cleanup(); resolve({ entries, mediaCount }); });
+    zip.on('entry', (entry: yauzl.Entry) => {
+      if (done) return;
+      if (signal.aborted) { abort(); return; }
+      total += entry.uncompressedSize;
+      if (names.has(entry.fileName) || names.size >= 5000 || entry.uncompressedSize > 8 * 1024 * 1024 || total > 128 * 1024 * 1024 || entry.isEncrypted()) {
+        fail(error('DOU_UNSAFE_ZIP')); return;
+      }
+      names.add(entry.fileName);
+      if (entry.fileName.endsWith('/')) { zip.readEntry(); return; }
+      // Flat names are the format observed in both real archives.
+      if (entry.fileName.includes('/') || entry.fileName.includes('\\')) { fail(error('DOU_UNSAFE_ZIP_PATH')); return; }
+      if (!entry.fileName.endsWith('.xml')) { mediaCount++; zip.readEntry(); return; }
+      zip.openReadStream(entry, (err, input) => {
+        if (err || !input) { fail(error('DOU_INVALID_ZIP_ENTRY')); return; }
+        if (done) { input.destroy(); return; }
+        stream = input; const chunks: Buffer[] = []; let size = 0;
+        input.on('data', (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > entry.uncompressedSize || size > 8 * 1024 * 1024) { fail(error('DOU_ZIP_SIZE_MISMATCH')); return; }
+          chunks.push(chunk);
+        });
+        input.on('error', () => fail(error('DOU_INVALID_ZIP_ENTRY')));
+        input.on('end', () => {
+          if (done) return;
+          const data = Buffer.concat(chunks);
+          if (data.length !== entry.uncompressedSize || crc32(data) !== entry.crc32) { fail(error('DOU_ZIP_CRC_MISMATCH')); return; }
+          entries.push({ name: entry.fileName, bytes: data }); stream = undefined; zip.readEntry();
+        });
+      });
+    });
+    if (signal.aborted) abort(); else zip.readEntry();
+  });
+}

@@ -26,6 +26,13 @@ export interface SourceOperationalSnapshot {
   itemErrors: number;
   attemptCount: number;
   retryCount: number;
+  dou?: {
+    xmlCount: number;
+    assembledMatterCount: number;
+    confazMatterCount: number;
+    editions: string[];
+    partialFailureCount: number;
+  };
 }
 
 function stateFromStatus(
@@ -70,6 +77,7 @@ export async function getSourceOperationalSnapshot(
     existing_publications: number;
     item_errors: number;
     attempt_count: number;
+    attempt_metadata: Record<string, unknown> | null;
   }>`
     WITH latest_run AS (
       SELECT cr.*
@@ -136,6 +144,7 @@ export async function getSourceOperationalSnapshot(
       la.started_at AS last_attempt_at,
       ls.last_success_at,
       la.response_time_ms AS last_duration_ms,
+      la.metadata AS attempt_metadata,
       lr.id AS latest_run_id,
       coalesce(im.found_items, 0)::int AS found_items,
       coalesce(im.processed_items, 0)::int AS processed_items,
@@ -161,6 +170,11 @@ export async function getSourceOperationalSnapshot(
     );
   }
 
+  const dou = row.attempt_metadata?.dou;
+  const data = dou && typeof dou === 'object' && !Array.isArray(dou)
+    ? dou as Record<string, unknown> : undefined;
+  const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+
   return {
     sourceId: row.source_id,
     sourceCode: row.source_code,
@@ -185,5 +199,12 @@ export async function getSourceOperationalSnapshot(
       row.attempt_count - 1,
       0,
     ),
+    ...(data ? { dou: {
+      xmlCount: count(data.xmlCount),
+      assembledMatterCount: count(data.assembledMatterCount),
+      confazMatterCount: count(data.confazMatterCount),
+      editions: Array.isArray(data.editions) ? data.editions.filter((v): v is string => typeof v === 'string') : [],
+      partialFailureCount: count(row.attempt_metadata?.partialFailureCount),
+    } } : {}),
   };
 }

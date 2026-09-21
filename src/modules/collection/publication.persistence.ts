@@ -1,4 +1,4 @@
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 
 import type {
   DB,
@@ -159,6 +159,10 @@ async function upsertOrigin(
   input: PersistPublicationInput,
   publicationId: string,
 ): Promise<void> {
+  const pageReference = input.publication.metadata.officialUrlGranularity === 'PAGE';
+  if (pageReference && !input.publication.externalId) {
+    throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
+  }
   const externalOrigin = input.publication.externalId
     ? await trx
         .selectFrom('publication_origins')
@@ -172,10 +176,11 @@ async function upsertOrigin(
         .executeTakeFirst()
     : undefined;
 
-  const urlOrigin = await trx
+  const urlOrigin = pageReference ? undefined : await trx
     .selectFrom('publication_origins')
     .select(['id', 'publication_id'])
     .where('source_id', '=', input.sourceId)
+    .where(sql<boolean>`metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'`)
     .where(
       'official_url',
       '=',

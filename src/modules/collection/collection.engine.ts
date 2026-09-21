@@ -267,108 +267,220 @@ export async function processAcquiredCollectionRun(
     heartbeatTimer.unref();
   }
 
-  let outcome: ConnectorExecutionOutcome;
-
   try {
-    outcome = connector
-      ? await executeConnector({
-          connector,
-          sourceId: run.sourceId,
-          runId: run.id,
-          attemptId: attempt.id,
-          timeoutMs,
-        })
-      : missingConnectorOutcome(run.connectorKey);
-  } finally {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-    }
-  }
+    const outcome: ConnectorExecutionOutcome = connector
+        ? await executeConnector({
+            connector,
+            sourceId: run.sourceId,
+            runId: run.id,
+            attemptId: attempt.id,
+            timeoutMs,
+          })
+        : missingConnectorOutcome(run.connectorKey);
 
-  await finishCollectionAttempt(db, {
-    attemptId: attempt.id,
-    outcome,
-  });
+    await finishCollectionAttempt(db, {
+      attemptId: attempt.id,
+      outcome,
+    });
 
-  if (!outcome.ok) {
-    const retry = decideRetry(
-      {
-        attemptNo: attempt.attemptNo,
-        maxAttempts: run.maxAttempts,
-        retryable: outcome.retryable,
-        ...(outcome.retryAfterSeconds !== undefined
-          ? {
-              retryAfterSeconds:
-                outcome.retryAfterSeconds,
-            }
-          : {}),
-      },
-      options.retryPolicy,
-    );
-
-    if (retry.shouldRetry && retry.delayMs !== null) {
-      const nextAttemptAt = new Date(
-        Date.now() + retry.delayMs,
+    if (!outcome.ok) {
+      const retry = decideRetry(
+        {
+          attemptNo: attempt.attemptNo,
+          maxAttempts: run.maxAttempts,
+          retryable: outcome.retryable,
+          ...(outcome.retryAfterSeconds !== undefined
+            ? {
+                retryAfterSeconds:
+                  outcome.retryAfterSeconds,
+              }
+            : {}),
+        },
+        options.retryPolicy,
       );
 
-      await scheduleCollectionRetry(db, {
+      if (retry.shouldRetry && retry.delayMs !== null) {
+        const nextAttemptAt = new Date(
+          Date.now() + retry.delayMs,
+        );
+
+        await scheduleCollectionRetry(db, {
+          runId: run.id,
+          workerId: run.workerId,
+          nextAttemptAt,
+          errorSummary:
+            `${outcome.code}: ${outcome.message}`,
+        });
+
+        logger.warn(
+          {
+            sourceId: run.sourceId,
+            runId: run.id,
+            attemptId: attempt.id,
+            attemptNo: attempt.attemptNo,
+            status: outcome.status,
+            errorCode: outcome.code,
+            errorMessage: outcome.message,
+            errorMetadata: outcome.metadata ?? null,
+            durationMs: outcome.durationMs,
+            nextAttemptAt:
+              nextAttemptAt.toISOString(),
+          },
+          'Collection retry scheduled',
+        );
+
+        return {
+          runId: run.id,
+          attemptNo: attempt.attemptNo,
+          state: 'RETRY_SCHEDULED',
+          nextAttemptAt,
+          metrics,
+        };
+      }
+
+      const status = resolveCollectionRunStatus(outcome);
+
+      await finishCollectionRun(db, {
         runId: run.id,
         workerId: run.workerId,
-        nextAttemptAt,
+        status,
         errorSummary:
           `${outcome.code}: ${outcome.message}`,
       });
 
-      logger.warn(
+      logger.error(
         {
           sourceId: run.sourceId,
           runId: run.id,
           attemptId: attempt.id,
           attemptNo: attempt.attemptNo,
-          status: outcome.status,
+          status,
+          attemptStatus: outcome.status,
           errorCode: outcome.code,
           errorMessage: outcome.message,
           errorMetadata: outcome.metadata ?? null,
           durationMs: outcome.durationMs,
-          nextAttemptAt:
-            nextAttemptAt.toISOString(),
         },
-        'Collection retry scheduled',
+        'Collection run failed',
       );
 
       return {
         runId: run.id,
         attemptNo: attempt.attemptNo,
-        state: 'RETRY_SCHEDULED',
-        nextAttemptAt,
+        state: 'TERMINAL',
+        status,
         metrics,
       };
     }
 
-    const status = resolveCollectionRunStatus(outcome);
+    metrics.found = outcome.result.publications.length;
+    metrics.connectorPartialFailures =
+      outcome.result.partialFailures?.length ?? 0;
+
+    for (
+      let index = 0;
+      index < outcome.result.publications.length;
+      index += 1
+    ) {
+      const publication =
+        outcome.result.publications[index]!;
+
+      try {
+        const normalized = normalizePublication({
+          sourceId: run.sourceId,
+          publication,
+        });
+
+        const persisted = await db
+          .transaction()
+          .execute((trx) =>
+            persistPublication(trx, {
+              sourceId: run.sourceId,
+              runId: run.id,
+              attemptId: attempt.id,
+              publication: normalized,
+            }),
+          );
+
+        metrics.processed += 1;
+        dispositionMetric(
+          metrics,
+          persisted.disposition,
+        );
+      } catch (error) {
+        metrics.itemErrors += 1;
+
+        await db.transaction().execute((trx) =>
+          recordCollectionItemFailure(trx, {
+            runId: run.id,
+            attemptId: attempt.id,
+            sourceItemKey: sourceItemKey(
+              publication,
+              index,
+            ),
+            ...(publication.externalId
+              ? {
+                  externalId:
+                    publication.externalId,
+                }
+              : {}),
+            ...(publication.officialUrl
+              ? {
+                  sourceUrl:
+                    publication.officialUrl,
+                }
+              : {}),
+            metadata: publication.metadata ?? {},
+            errorCode: 'PUBLICATION_PROCESSING_ERROR',
+            errorMessage: errorMessage(error),
+          }),
+        );
+
+        logger.warn(
+          {
+            sourceId: run.sourceId,
+            runId: run.id,
+            attemptId: attempt.id,
+            itemReference: sourceItemKey(
+              publication,
+              index,
+            ),
+            error: errorMessage(error),
+          },
+          'Publication processing failed',
+        );
+      }
+    }
+
+    const status = terminalStatusAfterProcessing(
+      outcome,
+      metrics,
+    );
 
     await finishCollectionRun(db, {
       runId: run.id,
       workerId: run.workerId,
       status,
-      errorSummary:
-        `${outcome.code}: ${outcome.message}`,
+      ...(metrics.itemErrors > 0 ||
+      metrics.connectorPartialFailures > 0
+        ? {
+            errorSummary:
+              `Partial processing: ${metrics.itemErrors} item errors, ${metrics.connectorPartialFailures} connector partial failures`,
+          }
+        : {}),
     });
 
-    logger.error(
+    logger.info(
       {
         sourceId: run.sourceId,
         runId: run.id,
         attemptId: attempt.id,
         attemptNo: attempt.attemptNo,
         status,
-        attemptStatus: outcome.status,
-        errorCode: outcome.code,
-        errorMessage: outcome.message,
-        errorMetadata: outcome.metadata ?? null,
         durationMs: outcome.durationMs,
+        ...metrics,
       },
-      'Collection run failed',
+      'Collection run completed',
     );
 
     return {
@@ -378,123 +490,8 @@ export async function processAcquiredCollectionRun(
       status,
       metrics,
     };
+  } finally {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
   }
-
-  metrics.found = outcome.result.publications.length;
-  metrics.connectorPartialFailures =
-    outcome.result.partialFailures?.length ?? 0;
-
-  for (
-    let index = 0;
-    index < outcome.result.publications.length;
-    index += 1
-  ) {
-    const publication =
-      outcome.result.publications[index]!;
-
-    try {
-      const normalized = normalizePublication({
-        sourceId: run.sourceId,
-        publication,
-      });
-
-      const persisted = await db
-        .transaction()
-        .execute((trx) =>
-          persistPublication(trx, {
-            sourceId: run.sourceId,
-            runId: run.id,
-            attemptId: attempt.id,
-            publication: normalized,
-          }),
-        );
-
-      metrics.processed += 1;
-      dispositionMetric(
-        metrics,
-        persisted.disposition,
-      );
-    } catch (error) {
-      metrics.itemErrors += 1;
-
-      await db.transaction().execute((trx) =>
-        recordCollectionItemFailure(trx, {
-          runId: run.id,
-          attemptId: attempt.id,
-          sourceItemKey: sourceItemKey(
-            publication,
-            index,
-          ),
-          ...(publication.externalId
-            ? {
-                externalId:
-                  publication.externalId,
-              }
-            : {}),
-          ...(publication.officialUrl
-            ? {
-                sourceUrl:
-                  publication.officialUrl,
-              }
-            : {}),
-          metadata: publication.metadata ?? {},
-          errorCode: 'PUBLICATION_PROCESSING_ERROR',
-          errorMessage: errorMessage(error),
-        }),
-      );
-
-      logger.warn(
-        {
-          sourceId: run.sourceId,
-          runId: run.id,
-          attemptId: attempt.id,
-          itemReference: sourceItemKey(
-            publication,
-            index,
-          ),
-          error: errorMessage(error),
-        },
-        'Publication processing failed',
-      );
-    }
-  }
-
-  const status = terminalStatusAfterProcessing(
-    outcome,
-    metrics,
-  );
-
-  await finishCollectionRun(db, {
-    runId: run.id,
-    workerId: run.workerId,
-    status,
-    ...(metrics.itemErrors > 0 ||
-    metrics.connectorPartialFailures > 0
-      ? {
-          errorSummary:
-            `Partial processing: ${metrics.itemErrors} item errors, ${metrics.connectorPartialFailures} connector partial failures`,
-        }
-      : {}),
-  });
-
-  logger.info(
-    {
-      sourceId: run.sourceId,
-      runId: run.id,
-      attemptId: attempt.id,
-      attemptNo: attempt.attemptNo,
-      status,
-      durationMs: outcome.durationMs,
-      ...metrics,
-    },
-    'Collection run completed',
-  );
-
-  return {
-    runId: run.id,
-    attemptNo: attempt.attemptNo,
-    state: 'TERMINAL',
-    status,
-    metrics,
-  };
 }
+

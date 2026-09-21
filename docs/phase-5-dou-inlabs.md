@@ -1,159 +1,97 @@
-# DOU / INLABS — investigação e preparação de acesso
+# DOU / INLABS — implementação e evidências
 
-Data: 2026-09-21. Base inspecionada: `main` em `23c79a4c205399358572cc5833cd10e7bb164dab`.
+Atualizado em 2026-09-21. Base: `main` em `23c79a4c205399358572cc5833cd10e7bb164dab`.
+PR #16 permanece draft. **Não concluído nem habilitado em produção.** Parser e conector agora usam XMLs reais enviados pelo titular; autenticação automatizada real, gate CONFAZ, armazenamento dos originais e validação Railway continuam pendentes.
 
-**Status: frente em andamento, bloqueada para validação real por falta de acesso autenticado ao INLABS.**
-Este documento não certifica captura, persistência, classificação ou operação produtiva do DOU.
-O código entregue nesta etapa é um cliente de transporte; ainda não está registrado como conector no Worker.
+## Diretrizes preservadas
 
-## Decisões recebidas
+ADR-042 recebida: DOU certificado é primário; INLABS é ingestão; portais dos órgãos são enriquecimento/validação.
+Publicação global, sem duplicação por tenant, sem IA e sem Motor de Relevância. Migrations 001–009, algoritmo de identidade (incluindo `publishedOn`) e parser CONFAZ permanecem intactos. Nenhuma evidência justifica modificar a identidade normativa.
+PRs 14/15, relay, Fly.io, Lightsail e proxies adicionais permanecem congelados. Nenhum outro conector foi iniciado.
 
-O encaminhamento do Gerente Geral determina a ADR-042: DOU certificado como fonte primária,
-INLABS como canal de ingestão e portais dos órgãos como enriquecimento/validação.
-O conector deverá ser genérico, inicialmente para Seção 1, e comprovar os quatro tipos de atos CONFAZ.
-As migrations 001–009 e o algoritmo global de identidade, inclusive `publishedOn`, permanecem intactos.
-PRs 14/15, relay, Fly.io, Lightsail e proxies adicionais continuam fora desta frente.
+## Fontes e acesso
 
-## Evidências oficiais consultadas
+- [Portal INLABS](https://inlabs.in.gov.br/acessar.php).
+- [Código oficial](https://github.com/Imprensa-Nacional/inlabs), revisão consultada `b73795a16ecdf53d2f9f66de86a0e3c7aa087042`.
+- [XML Python](https://github.com/Imprensa-Nacional/inlabs/blob/b73795a16ecdf53d2f9f66de86a0e3c7aa087042/public/python/inlabs-auto-download-xml.py) e [PDF Bash](https://github.com/Imprensa-Nacional/inlabs/blob/b73795a16ecdf53d2f9f66de86a0e3c7aa087042/public/bash/inlabs-auto-download-pdf.sh).
+- Ajuda oficial copiada pelo usuário da sessão autenticada, recebida em 2026-09-21, com dicionário XML.
+- ZIPs oficiais de 2026-09-18, normal e extra, baixados e enviados pelo usuário. Manifesto das fixtures registra hashes dos originais.
 
-- [Portal de acesso INLABS](https://inlabs.in.gov.br/acessar.php): formulário de cadastro/login; aviso sobre XML, PDF e versão certificada.
-- [Repositório oficial](https://github.com/Imprensa-Nacional/inlabs): revisão observada `b73795a16ecdf53d2f9f66de86a0e3c7aa087042`.
-- [Download XML em Python](https://github.com/Imprensa-Nacional/inlabs/blob/b73795a16ecdf53d2f9f66de86a0e3c7aa087042/public/python/inlabs-auto-download-xml.py).
-- [Download PDF em Bash](https://github.com/Imprensa-Nacional/inlabs/blob/b73795a16ecdf53d2f9f66de86a0e3c7aa087042/public/bash/inlabs-auto-download-pdf.sh).
-- [Orientações oficiais Python](https://github.com/Imprensa-Nacional/inlabs/blob/b73795a16ecdf53d2f9f66de86a0e3c7aa087042/public/python/README.md).
+A captura anterior mostrou manutenção em `/registrar.php`. Depois o titular conseguiu entrar com conta existente e visualizar as pastas. Isso comprova acesso no navegador do titular, não acesso autenticado do Worker. A captura não comprova status HTTP, SLA ou indisponibilidade de todas as rotas.
 
-São fontes oficiais disponíveis na revisão consultada; não constituem garantia de que todos os formatos
-continuam idênticos no serviço autenticado. Essa comparação depende da primeira consulta real.
-
-| Tema | Evidência / limite |
+| Tema | Evidência e implementação |
 | --- | --- |
-| Autenticação | POST HTTPS `/logar.php`, campos `email` e `password`; scripts verificam `inlabs_session_cookie`. Cadastro exige dados do titular. |
-| XML | ZIP por data e seção: `/index.php?p=AAAA-MM-DD&dl=AAAA-MM-DD-DO1.zip`. O ZIP contém XML segundo a documentação; schema e conteúdo ainda não inspecionados. |
-| Seções | Scripts XML enumeram DO1, DO2, DO3 e DO1E, DO2E, DO3E. A prioridade inicial será DO1/DO1E. |
-| PDF normal | `AAAA_MM_DD_ASSINADO_do1.pdf`, análogos do2/do3. |
-| PDF extra | Script Bash enumera `AAAA_MM_DD_ASSINADO_do1_extra_A.pdf` até letras posteriores; o script Python não faz essa enumeração explícita. Não presumir que o PDF normal contenha todas as extras. |
-| Suplementos | Os scripts consultados não demonstram convenção própria. Não inventar DO1S ou equivalentes. Inspecionar listagem autenticada e uma edição oficial real. |
-| Disponibilidade | Portal informa disponibilização diária após publicação no portal da Imprensa Nacional. Não há SLA/horário fixo comprovado; cron às 10:01 do exemplo Bash é uma sugestão de execução, não horário garantido da fonte. |
-| Histórico | README menciona acesso gratuito desde 2020-01-01; cobertura histórica completa e retenção não foram verificadas. |
-| Limites | Não foi encontrada quota formal nas fontes consultadas. Isso não equivale a acesso ilimitado. Não reproduzir retries recursivos sem limite dos exemplos. |
-| Referência legal | O próprio portal alerta que XML não substitui a versão certificada. URL de download INLABS e URL certificada da matéria devem ser preservadas separadamente. |
+| Login | POST HTTPS `/logar.php`, email/password, cookie `inlabs_session_cookie`, header `origem`. Cookie privado em memória por tentativa; sem logs/código contendo credenciais. |
+| XML | `index.php?p=AAAA-MM-DD&dl=AAAA-MM-DD-DO1.zip`; DO1/DO1E verificados nas amostras. Scripts também enumeram DO2/DO3 e extras; escopo atual Seção 1. |
+| Extra | DO1E contém várias edições: 177-A, B, C e D no mesmo ZIP. Não se assume ZIP = edição. |
+| PDF | Convenção oficial normal `AAAA_MM_DD_ASSINADO_do1.pdf`; extras `..._do1_extra_A.pdf` e letras seguintes. Transporte implementado, sem captura/armazenamento de PDF nesta validação. |
+| Suplementos | Convenção ainda não comprovada. Não inventamos DO1S; metadata informa `supplementsVerified=false`. |
+| Disponibilidade | Ajuda permite disponibilizar XML até o quinto dia útil do mês seguinte. O aviso de publicação diária tem ressalva para XML. Não prometer ingestão XML em tempo real. |
+| Quotas | Nenhuma quota formal identificada. Downloads sequenciais, lote limitado, timeout/cancelamento herdados do executor e retries centralizados no Motor. |
+| Histórico | README menciona desde 2020; cobertura/retenção completa não verificada. Não foi executado backfill histórico. |
 
-O acesso à raiz do INLABS retornou rejeição de requisição, enquanto `/acessar.php` respondeu.
-Isso não prova indisponibilidade geral nem erro de credencial. Não houve tentativa de login com credencial inventada.
+## Dicionário e parser
 
-## Cliente de transporte entregue
+`article@id` é ID editorial GN4; não serve para inventar links no Portal. `idMateria` é o ID da matéria no Portal. `idOficio` identifica lote e não é identidade da matéria. `pdfPage` é referência certificada de página, compartilhada por várias matérias.
 
-`inlabs.client.ts` utiliza os endpoints e convenções acima, sem nova dependência:
+O parser valida UTF-8, estrutura XML, ausência de DTD, data, nome de arquivo, identificadores, seção e referência certificada. Bibliotecas fixadas em package-lock: sax, yauzl e htmlparser2. ZIP: CRC32/tamanho, 64 MiB comprimido, 128 MiB descomprimido, 8 MiB por entrada e até 5.000 entradas; leitura sequencial sem extrair caminhos no disco. Esses limites são operacionais provisórios, não limites publicados da fonte.
 
-- credenciais injetadas pelo chamador; futuras variáveis propostas: `INLABS_EMAIL` e `INLABS_PASSWORD`;
-- cookie em campo privado, apenas em memória por tentativa, descartado por `close()`;
-- redirecionamentos manuais, sem encaminhar cookie/senha a outro host;
-- requisições canceláveis pelo sinal do executor existente; nenhum retry interno;
-- erros distintos para credenciais ausentes, autenticação, bloqueio de acesso, falha de rede, 429, 5xx e conteúdo inesperado;
-- limite de bytes antes e durante leitura, assinatura inicial ZIP/PDF e SHA-256 dos bytes recebidos;
-- 404 significa somente arquivo não disponível naquele instante, após verificar a sessão na listagem;
-- resposta HTML de login ou bloqueio não é aceita como arquivo;
-- ausência de logs de credenciais, cookies, corpo HTTP ou causas de erro externas.
+Continuações `idMateria-1.xml`, `-2.xml` etc. são reunidas em ordem numérica por jornal/idMateria, com metadados consistentes. Parte inválida ou lacuna observável rejeita a matéria inteira e conserva as outras. O formato observado não declara quantidade total de partes; não é possível detectar uma última parte ausente quando a sequência restante é contínua. Título pode estar vazio nas continuações. Texto HTML é convertido em texto; tabelas mantêm conteúdo textual, mas não diagramação. Imagens são contadas, não preservadas; conteúdo exclusivamente visual requer tratamento posterior.
 
-A checagem de assinatura inicial não valida integridade do ZIP nem assinatura digital do PDF.
-A leitura da listagem ainda precisa de validação estrutural positiva com a página real; não usar este cliente
-isoladamente para concluir `SUCCESS_NO_RESULTS` ou avançar checkpoint.
-O cliente não registra fonte, não chama IA, não persiste publicações e não baixa histórico automaticamente.
+Título, texto, órgão completo, unidade, tipo, número/ano, data de publicação, data do ato quando explícita, ementa, seção, edição, páginas, IDs e atributos originais são preservados, exceto bytes de highlightImage (somente indicador de presença, sem base64 no banco). Data de publicação vem de `pubDate`, não da data do ato. O dicionário menciona DOU1; a amostra usa DO1, respeitado pelo parser. Sem HTML oficial observado, `officialHtmlUrl=null`; nenhuma URL com slug é fabricada.
 
-## Inspeção do Motor de Coleta
+Identidade externa composta pelos campos observados `data:seção:edição:idMateria`, com ID original preservado em metadata. Classificação CONFAZ exige órgão explícito e cabeçalho apropriado; menção a ato no corpo não vira identidade daquele ato. Despachos e retificações sem número usam identidade source-scoped existente. A agência CONFAZ e famílias são normalizadas para compatibilidade com o conector existente, sem reimplementar seu parser.
 
-| Componente existente | Reuso / cuidado necessário |
-| --- | --- |
-| `CollectionConnector` / registry / executor | Preservar `collect(context)` e registrar `dou` somente após parser e validação de amostras. |
-| `ConnectorPublication` | Campos comuns disponíveis; seção, edição, página, unidade, ementa, data do ato, referência certificada e metadados originais cabem em `metadata`. |
-| Normalizador | Identidade forte exige esfera, órgão, tipo, número e publicação. Número/ano e órgão canônico precisam coincidir com CONFAZ, preservando o órgão original completo nos metadados. Sem prova de equivalência, usar identidade source-scoped existente. |
-| Persistência global | Publicações/origins/versões são globais, sem cópia por tenant. Não introduzir acesso a tabelas por empresa nesta etapa. |
-| Versions / URL primária | `getOrCreateVersion` atualiza `primary_official_url` para a URL da última versão inserida. Uma versão CONFAZ posterior poderia substituir a referência DOU. Essa precedência ainda não implementa a ADR-042. |
-| Arquivos | Normalizador preserva descriptors em metadata. Há tabela `publication_files`, mas nenhum adaptador de object storage/download/persistência de binários implementado na base inspecionada. Não declarar arquivos preservados em storage. |
-| Attempts / monitoramento | `ConnectorResult.metadata` já chega a `collection_attempts.metadata`. Edições e matérias podem ter contadores sem migration, mas o snapshot de monitoramento ainda não expõe esses campos específicos. |
-| Heartbeat | O timer do engine é encerrado após `executeConnector`, antes do loop de persistência. Uma edição grande pode exceder a janela de stale durante persistência. Antes de habilitar DOU, cobrir esse cenário e ajustar o ciclo de vida. |
-| Backfill | `trigger_type=BACKFILL` existe, porém o contexto do conector não traz trigger nem intervalo. Separar parâmetros por run exige adaptação explícita e teste; não alterar configuração da fonte compartilhada enquanto Scheduler roda. |
+## Evidência dos arquivos completos
 
-## Estratégia incremental proposta, ainda não ativada
+| Arquivo | Bytes ZIP | XML | Mídias | Matérias reunidas | Falhas de parsing | Matérias CONFAZ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2026-09-18-DO1.zip | 2.409.302 | 358 | 6 | 351 | 0 | 0 |
+| 2026-09-18-DO1E.zip | 52.506 | 14 | 0 | 12 | 0 | 0 |
 
-1. Uma única fonte global `dou`, com timezone America/Sao_Paulo, usando Worker e Scheduler existentes.
-2. Consulta de hora em hora, incluindo fim de semana para extras. Descobrir os arquivos do dia na listagem oficial;
-   repetir a descoberta durante o dia para detectar extras novas e ZIPs republicados.
-3. Janela inicial de revisita proposta: dia corrente mais dois dias anteriores. É uma política operacional provisória,
-   não uma garantia sobre atraso da fonte. Ajustar com medições e prever reconciliação de atrasos maiores.
-4. Separar data civil, seção e edição de filename. Não assumir relação 1 ZIP = 1 edição nem usar só a data como checkpoint.
-5. Identificar pacote por origem/data/seção/filename e hash dos bytes; identificar matéria pelo identificador oficial.
-   O hash do ZIP inteiro não deve participar de `content_hash` de todas as matérias: uma matéria extra no ZIP causaria
-   versões artificiais das demais. Guardar proveniência do pacote separada do hash dos arquivos individuais.
-6. Reaproveitar validators HTTP somente se verificados no serviço; não tratar `Last-Modified`/ETag como disponíveis por suposição.
-7. Checkpoint somente após persistência bem-sucedida, nunca ao concluir download. Para a primeira implementação,
-   avaliar metadata de runs/attempts com status terminal SUCCESS como recibo, sem assumir que attempt SUCCESS prova persistência.
-   Falha parcial deve manter pacote/itens elegíveis para replay idempotente.
-8. Lacunas após indisponibilidade maior que a janela devem ser visíveis e recuperadas em lotes limitados; não avançar data
-   silenciosamente nem disparar backfill integral. Limites de lote/volume serão medidos com edição real.
-9. Não chamar IA nem filtrar por relevância tributária. A contagem de atos CONFAZ é classificação estrutural de uma ingestão genérica.
+As 363 matérias produziram 363 hashes de identidade distintos. Medição local de leitura/parsing/normalização: aproximadamente 342 ms normal e 13 ms extra; não inclui rede nem PostgreSQL e não dimensiona produção.
+Normal: cerca de 4 MB descomprimidos; extra: 184.195 bytes. O volume PostgreSQL observado no Railway era 500 MB configurados, não espaço livre medido. Não extrapolar uma única data para backfill.
 
-## Backfill proposto
+Fixtures versionadas: 12 XMLs originais, bytes e hashes preservados, representando dez matérias (incluindo três despachos da Fazenda na mesma página e uma portaria em três partes). Testes também têm alterações sintéticas identificadas para versionamento e cabeçalhos sintéticos CONFAZ; estes **não atendem ao gate de captura CONFAZ real**.
 
-Separar do fluxo horário e iniciar por uma única data escolhida para validação. Medir bytes comprimidos/descomprimidos,
-número de matérias, duração de download/parsing/persistência, memória, crescimento de publicações/versões/origins e espaço em disco.
-No estado observado, o Postgres tem volume de 500 MB; isso é capacidade configurada, não espaço livre medido.
-Não executar backfill massivo sem essas medições. Qualquer armazenamento de originais depende da decisão de infraestrutura abaixo.
+## Necessidade comprovada da migration 010
 
-## Papéis e decisões para o Gerente Geral
+Os três XMLs `600_20260918_24382325`, `24382380` e `24382412` têm `idMateria` diferentes e apontam à mesma página 1 da edição 177-A. A unicidade antiga `(source_id, official_url)` rejeitaria matérias distintas. A edição normal também tem múltiplas matérias por página.
 
-Não foi criada migration. `PRIMARY`, `ENRICHMENT` e `VALIDATION` podem inicialmente ser convenções explícitas
-em `sources.connector_config` e `publication_origins.metadata`, mas isso sozinho não controla a versão vigente.
+A 010 mantém unicidade de URL para origens de documento; referências explicitamente marcadas `officialUrlGranularity=PAGE` exigem external_id não vazio e usam a unicidade existente de `(source_id, external_id)`. Há índice não único para consulta por página. A persistência acompanha essa distinção e continua rejeitando um external_id ligado a outra identidade. Não há mudança nos hashes nem nas migrations antigas.
 
-Decisões a fechar antes de declarar conformidade integral:
+**Não aplicada em produção.** Implantação deve aplicar 010 antes de habilitar DOU. O runner usa transação, mas o rebuild de índice exige janela compatível com o volume real. Rollback após gravar várias origens na mesma página não pode simplesmente restaurar o índice único antigo: exige análise dos dados, sem apagar matérias para satisfazer o índice. Desativar o conector primeiro é a contenção reversível.
 
-1. **Storage de originais:** não existe infraestrutura implementada a reutilizar nesta base. Definir/prover adaptador comum
-   aprovado ou aceitar provisoriamente somente referência + hash + texto, com retenção de bytes explicitamente pendente.
-2. **Precedência DOU × enriquecimento:** implementar preservação da URL certificada e definir como conteúdo complementar
-   convive com `is_current`. Metadados de origem dispensam migration inicialmente; a política de versão precisa ser explícita.
-3. **Checkpoints e backfill por run:** avaliar adaptação mínima usando metadata existente, incluindo permissão do worker,
-   atomicidade e recuperação; propor alteração estrutural somente se demonstrada necessária. Nenhuma foi aplicada.
+## Integração, incremental e recuperação
 
-`identity_hash`, `content_hash`, `publishedOn`, parser CONFAZ e migrations permaneceram sem alterações.
-Não há evidência nova nesta frente que justifique mudar a identidade normativa.
+Registry registra `dou` somente com `DOU_CONNECTOR_ENABLED=true`; permanece desligado por padrão. `INLABS_EMAIL` e `INLABS_PASSWORD` vêm de secrets do Worker. Nenhuma fonte produtiva foi provisionada ou configuração Railway alterada nesta etapa.
 
-## Validação e bloqueios
+Política provisória para execução horária em America/Sao_Paulo: dia corrente e dois anteriores, mais uma data rotativa do mês corrente/anterior. Máximo quatro datas e oito ZIPs por tentativa. A reconciliação é limitada e precisa de medição de cobertura; não é garantia de completude mensal. Intervalo desde último sucesso acima de 60 dias exige recuperação explícita (`DOU_BACKFILL_REQUIRED`). Nenhuma indisponibilidade dispara coleta de todo histórico.
 
-- Base: typecheck e 51 testes unitários existentes aprovados.
-- Transporte: 13 testes novos aprovados, com HTTP simulado; não são fixtures de atos oficiais.
-- Nesta estação, o launcher `tsx --test` tentou criar IPC não permitido. Executado `node --import tsx --test` com sucesso,
-  preservando o runner `node:test` e o carregador tsx. O comando existente do CI não foi alterado.
-- CI do PR: verificar o resultado no GitHub; não confundir aprovação de testes sintéticos com captura real.
-- Railway: API, Worker, Scheduler e Postgres reportaram deployment SUCCESS; Worker e Scheduler seguem `main`.
-  Não havia variáveis INLABS no Worker na inspeção. Nenhuma configuração/deployment foi alterada nesta etapa.
-- Login real, download de edição, schema XML, suplementos, referências certificadas por matéria, amostras CONFAZ,
-  persistência DOU, dedup entre fontes, checkpoint, execução real Worker/Scheduler e métricas específicas seguem pendentes.
+SHA-256 do pacote permite evitar parsing de ZIP inalterado, mas o download ainda ocorre; validators HTTP não foram comprovados. Hash do ZIP fica só em metadata, não no content_hash de todas as matérias. Os hashes individuais XML também ficam preservados. Alteração de uma matéria não deve criar versões das outras.
 
-Para destravar a inspeção, o titular deve criar/ativar conta no portal INLABS e disponibilizar uma amostra oficial
-(ZIP XML da Seção 1, idealmente com atos CONFAZ, e depois uma extra/suplemento disponível).
-Não enviar senha em conversa, arquivo, commit ou log. Credenciais produtivas deverão ser cadastradas como secrets do Railway.
+Recibos ficam em `collection_attempts.metadata.douArchives`, retidos por 65 dias e aceitos somente de runs terminais SUCCESS/SUCCESS_NO_RESULTS com attempt SUCCESS. Attempt SUCCESS sozinho ocorre antes da persistência e não é checkpoint. Falha parcial não avança recibos; próxima execução repete idempotentemente. Falha HTTP após outro pacote válido descarta o lote da tentativa e deixa retry com o Motor. A mudança no heartbeat mantém o timer durante persistência e fechamento do run; o comportamento preexistente de perda de ownership não foi redesenhado.
 
-## Gate de aceitação obrigatório
+Nenhum pacote disponível gera erro explícito, retryable, `INLABS_EDITIONS_NOT_AVAILABLE`. Não é prova de dia vazio. Download 404 exige consulta do índice; validação estrutural positiva do índice autenticado ainda precisa ser conferida com HTML real. Parser inválido gera erro por matéria, com código e filename em metadata. Manutenção é distinguida de autenticação, WAF, rede, rate-limit, timeout e edição ausente. Um lote sem CONFAZ continua sendo sucesso de ingestão genérica, com contador CONFAZ zero.
 
-Ainda **não atendido**: localizar e persistir Convênio ICMS, Ajuste SINIEF, Protocolo ICMS e Ato COTEPE/ICMS reais,
-conferindo tipo/número/data/ementa/texto/órgão/referência oficial, além de despachos e ratificações relacionados.
-Somente depois desses testes e da execução Railway será possível declarar eliminada a dependência crítica do CONFAZ.
+BACKFILL produtivo é rejeitado sem lote explícito. A classe aceita até quatro datas injetadas para testes/validação controlada; o registry produtivo não expõe essa opção. Falta fechar interface de execução administrativa por run, sem alterar a configuração compartilhada da fonte. Antes de ampliá-la, medir duração, memória, crescimento do banco/storage e impacto Railway.
 
-Esta é uma pausa por acesso externo, não encerramento da frente nem retorno final ao Gerente Geral.
-Retomar aqui com a amostra/autenticação; ao satisfazer os gates, consolidar o handoff e recomendar a próxima frente ao Gerente Geral.
-Não iniciar outros conectores neste trabalho.
+## Monitoramento
 
-## Evidência adicional: manutenção no cadastro
+O snapshot existente expõe estado, última coleta, contagens de publicações/versões/falhas/retries e agora campos opcionais DOU: XMLs, matérias reunidas, edições, matérias CONFAZ e falhas de parsing. Estado de cada pacote (PARSED/UNCHANGED/NOT_AVAILABLE/PARTIAL), hashes, páginas e detalhes por falha ficam na tentativa. `UNCHANGED` indica que nenhuma matéria foi novamente processada; contador zero não significa edição vazia. Não há nova Central visual nesta frente.
 
-O usuário apresentou captura da página `/registrar.php` com o aviso “Sistema em Manutenção Programada”.
-Isso comprova a resposta exibida naquela tentativa de cadastro, não indisponibilidade de todas as rotas nem
-o status HTTP da resposta. A consulta pública de leitura ainda retornou o formulário em `/acessar.php`;
-ela não executou cadastro nem comprovou sua recuperação. O aviso não informa prazo de retorno.
+## Validação e limite de aceitação
 
-O cliente agora reconhece o texto de manutenção em login, índice e respostas não binárias de download,
-inclusive quando servido com HTTP 200. Classifica como `INLABS_MAINTENANCE` / `SOURCE_UNAVAILABLE`,
-com retry permitido pelo Motor e preservação de `Retry-After` quando recebido. Uma edição 404 seguida de
-índice em manutenção não vira `NOT_AVAILABLE`. PDFs/ZIPs válidos não são classificados pelo texto de manutenção.
+80 testes unitários passaram localmente; typecheck passou. Leitura dos dois ZIPs completos passou conforme tabela. Transporte HTTP dos testes é simulado, enquanto os XMLs são reais. CI deve validar instalação limpa, build, migrations, regressões existentes e novo teste PostgreSQL: dez matérias, reprocessamento, uma nova versão, página compartilhada, restrições, Scheduler idempotente, recibos e heartbeat durante bloqueio real de persistência. Resultado final deve ser conferido no PR, não presumido a partir dos testes locais.
 
-Cinco testes de regressão usam HTML sintético baseado no texto visível da captura, sem apresentar esse HTML
-como fixture baixada da fonte. A inspeção do schema XML e os gates reais continuam pendentes.
+Railway: API, Worker, Scheduler e Postgres existentes reportaram deployments SUCCESS na inspeção; isso não valida DOU. Serviços continuam em main, sem credenciais INLABS identificadas. Não houve execução autenticada produtiva ou deploy desta branch.
+
+## Decisões para o Gerente Geral e bloqueios
+
+1. **Originais:** existe tabela publication_files e descritores, mas não adaptador de storage implementado nesta base. Propor adaptador comum aprovado ou aceitar fase provisória de referência/hash/texto. Não criar storage paralelo nem gravar binários no PostgreSQL. `archivalStorage=NOT_CONFIGURED` é explícito.
+2. **PRIMARY/ENRICHMENT/VALIDATION:** metadata registra PRIMARY/INLABS sem nova coluna; isso não impõe precedência. Persistência atual pode substituir URL/conteúdo corrente por nova versão de enriquecimento. Definir política mínima de preservação da referência DOU e versão vigente antes de habilitar coexistência produtiva. Não alterar a arquitetura silenciosamente.
+3. **Disponibilidade e recuperação:** confirmar que XML com o prazo publicado atende à necessidade de negócio; definir reconciliação completa e interface de backfill controlado após medir volume. Suplementos continuam sem evidência suficiente.
+4. **Acesso:** titular já acessou sua conta. Falta disponibilizar secrets INLABS no Worker para validação automatizada, sem transmitir senha por conversa/GitHub/log. A listagem autenticada real precisa ser inspecionada nesse ambiente antes de ativar o Scheduler.
+5. **Gate CONFAZ:** localizar e persistir Convênio ICMS, Ajuste SINIEF, Protocolo ICMS e Ato COTEPE/ICMS reais, mais despachos/ratificações relacionados; conferir número/data/ementa/texto/órgão/referência e deduplicação entre fontes. As duas edições enviadas não contêm essas amostras. Não declarar eliminada a dependência crítica do portal CONFAZ.
+
+Manter PR em draft e retornar a estes bloqueios após CI. A frente só termina após gate real e Railway funcional; não iniciar fontes seguintes.
