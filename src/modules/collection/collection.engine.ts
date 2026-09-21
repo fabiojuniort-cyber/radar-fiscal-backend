@@ -287,7 +287,13 @@ export async function processAcquiredCollectionRun(
       const retry = decideRetry(
         {
           attemptNo: attempt.attemptNo,
-          maxAttempts: run.maxAttempts,
+          // DOU/INLABS is operationally intermittent. Retryable transport/source
+          // failures keep the same run alive until a successful consultation.
+          // Non-retryable failures still terminate immediately.
+          maxAttempts:
+            run.connectorKey === 'dou'
+              ? Number.MAX_SAFE_INTEGER
+              : run.maxAttempts,
           retryable: outcome.retryable,
           ...(outcome.retryAfterSeconds !== undefined
             ? {
