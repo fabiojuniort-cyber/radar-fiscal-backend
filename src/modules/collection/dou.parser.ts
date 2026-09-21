@@ -251,11 +251,17 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
   const date = brazilDate(a.pubDate!);
   if (date !== context.date || a.pubName !== context.section) throw error('DOU_ARCHIVE_CONTEXT_MISMATCH');
   const pages: string[] = [];
+  const continuationTitles = new Set<string>();
   for (const p of parts) {
     for (const key of ['idMateria', 'pubDate', 'pubName', 'editionNumber', 'artCategory', 'artType']) {
       if (p.attrs[key] !== a[key]) throw error('DOU_INCONSISTENT_PARTS');
     }
-    if (p.part > 1 && douHtmlText(p.fields.Identifica ?? '') && douHtmlText(p.fields.Identifica ?? '') !== title) throw error('DOU_INCONSISTENT_TITLE');
+    if (p.part > 1) {
+      const continuationTitle = douHtmlText(p.fields.Identifica ?? '');
+      if (continuationTitle && continuationTitle !== title) {
+        continuationTitles.add(continuationTitle);
+      }
+    }
     let url: URL;
     try { url = new URL(p.attrs.pdfPage!); } catch { throw error('DOU_MISSING_CERTIFIED_REFERENCE'); }
     if (!['http:', 'https:'].includes(url.protocol) || url.hostname !== 'pesquisa.in.gov.br' || url.username || url.password || url.port ||
@@ -281,6 +287,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
         unit: a.artCategory!.split('/').at(-1), sourceActType: a.artType,
         actDate: structural.actDate ?? null, actYear: structural.actDate?.slice(0, 4) ?? null,
         structuralFamily: structural.family ?? null, abstract: douHtmlText(first.fields.Ementa ?? ''),
+        continuationTitles: [...continuationTitles],
         certifiedPageUrls: [...new Set(pages)], officialHtmlUrl: null,
         archive: context,
         parts: parts.map(p => ({ filename: p.entry.name, rawSha256: hash(p.entry.bytes), sizeBytes: p.entry.bytes.byteLength,
