@@ -399,7 +399,7 @@ export function parseNfePortalList(
 
     if (
       url.hostname.toLowerCase() !== 'www.nfe.fazenda.gov.br' ||
-      !/\/portal\/(?:exibirArquivo|listaHistorico)\.aspx$/i.test(
+      !/\/portal\/exibirArquivo\.aspx$/i.test(
         url.pathname,
       )
     ) {
