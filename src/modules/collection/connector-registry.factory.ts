@@ -13,6 +13,7 @@ import {
 export interface BuildConnectorRegistryOptions {
   includeSimulated?: boolean;
   db?: Kysely<DB>;
+  confazProxyUrl?: string;
 }
 
 export function buildConnectorRegistry(
@@ -22,6 +23,9 @@ export function buildConnectorRegistry(
 
   registry.register(
     new ConfazConnector({
+      ...(options.confazProxyUrl
+        ? { proxyUrl: options.confazProxyUrl }
+        : {}),
       ...(options.db
         ? {
             readSourceState: (sourceId) =>
