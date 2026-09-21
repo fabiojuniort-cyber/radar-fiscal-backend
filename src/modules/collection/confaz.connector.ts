@@ -1,3 +1,5 @@
+import * as nodeHttp from 'node:http';
+
 import type {
   CollectionConnector,
   ConnectorExecutionContext,
@@ -117,11 +119,55 @@ export type ConfazSourceStateReader = (
 
 export interface ConfazConnectorOptions {
   fetchImpl?: typeof fetch;
+  proxyUrl?: string;
   readSourceState?: ConfazSourceStateReader;
   now?: () => Date;
   requestSpacingMs?: number;
   refreshKnownPerFamily?: number;
   bootstrapWindowPerFamily?: number;
+}
+
+type SetGlobalProxyFromEnv = (
+  proxyEnv?: {
+    HTTP_PROXY?: string;
+    HTTPS_PROXY?: string;
+    NO_PROXY?: string;
+  },
+) => () => void;
+
+function createConfazProxyFetch(proxyUrl: string): typeof fetch {
+  const parsed = new URL(proxyUrl);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('CONFAZ proxy URL must use http:// or https://');
+  }
+
+  const setGlobalProxyFromEnv = (
+    nodeHttp as typeof nodeHttp & {
+      setGlobalProxyFromEnv?: SetGlobalProxyFromEnv;
+    }
+  ).setGlobalProxyFromEnv;
+
+  if (!setGlobalProxyFromEnv) {
+    throw new Error(
+      'Current Node.js runtime does not support built-in proxy configuration',
+    );
+  }
+
+  // POC constraint: the collection worker processes one run at a time.
+  // Scope the global proxy switch to the lifetime of this single fetch call
+  // and restore it immediately afterwards.
+  return (async (input, init) => {
+    const restore = setGlobalProxyFromEnv({
+      HTTPS_PROXY: proxyUrl,
+      NO_PROXY: '',
+    });
+
+    try {
+      return await fetch(input, init);
+    } finally {
+      restore();
+    }
+  }) as typeof fetch;
 }
 
 export interface ConfazIndexLink {
@@ -1155,6 +1201,7 @@ export class ConfazConnector implements CollectionConnector {
   readonly version = 'confaz-1.0.0';
 
   private readonly fetchImpl: typeof fetch;
+  private readonly proxyEnabled: boolean;
   private readonly readSourceState: ConfazSourceStateReader | undefined;
   private readonly now: () => Date;
   private readonly refreshKnownPerFamily: number;
@@ -1162,7 +1209,12 @@ export class ConfazConnector implements CollectionConnector {
   private readonly requestGate: RequestGate;
 
   constructor(options: ConfazConnectorOptions = {}) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.proxyEnabled = Boolean(options.proxyUrl);
+    this.fetchImpl =
+      options.fetchImpl ??
+      (options.proxyUrl
+        ? createConfazProxyFetch(options.proxyUrl)
+        : fetch);
     this.readSourceState = options.readSourceState;
     this.now = options.now ?? (() => new Date());
     this.refreshKnownPerFamily =
@@ -1361,6 +1413,7 @@ export class ConfazConnector implements CollectionConnector {
         knownOriginCount: state.knownOrigins.length,
         bootstrapLimited,
         requestSpacingMs: DEFAULT_REQUEST_SPACING_MS,
+        egressProxyEnabled: this.proxyEnabled,
       },
     };
   }
