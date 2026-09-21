@@ -3,6 +3,8 @@ import { ConnectorError } from './connector.error.js';
 import { InlabsClient, type InlabsCredentials, type InlabsXmlSection } from './inlabs.client.js';
 import { readDouZip, parseDouEntries, type DouArchiveContext } from './dou.parser.js';
 
+export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO2', 'DO2E', 'DO3', 'DO3E'];
+
 export interface DouState {
   archives: Record<string, string>;
   lastSuccessAt?: Date;
@@ -34,7 +36,7 @@ export function douCollectionDates(now: Date): string[] {
 
 export class DouConnector implements CollectionConnector {
   readonly key = 'dou';
-  readonly version = '0.2.0';
+  readonly version = '0.3.0';
   readonly #options: DouOptions;
   constructor(options: DouOptions) { this.#options = options; }
 
@@ -53,7 +55,7 @@ export class DouConnector implements CollectionConnector {
     try {
       await client.login(context.signal);
       for (const date of dates) {
-        for (const section of ['DO1', 'DO1E'] as InlabsXmlSection[]) {
+        for (const section of DOU_XML_SECTIONS) {
           context.signal.throwIfAborted();
           const filename = `${date}-${section}.zip`;
           const download = await client.downloadXml(date, section, context.signal);
@@ -89,7 +91,7 @@ export class DouConnector implements CollectionConnector {
         dou: { archives, xmlCount, mediaCount, assembledMatterCount: publications.length, editions: [...editions],
           partialFailures,
           confazMatterCount: publications.filter(p => p.agency === 'CONFAZ').length,
-          coverage: 'SECTION_1_NORMAL_AND_EXTRA', supplementsVerified: false,
+          coverage: 'DOU_SECTIONS_1_2_3_NORMAL_AND_EXTRA', sections: [...DOU_XML_SECTIONS], supplementsVerified: false,
           archivalStorage: 'NOT_CONFIGURED', xmlTimelinessGuaranteed: false },
         douArchives: receipts,
       } };
