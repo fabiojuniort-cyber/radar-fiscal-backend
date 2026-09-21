@@ -784,8 +784,8 @@ test(
       const delayMs =
         first.nextAttemptAt!.getTime() - Date.now();
       assert.ok(
-        delayMs >= 9_000 && delayMs <= 11_000,
-        `expected ~10s retry delay, got ${delayMs}ms`,
+        delayMs >= 19_000 && delayMs <= 21_000,
+        `expected ~20s retry delay, got ${delayMs}ms`,
       );
 
       await db
