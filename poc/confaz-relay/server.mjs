@@ -2,13 +2,8 @@ import server from './testable-server.mjs';
 
 const port = Number(process.env.PORT ?? '8080');
 
-if (
-  !Number.isInteger(port) ||
-  port < 1 ||
-  port > 65535
-) {
-  console.error('PORT must be a valid TCP port.');
-  process.exit(1);
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error('PORT must be a valid TCP port');
 }
 
 server.listen(port, '0.0.0.0', () => {
@@ -30,9 +25,7 @@ function shutdown(signal) {
       signal,
     }),
   );
-
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 10_000).unref();
+  server.close();
 }
 
 process.once('SIGTERM', () => shutdown('SIGTERM'));
