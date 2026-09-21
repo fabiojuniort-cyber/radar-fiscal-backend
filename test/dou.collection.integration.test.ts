@@ -84,6 +84,33 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
       const result = await run(first.runIds[0]); assert.equal(result.status,'SUCCESS_NO_RESULTS'); assert.equal(result.metrics.found,0);
       await db.updateTable('sources').set({schedule_cron:null}).where('id','=',sourceId).execute();
     });
+    await t.test('checkpoint reload retains receipts for all six DOU variants',async()=>{
+      const checkpointRun = await newRun();
+      await db.updateTable('collection_runs')
+        .set({status:'SUCCESS',finished_at:new Date(Date.now()+60_000)})
+        .where('id','=',checkpointRun)
+        .execute();
+      const archives = Object.fromEntries(
+        ['DO1','DO1E','DO2','DO2E','DO3','DO3E'].map((section,index)=>[
+          `2026-09-18-${section}.zip`,
+          String(index+1).repeat(64),
+        ]),
+      );
+      await db.insertInto('collection_attempts').values({
+        collection_run_id:checkpointRun,
+        attempt_no:1,
+        status:'SUCCESS',
+        metadata:{douArchives:archives},
+      }).execute();
+      const current = await newRun();
+      assert.deepEqual(
+        (await readDouSourceState(db,sourceId,current)).archives,
+        archives,
+      );
+      await db.deleteFrom('collection_runs')
+        .where('id','in',[current,checkpointRun])
+        .execute();
+    });
     await t.test('attempt success in partial/failed/running runs cannot advance receipts; backfill is explicit',async()=>{
       const current = await newRun(); const before = await readDouSourceState(db,sourceId,current);
       assert.equal(Object.keys(before.archives).length,2);
