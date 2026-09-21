@@ -17,6 +17,7 @@ import {
   processAcquiredCollectionRun,
   type CollectionEngineResult,
 } from '../src/modules/collection/collection.engine.js';
+import { ConnectorError } from '../src/modules/collection/connector.error.js';
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
 import {
   createMandatorySimulatedConnectors,
@@ -696,5 +697,133 @@ test(
     );
 
     await db.destroy();
+  },
+);
+
+
+test(
+  'retryable DOU run continues past finite source max_attempts until success',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+
+    const sourceId = randomUUID();
+    const runId = randomUUID();
+    let calls = 0;
+    const registry = new ConnectorRegistry();
+
+    try {
+      await db
+        .insertInto('sources')
+        .values({
+          id: sourceId,
+          code: `dou-retry-forever-${sourceId}`,
+          name: 'DOU Retry Forever',
+          jurisdiction_level: 'FEDERAL',
+          base_url: 'https://inlabs.in.gov.br',
+          connector_key: 'dou',
+          max_attempts: 1,
+        })
+        .execute();
+
+      await db
+        .insertInto('collection_runs')
+        .values({
+          id: runId,
+          source_id: sourceId,
+          scheduled_for: new Date(Date.now() - 60_000),
+          trigger_type: 'MANUAL',
+          status: 'PENDING',
+        })
+        .execute();
+
+      registry.register({
+        key: 'dou',
+        version: 'retry-test',
+        collect: async () => {
+          calls += 1;
+          if (calls === 1) {
+            throw new ConnectorError('temporary', {
+              kind: 'SOURCE_UNAVAILABLE',
+              code: 'INLABS_UNAVAILABLE',
+              retryable: true,
+            });
+          }
+          return { publications: [] };
+        },
+      });
+
+      const firstRun = await acquireNextCollectionRun(
+        db,
+        'worker-dou-retry-1',
+      );
+      assert.ok(firstRun);
+      const first = await processAcquiredCollectionRun(
+        db,
+        registry,
+        firstRun,
+        {
+          heartbeatIntervalMs: 0,
+          retryPolicy: {
+            baseDelayMs: 0,
+            maxBackoffMs: 0,
+          },
+        },
+      );
+
+      assert.equal(first.state, 'RETRY_SCHEDULED');
+
+      const secondRun = await acquireNextCollectionRun(
+        db,
+        'worker-dou-retry-2',
+      );
+      assert.ok(secondRun);
+      const second = await processAcquiredCollectionRun(
+        db,
+        registry,
+        secondRun,
+        {
+          heartbeatIntervalMs: 0,
+          retryPolicy: {
+            baseDelayMs: 0,
+            maxBackoffMs: 0,
+          },
+        },
+      );
+
+      assert.equal(second.state, 'TERMINAL');
+      assert.equal(second.status, 'SUCCESS_NO_RESULTS');
+      assert.equal(calls, 2);
+
+      const attempts = await db
+        .selectFrom('collection_attempts')
+        .select(['attempt_no', 'status'])
+        .where('collection_run_id', '=', runId)
+        .orderBy('attempt_no')
+        .execute();
+
+      assert.deepEqual(attempts, [
+        { attempt_no: 1, status: 'SOURCE_UNAVAILABLE' },
+        { attempt_no: 2, status: 'SUCCESS' },
+      ]);
+    } finally {
+      await db
+        .deleteFrom('collection_runs')
+        .where('id', '=', runId)
+        .execute();
+      await db
+        .deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
   },
 );

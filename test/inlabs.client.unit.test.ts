@@ -154,13 +154,41 @@ test('404 with expired session is an authentication failure', async () => {
   await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), code('INLABS_AUTH_FAILED'));
 });
 
-test('download redirects are not followed and clear the session', async () => {
+test('authenticated GET follows bounded same-origin redirects like official clients', async () => {
+  const redirected = new Response(null, { status: 302, headers: {
+    location: '/download/final.zip',
+    'set-cookie': 'inlabs_session_cookie=rotated-session; Secure; HttpOnly; Path=/',
+  } });
+  const { client, calls } = stub([loginResponse(), redirected, new Response(zip)]);
+  await client.login(signal());
+  const result = await client.downloadXml('2026-09-18', 'DO1', signal());
+  assert.equal(result.status, 'AVAILABLE');
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2]!.url, 'https://inlabs.in.gov.br/download/final.zip');
+  assert.equal(new Headers(calls[2]!.init.headers).get('cookie'),
+    'inlabs_session_cookie=rotated-session');
+});
+
+test('authenticated redirects never forward cookies to foreign origins', async () => {
   const { client, calls } = stub([loginResponse(), new Response(null, { status: 302,
     headers: { location: 'https://example.invalid/capture' } })]);
   await client.login(signal());
-  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), code('INLABS_SESSION_REDIRECT'));
-  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), code('INLABS_AUTH_REQUIRED'));
+  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()),
+    code('INLABS_UNEXPECTED_REDIRECT'));
   assert.equal(calls.length, 2);
+});
+
+test('redirects back to login remain retryable session failures', async () => {
+  const { client } = stub([loginResponse(), new Response(null, { status: 302,
+    headers: { location: '/logar.php' } })]);
+  await client.login(signal());
+  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), error => {
+    assert.ok(error instanceof ConnectorError);
+    assert.equal(error.code, 'INLABS_SESSION_REDIRECT');
+    assert.equal(error.retryable, true);
+    assert.equal(error.retryAfterSeconds, 10);
+    return true;
+  });
 });
 
 test('HTML masquerading as archive is not accepted as XML/PDF', async () => {
@@ -175,17 +203,25 @@ test('WAF rejection is distinguished from invalid credentials', async () => {
   await assert.rejects(client.readDailyIndex('2026-09-18', signal()), code('INLABS_ACCESS_DENIED'));
 });
 
-test('rate limits preserve Retry-After and 5xx remains retryable', async () => {
+test('rate limits and 5xx preserve Retry-After and otherwise use conservative defaults', async () => {
   for (const status of [429, 503]) {
     const { client } = stub([new Response(null, { status, headers: { 'retry-after': '90' } })]);
     await assert.rejects(client.login(signal()), error => {
       assert.ok(error instanceof ConnectorError);
       assert.equal(error.retryable, true);
       assert.equal(error.httpStatus, status);
-      if (status === 429) assert.equal(error.retryAfterSeconds, 90);
+      assert.equal(error.retryAfterSeconds, 90);
       return true;
     });
   }
+
+  const { client } = stub([new Response(null, { status: 502 })]);
+  await assert.rejects(client.login(signal()), error => {
+    assert.ok(error instanceof ConnectorError);
+    assert.equal(error.code, 'INLABS_UNAVAILABLE');
+    assert.equal(error.retryAfterSeconds, 10);
+    return true;
+  });
 });
 
 test('credentials and transport details never appear in network errors', async () => {
