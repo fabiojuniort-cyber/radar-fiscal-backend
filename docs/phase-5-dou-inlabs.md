@@ -1,7 +1,7 @@
 # DOU / INLABS — implementação e evidências
 
 Atualizado em 2026-09-21. Base: `main` em `23c79a4c205399358572cc5833cd10e7bb164dab`.
-PR #16 permanece draft. **Não concluído nem habilitado em produção.** Parser e conector agora usam XMLs reais enviados pelo titular; autenticação automatizada real, gate CONFAZ, armazenamento dos originais e validação Railway continuam pendentes.
+PR #16 permanece draft. **Não concluído nem habilitado em produção.** Parser e conector usam XMLs reais enviados pelo titular para DO1/DO1E. O runtime foi ampliado para coletar DO1/DO1E, DO2/DO2E e DO3/DO3E; autenticação automatizada real, validação das Seções 2/3, gate CONFAZ, armazenamento dos originais e validação Railway continuam pendentes.
 
 ## Diretrizes preservadas
 
@@ -22,7 +22,7 @@ A captura anterior mostrou manutenção em `/registrar.php`. Depois o titular co
 | Tema | Evidência e implementação |
 | --- | --- |
 | Login | POST HTTPS `/logar.php`, email/password, cookie `inlabs_session_cookie`, header `origem`. Cookie privado em memória por tentativa; sem logs/código contendo credenciais. |
-| XML | `index.php?p=AAAA-MM-DD&dl=AAAA-MM-DD-DO1.zip`; DO1/DO1E verificados nas amostras. Scripts também enumeram DO2/DO3 e extras; escopo atual Seção 1. |
+| XML | `index.php?p=AAAA-MM-DD&dl=AAAA-MM-DD-DOx.zip`; DO1/DO1E verificados nas amostras. O runtime coleta as seis variantes `DO1`, `DO1E`, `DO2`, `DO2E`, `DO3`, `DO3E`; Seções 2/3 ainda exigem evidência live antes de conclusão. |
 | Extra | DO1E contém várias edições: 177-A, B, C e D no mesmo ZIP. Não se assume ZIP = edição. |
 | PDF | Convenção oficial normal `AAAA_MM_DD_ASSINADO_do1.pdf`; extras `..._do1_extra_A.pdf` e letras seguintes. Transporte implementado, sem captura/armazenamento de PDF nesta validação. |
 | Suplementos | Convenção ainda não comprovada. Não inventamos DO1S; metadata informa `supplementsVerified=false`. |
@@ -66,7 +66,7 @@ A 010 mantém unicidade de URL para origens de documento; referências explicita
 
 Registry registra `dou` somente com `DOU_CONNECTOR_ENABLED=true`; permanece desligado por padrão. `INLABS_EMAIL` e `INLABS_PASSWORD` vêm de secrets do Worker. Nenhuma fonte produtiva foi provisionada ou configuração Railway alterada nesta etapa.
 
-Política provisória para execução horária em America/Sao_Paulo: dia corrente e dois anteriores, mais uma data rotativa do mês corrente/anterior. Máximo quatro datas e oito ZIPs por tentativa. A reconciliação é limitada e precisa de medição de cobertura; não é garantia de completude mensal. Intervalo desde último sucesso acima de 60 dias exige recuperação explícita (`DOU_BACKFILL_REQUIRED`). Nenhuma indisponibilidade dispara coleta de todo histórico.
+Política provisória para execução horária em America/Sao_Paulo: dia corrente e dois anteriores, mais uma data rotativa do mês corrente/anterior. Com cobertura integral do DOU, o teto passa a quatro datas e até 24 ZIPs por tentativa (seis seções/edições por data). A reconciliação é limitada e precisa de medição de cobertura; não é garantia de completude mensal. Intervalo desde último sucesso acima de 60 dias exige recuperação explícita (`DOU_BACKFILL_REQUIRED`). Nenhuma indisponibilidade dispara coleta de todo histórico.
 
 SHA-256 do pacote permite evitar parsing de ZIP inalterado, mas o download ainda ocorre; validators HTTP não foram comprovados. Hash do ZIP fica só em metadata, não no content_hash de todas as matérias. Os hashes individuais XML também ficam preservados. Alteração de uma matéria não deve criar versões das outras.
 
@@ -75,6 +75,14 @@ Recibos ficam em `collection_attempts.metadata.douArchives`, retidos por 65 dias
 Nenhum pacote disponível gera erro explícito, retryable, `INLABS_EDITIONS_NOT_AVAILABLE`. Não é prova de dia vazio. Download 404 exige consulta do índice; validação estrutural positiva do índice autenticado ainda precisa ser conferida com HTML real. Parser inválido gera erro por matéria, com código e filename em metadata. Manutenção é distinguida de autenticação, WAF, rede, rate-limit, timeout e edição ausente. Um lote sem CONFAZ continua sendo sucesso de ingestão genérica, com contador CONFAZ zero.
 
 BACKFILL produtivo é rejeitado sem lote explícito. A classe aceita até quatro datas injetadas para testes/validação controlada; o registry produtivo não expõe essa opção. Falta fechar interface de execução administrativa por run, sem alterar a configuração compartilhada da fonte. Antes de ampliá-la, medir duração, memória, crescimento do banco/storage e impacto Railway.
+
+## Cobertura integral do DOU e citações empresariais
+
+Decisão de escopo em 2026-09-21: a ingestão não ficará limitada à Seção 1. O Radar Fiscal deve poder detectar menções oficiais relacionadas a empresas/clientes, incluindo ocorrências por CNPJ, razão social e filiais. Por isso o conector passa a ingerir também Seções 2 e 3, normais e extras, preservando o conteúdo global uma única vez.
+
+A classificação de uso fica separada da coleta: DO1/DO1E permanecem prioritários para legislação e atos normativos; DO3/DO3E são particularmente relevantes para contratos, editais, avisos, sanções e outras citações individualizadas; DO2/DO2E também são preservados para cobertura oficial completa. Nenhuma seção é descartada por parecer pouco tributária durante a ingestão.
+
+O cruzamento por cliente será uma camada posterior, sem duplicar publicações: CNPJ completo, CNPJ normalizado, raiz quando aplicável, razão social e demais identificadores empresariais poderão gerar vínculos tenant-publication com o trecho comprobatório e uma classificação como benefício, credenciamento, multa/penalidade, sanção, contrato, licitação, decisão ou outra menção. A classificação não deve inventar vínculo quando o texto não o sustentar.
 
 ## Monitoramento
 
