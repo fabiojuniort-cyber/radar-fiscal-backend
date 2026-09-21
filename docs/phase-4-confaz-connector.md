@@ -235,3 +235,28 @@ Conclusão: alterar o egress Railway para Static Outbound IP não resolveu a con
 Após o teste, o start command do Worker foi restaurado para `npm run start:worker`; backend e scheduler não foram alterados. O Static Outbound IP permanece habilitado no Worker.
 
 A próxima prova autorizada é um relay/proxy source-specific. Nenhum relay está ativo em produção neste momento.
+
+
+## Fixie — resultado da POC source-specific
+
+Em 2026-09-21 foi executada uma POC real com Fixie HTTP/HTTPS, plano gratuito Tricycle, região US East, configurado somente no `radar-fiscal-worker` por `CONFAZ_PROXY_URL`.
+
+Diagnóstico isolado:
+
+- `Railway -> Fixie -> api.ipify.org`: sucesso;
+- resposta HTTP: `200 OK`;
+- latência observada: 348 ms;
+- IP de saída observado: `52.5.155.132`, correspondente a um dos IPs do proxy provisionado;
+- `Railway -> Fixie -> www.confaz.fazenda.gov.br:443`: timeout após 15.002 ms, sem resposta HTTP.
+
+Também foi executada uma collection run real pelo Motor de Coleta usando o proxy source-specific. O attempt expirou no timeout global de 90 s e foi classificado como `CONNECTOR_TIMEOUT`, confirmando que o relay Fixie não libera a rota até o CONFAZ.
+
+Conclusão:
+
+- credencial e transporte Fixie estão funcionais;
+- o bloqueio não é causado por configuração incorreta do proxy no Radar Fiscal;
+- um egress US East via Fixie/AWS também não alcança o CONFAZ;
+- repetir outro relay US/EU tem baixo valor técnico;
+- próxima prova deve usar egress em região brasileira, preferencialmente São Paulo.
+
+Após a POC, o Worker foi restaurado para `main` e `npm run start:worker`. O PR de proxy permanece draft e não foi consolidado em produção.
