@@ -186,7 +186,7 @@ test('redirects back to login remain retryable session failures', async () => {
     assert.ok(error instanceof ConnectorError);
     assert.equal(error.code, 'INLABS_SESSION_REDIRECT');
     assert.equal(error.retryable, true);
-    assert.equal(error.retryAfterSeconds, 10);
+    assert.equal(error.retryAfterSeconds, 20);
     return true;
   });
 });
@@ -201,7 +201,7 @@ test('HTML masquerading as archive is retried as a transient fetch failure', asy
       assert.equal(error.code, 'INLABS_INVALID_DOWNLOAD');
       assert.equal(error.kind, 'FETCH_ERROR');
       assert.equal(error.retryable, true);
-      assert.equal(error.retryAfterSeconds, 10);
+      assert.equal(error.retryAfterSeconds, 20);
       return true;
     },
   );
@@ -229,7 +229,7 @@ test('rate limits and 5xx preserve Retry-After and otherwise use conservative de
   await assert.rejects(client.login(signal()), error => {
     assert.ok(error instanceof ConnectorError);
     assert.equal(error.code, 'INLABS_UNAVAILABLE');
-    assert.equal(error.retryAfterSeconds, 10);
+    assert.equal(error.retryAfterSeconds, 20);
     return true;
   });
 });
