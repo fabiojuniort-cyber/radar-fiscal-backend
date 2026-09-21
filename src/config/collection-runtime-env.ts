@@ -83,6 +83,8 @@ const schema = z.object({
     .min(1_000)
     .default(30_000),
 
+  CONFAZ_PROXY_URL: z.string().url().optional(),
+
   COLLECTION_ENABLE_SIMULATED_CONNECTORS: z
     .enum(['true', 'false'])
     .default('false')
