@@ -1,7 +1,6 @@
 # DOU / INLABS — implementação e evidências
 
-Atualizado em 2026-09-21. Base: `main` em `23c79a4c205399358572cc5833cd10e7bb164dab`.
-PR #16 permanece draft. **Não concluído nem habilitado em produção.** Parser e conector usam XMLs reais enviados pelo titular para DO1/DO1E e já foram validados ao vivo no Railway contra as seis variantes DO1/DO1E, DO2/DO2E e DO3/DO3E. O runtime foi ampliado para coletar as três seções normais e extras; gate CONFAZ, suplementos, armazenamento dos originais e políticas finais de precedência/reconciliação continuam pendentes.
+Atualizado em 2026-09-21. PR #16 implementa o conector DOU/INLABS para as **seis variantes XML documentadas oficialmente**: `DO1/DO1E`, `DO2/DO2E` e `DO3/DO3E`. A implementação foi validada com arquivos reais, sessão autenticada no Railway e gate CONFAZ completo. O conector permanece **desabilitado por padrão em produção**; ativação é uma etapa operacional controlada após merge e aplicação da migration 010.
 
 ## Diretrizes preservadas
 
@@ -36,11 +35,11 @@ A captura anterior mostrou manutenção em `/registrar.php`. Depois o titular co
 
 O parser valida UTF-8, estrutura XML, ausência de DTD, data, nome de arquivo, identificadores, seção e referência certificada. Bibliotecas fixadas em package-lock: sax, yauzl e htmlparser2. ZIP: CRC32/tamanho, 64 MiB comprimido, 128 MiB descomprimido, 8 MiB por entrada e até 5.000 entradas; leitura sequencial sem extrair caminhos no disco. Esses limites são operacionais provisórios, não limites publicados da fonte.
 
-Continuações `idMateria-1.xml`, `-2.xml` etc. são reunidas em ordem numérica por jornal/idMateria, com metadados consistentes. Parte inválida ou lacuna observável rejeita a matéria inteira e conserva as outras. O formato observado não declara quantidade total de partes; não é possível detectar uma última parte ausente quando a sequência restante é contínua. Título pode estar vazio nas continuações. Texto HTML é convertido em texto; tabelas mantêm conteúdo textual, mas não diagramação. Imagens são contadas, não preservadas; conteúdo exclusivamente visual requer tratamento posterior.
+Continuações `idMateria-1.xml`, `-2.xml` etc. são reunidas em ordem numérica por jornal/idMateria, exigindo consistência dos metadados estruturais oficiais. Parte inválida ou lacuna observável rejeita a matéria inteira e conserva as outras. O formato observado não declara quantidade total de partes; não é possível detectar uma última parte ausente quando a sequência restante é contínua. O INLABS real demonstrou que `Identifica` pode estar vazio **ou mudar entre continuações do mesmo idMateria** (por exemplo, de “DESPACHOS...” para “RETIFICAÇÕES”); esses títulos de continuação são preservados em `metadata.dou.continuationTitles` e não invalidam a matéria. Texto HTML é convertido em texto; tabelas mantêm conteúdo textual, mas não diagramação. Imagens são contadas, não preservadas; conteúdo exclusivamente visual requer tratamento posterior.
 
 Título, texto, órgão completo, unidade, tipo, número/ano, data de publicação, data do ato quando explícita, ementa, seção, edição, páginas, IDs e atributos originais são preservados, exceto bytes de highlightImage (somente indicador de presença, sem base64 no banco). Data de publicação vem de `pubDate`, não da data do ato. O dicionário menciona DOU1; a amostra usa DO1, respeitado pelo parser. Sem HTML oficial observado, `officialHtmlUrl=null`; nenhuma URL com slug é fabricada.
 
-Identidade externa composta pelos campos observados `data:seção:edição:idMateria`, com ID original preservado em metadata. Classificação CONFAZ exige órgão explícito e cabeçalho apropriado; menção a ato no corpo não vira identidade daquele ato. Despachos e retificações sem número usam identidade source-scoped existente. A agência CONFAZ e famílias são normalizadas para compatibilidade com o conector existente, sem reimplementar seu parser.
+Identidade externa das matérias-fonte é composta pelos campos observados `data:seção:edição:idMateria`, com ID original preservado em metadata. Classificação CONFAZ exige órgão explícito e cabeçalho apropriado. Há uma exceção comprovada pelo XML oficial: o CONFAZ publica lotes de **Convênios ICMS, Ajustes SINIEF e Protocolos ICMS dentro de um DESPACHO agregador**. Nesses casos, o Despacho original é preservado e cada cabeçalho explícito, completo, datado e em caixa alta gera uma publicação filha normativa com `sourceRole=PRIMARY`, mesma página certificada e identidade forte por família/número/ano/data de publicação. Referências incidentais no corpo continuam sem gerar publicação filha. Isso permite deduplicação posterior com o portal CONFAZ.
 
 ## Evidência dos arquivos completos
 
@@ -54,19 +53,17 @@ Normal: cerca de 4 MB descomprimidos; extra: 184.195 bytes. O volume PostgreSQL 
 
 Fixtures versionadas: 12 XMLs originais, bytes e hashes preservados, representando dez matérias (incluindo três despachos da Fazenda na mesma página e uma portaria em três partes). Testes também têm alterações sintéticas identificadas para versionamento e cabeçalhos sintéticos CONFAZ.
 
-### Gate CONFAZ live — evidência parcial
+### Gate CONFAZ live — concluído
 
-A captura autenticada real no Railway em 2026-09-10, 2026-09-14 e 2026-09-15 comprovou matérias CONFAZ no XML oficial do DOU, com zero falhas de parsing nas edições consultadas. Exemplos capturados:
-- `DESPACHO Nº 41, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `41/2026`;
-- `ATO COTEPE/ICMS Nº 86, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `86/2026`;
-- `ATO COTEPE ICMS Nº 87, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `87/2026`;
-- `ATO COTEPE ICMS Nº 88, DE 9 DE SETEMBRO DE 2026` → CONFAZ, número `88/2026`;
-- `ATO COTEPE/ICMS Nº 94, DE 11 DE SETEMBRO DE 2026` e `95/2026`;
-- `ATO COTEPE/ICMS Nº 96, 97 e 98, DE 14 DE SETEMBRO DE 2026`;
-- despachos, atos declaratórios e retificações vinculadas ao CONFAZ.
+A validação autenticada no Railway comprovou primeiro Despachos, Atos COTEPE/ICMS, atos declaratórios e retificações em 10/09, 14/09 e 15/09/2026. A investigação de julho revelou a estrutura oficial dos lotes agregados:
 
-As referências certificadas `pesquisa.in.gov.br`, data, página, external_id e data de publicação foram preservadas. Tentativas posteriores, destinadas a localizar exemplos reais de Convênio ICMS, Ajuste SINIEF e Protocolo ICMS, receberam HTTP 502 no login do INLABS e foram classificadas como `INLABS_UNAVAILABLE`, `SOURCE_UNAVAILABLE`, `retryable=true`. Esse erro não foi convertido em autenticação inválida nem em ausência de publicação. O gate das três famílias restantes continua pendente exclusivamente por indisponibilidade temporária da fonte.
+- **06/07/2026 — Protocolo ICMS:** o `DESPACHO Nº 27, DE 2 DE JULHO DE 2026` contém cabeçalhos explícitos como `PROTOCOLO ICMS Nº 53/2026`, `54/2026`, `55/2026` e seguintes;
+- **08/07/2026 — Convênio ICMS:** o `DESPACHO Nº 28, DE 7 DE JULHO DE 2026` contém `CONVÊNIO ICMS Nº 63/2026`, `64/2026`, `65/2026` e seguintes;
+- **09/07/2026 — Ajuste SINIEF:** o `DESPACHO Nº 30, DE 8 DE JULHO DE 2026` contém `AJUSTE SINIEF Nº 17/2026`, `18/2026`, `19/2026` e seguintes.
 
+Após implementar a extração de atos embutidos e corrigir o tratamento de títulos de continuação, a execução live final autenticou na primeira tentativa e terminou com **zero falhas de parsing** nos três ZIPs. O resumo do gate foi: **36 ocorrências de Protocolo ICMS, 25 de Convênio ICMS e 12 de Ajuste SINIEF, `gatePassed=true`**. Os filhos normativos possuem título, família, número/ano, data de publicação no DOU, texto isolado, página certificada e vínculo com o Despacho pai.
+
+Durante a frente, o INLABS também oscilou com HTTP 502. O cliente classificou corretamente o evento como `INLABS_UNAVAILABLE / SOURCE_UNAVAILABLE / retryable=true`; não foi confundido com credencial inválida nem com ausência de publicação.
 ### Validação live Railway — DOU completo em 2026-09-18
 
 Serviço temporário isolado `inlabs-validation`, branch `feat/dou-inlabs`, sem Scheduler e sem persistência PostgreSQL. Credenciais referenciadas a partir do Worker, sem exposição em logs. Login autenticado e índice diário foram aceitos; o índice retornou 12.418 bytes.
@@ -92,13 +89,13 @@ A 010 mantém unicidade de URL para origens de documento; referências explicita
 
 ## Integração, incremental e recuperação
 
-Registry registra `dou` somente com `DOU_CONNECTOR_ENABLED=true`; permanece desligado por padrão. `INLABS_EMAIL` e `INLABS_PASSWORD` vêm de secrets do Worker. Nenhuma fonte produtiva foi provisionada ou configuração Railway alterada nesta etapa.
+Registry registra `dou` somente com `DOU_CONNECTOR_ENABLED=true`; permanece desligado por padrão. `INLABS_EMAIL` e `INLABS_PASSWORD` vêm de secrets do Worker. Foi adicionado `db:ensure-dou-source`, que recusa ativação se a flag ou as credenciais não estiverem presentes e cria/atualiza a fonte `dou` com agenda horária (`10 * * * *` por padrão, timezone `America/Sao_Paulo`). A fonte produtiva **ainda não foi provisionada/ativada** nesta frente.
 
 Política provisória para execução horária em America/Sao_Paulo: dia corrente e dois anteriores, mais uma data rotativa do mês corrente/anterior. Com cobertura integral do DOU, o teto passa a quatro datas e até 24 ZIPs por tentativa (seis seções/edições por data). A reconciliação é limitada e precisa de medição de cobertura; não é garantia de completude mensal. Intervalo desde último sucesso acima de 60 dias exige recuperação explícita (`DOU_BACKFILL_REQUIRED`). Nenhuma indisponibilidade dispara coleta de todo histórico.
 
 SHA-256 do pacote permite evitar parsing de ZIP inalterado, mas o download ainda ocorre; validators HTTP não foram comprovados. Hash do ZIP fica só em metadata, não no content_hash de todas as matérias. Os hashes individuais XML também ficam preservados. Alteração de uma matéria não deve criar versões das outras.
 
-Recibos ficam em `collection_attempts.metadata.douArchives`, retidos por 65 dias e aceitos somente de runs terminais SUCCESS/SUCCESS_NO_RESULTS com attempt SUCCESS. Attempt SUCCESS sozinho ocorre antes da persistência e não é checkpoint. Falha parcial não avança recibos; próxima execução repete idempotentemente. Falha HTTP após outro pacote válido descarta o lote da tentativa e deixa retry com o Motor. A mudança no heartbeat mantém o timer durante persistência e fechamento do run; o comportamento preexistente de perda de ownership não foi redesenhado.
+Recibos das **seis variantes** ficam em `collection_attempts.metadata.douArchives`, retidos por 65 dias e aceitos somente de runs terminais SUCCESS/SUCCESS_NO_RESULTS com attempt SUCCESS. O reload aceita `DO[123]E?`; uma regressão PostgreSQL impede que DO2/DO3 sejam reprocessados por perda de checkpoint. Attempt SUCCESS sozinho ocorre antes da persistência e não é checkpoint. Falha parcial não avança recibos; próxima execução repete idempotentemente. Falha HTTP após outro pacote válido descarta o lote da tentativa e deixa retry com o Motor. A mudança no heartbeat mantém o timer durante persistência e fechamento do run; o comportamento preexistente de perda de ownership não foi redesenhado.
 
 Nenhum pacote disponível gera erro explícito, retryable, `INLABS_EDITIONS_NOT_AVAILABLE`. Não é prova de dia vazio. Download 404 exige consulta do índice; validação estrutural positiva do índice autenticado ainda precisa ser conferida com HTML real. Parser inválido gera erro por matéria, com código e filename em metadata. Manutenção é distinguida de autenticação, WAF, rede, rate-limit, timeout e edição ausente. Um lote sem CONFAZ continua sendo sucesso de ingestão genérica, com contador CONFAZ zero.
 
@@ -118,17 +115,28 @@ O snapshot existente expõe estado, última coleta, contagens de publicações/v
 
 ## Validação e limite de aceitação
 
-CI da branch está verde após a ampliação para DOU completo; a execução #94 passou no commit `31f8af633ce4f5d4f4498fc32323a1bc7d1291d4`, incluindo typecheck, build, testes unitários, migrations, regressões de coleta, integração PostgreSQL/collection engine e autenticação/RLS. As validações live do Railway são adicionais ao CI: usam a sessão real do INLABS e não persistem no banco.
+O head funcional final anterior à limpeza passou CI completo no GitHub Actions. A execução #108 registrou **83 testes unitários + 39 testes de integração/regressão = 122 execuções, 0 falhas**, cobrindo typecheck, build, parser, INLABS, collection engine, PostgreSQL, autenticação/RLS, deduplicação, versionamento, heartbeat e precedência de fontes. Commits posteriores adicionaram regressões para checkpoints das seis variantes, enriquecimento de vigência e provisionamento seguro; cada alteração é novamente validada pelo CI antes do merge.
 
-Railway: `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no `radar-fiscal-worker`. O Worker produtivo continua em `main` e o conector DOU segue desabilitado por padrão. A branch foi executada apenas em serviço temporário isolado `inlabs-validation`, sem Scheduler e sem persistência, comprovando autenticação, índice e download/parser das seis variantes do DOU.
+Railway: `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no `radar-fiscal-worker`. O Worker produtivo continua em `main` e o conector DOU segue desabilitado por padrão. O serviço temporário `inlabs-validation` foi usado apenas para testes live, sem Scheduler e sem persistência PostgreSQL; sua remoção foi staged após a conclusão do gate.
 
-## Decisões fechadas, pendência externa e follow-ups
+### Precedência DOU × portais
 
-1. **Originais — decisão MVP fechada:** o conector não criará storage DOU específico nem gravará binários no PostgreSQL. O conteúdo normalizado, URL oficial, identificadores e SHA-256 do pacote/XML ficam preservados. A tabela `publication_files` permanece como contrato para uma futura camada **compartilhada** de object storage aplicável a todas as fontes. Isso é follow-up de infraestrutura, não bloqueio do conector DOU.
-2. **PRIMARY/ENRICHMENT/VALIDATION — fechado:** DOU/INLABS é `PRIMARY`; portal CONFAZ é `ENRICHMENT`. A persistência agora protege a versão corrente primária: conteúdo diferente vindo de enriquecimento pode ser armazenado como versão não corrente, mas não substitui a versão corrente nem `primary_official_url`. Se a fonte primária chegar depois, ela assume a referência primária. Há regressão PostgreSQL cobrindo a regra.
-3. **Disponibilidade e recuperação — decisão MVP fechada:** manter execução horária com dia corrente + dois anteriores + uma data antiga rotativa do mês corrente/anterior, no máximo quatro datas por run e seis variantes por data. Recibos ficam por 65 dias; gaps acima de 60 dias exigem backfill administrativo explícito. Um backfill histórico completo é capacidade operacional posterior e não bloqueia a coleta prospectiva do MVP.
-4. **Suplementos — não bloqueante:** os scripts e README oficiais do INLABS documentam apenas `DO1/DO1E`, `DO2/DO2E` e `DO3/DO3E`. Não há convenção oficial separada comprovada para suplemento XML. O sistema não inventará `DO1S` ou equivalente; nova variante só será adicionada quando houver evidência oficial.
-5. **Acesso — fechado:** `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no Worker e a sessão autenticada real já foi validada no Railway, incluindo índice e download/parser das seis variantes.
-6. **Gate CONFAZ — única pendência externa:** Ato COTEPE/ICMS, despachos, atos declaratórios e retificações foram capturados em XML real do DOU. O validador live versionado aponta para datas oficiais com Protocolo ICMS (06/07/2026), Convênios ICMS (08/07/2026) e Ajustes SINIEF (09/07/2026). O código e CI estão verdes, porém as tentativas atuais recebem HTTP 502 no login do INLABS, corretamente classificado como `INLABS_UNAVAILABLE / SOURCE_UNAVAILABLE / retryable=true`. Não converter essa indisponibilidade em falha de autenticação nem em ausência de publicação.
+- DOU/INLABS: `sourceRole=PRIMARY`;
+- portal CONFAZ: `sourceRole=ENRICHMENT`;
+- enriquecimento com conteúdo diferente pode ser preservado como versão não corrente, mas não substitui a versão corrente nem `primary_official_url` do DOU;
+- se o DOU chegar depois de uma origem de enriquecimento, o PRIMARY assume a versão corrente;
+- um enriquecimento pode preencher `effective_on` somente quando a vigência canônica estiver ausente; não apaga nem substitui uma vigência explícita do PRIMARY;
+- regressões PostgreSQL cobrem a regra.
+## Decisões fechadas e follow-ups
 
-Manter o PR em draft somente enquanto o gate live das três famílias restantes estiver impedido pelo HTTP 502 do INLABS. Todos os demais itens técnicos desta frente estão fechados para o MVP. Não iniciar fontes seguintes antes de registrar o resultado final desse gate ou declarar formalmente o bloqueio externo.
+1. **Originais — fechado para o MVP:** o conector não grava ZIP/PDF/binários no PostgreSQL. Conteúdo normalizado, URL oficial, identificadores e SHA-256 do pacote/XML são preservados. A tabela `publication_files` permanece como contrato para futura camada compartilhada de object storage.
+2. **PRIMARY/ENRICHMENT — fechado:** DOU/INLABS é PRIMARY e portais dos órgãos são ENRICHMENT/VALIDATION. Conteúdo do portal não derruba a versão primária; vigência ausente pode ser enriquecida de forma conservadora.
+3. **Recuperação — fechado para o MVP:** execução horária com dia corrente + dois anteriores + uma data antiga rotativa; no máximo quatro datas e seis variantes por data. Gaps acima de 60 dias exigem backfill administrativo explícito.
+4. **Suplementos — follow-up de cobertura:** o serviço certificado do DOU admite edições suplementares, mas os scripts de automação oficiais do INLABS consultados documentam somente `DO1/DO1E`, `DO2/DO2E` e `DO3/DO3E`. Não foi encontrada convenção XML separada comprovada; portanto o conector **não inventa `DO1S`**. A cobertura desta frente é “todas as variantes XML documentadas pelo INLABS”, não uma promessa de captura de uma eventual variante suplementar não documentada.
+5. **Gate CONFAZ — fechado:** Protocolo ICMS, Convênio ICMS, Ajuste SINIEF e Ato COTEPE/ICMS foram comprovados com XML real; atos agregados em Despachos são desmembrados sem perder o Despacho pai.
+6. **Citações empresariais — base de ingestão fechada:** DO1/DO1E/DO2/DO2E/DO3/DO3E são preservados globalmente. O match CNPJ/razão social/classificação de benefício, multa, contrato, sanção etc. pertence ao Motor de Relevância e não é implementado neste conector.
+7. **Ativação produtiva — controlada após merge:** aplicar migration 010, manter secrets no Worker, definir `DOU_CONNECTOR_ENABLED=true`, executar `db:ensure-dou-source` e observar a primeira coleta/monitoramento. Até isso ocorrer, merge do PR é seguro porque o registry não registra DOU por padrão.
+
+### Critério de conclusão da frente
+
+A frente DOU/INLABS é considerada tecnicamente concluída quando o PR final estiver com CI verde e mergeado. A ativação produtiva é um passo operacional separado e reversível, deliberadamente mantido fora do merge para evitar começar coletas antes da migration 010 e da decisão do Gerente Geral.
