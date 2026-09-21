@@ -340,7 +340,15 @@ export class InlabsClient {
     if (/requested URL was rejected|access denied|request rejected/i.test(prefix)) {
       throw fail('INLABS_ACCESS_DENIED', 'SOURCE_UNAVAILABLE');
     }
-    if (!valid) throw fail('INLABS_INVALID_DOWNLOAD', 'PROCESSING_ERROR');
+    if (!valid) {
+      throw fail(
+        'INLABS_INVALID_DOWNLOAD',
+        'FETCH_ERROR',
+        true,
+        response.status,
+        10,
+      );
+    }
     // Magic validation is transport validation only; ZIP integrity/XML parsing follows
     // in the connector once official samples and decompression limits are established.
     return { status: 'AVAILABLE', officialUrl, filename, bytes,

@@ -191,10 +191,20 @@ test('redirects back to login remain retryable session failures', async () => {
   });
 });
 
-test('HTML masquerading as archive is not accepted as XML/PDF', async () => {
+test('HTML masquerading as archive is retried as a transient fetch failure', async () => {
   const { client } = stub([loginResponse(), new Response('<html>maintenance</html>')]);
   await client.login(signal());
-  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), code('INLABS_INVALID_DOWNLOAD'));
+  await assert.rejects(
+    client.downloadXml('2026-09-18', 'DO1', signal()),
+    error => {
+      assert.ok(error instanceof ConnectorError);
+      assert.equal(error.code, 'INLABS_INVALID_DOWNLOAD');
+      assert.equal(error.kind, 'FETCH_ERROR');
+      assert.equal(error.retryable, true);
+      assert.equal(error.retryAfterSeconds, 10);
+      return true;
+    },
+  );
 });
 
 test('WAF rejection is distinguished from invalid credentials', async () => {
