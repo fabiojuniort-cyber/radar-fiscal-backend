@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   ConfazConnector,
+  createConfazRelayFetch,
   extractConfazIndexLinks,
   parseConfazPublicationHtml,
 } from '../src/modules/collection/confaz.connector.js';
@@ -351,5 +352,85 @@ test('rejects unsupported source-specific proxy schemes', () => {
       proxyUrl: 'socks5://proxy.example.test:1080',
     }),
     /proxy URL must use http:\/\/ or https:\/\//,
+  );
+});
+
+
+test('routes only official CONFAZ GET requests through source-specific relay', async () => {
+  const calls: Array<{
+    url: string;
+    authorization: string | null;
+  }> = [];
+
+  const fakeRelayFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url =
+      input instanceof Request
+        ? input.url
+        : input.toString();
+    const headers = new Headers(init?.headers);
+
+    calls.push({
+      url,
+      authorization: headers.get('authorization'),
+    });
+
+    return new Response('<html><body>ok</body></html>', {
+      status: 200,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'x-radar-origin-url':
+          'https://www.confaz.fazenda.gov.br/legislacao/protocolos/2026/pt088_26',
+      },
+    });
+  }) as typeof fetch;
+
+  const relayFetch = createConfazRelayFetch(
+    'https://relay.example.test',
+    'abcdefghijklmnopqrstuvwxyz123456',
+    fakeRelayFetch,
+  );
+
+  const response = await relayFetch(
+    'https://www.confaz.fazenda.gov.br/legislacao/protocolos/2026/pt088_26',
+    {
+      method: 'GET',
+      signal: new AbortController().signal,
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+
+  const relayUrl = new URL(calls[0]!.url);
+  assert.equal(relayUrl.origin, 'https://relay.example.test');
+  assert.equal(relayUrl.pathname, '/fetch');
+  assert.equal(
+    relayUrl.searchParams.get('path'),
+    '/legislacao/protocolos/2026/pt088_26',
+  );
+  assert.equal(
+    calls[0]!.authorization,
+    'Bearer abcdefghijklmnopqrstuvwxyz123456',
+  );
+
+  await assert.rejects(
+    () =>
+      relayFetch(
+        'https://example.com/legislacao/protocolos/2026/pt088_26',
+      ),
+    /non-CONFAZ target/,
+  );
+});
+
+test('requires complete source-specific relay configuration', () => {
+  assert.throws(
+    () =>
+      new ConfazConnector({
+        relayUrl: 'https://relay.example.test',
+      }),
+    /requires both relayUrl and relayToken/,
   );
 });
