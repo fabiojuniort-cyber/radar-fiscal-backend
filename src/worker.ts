@@ -62,6 +62,9 @@ async function run(): Promise<void> {
       includeSimulated:
         env.COLLECTION_ENABLE_SIMULATED_CONNECTORS,
       db,
+      ...(env.CONFAZ_PROXY_URL
+        ? { confazProxyUrl: env.CONFAZ_PROXY_URL }
+        : {}),
     });
 
     processLogger.info(
