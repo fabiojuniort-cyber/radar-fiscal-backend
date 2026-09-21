@@ -4,6 +4,7 @@ import test from 'node:test';
 
 process.env.RELAY_BEARER_TOKEN = 'test-token';
 process.env.PORT = '0';
+process.env.NODE_ENV = 'test';
 
 const { default: server } = await import('./testable-server.mjs');
 
