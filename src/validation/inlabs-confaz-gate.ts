@@ -17,8 +17,53 @@ const client = new InlabsClient({
   }),
 });
 
+async function loginWithRetry(): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await client.login(controller.signal);
+      console.log(JSON.stringify({
+        stage: 'login',
+        ok: true,
+        attempt,
+      }));
+      return;
+    } catch (error) {
+      lastError = error;
+      const value = error as {
+        code?: unknown;
+        httpStatus?: unknown;
+        retryable?: unknown;
+      };
+
+      console.log(JSON.stringify({
+        stage: 'login-retry',
+        ok: false,
+        attempt,
+        code: value?.code,
+        httpStatus: value?.httpStatus,
+        retryable: value?.retryable,
+      }));
+
+      if (
+        attempt === 3 ||
+        value?.retryable !== true
+      ) {
+        throw error;
+      }
+
+      await new Promise(resolve =>
+        setTimeout(resolve, attempt * 10_000),
+      );
+    }
+  }
+
+  throw lastError;
+}
+
 try {
-  await client.login(controller.signal);
+  await loginWithRetry();
 
   const summary: Record<string, number> = {};
 
