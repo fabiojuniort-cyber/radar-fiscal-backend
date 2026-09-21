@@ -31,6 +31,32 @@ test('real extra multipart article assembles in numeric order and distinct dispa
   assert.equal(new Set(dispatches.map(p => normalizePublication({sourceId:'dou',publication:p}).identityHash)).size, 3);
 });
 
+test('multipart continuation may carry a distinct official heading without losing the matter', async () => {
+  const entries = await fixtureEntries('DO1E');
+  const changed = entries.map(entry => {
+    if (!entry.name.endsWith('24378456-2.xml')) return entry;
+    const xml = Buffer.from(entry.bytes).toString('utf8');
+    return {
+      ...entry,
+      bytes: Buffer.from(
+        xml.replace(
+          '<Identifica />',
+          '<Identifica><![CDATA[ANEXO II - CONTINUAÇÃO]]></Identifica>',
+        ),
+      ),
+    };
+  });
+
+  const result = parseDouEntries(changed, archiveContext('DO1E'));
+  assert.deepEqual(result.partialFailures, []);
+  const publication = result.publications.find(p => p.actNumber === '4940/2026');
+  assert.ok(publication);
+  assert.deepEqual(
+    (publication.metadata!.dou as any).continuationTitles,
+    ['ANEXO II - CONTINUAÇÃO'],
+  );
+});
+
 test('missing/corrupted continuation rejects the entire matter while preserving other real articles', async () => {
   const entries = (await fixtureEntries('DO1E')).filter(e => !e.name.endsWith('24378456-2.xml'));
   const result = parseDouEntries(entries, archiveContext('DO1E'));
