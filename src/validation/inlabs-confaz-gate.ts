@@ -46,7 +46,8 @@ try {
     });
 
     const hits = parsed.publications.filter(publication =>
-      target.pattern.test(publication.title)
+      target.pattern.test(publication.title) ||
+      target.pattern.test(publication.content ?? '')
     );
 
     summary[target.family] = hits.length;
@@ -60,15 +61,25 @@ try {
       xmlCount: zip.entries.length,
       matterCount: parsed.publications.length,
       parseFailures: parsed.partialFailures.length,
-      hits: hits.map(publication => ({
-        title: publication.title,
-        agency: publication.agency,
-        actType: publication.actType,
-        actNumber: publication.actNumber ?? null,
-        publishedAt: publication.publishedAt?.toISOString().slice(0, 10) ?? null,
-        officialUrl: publication.officialUrl,
-        externalId: publication.externalId,
-      })),
+      parseFailureDetails: parsed.partialFailures,
+      hits: hits.slice(0, 10).map(publication => {
+        const content = publication.content ?? '';
+        const headings = [...content.matchAll(
+          /(?:CONV[ÊE]NIO ICMS|AJUSTE SINIEF|PROTOCOLO ICMS)\s+N[º°o.]?\s*\d+(?:\/\d{2,4})?(?:\s*,\s*DE\s+[^\n.]+)?/gi,
+        )].slice(0, 12).map(match => match[0].replace(/\s+/g, ' ').trim());
+
+        return {
+          title: publication.title,
+          agency: publication.agency,
+          actType: publication.actType,
+          actNumber: publication.actNumber ?? null,
+          publishedAt: publication.publishedAt?.toISOString().slice(0, 10) ?? null,
+          officialUrl: publication.officialUrl,
+          externalId: publication.externalId,
+          matchedInTitle: target.pattern.test(publication.title),
+          embeddedHeadings: headings,
+        };
+      }),
     }));
   }
 
