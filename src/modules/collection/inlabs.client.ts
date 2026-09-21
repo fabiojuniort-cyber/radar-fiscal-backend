@@ -4,8 +4,8 @@ import { ConnectorError } from './connector.error.js';
 
 const ORIGIN = 'https://inlabs.in.gov.br';
 const COOKIE = 'inlabs_session_cookie';
-const DEFAULT_RETRY_AFTER_SECONDS = 10;
-const MAINTENANCE_RETRY_AFTER_SECONDS = 10;
+const DEFAULT_RETRY_AFTER_SECONDS = 20;
+const MAINTENANCE_RETRY_AFTER_SECONDS = 20;
 const MAX_AUTHENTICATED_REDIRECTS = 3;
 export type InlabsXmlSection = 'DO1' | 'DO2' | 'DO3' | 'DO1E' | 'DO2E' | 'DO3E';
 export type InlabsPdfSection = 'do1' | 'do2' | 'do3';
@@ -346,7 +346,7 @@ export class InlabsClient {
         'FETCH_ERROR',
         true,
         response.status,
-        10,
+        20,
       );
     }
     // Magic validation is transport validation only; ZIP integrity/XML parsing follows
