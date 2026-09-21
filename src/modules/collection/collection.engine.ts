@@ -300,7 +300,7 @@ export async function processAcquiredCollectionRun(
               : run.maxAttempts,
           retryable: outcome.retryable,
           ...(persistentDouRetry
-            ? { retryAfterSeconds: 10 }
+            ? { retryAfterSeconds: 20 }
             : outcome.retryAfterSeconds !== undefined
               ? {
                   retryAfterSeconds:
@@ -310,8 +310,8 @@ export async function processAcquiredCollectionRun(
         },
         persistentDouRetry
           ? {
-              baseDelayMs: 10_000,
-              maxBackoffMs: 10_000,
+              baseDelayMs: 20_000,
+              maxBackoffMs: 20_000,
             }
           : options.retryPolicy,
       );
