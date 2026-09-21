@@ -148,6 +148,10 @@ test(
           officialUrl:
             'https://source-a.example.test/100-2026',
           externalId: '100-2026',
+          metadata: {
+            sourceRole: 'PRIMARY',
+            ingestionChannel: 'INLABS',
+          },
         },
       });
 
@@ -238,6 +242,10 @@ test(
             officialUrl:
               'https://source-a.example.test/100-2026',
             externalId: '100-2026',
+            metadata: {
+              sourceRole: 'PRIMARY',
+              ingestionChannel: 'INLABS',
+            },
           },
         });
 
@@ -307,10 +315,17 @@ test(
             publishedAt: new Date(
               '2026-09-19T15:00:00Z',
             ),
-            content: 'Conteúdo atualizado.',
+            content: 'Conteúdo enriquecido do portal.',
+            effectiveAt: new Date(
+              '2026-10-01T00:00:00Z',
+            ),
             officialUrl:
               'https://source-b.example.test/100-2026',
             externalId: 'mirror-100-2026',
+            metadata: {
+              sourceRole: 'ENRICHMENT',
+              ingestionChannel: 'CONFAZ_PORTAL',
+            },
           },
         });
 
@@ -328,6 +343,82 @@ test(
       assert.equal(
         mirrored.publicationId,
         first.publicationId,
+      );
+      assert.equal(
+        mirrored.disposition,
+        'NEW_VERSION',
+      );
+
+      const versionsAfterEnrichment = await db
+        .selectFrom('publication_versions')
+        .select([
+          'version_no',
+          'is_current',
+          'source_metadata',
+        ])
+        .where(
+          'publication_id',
+          '=',
+          first.publicationId,
+        )
+        .orderBy('version_no')
+        .execute();
+
+      assert.equal(
+        versionsAfterEnrichment.length,
+        3,
+      );
+      assert.deepEqual(
+        versionsAfterEnrichment.map(
+          (version) => ({
+            versionNo: version.version_no,
+            isCurrent: version.is_current,
+            sourceRole:
+              (
+                version.source_metadata as
+                  | Record<string, unknown>
+                  | null
+              )?.sourceRole ?? null,
+          }),
+        ),
+        [
+          {
+            versionNo: 1,
+            isCurrent: false,
+            sourceRole: 'PRIMARY',
+          },
+          {
+            versionNo: 2,
+            isCurrent: true,
+            sourceRole: 'PRIMARY',
+          },
+          {
+            versionNo: 3,
+            isCurrent: false,
+            sourceRole: 'ENRICHMENT',
+          },
+        ],
+      );
+
+      const canonicalPublication = await db
+        .selectFrom('publications')
+        .select([
+          'primary_official_url',
+          'title',
+          'effective_on',
+        ])
+        .where('id', '=', first.publicationId)
+        .executeTakeFirstOrThrow();
+
+      assert.equal(
+        canonicalPublication.primary_official_url,
+        'https://source-a.example.test/100-2026',
+      );
+      assert.equal(
+        canonicalPublication.effective_on
+          ?.toISOString()
+          .slice(0, 10),
+        '2026-10-01',
       );
 
       const origins = await db

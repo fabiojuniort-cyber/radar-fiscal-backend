@@ -21,11 +21,12 @@
     "db:verify-runtime": "node dist/infrastructure/database/verify-runtime-role.js",
     "db:verify-worker-runtime": "node dist/infrastructure/database/verify-worker-runtime-role.js",
     "db:prepare": "npm run db:migrate && npm run db:provision-runtime-role && npm run db:verify-runtime && npm run db:verify-worker-runtime",
-    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts",
+    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts test/inlabs.client.unit.test.ts test/dou.parser.unit.test.ts test/dou.connector.unit.test.ts",
     "test:integration": "tsx --test test/auth.integration.test.ts",
-    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts",
+    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts && tsx --test test/dou.collection.integration.test.ts",
     "db:ensure-confaz-source": "node dist/infrastructure/database/ensure-confaz-source.js",
-    "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js"
+    "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js",
+    "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
@@ -34,16 +35,23 @@
     "dotenv": "^17.4.2",
     "fastify": "^5.12.5",
     "fastify-type-provider-zod": "^7.0.0",
+    "htmlparser2": "12.0.0",
     "kysely": "^0.29.6",
     "pg": "^8.23.0",
+    "sax": "1.6.1",
+    "yauzl": "3.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@types/pg": "^8.23.1",
+    "@types/sax": "1.2.7",
+    "@types/yauzl": "3.4.0",
+    "@types/yazl": "3.3.1",
     "kysely-codegen": "^0.20.0",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "yazl": "3.3.1"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

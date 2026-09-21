@@ -780,6 +780,9 @@ export function parseConfazPublicationHtml(
 
   const metadata: Record<string, unknown> = {
     source: 'CONFAZ',
+    sourceRole: 'ENRICHMENT',
+    ingestionChannel: 'CONFAZ_PORTAL',
+    officialUrlGranularity: 'DOCUMENT',
     sourcePath,
     family: familyKey,
     year: reference.year,

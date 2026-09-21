@@ -2,6 +2,8 @@ import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { ConfazConnector } from './confaz.connector.js';
+import { DouConnector } from './dou.connector.js';
+import { readDouSourceState } from './dou-source-state.repository.js';
 import {
   readConfazSourceState,
 } from './confaz-source-state.repository.js';
@@ -13,12 +15,21 @@ import {
 export interface BuildConnectorRegistryOptions {
   includeSimulated?: boolean;
   db?: Kysely<DB>;
+  includeDou?: boolean;
 }
 
 export function buildConnectorRegistry(
   options: BuildConnectorRegistryOptions = {},
 ): ConnectorRegistry {
   const registry = new ConnectorRegistry();
+
+  if (options.includeDou ?? process.env.DOU_CONNECTOR_ENABLED === 'true') {
+    registry.register(new DouConnector({
+      credentials: () => process.env.INLABS_EMAIL && process.env.INLABS_PASSWORD
+        ? { email: process.env.INLABS_EMAIL, password: process.env.INLABS_PASSWORD } : undefined,
+      ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId) } : {}),
+    }));
+  }
 
   registry.register(
     new ConfazConnector({

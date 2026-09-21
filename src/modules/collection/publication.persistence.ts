@@ -1,4 +1,4 @@
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 
 import type {
   DB,
@@ -49,6 +49,57 @@ function itemStatus(
     case 'NEW_VERSION':
       return 'NEW_VERSION';
   }
+}
+
+type PublicationSourceRole =
+  | 'PRIMARY'
+  | 'ENRICHMENT'
+  | 'VALIDATION'
+  | 'UNSPECIFIED';
+
+function publicationSourceRole(
+  metadata: unknown,
+): PublicationSourceRole {
+  if (
+    metadata === null ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata)
+  ) {
+    return 'UNSPECIFIED';
+  }
+
+  const value = (metadata as Record<string, unknown>)
+    .sourceRole;
+
+  return value === 'PRIMARY' ||
+    value === 'ENRICHMENT' ||
+    value === 'VALIDATION'
+    ? value
+    : 'UNSPECIFIED';
+}
+
+async function enrichCanonicalPublication(
+  trx: Transaction<DB>,
+  publicationId: string,
+  publication: NormalizedPublication,
+): Promise<void> {
+  if (
+    publicationSourceRole(publication.metadata) !==
+      'ENRICHMENT' ||
+    publication.effectiveOn === undefined
+  ) {
+    return;
+  }
+
+  await trx
+    .updateTable('publications')
+    .set({
+      effective_on: publication.effectiveOn,
+      updated_at: new Date(),
+    })
+    .where('id', '=', publicationId)
+    .where('effective_on', 'is', null)
+    .execute();
 }
 
 async function upsertCollectionItem(
@@ -159,6 +210,10 @@ async function upsertOrigin(
   input: PersistPublicationInput,
   publicationId: string,
 ): Promise<void> {
+  const pageReference = input.publication.metadata.officialUrlGranularity === 'PAGE';
+  if (pageReference && !input.publication.externalId) {
+    throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
+  }
   const externalOrigin = input.publication.externalId
     ? await trx
         .selectFrom('publication_origins')
@@ -172,10 +227,11 @@ async function upsertOrigin(
         .executeTakeFirst()
     : undefined;
 
-  const urlOrigin = await trx
+  const urlOrigin = pageReference ? undefined : await trx
     .selectFrom('publication_origins')
     .select(['id', 'publication_id'])
     .where('source_id', '=', input.sourceId)
+    .where(sql<boolean>`metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'`)
     .where(
       'official_url',
       '=',
@@ -246,9 +302,28 @@ async function getOrCreateVersion(
   publicationVersionId: string;
   disposition: PublicationDisposition;
 }> {
+  const incomingRole = publicationSourceRole(
+    publication.metadata,
+  );
+
+  const currentVersion = await trx
+    .selectFrom('publication_versions')
+    .select([
+      'id',
+      'content_hash',
+      'source_metadata',
+    ])
+    .where('publication_id', '=', publicationId)
+    .where('is_current', '=', true)
+    .executeTakeFirst();
+
   const existingVersion = await trx
     .selectFrom('publication_versions')
-    .select('id')
+    .select([
+      'id',
+      'is_current',
+      'source_metadata',
+    ])
     .where('publication_id', '=', publicationId)
     .where(
       'content_hash',
@@ -258,6 +333,60 @@ async function getOrCreateVersion(
     .executeTakeFirst();
 
   if (existingVersion) {
+    if (incomingRole === 'PRIMARY') {
+      if (!existingVersion.is_current) {
+        await trx
+          .updateTable('publication_versions')
+          .set({ is_current: false })
+          .where('publication_id', '=', publicationId)
+          .where('is_current', '=', true)
+          .execute();
+
+        await trx
+          .updateTable('publication_versions')
+          .set({ is_current: true })
+          .where('id', '=', existingVersion.id)
+          .execute();
+      }
+
+      if (
+        publicationSourceRole(
+          existingVersion.source_metadata,
+        ) !== 'PRIMARY'
+      ) {
+        await trx
+          .updateTable('publication_versions')
+          .set({
+            source_metadata: asJson(
+              publication.metadata,
+            ),
+          })
+          .where('id', '=', existingVersion.id)
+          .execute();
+      }
+
+      await trx
+        .updateTable('publications')
+        .set({
+          title: publication.title,
+          ...(publication.effectiveOn !== undefined
+            ? { effective_on: publication.effectiveOn }
+            : {}),
+          primary_official_url:
+            publication.officialUrl,
+          last_seen_at: new Date(),
+          updated_at: new Date(),
+        })
+        .where('id', '=', publicationId)
+        .execute();
+    }
+
+    await enrichCanonicalPublication(
+      trx,
+      publicationId,
+      publication,
+    );
+
     return {
       publicationVersionId: existingVersion.id,
       disposition: 'EXISTING_PUBLICATION',
@@ -274,14 +403,23 @@ async function getOrCreateVersion(
   const nextVersionNo =
     (latestVersion?.version_no ?? 0) + 1;
 
-  await trx
-    .updateTable('publication_versions')
-    .set({
-      is_current: false,
-    })
-    .where('publication_id', '=', publicationId)
-    .where('is_current', '=', true)
-    .execute();
+  const preserveCurrentPrimary =
+    currentVersion !== undefined &&
+    publicationSourceRole(
+      currentVersion.source_metadata,
+    ) === 'PRIMARY' &&
+    incomingRole !== 'PRIMARY';
+
+  if (!preserveCurrentPrimary) {
+    await trx
+      .updateTable('publication_versions')
+      .set({
+        is_current: false,
+      })
+      .where('publication_id', '=', publicationId)
+      .where('is_current', '=', true)
+      .execute();
+  }
 
   const version = await trx
     .insertInto('publication_versions')
@@ -289,28 +427,39 @@ async function getOrCreateVersion(
       publication_id: publicationId,
       version_no: nextVersionNo,
       content_hash: publication.contentHash,
-      content_text: publication.contentText ?? null,
+      content_text:
+        publication.contentText ?? null,
       relevant_excerpt: null,
       source_metadata: asJson(
         publication.metadata,
       ),
-      is_current: true,
+      is_current: !preserveCurrentPrimary,
     })
     .returning('id')
     .executeTakeFirstOrThrow();
 
-  await trx
-    .updateTable('publications')
-    .set({
-      title: publication.title,
-      effective_on: publication.effectiveOn ?? null,
-      primary_official_url:
-        publication.officialUrl,
-      last_seen_at: new Date(),
-      updated_at: new Date(),
-    })
-    .where('id', '=', publicationId)
-    .execute();
+  if (!preserveCurrentPrimary) {
+    await trx
+      .updateTable('publications')
+      .set({
+        title: publication.title,
+        ...(publication.effectiveOn !== undefined
+          ? { effective_on: publication.effectiveOn }
+          : {}),
+        primary_official_url:
+          publication.officialUrl,
+        last_seen_at: new Date(),
+        updated_at: new Date(),
+      })
+      .where('id', '=', publicationId)
+      .execute();
+  }
+
+  await enrichCanonicalPublication(
+    trx,
+    publicationId,
+    publication,
+  );
 
   return {
     publicationVersionId: version.id,
