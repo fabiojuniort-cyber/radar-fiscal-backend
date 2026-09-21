@@ -4,6 +4,9 @@ import { ConnectorError } from './connector.error.js';
 
 const ORIGIN = 'https://inlabs.in.gov.br';
 const COOKIE = 'inlabs_session_cookie';
+const DEFAULT_RETRY_AFTER_SECONDS = 120;
+const MAINTENANCE_RETRY_AFTER_SECONDS = 300;
+const MAX_AUTHENTICATED_REDIRECTS = 3;
 export type InlabsXmlSection = 'DO1' | 'DO2' | 'DO3' | 'DO1E' | 'DO2E' | 'DO3E';
 export type InlabsPdfSection = 'do1' | 'do2' | 'do3';
 
@@ -64,7 +67,7 @@ function checkMaintenance(html: string, response: Response): void {
     .replace(/\s+/g, ' ');
   if (/sistema em manutencao programada|o sistema esta passando por manutencao programada/i.test(text)) {
     throw fail('INLABS_MAINTENANCE', 'SOURCE_UNAVAILABLE', true,
-      response.status, retryAfter(response));
+      response.status, retryAfter(response) ?? MAINTENANCE_RETRY_AFTER_SECONDS);
   }
 }
 
@@ -106,7 +109,8 @@ export class InlabsClient {
       return await this.#fetch(url, { ...init, redirect: 'manual', signal });
     } catch {
       signal.throwIfAborted();
-      throw fail('INLABS_NETWORK_ERROR', 'NETWORK_ERROR', true);
+      throw fail('INLABS_NETWORK_ERROR', 'NETWORK_ERROR', true,
+        undefined, DEFAULT_RETRY_AFTER_SECONDS);
     }
   }
 
@@ -127,10 +131,12 @@ export class InlabsClient {
       throw fail('INLABS_ACCESS_DENIED', 'SOURCE_UNAVAILABLE', false, 403);
     }
     if (response.status === 429) {
-      throw fail('INLABS_RATE_LIMITED', 'RATE_LIMITED', true, 429, retryAfter(response));
+      throw fail('INLABS_RATE_LIMITED', 'RATE_LIMITED', true, 429,
+        retryAfter(response) ?? DEFAULT_RETRY_AFTER_SECONDS);
     }
     if (response.status >= 500) {
-      throw fail('INLABS_UNAVAILABLE', 'SOURCE_UNAVAILABLE', true, response.status);
+      throw fail('INLABS_UNAVAILABLE', 'SOURCE_UNAVAILABLE', true, response.status,
+        retryAfter(response) ?? DEFAULT_RETRY_AFTER_SECONDS);
     }
     throw fail('INLABS_HTTP_ERROR', 'HTTP_ERROR', response.status === 408, response.status);
   }
@@ -160,7 +166,8 @@ export class InlabsClient {
       try { await reader.cancel(); } catch { /* Keep sanitized error. */ }
       signal.throwIfAborted();
       if (error instanceof ConnectorError) throw error;
-      throw fail('INLABS_BODY_READ_FAILED', 'NETWORK_ERROR', true);
+      throw fail('INLABS_BODY_READ_FAILED', 'NETWORK_ERROR', true,
+        undefined, DEFAULT_RETRY_AFTER_SECONDS);
     } finally { reader.releaseLock(); }
   }
 
@@ -207,20 +214,69 @@ export class InlabsClient {
 
   async #authenticatedGet(url: string, signal: AbortSignal): Promise<Response> {
     if (!this.#cookie) throw fail('INLABS_AUTH_REQUIRED', 'FETCH_ERROR');
-    const response = await this.#request(url, {
-      headers: { cookie: this.#cookie, origem: '736372697074' },
-    }, signal);
-    // requests.Session(), used by the official INLABS example, automatically accepts
-    // session-cookie rotation on normal responses. Mirror that behavior without ever
-    // forwarding cookies across redirects or origins.
-    if (!(response.status >= 300 && response.status < 400)) this.#refreshSessionCookie(response);
-    // Do not follow redirects with a cookie, even for a nominally public archive.
-    if (response.status >= 300 && response.status < 400) {
-      this.close();
+
+    let currentUrl = new URL(url);
+
+    for (let hop = 0; hop <= MAX_AUTHENTICATED_REDIRECTS; hop += 1) {
+      const response = await this.#request(currentUrl.toString(), {
+        headers: { cookie: this.#cookie, origem: '736372697074' },
+      }, signal);
+
+      // requests.Session()/curl -L in the official INLABS examples follow redirects
+      // and accept session-cookie rotation. We mirror that behavior only for bounded,
+      // same-origin redirects, so credentials/cookies are never forwarded elsewhere.
+      this.#refreshSessionCookie(response);
+
+      if (!(response.status >= 300 && response.status < 400)) {
+        return response;
+      }
+
+      const location = response.headers.get('location');
+      if (!location) {
+        this.close();
+        await this.#discard(response);
+        throw fail('INLABS_SESSION_REDIRECT', 'FETCH_ERROR', true,
+          response.status, DEFAULT_RETRY_AFTER_SECONDS);
+      }
+
+      let target: URL;
+      try {
+        target = new URL(location, currentUrl);
+      } catch {
+        this.close();
+        await this.#discard(response);
+        throw fail('INLABS_UNEXPECTED_REDIRECT', 'FETCH_ERROR', true,
+          response.status, DEFAULT_RETRY_AFTER_SECONDS);
+      }
+
+      if (
+        target.origin !== ORIGIN ||
+        target.username ||
+        target.password
+      ) {
+        this.close();
+        await this.#discard(response);
+        throw fail('INLABS_UNEXPECTED_REDIRECT', 'FETCH_ERROR', false,
+          response.status);
+      }
+
+      if (
+        target.pathname === '/logar.php' ||
+        target.pathname === '/acessar.php'
+      ) {
+        this.close();
+        await this.#discard(response);
+        throw fail('INLABS_SESSION_REDIRECT', 'FETCH_ERROR', true,
+          response.status, DEFAULT_RETRY_AFTER_SECONDS);
+      }
+
       await this.#discard(response);
-      throw fail('INLABS_SESSION_REDIRECT', 'FETCH_ERROR', true, response.status);
+      currentUrl = target;
     }
-    return response;
+
+    this.close();
+    throw fail('INLABS_REDIRECT_LOOP', 'FETCH_ERROR', true,
+      undefined, DEFAULT_RETRY_AFTER_SECONDS);
   }
 
   async readDailyIndex(date: string, signal: AbortSignal): Promise<string> {
