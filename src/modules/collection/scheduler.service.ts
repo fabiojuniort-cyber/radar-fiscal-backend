@@ -57,12 +57,39 @@ export async function runSchedulerTick(
       if (source.connector_key === 'dou') {
         const activeDouRun = await db
           .selectFrom('collection_runs')
-          .select('id')
+          .select([
+            'id',
+            'scheduled_for',
+            'trigger_type',
+          ])
           .where('source_id', '=', source.id)
           .where('status', 'in', ['PENDING', 'RUNNING'])
+          .orderBy('created_at')
           .executeTakeFirst();
 
         if (activeDouRun) {
+          const sameScheduledSlot =
+            activeDouRun.trigger_type === 'SCHEDULED' &&
+            activeDouRun.scheduled_for.getTime() ===
+              scheduledFor.getTime();
+
+          if (sameScheduledSlot) {
+            runIds.push(activeDouRun.id);
+
+            logger?.info(
+              {
+                sourceId: source.id,
+                sourceCode: source.code,
+                runId: activeDouRun.id,
+                scheduledFor:
+                  scheduledFor.toISOString(),
+              },
+              'Scheduled DOU run already exists for this slot',
+            );
+
+            continue;
+          }
+
           logger?.info(
             {
               sourceId: source.id,
