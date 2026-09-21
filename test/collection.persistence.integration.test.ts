@@ -316,6 +316,9 @@ test(
               '2026-09-19T15:00:00Z',
             ),
             content: 'Conteúdo enriquecido do portal.',
+            effectiveAt: new Date(
+              '2026-10-01T00:00:00Z',
+            ),
             officialUrl:
               'https://source-b.example.test/100-2026',
             externalId: 'mirror-100-2026',
@@ -402,6 +405,7 @@ test(
         .select([
           'primary_official_url',
           'title',
+          'effective_on',
         ])
         .where('id', '=', first.publicationId)
         .executeTakeFirstOrThrow();
@@ -409,6 +413,12 @@ test(
       assert.equal(
         canonicalPublication.primary_official_url,
         'https://source-a.example.test/100-2026',
+      );
+      assert.equal(
+        canonicalPublication.effective_on
+          ?.toISOString()
+          .slice(0, 10),
+        '2026-10-01',
       );
 
       const origins = await db
