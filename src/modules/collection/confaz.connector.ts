@@ -120,6 +120,8 @@ export type ConfazSourceStateReader = (
 export interface ConfazConnectorOptions {
   fetchImpl?: typeof fetch;
   proxyUrl?: string;
+  relayUrl?: string;
+  relayToken?: string;
   readSourceState?: ConfazSourceStateReader;
   now?: () => Date;
   requestSpacingMs?: number;
@@ -167,6 +169,65 @@ function createConfazProxyFetch(proxyUrl: string): typeof fetch {
     } finally {
       restore();
     }
+  }) as typeof fetch;
+}
+
+export function createConfazRelayFetch(
+  relayUrl: string,
+  relayToken: string,
+  relayFetch: typeof fetch = fetch,
+): typeof fetch {
+  const base = new URL(relayUrl);
+
+  if (base.protocol !== 'https:' && base.protocol !== 'http:') {
+    throw new Error('CONFAZ relay URL must use http:// or https://');
+  }
+
+  if (!relayToken.trim()) {
+    throw new Error('CONFAZ relay token must not be blank');
+  }
+
+  return (async (input, init) => {
+    const requested =
+      input instanceof Request
+        ? new URL(input.url)
+        : new URL(input.toString());
+
+    if (
+      requested.origin !== CONFAZ_BASE_URL ||
+      (requested.pathname !== '/' &&
+        !requested.pathname.startsWith('/legislacao/'))
+    ) {
+      throw new Error('CONFAZ relay rejected a non-CONFAZ target');
+    }
+
+    const method =
+      init?.method ??
+      (input instanceof Request ? input.method : 'GET');
+
+    if (method.toUpperCase() !== 'GET') {
+      throw new Error('CONFAZ relay only supports GET');
+    }
+
+    const endpoint = new URL('/fetch', base);
+    endpoint.searchParams.set(
+      'path',
+      `${requested.pathname}${requested.search}`,
+    );
+
+    const signal =
+      init?.signal ??
+      (input instanceof Request ? input.signal : undefined);
+
+    return relayFetch(endpoint, {
+      method: 'GET',
+      redirect: 'follow',
+      ...(signal ? { signal } : {}),
+      headers: {
+        Authorization: `Bearer ${relayToken}`,
+        Accept: '*/*',
+      },
+    });
   }) as typeof fetch;
 }
 
@@ -1201,7 +1262,7 @@ export class ConfazConnector implements CollectionConnector {
   readonly version = 'confaz-1.0.0';
 
   private readonly fetchImpl: typeof fetch;
-  private readonly proxyEnabled: boolean;
+  private readonly egressMode: 'DIRECT' | 'HTTP_PROXY' | 'RELAY';
   private readonly readSourceState: ConfazSourceStateReader | undefined;
   private readonly now: () => Date;
   private readonly refreshKnownPerFamily: number;
@@ -1209,12 +1270,37 @@ export class ConfazConnector implements CollectionConnector {
   private readonly requestGate: RequestGate;
 
   constructor(options: ConfazConnectorOptions = {}) {
-    this.proxyEnabled = Boolean(options.proxyUrl);
-    this.fetchImpl =
-      options.fetchImpl ??
-      (options.proxyUrl
-        ? createConfazProxyFetch(options.proxyUrl)
-        : fetch);
+    const relayConfigured =
+      options.relayUrl !== undefined ||
+      options.relayToken !== undefined;
+
+    if (
+      relayConfigured &&
+      (!options.relayUrl || !options.relayToken)
+    ) {
+      throw new Error(
+        'CONFAZ relay requires both relayUrl and relayToken',
+      );
+    }
+
+    if (options.relayUrl && options.relayToken) {
+      this.egressMode = 'RELAY';
+      this.fetchImpl =
+        options.fetchImpl ??
+        createConfazRelayFetch(
+          options.relayUrl,
+          options.relayToken,
+        );
+    } else if (options.proxyUrl) {
+      this.egressMode = 'HTTP_PROXY';
+      this.fetchImpl =
+        options.fetchImpl ??
+        createConfazProxyFetch(options.proxyUrl);
+    } else {
+      this.egressMode = 'DIRECT';
+      this.fetchImpl = options.fetchImpl ?? fetch;
+    }
+
     this.readSourceState = options.readSourceState;
     this.now = options.now ?? (() => new Date());
     this.refreshKnownPerFamily =
@@ -1283,10 +1369,46 @@ export class ConfazConnector implements CollectionConnector {
       );
     }
 
+    const relayedOriginUrl =
+      response.headers.get('x-radar-origin-url');
+
+    let finalUrl = response.url || url;
+
+    if (relayedOriginUrl) {
+      let parsedOriginUrl: URL;
+      try {
+        parsedOriginUrl = new URL(relayedOriginUrl);
+      } catch {
+        throw new ConnectorError(
+          'CONFAZ relay returned an invalid official origin URL',
+          {
+            kind: 'PROCESSING_ERROR',
+            code: 'CONFAZ_RELAY_INVALID_ORIGIN_URL',
+            retryable: false,
+            metadata: { url },
+          },
+        );
+      }
+
+      if (parsedOriginUrl.origin !== CONFAZ_BASE_URL) {
+        throw new ConnectorError(
+          'CONFAZ relay returned a non-CONFAZ origin URL',
+          {
+            kind: 'PROCESSING_ERROR',
+            code: 'CONFAZ_RELAY_INVALID_ORIGIN_URL',
+            retryable: false,
+            metadata: { url },
+          },
+        );
+      }
+
+      finalUrl = parsedOriginUrl.toString();
+    }
+
     const buffer = await response.arrayBuffer();
     return {
       html: decodeResponseBody(buffer, contentType),
-      finalUrl: response.url || url,
+      finalUrl,
       ...(contentType ? { contentType } : {}),
       ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
       ...(response.headers.get('last-modified')
@@ -1413,7 +1535,7 @@ export class ConfazConnector implements CollectionConnector {
         knownOriginCount: state.knownOrigins.length,
         bootstrapLimited,
         requestSpacingMs: DEFAULT_REQUEST_SPACING_MS,
-        egressProxyEnabled: this.proxyEnabled,
+        egressMode: this.egressMode,
       },
     };
   }
