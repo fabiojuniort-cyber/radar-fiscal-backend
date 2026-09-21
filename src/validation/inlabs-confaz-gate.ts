@@ -65,7 +65,7 @@ try {
         agency: publication.agency,
         actType: publication.actType,
         actNumber: publication.actNumber ?? null,
-        publishedAt: publication.publishedAt.toISOString().slice(0, 10),
+        publishedAt: publication.publishedAt?.toISOString().slice(0, 10) ?? null,
         officialUrl: publication.officialUrl,
         externalId: publication.externalId,
       })),
