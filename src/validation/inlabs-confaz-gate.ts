@@ -1,5 +1,5 @@
 import { InlabsClient } from '../modules/collection/inlabs.client.js';
-import { parseDouEntries, readDouZip } from '../modules/collection/dou.parser.js';
+import { douHtmlText, parseDouEntries, readDouZip } from '../modules/collection/dou.parser.js';
 
 const targets = [
   { date: '2026-07-06', family: 'PROTOCOLO ICMS', pattern: /PROTOCOLO ICMS/i },
@@ -44,6 +44,35 @@ try {
       officialUrl: download.officialUrl,
       rawSha256: download.rawSha256,
     });
+
+    const debugMatterId = target.date === '2026-07-06'
+      ? '24102897'
+      : target.date === '2026-07-09'
+        ? '24117523'
+        : undefined;
+
+    if (debugMatterId) {
+      const continuationTitles = zip.entries
+        .filter(entry => entry.name.includes(`_${debugMatterId}`))
+        .map(entry => {
+          const xml = new TextDecoder('utf-8').decode(entry.bytes);
+          const match = /<Identifica>([\s\S]*?)<\/Identifica>/i.exec(xml);
+          const raw = match?.[1]
+            ?.replace(/^<!\[CDATA\[/, '')
+            .replace(/\]\]>$/, '') ?? '';
+          return {
+            filename: entry.name,
+            identifica: douHtmlText(raw),
+          };
+        });
+
+      console.log(JSON.stringify({
+        stage: 'multipart-title-debug',
+        date: target.date,
+        matterId: debugMatterId,
+        parts: continuationTitles,
+      }));
+    }
 
     const hits = parsed.publications.filter(publication =>
       target.pattern.test(publication.title) ||
