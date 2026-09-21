@@ -2,7 +2,7 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-COPY package.json server.mjs ./
+COPY package.json server.mjs testable-server.mjs ./
 
 ENV NODE_ENV=production
 ENV PORT=8080
