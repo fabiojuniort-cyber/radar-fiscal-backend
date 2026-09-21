@@ -78,6 +78,12 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
     });
     await t.test('scheduler is idempotent and completed run receipts avoid reprocessing',async()=>{
       useCheckpoint = true;
+      // This legacy checkpoint scenario tests scheduler idempotency, not overlap.
+      // Start it from a clean run queue; overlap behavior has its own regression test.
+      await db.deleteFrom('collection_runs')
+        .where('source_id','=',sourceId)
+        .where('status','in',['PENDING','RUNNING'])
+        .execute();
       await db.updateTable('sources').set({schedule_cron:'* * * * *',schedule_timezone:'America/Sao_Paulo'}).where('id','=',sourceId).execute();
       const now = new Date(); const first = await runSchedulerTick(db,now); const second = await runSchedulerTick(db,now);
       assert.equal(first.runIds.length,1); assert.deepEqual(second.runIds,first.runIds);
