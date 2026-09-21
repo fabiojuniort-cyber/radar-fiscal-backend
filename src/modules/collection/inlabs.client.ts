@@ -89,6 +89,17 @@ export class InlabsClient {
 
   close(): void { this.#cookie = undefined; }
 
+  #sessionCookie(response: Response): string | undefined {
+    return response.headers.getSetCookie()
+      .map(value => value.match(/^inlabs_session_cookie=([^;\s]+)(?:;|$)/)?.[1])
+      .find(value => value !== undefined && value !== 'deleted');
+  }
+
+  #refreshSessionCookie(response: Response): void {
+    const cookie = this.#sessionCookie(response);
+    if (cookie && /^[A-Za-z0-9._~%+-]+$/.test(cookie)) this.#cookie = `${COOKIE}=${cookie}`;
+  }
+
   async #request(url: string, init: RequestInit, signal: AbortSignal): Promise<Response> {
     signal.throwIfAborted();
     try {
@@ -170,9 +181,7 @@ export class InlabsClient {
     }, signal);
     // The official script checks this cookie. The authenticated index must still be
     // verified before interpreting any missing archive as NOT_AVAILABLE.
-    const cookie = response.headers.getSetCookie()
-      .map(value => value.match(/^inlabs_session_cookie=([^;\s]+)(?:;|$)/)?.[1])
-      .find(value => value !== undefined && value !== 'deleted');
+    const cookie = this.#sessionCookie(response);
     const location = response.headers.get('location');
     if ([301, 302, 303].includes(response.status) && location) {
       let target: URL;
@@ -201,6 +210,10 @@ export class InlabsClient {
     const response = await this.#request(url, {
       headers: { cookie: this.#cookie, origem: '736372697074' },
     }, signal);
+    // requests.Session(), used by the official INLABS example, automatically accepts
+    // session-cookie rotation on normal responses. Mirror that behavior without ever
+    // forwarding cookies across redirects or origins.
+    if (!(response.status >= 300 && response.status < 400)) this.#refreshSessionCookie(response);
     // Do not follow redirects with a cookie, even for a nominally public archive.
     if (response.status >= 300 && response.status < 400) {
       this.close();
