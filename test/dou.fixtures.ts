@@ -36,7 +36,9 @@ export async function fixtureFetch(changed = false): Promise<typeof fetch> {
     const url = new URL(String(input));
     if (url.pathname === '/logar.php') return new Response(null, { status: 302, headers: { location: 'index.php', 'set-cookie': 'inlabs_session_cookie=test' } });
     if (new Headers(init?.headers).get('cookie') !== 'inlabs_session_cookie=test') return new Response(null, { status: 401 });
-    const bytes = archives.get(url.searchParams.get('dl') ?? '');
-    return bytes ? new Response(new Uint8Array(bytes)) : new Response('<html>Index</html>');
+    const dl = url.searchParams.get('dl');
+    if (!dl) return new Response('<html>Index</html>');
+    const bytes = archives.get(dl);
+    return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
   }) as typeof fetch;
 }
