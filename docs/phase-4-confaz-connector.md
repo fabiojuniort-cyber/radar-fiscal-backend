@@ -216,3 +216,22 @@ Decisão nesta frente:
 - não criar nova `identity_version` agora;
 - manter o ponto sob observação durante backfill/amostras futuras;
 - se surgir caso oficial em que a própria data original seja corrigida sem nova identidade editorial de retificação/republicação, retornar ao Gerente Geral antes de qualquer mudança estrutural.
+
+
+## Static Outbound IP — resultado controlado em produção
+
+Em 2026-09-20/21 o workspace Railway foi atualizado de Hobby para Pro e o recurso Static Outbound IP foi habilitado exclusivamente no serviço `radar-fiscal-worker`.
+
+Validação executada com deployment diagnóstico temporário e reversível:
+
+- egress observado pelo Worker: `152.55.176.226`;
+- requisição de controle para serviço de identificação de IP: sucesso;
+- requisição HTTPS única para `https://www.confaz.fazenda.gov.br/`: falha antes de HTTP;
+- causa preservada: `UND_ERR_CONNECT_TIMEOUT`;
+- detalhe: `Connect Timeout Error (attempted address: www.confaz.fazenda.gov.br:443, timeout: 10000ms)`.
+
+Conclusão: alterar o egress Railway para Static Outbound IP não resolveu a conectividade com o host oficial. O ponto exato de filtragem continua não comprovado; a evidência demonstra apenas que a rota Railway -> CONFAZ permanece indisponível mesmo com o egress estático.
+
+Após o teste, o start command do Worker foi restaurado para `npm run start:worker`; backend e scheduler não foram alterados. O Static Outbound IP permanece habilitado no Worker.
+
+A próxima prova autorizada é um relay/proxy source-specific. Nenhum relay está ativo em produção neste momento.
