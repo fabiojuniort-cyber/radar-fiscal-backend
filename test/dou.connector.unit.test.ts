@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DouConnector, douCollectionDates } from '../src/modules/collection/dou.connector.js';
+import { DOU_XML_SECTIONS, DouConnector, douCollectionDates } from '../src/modules/collection/dou.connector.js';
 import { fixtureFetch } from './dou.fixtures.js';
 import { buildConnectorRegistry } from '../src/modules/collection/connector-registry.factory.js';
 const context = () => ({ sourceId:'dou',runId:'run',attemptId:'attempt',signal:new AbortController().signal });
@@ -17,8 +17,13 @@ test('official XML fixtures pass through the connector and stable receipt skips 
   assert.equal(first.publications.length,10); assert.deepEqual(first.partialFailures,[]);
   assert.equal((first.metadata!.dou as any).xmlCount,12);
   assert.equal((first.metadata!.dou as any).confazMatterCount,0);
+  assert.deepEqual((first.metadata!.dou as any).sections, DOU_XML_SECTIONS);
+  assert.equal((first.metadata!.dou as any).coverage,'DOU_SECTIONS_1_2_3_NORMAL_AND_EXTRA');
   const second = await new DouConnector({credentials,now:()=>new Date("2026-09-21T12:00:00Z"),fetch,dates:['2026-09-18'],readState:async()=>({archives:first.metadata!.douArchives as Record<string,string>})}).collect(context());
-  assert.equal(second.publications.length,0); assert.ok((second.metadata!.dou as any).archives.every((a:any)=>a.state==='UNCHANGED'));
+  assert.equal(second.publications.length,0);
+  const states = Object.fromEntries((second.metadata!.dou as any).archives.map((a:any)=>[a.section,a.state]));
+  assert.equal(states.DO1,'UNCHANGED'); assert.equal(states.DO1E,'UNCHANGED');
+  for (const section of ['DO2','DO2E','DO3','DO3E']) assert.equal(states[section],'NOT_AVAILABLE');
 });
 
 test('changed package is parsed again without treating whole archive hash as publication content',async()=>{
