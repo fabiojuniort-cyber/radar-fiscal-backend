@@ -118,6 +118,18 @@ test('official form, cookie, XML normal/extra and PDF extra URL conventions', as
   await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), code('INLABS_AUTH_REQUIRED'));
 });
 
+test('authenticated responses can rotate the INLABS session cookie', async () => {
+  const rotated = new Response(zip, { headers: {
+    'set-cookie': 'inlabs_session_cookie=rotated-session; Secure; HttpOnly; Path=/',
+  } });
+  const { client, calls } = stub([loginResponse(), rotated, new Response(zip)]);
+  await client.login(signal());
+  await client.downloadXml('2026-09-18', 'DO1', signal());
+  await client.downloadXml('2026-09-18', 'DO2', signal());
+  assert.equal(new Headers(calls[1]!.init.headers).get('cookie'), 'inlabs_session_cookie=test-session');
+  assert.equal(new Headers(calls[2]!.init.headers).get('cookie'), 'inlabs_session_cookie=rotated-session');
+});
+
 test('no session cookie and foreign login redirects fail without forwarding secrets', async () => {
   for (const response of [new Response('login failed'), new Response(null, { status: 302,
     headers: { location: 'https://example.invalid', 'set-cookie': 'inlabs_session_cookie=value' } })]) {
