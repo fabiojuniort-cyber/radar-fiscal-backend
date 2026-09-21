@@ -25,7 +25,8 @@
     "test:integration": "tsx --test test/auth.integration.test.ts",
     "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts && tsx --test test/dou.collection.integration.test.ts",
     "db:ensure-confaz-source": "node dist/infrastructure/database/ensure-confaz-source.js",
-    "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js"
+    "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js",
+    "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
