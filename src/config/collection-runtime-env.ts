@@ -85,10 +85,37 @@ const schema = z.object({
 
   CONFAZ_PROXY_URL: z.string().url().optional(),
 
+  CONFAZ_RELAY_URL: z
+    .string()
+    .url()
+    .refine(
+      (value) => value.startsWith('https://'),
+      'CONFAZ relay URL must use https://',
+    )
+    .optional(),
+
+  CONFAZ_RELAY_TOKEN: z
+    .string()
+    .min(24)
+    .optional(),
+
   COLLECTION_ENABLE_SIMULATED_CONNECTORS: z
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+}).superRefine((value, ctx) => {
+  const hasRelayUrl = value.CONFAZ_RELAY_URL !== undefined;
+  const hasRelayToken =
+    value.CONFAZ_RELAY_TOKEN !== undefined;
+
+  if (hasRelayUrl !== hasRelayToken) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['CONFAZ_RELAY_URL'],
+      message:
+        'CONFAZ_RELAY_URL and CONFAZ_RELAY_TOKEN must be configured together',
+    });
+  }
 });
 
 const parsed = schema.safeParse(process.env);
