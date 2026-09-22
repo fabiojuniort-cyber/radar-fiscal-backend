@@ -24,7 +24,7 @@ As quatro listagens completas são consultadas em toda execução. O conector n�
 
 O `NfeEncatClient` usa cookie jar em memória por tentativa. Redirects são manuais, limitados e restritos ao mesmo origin `https://www.nfe.fazenda.gov.br`. Isso cobre o fluxo `AspxAutoDetectCookieSupport=1` e preserva também `ASP.NET_SessionId`.
 
-Redirect loop, redirect cross-origin, captcha/`consultaRecaptcha.aspx`, página de erro, Content-Type inválido, HTML sem a estrutura esperada `p.tituloSessao` e HTML devolvido no lugar de PDF/ZIP/XML são falhas de consulta, nunca resultado vazio.
+Redirect loop, redirect cross-origin, captcha/`consultaRecaptcha.aspx`, página de erro, Content-Type inválido e HTML devolvido no lugar de PDF/ZIP/XML são falhas de consulta, nunca resultado vazio. Notas, Informes e Schemas usam seções `p.tituloSessao`; a página oficial de Manuais usa `label.tituloPrincipal` e é validada separadamente.
 
 Os códigos 408, 425, 429 e 5xx são tratados como falhas transitórias/retryable. O executor do Motor continua responsável pelo timeout global da tentativa; o cliente adiciona timeout por requisição e respeita o `AbortSignal` recebido.
 
@@ -44,7 +44,7 @@ Assim, v1.40 e v1.50 são publicações distintas. Uma alteração posterior nos
 
 Cada item só é emitido ao Motor quando existe um checkpoint de arquivo válido. O download preserva nome (`Content-Disposition`), MIME, tamanho, ETag/Last-Modified e SHA-256 dos bytes. O `rawSha256` é colocado em `files[]`; o normalizador existente já incorpora os hashes dos arquivos ao `contentHash`.
 
-O estado incremental usa ETag/Last-Modified, quando fornecidos pelo portal, para requisições condicionais. Um `304 Not Modified` reaproveita o SHA-256 previamente validado. Sem validadores HTTP, o arquivo é baixado novamente e rehasheado; o token isoladamente não é tratado como evidência de imutabilidade.
+O estado incremental sempre relê as quatro listagens completas. Para itens já conhecidos, um checkpoint de arquivo validado nas últimas 24 horas é reaproveitado sem novo download; isso não oculta novas versões/tokens inseridos em qualquer posição da listagem. Itens conhecidos vencidos são revalidados em lotes oldest-first de até 16 arquivos por execução, distribuindo a revisão periódica ao longo das execuções horárias. Quando há ETag/Last-Modified, a revalidação usa requisições condicionais e um `304 Not Modified` reaproveita o SHA-256; quando não há validador, o arquivo selecionado para rechecagem é baixado novamente e rehasheado. Itens novos são sempre baixados imediatamente.
 
 ## Estado e falhas parciais
 
@@ -52,7 +52,7 @@ O estado incremental usa ETag/Last-Modified, quando fornecidos pelo portal, para
 
 Falha de download/processamento de um documento gera `partialFailures` e não impede os demais itens de serem coletados. Se todas as quatro listagens falharem, o conector lança `NFE_ENCAT_ALL_LISTINGS_FAILED`, permitindo ao Motor registrar fonte indisponível/falha de fetch em vez de `SUCCESS_NO_RESULTS`.
 
-Quatro listagens consultadas com sucesso, com a estrutura oficial reconhecida, e zero itens válidos constituem resultado vazio legítimo.
+Quatro listagens consultadas com sucesso, com a estrutura oficial reconhecida, e zero itens válidos constituem resultado vazio legítimo. A telemetria do conector também informa quantos checkpoints foram reaproveitados, quantos itens conhecidos foram rechecados, quantos arquivos foram baixados e quantos retornaram `304`.
 
 ## Ativação
 

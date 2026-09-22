@@ -21,6 +21,10 @@ import {
 
 export const NFE_ENCAT_CONNECTOR_KEY = 'nfe-encat';
 
+const DEFAULT_REVISIT_AFTER_MS =
+  24 * 60 * 60 * 1_000;
+const DEFAULT_MAX_RECHECKS_PER_RUN = 16;
+
 export const NFE_ENCAT_LISTINGS: ReadonlyArray<{
   family: NfeEncatPortalFamily;
   url: string;
@@ -62,10 +66,63 @@ export interface NfeEncatConnectorOptions {
   now?: () => Date;
   readState?: (sourceId: string) => Promise<NfeEncatSourceState>;
   client?: Omit<NfeEncatClientOptions, 'fetch'>;
+  revisitAfterMs?: number;
+  maxRechecksPerRun?: number;
 }
 
 function stateKey(item: Pick<NfeEncatListingItem, 'portalFamily' | 'contentToken'>): string {
   return `${item.portalFamily}:${item.contentToken}`;
+}
+
+function checkedAtMs(
+  stored: NfeEncatStoredFile,
+): number {
+  const value = Date.parse(stored.checkedAt);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function selectKnownRechecks(
+  discovered: NfeEncatListingItem[],
+  state: NfeEncatSourceState,
+  now: Date,
+  revisitAfterMs: number,
+  maxRechecksPerRun: number,
+): Set<string> {
+  const nowMs = now.getTime();
+
+  const candidates = discovered
+    .map((item) => {
+      const key = stateKey(item);
+      const previous = state.items[key];
+
+      return previous
+        ? {
+            key,
+            checkedAtMs: checkedAtMs(previous),
+          }
+        : undefined;
+    })
+    .filter(
+      (
+        candidate,
+      ): candidate is {
+        key: string;
+        checkedAtMs: number;
+      } =>
+        candidate !== undefined &&
+        nowMs - candidate.checkedAtMs >=
+          revisitAfterMs,
+    )
+    .sort(
+      (left, right) =>
+        left.checkedAtMs - right.checkedAtMs ||
+        left.key.localeCompare(right.key),
+    )
+    .slice(0, maxRechecksPerRun);
+
+  return new Set(
+    candidates.map((candidate) => candidate.key),
+  );
 }
 
 function connectorFailure(error: unknown): { code: string; message: string } {
@@ -151,12 +208,43 @@ export class NfeEncatConnector implements CollectionConnector {
   readonly #options: NfeEncatConnectorOptions;
 
   constructor(options: NfeEncatConnectorOptions = {}) {
+    const revisitAfterMs =
+      options.revisitAfterMs ??
+      DEFAULT_REVISIT_AFTER_MS;
+    const maxRechecksPerRun =
+      options.maxRechecksPerRun ??
+      DEFAULT_MAX_RECHECKS_PER_RUN;
+
+    if (
+      !Number.isSafeInteger(revisitAfterMs) ||
+      revisitAfterMs < 0
+    ) {
+      throw new RangeError(
+        'revisitAfterMs must be a non-negative integer',
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(maxRechecksPerRun) ||
+      maxRechecksPerRun < 0
+    ) {
+      throw new RangeError(
+        'maxRechecksPerRun must be a non-negative integer',
+      );
+    }
+
     this.#options = options;
   }
 
   async collect(context: ConnectorExecutionContext): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
     const state = await this.#options.readState?.(context.sourceId) ?? { items: {} };
+    const revisitAfterMs =
+      this.#options.revisitAfterMs ??
+      DEFAULT_REVISIT_AFTER_MS;
+    const maxRechecksPerRun =
+      this.#options.maxRechecksPerRun ??
+      DEFAULT_MAX_RECHECKS_PER_RUN;
     const client = new NfeEncatClient({
       ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
       ...(this.#options.client ?? {}),
@@ -168,6 +256,9 @@ export class NfeEncatConnector implements CollectionConnector {
     let listingsSucceeded = 0;
     let downloadedCount = 0;
     let notModifiedCount = 0;
+    let reusedCheckpointCount = 0;
+    let recheckedKnownCount = 0;
+    let newItemDownloadCount = 0;
 
     try {
       for (const listing of NFE_ENCAT_LISTINGS) {
@@ -211,10 +302,34 @@ export class NfeEncatConnector implements CollectionConnector {
       }
 
       const nextItems: Record<string, NfeEncatStoredFile> = {};
+      const recheckKeys = selectKnownRechecks(
+        discovered,
+        state,
+        now,
+        revisitAfterMs,
+        maxRechecksPerRun,
+      );
+
       for (const item of discovered) {
         context.signal.throwIfAborted();
         const key = stateKey(item);
         const previous = state.items[key];
+
+        if (previous && !recheckKeys.has(key)) {
+          nextItems[key] = previous;
+          reusedCheckpointCount += 1;
+          publications.push(
+            publicationFor(item, previous),
+          );
+          continue;
+        }
+
+        if (previous) {
+          recheckedKnownCount += 1;
+        } else {
+          newItemDownloadCount += 1;
+        }
+
         try {
           const response = await client.downloadFile(
             item.officialUrl,
@@ -289,6 +404,11 @@ export class NfeEncatConnector implements CollectionConnector {
             publicationCount: publications.length,
             downloadedCount,
             notModifiedCount,
+            reusedCheckpointCount,
+            recheckedKnownCount,
+            newItemDownloadCount,
+            revisitAfterMs,
+            maxRechecksPerRun,
             partialFailureCount: partialFailures.length,
             scope: ['NOTAS_TECNICAS', 'INFORMES_TECNICOS', 'SCHEMAS_NFE_NFCE', 'MANUAIS_NFE_NFCE'],
           },

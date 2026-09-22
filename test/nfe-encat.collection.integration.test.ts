@@ -56,6 +56,7 @@ test('NF-e/ENCAT through collection engine keeps official versions separate and 
     fetch: fetchImpl,
     readState: source => readNfeEncatSourceState(db, source),
     now: () => new Date('2026-09-21T20:00:00Z'),
+    revisitAfterMs: 0,
   }));
 
   async function run() {
