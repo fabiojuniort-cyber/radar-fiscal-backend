@@ -116,12 +116,14 @@ function linkPath(url: string): string {
   }
 }
 
-function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' } | undefined {
+function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' | 'pagina' } | undefined {
   const path = linkPath(url);
   const item = /\/item\/show\/(\d+)/i.exec(path)?.[1];
   if (item) return { id: item, type: 'item' };
   const archive = /\/arquivo\/show\/(\d+)/i.exec(path)?.[1];
   if (archive) return { id: archive, type: 'arquivo' };
+  const page = /\/pagina\/show\/(\d+)/i.exec(path)?.[1];
+  if (page) return { id: page, type: 'pagina' };
   return undefined;
 }
 
@@ -414,7 +416,12 @@ export function descriptorFromPage(
     kind,
     title: page.title,
     itemId: page.itemId,
-    externalId: (/\/arquivo\/show\//i.test(page.url) ? 'arquivo:' : 'item:') + page.itemId,
+    externalId:
+      (/\/arquivo\/show\//i.test(page.url)
+        ? 'arquivo:'
+        : /\/pagina\/show\//i.test(page.url)
+          ? 'pagina:'
+          : 'item:') + page.itemId,
     officialUrl: page.url,
     ...(page.publishedAt ? { publishedAt: page.publishedAt } : {}),
     ...(page.updatedAt ? { updatedAt: page.updatedAt } : {}),
