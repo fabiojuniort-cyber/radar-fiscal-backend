@@ -105,6 +105,7 @@ try {
                 'publicationCount', COALESCE((ca.metadata->>'publicationCount')::int, 0),
                 'partialFailureCount', COALESCE((ca.metadata->>'partialFailureCount')::int, 0),
                 'nfeEncat', ca.metadata->'nfeEncat',
+                'listingResults', ca.metadata->'listingResults',
                 'checkpointItems',
                   (
                     SELECT count(*)::int
