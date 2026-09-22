@@ -46,6 +46,14 @@ const transportFetch = (async (
   init?: RequestInit,
 ): Promise<Response> => {
   requestCount += 1;
+  if (requestCount % 100 === 0) {
+    console.error('SPED_REAL_CONNECTOR_PROGRESS=' + JSON.stringify({
+      requestCount,
+      htmlRequestCount,
+      fileRequestCount,
+      at: new Date().toISOString(),
+    }));
+  }
   const official = inputUrl(input);
   if (official.hostname.toLowerCase() !== HOST) {
     throw new Error('Unexpected host in SPED validation: ' + official.hostname);
@@ -151,6 +159,10 @@ async function run(
 
   return result;
 }
+
+console.error('SPED_REAL_CONNECTOR_START=' + JSON.stringify({
+  at: new Date().toISOString(),
+}));
 
 const bootstrap = await run(
   'BOOTSTRAP',
