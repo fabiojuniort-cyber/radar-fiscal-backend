@@ -24,6 +24,11 @@ export type SpedRevisionKind =
   | 'REPUBLICATION'
   | 'UPDATE';
 
+export type SpedDocumentStatus =
+  | 'DRAFT'
+  | 'FINAL'
+  | 'UNKNOWN';
+
 export interface SpedParsedLink {
   url: string;
   text: string;
@@ -57,6 +62,7 @@ export interface SpedDocumentDescriptor {
   documentFamily: string;
   revisionKind: SpedRevisionKind;
   republication: boolean;
+  documentStatus: SpedDocumentStatus;
   description?: string;
   relatedTaxes: string[];
   affectedRecords: string[];
@@ -300,6 +306,13 @@ function revisionKind(title: string): SpedRevisionKind {
   return 'ORIGINAL';
 }
 
+function documentStatus(title: string, text: string): SpedDocumentStatus {
+  const normalized = normalizeCompare(title + ' ' + text.slice(0, 2000));
+  if (/\bMINUTA\b|\bMINUTAS\b/.test(normalized)) return 'DRAFT';
+  if (/\bOFICIAL\b|\bDEFINITIV[AO]\b/.test(normalized)) return 'FINAL';
+  return 'UNKNOWN';
+}
+
 function actNumberFor(
   kind: SpedDocumentKind,
   title: string,
@@ -437,6 +450,7 @@ export function descriptorFromPage(
     documentFamily: documentFamily(module, kind, page.title, numbers.documentNumber),
     revisionKind: revision,
     republication: revision === 'REPUBLICATION',
+    documentStatus: documentStatus(page.title, page.text),
     ...(description ? { description } : {}),
     relatedTaxes: relatedTaxes(page.title + ' ' + description),
     affectedRecords: affectedRecords(description),
