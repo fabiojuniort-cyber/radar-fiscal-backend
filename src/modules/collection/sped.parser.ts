@@ -414,15 +414,26 @@ export function descriptorFromPage(
   const kind = documentKind(page.title, page.text);
   if (!kind) return undefined;
   const revision = revisionKind(page.title);
-  const version = versionFromTitle(page.title, kind) ?? versionFromBody(page.text, kind);
+  const titleVersion = versionFromTitle(page.title, kind);
+  const bodyVersion = versionFromBody(page.text, kind);
+  const version = titleVersion ?? bodyVersion;
   const numbers = actNumberFor(kind, page.title, version, revision);
-  const hasDocumentEvidence =
+  const genericNavigationTitle =
+    /^(?:DOWNLOADS?|MANUAIS?(?:\s+E\s+GUIAS?(?:\s+PRÁTICOS?)?)?|GUIAS?(?:\s+PRÁTICOS?)?|NOTAS?\s+(?:TÉCNICAS?|ORIENTATIVAS?)(?:\s+E\s+(?:TÉCNICAS?|ORIENTATIVAS?))?|ESQUEMAS?\s+XSD(?:\s*-\s*VERSÃO\s+MAIS\s+RECENTE)?|LEIAUTES?|TABELAS?)$/i.test(
+      normalizeSpace(page.title),
+    );
+  const strongDocumentEvidence =
     page.fileLinks.length > 0 ||
     page.publishedAt !== undefined ||
     page.updatedAt !== undefined ||
-    version !== undefined ||
+    titleVersion !== undefined ||
     numbers.documentNumber !== undefined;
-  if (kind !== 'OPERATIONAL_NOTICE' && !hasDocumentEvidence) return undefined;
+  if (
+    kind !== 'OPERATIONAL_NOTICE' &&
+    (!strongDocumentEvidence || (genericNavigationTitle && page.fileLinks.length === 0 && page.publishedAt === undefined && page.updatedAt === undefined))
+  ) {
+    return undefined;
+  }
   const files = page.fileLinks
     .map((link) => ({
       url: link.url,
