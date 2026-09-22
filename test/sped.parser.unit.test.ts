@@ -81,6 +81,18 @@ test('classifies EFD-Reinf XSD and DeRE official technical package', () => {
 });
 
 
+
+test('does not classify technical navigation/category pages as publications without document evidence', () => {
+  const parsed = parseSpedPage(
+    '<html><body><h1>EFD ICMS IPI</h1><h2>Manuais e Guias Práticos</h2>' +
+      '<a href="/item/show/7900">Guia Prático EFD ICMS IPI versão 3.2.1</a>' +
+      '<a href="/item/show/8112">Guia Prático EFD ICMS IPI versão 3.2.2</a>' +
+      '</body></html>',
+    'https://sped.rfb.gov.br/item/show/1573',
+  );
+  assert.equal(descriptorFromPage('EFD_ICMS_IPI', parsed), undefined);
+});
+
 test('parses arquivo/show document pages without treating the HTML page as the binary', () => {
   const parsed = parseSpedPage(
     '<html><body><h1>EFD Contribuições</h1>' +
