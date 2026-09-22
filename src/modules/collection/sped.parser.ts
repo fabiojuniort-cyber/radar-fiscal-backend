@@ -66,6 +66,7 @@ export interface SpedDocumentDescriptor {
   description?: string;
   relatedTaxes: string[];
   affectedRecords: string[];
+  linkedArtifactExternalIds?: string[];
   files: Array<{
     url: string;
     externalId: string;

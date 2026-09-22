@@ -212,6 +212,20 @@ function samePortalNavigation(url: string): boolean {
   }
 }
 
+function canonicalPortalUrl(value: string): string {
+  const parsed = new URL(value, SPED_ORIGIN);
+  parsed.hash = '';
+  return parsed.toString();
+}
+
+function isArtifactPage(url: string): boolean {
+  try {
+    return /^\/arquivo\/show\/\d+$/i.test(new URL(url, SPED_ORIGIN).pathname);
+  } catch {
+    return false;
+  }
+}
+
 function shouldFollowLink(
   module: SpedModule,
   seedKind: SpedModuleSeed['kind'],
@@ -244,6 +258,7 @@ async function crawlModule(
   }));
   const seen = new Set<string>();
   const descriptors = new Map<string, SpedDocumentDescriptor>();
+  const linkedArtifacts = new Map<string, Set<string>>();
   const failures: ConnectorPartialFailure[] = [];
   let pagesSucceeded = 0;
   let pagesFailed = 0;
@@ -260,10 +275,19 @@ async function crawlModule(
       pagesSucceeded += 1;
       if (current.depth === 0) seedSuccesses += 1;
       const descriptor = descriptorFromPage(definition.module, page);
-      if (descriptor) descriptors.set(descriptor.externalId, descriptor);
+      if (descriptor) {
+        descriptors.set(descriptor.externalId, descriptor);
+        const artifactUrls = page.links
+          .filter((link) => isArtifactPage(link.url))
+          .map((link) => canonicalPortalUrl(link.url));
+        if (artifactUrls.length > 0) {
+          linkedArtifacts.set(descriptor.externalId, new Set(artifactUrls));
+        }
+      }
       if (current.depth >= maxCrawlDepth) continue;
       for (const link of page.links) {
-        if (!shouldFollowLink(definition.module, current.seedKind, link.text, link.url)) continue;
+        const linkedArtifact = descriptor !== undefined && isArtifactPage(link.url);
+        if (!linkedArtifact && !shouldFollowLink(definition.module, current.seedKind, link.text, link.url)) continue;
         if (seen.has(link.url)) continue;
         queue.push({
           url: link.url,
@@ -283,9 +307,47 @@ async function crawlModule(
     }
   }
 
+  const descriptorByUrl = new Map(
+    [...descriptors.values()].map((descriptor) => [
+      canonicalPortalUrl(descriptor.officialUrl),
+      descriptor,
+    ]),
+  );
+
+  const consumedArtifactIds = new Set<string>();
+
+  for (const [parentExternalId, artifactUrls] of linkedArtifacts) {
+    const parent = descriptors.get(parentExternalId);
+    if (!parent) continue;
+
+    const linkedIds = new Set(parent.linkedArtifactExternalIds ?? []);
+    const filesByUrl = new Map(parent.files.map((file) => [file.url, file]));
+
+    for (const artifactUrl of artifactUrls) {
+      const artifact = descriptorByUrl.get(artifactUrl);
+      if (!artifact) continue;
+      const sameFamily =
+        artifact.documentFamily === parent.documentFamily ||
+        (
+          artifact.documentNumber !== undefined &&
+          artifact.documentNumber === parent.documentNumber
+        );
+      if (!sameFamily) continue;
+
+      linkedIds.add(artifact.externalId);
+      consumedArtifactIds.add(artifact.externalId);
+      for (const file of artifact.files) filesByUrl.set(file.url, file);
+    }
+
+    if (linkedIds.size > 0) parent.linkedArtifactExternalIds = [...linkedIds].sort();
+    parent.files = [...filesByUrl.values()];
+  }
+
   return {
     module: definition.module,
-    descriptors: [...descriptors.values()],
+    descriptors: [...descriptors.values()].filter(
+      (descriptor) => !consumedArtifactIds.has(descriptor.externalId),
+    ),
     pagesSucceeded,
     pagesFailed,
     pagesVisited: seen.size,
@@ -345,6 +407,9 @@ function publicationFor(
       ...(descriptor.updatedAt ? { updatedAt: descriptor.updatedAt.toISOString().slice(0, 10) } : {}),
       relatedTaxes: descriptor.relatedTaxes,
       affectedRecords: descriptor.affectedRecords,
+      ...(descriptor.linkedArtifactExternalIds
+        ? { linkedArtifactExternalIds: descriptor.linkedArtifactExternalIds }
+        : {}),
       fileCount: files.length,
     },
   };

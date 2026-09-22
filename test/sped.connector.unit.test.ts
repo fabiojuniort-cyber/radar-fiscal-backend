@@ -56,7 +56,12 @@ function router(options: { changedReinf?: boolean; failDere?: boolean } = {}) {
     if (p === '/item/show/8126') return html(detail('EFD Contribuições', 'Nota Técnica 012 2026 - ORIENTAÇÃO PARA OS CONTRIBUINTES DE PIS COFINS', '30/03/2026', '8127'));
     if (p === '/item/show/5786') return html(detail('EFD Contribuições', 'Tabela 4.3.11 - Versão 1.32', '16/03/2026', '5787', 'Tabela_4_3_11_V1.32.doc'));
     if (p === '/item/show/8116') return html(detail('EFD-Reinf', 'Nota Técnica 01/2026 – Ajustes nos leiautes da versão 2.1.2', '25/03/2026', '8117'));
-    if (p === '/item/show/8129') return html(detail('EFD-Reinf', 'Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2', '31/03/2026', '8130'));
+    if (p === '/item/show/8129') return new Response(null, { status: 302, headers: { location: '/pagina/show/8129' } });
+    if (p === '/pagina/show/8129') return html(
+      '<html><body><h1>EFD-Reinf</h1><h2>Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2</h2>' +
+      '<p>Publicado em 31/03/2026</p><a href="/arquivo/show/8070">clique aqui</a></body></html>'
+    );
+    if (p === '/arquivo/show/8070') return html(detail('EFD-Reinf', 'Nota Técnica EFD-Reinf 01/2026', '31/03/2026', '8070'));
     if (p === '/item/show/2270') return html(detail('EFD-Reinf', 'ESQUEMAS XSD - VERSÃO MAIS RECENTE', '15/01/2026', '2271', 'reinf-xsd.zip'));
     if (p === '/item/show/9001') return html('<html><body><h1>EFD-Reinf</h1><h2>Indisponibilidade Temporária</h2><p>Publicado em 25/03/2026</p></body></html>');
     if (p.startsWith('/arquivo/download/')) {
@@ -65,7 +70,7 @@ function router(options: { changedReinf?: boolean; failDere?: boolean } = {}) {
       if (headers['if-none-match'] === '"v1"' && !options.changedReinf) return new Response(null, { status: 304, headers: { etag: '"v1"' } });
       if (id === '2271' || id === '7951') return zip(id, '"v1"');
       if (id === '5787') return new Response(new Uint8Array([0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1,1]), { status: 200, headers: { 'content-type': 'application/msword', etag: '"v1"', 'content-disposition': 'attachment; filename="Tabela.doc"' } });
-      const tag = options.changedReinf && id === '8130' ? '"v2"' : '"v1"';
+      const tag = options.changedReinf && id === '8070' ? '"v2"' : '"v1"';
       return pdf(id + (tag === '"v2"' ? '-changed' : ''), tag);
     }
     return new Response('not found', { status: 404, headers: { 'content-type': 'text/html' } });
@@ -84,6 +89,14 @@ test('collects the four SPED modules and preserves historical gates and explicit
   assert.equal(result.publications.some(p => /ECF|ECD/.test(p.title)), false);
   const reinf = result.publications.filter(p => p.metadata?.documentFamily === 'EFD-Reinf NT 01/2026');
   assert.equal(reinf.length, 2);
+  const republication = reinf.find(p => p.metadata?.republication === true);
+  assert.ok(republication);
+  assert.equal(republication.files?.length, 1);
+  assert.deepEqual(republication.metadata?.linkedArtifactExternalIds, ['arquivo:8070']);
+  assert.equal(
+    result.publications.some(p => p.externalId === 'arquivo:8070'),
+    false,
+  );
   const normalized = reinf.map(p => normalizePublication({ sourceId: CONTEXT.sourceId, publication: p }));
   assert.notEqual(normalized[0]?.identityHash, normalized[1]?.identityHash);
 });
