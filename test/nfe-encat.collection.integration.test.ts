@@ -88,19 +88,23 @@ test('NF-e/ENCAT through collection engine keeps official versions separate and 
     const checkpointBeforePartial = await readNfeEncatSourceState(db, sourceId);
     assert.equal(Object.keys(checkpointBeforePartial.items).length, 2);
     const partialRunId = randomUUID();
+    const partialStartedAt = new Date();
+    const partialFinishedAt = new Date(partialStartedAt.getTime() + 1_000);
     await db.insertInto('collection_runs').values({
       id: partialRunId,
       source_id: sourceId,
-      scheduled_for: new Date('2026-09-21T20:01:00Z'),
+      scheduled_for: new Date(partialStartedAt.getTime() - 1_000),
       trigger_type: 'MANUAL',
       status: 'PARTIAL_SUCCESS',
-      finished_at: new Date('2026-09-21T20:01:01Z'),
+      started_at: partialStartedAt,
+      finished_at: partialFinishedAt,
     }).execute();
     await db.insertInto('collection_attempts').values({
       collection_run_id: partialRunId,
       attempt_no: 1,
       status: 'SUCCESS',
-      finished_at: new Date('2026-09-21T20:01:01Z'),
+      started_at: partialStartedAt,
+      finished_at: partialFinishedAt,
       metadata: {
         nfeEncatState: {
           items: {
@@ -108,7 +112,7 @@ test('NF-e/ENCAT through collection engine keeps official versions separate and 
               rawSha256: 'f'.repeat(64),
               sizeBytes: 1,
               mimeType: 'application/pdf',
-              checkedAt: '2026-09-21T20:01:01.000Z',
+              checkedAt: partialFinishedAt.toISOString(),
             },
           },
         },
