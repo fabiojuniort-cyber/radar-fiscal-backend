@@ -191,3 +191,30 @@ Validação estrutural via serviço isolado, sem persistência produtiva:
 - total: 716 páginas, 536 documentos, 203 arquivos.
 
 A porta 443 do host oficial permaneceu inacessível a partir dos egress de datacenter testados. A porta 80 respondeu e foi usada somente para diagnóstico estrutural e validação de hashes; o conector produtivo continua configurado para URLs oficiais HTTPS.
+
+
+## Links históricos removidos
+
+A validação real encontrou links antigos ainda referenciados por páginas do portal, mas que hoje retornam HTTP 404.
+
+Esses casos não significam indisponibilidade da fonte inteira. O conector registra a rota como `MISSING` no checkpoint e:
+
+- não converte o run em `PARTIAL_SUCCESS`;
+- não repete o 404 a cada hora;
+- revalida o tombstone pelo mesmo ciclo oldest-first;
+- se a rota voltar a responder 200, ela retorna automaticamente ao fluxo normal.
+
+Seeds estruturais continuam rigorosos: 404/410 em seed de módulo permanece falha real.
+
+## Latência de recheck de alterações silenciosas
+
+No bootstrap lógico validado em 22/09/2026, o conector produziu 524 publicações e 235 referências de arquivo.
+
+Com o padrão de 32 documentos conhecidos rechecados por run horário e elegibilidade após 24 horas:
+
+- novos IDs vistos nas listagens continuam sendo processados imediatamente;
+- alterações silenciosas em documentos antigos entram no ciclo de recheck;
+- um ciclo completo de aproximadamente 524 documentos exige cerca de 17 runs horários após a elegibilidade;
+- portanto a detecção de uma alteração silenciosa muito antiga pode ocorrer aproximadamente entre 24 e 41 horas após o último check, conforme sua posição no ciclo.
+
+Esse limite é deliberado para manter a coleta horária dentro do orçamento operacional do Worker.
