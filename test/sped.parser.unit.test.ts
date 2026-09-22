@@ -32,6 +32,26 @@ test('models Guia Prático 3.2.1 and 3.2.2 as distinct official versions in the 
   assert.notEqual(one?.externalId, two?.externalId);
 });
 
+
+test('keeps official EFD ICMS/IPI technical-note versions as separate publications in one family', () => {
+  const v11 = descriptorFromPage(
+    'EFD_ICMS_IPI',
+    page('7001', 'Nota Técnica 2023.001 v 1.1 (leiaute versão 018)', 'Publicado em 01/11/2023', '7002'),
+  );
+  const v12 = descriptorFromPage(
+    'EFD_ICMS_IPI',
+    page('7003', 'Nota Técnica 2023.001 v 1.2 (leiaute versão 018)', 'Publicado em 15/12/2023', '7004'),
+  );
+  assert.equal(v11?.officialVersion, '1.1');
+  assert.equal(v12?.officialVersion, '1.2');
+  assert.equal(v11?.documentNumber, '2023.001');
+  assert.equal(v12?.documentNumber, '2023.001');
+  assert.equal(v11?.documentFamily, v12?.documentFamily);
+  assert.notEqual(v11?.actNumber, v12?.actNumber);
+  assert.match(v11?.actNumber ?? '', /v1\.1$/);
+  assert.match(v12?.actNumber ?? '', /v1\.2$/);
+});
+
 test('distinguishes EFD-Reinf NT 01/2026 original and explicit republication', () => {
   const original = descriptorFromPage(
     'EFD_REINF',
@@ -81,6 +101,22 @@ test('classifies EFD-Reinf XSD and DeRE official technical package', () => {
 });
 
 
+
+
+test('parses pagina/show DeRE as an official publication page', () => {
+  const parsed = parseSpedPage(
+    '<html><body><h2>Receita Federal do Brasil e CGIBS publicam documentação técnica oficial da Declaração de Regimes Específicos (DeRE)</h2>' +
+      '<p>Publicado em 12/12/2025</p>' +
+      '<p>Pacote de integração Versão 1.0.0 inclui Manual de Orientação Leiautes Schemas XSD IBS CBS</p>' +
+      '<a href="/arquivo/download/7951">DeRE_v1.0.0.zip</a>' +
+      '</body></html>',
+    'https://sped.rfb.gov.br/pagina/show/7950',
+  );
+  const descriptor = descriptorFromPage('DERE', parsed);
+  assert.equal(descriptor?.externalId, 'pagina:7950');
+  assert.equal(descriptor?.officialVersion, '1.0.0');
+  assert.equal(descriptor?.files.length, 1);
+});
 
 test('does not classify technical navigation/category pages as publications without document evidence', () => {
   const parsed = parseSpedPage(
