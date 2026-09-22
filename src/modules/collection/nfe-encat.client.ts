@@ -142,7 +142,10 @@ function rejectPortalIntermediary(url: string, html: string): void {
   }
   const rawLower = html.toLowerCase();
   const text = normalizedPageText(html).toLowerCase();
-  if (/g-recaptcha|grecaptcha|recaptcha|\bcaptcha\b/i.test(rawLower)) {
+  if (
+    /g-recaptcha|grecaptcha|recaptcha\/api\.js|data-sitekey|h-captcha|hcaptcha/i.test(rawLower) ||
+    /não sou um robô|nao sou um robo|sou humano/i.test(text)
+  ) {
     throw failure('NFE_ENCAT_CAPTCHA', 'SOURCE_UNAVAILABLE', true);
   }
   if (/server error in ['\/]? application|runtime error|erro no servidor|internal server error|the resource cannot be found/i.test(text)) {
