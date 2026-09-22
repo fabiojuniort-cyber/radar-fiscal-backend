@@ -80,6 +80,23 @@ test('classifies EFD-Reinf XSD and DeRE official technical package', () => {
   assert.deepEqual(dere?.relatedTaxes.sort(), ['CBS', 'IBS']);
 });
 
+
+test('parses arquivo/show document pages without treating the HTML page as the binary', () => {
+  const parsed = parseSpedPage(
+    '<html><body><h1>EFD Contribuições</h1>' +
+      '<h2>Nota Técnica 011_2026 - Descontinuidade da EFD-Contribuições - Orientações para os contribuintes do PIS Cofins</h2>' +
+      '<p>Data 03/02/2026 00:00:00</p>' +
+      '<a href="/arquivo/download/8017">Nota Técnica 011_2026.pdf</a>' +
+      '</body></html>',
+    'https://sped.rfb.gov.br/arquivo/show/8016',
+  );
+  const descriptor = descriptorFromPage('EFD_CONTRIBUICOES', parsed);
+  assert.equal(descriptor?.externalId, 'arquivo:8016');
+  assert.equal(descriptor?.documentNumber, '11/2026');
+  assert.equal(descriptor?.files.length, 1);
+  assert.match(descriptor?.files[0]?.url ?? '', /\/arquivo\/download\/8017$/);
+});
+
 test('global highlight filter rejects ECD/ECF and accepts only scoped SPED module content', () => {
   assert.equal(isAllowedGlobalHighlight('EFD_ICMS_IPI', 'Nova versão do Guia Prático da EFD ICMS IPI'), true);
   assert.equal(isAllowedGlobalHighlight('EFD_CONTRIBUICOES', 'EFD-CONTRIBUIÇÕES - PUBLICAÇÃO DA NOTA TÉCNICA Nº 12'), true);
