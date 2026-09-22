@@ -438,9 +438,11 @@ async function crawlModule(
           linkedArtifacts.set(current.parentExternalId, urls);
         }
 
+        const currentDocumentUrl = canonicalPortalUrl(descriptor.officialUrl);
         const artifactUrls = page.links
           .filter((link) => isArtifactPage(link.url))
-          .map((link) => canonicalPortalUrl(link.url));
+          .map((link) => canonicalPortalUrl(link.url))
+          .filter((artifactUrl) => artifactUrl !== currentDocumentUrl);
 
         if (artifactUrls.length > 0) {
           const urls = linkedArtifacts.get(descriptor.externalId) ?? new Set<string>();
@@ -563,8 +565,10 @@ async function recheckDocument(
         linkedArtifacts.set(current.parentExternalId, urls);
       }
 
+      const currentDocumentUrl = canonicalPortalUrl(descriptor.officialUrl);
       for (const link of page.links.filter((link) => isArtifactPage(link.url))) {
         const artifactUrl = canonicalPortalUrl(link.url);
+        if (artifactUrl === currentDocumentUrl) continue;
         const urls = linkedArtifacts.get(descriptor.externalId) ?? new Set<string>();
         urls.add(artifactUrl);
         linkedArtifacts.set(descriptor.externalId, urls);
