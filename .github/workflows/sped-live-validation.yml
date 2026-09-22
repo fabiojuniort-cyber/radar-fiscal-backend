@@ -1,0 +1,22 @@
+name: SPED Live Validation
+
+on:
+  push:
+    branches:
+      - validation/sped-live-bootstrap
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Scan official SPED portal
+        run: node dist/validation/sped-live-scan.js
