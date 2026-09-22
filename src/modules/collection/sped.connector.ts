@@ -716,6 +716,27 @@ function connectorFile(
   };
 }
 
+function normalizedIdentityToken(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleUpperCase('pt-BR');
+}
+
+function spedPublicationIdentityKey(descriptor: SpedDocumentDescriptor): string {
+  const family = descriptor.documentNumber ?? descriptor.documentFamily;
+  return [
+    'SPED',
+    descriptor.module,
+    descriptor.kind,
+    normalizedIdentityToken(family),
+    descriptor.officialVersion ?? '',
+    descriptor.revisionKind,
+  ].join('|');
+}
+
 function publicationFor(
   descriptor: SpedDocumentDescriptor,
   files: ConnectorFile[],
@@ -732,6 +753,7 @@ function publicationFor(
     ...(descriptor.description ? { content: descriptor.description } : {}),
     officialUrl: descriptor.officialUrl,
     externalId: descriptor.externalId,
+    identityKey: spedPublicationIdentityKey(descriptor),
     ...(files.length ? { files } : {}),
     metadata: {
       module: descriptor.module,
@@ -744,6 +766,7 @@ function publicationFor(
       itemId: descriptor.itemId,
       ...(descriptor.documentNumber ? { documentNumber: descriptor.documentNumber } : {}),
       ...(descriptor.officialVersion ? { officialVersion: descriptor.officialVersion } : {}),
+      ...(descriptor.createdAt ? { sourceCreatedAt: descriptor.createdAt.toISOString().slice(0, 10) } : {}),
       ...(descriptor.updatedAt ? { updatedAt: descriptor.updatedAt.toISOString().slice(0, 10) } : {}),
       relatedTaxes: descriptor.relatedTaxes,
       affectedRecords: descriptor.affectedRecords,
