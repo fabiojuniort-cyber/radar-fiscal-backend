@@ -271,6 +271,89 @@ test('known document rechecks are globally bounded', async () => {
   );
 });
 
+
+test('historical 404/410 links become recheckable tombstones without partial success', async () => {
+  let deadHits = 0;
+  const base = router();
+
+  const fetchWithDeadLink = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = new URL(input.toString());
+
+    if (url.pathname === '/projeto/show/274') {
+      return html(moduleRoot([
+        ['/item/show/7900', 'Guia Prático EFD ICMS IPI versão 3.2.1'],
+        ['/item/show/8114', 'Guia Prático EFD ICMS IPI versão 3.2.2'],
+        ['/item/show/4040', 'Nota Técnica EFD ICMS IPI 99/2010'],
+      ]));
+    }
+
+    if (url.pathname === '/item/show/4040') {
+      deadHits += 1;
+      return new Response('gone', {
+        status: 404,
+        headers: { 'content-type': 'text/html' },
+      });
+    }
+
+    return base(input, init);
+  }) as typeof fetch;
+
+  const first = await new SpedConnector({
+    fetch: fetchWithDeadLink,
+    now: () => new Date('2026-09-20T00:00:00Z'),
+    maxCrawlDepth: 5,
+  }).collect(CONTEXT);
+
+  assert.equal(first.partialFailures?.length ?? 0, 0);
+  assert.equal(deadHits, 1);
+
+  const firstState = first.metadata?.spedState as {
+    items: Record<string, any>;
+    pages: Record<string, any>;
+  };
+  const tombstone = firstState.pages['https://sped.rfb.gov.br/item/show/4040'];
+  assert.equal(tombstone?.kind, 'MISSING');
+
+  deadHits = 0;
+  const replay = await new SpedConnector({
+    fetch: fetchWithDeadLink,
+    now: () => new Date('2026-09-20T01:00:00Z'),
+    readState: async () => firstState,
+    maxCrawlDepth: 5,
+  }).collect(CONTEXT);
+
+  assert.equal(replay.partialFailures?.length ?? 0, 0);
+  assert.equal(deadHits, 0);
+  assert.ok(
+    (replay.metadata?.sped as { skippedKnownMissingPageCount: number })
+      .skippedKnownMissingPageCount > 0,
+  );
+
+  deadHits = 0;
+  const aged = await new SpedConnector({
+    fetch: fetchWithDeadLink,
+    now: () => new Date('2026-09-22T00:00:00Z'),
+    readState: async () => firstState,
+    revisitAfterMs: 0,
+    maxRechecksPerRun: 1000,
+    maxCrawlDepth: 5,
+  }).collect(CONTEXT);
+
+  assert.equal(aged.partialFailures?.length ?? 0, 0);
+  assert.ok(deadHits >= 1);
+  assert.ok(
+    (aged.metadata?.sped as { recheckedMissingPageCount: number })
+      .recheckedMissingPageCount >= 1,
+  );
+  assert.ok(
+    (aged.metadata?.sped as { recheckedTombstonesConfirmed: number })
+      .recheckedTombstonesConfirmed >= 1,
+  );
+});
+
 test('partial module failure does not turn the whole SPED source into no-results', async () => {
   const result = await new SpedConnector({ fetch: router({ failDere: true }), maxCrawlDepth: 2 }).collect(CONTEXT);
   assert.ok(result.publications.length > 0);
