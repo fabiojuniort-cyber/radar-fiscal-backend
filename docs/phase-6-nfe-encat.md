@@ -24,7 +24,7 @@ As quatro listagens completas são consultadas em toda execução. O conector n�
 
 O `NfeEncatClient` usa cookie jar em memória por tentativa. Redirects são manuais, limitados e restritos ao mesmo origin `https://www.nfe.fazenda.gov.br`. Isso cobre o fluxo `AspxAutoDetectCookieSupport=1` e preserva também `ASP.NET_SessionId`.
 
-Redirect loop, redirect cross-origin, captcha/`consultaRecaptcha.aspx`, página de erro, Content-Type inválido e HTML devolvido no lugar de PDF/ZIP/XML são falhas de consulta, nunca resultado vazio.
+Redirect loop, redirect cross-origin, captcha/`consultaRecaptcha.aspx`, página de erro, Content-Type inválido, HTML sem a estrutura esperada `p.tituloSessao` e HTML devolvido no lugar de PDF/ZIP/XML são falhas de consulta, nunca resultado vazio.
 
 Os códigos 408, 425, 429 e 5xx são tratados como falhas transitórias/retryable. O executor do Motor continua responsável pelo timeout global da tentativa; o cliente adiciona timeout por requisição e respeita o `AbortSignal` recebido.
 
@@ -48,11 +48,11 @@ O estado incremental usa ETag/Last-Modified, quando fornecidos pelo portal, para
 
 ## Estado e falhas parciais
 
-`nfe-encat-source-state.repository.ts` recupera o último checkpoint de tentativa bem-sucedida a partir de `collection_attempts.metadata.nfeEncatState`; não há migration específica.
+`nfe-encat-source-state.repository.ts` recupera o checkpoint apenas do último **run terminalmente bem-sucedido** (`SUCCESS`/`SUCCESS_NO_RESULTS`) a partir de `collection_attempts.metadata.nfeEncatState`; um `PARTIAL_SUCCESS` nunca avança o estado incremental. Não há migration específica.
 
 Falha de download/processamento de um documento gera `partialFailures` e não impede os demais itens de serem coletados. Se todas as quatro listagens falharem, o conector lança `NFE_ENCAT_ALL_LISTINGS_FAILED`, permitindo ao Motor registrar fonte indisponível/falha de fetch em vez de `SUCCESS_NO_RESULTS`.
 
-Quatro listagens consultadas com sucesso e zero itens válidos constituem resultado vazio legítimo.
+Quatro listagens consultadas com sucesso, com a estrutura oficial reconhecida, e zero itens válidos constituem resultado vazio legítimo.
 
 ## Ativação
 
