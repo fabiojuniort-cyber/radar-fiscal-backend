@@ -221,6 +221,12 @@ function shouldFollowLink(
   if (!samePortalNavigation(url)) return false;
   if (seedKind === 'GLOBAL_HIGHLIGHTS') return isAllowedGlobalHighlight(module, text);
   if (/\/destaques\/show\//i.test(url)) return true;
+  if (
+    seedKind === 'MODULE_HIGHLIGHTS' &&
+    /INDISPONIBILIDADE|INTERRUPÇÃO|INTERRUPCAO|MANUTENÇÃO|MANUTENCAO/i.test(text)
+  ) {
+    return true;
+  }
   return isTechnicalNavigationText(text) || moduleTextMatches(module, text);
 }
 
