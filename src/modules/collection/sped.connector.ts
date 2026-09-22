@@ -9,6 +9,9 @@ import type {
 import { ConnectorError } from './connector.error.js';
 import {
   SpedClient,
+  SPED_GOVBR_BASE_URL,
+  SPED_GOVBR_ORIGIN,
+  SPED_LEGACY_ORIGIN,
   type SpedClientOptions,
 } from './sped.client.js';
 import {
@@ -23,7 +26,8 @@ import {
 } from './sped.parser.js';
 
 export const SPED_CONNECTOR_KEY = 'sped';
-const SPED_ORIGIN = 'https://sped.rfb.gov.br';
+export type SpedPortalMode = 'GOVBR' | 'LEGACY';
+const GOVBR_ROOT = SPED_GOVBR_BASE_URL.replace(/\/$/, '');
 const DEFAULT_REVISIT_AFTER_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_MAX_RECHECKS_PER_RUN = 16;
 const DEFAULT_MAX_PAGES_PER_MODULE = 600;
@@ -39,37 +43,73 @@ export interface SpedModuleDefinition {
   seeds: SpedModuleSeed[];
 }
 
-export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
+export const LEGACY_SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
   {
     module: 'EFD_ICMS_IPI',
     seeds: [
-      { url: SPED_ORIGIN + '/projeto/show/274', kind: 'MODULE' },
-      { url: SPED_ORIGIN + '/item/show/1573', kind: 'CATEGORY' },
-      { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
+      { url: SPED_LEGACY_ORIGIN + '/projeto/show/274', kind: 'MODULE' },
+      { url: SPED_LEGACY_ORIGIN + '/item/show/1573', kind: 'CATEGORY' },
+      { url: SPED_LEGACY_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
     ],
   },
   {
     module: 'EFD_CONTRIBUICOES',
     seeds: [
-      { url: SPED_ORIGIN + '/projeto/show/268', kind: 'MODULE' },
-      { url: SPED_ORIGIN + '/item/show/1545', kind: 'CATEGORY' },
-      { url: SPED_ORIGIN + '/destaques/show/285', kind: 'MODULE_HIGHLIGHTS' },
-      { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
+      { url: SPED_LEGACY_ORIGIN + '/projeto/show/268', kind: 'MODULE' },
+      { url: SPED_LEGACY_ORIGIN + '/item/show/1545', kind: 'CATEGORY' },
+      { url: SPED_LEGACY_ORIGIN + '/destaques/show/285', kind: 'MODULE_HIGHLIGHTS' },
+      { url: SPED_LEGACY_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
     ],
   },
   {
     module: 'EFD_REINF',
     seeds: [
-      { url: SPED_ORIGIN + '/projeto/show/1196', kind: 'MODULE' },
-      { url: SPED_ORIGIN + '/destaques/show/1199', kind: 'MODULE_HIGHLIGHTS' },
-      { url: SPED_ORIGIN + '/item/show/2270', kind: 'CATEGORY' },
+      { url: SPED_LEGACY_ORIGIN + '/projeto/show/1196', kind: 'MODULE' },
+      { url: SPED_LEGACY_ORIGIN + '/destaques/show/1199', kind: 'MODULE_HIGHLIGHTS' },
+      { url: SPED_LEGACY_ORIGIN + '/item/show/2270', kind: 'CATEGORY' },
     ],
   },
   {
     module: 'DERE',
     seeds: [
-      { url: SPED_ORIGIN + '/projeto/show/2918', kind: 'MODULE' },
-      { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
+      { url: SPED_LEGACY_ORIGIN + '/projeto/show/2918', kind: 'MODULE' },
+      { url: SPED_LEGACY_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
+    ],
+  },
+] as const;
+
+export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
+  {
+    module: 'EFD_ICMS_IPI',
+    seeds: [
+      { url: GOVBR_ROOT + '/assuntos/escrituracoes-digitais/efd-icms-ipi', kind: 'MODULE' },
+      { url: GOVBR_ROOT + '/assuntos/escrituracoes-digitais/efd-icms-ipi/manuais-e-documentos-tecnicos', kind: 'CATEGORY' },
+      { url: GOVBR_ROOT + '/assuntos/comunicados/efd-icms-ipi', kind: 'MODULE_HIGHLIGHTS' },
+    ],
+  },
+  {
+    module: 'EFD_CONTRIBUICOES',
+    seeds: [
+      { url: GOVBR_ROOT + '/assuntos/escrituracoes-digitais/efd-contribuicoes', kind: 'MODULE' },
+      { url: GOVBR_ROOT + '/assuntos/escrituracoes-digitais/efd-contribuicoes/documentos-tecnicos', kind: 'CATEGORY' },
+      { url: GOVBR_ROOT + '/assuntos/comunicados/efd-contribuicoes', kind: 'MODULE_HIGHLIGHTS' },
+    ],
+  },
+  {
+    module: 'EFD_REINF',
+    seeds: [
+      { url: GOVBR_ROOT + '/assuntos/escrituracoes-digitais/efd-reinf', kind: 'MODULE' },
+      { url: GOVBR_ROOT + '/assuntos/escrituracoes-digitais/efd-reinf/manuais-e-documentos-tecnicos', kind: 'CATEGORY' },
+      { url: GOVBR_ROOT + '/assuntos/comunicados/efd-reinf', kind: 'MODULE_HIGHLIGHTS' },
+    ],
+  },
+  {
+    module: 'DERE',
+    seeds: [
+      { url: GOVBR_ROOT + '/assuntos/documentos-fiscais/dere', kind: 'MODULE' },
+      { url: GOVBR_ROOT + '/assuntos/documentos-fiscais/dere/manuais-e-documentos-tecnicos/versao-atual-1', kind: 'CATEGORY' },
+      { url: GOVBR_ROOT + '/assuntos/documentos-fiscais/dere/manuais-e-documentos-tecnicos/versoes-anteriores', kind: 'CATEGORY' },
+      { url: GOVBR_ROOT + '/assuntos/comunicados/dere', kind: 'MODULE_HIGHLIGHTS' },
     ],
   },
 ] as const;
@@ -107,6 +147,7 @@ export interface SpedConnectorOptions {
   maxRechecksPerRun?: number;
   maxPagesPerModule?: number;
   maxCrawlDepth?: number;
+  portal?: SpedPortalMode;
 }
 
 interface DiscoveredFile {
@@ -195,27 +236,62 @@ function stateKey(file: DiscoveredFile): string {
 }
 
 function canonicalPortalUrl(value: string): string {
-  const parsed = new URL(value, SPED_ORIGIN);
+  const parsed = new URL(value, SPED_GOVBR_BASE_URL);
   parsed.hash = '';
   return parsed.toString();
 }
 
 function pageKindFromUrl(url: string): SpedPageKind {
   try {
-    const pathname = new URL(url, SPED_ORIGIN).pathname;
-    if (/^\/(?:projeto|pasta)\/show\/\d+$/i.test(pathname)) return 'CONTAINER';
-    if (/^\/destaques\/show\/\d+$/i.test(pathname)) return 'CONTAINER';
-    if (/^\/(?:pagina|arquivo)\/show\/\d+$/i.test(pathname)) return 'DOCUMENT';
+    const parsed = new URL(url, SPED_GOVBR_BASE_URL);
+    const pathname = parsed.pathname;
+    if (parsed.origin.toLowerCase() === SPED_LEGACY_ORIGIN) {
+      if (/^\/(?:projeto|pasta)\/show\/\d+$/i.test(pathname)) return 'CONTAINER';
+      if (/^\/destaques\/show\/\d+$/i.test(pathname)) return 'CONTAINER';
+      if (/^\/(?:pagina|arquivo)\/show\/\d+$/i.test(pathname)) return 'DOCUMENT';
+      return 'UNKNOWN';
+    }
+    if (parsed.origin.toLowerCase() === SPED_GOVBR_ORIGIN && pathname.startsWith('/sped/pt-br/')) {
+      if (/\/@@(?:display-file|download)\/file$/i.test(pathname)) return 'UNKNOWN';
+      return 'UNKNOWN';
+    }
     return 'UNKNOWN';
   } catch {
     return 'UNKNOWN';
   }
 }
 
-function samePortalNavigation(url: string): boolean {
+function govModulePathAllowed(module: SpedModule, pathname: string): boolean {
+  const paths: Record<SpedModule, string[]> = {
+    EFD_ICMS_IPI: [
+      '/sped/pt-br/assuntos/escrituracoes-digitais/efd-icms-ipi',
+      '/sped/pt-br/assuntos/comunicados/efd-icms-ipi',
+    ],
+    EFD_CONTRIBUICOES: [
+      '/sped/pt-br/assuntos/escrituracoes-digitais/efd-contribuicoes',
+      '/sped/pt-br/assuntos/comunicados/efd-contribuicoes',
+    ],
+    EFD_REINF: [
+      '/sped/pt-br/assuntos/escrituracoes-digitais/efd-reinf',
+      '/sped/pt-br/assuntos/comunicados/efd-reinf',
+    ],
+    DERE: [
+      '/sped/pt-br/assuntos/documentos-fiscais/dere',
+      '/sped/pt-br/assuntos/comunicados/dere',
+    ],
+  };
+  return paths[module].some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));
+}
+
+function samePortalNavigation(module: SpedModule, url: string, portal: SpedPortalMode): boolean {
   try {
     const parsed = new URL(url);
-    if (parsed.origin.toLowerCase() !== SPED_ORIGIN.toLowerCase()) return false;
+    if (portal === 'GOVBR') {
+      if (parsed.origin.toLowerCase() !== SPED_GOVBR_ORIGIN) return false;
+      if (/\/@@(?:display-file|download)\/file$/i.test(parsed.pathname)) return false;
+      return govModulePathAllowed(module, parsed.pathname);
+    }
+    if (parsed.origin.toLowerCase() !== SPED_LEGACY_ORIGIN) return false;
     return /^\/(?:item|pasta|projeto|pagina)\/show\/\d+$/i.test(parsed.pathname)
       || /^\/arquivo\/show\/\d+$/i.test(parsed.pathname)
       || /^\/destaques\/show\/\d+$/i.test(parsed.pathname);
@@ -224,9 +300,10 @@ function samePortalNavigation(url: string): boolean {
   }
 }
 
-function isArtifactPage(url: string): boolean {
+function isArtifactPage(url: string, portal: SpedPortalMode): boolean {
+  if (portal !== 'LEGACY') return false;
   try {
-    return /^\/arquivo\/show\/\d+$/i.test(new URL(url, SPED_ORIGIN).pathname);
+    return /^\/arquivo\/show\/\d+$/i.test(new URL(url, SPED_LEGACY_ORIGIN).pathname);
   } catch {
     return false;
   }
@@ -237,8 +314,10 @@ function shouldFollowLink(
   seedKind: SpedModuleSeed['kind'],
   text: string,
   url: string,
+  portal: SpedPortalMode,
 ): boolean {
-  if (!samePortalNavigation(url)) return false;
+  if (!samePortalNavigation(module, url, portal)) return false;
+  if (portal === 'GOVBR') return true;
   if (seedKind === 'GLOBAL_HIGHLIGHTS') return isAllowedGlobalHighlight(module, text);
   if (/\/destaques\/show\//i.test(url)) return true;
   if (
@@ -362,6 +441,7 @@ async function crawlModule(
   nowIso: string,
   maxPagesPerModule: number,
   maxCrawlDepth: number,
+  portal: SpedPortalMode,
 ): Promise<ModuleCrawlResult> {
   const queue: CrawlPage[] = definition.seeds.map((seed) => ({
     url: seed.url,
@@ -440,7 +520,7 @@ async function crawlModule(
 
         const currentDocumentUrl = canonicalPortalUrl(descriptor.officialUrl);
         const artifactUrls = page.links
-          .filter((link) => isArtifactPage(link.url))
+          .filter((link) => isArtifactPage(link.url, portal))
           .map((link) => canonicalPortalUrl(link.url))
           .filter((artifactUrl) => artifactUrl !== currentDocumentUrl);
 
@@ -465,7 +545,7 @@ async function crawlModule(
       if (current.depth >= maxCrawlDepth) continue;
 
       for (const link of page.links) {
-        if (!shouldFollowLink(definition.module, current.seedKind, link.text, link.url)) continue;
+        if (!shouldFollowLink(definition.module, current.seedKind, link.text, link.url, portal)) continue;
         queue.push({
           url: canonicalPortalUrl(link.url),
           depth: current.depth + 1,
@@ -518,6 +598,7 @@ async function recheckDocument(
   context: ConnectorExecutionContext,
   nextPages: Record<string, SpedKnownPage>,
   nowIso: string,
+  portal: SpedPortalMode,
 ): Promise<{
   descriptors: Map<string, SpedDocumentDescriptor>;
   linkedArtifacts: Map<string, Set<string>>;
@@ -566,7 +647,7 @@ async function recheckDocument(
       }
 
       const currentDocumentUrl = canonicalPortalUrl(descriptor.officialUrl);
-      for (const link of page.links.filter((link) => isArtifactPage(link.url))) {
+      for (const link of page.links.filter((link) => isArtifactPage(link.url, portal))) {
         const artifactUrl = canonicalPortalUrl(link.url);
         if (artifactUrl === currentDocumentUrl) continue;
         const urls = linkedArtifacts.get(descriptor.externalId) ?? new Set<string>();
@@ -638,6 +719,7 @@ function connectorFile(
 function publicationFor(
   descriptor: SpedDocumentDescriptor,
   files: ConnectorFile[],
+  portal: SpedPortalMode,
 ): ConnectorPublication {
   const agency = descriptor.module === 'DERE' ? 'RFB/CGIBS' : 'SPED/RFB';
   return {
@@ -665,6 +747,11 @@ function publicationFor(
       ...(descriptor.updatedAt ? { updatedAt: descriptor.updatedAt.toISOString().slice(0, 10) } : {}),
       relatedTaxes: descriptor.relatedTaxes,
       affectedRecords: descriptor.affectedRecords,
+      sourcePortal: portal,
+      sourceRole: portal === 'GOVBR' ? 'PRIMARY' : 'ENRICHMENT',
+      ...(descriptor.legacyReferences?.length
+        ? { legacyReferences: descriptor.legacyReferences }
+        : {}),
       ...(descriptor.linkedArtifactExternalIds
         ? { linkedArtifactExternalIds: descriptor.linkedArtifactExternalIds }
         : {}),
@@ -675,7 +762,7 @@ function publicationFor(
 
 export class SpedConnector implements CollectionConnector {
   readonly key = SPED_CONNECTOR_KEY;
-  readonly version = '0.2.0';
+  readonly version = '0.3.0';
   readonly #options: SpedConnectorOptions;
 
   constructor(options: SpedConnectorOptions = {}) {
@@ -705,10 +792,15 @@ export class SpedConnector implements CollectionConnector {
     const maxRechecksPerRun = this.#options.maxRechecksPerRun ?? DEFAULT_MAX_RECHECKS_PER_RUN;
     const maxPagesPerModule = this.#options.maxPagesPerModule ?? DEFAULT_MAX_PAGES_PER_MODULE;
     const maxCrawlDepth = this.#options.maxCrawlDepth ?? DEFAULT_MAX_CRAWL_DEPTH;
+    const portal = this.#options.portal ?? 'GOVBR';
+    const definitions = portal === 'GOVBR' ? SPED_MODULES : LEGACY_SPED_MODULES;
     const nextPages: Record<string, SpedKnownPage> = { ...state.pages };
 
     const client = new SpedClient({
       ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
+      ...(portal === 'GOVBR'
+        ? { origin: SPED_GOVBR_ORIGIN, pathPrefix: '/sped/pt-br/' }
+        : { origin: SPED_LEGACY_ORIGIN, pathPrefix: '/' }),
       ...(this.#options.client ?? {}),
     });
 
@@ -716,7 +808,7 @@ export class SpedConnector implements CollectionConnector {
     const crawlResults: ModuleCrawlResult[] = [];
 
     try {
-      for (const definition of SPED_MODULES) {
+      for (const definition of definitions) {
         context.signal.throwIfAborted();
         const result = await crawlModule(
           definition,
@@ -727,6 +819,7 @@ export class SpedConnector implements CollectionConnector {
           nowIso,
           maxPagesPerModule,
           maxCrawlDepth,
+          portal,
         );
         crawlResults.push(result);
         partialFailures.push(...result.failures);
@@ -778,7 +871,7 @@ export class SpedConnector implements CollectionConnector {
       let recheckedTombstonesConfirmed = 0;
 
       for (const candidate of selectedRechecks) {
-        const result = await recheckDocument(candidate, client, context, nextPages, nowIso);
+        const result = await recheckDocument(candidate, client, context, nextPages, nowIso, portal);
         if (candidate.kind === 'MISSING') recheckedMissingPageCount += 1;
         else recheckedKnownDocumentCount += 1;
         recheckPagesSucceeded += result.pagesSucceeded;
@@ -886,7 +979,7 @@ export class SpedConnector implements CollectionConnector {
           .filter((file): file is ConnectorFile => file !== undefined);
 
         if (descriptor.files.length > 0 && currentFiles.length === 0) continue;
-        publications.push(publicationFor(descriptor, currentFiles));
+        publications.push(publicationFor(descriptor, currentFiles, portal));
       }
 
       const skippedKnownDocumentCount = crawlResults.reduce(
@@ -900,7 +993,9 @@ export class SpedConnector implements CollectionConnector {
         metadata: {
           sped: {
             modulesSucceeded,
-            modulesTotal: SPED_MODULES.length,
+            modulesTotal: definitions.length,
+            portal,
+            primaryOrigin: portal === 'GOVBR' ? SPED_GOVBR_BASE_URL : SPED_LEGACY_ORIGIN,
             moduleResults: crawlResults.map((result) => ({
               module: result.module,
               pagesSucceeded: result.pagesSucceeded,
