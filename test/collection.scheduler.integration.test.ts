@@ -130,93 +130,100 @@ test(
   },
 );
 
+for (const connectorKey of ['dou', 'nfe-encat']) {
+  test(
+    `scheduler does not overlap ${connectorKey} while an active run is pending or retrying`,
+    async () => {
+      const adminUrl = process.env.DATABASE_ADMIN_URL;
+      assert.ok(adminUrl);
 
-test(
-  'scheduler does not overlap DOU while an active run is pending or retrying',
-  async () => {
-    const adminUrl = process.env.DATABASE_ADMIN_URL;
-    assert.ok(adminUrl);
+      const pool = new Pool({
+        connectionString: adminUrl,
+        max: 2,
+      });
+      const db = new Kysely<DB>({
+        dialect: new PostgresDialect({ pool }),
+      });
 
-    const pool = new Pool({
-      connectionString: adminUrl,
-      max: 2,
-    });
-    const db = new Kysely<DB>({
-      dialect: new PostgresDialect({ pool }),
-    });
+      const sourceId = randomUUID();
+      const activeRunId = randomUUID();
+      const now = new Date('2026-09-19T11:00:22Z');
 
-    const sourceId = randomUUID();
-    const activeRunId = randomUUID();
-    const now = new Date('2026-09-19T11:00:22Z');
+      try {
+        await db
+          .insertInto('sources')
+          .values({
+            id: sourceId,
+            code: `scheduler-${connectorKey}-${sourceId}`,
+            name: `Scheduler ${connectorKey} Source`,
+            jurisdiction_level: 'FEDERAL',
+            base_url:
+              connectorKey === 'dou'
+                ? 'https://inlabs.in.gov.br'
+                : 'https://www.nfe.fazenda.gov.br/portal',
+            connector_key: connectorKey,
+            schedule_cron:
+              connectorKey === 'dou'
+                ? '0 8,12,16,20 * * *'
+                : '0 * * * *',
+            schedule_timezone: 'America/Sao_Paulo',
+          })
+          .execute();
 
-    try {
-      await db
-        .insertInto('sources')
-        .values({
-          id: sourceId,
-          code: `scheduler-dou-${sourceId}`,
-          name: 'Scheduler DOU Source',
-          jurisdiction_level: 'FEDERAL',
-          base_url: 'https://inlabs.in.gov.br',
-          connector_key: 'dou',
-          schedule_cron: '0 8,12,16,20 * * *',
-          schedule_timezone: 'America/Sao_Paulo',
-        })
-        .execute();
+        await db
+          .insertInto('collection_runs')
+          .values({
+            id: activeRunId,
+            source_id: sourceId,
+            scheduled_for: new Date('2026-09-19T10:00:00Z'),
+            trigger_type: 'MANUAL',
+            status: 'RUNNING',
+            next_attempt_at: new Date('2026-09-19T11:00:10Z'),
+          })
+          .execute();
 
-      await db
-        .insertInto('collection_runs')
-        .values({
-          id: activeRunId,
-          source_id: sourceId,
-          scheduled_for: new Date('2026-09-19T10:00:00Z'),
-          trigger_type: 'MANUAL',
-          status: 'RUNNING',
-          next_attempt_at: new Date('2026-09-19T11:00:10Z'),
-        })
-        .execute();
+        const blocked = await runSchedulerTick(db, now);
+        assert.equal(blocked.dueSources, 1);
+        assert.deepEqual(blocked.runIds, []);
 
-      const blocked = await runSchedulerTick(db, now);
-      assert.equal(blocked.dueSources, 1);
-      assert.deepEqual(blocked.runIds, []);
+        await db
+          .updateTable('collection_runs')
+          .set({
+            status: 'SUCCESS',
+            finished_at: now,
+            source_consulted_at: now,
+            next_attempt_at: null,
+          })
+          .where('id', '=', activeRunId)
+          .execute();
 
-      await db
-        .updateTable('collection_runs')
-        .set({
-          status: 'SUCCESS',
-          finished_at: now,
-          source_consulted_at: now,
-          next_attempt_at: null,
-        })
-        .where('id', '=', activeRunId)
-        .execute();
+        const released = await runSchedulerTick(db, now);
+        assert.equal(released.dueSources, 1);
+        assert.equal(released.runIds.length, 1);
 
-      const released = await runSchedulerTick(db, now);
-      assert.equal(released.dueSources, 1);
-      assert.equal(released.runIds.length, 1);
+        const scheduled = await db
+          .selectFrom('collection_runs')
+          .select(['id', 'trigger_type', 'scheduled_for'])
+          .where('source_id', '=', sourceId)
+          .where('trigger_type', '=', 'SCHEDULED')
+          .execute();
 
-      const scheduled = await db
-        .selectFrom('collection_runs')
-        .select(['id', 'trigger_type', 'scheduled_for'])
-        .where('source_id', '=', sourceId)
-        .where('trigger_type', '=', 'SCHEDULED')
-        .execute();
-
-      assert.equal(scheduled.length, 1);
-      assert.equal(
-        scheduled[0]?.scheduled_for.toISOString(),
-        '2026-09-19T11:00:00.000Z',
-      );
-    } finally {
-      await db
-        .deleteFrom('collection_runs')
-        .where('source_id', '=', sourceId)
-        .execute();
-      await db
-        .deleteFrom('sources')
-        .where('id', '=', sourceId)
-        .execute();
-      await db.destroy();
-    }
-  },
-);
+        assert.equal(scheduled.length, 1);
+        assert.equal(
+          scheduled[0]?.scheduled_for.toISOString(),
+          '2026-09-19T11:00:00.000Z',
+        );
+      } finally {
+        await db
+          .deleteFrom('collection_runs')
+          .where('source_id', '=', sourceId)
+          .execute();
+        await db
+          .deleteFrom('sources')
+          .where('id', '=', sourceId)
+          .execute();
+        await db.destroy();
+      }
+    },
+  );
+}
