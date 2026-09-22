@@ -48,6 +48,7 @@ test('classifies schemas as production, homologation and retired and excludes ot
     ['RETIRED', undefined],
   ]);
   assert.ok(items.every(item => !/NFGas|NFAg|NFCom/i.test(item.title)));
+  assert.ok(items.every(item => item.fileType === 'ZIP'));
   const tokenWithPlus = items.find(item => item.documentStatus === 'TESTING')?.contentToken;
   assert.equal(tokenWithPlus, 'SCHEMATEST+ABC=');
 });
