@@ -60,6 +60,30 @@ test('keeps only NF-e/NFC-e manuals and excludes manuals for other DF-e', async 
   assert.equal(items.some(item => /NFGas/i.test(item.title)), false);
 });
 
+
+test('accepts the live manuals page shape without tituloSessao', () => {
+  const html = `<!doctype html><html><body>
+<div class="divTituloPrincipal"><label class="tituloPrincipal">Manuais </label></div>
+<div class="indentacaoConteudo">
+<p><a href="exibirArquivo.aspx?conteudo=MOC%3D"><span class="tituloConteudo">Manual de Orientação ao Contribuinte - MOC - versão 7.0 - NF-e e NFC-e</span></a><br>Manual oficial.</p>
+<p><a href="exibirArquivo.aspx?conteudo=ANEXO%3D"><span class="tituloConteudo">------&gt; Anexo I - Leiaute e Regra de Validação - NF-e e NFC-e</span></a></p>
+<p><a href="exibirArquivo.aspx?conteudo=NFGAS%3D"><span class="tituloConteudo">Manual NFGas</span></a></p>
+</div></body></html>`;
+
+  const items = parseNfeEncatListing(
+    html,
+    'MANUALS',
+    URLS.manuals,
+  );
+
+  assert.equal(items.length, 2);
+  assert.equal(items[0]?.officialVersion, '7.0');
+  assert.equal(items[0]?.documentFamily, 'MOC NF-E/NFC-E');
+  assert.equal(items[0]?.portalSection, 'UNSECTIONED');
+  assert.equal(items[0]?.documentStatus, 'PUBLISHED');
+  assert.equal(items.some((item) => /NFGas/i.test(item.title)), false);
+});
+
 test('rejects unrecognized HTML instead of treating it as a legitimate empty listing', () => {
   assert.throws(
     () => parseNfeEncatListing(
