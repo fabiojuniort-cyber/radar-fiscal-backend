@@ -23,6 +23,12 @@ function headerValue(init: RequestInit | undefined, name: string): string | unde
   return headers.get(name) ?? undefined;
 }
 
+function normalizeHtmlToOfficialHttps(body: string): string {
+  return body
+    .replaceAll('http://sped.rfb.gov.br', 'https://sped.rfb.gov.br')
+    .replaceAll('http:\/\/sped.rfb.gov.br', 'https:\/\/sped.rfb.gov.br');
+}
+
 function stubFileResponse(url: URL, init?: RequestInit): Response {
   fileRequestCount += 1;
   const etag = '"' + createHash('sha1').update(url.pathname + url.search).digest('hex') + '"';
@@ -82,6 +88,17 @@ const transportFetch = (async (
     }
     next.protocol = 'https:';
     headers.set('location', next.toString());
+  }
+
+  const contentType = headers.get('content-type') ?? '';
+  if (/text\/html|application\/xhtml\+xml/i.test(contentType)) {
+    const body = normalizeHtmlToOfficialHttps(await response.text());
+    headers.delete('content-length');
+    return new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
   }
 
   return new Response(response.body, {
