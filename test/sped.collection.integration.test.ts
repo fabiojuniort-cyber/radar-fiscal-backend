@@ -17,7 +17,9 @@ function html(body: string) {
 }
 
 function root(links: Array<[string, string]>) {
-  return '<html><body>' + links.map(([href, text]) => '<a href="' + href + '">' + text + '</a>').join('') + '</body></html>';
+  return '<html><body><h2>Documentos técnicos disponíveis</h2>' +
+    links.map(([href, text]) => '<a href="' + href + '">' + text + '</a>').join('') +
+    '</body></html>';
 }
 
 function detail(title: string, date: string, fileId: string) {
