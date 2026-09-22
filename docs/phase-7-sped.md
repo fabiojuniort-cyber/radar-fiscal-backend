@@ -100,18 +100,21 @@ Uma mudança posterior dos bytes da mesma publicação, sem mudança de identida
 
 ## Incremental
 
-Cada execução refaz a descoberta das páginas do portal para identificar itens novos rapidamente.
+O bootstrap real medido em 22/09/2026 encontrou 716 páginas, 536 documentos e 203 arquivos no escopo inicial. Por isso o incremental não refaz o acervo inteiro em cada hora.
 
-Arquivos:
+Em cada execução horária:
 
-- item novo: download imediato;
-- checkpoint recente: reutilizado;
-- checkpoint vencido: revalidado oldest-first;
-- padrão: recheck depois de 24 horas;
-- padrão: máximo de 32 rechecks de arquivos conhecidos por run;
-- ETag/Last-Modified são usados quando o portal os fornece.
+- containers/listagens (`projeto`, `pasta`, `destaques`) continuam sendo consultados;
+- rotas canônicas conhecidas ficam em `spedState.pages`;
+- páginas de documentos históricos recentes são puladas;
+- qualquer ID/documento novo visto em listagem é lido imediatamente;
+- documentos vencidos são rechecados oldest-first;
+- padrão: recheck após 24 horas;
+- padrão: máximo global de 32 documentos conhecidos por run;
+- quando um documento é rechecado, seus arquivos usam ETag/Last-Modified quando disponíveis e SHA-256 sempre que houver download;
+- linked artifacts, como o PDF apontado por uma página de republicação, são rechecados junto da publicação-pai.
 
-Isso evita redownload integral do acervo em cada execução e ainda permite detectar alteração silenciosa de arquivo antigo.
+O bootstrap permite até 600 páginas por módulo e profundidade 5. Em operação normal, o checkpoint reduz drasticamente o número de páginas documentais consultadas sem deixar de detectar novos itens.
 
 ## Falhas
 
@@ -175,3 +178,16 @@ A primeira coleta produtiva e o Scheduler permanecem bloqueados até existir um 
 ## Migrations
 
 Nenhuma migration é necessária para esta frente.
+
+
+## Medição real do bootstrap
+
+Validação estrutural via serviço isolado, sem persistência produtiva:
+
+- EFD ICMS/IPI: 214 páginas, 198 documentos, 55 arquivos;
+- EFD-Contribuições: 189 páginas, 132 documentos, 45 arquivos;
+- EFD-Reinf: 293 páginas, 198 documentos, 97 arquivos;
+- DeRE: 20 páginas, 8 documentos, 6 arquivos;
+- total: 716 páginas, 536 documentos, 203 arquivos.
+
+A porta 443 do host oficial permaneceu inacessível a partir dos egress de datacenter testados. A porta 80 respondeu e foi usada somente para diagnóstico estrutural e validação de hashes; o conector produtivo continua configurado para URLs oficiais HTTPS.
