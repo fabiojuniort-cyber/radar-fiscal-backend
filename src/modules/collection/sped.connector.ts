@@ -26,8 +26,8 @@ export const SPED_CONNECTOR_KEY = 'sped';
 const SPED_ORIGIN = 'https://sped.rfb.gov.br';
 const DEFAULT_REVISIT_AFTER_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_MAX_RECHECKS_PER_RUN = 32;
-const DEFAULT_MAX_PAGES_PER_MODULE = 180;
-const DEFAULT_MAX_CRAWL_DEPTH = 3;
+const DEFAULT_MAX_PAGES_PER_MODULE = 800;
+const DEFAULT_MAX_CRAWL_DEPTH = 6;
 
 interface SpedModuleSeed {
   url: string;
@@ -84,8 +84,18 @@ export interface SpedStoredFile {
   checkedAt: string;
 }
 
+export type SpedStoredPageRole = 'NAVIGATION' | 'DOCUMENT';
+
+export interface SpedStoredPage {
+  module: SpedModule;
+  role: SpedStoredPageRole;
+  checkedAt: string;
+  externalId?: string;
+}
+
 export interface SpedSourceState {
   items: Record<string, SpedStoredFile>;
+  pages: Record<string, SpedStoredPage>;
 }
 
 export interface SpedConnectorOptions {
@@ -120,6 +130,10 @@ interface ModuleCrawlResult {
   pagesFailed: number;
   pagesVisited: number;
   seedSuccesses: number;
+  pageStateUpdates: Record<string, SpedStoredPage>;
+  newPagesDiscovered: number;
+  knownDocumentsSkipped: number;
+  knownDocumentsRechecked: number;
   failures: ConnectorPartialFailure[];
 }
 
@@ -161,7 +175,11 @@ function stateKey(file: DiscoveredFile): string {
   return file.module + ':' + file.publicationExternalId + ':' + file.externalId;
 }
 
-function checkedAtMs(stored: SpedStoredFile): number {
+function pageStateKey(module: SpedModule, url: string): string {
+  return module + ':' + canonicalPortalUrl(url);
+}
+
+function checkedAtMs(stored: SpedStoredFile | SpedStoredPage): number {
   const value = Date.parse(stored.checkedAt);
   return Number.isFinite(value) ? value : 0;
 }
@@ -175,6 +193,34 @@ function discoveredFiles(descriptors: SpedDocumentDescriptor[]): DiscoveredFile[
       externalId: file.externalId,
       ...(file.name ? { name: file.name } : {}),
     })),
+  );
+}
+
+function selectDocumentPageRechecks(
+  state: SpedSourceState,
+  module: SpedModule,
+  now: Date,
+  revisitAfterMs: number,
+  maxRechecksPerRun: number,
+): Set<string> {
+  const nowMs = now.getTime();
+  return new Set(
+    Object.entries(state.pages)
+      .filter(([, page]) =>
+        page.module === module &&
+        page.role === 'DOCUMENT' &&
+        nowMs - checkedAtMs(page) >= revisitAfterMs,
+      )
+      .map(([key, page]) => ({
+        key,
+        checkedAtMs: checkedAtMs(page),
+        url: key.slice(module.length + 1),
+      }))
+      .sort((left, right) =>
+        left.checkedAtMs - right.checkedAtMs || left.key.localeCompare(right.key),
+      )
+      .slice(0, maxRechecksPerRun)
+      .map((candidate) => canonicalPortalUrl(candidate.url)),
   );
 }
 
@@ -248,33 +294,68 @@ async function crawlModule(
   definition: SpedModuleDefinition,
   client: SpedClient,
   context: ConnectorExecutionContext,
+  state: SpedSourceState,
+  now: Date,
+  revisitAfterMs: number,
+  maxRechecksPerRun: number,
   maxPagesPerModule: number,
   maxCrawlDepth: number,
+  bootstrapMode: boolean,
 ): Promise<ModuleCrawlResult> {
   const queue: CrawlPage[] = definition.seeds.map((seed) => ({
-    url: seed.url,
+    url: canonicalPortalUrl(seed.url),
     depth: 0,
     seedKind: seed.kind,
   }));
   const seen = new Set<string>();
   const descriptors = new Map<string, SpedDocumentDescriptor>();
   const linkedArtifacts = new Map<string, Set<string>>();
+  const pageStateUpdates: Record<string, SpedStoredPage> = {};
+  const selectedDocumentRechecks = bootstrapMode
+    ? new Set<string>()
+    : selectDocumentPageRechecks(
+        state,
+        definition.module,
+        now,
+        revisitAfterMs,
+        maxRechecksPerRun,
+      );
+  const skippedKnownDocuments = new Set<string>();
   const failures: ConnectorPartialFailure[] = [];
   let pagesSucceeded = 0;
   let pagesFailed = 0;
   let seedSuccesses = 0;
+  let newPagesDiscovered = 0;
+  let knownDocumentsRechecked = 0;
 
   while (queue.length && seen.size < maxPagesPerModule) {
     context.signal.throwIfAborted();
     const current = queue.shift()!;
-    if (seen.has(current.url)) continue;
-    seen.add(current.url);
+    const currentUrl = canonicalPortalUrl(current.url);
+    if (seen.has(currentUrl)) continue;
+    seen.add(currentUrl);
+    const currentKey = pageStateKey(definition.module, currentUrl);
+    const previousPage = state.pages[currentKey];
     try {
-      const response = await client.getHtml(current.url, context.signal);
+      const response = await client.getHtml(currentUrl, context.signal);
       const page = parseSpedPage(response.html, response.url);
       pagesSucceeded += 1;
+      if (!previousPage) newPagesDiscovered += 1;
+      if (
+        !bootstrapMode &&
+        previousPage?.role === 'DOCUMENT' &&
+        selectedDocumentRechecks.has(currentUrl)
+      ) {
+        knownDocumentsRechecked += 1;
+      }
       if (current.depth === 0) seedSuccesses += 1;
       const descriptor = descriptorFromPage(definition.module, page);
+      pageStateUpdates[currentKey] = {
+        module: definition.module,
+        role: descriptor ? 'DOCUMENT' : 'NAVIGATION',
+        checkedAt: now.toISOString(),
+        ...(descriptor ? { externalId: descriptor.externalId } : {}),
+      };
       if (descriptor) {
         descriptors.set(descriptor.externalId, descriptor);
         const artifactUrls = page.links
@@ -286,14 +367,46 @@ async function crawlModule(
       }
       if (current.depth >= maxCrawlDepth) continue;
       for (const link of page.links) {
-        const linkedArtifact = descriptor !== undefined && isArtifactPage(link.url);
-        if (!linkedArtifact && !shouldFollowLink(definition.module, current.seedKind, link.text, link.url)) continue;
-        if (seen.has(link.url)) continue;
-        queue.push({
-          url: link.url,
+        const linkUrl = canonicalPortalUrl(link.url);
+        if (seen.has(linkUrl)) continue;
+        const linkedArtifact = descriptor !== undefined && isArtifactPage(linkUrl);
+        const knownPage = state.pages[pageStateKey(definition.module, linkUrl)];
+
+        let follow = false;
+        if (linkedArtifact) {
+          follow = true;
+        } else if (bootstrapMode) {
+          follow = shouldFollowLink(
+            definition.module,
+            current.seedKind,
+            link.text,
+            linkUrl,
+          );
+        } else if (knownPage?.role === 'NAVIGATION') {
+          follow = true;
+        } else if (knownPage?.role === 'DOCUMENT') {
+          follow = selectedDocumentRechecks.has(linkUrl);
+          if (!follow) skippedKnownDocuments.add(linkUrl);
+        } else {
+          follow = shouldFollowLink(
+            definition.module,
+            current.seedKind,
+            link.text,
+            linkUrl,
+          );
+        }
+
+        if (!follow) continue;
+        const queued: CrawlPage = {
+          url: linkUrl,
           depth: current.depth + 1,
-          seedKind: current.seedKind === 'GLOBAL_HIGHLIGHTS' ? 'GLOBAL_HIGHLIGHTS' : 'CATEGORY',
-        });
+          seedKind:
+            current.seedKind === 'GLOBAL_HIGHLIGHTS'
+              ? 'GLOBAL_HIGHLIGHTS'
+              : 'CATEGORY',
+        };
+        if (linkedArtifact) queue.unshift(queued);
+        else queue.push(queued);
       }
     } catch (error) {
       if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
@@ -352,6 +465,10 @@ async function crawlModule(
     pagesFailed,
     pagesVisited: seen.size,
     seedSuccesses,
+    pageStateUpdates,
+    newPagesDiscovered,
+    knownDocumentsSkipped: skippedKnownDocuments.size,
+    knownDocumentsRechecked,
     failures,
   };
 }
@@ -438,7 +555,8 @@ export class SpedConnector implements CollectionConnector {
 
   async collect(context: ConnectorExecutionContext): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
-    const state = await this.#options.readState?.(context.sourceId) ?? { items: {} };
+    const state = await this.#options.readState?.(context.sourceId) ?? { items: {}, pages: {} };
+    const bootstrapMode = Object.keys(state.pages).length === 0;
     const revisitAfterMs = this.#options.revisitAfterMs ?? DEFAULT_REVISIT_AFTER_MS;
     const maxRechecksPerRun = this.#options.maxRechecksPerRun ?? DEFAULT_MAX_RECHECKS_PER_RUN;
     const maxPagesPerModule = this.#options.maxPagesPerModule ?? DEFAULT_MAX_PAGES_PER_MODULE;
@@ -453,7 +571,18 @@ export class SpedConnector implements CollectionConnector {
     try {
       for (const definition of SPED_MODULES) {
         context.signal.throwIfAborted();
-        const result = await crawlModule(definition, client, context, maxPagesPerModule, maxCrawlDepth);
+        const result = await crawlModule(
+          definition,
+          client,
+          context,
+          state,
+          now,
+          revisitAfterMs,
+          maxRechecksPerRun,
+          maxPagesPerModule,
+          maxCrawlDepth,
+          bootstrapMode,
+        );
         crawlResults.push(result);
         partialFailures.push(...result.failures);
       }
@@ -475,10 +604,15 @@ export class SpedConnector implements CollectionConnector {
         });
       }
 
+      const nextPages: Record<string, SpedStoredPage> = { ...state.pages };
+      for (const result of crawlResults) {
+        Object.assign(nextPages, result.pageStateUpdates);
+      }
+
       const descriptors = crawlResults.flatMap((result) => result.descriptors);
       const files = discoveredFiles(descriptors);
       const recheckKeys = selectKnownRechecks(files, state, now, revisitAfterMs, maxRechecksPerRun);
-      const nextItems: Record<string, SpedStoredFile> = {};
+      const nextItems: Record<string, SpedStoredFile> = { ...state.items };
       const resolvedFiles = new Map<string, ConnectorFile>();
       let downloadedCount = 0;
       let notModifiedCount = 0;
@@ -583,7 +717,12 @@ export class SpedConnector implements CollectionConnector {
               pagesVisited: result.pagesVisited,
               seedSuccesses: result.seedSuccesses,
               documentCount: result.descriptors.length,
+              newPagesDiscovered: result.newPagesDiscovered,
+              knownDocumentsSkipped: result.knownDocumentsSkipped,
+              knownDocumentsRechecked: result.knownDocumentsRechecked,
             })),
+            bootstrapMode,
+            trackedPageCount: Object.keys(nextPages).length,
             discoveredDocumentCount: descriptors.length,
             publicationCount: publications.length,
             discoveredFileCount: files.length,
@@ -597,7 +736,7 @@ export class SpedConnector implements CollectionConnector {
             partialFailureCount: partialFailures.length,
             scope: ['EFD_ICMS_IPI', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DERE'],
           },
-          spedState: { items: nextItems },
+          spedState: { items: nextItems, pages: nextPages },
         },
       };
     } finally {
