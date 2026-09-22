@@ -1,5 +1,6 @@
 // static-outbound-ip validation redeploy 2026-09-22
 import { lookup } from 'node:dns/promises';
+import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
 import { Parser } from 'htmlparser2';
@@ -16,6 +17,38 @@ const roots = [
 interface LinkInfo {
   href: string;
   text: string;
+}
+
+function directHttp(url: string, timeoutMs = 10_000): Promise<{ status?: number; location?: string; body?: string; error?: string; code?: string }> {
+  return new Promise((resolve) => {
+    const request = http.get(url, {
+      family: 4,
+      timeout: timeoutMs,
+      headers: {
+        'user-agent': 'RadarFiscal/1.0 (+official-source-monitoring)',
+        accept: 'text/html,*/*;q=0.5',
+      },
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      let total = 0;
+      response.on('data', (chunk: Buffer) => {
+        if (total >= 32_768) return;
+        chunks.push(chunk);
+        total += chunk.length;
+      });
+      response.on('end', () => {
+        resolve({
+          ...(response.statusCode !== undefined ? { status: response.statusCode } : {}),
+          ...(response.headers.location ? { location: response.headers.location } : {}),
+          body: Buffer.concat(chunks).toString('utf8').slice(0, 32_768),
+        });
+      });
+    });
+    request.on('timeout', () => request.destroy(new Error('HTTP_TIMEOUT')));
+    request.on('error', (error: NodeJS.ErrnoException) => {
+      resolve({ error: error.message, ...(error.code ? { code: error.code } : {}) });
+    });
+  });
 }
 
 function directHttps(url: string, timeoutMs = 10_000): Promise<{ status?: number; body?: string; error?: string; code?: string }> {
@@ -82,6 +115,15 @@ async function networkDiagnostic(): Promise<void> {
   }
   const egress = await directHttps('https://api.ipify.org?format=json');
   console.log('SPED_EGRESS=' + JSON.stringify(egress));
+  const plainPortal = await directHttp('http://sped.rfb.gov.br/');
+  console.log('SPED_HTTP_DIRECT=' + JSON.stringify({
+    status: plainPortal.status,
+    location: plainPortal.location,
+    error: plainPortal.error,
+    code: plainPortal.code,
+    bytes: plainPortal.body ? Buffer.byteLength(plainPortal.body) : 0,
+    hasSped: plainPortal.body ? /SPED|Sistema Público de Escrituração Digital/i.test(plainPortal.body) : false,
+  }));
   const directPortal = await directHttps(ORIGIN + '/');
   console.log('SPED_HTTPS_DIRECT=' + JSON.stringify({
     status: directPortal.status,
