@@ -34,6 +34,13 @@ export interface ConnectorPublication {
    */
   externalId?: string;
 
+  /**
+   * Chave canônica interna de correlação para o mesmo documento
+   * publicado em espelhos/origens oficiais diferentes dentro da mesma fonte.
+   * Não substitui externalId e não é um identificador fornecido pela fonte.
+   */
+  identityKey?: string;
+
   files?: ConnectorFile[];
 
   /**
