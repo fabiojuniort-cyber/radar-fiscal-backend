@@ -42,7 +42,7 @@ test('SPED through collection engine keeps explicit republication separate and c
         ['/item/show/8129', 'Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2'],
       ]));
     }
-    if (p === '/item/show/2270') return html('<html><body><h1>Esquemas XSD</h1></body></html>');
+    if (p === '/item/show/2270') return html('<html><body><h1>Portal SPED</h1></body></html>');
     if (p === '/item/show/8116') return html(detail('Nota Técnica 01/2026 – Ajustes nos leiautes da versão 2.1.2', '25/03/2026', '8117'));
     if (p === '/item/show/8129') return html(detail('Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2', '31/03/2026', '8130'));
     if (p === '/item/show/274' || p === '/item/show/1573' || p === '/item/show/268' || p === '/item/show/1545' || p === '/item/show/7950' || p === '/destaques/show/7' || p === '/destaques/show/285') {
