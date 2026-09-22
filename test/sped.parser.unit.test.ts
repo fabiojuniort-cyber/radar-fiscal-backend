@@ -97,6 +97,7 @@ test('classifies EFD-Reinf XSD and DeRE official technical package', () => {
   assert.equal(xsd?.kind, 'XSD_SCHEMA');
   assert.equal(dere?.kind, 'MANUAL');
   assert.equal(dere?.officialVersion, '1.0.0');
+  assert.equal(dere?.documentStatus, 'FINAL');
   assert.deepEqual(dere?.relatedTaxes.sort(), ['CBS', 'IBS']);
 });
 
@@ -143,6 +144,16 @@ test('parses arquivo/show document pages without treating the HTML page as the b
   assert.equal(descriptor?.documentNumber, '11/2026');
   assert.equal(descriptor?.files.length, 1);
   assert.match(descriptor?.files[0]?.url ?? '', /\/arquivo\/download\/8017$/);
+});
+
+
+test('marks explicitly identified DeRE minutas as DRAFT without assuming other documents are final', () => {
+  const draft = descriptorFromPage(
+    'DERE',
+    page('8200', 'DeRE - Atualização de Minutas do Manual e dos leiautes', 'Publicado em 23/02/2026 Minuta do Manual e minuta dos leiautes IBS CBS', '8201'),
+  );
+  assert.equal(draft?.documentStatus, 'DRAFT');
+  assert.equal(draft?.revisionKind, 'UPDATE');
 });
 
 test('global highlight filter rejects ECD/ECF and accepts only scoped SPED module content', () => {
