@@ -180,3 +180,25 @@ test('changed schema ZIP under the same official token creates a new content has
   assert.equal(normalizedFirst.identityHash, normalizedSecond.identityHash);
   assert.notEqual(normalizedFirst.contentHash, normalizedSecond.contentHash);
 });
+
+
+test('rejects a non-ZIP payload for schema packages', async () => {
+  const schema = '<!doctype html><html><body><p class="tituloSessao">Versões em uso - Ambiente de Produção</p><p><a href="exibirArquivo.aspx?conteudo=SCHEMA-PDF%3D"><span class="tituloConteudo">Esquema XML NF-e/NFC-e - Pacote 010b - Publicado em 10/09/2026</span></a><br>Pacote oficial.</p></body></html>';
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = input.toString();
+    const family = listingFamily(url);
+    if (family) return new Response(family === 'schemas' ? schema : emptyListing(), { status: 200, headers: { 'content-type': 'text/html' } });
+    if (url.includes('/exibirArquivo.aspx')) {
+      return new Response(new TextEncoder().encode('%PDF-1.7\\nnot-a-schema-zip'), {
+        status: 200,
+        headers: { 'content-type': 'application/pdf' },
+      });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  const result = await new NfeEncatConnector({ fetch: fetchImpl }).collect(CONTEXT);
+  assert.equal(result.publications.length, 0);
+  assert.equal(result.partialFailures?.length, 1);
+  assert.equal(result.partialFailures?.[0]?.code, 'NFE_ENCAT_FILE_TYPE_MISMATCH');
+});
