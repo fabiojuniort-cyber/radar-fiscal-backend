@@ -49,9 +49,9 @@ function directHttps(url: string, timeoutMs = 10_000): Promise<{ status?: number
   });
 }
 
-function tcpProbe(address: string, timeoutMs = 8_000): Promise<{ ok: boolean; error?: string; code?: string }> {
+function tcpProbe(address: string, port = 443, timeoutMs = 8_000): Promise<{ ok: boolean; error?: string; code?: string }> {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host: address, port: 443, family: 4 });
+    const socket = net.createConnection({ host: address, port, family: 4 });
     const timer = setTimeout(() => {
       socket.destroy();
       resolve({ ok: false, error: 'TCP_TIMEOUT' });
@@ -77,7 +77,8 @@ async function networkDiagnostic(): Promise<void> {
   }
   console.log('SPED_DNS=' + JSON.stringify({ addresses }));
   for (const entry of addresses.filter((entry) => entry.family === 4)) {
-    console.log('SPED_TCP=' + JSON.stringify({ address: entry.address, ...(await tcpProbe(entry.address)) }));
+    console.log('SPED_TCP=' + JSON.stringify({ address: entry.address, port: 443, ...(await tcpProbe(entry.address, 443)) }));
+    console.log('SPED_TCP=' + JSON.stringify({ address: entry.address, port: 80, ...(await tcpProbe(entry.address, 80)) }));
   }
   const egress = await directHttps('https://api.ipify.org?format=json');
   console.log('SPED_EGRESS=' + JSON.stringify(egress));
