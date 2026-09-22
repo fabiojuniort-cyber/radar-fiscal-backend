@@ -281,32 +281,59 @@ function mergeLinkedArtifacts(
     ]),
   );
   const consumedArtifactIds = new Set<string>();
+  const resolved = new Set<string>();
+  const resolving = new Set<string>();
 
-  for (const [parentExternalId, artifactUrls] of linkedArtifacts) {
-    const parent = descriptors.get(parentExternalId);
-    if (!parent) continue;
+  const sameDocumentFamily = (
+    parent: SpedDocumentDescriptor,
+    artifact: SpedDocumentDescriptor,
+  ): boolean =>
+    artifact.documentFamily === parent.documentFamily ||
+    (
+      artifact.documentNumber !== undefined &&
+      artifact.documentNumber === parent.documentNumber
+    );
 
-    const linkedIds = new Set(parent.linkedArtifactExternalIds ?? []);
-    const filesByUrl = new Map(parent.files.map((file) => [file.url, file]));
+  const resolveDescriptor = (externalId: string): SpedDocumentDescriptor | undefined => {
+    const descriptor = descriptors.get(externalId);
+    if (!descriptor) return undefined;
+    if (resolved.has(externalId)) return descriptor;
+    if (resolving.has(externalId)) return descriptor;
 
-    for (const artifactUrl of artifactUrls) {
+    resolving.add(externalId);
+
+    const filesByUrl = new Map(descriptor.files.map((file) => [file.url, file]));
+    const linkedIds = new Set(descriptor.linkedArtifactExternalIds ?? []);
+
+    for (const artifactUrl of linkedArtifacts.get(externalId) ?? []) {
       const artifact = descriptorByUrl.get(artifactUrl);
-      if (!artifact) continue;
-      const sameFamily =
-        artifact.documentFamily === parent.documentFamily ||
-        (
-          artifact.documentNumber !== undefined &&
-          artifact.documentNumber === parent.documentNumber
-        );
-      if (!sameFamily) continue;
+      if (!artifact || artifact.externalId === externalId) continue;
+      if (!sameDocumentFamily(descriptor, artifact)) continue;
 
-      linkedIds.add(artifact.externalId);
+      const child = resolveDescriptor(artifact.externalId) ?? artifact;
       consumedArtifactIds.add(artifact.externalId);
-      for (const file of artifact.files) filesByUrl.set(file.url, file);
+      linkedIds.add(artifact.externalId);
+
+      for (const linkedId of child.linkedArtifactExternalIds ?? []) {
+        linkedIds.add(linkedId);
+      }
+      for (const file of child.files) {
+        filesByUrl.set(file.url, file);
+      }
     }
 
-    if (linkedIds.size > 0) parent.linkedArtifactExternalIds = [...linkedIds].sort();
-    parent.files = [...filesByUrl.values()];
+    descriptor.files = [...filesByUrl.values()];
+    if (linkedIds.size > 0) {
+      descriptor.linkedArtifactExternalIds = [...linkedIds].sort();
+    }
+
+    resolving.delete(externalId);
+    resolved.add(externalId);
+    return descriptor;
+  };
+
+  for (const externalId of descriptors.keys()) {
+    resolveDescriptor(externalId);
   }
 
   return [...descriptors.values()].filter(
