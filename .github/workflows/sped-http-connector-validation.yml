@@ -1,0 +1,27 @@
+name: SPED HTTP Connector Validation
+
+on:
+  push:
+    branches:
+      - feat/sped-portal-connector
+    paths:
+      - src/validation/sped-http-connector-validation.ts
+      - src/modules/collection/sped.connector.ts
+      - src/modules/collection/sped-source-state.repository.ts
+      - .github/workflows/sped-http-connector-validation.yml
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run three-pass SPED connector validation
+        run: node dist/validation/sped-http-connector-validation.js
