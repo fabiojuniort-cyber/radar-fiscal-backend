@@ -175,6 +175,60 @@ test('recursively folds multi-level linked artifacts into the root publication',
   );
 });
 
+
+test('does not suppress an arquivo/show publication that links to itself', async () => {
+  const base = router();
+
+  const fetchWithSelfLink = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = new URL(input.toString());
+
+    if (url.pathname === '/projeto/show/274') {
+      return html(moduleRoot([
+        ['/item/show/9300', 'Guia Prático EFD ICMS IPI versão 9.3.0'],
+      ]));
+    }
+
+    if (url.pathname === '/item/show/9300') {
+      return new Response(null, {
+        status: 302,
+        headers: { location: '/arquivo/show/9300' },
+      });
+    }
+
+    if (url.pathname === '/arquivo/show/9300') {
+      return html(
+        '<html><body><h1>EFD ICMS IPI</h1>' +
+        '<h2>Guia Prático EFD ICMS IPI versão 9.3.0</h2>' +
+        '<p>Publicado em 22/09/2026</p>' +
+        '<a href="/arquivo/show/9300">Guia Prático EFD ICMS IPI versão 9.3.0</a>' +
+        '<a href="/arquivo/download/9300">guia.pdf</a>' +
+        '</body></html>'
+      );
+    }
+
+    return base(input, init);
+  }) as typeof fetch;
+
+  const result = await new SpedConnector({
+    fetch: fetchWithSelfLink,
+    maxCrawlDepth: 5,
+  }).collect(CONTEXT);
+
+  const publication = result.publications.find(
+    (item) => item.externalId === 'arquivo:9300',
+  );
+
+  assert.ok(publication);
+  assert.equal(publication.files?.length, 1);
+  assert.equal(
+    publication.metadata?.linkedArtifactExternalIds,
+    undefined,
+  );
+});
+
 test('reuses checkpoint without redownloading and changed bytes create a new content hash for same explicit publication', async () => {
   const first = await new SpedConnector({ fetch: router(), now: () => new Date('2026-09-21T00:00:00Z'), maxCrawlDepth: 2 }).collect(CONTEXT);
   const state = first.metadata?.spedState as {
