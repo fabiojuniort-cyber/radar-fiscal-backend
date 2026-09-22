@@ -1,3 +1,4 @@
+// HTTP bootstrap validation trigger
 import { createHash } from 'node:crypto';
 
 import {
