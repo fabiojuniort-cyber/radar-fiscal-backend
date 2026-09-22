@@ -10,6 +10,8 @@ import {
 import { ConnectorRegistry } from './connector.registry.js';
 import { NfeEncatConnector } from './nfe-encat.connector.js';
 import { readNfeEncatSourceState } from './nfe-encat-source-state.repository.js';
+import { SpedConnector } from './sped.connector.js';
+import { readSpedSourceState } from './sped-source-state.repository.js';
 import {
   createMandatorySimulatedConnectors,
 } from './simulated.connectors.js';
@@ -50,6 +52,17 @@ export function buildConnectorRegistry(
         ? {
             readState: (sourceId) =>
               readNfeEncatSourceState(options.db!, sourceId),
+          }
+        : {}),
+    }),
+  );
+
+  registry.register(
+    new SpedConnector({
+      ...(options.db
+        ? {
+            readState: (sourceId) =>
+              readSpedSourceState(options.db!, sourceId),
           }
         : {}),
     }),
