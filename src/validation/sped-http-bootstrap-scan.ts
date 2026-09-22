@@ -24,23 +24,60 @@ function transportUrl(officialUrl: string): string {
   return TRANSPORT_ORIGIN + parsed.pathname + parsed.search;
 }
 
-async function getHtml(officialUrl: string): Promise<{ html: string; status: number; bytes: number }> {
-  const response = await fetch(transportUrl(officialUrl), {
-    redirect: 'manual',
-    signal: AbortSignal.timeout(20_000),
-    headers: {
-      'user-agent': 'RadarFiscal-SPED-Validation/1.0',
-      accept: 'text/html,application/xhtml+xml,*/*;q=0.5',
-      'x-forwarded-proto': 'https',
-      'x-forwarded-port': '443',
-      'x-forwarded-host': 'sped.rfb.gov.br',
-    },
-  });
+async function requestHttp(
+  officialUrl: string,
+  timeoutMs: number,
+): Promise<Response & { finalOfficialUrl?: string }> {
+  let current = transportUrl(officialUrl);
+  const seen = new Set<string>();
+
+  for (let redirects = 0; redirects <= 6; redirects += 1) {
+    if (seen.has(current)) throw new Error('HTTP_REDIRECT_LOOP');
+    seen.add(current);
+
+    const response = await fetch(current, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        'user-agent': 'RadarFiscal-SPED-Validation/1.0',
+        accept: '*/*',
+      },
+    });
+
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      const finalOfficialUrl =
+        OFFICIAL_ORIGIN + new URL(current).pathname + new URL(current).search;
+      Object.defineProperty(response, 'finalOfficialUrl', {
+        value: finalOfficialUrl,
+        enumerable: false,
+      });
+      return response as Response & { finalOfficialUrl?: string };
+    }
+
+    const location = response.headers.get('location');
+    await response.body?.cancel();
+    if (!location) throw new Error('HTTP_REDIRECT_WITHOUT_LOCATION');
+    const next = new URL(location, current);
+    if (next.hostname.toLowerCase() !== 'sped.rfb.gov.br') {
+      throw new Error('HTTP_CROSS_ORIGIN_REDIRECT:' + next.toString());
+    }
+    next.protocol = 'http:';
+    current = next.toString();
+  }
+
+  throw new Error('HTTP_TOO_MANY_REDIRECTS');
+}
+
+async function getHtml(
+  officialUrl: string,
+): Promise<{ html: string; status: number; bytes: number; officialUrl: string }> {
+  const response = await requestHttp(officialUrl, 20_000);
   const html = await response.text();
   return {
     html,
     status: response.status,
     bytes: Buffer.byteLength(html),
+    officialUrl: response.finalOfficialUrl ?? officialUrl,
   };
 }
 
@@ -51,17 +88,7 @@ async function download(officialUrl: string): Promise<{
   contentType?: string;
   filename?: string;
 }> {
-  const response = await fetch(transportUrl(officialUrl), {
-    redirect: 'manual',
-    signal: AbortSignal.timeout(60_000),
-    headers: {
-      'user-agent': 'RadarFiscal-SPED-Validation/1.0',
-      accept: '*/*',
-      'x-forwarded-proto': 'https',
-      'x-forwarded-port': '443',
-      'x-forwarded-host': 'sped.rfb.gov.br',
-    },
-  });
+  const response = await requestHttp(officialUrl, 60_000);
   const bytes = new Uint8Array(await response.arrayBuffer());
   const disposition = response.headers.get('content-disposition');
   const filename = /filename\s*=\s*"?([^";]+)"?/i.exec(disposition ?? '')?.[1]?.trim();
@@ -85,7 +112,7 @@ function sameNavigation(url: string): boolean {
     const parsed = new URL(url);
     return parsed.origin === OFFICIAL_ORIGIN &&
       (
-        /^\/(?:item|pasta)\/show\/\d+$/i.test(parsed.pathname) ||
+        /^\/(?:item|pasta|projeto|pagina)\/show\/\d+$/i.test(parsed.pathname) ||
         /^\/arquivo\/show\/\d+$/i.test(parsed.pathname) ||
         /^\/destaques\/show\/\d+$/i.test(parsed.pathname)
       );
@@ -141,7 +168,7 @@ async function crawlModule(
       if (response.status < 200 || response.status >= 300) {
         throw new Error('HTTP_' + response.status);
       }
-      const page = parseSpedPage(response.html, current.url);
+      const page = parseSpedPage(response.html, response.officialUrl);
       pagesSucceeded += 1;
 
       const descriptor = descriptorFromPage(definition.module, page);
