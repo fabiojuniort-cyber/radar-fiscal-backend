@@ -281,7 +281,9 @@ function noteNumber(title: string): string | undefined {
   const normalized = normalizeSpace(title);
   const full = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(\d{1,3})[\s_\/-]+(20\d{2})/i.exec(normalized);
   if (full) return String(Number(full[1]!)).padStart(2, '0') + '/' + full[2];
-  const alt = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(20\d{2})[.\/_-](\d{1,3})/i.exec(normalized);
+  const yearDotCode = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(20\d{2})\.(\d{3})/i.exec(normalized);
+  if (yearDotCode) return yearDotCode[1] + '.' + yearDotCode[2];
+  const alt = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(20\d{2})[\/_-](\d{1,3})/i.exec(normalized);
   if (alt) return String(Number(alt[2]!)).padStart(2, '0') + '/' + alt[1];
   return undefined;
 }
