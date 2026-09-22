@@ -53,6 +53,7 @@ export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
     seeds: [
       { url: SPED_ORIGIN + '/item/show/268', kind: 'MODULE' },
       { url: SPED_ORIGIN + '/item/show/1545', kind: 'CATEGORY' },
+      { url: SPED_ORIGIN + '/destaques/show/285', kind: 'MODULE_HIGHLIGHTS' },
       { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
     ],
   },
