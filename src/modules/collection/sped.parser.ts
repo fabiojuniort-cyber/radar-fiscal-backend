@@ -116,12 +116,14 @@ function linkPath(url: string): string {
   }
 }
 
-function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' } | undefined {
+function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' | 'pagina' } | undefined {
   const path = linkPath(url);
   const item = /\/item\/show\/(\d+)/i.exec(path)?.[1];
   if (item) return { id: item, type: 'item' };
   const archive = /\/arquivo\/show\/(\d+)/i.exec(path)?.[1];
   if (archive) return { id: archive, type: 'arquivo' };
+  const page = /\/pagina\/show\/(\d+)/i.exec(path)?.[1];
+  if (page) return { id: page, type: 'pagina' };
   return undefined;
 }
 
@@ -279,7 +281,9 @@ function noteNumber(title: string): string | undefined {
   const normalized = normalizeSpace(title);
   const full = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(\d{1,3})[\s_\/-]+(20\d{2})/i.exec(normalized);
   if (full) return String(Number(full[1]!)).padStart(2, '0') + '/' + full[2];
-  const alt = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(20\d{2})[.\/_-](\d{1,3})/i.exec(normalized);
+  const yearDotCode = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(20\d{2})\.(\d{3})/i.exec(normalized);
+  if (yearDotCode) return yearDotCode[1] + '.' + yearDotCode[2];
+  const alt = /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)[^0-9]{0,12}(20\d{2})[\/_-](\d{1,3})/i.exec(normalized);
   if (alt) return String(Number(alt[2]!)).padStart(2, '0') + '/' + alt[1];
   return undefined;
 }
@@ -305,12 +309,16 @@ function actNumberFor(
   if (kind === 'TECHNICAL_NOTE' || kind === 'ORIENTATION_NOTE') {
     const number = noteNumber(title);
     if (!number) return {};
-    const suffix = revision === 'REPUBLICATION'
+    const versionSuffix = version ? ' v' + version : '';
+    const revisionSuffix = revision === 'REPUBLICATION'
       ? ' - REPUBLICAÇÃO'
       : revision === 'UPDATE'
         ? ' - ATUALIZAÇÃO'
         : '';
-    return { documentNumber: number, actNumber: number + suffix };
+    return {
+      documentNumber: number,
+      actNumber: number + versionSuffix + revisionSuffix,
+    };
   }
   if (kind === 'TABLE') {
     const number = tableNumber(title);
@@ -414,7 +422,12 @@ export function descriptorFromPage(
     kind,
     title: page.title,
     itemId: page.itemId,
-    externalId: (/\/arquivo\/show\//i.test(page.url) ? 'arquivo:' : 'item:') + page.itemId,
+    externalId:
+      (/\/arquivo\/show\//i.test(page.url)
+        ? 'arquivo:'
+        : /\/pagina\/show\//i.test(page.url)
+          ? 'pagina:'
+          : 'item:') + page.itemId,
     officialUrl: page.url,
     ...(page.publishedAt ? { publishedAt: page.publishedAt } : {}),
     ...(page.updatedAt ? { updatedAt: page.updatedAt } : {}),
