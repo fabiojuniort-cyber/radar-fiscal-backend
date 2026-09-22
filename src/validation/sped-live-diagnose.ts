@@ -90,4 +90,4 @@ for (const [name, path] of roots) {
   }
 }
 
-console.log('SPED_LIVE_DIAG=' + JSON.stringify(output));
+console.log('SPED_LIVE_DIAG=' + JSON.stringify({ generatedAt: new Date().toISOString(), ...output }));
