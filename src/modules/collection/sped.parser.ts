@@ -391,10 +391,16 @@ export function descriptorFromPage(
   if (!page.itemId) return undefined;
   const kind = documentKind(page.title, page.text);
   if (!kind) return undefined;
-  if (kind !== 'OPERATIONAL_NOTICE' && !isTechnicalNavigationText(page.title) && !page.fileLinks.length) return undefined;
   const revision = revisionKind(page.title);
   const version = versionFromTitle(page.title, kind) ?? versionFromBody(page.text, kind);
   const numbers = actNumberFor(kind, page.title, version, revision);
+  const hasDocumentEvidence =
+    page.fileLinks.length > 0 ||
+    page.publishedAt !== undefined ||
+    page.updatedAt !== undefined ||
+    version !== undefined ||
+    numbers.documentNumber !== undefined;
+  if (kind !== 'OPERATIONAL_NOTICE' && !hasDocumentEvidence) return undefined;
   const files = page.fileLinks
     .map((link) => ({
       url: link.url,
