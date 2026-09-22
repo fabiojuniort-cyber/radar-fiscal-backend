@@ -36,6 +36,7 @@ export async function readNfeEncatSourceState(
     .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
     .select(['ca.metadata', 'ca.finished_at'])
     .where('cr.source_id', '=', sourceId)
+    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS'])
     .where('ca.status', '=', 'SUCCESS')
     .orderBy('ca.finished_at', 'desc')
     .orderBy('ca.attempt_no', 'desc')
