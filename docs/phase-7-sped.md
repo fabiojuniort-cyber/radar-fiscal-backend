@@ -26,26 +26,26 @@ Componentes:
 
 ### EFD ICMS/IPI
 
-- `/item/show/274`
-- `/item/show/1573`
+- `/projeto/show/274` (raiz canônica atual do módulo)
+- `/item/show/1573` / redirecionamento equivalente de categoria
 - destaques globais `/destaques/show/7`, com filtro obrigatório de módulo.
 
 ### EFD-Contribuições
 
-- `/item/show/268`
-- `/item/show/1545`
+- `/projeto/show/268` (raiz canônica atual do módulo)
+- `/item/show/1545` / redirecionamento equivalente de categoria
 - destaques do módulo `/destaques/show/285`
 - destaques globais `/destaques/show/7`, com filtro obrigatório.
 
 ### EFD-Reinf
 
-- `/item/show/1196`
+- `/projeto/show/1196` (raiz canônica atual do módulo)
 - destaques do módulo `/destaques/show/1199`
-- `/item/show/2270` para esquemas XSD.
+- `/item/show/2270` / redirecionamento equivalente para esquemas XSD.
 
 ### DeRE
 
-- `/item/show/7950`
+- `/pagina/show/7950` (documentação técnica oficial DeRE)
 - destaques globais filtrados.
 
 A DeRE é tecnicamente compatível com o mesmo conector: sua documentação oficial está publicada dentro do Portal SPED e possui o mesmo modelo de páginas/arquivos.
@@ -156,11 +156,20 @@ A suíte cobre:
 
 ## Conectividade Railway
 
-Na inspeção inicial, requisições Node no Railway para `sped.rfb.gov.br:443` falharam antes de HTTP com `UND_ERR_CONNECT_TIMEOUT`.
+Na inspeção ao vivo, `sped.rfb.gov.br` resolveu para `200.198.239.243`.
 
-O serviço isolado `sped-validation` foi usado para o diagnóstico, sem alterar backend, Worker ou Scheduler produtivos.
+O serviço isolado `sped-validation` comprovou:
+- TCP/HTTP porta 80: acessível;
+- páginas oficiais em HTTP: status 200;
+- rotas antigas `/item/show/274`, `/268`, `/1196` e `/7950`: redirects internos para `/projeto/show/*` ou `/pagina/show/*`;
+- TCP/HTTPS porta 443: timeout antes de TLS/HTTP;
+- Static Outbound IP Railway: testado e não resolveu o timeout do 443;
+- proxy legado do CONFAZ: testado e não resolveu o acesso SPED;
+- GitHub Actions também apresentou bloqueio para o HTTPS ao vivo.
 
-O plano Railway atual suporta Static Outbound IP, porém a integração Railway disponível nesta sessão não expõe a ação de habilitá-lo. O teste com Static Outbound IP é um gate operacional antes da primeira coleta produtiva.
+O HTTP/80 foi utilizado somente para análise técnica e medição de bootstrap. Ele **não** é considerado rota produtiva aprovada: o conector continua usando `https://sped.rfb.gov.br` como origem oficial.
+
+A primeira coleta produtiva e o Scheduler permanecem bloqueados até existir um caminho HTTPS seguro aprovado.
 
 ## Migrations
 
