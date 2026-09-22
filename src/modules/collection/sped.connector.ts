@@ -369,7 +369,17 @@ async function crawlModule(
       if (current.depth === 0) seedSuccesses += 1;
 
       const descriptor = descriptorFromPage(definition.module, page);
-      if (descriptor && kind === 'UNKNOWN') {
+      if (
+        descriptor &&
+        kind === 'UNKNOWN' &&
+        (
+          descriptor.files.length > 0 ||
+          descriptor.publishedAt !== undefined ||
+          descriptor.updatedAt !== undefined ||
+          descriptor.documentNumber !== undefined ||
+          descriptor.officialVersion !== undefined
+        )
+      ) {
         kind = 'DOCUMENT';
         rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
       }
@@ -403,7 +413,7 @@ async function crawlModule(
         }
       }
 
-      if (descriptor || kind === 'DOCUMENT') continue;
+      if (kind === 'DOCUMENT') continue;
       if (current.depth >= maxCrawlDepth) continue;
 
       for (const link of page.links) {
