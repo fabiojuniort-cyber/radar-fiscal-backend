@@ -21,6 +21,9 @@ const targets: Array<{
   { gate: 'CONTRIB_NT_12_2026', module: 'EFD_CONTRIBUICOES', path: '/item/show/8126' },
   { gate: 'REINF_XSD', module: 'EFD_REINF', path: '/item/show/2270' },
   { gate: 'DERE', module: 'DERE', path: '/item/show/7950' },
+  { gate: 'REINF_REPUBLICADA_FILE_PAGE', module: 'EFD_REINF', path: '/arquivo/show/8070' },
+  { gate: 'REINF_XSD_CURRENT_FILE', module: 'EFD_REINF', path: '/item/show/8193' },
+  { gate: 'DERE_PROJECT', module: 'DERE', path: '/projeto/show/2918' },
 ];
 
 async function request(pathOrUrl: string, timeoutMs = 30_000): Promise<{
@@ -118,7 +121,9 @@ for (const target of targets) {
         title: page.title,
         headings: page.headings,
         textHead: page.text.slice(0, 1200),
-        links: page.links.slice(0, 80),
+        links: page.links.filter((link) =>
+          /download|dere|manual|leiaute|layout|xsd|schema|arquivo|pasta|nota|orienta/i.test(link.text + ' ' + link.path)
+        ).slice(0, 120),
         fileLinks: page.fileLinks,
       },
       descriptor: descriptor ? {
