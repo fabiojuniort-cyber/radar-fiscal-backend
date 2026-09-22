@@ -32,6 +32,24 @@ test('models Guia Prático 3.2.1 and 3.2.2 as distinct official versions in the 
   assert.notEqual(one?.externalId, two?.externalId);
 });
 
+
+test('keeps official EFD ICMS/IPI technical-note versions as separate publications in one family', () => {
+  const v11 = descriptorFromPage(
+    'EFD_ICMS_IPI',
+    page('7001', 'Nota Técnica 2023.001 v 1.1 (leiaute versão 018)', 'Publicado em 01/11/2023', '7002'),
+  );
+  const v12 = descriptorFromPage(
+    'EFD_ICMS_IPI',
+    page('7003', 'Nota Técnica 2023.001 v 1.2 (leiaute versão 018)', 'Publicado em 15/12/2023', '7004'),
+  );
+  assert.equal(v11?.officialVersion, '1.1');
+  assert.equal(v12?.officialVersion, '1.2');
+  assert.equal(v11?.documentFamily, v12?.documentFamily);
+  assert.notEqual(v11?.actNumber, v12?.actNumber);
+  assert.match(v11?.actNumber ?? '', /v1\.1$/);
+  assert.match(v12?.actNumber ?? '', /v1\.2$/);
+});
+
 test('distinguishes EFD-Reinf NT 01/2026 original and explicit republication', () => {
   const original = descriptorFromPage(
     'EFD_REINF',
