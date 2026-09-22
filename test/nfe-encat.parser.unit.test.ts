@@ -58,3 +58,17 @@ test('keeps only NF-e/NFC-e manuals and excludes manuals for other DF-e', async 
   assert.equal(items[0]?.documentFamily, 'MOC NF-E/NFC-E');
   assert.equal(items.some(item => /NFGas/i.test(item.title)), false);
 });
+
+test('rejects unrecognized HTML instead of treating it as a legitimate empty listing', () => {
+  assert.throws(
+    () => parseNfeEncatListing(
+      '<!doctype html><html><body><h1>Portal</h1></body></html>',
+      'TECHNICAL_NOTES',
+      URLS.notes,
+    ),
+    (error: unknown) => {
+      assert.equal((error as { code?: string }).code, 'NFE_ENCAT_UNRECOGNIZED_LISTING');
+      return true;
+    },
+  );
+});
