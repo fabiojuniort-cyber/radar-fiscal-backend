@@ -27,6 +27,22 @@ const diagnosticFetch: typeof fetch = async (input, init) => {
     return fetch(input, init);
   }
 
+  const blockedNonReinfRoots = new Set([
+    '/projeto/show/274',
+    '/item/show/1573',
+    '/destaques/show/7',
+    '/projeto/show/268',
+    '/item/show/1545',
+    '/destaques/show/285',
+    '/pagina/show/7950',
+  ]);
+  if (blockedNonReinfRoots.has(requested.pathname)) {
+    return new Response('diagnostic module blocked', {
+      status: 503,
+      headers: { 'content-type': 'text/plain' },
+    });
+  }
+
   const downloadId = /\/arquivo\/download\/(\d+)/i.exec(requested.pathname)?.[1];
   if (downloadId && downloadId !== ALLOWED_FILE_ID) {
     return new Response('diagnostic file blocked', {
@@ -54,7 +70,7 @@ const diagnosticFetch: typeof fetch = async (input, init) => {
 
 const connector = new SpedConnector({
   fetch: diagnosticFetch,
-  maxPagesPerModule: 120,
+  maxPagesPerModule: 50,
   maxCrawlDepth: 3,
   revisitAfterMs: 24 * 60 * 60 * 1000,
   maxRechecksPerRun: 0,
