@@ -43,7 +43,7 @@ export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
   {
     module: 'EFD_ICMS_IPI',
     seeds: [
-      { url: SPED_ORIGIN + '/item/show/274', kind: 'MODULE' },
+      { url: SPED_ORIGIN + '/projeto/show/274', kind: 'MODULE' },
       { url: SPED_ORIGIN + '/item/show/1573', kind: 'CATEGORY' },
       { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
     ],
@@ -51,7 +51,7 @@ export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
   {
     module: 'EFD_CONTRIBUICOES',
     seeds: [
-      { url: SPED_ORIGIN + '/item/show/268', kind: 'MODULE' },
+      { url: SPED_ORIGIN + '/projeto/show/268', kind: 'MODULE' },
       { url: SPED_ORIGIN + '/item/show/1545', kind: 'CATEGORY' },
       { url: SPED_ORIGIN + '/destaques/show/285', kind: 'MODULE_HIGHLIGHTS' },
       { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
@@ -60,7 +60,7 @@ export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
   {
     module: 'EFD_REINF',
     seeds: [
-      { url: SPED_ORIGIN + '/item/show/1196', kind: 'MODULE' },
+      { url: SPED_ORIGIN + '/projeto/show/1196', kind: 'MODULE' },
       { url: SPED_ORIGIN + '/destaques/show/1199', kind: 'MODULE_HIGHLIGHTS' },
       { url: SPED_ORIGIN + '/item/show/2270', kind: 'CATEGORY' },
     ],
@@ -68,7 +68,7 @@ export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
   {
     module: 'DERE',
     seeds: [
-      { url: SPED_ORIGIN + '/item/show/7950', kind: 'CATEGORY' },
+      { url: SPED_ORIGIN + '/pagina/show/7950', kind: 'CATEGORY' },
       { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
     ],
   },
@@ -204,7 +204,7 @@ function samePortalNavigation(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.origin.toLowerCase() !== SPED_ORIGIN.toLowerCase()) return false;
-    return /^\/(?:item|pasta)\/show\/\d+$/i.test(parsed.pathname)
+    return /^\/(?:item|pasta|projeto|pagina)\/show\/\d+$/i.test(parsed.pathname)
       || /^\/arquivo\/show\/\d+$/i.test(parsed.pathname)
       || /^\/destaques\/show\/\d+$/i.test(parsed.pathname);
   } catch {
