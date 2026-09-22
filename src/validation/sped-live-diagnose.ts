@@ -1,3 +1,4 @@
+// static-outbound-ip validation redeploy 2026-09-22
 import { Parser } from 'htmlparser2';
 
 const ORIGIN = 'https://sped.rfb.gov.br';
