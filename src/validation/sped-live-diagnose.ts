@@ -1,4 +1,7 @@
 // static-outbound-ip validation redeploy 2026-09-22
+import { lookup } from 'node:dns/promises';
+import https from 'node:https';
+import net from 'node:net';
 import { Parser } from 'htmlparser2';
 
 const ORIGIN = 'https://sped.rfb.gov.br';
@@ -13,6 +16,79 @@ const roots = [
 interface LinkInfo {
   href: string;
   text: string;
+}
+
+function directHttps(url: string, timeoutMs = 10_000): Promise<{ status?: number; body?: string; error?: string; code?: string }> {
+  return new Promise((resolve) => {
+    const request = https.get(url, {
+      family: 4,
+      timeout: timeoutMs,
+      headers: {
+        'user-agent': 'RadarFiscal/1.0 (+official-source-monitoring)',
+        accept: 'text/html,application/json,*/*;q=0.5',
+      },
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      let total = 0;
+      response.on('data', (chunk: Buffer) => {
+        if (total >= 32_768) return;
+        chunks.push(chunk);
+        total += chunk.length;
+      });
+      response.on('end', () => {
+        resolve({
+          status: response.statusCode,
+          body: Buffer.concat(chunks).toString('utf8').slice(0, 32_768),
+        });
+      });
+    });
+    request.on('timeout', () => request.destroy(new Error('HTTPS_TIMEOUT')));
+    request.on('error', (error: NodeJS.ErrnoException) => {
+      resolve({ error: error.message, code: error.code });
+    });
+  });
+}
+
+function tcpProbe(address: string, timeoutMs = 8_000): Promise<{ ok: boolean; error?: string; code?: string }> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: address, port: 443, family: 4 });
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve({ ok: false, error: 'TCP_TIMEOUT' });
+    }, timeoutMs);
+    socket.once('connect', () => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve({ ok: true });
+    });
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: error.message, code: error.code });
+    });
+  });
+}
+
+async function networkDiagnostic(): Promise<void> {
+  let addresses: Array<{ address: string; family: number }> = [];
+  try {
+    addresses = await lookup('sped.rfb.gov.br', { all: true });
+  } catch (error) {
+    console.log('SPED_DNS=' + JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+  }
+  console.log('SPED_DNS=' + JSON.stringify({ addresses }));
+  for (const entry of addresses.filter((entry) => entry.family === 4)) {
+    console.log('SPED_TCP=' + JSON.stringify({ address: entry.address, ...(await tcpProbe(entry.address)) }));
+  }
+  const egress = await directHttps('https://api.ipify.org?format=json');
+  console.log('SPED_EGRESS=' + JSON.stringify(egress));
+  const directPortal = await directHttps(ORIGIN + '/');
+  console.log('SPED_HTTPS_DIRECT=' + JSON.stringify({
+    status: directPortal.status,
+    error: directPortal.error,
+    code: directPortal.code,
+    bytes: directPortal.body ? Buffer.byteLength(directPortal.body) : 0,
+    hasSped: directPortal.body ? /SPED|Sistema Público de Escrituração Digital/i.test(directPortal.body) : false,
+  }));
 }
 
 async function fetchHtml(path: string): Promise<{ url: string; html: string; status: number; contentType: string }> {
@@ -38,9 +114,7 @@ function extractLinks(html: string): LinkInfo[] {
   let current: { href: string; text: string } | undefined;
   const parser = new Parser({
     onopentag(name, attrs) {
-      if (name.toLowerCase() === 'a' && attrs.href) {
-        current = { href: attrs.href, text: '' };
-      }
+      if (name.toLowerCase() === 'a' && attrs.href) current = { href: attrs.href, text: '' };
     },
     ontext(text) {
       if (current) current.text += text;
@@ -70,9 +144,11 @@ function unique<T>(values: T[], key: (value: T) => string): T[] {
   });
 }
 
-const keyword = /(guia|manual|nota|orienta|leiaute|layout|xsd|schema|tabela|validador|pva|pge|download|destaque|dere|regimes espec|arquivo)/i;
+await networkDiagnostic();
 
+const keyword = /(guia|manual|nota|orienta|leiaute|layout|xsd|schema|tabela|validador|pva|pge|download|destaque|dere|regimes espec|arquivo)/i;
 const output: Record<string, unknown> = {};
+
 for (const [name, path] of roots) {
   try {
     const page = await fetchHtml(path);
