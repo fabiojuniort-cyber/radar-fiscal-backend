@@ -84,7 +84,7 @@ export interface SpedStoredFile {
   checkedAt: string;
 }
 
-export type SpedPageKind = 'CONTAINER' | 'DOCUMENT' | 'UNKNOWN';
+export type SpedPageKind = 'CONTAINER' | 'DOCUMENT' | 'MISSING' | 'UNKNOWN';
 
 export interface SpedKnownPage {
   canonicalUrl: string;
@@ -129,6 +129,7 @@ interface KnownDocumentCandidate {
   module: SpedModule;
   url: string;
   checkedAt: string;
+  kind: 'DOCUMENT' | 'MISSING';
 }
 
 interface ModuleCrawlResult {
@@ -140,8 +141,19 @@ interface ModuleCrawlResult {
   pagesFailed: number;
   pagesVisited: number;
   skippedKnownDocuments: number;
+  skippedKnownMissingPages: number;
+  missingHistoricalPages: number;
   seedSuccesses: number;
   failures: ConnectorPartialFailure[];
+}
+
+function isHistoricalMissing(error: unknown): error is ConnectorError {
+  return (
+    error instanceof ConnectorError &&
+    error.kind === 'HTTP_ERROR' &&
+    error.retryable === false &&
+    (error.httpStatus === 404 || error.httpStatus === 410)
+  );
 }
 
 function failureInfo(error: unknown): { code: string; message: string; retryable?: boolean } {
@@ -365,6 +377,8 @@ async function crawlModule(
   let pagesFailed = 0;
   let seedSuccesses = 0;
   let skippedKnownDocuments = 0;
+  let skippedKnownMissingPages = 0;
+  let missingHistoricalPages = 0;
 
   while (queue.length && seen.size < maxPagesPerModule) {
     context.signal.throwIfAborted();
@@ -375,13 +389,18 @@ async function crawlModule(
     seen.add(seenKey);
 
     const known = routeFor(state, requestedUrl);
-    if (!current.forceFetch && known?.kind === 'DOCUMENT') {
+    if (
+      !current.forceFetch &&
+      (known?.kind === 'DOCUMENT' || known?.kind === 'MISSING')
+    ) {
       candidates.set(known.canonicalUrl, {
         module: definition.module,
         url: known.canonicalUrl,
         checkedAt: known.checkedAt,
+        kind: known.kind,
       });
-      skippedKnownDocuments += 1;
+      if (known.kind === 'MISSING') skippedKnownMissingPages += 1;
+      else skippedKnownDocuments += 1;
       continue;
     }
 
@@ -453,6 +472,18 @@ async function crawlModule(
       }
     } catch (error) {
       if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
+      if (current.depth > 0 && isHistoricalMissing(error)) {
+        rememberPage(
+          nextPages,
+          requestedUrl,
+          requestedUrl,
+          'MISSING',
+          definition.module,
+          nowIso,
+        );
+        missingHistoricalPages += 1;
+        continue;
+      }
       pagesFailed += 1;
       const failure = failureInfo(error);
       failures.push({
@@ -472,6 +503,8 @@ async function crawlModule(
     pagesFailed,
     pagesVisited: seen.size,
     skippedKnownDocuments,
+    skippedKnownMissingPages,
+    missingHistoricalPages,
     seedSuccesses,
     failures,
   };
@@ -488,6 +521,7 @@ async function recheckDocument(
   linkedArtifacts: Map<string, Set<string>>;
   pagesSucceeded: number;
   pagesFailed: number;
+  tombstonesConfirmed: number;
   failures: ConnectorPartialFailure[];
 }> {
   const descriptors = new Map<string, SpedDocumentDescriptor>();
@@ -502,6 +536,7 @@ async function recheckDocument(
   const seen = new Set<string>();
   let pagesSucceeded = 0;
   let pagesFailed = 0;
+  let tombstonesConfirmed = 0;
 
   while (queue.length) {
     context.signal.throwIfAborted();
@@ -543,6 +578,18 @@ async function recheckDocument(
       }
     } catch (error) {
       if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
+      if (isHistoricalMissing(error)) {
+        rememberPage(
+          nextPages,
+          requestedUrl,
+          requestedUrl,
+          'MISSING',
+          candidate.module,
+          nowIso,
+        );
+        tombstonesConfirmed += 1;
+        continue;
+      }
       pagesFailed += 1;
       const failure = failureInfo(error);
       failures.push({
@@ -553,7 +600,14 @@ async function recheckDocument(
     }
   }
 
-  return { descriptors, linkedArtifacts, pagesSucceeded, pagesFailed, failures };
+  return {
+    descriptors,
+    linkedArtifacts,
+    pagesSucceeded,
+    pagesFailed,
+    tombstonesConfirmed,
+    failures,
+  };
 }
 
 function connectorFile(
@@ -714,14 +768,18 @@ export class SpedConnector implements CollectionConnector {
         .slice(0, maxRechecksPerRun);
 
       let recheckedKnownDocumentCount = 0;
+      let recheckedMissingPageCount = 0;
       let recheckPagesSucceeded = 0;
       let recheckPagesFailed = 0;
+      let recheckedTombstonesConfirmed = 0;
 
       for (const candidate of selectedRechecks) {
         const result = await recheckDocument(candidate, client, context, nextPages, nowIso);
-        recheckedKnownDocumentCount += 1;
+        if (candidate.kind === 'MISSING') recheckedMissingPageCount += 1;
+        else recheckedKnownDocumentCount += 1;
         recheckPagesSucceeded += result.pagesSucceeded;
         recheckPagesFailed += result.pagesFailed;
+        recheckedTombstonesConfirmed += result.tombstonesConfirmed;
         partialFailures.push(...result.failures);
 
         const moduleResult = crawlResults.find((item) => item.module === candidate.module);
@@ -847,6 +905,8 @@ export class SpedConnector implements CollectionConnector {
               seedSuccesses: result.seedSuccesses,
               processedDocumentCount: result.descriptors.size,
               skippedKnownDocuments: result.skippedKnownDocuments,
+              skippedKnownMissingPages: result.skippedKnownMissingPages,
+              missingHistoricalPages: result.missingHistoricalPages,
               knownDocumentCandidates: result.candidates.length,
             })),
             processedDocumentCount: descriptors.length,
@@ -857,8 +917,23 @@ export class SpedConnector implements CollectionConnector {
             existingFileRecheckCount,
             newFileDownloadCount,
             skippedKnownDocumentCount,
-            reusedCheckpointCount: skippedKnownDocumentCount,
+            skippedKnownMissingPageCount: crawlResults.reduce(
+              (sum, result) => sum + result.skippedKnownMissingPages,
+              0,
+            ),
+            historicalMissingPageCount: crawlResults.reduce(
+              (sum, result) => sum + result.missingHistoricalPages,
+              0,
+            ),
+            reusedCheckpointCount:
+              skippedKnownDocumentCount +
+              crawlResults.reduce(
+                (sum, result) => sum + result.skippedKnownMissingPages,
+                0,
+              ),
             recheckedKnownDocumentCount,
+            recheckedMissingPageCount,
+            recheckedTombstonesConfirmed,
             recheckPagesSucceeded,
             recheckPagesFailed,
             knownDocumentCandidateCount: candidateMap.size,
