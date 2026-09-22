@@ -191,9 +191,24 @@ const bootstrap = await run(
   new Date('2026-09-22T13:00:00Z'),
 );
 
+const hourly = await run(
+  'PLUS_1H',
+  new Date('2026-09-22T14:00:00Z'),
+  state(bootstrap),
+);
+
+const aged = await run(
+  'PLUS_25H',
+  new Date('2026-09-23T14:00:00Z'),
+  state(hourly),
+);
+
 console.error('SPED_REAL_CONNECTOR_DONE=' + JSON.stringify({
   generatedAt: new Date().toISOString(),
   totalRequests: requestCount,
   totalHtmlRequests: htmlRequestCount,
   totalFileRequests: fileRequestCount,
+  bootstrapStatePages: Object.keys(state(bootstrap).pages ?? {}).length,
+  hourlyStatePages: Object.keys(state(hourly).pages ?? {}).length,
+  agedStatePages: Object.keys(state(aged).pages ?? {}).length,
 }));
