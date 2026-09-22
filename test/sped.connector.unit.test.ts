@@ -298,6 +298,20 @@ test('hourly incremental skips known document pages but captures a new item imme
   assert.equal((newResult.metadata?.sped as { newFileDownloadCount: number }).newFileDownloadCount, 1);
 });
 
+
+test('defaults to the safer 16-document recheck budget', async () => {
+  const result = await new SpedConnector({
+    fetch: router(),
+    now: () => new Date('2026-09-22T00:00:00Z'),
+    maxCrawlDepth: 2,
+  }).collect(CONTEXT);
+
+  assert.equal(
+    (result.metadata?.sped as { maxRechecksPerRun: number }).maxRechecksPerRun,
+    16,
+  );
+});
+
 test('known document rechecks are globally bounded', async () => {
   const first = await new SpedConnector({
     fetch: router(),

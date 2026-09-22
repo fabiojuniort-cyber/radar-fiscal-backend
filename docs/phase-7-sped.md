@@ -110,7 +110,7 @@ Em cada execução horária:
 - qualquer ID/documento novo visto em listagem é lido imediatamente;
 - documentos vencidos são rechecados oldest-first;
 - padrão: recheck após 24 horas;
-- padrão: máximo global de 32 documentos conhecidos por run;
+- padrão: máximo global de 16 documentos conhecidos por run;
 - quando um documento é rechecado, seus arquivos usam ETag/Last-Modified quando disponíveis e SHA-256 sempre que houver download;
 - linked artifacts, como o PDF apontado por uma página de republicação, são rechecados junto da publicação-pai.
 
@@ -210,11 +210,18 @@ Seeds estruturais continuam rigorosos: 404/410 em seed de módulo permanece falh
 
 No bootstrap lógico validado em 22/09/2026, o conector produziu 524 publicações e 235 referências de arquivo.
 
-Com o padrão de 32 documentos conhecidos rechecados por run horário e elegibilidade após 24 horas:
+Com o padrão de 16 documentos conhecidos rechecados por run horário e elegibilidade após 24 horas:
 
 - novos IDs vistos nas listagens continuam sendo processados imediatamente;
 - alterações silenciosas em documentos antigos entram no ciclo de recheck;
-- um ciclo completo de aproximadamente 524 documentos exige cerca de 17 runs horários após a elegibilidade;
-- portanto a detecção de uma alteração silenciosa muito antiga pode ocorrer aproximadamente entre 24 e 41 horas após o último check, conforme sua posição no ciclo.
+- o pool real observado contém cerca de 640 rotas documentais conhecidas; um ciclo completo exige cerca de 40 runs horários após a elegibilidade;
+- portanto a detecção de uma alteração silenciosa muito antiga pode ocorrer aproximadamente entre 24 e 64 horas após o último check, conforme sua posição no ciclo.
 
 Esse limite é deliberado para manter a coleta horária dentro do orçamento operacional do Worker.
+
+
+## Margem operacional do recheck
+
+Na validação real com transporte diagnóstico, a execução horária sem rechecks ficou em aproximadamente 68 s. Com 32 rechecks elegíveis, a execução chegou a aproximadamente 84 s, muito próxima do timeout operacional de 90 s do Worker.
+
+Por segurança, o lote padrão foi reduzido para 16 documentos conhecidos por run. Novos IDs permanecem imediatos; somente a revalidação de alterações silenciosas antigas usa esse lote.

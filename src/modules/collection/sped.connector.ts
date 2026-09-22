@@ -25,7 +25,7 @@ import {
 export const SPED_CONNECTOR_KEY = 'sped';
 const SPED_ORIGIN = 'https://sped.rfb.gov.br';
 const DEFAULT_REVISIT_AFTER_MS = 24 * 60 * 60 * 1_000;
-const DEFAULT_MAX_RECHECKS_PER_RUN = 32;
+const DEFAULT_MAX_RECHECKS_PER_RUN = 16;
 const DEFAULT_MAX_PAGES_PER_MODULE = 600;
 const DEFAULT_MAX_CRAWL_DEPTH = 5;
 
