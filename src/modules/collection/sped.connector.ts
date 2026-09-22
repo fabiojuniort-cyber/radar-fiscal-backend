@@ -26,8 +26,8 @@ export const SPED_CONNECTOR_KEY = 'sped';
 const SPED_ORIGIN = 'https://sped.rfb.gov.br';
 const DEFAULT_REVISIT_AFTER_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_MAX_RECHECKS_PER_RUN = 32;
-const DEFAULT_MAX_PAGES_PER_MODULE = 180;
-const DEFAULT_MAX_CRAWL_DEPTH = 3;
+const DEFAULT_MAX_PAGES_PER_MODULE = 600;
+const DEFAULT_MAX_CRAWL_DEPTH = 5;
 
 interface SpedModuleSeed {
   url: string;
@@ -68,7 +68,7 @@ export const SPED_MODULES: ReadonlyArray<SpedModuleDefinition> = [
   {
     module: 'DERE',
     seeds: [
-      { url: SPED_ORIGIN + '/pagina/show/7950', kind: 'CATEGORY' },
+      { url: SPED_ORIGIN + '/projeto/show/2918', kind: 'MODULE' },
       { url: SPED_ORIGIN + '/destaques/show/7', kind: 'GLOBAL_HIGHLIGHTS' },
     ],
   },
@@ -84,8 +84,18 @@ export interface SpedStoredFile {
   checkedAt: string;
 }
 
+export type SpedPageKind = 'CONTAINER' | 'DOCUMENT' | 'UNKNOWN';
+
+export interface SpedKnownPage {
+  canonicalUrl: string;
+  kind: SpedPageKind;
+  module: SpedModule;
+  checkedAt: string;
+}
+
 export interface SpedSourceState {
   items: Record<string, SpedStoredFile>;
+  pages: Record<string, SpedKnownPage>;
 }
 
 export interface SpedConnectorOptions {
@@ -111,14 +121,25 @@ interface CrawlPage {
   url: string;
   depth: number;
   seedKind: SpedModuleSeed['kind'];
+  forceFetch?: boolean;
+  parentExternalId?: string;
+}
+
+interface KnownDocumentCandidate {
+  module: SpedModule;
+  url: string;
+  checkedAt: string;
 }
 
 interface ModuleCrawlResult {
   module: SpedModule;
-  descriptors: SpedDocumentDescriptor[];
+  descriptors: Map<string, SpedDocumentDescriptor>;
+  linkedArtifacts: Map<string, Set<string>>;
+  candidates: KnownDocumentCandidate[];
   pagesSucceeded: number;
   pagesFailed: number;
   pagesVisited: number;
+  skippedKnownDocuments: number;
   seedSuccesses: number;
   failures: ConnectorPartialFailure[];
 }
@@ -161,43 +182,22 @@ function stateKey(file: DiscoveredFile): string {
   return file.module + ':' + file.publicationExternalId + ':' + file.externalId;
 }
 
-function checkedAtMs(stored: SpedStoredFile): number {
-  const value = Date.parse(stored.checkedAt);
-  return Number.isFinite(value) ? value : 0;
+function canonicalPortalUrl(value: string): string {
+  const parsed = new URL(value, SPED_ORIGIN);
+  parsed.hash = '';
+  return parsed.toString();
 }
 
-function discoveredFiles(descriptors: SpedDocumentDescriptor[]): DiscoveredFile[] {
-  return descriptors.flatMap((descriptor) =>
-    descriptor.files.map((file) => ({
-      module: descriptor.module,
-      publicationExternalId: descriptor.externalId,
-      url: file.url,
-      externalId: file.externalId,
-      ...(file.name ? { name: file.name } : {}),
-    })),
-  );
-}
-
-function selectKnownRechecks(
-  files: DiscoveredFile[],
-  state: SpedSourceState,
-  now: Date,
-  revisitAfterMs: number,
-  maxRechecksPerRun: number,
-): Set<string> {
-  const nowMs = now.getTime();
-  const candidates = files
-    .map((file) => {
-      const key = stateKey(file);
-      const previous = state.items[key];
-      return previous ? { key, checkedAtMs: checkedAtMs(previous) } : undefined;
-    })
-    .filter((candidate): candidate is { key: string; checkedAtMs: number } =>
-      candidate !== undefined && nowMs - candidate.checkedAtMs >= revisitAfterMs,
-    )
-    .sort((left, right) => left.checkedAtMs - right.checkedAtMs || left.key.localeCompare(right.key))
-    .slice(0, maxRechecksPerRun);
-  return new Set(candidates.map((candidate) => candidate.key));
+function pageKindFromUrl(url: string): SpedPageKind {
+  try {
+    const pathname = new URL(url, SPED_ORIGIN).pathname;
+    if (/^\/(?:projeto|pasta)\/show\/\d+$/i.test(pathname)) return 'CONTAINER';
+    if (/^\/destaques\/show\/\d+$/i.test(pathname)) return 'CONTAINER';
+    if (/^\/(?:pagina|arquivo)\/show\/\d+$/i.test(pathname)) return 'DOCUMENT';
+    return 'UNKNOWN';
+  } catch {
+    return 'UNKNOWN';
+  }
 }
 
 function samePortalNavigation(url: string): boolean {
@@ -210,12 +210,6 @@ function samePortalNavigation(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-function canonicalPortalUrl(value: string): string {
-  const parsed = new URL(value, SPED_ORIGIN);
-  parsed.hash = '';
-  return parsed.toString();
 }
 
 function isArtifactPage(url: string): boolean {
@@ -244,76 +238,48 @@ function shouldFollowLink(
   return isTechnicalNavigationText(text) || moduleTextMatches(module, text);
 }
 
-async function crawlModule(
-  definition: SpedModuleDefinition,
-  client: SpedClient,
-  context: ConnectorExecutionContext,
-  maxPagesPerModule: number,
-  maxCrawlDepth: number,
-): Promise<ModuleCrawlResult> {
-  const queue: CrawlPage[] = definition.seeds.map((seed) => ({
-    url: seed.url,
-    depth: 0,
-    seedKind: seed.kind,
-  }));
-  const seen = new Set<string>();
-  const descriptors = new Map<string, SpedDocumentDescriptor>();
-  const linkedArtifacts = new Map<string, Set<string>>();
-  const failures: ConnectorPartialFailure[] = [];
-  let pagesSucceeded = 0;
-  let pagesFailed = 0;
-  let seedSuccesses = 0;
+function rememberPage(
+  pages: Record<string, SpedKnownPage>,
+  requestedUrl: string,
+  canonicalUrl: string,
+  kind: SpedPageKind,
+  module: SpedModule,
+  checkedAt: string,
+): void {
+  const value: SpedKnownPage = { canonicalUrl, kind, module, checkedAt };
+  pages[canonicalPortalUrl(requestedUrl)] = value;
+  pages[canonicalUrl] = value;
+}
 
-  while (queue.length && seen.size < maxPagesPerModule) {
-    context.signal.throwIfAborted();
-    const current = queue.shift()!;
-    if (seen.has(current.url)) continue;
-    seen.add(current.url);
-    try {
-      const response = await client.getHtml(current.url, context.signal);
-      const page = parseSpedPage(response.html, response.url);
-      pagesSucceeded += 1;
-      if (current.depth === 0) seedSuccesses += 1;
-      const descriptor = descriptorFromPage(definition.module, page);
-      if (descriptor) {
-        descriptors.set(descriptor.externalId, descriptor);
-        const artifactUrls = page.links
-          .filter((link) => isArtifactPage(link.url))
-          .map((link) => canonicalPortalUrl(link.url));
-        if (artifactUrls.length > 0) {
-          linkedArtifacts.set(descriptor.externalId, new Set(artifactUrls));
-        }
-      }
-      if (current.depth >= maxCrawlDepth) continue;
-      for (const link of page.links) {
-        const linkedArtifact = descriptor !== undefined && isArtifactPage(link.url);
-        if (!linkedArtifact && !shouldFollowLink(definition.module, current.seedKind, link.text, link.url)) continue;
-        if (seen.has(link.url)) continue;
-        queue.push({
-          url: link.url,
-          depth: current.depth + 1,
-          seedKind: current.seedKind === 'GLOBAL_HIGHLIGHTS' ? 'GLOBAL_HIGHLIGHTS' : 'CATEGORY',
-        });
-      }
-    } catch (error) {
-      if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
-      pagesFailed += 1;
-      const failure = failureInfo(error);
-      failures.push({
-        code: failure.code,
-        message: failure.message,
-        itemReference: current.url,
-      });
-    }
-  }
+function routeFor(
+  state: SpedSourceState,
+  url: string,
+): SpedKnownPage | undefined {
+  return state.pages[canonicalPortalUrl(url)];
+}
 
+function descriptorFiles(descriptors: Iterable<SpedDocumentDescriptor>): DiscoveredFile[] {
+  return [...descriptors].flatMap((descriptor) =>
+    descriptor.files.map((file) => ({
+      module: descriptor.module,
+      publicationExternalId: descriptor.externalId,
+      url: file.url,
+      externalId: file.externalId,
+      ...(file.name ? { name: file.name } : {}),
+    })),
+  );
+}
+
+function mergeLinkedArtifacts(
+  descriptors: Map<string, SpedDocumentDescriptor>,
+  linkedArtifacts: Map<string, Set<string>>,
+): SpedDocumentDescriptor[] {
   const descriptorByUrl = new Map(
     [...descriptors.values()].map((descriptor) => [
       canonicalPortalUrl(descriptor.officialUrl),
       descriptor,
     ]),
   );
-
   const consumedArtifactIds = new Set<string>();
 
   for (const [parentExternalId, artifactUrls] of linkedArtifacts) {
@@ -343,17 +309,214 @@ async function crawlModule(
     parent.files = [...filesByUrl.values()];
   }
 
+  return [...descriptors.values()].filter(
+    (descriptor) => !consumedArtifactIds.has(descriptor.externalId),
+  );
+}
+
+async function crawlModule(
+  definition: SpedModuleDefinition,
+  client: SpedClient,
+  context: ConnectorExecutionContext,
+  state: SpedSourceState,
+  nextPages: Record<string, SpedKnownPage>,
+  nowIso: string,
+  maxPagesPerModule: number,
+  maxCrawlDepth: number,
+): Promise<ModuleCrawlResult> {
+  const queue: CrawlPage[] = definition.seeds.map((seed) => ({
+    url: seed.url,
+    depth: 0,
+    seedKind: seed.kind,
+  }));
+  const seen = new Set<string>();
+  const candidates = new Map<string, KnownDocumentCandidate>();
+  const descriptors = new Map<string, SpedDocumentDescriptor>();
+  const linkedArtifacts = new Map<string, Set<string>>();
+  const failures: ConnectorPartialFailure[] = [];
+  let pagesSucceeded = 0;
+  let pagesFailed = 0;
+  let seedSuccesses = 0;
+  let skippedKnownDocuments = 0;
+
+  while (queue.length && seen.size < maxPagesPerModule) {
+    context.signal.throwIfAborted();
+    const current = queue.shift()!;
+    const requestedUrl = canonicalPortalUrl(current.url);
+    const seenKey = (current.forceFetch ? 'F:' : 'N:') + requestedUrl + ':' + (current.parentExternalId ?? '');
+    if (seen.has(seenKey)) continue;
+    seen.add(seenKey);
+
+    const known = routeFor(state, requestedUrl);
+    if (!current.forceFetch && known?.kind === 'DOCUMENT') {
+      candidates.set(known.canonicalUrl, {
+        module: definition.module,
+        url: known.canonicalUrl,
+        checkedAt: known.checkedAt,
+      });
+      skippedKnownDocuments += 1;
+      continue;
+    }
+
+    try {
+      const response = await client.getHtml(requestedUrl, context.signal);
+      const finalUrl = canonicalPortalUrl(response.url);
+      let kind = pageKindFromUrl(finalUrl);
+      rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
+
+      const page = parseSpedPage(response.html, finalUrl);
+      pagesSucceeded += 1;
+      if (current.depth === 0) seedSuccesses += 1;
+
+      const descriptor = descriptorFromPage(definition.module, page);
+      if (descriptor && kind === 'UNKNOWN') {
+        kind = 'DOCUMENT';
+        rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
+      }
+      if (descriptor) {
+        descriptors.set(descriptor.externalId, descriptor);
+
+        if (current.parentExternalId) {
+          const urls = linkedArtifacts.get(current.parentExternalId) ?? new Set<string>();
+          urls.add(canonicalPortalUrl(descriptor.officialUrl));
+          linkedArtifacts.set(current.parentExternalId, urls);
+        }
+
+        const artifactUrls = page.links
+          .filter((link) => isArtifactPage(link.url))
+          .map((link) => canonicalPortalUrl(link.url));
+
+        if (artifactUrls.length > 0) {
+          const urls = linkedArtifacts.get(descriptor.externalId) ?? new Set<string>();
+          for (const artifactUrl of artifactUrls) urls.add(artifactUrl);
+          linkedArtifacts.set(descriptor.externalId, urls);
+
+          for (const artifactUrl of artifactUrls) {
+            queue.push({
+              url: artifactUrl,
+              depth: current.depth + 1,
+              seedKind: current.seedKind,
+              forceFetch: true,
+              parentExternalId: descriptor.externalId,
+            });
+          }
+        }
+      }
+
+      if (descriptor || kind === 'DOCUMENT') continue;
+      if (current.depth >= maxCrawlDepth) continue;
+
+      for (const link of page.links) {
+        if (!shouldFollowLink(definition.module, current.seedKind, link.text, link.url)) continue;
+        queue.push({
+          url: canonicalPortalUrl(link.url),
+          depth: current.depth + 1,
+          seedKind: current.seedKind === 'GLOBAL_HIGHLIGHTS' ? 'GLOBAL_HIGHLIGHTS' : 'CATEGORY',
+        });
+      }
+    } catch (error) {
+      if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
+      pagesFailed += 1;
+      const failure = failureInfo(error);
+      failures.push({
+        code: failure.code,
+        message: failure.message,
+        itemReference: requestedUrl,
+      });
+    }
+  }
+
   return {
     module: definition.module,
-    descriptors: [...descriptors.values()].filter(
-      (descriptor) => !consumedArtifactIds.has(descriptor.externalId),
-    ),
+    descriptors,
+    linkedArtifacts,
+    candidates: [...candidates.values()],
     pagesSucceeded,
     pagesFailed,
     pagesVisited: seen.size,
+    skippedKnownDocuments,
     seedSuccesses,
     failures,
   };
+}
+
+async function recheckDocument(
+  candidate: KnownDocumentCandidate,
+  client: SpedClient,
+  context: ConnectorExecutionContext,
+  nextPages: Record<string, SpedKnownPage>,
+  nowIso: string,
+): Promise<{
+  descriptors: Map<string, SpedDocumentDescriptor>;
+  linkedArtifacts: Map<string, Set<string>>;
+  pagesSucceeded: number;
+  pagesFailed: number;
+  failures: ConnectorPartialFailure[];
+}> {
+  const descriptors = new Map<string, SpedDocumentDescriptor>();
+  const linkedArtifacts = new Map<string, Set<string>>();
+  const failures: ConnectorPartialFailure[] = [];
+  const queue: CrawlPage[] = [{
+    url: candidate.url,
+    depth: 0,
+    seedKind: 'CATEGORY',
+    forceFetch: true,
+  }];
+  const seen = new Set<string>();
+  let pagesSucceeded = 0;
+  let pagesFailed = 0;
+
+  while (queue.length) {
+    context.signal.throwIfAborted();
+    const current = queue.shift()!;
+    const requestedUrl = canonicalPortalUrl(current.url);
+    if (seen.has(requestedUrl)) continue;
+    seen.add(requestedUrl);
+
+    try {
+      const response = await client.getHtml(requestedUrl, context.signal);
+      const finalUrl = canonicalPortalUrl(response.url);
+      const kind = pageKindFromUrl(finalUrl);
+      rememberPage(nextPages, requestedUrl, finalUrl, kind, candidate.module, nowIso);
+      const page = parseSpedPage(response.html, finalUrl);
+      pagesSucceeded += 1;
+
+      const descriptor = descriptorFromPage(candidate.module, page);
+      if (!descriptor) continue;
+      descriptors.set(descriptor.externalId, descriptor);
+
+      if (current.parentExternalId) {
+        const urls = linkedArtifacts.get(current.parentExternalId) ?? new Set<string>();
+        urls.add(canonicalPortalUrl(descriptor.officialUrl));
+        linkedArtifacts.set(current.parentExternalId, urls);
+      }
+
+      for (const link of page.links.filter((link) => isArtifactPage(link.url))) {
+        const artifactUrl = canonicalPortalUrl(link.url);
+        const urls = linkedArtifacts.get(descriptor.externalId) ?? new Set<string>();
+        urls.add(artifactUrl);
+        linkedArtifacts.set(descriptor.externalId, urls);
+        queue.push({
+          url: artifactUrl,
+          depth: current.depth + 1,
+          seedKind: 'CATEGORY',
+          forceFetch: true,
+          parentExternalId: descriptor.externalId,
+        });
+      }
+    } catch (error) {
+      if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
+      pagesFailed += 1;
+      const failure = failureInfo(error);
+      failures.push({
+        code: failure.code,
+        message: failure.message,
+        itemReference: requestedUrl,
+      });
+    }
+  }
+
+  return { descriptors, linkedArtifacts, pagesSucceeded, pagesFailed, failures };
 }
 
 function connectorFile(
@@ -417,7 +580,7 @@ function publicationFor(
 
 export class SpedConnector implements CollectionConnector {
   readonly key = SPED_CONNECTOR_KEY;
-  readonly version = '0.1.0';
+  readonly version = '0.2.0';
   readonly #options: SpedConnectorOptions;
 
   constructor(options: SpedConnectorOptions = {}) {
@@ -425,35 +588,51 @@ export class SpedConnector implements CollectionConnector {
     const maxRechecksPerRun = options.maxRechecksPerRun ?? DEFAULT_MAX_RECHECKS_PER_RUN;
     const maxPagesPerModule = options.maxPagesPerModule ?? DEFAULT_MAX_PAGES_PER_MODULE;
     const maxCrawlDepth = options.maxCrawlDepth ?? DEFAULT_MAX_CRAWL_DEPTH;
+
     for (const [name, value, minimum] of [
       ['revisitAfterMs', revisitAfterMs, 0],
       ['maxRechecksPerRun', maxRechecksPerRun, 0],
       ['maxPagesPerModule', maxPagesPerModule, 1],
       ['maxCrawlDepth', maxCrawlDepth, 0],
     ] as const) {
-      if (!Number.isSafeInteger(value) || value < minimum) throw new RangeError(name + ' must be an integer >= ' + minimum);
+      if (!Number.isSafeInteger(value) || value < minimum) {
+        throw new RangeError(name + ' must be an integer >= ' + minimum);
+      }
     }
     this.#options = options;
   }
 
   async collect(context: ConnectorExecutionContext): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
-    const state = await this.#options.readState?.(context.sourceId) ?? { items: {} };
+    const nowIso = now.toISOString();
+    const state = await this.#options.readState?.(context.sourceId) ?? { items: {}, pages: {} };
     const revisitAfterMs = this.#options.revisitAfterMs ?? DEFAULT_REVISIT_AFTER_MS;
     const maxRechecksPerRun = this.#options.maxRechecksPerRun ?? DEFAULT_MAX_RECHECKS_PER_RUN;
     const maxPagesPerModule = this.#options.maxPagesPerModule ?? DEFAULT_MAX_PAGES_PER_MODULE;
     const maxCrawlDepth = this.#options.maxCrawlDepth ?? DEFAULT_MAX_CRAWL_DEPTH;
+    const nextPages: Record<string, SpedKnownPage> = { ...state.pages };
+
     const client = new SpedClient({
       ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
       ...(this.#options.client ?? {}),
     });
+
     const partialFailures: ConnectorPartialFailure[] = [];
     const crawlResults: ModuleCrawlResult[] = [];
 
     try {
       for (const definition of SPED_MODULES) {
         context.signal.throwIfAborted();
-        const result = await crawlModule(definition, client, context, maxPagesPerModule, maxCrawlDepth);
+        const result = await crawlModule(
+          definition,
+          client,
+          context,
+          state,
+          nextPages,
+          nowIso,
+          maxPagesPerModule,
+          maxCrawlDepth,
+        );
         crawlResults.push(result);
         partialFailures.push(...result.failures);
       }
@@ -475,29 +654,71 @@ export class SpedConnector implements CollectionConnector {
         });
       }
 
-      const descriptors = crawlResults.flatMap((result) => result.descriptors);
-      const files = discoveredFiles(descriptors);
-      const recheckKeys = selectKnownRechecks(files, state, now, revisitAfterMs, maxRechecksPerRun);
-      const nextItems: Record<string, SpedStoredFile> = {};
+      const nowMs = now.getTime();
+      const candidateMap = new Map<string, KnownDocumentCandidate>();
+      for (const result of crawlResults) {
+        for (const candidate of result.candidates) {
+          const existing = candidateMap.get(candidate.url);
+          if (!existing || Date.parse(candidate.checkedAt) < Date.parse(existing.checkedAt)) {
+            candidateMap.set(candidate.url, candidate);
+          }
+        }
+      }
+
+      const selectedRechecks = [...candidateMap.values()]
+        .filter((candidate) => {
+          const checkedAt = Date.parse(candidate.checkedAt);
+          return !Number.isFinite(checkedAt) || nowMs - checkedAt >= revisitAfterMs;
+        })
+        .sort((left, right) =>
+          (Date.parse(left.checkedAt) || 0) - (Date.parse(right.checkedAt) || 0)
+          || left.url.localeCompare(right.url),
+        )
+        .slice(0, maxRechecksPerRun);
+
+      let recheckedKnownDocumentCount = 0;
+      let recheckPagesSucceeded = 0;
+      let recheckPagesFailed = 0;
+
+      for (const candidate of selectedRechecks) {
+        const result = await recheckDocument(candidate, client, context, nextPages, nowIso);
+        recheckedKnownDocumentCount += 1;
+        recheckPagesSucceeded += result.pagesSucceeded;
+        recheckPagesFailed += result.pagesFailed;
+        partialFailures.push(...result.failures);
+
+        const moduleResult = crawlResults.find((item) => item.module === candidate.module);
+        if (!moduleResult) continue;
+
+        for (const [key, descriptor] of result.descriptors) {
+          moduleResult.descriptors.set(key, descriptor);
+        }
+        for (const [parent, urls] of result.linkedArtifacts) {
+          const existing = moduleResult.linkedArtifacts.get(parent) ?? new Set<string>();
+          for (const url of urls) existing.add(url);
+          moduleResult.linkedArtifacts.set(parent, existing);
+        }
+      }
+
+      const descriptors = crawlResults.flatMap((result) =>
+        mergeLinkedArtifacts(result.descriptors, result.linkedArtifacts),
+      );
+      const files = descriptorFiles(descriptors);
+      const nextItems: Record<string, SpedStoredFile> = { ...state.items };
       const resolvedFiles = new Map<string, ConnectorFile>();
+
       let downloadedCount = 0;
       let notModifiedCount = 0;
-      let reusedCheckpointCount = 0;
-      let recheckedKnownCount = 0;
+      let existingFileRecheckCount = 0;
       let newFileDownloadCount = 0;
 
       for (const file of files) {
         context.signal.throwIfAborted();
         const key = stateKey(file);
         const previous = state.items[key];
-        if (previous && !recheckKeys.has(key)) {
-          nextItems[key] = previous;
-          resolvedFiles.set(key, connectorFile(file, previous));
-          reusedCheckpointCount += 1;
-          continue;
-        }
-        if (previous) recheckedKnownCount += 1;
+        if (previous) existingFileRecheckCount += 1;
         else newFileDownloadCount += 1;
+
         try {
           const response = await client.downloadFile(
             file.url,
@@ -509,6 +730,7 @@ export class SpedConnector implements CollectionConnector {
                 }
               : {},
           );
+
           let stored: SpedStoredFile;
           if (response.status === 'NOT_MODIFIED') {
             if (!previous) {
@@ -521,7 +743,7 @@ export class SpedConnector implements CollectionConnector {
             notModifiedCount += 1;
             stored = {
               ...previous,
-              checkedAt: now.toISOString(),
+              checkedAt: nowIso,
               ...(response.sourceEtag ? { sourceEtag: response.sourceEtag } : {}),
               ...(response.sourceLastModified ? { sourceLastModified: response.sourceLastModified } : {}),
             };
@@ -531,20 +753,18 @@ export class SpedConnector implements CollectionConnector {
               rawSha256: response.rawSha256,
               sizeBytes: response.sizeBytes,
               mimeType: response.mimeType,
-              checkedAt: now.toISOString(),
+              checkedAt: nowIso,
               ...(response.filename ? { filename: response.filename } : {}),
               ...(response.sourceEtag ? { sourceEtag: response.sourceEtag } : {}),
               ...(response.sourceLastModified ? { sourceLastModified: response.sourceLastModified } : {}),
             };
           }
+
           nextItems[key] = stored;
           resolvedFiles.set(key, connectorFile(file, stored));
         } catch (error) {
           if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
-          if (previous) {
-            nextItems[key] = previous;
-            resolvedFiles.set(key, connectorFile(file, previous));
-          }
+          if (previous) resolvedFiles.set(key, connectorFile(file, previous));
           const failure = failureInfo(error);
           partialFailures.push({
             code: failure.code,
@@ -556,7 +776,7 @@ export class SpedConnector implements CollectionConnector {
 
       const publications: ConnectorPublication[] = [];
       for (const descriptor of descriptors) {
-        const descriptorFiles = descriptor.files
+        const currentFiles = descriptor.files
           .map((file) => resolvedFiles.get(stateKey({
             module: descriptor.module,
             publicationExternalId: descriptor.externalId,
@@ -565,9 +785,15 @@ export class SpedConnector implements CollectionConnector {
             ...(file.name ? { name: file.name } : {}),
           })))
           .filter((file): file is ConnectorFile => file !== undefined);
-        if (descriptor.files.length > 0 && descriptorFiles.length === 0) continue;
-        publications.push(publicationFor(descriptor, descriptorFiles));
+
+        if (descriptor.files.length > 0 && currentFiles.length === 0) continue;
+        publications.push(publicationFor(descriptor, currentFiles));
       }
+
+      const skippedKnownDocumentCount = crawlResults.reduce(
+        (sum, result) => sum + result.skippedKnownDocuments,
+        0,
+      );
 
       return {
         publications,
@@ -582,22 +808,35 @@ export class SpedConnector implements CollectionConnector {
               pagesFailed: result.pagesFailed,
               pagesVisited: result.pagesVisited,
               seedSuccesses: result.seedSuccesses,
-              documentCount: result.descriptors.length,
+              processedDocumentCount: result.descriptors.size,
+              skippedKnownDocuments: result.skippedKnownDocuments,
+              knownDocumentCandidates: result.candidates.length,
             })),
-            discoveredDocumentCount: descriptors.length,
+            processedDocumentCount: descriptors.length,
             publicationCount: publications.length,
-            discoveredFileCount: files.length,
+            processedFileCount: files.length,
             downloadedCount,
             notModifiedCount,
-            reusedCheckpointCount,
-            recheckedKnownCount,
+            existingFileRecheckCount,
             newFileDownloadCount,
+            skippedKnownDocumentCount,
+            reusedCheckpointCount: skippedKnownDocumentCount,
+            recheckedKnownDocumentCount,
+            recheckPagesSucceeded,
+            recheckPagesFailed,
+            knownDocumentCandidateCount: candidateMap.size,
+            knownPageCount: Object.keys(nextPages).length,
             revisitAfterMs,
             maxRechecksPerRun,
+            maxPagesPerModule,
+            maxCrawlDepth,
             partialFailureCount: partialFailures.length,
             scope: ['EFD_ICMS_IPI', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DERE'],
           },
-          spedState: { items: nextItems },
+          spedState: {
+            items: nextItems,
+            pages: nextPages,
+          },
         },
       };
     } finally {
