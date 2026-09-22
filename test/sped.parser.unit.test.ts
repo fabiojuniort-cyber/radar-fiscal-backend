@@ -44,6 +44,8 @@ test('keeps official EFD ICMS/IPI technical-note versions as separate publicatio
   );
   assert.equal(v11?.officialVersion, '1.1');
   assert.equal(v12?.officialVersion, '1.2');
+  assert.equal(v11?.documentNumber, '2023.001');
+  assert.equal(v12?.documentNumber, '2023.001');
   assert.equal(v11?.documentFamily, v12?.documentFamily);
   assert.notEqual(v11?.actNumber, v12?.actNumber);
   assert.match(v11?.actNumber ?? '', /v1\.1$/);
