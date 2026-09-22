@@ -130,6 +130,22 @@ test('does not classify technical navigation/category pages as publications with
   assert.equal(descriptorFromPage('EFD_ICMS_IPI', parsed), undefined);
 });
 
+
+test('does not promote a generic XSD folder because a child version appears in the body', () => {
+  const parsed = parseSpedPage(
+    '<html><body><h1>SPED — Sistema Público de Escrituração Digital</h1>' +
+      '<h2>EFD-Reinf</h2><h3>ESQUEMAS XSD - VERSÃO MAIS RECENTE</h3>' +
+      '<h4>XSD EFD-Reinf v2.1.2 - CNPJ Alfanumérico</h4>' +
+      '<a href="/item/show/8193">XSD EFD-Reinf v2.1.2 - CNPJ Alfanumérico</a>' +
+      '<h4>Pacote XSD Eventos EFD Reinf v 2.1.2</h4>' +
+      '<a href="/item/show/7588">Pacote XSD Eventos EFD Reinf v 2.1.2</a>' +
+      '</body></html>',
+    'https://sped.rfb.gov.br/pasta/show/2270',
+  );
+  assert.equal(parsed.title, 'ESQUEMAS XSD - VERSÃO MAIS RECENTE');
+  assert.equal(descriptorFromPage('EFD_REINF', parsed), undefined);
+});
+
 test('parses arquivo/show document pages without treating the HTML page as the binary', () => {
   const parsed = parseSpedPage(
     '<html><body><h1>EFD Contribuições</h1>' +
