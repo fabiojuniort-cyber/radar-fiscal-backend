@@ -15,6 +15,10 @@ export interface SchedulerTickResult {
   invalidSchedules: number;
 }
 
+function preventsOverlappingRuns(connectorKey: string): boolean {
+  return connectorKey === 'dou' || connectorKey === 'nfe-encat';
+}
+
 export async function runSchedulerTick(
   db: Kysely<DB>,
   now: Date,
@@ -54,8 +58,8 @@ export async function runSchedulerTick(
 
       dueSources += 1;
 
-      if (source.connector_key === 'dou') {
-        const activeDouRun = await db
+      if (preventsOverlappingRuns(source.connector_key)) {
+        const activeRun = await db
           .selectFrom('collection_runs')
           .select([
             'id',
@@ -67,24 +71,25 @@ export async function runSchedulerTick(
           .orderBy('created_at')
           .executeTakeFirst();
 
-        if (activeDouRun) {
+        if (activeRun) {
           const sameScheduledSlot =
-            activeDouRun.trigger_type === 'SCHEDULED' &&
-            activeDouRun.scheduled_for.getTime() ===
+            activeRun.trigger_type === 'SCHEDULED' &&
+            activeRun.scheduled_for.getTime() ===
               scheduledFor.getTime();
 
           if (sameScheduledSlot) {
-            runIds.push(activeDouRun.id);
+            runIds.push(activeRun.id);
 
             logger?.info(
               {
                 sourceId: source.id,
                 sourceCode: source.code,
-                runId: activeDouRun.id,
+                connectorKey: source.connector_key,
+                runId: activeRun.id,
                 scheduledFor:
                   scheduledFor.toISOString(),
               },
-              'Scheduled DOU run already exists for this slot',
+              'Scheduled source run already exists for this slot',
             );
 
             continue;
@@ -94,11 +99,12 @@ export async function runSchedulerTick(
             {
               sourceId: source.id,
               sourceCode: source.code,
-              activeRunId: activeDouRun.id,
+              connectorKey: source.connector_key,
+              activeRunId: activeRun.id,
               scheduledFor:
                 scheduledFor.toISOString(),
             },
-            'Scheduled DOU run skipped because an active DOU run already exists',
+            'Scheduled source run skipped because an active run already exists',
           );
 
           continue;
