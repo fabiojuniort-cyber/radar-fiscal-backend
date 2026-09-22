@@ -14,6 +14,8 @@ import {
   type SpedModule,
 } from '../modules/collection/sped.parser.js';
 
+console.error('SPED_HTTP_SCAN_START=' + new Date().toISOString());
+
 const OFFICIAL_ORIGIN = 'https://sped.rfb.gov.br';
 const TRANSPORT_ORIGIN = 'http://sped.rfb.gov.br';
 const MAX_PAGES_PER_MODULE = 800;
