@@ -41,7 +41,12 @@ function knownPage(value: unknown): SpedKnownPage | undefined {
   const kind = item.kind;
   const module = item.module;
 
-  if (kind !== 'CONTAINER' && kind !== 'DOCUMENT' && kind !== 'UNKNOWN') return undefined;
+  if (
+    kind !== 'CONTAINER' &&
+    kind !== 'DOCUMENT' &&
+    kind !== 'MISSING' &&
+    kind !== 'UNKNOWN'
+  ) return undefined;
   if (
     module !== 'EFD_ICMS_IPI' &&
     module !== 'EFD_CONTRIBUICOES' &&
