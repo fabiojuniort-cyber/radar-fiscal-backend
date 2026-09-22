@@ -6,6 +6,8 @@ import { SpedClient } from '../src/modules/collection/sped.client.js';
 test('downloads and hashes official files and supports conditional 304', async () => {
   let conditionalSeen = false;
   const client = new SpedClient({
+    origin: 'https://sped.rfb.gov.br',
+    pathPrefix: '/',
     fetch: (async (_input: string | URL | Request, init?: RequestInit) => {
       const headers = (init?.headers ?? {}) as Record<string, string>;
       if (headers['if-none-match'] === '"v1"') {
