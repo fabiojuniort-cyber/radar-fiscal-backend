@@ -31,6 +31,9 @@ async function getHtml(officialUrl: string): Promise<{ html: string; status: num
     headers: {
       'user-agent': 'RadarFiscal-SPED-Validation/1.0',
       accept: 'text/html,application/xhtml+xml,*/*;q=0.5',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-port': '443',
+      'x-forwarded-host': 'sped.rfb.gov.br',
     },
   });
   const html = await response.text();
@@ -54,6 +57,9 @@ async function download(officialUrl: string): Promise<{
     headers: {
       'user-agent': 'RadarFiscal-SPED-Validation/1.0',
       accept: '*/*',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-port': '443',
+      'x-forwarded-host': 'sped.rfb.gov.br',
     },
   });
   const bytes = new Uint8Array(await response.arrayBuffer());
