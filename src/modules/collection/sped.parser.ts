@@ -41,6 +41,7 @@ export interface SpedPage {
   headings: string[];
   title: string;
   publishedAt?: Date;
+  createdAt?: Date;
   updatedAt?: Date;
   itemId?: string;
   links: SpedParsedLink[];
@@ -56,6 +57,7 @@ export interface SpedDocumentDescriptor {
   externalId: string;
   officialUrl: string;
   publishedAt?: Date;
+  createdAt?: Date;
   updatedAt?: Date;
   officialVersion?: string;
   documentNumber?: string;
@@ -326,7 +328,8 @@ export function parseSpedPage(html: string, url: string): SpedPage {
   const dataMatch = /\bData\s+(\d{2}\/\d{2}\/\d{4})(?:\s+\d{2}:\d{2}:\d{2})?/i.exec(text);
   const createdMatch = /Criado\s+em\s+(\d{2}\/\d{2}\/\d{4})/i.exec(text);
   const updateMatch = /(?:Atualiza(?:ção|cao)|Atualizado\s+em|Atualizada\s+em|Modificado\s+em)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i.exec(text);
-  const publishedAt = parseBrDate(publishedMatch?.[1] ?? dataMatch?.[1] ?? createdMatch?.[1] ?? '');
+  const publishedAt = parseBrDate(publishedMatch?.[1] ?? dataMatch?.[1] ?? '');
+  const createdAt = parseBrDate(createdMatch?.[1] ?? '');
   const updatedAt = parseBrDate(updateMatch?.[1] ?? '');
   const title = headingTitle(headings, text);
   const fileLinks = links.filter(isDirectFileLink);
@@ -338,6 +341,7 @@ export function parseSpedPage(html: string, url: string): SpedPage {
     headings,
     title,
     ...(publishedAt ? { publishedAt } : {}),
+    ...(createdAt ? { createdAt } : {}),
     ...(updatedAt ? { updatedAt } : {}),
     ...(documentPage ? { itemId: documentPage.id } : {}),
     links,
@@ -548,6 +552,7 @@ export function descriptorFromPage(
   const strongDocumentEvidence =
     page.fileLinks.length > 0 ||
     page.publishedAt !== undefined ||
+    page.createdAt !== undefined ||
     page.updatedAt !== undefined ||
     titleVersion !== undefined ||
     numbers.documentNumber !== undefined;
@@ -580,6 +585,7 @@ export function descriptorFromPage(
               : 'item:') + page.itemId,
     officialUrl: page.url,
     ...(page.publishedAt ? { publishedAt: page.publishedAt } : {}),
+    ...(page.createdAt ? { createdAt: page.createdAt } : {}),
     ...(page.updatedAt ? { updatedAt: page.updatedAt } : {}),
     ...(version ? { officialVersion: version } : {}),
     ...(numbers.documentNumber ? { documentNumber: numbers.documentNumber } : {}),
