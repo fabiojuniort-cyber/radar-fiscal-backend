@@ -17,6 +17,7 @@ interface LinkInfo {
 async function fetchHtml(path: string): Promise<{ url: string; html: string; status: number; contentType: string }> {
   const response = await fetch(new URL(path, ORIGIN), {
     redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
     headers: {
       'user-agent': 'RadarFiscal/1.0 (+official-source-monitoring)',
       accept: 'text/html,application/xhtml+xml,*/*;q=0.5',
@@ -75,7 +76,7 @@ for (const [name, path] of roots) {
   try {
     const page = await fetchHtml(path);
     const links = unique(extractLinks(page.html), link => `${link.href}|${link.text}`);
-    output[name] = {
+    const summary = {
       status: page.status,
       finalUrl: page.url,
       bytes: Buffer.byteLength(page.html),
@@ -85,9 +86,16 @@ for (const [name, path] of roots) {
       destaqueLinks: links.filter(link => /\/destaques\/show\/\d+/.test(link.href)).slice(0, 40),
       interestingLinks: links.filter(link => keyword.test(link.text) || keyword.test(link.href)).slice(0, 160),
     };
+    output[name] = summary;
+    console.log('SPED_PAGE=' + JSON.stringify({ name, ...summary }));
   } catch (error) {
-    output[name] = { error: error instanceof Error ? error.message : String(error) };
+    const failed = { error: error instanceof Error ? error.message : String(error) };
+    output[name] = failed;
+    console.log('SPED_PAGE=' + JSON.stringify({ name, ...failed }));
   }
 }
 
-console.log('SPED_LIVE_DIAG=' + JSON.stringify({ generatedAt: new Date().toISOString(), ...output }));
+console.log('SPED_LIVE_DIAG_DONE=' + JSON.stringify({
+  generatedAt: new Date().toISOString(),
+  pages: Object.keys(output),
+}));
