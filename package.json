@@ -30,7 +30,10 @@
     "db:ensure-nfe-encat-source": "node dist/infrastructure/database/ensure-nfe-encat-source.js",
     "db:trigger-nfe-encat-run": "node dist/infrastructure/database/trigger-nfe-encat-run.js",
     "db:inspect-nfe-encat": "node dist/infrastructure/database/inspect-nfe-encat.js",
-    "db:gate-nfe-encat-scheduler": "node dist/infrastructure/database/gate-nfe-encat-scheduler.js"
+    "db:gate-nfe-encat-scheduler": "node dist/infrastructure/database/gate-nfe-encat-scheduler.js",
+    "db:ensure-sped-source": "node dist/infrastructure/database/ensure-sped-source.js",
+    "db:trigger-sped-run": "node dist/infrastructure/database/trigger-sped-run.js",
+    "db:inspect-sped": "node dist/infrastructure/database/inspect-sped.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
