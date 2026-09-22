@@ -291,3 +291,41 @@ test('invalid attachment hashes fail normalization', () => {
     /64 hexadecimal characters/,
   );
 });
+
+
+test('canonical identity key correlates mirrored origins inside one logical source', () => {
+  const primary = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Guia Prático EFD ICMS IPI versão 3.2.4',
+      agency: 'SPED/RFB',
+      sphere: 'FEDERAL',
+      actType: 'GUIA PRÁTICO SPED',
+      actNumber: 'v3.2.4',
+      publishedAt: new Date('2026-09-10T00:00:00Z'),
+      officialUrl: 'https://www.gov.br/sped/pt-br/guia-3-2-4',
+      externalId: 'govbr:/sped/pt-br/guia-3-2-4',
+      identityKey: 'SPED|EFD_ICMS_IPI|EFD ICMS/IPI Guia Prático|3.2.4|OFFICIAL_VERSION',
+    },
+  });
+
+  const legacy = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Guia Prático EFD ICMS IPI versão 3.2.4',
+      agency: 'SPED/RFB',
+      sphere: 'FEDERAL',
+      actType: 'GUIA PRÁTICO SPED',
+      actNumber: 'v3.2.4',
+      publishedAt: new Date('2026-09-09T00:00:00Z'),
+      officialUrl: 'https://sped.rfb.gov.br/item/show/9999',
+      externalId: 'item:9999',
+      identityKey: 'SPED|EFD_ICMS_IPI|EFD ICMS/IPI Guia Prático|3.2.4|OFFICIAL_VERSION',
+    },
+  });
+
+  assert.equal(primary.identityStrength, 'SOURCE_SCOPED');
+  assert.equal(primary.identityBasis.sourceKeyType, 'CANONICAL_KEY');
+  assert.equal(primary.identityHash, legacy.identityHash);
+  assert.notEqual(primary.sourceItemKey, legacy.sourceItemKey);
+});
