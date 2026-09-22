@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 
 import { ConnectorError } from './connector.error.js';
 
-const SPED_ORIGIN = 'https://sped.rfb.gov.br';
+export const SPED_GOVBR_ORIGIN = 'https://www.gov.br';
+export const SPED_GOVBR_BASE_URL = 'https://www.gov.br/sped/pt-br/';
+export const SPED_LEGACY_ORIGIN = 'https://sped.rfb.gov.br';
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_REDIRECTS = 5;
 const DEFAULT_MAX_HTML_BYTES = 5 * 1024 * 1024;
@@ -15,6 +17,8 @@ export interface SpedClientOptions {
   maxRedirects?: number;
   maxHtmlBytes?: number;
   maxFileBytes?: number;
+  origin?: string;
+  pathPrefix?: string;
 }
 
 export interface SpedHtmlResponse {
@@ -183,6 +187,8 @@ export class SpedClient {
   readonly #maxRedirects: number;
   readonly #maxHtmlBytes: number;
   readonly #maxFileBytes: number;
+  readonly #origin: string;
+  readonly #pathPrefix: string;
 
   constructor(options: SpedClientOptions = {}) {
     this.#fetch = options.fetch ?? fetch;
@@ -190,6 +196,14 @@ export class SpedClient {
     this.#maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
     this.#maxHtmlBytes = options.maxHtmlBytes ?? DEFAULT_MAX_HTML_BYTES;
     this.#maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
+    const configuredOrigin = new URL(options.origin ?? SPED_GOVBR_ORIGIN);
+    if (configuredOrigin.protocol !== 'https:' || configuredOrigin.username || configuredOrigin.password) {
+      throw new RangeError('origin must be an absolute HTTPS origin without credentials');
+    }
+    this.#origin = configuredOrigin.origin;
+    const rawPathPrefix = options.pathPrefix ?? (this.#origin === SPED_GOVBR_ORIGIN ? '/sped/pt-br/' : '/');
+    const normalizedPrefix = '/' + rawPathPrefix.replace(/^\/+|\/+$/g, '');
+    this.#pathPrefix = normalizedPrefix === '/' ? '/' : normalizedPrefix + '/';
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 1) throw new RangeError('timeoutMs must be a positive integer');
     if (!Number.isSafeInteger(this.#maxRedirects) || this.#maxRedirects < 0 || this.#maxRedirects > 10) throw new RangeError('maxRedirects must be between 0 and 10');
     if (!Number.isSafeInteger(this.#maxHtmlBytes) || this.#maxHtmlBytes < 1) throw new RangeError('maxHtmlBytes must be positive');
@@ -197,6 +211,13 @@ export class SpedClient {
   }
 
   close(): void {}
+
+  #allowedUrl(url: URL): boolean {
+    if (url.origin.toLowerCase() !== this.#origin.toLowerCase()) return false;
+    if (this.#pathPrefix === '/') return true;
+    const root = this.#pathPrefix.slice(0, -1);
+    return url.pathname === root || url.pathname.startsWith(this.#pathPrefix);
+  }
 
   async #singleRequest(url: string, signal: AbortSignal, extraHeaders: Record<string, string> = {}): Promise<Response> {
     signal.throwIfAborted();
@@ -239,9 +260,11 @@ export class SpedClient {
   }
 
   async #request(url: string, signal: AbortSignal, extraHeaders: Record<string, string> = {}): Promise<{ response: Response; url: string }> {
-    const initial = new URL(url, SPED_ORIGIN);
-    if (initial.origin.toLowerCase() !== SPED_ORIGIN.toLowerCase()) {
-      throw failure('SPED_CROSS_ORIGIN_REQUEST', 'PROCESSING_ERROR', false, { metadata: { url: initial.toString() } });
+    const initial = new URL(url, this.#origin + this.#pathPrefix);
+    if (!this.#allowedUrl(initial)) {
+      throw failure('SPED_CROSS_ORIGIN_REQUEST', 'PROCESSING_ERROR', false, {
+        metadata: { url: initial.toString(), origin: this.#origin, pathPrefix: this.#pathPrefix },
+      });
     }
     const seen = new Set<string>();
     let current = initial.toString();
@@ -258,7 +281,7 @@ export class SpedClient {
       try { await response.body?.cancel(); } catch {}
       if (!location) throw failure('SPED_REDIRECT_WITHOUT_LOCATION', 'SOURCE_UNAVAILABLE', true, { httpStatus: response.status });
       const next = new URL(location, current);
-      if (next.origin.toLowerCase() !== SPED_ORIGIN.toLowerCase()) {
+      if (!this.#allowedUrl(next)) {
         throw failure('SPED_CROSS_ORIGIN_REDIRECT', 'SOURCE_UNAVAILABLE', false, {
           httpStatus: response.status,
           metadata: { from: current, to: next.toString() },
