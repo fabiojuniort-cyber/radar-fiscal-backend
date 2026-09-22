@@ -205,6 +205,7 @@ function samePortalNavigation(url: string): boolean {
     const parsed = new URL(url);
     if (parsed.origin.toLowerCase() !== SPED_ORIGIN.toLowerCase()) return false;
     return /^\/(?:item|pasta)\/show\/\d+$/i.test(parsed.pathname)
+      || /^\/arquivo\/show\/\d+$/i.test(parsed.pathname)
       || /^\/destaques\/show\/\d+$/i.test(parsed.pathname);
   } catch {
     return false;
