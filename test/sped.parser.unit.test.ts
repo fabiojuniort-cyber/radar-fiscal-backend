@@ -82,6 +82,22 @@ test('classifies EFD-Reinf XSD and DeRE official technical package', () => {
 
 
 
+
+test('parses pagina/show DeRE as an official publication page', () => {
+  const parsed = parseSpedPage(
+    '<html><body><h2>Receita Federal do Brasil e CGIBS publicam documentação técnica oficial da Declaração de Regimes Específicos (DeRE)</h2>' +
+      '<p>Publicado em 12/12/2025</p>' +
+      '<p>Pacote de integração Versão 1.0.0 inclui Manual de Orientação Leiautes Schemas XSD IBS CBS</p>' +
+      '<a href="/arquivo/download/7951">DeRE_v1.0.0.zip</a>' +
+      '</body></html>',
+    'https://sped.rfb.gov.br/pagina/show/7950',
+  );
+  const descriptor = descriptorFromPage('DERE', parsed);
+  assert.equal(descriptor?.externalId, 'pagina:7950');
+  assert.equal(descriptor?.officialVersion, '1.0.0');
+  assert.equal(descriptor?.files.length, 1);
+});
+
 test('does not classify technical navigation/category pages as publications without document evidence', () => {
   const parsed = parseSpedPage(
     '<html><body><h1>EFD ICMS IPI</h1><h2>Manuais e Guias Práticos</h2>' +
