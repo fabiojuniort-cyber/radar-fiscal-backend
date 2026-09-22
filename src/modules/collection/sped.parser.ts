@@ -116,8 +116,17 @@ function linkPath(url: string): string {
   }
 }
 
+function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' } | undefined {
+  const path = linkPath(url);
+  const item = /\/item\/show\/(\d+)/i.exec(path)?.[1];
+  if (item) return { id: item, type: 'item' };
+  const archive = /\/arquivo\/show\/(\d+)/i.exec(path)?.[1];
+  if (archive) return { id: archive, type: 'arquivo' };
+  return undefined;
+}
+
 function itemIdFromUrl(url: string): string | undefined {
-  return /\/item\/show\/(\d+)/i.exec(linkPath(url))?.[1];
+  return documentPageIdFromUrl(url)?.id;
 }
 
 function fileIdFromUrl(url: string): string | undefined {
@@ -187,10 +196,11 @@ export function parseSpedPage(html: string, url: string): SpedPage {
   const updatedAt = parseBrDate(updateMatch?.[1] ?? '');
   const title = headingTitle(headings, text);
   const fileLinks = links.filter((link) =>
-    /\/arquivo\/(?:download|show)\/\d+/i.test(link.path) ||
+    /\/arquivo\/download\/\d+/i.test(link.path) ||
     /\/estatico\//i.test(link.path),
   );
 
+  const documentPage = documentPageIdFromUrl(url);
   return {
     url,
     text,
@@ -198,7 +208,7 @@ export function parseSpedPage(html: string, url: string): SpedPage {
     title,
     ...(publishedAt ? { publishedAt } : {}),
     ...(updatedAt ? { updatedAt } : {}),
-    ...(itemIdFromUrl(url) ? { itemId: itemIdFromUrl(url)! } : {}),
+    ...(documentPage ? { itemId: documentPage.id } : {}),
     links,
     fileLinks,
   };
@@ -398,7 +408,7 @@ export function descriptorFromPage(
     kind,
     title: page.title,
     itemId: page.itemId,
-    externalId: 'item:' + page.itemId,
+    externalId: (/\/arquivo\/show\//i.test(page.url) ? 'arquivo:' : 'item:') + page.itemId,
     officialUrl: page.url,
     ...(page.publishedAt ? { publishedAt: page.publishedAt } : {}),
     ...(page.updatedAt ? { updatedAt: page.updatedAt } : {}),
