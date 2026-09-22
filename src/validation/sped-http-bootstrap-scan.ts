@@ -270,7 +270,7 @@ for (const definition of SPED_MODULES) {
       ]),
   );
 
-  console.log('SPED_HTTP_MODULE=' + JSON.stringify({
+  console.error('SPED_HTTP_MODULE=' + JSON.stringify({
     module: result.module,
     pagesVisited: result.pagesVisited,
     pagesSucceeded: result.pagesSucceeded,
@@ -338,7 +338,7 @@ for (const gate of [
   };
 }
 
-console.log('SPED_HTTP_BOOTSTRAP=' + JSON.stringify({
+console.error('SPED_HTTP_BOOTSTRAP=' + JSON.stringify({
   generatedAt: new Date().toISOString(),
   transport: 'HTTP_VALIDATION_ONLY',
   officialOrigin: OFFICIAL_ORIGIN,
