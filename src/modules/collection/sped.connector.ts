@@ -221,6 +221,12 @@ function shouldFollowLink(
   if (!samePortalNavigation(url)) return false;
   if (seedKind === 'GLOBAL_HIGHLIGHTS') return isAllowedGlobalHighlight(module, text);
   if (/\/destaques\/show\//i.test(url)) return true;
+  if (
+    seedKind === 'MODULE_HIGHLIGHTS' &&
+    /INDISPONIBILIDADE|INTERRUPÇÃO|INTERRUPCAO|MANUTENÇÃO|MANUTENCAO/i.test(text)
+  ) {
+    return true;
+  }
   return isTechnicalNavigationText(text) || moduleTextMatches(module, text);
 }
 
@@ -332,6 +338,7 @@ function publicationFor(
       documentFamily: descriptor.documentFamily,
       revisionKind: descriptor.revisionKind,
       republication: descriptor.republication,
+      documentStatus: descriptor.documentStatus,
       itemId: descriptor.itemId,
       ...(descriptor.documentNumber ? { documentNumber: descriptor.documentNumber } : {}),
       ...(descriptor.officialVersion ? { officialVersion: descriptor.officialVersion } : {}),
