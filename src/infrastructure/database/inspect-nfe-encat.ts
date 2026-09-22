@@ -106,10 +106,13 @@ try {
                 'partialFailureCount', COALESCE((ca.metadata->>'partialFailureCount')::int, 0),
                 'nfeEncat', ca.metadata->'nfeEncat',
                 'checkpointItems',
-                  jsonb_object_length(
-                    COALESCE(
-                      ca.metadata->'nfeEncatState'->'items',
-                      '{}'::jsonb
+                  (
+                    SELECT count(*)::int
+                    FROM jsonb_object_keys(
+                      COALESCE(
+                        ca.metadata->'nfeEncatState'->'items',
+                        '{}'::jsonb
+                      )
                     )
                   )
               )
