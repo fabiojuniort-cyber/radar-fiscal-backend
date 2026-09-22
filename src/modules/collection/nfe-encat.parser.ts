@@ -188,7 +188,7 @@ export function parseNfeEncatListing(
       externalId: token,
       officialUrl,
       listingUrl,
-      fileType: fileType(title),
+      fileType: portalFamily === 'SCHEMAS' ? 'ZIP' : fileType(title),
     });
   };
 
