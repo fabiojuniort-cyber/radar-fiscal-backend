@@ -40,7 +40,11 @@ function router(options: { changedReinf?: boolean; failDere?: boolean } = {}) {
     if (p === '/projeto/show/268') return html(moduleRoot([['/item/show/8058', 'EFD-CONTRIBUIÇÕES - ATUALIZAÇÃO DA NOTA TÉCNICA Nº 11 2026'], ['/item/show/8126', 'EFD-CONTRIBUIÇÕES - PUBLICAÇÃO DA NOTA TÉCNICA Nº 12']]));
     if (p === '/item/show/1545') return html(moduleRoot([['/item/show/5786', 'Tabela 4.3.11 - Versão 1.32']]));
     if (p === '/projeto/show/1196') return html(moduleRoot([['/item/show/8116', 'Nota Técnica 01/2026 – Ajustes nos leiautes'], ['/item/show/8129', 'Nota Técnica 01/2026 republicada'], ['/item/show/2270', 'Esquemas XSD']]));
-    if (p === '/destaques/show/1199') return html(moduleRoot([['/item/show/8116', 'Nota Técnica 01/2026 – Ajustes nos leiautes da versão 2.1.2'], ['/item/show/8129', 'Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2']]));
+    if (p === '/destaques/show/1199') return html(moduleRoot([
+      ['/item/show/8116', 'Nota Técnica 01/2026 – Ajustes nos leiautes da versão 2.1.2'],
+      ['/item/show/8129', 'Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2'],
+      ['/item/show/9001', 'Indisponibilidade Temporária'],
+    ]));
     if (p === '/destaques/show/7') return html(moduleRoot([['/item/show/8114', 'Nova versão do Guia Prático da EFD ICMS IPI'], ['/item/show/8126', 'EFD-CONTRIBUIÇÕES - PUBLICAÇÃO DA NOTA TÉCNICA Nº 12'], ['/pagina/show/7950', 'DeRE - documentação técnica oficial'], ['/item/show/9999', 'Publicação da Versão 12.0.3 do Programa da ECF']]));
     if (p === '/pagina/show/7950') {
       if (options.failDere) return new Response('unavailable', { status: 503, headers: { 'content-type': 'text/html' } });
@@ -54,6 +58,7 @@ function router(options: { changedReinf?: boolean; failDere?: boolean } = {}) {
     if (p === '/item/show/8116') return html(detail('EFD-Reinf', 'Nota Técnica 01/2026 – Ajustes nos leiautes da versão 2.1.2', '25/03/2026', '8117'));
     if (p === '/item/show/8129') return html(detail('EFD-Reinf', 'Nota Técnica 01/2026 republicada – Ajustes nos leiautes da versão 2.1.2', '31/03/2026', '8130'));
     if (p === '/item/show/2270') return html(detail('EFD-Reinf', 'ESQUEMAS XSD - VERSÃO MAIS RECENTE', '15/01/2026', '2271', 'reinf-xsd.zip'));
+    if (p === '/item/show/9001') return html('<html><body><h1>EFD-Reinf</h1><h2>Indisponibilidade Temporária</h2><p>Publicado em 25/03/2026</p></body></html>');
     if (p.startsWith('/arquivo/download/')) {
       const id = p.split('/').at(-1)!;
       const headers = (init?.headers ?? {}) as Record<string, string>;
@@ -75,6 +80,7 @@ test('collects the four SPED modules and preserves historical gates and explicit
   assert.ok(result.publications.some(p => p.title.includes('Nota Técnica 012 2026')));
   assert.ok(result.publications.some(p => p.title.includes('01/2026 republicada')));
   assert.ok(result.publications.some(p => p.metadata?.module === 'DERE'));
+  assert.ok(result.publications.some(p => p.metadata?.documentKind === 'OPERATIONAL_NOTICE'));
   assert.equal(result.publications.some(p => /ECF|ECD/.test(p.title)), false);
   const reinf = result.publications.filter(p => p.metadata?.documentFamily === 'EFD-Reinf NT 01/2026');
   assert.equal(reinf.length, 2);
