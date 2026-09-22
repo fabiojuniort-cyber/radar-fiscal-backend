@@ -48,6 +48,7 @@ function router(options: { changedReinf?: boolean; failDere?: boolean; includeNe
       ['/item/show/8129', 'Nota Técnica 01/2026 republicada'],
       ['/item/show/2270', 'Esquemas XSD'],
       ['/item/show/9100', 'ESQUEMAS XSD - VERSÃO MAIS RECENTE'],
+      ['/item/show/9202', 'Nota Técnica 02/2026 republicada'],
     ]));
     if (p === '/destaques/show/1199') return html(moduleRoot([
       ['/item/show/8116', 'Nota Técnica 01/2026 – Ajustes nos leiautes da versão 2.1.2'],
@@ -87,6 +88,26 @@ function router(options: { changedReinf?: boolean; failDere?: boolean; includeNe
       '9101',
       'reinf-cnpj-alpha.zip'
     ));
+    if (p === '/item/show/9202') return new Response(null, {
+      status: 302,
+      headers: { location: '/pagina/show/9202' },
+    });
+    if (p === '/pagina/show/9202') return html(
+      '<html><body><h1>EFD-Reinf</h1><h2>Nota Técnica 02/2026 republicada</h2>' +
+      '<p>Publicado em 22/09/2026</p>' +
+      '<a href="/arquivo/show/9200">clique aqui</a></body></html>'
+    );
+    if (p === '/arquivo/show/9200') return html(
+      '<html><body><h1>EFD-Reinf</h1><h2>Nota Técnica EFD-Reinf 02/2026</h2>' +
+      '<p>Publicado em 22/09/2026</p>' +
+      '<a href="/arquivo/show/9201">arquivo técnico</a></body></html>'
+    );
+    if (p === '/arquivo/show/9201') return html(detail(
+      'EFD-Reinf',
+      'Nota Técnica EFD-Reinf 02/2026',
+      '22/09/2026',
+      '9201'
+    ));
     if (p === '/item/show/9001') return html('<html><body><h1>EFD-Reinf</h1><h2>Indisponibilidade Temporária</h2><p>Publicado em 25/03/2026</p></body></html>');
     if (p.startsWith('/arquivo/download/')) {
       const id = p.split('/').at(-1)!;
@@ -124,6 +145,34 @@ test('collects the four SPED modules and preserves historical gates and explicit
   );
   const normalized = reinf.map(p => normalizePublication({ sourceId: CONTEXT.sourceId, publication: p }));
   assert.notEqual(normalized[0]?.identityHash, normalized[1]?.identityHash);
+});
+
+
+test('recursively folds multi-level linked artifacts into the root publication', async () => {
+  const result = await new SpedConnector({
+    fetch: router(),
+    maxCrawlDepth: 5,
+  }).collect(CONTEXT);
+
+  const root = result.publications.find(
+    (publication) =>
+      publication.externalId === 'pagina:9202' &&
+      publication.metadata?.republication === true,
+  );
+  assert.ok(root);
+  assert.equal(root.files?.length, 1);
+  assert.deepEqual(
+    root.metadata?.linkedArtifactExternalIds,
+    ['arquivo:9200', 'arquivo:9201'],
+  );
+  assert.equal(
+    result.publications.some((publication) => publication.externalId === 'arquivo:9200'),
+    false,
+  );
+  assert.equal(
+    result.publications.some((publication) => publication.externalId === 'arquivo:9201'),
+    false,
+  );
 });
 
 test('reuses checkpoint without redownloading and changed bytes create a new content hash for same explicit publication', async () => {
