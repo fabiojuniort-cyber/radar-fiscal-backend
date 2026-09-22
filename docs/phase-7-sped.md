@@ -73,6 +73,7 @@ Também são preservados, quando disponíveis:
 - `documentNumber`
 - `revisionKind`
 - `republication`
+- `documentStatus` (`DRAFT` somente quando a fonte indica minuta; `FINAL` somente quando indica oficial/definitivo; `UNKNOWN` nos demais casos)
 - `updatedAt`
 - `relatedTaxes`
 - `affectedRecords`
