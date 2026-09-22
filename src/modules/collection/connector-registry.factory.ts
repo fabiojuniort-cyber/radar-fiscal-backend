@@ -8,6 +8,8 @@ import {
   readConfazSourceState,
 } from './confaz-source-state.repository.js';
 import { ConnectorRegistry } from './connector.registry.js';
+import { NfeEncatConnector } from './nfe-encat.connector.js';
+import { readNfeEncatSourceState } from './nfe-encat-source-state.repository.js';
 import {
   createMandatorySimulatedConnectors,
 } from './simulated.connectors.js';
@@ -37,6 +39,17 @@ export function buildConnectorRegistry(
         ? {
             readSourceState: (sourceId) =>
               readConfazSourceState(options.db!, sourceId),
+          }
+        : {}),
+    }),
+  );
+
+  registry.register(
+    new NfeEncatConnector({
+      ...(options.db
+        ? {
+            readState: (sourceId) =>
+              readNfeEncatSourceState(options.db!, sourceId),
           }
         : {}),
     }),
