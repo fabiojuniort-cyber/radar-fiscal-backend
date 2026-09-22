@@ -142,9 +142,15 @@ function rejectPortalIntermediary(url: string, html: string): void {
   }
   const rawLower = html.toLowerCase();
   const text = normalizedPageText(html).toLowerCase();
+  const hasListingContent =
+    /class=["'][^"']*\\btituloSessao\\b[^"']*["']/i.test(html) ||
+    /documentos? vigentes|vers(?:o|õ)es oficiais|vers(?:o|õ)es em uso|vers(?:o|õ)es anteriores/i.test(text);
   if (
-    /g-recaptcha|grecaptcha|recaptcha\/api\.js|data-sitekey|h-captcha|hcaptcha/i.test(rawLower) ||
-    /não sou um robô|nao sou um robo|sou humano/i.test(text)
+    (
+      /g-recaptcha|grecaptcha|recaptcha\/api\.js|data-sitekey|h-captcha|hcaptcha/i.test(rawLower) ||
+      /não sou um robô|nao sou um robo|sou humano/i.test(text)
+    ) &&
+    !hasListingContent
   ) {
     throw failure('NFE_ENCAT_CAPTCHA', 'SOURCE_UNAVAILABLE', true);
   }
