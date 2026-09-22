@@ -24,6 +24,12 @@ const targets: Array<{
   { gate: 'REINF_REPUBLICADA_FILE_PAGE', module: 'EFD_REINF', path: '/arquivo/show/8070' },
   { gate: 'REINF_XSD_CURRENT_FILE', module: 'EFD_REINF', path: '/item/show/8193' },
   { gate: 'DERE_PROJECT', module: 'DERE', path: '/projeto/show/2918' },
+  { gate: 'DERE_MANUAL_1_0_0', module: 'DERE', path: '/item/show/7945' },
+  { gate: 'DERE_LAYOUT_EVENTS_1_0_0', module: 'DERE', path: '/item/show/7946' },
+  { gate: 'DERE_LAYOUT_TABLES_1_0_0', module: 'DERE', path: '/item/show/7947' },
+  { gate: 'DERE_LAYOUT_RULES_1_0_0', module: 'DERE', path: '/item/show/7948' },
+  { gate: 'DERE_XSD_1_0_0', module: 'DERE', path: '/item/show/7949' },
+  { gate: 'DERE_LAYOUT_HISTORY', module: 'DERE', path: '/item/show/8061' },
 ];
 
 async function request(pathOrUrl: string, timeoutMs = 30_000): Promise<{
