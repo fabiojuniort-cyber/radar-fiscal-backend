@@ -177,6 +177,16 @@ async function run(
     statePages: Object.keys(state(result).pages ?? {}).length,
     stateFiles: Object.keys(state(result).items ?? {}).length,
     reinfRepublication: publicationGate(result),
+    fileBearingPublications: result.publications
+      .filter((publication) => (publication.files?.length ?? 0) > 0)
+      .map((publication) => ({
+        module: publication.metadata?.module ?? null,
+        title: publication.title,
+        externalId: publication.externalId ?? null,
+        officialUrl: publication.officialUrl,
+        fileCount: publication.files?.length ?? 0,
+      }))
+      .slice(0, 250),
   }));
 
   return result;
