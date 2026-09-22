@@ -105,14 +105,14 @@ test('uses ETag/Last-Modified checkpoint, keeps content hash stable on 304 and c
   const firstState = first.metadata?.nfeEncatState as { items: Record<string, any> };
   const firstNormalized = normalizePublication({ sourceId: SOURCE_ID, publication: first.publications[0]! });
   generation = 2;
-  const second = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => firstState }).collect(CONTEXT);
+  const second = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => firstState, revisitAfterMs: 0 }).collect(CONTEXT);
   const secondState = second.metadata?.nfeEncatState as { items: Record<string, any> };
   const secondNormalized = normalizePublication({ sourceId: SOURCE_ID, publication: second.publications[0]! });
   assert.equal(conditionalSeen, true);
   assert.equal(firstNormalized.identityHash, secondNormalized.identityHash);
   assert.equal(firstNormalized.contentHash, secondNormalized.contentHash);
   generation = 3;
-  const third = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => secondState }).collect(CONTEXT);
+  const third = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => secondState, revisitAfterMs: 0 }).collect(CONTEXT);
   const thirdNormalized = normalizePublication({ sourceId: SOURCE_ID, publication: third.publications[0]! });
   assert.equal(firstNormalized.identityHash, thirdNormalized.identityHash);
   assert.notEqual(firstNormalized.contentHash, thirdNormalized.contentHash);
@@ -172,13 +172,154 @@ test('changed schema ZIP under the same official token creates a new content has
   const firstState = first.metadata?.nfeEncatState as { items: Record<string, any> };
   const normalizedFirst = normalizePublication({ sourceId: SOURCE_ID, publication: first.publications[0]! });
   generation = 2;
-  const second = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => firstState }).collect(CONTEXT);
+  const second = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => firstState, revisitAfterMs: 0 }).collect(CONTEXT);
   const normalizedSecond = normalizePublication({ sourceId: SOURCE_ID, publication: second.publications[0]! });
 
   assert.equal(first.publications[0]?.metadata?.portalFamily, 'SCHEMAS');
   assert.equal(first.publications[0]?.files?.[0]?.mimeType, 'application/zip');
   assert.equal(normalizedFirst.identityHash, normalizedSecond.identityHash);
   assert.notEqual(normalizedFirst.contentHash, normalizedSecond.contentHash);
+});
+
+
+test('reuses a recent validated file checkpoint without redownloading bytes', async () => {
+  let fileRequests = 0;
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = input.toString();
+    const family = listingFamily(url);
+    if (family) {
+      return new Response(
+        family === 'notes' ? oneNote() : emptyListing(),
+        { status: 200, headers: { 'content-type': 'text/html' } },
+      );
+    }
+
+    if (url.includes('/exibirArquivo.aspx')) {
+      fileRequests += 1;
+      return new Response(
+        new TextEncoder().encode('%PDF-1.7\\ncheckpoint'),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/pdf',
+            etag: '"checkpoint-v1"',
+          },
+        },
+      );
+    }
+
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  const firstNow = new Date('2026-09-22T00:00:00Z');
+  const first = await new NfeEncatConnector({
+    fetch: fetchImpl,
+    now: () => firstNow,
+  }).collect(CONTEXT);
+  const state = first.metadata?.nfeEncatState as {
+    items: Record<string, any>;
+  };
+
+  assert.equal(fileRequests, 1);
+
+  const second = await new NfeEncatConnector({
+    fetch: fetchImpl,
+    now: () => new Date('2026-09-22T01:00:00Z'),
+    readState: async () => state,
+  }).collect(CONTEXT);
+
+  assert.equal(fileRequests, 1);
+  assert.equal(second.publications.length, 1);
+  assert.equal(
+    (second.metadata?.nfeEncat as { reusedCheckpointCount: number })
+      .reusedCheckpointCount,
+    1,
+  );
+  assert.equal(
+    (second.metadata?.nfeEncat as { recheckedKnownCount: number })
+      .recheckedKnownCount,
+    0,
+  );
+});
+
+test('rechecks stale known files in bounded oldest-first batches', async () => {
+  const notes = `<!doctype html><html><body><p class="tituloSessao">Documentos vigentes</p>
+<p><a href="exibirArquivo.aspx?conteudo=A%3D"><span class="tituloConteudo">Nota Técnica 2026.009 v1.00 - Publicada em 09/09/2026</span></a></p>
+<p><a href="exibirArquivo.aspx?conteudo=B%3D"><span class="tituloConteudo">Nota Técnica 2023.003 v1.30 - Publicada em 29/07/2026</span></a></p>
+</body></html>`;
+  let phase: 'bootstrap' | 'recheck' = 'bootstrap';
+  let recheckRequests = 0;
+
+  const fetchImpl = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = input.toString();
+    const family = listingFamily(url);
+    if (family) {
+      return new Response(
+        family === 'notes' ? notes : emptyListing(),
+        { status: 200, headers: { 'content-type': 'text/html' } },
+      );
+    }
+
+    if (url.includes('/exibirArquivo.aspx')) {
+      const key = url.includes('A%3D') || url.includes('A=') ? 'A' : 'B';
+      const etag = `"${key}-v1"`;
+
+      if (phase === 'recheck') {
+        recheckRequests += 1;
+        const headers = headerRecord(init);
+        assert.equal(headers['if-none-match'], etag);
+        return new Response(null, {
+          status: 304,
+          headers: { etag },
+        });
+      }
+
+      return new Response(
+        new TextEncoder().encode(`%PDF-1.7\\n${key}`),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/pdf',
+            etag,
+          },
+        },
+      );
+    }
+
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  const first = await new NfeEncatConnector({
+    fetch: fetchImpl,
+    now: () => new Date('2026-09-20T00:00:00Z'),
+  }).collect(CONTEXT);
+  const state = first.metadata?.nfeEncatState as {
+    items: Record<string, any>;
+  };
+
+  phase = 'recheck';
+
+  const second = await new NfeEncatConnector({
+    fetch: fetchImpl,
+    now: () => new Date('2026-09-22T00:00:00Z'),
+    readState: async () => state,
+    revisitAfterMs: 24 * 60 * 60 * 1_000,
+    maxRechecksPerRun: 1,
+  }).collect(CONTEXT);
+
+  assert.equal(second.publications.length, 2);
+  assert.equal(recheckRequests, 1);
+  const metadata = second.metadata?.nfeEncat as {
+    reusedCheckpointCount: number;
+    recheckedKnownCount: number;
+    notModifiedCount: number;
+  };
+  assert.equal(metadata.reusedCheckpointCount, 1);
+  assert.equal(metadata.recheckedKnownCount, 1);
+  assert.equal(metadata.notModifiedCount, 1);
 });
 
 
