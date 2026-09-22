@@ -361,7 +361,7 @@ async function crawlModule(
     try {
       const response = await client.getHtml(requestedUrl, context.signal);
       const finalUrl = canonicalPortalUrl(response.url);
-      const kind = pageKindFromUrl(finalUrl);
+      let kind = pageKindFromUrl(finalUrl);
       rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
 
       const page = parseSpedPage(response.html, finalUrl);
@@ -369,6 +369,10 @@ async function crawlModule(
       if (current.depth === 0) seedSuccesses += 1;
 
       const descriptor = descriptorFromPage(definition.module, page);
+      if (descriptor && kind === 'UNKNOWN') {
+        kind = 'DOCUMENT';
+        rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
+      }
       if (descriptor) {
         descriptors.set(descriptor.externalId, descriptor);
 
@@ -399,7 +403,7 @@ async function crawlModule(
         }
       }
 
-      if (kind === 'DOCUMENT') continue;
+      if (descriptor || kind === 'DOCUMENT') continue;
       if (current.depth >= maxCrawlDepth) continue;
 
       for (const link of page.links) {
