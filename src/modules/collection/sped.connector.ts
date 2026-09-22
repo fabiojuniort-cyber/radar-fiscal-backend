@@ -338,6 +338,7 @@ function publicationFor(
       documentFamily: descriptor.documentFamily,
       revisionKind: descriptor.revisionKind,
       republication: descriptor.republication,
+      documentStatus: descriptor.documentStatus,
       itemId: descriptor.itemId,
       ...(descriptor.documentNumber ? { documentNumber: descriptor.documentNumber } : {}),
       ...(descriptor.officialVersion ? { officialVersion: descriptor.officialVersion } : {}),
