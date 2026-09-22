@@ -1,5 +1,7 @@
 import { Parser as HtmlParser } from 'htmlparser2';
 
+import { ConnectorError } from './connector.error.js';
+
 export type NfeEncatPortalFamily = 'TECHNICAL_NOTES' | 'TECHNICAL_REPORTS' | 'SCHEMAS' | 'MANUALS';
 export type NfeEncatDocumentStatus = 'CURRENT' | 'TESTING' | 'RETIRED' | 'PUBLISHED';
 export type NfeEncatEnvironment = 'PRODUCTION' | 'HOMOLOGATION';
@@ -143,6 +145,7 @@ export function parseNfeEncatListing(
   listingUrl: string,
 ): NfeEncatListingItem[] {
   let section = '';
+  let sawSection = false;
   let paragraph: ParagraphCapture | undefined;
   const items: NfeEncatListingItem[] = [];
 
@@ -153,6 +156,7 @@ export function parseNfeEncatListing(
     const text = normalizeText(current.text);
     if (/\btituloSessao\b/i.test(current.className)) {
       section = normalizeInline(text);
+      sawSection = true;
       return;
     }
     const href = current.links.find(link => /exibirArquivo\.aspx\?[^#]*\bconteudo=/i.test(link));
@@ -168,6 +172,7 @@ export function parseNfeEncatListing(
     const combined = `${title}\n${description ?? ''}`;
     const status = statusForSection(section);
     const environment = environmentForSection(section);
+    const publishedAt = publicationDate(combined);
     items.push({
       portalFamily,
       portalSection: section || 'UNSECTIONED',
@@ -176,7 +181,7 @@ export function parseNfeEncatListing(
       ...(number ? { documentNumber: number } : {}),
       documentFamily: documentFamilyFor(title, portalFamily, number),
       ...(version ? { officialVersion: version } : {}),
-      ...(publicationDate(combined) ? { publishedAt: publicationDate(combined)! } : {}),
+      ...(publishedAt ? { publishedAt } : {}),
       documentStatus: status,
       ...(environment ? { environment } : {}),
       contentToken: token,
@@ -221,6 +226,14 @@ export function parseNfeEncatListing(
 
   parser.end(html);
   if (paragraph) finalizeParagraph();
+
+  if (!sawSection) {
+    throw new ConnectorError('NFE_ENCAT_UNRECOGNIZED_LISTING', {
+      code: 'NFE_ENCAT_UNRECOGNIZED_LISTING',
+      kind: 'PROCESSING_ERROR',
+      retryable: false,
+    });
+  }
 
   const unique = new Map<string, NfeEncatListingItem>();
   for (const item of items) {
