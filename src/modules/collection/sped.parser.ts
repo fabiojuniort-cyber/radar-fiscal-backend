@@ -236,6 +236,7 @@ function documentKind(title: string, text: string): SpedDocumentKind | undefined
   if (/NOTA ORIENTATIVA/.test(normalized)) return 'ORIENTATION_NOTE';
   if (/DOCUMENTACAO EVOLUTIVA|DOCUMENTO EVOLUTIVO/.test(normalized)) return 'EVOLUTION_DOCUMENT';
   if (/GUIA PRATICO/.test(normalized)) return 'GUIDE';
+  if (/DOCUMENTACAO TECNICA/.test(normalized) && /MANUAL/.test(combined)) return 'MANUAL';
   if (/XSD|SCHEMA|ESQUEMA/.test(normalized)) return 'XSD_SCHEMA';
   if (/LEIAUTE|LAYOUT/.test(normalized)) return 'LAYOUT';
   if (/TABELA/.test(normalized)) return 'TABLE';
@@ -248,12 +249,20 @@ function documentKind(title: string, text: string): SpedDocumentKind | undefined
 
 function versionFromTitle(title: string, kind: SpedDocumentKind): string | undefined {
   const normalized = normalizeSpace(title);
+  if (kind === 'TECHNICAL_NOTE' || kind === 'ORIENTATION_NOTE') {
+    return /NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA).*?\b(?:\d{1,4}[.\/_-]?\d{0,4}).*?\bv\s*\.?\s*(\d+(?:\.\d+){1,3})\b/i.exec(normalized)?.[1];
+  }
   const direct = /\b(?:vers(?:ão|ao)|v)\s*\.?\s*(\d+(?:\.\d+){1,3})\b/i.exec(normalized)?.[1];
   if (direct) return direct;
   if (kind === 'GUIDE' || kind === 'SOFTWARE_RELEASE' || kind === 'TABLE' || kind === 'MANUAL' || kind === 'LAYOUT' || kind === 'XSD_SCHEMA') {
     return /\b(\d+(?:\.\d+){1,3})\b/.exec(normalized)?.[1];
   }
   return undefined;
+}
+
+function versionFromBody(text: string, kind: SpedDocumentKind): string | undefined {
+  if (!['MANUAL', 'LAYOUT', 'XSD_SCHEMA', 'EVOLUTION_DOCUMENT'].includes(kind)) return undefined;
+  return /\b(?:pacote(?:\s+de\s+integração)?\s+)?vers(?:ão|ao)\s*\.?\s*(\d+(?:\.\d+){1,3})\b/i.exec(text)?.[1];
 }
 
 function noteNumber(title: string): string | undefined {
@@ -374,7 +383,7 @@ export function descriptorFromPage(
   if (!kind) return undefined;
   if (kind !== 'OPERATIONAL_NOTICE' && !isTechnicalNavigationText(page.title) && !page.fileLinks.length) return undefined;
   const revision = revisionKind(page.title);
-  const version = versionFromTitle(page.title, kind);
+  const version = versionFromTitle(page.title, kind) ?? versionFromBody(page.text, kind);
   const numbers = actNumberFor(kind, page.title, version, revision);
   const files = page.fileLinks
     .map((link) => ({
