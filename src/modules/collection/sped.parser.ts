@@ -148,9 +148,10 @@ function headingTitle(headings: string[], fallbackText: string): string {
   const candidates = headings
     .map(normalizeSpace)
     .filter(Boolean)
-    .filter((heading) => !MODULE_TITLES.has(normalizeCompare(heading)));
-  const last = candidates.at(-1);
-  if (last) return last;
+    .filter((heading) => !MODULE_TITLES.has(normalizeCompare(heading)))
+    .filter((heading) => !/^SPED\s*[—-]\s*SISTEMA P[ÚU]BLICO DE ESCRITURA[ÇC][ÃA]O DIGITAL$/i.test(heading));
+  const first = candidates[0];
+  if (first) return first;
   const firstLine = normalizeSpace(fallbackText).slice(0, 240);
   return firstLine || 'Portal SPED';
 }
