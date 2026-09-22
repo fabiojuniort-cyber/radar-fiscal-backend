@@ -130,7 +130,7 @@ test(
   },
 );
 
-for (const connectorKey of ['dou', 'nfe-encat']) {
+for (const connectorKey of ['dou', 'nfe-encat', 'sped']) {
   test(
     `scheduler does not overlap ${connectorKey} while an active run is pending or retrying`,
     async () => {
@@ -160,7 +160,9 @@ for (const connectorKey of ['dou', 'nfe-encat']) {
             base_url:
               connectorKey === 'dou'
                 ? 'https://inlabs.in.gov.br'
-                : 'https://www.nfe.fazenda.gov.br/portal',
+                : connectorKey === 'nfe-encat'
+                  ? 'https://www.nfe.fazenda.gov.br/portal'
+                  : 'https://sped.rfb.gov.br',
             connector_key: connectorKey,
             schedule_cron:
               connectorKey === 'dou'
