@@ -84,6 +84,39 @@ test('NF-e/ENCAT through collection engine keeps official versions separate and 
     const first = await run();
     assert.equal(first.status, 'SUCCESS');
     assert.equal(first.metrics.newPublications, 2);
+
+    const checkpointBeforePartial = await readNfeEncatSourceState(db, sourceId);
+    assert.equal(Object.keys(checkpointBeforePartial.items).length, 2);
+    const partialRunId = randomUUID();
+    await db.insertInto('collection_runs').values({
+      id: partialRunId,
+      source_id: sourceId,
+      scheduled_for: new Date('2026-09-21T20:01:00Z'),
+      trigger_type: 'MANUAL',
+      status: 'PARTIAL_SUCCESS',
+      finished_at: new Date('2026-09-21T20:01:01Z'),
+    }).execute();
+    await db.insertInto('collection_attempts').values({
+      collection_run_id: partialRunId,
+      attempt_no: 1,
+      status: 'SUCCESS',
+      finished_at: new Date('2026-09-21T20:01:01Z'),
+      metadata: {
+        nfeEncatState: {
+          items: {
+            'TECHNICAL_NOTES:POISON': {
+              rawSha256: 'f'.repeat(64),
+              sizeBytes: 1,
+              mimeType: 'application/pdf',
+              checkedAt: '2026-09-21T20:01:01.000Z',
+            },
+          },
+        },
+      },
+    }).execute();
+    assert.deepEqual(await readNfeEncatSourceState(db, sourceId), checkpointBeforePartial);
+    await db.deleteFrom('collection_runs').where('id', '=', partialRunId).execute();
+
     const publications = await db.selectFrom('publications as p')
       .innerJoin('publication_origins as po', 'po.publication_id', 'p.id')
       .select(['p.id', 'p.act_number'])
