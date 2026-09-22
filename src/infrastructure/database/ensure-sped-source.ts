@@ -29,10 +29,10 @@ try {
       )
       VALUES (
         'sped',
-        'Portal SPED',
+        'Portal SPED — gov.br',
         'FEDERAL',
         'RFB/SPED',
-        'https://sped.rfb.gov.br',
+        'https://www.gov.br/sped/pt-br/',
         'sped',
         '{"modules":["EFD_ICMS_IPI","EFD_CONTRIBUICOES","EFD_REINF","DERE"]}'::jsonb,
         $1,
