@@ -307,12 +307,16 @@ function actNumberFor(
   if (kind === 'TECHNICAL_NOTE' || kind === 'ORIENTATION_NOTE') {
     const number = noteNumber(title);
     if (!number) return {};
-    const suffix = revision === 'REPUBLICATION'
+    const versionSuffix = version ? ' v' + version : '';
+    const revisionSuffix = revision === 'REPUBLICATION'
       ? ' - REPUBLICAÇÃO'
       : revision === 'UPDATE'
         ? ' - ATUALIZAÇÃO'
         : '';
-    return { documentNumber: number, actNumber: number + suffix };
+    return {
+      documentNumber: number,
+      actNumber: number + versionSuffix + revisionSuffix,
+    };
   }
   if (kind === 'TABLE') {
     const number = tableNumber(title);
