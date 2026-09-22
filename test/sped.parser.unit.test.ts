@@ -45,6 +45,7 @@ test('distinguishes EFD-Reinf NT 01/2026 original and explicit republication', (
   assert.equal(original?.documentNumber, '01/2026');
   assert.equal(original?.actNumber, '01/2026');
   assert.equal(republished?.revisionKind, 'REPUBLICATION');
+  assert.equal(republished?.officialVersion, undefined);
   assert.equal(republished?.actNumber, '01/2026 - REPUBLICAÇÃO');
   assert.equal(original?.documentFamily, republished?.documentFamily);
 });
@@ -71,10 +72,11 @@ test('classifies EFD-Reinf XSD and DeRE official technical package', () => {
   );
   const dere = descriptorFromPage(
     'DERE',
-    page('7950', 'Receita Federal do Brasil e CGIBS publicam documentação técnica oficial da Declaração de Regimes Específicos (DeRE)', 'Publicado em 12/12/2025 Manual de Orientação Leiautes Schemas XSD IBS CBS', '7951', 'DeRE_v1.0.0.zip'),
+    page('7950', 'Receita Federal do Brasil e CGIBS publicam documentação técnica oficial da Declaração de Regimes Específicos (DeRE)', 'Publicado em 12/12/2025 Pacote de integração Versão 1.0.0 inclui Manual de Orientação Leiautes Schemas XSD IBS CBS', '7951', 'DeRE_v1.0.0.zip'),
   );
   assert.equal(xsd?.kind, 'XSD_SCHEMA');
   assert.equal(dere?.kind, 'MANUAL');
+  assert.equal(dere?.officialVersion, '1.0.0');
   assert.deepEqual(dere?.relatedTaxes.sort(), ['CBS', 'IBS']);
 });
 
