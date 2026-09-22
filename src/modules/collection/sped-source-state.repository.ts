@@ -48,7 +48,7 @@ export async function readSpedSourceState(
   const items: Record<string, SpedStoredFile> = {};
   if (rawItems) {
     for (const [key, value] of Object.entries(rawItems)) {
-      if (!/^(?:EFD_ICMS_IPI|EFD_CONTRIBUICOES|EFD_REINF|DERE):(?:item|arquivo):\d+:/.test(key)) continue;
+      if (!/^(?:EFD_ICMS_IPI|EFD_CONTRIBUICOES|EFD_REINF|DERE):(?:item|arquivo|pagina):\d+:/.test(key)) continue;
       const parsed = storedFile(value);
       if (parsed) items[key] = parsed;
     }
