@@ -45,6 +45,7 @@ export interface SpedPage {
   itemId?: string;
   links: SpedParsedLink[];
   fileLinks: SpedParsedLink[];
+  legacyLinks: SpedParsedLink[];
 }
 
 export interface SpedDocumentDescriptor {
@@ -67,6 +68,7 @@ export interface SpedDocumentDescriptor {
   relatedTaxes: string[];
   affectedRecords: string[];
   linkedArtifactExternalIds?: string[];
+  legacyReferences?: string[];
   files: Array<{
     url: string;
     externalId: string;
@@ -74,7 +76,9 @@ export interface SpedDocumentDescriptor {
   }>;
 }
 
-const SPED_ORIGIN = 'https://sped.rfb.gov.br';
+const SPED_LEGACY_ORIGIN = 'https://sped.rfb.gov.br';
+const SPED_GOVBR_ORIGIN = 'https://www.gov.br';
+const SPED_GOVBR_PREFIX = '/sped/pt-br/';
 const MODULE_TITLES = new Set([
   'EFD ICMS IPI',
   'EFD-ICMS/IPI',
@@ -116,21 +120,40 @@ function parseBrDate(value: string): Date | undefined {
 
 function linkPath(url: string): string {
   try {
-    const parsed = new URL(url, SPED_ORIGIN);
+    const parsed = new URL(url, SPED_LEGACY_ORIGIN);
     return parsed.pathname + parsed.search;
   } catch {
     return url;
   }
 }
 
-function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' | 'pagina' } | undefined {
-  const path = linkPath(url);
+function isGovBrSpedUrl(url: URL): boolean {
+  return url.origin.toLowerCase() === SPED_GOVBR_ORIGIN &&
+    (url.pathname === '/sped/pt-br' || url.pathname.startsWith(SPED_GOVBR_PREFIX));
+}
+
+function samePortalUrl(candidate: URL, pageUrl: URL): boolean {
+  if (pageUrl.origin.toLowerCase() === SPED_LEGACY_ORIGIN) {
+    return candidate.origin.toLowerCase() === SPED_LEGACY_ORIGIN;
+  }
+  if (isGovBrSpedUrl(pageUrl)) return isGovBrSpedUrl(candidate);
+  return false;
+}
+
+function stableGovPath(url: URL): string {
+  return url.pathname.replace(/\/$/, '') || '/';
+}
+
+function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' | 'pagina' | 'govbr' } | undefined {
+  const parsed = new URL(url, SPED_LEGACY_ORIGIN);
+  const path = parsed.pathname + parsed.search;
   const item = /\/item\/show\/(\d+)/i.exec(path)?.[1];
   if (item) return { id: item, type: 'item' };
   const archive = /\/arquivo\/show\/(\d+)/i.exec(path)?.[1];
   if (archive) return { id: archive, type: 'arquivo' };
   const page = /\/pagina\/show\/(\d+)/i.exec(path)?.[1];
   if (page) return { id: page, type: 'pagina' };
+  if (isGovBrSpedUrl(parsed)) return { id: stableGovPath(parsed), type: 'govbr' };
   return undefined;
 }
 
@@ -139,9 +162,15 @@ function itemIdFromUrl(url: string): string | undefined {
 }
 
 function fileIdFromUrl(url: string): string | undefined {
-  const path = linkPath(url);
-  return /\/arquivo\/(?:download|show)\/(\d+)/i.exec(path)?.[1]
+  const parsed = new URL(url, SPED_LEGACY_ORIGIN);
+  const path = parsed.pathname + parsed.search;
+  const legacy = /\/arquivo\/(?:download|show)\/(\d+)/i.exec(path)?.[1]
     ?? /\/estatico\/([^/]+)\/([^/?#]+)/i.exec(path)?.slice(1).join(':');
+  if (legacy) return legacy;
+  if (isGovBrSpedUrl(parsed)) {
+    return 'govbr:' + stableGovPath(parsed).replace(/\/@@(?:display-file|download)\/file$/i, '');
+  }
+  return undefined;
 }
 
 function headingTitle(headings: string[], fallbackText: string): string {
@@ -156,9 +185,88 @@ function headingTitle(headings: string[], fallbackText: string): string {
   return firstLine || 'Portal SPED';
 }
 
+
+function parseVoltoState(html: string): unknown {
+  const match = /<script[^>]*>\s*window\.__data\s*=\s*([\s\S]*?)<\/script>/i.exec(html);
+  if (!match?.[1]) return undefined;
+  const raw = match[1].trim().replace(/;\s*$/, '').replace(/\bundefined\b/g, 'null');
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function embeddedLinks(html: string, pageUrl: string): SpedParsedLink[] {
+  const state = parseVoltoState(html);
+  if (!state) return [];
+  const page = new URL(pageUrl);
+  const found = new Map<string, SpedParsedLink>();
+  const visited = new Set<object>();
+
+  const add = (rawUrl: string, text = '') => {
+    try {
+      const absolute = new URL(rawUrl, page);
+      if (!samePortalUrl(absolute, page) && absolute.origin.toLowerCase() !== SPED_LEGACY_ORIGIN) return;
+      absolute.hash = '';
+      const key = absolute.toString();
+      const existing = found.get(key);
+      if (!existing || (!existing.text && text)) {
+        found.set(key, {
+          url: key,
+          path: absolute.pathname + absolute.search,
+          text: normalizeSpace(text),
+        });
+      }
+    } catch {}
+  };
+
+  const walk = (value: unknown): void => {
+    if (typeof value === 'string') {
+      if (
+        value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('/sped/pt-br/')
+      ) add(value);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    if (visited.has(value)) return;
+    visited.add(value);
+
+    const record = value as Record<string, unknown>;
+    const candidateUrl = typeof record['@id'] === 'string'
+      ? record['@id']
+      : typeof record.href === 'string'
+        ? record.href
+        : typeof record.url === 'string'
+          ? record.url
+          : undefined;
+    const title = typeof record.title === 'string'
+      ? record.title
+      : typeof record.name === 'string'
+        ? record.name
+        : '';
+    if (candidateUrl) add(candidateUrl, title);
+
+    for (const nested of Object.values(record)) walk(nested);
+  };
+
+  walk(state);
+  return [...found.values()];
+}
+
+function isDirectFileLink(link: SpedParsedLink): boolean {
+  return /\/arquivo\/download\/\d+/i.test(link.path) ||
+    /\/estatico\//i.test(link.path) ||
+    /\/@@(?:display-file|download)\/file(?:$|[?#])/i.test(link.path);
+}
+
 export function parseSpedPage(html: string, url: string): SpedPage {
   const links: SpedParsedLink[] = [];
+  const legacyLinks: SpedParsedLink[] = [];
   const headings: string[] = [];
+  const pageUrl = new URL(url, SPED_LEGACY_ORIGIN);
   const allText: string[] = [];
   let currentLink: { href: string; text: string } | undefined;
   let currentHeading: { tag: string; text: string } | undefined;
@@ -179,12 +287,15 @@ export function parseSpedPage(html: string, url: string): SpedPage {
       if (tag === 'a' && currentLink) {
         try {
           const absolute = new URL(currentLink.href, url);
-          if (absolute.origin.toLowerCase() === SPED_ORIGIN.toLowerCase()) {
-            links.push({
-              url: absolute.toString(),
-              path: absolute.pathname + absolute.search,
-              text: normalizeSpace(currentLink.text),
-            });
+          const parsedLink = {
+            url: absolute.toString(),
+            path: absolute.pathname + absolute.search,
+            text: normalizeSpace(currentLink.text),
+          };
+          if (samePortalUrl(absolute, pageUrl)) {
+            links.push(parsedLink);
+          } else if (absolute.origin.toLowerCase() === SPED_LEGACY_ORIGIN) {
+            legacyLinks.push(parsedLink);
           }
         } catch {}
         currentLink = undefined;
@@ -198,17 +309,27 @@ export function parseSpedPage(html: string, url: string): SpedPage {
   }, { decodeEntities: true });
   parser.end(html);
 
+  for (const embedded of embeddedLinks(html, url)) {
+    const absolute = new URL(embedded.url);
+    if (samePortalUrl(absolute, pageUrl)) {
+      if (!links.some((link) => link.url === embedded.url)) links.push(embedded);
+    } else if (
+      absolute.origin.toLowerCase() === SPED_LEGACY_ORIGIN &&
+      !legacyLinks.some((link) => link.url === embedded.url)
+    ) {
+      legacyLinks.push(embedded);
+    }
+  }
+
   const text = normalizeSpace(allText.join(' '));
   const publishedMatch = /Publicado\s+em\s+(\d{2}\/\d{2}\/\d{4})/i.exec(text);
   const dataMatch = /\bData\s+(\d{2}\/\d{2}\/\d{4})(?:\s+\d{2}:\d{2}:\d{2})?/i.exec(text);
-  const updateMatch = /(?:Atualiza(?:ção|cao)|Atualizado\s+em|Atualizada\s+em)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i.exec(text);
-  const publishedAt = parseBrDate(publishedMatch?.[1] ?? dataMatch?.[1] ?? '');
+  const createdMatch = /Criado\s+em\s+(\d{2}\/\d{2}\/\d{4})/i.exec(text);
+  const updateMatch = /(?:Atualiza(?:ção|cao)|Atualizado\s+em|Atualizada\s+em|Modificado\s+em)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i.exec(text);
+  const publishedAt = parseBrDate(publishedMatch?.[1] ?? dataMatch?.[1] ?? createdMatch?.[1] ?? '');
   const updatedAt = parseBrDate(updateMatch?.[1] ?? '');
   const title = headingTitle(headings, text);
-  const fileLinks = links.filter((link) =>
-    /\/arquivo\/download\/\d+/i.test(link.path) ||
-    /\/estatico\//i.test(link.path),
-  );
+  const fileLinks = links.filter(isDirectFileLink);
 
   const documentPage = documentPageIdFromUrl(url);
   return {
@@ -221,6 +342,7 @@ export function parseSpedPage(html: string, url: string): SpedPage {
     ...(documentPage ? { itemId: documentPage.id } : {}),
     links,
     fileLinks,
+    legacyLinks,
   };
 }
 
@@ -449,11 +571,13 @@ export function descriptorFromPage(
     title: page.title,
     itemId: page.itemId,
     externalId:
-      (/\/arquivo\/show\//i.test(page.url)
-        ? 'arquivo:'
-        : /\/pagina\/show\//i.test(page.url)
-          ? 'pagina:'
-          : 'item:') + page.itemId,
+      new URL(page.url, SPED_LEGACY_ORIGIN).origin.toLowerCase() === SPED_GOVBR_ORIGIN
+        ? 'govbr:' + page.itemId
+        : (/\/arquivo\/show\//i.test(page.url)
+            ? 'arquivo:'
+            : /\/pagina\/show\//i.test(page.url)
+              ? 'pagina:'
+              : 'item:') + page.itemId,
     officialUrl: page.url,
     ...(page.publishedAt ? { publishedAt: page.publishedAt } : {}),
     ...(page.updatedAt ? { updatedAt: page.updatedAt } : {}),
@@ -467,6 +591,9 @@ export function descriptorFromPage(
     ...(description ? { description } : {}),
     relatedTaxes: relatedTaxes(page.title + ' ' + description),
     affectedRecords: affectedRecords(description),
+    ...(page.legacyLinks.length
+      ? { legacyReferences: page.legacyLinks.map((link) => link.url) }
+      : {}),
     files,
   };
 }
