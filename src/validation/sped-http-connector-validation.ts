@@ -168,6 +168,11 @@ async function run(
     fileRequests: fileRequestCount - beforeFile,
     publications: result.publications.length,
     partialFailures: result.partialFailures?.length ?? 0,
+    partialFailureDetails: (result.partialFailures ?? []).map((failure) => ({
+      code: failure.code,
+      message: failure.message,
+      itemReference: failure.itemReference ?? null,
+    })),
     metrics: metrics(result),
     statePages: Object.keys(state(result).pages ?? {}).length,
     stateFiles: Object.keys(state(result).items ?? {}).length,
@@ -184,19 +189,6 @@ console.error('SPED_REAL_CONNECTOR_START=' + JSON.stringify({
 const bootstrap = await run(
   'BOOTSTRAP',
   new Date('2026-09-22T13:00:00Z'),
-);
-
-const hourly = await run(
-  'HOURLY_PLUS_1H',
-  new Date('2026-09-22T14:00:00Z'),
-  state(bootstrap),
-);
-
-await run(
-  'RECHECK_PLUS_25H',
-  new Date('2026-09-23T14:00:00Z'),
-  state(hourly),
-  { maxRechecksPerRun: 32 },
 );
 
 console.error('SPED_REAL_CONNECTOR_DONE=' + JSON.stringify({
