@@ -72,6 +72,39 @@ test('detects redirect loops instead of treating them as empty source', async ()
   );
 });
 
+test('does not treat ordinary Portal navigation links to consultaRecaptcha.aspx as a captcha', async () => {
+  const normalPortalPage = '<!doctype html><html><body><nav><a href="consultaRecaptcha.aspx?tipoConsulta=resumo">Consultar NF-e</a></nav><p class="tituloSessao">Documentos vigentes</p></body></html>';
+  const client = new NfeEncatClient({
+    fetch: (async () => new Response(normalPortalPage, {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    })) as typeof fetch,
+  });
+
+  const result = await client.getListing(LISTING, new AbortController().signal);
+  assert.match(result.html, /tituloSessao/);
+});
+
+test('accepts legitimate listing pages that include global reCAPTCHA assets', async () => {
+  const validWithGlobalRecaptcha =
+    '<!doctype html><html><head><script src="https://www.google.com/recaptcha/api.js"></script></head>' +
+    '<body><div class="g-recaptcha"></div><p class="tituloSessao">Documentos Vigentes</p>' +
+    '<p>Nota Técnica 2026.009 v1.00</p></body></html>';
+  const client = new NfeEncatClient({
+    fetch: (async () => new Response(validWithGlobalRecaptcha, {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    })) as typeof fetch,
+  });
+
+  const result = await client.getListing(
+    LISTING,
+    new AbortController().signal,
+  );
+
+  assert.match(result.html, /Nota Técnica 2026\.009/);
+});
+
 test('rejects captcha/intermediary HTML for listings and files', async () => {
   const captcha = '<!doctype html><html><body><div class="g-recaptcha">captcha</div></body></html>';
   const listingClient = new NfeEncatClient({
