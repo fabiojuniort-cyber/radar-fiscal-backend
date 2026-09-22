@@ -144,6 +144,9 @@ export function parseNfeEncatListing(
   portalFamily: NfeEncatPortalFamily,
   listingUrl: string,
 ): NfeEncatListingItem[] {
+  const hasManualPrincipal =
+    portalFamily === 'MANUALS' &&
+    /<label\b[^>]*class=["'][^"']*\btituloPrincipal\b[^"']*["'][^>]*>\s*Manuais\b/i.test(html);
   let section = '';
   let sawSection = false;
   let paragraph: ParagraphCapture | undefined;
@@ -227,7 +230,7 @@ export function parseNfeEncatListing(
   parser.end(html);
   if (paragraph) finalizeParagraph();
 
-  if (!sawSection) {
+  if (!sawSection && !hasManualPrincipal) {
     throw new ConnectorError('NFE_ENCAT_UNRECOGNIZED_LISTING', {
       code: 'NFE_ENCAT_UNRECOGNIZED_LISTING',
       kind: 'PROCESSING_ERROR',
