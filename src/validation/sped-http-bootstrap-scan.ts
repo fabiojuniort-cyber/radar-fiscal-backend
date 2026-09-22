@@ -364,4 +364,15 @@ console.error('SPED_HTTP_BOOTSTRAP=' + JSON.stringify({
     ),
   })),
   gates: gateResults,
+  rawFileBearingDescriptors: descriptors
+    .filter((descriptor) => descriptor.files.length > 0)
+    .map((descriptor) => ({
+      module: descriptor.module,
+      title: descriptor.title,
+      externalId: descriptor.externalId,
+      officialUrl: descriptor.officialUrl,
+      fileCount: descriptor.files.length,
+      fileUrls: descriptor.files.map((file) => file.url),
+    }))
+    .slice(0, 250),
 }));
