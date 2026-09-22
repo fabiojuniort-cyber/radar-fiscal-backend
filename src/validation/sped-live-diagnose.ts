@@ -124,6 +124,25 @@ async function networkDiagnostic(): Promise<void> {
     bytes: plainPortal.body ? Buffer.byteLength(plainPortal.body) : 0,
     hasSped: plainPortal.body ? /SPED|Sistema Público de Escrituração Digital/i.test(plainPortal.body) : false,
   }));
+  for (const path of [
+    '/item/show/274',
+    '/item/show/268',
+    '/item/show/1196',
+    '/item/show/7950',
+    '/arquivo/show/8016',
+    '/destaques/show/7',
+  ]) {
+    const probe = await directHttp('http://sped.rfb.gov.br' + path);
+    console.log('SPED_HTTP_PATH=' + JSON.stringify({
+      path,
+      status: probe.status,
+      location: probe.location,
+      error: probe.error,
+      code: probe.code,
+      bytes: probe.body ? Buffer.byteLength(probe.body) : 0,
+      bodyHead: probe.body?.replace(/\s+/g, ' ').slice(0, 240) ?? null,
+    }));
+  }
   const directPortal = await directHttps(ORIGIN + '/');
   console.log('SPED_HTTPS_DIRECT=' + JSON.stringify({
     status: directPortal.status,
