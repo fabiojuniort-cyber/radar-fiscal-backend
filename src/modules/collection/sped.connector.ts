@@ -314,6 +314,8 @@ async function crawlModule(
     ]),
   );
 
+  const consumedArtifactIds = new Set<string>();
+
   for (const [parentExternalId, artifactUrls] of linkedArtifacts) {
     const parent = descriptors.get(parentExternalId);
     if (!parent) continue;
@@ -333,6 +335,7 @@ async function crawlModule(
       if (!sameFamily) continue;
 
       linkedIds.add(artifact.externalId);
+      consumedArtifactIds.add(artifact.externalId);
       for (const file of artifact.files) filesByUrl.set(file.url, file);
     }
 
@@ -342,7 +345,9 @@ async function crawlModule(
 
   return {
     module: definition.module,
-    descriptors: [...descriptors.values()],
+    descriptors: [...descriptors.values()].filter(
+      (descriptor) => !consumedArtifactIds.has(descriptor.externalId),
+    ),
     pagesSucceeded,
     pagesFailed,
     pagesVisited: seen.size,
