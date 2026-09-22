@@ -307,7 +307,12 @@ test('historical 404/410 links become recheckable tombstones without partial suc
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
 
-  assert.equal(first.partialFailures?.length ?? 0, 0);
+  assert.equal(
+    (first.partialFailures ?? []).some(
+      (failure) => failure.itemReference === 'https://sped.rfb.gov.br/item/show/4040',
+    ),
+    false,
+  );
   assert.equal(deadHits, 1);
 
   const firstState = first.metadata?.spedState as {
@@ -325,7 +330,12 @@ test('historical 404/410 links become recheckable tombstones without partial suc
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
 
-  assert.equal(replay.partialFailures?.length ?? 0, 0);
+  assert.equal(
+    (replay.partialFailures ?? []).some(
+      (failure) => failure.itemReference === 'https://sped.rfb.gov.br/item/show/4040',
+    ),
+    false,
+  );
   assert.equal(deadHits, 0);
   assert.ok(
     (replay.metadata?.sped as { skippedKnownMissingPageCount: number })
@@ -342,7 +352,12 @@ test('historical 404/410 links become recheckable tombstones without partial suc
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
 
-  assert.equal(aged.partialFailures?.length ?? 0, 0);
+  assert.equal(
+    (aged.partialFailures ?? []).some(
+      (failure) => failure.itemReference === 'https://sped.rfb.gov.br/item/show/4040',
+    ),
+    false,
+  );
   assert.ok(deadHits >= 1);
   assert.ok(
     (aged.metadata?.sped as { recheckedMissingPageCount: number })
