@@ -37,14 +37,14 @@ function directHttps(url: string, timeoutMs = 10_000): Promise<{ status?: number
       });
       response.on('end', () => {
         resolve({
-          status: response.statusCode,
+          ...(response.statusCode !== undefined ? { status: response.statusCode } : {}),
           body: Buffer.concat(chunks).toString('utf8').slice(0, 32_768),
         });
       });
     });
     request.on('timeout', () => request.destroy(new Error('HTTPS_TIMEOUT')));
     request.on('error', (error: NodeJS.ErrnoException) => {
-      resolve({ error: error.message, code: error.code });
+      resolve({ error: error.message, ...(error.code ? { code: error.code } : {}) });
     });
   });
 }
@@ -63,7 +63,7 @@ function tcpProbe(address: string, timeoutMs = 8_000): Promise<{ ok: boolean; er
     });
     socket.once('error', (error: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      resolve({ ok: false, error: error.message, code: error.code });
+      resolve({ ok: false, error: error.message, ...(error.code ? { code: error.code } : {}) });
     });
   });
 }
