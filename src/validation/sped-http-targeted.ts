@@ -114,6 +114,13 @@ for (const target of targets) {
       transportUrl: pageResult.transportUrl,
       redirects: pageResult.redirects,
       bytes: Buffer.byteLength(html),
+      pageDebug: descriptor ? null : {
+        title: page.title,
+        headings: page.headings,
+        textHead: page.text.slice(0, 1200),
+        links: page.links.slice(0, 80),
+        fileLinks: page.fileLinks,
+      },
       descriptor: descriptor ? {
         title: descriptor.title,
         externalId: descriptor.externalId,
