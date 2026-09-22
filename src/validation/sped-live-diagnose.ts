@@ -89,7 +89,21 @@ for (const [name, path] of roots) {
     output[name] = summary;
     console.log('SPED_PAGE=' + JSON.stringify({ name, ...summary }));
   } catch (error) {
-    const failed = { error: error instanceof Error ? error.message : String(error) };
+    const cause =
+      error instanceof Error &&
+      'cause' in error &&
+      error.cause &&
+      typeof error.cause === 'object'
+        ? error.cause as Record<string, unknown>
+        : undefined;
+    const failed = {
+      error: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : typeof error,
+      causeCode: typeof cause?.code === 'string' ? cause.code : undefined,
+      causeMessage: typeof cause?.message === 'string' ? cause.message : undefined,
+      causeAddress: typeof cause?.address === 'string' ? cause.address : undefined,
+      causePort: typeof cause?.port === 'number' ? cause.port : undefined,
+    };
     output[name] = failed;
     console.log('SPED_PAGE=' + JSON.stringify({ name, ...failed }));
   }
