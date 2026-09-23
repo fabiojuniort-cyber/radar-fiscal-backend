@@ -235,9 +235,6 @@ function documentFamily(title: string, family: CgibsFamily, section?: string): s
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (family === 'TECHNICAL_DOCUMENTS' && section) {
-    return `${normalizeInline(section)} — ${cleaned || 'DOCUMENTO'}`;
-  }
   return cleaned || family;
 }
 
