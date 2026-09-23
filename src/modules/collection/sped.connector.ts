@@ -283,12 +283,39 @@ function govModulePathAllowed(module: SpedModule, pathname: string): boolean {
   return paths[module].some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));
 }
 
+function isGovBrSystemNavigation(pathname: string): boolean {
+  const segments = pathname.split('/').filter(Boolean);
+  return segments.some((segment) => {
+    if (/^@@(?:display-file|download)$/i.test(segment)) return false;
+    return segment === 'object_copy' || segment.startsWith('@');
+  });
+}
+
+function govBrNavigationLooksRelevant(module: SpedModule, text: string, url: string): boolean {
+  let pathname = '';
+  try {
+    pathname = decodeURIComponent(new URL(url).pathname).toLocaleLowerCase('pt-BR');
+  } catch {
+    return false;
+  }
+
+  const leaf = pathname.split('/').filter(Boolean).at(-1) ?? '';
+  if (/^(?:faq|fale-conosco|contato|acesso-a-informacao|ouvidoria|validadores?)$/i.test(leaf)) {
+    return false;
+  }
+
+  if (isTechnicalNavigationText(text) || moduleTextMatches(module, text)) return true;
+
+  return /(?:^|[-/])(?:manua(?:l|is)|document(?:o|os|acao)|tecnic(?:o|os|a|as)|nota(?:s)?|orienta|guia(?:s)?|leiaute(?:s)?|layout(?:s)?|xsd|schema|esquema(?:s)?|tabela(?:s)?|versao|versoes|histori(?:co|cos)|download(?:s)?|comunicado(?:s)?|programa(?:s)?|pva|pge)(?:[-/]|$)/i.test(pathname);
+}
+
 function samePortalNavigation(module: SpedModule, url: string, portal: SpedPortalMode): boolean {
   try {
     const parsed = new URL(url);
     if (portal === 'GOVBR') {
       if (parsed.origin.toLowerCase() !== SPED_GOVBR_ORIGIN) return false;
       if (/\/@@(?:display-file|download)\/file$/i.test(parsed.pathname)) return false;
+      if (isGovBrSystemNavigation(parsed.pathname)) return false;
       return govModulePathAllowed(module, parsed.pathname);
     }
     if (parsed.origin.toLowerCase() !== SPED_LEGACY_ORIGIN) return false;
@@ -317,7 +344,7 @@ function shouldFollowLink(
   portal: SpedPortalMode,
 ): boolean {
   if (!samePortalNavigation(module, url, portal)) return false;
-  if (portal === 'GOVBR') return true;
+  if (portal === 'GOVBR') return govBrNavigationLooksRelevant(module, text, url);
   if (seedKind === 'GLOBAL_HIGHLIGHTS') return isAllowedGlobalHighlight(module, text);
   if (/\/destaques\/show\//i.test(url)) return true;
   if (
@@ -554,6 +581,13 @@ async function crawlModule(
       }
     } catch (error) {
       if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
+      if (
+        current.depth > 0 &&
+        error instanceof ConnectorError &&
+        error.code === 'SPED_CROSS_ORIGIN_REDIRECT'
+      ) {
+        continue;
+      }
       if (current.depth > 0 && isHistoricalMissing(error)) {
         rememberPage(
           nextPages,
