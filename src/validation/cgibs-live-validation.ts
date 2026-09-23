@@ -87,6 +87,12 @@ console.log('CGIBS_LIVE_FIRST=' + JSON.stringify({
   metadata: first.metadata,
 }));
 
+requireGate(first.publications, 'RESOLUTION_2_2026', (_title, metadata) =>
+  String(metadata.normativeKey ?? '') === 'CGIBS|ACT|RESOLUCAO_CGIBS|2_2026',
+);
+requireGate(first.publications, 'RESOLUTION_3_2026', (_title, metadata) =>
+  String(metadata.normativeKey ?? '') === 'CGIBS|ACT|RESOLUCAO_CGIBS|3_2026',
+);
 requireGate(first.publications, 'RESOLUTION_6_2026', (_title, metadata) =>
   String(metadata.normativeKey ?? '') === 'CGIBS|ACT|RESOLUCAO_CGIBS|6_2026',
 );
