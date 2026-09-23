@@ -22,6 +22,8 @@ export interface FakeDocument {
   filename?: string;
   /** Extra links (e.g. an announcement linking the document file). */
   links?: Array<{ href: string; text: string }>;
+  /** Child item paths: makes this page a Volto folder (is_folderish + items). */
+  children?: string[];
 }
 
 export interface FakeListing {
@@ -120,6 +122,9 @@ export function documentHtml(doc: FakeDocument): string {
     review_state: 'published',
     ...(doc.file ? { file: { 'content-type': 'application/pdf', download: fileUrl, filename: doc.filename ?? doc.title + '.pdf', size: 100 } } : {}),
     ...(layout.length ? { blocks, blocks_layout: { items: layout } } : {}),
+    ...(doc.children?.length
+      ? { is_folderish: true, items: doc.children.map((path) => ({ '@id': GOV + path, '@type': 'File', title: DOC_TITLES.get(path) ?? path })) }
+      : { is_folderish: false }),
   };
   const inner =
     '<h1>' + doc.title + '</h1>' +
@@ -128,6 +133,7 @@ export function documentHtml(doc: FakeDocument): string {
     (doc.body ? '<p>' + doc.body + '</p>' : '') +
     (doc.file ? '<a href="' + fileUrl + '">' + (doc.filename ?? doc.title) + '</a>' : '') +
     (doc.links ?? []).map((link) => '<a href="' + link.href + '">' + link.text + '</a>').join(' ') +
+    (doc.children ?? []).map((path) => '<a href="' + GOV + path + '">' + (DOC_TITLES.get(path) ?? path) + '</a>').join(' ') +
     '<p>Compartilhe:</p>';
   return chrome(inner, content);
 }
@@ -237,7 +243,15 @@ export function productionLikeInventory(): { listings: FakeListing[]; documents:
       body: 'Tendo em vista a redução dos benefícios fiscais instituída pela Lei Complementar nº 224/2025.',
       links: [{ href: GOV + reinf + '/notas-tecnicas/1-2026/@@display-file/file', text: 'clique aqui' }],
     },
-    { path: reinf + '/versao-atual/esquemas-xsd', title: 'Esquemas XSD', type: 'Document', published: '02/06/2026', body: 'Esquemas XSD da versão atual.' },
+    // gov.br folder: its XSD packages are only reachable through it.
+    {
+      path: reinf + '/versao-atual/esquemas-xsd',
+      title: 'Esquemas XSD',
+      type: 'Document',
+      published: '02/06/2026',
+      body: 'Esquemas XSD da versão atual.',
+      children: [reinf + '/versao-atual/esquemas-xsd/xsd-eventos', reinf + '/versao-atual/esquemas-xsd/xsd-4010'],
+    },
     { path: reinf + '/historico/esquemas-xsd', title: 'Esquemas XSD', type: 'Document', published: '02/06/2026', body: 'Histórico de esquemas XSD.' },
     { path: reinf + '/versao-atual/esquemas-xsd/xsd-eventos', title: 'Pacote XSD Eventos EFD Reinf v 2.1.2', type: 'File', created: '02/06/2026', file: 'xsd-reinf-212' },
     { path: reinf + '/versao-atual/esquemas-xsd/xsd-4010', title: 'XSD Evento R-4010', type: 'File', created: '02/06/2026', file: 'xsd-4010' },
@@ -249,7 +263,12 @@ export function productionLikeInventory(): { listings: FakeListing[]; documents:
   ];
   const listings: FakeListing[] = [
     { path: icms, title: 'Manuais e Documentos Técnicos', items: documents.filter((doc) => doc.path.startsWith(icms)).map((doc) => doc.path) },
-    { path: reinf, title: 'Manuais e documentos técnicos', items: documents.filter((doc) => doc.path.startsWith(reinf)).map((doc) => doc.path) },
+    {
+      path: reinf,
+      title: 'Manuais e documentos técnicos',
+      // XSD packages are deliberately NOT listed here: only the folder links them.
+      items: documents.filter((doc) => doc.path.startsWith(reinf) && !doc.path.includes('/esquemas-xsd/')).map((doc) => doc.path),
+    },
     { path: reinfCom, title: 'Comunicados EFD-Reinf', items: documents.filter((doc) => doc.path.startsWith(reinfCom)).map((doc) => doc.path) },
     {
       path: dere + '/versao-atual-1',

@@ -47,6 +47,12 @@ export interface SpedPage {
    */
   documentText: string;
   documentTextSource: 'VOLTO_CONTENT' | 'VISIBLE_TEXT';
+  /**
+   * gov.br folder (Volto is_folderish with child items). Such a page may carry
+   * its own descriptor, but it is always a navigation container: its children
+   * (e.g. individual XSD packages) must be crawled on every run.
+   */
+  folderish: boolean;
   headings: string[];
   title: string;
   publishedAt?: Date;
@@ -364,6 +370,17 @@ function voltoDocumentText(state: unknown): string | undefined {
   return normalizeSpace(parts.join(' '));
 }
 
+function voltoFolderish(state: unknown): boolean {
+  if (!state || typeof state !== 'object') return false;
+  const content = (state as Record<string, unknown>).content;
+  if (!content || typeof content !== 'object') return false;
+  const contentRecord = content as Record<string, unknown>;
+  const data = (contentRecord.data && typeof contentRecord.data === 'object'
+    ? contentRecord.data
+    : contentRecord) as Record<string, unknown>;
+  return data.is_folderish === true && Array.isArray(data.items) && data.items.length > 0;
+}
+
 function isDirectFileLink(link: SpedParsedLink): boolean {
   return /\/arquivo\/download\/\d+/i.test(link.path) ||
     /\/estatico\//i.test(link.path) ||
@@ -445,10 +462,12 @@ export function parseSpedPage(html: string, url: string): SpedPage {
   const fileLinks = links.filter(isDirectFileLink);
 
   const documentPage = documentPageIdFromUrl(url);
-  const volto = isGovBrSpedUrl(pageUrl) ? voltoDocumentText(parseVoltoState(html)) : undefined;
+  const voltoState = isGovBrSpedUrl(pageUrl) ? parseVoltoState(html) : undefined;
+  const volto = voltoState !== undefined ? voltoDocumentText(voltoState) : undefined;
   return {
     url,
     text,
+    folderish: voltoFolderish(voltoState),
     documentText: volto ?? text,
     documentTextSource: volto !== undefined ? 'VOLTO_CONTENT' : 'VISIBLE_TEXT',
     headings,
