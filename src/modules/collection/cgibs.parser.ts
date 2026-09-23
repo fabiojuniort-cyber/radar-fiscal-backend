@@ -66,6 +66,11 @@ interface AnchorRecord {
   position: number;
 }
 
+interface HeadingRecord {
+  text: string;
+  position: number;
+}
+
 function normalizeInline(value: string): string {
   return value.replace(/[\t\n\r \u00a0]+/g, ' ').trim();
 }
@@ -303,6 +308,7 @@ function operationalNews(title: string): boolean {
 
 function collectAnchors(html: string): { headings: string[]; anchors: AnchorRecord[]; pageText: string; h1?: string } {
   const headings: string[] = [];
+  const headingRecords: HeadingRecord[] = [];
   const anchors: AnchorRecord[] = [];
   let currentHeading = '';
   let headingTag: string | undefined;
@@ -347,6 +353,7 @@ function collectAnchors(html: string): { headings: string[]; anchors: AnchorReco
         if (heading) {
           currentHeading = heading;
           headings.push(heading);
+          headingRecords.push({ text: heading, position: pageText.length });
           if (tag === 'h1' && !h1) h1 = heading;
         }
         headingTag = undefined;
@@ -366,10 +373,12 @@ function collectAnchors(html: string): { headings: string[]; anchors: AnchorReco
   }, { decodeEntities: true });
 
   parser.end(html);
-  for (const item of anchors) {
-    const start = Math.max(0, item.position - 900);
-    const end = Math.min(pageText.length, item.position + 1200);
-    item.context = normalizeInline(pageText.slice(start, end));
+  for (let index = 0; index < anchors.length; index += 1) {
+    const item = anchors[index]!;
+    const nextAnchorPosition = anchors[index + 1]?.position ?? pageText.length;
+    const nextHeadingPosition = headingRecords.find((heading) => heading.position > item.position)?.position ?? pageText.length;
+    const end = Math.min(nextAnchorPosition, nextHeadingPosition, pageText.length);
+    item.context = normalizeInline(pageText.slice(item.position, end));
   }
   return { headings, anchors, pageText: normalizeInline(pageText), ...(h1 ? { h1 } : {}) };
 }
@@ -399,19 +408,20 @@ function descriptorFromArtifact(
   if (!title) return undefined;
 
   const section = anchor.heading && anchor.heading !== title ? anchor.heading : undefined;
-  const combined = normalizeInline(`${anchor.heading ?? ''} ${anchor.text} ${anchor.context}`);
   const formal = formalAct(title);
   const actType = formal.actType ?? familyActType(family, title);
   const actNumber = formal.actNumber;
   const version = officialVersion(`${title} ${section ?? ''}`);
   const docFamily = documentFamily(title, family, section);
   const externalId = stablePath(absolute);
-  const publishedAt = publicationDate(combined);
-  const effectiveAt = effectiveDate(combined);
+  const publishedAt = publicationDate(anchor.context);
+  const effectiveAt = effectiveDate(anchor.context);
 
-  const statusContext = section && /VERS(?:A|Ã)O ATUAL|VERS(?:O|Õ)ES? ANTERIORES/i.test(section)
-    ? section
-    : `${title} ${combined}`;
+  const statusContext = formal.actType
+    ? title
+    : section && /VERS(?:A|Ã)O ATUAL|VERS(?:O|Õ)ES? ANTERIORES/i.test(section)
+      ? section
+      : title;
 
   return {
     family,
