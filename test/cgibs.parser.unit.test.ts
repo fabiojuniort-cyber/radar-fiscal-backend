@@ -58,6 +58,22 @@ test('prefers a formal link title when the page leaves a stale formal heading ac
   assert.match(parsed.documents[1]!.title, /Nº 3/);
 });
 
+test('treats zero-padded heading numbers as equivalent to unpadded link numbers', () => {
+  const html = `<!doctype html><html><body><main>
+  <h1>Portarias</h1>
+  <h4>PORTARIA Nº 01/2026</h4>
+  <a href="/upload/arquivos/202605/portaria-1.pdf">Portaria CGIBS nº 1 2026 (.pdf 587,21 KBytes)</a>
+  <p>Publicada e disponibilizada no site do CGIBS em 18/05/2026</p>
+  </main></body></html>`;
+
+  const parsed = parseCgibsContainer(html, 'PORTARIAS', CGIBS + 'portarias');
+  assert.equal(parsed.documents.length, 1);
+  const item = parsed.documents[0]!;
+  assert.equal(item.title, 'PORTARIA Nº 01/2026');
+  assert.equal(item.actNumber, '01/2026');
+  assert.equal(item.identityKey, 'CGIBS|ACT|PORTARIA_CGIBS|01_2026');
+});
+
 test('preserves revoked status without changing the formal Portaria identity', () => {
   const parsed = parseCgibsContainer(portariasHtml, 'PORTARIAS', CGIBS + 'portarias');
   assert.equal(parsed.documents.length, 1);
