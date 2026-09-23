@@ -123,7 +123,7 @@ function router(options: { changedReinf?: boolean; failDere?: boolean; includeNe
 }
 
 test('collects the four SPED modules and preserves historical gates and explicit Reinf republication', async () => {
-  const result = await new SpedConnector({ fetch: router(), maxCrawlDepth: 2 }).collect(CONTEXT);
+  const result = await new SpedConnector({ portal: 'LEGACY', fetch: router(), maxCrawlDepth: 2 }).collect(CONTEXT);
   assert.ok(result.publications.some(p => p.title.includes('3.2.1')));
   assert.ok(result.publications.some(p => p.title.includes('3.2.2')));
   assert.ok(result.publications.some(p => p.title.includes('NOTA TÉCNICA Nº 11')));
@@ -149,7 +149,7 @@ test('collects the four SPED modules and preserves historical gates and explicit
 
 
 test('recursively folds multi-level linked artifacts into the root publication', async () => {
-  const result = await new SpedConnector({
+  const result = await new SpedConnector({ portal: 'LEGACY',
     fetch: router(),
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
@@ -212,7 +212,7 @@ test('does not suppress an arquivo/show publication that links to itself', async
     return base(input, init);
   }) as typeof fetch;
 
-  const result = await new SpedConnector({
+  const result = await new SpedConnector({ portal: 'LEGACY',
     fetch: fetchWithSelfLink,
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
@@ -230,17 +230,17 @@ test('does not suppress an arquivo/show publication that links to itself', async
 });
 
 test('reuses checkpoint without redownloading and changed bytes create a new content hash for same explicit publication', async () => {
-  const first = await new SpedConnector({ fetch: router(), now: () => new Date('2026-09-21T00:00:00Z'), maxCrawlDepth: 2 }).collect(CONTEXT);
+  const first = await new SpedConnector({ portal: 'LEGACY', fetch: router(), now: () => new Date('2026-09-21T00:00:00Z'), maxCrawlDepth: 2 }).collect(CONTEXT);
   const state = first.metadata?.spedState as {
     items: Record<string, any>;
     pages: Record<string, any>;
   };
-  const second = await new SpedConnector({ fetch: router(), now: () => new Date('2026-09-21T01:00:00Z'), readState: async () => state, maxCrawlDepth: 2 }).collect(CONTEXT);
+  const second = await new SpedConnector({ portal: 'LEGACY', fetch: router(), now: () => new Date('2026-09-21T01:00:00Z'), readState: async () => state, maxCrawlDepth: 2 }).collect(CONTEXT);
   assert.equal((second.metadata?.sped as { downloadedCount: number }).downloadedCount, 0);
   assert.ok((second.metadata?.sped as { reusedCheckpointCount: number }).reusedCheckpointCount > 0);
 
   const repubFirst = first.publications.find(p => p.title.includes('01/2026 republicada'))!;
-  const changed = await new SpedConnector({ fetch: router({ changedReinf: true }), now: () => new Date('2026-09-23T00:00:00Z'), readState: async () => state, revisitAfterMs: 0, maxRechecksPerRun: 100, maxCrawlDepth: 2 }).collect(CONTEXT);
+  const changed = await new SpedConnector({ portal: 'LEGACY', fetch: router({ changedReinf: true }), now: () => new Date('2026-09-23T00:00:00Z'), readState: async () => state, revisitAfterMs: 0, maxRechecksPerRun: 100, maxCrawlDepth: 2 }).collect(CONTEXT);
   const repubChanged = changed.publications.find(p => p.title.includes('01/2026 republicada'))!;
   const a = normalizePublication({ sourceId: CONTEXT.sourceId, publication: repubFirst });
   const b = normalizePublication({ sourceId: CONTEXT.sourceId, publication: repubChanged });
@@ -257,7 +257,7 @@ test('hourly incremental skips known document pages but captures a new item imme
     return firstBase(input, init);
   }) as typeof fetch;
 
-  const first = await new SpedConnector({
+  const first = await new SpedConnector({ portal: 'LEGACY',
     fetch: firstFetch,
     now: () => new Date('2026-09-21T00:00:00Z'),
     maxCrawlDepth: 5,
@@ -275,7 +275,7 @@ test('hourly incremental skips known document pages but captures a new item imme
     return replayBase(input, init);
   }) as typeof fetch;
 
-  const replay = await new SpedConnector({
+  const replay = await new SpedConnector({ portal: 'LEGACY',
     fetch: replayFetch,
     now: () => new Date('2026-09-21T01:00:00Z'),
     readState: async () => state,
@@ -287,7 +287,7 @@ test('hourly incremental skips known document pages but captures a new item imme
   assert.ok(replayRequests < firstRequests);
   assert.ok((replay.metadata?.sped as { skippedKnownDocumentCount: number }).skippedKnownDocumentCount > 0);
 
-  const newResult = await new SpedConnector({
+  const newResult = await new SpedConnector({ portal: 'LEGACY',
     fetch: router({ includeNewGuide: true }),
     now: () => new Date('2026-09-21T02:00:00Z'),
     readState: async () => state,
@@ -300,7 +300,7 @@ test('hourly incremental skips known document pages but captures a new item imme
 
 
 test('defaults to the safer 16-document recheck budget', async () => {
-  const result = await new SpedConnector({
+  const result = await new SpedConnector({ portal: 'LEGACY',
     fetch: router(),
     now: () => new Date('2026-09-22T00:00:00Z'),
     maxCrawlDepth: 2,
@@ -313,7 +313,7 @@ test('defaults to the safer 16-document recheck budget', async () => {
 });
 
 test('known document rechecks are globally bounded', async () => {
-  const first = await new SpedConnector({
+  const first = await new SpedConnector({ portal: 'LEGACY',
     fetch: router(),
     now: () => new Date('2026-09-20T00:00:00Z'),
     maxCrawlDepth: 5,
@@ -324,7 +324,7 @@ test('known document rechecks are globally bounded', async () => {
     pages: Record<string, any>;
   };
 
-  const result = await new SpedConnector({
+  const result = await new SpedConnector({ portal: 'LEGACY',
     fetch: router(),
     now: () => new Date('2026-09-22T00:00:00Z'),
     readState: async () => state,
@@ -369,7 +369,7 @@ test('historical 404/410 links become recheckable tombstones without partial suc
     return base(input, init);
   }) as typeof fetch;
 
-  const first = await new SpedConnector({
+  const first = await new SpedConnector({ portal: 'LEGACY',
     fetch: fetchWithDeadLink,
     now: () => new Date('2026-09-20T00:00:00Z'),
     maxCrawlDepth: 5,
@@ -391,7 +391,7 @@ test('historical 404/410 links become recheckable tombstones without partial suc
   assert.equal(tombstone?.kind, 'MISSING');
 
   deadHits = 0;
-  const replay = await new SpedConnector({
+  const replay = await new SpedConnector({ portal: 'LEGACY',
     fetch: fetchWithDeadLink,
     now: () => new Date('2026-09-20T01:00:00Z'),
     readState: async () => firstState,
@@ -411,7 +411,7 @@ test('historical 404/410 links become recheckable tombstones without partial suc
   );
 
   deadHits = 0;
-  const aged = await new SpedConnector({
+  const aged = await new SpedConnector({ portal: 'LEGACY',
     fetch: fetchWithDeadLink,
     now: () => new Date('2026-09-22T00:00:00Z'),
     readState: async () => firstState,
@@ -438,7 +438,7 @@ test('historical 404/410 links become recheckable tombstones without partial suc
 });
 
 test('partial module failure does not turn the whole SPED source into no-results', async () => {
-  const result = await new SpedConnector({ fetch: router({ failDere: true }), maxCrawlDepth: 2 }).collect(CONTEXT);
+  const result = await new SpedConnector({ portal: 'LEGACY', fetch: router({ failDere: true }), maxCrawlDepth: 2 }).collect(CONTEXT);
   assert.ok(result.publications.length > 0);
   assert.ok((result.partialFailures?.length ?? 0) > 0);
   assert.ok((result.metadata?.sped as { modulesSucceeded: number }).modulesSucceeded >= 3);
@@ -447,7 +447,7 @@ test('partial module failure does not turn the whole SPED source into no-results
 test('total source unavailability is retryable', async () => {
   const unavailable = (async () => new Response('down', { status: 503, headers: { 'content-type': 'text/html' } })) as typeof fetch;
   await assert.rejects(
-    new SpedConnector({ fetch: unavailable }).collect(CONTEXT),
+    new SpedConnector({ portal: 'LEGACY', fetch: unavailable }).collect(CONTEXT),
     (error: unknown) => {
       assert.equal((error as { code?: string }).code, 'SPED_ALL_MODULES_FAILED');
       assert.equal((error as { retryable?: boolean }).retryable, true);

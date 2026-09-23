@@ -18,7 +18,7 @@ export interface NormalizedPublicationIdentityBasis {
   actNumber?: string;
   publishedOn?: string;
   sourceId?: string;
-  sourceKeyType?: 'EXTERNAL_ID' | 'OFFICIAL_URL';
+  sourceKeyType?: 'CANONICAL_KEY' | 'EXTERNAL_ID' | 'OFFICIAL_URL';
   sourceKey?: string;
 }
 
@@ -219,6 +219,7 @@ function buildIdentity(
     actType?: string;
     actNumber?: string;
     publishedOn?: string;
+    identityKey?: string;
     externalId?: string;
     officialUrl: string;
   },
@@ -226,6 +227,20 @@ function buildIdentity(
   strength: PublicationIdentityStrength;
   basis: NormalizedPublicationIdentityBasis;
 } {
+  if (input.identityKey) {
+    return {
+      strength: 'SOURCE_SCOPED',
+      basis: {
+        version: 1,
+        scope: input.scope,
+        ...(input.uf ? { uf: input.uf } : {}),
+        sourceId: input.sourceId,
+        sourceKeyType: 'CANONICAL_KEY',
+        sourceKey: input.identityKey,
+      },
+    };
+  }
+
   const strongAgency = normalizeIdentityToken(input.agency);
   const strongActType = normalizeIdentityToken(input.actType);
   const strongActNumber = normalizeIdentityToken(input.actNumber);
@@ -301,6 +316,9 @@ export function normalizePublication(
   const externalId = normalizeOptionalText(
     input.publication.externalId,
   );
+  const identityKey = normalizeOptionalText(
+    input.publication.identityKey,
+  );
   const contentText = normalizeOptionalText(
     input.publication.content,
   );
@@ -347,6 +365,7 @@ export function normalizePublication(
     ...(actType ? { actType } : {}),
     ...(actNumber ? { actNumber } : {}),
     ...(publishedOn ? { publishedOn } : {}),
+    ...(identityKey ? { identityKey } : {}),
     ...(externalId ? { externalId } : {}),
     officialUrl,
   });

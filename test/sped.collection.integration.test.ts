@@ -63,6 +63,7 @@ test('SPED through collection engine keeps explicit republication separate and c
 
   const registry = new ConnectorRegistry();
   registry.register(new SpedConnector({
+    portal: 'LEGACY',
     fetch: fetchImpl,
     readState: source => readSpedSourceState(db, source),
     now: () => new Date('2026-09-22T00:00:00Z'),

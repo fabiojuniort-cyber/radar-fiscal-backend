@@ -34,6 +34,21 @@ function storedFile(value: unknown): SpedStoredFile | undefined {
   };
 }
 
+function allowedSpedUrl(value: string): string | undefined {
+  try {
+    const parsed = new URL(value);
+    const legacy = parsed.origin.toLowerCase() === 'https://sped.rfb.gov.br';
+    const govbr =
+      parsed.origin.toLowerCase() === 'https://www.gov.br' &&
+      (parsed.pathname === '/sped/pt-br' || parsed.pathname.startsWith('/sped/pt-br/'));
+    if (!legacy && !govbr) return undefined;
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 function knownPage(value: unknown): SpedKnownPage | undefined {
   const item = record(value);
   if (!item) return undefined;
@@ -55,15 +70,8 @@ function knownPage(value: unknown): SpedKnownPage | undefined {
   ) return undefined;
   if (typeof item.canonicalUrl !== 'string') return undefined;
 
-  let canonicalUrl: string;
-  try {
-    const parsed = new URL(item.canonicalUrl);
-    if (parsed.origin.toLowerCase() !== 'https://sped.rfb.gov.br') return undefined;
-    parsed.hash = '';
-    canonicalUrl = parsed.toString();
-  } catch {
-    return undefined;
-  }
+  const canonicalUrl = allowedSpedUrl(item.canonicalUrl);
+  if (!canonicalUrl) return undefined;
 
   if (typeof item.checkedAt !== 'string' || !Number.isFinite(Date.parse(item.checkedAt))) return undefined;
 
@@ -97,7 +105,7 @@ export async function readSpedSourceState(
   const items: Record<string, SpedStoredFile> = {};
   if (rawItems) {
     for (const [key, value] of Object.entries(rawItems)) {
-      if (!/^(?:EFD_ICMS_IPI|EFD_CONTRIBUICOES|EFD_REINF|DERE):(?:item|arquivo|pagina):\d+:/.test(key)) continue;
+      if (!/^(?:EFD_ICMS_IPI|EFD_CONTRIBUICOES|EFD_REINF|DERE):/.test(key) || key.length > 4096) continue;
       const parsed = storedFile(value);
       if (parsed) items[key] = parsed;
     }
@@ -107,15 +115,8 @@ export async function readSpedSourceState(
   const pages: Record<string, SpedKnownPage> = {};
   if (rawPages) {
     for (const [key, value] of Object.entries(rawPages)) {
-      let safeKey: string;
-      try {
-        const parsedKey = new URL(key);
-        if (parsedKey.origin.toLowerCase() !== 'https://sped.rfb.gov.br') continue;
-        parsedKey.hash = '';
-        safeKey = parsedKey.toString();
-      } catch {
-        continue;
-      }
+      const safeKey = allowedSpedUrl(key);
+      if (!safeKey) continue;
 
       const parsed = knownPage(value);
       if (parsed) pages[safeKey] = parsed;

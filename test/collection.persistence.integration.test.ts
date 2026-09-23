@@ -532,3 +532,188 @@ test(
     }
   },
 );
+
+
+test(
+  'SPED gov.br PRIMARY and legacy ENRICHMENT share one publication and keep two origins',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for collection integration tests.');
+
+    const pool = new Pool({ connectionString: adminUrl, max: 2 });
+    const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+    const sourceId = randomUUID();
+    const runPrimary = randomUUID();
+    const runLegacy = randomUUID();
+    const attemptPrimary = randomUUID();
+    const attemptLegacy = randomUUID();
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: `sped-mirror-${sourceId}`,
+        name: 'SPED mirror correlation test',
+        jurisdiction_level: 'FEDERAL',
+        base_url: 'https://www.gov.br/sped/pt-br/',
+        connector_key: 'sped',
+      }).execute();
+
+      await db.insertInto('collection_runs').values([
+        {
+          id: runPrimary,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-22T10:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runLegacy,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-22T11:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+      ]).execute();
+
+      await db.insertInto('collection_attempts').values([
+        {
+          id: attemptPrimary,
+          collection_run_id: runPrimary,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptLegacy,
+          collection_run_id: runLegacy,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+      ]).execute();
+
+      const identityKey =
+        'SPED|EFD_ICMS_IPI|GUIDE|EFD ICMS/IPI GUIA PRATICO|3.2.4|OFFICIAL_VERSION';
+
+      const primary = normalizePublication({
+        sourceId,
+        publication: {
+          title: 'Guia Prático EFD ICMS IPI versão 3.2.4',
+          agency: 'SPED/RFB',
+          sphere: 'FEDERAL',
+          actType: 'GUIA PRÁTICO SPED',
+          actNumber: 'v3.2.4',
+          officialUrl:
+            'https://www.gov.br/sped/pt-br/assuntos/escrituracoes-digitais/efd-icms-ipi/guia-3-2-4',
+          externalId:
+            'govbr:/sped/pt-br/assuntos/escrituracoes-digitais/efd-icms-ipi/guia-3-2-4',
+          identityKey,
+          content: 'Conteúdo canônico do gov.br.',
+          metadata: {
+            sourceRole: 'PRIMARY',
+            sourcePortal: 'GOVBR',
+            documentFamily: 'EFD ICMS/IPI Guia Prático',
+            officialVersion: '3.2.4',
+          },
+        },
+      });
+
+      const primaryResult = await db.transaction().execute((trx) =>
+        persistPublication(trx, {
+          sourceId,
+          runId: runPrimary,
+          attemptId: attemptPrimary,
+          publication: primary,
+        }),
+      );
+
+      assert.equal(primaryResult.disposition, 'NEW_PUBLICATION');
+
+      const legacy = normalizePublication({
+        sourceId,
+        publication: {
+          title: 'Guia Prático EFD ICMS/IPI - Versão 3.2.4',
+          agency: 'SPED/RFB',
+          sphere: 'FEDERAL',
+          actType: 'GUIA PRÁTICO SPED',
+          actNumber: 'v3.2.4',
+          officialUrl: 'https://sped.rfb.gov.br/item/show/9999',
+          externalId: 'item:9999',
+          identityKey,
+          content: 'Conteúdo histórico do portal legado.',
+          metadata: {
+            sourceRole: 'ENRICHMENT',
+            sourcePortal: 'LEGACY',
+            documentFamily: 'EFD ICMS/IPI Guia Prático',
+            officialVersion: '3.2.4',
+          },
+        },
+      });
+
+      const legacyResult = await db.transaction().execute((trx) =>
+        persistPublication(trx, {
+          sourceId,
+          runId: runLegacy,
+          attemptId: attemptLegacy,
+          publication: legacy,
+        }),
+      );
+
+      assert.equal(legacyResult.publicationId, primaryResult.publicationId);
+      assert.equal(legacyResult.disposition, 'NEW_VERSION');
+
+      const publications = await db
+        .selectFrom('publications')
+        .select(['id', 'primary_official_url'])
+        .where('id', '=', primaryResult.publicationId)
+        .execute();
+
+      assert.equal(publications.length, 1);
+      assert.equal(
+        publications[0]?.primary_official_url,
+        primary.officialUrl,
+      );
+
+      const origins = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'official_url', 'metadata'])
+        .where('publication_id', '=', primaryResult.publicationId)
+        .orderBy('external_id')
+        .execute();
+
+      assert.equal(origins.length, 2);
+      assert.deepEqual(
+        new Set(origins.map((origin) =>
+          (origin.metadata as Record<string, unknown>)?.sourceRole,
+        )),
+        new Set(['PRIMARY', 'ENRICHMENT']),
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select(['version_no', 'is_current', 'source_metadata'])
+        .where('publication_id', '=', primaryResult.publicationId)
+        .orderBy('version_no')
+        .execute();
+
+      assert.equal(versions.length, 2);
+      assert.equal(versions.filter((version) => version.is_current).length, 1);
+      assert.equal(
+        (versions.find((version) => version.is_current)?.source_metadata as Record<string, unknown>)
+          ?.sourceRole,
+        'PRIMARY',
+      );
+    } finally {
+      const publicationIds = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [...new Set(rows.map((row) => row.publication_id))]);
+
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+      await db.deleteFrom('publication_origins').where('source_id', '=', sourceId).execute();
+      if (publicationIds.length > 0) {
+        await db.deleteFrom('publications').where('id', 'in', publicationIds).execute();
+      }
+      await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+      await db.destroy();
+    }
+  },
+);
