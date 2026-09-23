@@ -85,7 +85,9 @@ test('collects all official families, deduplicates the same Resolution PDF and c
 
   assert.equal(result.partialFailures?.length ?? 0, 0);
   assert.ok(result.publications.length >= 12);
-  const resolution6 = result.publications.filter((item) => item.actNumber === '6/2026');
+  const resolution6 = result.publications.filter((item) =>
+    item.actNumber === '6/2026' && item.actType === 'RESOLUÇÃO CGIBS',
+  );
   assert.equal(resolution6.length, 1, 'the Regulation rediscovery must not duplicate Resolution 6');
 
   const communication = result.publications.find((item) => item.actNumber === '01/2025');
