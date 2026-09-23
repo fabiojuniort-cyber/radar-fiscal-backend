@@ -392,9 +392,13 @@ export class RfbNormasConnector implements CollectionConnector {
       }
 
       const title = original.title ?? fallbackTitle(item);
+      const canonicalContent = original.title && original.normalizedText.startsWith(original.title)
+        ? original.normalizedText.slice(original.title.length).trim()
+        : original.normalizedText;
       const officialUrl = item.detailUrl;
       const metadata: Record<string, unknown> = {
-        sourceRole: 'PRIMARY',
+        sourceRole: 'ENRICHMENT',
+        representationSourceRole: 'PRIMARY',
         publicationEventRole: 'ENRICHMENT_WHEN_DOU_EXISTS',
         captureCategory: decision.category,
         captureReason: decision.reason,
@@ -418,7 +422,7 @@ export class RfbNormasConnector implements CollectionConnector {
         ...(canonical.actType ? { actType: canonical.actType } : {}),
         ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
         publishedAt: item.publishedAt,
-        content: original.normalizedText,
+        content: canonicalContent || original.normalizedText,
         officialUrl,
         externalId: item.idAto,
         ...(!strong ? { identityKey: `RFB_NORMAS|${item.idAto}` } : {}),
