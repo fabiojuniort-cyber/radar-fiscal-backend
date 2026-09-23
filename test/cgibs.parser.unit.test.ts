@@ -41,6 +41,23 @@ test('same official Resolution PDF listed as regulation preserves one stable ori
   assert.equal(regulation.sourceRole, 'ENRICHMENT');
 });
 
+test('prefers a formal link title when the page leaves a stale formal heading active', () => {
+  const html = `<!doctype html><html><body><main>
+  <h1>Resoluções</h1>
+  <h4>RESOLUÇÃO CGIBS Nº 2, DE 10 DE MARÇO DE 2026</h4>
+  <a href="/upload/arquivos/202603/resolucao-2.pdf">RESOLUÇÃO CGIBS Nº 2, DE 10 DE MARÇO DE 2026</a>
+  <p>Publicada e disponibilizada no site do CGIBS em 11/03/2026</p>
+  <a href="/upload/arquivos/202603/resolucao-3.pdf">RESOLUÇÃO CGIBS Nº 3, DE 10 DE MARÇO DE 2026</a>
+  <p>Publicada e disponibilizada no site do CGIBS em 11/03/2026</p>
+  </main></body></html>`;
+
+  const parsed = parseCgibsContainer(html, 'RESOLUTIONS', CGIBS + 'resolucoes');
+  assert.equal(parsed.documents.length, 2);
+  assert.deepEqual(parsed.documents.map((item) => item.actNumber), ['2/2026', '3/2026']);
+  assert.notEqual(parsed.documents[0]!.identityKey, parsed.documents[1]!.identityKey);
+  assert.match(parsed.documents[1]!.title, /Nº 3/);
+});
+
 test('preserves revoked status without changing the formal Portaria identity', () => {
   const parsed = parseCgibsContainer(portariasHtml, 'PORTARIAS', CGIBS + 'portarias');
   assert.equal(parsed.documents.length, 1);
