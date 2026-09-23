@@ -28,12 +28,12 @@ try {
     )).rows;
 
     attempts = (await pool.query(
-      `SELECT ca.id, ca.collection_run_id, ca.attempt_no, ca.status, ca.error_code,
-              ca.started_at, ca.finished_at, ca.created_at
+      `SELECT ca.collection_run_id, ca.attempt_no, ca.status, ca.response_time_ms,
+              ca.error_code, ca.retryable, ca.metadata
        FROM collection_attempts ca
        JOIN collection_runs cr ON cr.id = ca.collection_run_id
        WHERE cr.source_id = $1
-       ORDER BY ca.created_at DESC
+       ORDER BY cr.created_at DESC, ca.attempt_no DESC
        LIMIT 20`,
       [source.id],
     )).rows;
