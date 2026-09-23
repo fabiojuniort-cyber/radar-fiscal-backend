@@ -395,7 +395,8 @@ function descriptorFromArtifact(
   const heading = normalizeInline(anchor.heading ?? '');
   const genericAnchor = /^(?:BAIXAR|DOWNLOAD|ACESSE|CLIQUE AQUI|PDF|ARQUIVO|DOCUMENTO|VER DOCUMENTO)$/i.test(anchorText);
   const formalTitlePattern = /(?:RESOLU[CÇ][AÃ]O|PORTARIA|ATO\s+(?:T[EÉ]CNICO\s+)?CONJUNTO|COMUNICADO|NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)|INSTRU[CÇ][AÃ]O)\b/i;
-  const formalAnchor = formalTitlePattern.test(anchorText);
+  const anchorFormal = formalAct(anchorText);
+  const formalAnchor = Boolean(anchorFormal.actType && anchorFormal.actNumber);
   const formalHeading = formalTitlePattern.test(heading);
   const containerHeading = /^(?:VERS[AÃ]O ATUAL|VERS[ÕO]ES? ANTERIORES|NOTAS? ORIENTATIVAS?|RESOLU[CÇ][ÕO]ES|REGULAMENTOS|PORTARIAS|ATOS? CONJUNTOS?|ATOS? T[EÉ]CNICOS? CONJUNTOS?|DOCUMENTOS? T[EÉ]CNICOS?|GUIAS|CARTILHAS|NOT[IÍ]CIAS|COMUNICADOS? OFICIAIS)$/i.test(heading);
   const title = normalizeInline(
@@ -421,11 +422,7 @@ function descriptorFromArtifact(
   const publishedAt = publicationDate(anchor.context);
   const effectiveAt = effectiveDate(anchor.context);
 
-  const statusContext = formal.actType
-    ? title
-    : section && /VERS(?:A|Ã)O ATUAL|VERS(?:O|Õ)ES? ANTERIORES/i.test(section)
-      ? section
-      : title;
+  const statusContext = `${title} ${section ?? ''}`;
 
   return {
     family,
