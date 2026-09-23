@@ -398,7 +398,7 @@ function descriptorFromArtifact(
 
   const section = anchor.heading && anchor.heading !== title ? anchor.heading : undefined;
   const combined = normalizeInline(`${anchor.heading ?? ''} ${anchor.text} ${anchor.context}`);
-  const formal = formalAct(`${title} ${combined}`);
+  const formal = formalAct(title);
   const actType = formal.actType ?? familyActType(family, title);
   const actNumber = formal.actNumber;
   const version = officialVersion(`${title} ${section ?? ''}`);
