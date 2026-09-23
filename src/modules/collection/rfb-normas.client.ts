@@ -334,7 +334,9 @@ export class RfbNormasClient {
       const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
       throw failure('RFB_NORMAS_FILE_HTTP_ERROR', response.status === 429 ? 'RATE_LIMITED' : 'FETCH_ERROR', retryable, {
         httpStatus: response.status,
-        retryAfterSeconds: retryable ? retryAfterSeconds(response) ?? DEFAULT_RETRY_AFTER_SECONDS : undefined,
+        ...(retryable
+          ? { retryAfterSeconds: retryAfterSeconds(response) ?? DEFAULT_RETRY_AFTER_SECONDS }
+          : {}),
       });
     }
     const bytes = await this.#readBytes(response, this.#maxFileBytes, signal);
