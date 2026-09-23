@@ -63,6 +63,7 @@ interface AnchorRecord {
   text: string;
   heading?: string;
   context: string;
+  position: number;
 }
 
 function normalizeInline(value: string): string {
@@ -355,6 +356,7 @@ function collectAnchors(html: string): { headings: string[]; anchors: AnchorReco
           text: normalizeInline(anchor.text),
           ...(currentHeading ? { heading: currentHeading } : {}),
           context: normalizeInline(context.slice(-1200)),
+          position: pageText.length,
         });
         anchor = undefined;
       }
@@ -362,6 +364,11 @@ function collectAnchors(html: string): { headings: string[]; anchors: AnchorReco
   }, { decodeEntities: true });
 
   parser.end(html);
+  for (const item of anchors) {
+    const start = Math.max(0, item.position - 900);
+    const end = Math.min(pageText.length, item.position + 1200);
+    item.context = normalizeInline(pageText.slice(start, end));
+  }
   return { headings, anchors, pageText: normalizeInline(pageText), ...(h1 ? { h1 } : {}) };
 }
 
