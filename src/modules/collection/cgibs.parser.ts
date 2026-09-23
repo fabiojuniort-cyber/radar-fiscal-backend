@@ -406,7 +406,7 @@ function descriptorFromArtifact(
     externalId,
     identityKey: identityFor(family, title, actType, actNumber, docFamily, version, section),
     fileUrl: absolute,
-    fileName: anchor.text || stablePath(absolute).split('/').pop(),
+    fileName: anchor.text || stablePath(absolute).split('/').pop() || 'documento-cgibs',
     pageUrl: listingUrl,
     metadata: {
       listingUrl,
