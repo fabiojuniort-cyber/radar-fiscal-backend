@@ -29,6 +29,8 @@ try {
     fileStats,
     duplicateOrigins,
     unexpectedModules,
+    multiVersion,
+    versionTotals,
   ] = await Promise.all([
     pool.query('SELECT count(*)::int AS count FROM schema_migrations'),
     pool.query(`SELECT filename, applied_at FROM schema_migrations ORDER BY applied_at DESC LIMIT 5`),
@@ -54,7 +56,16 @@ try {
           'retryable', ca.retryable,
           'publicationCount', COALESCE((ca.metadata->>'publicationCount')::int, 0),
           'partialFailureCount', COALESCE((ca.metadata->>'partialFailureCount')::int, 0),
-          'sped', ca.metadata->'sped',
+          'sped', (COALESCE(ca.metadata->'sped', '{}'::jsonb) - 'identityAudit' - 'deferredDocuments' - 'moduleResults')
+                  || jsonb_build_object(
+                       'moduleResults', ca.metadata->'sped'->'moduleResults',
+                       'deferredDocuments', ca.metadata->'sped'->'deferredDocuments',
+                       'identityCollisionsResolved', jsonb_array_length(COALESCE(ca.metadata->'sped'->'identityAudit'->'collisionsResolved', '[]'::jsonb)),
+                       'identityUnresolvedCollisions', ca.metadata->'sped'->'identityAudit'->'unresolvedCollisions',
+                       'identityMirrorGroups', jsonb_array_length(COALESCE(ca.metadata->'sped'->'identityAudit'->'mirrorGroups', '[]'::jsonb)),
+                       'collisions', ca.metadata->'sped'->'identityAudit'->'collisionsResolved'
+                     ),
+          'stateVersion', ca.metadata->'spedState'->'version',
           'checkpointItems', (
             SELECT count(*)::int FROM jsonb_object_keys(COALESCE(ca.metadata->'spedState'->'items', '{}'::jsonb))
           )
@@ -80,28 +91,37 @@ try {
       GROUP BY 1 ORDER BY 1
     `, [sourceId]),
     pool.query(`
+      WITH gate_origins AS (
+        SELECT
+          CASE
+            WHEN po.metadata->>'module' = 'EFD_ICMS_IPI' AND po.metadata->>'documentKind' = 'GUIDE'
+                 AND po.metadata->>'officialVersion' = '3.2.4' THEN 'ICMS_IPI_GUIA_3_2_4'
+            WHEN po.metadata->>'module' = 'EFD_CONTRIBUICOES' AND po.metadata->>'documentNumber' = '11/2026'
+                 AND COALESCE(po.metadata->>'documentCarrier','DOCUMENT') = 'DOCUMENT' THEN 'CONTRIBUICOES_NT_11_2026'
+            WHEN po.metadata->>'module' = 'EFD_CONTRIBUICOES' AND po.metadata->>'documentNumber' = '12/2026'
+                 AND COALESCE(po.metadata->>'documentCarrier','DOCUMENT') = 'DOCUMENT' THEN 'CONTRIBUICOES_NT_12_2026'
+            WHEN po.metadata->>'module' = 'EFD_REINF' AND po.metadata->>'documentNumber' = '01/2026'
+                 AND COALESCE(po.metadata->>'documentCarrier','DOCUMENT') = 'DOCUMENT' THEN 'REINF_NT_01_2026'
+            WHEN po.metadata->>'module' = 'EFD_REINF' AND po.metadata->>'documentKind' = 'XSD_SCHEMA'
+                 AND po.metadata->>'officialVersion' = '2.1.2' THEN 'REINF_XSD_2_1_2'
+            WHEN po.metadata->>'module' = 'DERE' AND po.metadata->>'officialVersion' = '1.2.0' THEN 'DERE_1_2_0'
+          END AS gate,
+          po.publication_id, po.external_id
+        FROM publication_origins po
+        WHERE po.source_id = $1
+      )
       SELECT
-        p.id, p.act_type, p.act_number, p.title, p.published_on,
-        po.external_id,
-        po.metadata->>'module' AS module,
-        po.metadata->>'documentFamily' AS document_family,
-        po.metadata->>'officialVersion' AS official_version,
-        po.metadata->>'revisionKind' AS revision_kind,
+        g.gate, p.title, p.act_number, g.external_id,
         (SELECT count(*)::int FROM publication_versions pv2 WHERE pv2.publication_id = p.id) AS version_count,
-        pv.content_hash,
-        pv.source_metadata->'files' AS files
-      FROM publication_origins po
-      JOIN publications p ON p.id = po.publication_id
+        (
+          SELECT jsonb_agg(jsonb_build_object('name', f->>'name', 'sizeBytes', f->'sizeBytes', 'rawSha256', f->>'rawSha256'))
+          FROM jsonb_array_elements(COALESCE(pv.source_metadata->'files','[]'::jsonb)) f
+        ) AS files
+      FROM gate_origins g
+      JOIN publications p ON p.id = g.publication_id
       LEFT JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = TRUE
-      WHERE po.source_id = $1
-        AND (
-          (po.metadata->>'module' = 'EFD_ICMS_IPI' AND po.metadata->>'documentFamily' = 'EFD ICMS/IPI Guia Prático' AND po.metadata->>'officialVersion' IN ('3.2.1','3.2.2'))
-          OR (po.metadata->>'module' = 'EFD_REINF' AND po.metadata->>'documentFamily' = 'EFD-Reinf NT 01/2026')
-          OR (po.metadata->>'module' = 'EFD_CONTRIBUICOES' AND po.metadata->>'documentNumber' IN ('11/2026','12/2026'))
-          OR (po.metadata->>'module' = 'EFD_REINF' AND po.metadata->>'documentKind' = 'XSD_SCHEMA')
-          OR (po.metadata->>'module' = 'DERE')
-        )
-      ORDER BY po.metadata->>'module', p.published_on, p.title
+      WHERE g.gate IS NOT NULL
+      ORDER BY g.gate, p.title
     `, [sourceId]),
     pool.query(`
       SELECT
@@ -128,6 +148,24 @@ try {
         AND COALESCE(po.metadata->>'module','') NOT IN ('EFD_ICMS_IPI','EFD_CONTRIBUICOES','EFD_REINF','DERE')
       ORDER BY 1
     `, [sourceId]),
+    pool.query(`
+      SELECT p.id, p.title, count(DISTINCT pv.id)::int AS versions, count(DISTINCT po.id)::int AS origins
+      FROM publications p
+      JOIN publication_origins po ON po.publication_id = p.id AND po.source_id = $1
+      JOIN publication_versions pv ON pv.publication_id = p.id
+      GROUP BY p.id, p.title
+      HAVING count(DISTINCT pv.id) > 1
+      ORDER BY versions DESC, p.title
+      LIMIT 50
+    `, [sourceId]),
+    pool.query(`
+      SELECT count(DISTINCT p.id)::int AS publications,
+             count(DISTINCT pv.id)::int AS versions,
+             count(DISTINCT po.id)::int AS origins
+      FROM publications p
+      JOIN publication_origins po ON po.publication_id = p.id AND po.source_id = $1
+      LEFT JOIN publication_versions pv ON pv.publication_id = p.id
+    `, [sourceId]),
   ]);
 
   console.log('SPED_INSPECTION=' + JSON.stringify({
@@ -141,6 +179,8 @@ try {
     fileStats: fileStats.rows[0],
     duplicateOrigins: duplicateOrigins.rows,
     unexpectedModules: unexpectedModules.rows,
+    totals: versionTotals.rows[0],
+    publicationsWithMultipleVersions: multiVersion.rows,
   }));
 } finally {
   await pool.end();

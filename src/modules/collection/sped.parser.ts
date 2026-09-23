@@ -37,7 +37,16 @@ export interface SpedParsedLink {
 
 export interface SpedPage {
   url: string;
+  /** Visible page text. Never includes <script>/<style> payloads. */
   text: string;
+  /**
+   * Canonical document text used for publication content (and therefore
+   * content_hash). For gov.br pages it is derived from the structured Volto
+   * object (description, rich text and slate blocks in layout order), so
+   * portal chrome, navigation and per-request state never enter it.
+   */
+  documentText: string;
+  documentTextSource: 'VOLTO_CONTENT' | 'VISIBLE_TEXT';
   headings: string[];
   title: string;
   publishedAt?: Date;
@@ -49,9 +58,21 @@ export interface SpedPage {
   legacyLinks: SpedParsedLink[];
 }
 
+export type SpedDocumentCarrier = 'DOCUMENT' | 'ANNOUNCEMENT';
+
 export interface SpedDocumentDescriptor {
   module: SpedModule;
   kind: SpedDocumentKind;
+  /**
+   * DOCUMENT: the official document/page itself.
+   * ANNOUNCEMENT: a gov.br "comunicado" about a document. It is a distinct
+   * official object (own text/date) and must not share identity with the
+   * document it announces.
+   */
+  carrier: SpedDocumentCarrier;
+  /** Stable portal path (gov.br) or legacy item reference; identity fallback. */
+  canonicalPath: string;
+  documentTextSource: 'VOLTO_CONTENT' | 'VISIBLE_TEXT';
   title: string;
   itemId: string;
   externalId: string;
@@ -81,6 +102,7 @@ export interface SpedDocumentDescriptor {
 const SPED_LEGACY_ORIGIN = 'https://sped.rfb.gov.br';
 const SPED_GOVBR_ORIGIN = 'https://www.gov.br';
 const SPED_GOVBR_PREFIX = '/sped/pt-br/';
+const NON_VISIBLE_TAGS = new Set(['script', 'style', 'noscript', 'template']);
 const MODULE_TITLES = new Set([
   'EFD ICMS IPI',
   'EFD-ICMS/IPI',
@@ -263,6 +285,85 @@ function embeddedLinks(html: string, pageUrl: string): SpedParsedLink[] {
   return [...found.values()];
 }
 
+function stripHtml(value: string): string {
+  let text = '';
+  const parser = new Parser({
+    ontext(chunk) {
+      text += chunk + ' ';
+    },
+  }, { decodeEntities: true });
+  parser.end(value);
+  return normalizeSpace(text);
+}
+
+function slateText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(slateText).join(' ');
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  const own = typeof record.text === 'string' ? record.text : '';
+  return own + ' ' + slateText(record.children);
+}
+
+/**
+ * Stable document text from the Volto content object (window.__data.content).
+ *
+ * Only editorial fields are used. Router keys, redux state, navigation,
+ * breadcrumbs, timestamps and any other per-request/portal data are ignored.
+ */
+function voltoDocumentText(state: unknown): string | undefined {
+  if (!state || typeof state !== 'object') return undefined;
+  const content = (state as Record<string, unknown>).content;
+  if (!content || typeof content !== 'object') return undefined;
+  const contentRecord = content as Record<string, unknown>;
+  const data = (contentRecord.data && typeof contentRecord.data === 'object'
+    ? contentRecord.data
+    : contentRecord) as Record<string, unknown>;
+  if (typeof data['@type'] !== 'string' && typeof data.title !== 'string') return undefined;
+
+  const parts: string[] = [];
+  if (typeof data.description === 'string') parts.push(data.description);
+
+  const richText = data.text;
+  if (richText && typeof richText === 'object' && typeof (richText as Record<string, unknown>).data === 'string') {
+    parts.push(stripHtml((richText as Record<string, unknown>).data as string));
+  } else if (typeof richText === 'string') {
+    parts.push(stripHtml(richText));
+  }
+
+  const blocks = data.blocks && typeof data.blocks === 'object'
+    ? data.blocks as Record<string, unknown>
+    : undefined;
+  if (blocks) {
+    const layout = data.blocks_layout && typeof data.blocks_layout === 'object'
+      ? (data.blocks_layout as Record<string, unknown>).items
+      : undefined;
+    const order = Array.isArray(layout)
+      ? layout.filter((id): id is string => typeof id === 'string')
+      : Object.keys(blocks).sort();
+    for (const id of order) {
+      const block = blocks[id];
+      if (!block || typeof block !== 'object') continue;
+      const record = block as Record<string, unknown>;
+      if (record['@type'] !== 'slate' && record['@type'] !== 'text') continue;
+      if (typeof record.plaintext === 'string' && record.plaintext.trim()) {
+        parts.push(record.plaintext);
+      } else if (record.value !== undefined) {
+        parts.push(slateText(record.value));
+      } else if (record.text && typeof record.text === 'object') {
+        parts.push(slateText((record.text as Record<string, unknown>).blocks));
+      }
+    }
+  }
+
+  const file = data.file && typeof data.file === 'object'
+    ? data.file as Record<string, unknown>
+    : undefined;
+  if (file && typeof file.filename === 'string') parts.push('Arquivo: ' + file.filename);
+
+  return normalizeSpace(parts.join(' '));
+}
+
 function isDirectFileLink(link: SpedParsedLink): boolean {
   return /\/arquivo\/download\/\d+/i.test(link.path) ||
     /\/estatico\//i.test(link.path) ||
@@ -277,20 +378,24 @@ export function parseSpedPage(html: string, url: string): SpedPage {
   const allText: string[] = [];
   let currentLink: { href: string; text: string } | undefined;
   let currentHeading: { tag: string; text: string } | undefined;
+  let hiddenDepth = 0;
 
   const parser = new Parser({
     onopentag(name, attrs) {
       const tag = name.toLowerCase();
+      if (NON_VISIBLE_TAGS.has(tag)) hiddenDepth += 1;
       if (tag === 'a' && attrs.href) currentLink = { href: attrs.href, text: '' };
       if (/^h[1-4]$/.test(tag)) currentHeading = { tag, text: '' };
     },
     ontext(text) {
+      if (hiddenDepth > 0) return;
       allText.push(text);
       if (currentLink) currentLink.text += text;
       if (currentHeading) currentHeading.text += text;
     },
     onclosetag(name) {
       const tag = name.toLowerCase();
+      if (NON_VISIBLE_TAGS.has(tag) && hiddenDepth > 0) hiddenDepth -= 1;
       if (tag === 'a' && currentLink) {
         try {
           const absolute = new URL(currentLink.href, url);
@@ -340,9 +445,12 @@ export function parseSpedPage(html: string, url: string): SpedPage {
   const fileLinks = links.filter(isDirectFileLink);
 
   const documentPage = documentPageIdFromUrl(url);
+  const volto = isGovBrSpedUrl(pageUrl) ? voltoDocumentText(parseVoltoState(html)) : undefined;
   return {
     url,
     text,
+    documentText: volto ?? text,
+    documentTextSource: volto !== undefined ? 'VOLTO_CONTENT' : 'VISIBLE_TEXT',
     headings,
     title,
     ...(publishedAt ? { publishedAt } : {}),
@@ -547,7 +655,10 @@ export function descriptorFromPage(
   if (!kind) return undefined;
   const revision = revisionKind(page.title);
   const titleVersion = versionFromTitle(page.title, kind);
-  const bodyVersion = versionFromBody(page.text, kind);
+  // Body version comes only from canonical document text. The full page used to
+  // include the serialized Volto state (sibling navigation titles), which made
+  // the inferred version depend on unrelated portal items.
+  const bodyVersion = versionFromBody(page.documentText, kind);
   const version = titleVersion ?? bodyVersion;
   const numbers = actNumberFor(kind, page.title, version, revision);
   const genericNavigationTitle =
@@ -574,10 +685,19 @@ export function descriptorFromPage(
       ...(fileName(link) ? { name: fileName(link)! } : {}),
     }))
     .filter((file, index, values) => values.findIndex((other) => other.url === file.url) === index);
-  const description = normalizeSpace(page.text).slice(0, 12_000);
+  const description = normalizeSpace(page.documentText).slice(0, 12_000);
+  const parsedUrl = new URL(page.url, SPED_LEGACY_ORIGIN);
+  const govbr = parsedUrl.origin.toLowerCase() === SPED_GOVBR_ORIGIN;
   return {
     module,
     kind,
+    carrier: govbr && /\/assuntos\/comunicados(?:\/|$)/i.test(parsedUrl.pathname)
+      ? 'ANNOUNCEMENT'
+      : 'DOCUMENT',
+    canonicalPath: govbr
+      ? stableGovPath(parsedUrl).toLocaleLowerCase('pt-BR')
+      : (/\/arquivo\/show\//i.test(page.url) ? 'arquivo:' : /\/pagina\/show\//i.test(page.url) ? 'pagina:' : 'item:') + page.itemId,
+    documentTextSource: page.documentTextSource,
     title: page.title,
     itemId: page.itemId,
     externalId:

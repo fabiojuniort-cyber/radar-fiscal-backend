@@ -330,3 +330,34 @@ A CI permanente usa testes determinísticos e cobre:
 - persistência de múltiplas origins para uma publicação canônica.
 
 Validações ao vivo permanecem disponíveis como ferramenta operacional fora da CI.
+
+## Correção pós-ativação (2026-09-23): idempotência, identidade e checkpoint
+
+Incidente: o bootstrap `bbff4796` (PARTIAL_SUCCESS, 131 publicações + 15 versions) e o replay `5471c622` (146 versions artificiais). O hourly não foi ativado.
+
+Causas raiz confirmadas:
+
+1. **content_hash instável.** O parser guardava todo o texto do HTML, inclusive o `<script>window.__data=…>` do Volto. Esse estado muda a cada requisição: `router.key` aleatória e serialização do redux em ordem variável. Os primeiros 12.000 caracteres viravam `publication.content`. Correção: o texto visível exclui `script`, `style`, `noscript` e `template`, e o conteúdo canônico (`documentText`) vem do objeto Volto (`content.data`: description, rich text, blocos slate na ordem de `blocks_layout`, filename). A versão inferida do corpo usa só esse conteúdo canônico.
+2. **Colisões de identidade.**
+   - comunicado × documento (a mesma NT 01/2026);
+   - páginas sem número nem versão com o mesmo título ("Esquemas XSD" atual × histórico; manuais);
+   - espelhos do mesmo arquivo com páginas diferentes, que alternavam o conteúdo.
+
+   Correção (identity v2): `SPED|v2|módulo|carrier|kind|família/número|versão|revisão`. O `carrier` é DOCUMENT ou ANNOUNCEMENT. Quando não há número nem versão, entra o fallback `PATH:<caminho canônico>`. Há também uma guarda em runtime: só compartilha chave um espelho comprovado, isto é, o mesmo conjunto não vazio de SHA-256. Qualquer outra colisão é desambiguada de forma determinística, estável entre execuções, e registrada em `metadata.sped.identityAudit`. Espelhos emitem uma representação canônica única.
+3. **Checkpoint.**
+   - O estado de runs PARTIAL_SUCCESS não era reutilizado.
+   - Um documento cujo arquivo falhou ficava marcado como DOCUMENT conhecido, mas sem ter sido emitido.
+
+   Correção (state v2):
+   - O documento só é emitido com todos os arquivos resolvidos; caso contrário fica adiado (`deferredDocuments`) e é refeito já no run seguinte.
+   - PARTIAL_SUCCESS é reutilizável somente em estado v2.
+   - Itens FAILED do run e páginas sem `publication_origin` persistida voltam a ser buscados.
+   - Estados antigos (v1) são ignorados.
+4. **Gate do Guia 3.2.4.** Não houve colisão. Os 5 documentos ausentes do ICMS/IPI no bootstrap são exatamente as 5 falhas de download; o replay os capturou. Além disso, o `inspect-sped` filtrava os guias apenas nas versões 3.2.1 e 3.2.2 e foi corrigido.
+5. **Gate do XSD Reinf 2.1.2.** O arquivo oficial não mudou (`xsd-eventos`, 57.541 bytes, sha `6e4076…`); a inspeção só listava outro XSD. Surgiu um arquivo novo e legítimo: "XSD EFD-Reinf v2.1.2 - CNPJ Alfanumérico" (64.550 bytes, sha `26a82d…`).
+
+Saneamento controlado: `npm run db:sanitize-sped` roda em modo dry-run por padrão. Para executar: `SPED_SANITIZE_CONFIRM=<token> npm run db:sanitize-sped -- --execute`. A execução:
+
+- remove somente as publicações cujas origens são todas SPED, junto com versions, files e links de run (em cascata);
+- preserva runs, attempts e items (em `collection_items.publication_id` o valor vira NULL);
+- é bloqueada por cron ativo, run ativo, publicação compartilhada com outra fonte ou vínculo com empresas.

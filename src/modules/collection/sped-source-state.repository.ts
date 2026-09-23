@@ -1,11 +1,13 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
-import type {
-  SpedKnownPage,
-  SpedPageKind,
-  SpedSourceState,
-  SpedStoredFile,
+import {
+  SPED_STATE_VERSION,
+  type SpedIdentityRecord,
+  type SpedKnownPage,
+  type SpedPageKind,
+  type SpedSourceState,
+  type SpedStoredFile,
 } from './sped.connector.js';
 import type { SpedModule } from './sped.parser.js';
 
@@ -83,6 +85,36 @@ function knownPage(value: unknown): SpedKnownPage | undefined {
   };
 }
 
+function identityRecord(value: unknown): SpedIdentityRecord | undefined {
+  const item = record(value);
+  if (!item) return undefined;
+  if (typeof item.key !== 'string' || !item.key.startsWith('SPED|') || item.key.length > 4096) return undefined;
+  if (typeof item.baseKey !== 'string' || !item.baseKey.startsWith('SPED|') || item.baseKey.length > 4096) return undefined;
+  if (typeof item.officialUrl !== 'string' || !allowedSpedUrl(item.officialUrl)) return undefined;
+  if (typeof item.title !== 'string') return undefined;
+  if (!Array.isArray(item.fileSha256s) || !item.fileSha256s.every((hash) => typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash))) {
+    return undefined;
+  }
+  return {
+    key: item.key,
+    baseKey: item.baseKey,
+    officialUrl: item.officialUrl,
+    title: item.title,
+    ...(typeof item.content === 'string' ? { content: item.content } : {}),
+    fileSha256s: [...item.fileSha256s as string[]].sort(),
+  };
+}
+
+/**
+ * Loads the SPED incremental checkpoint.
+ *
+ * Only checkpoints written with SPED_STATE_VERSION semantics are trusted: in
+ * those, a page is marked as a known DOCUMENT only after its publication was
+ * emitted with every file resolved; deferred documents stay re-fetchable.
+ * That makes PARTIAL_SUCCESS checkpoints safe to reuse. Items whose
+ * persistence failed in that run (collection_items FAILED) are additionally
+ * removed from the checkpoint so they are retried immediately.
+ */
 export async function readSpedSourceState(
   db: Kysely<DB>,
   sourceId: string,
@@ -90,22 +122,56 @@ export async function readSpedSourceState(
   const last = await db
     .selectFrom('collection_attempts as ca')
     .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
-    .select(['ca.metadata', 'ca.finished_at'])
+    .select(['ca.metadata', 'ca.finished_at', 'cr.id as run_id', 'cr.status as run_status'])
     .where('cr.source_id', '=', sourceId)
-    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS'])
+    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS'])
     .where('ca.status', '=', 'SUCCESS')
+    .where(sql<boolean>`(ca.metadata -> 'spedState' ->> 'version') = ${String(SPED_STATE_VERSION)}`)
     .orderBy('ca.finished_at', 'desc')
     .orderBy('ca.attempt_no', 'desc')
     .executeTakeFirst();
 
-  const metadata = record(last?.metadata);
+  if (!last) return { version: SPED_STATE_VERSION, items: {}, pages: {}, identities: {} };
+
+  const metadata = record(last.metadata);
   const state = record(metadata?.spedState);
+
+  const failedItems = last.run_status === 'PARTIAL_SUCCESS'
+    ? await db
+        .selectFrom('collection_items')
+        .select(['external_id', 'source_url'])
+        .where('collection_run_id', '=', last.run_id)
+        .where('status', '=', 'FAILED')
+        .execute()
+    : [];
+  // Consistency with persisted domain data: a document can only be skipped as
+  // "known" if its origin really exists. This self-heals checkpoints after
+  // item persistence failures or a controlled domain clean-up.
+  const origins = await db
+    .selectFrom('publication_origins')
+    .select(['external_id', 'official_url'])
+    .where('source_id', '=', sourceId)
+    .execute();
+  const persistedExternalIds = new Set(origins.map((origin) => origin.external_id).filter((value): value is string => !!value));
+  const persistedUrls = new Set(
+    origins
+      .map((origin) => allowedSpedUrl(origin.official_url))
+      .filter((value): value is string => !!value),
+  );
+
+  const failedExternalIds = new Set(failedItems.map((item) => item.external_id).filter((value): value is string => !!value));
+  const failedUrls = new Set(
+    failedItems
+      .map((item) => (item.source_url ? allowedSpedUrl(item.source_url) : undefined))
+      .filter((value): value is string => !!value),
+  );
 
   const rawItems = record(state?.items);
   const items: Record<string, SpedStoredFile> = {};
   if (rawItems) {
     for (const [key, value] of Object.entries(rawItems)) {
       if (!/^(?:EFD_ICMS_IPI|EFD_CONTRIBUICOES|EFD_REINF|DERE):/.test(key) || key.length > 4096) continue;
+      if ([...failedExternalIds].some((externalId) => key.includes(':' + externalId + ':'))) continue;
       const parsed = storedFile(value);
       if (parsed) items[key] = parsed;
     }
@@ -119,9 +185,29 @@ export async function readSpedSourceState(
       if (!safeKey) continue;
 
       const parsed = knownPage(value);
-      if (parsed) pages[safeKey] = parsed;
+      if (!parsed) continue;
+      if (
+        failedUrls.has(parsed.canonicalUrl) ||
+        failedUrls.has(safeKey) ||
+        (parsed.kind === 'DOCUMENT' && !persistedUrls.has(parsed.canonicalUrl))
+      ) {
+        // Persistence failed or the publication no longer exists: keep it re-fetchable.
+        pages[safeKey] = { ...parsed, kind: 'UNKNOWN' };
+        continue;
+      }
+      pages[safeKey] = parsed;
     }
   }
 
-  return { items, pages };
+  const rawIdentities = record(state?.identities);
+  const identities: Record<string, SpedIdentityRecord> = {};
+  if (rawIdentities) {
+    for (const [externalId, value] of Object.entries(rawIdentities)) {
+      if (externalId.length > 4096 || failedExternalIds.has(externalId) || !persistedExternalIds.has(externalId)) continue;
+      const parsed = identityRecord(value);
+      if (parsed) identities[externalId] = parsed;
+    }
+  }
+
+  return { version: SPED_STATE_VERSION, items, pages, identities };
 }

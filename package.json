@@ -21,9 +21,9 @@
     "db:verify-runtime": "node dist/infrastructure/database/verify-runtime-role.js",
     "db:verify-worker-runtime": "node dist/infrastructure/database/verify-worker-runtime-role.js",
     "db:prepare": "npm run db:migrate && npm run db:provision-runtime-role && npm run db:verify-runtime && npm run db:verify-worker-runtime",
-    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts test/inlabs.client.unit.test.ts test/dou.parser.unit.test.ts test/dou.connector.unit.test.ts test/nfe-encat.client.unit.test.ts test/nfe-encat.parser.unit.test.ts test/nfe-encat.connector.unit.test.ts test/sped.client.unit.test.ts test/sped.parser.unit.test.ts test/sped.connector.unit.test.ts test/sped.govbr.unit.test.ts",
+    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts test/inlabs.client.unit.test.ts test/dou.parser.unit.test.ts test/dou.connector.unit.test.ts test/nfe-encat.client.unit.test.ts test/nfe-encat.parser.unit.test.ts test/nfe-encat.connector.unit.test.ts test/sped.client.unit.test.ts test/sped.parser.unit.test.ts test/sped.connector.unit.test.ts test/sped.govbr.unit.test.ts test/sped.idempotency.unit.test.ts",
     "test:integration": "tsx --test test/auth.integration.test.ts",
-    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts && tsx --test test/dou.collection.integration.test.ts && tsx --test test/nfe-encat.collection.integration.test.ts && tsx --test test/sped.collection.integration.test.ts",
+    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts && tsx --test test/dou.collection.integration.test.ts && tsx --test test/nfe-encat.collection.integration.test.ts && tsx --test test/sped.collection.integration.test.ts test/sped.replay.integration.test.ts test/sped.sanitization.integration.test.ts",
     "db:ensure-confaz-source": "node dist/infrastructure/database/ensure-confaz-source.js",
     "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js",
     "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js",
@@ -33,7 +33,8 @@
     "db:gate-nfe-encat-scheduler": "node dist/infrastructure/database/gate-nfe-encat-scheduler.js",
     "db:ensure-sped-source": "node dist/infrastructure/database/ensure-sped-source.js",
     "db:trigger-sped-run": "node dist/infrastructure/database/trigger-sped-run.js",
-    "db:inspect-sped": "node dist/infrastructure/database/inspect-sped.js"
+    "db:inspect-sped": "node dist/infrastructure/database/inspect-sped.js",
+    "db:sanitize-sped": "node dist/infrastructure/database/sanitize-sped-activation.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
