@@ -405,7 +405,6 @@ function descriptorFromArtifact(
     officialUrl: absolute,
     externalId,
     identityKey: identityFor(family, title, actType, actNumber, docFamily, version, section),
-    content: normalizeInline(anchor.context) || undefined,
     fileUrl: absolute,
     fileName: anchor.text || stablePath(absolute).split('/').pop(),
     pageUrl: listingUrl,
