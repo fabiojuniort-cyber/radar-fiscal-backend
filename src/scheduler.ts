@@ -4,7 +4,10 @@ import {
   assertWorkerRuntimeConnection,
   createStandaloneDatabase,
 } from './infrastructure/database/standalone-client.js';
+import { Pool } from 'pg';
+
 import { processLogger } from './infrastructure/logging/process-logger.js';
+import { runCapacitySnapshotIfDue } from './modules/operations/db-capacity.js';
 import {
   floorToUtcMinute,
 } from './modules/collection/cron.js';
@@ -53,6 +56,17 @@ async function run(): Promise<void> {
 
   let lastEvaluatedMinute: string | undefined;
 
+  // Optional dedicated monitoring connection, used only to measure WAL.
+  const monitor = env.CAPACITY_SNAPSHOTS_ENABLED && env.DATABASE_MONITOR_URL
+    ? new Pool({ connectionString: env.DATABASE_MONITOR_URL, max: 1 })
+    : undefined;
+  monitor?.on('error', (error) => {
+    processLogger.error(
+      { error: error.message },
+      'Capacity monitor PostgreSQL pool error',
+    );
+  });
+
   try {
     await assertStandaloneDatabaseConnection(db);
     await assertWorkerRuntimeConnection(db);
@@ -100,6 +114,32 @@ async function run(): Promise<void> {
             'Collection scheduler tick failed',
           );
         }
+
+        // Storage telemetry: isolated from collection scheduling (a failure
+        // here never affects run creation).
+        if (env.CAPACITY_SNAPSHOTS_ENABLED) {
+          try {
+            await runCapacitySnapshotIfDue(db, {
+              now,
+              intervalMs: env.CAPACITY_SNAPSHOT_INTERVAL_MS,
+              ...(env.DB_VOLUME_CAPACITY_BYTES !== undefined
+                ? { capacityBytes: env.DB_VOLUME_CAPACITY_BYTES }
+                : {}),
+              ...(monitor ? { monitor } : {}),
+              logger: processLogger,
+            });
+          } catch (error) {
+            processLogger.error(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Unknown capacity snapshot error',
+              },
+              'Database capacity snapshot failed',
+            );
+          }
+        }
       }
 
       if (!stopping) {
@@ -109,6 +149,7 @@ async function run(): Promise<void> {
       }
     }
   } finally {
+    await monitor?.end();
     await db.destroy();
 
     processLogger.info(

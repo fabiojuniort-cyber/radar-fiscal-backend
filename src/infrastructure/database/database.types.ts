@@ -104,6 +104,20 @@ export interface CollectionAttempts {
   status: string;
 }
 
+export interface CollectionCheckpoints {
+  connector_key: string;
+  created_at: Generated<Timestamp>;
+  generation: Int8;
+  id: Generated<string>;
+  payload: Json;
+  payload_bytes: number;
+  payload_sha256: string;
+  produced_by_attempt_id: string | null;
+  produced_by_run_id: string | null;
+  source_id: string;
+  state_version: number;
+}
+
 export interface CollectionItems {
   collection_run_id: string;
   created_at: Generated<Timestamp>;
@@ -189,6 +203,22 @@ export interface CompanyTaxProfiles {
   valid_from: Timestamp | null;
   valid_to: Timestamp | null;
   version_no: number;
+}
+
+export interface DbCapacitySnapshots {
+  alert_level: Generated<string>;
+  attempts_rows: Int8;
+  capacity_bytes: Int8 | null;
+  db_bytes: Int8;
+  estimated_pg_bytes: Int8;
+  estimated_used_ratio: Numeric | null;
+  id: Generated<string>;
+  platform_volume_used_bytes: Int8 | null;
+  publications_rows: Int8;
+  taken_at: Generated<Timestamp>;
+  top_tables: Generated<Json>;
+  wal_bytes: Int8 | null;
+  wal_estimate_basis: string;
 }
 
 export interface EstablishmentCnaes {
@@ -381,6 +411,7 @@ export interface DB {
   auth_sessions: AuthSessions;
   cnaes: Cnaes;
   collection_attempts: CollectionAttempts;
+  collection_checkpoints: CollectionCheckpoints;
   collection_items: CollectionItems;
   collection_run_publications: CollectionRunPublications;
   collection_runs: CollectionRuns;
@@ -388,6 +419,7 @@ export interface DB {
   company_cnaes: CompanyCnaes;
   company_publications: CompanyPublications;
   company_tax_profiles: CompanyTaxProfiles;
+  db_capacity_snapshots: DbCapacitySnapshots;
   establishment_cnaes: EstablishmentCnaes;
   establishment_types: EstablishmentTypes;
   establishments: Establishments;

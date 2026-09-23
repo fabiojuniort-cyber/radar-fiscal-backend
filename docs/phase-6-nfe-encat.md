@@ -48,7 +48,7 @@ O estado incremental sempre relê as quatro listagens completas. Para itens já 
 
 ## Estado e falhas parciais
 
-`nfe-encat-source-state.repository.ts` recupera o checkpoint apenas do último **run terminalmente bem-sucedido** (`SUCCESS`/`SUCCESS_NO_RESULTS`) a partir de `collection_attempts.metadata.nfeEncatState`; um `PARTIAL_SUCCESS` nunca avança o estado incremental. Não há migration específica.
+`nfe-encat-source-state.repository.ts` recupera o checkpoint apenas do último **run terminalmente bem-sucedido** (`SUCCESS`/`SUCCESS_NO_RESULTS`); um `PARTIAL_SUCCESS` nunca avança o estado incremental. Desde o Hardening do Motor o estado fica em `collection_checkpoints` (ver `docs/hardening-motor.md`); `collection_attempts.metadata.nfeEncatState` só é lido como fallback de transição.
 
 Falha de download/processamento de um documento gera `partialFailures` e não impede os demais itens de serem coletados. Se todas as quatro listagens falharem, o conector lança `NFE_ENCAT_ALL_LISTINGS_FAILED`, permitindo ao Motor registrar fonte indisponível/falha de fetch em vez de `SUCCESS_NO_RESULTS`.
 

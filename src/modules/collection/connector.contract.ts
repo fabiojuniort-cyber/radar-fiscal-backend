@@ -60,6 +60,33 @@ export interface ConnectorPartialFailure {
   itemReference?: string;
 }
 
+/**
+ * Reason a connector finished voluntarily with work still pending.
+ */
+export type ConnectorIncompleteReason = 'TIME_BUDGET_REACHED';
+
+export interface ConnectorCompletion {
+  /**
+   * false = the connector stopped at a safe point before covering everything.
+   * Everything returned is consistent and its checkpoint is valid; the next
+   * run continues from it. This is NOT a failure and NOT a timeout.
+   */
+  complete: boolean;
+  reason?: ConnectorIncompleteReason;
+  /** Optional connector-specific counters describing the pending work. */
+  pending?: Record<string, number>;
+}
+
+/**
+ * Operational checkpoint produced by an attempt. Stored by the engine in
+ * collection_checkpoints (not in collection_attempts.metadata). Only
+ * persisted when the connector returns normally.
+ */
+export interface ConnectorCheckpoint {
+  version: number;
+  state: Record<string, unknown>;
+}
+
 export interface ConnectorResult {
   publications: ConnectorPublication[];
 
@@ -70,6 +97,26 @@ export interface ConnectorResult {
   partialFailures?: ConnectorPartialFailure[];
 
   metadata?: Record<string, unknown>;
+
+  /** Opt-in: voluntary early stop (e.g. time budget) with pending work. */
+  completion?: ConnectorCompletion;
+
+  /** Opt-in: heavy operational state kept outside attempt history. */
+  checkpoint?: ConnectorCheckpoint;
+}
+
+/**
+ * Time budget of one attempt. The hard timeout is still enforced by the
+ * executor; the budget lets a connector stop gracefully before it.
+ */
+export interface ConnectorTimeBudget {
+  /** Hard timeout instant (the attempt is aborted as TIMEOUT after it). */
+  readonly deadlineAt: Date;
+  /** Instant after which the connector should stop starting new work. */
+  readonly softDeadlineAt: Date;
+  remainingMs(): number;
+  /** true once the soft deadline has passed. */
+  shouldYield(): boolean;
 }
 
 export interface ConnectorExecutionContext {
@@ -77,6 +124,8 @@ export interface ConnectorExecutionContext {
   runId: string;
   attemptId: string;
   signal: AbortSignal;
+  /** Always provided by the executor; optional for direct/test invocations. */
+  budget?: ConnectorTimeBudget;
 }
 
 export interface CollectionConnector {

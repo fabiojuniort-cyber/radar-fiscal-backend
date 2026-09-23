@@ -33,9 +33,11 @@ const DEFAULT_MAX_RECHECKS_PER_RUN = 16;
 const DEFAULT_MAX_PAGES_PER_MODULE = 600;
 const DEFAULT_MAX_CRAWL_DEPTH = 5;
 
+export type SpedSeedKind = 'MODULE' | 'CATEGORY' | 'MODULE_HIGHLIGHTS' | 'GLOBAL_HIGHLIGHTS';
+
 interface SpedModuleSeed {
   url: string;
-  kind: 'MODULE' | 'CATEGORY' | 'MODULE_HIGHLIGHTS' | 'GLOBAL_HIGHLIGHTS';
+  kind: SpedSeedKind;
 }
 
 export interface SpedModuleDefinition {
@@ -153,6 +155,21 @@ export interface SpedIdentityRecord {
  * a known DOCUMENT and hide its children, e.g. the EFD-Reinf XSD packages).
  */
 export const SPED_STATE_VERSION = 3;
+
+/** Max deferred documents listed in attempt metadata (the count is always exact). */
+export const SPED_DEFERRED_SAMPLE_SIZE = 50;
+
+/**
+ * Share of the available (soft) time budget that page discovery (crawl and
+ * rechecks) may use. The rest is reserved for downloading the files of what
+ * was discovered, so every yielded run still emits documents and the next run
+ * makes progress instead of re-discovering the same pages forever.
+ */
+export const SPED_DISCOVERY_BUDGET_SHARE = 0.6;
+
+/** Upper bound of crawl frontier entries carried in the checkpoint. */
+export const SPED_MAX_FRONTIER = 5_000;
+
 export const SPED_IDENTITY_VERSION = 'v2';
 const MAX_STORED_IDENTITY_CONTENT = 4_000;
 
@@ -165,6 +182,28 @@ export interface SpedSourceState {
   items: Record<string, SpedStoredFile>;
   pages: Record<string, SpedKnownPage>;
   identities?: Record<string, SpedIdentityRecord>;
+  /**
+   * Present only while a discovery cycle is interrupted by the time budget:
+   * the next run resumes from this frontier instead of restarting from the
+   * seeds (so a slow portal cannot starve discovery). Cleared when a run
+   * finishes without yielding.
+   */
+  cycle?: SpedCrawlCycle;
+}
+
+export interface SpedFrontierPage {
+  module: SpedModule;
+  url: string;
+  depth: number;
+  seedKind: SpedSeedKind;
+  forceFetch?: boolean;
+}
+
+export interface SpedCrawlCycle {
+  /** Modules whose crawl already finished in this cycle. */
+  completedModules: SpedModule[];
+  /** Pages still to visit (unvisited queue, deferred documents). */
+  frontier: SpedFrontierPage[];
 }
 
 export interface SpedIdentityCollision {
@@ -240,6 +279,17 @@ interface ModuleCrawlResult {
   missingHistoricalPages: number;
   seedSuccesses: number;
   failures: ConnectorPartialFailure[];
+  /** true when the crawl stopped at a safe point because of the time budget. */
+  yielded: boolean;
+  /** Pages still queued when the crawl yielded. */
+  pendingPages: number;
+  /** The unvisited queue itself (for the next run's frontier). */
+  remainingQueue: CrawlPage[];
+  /**
+   * Documents whose linked artifact pages were still queued when the crawl
+   * yielded: their file set is incomplete, so they must be deferred.
+   */
+  incompleteExternalIds: Set<string>;
 }
 
 function isHistoricalMissing(error: unknown): error is ConnectorError {
@@ -523,12 +573,17 @@ async function crawlModule(
   maxPagesPerModule: number,
   maxCrawlDepth: number,
   portal: SpedPortalMode,
+  shouldYield: () => boolean = () => false,
+  initialQueue?: CrawlPage[],
 ): Promise<ModuleCrawlResult> {
-  const queue: CrawlPage[] = definition.seeds.map((seed) => ({
-    url: seed.url,
-    depth: 0,
-    seedKind: seed.kind,
-  }));
+  // A resumed cycle starts from its frontier instead of the seeds.
+  const queue: CrawlPage[] = initialQueue
+    ? initialQueue.map((page) => ({ ...page }))
+    : definition.seeds.map((seed) => ({
+        url: seed.url,
+        depth: 0,
+        seedKind: seed.kind,
+      }));
   const seen = new Set<string>();
   const candidates = new Map<string, KnownDocumentCandidate>();
   const descriptors = new Map<string, SpedDocumentDescriptor>();
@@ -540,6 +595,7 @@ async function crawlModule(
   let skippedKnownDocuments = 0;
   let skippedKnownMissingPages = 0;
   let missingHistoricalPages = 0;
+  let yielded = false;
 
   while (queue.length && seen.size < maxPagesPerModule) {
     context.signal.throwIfAborted();
@@ -563,6 +619,15 @@ async function crawlModule(
       if (known.kind === 'MISSING') skippedKnownMissingPages += 1;
       else skippedKnownDocuments += 1;
       continue;
+    }
+
+    // Safe point: stop before starting a new network request once the time
+    // budget asks us to yield. The page goes back to the queue (not visited).
+    if (shouldYield()) {
+      seen.delete(seenKey);
+      queue.unshift(current);
+      yielded = true;
+      break;
     }
 
     try {
@@ -684,6 +749,16 @@ async function crawlModule(
     missingHistoricalPages,
     seedSuccesses,
     failures,
+    yielded,
+    pendingPages: yielded ? queue.length : 0,
+    remainingQueue: yielded ? queue : [],
+    incompleteExternalIds: new Set(
+      yielded
+        ? queue
+            .map((page) => page.parentExternalId)
+            .filter((value): value is string => typeof value === 'string')
+        : [],
+    ),
   };
 }
 
@@ -1142,10 +1217,52 @@ export class SpedConnector implements CollectionConnector {
 
     const partialFailures: ConnectorPartialFailure[] = [];
     const crawlResults: ModuleCrawlResult[] = [];
+    // Graceful time budget: once shouldYield() is true no new network work is
+    // started; everything already obtained is returned consistently and the
+    // checkpoint lets the next scheduled run continue.
+    const budget = context.budget;
+    const shouldYield = (): boolean => budget?.shouldYield() === true;
+    // Discovery may only use SPED_DISCOVERY_BUDGET_SHARE of the soft window.
+    const graceMs = budget ? budget.deadlineAt.getTime() - budget.softDeadlineAt.getTime() : 0;
+    const softWindowMs = budget ? Math.max(0, budget.remainingMs() - graceMs) : 0;
+    const discoveryReserveMs = softWindowMs * (1 - SPED_DISCOVERY_BUDGET_SHARE);
+    const shouldYieldDiscovery = (): boolean =>
+      shouldYield() ||
+      (budget !== undefined && budget.remainingMs() - graceMs <= discoveryReserveMs);
+    let yielded = false;
+    let pendingModules = 0;
+
+    // Resume an interrupted discovery cycle: finished modules are not crawled
+    // again from their seeds; only their frontier (if any) is visited.
+    const cycle = state.cycle;
+    const resumed = cycle !== undefined;
+    const completedModules = new Set<SpedModule>(cycle?.completedModules ?? []);
+    const frontierByModule = new Map<SpedModule, CrawlPage[]>();
+    for (const page of cycle?.frontier ?? []) {
+      const pages = frontierByModule.get(page.module) ?? [];
+      pages.push({
+        url: page.url,
+        depth: page.depth,
+        seedKind: page.seedKind,
+        ...(page.forceFetch ? { forceFetch: true } : {}),
+      });
+      frontierByModule.set(page.module, pages);
+    }
+    const finishedThisRun = new Set<SpedModule>();
 
     try {
-      for (const definition of definitions) {
+      for (const [index, definition] of definitions.entries()) {
         context.signal.throwIfAborted();
+        const frontier = frontierByModule.get(definition.module);
+        if (completedModules.has(definition.module) && !frontier) continue;
+        if (shouldYieldDiscovery()) {
+          yielded = true;
+          pendingModules = definitions
+            .slice(index)
+            .filter((item) => !completedModules.has(item.module) || frontierByModule.has(item.module))
+            .length;
+          break;
+        }
         const result = await crawlModule(
           definition,
           client,
@@ -1156,13 +1273,30 @@ export class SpedConnector implements CollectionConnector {
           maxPagesPerModule,
           maxCrawlDepth,
           portal,
+          shouldYieldDiscovery,
+          frontier,
         );
         crawlResults.push(result);
         partialFailures.push(...result.failures);
+        if (!result.yielded) finishedThisRun.add(definition.module);
+        if (result.yielded) {
+          yielded = true;
+          pendingModules = definitions.length - index - 1;
+          break;
+        }
       }
 
       const modulesSucceeded = crawlResults.filter((result) => result.seedSuccesses > 0).length;
-      if (modulesSucceeded === 0) {
+      // Without a yield, no successful seed means the source is unavailable.
+      // After a yield, modules may simply not have been reached yet: it is only
+      // a failure if something was attempted and nothing succeeded.
+      // A resumed cycle starts below the seeds, so seed successes are not
+      // expected there either.
+      const sourceUnavailable = yielded || resumed
+        ? crawlResults.some((result) => result.pagesFailed > 0) &&
+          !crawlResults.some((result) => result.pagesSucceeded > 0)
+        : modulesSucceeded === 0;
+      if (sourceUnavailable) {
         throw new ConnectorError('SPED_ALL_MODULES_FAILED', {
           code: 'SPED_ALL_MODULES_FAILED',
           kind: 'SOURCE_UNAVAILABLE',
@@ -1205,8 +1339,16 @@ export class SpedConnector implements CollectionConnector {
       let recheckPagesSucceeded = 0;
       let recheckPagesFailed = 0;
       let recheckedTombstonesConfirmed = 0;
+      let pendingRechecks = 0;
 
-      for (const candidate of selectedRechecks) {
+      for (const [index, candidate] of selectedRechecks.entries()) {
+        // Rechecks not done now keep their old checkedAt and are the first to
+        // be selected next run (oldest first). A recheck is never cut halfway.
+        if (yielded || shouldYieldDiscovery()) {
+          yielded = true;
+          pendingRechecks = selectedRechecks.length - index;
+          break;
+        }
         const result = await recheckDocument(candidate, client, context, nextPages, nowIso, portal);
         if (candidate.kind === 'MISSING') recheckedMissingPageCount += 1;
         else recheckedKnownDocumentCount += 1;
@@ -1239,11 +1381,24 @@ export class SpedConnector implements CollectionConnector {
       let notModifiedCount = 0;
       let existingFileRecheckCount = 0;
       let newFileDownloadCount = 0;
+      let pendingFiles = 0;
+      // Downloads use the full soft window, even after discovery yielded.
+      let downloadsYielded = false;
 
       for (const file of files) {
         context.signal.throwIfAborted();
         const key = stateKey(file);
         const previous = state.items[key];
+        if (downloadsYielded || shouldYield()) {
+          // No new download after the soft deadline. A file proven by the
+          // previous checkpoint stays resolved (same as a failed recheck);
+          // an unknown one leaves its document deferred for the next run.
+          downloadsYielded = true;
+          yielded = true;
+          if (previous) resolvedFiles.set(key, connectorFile(file, previous));
+          else pendingFiles += 1;
+          continue;
+        }
         if (previous) existingFileRecheckCount += 1;
         else newFileDownloadCount += 1;
 
@@ -1309,7 +1464,19 @@ export class SpedConnector implements CollectionConnector {
       // run fetches it again.
       const candidates: IdentityCandidate[] = [];
       const deferred: SpedDocumentDescriptor[] = [];
+      const incompleteExternalIds = new Set<string>();
+      for (const result of crawlResults) {
+        for (const externalId of result.incompleteExternalIds) incompleteExternalIds.add(externalId);
+      }
       for (const descriptor of descriptors) {
+        if (
+          incompleteExternalIds.has(descriptor.externalId) ||
+          (descriptor.linkedArtifactExternalIds ?? []).some((id) => incompleteExternalIds.has(id))
+        ) {
+          // Crawl yielded before all linked artifact pages were read.
+          deferred.push(descriptor);
+          continue;
+        }
         const currentFiles = descriptor.files
           .map((file) => resolvedFiles.get(stateKey({
             module: descriptor.module,
@@ -1367,10 +1534,90 @@ export class SpedConnector implements CollectionConnector {
         (sum, result) => sum + result.skippedKnownDocuments,
         0,
       );
+      const pendingCrawlPages = crawlResults.reduce((sum, result) => sum + result.pendingPages, 0);
+
+      // Next cycle state (only when this run yielded).
+      let nextCycle: SpedCrawlCycle | undefined;
+      if (yielded) {
+        const frontier: SpedFrontierPage[] = [];
+        const frontierKeys = new Set<string>();
+        const addFrontier = (page: SpedFrontierPage): void => {
+          const key = page.module + ' ' + page.url + ' ' + (page.forceFetch ? 'F' : 'N');
+          if (frontierKeys.has(key) || frontier.length >= SPED_MAX_FRONTIER) return;
+          frontierKeys.add(key);
+          frontier.push(page);
+        };
+        for (const result of crawlResults) {
+          for (const page of result.remainingQueue) {
+            if (page.parentExternalId) {
+              // Artifact of a document read in this run: revisit the whole
+              // document next time (its descriptor is not carried over).
+              const parent = allDescriptors.get(page.parentExternalId);
+              if (parent) {
+                addFrontier({
+                  module: result.module,
+                  url: canonicalPortalUrl(parent.officialUrl),
+                  depth: 1,
+                  seedKind: 'CATEGORY',
+                  forceFetch: true,
+                });
+              }
+              continue;
+            }
+            addFrontier({
+              module: result.module,
+              url: page.url,
+              depth: page.depth,
+              seedKind: page.seedKind,
+              ...(page.forceFetch ? { forceFetch: true } : {}),
+            });
+          }
+        }
+        for (const descriptor of deferred) {
+          addFrontier({
+            module: descriptor.module,
+            url: canonicalPortalUrl(descriptor.officialUrl),
+            depth: 1,
+            seedKind: 'CATEGORY',
+            forceFetch: true,
+          });
+        }
+        nextCycle = {
+          completedModules: definitions
+            .map((definition) => definition.module)
+            .filter((module) => completedModules.has(module) || finishedThisRun.has(module)),
+          frontier,
+        };
+      }
 
       return {
         publications,
         ...(partialFailures.length ? { partialFailures } : {}),
+        ...(yielded
+          ? {
+              completion: {
+                complete: false,
+                reason: 'TIME_BUDGET_REACHED' as const,
+                pending: {
+                  modules: pendingModules,
+                  crawlPages: pendingCrawlPages,
+                  rechecks: pendingRechecks,
+                  files: pendingFiles,
+                  deferredDocuments: deferred.length,
+                },
+              },
+            }
+          : {}),
+        checkpoint: {
+          version: SPED_STATE_VERSION,
+          state: {
+            version: SPED_STATE_VERSION,
+            items: nextItems,
+            pages: nextPages,
+            identities: identity.identities,
+            ...(nextCycle ? { cycle: nextCycle } : {}),
+          },
+        },
         metadata: {
           sped: {
             modulesSucceeded,
@@ -1424,7 +1671,8 @@ export class SpedConnector implements CollectionConnector {
             maxCrawlDepth,
             partialFailureCount: partialFailures.length,
             deferredDocumentCount: deferred.length,
-            deferredDocuments: deferred.map((descriptor) => ({
+            // Bounded sample: attempt metadata is history, not a data store.
+            deferredDocuments: deferred.slice(0, SPED_DEFERRED_SAMPLE_SIZE).map((descriptor) => ({
               externalId: descriptor.externalId,
               officialUrl: descriptor.officialUrl,
               title: descriptor.title,
@@ -1433,12 +1681,9 @@ export class SpedConnector implements CollectionConnector {
             identityAudit: identity.audit,
             stateVersion: SPED_STATE_VERSION,
             scope: ['EFD_ICMS_IPI', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DERE'],
-          },
-          spedState: {
-            version: SPED_STATE_VERSION,
-            items: nextItems,
-            pages: nextPages,
-            identities: identity.identities,
+            timeBudgetYielded: yielded,
+            resumedCycle: resumed,
+            nextFrontierSize: nextCycle?.frontier.length ?? 0,
           },
         },
       };

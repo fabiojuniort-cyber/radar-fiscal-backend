@@ -16,7 +16,9 @@ export function resolveCollectionRunStatus(
     const hasPartialFailures =
       (outcome.result.partialFailures?.length ?? 0) > 0;
 
-    if (hasPartialFailures) {
+    // A voluntary early stop (e.g. TIME_BUDGET_REACHED) left work pending:
+    // it is a partial success, never a timeout or a failure.
+    if (hasPartialFailures || outcome.result.completion?.complete === false) {
       return 'PARTIAL_SUCCESS';
     }
 

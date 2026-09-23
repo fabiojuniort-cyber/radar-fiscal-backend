@@ -52,6 +52,11 @@ export interface CollectionEngineLogger {
 
 export interface CollectionEngineOptions {
   timeoutMs?: number;
+  /**
+   * Time reserved at the end of the attempt for a graceful yield (the soft
+   * deadline is timeoutMs - budgetGraceMs). Defaults to defaultBudgetGraceMs.
+   */
+  budgetGraceMs?: number;
   heartbeatIntervalMs?: number;
   retryPolicy?: RetryPolicyOptions;
   logger?: CollectionEngineLogger;
@@ -183,7 +188,8 @@ function terminalStatusAfterProcessing(
 
   if (
     metrics.itemErrors > 0 ||
-    metrics.connectorPartialFailures > 0
+    metrics.connectorPartialFailures > 0 ||
+    outcome.result.completion?.complete === false
   ) {
     return 'PARTIAL_SUCCESS';
   }
@@ -191,6 +197,29 @@ function terminalStatusAfterProcessing(
   return outcome.result.publications.length > 0
     ? 'SUCCESS'
     : 'SUCCESS_NO_RESULTS';
+}
+
+/**
+ * Structured summary for PARTIAL_SUCCESS runs. A voluntary early stop is
+ * reported with its reason first (e.g. TIME_BUDGET_REACHED) so it is never
+ * confused with a timeout or a failure.
+ */
+function partialSummary(
+  outcome: Extract<ConnectorExecutionOutcome, { ok: true }>,
+  metrics: CollectionEngineMetrics,
+): string | undefined {
+  const parts: string[] = [];
+  const completion = outcome.result.completion;
+  if (completion?.complete === false) {
+    const pending = Object.entries(completion.pending ?? {})
+      .map(([key, value]) => key + '=' + value)
+      .join(', ');
+    parts.push((completion.reason ?? 'INCOMPLETE') + (pending ? ' (' + pending + ')' : ''));
+  }
+  if (metrics.itemErrors > 0 || metrics.connectorPartialFailures > 0) {
+    parts.push(`Partial processing: ${metrics.itemErrors} item errors, ${metrics.connectorPartialFailures} connector partial failures`);
+  }
+  return parts.length ? parts.join('; ') : undefined;
 }
 
 export async function processAcquiredCollectionRun(
@@ -275,12 +304,16 @@ export async function processAcquiredCollectionRun(
             runId: run.id,
             attemptId: attempt.id,
             timeoutMs,
+            ...(options.budgetGraceMs !== undefined ? { budgetGraceMs: options.budgetGraceMs } : {}),
           })
         : missingConnectorOutcome(run.connectorKey);
 
     await finishCollectionAttempt(db, {
       attemptId: attempt.id,
       outcome,
+      runId: run.id,
+      sourceId: run.sourceId,
+      connectorKey: run.connectorKey,
     });
 
     if (!outcome.ok) {
@@ -478,12 +511,8 @@ export async function processAcquiredCollectionRun(
       runId: run.id,
       workerId: run.workerId,
       status,
-      ...(metrics.itemErrors > 0 ||
-      metrics.connectorPartialFailures > 0
-        ? {
-            errorSummary:
-              `Partial processing: ${metrics.itemErrors} item errors, ${metrics.connectorPartialFailures} connector partial failures`,
-          }
+      ...(partialSummary(outcome, metrics)
+        ? { errorSummary: partialSummary(outcome, metrics)! }
         : {}),
     });
 
@@ -496,6 +525,12 @@ export async function processAcquiredCollectionRun(
         status,
         durationMs: outcome.durationMs,
         ...metrics,
+        ...(outcome.result.completion?.complete === false
+          ? {
+              incompleteReason: outcome.result.completion.reason ?? 'UNSPECIFIED',
+              pending: outcome.result.completion.pending ?? {},
+            }
+          : {}),
       },
       'Collection run completed',
     );

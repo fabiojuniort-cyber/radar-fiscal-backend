@@ -65,10 +65,20 @@ try {
                        'identityMirrorGroups', jsonb_array_length(COALESCE(ca.metadata->'sped'->'identityAudit'->'mirrorGroups', '[]'::jsonb)),
                        'collisions', ca.metadata->'sped'->'identityAudit'->'collisionsResolved'
                      ),
-          'stateVersion', ca.metadata->'spedState'->'version',
-          'checkpointItems', (
-            SELECT count(*)::int FROM jsonb_object_keys(COALESCE(ca.metadata->'spedState'->'items', '{}'::jsonb))
-          )
+          'stateVersion', COALESCE(ca.metadata->'checkpointRef'->'version', ca.metadata->'spedState'->'version'),
+          'checkpointGeneration', ca.metadata->'checkpointRef'->'generation',
+          'checkpointBytes', ca.metadata->'checkpointRef'->'bytes',
+          'checkpointItems', CASE
+            WHEN ca.metadata ? 'checkpointRef' THEN (
+              SELECT count(*)::int
+              FROM collection_checkpoints cc,
+                   jsonb_object_keys(COALESCE(cc.payload->'items', '{}'::jsonb))
+              WHERE cc.id::text = ca.metadata->'checkpointRef'->>'id'
+            )
+            ELSE (
+              SELECT count(*)::int FROM jsonb_object_keys(COALESCE(ca.metadata->'spedState'->'items', '{}'::jsonb))
+            )
+          END
         ) ORDER BY ca.attempt_no)
         FROM collection_attempts ca WHERE ca.collection_run_id = cr.id) AS attempts
       FROM collection_runs cr

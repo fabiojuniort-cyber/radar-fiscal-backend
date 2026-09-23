@@ -20,6 +20,8 @@ import {
 } from './nfe-encat.parser.js';
 
 export const NFE_ENCAT_CONNECTOR_KEY = 'nfe-encat';
+/** Version of the checkpoint payload stored in collection_checkpoints. */
+export const NFE_ENCAT_STATE_VERSION = 1;
 
 const DEFAULT_REVISIT_AFTER_MS =
   24 * 60 * 60 * 1_000;
@@ -412,7 +414,10 @@ export class NfeEncatConnector implements CollectionConnector {
             partialFailureCount: partialFailures.length,
             scope: ['NOTAS_TECNICAS', 'INFORMES_TECNICOS', 'SCHEMAS_NFE_NFCE', 'MANUAIS_NFE_NFCE'],
           },
-          nfeEncatState: { items: nextItems },
+        },
+        checkpoint: {
+          version: NFE_ENCAT_STATE_VERSION,
+          state: { items: nextItems },
         },
       };
     } finally {

@@ -11,6 +11,7 @@ import type {
   ConnectorExecutionFailure,
   ConnectorExecutionOutcome,
 } from './connector.executor.js';
+import { writeCheckpoint } from './checkpoint.repository.js';
 import type { CollectionRunTerminalStatus } from './run-status.js';
 
 export interface AcquiredCollectionRun {
@@ -55,6 +56,10 @@ export interface FinishRunInput {
 export interface FinishAttemptInput {
   attemptId: string;
   outcome: ConnectorExecutionOutcome;
+  /** Required when the outcome carries a checkpoint. */
+  runId?: string;
+  sourceId?: string;
+  connectorKey?: string;
 }
 
 function asJson(value: unknown): Json {
@@ -302,26 +307,54 @@ export async function finishCollectionAttempt(
   const finishedAt = new Date();
 
   if (input.outcome.ok) {
-    await db
-      .updateTable('collection_attempts')
-      .set({
-        status: 'SUCCESS',
-        finished_at: finishedAt,
-        response_time_ms:
-          input.outcome.durationMs,
-        retryable: false,
-        metadata: asJson({
-          ...(input.outcome.result.metadata ?? {}),
-          partialFailureCount:
-            input.outcome.result.partialFailures?.length ??
-            0,
-          publicationCount:
-            input.outcome.result.publications.length,
-        }),
-      })
-      .where('id', '=', input.attemptId)
-      .where('status', '=', 'RUNNING')
-      .execute();
+    const outcome = input.outcome;
+    const checkpoint = outcome.result.checkpoint;
+    if (checkpoint && (!input.runId || !input.sourceId || !input.connectorKey)) {
+      throw new Error('runId, sourceId and connectorKey are required to persist a checkpoint');
+    }
+
+    await db.transaction().execute(async (trx) => {
+      // Only the attempt that still owns its RUNNING row may finish it and
+      // publish a checkpoint (a recovered/stale attempt must not).
+      const owned = await trx
+        .selectFrom('collection_attempts')
+        .select('id')
+        .where('id', '=', input.attemptId)
+        .where('status', '=', 'RUNNING')
+        .forUpdate()
+        .executeTakeFirst();
+      if (!owned) return;
+
+      const checkpointRef = checkpoint
+        ? await writeCheckpoint(trx, {
+            sourceId: input.sourceId!,
+            connectorKey: input.connectorKey!,
+            runId: input.runId!,
+            attemptId: input.attemptId,
+            checkpoint,
+          })
+        : undefined;
+
+      await trx
+        .updateTable('collection_attempts')
+        .set({
+          status: 'SUCCESS',
+          finished_at: finishedAt,
+          response_time_ms: outcome.durationMs,
+          retryable: false,
+          metadata: asJson({
+            ...(outcome.result.metadata ?? {}),
+            partialFailureCount:
+              outcome.result.partialFailures?.length ?? 0,
+            publicationCount: outcome.result.publications.length,
+            ...(outcome.result.completion ? { completion: outcome.result.completion } : {}),
+            ...(checkpointRef ? { checkpointRef } : {}),
+          }),
+        })
+        .where('id', '=', input.attemptId)
+        .where('status', '=', 'RUNNING')
+        .execute();
+    });
 
     return;
   }

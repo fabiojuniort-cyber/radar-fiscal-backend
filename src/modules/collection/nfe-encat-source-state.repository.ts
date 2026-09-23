@@ -1,7 +1,13 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
-import type { NfeEncatSourceState, NfeEncatStoredFile } from './nfe-encat.connector.js';
+import { readCurrentCheckpoint } from './checkpoint.repository.js';
+import {
+  NFE_ENCAT_CONNECTOR_KEY,
+  NFE_ENCAT_STATE_VERSION,
+  type NfeEncatSourceState,
+  type NfeEncatStoredFile,
+} from './nfe-encat.connector.js';
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -27,23 +33,38 @@ function storedFile(value: unknown): NfeEncatStoredFile | undefined {
   };
 }
 
+/**
+ * Loads the NF-e incremental checkpoint: primarily from collection_checkpoints,
+ * falling back (transition only) to the legacy nfeEncatState embedded in the
+ * metadata of the last successful attempt. Accepted run statuses are unchanged.
+ */
 export async function readNfeEncatSourceState(
   db: Kysely<DB>,
   sourceId: string,
 ): Promise<NfeEncatSourceState> {
-  const last = await db
-    .selectFrom('collection_attempts as ca')
-    .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
-    .select(['ca.metadata', 'ca.finished_at'])
-    .where('cr.source_id', '=', sourceId)
-    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS'])
-    .where('ca.status', '=', 'SUCCESS')
-    .orderBy('ca.finished_at', 'desc')
-    .orderBy('ca.attempt_no', 'desc')
-    .executeTakeFirst();
+  const accepted = ['SUCCESS', 'SUCCESS_NO_RESULTS'];
+  const stored = await readCurrentCheckpoint(db, sourceId, NFE_ENCAT_CONNECTOR_KEY, {
+    stateVersion: NFE_ENCAT_STATE_VERSION,
+    acceptedRunStatuses: accepted,
+  });
 
-  const metadata = record(last?.metadata);
-  const state = record(metadata?.nfeEncatState);
+  let state: Record<string, unknown> | undefined;
+  if (stored) {
+    state = stored.state;
+  } else {
+    const last = await db
+      .selectFrom('collection_attempts as ca')
+      .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
+      .select(['ca.metadata', 'ca.finished_at'])
+      .where('cr.source_id', '=', sourceId)
+      .where('cr.status', 'in', accepted)
+      .where('ca.status', '=', 'SUCCESS')
+      .where(sql<boolean>`ca.metadata ? 'nfeEncatState'`)
+      .orderBy('ca.finished_at', 'desc')
+      .orderBy('ca.attempt_no', 'desc')
+      .executeTakeFirst();
+    state = record(record(last?.metadata)?.nfeEncatState);
+  }
   const rawItems = record(state?.items);
   const items: Record<string, NfeEncatStoredFile> = {};
   if (rawItems) {

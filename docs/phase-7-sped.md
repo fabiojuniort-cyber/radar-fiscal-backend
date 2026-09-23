@@ -36,7 +36,7 @@ Decisões explícitas:
 - `sped.client.ts`: HTTPS, redirects, limites, arquivos, SHA-256 e conditional GET.
 - `sped.parser.ts`: HTML + hidratação Volto `window.__data`, classificação, versões e arquivos.
 - `sped.connector.ts`: crawl por módulo, descoberta, downloads e incremental.
-- `sped-source-state.repository.ts`: checkpoint somente de attempts pertencentes a runs bem-sucedidos.
+- `sped-source-state.repository.ts`: checkpoint somente de runs bem-sucedidos; desde o Hardening do Motor lido de `collection_checkpoints` (fallback de transição: `metadata.spedState`). Budget de tempo e retomada por fronteira: `docs/hardening-motor.md`.
 - `ensure-sped-source.ts`: provisionamento da fonte `sped` com gov.br como `base_url`.
 
 ## Entradas gov.br
