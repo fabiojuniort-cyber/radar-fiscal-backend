@@ -2,6 +2,8 @@ import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { CgibsConnector } from './cgibs.connector.js';
+import { RfbNormasConnector } from './rfb-normas.connector.js';
+import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.js';
 import { readCgibsSourceState } from './cgibs-source-state.repository.js';
 import { ConfazConnector } from './confaz.connector.js';
 import { DouConnector } from './dou.connector.js';
@@ -36,6 +38,17 @@ export function buildConnectorRegistry(
       ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId) } : {}),
     }));
   }
+
+  registry.register(
+    new RfbNormasConnector({
+      ...(options.db
+        ? {
+            readState: (sourceId) =>
+              readRfbNormasSourceState(options.db!, sourceId),
+          }
+        : {}),
+    }),
+  );
 
   registry.register(
     new CgibsConnector({
