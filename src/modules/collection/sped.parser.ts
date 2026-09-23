@@ -146,6 +146,15 @@ function stableGovPath(url: URL): string {
   return url.pathname.replace(/\/$/, '') || '/';
 }
 
+function isGovBrSystemResource(url: URL): boolean {
+  if (!isGovBrSpedUrl(url)) return false;
+  const segments = url.pathname.split('/').filter(Boolean);
+  return segments.some((segment) => {
+    if (/^@@(?:display-file|download)$/i.test(segment)) return false;
+    return segment === 'object_copy' || segment.startsWith('@');
+  });
+}
+
 function documentPageIdFromUrl(url: string): { id: string; type: 'item' | 'arquivo' | 'pagina' | 'govbr' } | undefined {
   const parsed = new URL(url, SPED_LEGACY_ORIGIN);
   const path = parsed.pathname + parsed.search;
@@ -210,6 +219,7 @@ function embeddedLinks(html: string, pageUrl: string): SpedParsedLink[] {
     try {
       const absolute = new URL(rawUrl, page);
       if (!samePortalUrl(absolute, page) && absolute.origin.toLowerCase() !== SPED_LEGACY_ORIGIN) return;
+      if (isGovBrSystemResource(absolute)) return;
       absolute.hash = '';
       const key = absolute.toString();
       const existing = found.get(key);
@@ -224,14 +234,7 @@ function embeddedLinks(html: string, pageUrl: string): SpedParsedLink[] {
   };
 
   const walk = (value: unknown): void => {
-    if (typeof value === 'string') {
-      if (
-        value.startsWith('http://') ||
-        value.startsWith('https://') ||
-        value.startsWith('/sped/pt-br/')
-      ) add(value);
-      return;
-    }
+    if (typeof value === 'string') return;
     if (!value || typeof value !== 'object') return;
     if (visited.has(value)) return;
     visited.add(value);
