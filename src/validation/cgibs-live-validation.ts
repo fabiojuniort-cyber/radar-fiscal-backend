@@ -87,11 +87,11 @@ console.log('CGIBS_LIVE_FIRST=' + JSON.stringify({
   metadata: first.metadata,
 }));
 
-requireGate(first.publications, 'RESOLUTION_6_2026', (title, metadata) =>
-  /RESOLUCAO.*\b6\b/.test(title) || String(metadata.normativeKey ?? '').includes('RESOLUCAO_CGIBS|6_2026'),
+requireGate(first.publications, 'RESOLUTION_6_2026', (_title, metadata) =>
+  String(metadata.normativeKey ?? '') === 'CGIBS|ACT|RESOLUCAO_CGIBS|6_2026',
 );
-requireGate(first.publications, 'RESOLUTION_18_2026', (title, metadata) =>
-  /RESOLUCAO.*\b18\b/.test(title) || String(metadata.normativeKey ?? '').includes('RESOLUCAO_CGIBS|18_2026'),
+requireGate(first.publications, 'RESOLUTION_18_2026', (_title, metadata) =>
+  String(metadata.normativeKey ?? '') === 'CGIBS|ACT|RESOLUCAO_CGIBS|18_2026',
 );
 requireGate(first.publications, 'PORTARIA', (title, metadata) =>
   title.includes('PORTARIA') || String(metadata.family ?? '') === 'PORTARIAS',
@@ -105,8 +105,9 @@ requireGate(first.publications, 'JOINT_TECHNICAL_ACT', (title, metadata) =>
 requireGate(first.publications, 'DERE_1_2_0', (title, metadata) =>
   title.includes('DERE') && String(metadata.officialVersion ?? '') === '1.2.0',
 );
-requireGate(first.publications, 'DERE_XSD', (title) =>
-  title.includes('XSD') && title.includes('DERE'),
+requireGate(first.publications, 'DERE_XSD', (title, metadata) =>
+  title.includes('XSD') &&
+  String(metadata.listingOrPageUrl ?? '').includes('declaracao-de-regimes-especificos-dere'),
 );
 requireGate(first.publications, 'NOTA_ORIENTATIVA_2026_001', (title, metadata) =>
   (title.includes('NOTA ORIENTATIVA') && title.includes('2026')) ||
