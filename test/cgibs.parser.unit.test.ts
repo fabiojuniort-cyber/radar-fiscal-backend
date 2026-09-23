@@ -51,6 +51,58 @@ test('preserves revoked status without changing the formal Portaria identity', (
   assert.equal(item.revisionKind, 'REVOKED');
 });
 
+
+test('keeps publication dates and statuses inside each formal act block', () => {
+  const html = `<!doctype html><html><body><main>
+  <h1>Atos Técnicos Conjuntos</h1>
+  <h4>ATO TÉCNICO CONJUNTO RFB/CGIBS Nº 1, DE 31 DE JULHO DE 2026</h4>
+  <a href="/upload/arquivos/202608/ato-1.pdf">AM Ato Tecnico Conjunto Ratificacao NTs DFEs Revisao assinado</a>
+  <p>Publicado e disponibilizado no site do CGIBS em 01/08/2026</p>
+  <h4>ATO TÉCNICO CONJUNTO RFB/CGIBS Nº 4, DE 28 DE AGOSTO DE 2026</h4>
+  <a href="/upload/arquivos/202609/ato-4.pdf">Minuta Ato Tecnico Conjunto n 4 Split assinado assinado</a>
+  <p>Publicado e disponibilizado no site do CGIBS em 08/09/2026</p>
+  </main></body></html>`;
+
+  const parsed = parseCgibsContainer(
+    html,
+    'JOINT_TECHNICAL_ACTS',
+    CGIBS + 'atos-tecnicos-conjuntos',
+  );
+  const first = parsed.documents.find((item) => item.actNumber === '1/2026');
+  const fourth = parsed.documents.find((item) => item.actNumber === '4/2026');
+  assert.ok(first);
+  assert.ok(fourth);
+  assert.equal(first.publishedAt?.toISOString().slice(0, 10), '2026-08-01');
+  assert.equal(fourth.publishedAt?.toISOString().slice(0, 10), '2026-09-08');
+  assert.equal(first.documentStatus, 'PUBLISHED');
+  assert.equal(first.revisionKind, 'ORIGINAL');
+  assert.equal(fourth.documentStatus, 'PUBLISHED');
+  assert.equal(fourth.revisionKind, 'ORIGINAL');
+});
+
+test('does not leak a later revoked act status into a previous act', () => {
+  const html = `<!doctype html><html><body><main>
+  <h1>Portarias</h1>
+  <h4>PORTARIA Nº 01/2026</h4>
+  <a href="/upload/arquivos/202605/portaria-1.pdf">PORTARIA Nº 01/2026</a>
+  <p>Publicada e disponibilizada no site do CGIBS em 18/05/2026</p>
+  <h4>PORTARIA Nº 03/2026 (REVOGADA)</h4>
+  <a href="/upload/arquivos/202606/portaria-3.pdf">PORTARIA Nº 03/2026</a>
+  <p>Publicada e disponibilizada no site do CGIBS em 09/06/2026</p>
+  </main></body></html>`;
+
+  const parsed = parseCgibsContainer(html, 'PORTARIAS', CGIBS + 'portarias');
+  const first = parsed.documents.find((item) => item.actNumber === '01/2026');
+  const revoked = parsed.documents.find((item) => item.actNumber === '03/2026');
+  assert.ok(first);
+  assert.ok(revoked);
+  assert.equal(first.documentStatus, 'PUBLISHED');
+  assert.equal(first.publishedAt?.toISOString().slice(0, 10), '2026-05-18');
+  assert.equal(revoked.documentStatus, 'REVOKED');
+  assert.equal(revoked.revisionKind, 'REVOKED');
+  assert.equal(revoked.publishedAt?.toISOString().slice(0, 10), '2026-06-09');
+});
+
 test('technical current and historical formal versions are distinct, while container status stays outside document family', () => {
   const parsed = parseCgibsContainer(dereHtml, 'TECHNICAL_DOCUMENTS', CGIBS + 'declaracao-de-regimes-especificos-dere');
   const layouts = parsed.documents.filter((item) => /Leiautes da DeRE/.test(item.title));
