@@ -106,16 +106,25 @@ try {
                 'partialFailureCount', COALESCE((ca.metadata->>'partialFailureCount')::int, 0),
                 'nfeEncat', ca.metadata->'nfeEncat',
                 'listingResults', ca.metadata->'listingResults',
+                'checkpointGeneration', ca.metadata->'checkpointRef'->'generation',
                 'checkpointItems',
-                  (
-                    SELECT count(*)::int
-                    FROM jsonb_object_keys(
-                      COALESCE(
-                        ca.metadata->'nfeEncatState'->'items',
-                        '{}'::jsonb
+                  CASE
+                    WHEN ca.metadata ? 'checkpointRef' THEN (
+                      SELECT count(*)::int
+                      FROM collection_checkpoints cc,
+                           jsonb_object_keys(COALESCE(cc.payload->'items', '{}'::jsonb))
+                      WHERE cc.id::text = ca.metadata->'checkpointRef'->>'id'
+                    )
+                    ELSE (
+                      SELECT count(*)::int
+                      FROM jsonb_object_keys(
+                        COALESCE(
+                          ca.metadata->'nfeEncatState'->'items',
+                          '{}'::jsonb
+                        )
                       )
                     )
-                  )
+                  END
               )
               ORDER BY ca.attempt_no
             )

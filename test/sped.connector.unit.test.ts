@@ -231,7 +231,7 @@ test('does not suppress an arquivo/show publication that links to itself', async
 
 test('reuses checkpoint without redownloading and changed bytes create a new content hash for same explicit publication', async () => {
   const first = await new SpedConnector({ portal: 'LEGACY', fetch: router(), now: () => new Date('2026-09-21T00:00:00Z'), maxCrawlDepth: 2 }).collect(CONTEXT);
-  const state = first.metadata?.spedState as {
+  const state = first.checkpoint?.state as {
     items: Record<string, any>;
     pages: Record<string, any>;
   };
@@ -263,7 +263,7 @@ test('hourly incremental skips known document pages but captures a new item imme
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
 
-  const state = first.metadata?.spedState as {
+  const state = first.checkpoint?.state as {
     items: Record<string, any>;
     pages: Record<string, any>;
   };
@@ -319,7 +319,7 @@ test('known document rechecks are globally bounded', async () => {
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
 
-  const state = first.metadata?.spedState as {
+  const state = first.checkpoint?.state as {
     items: Record<string, any>;
     pages: Record<string, any>;
   };
@@ -383,7 +383,7 @@ test('historical 404/410 links become recheckable tombstones without partial suc
   );
   assert.equal(deadHits, 1);
 
-  const firstState = first.metadata?.spedState as {
+  const firstState = first.checkpoint?.state as {
     items: Record<string, any>;
     pages: Record<string, any>;
   };

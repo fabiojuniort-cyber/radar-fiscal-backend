@@ -1,8 +1,13 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
+import { readCurrentCheckpoint } from './checkpoint.repository.js';
 import {
+  SPED_CONNECTOR_KEY,
+  SPED_MAX_FRONTIER,
   SPED_STATE_VERSION,
+  type SpedCrawlCycle,
+  type SpedFrontierPage,
   type SpedIdentityRecord,
   type SpedKnownPage,
   type SpedPageKind,
@@ -105,6 +110,37 @@ function identityRecord(value: unknown): SpedIdentityRecord | undefined {
   };
 }
 
+const SPED_MODULES_SET = new Set(['EFD_ICMS_IPI', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DERE']);
+const SEED_KINDS = new Set(['MODULE', 'CATEGORY', 'MODULE_HIGHLIGHTS', 'GLOBAL_HIGHLIGHTS']);
+
+function crawlCycle(value: unknown): SpedCrawlCycle | undefined {
+  const cycle = record(value);
+  if (!cycle || !Array.isArray(cycle.completedModules) || !Array.isArray(cycle.frontier)) return undefined;
+  const completedModules = [...new Set(
+    cycle.completedModules.filter((module): module is SpedModule =>
+      typeof module === 'string' && SPED_MODULES_SET.has(module)),
+  )];
+  const frontier: SpedFrontierPage[] = [];
+  for (const raw of cycle.frontier.slice(0, SPED_MAX_FRONTIER)) {
+    const page = record(raw);
+    if (!page) continue;
+    if (typeof page.module !== 'string' || !SPED_MODULES_SET.has(page.module)) continue;
+    if (typeof page.url !== 'string') continue;
+    const url = allowedSpedUrl(page.url);
+    if (!url) continue;
+    if (typeof page.depth !== 'number' || !Number.isSafeInteger(page.depth) || page.depth < 0 || page.depth > 100) continue;
+    if (typeof page.seedKind !== 'string' || !SEED_KINDS.has(page.seedKind)) continue;
+    frontier.push({
+      module: page.module as SpedModule,
+      url,
+      depth: page.depth,
+      seedKind: page.seedKind as SpedFrontierPage['seedKind'],
+      ...(page.forceFetch === true ? { forceFetch: true } : {}),
+    });
+  }
+  return { completedModules, frontier };
+}
+
 /**
  * Loads the SPED incremental checkpoint.
  *
@@ -119,28 +155,42 @@ export async function readSpedSourceState(
   db: Kysely<DB>,
   sourceId: string,
 ): Promise<SpedSourceState> {
-  const last = await db
-    .selectFrom('collection_attempts as ca')
-    .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
-    .select(['ca.metadata', 'ca.finished_at', 'cr.id as run_id', 'cr.status as run_status'])
-    .where('cr.source_id', '=', sourceId)
-    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS'])
-    .where('ca.status', '=', 'SUCCESS')
-    .where(sql<boolean>`(ca.metadata -> 'spedState' ->> 'version') = ${String(SPED_STATE_VERSION)}`)
-    .orderBy('ca.finished_at', 'desc')
-    .orderBy('ca.attempt_no', 'desc')
-    .executeTakeFirst();
+  const accepted = ['SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS'];
+  // Primary store: collection_checkpoints (current generation, falling back
+  // to the retained previous ones when the newest is not acceptable).
+  const stored = await readCurrentCheckpoint(db, sourceId, SPED_CONNECTOR_KEY, {
+    stateVersion: SPED_STATE_VERSION,
+    acceptedRunStatuses: accepted,
+  });
+  // Transition fallback: legacy checkpoint embedded in attempt metadata.
+  const legacy = stored
+    ? undefined
+    : await db
+        .selectFrom('collection_attempts as ca')
+        .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
+        .select(['ca.metadata', 'ca.finished_at', 'cr.id as run_id', 'cr.status as run_status'])
+        .where('cr.source_id', '=', sourceId)
+        .where('cr.status', 'in', accepted)
+        .where('ca.status', '=', 'SUCCESS')
+        .where(sql<boolean>`(ca.metadata -> 'spedState' ->> 'version') = ${String(SPED_STATE_VERSION)}`)
+        .orderBy('ca.finished_at', 'desc')
+        .orderBy('ca.attempt_no', 'desc')
+        .executeTakeFirst();
 
+  const last = stored
+    ? { run_id: stored.producedByRunId, run_status: stored.producedByRunStatus }
+    : legacy
+      ? { run_id: legacy.run_id, run_status: legacy.run_status }
+      : undefined;
   if (!last) return { version: SPED_STATE_VERSION, items: {}, pages: {}, identities: {} };
 
-  const metadata = record(last.metadata);
-  const state = record(metadata?.spedState);
+  const state = stored ? stored.state : record(record(legacy?.metadata)?.spedState);
 
-  const failedItems = last.run_status === 'PARTIAL_SUCCESS'
+  const failedItems = last.run_status === 'PARTIAL_SUCCESS' && last.run_id
     ? await db
         .selectFrom('collection_items')
         .select(['external_id', 'source_url'])
-        .where('collection_run_id', '=', last.run_id)
+        .where('collection_run_id', '=', last.run_id!)
         .where('status', '=', 'FAILED')
         .execute()
     : [];
@@ -209,5 +259,9 @@ export async function readSpedSourceState(
     }
   }
 
-  return { version: SPED_STATE_VERSION, items, pages, identities };
+  // An interrupted discovery cycle is resumed only from the newest checkpoint
+  // of the table store (never from legacy metadata).
+  const cycle = stored ? crawlCycle(state?.cycle) : undefined;
+
+  return { version: SPED_STATE_VERSION, items, pages, identities, ...(cycle ? { cycle } : {}) };
 }

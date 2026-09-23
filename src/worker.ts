@@ -71,6 +71,8 @@ async function run(): Promise<void> {
           env.COLLECTION_POLL_INTERVAL_MS,
         collectionTimeoutMs:
           env.COLLECTION_TIMEOUT_MS,
+        budgetGraceMs:
+          env.COLLECTION_BUDGET_GRACE_MS ?? null,
         staleAfterMs:
           env.COLLECTION_STALE_AFTER_MS,
         simulatedConnectors:
@@ -105,6 +107,9 @@ async function run(): Promise<void> {
           {
             timeoutMs:
               env.COLLECTION_TIMEOUT_MS,
+            ...(env.COLLECTION_BUDGET_GRACE_MS !== undefined
+              ? { budgetGraceMs: env.COLLECTION_BUDGET_GRACE_MS }
+              : {}),
             heartbeatIntervalMs:
               env.COLLECTION_HEARTBEAT_INTERVAL_MS,
             logger: processLogger,

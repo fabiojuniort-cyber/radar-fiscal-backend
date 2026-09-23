@@ -102,11 +102,11 @@ test('uses ETag/Last-Modified checkpoint, keeps content hash stable on 304 and c
   }) as typeof fetch;
 
   const first = await new NfeEncatConnector({ fetch: fetchImpl }).collect(CONTEXT);
-  const firstState = first.metadata?.nfeEncatState as { items: Record<string, any> };
+  const firstState = first.checkpoint?.state as { items: Record<string, any> };
   const firstNormalized = normalizePublication({ sourceId: SOURCE_ID, publication: first.publications[0]! });
   generation = 2;
   const second = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => firstState, revisitAfterMs: 0 }).collect(CONTEXT);
-  const secondState = second.metadata?.nfeEncatState as { items: Record<string, any> };
+  const secondState = second.checkpoint?.state as { items: Record<string, any> };
   const secondNormalized = normalizePublication({ sourceId: SOURCE_ID, publication: second.publications[0]! });
   assert.equal(conditionalSeen, true);
   assert.equal(firstNormalized.identityHash, secondNormalized.identityHash);
@@ -169,7 +169,7 @@ test('changed schema ZIP under the same official token creates a new content has
   }) as typeof fetch;
 
   const first = await new NfeEncatConnector({ fetch: fetchImpl }).collect(CONTEXT);
-  const firstState = first.metadata?.nfeEncatState as { items: Record<string, any> };
+  const firstState = first.checkpoint?.state as { items: Record<string, any> };
   const normalizedFirst = normalizePublication({ sourceId: SOURCE_ID, publication: first.publications[0]! });
   generation = 2;
   const second = await new NfeEncatConnector({ fetch: fetchImpl, readState: async () => firstState, revisitAfterMs: 0 }).collect(CONTEXT);
@@ -216,7 +216,7 @@ test('reuses a recent validated file checkpoint without redownloading bytes', as
     fetch: fetchImpl,
     now: () => firstNow,
   }).collect(CONTEXT);
-  const state = first.metadata?.nfeEncatState as {
+  const state = first.checkpoint?.state as {
     items: Record<string, any>;
   };
 
@@ -296,7 +296,7 @@ test('rechecks stale known files in bounded oldest-first batches', async () => {
     fetch: fetchImpl,
     now: () => new Date('2026-09-20T00:00:00Z'),
   }).collect(CONTEXT);
-  const state = first.metadata?.nfeEncatState as {
+  const state = first.checkpoint?.state as {
     items: Record<string, any>;
   };
 

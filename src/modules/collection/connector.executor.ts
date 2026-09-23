@@ -1,6 +1,7 @@
 import type {
   CollectionConnector,
   ConnectorResult,
+  ConnectorTimeBudget,
 } from './connector.contract.js';
 import {
   isConnectorError,
@@ -42,6 +43,41 @@ export interface ExecuteConnectorInput {
   attemptId: string;
   timeoutMs: number;
   signal?: AbortSignal;
+  /**
+   * Time reserved between the soft deadline and the hard timeout for a
+   * graceful stop (emit resolved items, build checkpoint). Default:
+   * max(120s, 15% of timeoutMs), capped at 50% of timeoutMs.
+   */
+  budgetGraceMs?: number;
+  now?: () => number;
+}
+
+export const DEFAULT_MIN_BUDGET_GRACE_MS = 120_000;
+
+export function defaultBudgetGraceMs(timeoutMs: number): number {
+  return Math.min(
+    Math.max(DEFAULT_MIN_BUDGET_GRACE_MS, Math.round(timeoutMs * 0.15)),
+    Math.floor(timeoutMs * 0.5),
+  );
+}
+
+export function createTimeBudget(
+  startedAt: number,
+  timeoutMs: number,
+  graceMs: number,
+  now: () => number = Date.now,
+): ConnectorTimeBudget {
+  if (!Number.isFinite(graceMs) || graceMs < 0 || graceMs >= timeoutMs) {
+    throw new RangeError('budget grace must be >= 0 and smaller than timeoutMs');
+  }
+  const deadline = startedAt + timeoutMs;
+  const softDeadline = deadline - graceMs;
+  return {
+    deadlineAt: new Date(deadline),
+    softDeadlineAt: new Date(softDeadline),
+    remainingMs: () => Math.max(0, deadline - now()),
+    shouldYield: () => now() >= softDeadline,
+  };
 }
 
 class ConnectorTimeoutError extends Error {
@@ -84,7 +120,14 @@ export async function executeConnector(
     throw new RangeError('timeoutMs must be a positive finite number');
   }
 
-  const startedAt = Date.now();
+  const now = input.now ?? Date.now;
+  const startedAt = now();
+  const budget = createTimeBudget(
+    startedAt,
+    input.timeoutMs,
+    input.budgetGraceMs ?? defaultBudgetGraceMs(input.timeoutMs),
+    now,
+  );
   const timeoutController = new AbortController();
 
   const connectorSignal = input.signal
@@ -113,6 +156,7 @@ export async function executeConnector(
       runId: input.runId,
       attemptId: input.attemptId,
       signal: connectorSignal,
+      budget,
     }),
     timeoutPromise,
   ];

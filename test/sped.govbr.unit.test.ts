@@ -213,7 +213,7 @@ test('gov.br checkpoint replay is idempotent and avoids redownloading known file
     maxCrawlDepth: 5,
   }).collect(CONTEXT);
 
-  const state = first.metadata?.spedState as {
+  const state = first.checkpoint?.state as {
     items: Record<string, unknown>;
     pages: Record<string, unknown>;
   };

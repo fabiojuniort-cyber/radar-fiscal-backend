@@ -128,6 +128,9 @@ async function run(): Promise<void> {
       can_delete_companies: boolean;
       can_read_migrations: boolean;
       can_update_audit: boolean;
+      can_read_checkpoints: boolean;
+      can_read_capacity: boolean;
+      is_monitor_member: boolean;
     }>(`
       SELECT
         has_table_privilege(
@@ -149,7 +152,22 @@ async function run(): Promise<void> {
           current_user,
           'public.audit_log',
           'UPDATE'
-        ) AS can_update_audit
+        ) AS can_update_audit,
+        has_table_privilege(
+          current_user,
+          'public.collection_checkpoints',
+          'SELECT'
+        ) AS can_read_checkpoints,
+        has_table_privilege(
+          current_user,
+          'public.db_capacity_snapshots',
+          'SELECT'
+        ) AS can_read_capacity,
+        pg_has_role(
+          current_user,
+          'pg_monitor',
+          'MEMBER'
+        ) AS is_monitor_member
     `);
 
     const privilege = privileges.rows[0];
@@ -159,7 +177,10 @@ async function run(): Promise<void> {
       !privilege.can_read_companies ||
       privilege.can_delete_companies ||
       privilege.can_read_migrations ||
-      privilege.can_update_audit
+      privilege.can_update_audit ||
+      privilege.can_read_checkpoints ||
+      privilege.can_read_capacity ||
+      privilege.is_monitor_member
     ) {
       throw new Error(
         'Runtime database privileges do not match the expected policy.',

@@ -82,6 +82,15 @@ async function run(): Promise<void> {
       can_read_credentials: boolean;
       can_read_sessions: boolean;
       can_read_migrations: boolean;
+      can_read_checkpoints: boolean;
+      can_insert_checkpoints: boolean;
+      can_delete_checkpoints: boolean;
+      can_update_checkpoints: boolean;
+      can_insert_capacity: boolean;
+      can_update_capacity: boolean;
+      can_delete_capacity: boolean;
+      is_monitor_member: boolean;
+      is_read_all_stats_member: boolean;
     }>(`
       SELECT
         has_table_privilege(
@@ -128,7 +137,52 @@ async function run(): Promise<void> {
           'radar_worker_runtime',
           'public.schema_migrations',
           'SELECT'
-        ) AS can_read_migrations
+        ) AS can_read_migrations,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.collection_checkpoints',
+          'SELECT'
+        ) AS can_read_checkpoints,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.collection_checkpoints',
+          'INSERT'
+        ) AS can_insert_checkpoints,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.collection_checkpoints',
+          'DELETE'
+        ) AS can_delete_checkpoints,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.collection_checkpoints',
+          'UPDATE'
+        ) AS can_update_checkpoints,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.db_capacity_snapshots',
+          'INSERT'
+        ) AS can_insert_capacity,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.db_capacity_snapshots',
+          'UPDATE'
+        ) AS can_update_capacity,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.db_capacity_snapshots',
+          'DELETE'
+        ) AS can_delete_capacity,
+        pg_has_role(
+          'radar_worker_runtime',
+          'pg_monitor',
+          'MEMBER'
+        ) AS is_monitor_member,
+        pg_has_role(
+          'radar_worker_runtime',
+          'pg_read_all_stats',
+          'MEMBER'
+        ) AS is_read_all_stats_member
     `);
 
     const privilege = privileges.rows[0];
@@ -143,7 +197,18 @@ async function run(): Promise<void> {
       !privilege.can_update_publications ||
       privilege.can_read_credentials ||
       privilege.can_read_sessions ||
-      privilege.can_read_migrations
+      privilege.can_read_migrations ||
+      !privilege.can_read_checkpoints ||
+      !privilege.can_insert_checkpoints ||
+      !privilege.can_delete_checkpoints ||
+      // Checkpoint generations are immutable.
+      privilege.can_update_checkpoints ||
+      !privilege.can_insert_capacity ||
+      privilege.can_update_capacity ||
+      privilege.can_delete_capacity ||
+      // WAL telemetry needs pg_monitor: only a dedicated monitoring role.
+      privilege.is_monitor_member ||
+      privilege.is_read_all_stats_member
     ) {
       throw new Error(
         'Worker runtime privileges do not match the expected policy.',

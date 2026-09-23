@@ -138,7 +138,7 @@ if ((first.partialFailures?.length ?? 0) > 0) {
   throw new Error('Live gov.br collection returned partial failures.');
 }
 
-const state = first.metadata?.spedState as SpedSourceState | undefined;
+const state = first.checkpoint?.state as SpedSourceState | undefined;
 if (!state) throw new Error('Live gov.br collection did not return checkpoint state.');
 
 const second = await new SpedConnector({

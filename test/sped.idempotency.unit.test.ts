@@ -160,7 +160,7 @@ test('D: runtime guard disambiguates two different documents that derive the sam
 
   // The resolution is stable across runs: replaying with the emitted state
   // gives both origins exactly the same keys, even if only one is seen.
-  const state = (result.metadata as { spedState: never }).spedState;
+  const state = result.checkpoint!.state as never;
   const replay = await new SpedConnector({
     fetch: portal.fetch,
     readState: async () => state,
@@ -186,7 +186,7 @@ test('gov.br folder pages are containers: children are captured and new children
   assert.ok(titles.includes('XSD Evento R-4010'));
   assert.ok(titles.includes('Esquemas XSD'), 'the folder page itself is still captured');
 
-  const state = (first.metadata as { spedState: { pages: Record<string, { kind: string }> } }).spedState;
+  const state = first.checkpoint!.state as { pages: Record<string, { kind: string }> };
   const folder = Object.entries(state.pages).find(([url]) => url.endsWith('/versao-atual/esquemas-xsd'));
   assert.equal(folder?.[1].kind, 'CONTAINER');
 
@@ -197,7 +197,7 @@ test('gov.br folder pages are containers: children are captured and new children
   inventory.documents.find((doc) => doc.path === reinf + '/versao-atual/esquemas-xsd')!.children!.push(newChild);
   const incremental = await new SpedConnector({
     fetch: fakePortal(inventory).fetch,
-    readState: async () => (first.metadata as { spedState: never }).spedState,
+    readState: async () => first.checkpoint!.state as never,
   }).collect(CONTEXT);
   const found = incremental.publications.map((publication) => publication.title);
   assert.ok(found.includes('XSD EFD-Reinf v2.1.2 - CNPJ Alfanumérico'));
