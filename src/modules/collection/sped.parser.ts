@@ -218,7 +218,7 @@ function embeddedLinks(html: string, pageUrl: string): SpedParsedLink[] {
   const add = (rawUrl: string, text = '') => {
     try {
       const candidate = rawUrl.trim();
-      if (!/^(?:https?:\/\/|\/|\.\.?\/|@@)/i.test(candidate)) return;
+      if (!candidate || /^(?:URL|URI|HREF)$/i.test(candidate)) return;
       const absolute = new URL(candidate, page);
       if (!samePortalUrl(absolute, page) && absolute.origin.toLowerCase() !== SPED_LEGACY_ORIGIN) return;
       if (isGovBrSystemResource(absolute)) return;
