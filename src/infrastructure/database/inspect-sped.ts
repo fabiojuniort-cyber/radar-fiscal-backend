@@ -145,3 +145,5 @@ try {
 } finally {
   await pool.end();
 }
+
+// Operational redeploy marker: gov.br primary provisioning.
