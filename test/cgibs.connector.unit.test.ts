@@ -103,7 +103,16 @@ test('collects all official families, deduplicates the same Resolution PDF and c
     sourceId: CONTEXT.sourceId,
     publication,
   }));
-  assert.equal(new Set(normalized.map((item) => item.identityHash)).size, normalized.length);
+  const duplicateIdentities = [...normalized.reduce((groups, item, index) => {
+    const key = item.identityHash;
+    groups.set(key, [...(groups.get(key) ?? []), result.publications[index]!.title + ' @ ' + result.publications[index]!.officialUrl]);
+    return groups;
+  }, new Map<string, string[]>()).entries()].filter(([, members]) => members.length > 1);
+  assert.equal(
+    new Set(normalized.map((item) => item.identityHash)).size,
+    normalized.length,
+    'duplicate CGIBS identities: ' + JSON.stringify(duplicateIdentities),
+  );
 });
 
 test('immediate replay reuses file checkpoint and performs no file downloads', async () => {
