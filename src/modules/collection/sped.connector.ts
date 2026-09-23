@@ -300,13 +300,13 @@ function govBrNavigationLooksRelevant(module: SpedModule, text: string, url: str
   }
 
   const leaf = pathname.split('/').filter(Boolean).at(-1) ?? '';
-  if (/^(?:faq|fale-conosco|contato|acesso-a-informacao|ouvidoria|validadores?)$/i.test(leaf)) {
+  if (/^(?:faq|fale-conosco|contato|acesso-a-informacao|ouvidoria)$/i.test(leaf)) {
     return false;
   }
 
   if (isTechnicalNavigationText(text) || moduleTextMatches(module, text)) return true;
 
-  return /(?:^|[-/])(?:manua(?:l|is)|document(?:o|os|acao)|tecnic(?:o|os|a|as)|nota(?:s)?|orienta|guia(?:s)?|leiaute(?:s)?|layout(?:s)?|xsd|schema|esquema(?:s)?|tabela(?:s)?|versao|versoes|histori(?:co|cos)|download(?:s)?|comunicado(?:s)?|programa(?:s)?|pva|pge)(?:[-/]|$)/i.test(pathname);
+  return /(?:^|[-/])(?:manua(?:l|is)|document(?:o|os|acao)|tecnic(?:o|os|a|as)|nota(?:s)?|orienta|guia(?:s)?|leiaute(?:s)?|layout(?:s)?|xsd|schema|esquema(?:s)?|tabela(?:s)?|versao|versoes|histori(?:co|cos)|download(?:s)?|comunicado(?:s)?|programa(?:s)?|validador(?:es)?|pva|pge)(?:[-/]|$)/i.test(pathname);
 }
 
 function samePortalNavigation(module: SpedModule, url: string, portal: SpedPortalMode): boolean {
