@@ -288,7 +288,9 @@ function eligiblePageLink(url: string, listingUrl: string): boolean {
   const path = parsed.pathname.replace(/\/$/, '') || '/';
   if (EXCLUDED_PAGE_PATHS.has(path)) return false;
   if (fileLike(parsed.toString())) return false;
-  if (/^\/(?:midia|ouvidoria|busca|termos-de-uso)(?:\/|$)/i.test(path)) return false;
+  if (/^\/(?:midia|ouvidoria|busca|termos-de-uso|acessibilidade|fale-conosco|aviso-de-cookies|politica-de-privacidade|mapa-do-site)(?:\/|$)/i.test(path)) return false;
+  if (/^\/upload\//i.test(path)) return false;
+  if (/\.(?:jpe?g|png|gif|webp|svg|ico|css|js|map|woff2?|ttf)(?:$|[?#])/i.test(parsed.toString())) return false;
   return true;
 }
 
@@ -458,6 +460,11 @@ export function parseCgibsContainer(
     if (!title) continue;
     if (family === 'NEWS' && !operationalNews(title)) continue;
     if (!['OFFICIAL_COMMUNIQUES', 'TECHNICAL_DOCUMENTS', 'GUIDES', 'BOOKLETS', 'NEWS'].includes(family)) continue;
+    const technicalHint = asciiUpper(title + ' ' + new URL(absolute).pathname);
+    if (family === 'TECHNICAL_DOCUMENTS' && !/DERE|REGIME.?ESPECIFIC|SPLIT.?PAYMENT|DOCUMENTO.?TECNIC|MANUAL|LEIAUTE|LAYOUT|XSD|OPENAPI|ESQUEMA|NOTA.?ORIENTATIVA/.test(technicalHint)) continue;
+    if (family === 'OFFICIAL_COMMUNIQUES' && !/COMUNICADO|EMPRESAS.?HABILITADAS|ORIENTA/.test(technicalHint)) continue;
+    if (family === 'GUIDES' && !/GUIA/.test(technicalHint)) continue;
+    if (family === 'BOOKLETS' && !/CARTILHA/.test(technicalHint)) continue;
     const canonical = new URL(absolute);
     canonical.hash = '';
     const url = canonical.toString();
