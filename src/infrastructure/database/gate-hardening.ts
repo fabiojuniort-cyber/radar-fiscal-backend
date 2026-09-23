@@ -146,7 +146,7 @@ async function inspect(): Promise<void> {
           SELECT
             (SELECT count(*) FROM publication_versions pv
                WHERE pv.publication_id IN (SELECT publication_id FROM publication_origins WHERE source_id = ${source.id})
-                 AND pv.created_at >= ${since}::timestamptz)::bigint AS versions,
+                 AND pv.captured_at >= ${since}::timestamptz)::bigint AS versions,
             (SELECT count(*) FROM publications p
                WHERE p.id IN (SELECT publication_id FROM publication_origins WHERE source_id = ${source.id})
                  AND p.created_at >= ${since}::timestamptz)::bigint AS publications
