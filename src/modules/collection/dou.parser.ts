@@ -5,6 +5,7 @@ import sax from 'sax';
 import yauzl from 'yauzl';
 import type { ConnectorPublication, ConnectorPartialFailure } from './connector.contract.js';
 import { ConnectorError } from './connector.error.js';
+import { parseCanonicalRfbFormalAct } from './rfb-normas.identity.js';
 
 export interface DouXmlEntry { name: string; bytes: Uint8Array }
 export interface DouArchiveContext { date: string; section: string; filename: string; officialUrl: string; rawSha256: string }
@@ -87,10 +88,22 @@ export function classifyDouAct(title: string, category: string, sourceType: stri
   const special = /RETIFICA|REPUBLICA/.test(sourceType.toUpperCase()) || /^(RETIFICA|REPUBLICA)/.test(upper);
   const year = numbered?.[3]?.length === 4 ? numbered[3] : date?.slice(0, 4);
   const type = special ? sourceType.toUpperCase() : numbered?.[1]?.trim() || sourceType.toUpperCase();
+  const rfb = !special && !confaz
+    ? parseCanonicalRfbFormalAct(
+        title,
+        category,
+        sourceType,
+        date ? Number(date.slice(0, 4)) : undefined,
+      )
+    : undefined;
   return {
-    agency: confaz ? 'CONFAZ' : category,
-    actType: confaz && family && !special ? family : type,
-    ...(numbered && year && !special ? { actNumber: `${Number(numbered[2]!.replaceAll('.', ''))}/${year}` } : {}),
+    agency: confaz ? 'CONFAZ' : rfb?.agency ?? category,
+    actType: confaz && family && !special ? family : rfb?.actType ?? type,
+    ...(rfb?.actNumber
+      ? { actNumber: rfb.actNumber }
+      : numbered && year && !special
+        ? { actNumber: `${Number(numbered[2]!.replaceAll('.', ''))}/${year}` }
+        : {}),
     ...(date ? { actDate: date } : {}),
     ...(confaz && family && !special ? { family } : {}),
   };
