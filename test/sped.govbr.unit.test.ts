@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { SpedClient } from '../src/modules/collection/sped.client.js';
 import { SpedConnector } from '../src/modules/collection/sped.connector.js';
+import { parseSpedPage } from '../src/modules/collection/sped.parser.js';
 
 const BASE = 'https://www.gov.br/sped/pt-br';
 const CONTEXT = {
@@ -218,4 +220,81 @@ test('gov.br checkpoint replay is idempotent and avoids redownloading known file
   assert.equal(second.publications.length, 0);
   assert.equal((second.metadata?.sped as { downloadedCount: number }).downloadedCount, 0);
   assert.ok((second.metadata?.sped as { skippedKnownDocumentCount: number }).skippedKnownDocumentCount > 0);
+});
+
+
+test('live gov.br SPED official HTTPS gates are parseable and downloadable', {
+  skip: process.env.GITHUB_ACTIONS !== 'true',
+  timeout: 180_000,
+}, async () => {
+  const client = new SpedClient({
+    timeoutMs: 30_000,
+    maxFileBytes: 80 * 1024 * 1024,
+  });
+  const signal = new AbortController().signal;
+
+  const directPages = [
+    {
+      gate: 'EFD_ICMS_IPI_GUIDE_324',
+      url: BASE + '/assuntos/escrituracoes-digitais/efd-icms-ipi/manuais-e-documentos-tecnicos/guia-pratico-efd-versao-3-2-4.pdf',
+      title: /3\.2\.4/i,
+    },
+    {
+      gate: 'EFD_CONTRIB_NT_11_2026',
+      url: BASE + '/assuntos/escrituracoes-digitais/efd-contribuicoes/documentos-tecnicos/nota-tecnica-11-2026-descontinuidade-da-efd-contribuicoes-orientacoes-para-os-contribuintes',
+      title: /11\/2026/i,
+    },
+    {
+      gate: 'EFD_CONTRIB_NT_12_2026',
+      url: BASE + '/assuntos/escrituracoes-digitais/efd-contribuicoes/documentos-tecnicos/nota-tecnica-12-2026-reducao-linear-de-incentivos-e-beneficios-lc-224',
+      title: /12\/2026/i,
+    },
+    {
+      gate: 'EFD_REINF_NT_01_2026',
+      url: BASE + '/assuntos/escrituracoes-digitais/efd-reinf/documento-tecnicos/versao-atual/notas-tecnicas-e-orientativas/notas-tecnicas/1-2026',
+      title: /1-2026|01\/2026/i,
+    },
+    {
+      gate: 'EFD_REINF_XSD_212',
+      url: BASE + '/assuntos/escrituracoes-digitais/efd-reinf/documento-tecnicos/versao-atual/esquemas-xsd/xsd-eventos',
+      title: /2\.1\.2/i,
+    },
+  ] as const;
+
+  for (const gate of directPages) {
+    const html = await client.getHtml(gate.url, signal);
+    const page = parseSpedPage(html.html, html.url);
+    assert.match(page.title, gate.title, gate.gate);
+    assert.ok(page.fileLinks.length >= 1, gate.gate + ' must expose an official file');
+
+    const file = await client.downloadFile(page.fileLinks[0]!.url, signal);
+    assert.equal(file.status, 'DOWNLOADED', gate.gate);
+    if (file.status === 'DOWNLOADED') {
+      assert.match(file.rawSha256, /^[a-f0-9]{64}$/, gate.gate);
+      assert.ok(file.sizeBytes > 0, gate.gate);
+      assert.ok(file.url.startsWith(BASE + '/'), gate.gate);
+      console.error('SPED_GOVBR_GATE=' + JSON.stringify({
+        gate: gate.gate,
+        title: page.title,
+        pageUrl: html.url,
+        fileUrl: file.url,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        rawSha256: file.rawSha256,
+      }));
+    }
+  }
+
+  const dereIndexUrl =
+    BASE + '/assuntos/documentos-fiscais/dere/manuais-e-documentos-tecnicos/versao-atual-1';
+  const dereHtml = await client.getHtml(dereIndexUrl, signal);
+  const dereIndex = parseSpedPage(dereHtml.html, dereHtml.url);
+  const dere120Links = dereIndex.links.filter((link) =>
+    /1\.2\.0|1-2-0/i.test(link.text + ' ' + link.url),
+  );
+
+  console.error('SPED_GOVBR_DERE_120_LINKS=' + JSON.stringify(
+    dere120Links.slice(0, 20),
+  ));
+  assert.ok(dere120Links.length > 0, 'DeRE current page must expose version 1.2.0 links');
 });
