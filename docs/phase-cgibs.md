@@ -156,3 +156,39 @@ O serviço deve apontar para a branch/commit em validação, usar
 `restartPolicyType = NEVER` e não precisa de acesso ao PostgreSQL.
 Somente logs de um deployment cujo commit corresponda ao head do PR
 podem ser usados como evidência do gate live.
+
+
+## Evidência live — 23/09/2026
+
+Validação isolada no Railway executada contra o commit
+`e2aeccd454fad909a58c19169c7fb8bd6a0d62c0`.
+
+Resultado da primeira coleta:
+
+- 12/12 seeds oficiais consultados com sucesso;
+- 77 publicações documentais;
+- 77 arquivos oficiais baixados;
+- 77/77 arquivos com SHA-256 válido;
+- 0 falhas parciais;
+- famílias emitidas: 18 Resoluções, 10 Portarias, 7 Atos Conjuntos,
+  4 Atos Técnicos Conjuntos e 38 Documentos Técnicos;
+- Resolução CGIBS nº 6/2026 validada com data de publicação 30/04/2026;
+- Resolução CGIBS nº 18/2026 validada com data de publicação 15/09/2026;
+- Atos Técnicos Conjuntos 1–4/2026 validados como publicados, sem herdar
+  status de nomes internos de arquivos;
+- DeRE v1.2.0, XSD v1.2.0, Nota Orientativa 2026.001,
+  Split Payment e OpenAPI v1.1.0 validados.
+
+Replay imediato com o checkpoint da primeira coleta:
+
+- 77 publicações reconhecidas;
+- `downloadedCount = 0`;
+- `newFileDownloadCount = 0`;
+- `reusedCheckpointCount = 77`;
+- 0 falhas parciais;
+- marcador final `CGIBS_LIVE_OK=1`.
+
+O gate também revelou e permitiu corrigir antes do merge dois problemas de
+parsing: vazamento de data/status entre atos adjacentes e navegação por
+links institucionais/mídia global. Ambos ficaram cobertos por testes de
+regressão.
