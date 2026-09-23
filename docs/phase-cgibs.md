@@ -141,3 +141,18 @@ A agenda `0 * * * *` só pode ser ativada depois de:
 7. timeout operacional medido;
 8. uma execução real do Scheduler validada;
 9. overlap protection confirmada.
+
+
+## Validação live isolada
+
+O gate externo é executado fora da CI determinística para evitar que
+instabilidade da rede pública torne o pipeline flakey.
+
+Comando do serviço de validação isolado no Railway:
+
+`node dist/validation/cgibs-live-validation.js`
+
+O serviço deve apontar para a branch/commit em validação, usar
+`restartPolicyType = NEVER` e não precisa de acesso ao PostgreSQL.
+Somente logs de um deployment cujo commit corresponda ao head do PR
+podem ser usados como evidência do gate live.
