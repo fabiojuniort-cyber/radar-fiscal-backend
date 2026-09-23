@@ -31,6 +31,7 @@ function listing(items: Array<{ url: string; title: string }>): Response {
         { '@id': parent + '/@querystring-search?fullobjects=1', title: 'query service' },
         { '@id': parent + '/@@images/image', title: 'image rendition' },
         { '@id': parent + '/object_copy', title: 'copy action' },
+        { url: 'URL', title: 'schema placeholder' },
       ],
       internalApiUrl: parent + '/@breadcrumbs',
     },
