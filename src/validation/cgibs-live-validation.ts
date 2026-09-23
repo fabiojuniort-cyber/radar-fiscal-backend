@@ -2,6 +2,30 @@ import { CgibsConnector, type CgibsSourceState } from '../modules/collection/cgi
 
 const sourceId = '00000000-0000-4000-8000-00000000c91b';
 
+const tracedFetch: typeof fetch = async (input, init) => {
+  const url = input instanceof Request ? input.url : input.toString();
+  const startedAt = Date.now();
+  console.log('CGIBS_HTTP_START=' + url);
+  try {
+    const response = await fetch(input, init);
+    console.log('CGIBS_HTTP_DONE=' + JSON.stringify({
+      url,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+      contentLength: response.headers.get('content-length'),
+      contentType: response.headers.get('content-type'),
+    }));
+    return response;
+  } catch (error) {
+    console.error('CGIBS_HTTP_ERROR=' + JSON.stringify({
+      url,
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    throw error;
+  }
+};
+
 function asciiUpper(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 }
@@ -36,6 +60,7 @@ function requireGate(publications: Awaited<ReturnType<CgibsConnector['collect']>
 }
 
 const first = await new CgibsConnector({
+  fetch: tracedFetch,
   maxRechecksPerRun: 100,
   maxDetailPagesPerRun: 200,
 }).collect(context('10000000-0000-4000-8000-000000000001'));
@@ -103,6 +128,7 @@ const state = first.checkpoint?.state as unknown as CgibsSourceState;
 if (!state || !Object.keys(state.items).length) throw new Error('CGIBS live checkpoint is empty.');
 
 const replay = await new CgibsConnector({
+  fetch: tracedFetch,
   readState: async () => state,
   maxRechecksPerRun: 100,
   maxDetailPagesPerRun: 200,
