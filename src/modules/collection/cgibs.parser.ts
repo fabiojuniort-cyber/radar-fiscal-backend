@@ -153,7 +153,7 @@ function formalAct(value: string): { actType?: string; actNumber?: string } {
     [/PORTARIA CONJUNTA[^N]*N[ºO°.]?\s*/i, 'PORTARIA CONJUNTA'],
     [/RESOLUCAO CGIBS\s+N[ºO°.]?\s*/i, 'RESOLUÇÃO CGIBS'],
     [/PORTARIA(?:\s+CGIBS)?\s+N[ºO°.]?\s*/i, 'PORTARIA CGIBS'],
-    [/COMUNICADO(?:\s+CONJUNTO)?(?:\s+CGIBS(?:\s+E\s+RFB)?)?\s+N[ºO°.]?\s*/i, 'COMUNICADO OFICIAL'],
+    [/COMUNICADO(?:\s+OFICIAL|\s+CONJUNTO)?(?:\s+CGIBS(?:\s*(?:E|\/)\s*RFB)?)?\s+N[ºO°.]?\s*/i, 'COMUNICADO OFICIAL'],
     [/NOTA ORIENTATIVA(?:\s+DERE)?\s+N?[ºO°.]?\s*/i, 'NOTA ORIENTATIVA'],
   ];
 
@@ -380,9 +380,13 @@ function descriptorFromArtifact(
   const absolute = new URL(anchor.href, listingUrl).toString();
   if (!fileLike(absolute)) return undefined;
 
-  const title = normalizeInline(anchor.heading && !/VERS(?:A|Ã)O ATUAL|VERSOES? ANTERIORES|MANUAL DE|NOTAS ORIENTATIVAS?/i.test(anchor.heading)
-    ? anchor.heading
-    : anchor.text || anchor.heading || stablePath(absolute).split('/').pop() || 'Documento CGIBS');
+  const anchorText = normalizeInline(anchor.text);
+  const genericAnchor = /^(?:BAIXAR|DOWNLOAD|ACESSE|CLIQUE AQUI|PDF|ARQUIVO|DOCUMENTO|VER DOCUMENTO)$/i.test(anchorText);
+  const title = normalizeInline(
+    anchorText && !genericAnchor
+      ? anchorText
+      : anchor.heading || stablePath(absolute).split('/').pop() || 'Documento CGIBS',
+  );
   if (!title) return undefined;
 
   const section = anchor.heading && anchor.heading !== title ? anchor.heading : undefined;
@@ -396,6 +400,10 @@ function descriptorFromArtifact(
   const publishedAt = publicationDate(combined);
   const effectiveAt = effectiveDate(combined);
 
+  const statusContext = section && /VERS(?:A|Ã)O ATUAL|VERS(?:O|Õ)ES? ANTERIORES/i.test(section)
+    ? section
+    : `${title} ${combined}`;
+
   return {
     family,
     title,
@@ -406,8 +414,8 @@ function descriptorFromArtifact(
     ...(effectiveAt ? { effectiveAt } : {}),
     ...(version ? { officialVersion: version } : {}),
     documentFamily: docFamily,
-    documentStatus: statusFor(combined),
-    revisionKind: revisionKind(combined),
+    documentStatus: statusFor(statusContext),
+    revisionKind: revisionKind(statusContext),
     sourceRole: familyRole(family),
     officialUrl: absolute,
     externalId,
