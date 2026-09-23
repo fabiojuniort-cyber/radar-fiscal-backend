@@ -361,3 +361,12 @@ Saneamento controlado: `npm run db:sanitize-sped` roda em modo dry-run por padr�
 - remove somente as publicações cujas origens são todas SPED, junto com versions, files e links de run (em cascata);
 - preserva runs, attempts e items (em `collection_items.publication_id` o valor vira NULL);
 - é bloqueada por cron ativo, run ativo, publicação compartilhada com outra fonte ou vínculo com empresas.
+
+### Descoberta: pastas gov.br (2026-09-23)
+
+O bootstrap corrigido (`ea8202e8`) não capturou os pacotes XSD do EFD-Reinf 2.1.2: nem o clássico (`xsd-eventos`, sha `6e4076…`) nem o "CNPJ Alfanumérico". O motivo é que a página "Esquemas XSD" (versão atual) é uma pasta Volto (`is_folderish` com `items`) e era classificada como DOCUMENT. O crawler parava nela, e o checkpoint a pulava nas execuções seguintes. O defeito é anterior à correção de idempotência: o bootstrap antigo também não capturava esses pacotes.
+
+Correção:
+
+- página-pasta passa a ser sempre CONTAINER; os filhos são seguidos em toda execução, e a própria pasta continua capturada como publicação;
+- `SPED_STATE_VERSION` sobe para 3, então checkpoints v2, que podiam esconder pastas, são ignorados uma vez.

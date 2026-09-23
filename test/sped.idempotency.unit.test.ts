@@ -172,3 +172,37 @@ test('D: runtime guard disambiguates two different documents that derive the sam
     [...keys].sort(),
   );
 });
+
+// ---------------------------------------------------------------------------
+// gov.br folders (production gate: EFD-Reinf XSD 2.1.2 package)
+// ---------------------------------------------------------------------------
+
+test('gov.br folder pages are containers: children are captured and new children are discovered incrementally', async () => {
+  const inventory = productionLikeInventory();
+  const portal = fakePortal(inventory);
+  const first = await new SpedConnector({ fetch: portal.fetch }).collect(CONTEXT);
+  const titles = first.publications.map((publication) => publication.title);
+  assert.ok(titles.includes('Pacote XSD Eventos EFD Reinf v 2.1.2'), 'XSD package reachable only through the folder');
+  assert.ok(titles.includes('XSD Evento R-4010'));
+  assert.ok(titles.includes('Esquemas XSD'), 'the folder page itself is still captured');
+
+  const state = (first.metadata as { spedState: { pages: Record<string, { kind: string }> } }).spedState;
+  const folder = Object.entries(state.pages).find(([url]) => url.endsWith('/versao-atual/esquemas-xsd'));
+  assert.equal(folder?.[1].kind, 'CONTAINER');
+
+  // A new package appears inside the folder: the next incremental run finds it.
+  const reinf = '/assuntos/escrituracoes-digitais/efd-reinf/manuais-e-documentos-tecnicos';
+  const newChild = reinf + '/versao-atual/esquemas-xsd/xsd-2.1.2';
+  inventory.documents.push({ path: newChild, title: 'XSD EFD-Reinf v2.1.2 - CNPJ Alfanumérico', type: 'File', created: '20/09/2026', file: 'xsd-cnpj-alfa' });
+  inventory.documents.find((doc) => doc.path === reinf + '/versao-atual/esquemas-xsd')!.children!.push(newChild);
+  const incremental = await new SpedConnector({
+    fetch: fakePortal(inventory).fetch,
+    readState: async () => (first.metadata as { spedState: never }).spedState,
+  }).collect(CONTEXT);
+  const found = incremental.publications.map((publication) => publication.title);
+  assert.ok(found.includes('XSD EFD-Reinf v2.1.2 - CNPJ Alfanumérico'));
+  assert.ok(!found.includes('Pacote XSD Eventos EFD Reinf v 2.1.2'), 'known documents are still skipped');
+  // The CNPJ package and the classic package are distinct publications.
+  const keys = new Set([...first.publications, ...incremental.publications].map((publication) => publication.identityKey));
+  assert.equal(keys.size, new Set([...first.publications, ...incremental.publications].map((publication) => publication.externalId)).size - 1);
+});

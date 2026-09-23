@@ -148,7 +148,11 @@ export interface SpedIdentityRecord {
   fileSha256s: string[];
 }
 
-export const SPED_STATE_VERSION = 2;
+/**
+ * 3: folder pages are CONTAINERs (v2 checkpoints could mark a gov.br folder as
+ * a known DOCUMENT and hide its children, e.g. the EFD-Reinf XSD packages).
+ */
+export const SPED_STATE_VERSION = 3;
 export const SPED_IDENTITY_VERSION = 'v2';
 const MAX_STORED_IDENTITY_CONTENT = 4_000;
 
@@ -575,6 +579,7 @@ async function crawlModule(
       if (
         descriptor &&
         kind === 'UNKNOWN' &&
+        !page.folderish &&
         (
           descriptor.files.length > 0 ||
           descriptor.publishedAt !== undefined ||
@@ -584,6 +589,12 @@ async function crawlModule(
         )
       ) {
         kind = 'DOCUMENT';
+        rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
+      }
+      if (page.folderish) {
+        // A folder is never skipped by the checkpoint and its children are
+        // always followed, even when the folder itself yields a descriptor.
+        kind = 'CONTAINER';
         rememberPage(nextPages, requestedUrl, finalUrl, kind, definition.module, nowIso);
       }
       if (descriptor) {
@@ -1087,7 +1098,7 @@ function publicationFor(
 
 export class SpedConnector implements CollectionConnector {
   readonly key = SPED_CONNECTOR_KEY;
-  readonly version = '0.4.0';
+  readonly version = '0.4.1';
   readonly #options: SpedConnectorOptions;
 
   constructor(options: SpedConnectorOptions = {}) {

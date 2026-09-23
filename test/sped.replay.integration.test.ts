@@ -9,7 +9,7 @@ import type { DB } from '../src/infrastructure/database/database.types.js';
 import { acquireNextCollectionRun, createCollectionRun } from '../src/modules/collection/collection-run.repository.js';
 import { processAcquiredCollectionRun } from '../src/modules/collection/collection.engine.js';
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
-import { SpedConnector } from '../src/modules/collection/sped.connector.js';
+import { SPED_STATE_VERSION, SpedConnector } from '../src/modules/collection/sped.connector.js';
 import { readSpedSourceState } from '../src/modules/collection/sped-source-state.repository.js';
 import { fakePortal, productionLikeInventory } from './sped.govbr.fixtures.js';
 
@@ -118,8 +118,10 @@ test('A: bootstrap then replay through the collection engine is incremental and 
     const bootstrapFetches = { ...portal.stats };
 
     const state = await readSpedSourceState(h.db, h.sourceId);
-    assert.equal(state.version, 2);
-    assert.ok(Object.values(state.pages).filter((page) => page.kind === 'DOCUMENT').length >= 14);
+    assert.equal(state.version, SPED_STATE_VERSION);
+    // 13 document pages + 1 gov.br folder, which stays a CONTAINER.
+    assert.equal(Object.values(state.pages).filter((page) => page.kind === 'DOCUMENT').length, 13);
+    assert.equal(Object.values(state.pages).filter((page) => page.kind === 'CONTAINER' && page.canonicalUrl.endsWith('/versao-atual/esquemas-xsd')).length > 0, true);
 
     portal.reset();
     const replay = await h.run();
@@ -129,8 +131,9 @@ test('A: bootstrap then replay through the collection engine is incremental and 
     assert.deepEqual(afterReplay, afterBootstrap, 'same publications, versions and origins');
 
     const replayMeta = sped(await h.attemptMetadata(replay.runId));
-    assert.ok(replayMeta.skippedKnownDocumentCount >= 14, 'checkpoint must be loaded and reused');
-    assert.equal(portal.stats.documentPageFetches, 0, 'known documents are not re-fetched');
+    assert.ok(replayMeta.skippedKnownDocumentCount >= 13, 'checkpoint must be loaded and reused');
+    assert.equal(portal.stats.documentPageFetches, 1, 'only the folder container is re-fetched; known documents are not');
+    assert.equal(replay.metrics.existingPublications, 1, 'the folder page is re-emitted unchanged (no version)');
     assert.equal(portal.stats.fileDownloads, 0, 'no file is downloaded again');
     assert.ok(bootstrapFetches.documentPageFetches >= 14);
   } finally {
@@ -168,10 +171,10 @@ test('B: after a PARTIAL_SUCCESS bootstrap, completed items are reused and faile
     assert.equal(next.status, 'SUCCESS');
     assert.equal(next.metrics.newPublications, 2, 'the two failed guides are retried and captured');
     assert.equal(next.metrics.newVersions, 0);
-    assert.equal(portal.stats.documentPageFetches, 2, 'only the failed documents are fetched again');
+    assert.equal(portal.stats.documentPageFetches, 3, 'only the failed documents (plus the folder container) are fetched again');
     assert.equal(portal.stats.fileDownloads, 2);
     const nextMeta = sped(await h.attemptMetadata(next.runId));
-    assert.ok(nextMeta.skippedKnownDocumentCount >= 12, 'completed items reused from the PARTIAL_SUCCESS checkpoint');
+    assert.ok(nextMeta.skippedKnownDocumentCount >= 11, 'completed items reused from the PARTIAL_SUCCESS checkpoint');
 
     const afterNext = await h.counts();
     assert.equal(afterNext.publications, 13);
