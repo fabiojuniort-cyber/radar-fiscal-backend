@@ -383,6 +383,16 @@ function collectAnchors(html: string): { headings: string[]; anchors: AnchorReco
   return { headings, anchors, pageText: normalizeInline(pageText), ...(h1 ? { h1 } : {}) };
 }
 
+function equivalentActNumber(left?: string, right?: string): boolean {
+  if (!left || !right) return false;
+  const normalize = (value: string): string => {
+    const match = /^(\d+)\/(\d{4})$/.exec(value.trim());
+    if (!match?.[1] || !match[2]) return value.trim().toUpperCase();
+    return `${Number(match[1])}/${match[2]}`;
+  };
+  return normalize(left) === normalize(right);
+}
+
 function descriptorFromArtifact(
   family: CgibsFamily,
   listingUrl: string,
@@ -396,7 +406,17 @@ function descriptorFromArtifact(
   const genericAnchor = /^(?:BAIXAR|DOWNLOAD|ACESSE|CLIQUE AQUI|PDF|ARQUIVO|DOCUMENTO|VER DOCUMENTO)$/i.test(anchorText);
   const formalTitlePattern = /(?:RESOLU[CÇ][AÃ]O|PORTARIA|ATO\s+(?:T[EÉ]CNICO\s+)?CONJUNTO|COMUNICADO|NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)|INSTRU[CÇ][AÃ]O)\b/i;
   const anchorFormal = formalAct(anchorText);
-  const formalAnchor = Boolean(anchorFormal.actType && anchorFormal.actNumber);
+  const headingFormal = formalAct(heading);
+  const formalAnchor = Boolean(
+    anchorFormal.actType &&
+    anchorFormal.actNumber &&
+    (
+      !headingFormal.actType ||
+      !headingFormal.actNumber ||
+      canonicalToken(anchorFormal.actType) !== canonicalToken(headingFormal.actType) ||
+      !equivalentActNumber(anchorFormal.actNumber, headingFormal.actNumber)
+    )
+  );
   const formalHeading = formalTitlePattern.test(heading);
   const containerHeading = /^(?:VERS[AÃ]O ATUAL|VERS[ÕO]ES? ANTERIORES|NOTAS? ORIENTATIVAS?|RESOLU[CÇ][ÕO]ES|REGULAMENTOS|PORTARIAS|ATOS? CONJUNTOS?|ATOS? T[EÉ]CNICOS? CONJUNTOS?|DOCUMENTOS? T[EÉ]CNICOS?|GUIAS|CARTILHAS|NOT[IÍ]CIAS|COMUNICADOS? OFICIAIS)$/i.test(heading);
   const title = normalizeInline(
