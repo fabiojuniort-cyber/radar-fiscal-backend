@@ -192,3 +192,77 @@ O gate também revelou e permitiu corrigir antes do merge dois problemas de
 parsing: vazamento de data/status entre atos adjacentes e navegação por
 links institucionais/mídia global. Ambos ficaram cobertos por testes de
 regressão.
+
+
+## Fechamento produtivo — 23/09/2026
+
+Após o merge inicial, a validação produtiva revelou duas particularidades
+do HTML oficial que foram corrigidas antes do encerramento da frente:
+
+1. a Resolução CGIBS nº 3/2026 aparecia sob o heading ainda ativo da
+   Resolução nº 2/2026. O parser passou a preferir o título formal do
+   próprio link quando ele representa ato normativo semanticamente
+   diferente;
+2. Portarias usam, em alguns casos, heading com zero à esquerda
+   (`01/2026`) e link sem zero (`1/2026`). A comparação passou a
+   considerar os números semanticamente equivalentes, preservando a
+   identidade já persistida.
+
+O vínculo incorreto da Resolução nº 3 criado no primeiro bootstrap foi
+reparado de forma cirúrgica com dry-run e precondições transacionais.
+Após o reparo, a Resolução nº 2 voltou a possuir uma origem e uma versão
+correntes corretas, e a Resolução nº 3 foi recriada sob identidade
+própria no replay subsequente.
+
+Estado final do banco:
+
+- 77 publicações CGIBS;
+- 77 `publication_versions`;
+- 77 versões correntes;
+- 0 versões históricas artificiais;
+- 77 arquivos;
+- 77/77 SHA-256 válidos;
+- 0 origens duplicadas;
+- 0 publicações CGIBS com múltiplas origens internas inesperadas;
+- 18 Resoluções;
+- 10 Portarias;
+- 7 Atos Conjuntos;
+- 4 Atos Técnicos Conjuntos;
+- 38 Documentos Técnicos.
+
+Replay produtivo limpo:
+
+- 77 encontradas;
+- 77 processadas;
+- 77 existentes;
+- 0 novas publicações;
+- 0 novas versões;
+- 0 erros de item;
+- 0 falhas parciais;
+- 77 checkpoints reutilizados;
+- 0 downloads novos;
+- duração observada: aproximadamente 16,2 s.
+
+Execução real do Scheduler:
+
+- run: `b90513c9-dad1-4b2f-9499-20239914d704`;
+- `trigger_type = SCHEDULED`;
+- `scheduled_for = 2026-09-23T23:00:00Z`;
+- status: `SUCCESS`;
+- 77 encontradas / 77 processadas / 77 existentes;
+- 0 novas publicações;
+- 0 novas versões;
+- 0 erros;
+- 0 falhas parciais;
+- duração da tentativa: aproximadamente 13,8 s.
+
+Configuração operacional final:
+
+- `schedule_cron = 0 * * * *`;
+- timezone: `America/Sao_Paulo`;
+- Worker `COLLECTION_TIMEOUT_MS = 180000` (3 minutos);
+- timeout confirmado no log de inicialização do Worker;
+- proteção contra overlap habilitada explicitamente para `cgibs` no
+  Scheduler e coberta pelo teste de integração existente.
+
+Com esses gates, o conector CGIBS está apto para operação horária.
