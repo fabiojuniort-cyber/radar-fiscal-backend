@@ -1,6 +1,8 @@
 import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
+import { CgibsConnector } from './cgibs.connector.js';
+import { readCgibsSourceState } from './cgibs-source-state.repository.js';
 import { ConfazConnector } from './confaz.connector.js';
 import { DouConnector } from './dou.connector.js';
 import { readDouSourceState } from './dou-source-state.repository.js';
@@ -34,6 +36,17 @@ export function buildConnectorRegistry(
       ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId) } : {}),
     }));
   }
+
+  registry.register(
+    new CgibsConnector({
+      ...(options.db
+        ? {
+            readState: (sourceId) =>
+              readCgibsSourceState(options.db!, sourceId),
+          }
+        : {}),
+    }),
+  );
 
   registry.register(
     new ConfazConnector({
