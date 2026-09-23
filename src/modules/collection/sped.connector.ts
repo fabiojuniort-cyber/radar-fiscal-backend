@@ -133,9 +133,59 @@ export interface SpedKnownPage {
   checkedAt: string;
 }
 
+/**
+ * Identity already emitted for an origin (publication externalId).
+ * Used to keep identity assignments stable across incremental runs and to
+ * resolve identity collisions deterministically.
+ */
+export interface SpedIdentityRecord {
+  key: string;
+  baseKey: string;
+  officialUrl: string;
+  title: string;
+  /** Canonical content emitted for this origin (omitted when very large). */
+  content?: string;
+  fileSha256s: string[];
+}
+
+export const SPED_STATE_VERSION = 2;
+export const SPED_IDENTITY_VERSION = 'v2';
+const MAX_STORED_IDENTITY_CONTENT = 4_000;
+
 export interface SpedSourceState {
+  /**
+   * 2 = checkpoint semantics where only fully emitted documents are marked as
+   * known. Older states are not trusted for incremental skipping.
+   */
+  version?: number;
   items: Record<string, SpedStoredFile>;
   pages: Record<string, SpedKnownPage>;
+  identities?: Record<string, SpedIdentityRecord>;
+}
+
+export interface SpedIdentityCollision {
+  baseKey: string;
+  resolvedKey: string;
+  externalId: string;
+  officialUrl: string;
+  title: string;
+  module: SpedModule;
+  kind: SpedDocumentKind;
+  carrier: string;
+  documentFamily: string;
+  documentNumber?: string;
+  officialVersion?: string;
+  revisionKind: string;
+  collidedWith: Array<{ externalId: string; officialUrl: string; title?: string }>;
+}
+
+export interface SpedIdentityAudit {
+  identityVersion: string;
+  emittedPublicationCount: number;
+  distinctIdentityKeyCount: number;
+  mirrorGroups: Array<{ key: string; externalIds: string[] }>;
+  collisionsResolved: SpedIdentityCollision[];
+  unresolvedCollisions: number;
 }
 
 export interface SpedConnectorOptions {
@@ -759,40 +809,258 @@ function normalizedIdentityToken(value: string): string {
     .toLocaleUpperCase('pt-BR');
 }
 
-function spedPublicationIdentityKey(descriptor: SpedDocumentDescriptor): string {
+/**
+ * Semantic identity of a SPED document (identity v2).
+ *
+ * - carrier separates an announcement ("comunicado") from the document itself;
+ * - number/version/revision discriminate official editions;
+ * - when a document has neither number nor version, the family is title-derived
+ *   and therefore weak: the stable portal path is appended as a safe canonical
+ *   fallback (e.g. "Esquemas XSD" under versao-atual vs historico).
+ *
+ * Numbered/versioned documents keep a portal-independent key, so gov.br and
+ * legacy mirrors of the same edition still correlate.
+ */
+export function spedBaseIdentityKey(descriptor: SpedDocumentDescriptor): string {
   const family = descriptor.documentNumber ?? descriptor.documentFamily;
+  const weak = descriptor.documentNumber === undefined && descriptor.officialVersion === undefined;
   return [
     'SPED',
+    SPED_IDENTITY_VERSION,
     descriptor.module,
+    descriptor.carrier,
     descriptor.kind,
     normalizedIdentityToken(family),
     descriptor.officialVersion ?? '',
     descriptor.revisionKind,
+    ...(weak ? ['PATH:' + descriptor.canonicalPath] : []),
   ].join('|');
+}
+
+function collisionKey(baseKey: string, descriptor: SpedDocumentDescriptor): string {
+  return baseKey.includes('|PATH:') ? baseKey : baseKey + '|PATH:' + descriptor.canonicalPath;
+}
+
+function sameFileSet(left: string[], right: string[]): boolean {
+  return left.length > 0 && left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+interface IdentityCandidate {
+  descriptor: SpedDocumentDescriptor;
+  files: ConnectorFile[];
+  baseKey: string;
+  fileSha256s: string[];
+}
+
+interface IdentityResolution {
+  keys: Map<string, string>;
+  canonical: Map<string, { title: string; content?: string }>;
+  identities: Record<string, SpedIdentityRecord>;
+  audit: SpedIdentityAudit;
+}
+
+/**
+ * Deterministic identity resolution for one run.
+ *
+ * Invariant: two different official documents never share an identity key.
+ * The only accepted sharing is a proven mirror: the same non-empty set of file
+ * SHA-256 digests published at more than one official location. Mirrors emit
+ * one canonical title/content so they never alternate publication_versions.
+ */
+function resolveIdentities(
+  candidates: IdentityCandidate[],
+  previous: Record<string, SpedIdentityRecord>,
+): IdentityResolution {
+  const keys = new Map<string, string>();
+  const identities: Record<string, SpedIdentityRecord> = { ...previous };
+  const collisions: SpedIdentityCollision[] = [];
+  const runIds = new Set(candidates.map((candidate) => candidate.descriptor.externalId));
+
+  const occupants = (key: string): Array<{ externalId: string; fileSha256s: string[]; officialUrl: string; title: string }> => {
+    const found = new Map<string, { externalId: string; fileSha256s: string[]; officialUrl: string; title: string }>();
+    for (const [externalId, record] of Object.entries(identities)) {
+      if (record.key === key && (!runIds.has(externalId) || keys.has(externalId))) {
+        found.set(externalId, { externalId, fileSha256s: record.fileSha256s, officialUrl: record.officialUrl, title: record.title });
+      }
+    }
+    for (const candidate of candidates) {
+      if (keys.get(candidate.descriptor.externalId) === key) {
+        found.set(candidate.descriptor.externalId, {
+          externalId: candidate.descriptor.externalId,
+          fileSha256s: candidate.fileSha256s,
+          officialUrl: candidate.descriptor.officialUrl,
+          title: candidate.descriptor.title,
+        });
+      }
+    }
+    return [...found.values()];
+  };
+
+  const ordered = [...candidates].sort((left, right) =>
+    left.baseKey.localeCompare(right.baseKey) ||
+    left.descriptor.officialUrl.localeCompare(right.descriptor.officialUrl),
+  );
+
+  // 1. Origins that already own an identity derived from the same base keep it.
+  for (const candidate of ordered) {
+    const stored = previous[candidate.descriptor.externalId];
+    if (stored && stored.baseKey === candidate.baseKey) {
+      keys.set(candidate.descriptor.externalId, stored.key);
+    }
+  }
+
+  // 2. New origins: take the base key unless it belongs to a different document.
+  for (const candidate of ordered) {
+    const externalId = candidate.descriptor.externalId;
+    if (keys.has(externalId)) continue;
+    const current = occupants(candidate.baseKey).filter((item) => item.externalId !== externalId);
+    const conflicting = current.filter((item) => !sameFileSet(item.fileSha256s, candidate.fileSha256s));
+    if (current.length === 0 || conflicting.length === 0) {
+      keys.set(externalId, candidate.baseKey);
+      continue;
+    }
+    const resolvedKey = collisionKey(candidate.baseKey, candidate.descriptor);
+    const stillTaken = occupants(resolvedKey).some((item) => item.externalId !== externalId);
+    keys.set(externalId, stillTaken ? resolvedKey + '|ID:' + externalId : resolvedKey);
+    collisions.push({
+      baseKey: candidate.baseKey,
+      resolvedKey: keys.get(externalId)!,
+      externalId,
+      officialUrl: candidate.descriptor.officialUrl,
+      title: candidate.descriptor.title,
+      module: candidate.descriptor.module,
+      kind: candidate.descriptor.kind,
+      carrier: candidate.descriptor.carrier,
+      documentFamily: candidate.descriptor.documentFamily,
+      ...(candidate.descriptor.documentNumber ? { documentNumber: candidate.descriptor.documentNumber } : {}),
+      ...(candidate.descriptor.officialVersion ? { officialVersion: candidate.descriptor.officialVersion } : {}),
+      revisionKind: candidate.descriptor.revisionKind,
+      collidedWith: conflicting.map((item) => ({
+        externalId: item.externalId,
+        officialUrl: item.officialUrl,
+        title: item.title,
+      })),
+    });
+  }
+
+  // 3. Canonical representation for mirror groups (same key, several origins).
+  const canonical = new Map<string, { title: string; content?: string }>();
+  const byKey = new Map<string, IdentityCandidate[]>();
+  for (const candidate of candidates) {
+    const key = keys.get(candidate.descriptor.externalId)!;
+    byKey.set(key, [...(byKey.get(key) ?? []), candidate]);
+  }
+  const mirrorGroups: Array<{ key: string; externalIds: string[] }> = [];
+  for (const [key, members] of byKey) {
+    const owners = Object.entries(previous)
+      .filter(([externalId, record]) => record.key === key && !runIds.has(externalId))
+      .map(([, record]) => record);
+    if (members.length + owners.length < 2) continue;
+    mirrorGroups.push({
+      key,
+      externalIds: [
+        ...members.map((member) => member.descriptor.externalId),
+        ...Object.entries(previous)
+          .filter(([externalId, record]) => record.key === key && !runIds.has(externalId))
+          .map(([externalId]) => externalId),
+      ].sort(),
+    });
+    // Representative = smallest official URL among all known origins. Stored
+    // owners are only eligible when their canonical content was retained, so
+    // a representative absent from this run is reproduced exactly.
+    const options = [
+      ...members.map((member) => ({
+        officialUrl: member.descriptor.officialUrl,
+        title: member.descriptor.title,
+        ...(member.descriptor.description !== undefined ? { content: member.descriptor.description } : {}),
+      })),
+      ...owners
+        .filter((owner) => owner.content !== undefined)
+        .map((owner) => ({
+          officialUrl: owner.officialUrl,
+          title: owner.title,
+          content: owner.content!,
+        })),
+    ].sort((left, right) => left.officialUrl.localeCompare(right.officialUrl));
+    const representative = options[0]!;
+    for (const member of members) {
+      canonical.set(member.descriptor.externalId, {
+        title: representative.title,
+        ...(representative.content !== undefined ? { content: representative.content } : {}),
+      });
+    }
+  }
+
+  for (const candidate of candidates) {
+    const externalId = candidate.descriptor.externalId;
+    identities[externalId] = {
+      key: keys.get(externalId)!,
+      baseKey: candidate.baseKey,
+      officialUrl: candidate.descriptor.officialUrl,
+      title: candidate.descriptor.title,
+      ...(candidate.descriptor.description !== undefined &&
+      candidate.descriptor.description.length <= MAX_STORED_IDENTITY_CONTENT
+        ? { content: candidate.descriptor.description }
+        : {}),
+      fileSha256s: candidate.fileSha256s,
+    };
+  }
+
+  // Final invariant check over this run's emissions.
+  let unresolvedCollisions = 0;
+  const seen = new Map<string, IdentityCandidate>();
+  for (const candidate of candidates) {
+    const key = keys.get(candidate.descriptor.externalId)!;
+    const other = seen.get(key);
+    if (other && !sameFileSet(other.fileSha256s, candidate.fileSha256s)) unresolvedCollisions += 1;
+    if (!other) seen.set(key, candidate);
+  }
+
+  return {
+    keys,
+    canonical,
+    identities,
+    audit: {
+      identityVersion: SPED_IDENTITY_VERSION,
+      emittedPublicationCount: candidates.length,
+      distinctIdentityKeyCount: new Set(keys.values()).size,
+      mirrorGroups,
+      collisionsResolved: collisions,
+      unresolvedCollisions,
+    },
+  };
 }
 
 function publicationFor(
   descriptor: SpedDocumentDescriptor,
   files: ConnectorFile[],
   portal: SpedPortalMode,
+  identityKey: string,
+  canonical?: { title: string; content?: string },
 ): ConnectorPublication {
+  const title = canonical?.title ?? descriptor.title;
+  const content = canonical ? canonical.content : descriptor.description;
   const agency = descriptor.module === 'DERE' ? 'RFB/CGIBS' : 'SPED/RFB';
   return {
-    title: descriptor.title,
+    title,
     agency,
     sphere: 'FEDERAL',
     actType: kindLabel(descriptor.kind),
     ...(descriptor.actNumber ? { actNumber: descriptor.actNumber } : {}),
     ...(descriptor.publishedAt ? { publishedAt: descriptor.publishedAt } : {}),
-    ...(descriptor.description ? { content: descriptor.description } : {}),
+    ...(content ? { content } : {}),
     officialUrl: descriptor.officialUrl,
     externalId: descriptor.externalId,
-    identityKey: spedPublicationIdentityKey(descriptor),
+    identityKey,
     ...(files.length ? { files } : {}),
     metadata: {
       module: descriptor.module,
       moduleLabel: moduleLabel(descriptor.module),
       documentKind: descriptor.kind,
+      documentCarrier: descriptor.carrier,
+      originTitle: descriptor.title,
+      contentSource: descriptor.documentTextSource,
+      identityVersion: SPED_IDENTITY_VERSION,
       documentFamily: descriptor.documentFamily,
       revisionKind: descriptor.revisionKind,
       republication: descriptor.republication,
@@ -819,7 +1087,7 @@ function publicationFor(
 
 export class SpedConnector implements CollectionConnector {
   readonly key = SPED_CONNECTOR_KEY;
-  readonly version = '0.3.0';
+  readonly version = '0.4.0';
   readonly #options: SpedConnectorOptions;
 
   constructor(options: SpedConnectorOptions = {}) {
@@ -1023,7 +1291,13 @@ export class SpedConnector implements CollectionConnector {
         }
       }
 
-      const publications: ConnectorPublication[] = [];
+      // A document is emitted only when every one of its files is resolved
+      // (downloaded now or proven by a previous checkpoint). Otherwise it is
+      // deferred: not emitted with a partial file set (which would create an
+      // artificial version later) and not marked as known, so the very next
+      // run fetches it again.
+      const candidates: IdentityCandidate[] = [];
+      const deferred: SpedDocumentDescriptor[] = [];
       for (const descriptor of descriptors) {
         const currentFiles = descriptor.files
           .map((file) => resolvedFiles.get(stateKey({
@@ -1032,11 +1306,50 @@ export class SpedConnector implements CollectionConnector {
             url: file.url,
             externalId: file.externalId,
             ...(file.name ? { name: file.name } : {}),
-          })))
-          .filter((file): file is ConnectorFile => file !== undefined);
+          })));
+        if (currentFiles.some((file) => file === undefined)) {
+          deferred.push(descriptor);
+          continue;
+        }
+        const resolved = currentFiles as ConnectorFile[];
+        candidates.push({
+          descriptor,
+          files: resolved,
+          baseKey: spedBaseIdentityKey(descriptor),
+          fileSha256s: resolved
+            .map((file) => file.rawSha256)
+            .filter((hash): hash is string => typeof hash === 'string')
+            .sort(),
+        });
+      }
 
-        if (descriptor.files.length > 0 && currentFiles.length === 0) continue;
-        publications.push(publicationFor(descriptor, currentFiles, portal));
+      const identity = resolveIdentities(candidates, state.identities ?? {});
+      const publications: ConnectorPublication[] = candidates.map((candidate) =>
+        publicationFor(
+          candidate.descriptor,
+          candidate.files,
+          portal,
+          identity.keys.get(candidate.descriptor.externalId)!,
+          identity.canonical.get(candidate.descriptor.externalId),
+        ),
+      );
+
+      const allDescriptors = new Map<string, SpedDocumentDescriptor>();
+      for (const result of crawlResults) {
+        for (const [externalId, descriptor] of result.descriptors) allDescriptors.set(externalId, descriptor);
+      }
+      const pendingUrls = new Set<string>();
+      for (const descriptor of deferred) {
+        pendingUrls.add(canonicalPortalUrl(descriptor.officialUrl));
+        for (const linkedId of descriptor.linkedArtifactExternalIds ?? []) {
+          const linked = allDescriptors.get(linkedId);
+          if (linked) pendingUrls.add(canonicalPortalUrl(linked.officialUrl));
+        }
+      }
+      for (const [key, page] of Object.entries(nextPages)) {
+        if (pendingUrls.has(page.canonicalUrl) || pendingUrls.has(key)) {
+          nextPages[key] = { ...page, kind: 'UNKNOWN' };
+        }
       }
 
       const skippedKnownDocumentCount = crawlResults.reduce(
@@ -1099,11 +1412,22 @@ export class SpedConnector implements CollectionConnector {
             maxPagesPerModule,
             maxCrawlDepth,
             partialFailureCount: partialFailures.length,
+            deferredDocumentCount: deferred.length,
+            deferredDocuments: deferred.map((descriptor) => ({
+              externalId: descriptor.externalId,
+              officialUrl: descriptor.officialUrl,
+              title: descriptor.title,
+              module: descriptor.module,
+            })),
+            identityAudit: identity.audit,
+            stateVersion: SPED_STATE_VERSION,
             scope: ['EFD_ICMS_IPI', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DERE'],
           },
           spedState: {
+            version: SPED_STATE_VERSION,
             items: nextItems,
             pages: nextPages,
+            identities: identity.identities,
           },
         },
       };

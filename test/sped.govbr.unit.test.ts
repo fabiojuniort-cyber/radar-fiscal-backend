@@ -198,7 +198,7 @@ test('gov.br is the default SPED portal and captures current gates through Volto
   assert.equal(guide.metadata?.sourcePortal, 'GOVBR');
   assert.equal(guide.metadata?.sourceCreatedAt, '2026-09-10');
   assert.equal(guide.publishedAt, undefined);
-  assert.match(guide.identityKey ?? '', /^SPED\|EFD_ICMS_IPI\|GUIDE\|/);
+  assert.match(guide.identityKey ?? '', /^SPED\|v2\|EFD_ICMS_IPI\|DOCUMENT\|GUIDE\|EFD ICMS\/IPI GUIA PRATICO\|3\.2\.4\|ORIGINAL$/);
   assert.equal(guide.files?.length, 1);
   assert.match(guide.files?.[0]?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
   assert.ok(guide.files?.[0]?.url.endsWith('/@@display-file/file'));
