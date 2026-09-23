@@ -19,7 +19,7 @@ try {
   if (!source) throw new Error('CGIBS source is not provisioned.');
   const sourceId = source.id;
 
-  const [runs, familyCounts, typeCounts, gates, fileStats, duplicateOrigins, versionStats] = await Promise.all([
+  const [runs, familyCounts, typeCounts, gates, fileStats, duplicateOrigins, versionStats, multiOrigins] = await Promise.all([
     pool.query(`
       SELECT
         cr.id, cr.trigger_type, cr.status, cr.scheduled_for, cr.started_at, cr.finished_at,
@@ -118,6 +118,35 @@ try {
       JOIN publication_versions pv ON pv.publication_id = p.id
       WHERE po.source_id = $1
     `, [sourceId]),
+    pool.query(`
+      SELECT
+        p.id, p.act_type, p.act_number, p.title,
+        count(*)::int AS origin_count,
+        jsonb_agg(jsonb_build_object(
+          'externalId', po.external_id,
+          'officialUrl', po.official_url,
+          'family', po.metadata->>'family',
+          'documentFamily', po.metadata->>'documentFamily',
+          'revisionKind', po.metadata->>'revisionKind',
+          'normativeKey', po.metadata->>'normativeKey'
+        ) ORDER BY po.external_id) AS origins,
+        (
+          SELECT jsonb_agg(jsonb_build_object(
+            'id', pv.id,
+            'isCurrent', pv.is_current,
+            'contentHash', pv.content_hash,
+            'capturedAt', pv.captured_at
+          ) ORDER BY pv.captured_at)
+          FROM publication_versions pv
+          WHERE pv.publication_id = p.id
+        ) AS versions
+      FROM publication_origins po
+      JOIN publications p ON p.id = po.publication_id
+      WHERE po.source_id = $1
+      GROUP BY p.id, p.act_type, p.act_number, p.title
+      HAVING count(*) > 1
+      ORDER BY origin_count DESC, p.title
+    `, [sourceId]),
   ]);
 
   console.log('CGIBS_INSPECTION=' + JSON.stringify({
@@ -129,6 +158,7 @@ try {
     fileStats: fileStats.rows[0],
     duplicateOrigins: duplicateOrigins.rows,
     versionStats: versionStats.rows[0],
+    multiOrigins: multiOrigins.rows,
   }));
 } finally {
   await pool.end();
