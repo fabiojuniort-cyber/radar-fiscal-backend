@@ -381,11 +381,18 @@ function descriptorFromArtifact(
   if (!fileLike(absolute)) return undefined;
 
   const anchorText = normalizeInline(anchor.text);
+  const heading = normalizeInline(anchor.heading ?? '');
   const genericAnchor = /^(?:BAIXAR|DOWNLOAD|ACESSE|CLIQUE AQUI|PDF|ARQUIVO|DOCUMENTO|VER DOCUMENTO)$/i.test(anchorText);
+  const formalHeading = /(?:RESOLU[CÇ][AÃ]O|PORTARIA|ATO\s+(?:T[EÉ]CNICO\s+)?CONJUNTO|COMUNICADO|NOTA\s+(?:T[EÉ]CNICA|ORIENTATIVA)|INSTRU[CÇ][AÃ]O)\b/i.test(heading);
+  const containerHeading = /^(?:VERS[AÃ]O ATUAL|VERS[ÕO]ES? ANTERIORES|NOTAS? ORIENTATIVAS?|RESOLU[CÇ][ÕO]ES|REGULAMENTOS|PORTARIAS|ATOS? CONJUNTOS?|ATOS? T[EÉ]CNICOS? CONJUNTOS?|DOCUMENTOS? T[EÉ]CNICOS?|GUIAS|CARTILHAS|NOT[IÍ]CIAS|COMUNICADOS? OFICIAIS)$/i.test(heading);
   const title = normalizeInline(
-    anchorText && !genericAnchor
-      ? anchorText
-      : anchor.heading || stablePath(absolute).split('/').pop() || 'Documento CGIBS',
+    formalHeading
+      ? heading
+      : anchorText && !genericAnchor
+        ? anchorText
+        : !containerHeading && heading
+          ? heading
+          : stablePath(absolute).split('/').pop() || 'Documento CGIBS',
   );
   if (!title) return undefined;
 
