@@ -96,24 +96,33 @@ const first = await new SpedConnector({
 const publications = summary(first);
 const gates = gateChecks(publications);
 
-console.log('SPED_GOVBR_LIVE_FIRST=' + JSON.stringify({
+console.error('SPED_GOVBR_LIVE_FIRST=' + JSON.stringify({
   metadata: first.metadata?.sped,
-  partialFailures: first.partialFailures ?? [],
+  partialFailureCount: first.partialFailures?.length ?? 0,
   publicationCount: publications.length,
-  publications,
+  fileCount: publications.reduce((sum, publication) => sum + publication.files.length, 0),
 }));
 
-console.log('SPED_GOVBR_LIVE_GATES=' + JSON.stringify(
-  Object.fromEntries(
-    Object.entries(gates).map(([key, values]) => [
-      key,
-      {
-        count: values.length,
-        titles: values.map((value) => value.title),
-      },
-    ]),
-  ),
-));
+const gateEvidence = Object.fromEntries(
+  Object.entries(gates).map(([key, values]) => [
+    key,
+    values.map((value) => ({
+      title: value.title,
+      officialUrl: value.officialUrl,
+      documentFamily: value.documentFamily,
+      documentNumber: value.documentNumber,
+      officialVersion: value.officialVersion,
+      sourceCreatedAt: value.sourceCreatedAt,
+      files: value.files.map((file) => ({
+        url: file.url,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        rawSha256: file.rawSha256,
+      })),
+    })),
+  ]),
+);
+console.error('SPED_GOVBR_LIVE_GATES=' + JSON.stringify(gateEvidence));
 
 assertFiles(publications);
 
@@ -144,11 +153,13 @@ const second = await new SpedConnector({
   attemptId: '55555555-5555-4555-8555-555555555555',
 });
 
-console.log('SPED_GOVBR_LIVE_REPLAY=' + JSON.stringify({
+console.error('SPED_GOVBR_LIVE_REPLAY=' + JSON.stringify({
   metadata: second.metadata?.sped,
   partialFailures: second.partialFailures ?? [],
   publicationCount: second.publications.length,
-  publications: summary(second),
+  skippedKnownDocumentCount:
+    (second.metadata?.sped as { skippedKnownDocumentCount?: number } | undefined)
+      ?.skippedKnownDocumentCount ?? 0,
 }));
 
 if (second.publications.length !== 0) {
@@ -161,4 +172,4 @@ if ((second.partialFailures?.length ?? 0) > 0) {
   throw new Error('Immediate replay returned partial failures.');
 }
 
-console.log('SPED_GOVBR_LIVE_OK=1');
+console.error('SPED_GOVBR_LIVE_OK=1');
