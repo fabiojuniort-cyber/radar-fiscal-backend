@@ -21,10 +21,18 @@ function html(body: string): Response {
 }
 
 function listing(items: Array<{ url: string; title: string }>): Response {
+  const parent = items[0]?.url.replace(/\/[^/]+$/, '') ?? BASE;
   const state = JSON.stringify({
     content: {
       title: 'Documentos técnicos',
-      items: items.map((item) => ({ '@id': item.url, title: item.title })),
+      items: [
+        ...items.map((item) => ({ '@id': item.url, title: item.title })),
+        { '@id': parent + '/@contextnavigation', title: 'context navigation' },
+        { '@id': parent + '/@querystring-search?fullobjects=1', title: 'query service' },
+        { '@id': parent + '/@@images/image', title: 'image rendition' },
+        { '@id': parent + '/object_copy', title: 'copy action' },
+      ],
+      internalApiUrl: parent + '/@breadcrumbs',
     },
   });
   return html(
