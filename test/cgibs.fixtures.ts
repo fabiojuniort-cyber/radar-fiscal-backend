@@ -43,6 +43,10 @@ export const technicalIndexHtml = `<!doctype html><html><body><main>
 <h1>Documentos Técnicos</h1>
 <a href="/declaracao-de-regimes-especificos-dere">Declaração de Regimes Específicos — DeRE</a>
 <a href="/split-payment">Split Payment</a>
+<a href="/acessibilidade">Acessibilidade</a>
+<a href="/fale-conosco">Fale conosco</a>
+<a href="/aviso-de-cookies">Aviso de cookies</a>
+<a href="/upload/recortes/202609/banner.jpg">Banner institucional</a>
 </main></body></html>`;
 
 export const dereHtml = `<!doctype html><html><body><main>
