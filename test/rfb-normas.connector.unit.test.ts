@@ -7,6 +7,8 @@ import {
   ADE_API_ORIGINAL,
   IN_API_ORIGINAL,
   SC_API_ORIGINAL,
+  PORTARIA_RETIFICATION_API,
+  PORTARIA_DUPLICATE_API,
   representationPayload,
   RFB_EMPTY_FIXTURE,
   RFB_SEARCH_FIXTURE,
@@ -21,7 +23,11 @@ const CONTEXT = {
   signal: new AbortController().signal,
 };
 
-function portal(options: { changedVigente?: boolean; failAttachment?: boolean } = {}) {
+function portal(options: {
+  changedVigente?: boolean;
+  failAttachment?: boolean;
+  attachmentLabel?: string;
+} = {}) {
   let fileDownloads = 0;
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(input.toString());
@@ -61,7 +67,7 @@ function portal(options: { changedVigente?: boolean; failAttachment?: boolean } 
     if (url.pathname.endsWith('/anexoOutros.action')) {
       fileDownloads += 1;
       if (options.failAttachment) return new Response('temporary', { status: 503 });
-      return new Response(pdfBytes('SC 180'), {
+      return new Response(pdfBytes(options.attachmentLabel ?? 'SC 180'), {
         status: 200,
         headers: { 'content-type': 'application/pdf', etag: '"sc-180-v1"' },
       });
@@ -108,6 +114,14 @@ test('collects deterministic scope and reports discovered/included/excluded reas
   const sc = result.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA');
   assert.ok(sc);
   assert.equal(((sc.metadata?.rfbNormas as any).files ?? []).length, 1);
+  assert.equal(sc.files?.length, 1);
+  const normalizedSc = normalizePublication({
+    sourceId: CONTEXT.sourceId,
+    publication: sc,
+  });
+  assert.equal(normalizedSc.files.length, 1);
+  assert.match(normalizedSc.files[0]!.rawSha256 ?? '', /^[a-f0-9]{64}$/);
+  assert.equal((normalizedSc.metadata.files as unknown[]).length, 1);
   assert.equal(fake.fileDownloads(), 1);
 });
 
@@ -143,6 +157,79 @@ test('immediate replay reuses known attachments and creates no content hash chan
     ((replayInstruction.metadata?.rfbNormas as any).representations.relacional.available),
     false,
     '403 relation view is optional and must be tracked as unavailable',
+  );
+});
+
+test('attachment byte change creates a content hash change for the same publication', async () => {
+  const firstPortal = portal({ attachmentLabel: 'SC 180 v1' });
+  const first = await new RfbNormasConnector({
+    fetch: firstPortal.fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+  }).collect(CONTEXT);
+
+  const state = first.checkpoint!.state as unknown as RfbNormasSourceState;
+  const changedPortal = portal({ attachmentLabel: 'SC 180 v2' });
+  const changed = await new RfbNormasConnector({
+    fetch: changedPortal.fetch,
+    readState: async () => state,
+    now: () => new Date('2026-09-23T16:00:00Z'),
+    revisitAfterMs: 0,
+  }).collect(CONTEXT);
+
+  const firstSc = first.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
+  const changedSc = changed.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
+  const firstNormalized = normalizePublication({ sourceId: CONTEXT.sourceId, publication: firstSc });
+  const changedNormalized = normalizePublication({ sourceId: CONTEXT.sourceId, publication: changedSc });
+
+  assert.equal(firstNormalized.identityHash, changedNormalized.identityHash);
+  assert.notEqual(firstNormalized.contentHash, changedNormalized.contentHash);
+});
+
+test('official repeated retification reuses target canonical content without artificial version hash', async () => {
+  const search = `<!doctype html><html><body>
+  <div>Total de atos localizados: 2</div><div>Página 1 de 1</div>
+  <table><tbody>
+  <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148881">Portaria</a></td><td>619</td><td>RFB</td><td>16/01/2026</td><td>Retificação tributária da Portaria RFB nº 619/2025.</td></tr>
+  <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148882">Portaria</a></td><td>619</td><td>RFB</td><td>16/01/2026</td><td>Retificação tributária da Portaria RFB nº 619/2025.</td></tr>
+  </tbody></table></body></html>`;
+
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = new URL(input.toString());
+    if (url.pathname.endsWith('/consulta.action')) {
+      return new Response(search, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    const match = /\/api\/consulta-externa\/ato\/(148881|148882)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+    if (!match?.[1] || !match[2]) return new Response('missing', { status: 404 });
+    if (match[2] !== 'original') return new Response(null, { status: 406 });
+    const payload = match[1] === '148881' ? PORTARIA_RETIFICATION_API : PORTARIA_DUPLICATE_API;
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  const result = await new RfbNormasConnector({
+    fetch: fetchImpl,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-01-16T15:00:00Z'),
+  }).collect(CONTEXT);
+
+  assert.equal(result.publications.length, 2);
+  const first = result.publications.find(p => p.externalId === '148881')!;
+  const duplicate = result.publications.find(p => p.externalId === '148882')!;
+  const n1 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: first });
+  const n2 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: duplicate });
+
+  assert.equal(n1.identityHash, n2.identityHash);
+  assert.equal(n1.contentHash, n2.contentHash);
+  assert.equal(
+    (duplicate.metadata?.rfbNormas as any).duplicateOfIdAto,
+    '148881',
+  );
+  assert.equal(
+    (duplicate.metadata?.rfbNormas as any).canonicalOriginalIdAto,
+    '148881',
   );
 });
 
