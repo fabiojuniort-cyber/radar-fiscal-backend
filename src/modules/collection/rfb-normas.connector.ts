@@ -12,12 +12,12 @@ import {
   type RfbNormasClientOptions,
 } from './rfb-normas.client.js';
 import {
+  buildRfbApiRepresentationUrl,
   buildRfbModernRepresentationUrl,
-  buildRfbRepresentationUrl,
   buildRfbSearchUrl,
   canonicalizeRfbListingNumber,
   decideRfbCapture,
-  parseRfbRepresentationHtml,
+  parseRfbApiRepresentation,
   parseRfbSearchPage,
   type RfbFilterDecision,
   type RfbNormasListingItem,
@@ -293,18 +293,18 @@ export class RfbNormasConnector implements CollectionConnector {
           });
         }
 
-        const url = buildRfbRepresentationUrl(item.idAto, kind);
+        const apiUrl = buildRfbApiRepresentationUrl(item.idAto, kind);
         try {
           counters.representationRequests += 1;
           const response = kind === 'original'
-            ? await client.getHtml(url, context.signal)
-            : await client.getOptionalHtml(url, context.signal);
+            ? await client.getJson(apiUrl, context.signal)
+            : await client.getOptionalJson(apiUrl, context.signal);
 
           if (response.status === 'NOT_AVAILABLE') {
             counters.representationUnavailable += 1;
             representations[kind] = {
               url: buildRfbModernRepresentationUrl(item.idAto, kind),
-              legacyUrl: url,
+              apiUrl,
               available: false,
               httpStatus: response.httpStatus,
               lastCheckedAt: now.toISOString(),
@@ -312,10 +312,18 @@ export class RfbNormasConnector implements CollectionConnector {
             continue;
           }
 
-          const parsed = parseRfbRepresentationHtml(response.html, response.url);
+          const parsed = parseRfbApiRepresentation(response.payload);
+          const payloadId = (response.payload as { idAto?: unknown } | null)?.idAto;
+          if (String(payloadId ?? '') !== item.idAto) {
+            throw new ConnectorError('RFB_NORMAS_ID_MISMATCH', {
+              code: 'RFB_NORMAS_ID_MISMATCH',
+              kind: 'PROCESSING_ERROR',
+              retryable: false,
+            });
+          }
           representations[kind] = {
             url: buildRfbModernRepresentationUrl(item.idAto, kind),
-            legacyUrl: response.url,
+            apiUrl: response.url,
             available: true,
             normalizedHash: parsed.normalizedHash,
             lastCheckedAt: now.toISOString(),
@@ -332,7 +340,7 @@ export class RfbNormasConnector implements CollectionConnector {
           });
           representations[kind] = {
             url: buildRfbModernRepresentationUrl(item.idAto, kind),
-            legacyUrl: url,
+            apiUrl,
             available: false,
             errorCode: info.code,
             lastCheckedAt: now.toISOString(),
@@ -349,7 +357,16 @@ export class RfbNormasConnector implements CollectionConnector {
       }
 
       counters.detailRequests += 1;
-      const canonical = canonicalizeRfbListingNumber(item, original.title);
+      const canonical = canonicalizeRfbListingNumber(
+        {
+          ...item,
+          ...(original.agency ? { agency: original.agency } : {}),
+          ...(original.type ? { type: original.type } : {}),
+          ...(original.number ? { number: original.number } : {}),
+          ...(original.publishedAt ? { publishedAt: original.publishedAt } : {}),
+        },
+        original.title,
+      );
       const files: ConnectorFile[] = [];
 
       for (const attachment of original.attachments) {
@@ -420,10 +437,8 @@ export class RfbNormasConnector implements CollectionConnector {
       }
 
       const title = original.title ?? fallbackTitle(item);
-      const canonicalContent = original.title && original.normalizedText.startsWith(original.title)
-        ? original.normalizedText.slice(original.title.length).trim()
-        : original.normalizedText;
-      const officialUrl = item.detailUrl;
+      const canonicalContent = original.normalizedText;
+      const officialUrl = buildRfbModernRepresentationUrl(item.idAto, 'original');
       const metadata: Record<string, unknown> = {
         sourceRole: 'ENRICHMENT',
         representationSourceRole: 'PRIMARY',
@@ -435,10 +450,13 @@ export class RfbNormasConnector implements CollectionConnector {
           listingType: item.type,
           listingNumber: item.number,
           listingAgency: item.agency,
-          publicationDate: dateOnly(item.publishedAt),
+          publicationDate: dateOnly(original.publishedAt ?? item.publishedAt),
+          listingPublicationDate: dateOnly(item.publishedAt),
+          ...(original.publicationReference ? { publicationReference: original.publicationReference } : {}),
           abstract: item.abstract,
           representations,
           ...(canonical.actDate ? { actDate: dateOnly(canonical.actDate) } : {}),
+          republication: original.republication,
         },
       };
 
@@ -449,8 +467,9 @@ export class RfbNormasConnector implements CollectionConnector {
         ...(canonical.agency ? { agency: canonical.agency } : {}),
         ...(canonical.actType ? { actType: canonical.actType } : {}),
         ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
-        publishedAt: item.publishedAt,
-        content: canonicalContent || original.normalizedText,
+        publishedAt: original.publishedAt ?? item.publishedAt,
+        ...(original.effectiveAt ? { effectiveAt: original.effectiveAt } : {}),
+        content: canonicalContent,
         officialUrl,
         externalId: item.idAto,
         ...(!strong ? { identityKey: `RFB_NORMAS|${item.idAto}` } : {}),
