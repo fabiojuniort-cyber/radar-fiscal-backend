@@ -6,6 +6,7 @@ import { RfbNormasClient } from '../src/modules/collection/rfb-normas.client.js'
 
 const SEARCH = 'https://normas.receita.fazenda.gov.br/sijut2consulta/consulta.action';
 const FILE = 'https://normas.receita.fazenda.gov.br/sijut2consulta/anexoOutros.action?idArquivoBinario=90001';
+const API = 'https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153667/visao/original';
 
 test('reads official HTML and rejects cross-origin navigation', async () => {
   const client = new RfbNormasClient({
@@ -92,3 +93,28 @@ for (const status of [408, 425, 429, 500, 503]) {
     );
   });
 }
+
+
+test('reads modern official JSON API and treats optional 403 as unavailable', async () => {
+  const client = new RfbNormasClient({
+    fetch: (async (input) => {
+      const url = input.toString();
+      if (url.includes('/visao/relacional')) return new Response(null, { status: 403 });
+      return new Response(JSON.stringify({ idAto: 153667, visao: 'original' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch,
+  });
+
+  const original = await client.getJson(API, new AbortController().signal);
+  assert.equal(original.status, 'OK');
+  assert.deepEqual(original.payload, { idAto: 153667, visao: 'original' });
+
+  const relation = await client.getOptionalJson(
+    API.replace('/original', '/relacional'),
+    new AbortController().signal,
+  );
+  assert.equal(relation.status, 'NOT_AVAILABLE');
+  if (relation.status === 'NOT_AVAILABLE') assert.equal(relation.httpStatus, 403);
+});
