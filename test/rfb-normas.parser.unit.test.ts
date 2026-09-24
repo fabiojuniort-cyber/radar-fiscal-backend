@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  buildRfbRepresentationUrl,
+  buildRfbApiRepresentationUrl,
   buildRfbSearchUrl,
   canonicalizeRfbListingNumber,
   decideRfbCapture,
   extractRfbIdAto,
-  parseRfbRepresentationHtml,
+  parseRfbApiRepresentation,
   parseRfbSearchPage,
 } from '../src/modules/collection/rfb-normas.parser.js';
-import { RFB_SEARCH_FIXTURE, IN_ORIGINAL } from './rfb-normas.fixtures.js';
+import { RFB_SEARCH_FIXTURE, IN_API_ORIGINAL } from './rfb-normas.fixtures.js';
 
 test('parses Sistema Normas search results with official idAto and pagination', () => {
   const page = parseRfbSearchPage(RFB_SEARCH_FIXTURE, 1);
@@ -37,8 +37,8 @@ test('builds publication-date search and official representation URLs', () => {
   assert.equal(url.searchParams.get('dt_inicio'), '17/09/2026');
   assert.equal(url.searchParams.get('dt_fim'), '23/09/2026');
   assert.equal(url.searchParams.get('p'), '2');
-  assert.match(buildRfbRepresentationUrl('123', 'original'), /visao=original.*idAto=123/);
-  assert.match(buildRfbRepresentationUrl('123', 'multivigente'), /visao=anotado.*idAto=123/);
+  assert.match(buildRfbApiRepresentationUrl('123', 'original'), /\/ato\/123\/visao\/original$/);
+  assert.match(buildRfbApiRepresentationUrl('123', 'multivigente'), /\/ato\/123\/visao\/multivigente$/);
 });
 
 test('deterministic filter includes approved scope and records objective exclusions', () => {
@@ -70,17 +70,25 @@ test('NCM-only Cosit interpretation is excluded deterministically', () => {
   });
 });
 
-test('parses printer-friendly original content and canonical formal identity', () => {
-  const representation = parseRfbRepresentationHtml(
-    IN_ORIGINAL,
-    'https://normas.receita.fazenda.gov.br/sijut2consulta/imprimir.action?visao=original&idAto=150001',
-  );
+test('parses modern official API content, dates, attachments and canonical identity', () => {
+  const representation = parseRfbApiRepresentation(IN_API_ORIGINAL);
   assert.match(representation.title ?? '', /2\.344/);
   assert.match(representation.normalizedText, /Art\. 1º/);
   assert.match(representation.normalizedHash, /^[a-f0-9]{64}$/);
+  assert.equal(representation.publishedAt?.toISOString().slice(0, 10), '2026-09-23');
+  assert.equal(representation.effectiveAt?.toISOString().slice(0, 10), '2026-09-23');
+  assert.equal(representation.agency, 'RFB');
+  assert.equal(representation.type, 'Instrução Normativa');
+  assert.equal(representation.number, '2.344');
 
   const item = parseRfbSearchPage(RFB_SEARCH_FIXTURE).items[0]!;
-  const canonical = canonicalizeRfbListingNumber(item, representation.title);
+  const canonical = canonicalizeRfbListingNumber({
+    ...item,
+    agency: representation.agency!,
+    type: representation.type!,
+    number: representation.number!,
+    publishedAt: representation.publishedAt!,
+  }, representation.title);
   assert.equal(canonical.agency, 'RFB');
   assert.equal(canonical.actType, 'INSTRUÇÃO NORMATIVA');
   assert.equal(canonical.actNumber, '2344/2026');
