@@ -18,7 +18,7 @@ try {
   if (!source) throw new Error('RFB Normas source is not provisioned.');
   const sourceId = source.id;
 
-  const [runs, checkpoint, totals, categories, types, files, duplicates, crossSource] = await Promise.all([
+  const [runs, checkpoint, totals, categories, types, files, duplicates, crossSource, multiVersions, sampleFiles] = await Promise.all([
     pool.query(`
       SELECT
         cr.id, cr.trigger_type, cr.status, cr.scheduled_for, cr.started_at, cr.finished_at,
@@ -127,6 +127,37 @@ try {
         HAVING count(DISTINCT po.source_id) > 1
       ) x
     `, [sourceId]),
+    pool.query(`
+      SELECT p.id, p.act_type, p.act_number, p.title,
+             po.external_id, po.official_url,
+             jsonb_agg(jsonb_build_object(
+               'versionNo', pv.version_no,
+               'isCurrent', pv.is_current,
+               'contentHash', pv.content_hash,
+               'sourceRole', pv.source_metadata->>'sourceRole',
+               'sourceIdAto', pv.source_metadata->'rfbNormas'->>'idAto',
+               'fileCount', COALESCE(jsonb_array_length(pv.source_metadata->'files'), 0)
+             ) ORDER BY pv.version_no) AS versions
+      FROM publications p
+      JOIN publication_origins po ON po.publication_id = p.id AND po.source_id = $1
+      JOIN publication_versions pv ON pv.publication_id = p.id
+      GROUP BY p.id, p.act_type, p.act_number, p.title, po.external_id, po.official_url
+      HAVING count(pv.id) > 1
+      ORDER BY p.title
+      LIMIT 20
+    `, [sourceId]),
+    pool.query(`
+      SELECT p.id, p.title, po.external_id,
+             pv.source_metadata->'files' AS files
+      FROM publication_origins po
+      JOIN publications p ON p.id = po.publication_id
+      JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = TRUE
+      WHERE po.source_id = $1
+        AND jsonb_typeof(pv.source_metadata->'files') = 'array'
+        AND jsonb_array_length(pv.source_metadata->'files') > 0
+      ORDER BY p.published_on DESC NULLS LAST
+      LIMIT 5
+    `, [sourceId]),
   ]);
 
   console.log('RFB_NORMAS_DB_STATE=' + JSON.stringify({
@@ -139,6 +170,8 @@ try {
     files: files.rows[0],
     duplicateOrigins: duplicates.rows,
     crossSource: crossSource.rows[0],
+    multiVersions: multiVersions.rows,
+    sampleFiles: sampleFiles.rows,
   }));
 } finally {
   await pool.end();
