@@ -6,6 +6,9 @@ import { normalizePublication } from '../src/modules/collection/publication.norm
 import {
   ADE_API_ORIGINAL,
   IN_API_ORIGINAL,
+  RETIFICATION_API_ORIGINAL,
+  RETIFICATION_DUPLICATE_API_ORIGINAL,
+  RFB_RETIFICATION_SEARCH_FIXTURE,
   SC_API_ORIGINAL,
   representationPayload,
   RFB_EMPTY_FIXTURE,
@@ -144,6 +147,67 @@ test('immediate replay reuses known attachments and creates no content hash chan
     false,
     '403 relation view is optional and must be tracked as unavailable',
   );
+});
+
+test('captures substantive retification separately and deterministically excludes repeated publication reference', async () => {
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = new URL(input.toString());
+    if (url.pathname.endsWith('/consulta.action')) {
+      return new Response(RFB_RETIFICATION_SEARCH_FIXTURE, {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }
+    if (url.hostname === 'normasinternet2.receita.fazenda.gov.br') {
+      const match = /\/ato\/(\d+)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+      const id = match?.[1];
+      const view = match?.[2] as 'original' | 'vigente' | 'multivigente' | 'relacional' | undefined;
+      if (!id || !view) return new Response('missing', { status: 404 });
+      if (view === 'relacional') return new Response(null, { status: 403 });
+      const base =
+        id === '148881' ? RETIFICATION_API_ORIGINAL :
+        id === '148882' ? RETIFICATION_DUPLICATE_API_ORIGINAL :
+        undefined;
+      if (!base) return new Response('missing', { status: 404 });
+      const payload = representationPayload(base, view);
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  const result = await new RfbNormasConnector({
+    fetch: fetchImpl,
+    readState: async () => incrementalState(),
+    now: () => new Date('2025-12-06T15:00:00Z'),
+    lookbackDays: 7,
+  }).collect(CONTEXT);
+
+  assert.equal(result.publications.length, 1);
+  const retification = result.publications[0]!;
+  assert.equal(retification.actType, 'RETIFICAÇÃO');
+  assert.equal(retification.actNumber, undefined);
+  assert.equal(retification.externalId, '148881');
+  assert.match(retification.title, /^RETIFICAÇÃO — PORTARIA RFB Nº 619/);
+  assert.equal(
+    retification.identityKey,
+    'RFB_NORMAS|RETIFICATION|RFB|PORTARIA|619/2025|2025-12-05',
+  );
+  assert.equal((retification.metadata?.rfbNormas as any).revisionKind, 'RETIFICATION');
+  assert.deepEqual((retification.metadata?.rfbNormas as any).targetAct, {
+    agency: 'RFB',
+    actType: 'PORTARIA',
+    actNumber: '619/2025',
+  });
+
+  const filtering = (result.metadata as any).rfbNormas.filtering;
+  assert.equal(filtering.discoveredCount, 2);
+  assert.equal(filtering.includedCount, 1);
+  assert.equal(filtering.excludedCount, 1);
+  assert.equal(filtering.excludedByReason.DUPLICATE_RETIFICATION_REFERENCE, 1);
+  assert.equal(filtering.excludedItems[0].idAto, '148882');
 });
 
 test('successful empty search returns zero publications, unavailable source throws', async () => {

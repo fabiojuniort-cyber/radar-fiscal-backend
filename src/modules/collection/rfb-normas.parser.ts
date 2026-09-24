@@ -457,6 +457,8 @@ function apiSegments(payload: Record<string, unknown>): ApiSegment[] {
 
 export interface RfbApiRepresentation extends RfbRepresentation {
   publishedAt?: Date;
+  revisionKind?: 'RETIFICATION';
+  duplicatePublicationReference: boolean;
   effectiveAt?: Date;
   actDate?: Date;
   agency?: string;
@@ -524,12 +526,20 @@ export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentatio
   const publishedOn = validIsoDate(root.dataPublicacao);
   const effectiveOn = validIsoDate(root.dataVigenciaInicio);
   const actOn = validIsoDate(epigrafe?.dataAto);
+  const revisionKind = /^RETIFICA[CÇ][AÃ]O\b/i.test(normalizedText)
+    ? 'RETIFICATION' as const
+    : undefined;
+  const duplicatePublicationReference =
+    revisionKind === 'RETIFICATION' &&
+    /^RETIFICA[CÇ][AÃ]O\s*\(PUBLICA[CÇ][AÃ]O REPETIDA\)/i.test(normalizedText);
 
   return {
     normalizedText,
     normalizedHash: relationshipDigest,
     ...(title ? { title } : {}),
     attachments,
+    ...(revisionKind ? { revisionKind } : {}),
+    duplicatePublicationReference,
     ...(root.vigente === false ? { status: 'REVOKED' } : root.vigente === true ? { status: 'VIGENTE' } : {}),
     ...(publishedOn ? { publishedAt: new Date(`${publishedOn}T00:00:00Z`) } : {}),
     ...(effectiveOn ? { effectiveAt: new Date(`${effectiveOn}T00:00:00Z`) } : {}),

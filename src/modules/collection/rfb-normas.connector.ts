@@ -217,6 +217,35 @@ function addDecision(
   }
 }
 
+function reclassifyIncludedAsExcluded(
+  metrics: FilteringMetrics,
+  item: RfbNormasListingItem,
+  decision: RfbFilterDecision,
+  reason: string,
+  maxExcludedItems: number,
+): void {
+  metrics.includedCount = Math.max(0, metrics.includedCount - 1);
+  const category = decision.category ?? 'UNKNOWN';
+  const currentCategory = metrics.includedByCategory[category] ?? 0;
+  if (currentCategory <= 1) delete metrics.includedByCategory[category];
+  else metrics.includedByCategory[category] = currentCategory - 1;
+
+  metrics.excludedCount += 1;
+  metrics.excludedByReason[reason] = (metrics.excludedByReason[reason] ?? 0) + 1;
+  if (metrics.excludedItems.length < maxExcludedItems) {
+    metrics.excludedItems.push({
+      idAto: item.idAto,
+      type: item.type,
+      number: item.number,
+      agency: item.agency,
+      publishedOn: dateOnly(item.publishedAt),
+      reason,
+    });
+  } else {
+    metrics.excludedItemsTruncated += 1;
+  }
+}
+
 function pendingMonths(cursorMonth: string, now: Date): number {
   const cursor = monthStart(cursorMonth);
   const current = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -357,6 +386,17 @@ export class RfbNormasConnector implements CollectionConnector {
       }
 
       counters.detailRequests += 1;
+      if (original.duplicatePublicationReference) {
+        reclassifyIncludedAsExcluded(
+          filtering,
+          item,
+          decision,
+          'DUPLICATE_RETIFICATION_REFERENCE',
+          maxExcludedItems,
+        );
+        return;
+      }
+
       const canonical = canonicalizeRfbListingNumber(
         {
           ...item,
@@ -438,9 +478,23 @@ export class RfbNormasConnector implements CollectionConnector {
       }
 
       const sourceTitle = original.title ?? fallbackTitle(item);
-      const title = sourceTitle.toLocaleUpperCase('pt-BR');
+      const isRetification = original.revisionKind === 'RETIFICATION';
+      const title = isRetification
+        ? `RETIFICAÇÃO — ${sourceTitle.toLocaleUpperCase('pt-BR')}`
+        : sourceTitle.toLocaleUpperCase('pt-BR');
       const canonicalContent = original.normalizedText;
       const officialUrl = buildRfbModernRepresentationUrl(item.idAto, 'original');
+      const publishedAt = original.publishedAt ?? item.publishedAt;
+      const retificationIdentity = isRetification
+        ? [
+            'RFB_NORMAS',
+            'RETIFICATION',
+            canonical.agency ?? original.agency ?? item.agency,
+            canonical.actType ?? original.type ?? item.type,
+            canonical.actNumber ?? item.number,
+            dateOnly(publishedAt),
+          ].join('|')
+        : undefined;
       const metadata: Record<string, unknown> = {
         sourceRole: 'ENRICHMENT',
         representationSourceRole: 'PRIMARY',
@@ -462,21 +516,39 @@ export class RfbNormasConnector implements CollectionConnector {
           files,
           ...(canonical.actDate ? { actDate: dateOnly(canonical.actDate) } : {}),
           republication: original.republication,
+          ...(isRetification
+            ? {
+                revisionKind: 'RETIFICATION',
+                targetAct: {
+                  ...(canonical.agency ? { agency: canonical.agency } : {}),
+                  ...(canonical.actType ? { actType: canonical.actType } : {}),
+                  ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
+                },
+              }
+            : {}),
         },
       };
 
-      const strong = canonical.agency && canonical.actType && canonical.actNumber;
+      const strong = !isRetification && canonical.agency && canonical.actType && canonical.actNumber;
       publications.push({
         title,
         sphere: 'FEDERAL',
         ...(canonical.agency ? { agency: canonical.agency } : {}),
-        ...(canonical.actType ? { actType: canonical.actType } : {}),
-        ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
-        publishedAt: original.publishedAt ?? item.publishedAt,
+        ...(isRetification
+          ? { actType: 'RETIFICAÇÃO' }
+          : canonical.actType
+            ? { actType: canonical.actType }
+            : {}),
+        ...(!isRetification && canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
+        publishedAt,
         content: canonicalContent,
         officialUrl,
         externalId: item.idAto,
-        ...(!strong ? { identityKey: `RFB_NORMAS|${item.idAto}` } : {}),
+        ...(retificationIdentity
+          ? { identityKey: retificationIdentity }
+          : !strong
+            ? { identityKey: `RFB_NORMAS|${item.idAto}` }
+            : {}),
         metadata,
       });
     };
