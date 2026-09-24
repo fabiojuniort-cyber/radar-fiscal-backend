@@ -130,7 +130,7 @@ test(
   },
 );
 
-for (const connectorKey of ['dou', 'nfe-encat', 'sped', 'cgibs', 'rfb-normas']) {
+for (const connectorKey of ['dou', 'nfe-encat', 'sped', 'cgibs', 'rfb-normas', 'doe-sp']) {
   test(
     `scheduler does not overlap ${connectorKey} while an active run is pending or retrying`,
     async () => {
@@ -156,9 +156,12 @@ for (const connectorKey of ['dou', 'nfe-encat', 'sped', 'cgibs', 'rfb-normas']) 
             id: sourceId,
             code: `scheduler-${connectorKey}-${sourceId}`,
             name: `Scheduler ${connectorKey} Source`,
-            jurisdiction_level: 'FEDERAL',
+            jurisdiction_level: connectorKey === 'doe-sp' ? 'STATE' : 'FEDERAL',
+            ...(connectorKey === 'doe-sp' ? { uf: 'SP' } : {}),
             base_url:
-              connectorKey === 'dou'
+              connectorKey === 'doe-sp'
+                ? 'https://doe.sp.gov.br/'
+                : connectorKey === 'dou'
                 ? 'https://inlabs.in.gov.br'
                 : connectorKey === 'nfe-encat'
                   ? 'https://www.nfe.fazenda.gov.br/portal'

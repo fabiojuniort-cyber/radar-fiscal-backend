@@ -2,6 +2,8 @@ import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { CgibsConnector } from './cgibs.connector.js';
+import { DoeSpConnector } from './doe-sp.connector.js';
+import { readDoeSpSourceState } from './doe-sp-source-state.repository.js';
 import { RfbNormasConnector } from './rfb-normas.connector.js';
 import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.js';
 import { readCgibsSourceState } from './cgibs-source-state.repository.js';
@@ -56,6 +58,17 @@ export function buildConnectorRegistry(
         ? {
             readState: (sourceId) =>
               readCgibsSourceState(options.db!, sourceId),
+          }
+        : {}),
+    }),
+  );
+
+  registry.register(
+    new DoeSpConnector({
+      ...(options.db
+        ? {
+            readState: (sourceId) =>
+              readDoeSpSourceState(options.db!, sourceId),
           }
         : {}),
     }),
