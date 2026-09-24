@@ -94,3 +94,21 @@ test('parses modern official API content, dates, attachments and canonical ident
   assert.equal(canonical.actNumber, '2344/2026');
   assert.equal(canonical.actDate?.toISOString().slice(0, 10), '2026-09-22');
 });
+
+
+test('captures joint PGFN/RFB tax transaction notice deterministically', () => {
+  const item = {
+    idAto: '153623',
+    type: 'Edital de Transação',
+    number: '5',
+    agency: 'PGFN RFB',
+    publishedAt: new Date('2026-09-18T00:00:00Z'),
+    abstract: 'Torna pública proposta de transação para regularização de débitos tributários.',
+    detailUrl: 'https://normas.receita.fazenda.gov.br/sijut2consulta/link.action?idAto=153623',
+  };
+  assert.deepEqual(decideRfbCapture(item), {
+    included: true,
+    category: 'OPERATIONAL',
+    reason: 'CENTRAL_TAX_TRANSACTION_NOTICE',
+  });
+});
