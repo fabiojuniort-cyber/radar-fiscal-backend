@@ -87,4 +87,14 @@ http.createServer(async(req,res)=>{
       res.end(data);
     });
   }catch(e){console.error(e);json(res,500,{error:"internal_error"});}
-}).listen(port,"0.0.0.0",()=>console.log("TriBusca prototype listening on",port));
+}).listen(port,"0.0.0.0",async()=>{
+  console.log("TriBusca prototype listening on",port);
+  if(pool){
+    try{
+      const check=await pool.query("SELECT count(*)::int AS count FROM publications");
+      console.log("TriBusca archive database connected. Publications:",check.rows[0].count);
+    }catch(e){
+      console.error("TriBusca archive database validation failed",e);
+    }
+  }
+});
