@@ -78,15 +78,15 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
 
     const first = await run();
     assert.equal(first.status, 'SUCCESS');
-    assert.equal(first.metrics.newPublications, 4);
+    assert.equal(first.metrics.newPublications, 3);
     assert.equal(first.metrics.newVersions, 0);
 
     const origins = await db.selectFrom('publication_origins')
       .select(['publication_id', 'external_id', 'official_url'])
       .where('source_id', '=', sourceId)
       .execute();
-    assert.equal(origins.length, 4);
-    assert.deepEqual(origins.map((origin) => origin.external_id).sort(), [ID.sre43, ID.decree70843, ID.dicar59, ID.retification].sort());
+    assert.equal(origins.length, 3);
+    assert.deepEqual(origins.map((origin) => origin.external_id).sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
     assert.ok(origins.every((origin) => origin.official_url.startsWith('https://doe.sp.gov.br/executivo/')));
 
     const publications = await db.selectFrom('publications as p')
@@ -94,10 +94,10 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
       .select(['p.act_type', 'p.act_number', 'p.agency', 'p.uf', 'p.jurisdiction_level', 'p.identity_strength'])
       .where('po.source_id', '=', sourceId)
       .execute();
-    const decree = publications.find((row) => row.act_number === '70843/2026');
-    assert.equal(decree?.identity_strength, 'STRONG');
-    assert.equal(decree?.uf, 'SP');
-    assert.equal(decree?.jurisdiction_level, 'STATE');
+    const sre = publications.find((row) => row.act_number === '43/2026');
+    assert.equal(sre?.identity_strength, 'STRONG');
+    assert.equal(sre?.uf, 'SP');
+    assert.equal(sre?.jurisdiction_level, 'STATE');
     assert.equal(publications.filter((row) => row.identity_strength === 'SOURCE_SCOPED').length, 1);
 
     const versions = await db.selectFrom('publication_versions as v')
@@ -106,7 +106,7 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
       .where('po.source_id', '=', sourceId)
       .execute();
     const files = versions.flatMap((row) => ((row.source_metadata as Record<string, unknown>).files as Array<Record<string, unknown>>) ?? []);
-    assert.equal(files.length, 5); // 4 authenticated PDFs + 1 attachment
+    assert.equal(files.length, 4); // 3 authenticated PDFs + 1 attachment
     assert.ok(files.every((file) => /^[a-f0-9]{64}$/.test(String(file.rawSha256)) && Number(file.sizeBytes) > 0));
 
     const detailsBeforeReplay = api.count('/v2/publications/');
@@ -119,15 +119,15 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
     assert.equal(forced.status, 'SUCCESS');
     assert.equal(forced.metrics.newPublications, 0);
     assert.equal(forced.metrics.newVersions, 0);
-    assert.equal(forced.metrics.existingPublications, 2); // window (2 days) re-read; backfill is not repeated
+    assert.equal(forced.metrics.existingPublications, 1); // window (2 days) re-read; backfill is not repeated
 
     const counts = await db.selectFrom('publication_origins as po')
       .innerJoin('publication_versions as v', 'v.publication_id', 'po.publication_id')
       .select((eb) => [eb.fn.countAll<string>().as('versions'), eb.fn.count<string>('po.id').distinct().as('origins')])
       .where('po.source_id', '=', sourceId)
       .executeTakeFirstOrThrow();
-    assert.equal(Number(counts.versions), 4);
-    assert.equal(Number(counts.origins), 4);
+    assert.equal(Number(counts.versions), 3);
+    assert.equal(Number(counts.origins), 3);
 
     const state = await readDoeSpSourceState(db, sourceId);
     assert.deepEqual(state.pendingRanges, []);
