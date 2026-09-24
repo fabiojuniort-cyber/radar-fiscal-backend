@@ -63,7 +63,9 @@ export interface ConnectorPartialFailure {
 /**
  * Reason a connector finished voluntarily with work still pending.
  */
-export type ConnectorIncompleteReason = 'TIME_BUDGET_REACHED';
+export type ConnectorIncompleteReason =
+  | 'TIME_BUDGET_REACHED'
+  | 'PARTIAL_FAILURE_RETRY_REQUIRED';
 
 export interface ConnectorCompletion {
   /**
