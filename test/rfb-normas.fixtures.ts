@@ -9,6 +9,15 @@ export const RFB_SEARCH_FIXTURE = `<!doctype html><html><body>
 </tbody></table>
 </body></html>`;
 
+
+export const RFB_RETIFICATION_SEARCH_FIXTURE = `<!doctype html><html><body>
+<div>Total de atos localizados: 2</div><div>Página 1 de 1</div>
+<table><tbody>
+<tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148881">Portaria</a></td><td>619</td><td>RFB</td><td>05/12/2025</td><td>Retificação da Portaria RFB nº 619, de 3 de dezembro de 2025.</td></tr>
+<tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148882">Portaria</a></td><td>619</td><td>RFB</td><td>05/12/2025</td><td>Retificação da Portaria RFB nº 619, de 3 de dezembro de 2025.</td></tr>
+</tbody></table>
+</body></html>`;
+
 export const RFB_EMPTY_FIXTURE = `<!doctype html><html><body>
 <div>Total de atos localizados: 0</div><div>Página 1 de 1</div>
 <table><tbody></tbody></table>
@@ -181,6 +190,39 @@ export const ADE_API_ORIGINAL = apiPayload({
   text: 'Dispõe sobre obrigação acessória DCTF e procedimento de declaração.',
 });
 
+export const RETIFICATION_API_ORIGINAL = apiPayload({
+  idAto: 148881,
+  typeName: 'Portaria',
+  typeSigla: 'PORT',
+  number: '619',
+  agencySigla: 'RFB',
+  agencyName: 'Secretaria Especial da Receita Federal do Brasil',
+  actDate: '2025-12-03',
+  publicationDate: '2025-12-05',
+  title: 'Portaria RFB nº 619, de 3 de dezembro de 2025',
+  text: [
+    'Retificação',
+    'No art. 2º da Portaria RFB nº 619, de 3 de dezembro de 2025, publicada no Diário Oficial da União nº 231, de 4 de dezembro de 2025, Seção 1, página 44:',
+    'Onde se lê: "V - ao tratamento dos dados por terceiros com a finalidade exclusiva de avaliação de concessão de crédito pessoal; e"',
+    'Leia-se: "V - ao tratamento dos dados por terceiros com a finalidade exclusiva de avaliação de concessão de crédito; e"',
+    'Nota Normas: Esta retificação foi publicada em duplicata na mesma edição do DOU.',
+  ].join(' '),
+});
+
+export const RETIFICATION_DUPLICATE_API_ORIGINAL = apiPayload({
+  idAto: 148882,
+  typeName: 'Portaria',
+  typeSigla: 'PORT',
+  number: '619',
+  agencySigla: 'RFB',
+  agencyName: 'Secretaria Especial da Receita Federal do Brasil',
+  actDate: '2025-12-03',
+  publicationDate: '2025-12-05',
+  title: 'Portaria RFB nº 619, de 3 de dezembro de 2025',
+  text: 'Retificação (publicação repetida) Nota Normas: Esta retificação foi publicada em duplicata na mesma edição do DOU.',
+});
+
+
 export function representationPayload(
   base: Record<string, unknown>,
   view: 'original' | 'vigente' | 'multivigente',
@@ -194,52 +236,3 @@ export function representationPayload(
   }
   return clone;
 }
-
-
-export const PORTARIA_RETIFICATION_API = apiPayload({
-  idAto: 148881,
-  typeName: 'Portaria',
-  typeSigla: 'Port.',
-  number: '619',
-  agencySigla: 'RFB',
-  agencyName: 'Secretaria Especial da Receita Federal do Brasil',
-  actDate: '2025-12-03',
-  publicationDate: '2026-01-16',
-  title: 'Portaria RFB nº 619, de 3 de dezembro de 2025',
-  text: 'Retificação. No art. 2º da Portaria RFB nº 619, onde se lê concessão de crédito pessoal, leia-se concessão de crédito.',
-});
-
-export const PORTARIA_DUPLICATE_API = (() => {
-  const payload = apiPayload({
-    idAto: 148882,
-    typeName: 'Portaria',
-    typeSigla: 'Port.',
-    number: '619',
-    agencySigla: 'RFB',
-    agencyName: 'Secretaria Especial da Receita Federal do Brasil',
-    actDate: '2025-12-03',
-    publicationDate: '2026-01-16',
-    title: 'Portaria RFB nº 619, de 3 de dezembro de 2025',
-    text: 'Retificação (publicação repetida)',
-  });
-  payload.ehVisaoExclusiva = true;
-  payload.exibirVisoes = '1000';
-  const ementas = payload.ementas as Array<Record<string, unknown>>;
-  ementas[0]!.ancorasDestino = [{
-    idAto: 148881,
-    href: '148881',
-    texto: '[Vide o(a) Portaria RFB nº 619, de 3 de dezembro de 2025]',
-    dataInicioVigencia: '16/01/2026',
-  }];
-  payload.outrosSegmentos = [{
-    idAto: 148882,
-    idSegmento: 2,
-    ordemSegmentoAto: 2,
-    omitir: false,
-    original: true,
-    compilado: true,
-    textoIntegra: 'Nota Normas: Esta retificação foi publicada em duplicata na mesma edição do DOU.',
-    arquivoBinario: null,
-  }];
-  return payload;
-})();
