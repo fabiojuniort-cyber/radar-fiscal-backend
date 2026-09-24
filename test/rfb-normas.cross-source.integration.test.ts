@@ -26,7 +26,7 @@ test('DOU + Sistema Normas converge to one publication with two official origins
 
   const title = 'INSTRUÇÃO NORMATIVA RFB Nº 2.344, DE 22 DE SETEMBRO DE 2026';
   const content = [
-    'Dispõe sobre regras de tributação federal e obrigações acessórias.',
+    'Texto oficial do DOU com formatação deliberadamente diferente da representação da Receita.',
     'Art. 1º Esta Instrução Normativa disciplina o procedimento.',
     'Art. 2º Esta Instrução Normativa entra em vigor na data de sua publicação.',
   ].join(' ');
@@ -173,11 +173,53 @@ test('DOU + Sistema Normas converge to one publication with two official origins
     assert.deepEqual(new Set(origins.map(row => row.source_id)), new Set([douSourceId, rfbSourceId]));
 
     const versions = await db.selectFrom('publication_versions')
-      .select(['id', 'is_current', 'content_hash'])
+      .select(['id', 'is_current', 'content_hash', 'source_metadata'])
       .where('publication_id', '=', publicationId)
       .execute();
-    assert.equal(versions.length, 1, 'equivalent DOU/RFB original text must not create an artificial version');
+    assert.equal(versions.length, 1, 'RFB enrichment must not create an artificial version beside a DOU PRIMARY version');
     assert.equal(versions[0]!.is_current, true);
+    assert.equal((versions[0]!.source_metadata as { sourceRole?: string }).sourceRole, 'PRIMARY');
+
+    // Repeat the same gate in reverse arrival order: Sistema Normas first, DOU second.
+    await db.deleteFrom('collection_runs').where('source_id', 'in', [douSourceId, rfbSourceId]).execute();
+    await db.deleteFrom('publication_origins').where('source_id', 'in', [douSourceId, rfbSourceId]).execute();
+    await db.deleteFrom('publications').where('id', '=', publicationId).execute();
+
+    const rfbFirst = await run(rfbSourceId);
+    assert.equal(rfbFirst.status, 'SUCCESS');
+    assert.equal(rfbFirst.metrics.newPublications, 1);
+
+    const douSecond = await run(douSourceId);
+    assert.equal(douSecond.status, 'SUCCESS');
+    assert.equal(douSecond.metrics.newPublications, 0);
+    assert.equal(douSecond.metrics.newVersions, 0);
+    assert.equal(douSecond.metrics.existingPublications, 1);
+
+    const reversePublications = await db.selectFrom('publications')
+      .select(['id', 'agency', 'act_type', 'act_number', 'published_on', 'primary_official_url'])
+      .where('agency', '=', 'RFB')
+      .where('act_type', '=', 'INSTRUÇÃO NORMATIVA')
+      .where('act_number', '=', '2344/2026')
+      .where('published_on', '=', '2026-09-23')
+      .execute();
+    assert.equal(reversePublications.length, 1);
+
+    const reverseId = reversePublications[0]!.id;
+    const reverseOrigins = await db.selectFrom('publication_origins')
+      .select(['source_id', 'external_id'])
+      .where('publication_id', '=', reverseId)
+      .execute();
+    assert.equal(reverseOrigins.length, 2);
+    assert.deepEqual(new Set(reverseOrigins.map(row => row.source_id)), new Set([douSourceId, rfbSourceId]));
+
+    const reverseVersions = await db.selectFrom('publication_versions')
+      .select(['id', 'is_current', 'source_metadata'])
+      .where('publication_id', '=', reverseId)
+      .execute();
+    assert.equal(reverseVersions.length, 1, 'late DOU PRIMARY must replace the enrichment version in place');
+    assert.equal(reverseVersions[0]!.is_current, true);
+    assert.equal((reverseVersions[0]!.source_metadata as { sourceRole?: string }).sourceRole, 'PRIMARY');
+    assert.match(reversePublications[0]!.primary_official_url ?? '', /pesquisa\.in\.gov\.br/);
   } finally {
     const publicationIds = [...new Set(
       (await db.selectFrom('publication_origins')
