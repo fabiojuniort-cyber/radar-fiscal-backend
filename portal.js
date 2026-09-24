@@ -9,6 +9,60 @@ const healthLabel=h=>({OPERATIONAL:"Operacional",UNSTABLE:"Instável",UNAVAILABL
 const healthClass=h=>({OPERATIONAL:"ok",UNSTABLE:"warn",UNAVAILABLE:"bad",NOT_CONSULTED:"neutral"})[h]||"neutral";
 let user=null,publicationState={page:1,q:"",source:"",uf:"",jurisdiction:"",actType:"",mode:"acervo"};
 
+function splitLegalSegments(text){
+  const clean=String(text||"").replace(/\r\n/g,"\n").trim();
+  if(!clean)return [];
+  let blocks=clean.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean);
+  if(blocks.length<2){
+    const lines=clean.split(/\n/).map(x=>x.trim()).filter(Boolean);
+    const starts=/^(Art\.?\s*\d+|Artigo\s+\d+|§\s*\d+|Parágrafo\s+único|Parágrafo|[IVXLCDM]+\s*[–—-]|[a-z]\)|\d+\s*[.)-])/i;
+    blocks=[];let current="";
+    for(const line of lines){
+      if(starts.test(line)&&current){blocks.push(current.trim());current=line;}
+      else current+=(current?"\n":"")+line;
+    }
+    if(current)blocks.push(current.trim());
+  }
+  const out=[];
+  for(const block of blocks){
+    if(block.length<=2200){out.push(block);continue;}
+    let rest=block;
+    while(rest.length>2200){
+      let cut=rest.lastIndexOf(". ",2200);
+      if(cut<900)cut=2200;
+      out.push(rest.slice(0,cut+1).trim());
+      rest=rest.slice(cut+1).trim();
+    }
+    if(rest)out.push(rest);
+  }
+  return out.slice(0,120);
+}
+function segmentLabel(text,index){
+  const m=String(text).match(/^(Art\.?\s*\d+[^\s]*|Artigo\s+\d+[^\s]*|§\s*\d+[^\s]*|Parágrafo\s+único|[IVXLCDM]+\s*[–—-]?|[a-z]\))/i);
+  return m?m[1]:"Trecho "+(index+1);
+}
+async function translateSegment(button,versionId,text){
+  const box=button.closest(".legal-segment").querySelector(".norma-inline");
+  button.disabled=true;button.textContent="Preparando Norma Clara…";
+  box.classList.add("open");box.innerHTML='<span>NORMA CLARA</span><p>Traduzindo para português claro e popular…</p>';
+  try{
+    const r=await fetch("/api/norma-clara",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({publicationVersionId:versionId,sourceText:text})});
+    const data=await r.json();
+    if(!r.ok){
+      if(data.error==="openai_not_configured")throw new Error("OPENAI_NOT_CONFIGURED");
+      throw new Error(data.error||"request_failed");
+    }
+    box.innerHTML='<span>NORMA CLARA · '+(data.cached?'REUTILIZADA':'GERADA AGORA')+'</span><p>'+esc(data.translation)+'</p>';
+    button.textContent="Ocultar Norma Clara";button.dataset.open="1";
+  }catch(e){
+    box.innerHTML=e.message==="OPENAI_NOT_CONFIGURED"
+      ?'<span>NORMA CLARA</span><p>A integração está instalada, mas falta configurar a chave da OpenAI no serviço Railway.</p>'
+      :'<span>NORMA CLARA</span><p>Não foi possível gerar a tradução agora. Tente novamente.</p>';
+    button.textContent="Tentar Norma Clara novamente";
+  }finally{button.disabled=false}
+}
+
+
 async function api(url){const r=await fetch(url,{credentials:"same-origin"});if(r.status===401){location.href="/login.html";throw new Error("unauthorized")}const data=await r.json();if(!r.ok)throw new Error(data.error||"request_failed");return data}
 async function boot(){const me=await api("/api/me");user=me.user;document.getElementById("top-company").textContent=user.company;document.getElementById("top-user").textContent=user.name;route()}
 function setActive(name){document.querySelectorAll(".product-nav a[data-route]").forEach(a=>a.classList.toggle("active",a.dataset.route===name))}
@@ -60,9 +114,19 @@ function bindPublicationClicks(){document.querySelectorAll("[data-pub]").forEach
 async function openPublication(id){
  const drawer=document.getElementById("drawer"),content=document.getElementById("drawer-content");drawer.classList.add("open");drawer.setAttribute("aria-hidden","false");content.innerHTML='<div class="page-loading">Abrindo publicação…</div>';
  const d=await api("/api/publications/"+id),p=d.publication;
- const body=esc(p.content_text||p.relevant_excerpt||"Texto integral ainda não armazenado para esta publicação.").replace(/\\n/g,"<br>");
- content.innerHTML='<div class="drawer-eyebrow">'+esc(p.act_type||"Publicação oficial")+'</div><h1>'+esc(p.title)+'</h1><div class="detail-meta">'+[p.act_number,p.agency,p.uf,date(p.published_on)].filter(Boolean).map(esc).join(" · ")+'</div><div class="detail-actions">'+(p.primary_official_url?'<a class="btn primary" target="_blank" rel="noopener" href="'+esc(p.primary_official_url)+'">Fonte oficial ↗</a>':'')+'<button class="btn ghost" id="norma-demo">Norma Clara</button></div><div class="detail-tabs"><b>Documento oficial</b><span>Versão '+esc(p.version_no||1)+'</span></div><article class="legal-document">'+body+'</article><section class="origin-box"><b>Rastreabilidade</b>'+d.origins.map(o=>'<div><span>'+esc(o.source_name)+'</span><a target="_blank" rel="noopener" href="'+esc(o.official_url)+'">Abrir origem ↗</a></div>').join("")+'</section>';
- const nb=document.getElementById("norma-demo");if(nb)nb.onclick=()=>alert("A interface da Norma Clara está pronta conceitualmente. A geração por IA ainda não foi ativada neste protótipo para não apresentar tradução simulada como real.");
+ const official=p.content_text||p.relevant_excerpt||"";
+ const segments=splitLegalSegments(official);
+ const documentHtml=segments.length
+   ?segments.map((text,i)=>'<section class="legal-segment"><div class="segment-ref">'+esc(segmentLabel(text,i))+'</div><div class="segment-official">'+esc(text).replace(/\\n/g,"<br>")+'</div><button class="norma-segment-btn" data-index="'+i+'">Traduzir para português claro e popular</button><div class="norma-inline"></div></section>').join("")
+   :'<div class="document-empty">O texto integral ainda não está armazenado para esta publicação.</div>';
+ content.innerHTML='<div class="drawer-eyebrow">'+esc(p.act_type||"Publicação oficial")+'</div><h1>'+esc(p.title)+'</h1><div class="detail-meta">'+[p.act_number,p.agency,p.uf,date(p.published_on)].filter(Boolean).map(esc).join(" · ")+'</div><div class="detail-actions">'+(p.primary_official_url?'<a class="btn primary" target="_blank" rel="noopener" href="'+esc(p.primary_official_url)+'">Fonte oficial ↗</a>':'')+'<span class="norma-ready">Norma Clara por dispositivo</span></div><div class="detail-tabs"><b>Documento oficial</b><span>Versão '+esc(p.version_no||1)+'</span></div><article class="legal-document">'+documentHtml+'</article><section class="origin-box"><b>Rastreabilidade</b>'+d.origins.map(o=>'<div><span>'+esc(o.source_name)+'</span><a target="_blank" rel="noopener" href="'+esc(o.official_url)+'">Abrir origem ↗</a></div>').join("")+'</section>';
+ content.querySelectorAll(".norma-segment-btn").forEach(btn=>{
+   btn.onclick=()=>{
+     const idx=Number(btn.dataset.index),box=btn.closest(".legal-segment").querySelector(".norma-inline");
+     if(btn.dataset.open==="1"){box.classList.toggle("open");btn.textContent=box.classList.contains("open")?"Ocultar Norma Clara":"Mostrar Norma Clara";return}
+     translateSegment(btn,p.version_id,segments[idx]);
+   };
+ });
 }
 async function renderMonitor(){
  setActive("monitoramento");view.innerHTML=head("Monitoramento","Central de Monitoramento","Saúde operacional das fontes separada da cobertura legislativa.");
@@ -77,7 +141,7 @@ function sourceTable(items,central){
  return '<section class="surface source-table-wrap"><div class="results-head"><div><b>'+items.length+'</b> fontes cadastradas</div><span>'+ (central?"Status operacional em tempo real do banco":"Cobertura e conectores") +'</span></div><div class="source-table"><div class="source-tr header"><span>Fonte</span><span>Status</span><span>Última tentativa</span><span>Tentativas 24h</span><span>Hoje</span><span>Total</span></div>'+items.map(s=>'<div class="source-tr"><span><b>'+esc(s.name)+'</b><small>'+esc(s.code)+(s.uf?' · '+s.uf:'')+'</small></span><span><i class="health-dot '+healthClass(s.health)+'"></i>'+healthLabel(s.health)+'</span><span>'+dt(s.last_attempt_at)+'</span><span>'+n(s.attempts_24h||0)+'</span><span>'+n(s.publications_today||0)+'</span><span>'+n(s.publications_total||0)+'</span></div>').join("")+'</div></section>';
 }
 function renderMarkers(){setActive("marcadores");view.innerHTML=head("Inteligência","Marcadores Tributários","A taxonomia controlada que conectará publicações, busca e Perfil Tributário.")+'<section class="editorial-page"><div class="taxonomy-demo"><div><span>Tributo</span><b>ICMS</b><b>ISS</b><b>IBS</b><b>CBS</b></div><div><span>Operação</span><b>Venda</b><b>Transferência</b><b>Devolução</b><b>Formação de lote</b></div><div><span>Segmento</span><b>Agronegócio</b><b>Indústria</b><b>Transporte</b></div><div><span>Produto</span><b>Fertilizantes</b><b>Defensivos</b><b>Sementes</b><b>Grãos</b></div></div><div class="info-note"><b>Estrutura preparada para o produto.</b><p>A classificação automática e o motor de matching ainda não estão ativos neste protótipo. Não exibimos marcadores inventados como se fossem dados processados.</p></div></section>'}
-function renderNorma(){setActive("norma-clara");view.innerHTML=head("Compreensão","Norma Clara","Leia o texto oficial e, quando ativada, traduza cada unidade jurídica para português claro e popular.")+'<section class="norma-product"><div class="legal-sample"><span>Texto oficial</span><b>§ 1º</b><p>O imposto incide também sobre o serviço proveniente do exterior do País ou cuja prestação se tenha iniciado no exterior do País.</p><button class="btn primary" id="norma-info">Traduzir para português claro e popular</button></div><div class="norma-output"><span>NORMA CLARA</span><p>A geração real será conectada à IA e persistida por versão/bloco. O protótipo não fabrica uma tradução para parecer funcional.</p></div></section>';document.getElementById("norma-info").onclick=()=>alert("Norma Clara será ativada quando a integração de IA for implementada. O original sempre permanecerá preservado.")}
+function renderNorma(){setActive("norma-clara");view.innerHTML=head("Compreensão","Norma Clara","Traduza cada artigo, parágrafo, inciso ou outro bloco jurídico para português claro e popular, mantendo o original intacto.")+'<section class="norma-product"><div class="legal-sample"><span>Como funciona</span><h2>Dentro de qualquer publicação</h2><p>Abra uma publicação no Acervo. Cada unidade jurídica possui seu próprio botão <b>Traduzir para português claro e popular</b>.</p><p>A tradução é vinculada à versão exata do documento, reutilizada entre usuários e regenerada somente quando uma nova Norma Clara Engine for homologada.</p><a class="btn primary" href="#acervo">Abrir o acervo →</a></div><div class="norma-output"><span>PRINCÍPIOS</span><p>✓ Texto oficial nunca é substituído.<br>✓ Tradução por bloco jurídico.<br>✓ Sem interpretação de impacto.<br>✓ Cache compartilhado no PostgreSQL.<br>✓ Controle de concorrência para evitar chamadas duplicadas.<br>✓ Engine versionada, independente do nome público do modelo.</p></div></section>'}
 function renderCompany(){setActive("empresas");view.innerHTML=head("Organização","Empresas","Entidades monitoradas dentro da sua conta.")+'<section class="surface company-page"><div class="company-hero"><div class="company-avatar">'+esc((user.company||"E").charAt(0))+'</div><div><h2>'+esc(user.company)+'</h2><p>Empresa principal da sessão de demonstração</p></div><button class="btn ghost">Editar cadastro</button></div><div class="company-fields"><div><span>CNPJ</span><b>Não informado</b></div><div><span>Regime tributário</span><b>Não informado</b></div><div><span>Estabelecimentos</span><b>0 cadastrados</b></div><div><span>Perfil Tributário</span><b>Em configuração</b></div></div></section>'}
 function renderEstablishments(){setActive("estabelecimentos");view.innerHTML=head("Organização","Estabelecimentos","Filiais e unidades usadas para contextualizar cobertura estadual.")+'<section class="empty-final"><div>＋</div><h2>Nenhum estabelecimento cadastrado</h2><p>Cadastre matriz, filiais, armazéns, fazendas, indústrias ou outras unidades para alimentar o contexto geográfico da empresa.</p><button class="btn primary">Adicionar estabelecimento</button></section>'}
 function renderProfile(){setActive("perfil");view.innerHTML=head("Organização","Perfil Tributário","Contexto estruturado usado para priorizar publicações.")+'<section class="profile-columns"><div class="surface profile-block"><span>Segmentos</span><h2>O que a empresa faz</h2><div class="chip-editor"><button>Agronegócio</button><button>Indústria</button><button>Comércio</button><button>Serviços</button></div></div><div class="surface profile-block"><span>Operações</span><h2>Processos fiscais</h2><div class="chip-editor"><button>Venda</button><button>Compra</button><button>Transferência</button><button>Devolução</button><button>Importação</button><button>Exportação</button></div></div><div class="surface profile-block"><span>Tributos</span><h2>Temas monitorados</h2><div class="chip-editor"><button>ICMS</button><button>ISS</button><button>IBS</button><button>CBS</button><button>IPI</button></div></div></section><div class="info-note"><b>Próxima integração</b><p>Este perfil será conectado aos Marcadores Tributários para gerar relevância explicável por empresa.</p></div>'}
