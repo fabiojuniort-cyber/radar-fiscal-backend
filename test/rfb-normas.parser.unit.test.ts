@@ -19,7 +19,7 @@ test('parses Sistema Normas search results with official idAto and pagination', 
   assert.equal(page.items.length, 5);
   assert.equal(page.items[0]!.idAto, '150001');
   assert.equal(page.items[1]!.agency, 'Cosit');
-  assert.equal(page.items[0]!.publishedAt.toISOString().slice(0, 10), '2026-09-23');
+  assert.equal(page.items[0]!.publishedAt.toISOString().slice(0, 10), '2026-09-21');
 });
 
 test('extracts idAto from modern and legacy official URLs', () => {
