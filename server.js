@@ -186,6 +186,28 @@ async function api(req,res,pathname,url){
       return json(res,200,{items:result.rows.map(r=>({...r,health:healthLabel(r.last_run_status,r.last_attempt_at)}))});
     }catch(e){console.error("sources failed",e);return json(res,500,{error:"sources_failed"});}
   }
+
+  if(pathname==="/api/publication-filter-options"&&req.method==="GET"){
+    if(!requireUser(req,res)||!(await requireDb(res)))return;
+    try{
+      const [types,agencies,sources,ufs,range]=await Promise.all([
+        pool.query("SELECT act_type AS value,count(*)::int AS count FROM publications WHERE act_type IS NOT NULL AND btrim(act_type)<>'' GROUP BY act_type ORDER BY count DESC,act_type LIMIT 150"),
+        pool.query("SELECT agency AS value,count(*)::int AS count FROM publications WHERE agency IS NOT NULL AND btrim(agency)<>'' GROUP BY agency ORDER BY count DESC,agency LIMIT 250"),
+        pool.query(`SELECT s.code AS value,s.name AS label,count(DISTINCT po.publication_id)::int AS count
+                    FROM sources s JOIN publication_origins po ON po.source_id=s.id
+                    GROUP BY s.code,s.name ORDER BY count DESC,s.name`),
+        pool.query("SELECT uf AS value,count(*)::int AS count FROM publications WHERE uf IS NOT NULL AND btrim(uf)<>'' GROUP BY uf ORDER BY uf"),
+        pool.query("SELECT min(published_on) AS min_date,max(published_on) AS max_date FROM publications")
+      ]);
+      return json(res,200,{
+        actTypes:types.rows,
+        agencies:agencies.rows,
+        sources:sources.rows,
+        ufs:ufs.rows,
+        dateRange:range.rows[0]
+      });
+    }catch(e){console.error("publication filter options failed",e);return json(res,500,{error:"filter_options_failed"});}
+  }
   if(pathname==="/api/publications"&&req.method==="GET"){
     if(!requireUser(req,res)||!(await requireDb(res)))return;
     try{
@@ -196,6 +218,7 @@ async function api(req,res,pathname,url){
       const uf=String(url.searchParams.get("uf")||"").trim().toUpperCase();
       const actType=String(url.searchParams.get("actType")||"").trim();
       const jurisdiction=String(url.searchParams.get("jurisdiction")||"").trim().toUpperCase();
+      const agency=String(url.searchParams.get("agency")||"").trim();
       const dateFrom=String(url.searchParams.get("dateFrom")||"").trim();
       const dateTo=String(url.searchParams.get("dateTo")||"").trim();
       const clauses=[];const params=[];
@@ -208,6 +231,7 @@ async function api(req,res,pathname,url){
       if(uf){const x=p(uf);clauses.push(`p.uf=${x}`);}
       if(actType){const x=p(actType);clauses.push(`p.act_type=${x}`);}
       if(jurisdiction){const x=p(jurisdiction);clauses.push(`p.jurisdiction_level=${x}`);}
+      if(agency){const x=p(agency);clauses.push(`p.agency=${x}`);}
       if(dateFrom){const x=p(dateFrom);clauses.push(`p.published_on>=${x}::date`);}
       if(dateTo){const x=p(dateTo);clauses.push(`p.published_on<=${x}::date`);}
       const where=clauses.length?"WHERE "+clauses.join(" AND "):"";
