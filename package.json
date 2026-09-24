@@ -11,7 +11,7 @@
     "dev:worker": "tsx watch src/worker.ts",
     "dev:scheduler": "tsx watch src/scheduler.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node -e \"if(process.env.DOE_SP_INSPECT==='1'){import('./dist/infrastructure/database/inspect-doe-sp.js')}else{console.log('DOE-SP inspection guarded')}\"",
+    "start": "node -e \"const op=process.env.DOE_SP_OP;if(op==='trigger')import('./dist/infrastructure/database/trigger-doe-sp-run.js');else if(op==='inspect')import('./dist/infrastructure/database/inspect-doe-sp.js');else console.log('DOE-SP ops runner guarded')\"",
     "start:worker": "node dist/worker.js",
     "start:scheduler": "node dist/scheduler.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
