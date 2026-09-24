@@ -3,6 +3,15 @@ import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 
+if (process.env.DOE_SP_OP === 'trigger') {
+  await import('./trigger-doe-sp-run.js');
+  process.exit(0);
+}
+if (process.env.DOE_SP_OP === 'inspect') {
+  await import('./inspect-doe-sp.js');
+  process.exit(0);
+}
+
 type Plan = {
   sourceId: string;
   sourceCode: string;
