@@ -7,7 +7,7 @@ const date=v=>v?new Date(v).toLocaleDateString("pt-BR"):"—";
 const dt=v=>v?new Date(v).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"—";
 const healthLabel=h=>({OPERATIONAL:"Operacional",UNSTABLE:"Instável",UNAVAILABLE:"Indisponível",NOT_CONSULTED:"Não consultada"})[h]||h;
 const healthClass=h=>({OPERATIONAL:"ok",UNSTABLE:"warn",UNAVAILABLE:"bad",NOT_CONSULTED:"neutral"})[h]||"neutral";
-let user=null,publicationState={page:1,q:"",source:"",uf:"",jurisdiction:"",actType:"",mode:"acervo"};
+let user=null,filterOptions=null,filtersOpen=true,publicationState={page:1,q:"",source:"",uf:"",jurisdiction:"",actType:"",agency:"",dateFrom:"",dateTo:"",period:"",mode:"acervo"};
 
 function splitLegalSegments(text){
   const clean=String(text||"").replace(/\r\n/g,"\n").trim();
@@ -89,18 +89,97 @@ async function renderInicio(){
  view.innerHTML+='<section class="dashboard-grid"><div class="surface"><div class="surface-head"><div><span>Últimas capturas</span><h2>Entraram agora no acervo</h2></div><a href="#publicacoes">Ver todas →</a></div><div class="recent-list">'+d.latest.map(p=>'<button class="recent-row" data-pub="'+p.id+'"><span>'+date(p.published_on)+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(p.source_name)+' · '+esc(p.act_type||"Publicação")+(p.uf?' · '+p.uf:'')+'</small></div><em>→</em></button>').join("")+'</div></div><div class="surface source-mini"><div class="surface-head"><div><span>Saúde operacional</span><h2>Fontes</h2></div><a href="#monitoramento">Abrir central →</a></div><div class="health-summary"><div><b>'+n(d.sourcesSummary.OPERATIONAL||0)+'</b><span>Operacionais</span></div><div><b>'+n(d.sourcesSummary.UNSTABLE||0)+'</b><span>Instáveis</span></div><div><b>'+n(d.sourcesSummary.UNAVAILABLE||0)+'</b><span>Indisponíveis</span></div></div><div class="mini-sources">'+d.sources.slice(0,6).map(s=>'<div><span class="health-dot '+healthClass(s.health)+'"></span><b>'+esc(s.name)+'</b><small>'+healthLabel(s.health)+'</small></div>').join("")+'</div></div></section>';
  bindPublicationClicks();
 }
+function optionList(items,current,labelKey="value"){
+ return (items||[]).map(x=>'<option value="'+esc(x.value)+'" '+(String(current)===String(x.value)?"selected":"")+'>'+esc(x[labelKey]||x.value)+' ('+n(x.count)+')</option>').join("");
+}
+function activeFilterChips(){
+ const chips=[];
+ if(publicationState.q)chips.push(["q","Busca: "+publicationState.q]);
+ if(publicationState.jurisdiction)chips.push(["jurisdiction",publicationState.jurisdiction==="FEDERAL"?"Federal":"Estadual"]);
+ if(publicationState.source){const s=(filterOptions?.sources||[]).find(x=>x.value===publicationState.source);chips.push(["source","Fonte: "+(s?.label||publicationState.source)])}
+ if(publicationState.actType)chips.push(["actType","Tipo: "+publicationState.actType]);
+ if(publicationState.agency)chips.push(["agency","Órgão: "+publicationState.agency]);
+ if(publicationState.uf)chips.push(["uf","UF: "+publicationState.uf]);
+ if(publicationState.dateFrom||publicationState.dateTo)chips.push(["period","Período: "+(publicationState.dateFrom?date(publicationState.dateFrom):"início")+" → "+(publicationState.dateTo?date(publicationState.dateTo):"hoje")]);
+ if(!chips.length)return "";
+ return '<div class="active-filters">'+chips.map(c=>'<button type="button" data-clear-filter="'+c[0]+'">'+esc(c[1])+' <span>×</span></button>').join("")+'<button type="button" class="clear-all" data-clear-filter="all">Limpar todos</button></div>';
+}
 function publicationFilters(){
- return '<form id="pub-filter" class="filter-bar"><input id="pub-q" value="'+esc(publicationState.q)+'" placeholder="Buscar título, número, órgão ou conteúdo…"><select id="pub-j"><option value="">Todas as esferas</option><option value="FEDERAL" '+(publicationState.jurisdiction==="FEDERAL"?"selected":"")+'>Federal</option><option value="STATE" '+(publicationState.jurisdiction==="STATE"?"selected":"")+'>Estadual</option></select><input id="pub-uf" maxlength="2" value="'+esc(publicationState.uf)+'" placeholder="UF"><button class="btn primary">Buscar</button><button id="clear-filter" class="btn ghost" type="button">Limpar</button></form>'
+ const o=filterOptions||{actTypes:[],agencies:[],sources:[],ufs:[]};
+ return '<div class="archive-filter-shell">'+
+ '<form id="pub-filter" class="archive-search-row">'+
+   '<div class="archive-search"><span>⌕</span><input id="pub-q" value="'+esc(publicationState.q)+'" placeholder="Buscar por título, número, órgão ou conteúdo…"></div>'+
+   '<button id="toggle-filters" class="btn filter-toggle '+(filtersOpen?"active":"")+'" type="button">Filtros <span id="filter-count"></span></button>'+
+   '<button class="btn primary">Buscar</button>'+
+ '</form>'+
+ '<div id="advanced-filters" class="advanced-filters '+(filtersOpen?"open":"")+'">'+
+   '<label><span>Esfera</span><select id="pub-j"><option value="">Todas</option><option value="FEDERAL" '+(publicationState.jurisdiction==="FEDERAL"?"selected":"")+'>Federal</option><option value="STATE" '+(publicationState.jurisdiction==="STATE"?"selected":"")+'>Estadual</option></select></label>'+
+   '<label><span>Fonte oficial</span><select id="pub-source"><option value="">Todas as fontes</option>'+optionList(o.sources,publicationState.source,"label")+'</select></label>'+
+   '<label><span>Tipo de ato</span><select id="pub-type"><option value="">Todos os tipos</option>'+optionList(o.actTypes,publicationState.actType)+'</select></label>'+
+   '<label><span>Órgão</span><select id="pub-agency"><option value="">Todos os órgãos</option>'+optionList(o.agencies,publicationState.agency)+'</select></label>'+
+   '<label><span>UF</span><select id="pub-uf"><option value="">Todas</option>'+optionList(o.ufs,publicationState.uf)+'</select></label>'+
+   '<label><span>Período</span><select id="pub-period"><option value="" '+(!publicationState.period?"selected":"")+'>Todo o período</option><option value="today" '+(publicationState.period==="today"?"selected":"")+'>Hoje</option><option value="7d" '+(publicationState.period==="7d"?"selected":"")+'>Últimos 7 dias</option><option value="30d" '+(publicationState.period==="30d"?"selected":"")+'>Últimos 30 dias</option><option value="90d" '+(publicationState.period==="90d"?"selected":"")+'>Últimos 90 dias</option><option value="year" '+(publicationState.period==="year"?"selected":"")+'>Este ano</option><option value="custom" '+(publicationState.period==="custom"?"selected":"")+'>Personalizado</option></select></label>'+
+   '<label class="custom-date '+(publicationState.period==="custom"?"show":"")+'"><span>De</span><input id="pub-from" type="date" value="'+esc(publicationState.dateFrom)+'"></label>'+
+   '<label class="custom-date '+(publicationState.period==="custom"?"show":"")+'"><span>Até</span><input id="pub-to" type="date" value="'+esc(publicationState.dateTo)+'"></label>'+
+   '<div class="filter-actions"><button id="apply-filters" class="btn primary" type="button">Aplicar filtros</button><button id="clear-filter" class="btn ghost" type="button">Limpar</button></div>'+
+ '</div>'+
+ '<div id="active-filter-area">'+activeFilterChips()+'</div>'+
+ '</div>'
+}
+function isoLocal(d){return d.toISOString().slice(0,10)}
+function applyPeriod(){
+ const period=document.getElementById("pub-period").value;publicationState.period=period;
+ if(period==="custom"){
+   publicationState.dateFrom=document.getElementById("pub-from").value||"";
+   publicationState.dateTo=document.getElementById("pub-to").value||"";
+   return;
+ }
+ if(!period){publicationState.dateFrom="";publicationState.dateTo="";return}
+ const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()),from=new Date(today);
+ publicationState.dateTo=isoLocal(today);
+ if(period==="today")from.setDate(today.getDate());
+ if(period==="7d")from.setDate(today.getDate()-6);
+ if(period==="30d")from.setDate(today.getDate()-29);
+ if(period==="90d")from.setDate(today.getDate()-89);
+ if(period==="year"){from.setMonth(0,1)}
+ publicationState.dateFrom=isoLocal(from);
+}
+function readFilterForm(){
+ publicationState.page=1;
+ publicationState.q=document.getElementById("pub-q").value.trim();
+ publicationState.jurisdiction=document.getElementById("pub-j").value;
+ publicationState.source=document.getElementById("pub-source").value;
+ publicationState.actType=document.getElementById("pub-type").value;
+ publicationState.agency=document.getElementById("pub-agency").value;
+ publicationState.uf=document.getElementById("pub-uf").value;
+ applyPeriod();
+}
+function refreshFilterChrome(){
+ const area=document.getElementById("active-filter-area");if(area)area.innerHTML=activeFilterChips();
+ const count=["q","jurisdiction","source","actType","agency","uf"].filter(k=>publicationState[k]).length+(publicationState.dateFrom||publicationState.dateTo?1:0);
+ const badge=document.getElementById("filter-count");if(badge)badge.textContent=count?"("+count+")":"";
+ document.querySelectorAll("[data-clear-filter]").forEach(btn=>btn.onclick=()=>{
+   const key=btn.dataset.clearFilter;
+   if(key==="all"){publicationState={...publicationState,page:1,q:"",uf:"",jurisdiction:"",source:"",actType:"",agency:"",dateFrom:"",dateTo:"",period:""}}
+   else if(key==="period"){publicationState.dateFrom="";publicationState.dateTo="";publicationState.period=""}
+   else publicationState[key]="";
+   renderPublications(publicationState.mode);
+ });
 }
 async function renderPublications(mode){
  const isArchive=mode==="acervo";setActive(isArchive?"acervo":"publicacoes");publicationState.mode=mode;
+ if(!filterOptions){try{filterOptions=await api("/api/publication-filter-options")}catch(e){filterOptions={actTypes:[],agencies:[],sources:[],ufs:[]}}}
  view.innerHTML=head(isArchive?"Acervo":"Inteligência",isArchive?"Acervo Tributário":"Publicações","Consulte publicações oficiais já capturadas e preservadas pela TriBusca.")+publicationFilters()+'<div id="pub-results" class="surface publications-surface"><div class="page-loading">Consultando banco real…</div></div>';
- document.getElementById("pub-filter").onsubmit=e=>{e.preventDefault();publicationState.page=1;publicationState.q=document.getElementById("pub-q").value.trim();publicationState.jurisdiction=document.getElementById("pub-j").value;publicationState.uf=document.getElementById("pub-uf").value.trim().toUpperCase();loadPublications()};
- document.getElementById("clear-filter").onclick=()=>{publicationState={...publicationState,page:1,q:"",uf:"",jurisdiction:"",source:"",actType:""};renderPublications(mode)};
- loadPublications();
+ const form=document.getElementById("pub-filter");
+ form.onsubmit=e=>{e.preventDefault();readFilterForm();refreshFilterChrome();loadPublications()};
+ document.getElementById("toggle-filters").onclick=()=>{filtersOpen=!filtersOpen;document.getElementById("advanced-filters").classList.toggle("open",filtersOpen);document.getElementById("toggle-filters").classList.toggle("active",filtersOpen)};
+ document.getElementById("pub-period").onchange=e=>{document.querySelectorAll(".custom-date").forEach(x=>x.classList.toggle("show",e.target.value==="custom"))};
+ document.getElementById("apply-filters").onclick=()=>{readFilterForm();refreshFilterChrome();loadPublications()};
+ document.getElementById("clear-filter").onclick=()=>{publicationState={...publicationState,page:1,q:"",uf:"",jurisdiction:"",source:"",actType:"",agency:"",dateFrom:"",dateTo:"",period:""};renderPublications(mode)};
+ refreshFilterChrome();loadPublications();
 }
 async function loadPublications(){
- const params=new URLSearchParams({page:String(publicationState.page),pageSize:"25"});["q","source","uf","jurisdiction","actType"].forEach(k=>{if(publicationState[k])params.set(k,publicationState[k])});
+ const params=new URLSearchParams({page:String(publicationState.page),pageSize:"25"});["q","source","uf","jurisdiction","actType","agency","dateFrom","dateTo"].forEach(k=>{if(publicationState[k])params.set(k,publicationState[k])});
  const d=await api("/api/publications?"+params.toString());const el=document.getElementById("pub-results");
  el.innerHTML='<div class="results-head"><div><b>'+n(d.total)+'</b> publicação(ões)</div><span>Página '+d.page+' de '+d.totalPages+'</span></div>'+
  '<div class="publication-table"><div class="publication-tr header"><span>Data</span><span>Publicação</span><span>Fonte</span><span>Escopo</span><span></span></div>'+
