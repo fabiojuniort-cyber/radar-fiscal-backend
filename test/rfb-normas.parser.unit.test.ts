@@ -10,7 +10,11 @@ import {
   parseRfbApiRepresentation,
   parseRfbSearchPage,
 } from '../src/modules/collection/rfb-normas.parser.js';
-import { RFB_SEARCH_FIXTURE, IN_API_ORIGINAL } from './rfb-normas.fixtures.js';
+import {
+  RFB_SEARCH_FIXTURE,
+  IN_API_ORIGINAL,
+  PORTARIA_DUPLICATE_API,
+} from './rfb-normas.fixtures.js';
 
 test('parses Sistema Normas search results with official idAto and pagination', () => {
   const page = parseRfbSearchPage(RFB_SEARCH_FIXTURE, 1);
@@ -111,4 +115,11 @@ test('captures joint PGFN/RFB tax transaction notice deterministically', () => {
     category: 'OPERATIONAL',
     reason: 'CENTRAL_TAX_TRANSACTION_NOTICE',
   });
+});
+
+
+test('detects official repeated-publication target from Receita anchor', () => {
+  const representation = parseRfbApiRepresentation(PORTARIA_DUPLICATE_API);
+  assert.equal(representation.duplicateOfIdAto, '148881');
+  assert.match(representation.normalizedText, /publicação repetida/i);
 });
