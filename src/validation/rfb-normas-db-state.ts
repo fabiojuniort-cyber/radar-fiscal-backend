@@ -61,7 +61,7 @@ try {
              cc.produced_by_run_id, cr.status AS produced_by_run_status,
              cc.payload->'bootstrap' AS bootstrap,
              cc.payload->>'lastSuccessAt' AS last_success_at,
-             COALESCE(jsonb_object_length(cc.payload->'files'), 0) AS checkpoint_files,
+             COALESCE((SELECT count(*)::int FROM jsonb_object_keys(COALESCE(cc.payload->'files','{}'::jsonb))), 0) AS checkpoint_files,
              cc.payload_bytes, cc.payload_sha256
       FROM collection_checkpoints cc
       LEFT JOIN collection_runs cr ON cr.id = cc.produced_by_run_id
