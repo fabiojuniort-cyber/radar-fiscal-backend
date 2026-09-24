@@ -53,3 +53,144 @@ export const OPTIONAL_EMPTY = `<!doctype html><html><body><p>Representação dis
 export function pdfBytes(label: string): Uint8Array {
   return new TextEncoder().encode('%PDF-1.7\\n' + label);
 }
+
+
+export function apiPayload(input: {
+  idAto: number;
+  typeName: string;
+  typeSigla: string;
+  number: string;
+  agencySigla: string;
+  agencyName: string;
+  actDate: string;
+  publicationDate: string;
+  effectiveDate?: string;
+  title: string;
+  text: string;
+  view?: string;
+  attachmentId?: number;
+  attachmentName?: string;
+  current?: boolean;
+}): Record<string, unknown> {
+  return {
+    idAto: input.idAto,
+    epigrafe: {
+      tipoAto: {
+        idTipoAto: 1,
+        siglaTipoAto: input.typeSigla,
+        nomeTipoAto: input.typeName,
+      },
+      numeroAto: input.number,
+      dataAto: input.actDate,
+      orgaos: [{
+        idOrgao: 1,
+        siglaOrgao: input.agencySigla,
+        nomeOrgao: input.agencyName,
+      }],
+      dataAtoPorExtenso: input.actDate,
+    },
+    epigrafeCompleta: input.title,
+    epigrafeSimplificada: input.title,
+    epigrafesAnteriores: [],
+    epigrafeUrl: input.title,
+    dadosPublicacao: `Publicado(a) no DOU de ${input.publicationDate.split('-').reverse().join('/')}, seção 1`,
+    dataPublicacao: input.publicationDate,
+    dataVigenciaInicio: input.effectiveDate ?? input.publicationDate,
+    exibirVisoes: '1111',
+    visao: input.view ?? 'original',
+    integro: true,
+    vigente: input.current ?? true,
+    ehRepublicado: false,
+    idAtoRepublicador: null,
+    dataRepublicador: null,
+    ehVisaoExclusiva: false,
+    publicado: true,
+    internet: true,
+    ementas: [{
+      idAto: input.idAto,
+      idSegmento: 1,
+      ordemSegmentoAto: 1,
+      omitir: false,
+      original: true,
+      compilado: true,
+      textoIntegra: input.text,
+      arquivoBinario: null,
+    }],
+    outrosSegmentos: input.attachmentId ? [{
+      idAto: input.idAto,
+      idSegmento: 2,
+      ordemSegmentoAto: 2,
+      omitir: false,
+      original: true,
+      compilado: true,
+      textoIntegra: input.attachmentName ?? '',
+      arquivoBinario: {
+        idArquivoBinario: input.attachmentId,
+        nomeArquivoBinario: input.attachmentName ?? `arquivo-${input.attachmentId}.pdf`,
+      },
+    }] : [],
+    ancorasRetificacaoEpigrafe: [],
+    ancorasNoAto: [],
+    historico: [],
+    tiposSegmento: [],
+  };
+}
+
+export const IN_API_ORIGINAL = apiPayload({
+  idAto: 150001,
+  typeName: 'Instrução Normativa',
+  typeSigla: 'IN',
+  number: '2.344',
+  agencySigla: 'RFB',
+  agencyName: 'Secretaria Especial da Receita Federal do Brasil',
+  actDate: '2026-09-22',
+  publicationDate: '2026-09-23',
+  title: 'INSTRUÇÃO NORMATIVA RFB Nº 2.344, DE 22 DE SETEMBRO DE 2026',
+  text: [
+    'Dispõe sobre regras de tributação federal e obrigações acessórias.',
+    'Art. 1º Esta Instrução Normativa disciplina o procedimento.',
+    'Art. 2º Esta Instrução Normativa entra em vigor na data de sua publicação.',
+  ].join(' '),
+});
+
+export const SC_API_ORIGINAL = apiPayload({
+  idAto: 150002,
+  typeName: 'Solução de Consulta',
+  typeSigla: 'SC',
+  number: '180',
+  agencySigla: 'Cosit',
+  agencyName: 'Coordenação-Geral de Tributação',
+  actDate: '2026-09-22',
+  publicationDate: '2026-09-23',
+  title: 'SOLUÇÃO DE CONSULTA COSIT Nº 180, DE 22 DE SETEMBRO DE 2026',
+  text: 'Assunto: Cofins. Crédito presumido de ICMS. Não incidência.',
+  attachmentId: 90001,
+  attachmentName: 'SC Cosit nº 180-2026.pdf',
+});
+
+export const ADE_API_ORIGINAL = apiPayload({
+  idAto: 150005,
+  typeName: 'Ato Declaratório Executivo',
+  typeSigla: 'ADE',
+  number: '99',
+  agencySigla: 'Cofis',
+  agencyName: 'Coordenação-Geral de Fiscalização',
+  actDate: '2026-09-22',
+  publicationDate: '2026-09-23',
+  title: 'ATO DECLARATÓRIO EXECUTIVO COFIS Nº 99, DE 22 DE SETEMBRO DE 2026',
+  text: 'Dispõe sobre obrigação acessória DCTF e procedimento de declaração.',
+});
+
+export function representationPayload(
+  base: Record<string, unknown>,
+  view: 'original' | 'vigente' | 'multivigente',
+  textSuffix = '',
+): Record<string, unknown> {
+  const clone = structuredClone(base);
+  clone.visao = view;
+  const ementas = clone.ementas as Array<Record<string, unknown>>;
+  if (textSuffix && ementas[0]) {
+    ementas[0].textoIntegra = String(ementas[0].textoIntegra ?? '') + ' ' + textSuffix;
+  }
+  return clone;
+}
