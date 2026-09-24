@@ -115,17 +115,26 @@ export function buildRfbSearchUrl(input: {
     return `${day}/${month}/${date.getUTCFullYear()}`;
   };
   const params = new URLSearchParams({
+    facetsExistentes: '',
+    orgaosSelecionados: '',
+    tiposAtosSelecionados: '',
+    lblTiposAtosSelecionados: '',
+    ordemColuna: '',
+    ordemDirecao: '',
+    tipoConsulta: 'formulario',
+    tipoAtoFacet: '',
+    siglaOrgaoFacet: '',
+    anoAtoFacet: '',
     termoBusca: '',
     numero_ato: '',
     tipoData: '2',
     dt_inicio: format(input.start),
     dt_fim: format(input.end),
     ano_ato: '',
-    tiposAtosSelecionados: '',
-    orgaosSelecionados: '',
-    tipoConsulta: 'formulario',
     optOrdem: 'Publicacao_DESC',
     p: String(input.page),
+    x: '0',
+    y: '0',
   });
   return `${RFB_NORMAS_SEARCH_URL}?${params.toString()}`;
 }
