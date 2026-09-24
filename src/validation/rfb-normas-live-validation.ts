@@ -55,12 +55,7 @@ const acts = result.publications.map((publication) => ({
   category: publication.metadata?.captureCategory,
   reason: publication.metadata?.captureReason,
   representations: (publication.metadata?.rfbNormas as Record<string, unknown> | undefined)?.representations,
-  files: publication.files?.map(file => ({
-    url: file.url,
-    rawSha256: file.rawSha256,
-    sizeBytes: file.sizeBytes,
-    mimeType: file.mimeType,
-  })) ?? [],
+  files: (((publication.metadata?.rfbNormas as { files?: Array<Record<string, unknown>> } | undefined)?.files) ?? []),
 }));
 
 console.log('RFB_NORMAS_LIVE_RESULT=' + JSON.stringify({
@@ -84,6 +79,27 @@ if (discovered < 1) throw new Error('RFB Normas live search discovered no acts i
 if (discovered !== included + excluded) {
   throw new Error('RFB Normas live filtering counters do not reconcile.');
 }
+const sc180 = result.publications.find(p =>
+  p.agency === 'COSIT' &&
+  p.actType === 'SOLUÇÃO DE CONSULTA' &&
+  p.actNumber === '180/2026'
+);
+if (sc180) {
+  if (sc180.externalId !== '153667') {
+    throw new Error('SC Cosit 180/2026 idAto mismatch: ' + sc180.externalId);
+  }
+  if (sc180.publishedAt?.toISOString().slice(0, 10) !== '2026-09-23') {
+    throw new Error('SC Cosit 180/2026 publication date mismatch.');
+  }
+  const rfb = sc180.metadata?.rfbNormas as { files?: Array<Record<string, unknown>> } | undefined;
+  const file = rfb?.files?.find(item => item.externalId === '86539');
+  if (!file || typeof file.rawSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(file.rawSha256)) {
+    throw new Error('SC Cosit 180/2026 official PDF SHA-256 gate failed.');
+  }
+} else {
+  console.log('RFB_NORMAS_LIVE_NOTE=SC Cosit 180/2026 not present in current search result');
+}
+
 if (!result.publications.some(p => p.agency === 'COSIT' && p.actType === 'SOLUÇÃO DE CONSULTA')) {
   console.log('RFB_NORMAS_LIVE_NOTE=no COSIT solution found in current 7-day window');
 }
@@ -92,7 +108,7 @@ for (const publication of result.publications) {
   const representations =
     (publication.metadata?.rfbNormas as { representations?: Record<string, Record<string, unknown>> } | undefined)?.representations;
   const original = representations?.original;
-  if (!original || original.available !== true || typeof original.normalizedHash !== 'string') {
+  if (!original || original.available !== true || typeof original.normalizedHash !== 'string' || typeof original.apiUrl !== 'string') {
     throw new Error('Included act is missing a hashed original representation: ' + publication.externalId);
   }
 }
