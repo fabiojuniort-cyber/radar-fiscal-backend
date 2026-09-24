@@ -436,7 +436,8 @@ export class RfbNormasConnector implements CollectionConnector {
         }
       }
 
-      const title = original.title ?? fallbackTitle(item);
+      const sourceTitle = original.title ?? fallbackTitle(item);
+      const title = sourceTitle.toLocaleUpperCase('pt-BR');
       const canonicalContent = original.normalizedText;
       const officialUrl = buildRfbModernRepresentationUrl(item.idAto, 'original');
       const metadata: Record<string, unknown> = {
@@ -452,9 +453,12 @@ export class RfbNormasConnector implements CollectionConnector {
           listingAgency: item.agency,
           publicationDate: dateOnly(original.publishedAt ?? item.publishedAt),
           listingPublicationDate: dateOnly(item.publishedAt),
+          ...(original.effectiveAt ? { effectiveDate: dateOnly(original.effectiveAt) } : {}),
+          sourceTitle,
           ...(original.publicationReference ? { publicationReference: original.publicationReference } : {}),
           abstract: item.abstract,
           representations,
+          files,
           ...(canonical.actDate ? { actDate: dateOnly(canonical.actDate) } : {}),
           republication: original.republication,
         },
@@ -468,12 +472,10 @@ export class RfbNormasConnector implements CollectionConnector {
         ...(canonical.actType ? { actType: canonical.actType } : {}),
         ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
         publishedAt: original.publishedAt ?? item.publishedAt,
-        ...(original.effectiveAt ? { effectiveAt: original.effectiveAt } : {}),
         content: canonicalContent,
         officialUrl,
         externalId: item.idAto,
         ...(!strong ? { identityKey: `RFB_NORMAS|${item.idAto}` } : {}),
-        ...(files.length ? { files } : {}),
         metadata,
       });
     };
