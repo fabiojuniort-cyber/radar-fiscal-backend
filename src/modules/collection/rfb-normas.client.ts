@@ -4,6 +4,7 @@ import { ConnectorError } from './connector.error.js';
 
 export const RFB_NORMAS_ALLOWED_ORIGINS = new Set([
   'https://normas.receita.fazenda.gov.br',
+  'https://normasinternet2.receita.fazenda.gov.br',
 ]);
 
 const DEFAULT_TIMEOUT_MS = 25_000;
@@ -35,6 +36,16 @@ export interface RfbOptionalMissingResponse {
 }
 
 export type RfbOptionalHtmlResponse = RfbHtmlResponse | RfbOptionalMissingResponse;
+
+export interface RfbJsonResponse {
+  status: 'OK';
+  url: string;
+  payload: unknown;
+  sourceEtag?: string;
+  sourceLastModified?: string;
+}
+
+export type RfbOptionalJsonResponse = RfbJsonResponse | RfbOptionalMissingResponse;
 
 export interface RfbDownloadedFile {
   status: 'DOWNLOADED';
@@ -308,6 +319,81 @@ export class RfbNormasClient {
 
   async getOptionalHtml(url: string, signal: AbortSignal): Promise<RfbOptionalHtmlResponse> {
     return this.#checkedHtml(url, signal, true);
+  }
+
+  async #checkedJson(
+    url: string,
+    signal: AbortSignal,
+    optional: boolean,
+  ): Promise<RfbOptionalJsonResponse> {
+    const { response, url: finalUrl } = await this.#request(url, signal, {
+      accept: 'application/json',
+    });
+
+    if (optional && [400, 403, 404, 410].includes(response.status)) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
+      return { status: 'NOT_AVAILABLE', url: finalUrl, httpStatus: response.status };
+    }
+
+    if (!(response.status >= 200 && response.status < 300)) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
+      const retryAfter = retryAfterSeconds(response) ?? DEFAULT_RETRY_AFTER_SECONDS;
+      if (response.status === 429) {
+        throw failure('RFB_NORMAS_RATE_LIMITED', 'RATE_LIMITED', true, {
+          httpStatus: response.status,
+          retryAfterSeconds: retryAfter,
+        });
+      }
+      if (response.status === 408 || response.status === 425 || response.status >= 500) {
+        throw failure('RFB_NORMAS_SOURCE_UNAVAILABLE', 'SOURCE_UNAVAILABLE', true, {
+          httpStatus: response.status,
+          retryAfterSeconds: retryAfter,
+        });
+      }
+      throw failure('RFB_NORMAS_JSON_HTTP_ERROR', 'HTTP_ERROR', false, {
+        httpStatus: response.status,
+      });
+    }
+
+    const contentType = cleanContentType(response.headers.get('content-type'));
+    if (contentType !== 'application/json' && !contentType.endsWith('+json')) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
+      throw failure('RFB_NORMAS_INVALID_JSON_CONTENT_TYPE', 'FETCH_ERROR', true, {
+        metadata: { contentType },
+      });
+    }
+
+    const bytes = await this.#readBytes(response, this.#maxHtmlBytes, signal);
+    if (!bytes.length) {
+      throw failure('RFB_NORMAS_EMPTY_JSON', 'FETCH_ERROR', true);
+    }
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(new TextDecoder('utf-8', { fatal: false }).decode(bytes));
+    } catch {
+      throw failure('RFB_NORMAS_INVALID_JSON', 'FETCH_ERROR', true);
+    }
+
+    return {
+      status: 'OK',
+      url: finalUrl,
+      payload,
+      ...(response.headers.get('etag') ? { sourceEtag: response.headers.get('etag')! } : {}),
+      ...(response.headers.get('last-modified') ? { sourceLastModified: response.headers.get('last-modified')! } : {}),
+    };
+  }
+
+  async getJson(url: string, signal: AbortSignal): Promise<RfbJsonResponse> {
+    const result = await this.#checkedJson(url, signal, false);
+    if (result.status !== 'OK') {
+      throw failure('RFB_NORMAS_REQUIRED_JSON_MISSING', 'SOURCE_UNAVAILABLE', true);
+    }
+    return result;
+  }
+
+  async getOptionalJson(url: string, signal: AbortSignal): Promise<RfbOptionalJsonResponse> {
+    return this.#checkedJson(url, signal, true);
   }
 
   async downloadFile(
