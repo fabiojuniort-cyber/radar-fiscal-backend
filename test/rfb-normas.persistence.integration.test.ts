@@ -11,13 +11,13 @@ import { processAcquiredCollectionRun } from '../src/modules/collection/collecti
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
 import { RfbNormasConnector } from '../src/modules/collection/rfb-normas.connector.js';
 import {
-  PORTARIA_DUPLICATE_API,
-  PORTARIA_RETIFICATION_API,
+  RETIFICATION_API_ORIGINAL,
+  RETIFICATION_DUPLICATE_API_ORIGINAL,
   SC_API_ORIGINAL,
   pdfBytes,
 } from './rfb-normas.fixtures.js';
 
-test('RFB persists attachment hashes and repeated retification as one version with two origins', async () => {
+test('RFB persists attachment SHA and excludes repeated retification reference without artificial version', async () => {
   const adminUrl = process.env.DATABASE_ADMIN_URL;
   assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for RFB persistence integration test.');
 
@@ -38,24 +38,29 @@ test('RFB persists attachment hashes and repeated retification as one version wi
     if (url.pathname.endsWith('/consulta.action')) {
       return new Response(search, { status: 200, headers: { 'content-type': 'text/html' } });
     }
+
     const match = /\/api\/consulta-externa\/ato\/(148881|148882|150002)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
     if (match?.[1] && match[2]) {
-      if (match[2] !== 'original') return new Response(null, { status: 406 });
-      const payload =
-        match[1] === '148881' ? PORTARIA_RETIFICATION_API :
-        match[1] === '148882' ? PORTARIA_DUPLICATE_API :
+      if (match[2] === 'relacional') return new Response(null, { status: 403 });
+      const base =
+        match[1] === '148881' ? RETIFICATION_API_ORIGINAL :
+        match[1] === '148882' ? RETIFICATION_DUPLICATE_API_ORIGINAL :
         SC_API_ORIGINAL;
+      const payload = structuredClone(base);
+      payload.visao = match[2];
       return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
     }
+
     if (url.pathname.endsWith('/anexoOutros.action')) {
       return new Response(pdfBytes('SC Cosit 180 official PDF'), {
         status: 200,
         headers: { 'content-type': 'application/pdf' },
       });
     }
+
     return new Response('not found', { status: 404 });
   }) as typeof fetch;
 
@@ -90,6 +95,7 @@ test('RFB persists attachment hashes and repeated retification as one version wi
     const acquired = await acquireNextCollectionRun(db, `rfb-persistence-${sourceId}`);
     assert.ok(acquired);
     assert.equal(acquired.id, runId);
+
     const result = await processAcquiredCollectionRun(db, registry, acquired, {
       timeoutMs: 20_000,
       heartbeatIntervalMs: 0,
@@ -97,30 +103,28 @@ test('RFB persists attachment hashes and repeated retification as one version wi
 
     assert.equal(result.status, 'SUCCESS');
     assert.equal(result.metrics.newPublications, 2);
-    assert.equal(result.metrics.existingPublications, 1);
     assert.equal(result.metrics.newVersions, 0);
 
-    const portaria = await db.selectFrom('publications')
-      .select(['id'])
-      .where('agency', '=', 'RFB')
-      .where('act_type', '=', 'PORTARIA')
-      .where('act_number', '=', '619/2025')
-      .where('published_on', '=', '2026-01-16')
+    const retification = await db.selectFrom('publication_origins as po')
+      .innerJoin('publications as p', 'p.id', 'po.publication_id')
+      .select(['p.id', 'p.act_type', 'po.external_id'])
+      .where('po.source_id', '=', sourceId)
+      .where('po.external_id', '=', '148881')
       .executeTakeFirstOrThrow();
+    assert.equal(retification.act_type, 'RETIFICAÇÃO');
 
-    const origins = await db.selectFrom('publication_origins')
-      .select(['external_id'])
-      .where('publication_id', '=', portaria.id)
-      .orderBy('external_id')
-      .execute();
-    assert.deepEqual(origins.map(row => row.external_id), ['148881', '148882']);
+    const duplicateOrigin = await db.selectFrom('publication_origins')
+      .select('id')
+      .where('source_id', '=', sourceId)
+      .where('external_id', '=', '148882')
+      .executeTakeFirst();
+    assert.equal(duplicateOrigin, undefined);
 
-    const portariaVersions = await db.selectFrom('publication_versions')
-      .select(['id', 'is_current'])
-      .where('publication_id', '=', portaria.id)
+    const versions = await db.selectFrom('publication_versions')
+      .select(['id'])
+      .where('publication_id', '=', retification.id)
       .execute();
-    assert.equal(portariaVersions.length, 1);
-    assert.equal(portariaVersions[0]!.is_current, true);
+    assert.equal(versions.length, 1);
 
     const sc = await db.selectFrom('publications')
       .select(['id'])
@@ -134,6 +138,7 @@ test('RFB persists attachment hashes and repeated retification as one version wi
       .where('publication_id', '=', sc.id)
       .where('is_current', '=', true)
       .executeTakeFirstOrThrow();
+
     const metadata = scVersion.source_metadata as Record<string, unknown>;
     const files = metadata.files as Array<Record<string, unknown>>;
     assert.equal(files.length, 1);
@@ -147,6 +152,7 @@ test('RFB persists attachment hashes and repeated retification as one version wi
         .execute())
         .map(row => row.publication_id),
     )];
+
     await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
     await db.deleteFrom('publication_origins').where('source_id', '=', sourceId).execute();
     if (publicationIds.length) {
