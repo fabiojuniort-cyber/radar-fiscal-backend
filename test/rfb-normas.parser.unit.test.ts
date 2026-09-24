@@ -11,9 +11,10 @@ import {
   parseRfbSearchPage,
 } from '../src/modules/collection/rfb-normas.parser.js';
 import {
-  RFB_SEARCH_FIXTURE,
   IN_API_ORIGINAL,
-  PORTARIA_DUPLICATE_API,
+  RETIFICATION_API_ORIGINAL,
+  RETIFICATION_DUPLICATE_API_ORIGINAL,
+  RFB_SEARCH_FIXTURE,
 } from './rfb-normas.fixtures.js';
 
 test('parses Sistema Normas search results with official idAto and pagination', () => {
@@ -100,6 +101,21 @@ test('parses modern official API content, dates, attachments and canonical ident
 });
 
 
+test('detects retification content even when Sistema Normas inherits the target Portaria title', () => {
+  const parsed = parseRfbApiRepresentation(RETIFICATION_API_ORIGINAL);
+  assert.equal(parsed.title, 'Portaria RFB nº 619, de 3 de dezembro de 2025');
+  assert.equal(parsed.revisionKind, 'RETIFICATION');
+  assert.equal(parsed.duplicatePublicationReference, false);
+  assert.match(parsed.normalizedText, /^Retificação/);
+});
+
+test('detects explicit repeated-publication retification reference', () => {
+  const parsed = parseRfbApiRepresentation(RETIFICATION_DUPLICATE_API_ORIGINAL);
+  assert.equal(parsed.revisionKind, 'RETIFICATION');
+  assert.equal(parsed.duplicatePublicationReference, true);
+  assert.match(parsed.normalizedText, /publicação repetida/i);
+});
+
 test('captures joint PGFN/RFB tax transaction notice deterministically', () => {
   const item = {
     idAto: '153623',
@@ -115,11 +131,4 @@ test('captures joint PGFN/RFB tax transaction notice deterministically', () => {
     category: 'OPERATIONAL',
     reason: 'CENTRAL_TAX_TRANSACTION_NOTICE',
   });
-});
-
-
-test('detects official repeated-publication target from Receita anchor', () => {
-  const representation = parseRfbApiRepresentation(PORTARIA_DUPLICATE_API);
-  assert.equal(representation.duplicateOfIdAto, '148881');
-  assert.match(representation.normalizedText, /publicação repetida/i);
 });
