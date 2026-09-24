@@ -18,3 +18,55 @@ body.drawer-open{overflow:hidden}
 }
 @media(prefers-reduced-motion:reduce){.product-nav{transition:none}}
 .pill.neutral{background:#F1F4F8;color:#526177}
+
+/* ===== Onda 2 ===== */
+.muted{color:var(--muted)}.small{font-size:12px}
+.soon{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);background:#FFF7E8;border-radius:999px;padding:2px 7px;vertical-align:middle}
+.state-error{background:#FFF5F5;border:1px solid #F3D0D0;border-radius:14px;padding:18px 20px;color:#7A1F1F}.state-error p{margin:6px 0 0;font-size:13px}
+.empty-inline{padding:36px 22px;color:var(--muted);font-size:14px}.empty-inline b{color:var(--ink)}.empty-inline p{margin:6px 0 0}
+.is-loading{opacity:.55;transition:opacity .15s ease;pointer-events:none}
+.mini-foot{padding:12px 18px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+.recent-row>span{font-size:12px}.recent-row small,.publication-tr small{font-size:12px}.publication-tr b{font-size:14px}.publication-tr>span{font-size:13px}
+.feed-day h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;padding:16px 20px 8px;border-bottom:1px solid var(--line);background:#fafbfd}.feed-day h2 small{font-weight:600;margin-left:6px}
+/* detalhe: três camadas */
+.layer{border-radius:14px;padding:16px 18px;margin:14px 0}
+.layer-label{font-size:11px;font-weight:850;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+.layer-fact{border:1px solid var(--line);background:#fff}.layer-fact .layer-label{color:var(--ink)}
+.layer-intel{background:#F4F8FF;border:1px dashed #C9DAF8}.layer-intel .layer-label{color:var(--blue)}.layer-intel p{margin:0;font-size:13px;line-height:1.6;color:#415773}
+.fact-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 18px;margin:0}.fact-grid dt{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.fact-grid dd{margin:3px 0 0;font-size:14px;font-weight:650}
+.detail-tabs{justify-content:flex-start;gap:6px;padding:0;font-size:13px}
+.detail-tabs [role=tab]{border:0;background:transparent;padding:13px 12px;cursor:pointer;color:var(--muted);font-weight:700;border-bottom:2px solid transparent;margin-bottom:-1px}
+.detail-tabs [role=tab][aria-selected=true]{color:var(--ink);border-bottom-color:var(--blue)}
+.panel-h{font-size:13px;margin:22px 0 6px}.panel-h small{font-weight:500;color:var(--muted);margin-left:6px}
+.file-row{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:13px 0;border-bottom:1px solid var(--line);font-size:13px}.file-row b{display:block}.file-row small{display:block;color:var(--muted);margin-top:3px;font-size:12px}.file-row a{color:var(--blue);font-weight:700;white-space:nowrap}
+.file-row code,.diff-head code{display:inline-block;margin-top:4px;font-size:11px;color:#526177;background:#F3F6FA;border-radius:6px;padding:2px 6px}
+.tag-lite{font-size:10px;font-weight:800;color:var(--ok);background:#EDF8F4;border-radius:999px;padding:2px 7px;margin-left:4px}
+.btn.small{padding:8px 12px;font-size:12px}
+.segment-ref,.norma-inline span,.norma-segment-btn{font-size:12px}.norma-inline p{font-size:14px}
+.diff-head{margin:18px 0 8px;font-size:13px;font-weight:750}
+.diff-seg{padding:14px 0;border-bottom:1px solid var(--line)}.diff-seg ins{background:#E3F8EE;color:#0B5A3C;text-decoration:none;border-radius:3px}.diff-seg del{background:#FDEBEC;color:#8A1C24;border-radius:3px}
+/* monitoramento */
+.monitor .source-tr{grid-template-columns:minmax(200px,1.3fr) 120px 170px 130px 110px 120px 100px;min-width:1000px}
+.source-tr span{font-size:13px}.source-tr b{font-size:13px}.source-tr small{font-size:12px}.source-tr.header span{font-size:11px}
+.source-block{border-bottom:1px solid var(--line)}.source-block .source-tr{border-bottom:0}
+.runs-toggle{border:0;background:transparent;color:var(--blue);font-weight:750;font-size:12px;padding:0 18px 12px;cursor:pointer}
+.runs-panel{padding:0 18px 14px}.run-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:10px 0;border-top:1px dashed var(--line);font-size:13px}.run-row small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.attempts{margin:0;padding-left:18px;font-size:12px;color:#415773}.warn-text{color:var(--warn)!important}
+.legend{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6}
+.chip-static{display:flex;flex-wrap:wrap;gap:7px;list-style:none;margin:0;padding:0}.chip-static li{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:#526177}
+.product-nav a{font-size:13px}.metric small,.metric span{font-size:12px}.health-summary span,.mini-sources small{font-size:12px}.mini-sources b{font-size:13px}
+@media(max-width:800px){
+  .fact-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .monitor .source-tr{grid-template-columns:1fr 1fr;min-width:0;gap:8px 12px}.monitor .source-tr.header{display:none}.monitor .source-tr>span:first-child{grid-column:1/-1}
+  .run-row{grid-template-columns:1fr}.file-row{flex-direction:column;align-items:flex-start}
+}
+/* site público — Onda 2 */
+.radar-type{font-size:12px;color:var(--muted);margin-top:6px}
+.portfolio-list .source-row small{display:block;font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
+.norma-inline-demo{margin-top:42px}.norma-inline-demo .lawbox{max-width:760px;margin-left:auto}.plain small{display:block;margin-top:8px;font-size:12px;color:var(--muted)}
+.steps{list-style:none;counter-reset:s;margin:26px 0 0;padding:0}.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:4px 12px;padding:14px 0;border-top:1px solid rgba(255,255,255,.14)}
+.steps li:before{content:counter(s,decimal-leading-zero);grid-row:span 2;font-size:12px;color:var(--cyan);font-weight:800;padding-top:2px}.steps b{font-size:15px}.steps span{font-size:13px;color:#C6D6E9;line-height:1.55}
+.example-note{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9BC1E9;margin-bottom:10px}
+.footer-inner{align-items:center;flex-wrap:wrap}.footer-inner>div:first-child{display:flex;align-items:center;gap:12px}.footer-logo{width:120px}
+.footer-inner nav{display:flex;gap:18px;flex-wrap:wrap}.footer-inner nav a:hover{color:var(--blue)}.footer-legal{display:flex;flex-direction:column;gap:3px;text-align:right}
+@media(max-width:600px){.footer-legal{text-align:left;margin-top:12px}.footer-inner nav{margin-top:12px}}
