@@ -21,7 +21,7 @@ const CONTEXT = {
   signal: new AbortController().signal,
 };
 
-function portal(options: { changedVigente?: boolean } = {}) {
+function portal(options: { changedVigente?: boolean; failAttachment?: boolean } = {}) {
   let fileDownloads = 0;
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(input.toString());
@@ -60,6 +60,7 @@ function portal(options: { changedVigente?: boolean } = {}) {
     }
     if (url.pathname.endsWith('/anexoOutros.action')) {
       fileDownloads += 1;
+      if (options.failAttachment) return new Response('temporary', { status: 503 });
       return new Response(pdfBytes('SC 180'), {
         status: 200,
         headers: { 'content-type': 'application/pdf', etag: '"sc-180-v1"' },
@@ -164,6 +165,24 @@ test('successful empty search returns zero publications, unavailable source thro
     now: () => new Date('2026-09-23T15:00:00Z'),
   });
   await assert.rejects(down.collect(CONTEXT));
+});
+
+test('bootstrap retains month/page when an included publication fails', async () => {
+  const fake = portal({ failAttachment: true });
+  const connector = new RfbNormasConnector({
+    fetch: fake.fetch,
+    now: () => new Date('2025-01-10T15:00:00Z'),
+  });
+
+  const result = await connector.collect(CONTEXT);
+  assert.equal(result.completion?.complete, false);
+  assert.equal(result.completion?.reason, 'PARTIAL_FAILURE_RETRY_REQUIRED');
+  assert.equal(result.partialFailures?.length, 1);
+
+  const state = result.checkpoint!.state as unknown as RfbNormasSourceState;
+  assert.equal(state.bootstrap.complete, false);
+  assert.equal(state.bootstrap.month, '2025-01');
+  assert.equal(state.bootstrap.page, 1);
 });
 
 test('bootstrap starts in 2025 and can stop safely on time budget', async () => {
