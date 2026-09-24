@@ -30,7 +30,7 @@ function requireUser(req,res){const user=sessionUser(req);if(!user){json(res,401
 async function requireDb(res){if(!pool){json(res,503,{error:"database_unavailable"});return false;}return true;}
 
 const NORMA_CLARA_ENGINE_VERSION=process.env.NORMA_CLARA_ENGINE_VERSION||"nc-v1";
-const NORMA_CLARA_MODEL=process.env.NORMA_CLARA_MODEL||"gpt-6-luna";
+const NORMA_CLARA_MODEL=process.env.NORMA_CLARA_MODEL||"gpt-5.6-luna";
 
 function outputText(response){
   for(const item of response.output||[]){
@@ -310,6 +310,10 @@ async function api(req,res,pathname,url){
     }catch(e){
       console.error("norma clara failed",e);
       if(e.code==="openai_not_configured")return json(res,503,{error:"openai_not_configured"});
+      const openaiCode=e.details&&e.details.error&&e.details.error.code;
+      if(openaiCode==="credit_balance_exhausted")return json(res,402,{error:"openai_credit_balance_exhausted"});
+      if(openaiCode==="organization_spend_limit_exceeded"||openaiCode==="project_spend_limit_exceeded")return json(res,402,{error:"openai_spend_limit_exceeded"});
+      if(openaiCode==="model_not_found")return json(res,502,{error:"openai_model_not_found"});
       return json(res,502,{error:"norma_clara_failed"});
     }
   }
