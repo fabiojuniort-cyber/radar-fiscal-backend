@@ -14,10 +14,10 @@ if (!databaseUrl) {
 const APPLY = process.argv.includes('--apply');
 
 const SOURCE_CODE = 'rfb-normas';
-const PORTARIA_619_PUBLICATION_ID = '4d1acd59-edb8-4e9f-bfe8-21744481cbdd';
+const loaded.publicationId = '4d1acd59-edb8-4e9f-bfe8-21744481cbdd';
 const PORTARIA_619_KEEP = '148881';
 const PORTARIA_619_DROP = '148882';
-const PORTARIA_140_PUBLICATION_ID = '4175edbb-f2c8-419b-bed2-dbbca28ad94b';
+const loaded.publicationId = '4175edbb-f2c8-419b-bed2-dbbca28ad94b';
 const PORTARIA_140_KEEP = '151936';
 const PORTARIA_140_DROP = '151937';
 
@@ -50,41 +50,37 @@ async function sourceId(client: PoolClient): Promise<string> {
 async function loadCase(
   client: PoolClient,
   source: string,
-  publicationId: string,
   keepExternalId: string,
   dropExternalId: string,
 ) {
-  const publicationResult = await client.query(
-    `SELECT id, identity_hash, identity_strength, identity_basis,
-            jurisdiction_level, uf, agency, act_type, act_number, title,
-            published_on, effective_on, primary_official_url
-       FROM publications
-      WHERE id = $1
-      FOR UPDATE`,
-    [publicationId],
+  const keepResult = await client.query(
+    `SELECT po.id AS origin_id, po.publication_id, po.external_id, po.official_url,
+            po.metadata AS origin_metadata,
+            p.identity_hash, p.identity_strength, p.identity_basis,
+            p.jurisdiction_level, p.uf, p.agency, p.act_type, p.act_number,
+            p.title, p.published_on, p.effective_on, p.primary_official_url
+       FROM publication_origins po
+       JOIN publications p ON p.id = po.publication_id
+      WHERE po.source_id = $1
+        AND po.external_id = $2
+      FOR UPDATE OF po, p`,
+    [source, keepExternalId],
   );
-  if (publicationResult.rowCount !== 1) {
-    throw new Error('Publication not found: ' + publicationId);
+  if (keepResult.rowCount !== 1) {
+    throw new Error('Expected one keep origin for external_id=' + keepExternalId);
   }
 
-  const originsResult = await client.query(
-    `SELECT id, publication_id, source_id, external_id, official_url, metadata
+  const publication = keepResult.rows[0];
+  const publicationId = publication.publication_id as string;
+
+  const dropResult = await client.query(
+    `SELECT id, publication_id, external_id, official_url, metadata
        FROM publication_origins
-      WHERE publication_id = $1
-        AND source_id = $2
-        AND external_id = ANY($3::text[])
-      ORDER BY external_id
+      WHERE source_id = $1
+        AND external_id = $2
       FOR UPDATE`,
-    [publicationId, source, [keepExternalId, dropExternalId]],
+    [source, dropExternalId],
   );
-
-  const keepOrigin = originsResult.rows.find((row) => row.external_id === keepExternalId);
-  const dropOrigin = originsResult.rows.find((row) => row.external_id === dropExternalId);
-  if (!keepOrigin || !dropOrigin || originsResult.rowCount !== 2) {
-    throw new Error(
-      `Expected exactly the two RFB origins ${keepExternalId}/${dropExternalId} for ${publicationId}.`,
-    );
-  }
 
   const versionsResult = await client.query(
     `SELECT id, publication_id, version_no, content_hash, content_text,
@@ -97,21 +93,21 @@ async function loadCase(
     [publicationId],
   );
 
-  const keepVersion = versionsResult.rows.find((row) => row.source_id_ato === keepExternalId);
-  const dropVersion = versionsResult.rows.find((row) => row.source_id_ato === dropExternalId);
-  if (!keepVersion || !dropVersion || versionsResult.rowCount !== 2) {
-    throw new Error(
-      `Expected exactly two versions mapped to ${keepExternalId}/${dropExternalId} for ${publicationId}.`,
-    );
-  }
-
   return {
-    publication: publicationResult.rows[0],
-    keepOrigin,
-    dropOrigin,
-    keepVersion,
-    dropVersion,
+    publicationId,
+    publication,
+    keepOrigin: {
+      id: publication.origin_id,
+      publication_id: publicationId,
+      source_id: source,
+      external_id: keepExternalId,
+      official_url: publication.official_url,
+      metadata: publication.origin_metadata,
+    },
+    dropOrigin: dropResult.rows[0] ?? null,
     versions: versionsResult.rows,
+    keepVersion: versionsResult.rows.find((row) => row.source_id_ato === keepExternalId) ?? null,
+    dropVersion: versionsResult.rows.find((row) => row.source_id_ato === dropExternalId) ?? null,
   };
 }
 
@@ -164,18 +160,34 @@ async function repairPortaria619(
   const loaded = await loadCase(
     client,
     source,
-    PORTARIA_619_PUBLICATION_ID,
     PORTARIA_619_KEEP,
     PORTARIA_619_DROP,
   );
 
   const publication = loaded.publication;
   if (
+    publication.act_type === 'RETIFICAÇÃO' &&
+    publication.act_number === null &&
+    loaded.dropOrigin === null &&
+    loaded.versions.length === 1 &&
+    loaded.keepVersion
+  ) {
+    return {
+      publicationId: loaded.publicationId,
+      state: 'ALREADY_REPAIRED',
+      keepExternalId: PORTARIA_619_KEEP,
+    };
+  }
+  if (
     publication.act_type !== 'PORTARIA' ||
     publication.act_number !== '619/2025' ||
-    publication.agency !== 'RFB'
+    publication.agency !== 'RFB' ||
+    !loaded.dropOrigin ||
+    !loaded.keepVersion ||
+    !loaded.dropVersion ||
+    loaded.versions.length !== 2
   ) {
-    throw new Error('Portaria 619 safety gate failed: publication identity is not the expected target act.');
+    throw new Error('Portaria 619 safety gate failed: unexpected pre-repair state.');
   }
 
   const sourceMetadata = asRecord(loaded.keepVersion.source_metadata);
@@ -228,14 +240,14 @@ async function repairPortaria619(
 
   const collision = await client.query(
     `SELECT id FROM publications WHERE identity_hash = $1 AND id <> $2`,
-    [normalized.identityHash, PORTARIA_619_PUBLICATION_ID],
+    [normalized.identityHash, loaded.publicationId],
   );
   if (collision.rowCount) {
     throw new Error('Retification identity already belongs to another publication: ' + collision.rows[0].id);
   }
 
   const preview = {
-    publicationId: PORTARIA_619_PUBLICATION_ID,
+    publicationId: loaded.publicationId,
     before: {
       actType: publication.act_type,
       actNumber: publication.act_number,
@@ -270,7 +282,7 @@ async function repairPortaria619(
   );
   const detached = await detachDuplicateCollectionItems(
     client,
-    PORTARIA_619_PUBLICATION_ID,
+    loaded.publicationId,
     PORTARIA_619_DROP,
     'DUPLICATE_PUBLICATION_REFERENCE',
   );
@@ -329,7 +341,7 @@ async function repairPortaria619(
             updated_at = now()
       WHERE id = $1`,
     [
-      PORTARIA_619_PUBLICATION_ID,
+      loaded.publicationId,
       normalized.identityHash,
       normalized.identityStrength,
       JSON.stringify(normalized.identityBasis),
@@ -357,24 +369,40 @@ async function repairPortaria140(
   const loaded = await loadCase(
     client,
     source,
-    PORTARIA_140_PUBLICATION_ID,
     PORTARIA_140_KEEP,
     PORTARIA_140_DROP,
   );
 
   const publication = loaded.publication;
   if (
-    publication.act_type !== 'PORTARIA CONJUNTA' ||
-    publication.act_number !== '140/2026'
+    publication.act_type === 'PORTARIA CONJUNTA' &&
+    publication.act_number === '140/2026' &&
+    loaded.dropOrigin === null &&
+    loaded.versions.length === 1 &&
+    loaded.keepVersion
   ) {
-    throw new Error('Portaria Conjunta 140 safety gate failed: unexpected publication identity.');
+    return {
+      publicationId: loaded.publicationId,
+      state: 'ALREADY_REPAIRED',
+      keepExternalId: PORTARIA_140_KEEP,
+    };
+  }
+  if (
+    publication.act_type !== 'PORTARIA CONJUNTA' ||
+    publication.act_number !== '140/2026' ||
+    !loaded.dropOrigin ||
+    !loaded.keepVersion ||
+    !loaded.dropVersion ||
+    loaded.versions.length !== 2
+  ) {
+    throw new Error('Portaria Conjunta 140 safety gate failed: unexpected pre-repair state.');
   }
   if (loaded.keepVersion.is_current !== true) {
     throw new Error('Portaria Conjunta 140 safety gate failed: substantive 151936 version must be current.');
   }
 
   const preview = {
-    publicationId: PORTARIA_140_PUBLICATION_ID,
+    publicationId: loaded.publicationId,
     before: {
       actType: publication.act_type,
       actNumber: publication.act_number,
@@ -404,7 +432,7 @@ async function repairPortaria140(
   );
   const detached = await detachDuplicateCollectionItems(
     client,
-    PORTARIA_140_PUBLICATION_ID,
+    loaded.publicationId,
     PORTARIA_140_DROP,
     'DUPLICATE_PUBLICATION_REFERENCE',
   );
@@ -429,7 +457,7 @@ async function repairPortaria140(
         SET primary_official_url = $2,
             updated_at = now()
       WHERE id = $1`,
-    [PORTARIA_140_PUBLICATION_ID, loaded.keepOrigin.official_url],
+    [loaded.publicationId, loaded.keepOrigin.official_url],
   );
 
   return {
