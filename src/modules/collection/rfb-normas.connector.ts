@@ -332,7 +332,6 @@ export class RfbNormasConnector implements CollectionConnector {
           if (kind === 'original') original = parsed;
         } catch (error) {
           if (kind === 'original') throw error;
-          failedIncluded = true;
           const info = failureInfo(error);
           partialFailures.push({
             code: info.code,
@@ -512,6 +511,7 @@ export class RfbNormasConnector implements CollectionConnector {
             if (error.kind === 'CANCELLED') throw error;
             return { totalPages: parsed.totalPages, yielded: true, failedIncluded };
           }
+          failedIncluded = true;
           const info = failureInfo(error);
           partialFailures.push({
             code: info.code,
