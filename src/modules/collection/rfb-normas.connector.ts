@@ -280,7 +280,7 @@ export class RfbNormasConnector implements CollectionConnector {
     ): Promise<void> => {
       const representations: Record<string, Record<string, unknown>> = {};
       let original:
-        | ReturnType<typeof parseRfbRepresentationHtml>
+        | ReturnType<typeof parseRfbApiRepresentation>
         | undefined;
 
       for (const kind of representationKinds) {
