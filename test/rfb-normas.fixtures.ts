@@ -194,3 +194,52 @@ export function representationPayload(
   }
   return clone;
 }
+
+
+export const PORTARIA_RETIFICATION_API = apiPayload({
+  idAto: 148881,
+  typeName: 'Portaria',
+  typeSigla: 'Port.',
+  number: '619',
+  agencySigla: 'RFB',
+  agencyName: 'Secretaria Especial da Receita Federal do Brasil',
+  actDate: '2025-12-03',
+  publicationDate: '2026-01-16',
+  title: 'Portaria RFB nº 619, de 3 de dezembro de 2025',
+  text: 'Retificação. No art. 2º da Portaria RFB nº 619, onde se lê concessão de crédito pessoal, leia-se concessão de crédito.',
+});
+
+export const PORTARIA_DUPLICATE_API = (() => {
+  const payload = apiPayload({
+    idAto: 148882,
+    typeName: 'Portaria',
+    typeSigla: 'Port.',
+    number: '619',
+    agencySigla: 'RFB',
+    agencyName: 'Secretaria Especial da Receita Federal do Brasil',
+    actDate: '2025-12-03',
+    publicationDate: '2026-01-16',
+    title: 'Portaria RFB nº 619, de 3 de dezembro de 2025',
+    text: 'Retificação (publicação repetida)',
+  });
+  payload.ehVisaoExclusiva = true;
+  payload.exibirVisoes = '1000';
+  const ementas = payload.ementas as Array<Record<string, unknown>>;
+  ementas[0]!.ancorasDestino = [{
+    idAto: 148881,
+    href: '148881',
+    texto: '[Vide o(a) Portaria RFB nº 619, de 3 de dezembro de 2025]',
+    dataInicioVigencia: '16/01/2026',
+  }];
+  payload.outrosSegmentos = [{
+    idAto: 148882,
+    idSegmento: 2,
+    ordemSegmentoAto: 2,
+    omitir: false,
+    original: true,
+    compilado: true,
+    textoIntegra: 'Nota Normas: Esta retificação foi publicada em duplicata na mesma edição do DOU.',
+    arquivoBinario: null,
+  }];
+  return payload;
+})();
