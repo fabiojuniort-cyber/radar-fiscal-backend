@@ -221,3 +221,55 @@ O cron permanece nulo até todos os gates produtivos serem concluídos.
 11. timeout medido;
 12. overlap protection validada;
 13. somente então ativar `0 * * * *`.
+
+
+## Evidência live — 23/09/2026
+
+Validação isolada no Railway executada contra o head
+`bc6e36a17bc9b9de3d9ac31c4dbe2683350277da`.
+
+Janela incremental real de 7 dias:
+
+- 106 atos descobertos;
+- 20 atos incluídos;
+- 86 atos excluídos por regra determinística;
+- 6 INTERPRETATIVE;
+- 9 OPERATIONAL;
+- 3 NORMATIVE;
+- 2 PORTARIA;
+- 0 falhas parciais.
+
+Principais motivos de exclusão observados:
+
+- `ADE_NONCENTRAL`: 57;
+- `ADE_LOW_VALUE_CERTIFICATION`: 14;
+- `INTERPRETATIVE_NON_COSIT`: 8;
+- `PORTARIA_NONCENTRAL`: 6;
+- `PORTARIA_ADMINISTRATIVE`: 1.
+
+A SC Cosit nº 180/2026 foi validada diretamente:
+
+- `idAto = 153667`;
+- publicação em 23/09/2026;
+- PDF oficial `idArquivoBinario = 86539`;
+- SHA-256 válido:
+  `2d192678c077746ce3b55c5340c82fd8cc80236f71037d86558b8f1cdee276d3`.
+
+A API moderna oficial foi confirmada em:
+
+`https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/{idAto}/visao/{kind}`
+
+A visão `original` é obrigatória. Algumas famílias não disponibilizam
+`vigente`, `multivigente` ou `relacional`. A API sinaliza isso com
+HTTP 403/406; nesses casos o conector registra `available=false` e o
+status HTTP em metadata, sem transformar ausência oficial esperada em
+falha parcial.
+
+Exemplo confirmado: Edital de Transação PGFN/RFB nº 5/2026
+(`idAto=153623`) possui apenas visão original; vigente e multivigente
+retornam 406 com mensagem oficial de visão indisponível, e relacional
+retorna 403.
+
+Marcador final da validação:
+
+`RFB_NORMAS_LIVE_OK=1`.
