@@ -14,10 +14,8 @@ if (!databaseUrl) {
 const APPLY = process.argv.includes('--apply');
 
 const SOURCE_CODE = 'rfb-normas';
-const loaded.publicationId = '4d1acd59-edb8-4e9f-bfe8-21744481cbdd';
 const PORTARIA_619_KEEP = '148881';
 const PORTARIA_619_DROP = '148882';
-const loaded.publicationId = '4175edbb-f2c8-419b-bed2-dbbca28ad94b';
 const PORTARIA_140_KEEP = '151936';
 const PORTARIA_140_DROP = '151937';
 
