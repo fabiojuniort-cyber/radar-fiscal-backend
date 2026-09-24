@@ -49,25 +49,21 @@ async function translateSegment(button,versionId,text){
     const r=await fetch("/api/norma-clara",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({publicationVersionId:versionId,sourceText:text})});
     const data=await r.json();
     if(!r.ok){
-      if(data.error==="openai_not_configured")throw new Error("OPENAI_NOT_CONFIGURED");
-      if(data.error==="openai_credit_balance_exhausted")throw new Error("OPENAI_CREDITS");
-      if(data.error==="openai_spend_limit_exceeded")throw new Error("OPENAI_SPEND_LIMIT");
-      if(data.error==="openai_model_not_found")throw new Error("OPENAI_MODEL");
-      throw new Error(data.error||"request_failed");
+      const code=data.error||"request_failed";
+      console.warn("[norma-clara]",r.status,code);
+      if(code==="norma_clara_quota_exceeded")throw new Error("QUOTA");
+      if(code==="norma_clara_rate_limited")throw new Error("RATE");
+      throw new Error("UNAVAILABLE");
     }
-    box.innerHTML='<span>NORMA CLARA · '+(data.cached?'REUTILIZADA':'GERADA AGORA')+'</span><p>'+esc(data.translation)+'</p>';
+    box.innerHTML='<span>NORMA CLARA · LEITURA AUXILIAR</span><p>'+esc(data.translation)+'</p><small class="norma-note">Gerada por IA. Não substitui o texto oficial.</small>';
     button.textContent="Ocultar Norma Clara";button.dataset.open="1";
   }catch(e){
-    box.innerHTML=e.message==="OPENAI_NOT_CONFIGURED"
-      ?'<span>NORMA CLARA</span><p>A integração está instalada, mas falta configurar a chave da OpenAI no serviço Railway.</p>'
-      :e.message==="OPENAI_CREDITS"
-        ?'<span>NORMA CLARA · API SEM CRÉDITOS</span><p>A integração está funcionando, mas o saldo da OpenAI API acabou. Após adicionar créditos à conta da API, tente novamente.</p>'
-        :e.message==="OPENAI_SPEND_LIMIT"
-          ?'<span>NORMA CLARA · LIMITE DE GASTO</span><p>A OpenAI API atingiu o limite de gasto configurado para a organização ou projeto.</p>'
-          :e.message==="OPENAI_MODEL"
-            ?'<span>NORMA CLARA · MODELO INDISPONÍVEL</span><p>O modelo configurado para a Norma Clara não está disponível para esta conta.</p>'
-            :'<span>NORMA CLARA</span><p>Não foi possível gerar a tradução agora. Tente novamente.</p>';
-    button.textContent="Tentar Norma Clara novamente";
+    const msg={
+      QUOTA:"Você já usou todos os blocos da Norma Clara disponíveis no seu plano neste período. O texto oficial continua acessível.",
+      RATE:"Muitas solicitações em sequência. Aguarde alguns segundos e tente novamente."
+    }[e.message]||"A Norma Clara está temporariamente indisponível. O texto oficial acima continua acessível.";
+    box.innerHTML='<span>NORMA CLARA</span><p>'+msg+'</p>';
+    button.textContent=e.message==="QUOTA"?"Limite do plano atingido":"Tentar Norma Clara novamente";
   }finally{button.disabled=false}
 }
 
