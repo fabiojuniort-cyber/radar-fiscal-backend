@@ -4,12 +4,10 @@ import test from 'node:test';
 import { RfbNormasConnector, type RfbNormasSourceState } from '../src/modules/collection/rfb-normas.connector.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import {
-  ADE_ORIGINAL,
-  IN_MULTIVIGENTE,
-  IN_ORIGINAL,
-  IN_RELACIONAL,
-  IN_VIGENTE,
-  OPTIONAL_EMPTY,
+  ADE_API_ORIGINAL,
+  IN_API_ORIGINAL,
+  SC_API_ORIGINAL,
+  representationPayload,
   RFB_EMPTY_FIXTURE,
   RFB_SEARCH_FIXTURE,
   SC_ORIGINAL,
@@ -30,31 +28,35 @@ function portal(options: { changedVigente?: boolean } = {}) {
     if (url.pathname.endsWith('/consulta.action')) {
       return new Response(RFB_SEARCH_FIXTURE, { status: 200, headers: { 'content-type': 'text/html' } });
     }
-    if (url.pathname.endsWith('/imprimir.action')) {
-      const id = url.searchParams.get('idAto');
-      const view = url.searchParams.get('visao');
-      if (id === '150001') {
-        const body =
-          view === 'original' ? IN_ORIGINAL :
-          view === 'vigente' ? (options.changedVigente ? IN_VIGENTE.replace('Texto vigente consolidado.', 'Texto vigente consolidado alterado.') : IN_VIGENTE) :
-          view === 'anotado' ? IN_MULTIVIGENTE :
-          view === 'relacional' ? IN_RELACIONAL :
-          OPTIONAL_EMPTY;
-        return new Response(body, { status: 200, headers: { 'content-type': 'text/html' } });
-      }
-      if (id === '150002') {
-        return new Response(view === 'original' ? SC_ORIGINAL : OPTIONAL_EMPTY, {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        });
-      }
-      if (id === '150005') {
-        return new Response(view === 'original' ? ADE_ORIGINAL : OPTIONAL_EMPTY, {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        });
-      }
-      return new Response('missing', { status: 404 });
+    if (url.hostname === 'normasinternet2.receita.fazenda.gov.br' && /\/api\/consulta-externa\/ato\//.test(url.pathname)) {
+      const match = /\/ato\/(\d+)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+      const id = match?.[1];
+      const view = match?.[2] as 'original' | 'vigente' | 'multivigente' | 'relacional' | undefined;
+      if (!id || !view) return new Response('missing', { status: 404 });
+      if (view === 'relacional') return new Response(null, { status: 403 });
+
+      const base =
+        id === '150001' ? IN_API_ORIGINAL :
+        id === '150002' ? SC_API_ORIGINAL :
+        id === '150005' ? ADE_API_ORIGINAL :
+        undefined;
+      if (!base) return new Response('missing', { status: 404 });
+
+      const payload = representationPayload(
+        base,
+        view,
+        id === '150001' && view === 'vigente' && options.changedVigente
+          ? 'Texto vigente consolidado alterado.'
+          : view === 'vigente'
+            ? 'Texto vigente consolidado.'
+            : view === 'multivigente'
+              ? 'Histórico multivigente.'
+              : '',
+      );
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     if (url.pathname.endsWith('/anexoOutros.action')) {
       fileDownloads += 1;
@@ -136,6 +138,11 @@ test('immediate replay reuses known attachments and creates no content hash chan
   const firstVigente = ((firstInstruction.metadata?.rfbNormas as any).representations.vigente.normalizedHash);
   const replayVigente = ((replayInstruction.metadata?.rfbNormas as any).representations.vigente.normalizedHash);
   assert.notEqual(firstVigente, replayVigente, 'representation hash must detect consolidated change');
+  assert.equal(
+    ((replayInstruction.metadata?.rfbNormas as any).representations.relacional.available),
+    false,
+    '403 relation view is optional and must be tracked as unavailable',
+  );
 });
 
 test('successful empty search returns zero publications, unavailable source throws', async () => {
