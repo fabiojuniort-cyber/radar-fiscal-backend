@@ -69,53 +69,43 @@ test('first run: collects only included acts, as individual publications with fi
   const { api, instance } = connector({});
   const result = await instance.collect(context());
 
-  assert.deepEqual(result.publications.map((item) => item.externalId).sort(), [ID.sre43, ID.decree70843].sort());
+  assert.deepEqual(result.publications.map((item) => item.externalId), [ID.sre43]);
   assert.equal(result.partialFailures, undefined);
   assert.equal(result.completion, undefined);
-
-  const decree = result.publications.find((item) => item.externalId === ID.decree70843)!;
-  assert.equal(decree.agency, 'GOVERNO-SP');
-  assert.equal(decree.actType, 'DECRETO');
-  assert.equal(decree.actNumber, '70843/2026');
-  assert.equal(decree.sphere, 'STATE');
-  assert.equal(decree.stateCode, 'SP');
-  assert.equal(decree.publishedAt?.toISOString(), '2026-09-04T00:00:00.000Z');
-  assert.equal(decree.officialUrl, 'https://doe.sp.gov.br/executivo/decretos/decreto-n-70843-de-3-de-setembro-de-2026-202609031182022102868');
-  assert.match(decree.content ?? '', /^Dispõe sobre a classificação institucional/);
-  assert.equal(decree.metadata?.editionNumber, 169);
-  assert.equal(decree.metadata?.editionAuthCode, 'E.2026.09.04.1.26.1');
-  assert.equal(decree.metadata?.editionPdfUrl, 'https://do-api-publication-pdf.doe.sp.gov.br/v1/editions/2d9ae845-29b5-4e1f-bae8-a3a532cbae7f');
-  assert.equal(decree.metadata?.supplementaryEditionCount, 1);
-  assert.equal(decree.metadata?.editionHint, 'REGULAR');
-  assert.equal(decree.metadata?.signedOn, '2026-09-03');
-  assert.equal(decree.files?.length, 1);
-  assert.equal(decree.files?.[0]?.mimeType, 'application/pdf');
-  assert.match(decree.files?.[0]?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
-  assert.equal(decree.files?.[0]?.metadata?.kind, 'AUTHENTICATED_PUBLICATION_PDF');
 
   const sre = result.publications.find((item) => item.externalId === ID.sre43)!;
   assert.equal(sre.agency, 'SEFAZ-SP/SRE');
   assert.equal(sre.actNumber, '43/2026');
   assert.equal(sre.metadata?.captureCategory, 'SEFAZ_TAX_ADMINISTRATION');
+  assert.equal(sre.sphere, 'STATE');
+  assert.equal(sre.stateCode, 'SP');
+  assert.equal(sre.publishedAt?.toISOString(), '2026-09-04T00:00:00.000Z');
+  assert.equal(sre.metadata?.editionNumber, 169);
+  assert.equal(sre.metadata?.supplementaryEditionCount, 1);
+  assert.equal(sre.files?.length, 1);
+  assert.equal(sre.files?.[0]?.mimeType, 'application/pdf');
+  assert.match(sre.files?.[0]?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
+  assert.equal(sre.files?.[0]?.metadata?.kind, 'AUTHENTICATED_PUBLICATION_PDF');
   assert.equal(sre.metadata?.ementa, 'Altera a Portaria CAT 125/11, de 9 de setembro de 2011, que institui o Sistema Ambiente de Pagamentos e o Documento de Arrecadação de Receitas Estaduais - DARE-SP.');
 
   const meta = result.metadata?.doeSp as Record<string, any>;
   assert.equal(meta.filtering.discoveredCount, 9);
-  assert.equal(meta.filtering.includedCount, 2);
-  assert.equal(meta.filtering.excludedCount, 7);
+  assert.equal(meta.filtering.includedCount, 1);
+  assert.equal(meta.filtering.excludedCount, 8);
   assert.deepEqual(meta.filtering.excludedByReason, {
     GOVERNOR_ACT_WITHOUT_TAX_TERMS: 2,
     PGE_WITHOUT_TAX_TERMS: 1,
     OTHER_ORGAN_WITHOUT_TAX_TERMS: 2,
     INDIVIDUAL_TAX_ADMINISTRATIVE_ACT: 2,
+    NUMBERED_DECREE_WITHOUT_TAX_TERMS: 1,
   });
   // Excluded samples carry no title (they may identify taxpayers).
   assert.ok(meta.filtering.excludedSamples.every((sample: Record<string, unknown>) => !('title' in sample)));
   // Details only for included acts.
-  assert.equal(api.count('/v2/publications/'), 2);
+  assert.equal(api.count('/v2/publications/'), 1);
 
   const state = checkpointState(result);
-  assert.deepEqual(state.days['2026-09-04']?.included, [ID.sre43, ID.decree70843].sort());
+  assert.deepEqual(state.days['2026-09-04']?.included, [ID.sre43]);
   assert.match(state.days['2026-09-04']?.idsHash ?? '', /^[a-f0-9]{64}$/);
   assert.equal(state.windowEnd, '2026-09-04');
   assert.deepEqual(state.pendingRanges, []);
@@ -177,7 +167,7 @@ test('a new act in the day (supplement) is picked up alone', async () => {
   assert.deepEqual(result.publications.map((item) => item.externalId), [extraId]);
   assert.equal(result.publications[0]!.metadata?.editionHint, 'SUPPLEMENTARY_OR_EXTRA');
   assert.equal(api.count('/v2/publications/'), 1);
-  assert.equal(checkpointState(result).days['2026-09-04']?.included.length, 3);
+  assert.equal(checkpointState(result).days['2026-09-04']?.included.length, 2);
 });
 
 test('an empty day is a legitimate zero-result consultation', async () => {
@@ -203,12 +193,12 @@ test('source unavailable is an error, never zero publications', async () => {
 test('an item failing does not block the day, is reported and retried next run without artificial versions', async () => {
   const failing = connector({ failures: [{ match: '/v2/authentication/download/2026.09.03.1.1.28.3.214', status: 500 }] });
   const partial = await failing.instance.collect(context());
-  assert.deepEqual(partial.publications.map((item) => item.externalId), [ID.decree70843]);
+  assert.deepEqual(partial.publications.map((item) => item.externalId), []);
   assert.equal(partial.partialFailures?.length, 1);
   assert.equal(partial.partialFailures?.[0]?.code, 'DOE_SP_SOURCE_UNAVAILABLE');
   assert.equal(partial.partialFailures?.[0]?.itemReference, `2026-09-04#${ID.sre43}`);
   const state = checkpointState(partial);
-  assert.deepEqual(state.days['2026-09-04']?.included, [ID.decree70843]);
+  assert.deepEqual(state.days['2026-09-04']?.included, []);
   assert.equal(state.days['2026-09-04']?.idsHash, '');
 
   const healed = connector({ state });
@@ -224,7 +214,7 @@ test('malformed list items are isolated as partial failures', async () => {
   };
   const { instance } = connector({ days: { '2026-09-04': broken } });
   const result = await instance.collect(context());
-  assert.equal(result.publications.length, 2);
+  assert.equal(result.publications.length, 1);
   assert.equal(result.partialFailures?.[0]?.code, 'DOE_SP_MALFORMED_LIST_ITEM');
   assert.equal(checkpointState(result).days['2026-09-04']?.idsHash, '');
 });
@@ -237,7 +227,7 @@ test('bootstrap walks back days once, with retifications isolated and attachment
   };
   const { api, instance } = connector({ days, bootstrapStartDate: '2026-09-01' });
   const result = await instance.collect(context());
-  assert.deepEqual(result.publications.map((item) => item.externalId).sort(), [ID.sre43, ID.decree70843, ID.dicar59, ID.retification].sort());
+  assert.deepEqual(result.publications.map((item) => item.externalId).sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
   const state = checkpointState(result);
   assert.deepEqual(state.pendingRanges, []);
   assert.equal(state.coverageFrom, '2026-09-01');
@@ -290,7 +280,7 @@ test('time budget stops at a safe point and resumes from the checkpoint', async 
   assert.equal(resumed.completion, undefined);
   assert.deepEqual(checkpointState(resumed).pendingRanges, []);
   const all = new Set([...partial.publications, ...resumed.publications].map((item) => item.externalId));
-  assert.deepEqual([...all].sort(), [ID.sre43, ID.decree70843, ID.dicar59, ID.retification].sort());
+  assert.deepEqual([...all].sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
 });
 
 test('downtime longer than the window is queued as a gap', async () => {
