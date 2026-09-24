@@ -13,8 +13,8 @@
     <a href="/" class="brand"><img src="/logo.webp" alt="TriBusca"></a>
     <nav>
       <a href="#cobertura">Cobertura</a>
+      <a href="#portfolio">Portfólio</a>
       <a href="#como-funciona">Como funciona</a>
-      <a href="#marcadores">Marcadores</a>
       <a href="#norma-clara">Norma Clara</a>
     </nav>
     <div class="actions">
@@ -33,24 +33,15 @@
       <p>A TriBusca acompanha fontes oficiais e organiza mudanças tributárias para sua empresa chegar mais rápido ao que merece atenção.</p>
       <div class="hero-actions">
         <a class="btn primary" href="/registrar.html">Experimentar grátis →</a>
-        <a class="btn ghost" href="#como-funciona">Conhecer soluções</a>
+        <a class="btn ghost" href="#portfolio">Conhecer soluções</a>
       </div>
       <small>7 dias para conhecer a TriBusca.</small>
     </div>
 
-    <aside class="radar">
+    <aside class="radar" aria-live="polite">
       <div class="radar-title">Agora no radar</div>
-      <div class="radar-sub">Amostra visual · dados demonstrativos</div>
-      <article>
-        <div class="meta"><span>CONFAZ</span><span>Hoje</span></div>
-        <strong>Alteração em benefício fiscal relacionado a insumos agrícolas</strong>
-        <div class="tags"><span>ICMS</span><span>Agronegócio</span><span>Benefício Fiscal</span></div>
-      </article>
-      <article>
-        <div class="meta"><span>Portal NF-e</span><span>Ontem</span></div>
-        <strong>Nova versão de Nota Técnica da NF-e</strong>
-        <div class="tags"><span>NF-e</span><span>Documento Fiscal</span></div>
-      </article>
+      <div class="radar-sub" id="radar-sub">Últimas capturas reais</div>
+      <div id="radar-list"><article><strong class="muted">Carregando capturas…</strong></article></div>
     </aside>
   </div>
 </section>
@@ -108,59 +99,60 @@
   </div>
 </section>
 
-<section class="section match" id="como-funciona">
-  <div class="container match-grid">
-    <div>
-      <div class="eyebrow cyan">Relevância explicável</div>
-      <h2>A legislação encontra a empresa.</h2>
-      <p class="lead">Marcadores Tributários conectam o conteúdo da publicação ao Perfil Tributário e ajudam a priorizar o que merece análise.</p>
-    </div>
-    <div class="match-list">
-      <div class="match-row">
-        <div class="match-label">Publicação</div>
-        <div class="match-value">Convênio ICMS 100/97<small>ICMS · Benefício Fiscal · Fertilizantes · Operações de saída</small></div>
-      </div>
-      <div class="match-row">
-        <div class="match-label">Perfil</div>
-        <div class="match-value">Empresa Demonstrativa S.A.<small>Agronegócio · GO · Fertilizantes · Venda</small></div>
-      </div>
-      <div class="match-row">
-        <div class="match-label">Resultado</div>
-        <div class="match-value">Possivelmente relevante<small>✓ Trata de fertilizantes<br>✓ Envolve operação de venda<br>✓ Trata de ICMS<br>✓ Aplicável a Goiás<br>✓ Empresa possui estabelecimento em GO</small></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="section" id="marcadores">
+<section class="section" id="portfolio">
   <div class="container split">
     <div>
-      <div class="eyebrow">Marcadores Tributários</div>
-      <h2>Classificação que serve para navegar — e para conectar.</h2>
-      <p class="lead">Os Marcadores são um vocabulário controlado da TriBusca, não tags livres inventadas pela IA.</p>
+      <div class="eyebrow">Portfólio</div>
+      <h2>Uma plataforma, cinco frentes.</h2>
+      <p class="lead">Os módulos são partes da TriBusca, não produtos separados. O status de cada um é mostrado como está hoje.</p>
     </div>
-    <div class="marker-demo">
-      <h3>CONVÊNIO ICMS 100/97</h3>
-      <div class="demo">Exemplo de visualização</div>
-      <div class="tags large"><span>ICMS</span><span>Benefício Fiscal</span><span>Agronegócio</span><span>Fertilizantes</span><span>Defensivos</span><span>Operações de saída</span></div>
-      <p>Clique em <b>Fertilizantes</b> e encontre normas relacionadas. Combine com ICMS, UF ou operação para reduzir o ruído sem perder a origem oficial.</p>
+    <div class="source-list portfolio-list">
+      <div class="source-row"><div><strong>Busca Inteligente</strong><small>Todo o acervo por título, número, órgão, conteúdo, fonte, UF e período.</small></div><span class="pill">Disponível</span></div>
+      <div class="source-row"><div><strong>Monitor Estadual</strong><small>Fontes estaduais e federais acompanhadas, com saúde operacional visível.</small></div><span class="pill">Disponível</span></div>
+      <div class="source-row" id="norma-clara"><div><strong>Norma Clara</strong><small>Cada dispositivo traduzido para português claro e popular, abaixo do texto oficial.</small></div><span class="pill">Disponível</span></div>
+      <div class="source-row"><div><strong>Radar Tributário</strong><small>Novidades do dia já disponíveis; priorização por relevância em desenvolvimento.</small></div><span class="pill wip">Em desenvolvimento</span></div>
+      <div class="source-row"><div><strong>Perfil Tributário</strong><small>Contexto estruturado da empresa: UFs, operações, produtos, tributos e CFOPs.</small></div><span class="pill wip">Em desenvolvimento</span></div>
     </div>
   </div>
-</section>
-
-<section class="section norma" id="norma-clara">
-  <div class="container split">
-    <div>
-      <div class="eyebrow">Norma Clara</div>
-      <h2>O original permanece. A compreensão vem logo abaixo.</h2>
-      <p class="lead">A Norma Clara traduz cada artigo, parágrafo ou inciso para português claro e popular, sem interpretar impacto nem substituir o texto oficial.</p>
-    </div>
+  <div class="container norma-inline-demo">
     <div class="lawbox">
       <div class="lawlabel">Texto oficial</div>
       <div class="lawtext">§ 1º O imposto incide também sobre o serviço proveniente do exterior do País ou cuja prestação se tenha iniciado no exterior do País.</div>
       <div class="plain">
-        <strong>NORMA CLARA · EM PORTUGUÊS CLARO E POPULAR</strong>
+        <strong>NORMA CLARA · LEITURA AUXILIAR</strong>
         <p>O imposto também é cobrado quando o serviço vem de fora do Brasil ou quando começou a ser prestado no exterior.</p>
+        <small>Gerada por IA. Não substitui o texto oficial.</small>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section match" id="como-funciona">
+  <div class="container match-grid">
+    <div>
+      <div class="eyebrow cyan">Como funciona</div>
+      <h2>A legislação encontra a empresa.</h2>
+      <ol class="steps">
+        <li><b>Captura oficial</b><span>Fontes oficiais consultadas automaticamente; texto, arquivos e hash preservados.</span></li>
+        <li><b>Marcadores Tributários</b><span>Vocabulário controlado da TriBusca — nunca tags livres criadas pela IA.</span></li>
+        <li><b>Relevância explicável</b><span>Cruzamento com o Perfil Tributário, dizendo por que cada norma foi priorizada.</span></li>
+      </ol>
+    </div>
+    <div>
+      <div class="example-note">Exemplo ilustrativo · classificação e relevância em desenvolvimento</div>
+      <div class="match-list">
+        <div class="match-row">
+          <div class="match-label">Publicação</div>
+          <div class="match-value">Convênio ICMS 100/97<small>ICMS · Benefício Fiscal · Fertilizantes · Operações de saída</small></div>
+        </div>
+        <div class="match-row">
+          <div class="match-label">Perfil</div>
+          <div class="match-value">Empresa exemplo<small>Agronegócio · GO · Fertilizantes · Venda</small></div>
+        </div>
+        <div class="match-row">
+          <div class="match-label">Por que priorizar</div>
+          <div class="match-value">Possivelmente relevante<small>✓ Trata de fertilizantes<br>✓ Envolve operação de venda<br>✓ Trata de ICMS<br>✓ A empresa possui estabelecimento em GO</small></div>
+        </div>
       </div>
     </div>
   </div>
@@ -195,8 +187,9 @@
 
 <footer>
   <div class="container footer-inner">
-    <span>TriBusca · Monitoramento e Inteligência Tributária</span>
-    <span>Protótipo visual · dados demonstrativos</span>
+    <div><img src="/logo.webp" alt="TriBusca" class="footer-logo"><span>Monitoramento e Inteligência Tributária</span></div>
+    <nav aria-label="Rodapé"><a href="#cobertura">Cobertura</a><a href="#portfolio">Portfólio</a><a href="#como-funciona">Como funciona</a><a href="/login.html">Entrar</a><a href="/registrar.html">Experimentar grátis</a></nav>
+    <div class="footer-legal"><span>Termos de uso e Política de privacidade em elaboração</span><span>© 2026 TriBusca</span></div>
   </div>
 </footer>
 <script src="/app.js"></script>

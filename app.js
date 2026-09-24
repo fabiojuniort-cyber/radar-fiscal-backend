@@ -109,4 +109,17 @@ document.getElementById("state-prev").addEventListener("click",prev);
 const frame=document.querySelector(".state-frame");
 frame.addEventListener("mouseenter",()=>clearInterval(timer));
 frame.addEventListener("mouseleave",restart);
-draw();restart();loadCoverage();
+async function loadLatest(){
+  const list=document.getElementById("radar-list"),sub=document.getElementById("radar-sub");if(!list)return;
+  try{
+    const r=await fetch("/api/public/latest");if(!r.ok)throw new Error("latest");
+    const d=await r.json();
+    const day=v=>{const k=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo"}).format(new Date(v));const t=new Date();const y=new Date(t);y.setDate(t.getDate()-1);const f=x=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo"}).format(x);return k===f(t)?"Hoje":k===f(y)?"Ontem":new Date(v).toLocaleDateString("pt-BR")};
+    list.innerHTML=d.items.length?d.items.map(p=>'<article><div class="meta"><span>'+esc(p.source_name)+'</span><span>'+day(p.first_collected_at)+'</span></div><strong>'+esc(p.title)+'</strong><div class="radar-type">'+esc(p.act_type||"")+(p.uf?' · '+esc(p.uf):'')+'</div></article>').join(""):'<article><strong class="muted">Sem capturas recentes.</strong></article>';
+    if(d.stats&&sub){
+      const mins=d.stats.last_collection_at?Math.max(1,Math.round((Date.now()-new Date(d.stats.last_collection_at))/60000)):null;
+      sub.textContent=new Intl.NumberFormat("pt-BR").format(d.stats.total)+" publicações preservadas"+(mins!=null?" · última coleta há "+(mins<60?mins+" min":Math.round(mins/60)+" h"):"");
+    }
+  }catch(e){list.innerHTML='<article><strong class="muted">Capturas indisponíveis no momento.</strong></article>'}
+}
+draw();restart();loadCoverage();loadLatest();
