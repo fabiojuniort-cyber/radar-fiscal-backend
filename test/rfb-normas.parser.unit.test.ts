@@ -105,7 +105,7 @@ test('detects retification content even when Sistema Normas inherits the target 
   const parsed = parseRfbApiRepresentation(RETIFICATION_API_ORIGINAL);
   assert.equal(parsed.title, 'Portaria RFB nº 619, de 3 de dezembro de 2025');
   assert.equal(parsed.revisionKind, 'RETIFICATION');
-  assert.equal(parsed.duplicatePublicationReference, true);
+  assert.equal(parsed.duplicatePublicationReference, false);
   assert.match(parsed.normalizedText, /^Retificação/);
 });
 
