@@ -295,12 +295,15 @@ async function openPublication(id,push){
 function citationsHtml(list){
  if(!list.length)return '<p class="cite-empty"><b>Normas citadas:</b> nenhuma referência a outra norma foi identificada no texto.</p>';
  const found=list.filter(c=>c.status==="FOUND").length;
- return '<div class="citations"><p><b>Normas citadas no texto</b> <span class="muted">· '+list.length+' identificada(s) por regras no texto oficial'+(found?', '+found+' no acervo':'')+'</span></p><ul>'+
-  list.map(c=>'<li><span class="cite-label">'+esc(c.label)+'</span>'+(c.status==="FOUND"
+ const order={FOUND:0,POSSIBLE:1,NOT_CAPTURED:2};list=list.slice().sort((a,b)=>order[a.status]-order[b.status]);
+ const missing=list.filter(c=>c.status==="NOT_CAPTURED").length,visible=list.filter(c=>c.status!=="NOT_CAPTURED").length;
+ const row=c=>'<li><span class="cite-label">'+esc(c.label)+'</span>'+(c.status==="FOUND"
     ?'<button type="button" class="cite-link" data-pub="'+c.publication.id+'">Abrir no acervo →</button>'
     :c.status==="POSSIBLE"
       ?'<a class="cite-maybe" href="#acervo?q='+encodeURIComponent(c.label)+'">'+c.candidates.length+' possível(is) correspondência(s) →</a>'
-      :'<span class="cite-missing">ainda não capturada</span>')+'</li>').join("")+'</ul></div>';
+      :'<span class="cite-missing">ainda não capturada</span>')+'</li>';
+ return '<div class="citations"><p><b>Normas citadas no texto</b> <span class="muted">· '+list.length+' identificada(s) por regras no texto oficial'+(found?', '+found+' no acervo':'')+'</span></p><ul>'+list.filter(c=>c.status!=="NOT_CAPTURED").map(row).join("")+'</ul>'+
+  (missing?'<details class="cite-more"'+(visible?'':' open')+'><summary>'+missing+' norma(s) citada(s) ainda não capturada(s)</summary><ul>'+list.filter(c=>c.status==="NOT_CAPTURED").map(row).join("")+'</ul></details>':'')+'</div>';
 }
 async function showDiff(id,to){
  const area=document.getElementById("diff-area");area.innerHTML='<div class="page-loading">Comparando versões…</div>';

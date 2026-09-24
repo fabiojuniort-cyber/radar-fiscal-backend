@@ -226,9 +226,11 @@ function segmentDiff(oldSegs,newSegs){
 // Ficam de fora extratos, avisos, editais, licitações, atas, comunicados e atos de pessoal.
 const NORMATIVE_SQL=`(
   (p.act_type ~* '^(LEI|DECRETO|MEDIDA PROVIS|EMENDA CONSTITUCIONAL|PORTARIA|INSTRU[CÇ][AÃ]O NORMATIVA|RESOLU[CÇ][AÃ]O|CONV[EÊ]NIO ICMS|AJUSTE SINIEF|PROTOCOLO ICMS|ATO COTEPE|ATO DECLARAT|ATO T[EÉ]CNICO|SOLU[CÇ][AÃ]O DE CONSULTA|PARECER NORMATIVO|NOTA T[EÉ]CNICA|MANUAL|LEIAUTE|ESQUEMA|TABELA SPED|DELIBERA[CÇ][AÃ]O)'
-   AND p.act_type !~* '^PORTARIA DE PESSOAL')
-  OR (p.act_type IN ('RETIFICAÇÃO','REPUBLICAÇÃO') AND p.title ~* '(LEI|DECRETO|PORTARIA|INSTRU|RESOLU|CONV[EÊ]NIO ICMS|AJUSTE|PROTOCOLO|ATO )')
-) AND COALESCE(left(v.content_text,200),'') !~* '^\\s*(Nomeia|Designa|Exonera|Dispensa|Aposenta|Concede f[eé]rias|Concede licen)'`;
+   AND p.act_type !~* 'DE PESSOAL')
+  OR (p.act_type IN ('RETIFICAÇÃO','REPUBLICAÇÃO') AND p.title ~* '\\m(LEI|DECRETO|PORTARIA|INSTRU[CÇ][AÃ]O|RESOLU[CÇ][AÃ]O|CONV[EÊ]NIO ICMS|AJUSTE SINIEF|PROTOCOLO ICMS|ATO)\\M')
+) AND p.title !~* '^\\s*(EXTRATO|AVISO|EDITAL|RESULTADO|ATA\\M|PAUTA|ALVAR|COMUNICADO|TERMO DE|CONTRATO)'
+  AND p.title !~* 'DE PESSOAL'
+  AND (CASE WHEN p.jurisdiction_level='STATE' THEN COALESCE(left(v.content_text,200),'') !~* '^\\s*(Nomeia|Designa|Exonera|Dispensa|Aposenta|Concede f[eé]rias|Concede licen)' ELSE TRUE END)`;
 
 // Citações: referências a outras normas no texto oficial, por regras determinísticas (sem IA).
 const CITE_TYPES=[
@@ -238,7 +240,7 @@ const CITE_TYPES=[
   ["Resolução","RESOLUÇÃO"],["Portaria","PORTARIA"],["Solução de Consulta","SOLUÇÃO DE CONSULTA"]
 ];
 const MONTHS="janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro";
-const CITE_RE=new RegExp(String.raw`\b(${CITE_TYPES.map(t=>t[0].replace(/ /g,"\\s+")).join("|")})(?:\s+(?:Conjunta\s+)?([A-Z][A-Za-z]{1,9}(?:\/[A-Z][A-Za-z]{1,9})*))?\s+(?:n[º°o.]\s*|nº\s*)?(\d{1,3}(?:\.\d{3})+|\d{1,6})(?:\s*\/\s*(\d{2,4}))?(?:\s*,\s*de\s+\d{1,2}[º°o]?\s+de\s+(?:${MONTHS})\s+de\s+(\d{4})|\s*,\s*de\s+(\d{4})\b)?`,"gi");
+const CITE_RE=new RegExp(String.raw`\b(${CITE_TYPES.map(t=>t[0].replace(/ /g,"\\s+")).join("|")})(?:\s+(?:Conjunta\s+)?([A-Z][A-Za-z]{1,9}(?:\/[A-Z][A-Za-z]{1,9})*))?\s+(?:n[º°o.]\s*|nº\s*)?(\d{1,3}(?:\.\d{3})+|\d{1,6})(?:\s*\/\s*(\d{2,4}))?(?:\s*,\s*de\s+(\d{1,2})[º°o]?\s+de\s+(${MONTHS})\s+de\s+(\d{4})|\s*,\s*de\s+(\d{4})\b)?`,"gi");
 const QUAL_STOP=new Set(["DE","DA","DO","DOS","DAS","EM","NO","NA","QUE","FEDERAL","ESTADUAL","N"]);
 function extractCitations(text){
   const out=new Map();
@@ -247,27 +249,34 @@ function extractCitations(text){
     const t=CITE_TYPES.find(x=>x[0].toLowerCase()===typeTxt.toLowerCase());if(!t)continue;
     let qual=m[2]&&!QUAL_STOP.has(m[2].toUpperCase())?m[2].toUpperCase():null;
     const num=m[3].replace(/\./g,"");
-    let year=m[5]||m[6]||m[4]||null;if(year&&year.length===2)year=(Number(year)>=50?"19":"20")+year;
+    let year=m[7]||m[8]||m[4]||null;if(year&&year.length===2)year=(Number(year)>=50?"19":"20")+year;
+    const date=m[5]&&m[6]&&m[7]?`${m[7]}-${String(MONTHS.split("|").indexOf(m[6].toLowerCase())+1).padStart(2,"0")}-${m[5].padStart(2,"0")}`:null;
     const key=[t[1],qual||"",num,year||""].join("|");
-    if(!out.has(key))out.set(key,{type:t[1],qualifier:qual,number:num,year,label:m[0].replace(/\s+/g," ").trim()});
+    if(!out.has(key))out.set(key,{type:t[1],qualifier:qual,number:num,year,date,label:m[0].replace(/\s+/g," ").trim()});
     if(out.size>=40)break;
   }
   return [...out.values()];
 }
 async function resolveCitations(cites,self){
   if(!cites.length)return [];
+  const GENERIC=new Set(["PORTARIA","RESOLUÇÃO","SOLUÇÃO DE CONSULTA"]);// emitidos por centenas de órgãos: sem órgão citado, nunca "encontrada"
+  const iso=d=>d?new Date(d).toISOString().slice(0,10):null;
   const nums=[...new Set(cites.map(c=>c.number))];
-  const r=await pool.query(`SELECT id,act_type,act_number,agency,uf,jurisdiction_level,title FROM publications
+  const [selfNum,selfYear]=String(self.act_number||"").split("/");
+  cites=cites.filter(c=>!(String(self.act_type||"").toUpperCase().startsWith(c.type)&&c.number===selfNum&&(!c.year||c.year===selfYear)));
+  if(!cites.length)return [];
+  const r=await pool.query(`SELECT id,act_type,act_number,agency,uf,jurisdiction_level,title,published_on FROM publications
     WHERE act_number IS NOT NULL AND split_part(act_number,'/',1) = ANY($1::text[])`,[nums]);
   return cites.map(c=>{
     let cands=r.rows.filter(p=>p.id!==self.id&&split(p.act_number)[0]===c.number&&String(p.act_type||"").toUpperCase().startsWith(c.type)
       &&!(c.type==="LEI"&&/^LEI COMPLEMENTAR/i.test(p.act_type))&&!(c.type==="DECRETO"&&/^DECRETO[- ](LEI|LEGISLATIVO)/i.test(p.act_type)));
     if(c.year)cands=cands.filter(p=>split(p.act_number)[1]===c.year);
+    if(c.date)cands=cands.filter(p=>!p.published_on||iso(p.published_on)===c.date||String(p.title||"").toUpperCase().includes(String(Number(c.date.slice(8)))+" DE "));
     if(c.qualifier)cands=cands.filter(p=>(String(p.agency||"")+" "+String(p.act_type||"")+" "+String(p.title||"")).toUpperCase().includes(c.qualifier));
     const same=cands.filter(p=>p.jurisdiction_level===self.jurisdiction_level&&(p.uf||null)===(self.uf||null));
     const pick=same.length===1?same[0]:cands.length===1?cands[0]:null;
     // Forte: órgão citado confere, ou ano confere e a esfera/UF é compatível com a publicação que cita.
-    const strong=pick&&(c.qualifier||(c.year&&(same.length===1||!self.uf||pick.uf===self.uf)));
+    const strong=pick&&(c.qualifier||(!GENERIC.has(c.type)&&c.year&&(same.length===1||!self.uf||pick.uf===self.uf)));
     if(pick&&strong)return {...c,status:"FOUND",publication:{id:pick.id,title:cleanTitle(pick.title)}};
     if(cands.length)return {...c,status:"POSSIBLE",candidates:cands.slice(0,3).map(p=>({id:p.id,title:cleanTitle(p.title)}))};
     return {...c,status:"NOT_CAPTURED"};

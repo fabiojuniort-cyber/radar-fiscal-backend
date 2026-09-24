@@ -90,3 +90,4 @@ body.drawer-open{overflow:hidden}
 .citations ul{list-style:none;margin:0;padding:0}.citations li{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:8px 0;border-bottom:1px solid #E3ECFA;font-size:13px}
 .cite-label{color:var(--ink)}.cite-link{border:0;background:transparent;color:var(--blue);font-weight:750;cursor:pointer;font-size:12px;white-space:nowrap}
 .cite-maybe{color:var(--warn);font-weight:700;font-size:12px;white-space:nowrap}.cite-missing{color:var(--muted);font-size:12px;white-space:nowrap}.cite-empty{margin-top:10px!important}
+.cite-more summary{cursor:pointer;font-size:12px;color:var(--muted);padding:8px 0;font-weight:650}
