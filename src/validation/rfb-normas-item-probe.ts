@@ -51,6 +51,9 @@ for (const attachment of parsed.attachments) {
 console.log('RFB_NORMAS_ITEM_PROBE=' + JSON.stringify({
   idAto,
   title: parsed.title ?? null,
+  normalizedHash: parsed.normalizedHash,
+  status: parsed.status ?? null,
+  normalizedTextPreview: parsed.normalizedText.slice(0, 800),
   attachmentCount: parsed.attachments.length,
   attachments: parsed.attachments,
   downloads,
