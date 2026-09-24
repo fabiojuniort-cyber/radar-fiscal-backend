@@ -356,6 +356,55 @@ export class RfbNormasConnector implements CollectionConnector {
         });
       }
 
+      let canonicalOriginal = original;
+      let canonicalOriginalIdAto = item.idAto;
+      if (original.duplicateOfIdAto) {
+        const seenTargets = new Set<string>([item.idAto]);
+        let targetId = original.duplicateOfIdAto;
+        for (let depth = 0; depth < 5; depth += 1) {
+          if (seenTargets.has(targetId)) {
+            throw new ConnectorError('RFB_NORMAS_DUPLICATE_REFERENCE_LOOP', {
+              code: 'RFB_NORMAS_DUPLICATE_REFERENCE_LOOP',
+              kind: 'PROCESSING_ERROR',
+              retryable: false,
+            });
+          }
+          seenTargets.add(targetId);
+          counters.representationRequests += 1;
+          const targetResponse = await client.getJson(
+            buildRfbApiRepresentationUrl(targetId, 'original'),
+            context.signal,
+          );
+          const targetPayloadId = (targetResponse.payload as { idAto?: unknown } | null)?.idAto;
+          if (String(targetPayloadId ?? '') !== targetId) {
+            throw new ConnectorError('RFB_NORMAS_DUPLICATE_TARGET_ID_MISMATCH', {
+              code: 'RFB_NORMAS_DUPLICATE_TARGET_ID_MISMATCH',
+              kind: 'PROCESSING_ERROR',
+              retryable: false,
+            });
+          }
+          const target = parseRfbApiRepresentation(targetResponse.payload);
+          if (!target.normalizedText) {
+            throw new ConnectorError('RFB_NORMAS_DUPLICATE_TARGET_EMPTY', {
+              code: 'RFB_NORMAS_DUPLICATE_TARGET_EMPTY',
+              kind: 'PROCESSING_ERROR',
+              retryable: true,
+            });
+          }
+          canonicalOriginal = target;
+          canonicalOriginalIdAto = targetId;
+          if (!target.duplicateOfIdAto) break;
+          targetId = target.duplicateOfIdAto;
+          if (depth === 4) {
+            throw new ConnectorError('RFB_NORMAS_DUPLICATE_REFERENCE_DEPTH', {
+              code: 'RFB_NORMAS_DUPLICATE_REFERENCE_DEPTH',
+              kind: 'PROCESSING_ERROR',
+              retryable: false,
+            });
+          }
+        }
+      }
+
       counters.detailRequests += 1;
       const canonical = canonicalizeRfbListingNumber(
         {
@@ -369,7 +418,7 @@ export class RfbNormasConnector implements CollectionConnector {
       );
       const files: ConnectorFile[] = [];
 
-      for (const attachment of original.attachments) {
+      for (const attachment of canonicalOriginal.attachments) {
         context.signal.throwIfAborted();
         const previous = state.files[attachment.externalId];
         if (previous && !shouldRecheck(previous, now, revisitAfterMs)) {
@@ -439,7 +488,7 @@ export class RfbNormasConnector implements CollectionConnector {
 
       const sourceTitle = original.title ?? fallbackTitle(item);
       const title = sourceTitle.toLocaleUpperCase('pt-BR');
-      const canonicalContent = original.normalizedText;
+      const canonicalContent = canonicalOriginal.normalizedText;
       const officialUrl = buildRfbModernRepresentationUrl(item.idAto, 'original');
       const metadata: Record<string, unknown> = {
         sourceRole: 'ENRICHMENT',
@@ -460,6 +509,13 @@ export class RfbNormasConnector implements CollectionConnector {
           abstract: item.abstract,
           representations,
           files,
+          ...(original.duplicateOfIdAto
+            ? {
+                duplicateOfIdAto: original.duplicateOfIdAto,
+                canonicalOriginalIdAto,
+                canonicalOriginalNormalizedHash: canonicalOriginal.normalizedHash,
+              }
+            : {}),
           ...(canonical.actDate ? { actDate: dateOnly(canonical.actDate) } : {}),
           republication: original.republication,
         },
@@ -477,6 +533,7 @@ export class RfbNormasConnector implements CollectionConnector {
         officialUrl,
         externalId: item.idAto,
         ...(!strong ? { identityKey: `RFB_NORMAS|${item.idAto}` } : {}),
+        ...(files.length ? { files } : {}),
         metadata,
       });
     };
