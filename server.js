@@ -12,6 +12,7 @@ const sessions=new Map();
 users.set("demo@tribusca.com.br",{name:"Usuário Demo",email:"demo@tribusca.com.br",company:"Empresa Demonstrativa S.A.",password:"demo123"});
 
 const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".webp":"image/webp",".png":"image/png"};
+const STATIC_FILES=new Set(["index.html","login.html","registrar.html","app.html","style.css","app-shell.css","app.js","auth.js","portal.js","portal-shell.js","logo.webp"]);
 const json=(res,status,obj)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});res.end(JSON.stringify(obj));};
 const body=async req=>{let raw="";for await(const chunk of req){raw+=chunk;if(raw.length>100000)throw new Error("too_large");}return raw?JSON.parse(raw):{};};
 const cookies=req=>Object.fromEntries((req.headers.cookie||"").split(";").map(v=>v.trim()).filter(Boolean).map(v=>{const i=v.indexOf("=");return [decodeURIComponent(v.slice(0,i)),decodeURIComponent(v.slice(i+1))]}));
@@ -19,12 +20,44 @@ const sessionUser=req=>{const token=cookies(req).tribusca_proto_session;const em
 const setSession=(res,email)=>{const token=crypto.randomBytes(24).toString("hex");sessions.set(token,email);res.setHeader("Set-Cookie","tribusca_proto_session="+token+"; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800");};
 const brTodaySql="(now() AT TIME ZONE 'America/Sao_Paulo')::date";
 
-function healthLabel(status,lastAttempt){
-  if(!lastAttempt)return "NOT_CONSULTED";
-  if(status==="SUCCESS"||status==="SUCCESS_NO_RESULTS")return "OPERATIONAL";
-  if(status==="PARTIAL_SUCCESS"||status==="RUNNING")return "UNSTABLE";
-  if(["SOURCE_UNAVAILABLE","FETCH_FAILED","PROCESSING_FAILED"].includes(status))return "UNAVAILABLE";
-  return "NOT_CONSULTED";
+// Intervalo esperado entre execuções, a partir do campo de hora do cron (min h dom mon dow).
+function cronIntervalHours(cron){
+  const parts=String(cron||"").trim().split(/\s+/);
+  if(parts.length<5)return 24;
+  const h=parts[1];
+  if(h==="*")return 1;
+  const step=h.match(/^\*\/(\d+)$/);if(step)return Number(step[1]);
+  const hours=h.split(",").map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<24).sort((a,b)=>a-b);
+  if(hours.length<2)return 24;
+  let gap=24-hours[hours.length-1]+hours[0];
+  for(let i=1;i<hours.length;i++)gap=Math.max(gap,hours[i]-hours[i-1]);
+  return gap;
+}
+// Regra de saúde (Onda 1):
+// Não consultada: nenhuma tentativa registrada.
+// Indisponível: há tentativas, mas nenhum sucesso (completo ou parcial) nas últimas 24h.
+// Operacional: última execução finalizada com sucesso completo, dentro de 2x o intervalo esperado.
+// Instável: todo o resto (sucesso parcial, falhas recentes com sucesso dentro de 24h, atraso).
+function sourceHealth(r,now=Date.now()){
+  if(!r.last_attempt_at)return "NOT_CONSULTED";
+  const H=3600e3;
+  const full=r.last_full_success_at?new Date(r.last_full_success_at).getTime():0;
+  const any=Math.max(full,r.last_partial_success_at?new Date(r.last_partial_success_at).getTime():0);
+  if(!any||now-any>24*H)return "UNAVAILABLE";
+  const windowMs=Math.max(2*cronIntervalHours(r.schedule_cron),2)*H+15*60e3;
+  if(["SUCCESS","SUCCESS_NO_RESULTS"].includes(r.last_finished_status)&&full&&now-full<=windowMs)return "OPERATIONAL";
+  return "UNSTABLE";
+}
+const SOURCE_HEALTH_SQL=`
+  (SELECT max(ca.started_at) FROM collection_attempts ca JOIN collection_runs cr ON cr.id=ca.collection_run_id WHERE cr.source_id=s.id) AS last_attempt_at,
+  (SELECT max(cr.finished_at) FROM collection_runs cr WHERE cr.source_id=s.id AND cr.status IN ('SUCCESS','SUCCESS_NO_RESULTS')) AS last_full_success_at,
+  (SELECT max(cr.finished_at) FROM collection_runs cr WHERE cr.source_id=s.id AND cr.status='PARTIAL_SUCCESS') AS last_partial_success_at,
+  (SELECT cr.status FROM collection_runs cr WHERE cr.source_id=s.id AND cr.finished_at IS NOT NULL ORDER BY cr.finished_at DESC LIMIT 1) AS last_finished_status,
+  (SELECT cr.status FROM collection_runs cr WHERE cr.source_id=s.id ORDER BY cr.scheduled_for DESC LIMIT 1) AS last_run_status,
+  (SELECT ca.response_time_ms FROM collection_attempts ca JOIN collection_runs cr ON cr.id=ca.collection_run_id WHERE cr.source_id=s.id AND ca.response_time_ms IS NOT NULL ORDER BY ca.started_at DESC LIMIT 1) AS last_response_time_ms`;
+function withHealth(r){
+  const last=[r.last_full_success_at,r.last_partial_success_at].filter(Boolean).map(x=>new Date(x)).sort((a,b)=>b-a)[0]||null;
+  return {...r,last_success_at:last,health:sourceHealth(r)};
 }
 function requireUser(req,res){const user=sessionUser(req);if(!user){json(res,401,{error:"unauthorized"});return null;}return user;}
 async function requireDb(res){if(!pool){json(res,503,{error:"database_unavailable"});return false;}return true;}
@@ -115,7 +148,44 @@ async function generateNormaClara(sourceText){
   return parsed.plain_language.trim();
 }
 
+// Cobertura pública: só "Disponível" ou "Em implantação".
+// Disponível = fonte ativa, com sucesso (completo ou parcial) nas últimas 48h e publicações no acervo.
+// COVERAGE_VIA: fonte cuja cobertura é garantida por outra fonte primária (decisão congelada: DOU é PRIMARY do CONFAZ).
+const COVERAGE_VIA={confaz:"dou"};
+const FEDERAL_DISPLAY=[["dou","DOU / INLABS"],["confaz","CONFAZ"],["nfe-encat","Portal NF-e / ENCAT"],["sped","SPED"],["cgibs","CGIBS"],["rfb-normas","Receita Federal"]];
+let coverageCache={at:0,data:null};
+async function publicCoverage(){
+  if(coverageCache.data&&Date.now()-coverageCache.at<5*60e3)return coverageCache.data;
+  const r=await pool.query(`
+    SELECT s.code,s.name,s.jurisdiction_level,s.uf,s.is_active,
+      (SELECT max(cr.finished_at) FROM collection_runs cr WHERE cr.source_id=s.id AND cr.status IN ('SUCCESS','SUCCESS_NO_RESULTS','PARTIAL_SUCCESS')) AS last_success_at,
+      EXISTS(SELECT 1 FROM publication_origins po WHERE po.source_id=s.id) AS has_publications
+    FROM sources s`);
+  const now=Date.now();
+  const available=new Map(r.rows.map(x=>[x.code,Boolean(x.is_active&&x.has_publications&&x.last_success_at&&now-new Date(x.last_success_at).getTime()<=48*3600e3)]));
+  const byCode=new Map(r.rows.map(x=>[x.code,x]));
+  const status=code=>{
+    if(available.get(code))return {status:"DISPONIVEL",via:null};
+    const via=COVERAGE_VIA[code];
+    if(via&&available.get(via))return {status:"DISPONIVEL",via:(FEDERAL_DISPLAY.find(f=>f[0]===via)||[via,via])[1]};
+    return {status:"EM_IMPLANTACAO",via:null};
+  };
+  const federal=FEDERAL_DISPLAY.map(([code,label])=>({code,label,...status(code)}));
+  const states={};
+  for(const x of r.rows){if(x.jurisdiction_level==="STATE"&&x.uf&&status(x.code).status==="DISPONIVEL")states[x.uf]="DISPONIVEL";}
+  coverageCache={at:Date.now(),data:{federal,states,updatedAt:new Date().toISOString()}};
+  return coverageCache.data;
+}
+
 async function api(req,res,pathname,url){
+  if(pathname==="/api/public/coverage"&&req.method==="GET"){
+    if(!pool)return json(res,503,{error:"database_unavailable"});
+    try{
+      const data=await publicCoverage();
+      res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"public, max-age=300"});
+      return res.end(JSON.stringify(data));
+    }catch(e){console.error("coverage failed",e);return json(res,500,{error:"coverage_failed"});}
+  }
   if(pathname==="/api/register"&&req.method==="POST"){
     const data=await body(req);
     const name=String(data.name||"").trim(),email=String(data.email||"").trim().toLowerCase(),company=String(data.company||"").trim(),password=String(data.password||"");
@@ -159,13 +229,12 @@ async function api(req,res,pathname,url){
         ORDER BY p.first_collected_at DESC LIMIT 8
       `);
       const sourceRows=await pool.query(`
-        SELECT s.id,s.code,s.name,s.jurisdiction_level,s.uf,s.is_active,
-               v.last_attempt_at,v.last_success_at,v.last_response_time_ms,v.last_run_status
-        FROM sources s LEFT JOIN v_source_monitoring v ON v.source_id=s.id
+        SELECT s.id,s.code,s.name,s.jurisdiction_level,s.uf,s.is_active,s.schedule_cron,${SOURCE_HEALTH_SQL}
+        FROM sources s
         WHERE s.is_active=TRUE
         ORDER BY CASE s.jurisdiction_level WHEN 'FEDERAL' THEN 0 ELSE 1 END,s.name
       `);
-      const sources=sourceRows.rows.map(r=>({...r,health:healthLabel(r.last_run_status,r.last_attempt_at)}));
+      const sources=sourceRows.rows.map(withHealth);
       const summary=sources.reduce((a,s)=>{a[s.health]=(a[s.health]||0)+1;return a;},{});
       return json(res,200,{metrics:metrics.rows[0],latest:latest.rows,sourcesSummary:summary,sources:sources.slice(0,8)});
     }catch(e){console.error("dashboard failed",e);return json(res,500,{error:"dashboard_failed"});}
@@ -174,16 +243,15 @@ async function api(req,res,pathname,url){
     if(!requireUser(req,res)||!(await requireDb(res)))return;
     try{
       const result=await pool.query(`
-        SELECT s.id,s.code,s.name,s.jurisdiction_level,s.uf,s.agency,s.base_url,s.schedule_cron,s.schedule_timezone,s.is_active,
-               v.last_attempt_at,v.last_success_at,v.last_response_time_ms,v.last_run_status,
+        SELECT s.id,s.code,s.name,s.jurisdiction_level,s.uf,s.agency,s.base_url,s.schedule_cron,s.schedule_timezone,s.is_active,${SOURCE_HEALTH_SQL},
                (SELECT count(*)::int FROM collection_runs cr WHERE cr.source_id=s.id AND cr.created_at>=now()-interval '24 hours') AS runs_24h,
                (SELECT count(*)::int FROM collection_attempts ca JOIN collection_runs cr ON cr.id=ca.collection_run_id WHERE cr.source_id=s.id AND ca.started_at>=now()-interval '24 hours') AS attempts_24h,
                (SELECT count(DISTINCT po.publication_id)::int FROM publication_origins po WHERE po.source_id=s.id) AS publications_total,
                (SELECT count(DISTINCT po.publication_id)::int FROM publication_origins po JOIN publications p ON p.id=po.publication_id WHERE po.source_id=s.id AND (p.first_collected_at AT TIME ZONE 'America/Sao_Paulo')::date=${brTodaySql}) AS publications_today
-        FROM sources s LEFT JOIN v_source_monitoring v ON v.source_id=s.id
+        FROM sources s
         ORDER BY CASE s.jurisdiction_level WHEN 'FEDERAL' THEN 0 ELSE 1 END,s.uf NULLS FIRST,s.name
       `);
-      return json(res,200,{items:result.rows.map(r=>({...r,health:healthLabel(r.last_run_status,r.last_attempt_at)}))});
+      return json(res,200,{items:result.rows.map(withHealth)});
     }catch(e){console.error("sources failed",e);return json(res,500,{error:"sources_failed"});}
   }
 
@@ -342,6 +410,7 @@ http.createServer(async(req,res)=>{
     if(pathname.startsWith("/api/")){const handled=await api(req,res,pathname,url);if(handled!==false)return;}
     let target=pathname;if(target==="/")target="/index.html";
     const relative=target.startsWith("/")?target.slice(1):target;
+    if(!STATIC_FILES.has(relative)){res.writeHead(404,{"Content-Type":"text/plain; charset=utf-8"});res.end("Not found");return;}
     const file=path.join(process.cwd(),relative);
     fs.readFile(file,(err,data)=>{
       if(err){res.writeHead(404,{"Content-Type":"text/plain; charset=utf-8"});res.end("Not found");return;}
