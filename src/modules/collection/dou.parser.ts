@@ -88,13 +88,35 @@ export function classifyDouAct(title: string, category: string, sourceType: stri
   const special = /RETIFICA|REPUBLICA/.test(sourceType.toUpperCase()) || /^(RETIFICA|REPUBLICA)/.test(upper);
   const year = numbered?.[3]?.length === 4 ? numbered[3] : date?.slice(0, 4);
   const type = special ? sourceType.toUpperCase() : numbered?.[1]?.trim() || sourceType.toUpperCase();
-  const rfb = !special && !confaz
+  const parsedRfb = !special && !confaz
     ? parseCanonicalRfbFormalAct(
         title,
         category,
         sourceType,
         date ? Number(date.slice(0, 4)) : undefined,
       )
+    : undefined;
+  // Cross-source canonicalization is deliberately limited to families for
+  // which the existing DOU taxonomy is not unit-specific. ADE/Portaria
+  // headings such as "ATO DECLARATÓRIO EXECUTIVO COANA" keep their proven
+  // legacy taxonomy so this feature cannot rewrite existing production
+  // identities merely to satisfy Receita correlation.
+  const canonicalRfbTypes = new Set([
+    'INSTRUÇÃO NORMATIVA',
+    'INSTRUÇÃO NORMATIVA CONJUNTA',
+    'ATO DECLARATÓRIO INTERPRETATIVO',
+    'ATO DECLARATÓRIO NORMATIVO',
+    'PARECER NORMATIVO',
+    'SOLUÇÃO DE CONSULTA',
+    'SOLUÇÃO DE DIVERGÊNCIA',
+    'NOTA TÉCNICA',
+    'NOTA TÉCNICA CONJUNTA',
+    'ATO TÉCNICO CONJUNTO',
+    'NORMA DE EXECUÇÃO',
+    'NORMA DE EXECUÇÃO CONJUNTA',
+  ]);
+  const rfb = parsedRfb && canonicalRfbTypes.has(parsedRfb.actType)
+    ? parsedRfb
     : undefined;
   return {
     agency: confaz ? 'CONFAZ' : rfb?.agency ?? category,
