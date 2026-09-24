@@ -391,7 +391,7 @@ export class RfbNormasConnector implements CollectionConnector {
           filtering,
           item,
           decision,
-          'DUPLICATE_RETIFICATION_REFERENCE',
+          'DUPLICATE_PUBLICATION_REFERENCE',
           maxExcludedItems,
         );
         return;
