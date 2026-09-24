@@ -124,12 +124,40 @@ function monthEnd(month: string, now: Date): Date {
   const start = monthStart(month);
   const next = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
   const end = new Date(next.getTime() - 1);
-  const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+  const local = saoPauloDateParts(now);
+  const todayEnd = new Date(Date.UTC(local.year, local.month - 1, local.day, 23, 59, 59, 999));
   return end.getTime() < todayEnd.getTime() ? end : todayEnd;
 }
 
-function todayUtc(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+function saoPauloDateParts(now: Date): { year: number; month: number; day: number; iso: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === 'year')?.value);
+  const month = Number(parts.find((part) => part.type === 'month')?.value);
+  const day = Number(parts.find((part) => part.type === 'day')?.value);
+  if (!Number.isSafeInteger(year) || !Number.isSafeInteger(month) || !Number.isSafeInteger(day)) {
+    throw new RangeError('Could not resolve America/Sao_Paulo date');
+  }
+  return {
+    year,
+    month,
+    day,
+    iso: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
+}
+
+function saoPauloToday(now: Date): Date {
+  const local = saoPauloDateParts(now);
+  return new Date(Date.UTC(local.year, local.month - 1, local.day));
+}
+
+function saoPauloMonth(now: Date): string {
+  const local = saoPauloDateParts(now);
+  return `${local.year}-${String(local.month).padStart(2, '0')}`;
 }
 
 function dateOnly(value: Date): string {
@@ -475,7 +503,7 @@ export class RfbNormasConnector implements CollectionConnector {
     let completion: ConnectorResult['completion'];
 
     if (!bootstrap.complete) {
-      const currentMonth = now.toISOString().slice(0, 7);
+      const currentMonth = saoPauloMonth(now);
       while (bootstrap.month <= currentMonth) {
         if (context.budget?.shouldYield()) {
           completion = {
@@ -511,7 +539,7 @@ export class RfbNormasConnector implements CollectionConnector {
         if (bootstrap.complete) break;
       }
     } else {
-      const end = todayUtc(now);
+      const end = saoPauloToday(now);
       const start = new Date(end.getTime() - (lookbackDays - 1) * 86_400_000);
       let page = 1;
       while (true) {
