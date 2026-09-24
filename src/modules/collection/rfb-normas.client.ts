@@ -330,7 +330,7 @@ export class RfbNormasClient {
       accept: 'application/json',
     });
 
-    if (optional && [400, 403, 404, 410].includes(response.status)) {
+    if (optional && [400, 403, 404, 406, 410].includes(response.status)) {
       try { await response.body?.cancel(); } catch { /* ignore */ }
       return { status: 'NOT_AVAILABLE', url: finalUrl, httpStatus: response.status };
     }
