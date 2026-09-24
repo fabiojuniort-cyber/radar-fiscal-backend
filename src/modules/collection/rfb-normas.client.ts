@@ -400,6 +400,7 @@ export class RfbNormasClient {
     url: string,
     signal: AbortSignal,
     conditional: { etag?: string; lastModified?: string } = {},
+    expectedName?: string,
   ): Promise<RfbFileResponse> {
     const headers: Record<string, string> = {};
     if (conditional.etag) headers['if-none-match'] = conditional.etag;
@@ -427,20 +428,32 @@ export class RfbNormasClient {
     const bytes = await this.#readBytes(response, this.#maxFileBytes, signal);
     if (!bytes.length) throw failure('RFB_NORMAS_EMPTY_FILE', 'FETCH_ERROR', true);
     const contentType = cleanContentType(response.headers.get('content-type'));
-    const filename = contentDispositionFilename(response.headers.get('content-disposition'));
+    const filename = contentDispositionFilename(response.headers.get('content-disposition')) ?? expectedName;
     const head = new TextDecoder('utf-8', { fatal: false })
       .decode(bytes.subarray(0, Math.min(bytes.length, 1024)))
       .trimStart().toLowerCase();
-    if (contentType === 'text/html' || head.startsWith('<!doctype html') || head.startsWith('<html')) {
+    const declaredHtmlAttachment =
+      /\.(?:html?|xhtml)$/i.test(filename ?? '') &&
+      ['application/htm', 'text/htm', 'text/html', 'application/xhtml+xml'].includes(contentType);
+    if (
+      !declaredHtmlAttachment &&
+      (contentType === 'text/html' ||
+        contentType === 'application/xhtml+xml' ||
+        head.startsWith('<!doctype html') ||
+        head.startsWith('<html'))
+    ) {
       throw failure('RFB_NORMAS_HTML_INSTEAD_OF_FILE', 'FETCH_ERROR', true);
     }
+    const mimeType = declaredHtmlAttachment
+      ? 'text/html'
+      : sniffMime(bytes, contentType, filename, finalUrl);
     return {
       status: 'DOWNLOADED',
       url: finalUrl,
       bytes,
       rawSha256: createHash('sha256').update(bytes).digest('hex'),
       sizeBytes: bytes.byteLength,
-      mimeType: sniffMime(bytes, contentType, filename, finalUrl),
+      mimeType,
       ...(filename ? { filename } : {}),
       ...(response.headers.get('etag') ? { sourceEtag: response.headers.get('etag')! } : {}),
       ...(response.headers.get('last-modified') ? { sourceLastModified: response.headers.get('last-modified')! } : {}),
