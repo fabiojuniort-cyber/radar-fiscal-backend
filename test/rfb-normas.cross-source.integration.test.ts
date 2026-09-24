@@ -12,7 +12,7 @@ import { ConnectorRegistry } from '../src/modules/collection/connector.registry.
 import type { CollectionConnector } from '../src/modules/collection/connector.contract.js';
 import { classifyDouAct } from '../src/modules/collection/dou.parser.js';
 import { RfbNormasConnector } from '../src/modules/collection/rfb-normas.connector.js';
-import { IN_MULTIVIGENTE, IN_ORIGINAL, IN_RELACIONAL, IN_VIGENTE } from './rfb-normas.fixtures.js';
+import { IN_API_ORIGINAL, representationPayload } from './rfb-normas.fixtures.js';
 
 test('DOU + Sistema Normas converge to one publication with two official origins', async () => {
   const adminUrl = process.env.DATABASE_ADMIN_URL;
@@ -77,14 +77,17 @@ test('DOU + Sistema Normas converge to one publication with two official origins
     if (url.pathname.endsWith('/consulta.action')) {
       return new Response(oneRowSearch, { status: 200, headers: { 'content-type': 'text/html' } });
     }
-    if (url.pathname.endsWith('/imprimir.action')) {
-      const view = url.searchParams.get('visao');
-      const body =
-        view === 'original' ? IN_ORIGINAL :
-        view === 'vigente' ? IN_VIGENTE :
-        view === 'anotado' ? IN_MULTIVIGENTE :
-        IN_RELACIONAL;
-      return new Response(body, { status: 200, headers: { 'content-type': 'text/html' } });
+    const api = /\/api\/consulta-externa\/ato\/150001\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+    if (api?.[1]) {
+      if (api[1] === 'relacional') return new Response(null, { status: 403 });
+      const payload = representationPayload(
+        IN_API_ORIGINAL,
+        api[1] as 'original' | 'vigente' | 'multivigente',
+      );
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     return new Response('not found', { status: 404 });
   }) as typeof fetch;
