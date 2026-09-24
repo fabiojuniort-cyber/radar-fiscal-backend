@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>TriBusca — Monitoramento e Inteligência Tributária</title>
   <meta name="description" content="TriBusca — Monitoramento e Inteligência Tributária">
-  <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app-shell.css">
+  <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="theme-color" content="#08306B"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app-shell.css">
 </head>
 <body>
 <header class="header">
@@ -56,7 +56,7 @@
       <div class="carousel-count" id="carousel-count">1 / 5</div>
     </div>
 
-    <div class="state-frame">
+    <div class="state-frame" id="state-frame" role="group" aria-roledescription="carrossel" tabindex="0">
       <div class="state-copy">
         <div>
           <div class="eyebrow cyan">Cobertura estadual</div>
@@ -66,18 +66,20 @@
         </div>
         <div class="state-bottom">
           <div class="state-nav">
-            <button id="state-prev" aria-label="Estado anterior">←</button>
-            <button id="state-next" aria-label="Próximo estado">→</button>
+            <button id="state-prev" type="button" aria-label="Estado anterior">←</button>
+            <button id="state-pause" type="button" aria-label="Pausar rotação automática" aria-pressed="false">❚❚</button>
+            <button id="state-next" type="button" aria-label="Próximo estado">→</button>
           </div>
           <div class="state-dots" id="state-dots"></div>
         </div>
       </div>
       <div class="state-photo" id="state-photo">
-        <div class="photo-loading" id="photo-loading">Carregando fotografia real…</div>
+        <img id="state-img" class="state-img" alt="" decoding="async">
+        <div class="photo-loading" id="photo-loading">Carregando fotografia…</div>
         <div class="caption" id="state-caption"></div>
       </div>
     </div>
-    <p class="carousel-note">São Paulo aparece sempre primeiro. As quatro UFs seguintes são sorteadas novamente a cada atualização da página.</p>
+    <p class="carousel-note">Fotografias reais do Wikimedia Commons, com autoria e licença na legenda. São Paulo aparece primeiro; os demais estados variam a cada visita.</p>
   </div>
 </section>
 

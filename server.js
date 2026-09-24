@@ -11,8 +11,9 @@ const sessions=new Map();
 
 users.set("demo@tribusca.com.br",{name:"Usuário Demo",email:"demo@tribusca.com.br",company:"Empresa Demonstrativa S.A.",password:"demo123",plan:"trial"});
 
-const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".webp":"image/webp",".png":"image/png"};
-const STATIC_FILES=new Set(["index.html","login.html","registrar.html","app.html","style.css","app-shell.css","app.js","auth.js","portal.js","portal-shell.js","logo.webp"]);
+const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".webp":"image/webp",".png":"image/png",".ico":"image/x-icon"};
+const STATIC_FILES=new Set(["index.html","login.html","registrar.html","app.html","404.html","style.css","app-shell.css","app.js","auth.js","portal.js","portal-shell.js","logo.webp","favicon.ico","favicon-32.png","apple-touch-icon.png"]);
+const notFound=res=>fs.readFile(path.join(process.cwd(),"404.html"),(err,data)=>{res.writeHead(404,{"Content-Type":err?"text/plain; charset=utf-8":"text/html; charset=utf-8"});res.end(err?"Not found":data)});
 const json=(res,status,obj)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});res.end(JSON.stringify(obj));};
 const body=async req=>{let raw="";for await(const chunk of req){raw+=chunk;if(raw.length>100000)throw new Error("too_large");}return raw?JSON.parse(raw):{};};
 const cookies=req=>Object.fromEntries((req.headers.cookie||"").split(";").map(v=>v.trim()).filter(Boolean).map(v=>{const i=v.indexOf("=");return [decodeURIComponent(v.slice(0,i)),decodeURIComponent(v.slice(i+1))]}));
@@ -349,7 +350,9 @@ async function api(req,res,pathname,url){
   if(pathname==="/api/register"&&req.method==="POST"){
     const data=await body(req);
     const name=String(data.name||"").trim(),email=String(data.email||"").trim().toLowerCase(),company=String(data.company||"").trim(),password=String(data.password||"");
-    if(!name||!email.includes("@")||!company||password.length<4)return json(res,400,{error:"invalid_fields"});
+    if(!name||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!company)return json(res,400,{error:"invalid_fields"});
+    if(password.length<8)return json(res,400,{error:"weak_password"});
+    if(users.has(email))return json(res,409,{error:"email_in_use"});
     users.set(email,{name,email,company,password,plan:"trial"});setSession(res,email);return json(res,201,{user:{name,email,company}});
   }
   if(pathname==="/api/login"&&req.method==="POST"){
@@ -607,10 +610,10 @@ http.createServer(async(req,res)=>{
     if(pathname.startsWith("/api/")){const handled=await api(req,res,pathname,url);if(handled!==false)return;}
     let target=pathname;if(target==="/")target="/index.html";
     const relative=target.startsWith("/")?target.slice(1):target;
-    if(!STATIC_FILES.has(relative)){res.writeHead(404,{"Content-Type":"text/plain; charset=utf-8"});res.end("Not found");return;}
+    if(!STATIC_FILES.has(relative))return notFound(res);
     const file=path.join(process.cwd(),relative);
     fs.readFile(file,(err,data)=>{
-      if(err){res.writeHead(404,{"Content-Type":"text/plain; charset=utf-8"});res.end("Not found");return;}
+      if(err)return notFound(res);
       res.writeHead(200,{"Content-Type":types[path.extname(file)]||"application/octet-stream","Cache-Control":"no-cache"});res.end(data);
     });
   }catch(e){console.error(e);json(res,500,{error:"internal_error"});}
