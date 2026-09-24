@@ -531,10 +531,7 @@ export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentatio
     : undefined;
   const duplicatePublicationReference =
     revisionKind === 'RETIFICATION' &&
-    (
-      /^RETIFICA[CÇ][AÃ]O\s*\(PUBLICA[CÇ][AÃ]O REPETIDA\)/i.test(normalizedText) ||
-      /PUBLICA[CÇ][AÃ]O REPETIDA|PUBLICAD[AO] EM DUPLICATA/i.test(normalizedText)
-    );
+    /^RETIFICA[CÇ][AÃ]O\s*\(PUBLICA[CÇ][AÃ]O REPETIDA\)/i.test(normalizedText);
 
   return {
     normalizedText,
