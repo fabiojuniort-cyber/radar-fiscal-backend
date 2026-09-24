@@ -151,9 +151,20 @@ export class DoeSpClient {
       if (controller.signal.aborted) {
         throw failure('DOE_SP_REQUEST_TIMEOUT', 'NETWORK_ERROR', true, { retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS });
       }
+      const failureCause = error instanceof Error
+        ? (error as Error & { cause?: { name?: unknown; code?: unknown; message?: unknown; address?: unknown; port?: unknown } }).cause
+        : undefined;
       throw failure('DOE_SP_NETWORK_ERROR', 'NETWORK_ERROR', true, {
         retryAfterSeconds: DEFAULT_RETRY_AFTER_SECONDS,
-        metadata: { cause: error instanceof Error ? error.name : 'unknown' },
+        metadata: {
+          url: parsed.toString(),
+          cause: error instanceof Error ? error.name : 'unknown',
+          ...(typeof failureCause?.name === 'string' ? { causeName: failureCause.name } : {}),
+          ...(typeof failureCause?.code === 'string' ? { causeCode: failureCause.code } : {}),
+          ...(typeof failureCause?.message === 'string' ? { causeMessage: failureCause.message } : {}),
+          ...(typeof failureCause?.address === 'string' ? { causeAddress: failureCause.address } : {}),
+          ...(typeof failureCause?.port === 'number' ? { causePort: failureCause.port } : {}),
+        },
       });
     } finally {
       clearTimeout(timer);
