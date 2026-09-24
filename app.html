@@ -1,1 +1,33 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acervo — TriBusca</title><link rel="stylesheet" href="/style.css"></head><body class="inside"><header class="inside-top"><a href="/" class="mock-brand"><img src="/logo.webp" alt="TriBusca"></a><div class="inside-actions"><span id="inside-user"></span><button id="logout" class="btn ghost">Sair</button></div></header><main class="inside-wrap"><aside class="inside-nav"><a class="active" href="/app.html">Acervo</a><a href="/app.html">Publicações</a><a href="/">Site público</a></aside><section class="inside-main"><div class="eyebrow">Acervo TriBusca</div><div class="inside-head"><div><h1>Consulte o acervo</h1><p>Publicações reais já coletadas pelo backend do projeto.</p></div></div><form id="search-form" class="searchbar"><input id="search-q" placeholder="Buscar por título, número, órgão ou conteúdo…"><button class="btn primary">Buscar</button></form><div class="archive-status" id="archive-status">Carregando publicações…</div><div class="archive-list" id="archive-list"></div></section></main><script src="/auth.js"></script><script src="/archive.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TriBusca — Inteligência Tributária</title><link rel="stylesheet" href="/style.css"></head>
+<body class="product-app">
+<header class="product-top">
+  <a href="/app.html#inicio" class="product-brand"><img src="/logo.webp" alt="TriBusca"></a>
+  <div class="global-search"><span>⌕</span><input id="global-search" placeholder="Buscar no acervo…"><kbd>Ctrl K</kbd></div>
+  <div class="product-account"><div><b id="top-company">Empresa</b><span id="top-user">Usuário</span></div><button id="logout" class="btn ghost">Sair</button></div>
+</header>
+<div class="product-shell">
+<aside class="product-nav">
+  <div class="nav-group">Visão Geral</div>
+  <a href="#inicio" data-route="inicio">Início</a>
+  <div class="nav-group">Inteligência</div>
+  <a href="#publicacoes" data-route="publicacoes">Publicações</a>
+  <a href="#acervo" data-route="acervo">Acervo</a>
+  <a href="#marcadores" data-route="marcadores">Marcadores Tributários</a>
+  <a href="#norma-clara" data-route="norma-clara">Norma Clara</a>
+  <div class="nav-group">Monitoramento</div>
+  <a href="#monitoramento" data-route="monitoramento">Central de Monitoramento</a>
+  <a href="#fontes" data-route="fontes">Fontes Oficiais</a>
+  <div class="nav-group">Organização</div>
+  <a href="#empresas" data-route="empresas">Empresas</a>
+  <a href="#estabelecimentos" data-route="estabelecimentos">Estabelecimentos</a>
+  <a href="#perfil" data-route="perfil">Perfil Tributário</a>
+  <div class="nav-group">Administração</div>
+  <a href="#configuracoes" data-route="configuracoes">Configurações</a>
+  <a class="public-link" href="/">↗ Site público</a>
+</aside>
+<main id="product-view" class="product-view"><div class="page-loading">Carregando TriBusca…</div></main>
+</div>
+<div id="drawer" class="detail-drawer" aria-hidden="true"><div class="drawer-panel"><button id="drawer-close" class="drawer-close">×</button><div id="drawer-content"></div></div></div>
+<script src="/auth.js"></script><script src="/portal.js"></script></body></html>
