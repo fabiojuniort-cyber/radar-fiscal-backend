@@ -347,6 +347,17 @@ export function decideRfbCapture(item: RfbNormasListingItem): RfbFilterDecision 
     };
   }
 
+  if (type === 'EDITAL DE TRANSAÇÃO') {
+    if (agency !== 'RFB_PGFN') {
+      return { included: false, reason: 'TRANSACTION_NOTICE_NON_JOINT' };
+    }
+    return {
+      included: true,
+      category: 'OPERATIONAL',
+      reason: 'CENTRAL_TAX_TRANSACTION_NOTICE',
+    };
+  }
+
   if (type === 'ORIENTAÇÃO NORMATIVA' || type === 'ATO CONJUNTO') {
     if (!isCentralRfbAgency(item.agency)) {
       return { included: false, reason: 'EQUIVALENT_NONCENTRAL' };
