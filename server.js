@@ -29,6 +29,92 @@ function healthLabel(status,lastAttempt){
 function requireUser(req,res){const user=sessionUser(req);if(!user){json(res,401,{error:"unauthorized"});return null;}return user;}
 async function requireDb(res){if(!pool){json(res,503,{error:"database_unavailable"});return false;}return true;}
 
+const NORMA_CLARA_ENGINE_VERSION=process.env.NORMA_CLARA_ENGINE_VERSION||"nc-v1";
+const NORMA_CLARA_MODEL=process.env.NORMA_CLARA_MODEL||"gpt-6-luna";
+
+function outputText(response){
+  for(const item of response.output||[]){
+    if(item.type!=="message")continue;
+    for(const content of item.content||[]){
+      if(content.type==="output_text"&&typeof content.text==="string")return content.text;
+    }
+  }
+  return "";
+}
+function normalizeLegalText(value){
+  return String(value||"").replace(/\r\n/g,"\n").replace(/[ \t]+/g," ").trim();
+}
+async function ensureNormaClaraTable(){
+  if(!pool)return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS norma_clara_translations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      publication_version_id UUID NOT NULL REFERENCES publication_versions(id) ON DELETE CASCADE,
+      segment_hash CHAR(64) NOT NULL,
+      engine_version TEXT NOT NULL,
+      model TEXT NOT NULL,
+      translation_text TEXT NOT NULL,
+      generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(publication_version_id,segment_hash,engine_version)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS ix_norma_clara_lookup
+    ON norma_clara_translations(publication_version_id,segment_hash,engine_version)
+  `);
+}
+async function generateNormaClara(sourceText){
+  if(!process.env.OPENAI_API_KEY){
+    const error=new Error("openai_not_configured");error.code="openai_not_configured";throw error;
+  }
+  const response=await fetch("https://api.openai.com/v1/responses",{
+    method:"POST",
+    headers:{
+      "Authorization":"Bearer "+process.env.OPENAI_API_KEY,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      model:NORMA_CLARA_MODEL,
+      store:false,
+      input:[
+        {
+          role:"developer",
+          content:"Você é a Norma Clara da TriBusca. Sua única função é traduzir dispositivos legais brasileiros para português claro e popular. Não interprete impacto tributário, não recomende conduta, não conclua obrigações para empresas, não acrescente fatos, não omita condições, exceções, sujeitos, datas ou limitações relevantes. Preserve o sentido jurídico do trecho. Use linguagem brasileira simples e direta. Se um termo técnico for indispensável, mantenha-o e explique-o brevemente. Responda somente no schema solicitado."
+        },
+        {
+          role:"user",
+          content:"Traduza exclusivamente o trecho oficial abaixo para português claro e popular:\n\n"+sourceText
+        }
+      ],
+      text:{
+        format:{
+          type:"json_schema",
+          name:"norma_clara_translation",
+          strict:true,
+          schema:{
+            type:"object",
+            properties:{
+              plain_language:{type:"string",minLength:1}
+            },
+            required:["plain_language"],
+            additionalProperties:false
+          }
+        }
+      }
+    })
+  });
+  const data=await response.json();
+  if(!response.ok){
+    const error=new Error("openai_request_failed");error.details=data;throw error;
+  }
+  const text=outputText(data);
+  if(!text)throw new Error("openai_empty_response");
+  const parsed=JSON.parse(text);
+  if(!parsed.plain_language)throw new Error("openai_invalid_response");
+  return parsed.plain_language.trim();
+}
+
 async function api(req,res,pathname,url){
   if(pathname==="/api/register"&&req.method==="POST"){
     const data=await body(req);
@@ -144,6 +230,65 @@ async function api(req,res,pathname,url){
       return json(res,200,{items:list.rows,total:count.rows[0].total,page,pageSize,totalPages:Math.max(Math.ceil(count.rows[0].total/pageSize),1)});
     }catch(e){console.error("publications query failed",e);return json(res,500,{error:"query_failed"});}
   }
+
+  if(pathname==="/api/norma-clara"&&req.method==="POST"){
+    if(!requireUser(req,res)||!(await requireDb(res)))return;
+    const data=await body(req);
+    const publicationVersionId=String(data.publicationVersionId||"").trim();
+    const sourceText=normalizeLegalText(data.sourceText||"");
+    if(!/^[0-9a-f-]{36}$/i.test(publicationVersionId)||sourceText.length<3||sourceText.length>5000){
+      return json(res,400,{error:"invalid_segment"});
+    }
+    try{
+      const version=await pool.query(
+        "SELECT id,content_text,relevant_excerpt FROM publication_versions WHERE id=$1",
+        [publicationVersionId]
+      );
+      if(!version.rowCount)return json(res,404,{error:"version_not_found"});
+      const official=normalizeLegalText(version.rows[0].content_text||version.rows[0].relevant_excerpt||"");
+      if(!official||!official.includes(sourceText)){
+        return json(res,400,{error:"segment_not_in_official_text"});
+      }
+      const segmentHash=crypto.createHash("sha256").update(sourceText,"utf8").digest("hex");
+      const cached=await pool.query(
+        "SELECT translation_text,engine_version,model,generated_at FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version=$3",
+        [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]
+      );
+      if(cached.rowCount){
+        return json(res,200,{translation:cached.rows[0].translation_text,engineVersion:cached.rows[0].engine_version,model:cached.rows[0].model,cached:true,generatedAt:cached.rows[0].generated_at});
+      }
+      const client=await pool.connect();
+      try{
+        await client.query("BEGIN");
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[publicationVersionId+":"+segmentHash+":"+NORMA_CLARA_ENGINE_VERSION]);
+        const second=await client.query(
+          "SELECT translation_text,engine_version,model,generated_at FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version=$3",
+          [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]
+        );
+        if(second.rowCount){
+          await client.query("COMMIT");
+          return json(res,200,{translation:second.rows[0].translation_text,engineVersion:second.rows[0].engine_version,model:second.rows[0].model,cached:true,generatedAt:second.rows[0].generated_at});
+        }
+        const translation=await generateNormaClara(sourceText);
+        await client.query(
+          "DELETE FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version<>$3",
+          [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]
+        );
+        const inserted=await client.query(
+          "INSERT INTO norma_clara_translations(publication_version_id,segment_hash,engine_version,model,translation_text) VALUES($1,$2,$3,$4,$5) RETURNING generated_at",
+          [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION,NORMA_CLARA_MODEL,translation]
+        );
+        await client.query("COMMIT");
+        return json(res,200,{translation,engineVersion:NORMA_CLARA_ENGINE_VERSION,model:NORMA_CLARA_MODEL,cached:false,generatedAt:inserted.rows[0].generated_at});
+      }catch(e){
+        await client.query("ROLLBACK");throw e;
+      }finally{client.release();}
+    }catch(e){
+      console.error("norma clara failed",e);
+      if(e.code==="openai_not_configured")return json(res,503,{error:"openai_not_configured"});
+      return json(res,502,{error:"norma_clara_failed"});
+    }
+  }
   const detailMatch=pathname.match(/^\/api\/publications\/([0-9a-f-]{36})$/i);
   if(detailMatch&&req.method==="GET"){
     if(!requireUser(req,res)||!(await requireDb(res)))return;
@@ -177,5 +322,5 @@ http.createServer(async(req,res)=>{
   }catch(e){console.error(e);json(res,500,{error:"internal_error"});}
 }).listen(port,"0.0.0.0",async()=>{
   console.log("TriBusca prototype listening on",port);
-  if(pool){try{const check=await pool.query("SELECT count(*)::int AS count FROM publications");console.log("TriBusca archive database connected. Publications:",check.rows[0].count);}catch(e){console.error("TriBusca archive database validation failed",e);}}
+  if(pool){try{await ensureNormaClaraTable();const check=await pool.query("SELECT count(*)::int AS count FROM publications");console.log("TriBusca archive database connected. Publications:",check.rows[0].count);console.log("Norma Clara engine:",NORMA_CLARA_ENGINE_VERSION,"model:",NORMA_CLARA_MODEL,"OpenAI configured:",Boolean(process.env.OPENAI_API_KEY));}catch(e){console.error("TriBusca archive database validation failed",e);}}
 });
