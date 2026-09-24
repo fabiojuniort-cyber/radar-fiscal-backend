@@ -9,53 +9,28 @@ const healthLabel=h=>({OPERATIONAL:"Operacional",UNSTABLE:"Instável",UNAVAILABL
 const healthClass=h=>({OPERATIONAL:"ok",UNSTABLE:"warn",UNAVAILABLE:"bad",NOT_CONSULTED:"neutral"})[h]||"neutral";
 let user=null,filterOptions=null,filtersOpen=true,publicationState={page:1,q:"",source:"",uf:"",jurisdiction:"",actType:"",agency:"",dateFrom:"",dateTo:"",period:"",mode:"acervo"};
 
-function splitLegalSegments(text){
-  const clean=String(text||"").replace(/\r\n/g,"\n").trim();
-  if(!clean)return [];
-  let blocks=clean.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean);
-  if(blocks.length<2){
-    const lines=clean.split(/\n/).map(x=>x.trim()).filter(Boolean);
-    const starts=/^(Art\.?\s*\d+|Artigo\s+\d+|§\s*\d+|Parágrafo\s+único|Parágrafo|[IVXLCDM]+\s*[–—-]|[a-z]\)|\d+\s*[.)-])/i;
-    blocks=[];let current="";
-    for(const line of lines){
-      if(starts.test(line)&&current){blocks.push(current.trim());current=line;}
-      else current+=(current?"\n":"")+line;
-    }
-    if(current)blocks.push(current.trim());
-  }
-  const out=[];
-  for(const block of blocks){
-    if(block.length<=2200){out.push(block);continue;}
-    let rest=block;
-    while(rest.length>2200){
-      let cut=rest.lastIndexOf(". ",2200);
-      if(cut<900)cut=2200;
-      out.push(rest.slice(0,cut+1).trim());
-      rest=rest.slice(cut+1).trim();
-    }
-    if(rest)out.push(rest);
-  }
-  return out.slice(0,120);
+// Segmentação jurídica e cota da Norma Clara vêm do servidor (/api/publications/:id).
+const normaBox=t=>'<span>NORMA CLARA · LEITURA AUXILIAR</span><p>'+esc(t)+'</p><small class="norma-note">Gerada por IA. Não substitui o texto oficial.</small>';
+function updateQuota(q){
+  const el=document.getElementById("nc-quota");if(!el||!q)return;
+  el.textContent="Norma Clara · "+n(q.used)+" de "+n(q.limit)+" blocos usados neste mês";
+  el.title="Cada bloco desbloqueado usa 1 da cota do plano. Blocos já abertos por você não contam de novo.";
 }
-function segmentLabel(text,index){
-  const m=String(text).match(/^(Art\.?\s*\d+[^\s]*|Artigo\s+\d+[^\s]*|§\s*\d+[^\s]*|Parágrafo\s+único|[IVXLCDM]+\s*[–—-]?|[a-z]\))/i);
-  return m?m[1]:"Trecho "+(index+1);
-}
-async function translateSegment(button,versionId,text){
+async function translateSegment(button,versionId,hash){
   const box=button.closest(".legal-segment").querySelector(".norma-inline");
   button.disabled=true;button.textContent="Preparando Norma Clara…";
   box.classList.add("open");box.innerHTML='<span>NORMA CLARA</span><p>Traduzindo para português claro e popular…</p>';
   try{
-    const r=await fetch("/api/norma-clara",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({publicationVersionId:versionId,sourceText:text})});
+    const r=await fetch("/api/norma-clara",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({publicationVersionId:versionId,segmentHash:hash})});
     const data=await r.json();
     if(!r.ok){
       const code=data.error||"request_failed";
       console.warn("[norma-clara]",r.status,code);
-      if(code==="norma_clara_quota_exceeded")throw new Error("QUOTA");
+      if(code==="norma_clara_quota_exceeded"){updateQuota(data.quota);throw new Error("QUOTA");}
       if(code==="norma_clara_rate_limited")throw new Error("RATE");
       throw new Error("UNAVAILABLE");
     }
-    box.innerHTML='<span>NORMA CLARA · LEITURA AUXILIAR</span><p>'+esc(data.translation)+'</p><small class="norma-note">Gerada por IA. Não substitui o texto oficial.</small>';
+    box.innerHTML=normaBox(data.translation);updateQuota(data.quota);
     button.textContent="Ocultar Norma Clara";button.dataset.open="1";
   }catch(e){
     const msg={
@@ -198,19 +173,21 @@ function bindPublicationClicks(){document.querySelectorAll("[data-pub]").forEach
 async function openPublication(id){
  const drawer=document.getElementById("drawer"),content=document.getElementById("drawer-content");drawer.classList.add("open");drawer.setAttribute("aria-hidden","false");content.innerHTML='<div class="page-loading">Abrindo publicação…</div>';
  const d=await api("/api/publications/"+id),p=d.publication;
- const official=p.content_text||p.relevant_excerpt||"";
- const segments=splitLegalSegments(official);
+ const segments=d.segments||[];
  const documentHtml=segments.length
-   ?segments.map((text,i)=>'<section class="legal-segment"><div class="segment-ref">'+esc(segmentLabel(text,i))+'</div><div class="segment-official">'+esc(text).replace(/\\n/g,"<br>")+'</div><button class="norma-segment-btn" data-index="'+i+'">Traduzir para português claro e popular</button><div class="norma-inline"></div></section>').join("")
+   ?segments.map((s,i)=>'<section class="legal-segment"><div class="segment-ref">'+esc(s.label)+'</div><div class="segment-official">'+esc(s.text)+'</div>'+(s.unlocked
+       ?'<button class="norma-segment-btn" data-index="'+i+'" data-open="1">Ocultar Norma Clara</button><div class="norma-inline open">'+normaBox(s.translation)+'</div>'
+       :'<button class="norma-segment-btn" data-index="'+i+'">Traduzir para português claro e popular</button><div class="norma-inline"></div>')+'</section>').join("")
    :'<div class="document-empty">O texto integral ainda não está armazenado para esta publicação.</div>';
- content.innerHTML='<div class="drawer-eyebrow">'+esc(p.act_type||"Publicação oficial")+'</div><h1>'+esc(p.title)+'</h1><div class="detail-meta">'+[p.act_number,p.agency,p.uf,date(p.published_on)].filter(Boolean).map(esc).join(" · ")+'</div><div class="detail-actions">'+(p.primary_official_url?'<a class="btn primary" target="_blank" rel="noopener" href="'+esc(p.primary_official_url)+'">Fonte oficial ↗</a>':'')+'<span class="norma-ready">Norma Clara por dispositivo</span></div><div class="detail-tabs"><b>Documento oficial</b><span>Versão '+esc(p.version_no||1)+'</span></div><article class="legal-document">'+documentHtml+'</article><section class="origin-box"><b>Rastreabilidade</b>'+d.origins.map(o=>'<div><span>'+esc(o.source_name)+'</span><a target="_blank" rel="noopener" href="'+esc(o.official_url)+'">Abrir origem ↗</a></div>').join("")+'</section>';
+ content.innerHTML='<div class="drawer-eyebrow">'+esc(p.act_type||"Publicação oficial")+'</div><h1>'+esc(p.title)+'</h1><div class="detail-meta">'+[p.act_number,p.agency,p.uf,date(p.published_on)].filter(Boolean).map(esc).join(" · ")+'</div><div class="detail-actions">'+(p.primary_official_url?'<a class="btn primary" target="_blank" rel="noopener" href="'+esc(p.primary_official_url)+'">Fonte oficial ↗</a>':'')+'<span class="norma-ready" id="nc-quota">Norma Clara por dispositivo</span></div><div class="detail-tabs"><b>Documento oficial</b><span>Versão '+esc(p.version_no||1)+'</span></div><article class="legal-document">'+documentHtml+'</article><section class="origin-box"><b>Rastreabilidade</b>'+d.origins.map(o=>'<div><span>'+esc(o.source_name)+'</span><a target="_blank" rel="noopener" href="'+esc(o.official_url)+'">Abrir origem ↗</a></div>').join("")+'</section>';
  content.querySelectorAll(".norma-segment-btn").forEach(btn=>{
    btn.onclick=()=>{
      const idx=Number(btn.dataset.index),box=btn.closest(".legal-segment").querySelector(".norma-inline");
      if(btn.dataset.open==="1"){box.classList.toggle("open");btn.textContent=box.classList.contains("open")?"Ocultar Norma Clara":"Mostrar Norma Clara";return}
-     translateSegment(btn,p.version_id,segments[idx]);
+     translateSegment(btn,p.version_id,segments[idx].hash);
    };
  });
+ updateQuota(d.normaClara);
 }
 async function renderMonitor(){
  setActive("monitoramento");view.innerHTML=head("Monitoramento","Central de Monitoramento","Saúde operacional das fontes separada da cobertura legislativa.");

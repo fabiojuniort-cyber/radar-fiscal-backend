@@ -9,7 +9,7 @@ const pool=process.env.DATABASE_URL ? new Pool({connectionString:process.env.DAT
 const users=new Map();
 const sessions=new Map();
 
-users.set("demo@tribusca.com.br",{name:"Usuário Demo",email:"demo@tribusca.com.br",company:"Empresa Demonstrativa S.A.",password:"demo123"});
+users.set("demo@tribusca.com.br",{name:"Usuário Demo",email:"demo@tribusca.com.br",company:"Empresa Demonstrativa S.A.",password:"demo123",plan:"trial"});
 
 const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".webp":"image/webp",".png":"image/png"};
 const STATIC_FILES=new Set(["index.html","login.html","registrar.html","app.html","style.css","app-shell.css","app.js","auth.js","portal.js","portal-shell.js","logo.webp"]);
@@ -177,6 +177,104 @@ async function publicCoverage(){
   return coverageCache.data;
 }
 
+// ===== Norma Clara: segmentação jurídica no servidor =====
+// Unidade: artigo, parágrafo (§/parágrafo único), ementa e preâmbulo. Incisos e alíneas ficam
+// dentro do caput/parágrafo; só viram bloco próprio quando o bloco passa de SEG_MAX caracteres.
+const SEG_MAX=2200;
+const MARK_ART=String.raw`(?:Art\.\s*\d+[º°o]?(?:-[A-Z])?\s+[A-ZÀ-Ú]|Artigo\s+\d+[º°o]?(?:-[A-Z])?\s*[-–—.])`;
+const MARK_PAR=String.raw`(?:§\s*\d+[º°o]?\s|Parágrafo\s+único)`;
+const INLINE_BREAK=new RegExp(String.raw`([.;:!?"”])\s+(?=${MARK_ART}|${MARK_PAR})`,"g");
+const LINE_START=new RegExp(String.raw`^(?:${MARK_ART}|${MARK_PAR})`);
+const ITEM_START=/^(?:[IVXLCDM]{1,6}\s*[-–—]\s|[a-z]\)\s)/;
+const PREAMBLE=/(?<=\.)\s+(?=(?:O|A)\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{4,}[\s,])/;
+function splitLong(block){
+  if(block.length<=SEG_MAX)return [block];
+  const parts=block.split(/(?<=[:;])\s+(?=[IVXLCDM]{1,6}\s*[-–—]\s)/);
+  const out=[];let cur="";
+  for(const p of parts){if(cur&&(cur+" "+p).length>SEG_MAX){out.push(cur);cur=p}else cur=cur?cur+" "+p:p}
+  if(cur)out.push(cur);
+  return out.flatMap(b=>{
+    const r=[];let rest=b;
+    while(rest.length>SEG_MAX){let cut=rest.lastIndexOf(". ",SEG_MAX);if(cut<900)cut=SEG_MAX;r.push(rest.slice(0,cut+1).trim());rest=rest.slice(cut+1).trim()}
+    if(rest)r.push(rest);return r;
+  });
+}
+function segmentLabel(text,index,isPreamble){
+  let m=text.match(/^Art\.\s*(\d+[º°o]?(?:-[A-Z])?)/);if(m)return "Art. "+m[1];
+  m=text.match(/^Artigo\s+(\d+[º°o]?(?:-[A-Z])?)/);if(m)return "Artigo "+m[1];
+  m=text.match(/^§\s*(\d+[º°o]?)/);if(m)return "§ "+m[1];
+  if(/^Parágrafo\s+único/.test(text))return "Parágrafo único";
+  if(isPreamble||(index===0&&/^(?:O|A)\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{4,}/.test(text)))return "Preâmbulo";
+  if(index===0)return "Ementa";
+  return "Trecho "+(index+1);
+}
+function legalSegments(raw){
+  let text=String(raw||"").replace(/\r\n/g,"\n").replace(/[ \t]+/g," ").trim();
+  if(!text)return [];
+  text=text.replace(INLINE_BREAK,"$1\n\n");
+  let blocks=text.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean);
+  if(blocks.length<2){
+    blocks=[];let cur="";
+    for(const line of text.split("\n").map(x=>x.trim()).filter(Boolean)){
+      if(LINE_START.test(line)&&cur){blocks.push(cur);cur=line}else cur=cur?cur+"\n"+line:line;
+    }
+    if(cur)blocks.push(cur);
+  }
+  // incisos/alíneas soltos voltam para o bloco anterior
+  const merged=[];
+  for(const b of blocks){
+    const prev=merged[merged.length-1];
+    if(prev&&ITEM_START.test(b)&&(prev+"\n"+b).length<=SEG_MAX)merged[merged.length-1]=prev+"\n"+b;else merged.push(b);
+  }
+  // ementa e preâmbulo antes do primeiro artigo
+  const out=[];
+  merged.forEach((b,i)=>{
+    if(i===0&&!LINE_START.test(b)){
+      const pre=b.split(PREAMBLE);
+      if(pre.length===2){out.push({text:pre[0].trim()});out.push({text:pre[1].trim(),preamble:true});return}
+    }
+    out.push({text:b});
+  });
+  return out.flatMap(o=>splitLong(o.text).map(t=>({text:t,preamble:!!o.preamble}))).slice(0,200).map((o,i)=>{
+    const normalized=normalizeLegalText(o.text);
+    return {index:i,label:segmentLabel(o.text,i,o.preamble),text:o.text,hash:crypto.createHash("sha256").update(normalized,"utf8").digest("hex"),normalized};
+  });
+}
+
+// ===== Norma Clara: planos, cota e desbloqueios (protótipo: em memória, como usuários e sessões) =====
+// Regras aprovadas: desbloquear um bloco consome 1 da cota (tradução nova ou reaproveitada);
+// reabrir bloco já desbloqueado não consome; falha na geração não consome;
+// IA só é chamada quando o bloco não existe no banco. A cota vem do plano.
+const PLANS={trial:{label:"Avaliação",normaClaraBlocksMonth:Number(process.env.NORMA_CLARA_TRIAL_BLOCKS||30)}};
+const NC_RATE_PER_MIN=Number(process.env.NORMA_CLARA_RATE_PER_MIN||10);
+const NC_GLOBAL_DAILY=Number(process.env.NORMA_CLARA_GLOBAL_DAILY_GENERATIONS||300);
+const ncUnlocks=new Map(),ncUsage=new Map(),ncBurst=new Map();
+let ncGlobal={day:"",count:0};
+const brDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo"}).format(new Date());
+const ncPeriod=()=>brDate().slice(0,7);
+function ncQuota(user){
+  const plan=PLANS[user.plan]||PLANS.trial;const u=ncUsage.get(user.email);
+  const used=u&&u.period===ncPeriod()?u.count:0;
+  return {plan:user.plan||"trial",limit:plan.normaClaraBlocksMonth,used,remaining:Math.max(plan.normaClaraBlocksMonth-used,0),period:ncPeriod()};
+}
+function ncConsume(user){const p=ncPeriod();const u=ncUsage.get(user.email);if(!u||u.period!==p)ncUsage.set(user.email,{period:p,count:1});else u.count++}
+const ncKey=hash=>hash+"|"+NORMA_CLARA_ENGINE_VERSION;
+const ncIsUnlocked=(user,hash)=>Boolean(ncUnlocks.get(user.email)&&ncUnlocks.get(user.email).has(ncKey(hash)));
+function ncUnlock(user,hash){if(!ncUnlocks.has(user.email))ncUnlocks.set(user.email,new Set());ncUnlocks.get(user.email).add(ncKey(hash))}
+function ncBurstOk(user){
+  const now=Date.now();const list=(ncBurst.get(user.email)||[]).filter(t=>now-t<60e3);
+  if(list.length>=NC_RATE_PER_MIN){ncBurst.set(user.email,list);return false}
+  list.push(now);ncBurst.set(user.email,list);return true;
+}
+function ncGlobalOk(){const d=brDate();if(ncGlobal.day!==d)ncGlobal={day:d,count:0};return ncGlobal.count<NC_GLOBAL_DAILY}
+async function ncFindTranslation(db,hash){
+  const r=await db.query("SELECT translation_text,engine_version,model,generated_at FROM norma_clara_translations WHERE segment_hash=$1 AND engine_version=$2 ORDER BY generated_at ASC LIMIT 1",[hash,NORMA_CLARA_ENGINE_VERSION]);
+  return r.rows[0]||null;
+}
+async function ncCopyToVersion(db,versionId,hash,t){
+  await db.query("INSERT INTO norma_clara_translations(publication_version_id,segment_hash,engine_version,model,translation_text,generated_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (publication_version_id,segment_hash,engine_version) DO NOTHING",[versionId,hash,t.engine_version,t.model,t.translation_text,t.generated_at]);
+}
+
 async function api(req,res,pathname,url){
   if(pathname==="/api/public/coverage"&&req.method==="GET"){
     if(!pool)return json(res,503,{error:"database_unavailable"});
@@ -190,7 +288,7 @@ async function api(req,res,pathname,url){
     const data=await body(req);
     const name=String(data.name||"").trim(),email=String(data.email||"").trim().toLowerCase(),company=String(data.company||"").trim(),password=String(data.password||"");
     if(!name||!email.includes("@")||!company||password.length<4)return json(res,400,{error:"invalid_fields"});
-    users.set(email,{name,email,company,password});setSession(res,email);return json(res,201,{user:{name,email,company}});
+    users.set(email,{name,email,company,password,plan:"trial"});setSession(res,email);return json(res,201,{user:{name,email,company}});
   }
   if(pathname==="/api/login"&&req.method==="POST"){
     const data=await body(req);const email=String(data.email||"").trim().toLowerCase(),password=String(data.password||"");
@@ -203,7 +301,7 @@ async function api(req,res,pathname,url){
   }
   if(pathname==="/api/me"&&req.method==="GET"){
     const user=requireUser(req,res);if(!user)return;
-    return json(res,200,{user:{name:user.name,email:user.email,company:user.company,trialDaysRemaining:7}});
+    return json(res,200,{user:{name:user.name,email:user.email,company:user.company,plan:user.plan||"trial",trialDaysRemaining:7},normaClara:ncQuota(user)});
   }
   if(pathname==="/api/dashboard"&&req.method==="GET"){
     if(!requireUser(req,res)||!(await requireDb(res)))return;
@@ -324,59 +422,56 @@ async function api(req,res,pathname,url){
   }
 
   if(pathname==="/api/norma-clara"&&req.method==="POST"){
-    if(!requireUser(req,res)||!(await requireDb(res)))return;
+    const user=requireUser(req,res);if(!user)return;
+    if(!(await requireDb(res)))return;
     const data=await body(req);
     const publicationVersionId=String(data.publicationVersionId||"").trim();
-    const sourceText=normalizeLegalText(data.sourceText||"");
-    if(!/^[0-9a-f-]{36}$/i.test(publicationVersionId)||sourceText.length<3||sourceText.length>5000){
+    const segmentHash=String(data.segmentHash||"").trim().toLowerCase();
+    if(!/^[0-9a-f-]{36}$/i.test(publicationVersionId)||!/^[0-9a-f]{64}$/.test(segmentHash)){
       return json(res,400,{error:"invalid_segment"});
     }
     try{
-      const version=await pool.query(
-        "SELECT id,content_text,relevant_excerpt FROM publication_versions WHERE id=$1",
-        [publicationVersionId]
-      );
+      const version=await pool.query("SELECT id,content_text,relevant_excerpt FROM publication_versions WHERE id=$1",[publicationVersionId]);
       if(!version.rowCount)return json(res,404,{error:"version_not_found"});
-      const official=normalizeLegalText(version.rows[0].content_text||version.rows[0].relevant_excerpt||"");
-      if(!official||!official.includes(sourceText)){
-        return json(res,400,{error:"segment_not_in_official_text"});
+      const segment=legalSegments(version.rows[0].content_text||version.rows[0].relevant_excerpt||"").find(x=>x.hash===segmentHash);
+      if(!segment)return json(res,400,{error:"segment_not_in_official_text"});
+      const reply=(t,extra)=>json(res,200,{translation:t.translation_text,engineVersion:t.engine_version,generatedAt:t.generated_at,quota:ncQuota(user),...extra});
+      let existing=await ncFindTranslation(pool,segmentHash);
+      if(existing&&ncIsUnlocked(user,segmentHash))return reply(existing,{alreadyUnlocked:true});
+      if(!ncBurstOk(user))return json(res,429,{error:"norma_clara_rate_limited"});
+      if(ncQuota(user).remaining<=0)return json(res,429,{error:"norma_clara_quota_exceeded",quota:ncQuota(user)});
+      if(existing){
+        await ncCopyToVersion(pool,publicationVersionId,segmentHash,existing);
+        ncConsume(user);ncUnlock(user,segmentHash);
+        return reply(existing,{reused:true});
       }
-      const segmentHash=crypto.createHash("sha256").update(sourceText,"utf8").digest("hex");
-      const cached=await pool.query(
-        "SELECT translation_text,engine_version,model,generated_at FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version=$3",
-        [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]
-      );
-      if(cached.rowCount){
-        return json(res,200,{translation:cached.rows[0].translation_text,engineVersion:cached.rows[0].engine_version,model:cached.rows[0].model,cached:true,generatedAt:cached.rows[0].generated_at});
-      }
+      if(!ncGlobalOk())return json(res,503,{error:"norma_clara_unavailable"});
       const client=await pool.connect();
       try{
         await client.query("BEGIN");
-        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[publicationVersionId+":"+segmentHash+":"+NORMA_CLARA_ENGINE_VERSION]);
-        const second=await client.query(
-          "SELECT translation_text,engine_version,model,generated_at FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version=$3",
-          [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]
-        );
-        if(second.rowCount){
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",["norma-clara:"+segmentHash+":"+NORMA_CLARA_ENGINE_VERSION]);
+        existing=await ncFindTranslation(client,segmentHash);
+        if(existing){
+          await ncCopyToVersion(client,publicationVersionId,segmentHash,existing);
           await client.query("COMMIT");
-          return json(res,200,{translation:second.rows[0].translation_text,engineVersion:second.rows[0].engine_version,model:second.rows[0].model,cached:true,generatedAt:second.rows[0].generated_at});
+          ncConsume(user);ncUnlock(user,segmentHash);
+          return reply(existing,{reused:true});
         }
-        const translation=await generateNormaClara(sourceText);
-        await client.query(
-          "DELETE FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version<>$3",
-          [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]
-        );
+        const translation=await generateNormaClara(segment.normalized);
+        ncGlobal.count++;
+        await client.query("DELETE FROM norma_clara_translations WHERE publication_version_id=$1 AND segment_hash=$2 AND engine_version<>$3",[publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION]);
         const inserted=await client.query(
           "INSERT INTO norma_clara_translations(publication_version_id,segment_hash,engine_version,model,translation_text) VALUES($1,$2,$3,$4,$5) RETURNING generated_at",
           [publicationVersionId,segmentHash,NORMA_CLARA_ENGINE_VERSION,NORMA_CLARA_MODEL,translation]
         );
         await client.query("COMMIT");
-        return json(res,200,{translation,engineVersion:NORMA_CLARA_ENGINE_VERSION,model:NORMA_CLARA_MODEL,cached:false,generatedAt:inserted.rows[0].generated_at});
+        ncConsume(user);ncUnlock(user,segmentHash);
+        return reply({translation_text:translation,engine_version:NORMA_CLARA_ENGINE_VERSION,generated_at:inserted.rows[0].generated_at},{generated:true});
       }catch(e){
         await client.query("ROLLBACK");throw e;
       }finally{client.release();}
     }catch(e){
-      console.error("norma clara failed",e);
+      console.error("norma clara failed",e.message,e.details&&e.details.error&&e.details.error.code);
       if(e.code==="openai_not_configured")return json(res,503,{error:"openai_not_configured"});
       const openaiCode=e.details&&e.details.error&&e.details.error.code;
       if(openaiCode==="credit_balance_exhausted")return json(res,402,{error:"openai_credit_balance_exhausted"});
@@ -387,7 +482,8 @@ async function api(req,res,pathname,url){
   }
   const detailMatch=pathname.match(/^\/api\/publications\/([0-9a-f-]{36})$/i);
   if(detailMatch&&req.method==="GET"){
-    if(!requireUser(req,res)||!(await requireDb(res)))return;
+    const user=requireUser(req,res);if(!user)return;
+    if(!(await requireDb(res)))return;
     try{
       const id=detailMatch[1];
       const pub=await pool.query(`
@@ -398,7 +494,12 @@ async function api(req,res,pathname,url){
       if(!pub.rowCount)return json(res,404,{error:"not_found"});
       const origins=await pool.query(`SELECT s.name AS source_name,s.code AS source_code,po.external_id,po.official_url,po.first_seen_at,po.last_seen_at FROM publication_origins po JOIN sources s ON s.id=po.source_id WHERE po.publication_id=$1 ORDER BY po.first_seen_at`,[id]);
       const files=await pool.query(`SELECT pf.original_filename,pf.mime_type,pf.size_bytes,pf.official_url,pf.raw_sha256 FROM publication_files pf WHERE pf.publication_version_id=$1 ORDER BY pf.created_at`,[pub.rows[0].version_id]);
-      return json(res,200,{publication:pub.rows[0],origins:origins.rows,files:files.rows});
+      const segs=legalSegments(pub.rows[0].content_text||pub.rows[0].relevant_excerpt||"");
+      const hashes=segs.filter(x=>ncIsUnlocked(user,x.hash)).map(x=>x.hash);
+      const tr=hashes.length?await pool.query("SELECT DISTINCT ON (segment_hash) segment_hash::text AS h,translation_text FROM norma_clara_translations WHERE segment_hash::text = ANY($1::text[]) AND engine_version=$2 ORDER BY segment_hash,generated_at",[hashes,NORMA_CLARA_ENGINE_VERSION]):{rows:[]};
+      const map=new Map(tr.rows.map(r=>[r.h,r.translation_text]));
+      const segments=segs.map(x=>({hash:x.hash,label:x.label,text:x.text,unlocked:map.has(x.hash),translation:map.get(x.hash)||null}));
+      return json(res,200,{publication:pub.rows[0],origins:origins.rows,files:files.rows,segments,normaClara:ncQuota(user)});
     }catch(e){console.error("detail failed",e);return json(res,500,{error:"detail_failed"});}
   }
   return false;
