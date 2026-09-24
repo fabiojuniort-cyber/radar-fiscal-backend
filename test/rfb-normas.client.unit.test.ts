@@ -118,3 +118,31 @@ test('reads modern official JSON API and treats optional 403 as unavailable', as
   assert.equal(relation.status, 'NOT_AVAILABLE');
   if (relation.status === 'NOT_AVAILABLE') assert.equal(relation.httpStatus, 403);
 });
+
+
+test('accepts HTML only when the official attachment is explicitly declared .htm', async () => {
+  const html = new TextEncoder().encode('<html><body><table><tr><td>Anexo oficial</td></tr></table></body></html>');
+  const client = new RfbNormasClient({
+    fetch: (async () => new Response(html, {
+      status: 200,
+      headers: { 'content-type': 'application/htm' },
+    })) as typeof fetch,
+  });
+
+  const official = await client.downloadFile(
+    FILE,
+    new AbortController().signal,
+    {},
+    'Anexo Único.htm',
+  );
+  assert.equal(official.status, 'DOWNLOADED');
+  if (official.status === 'DOWNLOADED') assert.equal(official.mimeType, 'text/html');
+
+  await assert.rejects(
+    client.downloadFile(FILE, new AbortController().signal),
+    (error: unknown) => {
+      assert.equal((error as { code?: string }).code, 'RFB_NORMAS_HTML_INSTEAD_OF_FILE');
+      return true;
+    },
+  );
+});
