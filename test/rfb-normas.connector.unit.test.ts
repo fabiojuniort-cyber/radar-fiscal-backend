@@ -177,3 +177,25 @@ test('bootstrap starts in 2025 and can stop safely on time budget', async () => 
   const state = result.checkpoint!.state as unknown as RfbNormasSourceState;
   assert.equal(state.bootstrap.complete, true);
 });
+
+
+test('incremental lookback uses America/Sao_Paulo date at UTC midnight boundary', async () => {
+  const searches: URL[] = [];
+  const connector = new RfbNormasConnector({
+    fetch: (async (input) => {
+      const url = new URL(input.toString());
+      searches.push(url);
+      return new Response(RFB_EMPTY_FIXTURE, {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }) as typeof fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-24T00:08:45Z'),
+    lookbackDays: 7,
+  });
+  await connector.collect(CONTEXT);
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0]!.searchParams.get('dt_inicio'), '17/09/2026');
+  assert.equal(searches[0]!.searchParams.get('dt_fim'), '23/09/2026');
+});
