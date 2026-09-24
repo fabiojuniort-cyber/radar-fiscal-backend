@@ -30,6 +30,7 @@ export type DoeSpExclusionReason =
   | 'OUT_OF_SCOPE_SECTION'
   | 'INDIVIDUAL_TAX_ADMINISTRATIVE_ACT'
   | 'SEFAZ_NON_TAX_UNIT'
+  | 'NUMBERED_DECREE_WITHOUT_TAX_TERMS'
   | 'GOVERNOR_ACT_WITHOUT_TAX_TERMS'
   | 'VETO_WITHOUT_TAX_TERMS'
   | 'PGE_WITHOUT_TAX_TERMS'
@@ -94,7 +95,14 @@ export function decideDoeSpCapture(candidate: DoeSpCandidate): DoeSpDecision {
   }
 
   if (organ === 'DECRETOS') {
-    if (type === 'DECRETO NUMERADO' || /^DECRETO N/.test(title)) return { included: true, category: 'NUMBERED_DECREE' };
+    if (type === 'DECRETO NUMERADO' || /^DECRETO N/.test(title)) {
+      return hasTaxTerms(candidate)
+        ? { included: true, category: 'NUMBERED_DECREE' }
+        : { included: false, reason: 'NUMBERED_DECREE_WITHOUT_TAX_TERMS' };
+    }
+    // Retifications/errata in the Decretos section are kept conservatively: their
+    // short summary may only reference the corrected decree number, without
+    // repeating the tax subject. They remain SOURCE_SCOPED and are rare.
     return { included: true, category: 'DECREES_SECTION' };
   }
 
