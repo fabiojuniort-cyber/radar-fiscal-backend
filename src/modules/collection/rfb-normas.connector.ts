@@ -390,6 +390,7 @@ export class RfbNormasConnector implements CollectionConnector {
                   ...(previous.sourceLastModified ? { lastModified: previous.sourceLastModified } : {}),
                 }
               : {},
+            attachment.name,
           );
           let stored: RfbStoredFile;
           if (response.status === 'NOT_MODIFIED') {
