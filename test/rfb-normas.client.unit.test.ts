@@ -95,11 +95,18 @@ for (const status of [408, 425, 429, 500, 503]) {
 }
 
 
-test('reads modern official JSON API and treats optional 403 as unavailable', async () => {
+test('reads modern official JSON API and treats optional 403/406 as unavailable', async () => {
   const client = new RfbNormasClient({
     fetch: (async (input) => {
       const url = input.toString();
       if (url.includes('/visao/relacional')) return new Response(null, { status: 403 });
+      if (url.includes('/visao/vigente')) return new Response(JSON.stringify({
+        status: 'NOT_ACCEPTABLE',
+        message: 'A visão solicitada não está disponível para este ato. Consulte a visão original',
+      }), {
+        status: 406,
+        headers: { 'content-type': 'application/json' },
+      });
       return new Response(JSON.stringify({ idAto: 153667, visao: 'original' }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -117,6 +124,13 @@ test('reads modern official JSON API and treats optional 403 as unavailable', as
   );
   assert.equal(relation.status, 'NOT_AVAILABLE');
   if (relation.status === 'NOT_AVAILABLE') assert.equal(relation.httpStatus, 403);
+
+  const unavailableView = await client.getOptionalJson(
+    API.replace('/original', '/vigente'),
+    new AbortController().signal,
+  );
+  assert.equal(unavailableView.status, 'NOT_AVAILABLE');
+  if (unavailableView.status === 'NOT_AVAILABLE') assert.equal(unavailableView.httpStatus, 406);
 });
 
 
