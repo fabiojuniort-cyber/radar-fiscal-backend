@@ -63,6 +63,26 @@ test('DOE-SP capture rules: legislation, tax terms outside SEFAZ, non-tax SEFAZ 
     title: 'RESOLUÇÃO SFP-25 DE 31-08-2026', hierarchy: [...base, 'Secretaria da Fazenda e Planejamento', 'Gabinete do Secretário'],
   }), { included: true, category: 'SEFAZ_CABINET' });
   assert.deepEqual(decideDoeSpCapture({
+    title: 'RESOLUÇÃO SFP/AEFP Nº 739 DE 16 DE SETEMBRO DE 2026', hierarchy: [...base, 'Secretaria da Fazenda e Planejamento', 'Gabinete do Secretário'], typeName: 'Resolução',
+    excerpt: 'Dispõe sobre Índices de Reajustes de Preços de Contratos de Serviços.',
+  }), { included: false, reason: 'SEFAZ_CABINET_NON_TAX_INDEX' });
+  assert.deepEqual(decideDoeSpCapture({
+    title: 'RESOLUÇÃO SFP/AEFP Nº 740 DE 16 DE SETEMBRO DE 2026', hierarchy: [...base, 'Secretaria da Fazenda e Planejamento', 'Gabinete do Secretário'], typeName: 'Resolução',
+    excerpt: 'Autoriza a divulgação dos Índices de Preços de Obras Públicas.',
+  }), { included: false, reason: 'SEFAZ_CABINET_NON_TAX_INDEX' });
+  assert.deepEqual(decideDoeSpCapture({
+    title: 'Autorização para Transferência de Valores de Apoio', hierarchy: [...base, 'Secretaria da Cultura, Economia e Indústria Criativas'], typeName: 'Comunicado',
+    excerpt: 'Assunto: PROAC INCENTIVO FISCAL - ICMS - PROJETO CULTURAL - CÓDIGO 55.579.',
+  }), { included: false, reason: 'OTHER_ORGAN_INDIVIDUAL_TAX_INCENTIVE' });
+  assert.deepEqual(decideDoeSpCapture({
+    title: 'COMISSÃO DE ANÁLISE DE PROJETOS - CAP', hierarchy: [...base, 'Secretaria da Cultura, Economia e Indústria Criativas'], typeName: 'Comunicado',
+    excerpt: 'Aprovação de projetos do PROAC Incentivo Fiscal - ICMS.',
+  }), { included: false, reason: 'OTHER_ORGAN_INDIVIDUAL_TAX_INCENTIVE' });
+  assert.deepEqual(decideDoeSpCapture({
+    title: 'Publicação n.005/26 – Quebra de Ordem Cronológica', hierarchy: [...base, 'Universidade Estadual Paulista'], typeName: 'Comunicado',
+    excerpt: 'Pagamento de notas fiscais fora da ordem cronológica.',
+  }), { included: false, reason: 'OTHER_ORGAN_PAYMENT_ORDER' });
+  assert.deepEqual(decideDoeSpCapture({
     title: 'EXTRATO DE CONTRATO', hierarchy: ['Executivo', 'Atos de Gestão e Despesas', 'Secretaria da Fazenda e Planejamento'],
   }), { included: false, reason: 'OUT_OF_SCOPE_SECTION' });
   // "fiscal do contrato" is not tax vocabulary.

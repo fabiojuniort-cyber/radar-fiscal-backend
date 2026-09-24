@@ -63,11 +63,13 @@ Não há IA na decisão de captura. Cada ato recebe uma **categoria** (incluído
 | Retificações/erratas da seção DECRETOS | `DECREES_SECTION` (captura conservadora, pois a ementa curta pode apenas referenciar o decreto corrigido) |
 | Atos do Governador / vetos | incluídos só com vocabulário tributário (`GOVERNOR_ACT_TAX_TERMS`, `VETO_TAX_TERMS`) |
 | Fazenda: Receita Estadual e Administração Tributária (Portaria SRE, Comunicados DICAR/DIGES/DEAT…) | `SEFAZ_TAX_ADMINISTRATION` |
-| Fazenda: Gabinete do Secretário (Resolução SFP) | `SEFAZ_CABINET` |
+| Fazenda: Gabinete do Secretário (Resolução SFP) | `SEFAZ_CABINET`, exceto índices administrativos SFP/AEFP de reajuste/preços de contratos e obras (`SEFAZ_CABINET_NON_TAX_INDEX`) |
 | Fazenda: Delegacias Tributárias, Postos Fiscais, Núcleos | excluídos como `INDIVIDUAL_TAX_ADMINISTRATIVE_ACT`: são atos sobre contribuintes identificados (cassação de IE, PCN, AIIM, ITCMD) |
 | Fazenda: Tesouro, Orçamento, Planejamento, CTA | incluídos só com vocabulário tributário (`SEFAZ_OTHER_TAX_TERMS`) |
 | PGE: Contencioso Tributário-fiscal, Dívida Ativa ou vocabulário tributário | `PGE_TAX` |
 | Outros órgãos: tipo normativo com vocabulário tributário no título ou na ementa | `OTHER_ORGAN_TAX_TERMS` |
+| ProAC: aprovações/transferências de projetos individuais com "incentivo fiscal - ICMS" | excluídas como `OTHER_ORGAN_INDIVIDUAL_TAX_INCENTIVE` |
+| Comunicados de quebra de ordem cronológica/pagamentos | excluídos como `OTHER_ORGAN_PAYMENT_ORDER` |
 
 O vocabulário tributário (`DOE_SP_TAX_TERMS`) inclui, entre outros:
 
@@ -80,7 +82,7 @@ O vocabulário tributário (`DOE_SP_TAX_TERMS`) inclui, entre outros:
 - dívida ativa;
 - Reforma Tributária.
 
-A lista não é filtro exclusivo: ela decide a inclusão fora dos órgãos tributários e também evita a captura indiscriminada de decretos numerados sem conteúdo tributário. Palavras ambíguas ficaram de fora de propósito, como "fiscal" sozinho ("fiscal do contrato") e "isenção" ("isenção de taxa de inscrição").
+A lista não é filtro exclusivo: ela decide a inclusão fora dos órgãos tributários e também evita a captura indiscriminada de decretos numerados sem conteúdo tributário. Palavras ambíguas ficaram de fora de propósito, como "fiscal" sozinho ("fiscal do contrato") e "isenção" ("isenção de taxa de inscrição"). Também há exclusões contextuais estreitas para ruídos comprovados em produção; o termo geral `incentivo fiscal` continua válido para normas tributárias e não foi removido do vocabulário.
 
 As métricas de cada tentativa registram:
 

@@ -34,6 +34,9 @@ export type DoeSpExclusionReason =
   | 'GOVERNOR_ACT_WITHOUT_TAX_TERMS'
   | 'VETO_WITHOUT_TAX_TERMS'
   | 'PGE_WITHOUT_TAX_TERMS'
+  | 'SEFAZ_CABINET_NON_TAX_INDEX'
+  | 'OTHER_ORGAN_INDIVIDUAL_TAX_INCENTIVE'
+  | 'OTHER_ORGAN_PAYMENT_ORDER'
   | 'NON_NORMATIVE_TYPE'
   | 'OTHER_ORGAN_WITHOUT_TAX_TERMS';
 
@@ -86,6 +89,7 @@ export function decideDoeSpCapture(candidate: DoeSpCandidate): DoeSpDecision {
   const unitPath = units.join(' > ');
   const type = candidate.typeName ? asciiUpper(candidate.typeName) : undefined;
   const title = asciiUpper(candidate.title);
+  const text = asciiUpper(candidate.title + ' ' + (candidate.excerpt ?? ''));
 
   if (
     organ === 'LEIS' || organ === 'LEIS COMPLEMENTARES' || organ.startsWith('EMENDA') ||
@@ -127,7 +131,17 @@ export function decideDoeSpCapture(candidate: DoeSpCandidate): DoeSpDecision {
     if (/RECEITA ESTADUAL|ADMINISTRACAO TRIBUTARIA|TRIBUNAL DE IMPOSTOS E TAXAS/.test(unitPath)) {
       return { included: true, category: 'SEFAZ_TAX_ADMINISTRATION' };
     }
-    if (units[0] === 'GABINETE DO SECRETARIO') return { included: true, category: 'SEFAZ_CABINET' };
+    if (units[0] === 'GABINETE DO SECRETARIO') {
+      // SFP/AEFP also publishes administrative price indexes for contracts and
+      // public works. They are not tax rules even though they sit in the cabinet.
+      if (
+        /\bSFP\s*\/\s*AEFP\b/.test(title) &&
+        /\b(?:INDICES? DE (?:REAJUSTES?|PRECOS?)|REAJUSTES? DE PRECOS|PRECOS? DE OBRAS PUBLICAS|CONTRATOS? DE SERVICOS)\b/.test(text)
+      ) {
+        return { included: false, reason: 'SEFAZ_CABINET_NON_TAX_INDEX' };
+      }
+      return { included: true, category: 'SEFAZ_CABINET' };
+    }
     return hasTaxTerms(candidate)
       ? { included: true, category: 'SEFAZ_OTHER_TAX_TERMS' }
       : { included: false, reason: 'SEFAZ_NON_TAX_UNIT' };
@@ -141,6 +155,20 @@ export function decideDoeSpCapture(candidate: DoeSpCandidate): DoeSpDecision {
   }
 
   if (type && !NORMATIVE_TYPES.has(type)) return { included: false, reason: 'NON_NORMATIVE_TYPE' };
+
+  // Operational grants under ProAC can contain the literal "incentivo fiscal -
+  // ICMS" but are approvals/transfers for identified projects, not general tax
+  // rules. Keep actual tax legislation from other organs eligible.
+  if (/\bPROAC\b/.test(text) && /\bINCENTIVO FISCAL\b/.test(text) && /\bICMS\b/.test(text)) {
+    return { included: false, reason: 'OTHER_ORGAN_INDIVIDUAL_TAX_INCENTIVE' };
+  }
+
+  // "Quebra de ordem cronológica" publications are payment/procurement notices.
+  // They may quote invoice/fiscal terminology without creating tax obligations.
+  if (/\bQUEBRA DE ORDEM CRONOLOGICA\b/.test(text)) {
+    return { included: false, reason: 'OTHER_ORGAN_PAYMENT_ORDER' };
+  }
+
   return hasTaxTerms(candidate)
     ? { included: true, category: 'OTHER_ORGAN_TAX_TERMS' }
     : { included: false, reason: 'OTHER_ORGAN_WITHOUT_TAX_TERMS' };
