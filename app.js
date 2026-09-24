@@ -35,7 +35,26 @@ function sampleFour(){
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   return pool.slice(0,4);
 }
-const sessionStates=[SP,...sampleFour()].map(x=>({...x,status:"Em implantação"}));
+// Status vem de /api/public/coverage; na falta de confirmação, "Em implantação" (nunca afirmar cobertura sem o backend).
+const sessionStates=[SP,...sampleFour()].map(x=>({...x,status:"Em implantação",available:false}));
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function loadCoverage(){
+  try{
+    const r=await fetch("/api/public/coverage");if(!r.ok)throw new Error("coverage");
+    const c=await r.json();
+    sessionStates.forEach(s=>{s.available=c.states&&c.states[s.uf]==="DISPONIVEL";s.status=s.available?"Disponível":"Em implantação"});
+    const list=document.getElementById("federal-coverage");
+    if(list)list.innerHTML=c.federal.map(f=>'<div class="source-row"><strong>'+esc(f.label)+'</strong><span class="pill'+(f.status==="DISPONIVEL"?'':' wip')+'">'+(f.status==="DISPONIVEL"?'Disponível'+(f.via?' · via '+esc(f.via):''):'Em implantação')+'</span></div>').join("");
+  }catch(e){
+    const list=document.getElementById("federal-coverage");
+    if(list)list.querySelectorAll(".pill").forEach(p=>{p.className="pill neutral";p.textContent="Status indisponível no momento"});
+  }
+  drawStatus();
+}
+function drawStatus(){
+  const s=sessionStates[index];
+  document.getElementById("state-status").innerHTML='<span class="status"><span class="dot" style="background:'+(s.available?'#00E6D6':'#FFB84D')+'"></span>'+s.status+'</span>';
+}
 let index=0,timer;
 const cache=new Map();
 
@@ -69,7 +88,7 @@ async function draw(){
   document.getElementById("state-title").textContent=s.name+" / "+s.uf;
   document.getElementById("state-capital").textContent=s.capital;
   document.getElementById("state-place").textContent="Fotografia real da capital";
-  document.getElementById("state-status").innerHTML='<span class="status"><span class="dot" style="background:#FFB84D"></span>'+s.status+'</span>';
+  drawStatus();
   document.getElementById("carousel-count").textContent=(index+1)+" / "+sessionStates.length;
   document.getElementById("state-dots").innerHTML=sessionStates.map((_,i)=>'<span class="'+(i===index?'active':'')+'"></span>').join("");
   const photo=document.getElementById("state-photo"),loading=document.getElementById("photo-loading");
@@ -90,4 +109,4 @@ document.getElementById("state-prev").addEventListener("click",prev);
 const frame=document.querySelector(".state-frame");
 frame.addEventListener("mouseenter",()=>clearInterval(timer));
 frame.addEventListener("mouseleave",restart);
-draw();restart();
+draw();restart();loadCoverage();

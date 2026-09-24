@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>TriBusca — Monitoramento e Inteligência Tributária</title>
   <meta name="description" content="TriBusca — Monitoramento e Inteligência Tributária">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app-shell.css">
 </head>
 <body>
 <header class="header">
@@ -97,13 +97,13 @@
       <h2>O que está ativo fica claro.</h2>
       <p class="lead">A TriBusca diferencia uma fonte em produção de outra ainda em implantação. Nada é apresentado como cobertura produtiva antes de estar operacional.</p>
     </div>
-    <div class="source-list">
-      <div class="source-row"><strong>DOU / INLABS</strong><span class="pill">Monitoramento ativo</span></div>
-      <div class="source-row"><strong>CONFAZ</strong><span class="pill">Monitoramento ativo</span></div>
-      <div class="source-row"><strong>Portal NF-e / ENCAT</strong><span class="pill">Monitoramento ativo</span></div>
-      <div class="source-row"><strong>SPED</strong><span class="pill">Monitoramento ativo</span></div>
-      <div class="source-row"><strong>CGIBS</strong><span class="pill wip">Em implantação</span></div>
-      <div class="source-row"><strong>Receita Federal</strong><span class="pill wip">Em implantação</span></div>
+    <div class="source-list" id="federal-coverage" aria-live="polite">
+      <div class="source-row"><strong>DOU / INLABS</strong><span class="pill neutral">Verificando…</span></div>
+      <div class="source-row"><strong>CONFAZ</strong><span class="pill neutral">Verificando…</span></div>
+      <div class="source-row"><strong>Portal NF-e / ENCAT</strong><span class="pill neutral">Verificando…</span></div>
+      <div class="source-row"><strong>SPED</strong><span class="pill neutral">Verificando…</span></div>
+      <div class="source-row"><strong>CGIBS</strong><span class="pill neutral">Verificando…</span></div>
+      <div class="source-row"><strong>Receita Federal</strong><span class="pill neutral">Verificando…</span></div>
     </div>
   </div>
 </section>
@@ -160,7 +160,7 @@
       <div class="lawtext">§ 1º O imposto incide também sobre o serviço proveniente do exterior do País ou cuja prestação se tenha iniciado no exterior do País.</div>
       <div class="plain">
         <strong>NORMA CLARA · EM PORTUGUÊS CLARO E POPULAR</strong>
-        <p>O imposto também pode ser cobrado quando o serviço vem de fora do Brasil ou quando começou a ser prestado no exterior.</p>
+        <p>O imposto também é cobrado quando o serviço vem de fora do Brasil ou quando começou a ser prestado no exterior.</p>
       </div>
     </div>
   </div>
