@@ -17,7 +17,8 @@ export type CanonicalRfbAgency =
   | 'COSIS'
   | 'SUARA'
   | 'SUFIS'
-  | 'SUARI';
+  | 'SUARI'
+  | 'RFB_PGFN';
 
 export type CanonicalRfbActType =
   | 'INSTRUÇÃO NORMATIVA'
@@ -39,7 +40,8 @@ export type CanonicalRfbActType =
   | 'PORTARIA NORMATIVA'
   | 'PORTARIA INTERMINISTERIAL'
   | 'ORIENTAÇÃO NORMATIVA'
-  | 'ATO CONJUNTO';
+  | 'ATO CONJUNTO'
+  | 'EDITAL DE TRANSAÇÃO';
 
 const TYPE_PATTERNS: ReadonlyArray<[RegExp, CanonicalRfbActType]> = [
   [/\bINSTRUCAO NORMATIVA CONJUNTA\b/, 'INSTRUÇÃO NORMATIVA CONJUNTA'],
@@ -61,18 +63,20 @@ const TYPE_PATTERNS: ReadonlyArray<[RegExp, CanonicalRfbActType]> = [
   [/\bPORTARIA CONJUNTA\b/, 'PORTARIA CONJUNTA'],
   [/\bPORTARIA\b/, 'PORTARIA'],
   [/\bORIENTACAO NORMATIVA\b/, 'ORIENTAÇÃO NORMATIVA'],
+  [/\bEDITAL DE TRANSACAO\b/, 'EDITAL DE TRANSAÇÃO'],
   [/\bATO CONJUNTO\b/, 'ATO CONJUNTO'],
 ];
 
 const CENTRAL_AGENCIES = new Set<CanonicalRfbAgency>([
   'RFB', 'COSIT', 'COANA', 'COFIS', 'CODAC', 'COCAD',
-  'CORAT', 'COTEC', 'COSIS', 'SUARA', 'SUFIS', 'SUARI',
+  'CORAT', 'COTEC', 'COSIS', 'SUARA', 'SUFIS', 'SUARI', 'RFB_PGFN',
 ]);
 
 export function canonicalizeRfbAgency(value: string): CanonicalRfbAgency | undefined {
   const upper = asciiUpper(value).replace(/\s+/g, ' ').trim();
   if (!upper) return undefined;
 
+  if (/\bPGFN\b/.test(upper) && /\bRFB\b|RECEITA FEDERAL/.test(upper)) return 'RFB_PGFN';
   if (/\bCOSIT\b|COORDENACAO-GERAL DE TRIBUTACAO/.test(upper)) return 'COSIT';
   if (/\bCOANA\b|COORDENACAO-GERAL DE ADMINISTRACAO ADUANEIRA/.test(upper)) return 'COANA';
   if (/\bCOFIS\b|COORDENACAO-GERAL DE FISCALIZACAO/.test(upper)) return 'COFIS';
