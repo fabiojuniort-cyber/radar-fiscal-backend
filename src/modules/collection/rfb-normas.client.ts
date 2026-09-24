@@ -4,7 +4,6 @@ import { ConnectorError } from './connector.error.js';
 
 export const RFB_NORMAS_ALLOWED_ORIGINS = new Set([
   'https://normas.receita.fazenda.gov.br',
-  'http://normas.receita.fazenda.gov.br',
 ]);
 
 const DEFAULT_TIMEOUT_MS = 25_000;
