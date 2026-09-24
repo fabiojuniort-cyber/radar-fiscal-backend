@@ -59,7 +59,8 @@ Não há IA na decisão de captura. Cada ato recebe uma **categoria** (incluído
 | Regra | Resultado |
 |---|---|
 | Leis, Leis Complementares, Emendas | `LEGISLATION` |
-| DECRETOS (numerados, retificações da seção) | `NUMBERED_DECREE` / `DECREES_SECTION` |
+| Decretos numerados | incluídos somente quando título/ementa contém vocabulário tributário (`NUMBERED_DECREE`); os demais são `NUMBERED_DECREE_WITHOUT_TAX_TERMS` |
+| Retificações/erratas da seção DECRETOS | `DECREES_SECTION` (captura conservadora, pois a ementa curta pode apenas referenciar o decreto corrigido) |
 | Atos do Governador / vetos | incluídos só com vocabulário tributário (`GOVERNOR_ACT_TAX_TERMS`, `VETO_TAX_TERMS`) |
 | Fazenda: Receita Estadual e Administração Tributária (Portaria SRE, Comunicados DICAR/DIGES/DEAT…) | `SEFAZ_TAX_ADMINISTRATION` |
 | Fazenda: Gabinete do Secretário (Resolução SFP) | `SEFAZ_CABINET` |
@@ -79,7 +80,7 @@ O vocabulário tributário (`DOE_SP_TAX_TERMS`) inclui, entre outros:
 - dívida ativa;
 - Reforma Tributária.
 
-A lista não é filtro exclusivo: ela só decide a inclusão fora dos órgãos tributários. Palavras ambíguas ficaram de fora de propósito, como "fiscal" sozinho ("fiscal do contrato") e "isenção" ("isenção de taxa de inscrição").
+A lista não é filtro exclusivo: ela decide a inclusão fora dos órgãos tributários e também evita a captura indiscriminada de decretos numerados sem conteúdo tributário. Palavras ambíguas ficaram de fora de propósito, como "fiscal" sozinho ("fiscal do contrato") e "isenção" ("isenção de taxa de inscrição").
 
 As métricas de cada tentativa registram:
 
@@ -195,6 +196,7 @@ As fixtures (`test/doe-sp.fixtures.ts`) são payloads reais de 24/09/2026. O CSS
 - Os cadernos Legislativo, Municípios, Empresarial e Jucesp e as seções Atos de Pessoal e Gestão ficam fora do escopo. Leis sancionadas saem no Executivo › LEIS.
 - O acervo anterior a 07/2023 fica fora da API.
 - Republicação de ato numerado em outra data gera uma publicação distinta, porque a identidade usa a data do DOE.
+- Decretos numerados não tributários não entram no canal tributário apenas por estarem na seção DECRETOS; a inclusão exige evidência determinística no título/ementa.
 
 ## 13. Fechamento produtivo
 

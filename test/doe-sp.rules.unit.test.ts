@@ -19,7 +19,7 @@ function decisionFor(list: unknown, id: string) {
 }
 
 test('DOE-SP capture rules on the real 04/09/2026 edition', () => {
-  assert.deepEqual(decisionFor(list0904, ID.decree70843), { included: true, category: 'NUMBERED_DECREE' });
+  assert.deepEqual(decisionFor(list0904, ID.decree70843), { included: false, reason: 'NUMBERED_DECREE_WITHOUT_TAX_TERMS' });
   assert.deepEqual(decisionFor(list0904, ID.sre43), { included: true, category: 'SEFAZ_TAX_ADMINISTRATION' });
   assert.deepEqual(decisionFor(list0904, ID.delegaciaCassacao), { included: false, reason: 'INDIVIDUAL_TAX_ADMINISTRATIVE_ACT' });
   assert.deepEqual(decisionFor(list0904, ID.postoFiscal), { included: false, reason: 'INDIVIDUAL_TAX_ADMINISTRATIVE_ACT' });
@@ -36,6 +36,14 @@ test('DOE-SP capture rules: legislation, tax terms outside SEFAZ, non-tax SEFAZ 
   const base = ['Executivo', 'Atos Normativos'];
   assert.deepEqual(decideDoeSpCapture({ title: 'LEI Nº 18.345, DE 28 DE NOVEMBRO DE 2025', hierarchy: [...base, 'Leis'], typeName: 'Lei' }), { included: true, category: 'LEGISLATION' });
   assert.deepEqual(decideDoeSpCapture({ title: 'LEI COMPLEMENTAR Nº 1.436, DE 28 DE NOVEMBRO DE 2025', hierarchy: [...base, 'Leis Complementares'] }), { included: true, category: 'LEGISLATION' });
+  assert.deepEqual(decideDoeSpCapture({
+    title: 'DECRETO Nº 70.900, DE 23 DE SETEMBRO DE 2026', hierarchy: [...base, 'Decretos'], typeName: 'Decreto Numerado',
+    excerpt: 'Introduz alterações no Regulamento do ICMS do Estado de São Paulo.',
+  }), { included: true, category: 'NUMBERED_DECREE' });
+  assert.deepEqual(decideDoeSpCapture({
+    title: 'DECRETO Nº 70.901, DE 23 DE SETEMBRO DE 2026', hierarchy: [...base, 'Decretos'], typeName: 'Decreto Numerado',
+    excerpt: 'Dispõe sobre abertura de crédito suplementar ao Orçamento Fiscal.',
+  }), { included: false, reason: 'NUMBERED_DECREE_WITHOUT_TAX_TERMS' });
   assert.deepEqual(decideDoeSpCapture({
     title: 'RESOLUÇÃO SAA Nº 50, DE 1 DE JULHO DE 2026', hierarchy: [...base, 'Secretaria de Agricultura e Abastecimento', 'Gabinete do Secretário'],
     typeName: 'Resolução', excerpt: 'Dispõe sobre o diferimento do ICMS nas saídas de produtor rural',
