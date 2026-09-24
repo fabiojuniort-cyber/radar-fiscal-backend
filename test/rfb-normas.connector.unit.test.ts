@@ -24,7 +24,11 @@ const CONTEXT = {
   signal: new AbortController().signal,
 };
 
-function portal(options: { changedVigente?: boolean; failAttachment?: boolean } = {}) {
+function portal(options: {
+  changedVigente?: boolean;
+  failAttachment?: boolean;
+  attachmentLabel?: string;
+} = {}) {
   let fileDownloads = 0;
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(input.toString());
@@ -64,7 +68,7 @@ function portal(options: { changedVigente?: boolean; failAttachment?: boolean } 
     if (url.pathname.endsWith('/anexoOutros.action')) {
       fileDownloads += 1;
       if (options.failAttachment) return new Response('temporary', { status: 503 });
-      return new Response(pdfBytes('SC 180'), {
+      return new Response(pdfBytes(options.attachmentLabel ?? 'SC 180'), {
         status: 200,
         headers: { 'content-type': 'application/pdf', etag: '"sc-180-v1"' },
       });
@@ -111,6 +115,14 @@ test('collects deterministic scope and reports discovered/included/excluded reas
   const sc = result.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA');
   assert.ok(sc);
   assert.equal(((sc.metadata?.rfbNormas as any).files ?? []).length, 1);
+  assert.equal(sc.files?.length, 1);
+  const normalizedSc = normalizePublication({
+    sourceId: CONTEXT.sourceId,
+    publication: sc,
+  });
+  assert.equal(normalizedSc.files.length, 1);
+  assert.match(normalizedSc.files[0]!.rawSha256 ?? '', /^[a-f0-9]{64}$/);
+  assert.equal((normalizedSc.metadata.files as unknown[]).length, 1);
   assert.equal(fake.fileDownloads(), 1);
 });
 
@@ -147,6 +159,32 @@ test('immediate replay reuses known attachments and creates no content hash chan
     false,
     '403 relation view is optional and must be tracked as unavailable',
   );
+});
+
+test('attachment byte change creates a content hash change for the same publication', async () => {
+  const firstPortal = portal({ attachmentLabel: 'SC 180 v1' });
+  const first = await new RfbNormasConnector({
+    fetch: firstPortal.fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+  }).collect(CONTEXT);
+
+  const state = first.checkpoint!.state as unknown as RfbNormasSourceState;
+  const changedPortal = portal({ attachmentLabel: 'SC 180 v2' });
+  const changed = await new RfbNormasConnector({
+    fetch: changedPortal.fetch,
+    readState: async () => state,
+    now: () => new Date('2026-09-23T16:00:00Z'),
+    revisitAfterMs: 0,
+  }).collect(CONTEXT);
+
+  const firstSc = first.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
+  const changedSc = changed.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
+  const n1 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: firstSc });
+  const n2 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: changedSc });
+
+  assert.equal(n1.identityHash, n2.identityHash);
+  assert.notEqual(n1.contentHash, n2.contentHash);
 });
 
 test('captures substantive retification separately and deterministically excludes repeated publication reference', async () => {
