@@ -432,16 +432,15 @@ export class RfbNormasClient {
     const head = new TextDecoder('utf-8', { fatal: false })
       .decode(bytes.subarray(0, Math.min(bytes.length, 1024)))
       .trimStart().toLowerCase();
+    const htmlBody =
+      contentType === 'text/html' ||
+      contentType === 'application/xhtml+xml' ||
+      head.startsWith('<!doctype html') ||
+      head.startsWith('<html');
     const declaredHtmlAttachment =
       /\.(?:html?|xhtml)$/i.test(filename ?? '') &&
-      ['application/htm', 'text/htm', 'text/html', 'application/xhtml+xml'].includes(contentType);
-    if (
-      !declaredHtmlAttachment &&
-      (contentType === 'text/html' ||
-        contentType === 'application/xhtml+xml' ||
-        head.startsWith('<!doctype html') ||
-        head.startsWith('<html'))
-    ) {
+      htmlBody;
+    if (!declaredHtmlAttachment && htmlBody) {
       throw failure('RFB_NORMAS_HTML_INSTEAD_OF_FILE', 'FETCH_ERROR', true);
     }
     const mimeType = declaredHtmlAttachment
