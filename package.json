@@ -21,9 +21,9 @@
     "db:verify-runtime": "node dist/infrastructure/database/verify-runtime-role.js",
     "db:verify-worker-runtime": "node dist/infrastructure/database/verify-worker-runtime-role.js",
     "db:prepare": "npm run db:migrate && npm run db:provision-runtime-role && npm run db:verify-runtime && npm run db:verify-worker-runtime",
-    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts test/inlabs.client.unit.test.ts test/dou.parser.unit.test.ts test/dou.connector.unit.test.ts test/nfe-encat.client.unit.test.ts test/nfe-encat.parser.unit.test.ts test/nfe-encat.connector.unit.test.ts test/sped.client.unit.test.ts test/sped.parser.unit.test.ts test/sped.connector.unit.test.ts test/sped.govbr.unit.test.ts test/sped.idempotency.unit.test.ts test/collection.hardening.unit.test.ts test/cgibs.client.unit.test.ts test/cgibs.parser.unit.test.ts test/cgibs.connector.unit.test.ts",
+    "test": "tsx --test test/auth.unit.test.ts test/collection.executor.unit.test.ts test/collection.retry.unit.test.ts test/collection.run-status.unit.test.ts test/collection.normalizer.unit.test.ts test/collection.cron.unit.test.ts test/confaz.connector.unit.test.ts test/inlabs.client.unit.test.ts test/dou.parser.unit.test.ts test/dou.connector.unit.test.ts test/nfe-encat.client.unit.test.ts test/nfe-encat.parser.unit.test.ts test/nfe-encat.connector.unit.test.ts test/sped.client.unit.test.ts test/sped.parser.unit.test.ts test/sped.connector.unit.test.ts test/sped.govbr.unit.test.ts test/sped.idempotency.unit.test.ts test/collection.hardening.unit.test.ts test/cgibs.client.unit.test.ts test/cgibs.parser.unit.test.ts test/cgibs.connector.unit.test.ts test/rfb-normas.identity.unit.test.ts test/rfb-normas.client.unit.test.ts test/rfb-normas.parser.unit.test.ts test/rfb-normas.connector.unit.test.ts",
     "test:integration": "tsx --test test/auth.integration.test.ts",
-    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts && tsx --test test/dou.collection.integration.test.ts && tsx --test test/nfe-encat.collection.integration.test.ts && tsx --test test/sped.collection.integration.test.ts test/sped.replay.integration.test.ts test/sped.sanitization.integration.test.ts && tsx --test test/collection.hardening.integration.test.ts && tsx --test test/cgibs.collection.integration.test.ts",
+    "test:collection-integration": "tsx --test test/collection.persistence.integration.test.ts test/collection.run-lifecycle.integration.test.ts test/collection.scenarios.integration.test.ts test/collection.scheduler.integration.test.ts test/collection.stale-recovery.integration.test.ts test/collection.monitoring.integration.test.ts test/confaz.collection.integration.test.ts && tsx --test test/dou.collection.integration.test.ts && tsx --test test/nfe-encat.collection.integration.test.ts && tsx --test test/sped.collection.integration.test.ts test/sped.replay.integration.test.ts test/sped.sanitization.integration.test.ts && tsx --test test/collection.hardening.integration.test.ts && tsx --test test/cgibs.collection.integration.test.ts && tsx --test test/rfb-normas.cross-source.integration.test.ts",
     "db:ensure-confaz-source": "node dist/infrastructure/database/ensure-confaz-source.js",
     "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js",
     "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js",
@@ -40,7 +40,10 @@
     "db:gate-hardening": "node dist/infrastructure/database/gate-hardening.js",
     "db:ensure-cgibs-source": "node dist/infrastructure/database/ensure-cgibs-source.js",
     "db:trigger-cgibs-run": "node dist/infrastructure/database/trigger-cgibs-run.js",
-    "db:inspect-cgibs": "node dist/infrastructure/database/inspect-cgibs.js"
+    "db:inspect-cgibs": "node dist/infrastructure/database/inspect-cgibs.js",
+    "db:ensure-rfb-normas-source": "node dist/infrastructure/database/ensure-rfb-normas-source.js",
+    "db:trigger-rfb-normas-run": "node dist/infrastructure/database/trigger-rfb-normas-run.js",
+    "db:inspect-rfb-normas": "node dist/infrastructure/database/inspect-rfb-normas.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
