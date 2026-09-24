@@ -244,7 +244,7 @@ test('captures substantive retification separately and deterministically exclude
   assert.equal(filtering.discoveredCount, 2);
   assert.equal(filtering.includedCount, 1);
   assert.equal(filtering.excludedCount, 1);
-  assert.equal(filtering.excludedByReason.DUPLICATE_RETIFICATION_REFERENCE, 1);
+  assert.equal(filtering.excludedByReason.DUPLICATE_PUBLICATION_REFERENCE, 1);
   assert.equal(filtering.excludedItems[0].idAto, '148882');
 });
 
