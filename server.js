@@ -222,6 +222,59 @@ function segmentDiff(oldSegs,newSegs){
   return out;
 }
 
+// Ato normativo: tipos que criam, alteram ou orientam norma (inclui documentos técnicos fiscais do SPED/NF-e).
+// Ficam de fora extratos, avisos, editais, licitações, atas, comunicados e atos de pessoal.
+const NORMATIVE_SQL=`(
+  (p.act_type ~* '^(LEI|DECRETO|MEDIDA PROVIS|EMENDA CONSTITUCIONAL|PORTARIA|INSTRU[CÇ][AÃ]O NORMATIVA|RESOLU[CÇ][AÃ]O|CONV[EÊ]NIO ICMS|AJUSTE SINIEF|PROTOCOLO ICMS|ATO COTEPE|ATO DECLARAT|ATO T[EÉ]CNICO|SOLU[CÇ][AÃ]O DE CONSULTA|PARECER NORMATIVO|NOTA T[EÉ]CNICA|MANUAL|LEIAUTE|ESQUEMA|TABELA SPED|DELIBERA[CÇ][AÃ]O)'
+   AND p.act_type !~* '^PORTARIA DE PESSOAL')
+  OR (p.act_type IN ('RETIFICAÇÃO','REPUBLICAÇÃO') AND p.title ~* '(LEI|DECRETO|PORTARIA|INSTRU|RESOLU|CONV[EÊ]NIO ICMS|AJUSTE|PROTOCOLO|ATO )')
+) AND COALESCE(left(v.content_text,200),'') !~* '^\\s*(Nomeia|Designa|Exonera|Dispensa|Aposenta|Concede f[eé]rias|Concede licen)'`;
+
+// Citações: referências a outras normas no texto oficial, por regras determinísticas (sem IA).
+const CITE_TYPES=[
+  ["Lei Complementar","LEI COMPLEMENTAR"],["Decreto-Lei","DECRETO-LEI"],["Decreto Legislativo","DECRETO LEGISLATIVO"],["Lei","LEI"],["Decreto","DECRETO"],
+  ["Medida Provisória","MEDIDA PROVISÓRIA"],["Emenda Constitucional","EMENDA CONSTITUCIONAL"],["Instrução Normativa","INSTRUÇÃO NORMATIVA"],
+  ["Convênio ICMS","CONVÊNIO ICMS"],["Ajuste SINIEF","AJUSTE SINIEF"],["Protocolo ICMS","PROTOCOLO ICMS"],["Ato COTEPE","ATO COTEPE"],
+  ["Resolução","RESOLUÇÃO"],["Portaria","PORTARIA"],["Solução de Consulta","SOLUÇÃO DE CONSULTA"]
+];
+const MONTHS="janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro";
+const CITE_RE=new RegExp(String.raw`\b(${CITE_TYPES.map(t=>t[0].replace(/ /g,"\\s+")).join("|")})(?:\s+(?:Conjunta\s+)?([A-Z][A-Za-z]{1,9}(?:\/[A-Z][A-Za-z]{1,9})*))?\s+(?:n[º°o.]\s*|nº\s*)?(\d{1,3}(?:\.\d{3})+|\d{1,6})(?:\s*\/\s*(\d{2,4}))?(?:\s*,\s*de\s+\d{1,2}[º°o]?\s+de\s+(?:${MONTHS})\s+de\s+(\d{4})|\s*,\s*de\s+(\d{4})\b)?`,"gi");
+const QUAL_STOP=new Set(["DE","DA","DO","DOS","DAS","EM","NO","NA","QUE","FEDERAL","ESTADUAL","N"]);
+function extractCitations(text){
+  const out=new Map();
+  for(const m of String(text||"").matchAll(CITE_RE)){
+    const typeTxt=m[1].replace(/\s+/g," ");
+    const t=CITE_TYPES.find(x=>x[0].toLowerCase()===typeTxt.toLowerCase());if(!t)continue;
+    let qual=m[2]&&!QUAL_STOP.has(m[2].toUpperCase())?m[2].toUpperCase():null;
+    const num=m[3].replace(/\./g,"");
+    let year=m[5]||m[6]||m[4]||null;if(year&&year.length===2)year=(Number(year)>=50?"19":"20")+year;
+    const key=[t[1],qual||"",num,year||""].join("|");
+    if(!out.has(key))out.set(key,{type:t[1],qualifier:qual,number:num,year,label:m[0].replace(/\s+/g," ").trim()});
+    if(out.size>=40)break;
+  }
+  return [...out.values()];
+}
+async function resolveCitations(cites,self){
+  if(!cites.length)return [];
+  const nums=[...new Set(cites.map(c=>c.number))];
+  const r=await pool.query(`SELECT id,act_type,act_number,agency,uf,jurisdiction_level,title FROM publications
+    WHERE act_number IS NOT NULL AND split_part(act_number,'/',1) = ANY($1::text[])`,[nums]);
+  return cites.map(c=>{
+    let cands=r.rows.filter(p=>p.id!==self.id&&split(p.act_number)[0]===c.number&&String(p.act_type||"").toUpperCase().startsWith(c.type)
+      &&!(c.type==="LEI"&&/^LEI COMPLEMENTAR/i.test(p.act_type))&&!(c.type==="DECRETO"&&/^DECRETO[- ](LEI|LEGISLATIVO)/i.test(p.act_type)));
+    if(c.year)cands=cands.filter(p=>split(p.act_number)[1]===c.year);
+    if(c.qualifier)cands=cands.filter(p=>(String(p.agency||"")+" "+String(p.act_type||"")+" "+String(p.title||"")).toUpperCase().includes(c.qualifier));
+    const same=cands.filter(p=>p.jurisdiction_level===self.jurisdiction_level&&(p.uf||null)===(self.uf||null));
+    const pick=same.length===1?same[0]:cands.length===1?cands[0]:null;
+    // Forte: órgão citado confere, ou ano confere e a esfera/UF é compatível com a publicação que cita.
+    const strong=pick&&(c.qualifier||(c.year&&(same.length===1||!self.uf||pick.uf===self.uf)));
+    if(pick&&strong)return {...c,status:"FOUND",publication:{id:pick.id,title:cleanTitle(pick.title)}};
+    if(cands.length)return {...c,status:"POSSIBLE",candidates:cands.slice(0,3).map(p=>({id:p.id,title:cleanTitle(p.title)}))};
+    return {...c,status:"NOT_CAPTURED"};
+  });
+  function split(n){const [a,b]=String(n||"").split("/");return [a,b]}
+}
+
 // ===== Norma Clara: segmentação jurídica no servidor =====
 // Unidade: artigo, parágrafo (§/parágrafo único), ementa e preâmbulo. Incisos e alíneas ficam
 // dentro do caput/parágrafo; só viram bloco próprio quando o bloco passa de SEG_MAX caracteres.
@@ -328,8 +381,9 @@ async function api(req,res,pathname,url){
         const [items,stats]=await Promise.all([
           pool.query(`SELECT p.title,p.act_type,p.published_on,p.first_collected_at,p.uf,src.name AS source_name
             FROM publications p
+            LEFT JOIN publication_versions v ON v.publication_id=p.id AND v.is_current=TRUE
             JOIN LATERAL (SELECT s.name FROM publication_origins po JOIN sources s ON s.id=po.source_id WHERE po.publication_id=p.id ORDER BY po.first_seen_at LIMIT 1) src ON TRUE
-            WHERE p.identity_strength='STRONG' AND p.act_type IS NOT NULL AND p.act_type NOT IN ('COMUNICADO','EXTRATO','EDITAL','DESPACHO')
+            WHERE p.identity_strength='STRONG' AND ${NORMATIVE_SQL}
             ORDER BY p.first_collected_at DESC LIMIT 2`),
           pool.query(`SELECT (SELECT count(*)::int FROM publications) AS total,(SELECT max(finished_at) FROM collection_runs WHERE status IN ('SUCCESS','SUCCESS_NO_RESULTS','PARTIAL_SUCCESS')) AS last_collection_at`)
         ]);
@@ -386,10 +440,12 @@ async function api(req,res,pathname,url){
         SELECT p.id,p.title,p.act_type,p.act_number,p.agency,p.uf,p.jurisdiction_level,p.published_on,p.first_collected_at,
           COALESCE(src.source_name,p.agency,'Fonte oficial') AS source_name
         FROM publications p
+        LEFT JOIN publication_versions v ON v.publication_id=p.id AND v.is_current=TRUE
         LEFT JOIN LATERAL (
           SELECT s.name AS source_name FROM publication_origins po JOIN sources s ON s.id=po.source_id
           WHERE po.publication_id=p.id ORDER BY po.first_seen_at ASC LIMIT 1
         ) src ON TRUE
+        WHERE ${NORMATIVE_SQL}
         ORDER BY p.first_collected_at DESC LIMIT 8
       `);
       const sourceRows=await pool.query(`
@@ -468,9 +524,10 @@ async function api(req,res,pathname,url){
       const dateTo=String(url.searchParams.get("dateTo")||"").trim();
       const clauses=[];const params=[];
       const p=v=>{params.push(v);return "$"+params.length;};
+      let tsParam=null,likeParam=null;
       if(q){
         // UNION permite ao planejador usar o índice GIN de search_vector (o OR com ILIKE forçava varredura completa).
-        const like=p("%"+q+"%");const ts=p(q);
+        const like=p("%"+q+"%");const ts=p(q);tsParam=ts;likeParam=like;
         clauses.push(`p.id IN (
           SELECT pv.publication_id FROM publication_versions pv WHERE pv.is_current=TRUE AND pv.search_vector @@ websearch_to_tsquery('portuguese',${ts})
           UNION SELECT px.id FROM publications px WHERE px.title ILIKE ${like} OR COALESCE(px.act_number,'') ILIKE ${like} OR COALESCE(px.agency,'') ILIKE ${like})`);
@@ -482,7 +539,9 @@ async function api(req,res,pathname,url){
       if(agency){const x=p("%"+agency+"%");clauses.push(`p.agency ILIKE ${x}`);}
       const collectedDays=Math.min(Math.max(Number(url.searchParams.get("collectedDays")||0),0),31);
       if(collectedDays){const x=p(String(collectedDays));clauses.push(`p.first_collected_at>=now()-(${x}||' days')::interval`);}
-      const sortCollected=url.searchParams.get("sort")==="collected";
+      const sortParam=url.searchParams.get("sort")||"";
+      const sortCollected=sortParam==="collected";
+      if(url.searchParams.get("normative")==="1")clauses.push(NORMATIVE_SQL);
       if(dateFrom){const x=p(dateFrom);clauses.push(`p.published_on>=${x}::date`);}
       if(dateTo){const x=p(dateTo);clauses.push(`p.published_on<=${x}::date`);}
       const where=clauses.length?"WHERE "+clauses.join(" AND "):"";
@@ -491,7 +550,8 @@ async function api(req,res,pathname,url){
       const list=await pool.query(`
         SELECT p.id,p.jurisdiction_level,p.uf,p.agency,p.act_type,p.act_number,p.title,p.published_on,p.effective_on,
                p.primary_official_url,p.first_collected_at,v.relevant_excerpt,v.version_no,
-               src.source_name,src.source_code
+               src.source_name,src.source_code${tsParam?`,
+               ts_headline('portuguese',left(COALESCE(v.content_text,v.relevant_excerpt,''),20000),websearch_to_tsquery('portuguese',${tsParam}),'StartSel=[[b]],StopSel=[[/b]],MaxWords=28,MinWords=10,MaxFragments=1') AS snippet`:""}
         FROM publications p
         LEFT JOIN publication_versions v ON v.publication_id=p.id AND v.is_current=TRUE
         LEFT JOIN LATERAL (
@@ -499,7 +559,7 @@ async function api(req,res,pathname,url){
           WHERE po.publication_id=p.id ORDER BY po.first_seen_at ASC LIMIT 1
         ) src ON TRUE
         ${where}
-        ORDER BY ${sortCollected?"p.first_collected_at DESC":"p.published_on DESC NULLS LAST,p.first_collected_at DESC"}
+        ORDER BY ${sortCollected?"p.first_collected_at DESC":(tsParam&&sortParam!=="date")?`(p.title ILIKE ${likeParam})::int DESC, ts_rank(v.search_vector,websearch_to_tsquery('portuguese',${tsParam})) DESC, p.published_on DESC NULLS LAST`:"p.published_on DESC NULLS LAST,p.first_collected_at DESC"}
         LIMIT ${lim} OFFSET ${off}
       `,listParams);
       return json(res,200,{items:list.rows.map(withCleanTitle),total:count.rows[0].total,page,pageSize,totalPages:Math.max(Math.ceil(count.rows[0].total/pageSize),1)});
@@ -598,7 +658,9 @@ async function api(req,res,pathname,url){
       const map=new Map(tr.rows.map(r=>[r.h,r.translation_text]));
       const segments=segs.map(x=>({hash:x.hash,label:x.label,text:x.text,unlocked:map.has(x.hash),translation:map.get(x.hash)||null}));
       const versions=await pool.query(`SELECT id,version_no,captured_at,content_hash,is_current FROM publication_versions WHERE publication_id=$1 ORDER BY version_no DESC`,[id]);
-      return json(res,200,{publication:withCleanTitle(pub.rows[0]),origins:origins.rows,files:files.rows,versions:versions.rows,segments,normaClara:ncQuota(user)});
+      let citations=[];
+      try{citations=await resolveCitations(extractCitations(pub.rows[0].content_text||pub.rows[0].relevant_excerpt||""),pub.rows[0])}catch(e){console.error("citations failed",e.message)}
+      return json(res,200,{publication:withCleanTitle(pub.rows[0]),origins:origins.rows,files:files.rows,versions:versions.rows,citations,segments,normaClara:ncQuota(user)});
     }catch(e){console.error("detail failed",e);return json(res,500,{error:"detail_failed"});}
   }
   return false;

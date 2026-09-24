@@ -72,7 +72,7 @@ async function renderInicio(){
   metric("Publicadas hoje",n(m.published_today),"pela data oficial de publicação")+
   metric("Novas versões hoje",n(m.new_versions_today),"alterações de texto capturadas")+
  '</section>'+
- '<section class="dashboard-grid"><div class="surface"><div class="surface-head"><div><span>Últimas capturas</span><h2>Entraram agora no acervo</h2></div><a href="#publicacoes">Ver novidades →</a></div><div class="recent-list">'+
+ '<section class="dashboard-grid"><div class="surface"><div class="surface-head"><div><span>Últimas capturas · atos normativos</span><h2>Entraram agora no acervo</h2></div><a href="#publicacoes">Ver novidades →</a></div><div class="recent-list">'+
   (d.latest.length?d.latest.map(p=>'<button class="recent-row" data-pub="'+p.id+'"><span>'+(p.published_on?date(p.published_on):'<i class="muted">coletada '+date(p.first_collected_at)+'</i>')+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(p.source_name)+' · '+esc(p.act_type||"Publicação")+(p.uf?' · '+p.uf:'')+'</small></div><em aria-hidden="true">→</em></button>').join(""):'<div class="empty-inline">Nenhuma captura recente.</div>')+
  '</div></div><div class="surface source-mini"><div class="surface-head"><div><span>Saúde operacional</span><h2>Fontes</h2></div><a href="#monitoramento">Abrir central →</a></div><div class="health-summary"><div><b>'+n(d.sourcesSummary.OPERATIONAL||0)+'</b><span>Operacionais</span></div><div><b>'+n(d.sourcesSummary.UNSTABLE||0)+'</b><span>Instáveis</span></div><div><b>'+n(d.sourcesSummary.UNAVAILABLE||0)+'</b><span>Indisponíveis</span></div></div><div class="mini-sources">'+d.sources.map(s=>'<div><span class="health-dot '+healthClass(s.health)+'" aria-hidden="true"></span><b>'+esc(s.name)+'</b><small>'+healthLabel(s.health)+'</small></div>').join("")+'</div><div class="mini-foot">'+n(m.active_sources)+' fontes ativas · '+n(m.runs_24h)+' execuções em 24h</div></div></section>'+
  '<section class="module-section"><div class="section-title"><div><span>Portfólio TriBusca</span><h2>Atalhos</h2></div></div><div class="module-list">'+
@@ -83,7 +83,8 @@ async function renderInicio(){
 }
 
 // ===== Acervo e Publicações =====
-const FILTER_KEYS=["q","source","uf","jurisdiction","actType","agency","dateFrom","dateTo","period"];
+const FILTER_KEYS=["q","source","uf","jurisdiction","actType","agency","dateFrom","dateTo","period","normative","sort"];
+const snippetHtml=t=>esc(t).replace(/\[\[b\]\]/g,"<mark>").replace(/\[\[\/b\]\]/g,"</mark>");
 function stateFromQuery(qs){
  const p=new URLSearchParams(qs||"");
  FILTER_KEYS.forEach(k=>publicationState[k]=p.get(k)||"");
@@ -111,6 +112,7 @@ function activeFilterChips(){
  if(publicationState.actType)chips.push(["actType","Tipo: "+publicationState.actType]);
  if(publicationState.agency)chips.push(["agency","Órgão: "+publicationState.agency]);
  if(publicationState.uf)chips.push(["uf","UF: "+publicationState.uf]);
+ if(publicationState.normative==="1")chips.push(["normative","Somente atos normativos"]);
  if(publicationState.dateFrom||publicationState.dateTo)chips.push(["period","Período: "+(publicationState.dateFrom?date(publicationState.dateFrom+"T12:00:00"):"início")+" → "+(publicationState.dateTo?date(publicationState.dateTo+"T12:00:00"):"hoje")]);
  if(!chips.length)return "";
  return '<div class="active-filters">'+chips.map(c=>'<button type="button" data-clear-filter="'+c[0]+'" aria-label="Remover filtro '+esc(c[1])+'">'+esc(c[1])+' <span aria-hidden="true">×</span></button>').join("")+'<button type="button" class="clear-all" data-clear-filter="all">Limpar todos</button></div>';
@@ -124,6 +126,8 @@ function publicationFilters(){
    '<button id="toggle-filters" class="btn filter-toggle '+(filtersOpen?"active":"")+'" type="button" aria-expanded="'+filtersOpen+'" aria-controls="advanced-filters">Filtros <span id="filter-count"></span></button>'+
    '<button class="btn primary">Buscar</button>'+
  '</form>'+
+ '<div class="archive-options"><label class="switch"><input type="checkbox" id="pub-normative" '+(publicationState.normative==="1"?"checked":"")+'><span>Somente atos normativos</span></label>'+
+   '<label class="sort-select"><span>Ordenar</span><select id="pub-sort"><option value="">'+(publicationState.q?"Mais relevantes":"Mais recentes")+'</option><option value="date" '+(publicationState.sort==="date"?"selected":"")+'>Data de publicação</option></select></label></div>'+
  '<div id="advanced-filters" class="advanced-filters '+(filtersOpen?"open":"")+'">'+
    '<label><span>Esfera</span><select id="pub-j"><option value="">Todas</option><option value="FEDERAL" '+(publicationState.jurisdiction==="FEDERAL"?"selected":"")+'>Federal</option><option value="STATE" '+(publicationState.jurisdiction==="STATE"?"selected":"")+'>Estadual</option></select></label>'+
    '<label><span>Fonte oficial</span><select id="pub-source"><option value="">Todas as fontes</option>'+optionList(o.sources,publicationState.source,"label")+'</select></label>'+
@@ -159,6 +163,8 @@ function readFilterForm(){
  publicationState.actType=document.getElementById("pub-type").value;
  publicationState.agency=document.getElementById("pub-agency").value.trim();
  publicationState.uf=document.getElementById("pub-uf").value;
+ publicationState.normative=document.getElementById("pub-normative").checked?"1":"";
+ publicationState.sort=document.getElementById("pub-sort").value;
  applyPeriod();
 }
 function advancedCount(){return ["jurisdiction","source","actType","agency","uf"].filter(k=>publicationState[k]).length+(publicationState.dateFrom||publicationState.dateTo?1:0)}
@@ -186,13 +192,15 @@ async function renderAcervo(){
  document.getElementById("pub-period").onchange=e=>{document.querySelectorAll(".custom-date").forEach(x=>x.classList.toggle("show",e.target.value==="custom"))};
  document.getElementById("apply-filters").onclick=()=>{readFilterForm();refreshFilterChrome();loadPublications()};
  document.getElementById("clear-filter").onclick=()=>{FILTER_KEYS.forEach(k=>publicationState[k]="");publicationState.page=1;renderAcervo()};
+ document.getElementById("pub-normative").onchange=()=>{readFilterForm();refreshFilterChrome();loadPublications()};
+ document.getElementById("pub-sort").onchange=()=>{readFilterForm();loadPublications()};
  refreshFilterChrome();loadPublications();
 }
 async function loadPublications(){
  const el=document.getElementById("pub-results");if(!el)return;
  el.classList.add("is-loading");el.setAttribute("aria-busy","true");
  syncUrl();
- const params=new URLSearchParams({page:String(publicationState.page),pageSize:"25"});["q","source","uf","jurisdiction","actType","agency","dateFrom","dateTo"].forEach(k=>{if(publicationState[k])params.set(k,publicationState[k])});
+ const params=new URLSearchParams({page:String(publicationState.page),pageSize:"25"});["q","source","uf","jurisdiction","actType","agency","dateFrom","dateTo","normative","sort"].forEach(k=>{if(publicationState[k])params.set(k,publicationState[k])});
  let d;try{d=await api("/api/publications?"+params.toString())}catch(e){el.classList.remove("is-loading");el.innerHTML=errorBox("A busca falhou. Tente novamente.");return}
  el.classList.remove("is-loading");el.removeAttribute("aria-busy");
  if(!d.items.length){
@@ -200,22 +208,23 @@ async function loadPublications(){
  }
  el.innerHTML='<div class="results-head"><div><b>'+n(d.total)+'</b> publicação(ões)</div><span>Página '+d.page+' de '+n(d.totalPages)+'</span></div>'+
  '<div class="publication-table" role="list"><div class="publication-tr header" aria-hidden="true"><span>Data</span><span>Publicação</span><span>Fonte</span><span>Escopo</span><span></span></div>'+
- d.items.map(p=>'<button class="publication-tr" role="listitem" data-pub="'+p.id+'"><span>'+date(p.published_on)+'</span><span><b>'+esc(p.title)+'</b><small>'+esc([p.act_type,p.act_number,p.agency].filter(Boolean).join(" · "))+'</small></span><span>'+esc(p.source_name||p.agency||"—")+'</span><span>'+esc(p.jurisdiction_level==="FEDERAL"?"Federal":(p.uf||"Estadual"))+'</span><span aria-hidden="true">→</span></button>').join("")+'</div>'+
+ d.items.map(p=>'<button class="publication-tr" role="listitem" data-pub="'+p.id+'"><span>'+date(p.published_on)+'</span><span><b>'+esc(p.title)+'</b><small>'+esc([p.act_type,p.act_number,p.agency].filter(Boolean).join(" · "))+'</small>'+(p.snippet&&p.snippet.includes("[[b]]")?'<em class="snippet">…'+snippetHtml(p.snippet)+'…</em>':'')+'</span><span>'+esc(p.source_name||p.agency||"—")+'</span><span>'+esc(p.jurisdiction_level==="FEDERAL"?"Federal":(p.uf||"Estadual"))+'</span><span aria-hidden="true">→</span></button>').join("")+'</div>'+
  '<nav class="pagination" aria-label="Paginação"><button class="btn ghost" id="prev-page" '+(d.page<=1?"disabled":"")+'>← Anterior</button><span>'+n(d.total)+' resultados</span><button class="btn ghost" id="next-page" '+(d.page>=d.totalPages?"disabled":"")+'>Próxima →</button></nav>';
  document.getElementById("prev-page").onclick=()=>{if(publicationState.page>1){publicationState.page--;loadPublications();scrollTo(0,0)}};
  document.getElementById("next-page").onclick=()=>{if(publicationState.page<d.totalPages){publicationState.page++;loadPublications();scrollTo(0,0)}};
  bindPublicationClicks();
 }
 // Publicações = feed das novidades (coletadas nos últimos 7 dias), agrupado por dia.
-let feedState={page:1,items:[],total:0,totalPages:1};
+let feedState={page:1,items:[],total:0,totalPages:1},feedNormative=true;
 async function renderFeed(){
  setActive("publicacoes");publicationState.mode="publicacoes";feedState={page:1,items:[],total:0,totalPages:1};
- view.innerHTML=head("Inteligência","Publicações","Novidades capturadas nos últimos 7 dias, da mais recente para a mais antiga.",'<a class="btn ghost" href="#acervo">Buscar no acervo</a>')+'<div id="feed" class="surface publications-surface" aria-live="polite"><div class="page-loading">Carregando novidades…</div></div>';
+ view.innerHTML=head("Inteligência","Publicações","Novidades capturadas nos últimos 7 dias, da mais recente para a mais antiga.",'<a class="btn ghost" href="#acervo">Buscar no acervo</a>')+'<div class="archive-options"><label class="switch"><input type="checkbox" id="feed-normative" '+(feedNormative?"checked":"")+'><span>Somente atos normativos</span></label><span class="muted small">Sem o filtro, aparecem também extratos, avisos, editais e atos de pessoal.</span></div><div id="feed" class="surface publications-surface" aria-live="polite"><div class="page-loading">Carregando novidades…</div></div>';
+ document.getElementById("feed-normative").onchange=e=>{feedNormative=e.target.checked;feedState={page:1,items:[],total:0,totalPages:1};loadFeed()};
  await loadFeed();
 }
 async function loadFeed(){
  const el=document.getElementById("feed");if(!el)return;
- let d;try{d=await api("/api/publications?collectedDays=7&sort=collected&pageSize=50&page="+feedState.page)}catch(e){el.innerHTML=errorBox();return}
+ let d;try{d=await api("/api/publications?collectedDays=7&sort=collected&pageSize=50"+(feedNormative?"&normative=1":"")+"&page="+feedState.page)}catch(e){el.innerHTML=errorBox();return}
  feedState.items=feedState.items.concat(d.items);feedState.total=d.total;feedState.totalPages=d.totalPages;
  if(!feedState.items.length){el.innerHTML='<div class="empty-inline"><b>Nenhuma novidade nos últimos 7 dias.</b></div>';return}
  const today=brDay(new Date()),y=new Date();y.setDate(y.getDate()-1);const yesterday=brDay(y);
@@ -261,7 +270,7 @@ async function openPublication(id,push){
    factRow("Tipo de ato",esc(p.act_type||"—"))+factRow("Número",esc(p.act_number||"—"))+factRow("Órgão",esc(p.agency||"—"))+factRow("Esfera",esc(scope))+
    factRow("Publicação",date(p.published_on))+factRow("Vigência",p.effective_on?date(p.effective_on):"Não informada na fonte")+factRow("Capturada em",dt(p.first_collected_at))+factRow("Versão atual",esc(p.version_no||1)+(versions.length>1?" de "+versions.length:""))+
   '</dl></section>'+
-  '<section class="layer layer-intel" aria-labelledby="l-intel"><div class="layer-label" id="l-intel">Inteligência TriBusca</div><p><b>Marcadores Tributários:</b> esta publicação ainda não foi classificada. A classificação usará a taxonomia controlada da TriBusca e será exibida aqui, com evidência.</p></section>'+
+  '<section class="layer layer-intel" aria-labelledby="l-intel"><div class="layer-label" id="l-intel">Inteligência TriBusca</div><p><b>Marcadores Tributários:</b> esta publicação ainda não foi classificada. A classificação usará a taxonomia controlada da TriBusca e será exibida aqui, com evidência.</p>'+citationsHtml(d.citations||[])+'</section>'+
   '<div class="detail-tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="texto">Texto oficial</button><button role="tab" aria-selected="false" data-tab="origem">Arquivos e origem ('+(files.length+origins.length)+')</button><button role="tab" aria-selected="false" data-tab="versoes">Versões ('+versions.length+')</button></div>'+
   '<div class="tab-panel" data-panel="texto" role="tabpanel"><article class="legal-document">'+documentHtml+'</article></div>'+
   '<div class="tab-panel" data-panel="origem" role="tabpanel" hidden><h3 class="panel-h">Origens oficiais'+(origins.length>1?' <small>também publicado em '+(origins.length-1)+' outra(s) fonte(s)</small>':'')+'</h3>'+originsHtml+'<h3 class="panel-h">Arquivos preservados</h3>'+filesHtml+'</div>'+
@@ -271,6 +280,8 @@ async function openPublication(id,push){
   content.querySelectorAll("[data-panel]").forEach(x=>x.hidden=x.dataset.panel!==t.dataset.tab);
  });
  content.querySelectorAll("[data-diff]").forEach(b=>b.onclick=()=>showDiff(p.id,Number(b.dataset.diff)));
+ content.querySelectorAll(".cite-link[data-pub]").forEach(b=>b.onclick=()=>{openPublication(b.dataset.pub,true);document.querySelector(".drawer-panel").scrollTop=0});
+ content.querySelectorAll(".cite-maybe").forEach(a=>a.onclick=()=>document.getElementById("drawer").classList.remove("open"));
  document.getElementById("copy-link").onclick=async e=>{const url=location.origin+location.pathname+"#acervo?pub="+p.id;try{await navigator.clipboard.writeText(url);e.target.textContent="Link copiado"}catch{e.target.textContent=url}};
  content.querySelectorAll(".norma-segment-btn").forEach(btn=>{
    btn.onclick=()=>{
@@ -280,6 +291,16 @@ async function openPublication(id,push){
    };
  });
  updateQuota(d.normaClara);
+}
+function citationsHtml(list){
+ if(!list.length)return '<p class="cite-empty"><b>Normas citadas:</b> nenhuma referência a outra norma foi identificada no texto.</p>';
+ const found=list.filter(c=>c.status==="FOUND").length;
+ return '<div class="citations"><p><b>Normas citadas no texto</b> <span class="muted">· '+list.length+' identificada(s) por regras no texto oficial'+(found?', '+found+' no acervo':'')+'</span></p><ul>'+
+  list.map(c=>'<li><span class="cite-label">'+esc(c.label)+'</span>'+(c.status==="FOUND"
+    ?'<button type="button" class="cite-link" data-pub="'+c.publication.id+'">Abrir no acervo →</button>'
+    :c.status==="POSSIBLE"
+      ?'<a class="cite-maybe" href="#acervo?q='+encodeURIComponent(c.label)+'">'+c.candidates.length+' possível(is) correspondência(s) →</a>'
+      :'<span class="cite-missing">ainda não capturada</span>')+'</li>').join("")+'</ul></div>';
 }
 async function showDiff(id,to){
  const area=document.getElementById("diff-area");area.innerHTML='<div class="page-loading">Comparando versões…</div>';
