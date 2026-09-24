@@ -134,12 +134,12 @@ test('reads modern official JSON API and treats optional 403/406 as unavailable'
 });
 
 
-test('accepts HTML only when the official attachment is explicitly declared .htm', async () => {
+test('accepts declared official HTML attachment even when server MIME is generic', async () => {
   const html = new TextEncoder().encode('<html><body><table><tr><td>Anexo oficial</td></tr></table></body></html>');
   const client = new RfbNormasClient({
     fetch: (async () => new Response(html, {
       status: 200,
-      headers: { 'content-type': 'application/htm' },
+      headers: { 'content-type': 'application/octet-stream' },
     })) as typeof fetch,
   });
 
