@@ -1,12 +1,12 @@
 
 (function(){
-  function goApp(user){ localStorage.setItem("tribuscaMockUser",JSON.stringify(user)); location.href="/app.html"; }
-  const lf=document.getElementById("login-form");
-  if(lf) lf.addEventListener("submit",e=>{e.preventDefault(); const email=document.getElementById("login-email").value.trim(); goApp({name:email.split("@")[0],email,company:"Empresa Demonstrativa S.A."});});
-  const rf=document.getElementById("register-form");
-  if(rf) rf.addEventListener("submit",e=>{e.preventDefault(); goApp({name:document.getElementById("reg-name").value.trim(),email:document.getElementById("reg-email").value.trim(),company:document.getElementById("reg-company").value.trim()});});
-  const u=document.getElementById("mock-user");
-  if(u){ const user=JSON.parse(localStorage.getItem("tribuscaMockUser")||'{"name":"Visitante","company":"Empresa Demonstrativa S.A."}'); u.textContent=(user.name||"Visitante")+" · "+(user.company||"Empresa Demonstrativa S.A."); }
-  const lo=document.getElementById("logout");
-  if(lo) lo.addEventListener("click",()=>{localStorage.removeItem("tribuscaMockUser");location.href="/login.html";});
+ async function request(url,options){const r=await fetch(url,{credentials:"same-origin",headers:{"Content-Type":"application/json"},...options});let data={};try{data=await r.json()}catch{};if(!r.ok)throw Object.assign(new Error(data.error||"request_failed"),{status:r.status,data});return data;}
+ const lf=document.getElementById("login-form");
+ if(lf)lf.addEventListener("submit",async e=>{e.preventDefault();const msg=document.getElementById("auth-message");msg.textContent="Entrando…";try{await request("/api/login",{method:"POST",body:JSON.stringify({email:document.getElementById("login-email").value,password:document.getElementById("login-password").value})});location.href="/app.html";}catch(err){msg.textContent="E-mail ou senha inválidos. Você também pode usar demo@tribusca.com.br / demo123.";}});
+ const rf=document.getElementById("register-form");
+ if(rf)rf.addEventListener("submit",async e=>{e.preventDefault();const msg=document.getElementById("auth-message");msg.textContent="Criando conta…";try{await request("/api/register",{method:"POST",body:JSON.stringify({name:document.getElementById("reg-name").value,email:document.getElementById("reg-email").value,company:document.getElementById("reg-company").value,password:document.getElementById("reg-password").value})});location.href="/app.html";}catch(err){msg.textContent="Revise os campos e tente novamente.";}});
+ const lo=document.getElementById("logout");
+ if(lo)lo.addEventListener("click",async()=>{try{await request("/api/logout",{method:"POST"})}catch{}location.href="/login.html";});
+ const u=document.getElementById("inside-user");
+ if(u)request("/api/me",{method:"GET"}).then(d=>u.textContent=d.user.name+" · "+d.user.company).catch(()=>location.href="/login.html");
 })();
