@@ -332,6 +332,7 @@ export class RfbNormasConnector implements CollectionConnector {
           if (kind === 'original') original = parsed;
         } catch (error) {
           if (kind === 'original') throw error;
+          failedIncluded = true;
           const info = failureInfo(error);
           partialFailures.push({
             code: info.code,
@@ -485,11 +486,12 @@ export class RfbNormasConnector implements CollectionConnector {
       start: Date,
       end: Date,
       page: number,
-    ): Promise<{ totalPages: number; yielded: boolean }> => {
+    ): Promise<{ totalPages: number; yielded: boolean; failedIncluded: boolean }> => {
       const url = buildRfbSearchUrl({ start, end, page });
       const search = await client.getHtml(url, context.signal);
       counters.searchPages += 1;
       const parsed = parseRfbSearchPage(search.html, page);
+      let failedIncluded = false;
 
       for (const item of parsed.items) {
         const decision = decideRfbCapture(item);
@@ -497,7 +499,7 @@ export class RfbNormasConnector implements CollectionConnector {
         if (!decision.included) continue;
 
         if (context.budget?.shouldYield()) {
-          return { totalPages: parsed.totalPages, yielded: true };
+          return { totalPages: parsed.totalPages, yielded: true, failedIncluded };
         }
 
         try {
@@ -508,7 +510,7 @@ export class RfbNormasConnector implements CollectionConnector {
             (error.kind === 'CANCELLED' || error.code === 'RFB_NORMAS_TIME_BUDGET_REACHED')
           ) {
             if (error.kind === 'CANCELLED') throw error;
-            return { totalPages: parsed.totalPages, yielded: true };
+            return { totalPages: parsed.totalPages, yielded: true, failedIncluded };
           }
           const info = failureInfo(error);
           partialFailures.push({
@@ -518,7 +520,7 @@ export class RfbNormasConnector implements CollectionConnector {
           });
         }
       }
-      return { totalPages: parsed.totalPages, yielded: false };
+      return { totalPages: parsed.totalPages, yielded: false, failedIncluded };
     };
 
     let bootstrap = { ...state.bootstrap };
@@ -544,6 +546,18 @@ export class RfbNormasConnector implements CollectionConnector {
             complete: false,
             reason: 'TIME_BUDGET_REACHED',
             pending: { bootstrapMonths: pendingMonths(bootstrap.month, now) },
+          };
+          break;
+        }
+
+        if (result.failedIncluded) {
+          completion = {
+            complete: false,
+            reason: 'PARTIAL_FAILURE_RETRY_REQUIRED',
+            pending: {
+              bootstrapMonths: pendingMonths(bootstrap.month, now),
+              bootstrapPage: bootstrap.page,
+            },
           };
           break;
         }
