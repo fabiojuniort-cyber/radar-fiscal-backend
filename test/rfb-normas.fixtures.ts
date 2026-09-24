@@ -1,7 +1,7 @@
 export const RFB_SEARCH_FIXTURE = `<!doctype html><html><body>
 <div>Total de atos localizados: 5</div><div>Página 1 de 1</div>
 <table><tbody>
-<tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/150001">Instrução Normativa</a></td><td>2.344</td><td>RFB</td><td>23/09/2026</td><td>Altera regras de tributação federal e obrigações acessórias.</td></tr>
+<tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/150001">Instrução Normativa</a></td><td>2.344</td><td>RFB</td><td>21/09/2026</td><td>Altera regras de tributação federal e obrigações acessórias.</td></tr>
 <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/150002">Solução de Consulta</a></td><td>180</td><td>Cosit</td><td>23/09/2026</td><td>Assunto: Cofins. Crédito presumido de ICMS. Não incidência.</td></tr>
 <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/150003">Portaria</a></td><td>732</td><td>RFB</td><td>23/09/2026</td><td>Suspende temporariamente as atividades da Agência da Receita Federal do Brasil que especifica.</td></tr>
 <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/150004">Ato Declaratório Executivo</a></td><td>123</td><td>Coana</td><td>23/09/2026</td><td>Certifica como Operador Econômico Autorizado a pessoa jurídica que especifica.</td></tr>
