@@ -50,6 +50,9 @@ async function translateSegment(button,versionId,text){
     const data=await r.json();
     if(!r.ok){
       if(data.error==="openai_not_configured")throw new Error("OPENAI_NOT_CONFIGURED");
+      if(data.error==="openai_credit_balance_exhausted")throw new Error("OPENAI_CREDITS");
+      if(data.error==="openai_spend_limit_exceeded")throw new Error("OPENAI_SPEND_LIMIT");
+      if(data.error==="openai_model_not_found")throw new Error("OPENAI_MODEL");
       throw new Error(data.error||"request_failed");
     }
     box.innerHTML='<span>NORMA CLARA · '+(data.cached?'REUTILIZADA':'GERADA AGORA')+'</span><p>'+esc(data.translation)+'</p>';
@@ -57,7 +60,13 @@ async function translateSegment(button,versionId,text){
   }catch(e){
     box.innerHTML=e.message==="OPENAI_NOT_CONFIGURED"
       ?'<span>NORMA CLARA</span><p>A integração está instalada, mas falta configurar a chave da OpenAI no serviço Railway.</p>'
-      :'<span>NORMA CLARA</span><p>Não foi possível gerar a tradução agora. Tente novamente.</p>';
+      :e.message==="OPENAI_CREDITS"
+        ?'<span>NORMA CLARA · API SEM CRÉDITOS</span><p>A integração está funcionando, mas o saldo da OpenAI API acabou. Após adicionar créditos à conta da API, tente novamente.</p>'
+        :e.message==="OPENAI_SPEND_LIMIT"
+          ?'<span>NORMA CLARA · LIMITE DE GASTO</span><p>A OpenAI API atingiu o limite de gasto configurado para a organização ou projeto.</p>'
+          :e.message==="OPENAI_MODEL"
+            ?'<span>NORMA CLARA · MODELO INDISPONÍVEL</span><p>O modelo configurado para a Norma Clara não está disponível para esta conta.</p>'
+            :'<span>NORMA CLARA</span><p>Não foi possível gerar a tradução agora. Tente novamente.</p>';
     button.textContent="Tentar Norma Clara novamente";
   }finally{button.disabled=false}
 }
