@@ -106,7 +106,7 @@ test('collects deterministic scope and reports discovered/included/excluded reas
 
   const sc = result.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA');
   assert.ok(sc);
-  assert.equal(sc.files?.length, 1);
+  assert.equal(((sc.metadata?.rfbNormas as any).files ?? []).length, 1);
   assert.equal(fake.fileDownloads(), 1);
 });
 
