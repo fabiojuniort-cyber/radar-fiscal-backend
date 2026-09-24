@@ -6,9 +6,10 @@ import { normalizePublication } from '../src/modules/collection/publication.norm
 import {
   ADE_API_ORIGINAL,
   IN_API_ORIGINAL,
+  RETIFICATION_API_ORIGINAL,
+  RETIFICATION_DUPLICATE_API_ORIGINAL,
+  RFB_RETIFICATION_SEARCH_FIXTURE,
   SC_API_ORIGINAL,
-  PORTARIA_RETIFICATION_API,
-  PORTARIA_DUPLICATE_API,
   representationPayload,
   RFB_EMPTY_FIXTURE,
   RFB_SEARCH_FIXTURE,
@@ -179,58 +180,72 @@ test('attachment byte change creates a content hash change for the same publicat
 
   const firstSc = first.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
   const changedSc = changed.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
-  const firstNormalized = normalizePublication({ sourceId: CONTEXT.sourceId, publication: firstSc });
-  const changedNormalized = normalizePublication({ sourceId: CONTEXT.sourceId, publication: changedSc });
+  const n1 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: firstSc });
+  const n2 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: changedSc });
 
-  assert.equal(firstNormalized.identityHash, changedNormalized.identityHash);
-  assert.notEqual(firstNormalized.contentHash, changedNormalized.contentHash);
+  assert.equal(n1.identityHash, n2.identityHash);
+  assert.notEqual(n1.contentHash, n2.contentHash);
 });
 
-test('official repeated retification reuses target canonical content without artificial version hash', async () => {
-  const search = `<!doctype html><html><body>
-  <div>Total de atos localizados: 2</div><div>Página 1 de 1</div>
-  <table><tbody>
-  <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148881">Portaria</a></td><td>619</td><td>RFB</td><td>16/01/2026</td><td>Retificação tributária da Portaria RFB nº 619/2025.</td></tr>
-  <tr><td><a href="https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148882">Portaria</a></td><td>619</td><td>RFB</td><td>16/01/2026</td><td>Retificação tributária da Portaria RFB nº 619/2025.</td></tr>
-  </tbody></table></body></html>`;
-
+test('captures substantive retification separately and deterministically excludes repeated publication reference', async () => {
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(input.toString());
     if (url.pathname.endsWith('/consulta.action')) {
-      return new Response(search, { status: 200, headers: { 'content-type': 'text/html' } });
+      return new Response(RFB_RETIFICATION_SEARCH_FIXTURE, {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
     }
-    const match = /\/api\/consulta-externa\/ato\/(148881|148882)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
-    if (!match?.[1] || !match[2]) return new Response('missing', { status: 404 });
-    if (match[2] !== 'original') return new Response(null, { status: 406 });
-    const payload = match[1] === '148881' ? PORTARIA_RETIFICATION_API : PORTARIA_DUPLICATE_API;
-    return new Response(JSON.stringify(payload), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
+    if (url.hostname === 'normasinternet2.receita.fazenda.gov.br') {
+      const match = /\/ato\/(\d+)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+      const id = match?.[1];
+      const view = match?.[2] as 'original' | 'vigente' | 'multivigente' | 'relacional' | undefined;
+      if (!id || !view) return new Response('missing', { status: 404 });
+      if (view === 'relacional') return new Response(null, { status: 403 });
+      const base =
+        id === '148881' ? RETIFICATION_API_ORIGINAL :
+        id === '148882' ? RETIFICATION_DUPLICATE_API_ORIGINAL :
+        undefined;
+      if (!base) return new Response('missing', { status: 404 });
+      const payload = representationPayload(base, view);
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response('not found', { status: 404 });
   }) as typeof fetch;
 
   const result = await new RfbNormasConnector({
     fetch: fetchImpl,
     readState: async () => incrementalState(),
-    now: () => new Date('2026-01-16T15:00:00Z'),
+    now: () => new Date('2025-12-06T15:00:00Z'),
+    lookbackDays: 7,
   }).collect(CONTEXT);
 
-  assert.equal(result.publications.length, 2);
-  const first = result.publications.find(p => p.externalId === '148881')!;
-  const duplicate = result.publications.find(p => p.externalId === '148882')!;
-  const n1 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: first });
-  const n2 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: duplicate });
+  assert.equal(result.publications.length, 1);
+  const retification = result.publications[0]!;
+  assert.equal(retification.actType, 'RETIFICAÇÃO');
+  assert.equal(retification.actNumber, undefined);
+  assert.equal(retification.externalId, '148881');
+  assert.match(retification.title, /^RETIFICAÇÃO — PORTARIA RFB Nº 619/);
+  assert.equal(
+    retification.identityKey,
+    'RFB_NORMAS|RETIFICATION|RFB|PORTARIA|619/2025|2025-12-05',
+  );
+  assert.equal((retification.metadata?.rfbNormas as any).revisionKind, 'RETIFICATION');
+  assert.deepEqual((retification.metadata?.rfbNormas as any).targetAct, {
+    agency: 'RFB',
+    actType: 'PORTARIA',
+    actNumber: '619/2025',
+  });
 
-  assert.equal(n1.identityHash, n2.identityHash);
-  assert.equal(n1.contentHash, n2.contentHash);
-  assert.equal(
-    (duplicate.metadata?.rfbNormas as any).duplicateOfIdAto,
-    '148881',
-  );
-  assert.equal(
-    (duplicate.metadata?.rfbNormas as any).canonicalOriginalIdAto,
-    '148881',
-  );
+  const filtering = (result.metadata as any).rfbNormas.filtering;
+  assert.equal(filtering.discoveredCount, 2);
+  assert.equal(filtering.includedCount, 1);
+  assert.equal(filtering.excludedCount, 1);
+  assert.equal(filtering.excludedByReason.DUPLICATE_RETIFICATION_REFERENCE, 1);
+  assert.equal(filtering.excludedItems[0].idAto, '148882');
 });
 
 test('successful empty search returns zero publications, unavailable source throws', async () => {
