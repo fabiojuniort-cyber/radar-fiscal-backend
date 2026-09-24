@@ -217,6 +217,35 @@ function addDecision(
   }
 }
 
+function reclassifyIncludedAsExcluded(
+  metrics: FilteringMetrics,
+  item: RfbNormasListingItem,
+  decision: RfbFilterDecision,
+  reason: string,
+  maxExcludedItems: number,
+): void {
+  metrics.includedCount = Math.max(0, metrics.includedCount - 1);
+  const category = decision.category ?? 'UNKNOWN';
+  const currentCategory = metrics.includedByCategory[category] ?? 0;
+  if (currentCategory <= 1) delete metrics.includedByCategory[category];
+  else metrics.includedByCategory[category] = currentCategory - 1;
+
+  metrics.excludedCount += 1;
+  metrics.excludedByReason[reason] = (metrics.excludedByReason[reason] ?? 0) + 1;
+  if (metrics.excludedItems.length < maxExcludedItems) {
+    metrics.excludedItems.push({
+      idAto: item.idAto,
+      type: item.type,
+      number: item.number,
+      agency: item.agency,
+      publishedOn: dateOnly(item.publishedAt),
+      reason,
+    });
+  } else {
+    metrics.excludedItemsTruncated += 1;
+  }
+}
+
 function pendingMonths(cursorMonth: string, now: Date): number {
   const cursor = monthStart(cursorMonth);
   const current = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -356,56 +385,18 @@ export class RfbNormasConnector implements CollectionConnector {
         });
       }
 
-      let canonicalOriginal = original;
-      let canonicalOriginalIdAto = item.idAto;
-      if (original.duplicateOfIdAto) {
-        const seenTargets = new Set<string>([item.idAto]);
-        let targetId = original.duplicateOfIdAto;
-        for (let depth = 0; depth < 5; depth += 1) {
-          if (seenTargets.has(targetId)) {
-            throw new ConnectorError('RFB_NORMAS_DUPLICATE_REFERENCE_LOOP', {
-              code: 'RFB_NORMAS_DUPLICATE_REFERENCE_LOOP',
-              kind: 'PROCESSING_ERROR',
-              retryable: false,
-            });
-          }
-          seenTargets.add(targetId);
-          counters.representationRequests += 1;
-          const targetResponse = await client.getJson(
-            buildRfbApiRepresentationUrl(targetId, 'original'),
-            context.signal,
-          );
-          const targetPayloadId = (targetResponse.payload as { idAto?: unknown } | null)?.idAto;
-          if (String(targetPayloadId ?? '') !== targetId) {
-            throw new ConnectorError('RFB_NORMAS_DUPLICATE_TARGET_ID_MISMATCH', {
-              code: 'RFB_NORMAS_DUPLICATE_TARGET_ID_MISMATCH',
-              kind: 'PROCESSING_ERROR',
-              retryable: false,
-            });
-          }
-          const target = parseRfbApiRepresentation(targetResponse.payload);
-          if (!target.normalizedText) {
-            throw new ConnectorError('RFB_NORMAS_DUPLICATE_TARGET_EMPTY', {
-              code: 'RFB_NORMAS_DUPLICATE_TARGET_EMPTY',
-              kind: 'PROCESSING_ERROR',
-              retryable: true,
-            });
-          }
-          canonicalOriginal = target;
-          canonicalOriginalIdAto = targetId;
-          if (!target.duplicateOfIdAto) break;
-          targetId = target.duplicateOfIdAto;
-          if (depth === 4) {
-            throw new ConnectorError('RFB_NORMAS_DUPLICATE_REFERENCE_DEPTH', {
-              code: 'RFB_NORMAS_DUPLICATE_REFERENCE_DEPTH',
-              kind: 'PROCESSING_ERROR',
-              retryable: false,
-            });
-          }
-        }
+      counters.detailRequests += 1;
+      if (original.duplicatePublicationReference) {
+        reclassifyIncludedAsExcluded(
+          filtering,
+          item,
+          decision,
+          'DUPLICATE_RETIFICATION_REFERENCE',
+          maxExcludedItems,
+        );
+        return;
       }
 
-      counters.detailRequests += 1;
       const canonical = canonicalizeRfbListingNumber(
         {
           ...item,
@@ -418,7 +409,7 @@ export class RfbNormasConnector implements CollectionConnector {
       );
       const files: ConnectorFile[] = [];
 
-      for (const attachment of canonicalOriginal.attachments) {
+      for (const attachment of original.attachments) {
         context.signal.throwIfAborted();
         const previous = state.files[attachment.externalId];
         if (previous && !shouldRecheck(previous, now, revisitAfterMs)) {
@@ -487,9 +478,23 @@ export class RfbNormasConnector implements CollectionConnector {
       }
 
       const sourceTitle = original.title ?? fallbackTitle(item);
-      const title = sourceTitle.toLocaleUpperCase('pt-BR');
-      const canonicalContent = canonicalOriginal.normalizedText;
+      const isRetification = original.revisionKind === 'RETIFICATION';
+      const title = isRetification
+        ? `RETIFICAÇÃO — ${sourceTitle.toLocaleUpperCase('pt-BR')}`
+        : sourceTitle.toLocaleUpperCase('pt-BR');
+      const canonicalContent = original.normalizedText;
       const officialUrl = buildRfbModernRepresentationUrl(item.idAto, 'original');
+      const publishedAt = original.publishedAt ?? item.publishedAt;
+      const retificationIdentity = isRetification
+        ? [
+            'RFB_NORMAS',
+            'RETIFICATION',
+            canonical.agency ?? original.agency ?? item.agency,
+            canonical.actType ?? original.type ?? item.type,
+            canonical.actNumber ?? item.number,
+            dateOnly(publishedAt),
+          ].join('|')
+        : undefined;
       const metadata: Record<string, unknown> = {
         sourceRole: 'ENRICHMENT',
         representationSourceRole: 'PRIMARY',
@@ -509,30 +514,41 @@ export class RfbNormasConnector implements CollectionConnector {
           abstract: item.abstract,
           representations,
           files,
-          ...(original.duplicateOfIdAto
-            ? {
-                duplicateOfIdAto: original.duplicateOfIdAto,
-                canonicalOriginalIdAto,
-                canonicalOriginalNormalizedHash: canonicalOriginal.normalizedHash,
-              }
-            : {}),
           ...(canonical.actDate ? { actDate: dateOnly(canonical.actDate) } : {}),
           republication: original.republication,
+          ...(isRetification
+            ? {
+                revisionKind: 'RETIFICATION',
+                targetAct: {
+                  ...(canonical.agency ? { agency: canonical.agency } : {}),
+                  ...(canonical.actType ? { actType: canonical.actType } : {}),
+                  ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
+                },
+              }
+            : {}),
         },
       };
 
-      const strong = canonical.agency && canonical.actType && canonical.actNumber;
+      const strong = !isRetification && canonical.agency && canonical.actType && canonical.actNumber;
       publications.push({
         title,
         sphere: 'FEDERAL',
         ...(canonical.agency ? { agency: canonical.agency } : {}),
-        ...(canonical.actType ? { actType: canonical.actType } : {}),
-        ...(canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
-        publishedAt: original.publishedAt ?? item.publishedAt,
+        ...(isRetification
+          ? { actType: 'RETIFICAÇÃO' }
+          : canonical.actType
+            ? { actType: canonical.actType }
+            : {}),
+        ...(!isRetification && canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
+        publishedAt,
         content: canonicalContent,
         officialUrl,
         externalId: item.idAto,
-        ...(!strong ? { identityKey: `RFB_NORMAS|${item.idAto}` } : {}),
+        ...(retificationIdentity
+          ? { identityKey: retificationIdentity }
+          : !strong
+            ? { identityKey: `RFB_NORMAS|${item.idAto}` }
+            : {}),
         ...(files.length ? { files } : {}),
         metadata,
       });
