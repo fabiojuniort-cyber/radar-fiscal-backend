@@ -54,10 +54,13 @@ const SOURCE_HEALTH_SQL=`
   (SELECT max(cr.finished_at) FROM collection_runs cr WHERE cr.source_id=s.id AND cr.status='PARTIAL_SUCCESS') AS last_partial_success_at,
   (SELECT cr.status FROM collection_runs cr WHERE cr.source_id=s.id AND cr.finished_at IS NOT NULL ORDER BY cr.finished_at DESC LIMIT 1) AS last_finished_status,
   (SELECT cr.status FROM collection_runs cr WHERE cr.source_id=s.id ORDER BY cr.scheduled_for DESC LIMIT 1) AS last_run_status,
-  (SELECT ca.response_time_ms FROM collection_attempts ca JOIN collection_runs cr ON cr.id=ca.collection_run_id WHERE cr.source_id=s.id AND ca.response_time_ms IS NOT NULL ORDER BY ca.started_at DESC LIMIT 1) AS last_response_time_ms`;
+  (SELECT ca.response_time_ms FROM collection_attempts ca JOIN collection_runs cr ON cr.id=ca.collection_run_id WHERE cr.source_id=s.id AND ca.response_time_ms IS NOT NULL ORDER BY ca.started_at DESC LIMIT 1) AS last_response_time_ms,
+  (SELECT json_build_object('status',cr.status,'started_at',cr.started_at,'finished_at',cr.finished_at,'trigger_type',cr.trigger_type,'error_summary',left(cr.error_summary,240)) FROM collection_runs cr WHERE cr.source_id=s.id ORDER BY cr.scheduled_for DESC LIMIT 1) AS last_run,
+  (SELECT count(*)::int FROM collection_attempts ca JOIN collection_runs cr ON cr.id=ca.collection_run_id WHERE cr.source_id=s.id AND ca.started_at>=now()-interval '24 hours' AND ca.status NOT IN ('SUCCESS','SUCCESS_NO_RESULTS','PARTIAL_SUCCESS','RUNNING','PENDING')) AS failed_attempts_24h,
+  (SELECT min(cr.scheduled_for) FROM collection_runs cr WHERE cr.source_id=s.id AND cr.status='PENDING' AND cr.scheduled_for>now()) AS next_pending_at`;
 function withHealth(r){
   const last=[r.last_full_success_at,r.last_partial_success_at].filter(Boolean).map(x=>new Date(x)).sort((a,b)=>b-a)[0]||null;
-  return {...r,last_success_at:last,health:sourceHealth(r)};
+  return {...r,last_success_at:last,next_run_at:r.next_pending_at||(r.is_active?nextCronRun(r.schedule_cron):null),health:sourceHealth(r)};
 }
 function requireUser(req,res){const user=sessionUser(req);if(!user){json(res,401,{error:"unauthorized"});return null;}return user;}
 async function requireDb(res){if(!pool){json(res,503,{error:"database_unavailable"});return false;}return true;}
@@ -153,7 +156,7 @@ async function generateNormaClara(sourceText){
 // COVERAGE_VIA: fonte cuja cobertura é garantida por outra fonte primária (decisão congelada: DOU é PRIMARY do CONFAZ).
 const COVERAGE_VIA={confaz:"dou"};
 const FEDERAL_DISPLAY=[["dou","DOU / INLABS"],["confaz","CONFAZ"],["nfe-encat","Portal NF-e / ENCAT"],["sped","SPED"],["cgibs","CGIBS"],["rfb-normas","Receita Federal"]];
-let coverageCache={at:0,data:null};
+let coverageCache={at:0,data:null},latestCache={at:0,data:null};
 async function publicCoverage(){
   if(coverageCache.data&&Date.now()-coverageCache.at<5*60e3)return coverageCache.data;
   const r=await pool.query(`
@@ -175,6 +178,47 @@ async function publicCoverage(){
   for(const x of r.rows){if(x.jurisdiction_level==="STATE"&&x.uf&&status(x.code).status==="DISPONIVEL")states[x.uf]="DISPONIVEL";}
   coverageCache={at:Date.now(),data:{federal,states,updatedAt:new Date().toISOString()}};
   return coverageCache.data;
+}
+
+// Remove sufixos técnicos de nome de arquivo do título exibido (ex.: "(.zip 18,86 KBytes)").
+const cleanTitle=t=>String(t||"").replace(/\s*\((?:\.[a-z0-9]{2,5}\s+)?[\d.,]+\s*[KMG]?Bytes\)\s*$/i,"").trim();
+const withCleanTitle=r=>({...r,title:cleanTitle(r.title)});
+// Próxima execução prevista a partir do cron (min h * * *), em America/Sao_Paulo (UTC-3, sem horário de verão).
+function nextCronRun(cron,from=Date.now()){
+  const p=String(cron||"").trim().split(/\s+/);if(p.length<5)return null;
+  const field=(f,max)=>{if(f==="*")return [...Array(max).keys()];const st=f.match(/^\*\/(\d+)$/);if(st)return [...Array(max).keys()].filter(x=>x%Number(st[1])===0);return f.split(",").map(Number).filter(x=>Number.isInteger(x)&&x>=0&&x<max)};
+  const mins=field(p[0],60),hours=field(p[1],24);if(!mins.length||!hours.length)return null;
+  const offset=3*3600e3;let t=new Date(from-offset);t.setUTCSeconds(0,0);t=new Date(t.getTime()+60e3);
+  for(let i=0;i<60*24*2;i++){if(hours.includes(t.getUTCHours())&&mins.includes(t.getUTCMinutes()))return new Date(t.getTime()+offset).toISOString();t=new Date(t.getTime()+60e3)}
+  return null;
+}
+// Diff por palavras (LCS) para um par de blocos alterados.
+function wordDiff(a,b){
+  const A=a.split(/(\s+)/),B=b.split(/(\s+)/);
+  if(A.length*B.length>400000)return [{op:"del",text:a},{op:"ins",text:b}];
+  const m=A.length,n=B.length,L=Array.from({length:m+1},()=>new Uint16Array(n+1));
+  for(let i=m-1;i>=0;i--)for(let j=n-1;j>=0;j--)L[i][j]=A[i]===B[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  const out=[];const push=(op,text)=>{const last=out[out.length-1];if(last&&last.op===op)last.text+=text;else out.push({op,text})};
+  let i=0,j=0;while(i<m&&j<n){if(A[i]===B[j]){push("eq",A[i]);i++;j++}else if(L[i+1][j]>=L[i][j+1]){push("del",A[i]);i++}else{push("ins",B[j]);j++}}
+  while(i<m)push("del",A[i++]);while(j<n)push("ins",B[j++]);
+  return out;
+}
+// Diff por bloco jurídico: LCS sobre hashes; blocos removidos+adicionados com o mesmo rótulo viram "alterado".
+function segmentDiff(oldSegs,newSegs){
+  const a=oldSegs.map(x=>x.hash),b=newSegs.map(x=>x.hash),m=a.length,n=b.length;
+  const L=Array.from({length:m+1},()=>new Uint16Array(n+1));
+  for(let i=m-1;i>=0;i--)for(let j=n-1;j>=0;j--)L[i][j]=a[i]===b[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  const raw=[];let i=0,j=0;
+  while(i<m&&j<n){if(a[i]===b[j]){raw.push({op:"same",seg:newSegs[j]});i++;j++}else if(L[i+1][j]>=L[i][j+1]){raw.push({op:"removed",seg:oldSegs[i++]})}else raw.push({op:"added",seg:newSegs[j++]})}
+  while(i<m)raw.push({op:"removed",seg:oldSegs[i++]});while(j<n)raw.push({op:"added",seg:newSegs[j++]});
+  const out=[];
+  for(let k=0;k<raw.length;k++){
+    const r=raw[k],nx=raw[k+1];
+    if(r.op==="removed"&&nx&&nx.op==="added"&&nx.seg.label===r.seg.label){out.push({op:"changed",label:r.seg.label,parts:wordDiff(r.seg.text,nx.seg.text)});k++;continue}
+    if(r.op==="same"){out.push({op:"same",label:r.seg.label});continue}
+    out.push({op:r.op,label:r.seg.label,text:r.seg.text});
+  }
+  return out;
 }
 
 // ===== Norma Clara: segmentação jurídica no servidor =====
@@ -276,6 +320,24 @@ async function ncCopyToVersion(db,versionId,hash,t){
 }
 
 async function api(req,res,pathname,url){
+  if(pathname==="/api/public/latest"&&req.method==="GET"){
+    if(!pool)return json(res,503,{error:"database_unavailable"});
+    try{
+      if(!latestCache.data||Date.now()-latestCache.at>5*60e3){
+        const [items,stats]=await Promise.all([
+          pool.query(`SELECT p.title,p.act_type,p.published_on,p.first_collected_at,p.uf,src.name AS source_name
+            FROM publications p
+            JOIN LATERAL (SELECT s.name FROM publication_origins po JOIN sources s ON s.id=po.source_id WHERE po.publication_id=p.id ORDER BY po.first_seen_at LIMIT 1) src ON TRUE
+            WHERE p.identity_strength='STRONG' AND p.act_type IS NOT NULL AND p.act_type NOT IN ('COMUNICADO','EXTRATO','EDITAL','DESPACHO')
+            ORDER BY p.first_collected_at DESC LIMIT 2`),
+          pool.query(`SELECT (SELECT count(*)::int FROM publications) AS total,(SELECT max(finished_at) FROM collection_runs WHERE status IN ('SUCCESS','SUCCESS_NO_RESULTS','PARTIAL_SUCCESS')) AS last_collection_at`)
+        ]);
+        latestCache={at:Date.now(),data:{items:items.rows.map(withCleanTitle),stats:stats.rows[0]}};
+      }
+      res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"public, max-age=300"});
+      return res.end(JSON.stringify(latestCache.data));
+    }catch(e){console.error("latest failed",e);return json(res,500,{error:"latest_failed"});}
+  }
   if(pathname==="/api/public/coverage"&&req.method==="GET"){
     if(!pool)return json(res,503,{error:"database_unavailable"});
     try{
@@ -310,6 +372,7 @@ async function api(req,res,pathname,url){
         SELECT
           (SELECT count(*)::int FROM publications) AS total_publications,
           (SELECT count(*)::int FROM publications WHERE (first_collected_at AT TIME ZONE 'America/Sao_Paulo')::date = ${brTodaySql}) AS publications_today,
+          (SELECT count(*)::int FROM publications WHERE published_on = ${brTodaySql}) AS published_today,
           (SELECT count(*)::int FROM publication_versions WHERE version_no > 1 AND (captured_at AT TIME ZONE 'America/Sao_Paulo')::date = ${brTodaySql}) AS new_versions_today,
           (SELECT count(*)::int FROM sources WHERE is_active=TRUE) AS active_sources,
           (SELECT count(*)::int FROM collection_runs WHERE created_at >= now()-interval '24 hours') AS runs_24h,
@@ -334,7 +397,7 @@ async function api(req,res,pathname,url){
       `);
       const sources=sourceRows.rows.map(withHealth);
       const summary=sources.reduce((a,s)=>{a[s.health]=(a[s.health]||0)+1;return a;},{});
-      return json(res,200,{metrics:metrics.rows[0],latest:latest.rows,sourcesSummary:summary,sources:sources.slice(0,8)});
+      return json(res,200,{metrics:metrics.rows[0],latest:latest.rows.map(withCleanTitle),sourcesSummary:summary,sources:sources.slice(0,8)});
     }catch(e){console.error("dashboard failed",e);return json(res,500,{error:"dashboard_failed"});}
   }
   if(pathname==="/api/sources"&&req.method==="GET"){
@@ -353,6 +416,19 @@ async function api(req,res,pathname,url){
     }catch(e){console.error("sources failed",e);return json(res,500,{error:"sources_failed"});}
   }
 
+  const runsMatch=pathname.match(/^\/api\/sources\/([a-z0-9-]{2,40})\/runs$/);
+  if(runsMatch&&req.method==="GET"){
+    if(!requireUser(req,res)||!(await requireDb(res)))return;
+    try{
+      const r=await pool.query(`
+        SELECT cr.id,cr.status,cr.trigger_type,cr.scheduled_for,cr.started_at,cr.finished_at,left(cr.error_summary,300) AS error_summary,
+          COALESCE((SELECT json_agg(json_build_object('attempt_no',ca.attempt_no,'status',ca.status,'started_at',ca.started_at,'finished_at',ca.finished_at,'response_time_ms',ca.response_time_ms,'http_status',ca.http_status,'error_code',ca.error_code,'error_message',left(ca.error_message,200)) ORDER BY ca.attempt_no)
+            FROM collection_attempts ca WHERE ca.collection_run_id=cr.id),'[]'::json) AS attempts
+        FROM collection_runs cr JOIN sources s ON s.id=cr.source_id
+        WHERE s.code=$1 ORDER BY cr.scheduled_for DESC LIMIT 5`,[runsMatch[1]]);
+      return json(res,200,{items:r.rows});
+    }catch(e){console.error("runs failed",e);return json(res,500,{error:"runs_failed"});}
+  }
   if(pathname==="/api/publication-filter-options"&&req.method==="GET"){
     if(!requireUser(req,res)||!(await requireDb(res)))return;
     try{
@@ -390,14 +466,20 @@ async function api(req,res,pathname,url){
       const clauses=[];const params=[];
       const p=v=>{params.push(v);return "$"+params.length;};
       if(q){
+        // UNION permite ao planejador usar o índice GIN de search_vector (o OR com ILIKE forçava varredura completa).
         const like=p("%"+q+"%");const ts=p(q);
-        clauses.push(`(p.title ILIKE ${like} OR COALESCE(p.act_number,'') ILIKE ${like} OR COALESCE(p.agency,'') ILIKE ${like} OR (v.search_vector @@ websearch_to_tsquery('portuguese',${ts})))`);
+        clauses.push(`p.id IN (
+          SELECT pv.publication_id FROM publication_versions pv WHERE pv.is_current=TRUE AND pv.search_vector @@ websearch_to_tsquery('portuguese',${ts})
+          UNION SELECT px.id FROM publications px WHERE px.title ILIKE ${like} OR COALESCE(px.act_number,'') ILIKE ${like} OR COALESCE(px.agency,'') ILIKE ${like})`);
       }
       if(source){const x=p(source);clauses.push(`EXISTS(SELECT 1 FROM publication_origins po2 JOIN sources s2 ON s2.id=po2.source_id WHERE po2.publication_id=p.id AND s2.code=${x})`);}
       if(uf){const x=p(uf);clauses.push(`p.uf=${x}`);}
       if(actType){const x=p(actType);clauses.push(`p.act_type=${x}`);}
       if(jurisdiction){const x=p(jurisdiction);clauses.push(`p.jurisdiction_level=${x}`);}
-      if(agency){const x=p(agency);clauses.push(`p.agency=${x}`);}
+      if(agency){const x=p("%"+agency+"%");clauses.push(`p.agency ILIKE ${x}`);}
+      const collectedDays=Math.min(Math.max(Number(url.searchParams.get("collectedDays")||0),0),31);
+      if(collectedDays){const x=p(String(collectedDays));clauses.push(`p.first_collected_at>=now()-(${x}||' days')::interval`);}
+      const sortCollected=url.searchParams.get("sort")==="collected";
       if(dateFrom){const x=p(dateFrom);clauses.push(`p.published_on>=${x}::date`);}
       if(dateTo){const x=p(dateTo);clauses.push(`p.published_on<=${x}::date`);}
       const where=clauses.length?"WHERE "+clauses.join(" AND "):"";
@@ -414,10 +496,10 @@ async function api(req,res,pathname,url){
           WHERE po.publication_id=p.id ORDER BY po.first_seen_at ASC LIMIT 1
         ) src ON TRUE
         ${where}
-        ORDER BY p.published_on DESC NULLS LAST,p.first_collected_at DESC
+        ORDER BY ${sortCollected?"p.first_collected_at DESC":"p.published_on DESC NULLS LAST,p.first_collected_at DESC"}
         LIMIT ${lim} OFFSET ${off}
       `,listParams);
-      return json(res,200,{items:list.rows,total:count.rows[0].total,page,pageSize,totalPages:Math.max(Math.ceil(count.rows[0].total/pageSize),1)});
+      return json(res,200,{items:list.rows.map(withCleanTitle),total:count.rows[0].total,page,pageSize,totalPages:Math.max(Math.ceil(count.rows[0].total/pageSize),1)});
     }catch(e){console.error("publications query failed",e);return json(res,500,{error:"query_failed"});}
   }
 
@@ -480,6 +562,19 @@ async function api(req,res,pathname,url){
       return json(res,502,{error:"norma_clara_failed"});
     }
   }
+  const diffMatch=pathname.match(/^\/api\/publications\/([0-9a-f-]{36})\/diff$/i);
+  if(diffMatch&&req.method==="GET"){
+    if(!requireUser(req,res)||!(await requireDb(res)))return;
+    try{
+      const to=Number(url.searchParams.get("to")),from=Number(url.searchParams.get("from")||to-1);
+      if(!Number.isInteger(to)||!Number.isInteger(from)||from<1||from>=to)return json(res,400,{error:"invalid_versions"});
+      const r=await pool.query("SELECT version_no,content_text,relevant_excerpt,captured_at FROM publication_versions WHERE publication_id=$1 AND version_no = ANY($2::int[])",[diffMatch[1],[from,to]]);
+      const a=r.rows.find(x=>x.version_no===from),b=r.rows.find(x=>x.version_no===to);
+      if(!a||!b)return json(res,404,{error:"version_not_found"});
+      const changes=segmentDiff(legalSegments(a.content_text||a.relevant_excerpt||""),legalSegments(b.content_text||b.relevant_excerpt||""));
+      return json(res,200,{from:{version_no:from,captured_at:a.captured_at},to:{version_no:to,captured_at:b.captured_at},changes});
+    }catch(e){console.error("diff failed",e);return json(res,500,{error:"diff_failed"});}
+  }
   const detailMatch=pathname.match(/^\/api\/publications\/([0-9a-f-]{36})$/i);
   if(detailMatch&&req.method==="GET"){
     const user=requireUser(req,res);if(!user)return;
@@ -499,7 +594,8 @@ async function api(req,res,pathname,url){
       const tr=hashes.length?await pool.query("SELECT DISTINCT ON (segment_hash) segment_hash::text AS h,translation_text FROM norma_clara_translations WHERE segment_hash::text = ANY($1::text[]) AND engine_version=$2 ORDER BY segment_hash,generated_at",[hashes,NORMA_CLARA_ENGINE_VERSION]):{rows:[]};
       const map=new Map(tr.rows.map(r=>[r.h,r.translation_text]));
       const segments=segs.map(x=>({hash:x.hash,label:x.label,text:x.text,unlocked:map.has(x.hash),translation:map.get(x.hash)||null}));
-      return json(res,200,{publication:pub.rows[0],origins:origins.rows,files:files.rows,segments,normaClara:ncQuota(user)});
+      const versions=await pool.query(`SELECT id,version_no,captured_at,content_hash,is_current FROM publication_versions WHERE publication_id=$1 ORDER BY version_no DESC`,[id]);
+      return json(res,200,{publication:withCleanTitle(pub.rows[0]),origins:origins.rows,files:files.rows,versions:versions.rows,segments,normaClara:ncQuota(user)});
     }catch(e){console.error("detail failed",e);return json(res,500,{error:"detail_failed"});}
   }
   return false;
