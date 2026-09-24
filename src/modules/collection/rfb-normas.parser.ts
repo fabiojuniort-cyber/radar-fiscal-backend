@@ -361,110 +361,175 @@ export function decideRfbCapture(item: RfbNormasListingItem): RfbFilterDecision 
   return { included: false, reason: 'TYPE_OUT_OF_SCOPE' };
 }
 
-function representationText(html: string): { text: string; headings: string[]; anchors: Array<{ href: string; text: string }> } {
-  let ignored = 0;
-  let text = '';
-  let heading = '';
-  let headingTag: string | undefined;
-  const headings: string[] = [];
-  let anchor: { href: string; text: string } | undefined;
-  const anchors: Array<{ href: string; text: string }> = [];
-
+function htmlFragmentText(value: string): string {
+  let out = '';
   const parser = new HtmlParser({
-    onopentag(name, attrs) {
-      const tag = name.toLowerCase();
-      if (['script', 'style', 'nav', 'footer', 'header'].includes(tag)) {
-        ignored += 1;
-        return;
-      }
-      if (ignored) return;
-      if (/^h[1-6]$/.test(tag)) {
-        headingTag = tag;
-        heading = '';
-      }
-      if (tag === 'a' && attrs.href) anchor = { href: attrs.href, text: '' };
-      if (['br', 'p', 'div', 'li', 'tr'].includes(tag)) text += '\n';
+    onopentag(name) {
+      if (/^(?:br|p|div|li|tr|td|th|h[1-6])$/.test(name.toLowerCase())) out += '\n';
     },
-    ontext(value) {
-      if (ignored) return;
-      text += value;
-      if (headingTag) heading += value;
-      if (anchor) anchor.text += value;
+    ontext(text) {
+      out += text;
     },
     onclosetag(name) {
-      const tag = name.toLowerCase();
-      if (['script', 'style', 'nav', 'footer', 'header'].includes(tag)) {
-        if (ignored) ignored -= 1;
-        return;
-      }
-      if (ignored) return;
-      if (tag === headingTag) {
-        const value = normalizeInline(heading);
-        if (value) headings.push(value);
-        headingTag = undefined;
-      }
-      if (tag === 'a' && anchor) {
-        anchors.push({ href: anchor.href, text: normalizeInline(anchor.text) });
-        anchor = undefined;
-      }
+      if (/^(?:p|div|li|tr|td|th|h[1-6])$/.test(name.toLowerCase())) out += '\n';
     },
   }, { decodeEntities: true });
-  parser.end(html);
+  parser.end(value);
+  return out
+    .replace(/[\t \u00a0]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n+/g, '\n')
+    .trim();
+}
 
-  const normalizedText = text
-    .split(/\n+/)
-    .map(normalizeInline)
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function validIsoDate(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  return Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value
+    ? value
+    : undefined;
+}
+
+interface ApiSegment {
+  order: number;
+  text: string;
+  attachment?: RfbAttachment;
+}
+
+function apiSegments(payload: Record<string, unknown>): ApiSegment[] {
+  const segments: ApiSegment[] = [];
+  const visit = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    for (const raw of value) {
+      const item = record(raw);
+      if (!item) continue;
+      const order = typeof item.ordemSegmentoAto === 'number' && Number.isFinite(item.ordemSegmentoAto)
+        ? item.ordemSegmentoAto
+        : Number.MAX_SAFE_INTEGER;
+      const omit = item.omitir === true;
+      const text = !omit && typeof item.textoIntegra === 'string'
+        ? htmlFragmentText(item.textoIntegra)
+        : '';
+      const file = record(item.arquivoBinario);
+      const id = file && typeof file.idArquivoBinario === 'number' && Number.isSafeInteger(file.idArquivoBinario)
+        ? String(file.idArquivoBinario)
+        : undefined;
+      const name = file && typeof file.nomeArquivoBinario === 'string'
+        ? normalizeInline(file.nomeArquivoBinario)
+        : undefined;
+      if (text || id) {
+        segments.push({
+          order,
+          text,
+          ...(id
+            ? {
+                attachment: {
+                  url: `${RFB_NORMAS_ORIGIN}/sijut2consulta/anexoOutros.action?idArquivoBinario=${encodeURIComponent(id)}`,
+                  externalId: id,
+                  ...(name ? { name } : {}),
+                },
+              }
+            : {}),
+        });
+      }
+    }
+  };
+  visit(payload.ementas);
+  visit(payload.outrosSegmentos);
+  return segments.sort((a, b) => a.order - b.order);
+}
+
+export interface RfbApiRepresentation extends RfbRepresentation {
+  publishedAt?: Date;
+  effectiveAt?: Date;
+  actDate?: Date;
+  agency?: string;
+  type?: string;
+  number?: string;
+  published: boolean;
+  current: boolean;
+  republication: boolean;
+  publicationReference?: string;
+}
+
+export function buildRfbApiRepresentationUrl(
+  idAto: string,
+  kind: 'original' | 'vigente' | 'multivigente' | 'relacional',
+): string {
+  return `https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/${encodeURIComponent(idAto)}/visao/${kind}`;
+}
+
+export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentation {
+  const root = record(payload);
+  if (!root) throw new TypeError('RFB Normas API payload must be an object.');
+  const idAto = root.idAto;
+  if (typeof idAto !== 'number' || !Number.isSafeInteger(idAto) || idAto < 1) {
+    throw new TypeError('RFB Normas API payload is missing a valid idAto.');
+  }
+
+  const epigrafe = record(root.epigrafe);
+  const tipoAto = record(epigrafe?.tipoAto);
+  const orgaos = Array.isArray(epigrafe?.orgaos) ? epigrafe!.orgaos : [];
+  const firstAgency = record(orgaos[0]);
+  const title = typeof root.epigrafeCompleta === 'string'
+    ? normalizeInline(root.epigrafeCompleta)
+    : undefined;
+  const segments = apiSegments(root);
+  const normalizedText = segments
+    .map((segment) => segment.text)
     .filter(Boolean)
-    .filter((line) => !/^(?:Voltar|Imprimir|Fechar|Topo)$/i.test(line))
     .join('\n')
     .trim();
 
-  return { text: normalizedText, headings, anchors };
-}
-
-export function parseRfbRepresentationHtml(html: string, baseUrl: string): RfbRepresentation {
-  const parsed = representationText(html);
-  const title = parsed.headings.find((value) => {
-    const type = canonicalizeRfbActType(value);
-    return type !== undefined && /N[ºO°.]?\s*[\d.]+/i.test(value);
-  }) ?? parsed.text.split('\n').find((value) => {
-    const type = canonicalizeRfbActType(value);
-    return type !== undefined && /N[ºO°.]?\s*[\d.]+/i.test(value);
-  });
-
   const attachments: RfbAttachment[] = [];
   const seen = new Set<string>();
-  for (const link of parsed.anchors) {
-    let absolute: URL;
-    try {
-      absolute = new URL(link.href, baseUrl);
-    } catch {
-      continue;
-    }
-    if (absolute.hostname !== 'normas.receita.fazenda.gov.br') continue;
-    const externalId = absolute.searchParams.get('idArquivoBinario');
-    if (absolute.pathname !== '/sijut2consulta/anexoOutros.action' || !externalId || !/^\d+$/.test(externalId)) continue;
-    if (seen.has(externalId)) continue;
-    seen.add(externalId);
-    attachments.push({
-      url: absolute.toString(),
-      externalId,
-      ...(link.text ? { name: link.text } : {}),
-    });
+  for (const segment of segments) {
+    if (!segment.attachment || seen.has(segment.attachment.externalId)) continue;
+    seen.add(segment.attachment.externalId);
+    attachments.push(segment.attachment);
   }
 
-  const status = /\bREVOGAD[AO]\b/i.test(parsed.text)
-    ? 'REVOKED'
-    : /\bVIGENTE\b/i.test(parsed.text)
-      ? 'VIGENTE'
-      : undefined;
+  const history = Array.isArray(root.historico)
+    ? root.historico
+        .map((item) => record(item))
+        .filter((item): item is Record<string, unknown> => item !== undefined)
+        .map((item) => JSON.stringify(item, Object.keys(item).sort()))
+        .sort()
+    : [];
+  const relationshipDigest = createHash('sha256')
+    .update(JSON.stringify({
+      text: normalizedText,
+      history,
+      anchors: Array.isArray(root.ancorasNoAto) ? root.ancorasNoAto : [],
+      retificationAnchors: Array.isArray(root.ancorasRetificacaoEpigrafe) ? root.ancorasRetificacaoEpigrafe : [],
+    }))
+    .digest('hex');
+
+  const publishedOn = validIsoDate(root.dataPublicacao);
+  const effectiveOn = validIsoDate(root.dataVigenciaInicio);
+  const actOn = validIsoDate(epigrafe?.dataAto);
 
   return {
-    normalizedText: parsed.text,
-    normalizedHash: createHash('sha256').update(parsed.text, 'utf8').digest('hex'),
+    normalizedText,
+    normalizedHash: relationshipDigest,
     ...(title ? { title } : {}),
     attachments,
-    ...(status ? { status } : {}),
+    ...(root.vigente === false ? { status: 'REVOKED' } : root.vigente === true ? { status: 'VIGENTE' } : {}),
+    ...(publishedOn ? { publishedAt: new Date(`${publishedOn}T00:00:00Z`) } : {}),
+    ...(effectiveOn ? { effectiveAt: new Date(`${effectiveOn}T00:00:00Z`) } : {}),
+    ...(actOn ? { actDate: new Date(`${actOn}T00:00:00Z`) } : {}),
+    ...(typeof firstAgency?.siglaOrgao === 'string' ? { agency: firstAgency.siglaOrgao } : {}),
+    ...(typeof tipoAto?.nomeTipoAto === 'string' ? { type: tipoAto.nomeTipoAto } : {}),
+    ...(typeof epigrafe?.numeroAto === 'string' ? { number: epigrafe.numeroAto } : {}),
+    published: root.publicado === true,
+    current: root.vigente === true,
+    republication: root.ehRepublicado === true,
+    ...(typeof root.dadosPublicacao === 'string' ? { publicationReference: normalizeInline(root.dadosPublicacao) } : {}),
   };
 }
 
