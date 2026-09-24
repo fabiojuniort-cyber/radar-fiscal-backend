@@ -549,6 +549,7 @@ export class RfbNormasConnector implements CollectionConnector {
           : !strong
             ? { identityKey: `RFB_NORMAS|${item.idAto}` }
             : {}),
+        ...(files.length ? { files } : {}),
         metadata,
       });
     };
