@@ -12,6 +12,7 @@ import {
 } from '../src/modules/collection/rfb-normas.parser.js';
 import {
   IN_API_ORIGINAL,
+  JOINT_PORTARIA_DUPLICATE_API_ORIGINAL,
   RETIFICATION_API_ORIGINAL,
   RETIFICATION_DUPLICATE_API_ORIGINAL,
   RFB_SEARCH_FIXTURE,
@@ -114,6 +115,13 @@ test('detects explicit repeated-publication retification reference', () => {
   assert.equal(parsed.revisionKind, 'RETIFICATION');
   assert.equal(parsed.duplicatePublicationReference, true);
   assert.match(parsed.normalizedText, /publicação repetida/i);
+});
+
+test('detects generic repeated publication reference without retification marker', () => {
+  const parsed = parseRfbApiRepresentation(JOINT_PORTARIA_DUPLICATE_API_ORIGINAL);
+  assert.equal(parsed.revisionKind, undefined);
+  assert.equal(parsed.duplicatePublicationReference, true);
+  assert.match(parsed.normalizedText, /^Publicação repetida/i);
 });
 
 test('captures joint PGFN/RFB tax transaction notice deterministically', () => {

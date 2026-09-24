@@ -222,6 +222,33 @@ export const RETIFICATION_DUPLICATE_API_ORIGINAL = apiPayload({
   text: 'Retificação (publicação repetida) Nota Normas: Esta retificação foi publicada em duplicata na mesma edição do DOU.',
 });
 
+export const JOINT_PORTARIA_API_ORIGINAL = apiPayload({
+  idAto: 151936,
+  typeName: 'Portaria Conjunta',
+  typeSigla: 'PORT CONJ',
+  number: '140',
+  agencySigla: 'Cofis / Coana / Cotec',
+  agencyName: 'Coordenações-Gerais da Receita Federal',
+  actDate: '2026-06-17',
+  publicationDate: '2026-06-18',
+  title: 'Portaria Conjunta Cofis / Coana / Cotec nº 140, de 17 de junho de 2026',
+  text: 'Altera a Portaria Conjunta Cofis/Coana/Cotec nº 2, de 24 de novembro de 2020, para atualizar o trâmite da Requisição de Informações sobre a Movimentação Financeira.',
+});
+
+export const JOINT_PORTARIA_DUPLICATE_API_ORIGINAL = apiPayload({
+  idAto: 151937,
+  typeName: 'Portaria Conjunta',
+  typeSigla: 'PORT CONJ',
+  number: '140',
+  agencySigla: 'Cofis / Coana / Cotec',
+  agencyName: 'Coordenações-Gerais da Receita Federal',
+  actDate: '2026-06-17',
+  publicationDate: '2026-06-18',
+  title: 'Portaria Conjunta Cofis / Coana / Cotec nº 140, de 17 de junho de 2026',
+  text: 'Publicação repetida Nota Normas: Este ato foi publicado em duplicata na mesma edição do DOU. Clique no link acima para tomar conhecimento do seu conteúdo e de eventuais modificações que tenha sofrido.',
+});
+
+
 
 export function representationPayload(
   base: Record<string, unknown>,

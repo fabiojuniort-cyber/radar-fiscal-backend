@@ -530,8 +530,11 @@ export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentatio
     ? 'RETIFICATION' as const
     : undefined;
   const duplicatePublicationReference =
-    revisionKind === 'RETIFICATION' &&
-    /^RETIFICA[CÇ][AÃ]O\s*\(PUBLICA[CÇ][AÃ]O REPETIDA\)/i.test(normalizedText);
+    /^PUBLICA[CÇ][AÃ]O REPETIDA\b/i.test(normalizedText) ||
+    (
+      revisionKind === 'RETIFICATION' &&
+      /^RETIFICA[CÇ][AÃ]O\s*\(PUBLICA[CÇ][AÃ]O REPETIDA\)/i.test(normalizedText)
+    );
 
   return {
     normalizedText,
