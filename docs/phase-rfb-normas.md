@@ -273,3 +273,149 @@ retorna 403.
 Marcador final da validação:
 
 `RFB_NORMAS_LIVE_OK=1`.
+
+
+## Checkpoint operacional — 24/09/2026
+
+Checkpoint salvo durante a validação produtiva final da frente Receita Federal / Sistema Normas.
+
+### Estado já concluído
+
+- implementação principal mergeada na `main` pelo PR #48;
+- correções produtivas adicionais mergeadas até o PR #57;
+- fonte produtiva `rfb-normas` ativa;
+- `RFB_LOOKBACK_DAYS = 7`;
+- bootstrap 2025-01 → 2026-09 concluído;
+- último replay incremental limpo:
+  - 22 encontradas;
+  - 22 existentes;
+  - 0 novas publicações;
+  - 0 novas versões;
+  - 0 erros;
+  - 0 falhas parciais;
+- checkpoint final:
+  - bootstrap completo;
+  - 752 arquivos conhecidos;
+- estado final auditado:
+  - 959 publications;
+  - 959 publication_origins;
+  - 959 publication_versions;
+  - 959 versões correntes;
+  - 0 versões históricas artificiais;
+  - 752 anexos;
+  - 752/752 SHA-256 válidos;
+  - 0 publication_origins duplicadas;
+- validação live de 7 dias aprovada;
+- API moderna oficial confirmada;
+- filtro determinístico e auditável funcionando;
+- overlap protection já implementada para `rfb-normas`.
+
+### Fonte produtiva
+
+- source id: `4e9a40f1-9a12-4786-a816-5104cb252e3f`;
+- connector_key: `rfb-normas`;
+- schedule timezone: `America/Sao_Paulo`;
+- cron ainda está `NULL`;
+- max_attempts: 3.
+
+### Runs produtivos relevantes
+
+Bootstrap avançou em múltiplos runs respeitando time budget:
+
+- `8795f7eb-e10f-4ab8-93ea-d329bdf9e90c` — PARTIAL_SUCCESS;
+- `98413d3f-d78b-462d-bfbc-f1ed3b4a0c00` — PARTIAL_SUCCESS;
+- `5f8d38e4-2089-4d78-986e-cfe3ebfb35aa` — PARTIAL_SUCCESS;
+- `50c452c4-c439-414e-9e7c-397bb212dfc6` — SUCCESS, bootstrap completo.
+
+Replay incremental:
+
+- `44048c1b-2512-469d-9586-97acaa4ce153` — SUCCESS;
+- 22 encontradas / 22 existentes / 0 novas / 0 versões / 0 erros;
+- duração aproximada: 30 s.
+
+### Gate ainda aberto
+
+O único gate produtivo importante ainda não encerrado é:
+
+`DOU × Sistema Normas → 1 publication + múltiplas publication_origins`.
+
+A auditoria atual mostrou:
+
+- `publications_with_multiple_sources = 0`;
+- porém existem pares fortes já persistidos separadamente por legado do DOU.
+
+Pares reais confirmados que deveriam convergir incluem:
+
+- IN RFB nº 2.344/2026;
+- IN RFB nº 2.340/2026;
+- SC COSIT nº 180/2026;
+- SC COSIT nº 177/2026;
+- SC COSIT nº 164/2026;
+- SC COSIT nº 154/2026;
+- ADE COCAD nº 74/2026;
+- ADE CORAT nº 66/2026;
+- ADE CORAT nº 67/2026.
+
+Não fazer merge por número/data isolados. O probe de potenciais matches também retornou falsos positivos de outros órgãos.
+
+### Diagnóstico atual do cross-source
+
+O algoritmo novo está correto para ingestões futuras e o teste de integração DOU × Sistema Normas já comprova:
+
+- 1 publication;
+- 2 origins;
+- 0 duplicidade;
+- 0 versão artificial para conteúdo equivalente.
+
+O problema produtivo é legado: atos DOU antigos já haviam sido persistidos antes da canonização comum de RFB/COSIT.
+
+### Próximo passo exato
+
+1. concluir o probe `rfb-normas-cross-source-detail.ts`;
+2. comparar conteúdo/metadata dos pares fortes reais;
+3. criar reparo transacional somente para matches fortes:
+   - mesmo órgão Receita normalizado;
+   - mesmo tipo canônico;
+   - mesmo número/ano;
+   - mesma data de publicação;
+4. preservar ambas as origins;
+5. preservar DOU como PRIMARY do evento jurídico;
+6. preservar Sistema Normas como PRIMARY da representação Receita / ENRICHMENT no mecanismo de versão;
+7. não criar `publication_version` artificial por anexos/representação consolidada;
+8. rodar novamente o probe cross-source e exigir pelo menos um caso real com:
+   - 1 publication;
+   - 2 publication_origins;
+   - identidade normativa forte;
+9. executar replay incremental novamente;
+10. exigir:
+   - 0 novas publicações;
+   - 0 novas versões;
+   - 0 erros;
+11. medir timeout operacional;
+12. somente então ativar:
+   - `schedule_cron = 0 * * * *`;
+   - timezone `America/Sao_Paulo`;
+13. observar run real `SCHEDULED`;
+14. neutralizar os serviços temporários:
+   - `rfb-normas-validation`;
+   - `rfb-normas-repair`;
+15. atualizar esta documentação com o fechamento final.
+
+### Infra temporária atual
+
+- `rfb-normas-validation`: serviço auxiliar de validação;
+- `rfb-normas-repair`: serviço auxiliar usado em reparos produtivos anteriores;
+- ambos devem ser neutralizados/removidos após o fechamento.
+
+### Observação importante
+
+Não declarar a frente concluída ainda.
+
+Critérios faltantes para encerramento:
+
+- cross-source real DOU × Sistema Normas corrigido e comprovado;
+- replay pós-reparo limpo;
+- timeout operacional definido;
+- cron horário ativado;
+- run real do Scheduler observado;
+- limpeza da infra temporária.
