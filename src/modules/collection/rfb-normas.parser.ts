@@ -457,7 +457,8 @@ function apiSegments(payload: Record<string, unknown>): ApiSegment[] {
 
 export interface RfbApiRepresentation extends RfbRepresentation {
   publishedAt?: Date;
-  duplicateOfIdAto?: string;
+  revisionKind?: 'RETIFICATION';
+  duplicatePublicationReference: boolean;
   effectiveAt?: Date;
   actDate?: Date;
   agency?: string;
@@ -474,45 +475,6 @@ export function buildRfbApiRepresentationUrl(
   kind: 'original' | 'vigente' | 'multivigente' | 'relacional',
 ): string {
   return `https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/${encodeURIComponent(idAto)}/visao/${kind}`;
-}
-
-function duplicateReferenceTarget(
-  root: Record<string, unknown>,
-  currentIdAto: number,
-  normalizedText: string,
-): string | undefined {
-  if (!/PUBLICA[CÇ][AÃ]O REPETIDA/i.test(normalizedText)) return undefined;
-
-  const candidates = [...(
-    Array.isArray(root.ementas) ? root.ementas : []
-  ), ...(
-    Array.isArray(root.outrosSegmentos) ? root.outrosSegmentos : []
-  )];
-
-  for (const raw of candidates) {
-    const segment = record(raw);
-    if (!segment || !Array.isArray(segment.ancorasDestino)) continue;
-    for (const rawAnchor of segment.ancorasDestino) {
-      const anchor = record(rawAnchor);
-      const target = anchor?.idAto;
-      if (
-        typeof target === 'number' &&
-        Number.isSafeInteger(target) &&
-        target > 0 &&
-        target !== currentIdAto
-      ) {
-        return String(target);
-      }
-      if (
-        typeof target === 'string' &&
-        /^\d+$/.test(target) &&
-        Number(target) !== currentIdAto
-      ) {
-        return String(Number(target));
-      }
-    }
-  }
-  return undefined;
 }
 
 export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentation {
@@ -564,14 +526,20 @@ export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentatio
   const publishedOn = validIsoDate(root.dataPublicacao);
   const effectiveOn = validIsoDate(root.dataVigenciaInicio);
   const actOn = validIsoDate(epigrafe?.dataAto);
-  const duplicateOfIdAto = duplicateReferenceTarget(root, idAto, normalizedText);
+  const revisionKind = /^RETIFICA[CÇ][AÃ]O\b/i.test(normalizedText)
+    ? 'RETIFICATION' as const
+    : undefined;
+  const duplicatePublicationReference =
+    revisionKind === 'RETIFICATION' &&
+    /^RETIFICA[CÇ][AÃ]O\s*\(PUBLICA[CÇ][AÃ]O REPETIDA\)/i.test(normalizedText);
 
   return {
     normalizedText,
     normalizedHash: relationshipDigest,
     ...(title ? { title } : {}),
-    ...(duplicateOfIdAto ? { duplicateOfIdAto } : {}),
     attachments,
+    ...(revisionKind ? { revisionKind } : {}),
+    duplicatePublicationReference,
     ...(root.vigente === false ? { status: 'REVOKED' } : root.vigente === true ? { status: 'VIGENTE' } : {}),
     ...(publishedOn ? { publishedAt: new Date(`${publishedOn}T00:00:00Z`) } : {}),
     ...(effectiveOn ? { effectiveAt: new Date(`${effectiveOn}T00:00:00Z`) } : {}),
