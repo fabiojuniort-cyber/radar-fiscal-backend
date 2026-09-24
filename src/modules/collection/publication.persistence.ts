@@ -78,6 +78,21 @@ function publicationSourceRole(
     : 'UNSPECIFIED';
 }
 
+function isPrimaryAuthoritativeVersionPolicy(
+  metadata: unknown,
+): boolean {
+  if (
+    metadata === null ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata)
+  ) {
+    return false;
+  }
+
+  return (metadata as Record<string, unknown>)
+    .versionPolicy === 'PRIMARY_AUTHORITATIVE';
+}
+
 async function enrichCanonicalPublication(
   trx: Transaction<DB>,
   publicationId: string,
@@ -332,6 +347,22 @@ async function getOrCreateVersion(
     )
     .executeTakeFirst();
 
+  const currentRole = currentVersion
+    ? publicationSourceRole(
+        currentVersion.source_metadata,
+      )
+    : 'UNSPECIFIED';
+  const incomingPrimaryAuthoritative =
+    isPrimaryAuthoritativeVersionPolicy(
+      publication.metadata,
+    );
+  const currentPrimaryAuthoritative =
+    currentVersion
+      ? isPrimaryAuthoritativeVersionPolicy(
+          currentVersion.source_metadata,
+        )
+      : false;
+
   if (existingVersion) {
     if (incomingRole === 'PRIMARY') {
       if (!existingVersion.is_current) {
@@ -389,6 +420,66 @@ async function getOrCreateVersion(
 
     return {
       publicationVersionId: existingVersion.id,
+      disposition: 'EXISTING_PUBLICATION',
+    };
+  }
+
+  if (
+    currentVersion &&
+    currentRole === 'PRIMARY' &&
+    incomingRole === 'ENRICHMENT' &&
+    incomingPrimaryAuthoritative
+  ) {
+    await enrichCanonicalPublication(
+      trx,
+      publicationId,
+      publication,
+    );
+
+    return {
+      publicationVersionId: currentVersion.id,
+      disposition: 'EXISTING_PUBLICATION',
+    };
+  }
+
+  if (
+    currentVersion &&
+    currentRole === 'ENRICHMENT' &&
+    currentPrimaryAuthoritative &&
+    incomingRole === 'PRIMARY'
+  ) {
+    await trx
+      .updateTable('publication_versions')
+      .set({
+        content_hash: publication.contentHash,
+        content_text:
+          publication.contentText ?? null,
+        relevant_excerpt: null,
+        source_metadata: asJson(
+          publication.metadata,
+        ),
+        is_current: true,
+      })
+      .where('id', '=', currentVersion.id)
+      .execute();
+
+    await trx
+      .updateTable('publications')
+      .set({
+        title: publication.title,
+        ...(publication.effectiveOn !== undefined
+          ? { effective_on: publication.effectiveOn }
+          : {}),
+        primary_official_url:
+          publication.officialUrl,
+        last_seen_at: new Date(),
+        updated_at: new Date(),
+      })
+      .where('id', '=', publicationId)
+      .execute();
+
+    return {
+      publicationVersionId: currentVersion.id,
       disposition: 'EXISTING_PUBLICATION',
     };
   }

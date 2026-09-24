@@ -497,6 +497,7 @@ export class RfbNormasConnector implements CollectionConnector {
         : undefined;
       const metadata: Record<string, unknown> = {
         sourceRole: 'ENRICHMENT',
+        versionPolicy: 'PRIMARY_AUTHORITATIVE',
         representationSourceRole: 'PRIMARY',
         publicationEventRole: 'ENRICHMENT_WHEN_DOU_EXISTS',
         captureCategory: decision.category,
