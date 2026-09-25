@@ -88,6 +88,38 @@ test('DOE-SP client decodes the authenticated PDF and hashes the PDF bytes', asy
   await assert.rejects(notPdf.downloadAuthenticatedPdf('1.2.3', signal), isError('DOE_SP_INVALID_AUTHENTICATED_PDF', 'FETCH_ERROR'));
 });
 
+test('DOE-SP authenticated PDF envelope may exceed generic JSON cap but decoded file cap still applies', async () => {
+  const bytes = Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(512, 0x41)]);
+  const envelope = { name: 'large.pdf', content: bytes.toString('base64') };
+  const body = JSON.stringify(envelope);
+  assert.ok(Buffer.byteLength(body) > 64);
+
+  const client = new DoeSpClient({
+    fetch: respond(() => new Response(body, { headers: { 'content-type': 'application/json' } })),
+    maxJsonBytes: 64,
+    maxFileBytes: 1024,
+  });
+
+  await assert.rejects(
+    client.getJson(DOE_SP_SEARCH_API, 'v2/journals', {}, signal),
+    isError('DOE_SP_RESPONSE_TOO_LARGE', 'FETCH_ERROR'),
+  );
+
+  const file = await client.downloadAuthenticatedPdf('2025.05.06.1.1.27.1.203.1057223', signal);
+  assert.equal(file.sizeBytes, bytes.byteLength);
+  assert.equal(file.rawSha256, createHash('sha256').update(bytes).digest('hex'));
+
+  const capped = new DoeSpClient({
+    fetch: respond(() => new Response(body, { headers: { 'content-type': 'application/json' } })),
+    maxJsonBytes: 64,
+    maxFileBytes: 64,
+  });
+  await assert.rejects(
+    capped.downloadAuthenticatedPdf('2025.05.06.1.1.27.1.203.1057223', signal),
+    isError('DOE_SP_RESPONSE_TOO_LARGE', 'FETCH_ERROR'),
+  );
+});
+
 test('DOE-SP client downloads attachments and rejects HTML error pages', async () => {
   const ok = new DoeSpClient({ fetch: respond(() => new Response(pdfBytes('anexo'), { headers: { 'content-type': 'application/pdf' } })) });
   const file = await ok.downloadAttachment('ede64d5b-2bdc-4c9b-bfd3-841a1c69eded', 'Anexo.pdf', signal);
