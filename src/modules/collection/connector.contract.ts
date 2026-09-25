@@ -41,7 +41,19 @@ export interface ConnectorPublication {
    */
   identityKey?: string;
 
+  /**
+   * Artefatos que pertencem a esta origem específica.
+   * Por padrão, também formam o conjunto canônico da versão.
+   */
   files?: ConnectorFile[];
+
+  /**
+   * Override opcional do conjunto de artefatos usado apenas para
+   * versionamento/conteúdo canônico quando ele difere dos arquivos
+   * pertencentes à origem. Não implica propriedade desses arquivos
+   * pela origem atual. Se omitido, `files` é usado.
+   */
+  versionFiles?: ConnectorFile[];
 
   /**
    * Dados específicos da fonte que precisam ser preservados,
