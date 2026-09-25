@@ -201,7 +201,25 @@ function pushRange(ranges: DoeSpDateRange[], from: string, to: string): DoeSpDat
 // ------------------------------------------------------------------ helpers
 
 function failureInfo(error: unknown): { code: string; message: string } {
-  if (error instanceof ConnectorError) return { code: error.code, message: error.message };
+  if (error instanceof ConnectorError) {
+    if (error.code === 'DOE_SP_HTTP_ERROR') {
+      const endpoint = typeof error.metadata?.endpoint === 'string' ? error.metadata.endpoint : undefined;
+      const contentType = typeof error.metadata?.contentType === 'string' ? error.metadata.contentType : undefined;
+      const responseSample = typeof error.metadata?.responseSample === 'string' ? error.metadata.responseSample : undefined;
+      const diagnostics = [
+        error.httpStatus !== undefined ? `status=${error.httpStatus}` : undefined,
+        endpoint ? `endpoint=${endpoint}` : undefined,
+        contentType ? `contentType=${contentType}` : undefined,
+        responseSample ? `responseSample=${JSON.stringify(responseSample)}` : undefined,
+      ].filter((value): value is string => Boolean(value));
+
+      return {
+        code: error.code,
+        message: diagnostics.length ? `${error.message} [${diagnostics.join('; ')}]` : error.message,
+      };
+    }
+    return { code: error.code, message: error.message };
+  }
   return { code: 'DOE_SP_UNHANDLED_ERROR', message: error instanceof Error ? error.message : 'Unknown DOE-SP error' };
 }
 
