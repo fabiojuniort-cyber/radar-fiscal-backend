@@ -745,13 +745,22 @@ export class DoeSpConnector implements CollectionConnector {
         });
       }
 
-      return {
-        prepared,
-        publication: composePublication(
+      const publication =
+        composePublication(
           prepared,
           files,
           authenticatedPdf,
-        ),
+        );
+
+      if (detail.authCode && pdf) {
+        publication.artifactReconciliation = {
+          kind: 'RECOVER_ORIGIN_ARTIFACT',
+        };
+      }
+
+      return {
+        prepared,
+        publication,
         authenticatedPdfCaptured:
           Boolean(detail.authCode && pdf),
       };
@@ -988,6 +997,16 @@ export class DoeSpConnector implements CollectionConnector {
           },
         );
         fallback.versionFiles = alternativeFiles;
+        if (
+          alternative.publication.externalId
+        ) {
+          fallback.artifactEquivalence = {
+            kind:
+              'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId:
+              alternative.publication.externalId,
+          };
+        }
 
         publications.push(fallback);
         counters.authPdfEquivalent404 += 1;
