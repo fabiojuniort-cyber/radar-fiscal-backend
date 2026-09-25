@@ -23,6 +23,12 @@ export interface PortalOptions {
   failures?: Array<{ match: string; status: number }>;
   /** Extra/overridden publication details by id. */
   details?: Record<string, Record<string, unknown>>;
+  /** Per-authCode response override for authenticated publication PDFs. */
+  authResponses?: Record<string, {
+    body: unknown;
+    status?: number;
+    contentType?: string;
+  }>;
 }
 
 export interface Portal {
@@ -61,7 +67,17 @@ export function portal(options: PortalOptions): Portal {
       }
       const auth = /^\/v2\/authentication\/download\/(.+)$/.exec(path);
       if (auth) {
-        const owner = Object.values(allDetails).find((item) => item.authCode === decodeURIComponent(auth[1]!));
+        const authCode = decodeURIComponent(auth[1]!);
+        const override = options.authResponses?.[authCode];
+        if (override) {
+          return new Response(JSON.stringify(override.body), {
+            status: override.status ?? 200,
+            headers: {
+              'content-type': override.contentType ?? 'application/json; charset=utf-8',
+            },
+          });
+        }
+        const owner = Object.values(allDetails).find((item) => item.authCode === authCode);
         return owner ? json(authPdfEnvelope(String(owner.id))) : json({ status: 400 }, 400);
       }
       const attachment = /^\/v2\/publications\/attachment\/downloadattachment\/(.+)$/.exec(path);
