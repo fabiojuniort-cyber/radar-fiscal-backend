@@ -3,8 +3,9 @@ import test from 'node:test';
 
 import { ConnectorError } from '../src/modules/collection/connector.error.js';
 import { DOE_SP_SEARCH_API, DoeSpClient } from '../src/modules/collection/doe-sp.client.js';
-import { DoeSpConnector, EMPTY_DOE_SP_STATE } from '../src/modules/collection/doe-sp.connector.js';
+import { DoeSpConnector, EMPTY_DOE_SP_STATE, isDoeSpEquivalentRepresentationAuthPdf404 } from '../src/modules/collection/doe-sp.connector.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
+import { portal } from './doe-sp.portal.js';
 
 /*
  * Real production case (25/09/2026): the authenticated PDF of
@@ -69,6 +70,149 @@ const context = () => ({
   attemptId: '33333333-3333-4333-8333-333333333333',
   signal: new AbortController().signal,
 });
+
+const EQ_DATE = '2026-09-24';
+const EQ_BAD_ID = '6098db3e-c841-40de-c0fc-08ddce07602e';
+const EQ_GOOD_ID = '645399a3-5a4e-44f7-c5cd-08ddcdea30ea';
+const EQ_BAD_AUTH = '2026.09.23.1.1.28.3.214.9000001';
+const EQ_GOOD_AUTH = '2026.09.23.1.1.28.3.214.9000002';
+const EQ_TYPE_PORTARIA = 'cb4ba2b1-3c31-4d79-85be-0c348ef04c66';
+const EQ_TITLE = 'PORTARIA SRE 42, DE 23 DE SETEMBRO DE 2026';
+const EQ_HIERARCHY = 'Executivo > Atos Normativos > Secretaria da Fazenda e Planejamento > Subsecretaria da Receita Estadual';
+const EQ_KNOWN_404_MESSAGE = 'Não foi possível consultar o status de processamento do documento solicitado.';
+
+interface EquivalentFixtureOptions {
+  includeAlternative?: boolean;
+  badContent?: string;
+  goodContent?: string;
+  badTitle?: string;
+  goodTitle?: string;
+  badStatus?: number;
+  badMessage?: string;
+}
+
+function equivalentFixture(options: EquivalentFixtureOptions = {}) {
+  const includeAlternative = options.includeAlternative ?? true;
+  const badTitle = options.badTitle ?? EQ_TITLE;
+  const goodTitle = options.goodTitle ?? EQ_TITLE;
+  const badContent = options.badContent ?? '<p>Texto oficial idêntico da Portaria SRE 42.</p>';
+  const goodContent = options.goodContent ?? badContent;
+  const items = [
+    {
+      isLegacy: false,
+      id: EQ_BAD_ID,
+      publicationTypeId: EQ_TYPE_PORTARIA,
+      date: `${EQ_DATE}T01:00:00`,
+      title: badTitle,
+      slug: 'executivo/secretaria-da-fazenda-e-planejamento/portaria-sre-42-duplicata-a',
+      excerpt: 'Altera disciplina tributária.',
+      hierarchy: EQ_HIERARCHY,
+      totalTermsFound: 0,
+    },
+    ...(includeAlternative
+      ? [{
+          isLegacy: false,
+          id: EQ_GOOD_ID,
+          publicationTypeId: EQ_TYPE_PORTARIA,
+          date: `${EQ_DATE}T01:00:01`,
+          title: goodTitle,
+          slug: 'executivo/secretaria-da-fazenda-e-planejamento/portaria-sre-42-duplicata-b',
+          excerpt: 'Altera disciplina tributária.',
+          hierarchy: EQ_HIERARCHY,
+          totalTermsFound: 0,
+        }]
+      : []),
+  ];
+  const structuredPublications = items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    slug: item.slug,
+  }));
+  const detailsFixture: Record<string, Record<string, unknown>> = {
+    [EQ_BAD_ID]: {
+      id: EQ_BAD_ID,
+      title: badTitle,
+      slug: items[0]!.slug,
+      date: EQ_DATE,
+      journal: 'Executivo',
+      section: 'Subsecretaria da Receita Estadual',
+      firstLevelSectionName: 'Atos Normativos',
+      secondLevelSectionName: 'Secretaria da Fazenda e Planejamento',
+      publicationType: 'Portaria',
+      editionPages: [],
+      content: badContent,
+      attachments: [],
+      authCode: EQ_BAD_AUTH,
+    },
+  };
+  if (includeAlternative) {
+    detailsFixture[EQ_GOOD_ID] = {
+      id: EQ_GOOD_ID,
+      title: goodTitle,
+      slug: items[1]!.slug,
+      date: EQ_DATE,
+      journal: 'Executivo',
+      section: 'Subsecretaria da Receita Estadual',
+      firstLevelSectionName: 'Atos Normativos',
+      secondLevelSectionName: 'Secretaria da Fazenda e Planejamento',
+      publicationType: 'Portaria',
+      editionPages: [],
+      content: goodContent,
+      attachments: [],
+      authCode: EQ_GOOD_AUTH,
+    };
+  }
+
+  return portal({
+    days: {
+      [EQ_DATE]: {
+        structured: {
+          journalName: 'Executivo',
+          items: [{
+            id: SECTION,
+            name: 'Atos Normativos',
+            children: [{
+              id: 'e0e06c19-4428-471f-7d57-08db6b94d2bf',
+              name: 'SECRETARIA DA FAZENDA E PLANEJAMENTO',
+              publications: structuredPublications,
+            }],
+          }],
+        },
+        list: {
+          pages: 1,
+          pageSize: 10,
+          publications: items,
+        },
+      },
+    },
+    details: detailsFixture,
+    authResponses: {
+      [EQ_BAD_AUTH]: {
+        status: options.badStatus ?? 404,
+        body: {
+          traceIdentifier: 'test',
+          requestErrors: [options.badMessage ?? EQ_KNOWN_404_MESSAGE],
+          title: `HTTP ${options.badStatus ?? 404}`,
+          status: options.badStatus ?? 404,
+        },
+      },
+    },
+  });
+}
+
+async function collectEquivalentFixture(
+  options: EquivalentFixtureOptions = {},
+) {
+  const fixture = equivalentFixture(options);
+  const result = await new DoeSpConnector({
+    fetch: fixture.fetch,
+    now: () => new Date(EQ_DATE + 'T15:00:00Z'),
+    lookbackDays: 1,
+    forceReprocess: false,
+    readState: async () => EMPTY_DOE_SP_STATE,
+  }).collect(context());
+  return { fixture, result };
+}
 
 test('client: "Processando" envelope is a retryable NOT_READY error, not an invalid PDF', async () => {
   const client = new DoeSpClient({ fetch: (async () => json(PROCESSING)) as typeof fetch });
@@ -187,4 +331,107 @@ test('connector: authenticated PDF HTTP diagnostics survive in the recorded part
   assert.match(failure?.message ?? '', /Forbidden by upstream/);
   assert.ok(!(failure?.message ?? '').includes(marker));
   assert.ok(!(failure?.message ?? '').includes('B'.repeat(80)));
+});
+
+
+test('connector: isolated known authenticated PDF 404 still blocks the item/day', async () => {
+  const { result } = await collectEquivalentFixture({ includeAlternative: false });
+  assert.equal(result.publications.length, 0);
+  assert.equal(result.partialFailures?.length, 1);
+  assert.equal(result.partialFailures?.[0]?.code, 'DOE_SP_HTTP_ERROR');
+  const day = (result.metadata?.doeSp as { days: Array<{ date: string; complete: boolean; failed: number }> }).days
+    .find((item) => item.date === EQ_DATE);
+  assert.equal(day?.complete, false);
+  assert.equal(day?.failed, 1);
+});
+
+test('connector: same strong identity with different normalized text does not use the 404 fallback', async () => {
+  const { result } = await collectEquivalentFixture({
+    goodContent: '<p>Texto oficial divergente da Portaria SRE 42.</p>',
+  });
+  assert.deepEqual(result.publications.map((item) => item.externalId), [EQ_GOOD_ID]);
+  assert.equal(result.partialFailures?.length, 1);
+  assert.equal(result.partialFailures?.[0]?.itemReference, `${EQ_DATE}#${EQ_BAD_ID}`);
+});
+
+test('connector: same text with weak or divergent identity does not use the 404 fallback', async () => {
+  const { result } = await collectEquivalentFixture({
+    goodTitle: 'PORTARIA, DE 23 DE SETEMBRO DE 2026',
+  });
+  assert.deepEqual(result.publications.map((item) => item.externalId), [EQ_GOOD_ID]);
+  assert.equal(result.partialFailures?.length, 1);
+  assert.equal(result.partialFailures?.[0]?.itemReference, `${EQ_DATE}#${EQ_BAD_ID}`);
+});
+
+test('connector: proven equivalent representation with valid alternate PDF completes both origins deterministically', async () => {
+  const { result } = await collectEquivalentFixture();
+  assert.equal(result.partialFailures, undefined);
+  assert.deepEqual(
+    result.publications.map((item) => item.externalId).sort(),
+    [EQ_BAD_ID, EQ_GOOD_ID].sort(),
+  );
+
+  const good = result.publications.find((item) => item.externalId === EQ_GOOD_ID)!;
+  const bad = result.publications.find((item) => item.externalId === EQ_BAD_ID)!;
+  assert.equal(good.metadata?.authenticatedPdf, 'CAPTURED');
+  assert.equal(bad.metadata?.authenticatedPdf, 'AUTH_PDF_404_EQUIVALENT_REPRESENTATION');
+  assert.equal(bad.metadata?.sourceRole, 'VALIDATION');
+  assert.equal(
+    (bad.metadata?.equivalentRepresentation as Record<string, unknown>)?.externalId,
+    EQ_GOOD_ID,
+  );
+
+  const normalizedGood = normalizePublication({ sourceId: context().sourceId, publication: good });
+  const normalizedBad = normalizePublication({ sourceId: context().sourceId, publication: bad });
+  assert.equal(normalizedGood.identityStrength, 'STRONG');
+  assert.equal(normalizedBad.identityStrength, 'STRONG');
+  assert.equal(normalizedBad.identityHash, normalizedGood.identityHash);
+  assert.equal(normalizedBad.contentHash, normalizedGood.contentHash);
+
+  const meta = result.metadata?.doeSp as {
+    counters: { authPdfEquivalent404: number };
+    days: Array<{ date: string; complete: boolean; failed: number; published: number }>;
+  };
+  assert.equal(meta.counters.authPdfEquivalent404, 1);
+  const day = meta.days.find((item) => item.date === EQ_DATE);
+  assert.equal(day?.complete, true);
+  assert.equal(day?.failed, 0);
+  assert.equal(day?.published, 2);
+});
+
+test('strict 404 predicate rejects other statuses, messages and endpoints', () => {
+  const make = (
+    httpStatus: number,
+    endpoint: string,
+    responseSample: string,
+  ) => new ConnectorError('DOE_SP_HTTP_ERROR', {
+    code: 'DOE_SP_HTTP_ERROR',
+    kind: 'HTTP_ERROR',
+    retryable: false,
+    httpStatus,
+    metadata: {
+      endpoint,
+      contentType: 'application/json',
+      responseSample,
+    },
+  });
+
+  assert.equal(
+    isDoeSpEquivalentRepresentationAuthPdf404(
+      make(403, '/v2/authentication/download/{authCode}', EQ_KNOWN_404_MESSAGE),
+    ),
+    false,
+  );
+  assert.equal(
+    isDoeSpEquivalentRepresentationAuthPdf404(
+      make(404, '/v2/authentication/download/{authCode}', 'Documento não encontrado.'),
+    ),
+    false,
+  );
+  assert.equal(
+    isDoeSpEquivalentRepresentationAuthPdf404(
+      make(404, '/v2/other/{authCode}', EQ_KNOWN_404_MESSAGE),
+    ),
+    false,
+  );
 });
