@@ -478,6 +478,55 @@ test(
         metadata.partialFailureCount,
         httpFailures.length + 2,
       );
+
+      const foreignAttempt =
+        await startCollectionAttempt(
+          db,
+          runId,
+          acquired.workerId,
+          'test-v1',
+        );
+
+      await finishCollectionAttempt(db, {
+        attemptId: foreignAttempt.id,
+        connectorKey: 'confaz',
+        outcome: {
+          ok: true,
+          status: 'SUCCESS',
+          durationMs: 10,
+          result: {
+            publications: [],
+            partialFailures: [
+              {
+                code: 'DOE_SP_HTTP_ERROR',
+                message:
+                  'HTTP error [status=403; endpoint=/v2/authentication/download/{authCode}; contentType=text/plain; responseSample="FOREIGN_SECRET"]',
+                itemReference:
+                  `2025-07-29#${randomUUID()}`,
+              },
+            ],
+          },
+        },
+      });
+
+      const foreignRow = await db
+        .selectFrom('collection_attempts')
+        .select('metadata')
+        .where('id', '=', foreignAttempt.id)
+        .executeTakeFirstOrThrow();
+
+      const foreignMetadata =
+        foreignRow.metadata as Record<string, unknown>;
+
+      assert.equal(
+        foreignMetadata.doeSpHttpDiagnostics,
+        undefined,
+      );
+      assert.ok(
+        !JSON.stringify(foreignMetadata).includes(
+          'FOREIGN_SECRET',
+        ),
+      );
     } finally {
       if (runId) {
         await db
