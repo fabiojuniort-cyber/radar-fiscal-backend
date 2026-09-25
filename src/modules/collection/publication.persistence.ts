@@ -93,6 +93,239 @@ function isPrimaryAuthoritativeVersionPolicy(
     .versionPolicy === 'PRIMARY_AUTHORITATIVE';
 }
 
+interface ArtifactReconciliationEvidence {
+  originId: string;
+  priorMetadata: Record<string, unknown>;
+  equivalentExternalId: string;
+  alreadyReconciled: boolean;
+}
+
+function metadataRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function reconciliationEvidence(
+  metadata: unknown,
+): Omit<
+  ArtifactReconciliationEvidence,
+  'originId' | 'priorMetadata'
+> | undefined {
+  const row = metadataRecord(metadata);
+  if (!row) return undefined;
+
+  const equivalence = metadataRecord(
+    row.artifactEquivalence,
+  );
+  if (
+    equivalence?.kind ===
+      'PROVEN_EQUIVALENT_REPRESENTATION' &&
+    typeof equivalence.equivalentExternalId ===
+      'string' &&
+    equivalence.equivalentExternalId
+  ) {
+    return {
+      equivalentExternalId:
+        equivalence.equivalentExternalId,
+      alreadyReconciled: false,
+    };
+  }
+
+  const reconciliation = metadataRecord(
+    row.artifactReconciliation,
+  );
+  if (
+    reconciliation?.kind ===
+      'ORIGIN_ARTIFACT_RECOVERY' &&
+    reconciliation.state === 'RECONCILED' &&
+    typeof reconciliation.equivalentExternalId ===
+      'string' &&
+    reconciliation.equivalentExternalId
+  ) {
+    return {
+      equivalentExternalId:
+        reconciliation.equivalentExternalId,
+      alreadyReconciled: true,
+    };
+  }
+
+  return undefined;
+}
+
+async function loadArtifactReconciliationEvidence(
+  trx: Transaction<DB>,
+  input: PersistPublicationInput,
+  publicationId: string,
+): Promise<
+  ArtifactReconciliationEvidence | undefined
+> {
+  if (
+    input.publication.artifactReconciliation?.kind !==
+      'RECOVER_ORIGIN_ARTIFACT' ||
+    input.publication.identityStrength !== 'STRONG' ||
+    !input.publication.externalId
+  ) {
+    return undefined;
+  }
+
+  const origin = await trx
+    .selectFrom('publication_origins')
+    .select(['id', 'publication_id', 'metadata'])
+    .where('source_id', '=', input.sourceId)
+    .where(
+      'external_id',
+      '=',
+      input.publication.externalId,
+    )
+    .executeTakeFirst();
+
+  if (
+    !origin ||
+    origin.publication_id !== publicationId
+  ) {
+    return undefined;
+  }
+
+  const evidence = reconciliationEvidence(
+    origin.metadata,
+  );
+  if (!evidence) return undefined;
+
+  return {
+    originId: origin.id,
+    priorMetadata:
+      metadataRecord(origin.metadata) ?? {},
+    ...evidence,
+  };
+}
+
+function dateOnly(
+  value: unknown,
+): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === 'string') {
+    return value.slice(0, 10);
+  }
+
+  return null;
+}
+
+async function canReuseCurrentVersionForArtifactReconciliation(
+  trx: Transaction<DB>,
+  publicationId: string,
+  publication: NormalizedPublication,
+  currentVersion:
+    | {
+        id: string;
+        content_text: string | null;
+      }
+    | undefined,
+  evidence:
+    ArtifactReconciliationEvidence | undefined,
+): Promise<boolean> {
+  if (
+    !evidence ||
+    !currentVersion ||
+    publication.identityStrength !== 'STRONG'
+  ) {
+    return false;
+  }
+
+  const canonical = await trx
+    .selectFrom('publications')
+    .select([
+      'identity_hash',
+      'identity_strength',
+      'title',
+      'effective_on',
+    ])
+    .where('id', '=', publicationId)
+    .executeTakeFirst();
+
+  if (
+    !canonical ||
+    canonical.identity_strength !== 'STRONG' ||
+    canonical.identity_hash !==
+      publication.identityHash
+  ) {
+    return false;
+  }
+
+  return canonical.title === publication.title &&
+    (currentVersion.content_text ?? null) ===
+      (publication.contentText ?? null) &&
+    dateOnly(canonical.effective_on) ===
+      (publication.effectiveOn ?? null);
+}
+
+function reconciliationHistory(
+  evidence: ArtifactReconciliationEvidence,
+): unknown[] {
+  const current =
+    evidence.priorMetadata
+      .artifactReconciliationHistory;
+  const existing = Array.isArray(current)
+    ? current
+    : [];
+
+  if (evidence.alreadyReconciled) {
+    return existing;
+  }
+
+  const snapshot = {
+    ...evidence.priorMetadata,
+  };
+  delete snapshot.artifactReconciliationHistory;
+
+  return [
+    ...existing,
+    {
+      kind: 'ORIGIN_ARTIFACT_RECOVERY',
+      previousOriginMetadata: snapshot,
+    },
+  ];
+}
+
+function reconciledOriginMetadata(
+  incoming: Record<string, unknown>,
+  evidence: ArtifactReconciliationEvidence,
+  versionReused: boolean,
+): Record<string, unknown> {
+  const history = reconciliationHistory(
+    evidence,
+  );
+
+  return {
+    ...incoming,
+    artifactReconciliation: {
+      kind: 'ORIGIN_ARTIFACT_RECOVERY',
+      state: versionReused
+        ? 'RECONCILED'
+        : 'RECOVERED_WITH_VERSION_CHANGE',
+      equivalentExternalId:
+        evidence.equivalentExternalId,
+    },
+    ...(history.length
+      ? {
+          artifactReconciliationHistory:
+            history,
+        }
+      : {}),
+  };
+}
+
 async function enrichCanonicalPublication(
   trx: Transaction<DB>,
   publicationId: string,
@@ -224,8 +457,21 @@ async function upsertOrigin(
   trx: Transaction<DB>,
   input: PersistPublicationInput,
   publicationId: string,
+  reconciliation:
+    | {
+        evidence: ArtifactReconciliationEvidence;
+        versionReused: boolean;
+      }
+    | undefined,
 ): Promise<void> {
-  const pageReference = input.publication.originMetadata.officialUrlGranularity === 'PAGE';
+  const originMetadata = reconciliation
+    ? reconciledOriginMetadata(
+        originMetadata,
+        reconciliation.evidence,
+        reconciliation.versionReused,
+      )
+    : originMetadata;
+  const pageReference = originMetadata.officialUrlGranularity === 'PAGE';
   if (pageReference && !input.publication.externalId) {
     throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
   }
@@ -284,7 +530,7 @@ async function upsertOrigin(
         official_url: input.publication.officialUrl,
         last_seen_at: new Date(),
         metadata: asJson(
-          input.publication.originMetadata,
+          originMetadata,
         ),
       })
       .where('id', '=', origin.id)
@@ -302,7 +548,7 @@ async function upsertOrigin(
         input.publication.externalId ?? null,
       official_url: input.publication.officialUrl,
       metadata: asJson(
-        input.publication.originMetadata,
+        originMetadata,
       ),
     })
     .execute();
