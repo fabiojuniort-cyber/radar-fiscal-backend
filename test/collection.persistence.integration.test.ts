@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import {
@@ -739,8 +739,12 @@ test(
     const sourceId = randomUUID();
     const runGood = randomUUID();
     const runBad = randomUUID();
+    const runRecover = randomUUID();
+    const runReplay = randomUUID();
     const attemptGood = randomUUID();
     const attemptBad = randomUUID();
+    const attemptRecover = randomUUID();
+    const attemptReplay = randomUUID();
     const goodId =
       '645399a3-5a4e-44f7-c5cd-08ddcdea30ea';
     const badId =
@@ -754,6 +758,27 @@ test(
       mimeType: 'application/pdf',
       rawSha256: productionSha,
       sizeBytes: productionSize,
+      metadata: {
+        kind: 'AUTHENTICATED_PUBLICATION_PDF',
+        origin: 'DOE_SP',
+      },
+    };
+    const recoveredPdfBytes = Buffer.from(
+      '%PDF-1.4\n% recovered-own-6098\n%%EOF\n',
+      'utf8',
+    );
+    const recoveredSha = createHash('sha256')
+      .update(recoveredPdfBytes)
+      .digest('hex');
+    const recoveredSize =
+      recoveredPdfBytes.byteLength;
+    assert.notEqual(recoveredSha, productionSha);
+    const recoveredFile = {
+      url:
+        'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/2025.07.28.1.1.27.5.214.1229474',
+      mimeType: 'application/pdf',
+      rawSha256: recoveredSha,
+      sizeBytes: recoveredSize,
       metadata: {
         kind: 'AUTHENTICATED_PUBLICATION_PDF',
         origin: 'DOE_SP',
@@ -805,6 +830,20 @@ test(
               new Date('2026-09-25T10:01:00Z'),
             trigger_type: 'MANUAL',
           },
+          {
+            id: runRecover,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:02:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runReplay,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:03:00Z'),
+            trigger_type: 'MANUAL',
+          },
         ])
         .execute();
 
@@ -820,6 +859,18 @@ test(
           {
             id: attemptBad,
             collection_run_id: runBad,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptRecover,
+            collection_run_id: runRecover,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptReplay,
+            collection_run_id: runReplay,
             attempt_no: 1,
             status: 'RUNNING',
           },
@@ -849,6 +900,11 @@ test(
             'https://doe.sp.gov.br/executivo/portaria-sre-42-404',
           externalId: badId,
           versionFiles: [validFile],
+          artifactEquivalence: {
+            kind:
+              'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: goodId,
+          },
           metadata: {
             sourceRole: 'VALIDATION',
             authenticatedPdf:
@@ -979,6 +1035,189 @@ test(
         versionFiles[0]?.sizeBytes,
         productionSize,
       );
+      const canonicalVersionId =
+        persistedGood.publicationVersionId;
+      const canonicalVersion = await db
+        .selectFrom('publication_versions')
+        .select(['content_hash'])
+        .where('id', '=', canonicalVersionId)
+        .executeTakeFirstOrThrow();
+
+      const recovered = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://doe.sp.gov.br/executivo/portaria-sre-42-404',
+          externalId: badId,
+          files: [recoveredFile],
+          artifactReconciliation: {
+            kind: 'RECOVER_ORIGIN_ARTIFACT',
+          },
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authenticatedPdf: 'CAPTURED',
+          },
+        },
+      });
+
+      const recoveredResult = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runRecover,
+            attemptId: attemptRecover,
+            publication: recovered,
+          }),
+        );
+
+      assert.equal(
+        recoveredResult.disposition,
+        'EXISTING_PUBLICATION',
+      );
+      assert.equal(
+        recoveredResult.publicationId,
+        persistedGood.publicationId,
+      );
+      assert.equal(
+        recoveredResult.publicationVersionId,
+        canonicalVersionId,
+      );
+
+      const afterRecoveryVersions = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'content_hash', 'source_metadata'])
+        .where(
+          'publication_id',
+          '=',
+          persistedGood.publicationId,
+        )
+        .execute();
+      assert.equal(afterRecoveryVersions.length, 1);
+      assert.equal(
+        afterRecoveryVersions[0]!.id,
+        canonicalVersionId,
+      );
+      assert.equal(
+        afterRecoveryVersions[0]!.content_hash,
+        canonicalVersion.content_hash,
+      );
+      const canonicalFilesAfterRecovery =
+        (afterRecoveryVersions[0]!.source_metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        canonicalFilesAfterRecovery[0]?.rawSha256,
+        productionSha,
+      );
+
+      const originsAfterRecovery = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(originsAfterRecovery.length, 2);
+      const recoveredBadOrigin =
+        originsAfterRecovery.find(
+          (row) => row.external_id === badId,
+        )!;
+      const recoveredGoodOrigin =
+        originsAfterRecovery.find(
+          (row) => row.external_id === goodId,
+        )!;
+      const recoveredBadMetadata =
+        recoveredBadOrigin.metadata as Record<string, unknown>;
+      const recoveredGoodMetadata =
+        recoveredGoodOrigin.metadata as Record<string, unknown>;
+      assert.equal(
+        recoveredBadMetadata.authenticatedPdf,
+        'CAPTURED',
+      );
+      const recoveredBadFiles =
+        recoveredBadMetadata.files as Array<Record<string, unknown>>;
+      assert.equal(
+        recoveredBadFiles[0]?.rawSha256,
+        recoveredSha,
+      );
+      assert.equal(
+        recoveredBadFiles[0]?.sizeBytes,
+        recoveredSize,
+      );
+      const recoveredGoodFiles =
+        recoveredGoodMetadata.files as Array<Record<string, unknown>>;
+      assert.equal(
+        recoveredGoodFiles[0]?.rawSha256,
+        productionSha,
+      );
+      assert.equal(
+        recoveredGoodFiles[0]?.sizeBytes,
+        productionSize,
+      );
+
+      const reconciliation =
+        recoveredBadMetadata.artifactReconciliation as Record<string, unknown>;
+      assert.equal(reconciliation.state, 'RECONCILED');
+      assert.equal(
+        reconciliation.equivalentExternalId,
+        goodId,
+      );
+      const history =
+        recoveredBadMetadata.artifactReconciliationHistory as Array<Record<string, unknown>>;
+      assert.equal(history.length, 1);
+      const previous =
+        history[0]?.previousOriginMetadata as Record<string, unknown>;
+      assert.equal(
+        previous.authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+      const previousEquivalent =
+        previous.equivalentRepresentation as Record<string, unknown>;
+      assert.equal(
+        previousEquivalent.externalId,
+        goodId,
+      );
+
+      const replayResult = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runReplay,
+            attemptId: attemptReplay,
+            publication: recovered,
+          }),
+        );
+      assert.equal(
+        replayResult.disposition,
+        'EXISTING_PUBLICATION',
+      );
+      assert.equal(
+        replayResult.publicationVersionId,
+        canonicalVersionId,
+      );
+      const replayVersions = await db
+        .selectFrom('publication_versions')
+        .select('id')
+        .where(
+          'publication_id',
+          '=',
+          persistedGood.publicationId,
+        )
+        .execute();
+      assert.equal(replayVersions.length, 1);
+      const replayOrigins = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(replayOrigins.length, 2);
+      const replayBadMetadata =
+        replayOrigins.find(
+          (row) => row.external_id === badId,
+        )!.metadata as Record<string, unknown>;
+      const replayHistory =
+        replayBadMetadata.artifactReconciliationHistory as Array<Record<string, unknown>>;
+      assert.equal(replayHistory.length, 1);
     } finally {
       const publicationIds = [
         ...new Set(
