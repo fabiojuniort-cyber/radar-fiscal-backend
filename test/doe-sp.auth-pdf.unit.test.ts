@@ -110,3 +110,81 @@ test('connector: after the grace period the act is published without the never-r
   const hash = (item: typeof publication) => normalizePublication({ sourceId: context().sourceId, publication: item }).contentHash;
   assert.equal(hash(second.publications[0]!), hash(publication));
 });
+
+
+test('client: authenticated PDF HTTP error retains only bounded sanitized diagnostics', async () => {
+  const authCode = '2025.07.28.1.1.27.5.214.1229474';
+  const marker = 'REDACT_ME_VALUE';
+  const body = JSON.stringify({
+    message: 'Acesso negado para o documento solicitado.',
+    password: marker,
+    authCode,
+    content: 'A'.repeat(180),
+    extra: 'Z'.repeat(600),
+  });
+  const client = new DoeSpClient({
+    fetch: (async () => new Response(body, {
+      status: 403,
+      headers: { 'content-type': 'application/problem+json; charset=utf-8' },
+    })) as typeof fetch,
+  });
+
+  await assert.rejects(
+    client.downloadAuthenticatedPdf(authCode, new AbortController().signal),
+    (error: unknown) => {
+      if (!(error instanceof ConnectorError)) return false;
+      assert.equal(error.code, 'DOE_SP_HTTP_ERROR');
+      assert.equal(error.kind, 'HTTP_ERROR');
+      assert.equal(error.retryable, false);
+      assert.equal(error.httpStatus, 403);
+      assert.equal(error.metadata?.endpoint, '/v2/authentication/download/{authCode}');
+      assert.equal(error.metadata?.contentType, 'application/problem+json; charset=utf-8');
+      const sample = String(error.metadata?.responseSample ?? '');
+      assert.ok(sample.length > 0);
+      assert.ok(sample.length <= 240);
+      assert.match(sample, /Acesso negado/);
+      assert.ok(!sample.includes(marker));
+      assert.ok(!sample.includes(authCode));
+      assert.ok(!sample.includes('A'.repeat(80)));
+      return true;
+    },
+  );
+});
+
+test('connector: authenticated PDF HTTP diagnostics survive in the recorded partial failure', async () => {
+  const date = '2026-09-24';
+  const marker = 'REDACT_ME_CONNECTOR';
+  const regular = api(date);
+  const diagnosticFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input.toString());
+    if (url.pathname.startsWith('/v2/authentication/download/')) {
+      return new Response(JSON.stringify({
+        message: 'Forbidden by upstream',
+        password: marker,
+        content: 'B'.repeat(160),
+      }), {
+        status: 403,
+        headers: { 'content-type': 'application/problem+json; charset=utf-8' },
+      });
+    }
+    return regular(input, init);
+  }) as typeof fetch;
+
+  const result = await new DoeSpConnector({
+    fetch: diagnosticFetch,
+    now: () => new Date('2026-09-24T15:00:00Z'),
+    lookbackDays: 1,
+    forceReprocess: false,
+    readState: async () => EMPTY_DOE_SP_STATE,
+  }).collect(context());
+
+  assert.equal(result.publications.length, 0);
+  const failure = result.partialFailures?.[0];
+  assert.equal(failure?.code, 'DOE_SP_HTTP_ERROR');
+  assert.match(failure?.message ?? '', /status=403/);
+  assert.match(failure?.message ?? '', /endpoint=\/v2\/authentication\/download\/\{authCode\}/);
+  assert.match(failure?.message ?? '', /contentType=application\/problem\+json; charset=utf-8/);
+  assert.match(failure?.message ?? '', /Forbidden by upstream/);
+  assert.ok(!(failure?.message ?? '').includes(marker));
+  assert.ok(!(failure?.message ?? '').includes('B'.repeat(80)));
+});

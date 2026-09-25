@@ -22,6 +22,9 @@ const DEFAULT_MAX_JSON_BYTES = 16 * 1024 * 1024;
 const DEFAULT_MAX_FILE_BYTES = 64 * 1024 * 1024;
 const DEFAULT_RETRY_AFTER_SECONDS = 60;
 const AUTH_PDF_ENVELOPE_OVERHEAD_BYTES = 1024 * 1024;
+const HTTP_ERROR_SAMPLE_READ_BYTES = 1024;
+const HTTP_ERROR_SAMPLE_MAX_CHARS = 240;
+const AUTH_PDF_DIAGNOSTIC_ENDPOINT = '/v2/authentication/download/{authCode}';
 
 export interface DoeSpClientOptions {
   fetch?: typeof fetch;
@@ -172,21 +175,90 @@ export class DoeSpClient {
     }
   }
 
-  async #checkStatus(response: Response, allowNotFound: boolean): Promise<void> {
+  async #readHttpErrorSample(response: Response): Promise<string | undefined> {
+    const contentType = cleanContentType(response.headers.get('content-type'));
+    if (
+      contentType === 'application/pdf' ||
+      contentType === 'application/octet-stream' ||
+      contentType.startsWith('image/')
+    ) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
+      return '[binary body omitted]';
+    }
+    if (!response.body) return undefined;
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      while (total < HTTP_ERROR_SAMPLE_READ_BYTES) {
+        const next = await reader.read();
+        if (next.done) break;
+        const remaining = HTTP_ERROR_SAMPLE_READ_BYTES - total;
+        const slice = next.value.byteLength > remaining ? next.value.subarray(0, remaining) : next.value;
+        chunks.push(slice);
+        total += slice.byteLength;
+        if (slice.byteLength < next.value.byteLength) break;
+      }
+    } finally {
+      try { await reader.cancel(); } catch { /* ignore */ }
+      reader.releaseLock();
+    }
+
+    let sample = new TextDecoder('utf-8', { fatal: false })
+      .decode(Buffer.concat(chunks, total))
+      .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!sample) return undefined;
+
+    sample = sample
+      .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+      .replace(/(["']?(?:authorization|cookie|set-cookie|password|token|access_token|refresh_token|api[_-]?key)["']?\s*[:=]\s*)(["'][^"']*["']|[^\s,;}]+)/gi, '$1[REDACTED]')
+      .replace(/\b\d{4}(?:\.\d+){5,}\b/g, '[REDACTED_AUTH_CODE]')
+      .replace(/[A-Za-z0-9+/]{80,}={0,2}/g, '[REDACTED_LONG_TOKEN]');
+
+    if (sample.length > HTTP_ERROR_SAMPLE_MAX_CHARS) {
+      sample = sample.slice(0, HTTP_ERROR_SAMPLE_MAX_CHARS - 1).trimEnd() + '…';
+    }
+    return sample;
+  }
+
+  async #checkStatus(
+    response: Response,
+    allowNotFound: boolean,
+    diagnosticEndpoint?: string,
+  ): Promise<void> {
     if (response.status >= 200 && response.status < 300) return;
     if (allowNotFound && response.status === 404) return;
-    try { await response.body?.cancel(); } catch { /* ignore */ }
+
     const retryAfter = retryAfterSeconds(response) ?? DEFAULT_RETRY_AFTER_SECONDS;
     if (response.status === 429) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
       throw failure('DOE_SP_RATE_LIMITED', 'RATE_LIMITED', true, { httpStatus: 429, retryAfterSeconds: retryAfter });
     }
     if (response.status === 408 || response.status === 425 || response.status >= 500) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
       throw failure('DOE_SP_SOURCE_UNAVAILABLE', 'SOURCE_UNAVAILABLE', true, {
         httpStatus: response.status,
         retryAfterSeconds: retryAfter,
       });
     }
-    throw failure('DOE_SP_HTTP_ERROR', 'HTTP_ERROR', false, { httpStatus: response.status });
+
+    const responseSample = diagnosticEndpoint ? await this.#readHttpErrorSample(response) : undefined;
+    if (!diagnosticEndpoint) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
+    }
+    throw failure('DOE_SP_HTTP_ERROR', 'HTTP_ERROR', false, {
+      httpStatus: response.status,
+      ...(diagnosticEndpoint ? {
+        metadata: {
+          endpoint: diagnosticEndpoint,
+          contentType: (response.headers.get('content-type') ?? '').slice(0, 160),
+          ...(responseSample ? { responseSample } : {}),
+        },
+      } : {}),
+    });
   }
 
   async #readBytes(response: Response, limit: number, signal: AbortSignal): Promise<Uint8Array> {
@@ -229,12 +301,16 @@ export class DoeSpClient {
     path: string,
     params: Record<string, string> = {},
     signal: AbortSignal,
-    options: { allowNotFound?: boolean; maxBytes?: number } = {},
+    options: { allowNotFound?: boolean; maxBytes?: number; diagnosticEndpoint?: string } = {},
   ): Promise<DoeSpJsonResponse> {
     const url = new URL(path, base);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     const response = await this.#request(url.toString(), signal, 'application/json');
-    await this.#checkStatus(response, options.allowNotFound === true);
+    await this.#checkStatus(
+      response,
+      options.allowNotFound === true,
+      options.diagnosticEndpoint,
+    );
     const contentType = cleanContentType(response.headers.get('content-type'));
     const bytes = await this.#readBytes(response, options.maxBytes ?? this.#maxJsonBytes, signal);
     if (response.status === 404) {
@@ -296,7 +372,7 @@ export class DoeSpClient {
       authenticatedPdfPath(authCode),
       {},
       signal,
-      { maxBytes: envelopeMaxBytes },
+      { maxBytes: envelopeMaxBytes, diagnosticEndpoint: AUTH_PDF_DIAGNOSTIC_ENDPOINT },
     );
     const body = response.body as Record<string, unknown> | null;
     const content = typeof body?.content === 'string' ? body.content : undefined;
