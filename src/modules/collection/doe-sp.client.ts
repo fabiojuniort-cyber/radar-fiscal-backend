@@ -21,6 +21,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_JSON_BYTES = 16 * 1024 * 1024;
 const DEFAULT_MAX_FILE_BYTES = 64 * 1024 * 1024;
 const DEFAULT_RETRY_AFTER_SECONDS = 60;
+const AUTH_PDF_ENVELOPE_OVERHEAD_BYTES = 1024 * 1024;
 
 export interface DoeSpClientOptions {
   fetch?: typeof fetch;
@@ -228,14 +229,14 @@ export class DoeSpClient {
     path: string,
     params: Record<string, string> = {},
     signal: AbortSignal,
-    options: { allowNotFound?: boolean } = {},
+    options: { allowNotFound?: boolean; maxBytes?: number } = {},
   ): Promise<DoeSpJsonResponse> {
     const url = new URL(path, base);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     const response = await this.#request(url.toString(), signal, 'application/json');
     await this.#checkStatus(response, options.allowNotFound === true);
     const contentType = cleanContentType(response.headers.get('content-type'));
-    const bytes = await this.#readBytes(response, this.#maxJsonBytes, signal);
+    const bytes = await this.#readBytes(response, options.maxBytes ?? this.#maxJsonBytes, signal);
     if (response.status === 404) {
       return { url: url.toString(), status: 404, body: null, rawSha256: sha256(bytes), sizeBytes: bytes.byteLength };
     }
@@ -285,7 +286,18 @@ export class DoeSpClient {
    * over the decoded PDF bytes (the official file), not the JSON envelope.
    */
   async downloadAuthenticatedPdf(authCode: string, signal: AbortSignal): Promise<DoeSpDownloadedFile> {
-    const response = await this.getJson(DOE_SP_SEARCH_API, authenticatedPdfPath(authCode), {}, signal);
+    // The endpoint wraps the binary PDF in base64 JSON. A valid PDF near the
+    // file limit expands by ~4/3 and can legitimately exceed the generic JSON
+    // cap used by metadata/list endpoints. Bound this envelope from the file
+    // cap instead of relaxing JSON limits globally.
+    const envelopeMaxBytes = Math.ceil(this.#maxFileBytes / 3) * 4 + AUTH_PDF_ENVELOPE_OVERHEAD_BYTES;
+    const response = await this.getJson(
+      DOE_SP_SEARCH_API,
+      authenticatedPdfPath(authCode),
+      {},
+      signal,
+      { maxBytes: envelopeMaxBytes },
+    );
     const body = response.body as Record<string, unknown> | null;
     const content = typeof body?.content === 'string' ? body.content : undefined;
     if (!content && body?.isSuccess === true && typeof body.message === 'string') {
@@ -299,6 +311,9 @@ export class DoeSpClient {
       throw failure('DOE_SP_INVALID_AUTHENTICATED_PDF', 'FETCH_ERROR', false);
     }
     const bytes = new Uint8Array(Buffer.from(content, 'base64'));
+    if (bytes.byteLength > this.#maxFileBytes) {
+      throw failure('DOE_SP_RESPONSE_TOO_LARGE', 'FETCH_ERROR', false, { metadata: { decodedBytes: bytes.byteLength } });
+    }
     if (bytes.length < 5 || new TextDecoder('ascii').decode(bytes.subarray(0, 5)) !== '%PDF-') {
       throw failure('DOE_SP_INVALID_AUTHENTICATED_PDF', 'FETCH_ERROR', false);
     }
