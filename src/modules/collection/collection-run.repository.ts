@@ -294,6 +294,209 @@ export async function startCollectionAttempt(
   });
 }
 
+const DOE_SP_HTTP_DIAGNOSTIC_MAX_ENTRIES = 5;
+const DOE_SP_HTTP_DIAGNOSTIC_MAX_ITEM_REFERENCE_CHARS = 96;
+const DOE_SP_HTTP_DIAGNOSTIC_MAX_CONTENT_TYPE_CHARS = 160;
+const DOE_SP_HTTP_DIAGNOSTIC_MAX_RESPONSE_SAMPLE_CHARS = 240;
+const DOE_SP_AUTH_PDF_DIAGNOSTIC_ENDPOINT =
+  '/v2/authentication/download/{authCode}';
+
+interface DoeSpHttpDiagnostic {
+  itemReference?: string;
+  httpStatus?: number;
+  endpoint: string;
+  contentType?: string;
+  responseSample?: string;
+}
+
+function cleanBoundedText(
+  value: string,
+  maxChars: number,
+): string | undefined {
+  const cleaned = value
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) return undefined;
+  return cleaned.slice(0, maxChars);
+}
+
+function sanitizeDoeSpItemReference(
+  value: string | undefined,
+): string | undefined {
+  if (!value) return undefined;
+
+  const trimmed = value
+    .trim()
+    .slice(0, DOE_SP_HTTP_DIAGNOSTIC_MAX_ITEM_REFERENCE_CHARS);
+
+  return /^\d{4}-\d{2}-\d{2}#[0-9a-fA-F-]{36}$/.test(
+    trimmed,
+  )
+    ? trimmed
+    : undefined;
+}
+
+function sanitizeDoeSpResponseSample(
+  value: string,
+): string | undefined {
+  let sample = value
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!sample) return undefined;
+
+  sample = sample
+    .replace(
+      /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
+      'Bearer [REDACTED]',
+    )
+    .replace(
+      /(["']?(?:authorization|cookie|set-cookie|password|token|access_token|refresh_token|api[_-]?key)["']?\s*[:=]\s*)(["'][^"']*["']|[^\s,;}]+)/gi,
+      '$1[REDACTED]',
+    )
+    .replace(
+      /\b\d{4}(?:\.\d+){5,}\b/g,
+      '[REDACTED_AUTH_CODE]',
+    )
+    .replace(
+      /[A-Za-z0-9+/]{80,}={0,2}/g,
+      '[REDACTED_LONG_TOKEN]',
+    );
+
+  if (
+    sample.length >
+    DOE_SP_HTTP_DIAGNOSTIC_MAX_RESPONSE_SAMPLE_CHARS
+  ) {
+    sample =
+      sample
+        .slice(
+          0,
+          DOE_SP_HTTP_DIAGNOSTIC_MAX_RESPONSE_SAMPLE_CHARS - 1,
+        )
+        .trimEnd() + '…';
+  }
+
+  return sample || undefined;
+}
+
+function extractDoeSpHttpDiagnostic(
+  message: string,
+  itemReference: string | undefined,
+): DoeSpHttpDiagnostic | undefined {
+  const statusMatch = message.match(
+    /(?:\[|;\s*)status=(\d{3})(?:;|\])/,
+  );
+  const endpointMatch = message.match(
+    /(?:\[|;\s*)endpoint=([^;\]]{1,240})(?:;|\])/,
+  );
+
+  if (
+    !statusMatch ||
+    endpointMatch?.[1]?.trim() !==
+      DOE_SP_AUTH_PDF_DIAGNOSTIC_ENDPOINT
+  ) {
+    return undefined;
+  }
+
+  const httpStatus = Number(statusMatch[1]);
+  if (
+    !Number.isInteger(httpStatus) ||
+    httpStatus < 100 ||
+    httpStatus > 599
+  ) {
+    return undefined;
+  }
+
+  const contentTypeMatch = message.match(
+    /(?:\[|;\s*)contentType=([^;\]]{1,240})(?:;|\])/,
+  );
+
+  let responseSample: string | undefined;
+  const sampleMarker = '; responseSample=';
+  const sampleStart = message.lastIndexOf(sampleMarker);
+
+  if (sampleStart >= 0 && message.endsWith(']')) {
+    const encodedSample = message
+      .slice(sampleStart + sampleMarker.length, -1)
+      .trim();
+
+    try {
+      const parsed = JSON.parse(encodedSample) as unknown;
+      if (typeof parsed === 'string') {
+        responseSample =
+          sanitizeDoeSpResponseSample(parsed);
+      }
+    } catch {
+      // Ignore malformed/untrusted diagnostic text.
+    }
+  }
+
+  const contentType = contentTypeMatch?.[1]
+    ? cleanBoundedText(
+        contentTypeMatch[1],
+        DOE_SP_HTTP_DIAGNOSTIC_MAX_CONTENT_TYPE_CHARS,
+      )
+    : undefined;
+
+  const sanitizedItemReference =
+    sanitizeDoeSpItemReference(itemReference);
+
+  return {
+    ...(sanitizedItemReference
+      ? { itemReference: sanitizedItemReference }
+      : {}),
+    httpStatus,
+    endpoint: DOE_SP_AUTH_PDF_DIAGNOSTIC_ENDPOINT,
+    ...(contentType ? { contentType } : {}),
+    ...(responseSample ? { responseSample } : {}),
+  };
+}
+
+function doeSpHttpDiagnostics(
+  connectorKey: string | undefined,
+  partialFailures:
+    | Array<{
+        code: string;
+        message: string;
+        itemReference?: string;
+      }>
+    | undefined,
+): DoeSpHttpDiagnostic[] | undefined {
+  if (
+    connectorKey !== 'doe-sp' ||
+    !partialFailures?.length
+  ) {
+    return undefined;
+  }
+
+  const diagnostics: DoeSpHttpDiagnostic[] = [];
+
+  for (const failure of partialFailures) {
+    if (failure.code !== 'DOE_SP_HTTP_ERROR') continue;
+
+    const diagnostic = extractDoeSpHttpDiagnostic(
+      failure.message,
+      failure.itemReference,
+    );
+
+    if (!diagnostic) continue;
+
+    diagnostics.push(diagnostic);
+
+    if (
+      diagnostics.length >=
+      DOE_SP_HTTP_DIAGNOSTIC_MAX_ENTRIES
+    ) {
+      break;
+    }
+  }
+
+  return diagnostics.length ? diagnostics : undefined;
+}
+
 function failureMetadata(
   outcome: ConnectorExecutionFailure,
 ): Json {
@@ -309,6 +512,11 @@ export async function finishCollectionAttempt(
   if (input.outcome.ok) {
     const outcome = input.outcome;
     const checkpoint = outcome.result.checkpoint;
+    const safeDoeSpHttpDiagnostics =
+      doeSpHttpDiagnostics(
+        input.connectorKey,
+        outcome.result.partialFailures,
+      );
     if (checkpoint && (!input.runId || !input.sourceId || !input.connectorKey)) {
       throw new Error('runId, sourceId and connectorKey are required to persist a checkpoint');
     }
@@ -346,6 +554,12 @@ export async function finishCollectionAttempt(
             ...(outcome.result.metadata ?? {}),
             partialFailureCount:
               outcome.result.partialFailures?.length ?? 0,
+            ...(safeDoeSpHttpDiagnostics
+              ? {
+                  doeSpHttpDiagnostics:
+                    safeDoeSpHttpDiagnostics,
+                }
+              : {}),
             publicationCount: outcome.result.publications.length,
             ...(outcome.result.completion ? { completion: outcome.result.completion } : {}),
             ...(checkpointRef ? { checkpointRef } : {}),
