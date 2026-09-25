@@ -959,7 +959,7 @@ export class DoeSpConnector implements CollectionConnector {
         // this authCode itself returned the known 404.
         const fallback = composePublication(
           candidate,
-          alternativeFiles,
+          [],
           'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
           'VALIDATION',
           {
@@ -968,12 +968,16 @@ export class DoeSpConnector implements CollectionConnector {
                 alternative.publication.externalId,
               officialUrl:
                 alternative.publication.officialUrl,
-              authenticatedPdfSha256:
-                authFile.rawSha256,
-              authenticatedPdfSizeBytes:
-                authFile.sizeBytes,
               textSha256:
                 candidate.textSha256,
+              authenticatedPdf: {
+                ownerExternalId:
+                  alternative.publication.externalId,
+                rawSha256:
+                  authFile.rawSha256,
+                sizeBytes:
+                  authFile.sizeBytes,
+              },
             },
             authenticatedPdfError: {
               code: 'DOE_SP_HTTP_ERROR',
@@ -983,6 +987,7 @@ export class DoeSpConnector implements CollectionConnector {
             },
           },
         );
+        fallback.versionFiles = alternativeFiles;
 
         publications.push(fallback);
         counters.authPdfEquivalent404 += 1;
