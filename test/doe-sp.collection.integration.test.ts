@@ -168,6 +168,13 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
     .update(validPdfBytes)
     .digest('hex');
   const validPdfSize = validPdfBytes.byteLength;
+  const recoveredPdfBytes = pdfBytes('auth ' + badId);
+  const recoveredPdfSha = createHash('sha256')
+    .update(recoveredPdfBytes)
+    .digest('hex');
+  const recoveredPdfSize =
+    recoveredPdfBytes.byteLength;
+  assert.notEqual(recoveredPdfSha, validPdfSha);
   const authResponses: NonNullable<Parameters<typeof portal>[0]['authResponses']> = {
     [badAuth]: {
       status: 404,
@@ -368,10 +375,13 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
 
     const publicationId = origins[0]!.publication_id;
     const versionRows = await db.selectFrom('publication_versions')
-      .select(['source_metadata'])
+      .select(['id', 'content_hash', 'source_metadata'])
       .where('publication_id', '=', publicationId)
       .execute();
     assert.equal(versionRows.length, 1);
+    const canonicalVersionId = versionRows[0]!.id;
+    const canonicalContentHash =
+      versionRows[0]!.content_hash;
     const versionFiles =
       (versionRows[0]!.source_metadata as Record<string, unknown>).files as Array<Record<string, unknown>>;
     assert.equal(versionFiles.length, 1);
@@ -396,13 +406,14 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
 
     authResponses[badAuth] = {
       status: 200,
-      body: authPdfEnvelope(goodId),
+      body: authPdfEnvelope(badId),
     };
     force = true;
     const healed = await run();
     assert.equal(healed.status, 'SUCCESS');
     assert.equal(healed.metrics.newPublications, 0);
     assert.equal(healed.metrics.newVersions, 0);
+    assert.equal(healed.metrics.existingPublications, 2);
 
     const healedOrigins = await db.selectFrom('publication_origins')
       .select(['publication_id', 'external_id', 'metadata'])
@@ -411,25 +422,112 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
     assert.equal(healedOrigins.length, 2);
     assert.equal(new Set(healedOrigins.map((row) => row.publication_id)).size, 1);
     const healedBad = healedOrigins.find((row) => row.external_id === badId)!;
+    const healedGood = healedOrigins.find((row) => row.external_id === goodId)!;
     const healedBadMetadata = healedBad.metadata as Record<string, unknown>;
+    const healedGoodMetadata = healedGood.metadata as Record<string, unknown>;
     assert.equal(
       healedBadMetadata.authenticatedPdf,
       'CAPTURED',
     );
     const healedBadFiles = healedBadMetadata.files as Array<Record<string, unknown>>;
     assert.equal(healedBadFiles.length, 1);
-    assert.equal(healedBadFiles[0]?.rawSha256, validPdfSha);
-    assert.equal(healedBadFiles[0]?.sizeBytes, validPdfSize);
+    assert.equal(
+      healedBadFiles[0]?.rawSha256,
+      recoveredPdfSha,
+    );
+    assert.equal(
+      healedBadFiles[0]?.sizeBytes,
+      recoveredPdfSize,
+    );
     assert.match(
       String(healedBadFiles[0]?.url ?? ''),
       new RegExp(badAuth.replaceAll('.', '\\.')),
     );
+    assert.notEqual(
+      healedBadFiles[0]?.rawSha256,
+      validPdfSha,
+    );
 
-    const healedVersionCount = await db.selectFrom('publication_versions')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
+    const healedGoodFiles =
+      healedGoodMetadata.files as Array<Record<string, unknown>>;
+    assert.equal(healedGoodFiles.length, 1);
+    assert.equal(
+      healedGoodFiles[0]?.rawSha256,
+      validPdfSha,
+    );
+    assert.equal(
+      healedGoodFiles[0]?.sizeBytes,
+      validPdfSize,
+    );
+
+    const reconciliation =
+      healedBadMetadata.artifactReconciliation as Record<string, unknown>;
+    assert.equal(
+      reconciliation.state,
+      'RECONCILED',
+    );
+    assert.equal(
+      reconciliation.equivalentExternalId,
+      goodId,
+    );
+    const history =
+      healedBadMetadata.artifactReconciliationHistory as Array<Record<string, unknown>>;
+    assert.equal(history.length, 1);
+    const previousOriginMetadata =
+      history[0]?.previousOriginMetadata as Record<string, unknown>;
+    assert.equal(
+      previousOriginMetadata.authenticatedPdf,
+      'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+    );
+    const previousEquivalent =
+      previousOriginMetadata.equivalentRepresentation as Record<string, unknown>;
+    assert.equal(previousEquivalent.externalId, goodId);
+
+    const healedVersions = await db.selectFrom('publication_versions')
+      .select(['id', 'content_hash', 'source_metadata'])
       .where('publication_id', '=', publicationId)
+      .execute();
+    assert.equal(healedVersions.length, 1);
+    assert.equal(healedVersions[0]!.id, canonicalVersionId);
+    assert.equal(
+      healedVersions[0]!.content_hash,
+      canonicalContentHash,
+    );
+    const healedCanonicalFiles =
+      (healedVersions[0]!.source_metadata as Record<string, unknown>).files as Array<Record<string, unknown>>;
+    assert.equal(
+      healedCanonicalFiles[0]?.rawSha256,
+      validPdfSha,
+    );
+    assert.equal(
+      healedCanonicalFiles[0]?.sizeBytes,
+      validPdfSize,
+    );
+
+    const healedReplay = await run();
+    assert.equal(healedReplay.status, 'SUCCESS');
+    assert.equal(healedReplay.metrics.newPublications, 0);
+    assert.equal(healedReplay.metrics.newVersions, 0);
+    const replayVersions = await db.selectFrom('publication_versions')
+      .select(['id', 'content_hash'])
+      .where('publication_id', '=', publicationId)
+      .execute();
+    assert.equal(replayVersions.length, 1);
+    assert.equal(replayVersions[0]!.id, canonicalVersionId);
+    assert.equal(
+      replayVersions[0]!.content_hash,
+      canonicalContentHash,
+    );
+    const replayBadOrigin = await db.selectFrom('publication_origins')
+      .select('metadata')
+      .where('source_id', '=', sourceId)
+      .where('external_id', '=', badId)
       .executeTakeFirstOrThrow();
-    assert.equal(Number(healedVersionCount.count), 1);
+    const replayBadMetadata =
+      replayBadOrigin.metadata as Record<string, unknown>;
+    const replayHistory =
+      replayBadMetadata.artifactReconciliationHistory as Array<Record<string, unknown>>;
+    assert.equal(replayHistory.length, 1);
   } finally {
     const publicationIds = [...new Set(
       (await db.selectFrom('publication_origins').select('publication_id').where('source_id', '=', sourceId).execute())
