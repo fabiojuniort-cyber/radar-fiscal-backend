@@ -559,9 +559,12 @@ async function getOrCreateVersion(
   publicationId: string,
   publication: NormalizedPublication,
   publicationInserted: boolean,
+  reconciliationEvidence:
+    ArtifactReconciliationEvidence | undefined,
 ): Promise<{
   publicationVersionId: string;
   disposition: PublicationDisposition;
+  artifactReconciliationApplied: boolean;
 }> {
   const incomingRole = publicationSourceRole(
     publication.metadata,
@@ -572,6 +575,7 @@ async function getOrCreateVersion(
     .select([
       'id',
       'content_hash',
+      'content_text',
       'source_metadata',
     ])
     .where('publication_id', '=', publicationId)
@@ -608,6 +612,33 @@ async function getOrCreateVersion(
           currentVersion.source_metadata,
         )
       : false;
+
+  const artifactReconciliationApplied =
+    await canReuseCurrentVersionForArtifactReconciliation(
+      trx,
+      publicationId,
+      publication,
+      currentVersion
+        ? {
+            id: currentVersion.id,
+            content_text:
+              currentVersion.content_text,
+          }
+        : undefined,
+      reconciliationEvidence,
+    );
+
+  if (
+    artifactReconciliationApplied &&
+    currentVersion
+  ) {
+    return {
+      publicationVersionId:
+        currentVersion.id,
+      disposition: 'EXISTING_PUBLICATION',
+      artifactReconciliationApplied: true,
+    };
+  }
 
   if (existingVersion) {
     if (incomingRole === 'PRIMARY') {
@@ -667,6 +698,7 @@ async function getOrCreateVersion(
     return {
       publicationVersionId: existingVersion.id,
       disposition: 'EXISTING_PUBLICATION',
+      artifactReconciliationApplied: false,
     };
   }
 
@@ -685,6 +717,7 @@ async function getOrCreateVersion(
     return {
       publicationVersionId: currentVersion.id,
       disposition: 'EXISTING_PUBLICATION',
+      artifactReconciliationApplied: false,
     };
   }
 
@@ -727,6 +760,7 @@ async function getOrCreateVersion(
     return {
       publicationVersionId: currentVersion.id,
       disposition: 'EXISTING_PUBLICATION',
+      artifactReconciliationApplied: false,
     };
   }
 
@@ -803,6 +837,7 @@ async function getOrCreateVersion(
     disposition: publicationInserted
       ? 'NEW_PUBLICATION'
       : 'NEW_VERSION',
+    artifactReconciliationApplied: false,
   };
 }
 
