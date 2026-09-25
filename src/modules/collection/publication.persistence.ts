@@ -131,7 +131,7 @@ async function upsertCollectionItem(
       source_url: input.publication.officialUrl,
       status: 'DISCOVERED',
       raw_metadata: asJson(
-        input.publication.metadata,
+        input.publication.originMetadata,
       ),
     })
     .onConflict((conflict) =>
@@ -146,7 +146,7 @@ async function upsertCollectionItem(
           source_url:
             input.publication.officialUrl,
           raw_metadata: asJson(
-            input.publication.metadata,
+            input.publication.originMetadata,
           ),
           updated_at: new Date(),
         }),
@@ -225,7 +225,7 @@ async function upsertOrigin(
   input: PersistPublicationInput,
   publicationId: string,
 ): Promise<void> {
-  const pageReference = input.publication.metadata.officialUrlGranularity === 'PAGE';
+  const pageReference = input.publication.originMetadata.officialUrlGranularity === 'PAGE';
   if (pageReference && !input.publication.externalId) {
     throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
   }
@@ -284,7 +284,7 @@ async function upsertOrigin(
         official_url: input.publication.officialUrl,
         last_seen_at: new Date(),
         metadata: asJson(
-          input.publication.metadata,
+          input.publication.originMetadata,
         ),
       })
       .where('id', '=', origin.id)
@@ -302,7 +302,7 @@ async function upsertOrigin(
         input.publication.externalId ?? null,
       official_url: input.publication.officialUrl,
       metadata: asJson(
-        input.publication.metadata,
+        input.publication.originMetadata,
       ),
     })
     .execute();
