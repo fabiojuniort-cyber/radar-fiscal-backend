@@ -341,16 +341,51 @@ export class DoeSpConnector implements CollectionConnector {
       category: DoeSpInclusionCategory,
       typeName: string | undefined,
       edition: EditionInfo,
+      sameDayItems: DoeSpListItem[],
     ): Promise<ConnectorPublication> => {
       const response = await client.getJson(DOE_SP_SEARCH_API, 'v2/publications/' + item.id, {}, context.signal);
       counters.detailsFetched += 1;
       const detail = parseDoeSpDetail(response.body, item.id);
       const capturedAt = now.toISOString();
       const files: ConnectorFile[] = [];
+      const identity = doeSpNormativeIdentity({ title: detail.title, ...(typeName ? { typeName } : {}), category });
+      let pdfAuthCode = detail.authCode;
+      let equivalentPdfRecord: { id: string; officialUrl: string; originalAuthCode: string } | undefined;
 
       let authenticatedPdf: 'CAPTURED' | 'NOT_RENDERED_BY_SOURCE' | 'NO_AUTH_CODE' = detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
       const pdf = detail.authCode
-        ? await client.downloadAuthenticatedPdf(detail.authCode, context.signal).catch((error: unknown) => {
+        ? await client.downloadAuthenticatedPdf(detail.authCode, context.signal).catch(async (error: unknown) => {
+            // The official list can expose two GUIDs for the exact same act,
+            // with one broken PDF endpoint. Resolve only a historical 404,
+            // strong identity and byte-identical HTML/attachments in the same
+            // day's official list. Never borrow by title similarity alone.
+            if (error instanceof ConnectorError && error.httpStatus === 404 && identity &&
+                detail.contentHtml.trim() && detail.date <= addDays(today, -DOE_SP_AUTH_PDF_GRACE_DAYS)) {
+              const candidates = sameDayItems.filter((other) => other.id !== item.id &&
+                other.title === item.title && JSON.stringify(other.hierarchy) === JSON.stringify(item.hierarchy))
+                .sort((a, b) => a.id.localeCompare(b.id));
+              for (const candidate of candidates) {
+                if (context.budget?.shouldYield()) break;
+                try {
+                  const response = await client.getJson(DOE_SP_SEARCH_API, 'v2/publications/' + candidate.id, {}, context.signal);
+                  counters.detailsFetched += 1;
+                  const other = parseDoeSpDetail(response.body, candidate.id);
+                  const otherIdentity = doeSpNormativeIdentity({ title: other.title, ...(typeName ? { typeName } : {}), category });
+                  if (!other.authCode || other.authCode === detail.authCode || other.title !== detail.title ||
+                      other.date !== detail.date || other.journal !== detail.journal ||
+                      other.contentHtml !== detail.contentHtml ||
+                      JSON.stringify(other.attachments) !== JSON.stringify(detail.attachments) ||
+                      JSON.stringify(otherIdentity) !== JSON.stringify(identity)) continue;
+                  const replacement = await client.downloadAuthenticatedPdf(other.authCode, context.signal);
+                  pdfAuthCode = other.authCode;
+                  equivalentPdfRecord = { id: other.id, officialUrl: publicationPageUrl(other.slug), originalAuthCode: detail.authCode! };
+                  return replacement;
+                } catch (candidateError) {
+                  if (isCancel(candidateError) || isSourceLevel(candidateError)) throw candidateError;
+                  // A failed candidate is not evidence; retain the original 404.
+                }
+              }
+            }
             // A PDF the source never rendered must not block the act forever:
             // after the grace period the act is kept (official HTML text) without it.
             if (
@@ -369,10 +404,10 @@ export class DoeSpConnector implements CollectionConnector {
         counters.filesDownloaded += 1;
         counters.fileBytes += pdf.sizeBytes;
         files.push({
-          url: authenticatedPdfUrl(detail.authCode),
+          url: authenticatedPdfUrl(pdfAuthCode!),
           ...(pdf.name ? { name: pdf.name } : {}),
           mimeType: pdf.mimeType,
-          externalId: 'auth:' + detail.authCode,
+          externalId: 'auth:' + pdfAuthCode,
           rawSha256: pdf.rawSha256,
           sizeBytes: pdf.sizeBytes,
           metadata: { kind: 'AUTHENTICATED_PUBLICATION_PDF', capturedAt, origin: 'DOE_SP', textExtraction: 'NOT_REQUIRED_HTML_TEXT_AVAILABLE' },
@@ -394,7 +429,6 @@ export class DoeSpConnector implements CollectionConnector {
       }
 
       const contentText = doeSpHtmlText(detail.contentHtml);
-      const identity = doeSpNormativeIdentity({ title: detail.title, ...(typeName ? { typeName } : {}), category });
       const actType = identity?.actType ?? doeSpActType(detail.title, detail.publicationType ?? typeName);
       const organ = doeSpOrgan(item.hierarchy);
       const signedOn = identity?.signedOn ?? doeSpTitleDate(detail.title);
@@ -438,6 +472,7 @@ export class DoeSpConnector implements CollectionConnector {
           supplementaryEditionCount: edition.supplementaryEditionCount,
           textExtraction: contentText ? 'HTML_TEXT' : 'EMPTY',
           authenticatedPdf,
+          ...(equivalentPdfRecord ? { equivalentPdfRecord } : {}),
           attachmentCount: detail.attachments.length,
         },
       };
@@ -519,7 +554,7 @@ export class DoeSpConnector implements CollectionConnector {
           break;
         }
         try {
-          publications.push(await buildPublication(next.item, next.category, next.typeName, edition));
+          publications.push(await buildPublication(next.item, next.category, next.typeName, edition, list.items));
           processed.add(next.item.id);
           outcome.published += 1;
         } catch (error) {

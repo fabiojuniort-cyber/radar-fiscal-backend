@@ -110,3 +110,84 @@ test('connector: after the grace period the act is published without the never-r
   const hash = (item: typeof publication) => normalizePublication({ sourceId: context().sourceId, publication: item }).contentHash;
   assert.equal(hash(second.publications[0]!), hash(publication));
 });
+
+// Production: two GUIDs in DOE 29/07/2025 for Portaria SRE 42 with
+// byte-identical official HTML. Only the first authenticated PDF returns 404.
+const EQUIVALENT_ID = '645399a3-5a4e-44f7-c5cd-08ddcdea30ea';
+function equivalentApi(options: {
+  mismatch?: 'content' | 'date' | 'attachments' | 'hierarchy';
+  status?: number;
+  recent?: boolean;
+  weak?: boolean;
+} = {}) {
+  const date = options.recent ? '2026-09-24' : '2025-07-29';
+  const title = options.weak ? 'COMUNICADO, DE 28 DE JULHO DE 2025' : 'PORTARIA SRE 42, DE 28 DE JULHO DE 2025';
+  const base = api(date);
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = new URL(input.toString());
+    if (url.pathname.startsWith('/v2/authentication/download/')) {
+      if (url.pathname.endsWith('/2025.07.28.1.1.27.5.214.1229788')) return json({ name: 'official.pdf', content: Buffer.from('%PDF-1.4\nfixture').toString('base64') });
+      return json({ title: 'HTTP error' }, options.status ?? 404);
+    }
+    if (url.pathname.startsWith('/v2/publications/')) {
+      const equivalent = url.pathname.endsWith(EQUIVALENT_ID);
+      const body = await (await base(new URL('/v2/publications/' + ID, DOE_SP_SEARCH_API))).json() as Record<string, unknown>;
+      return json({ ...body, title, publicationType: options.weak ? 'Comunicado' : 'Portaria',
+        ...(equivalent ? {
+          id: EQUIVALENT_ID, authCode: '2025.07.28.1.1.27.5.214.1229788', slug: 'executivo/equivalent-official-record',
+          ...(options.mismatch === 'content' ? { content: '<p>Different legal text.</p>' } : {}),
+          ...(options.mismatch === 'date' ? { date: '2025-07-30' } : {}),
+          ...(options.mismatch === 'attachments' ? { attachments: [{ id: 'a828451b-920d-4bfc-a46a-c2c2a8060e48', name: 'Annex.pdf', position: 1 }] } : {}),
+        } : {}),
+      });
+    }
+    const response = await base(input);
+    const body = await response.json() as Record<string, unknown>;
+    if (url.pathname === '/v2/summary/list' && url.searchParams.get('Date') === date) {
+      const first = { ...(body.publications as Record<string, unknown>[])[0], title };
+      body.publications = [first, { ...first, id: EQUIVALENT_ID,
+        ...(options.mismatch === 'hierarchy' ? { hierarchy: HIERARCHY + ' > Another unit' } : {}),
+      }];
+    }
+    return json(body, response.status);
+  }) as typeof fetch;
+  return new DoeSpConnector({ fetch: fetchImpl, now: () => new Date('2026-09-24T15:00:00Z'), lookbackDays: 1,
+    bootstrapStartDate: date, forceReprocess: true, readState: async () => ({
+      ...EMPTY_DOE_SP_STATE, coverageFrom: date, windowEnd: '2026-09-24',
+      pendingRanges: options.recent ? [] : [{ from: date, to: date }], days: {},
+    }),
+  });
+}
+
+test('historical PDF 404 resolves only through an exact official equivalent and replays without artificial versions', async () => {
+  const first = await equivalentApi().collect(context());
+  const replay = await equivalentApi().collect(context());
+  assert.equal(first.partialFailures, undefined);
+  assert.equal(first.publications.length, 2);
+  assert.deepEqual(first.checkpoint?.state.pendingRanges, []);
+  const normalized = [...first.publications, ...replay.publications].map(publication =>
+    normalizePublication({ sourceId: context().sourceId, publication }));
+  assert.equal(new Set(normalized.map(p => p.identityHash)).size, 1);
+  assert.equal(new Set(normalized.map(p => p.contentHash)).size, 1);
+  assert.equal(new Set(first.publications.map(p => p.externalId)).size, 2);
+  assert.equal(first.publications[0]?.metadata?.authenticatedPdf, 'CAPTURED');
+  assert.equal((first.publications[0]?.metadata?.equivalentPdfRecord as { id: string }).id, EQUIVALENT_ID);
+  assert.equal(first.publications[0]?.files?.[0]?.externalId, 'auth:2025.07.28.1.1.27.5.214.1229788');
+});
+
+for (const mismatch of ['content', 'date', 'attachments', 'hierarchy'] as const) {
+  test(`PDF 404 stays a failure when the candidate differs in ${mismatch}`, async () => {
+    const result = await equivalentApi({ mismatch }).collect(context());
+    assert.equal(result.partialFailures?.[0]?.code, 'DOE_SP_HTTP_ERROR');
+    assert.equal(result.publications.some(p => p.externalId === ID), false);
+    assert.deepEqual(result.checkpoint?.state.pendingRanges, [{ from: '2025-07-29', to: '2025-07-29' }]);
+  });
+}
+
+for (const options of [{ recent: true }, { weak: true }, { status: 503 }, { status: 403 }]) {
+  test(`equivalent-record fallback does not mask unrelated failures: ${JSON.stringify(options)}`, async () => {
+    const result = await equivalentApi(options).collect(context());
+    assert.ok(result.partialFailures?.length);
+    assert.equal(result.publications.some(p => p.externalId === ID), false);
+  });
+}
