@@ -53,6 +53,8 @@ export interface NormalizedPublication {
   originMetadata: Record<string, unknown>;
   /** Canonical/version artifact set. */
   files: NormalizedPublicationFile[];
+  /** Explicit origin-artifact recovery intent; never changes hashes by itself. */
+  artifactReconciliation?: ConnectorPublication['artifactReconciliation'];
   identityStrength: PublicationIdentityStrength;
   identityBasis: NormalizedPublicationIdentityBasis;
   identityHash: string;
@@ -428,8 +430,20 @@ export function normalizePublication(
       ...(originFiles.length > 0
         ? { files: originFiles }
         : {}),
+      ...(input.publication.artifactEquivalence
+        ? {
+            artifactEquivalence:
+              input.publication.artifactEquivalence,
+          }
+        : {}),
     },
     files,
+    ...(input.publication.artifactReconciliation
+      ? {
+          artifactReconciliation:
+            input.publication.artifactReconciliation,
+        }
+      : {}),
     identityStrength: identity.strength,
     identityBasis: identity.basis,
     identityHash,
