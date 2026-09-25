@@ -376,9 +376,23 @@ test('connector: proven equivalent representation with valid alternate PDF compl
   assert.equal(good.metadata?.authenticatedPdf, 'CAPTURED');
   assert.equal(bad.metadata?.authenticatedPdf, 'AUTH_PDF_404_EQUIVALENT_REPRESENTATION');
   assert.equal(bad.metadata?.sourceRole, 'VALIDATION');
+  const equivalent =
+    bad.metadata?.equivalentRepresentation as
+      | Record<string, unknown>
+      | undefined;
+  assert.equal(equivalent?.externalId, EQ_GOOD_ID);
+  const equivalentPdf =
+    equivalent?.authenticatedPdf as
+      | Record<string, unknown>
+      | undefined;
   assert.equal(
-    (bad.metadata?.equivalentRepresentation as Record<string, unknown>)?.externalId,
+    equivalentPdf?.ownerExternalId,
     EQ_GOOD_ID,
+  );
+  assert.equal(bad.files, undefined);
+  assert.deepEqual(
+    bad.versionFiles,
+    good.files,
   );
 
   const normalizedGood = normalizePublication({ sourceId: context().sourceId, publication: good });
@@ -387,6 +401,13 @@ test('connector: proven equivalent representation with valid alternate PDF compl
   assert.equal(normalizedBad.identityStrength, 'STRONG');
   assert.equal(normalizedBad.identityHash, normalizedGood.identityHash);
   assert.equal(normalizedBad.contentHash, normalizedGood.contentHash);
+  assert.equal(
+    Object.hasOwn(normalizedBad.originMetadata, 'files'),
+    false,
+  );
+  assert.ok(
+    Array.isArray(normalizedBad.metadata.files),
+  );
 
   const meta = result.metadata?.doeSp as {
     counters: { authPdfEquivalent404: number };
@@ -433,5 +454,92 @@ test('strict 404 predicate rejects other statuses, messages and endpoints', () =
       make(404, '/v2/other/{authCode}', EQ_KNOWN_404_MESSAGE),
     ),
     false,
+  );
+});
+
+
+test('normalizer: alternate production PDF stays version-only for the 404 origin', () => {
+  const productionSha =
+    '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30';
+  const productionSize = 466_065;
+  const validFile = {
+    url:
+      'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/2025.07.28.1.1.27.5.214.1229788',
+    mimeType: 'application/pdf',
+    rawSha256: productionSha,
+    sizeBytes: productionSize,
+    metadata: {
+      kind: 'AUTHENTICATED_PUBLICATION_PDF',
+      origin: 'DOE_SP',
+    },
+  };
+  const shared = {
+    title:
+      'PORTARIA SRE 42, DE 28 DE JULHO DE 2025',
+    agency: 'SEFAZ-SP/SRE',
+    sphere: 'STATE' as const,
+    stateCode: 'SP',
+    actType: 'PORTARIA',
+    actNumber: '42/2025',
+    publishedAt:
+      new Date('2025-07-29T00:00:00Z'),
+    content:
+      'Texto canônico idêntico da Portaria SRE 42.',
+  };
+
+  const valid = normalizePublication({
+    sourceId: context().sourceId,
+    publication: {
+      ...shared,
+      officialUrl:
+        'https://doe.sp.gov.br/executivo/portaria-sre-42-valid',
+      externalId: EQ_GOOD_ID,
+      files: [validFile],
+      metadata: {
+        sourceRole: 'PRIMARY',
+        authenticatedPdf: 'CAPTURED',
+      },
+    },
+  });
+
+  const fallback = normalizePublication({
+    sourceId: context().sourceId,
+    publication: {
+      ...shared,
+      officialUrl:
+        'https://doe.sp.gov.br/executivo/portaria-sre-42-404',
+      externalId: EQ_BAD_ID,
+      versionFiles: [validFile],
+      metadata: {
+        sourceRole: 'VALIDATION',
+        authenticatedPdf:
+          'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+        equivalentRepresentation: {
+          externalId: EQ_GOOD_ID,
+          authenticatedPdf: {
+            ownerExternalId: EQ_GOOD_ID,
+            rawSha256: productionSha,
+            sizeBytes: productionSize,
+          },
+        },
+      },
+    },
+  });
+
+  assert.equal(valid.contentHash, fallback.contentHash);
+  assert.equal(valid.identityHash, fallback.identityHash);
+  const validOriginFiles =
+    valid.originMetadata.files as
+      | Array<Record<string, unknown>>
+      | undefined;
+  assert.equal(validOriginFiles?.[0]?.rawSha256, productionSha);
+  assert.equal(validOriginFiles?.[0]?.sizeBytes, productionSize);
+  assert.equal(
+    Object.hasOwn(fallback.originMetadata, 'files'),
+    false,
+  );
+  assert.equal(
+    (fallback.metadata.files as Array<Record<string, unknown>>)[0]?.rawSha256,
+    productionSha,
   );
 });
