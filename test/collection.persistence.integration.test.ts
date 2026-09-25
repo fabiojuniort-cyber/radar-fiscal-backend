@@ -10,7 +10,7 @@ import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
-import { persistPublication } from '../src/modules/collection/publication.persistence.js';
+import { persistPublication, PublicationOriginConflictError } from '../src/modules/collection/publication.persistence.js';
 
 test(
   'publication persistence deduplicates, versions and keeps weak identities separate',
@@ -1706,6 +1706,244 @@ test(
           .execute();
         await db.destroy();
       }
+    }
+  },
+);
+
+
+test(
+  'proven artifact equivalence cannot cross a divergent strong identity',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+    const sourceId = randomUUID();
+    const runGood = randomUUID();
+    const runFallback = randomUUID();
+    const runRecover = randomUUID();
+    const attemptGood = randomUUID();
+    const attemptFallback = randomUUID();
+    const attemptRecover = randomUUID();
+    const goodId = 'identity-good-' + sourceId;
+    const badId = 'identity-bad-' + sourceId;
+    const baseFile = {
+      url: 'https://example.test/identity-a.pdf',
+      rawSha256: 'e'.repeat(64),
+      sizeBytes: 300,
+    };
+    const ownFile = {
+      url: 'https://example.test/identity-b.pdf',
+      rawSha256: 'f'.repeat(64),
+      sizeBytes: 301,
+    };
+    const common = {
+      title: 'PORTARIA TESTE 77/2026',
+      agency: 'SEFAZ-TESTE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '77/2026-' + sourceId,
+      publishedAt:
+        new Date('2026-09-25T00:00:00Z'),
+      content: 'Conteúdo lógico original.',
+    };
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: 'identity-reconciliation-' + sourceId,
+        name: 'Identity reconciliation gate',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        agency: 'Test',
+        base_url: 'https://example.test/',
+        connector_key: 'test',
+      }).execute();
+      await db.insertInto('collection_runs').values([
+        {
+          id: runGood,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T13:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runFallback,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T13:01:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runRecover,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T13:02:00Z'),
+          trigger_type: 'MANUAL',
+        },
+      ]).execute();
+      await db.insertInto('collection_attempts').values([
+        {
+          id: attemptGood,
+          collection_run_id: runGood,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptFallback,
+          collection_run_id: runFallback,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptRecover,
+          collection_run_id: runRecover,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+      ]).execute();
+
+      const good = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://example.test/identity/good',
+          externalId: goodId,
+          files: [baseFile],
+          metadata: {
+            sourceRole: 'PRIMARY',
+          },
+        },
+      });
+      const fallback = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://example.test/identity/bad',
+          externalId: badId,
+          versionFiles: [baseFile],
+          artifactEquivalence: {
+            kind:
+              'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: goodId,
+          },
+          metadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+          },
+        },
+      });
+
+      await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runGood,
+          attemptId: attemptGood,
+          publication: good,
+        }),
+      );
+      const fallbackResult =
+        await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runFallback,
+            attemptId: attemptFallback,
+            publication: fallback,
+          }),
+        );
+
+      const divergentIdentity =
+        normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            actNumber:
+              '78/2026-' + sourceId,
+            officialUrl:
+              'https://example.test/identity/bad',
+            externalId: badId,
+            files: [ownFile],
+            artifactReconciliation: {
+              kind: 'RECOVER_ORIGIN_ARTIFACT',
+            },
+            metadata: {
+              sourceRole: 'PRIMARY',
+              authenticatedPdf: 'CAPTURED',
+            },
+          },
+        });
+
+      await assert.rejects(
+        db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runRecover,
+            attemptId: attemptRecover,
+            publication: divergentIdentity,
+          }),
+        ),
+        (error: unknown) =>
+          error instanceof
+            PublicationOriginConflictError,
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select('id')
+        .where(
+          'publication_id',
+          '=',
+          fallbackResult.publicationId,
+        )
+        .execute();
+      assert.equal(versions.length, 1);
+      const badOrigin = await db
+        .selectFrom('publication_origins')
+        .select('metadata')
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      assert.equal(
+        (badOrigin.metadata as Record<string, unknown>)
+          .authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+    } finally {
+      const ids = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (ids.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', ids)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
     }
   },
 );
