@@ -288,6 +288,13 @@ export class DoeSpClient {
     const response = await this.getJson(DOE_SP_SEARCH_API, authenticatedPdfPath(authCode), {}, signal);
     const body = response.body as Record<string, unknown> | null;
     const content = typeof body?.content === 'string' ? body.content : undefined;
+    if (!content && body?.isSuccess === true && typeof body.message === 'string') {
+      // The source answers 200 `{ isSuccess, message: 'O documento encontra-se com status "Processando"' }`
+      // while (or when it never finishes) rendering the authenticated PDF.
+      throw failure('DOE_SP_AUTHENTICATED_PDF_NOT_READY', 'FETCH_ERROR', true, {
+        metadata: { sourceMessage: body.message.slice(0, 200) },
+      });
+    }
     if (!content || !/^[A-Za-z0-9+/]+={0,2}$/.test(content)) {
       throw failure('DOE_SP_INVALID_AUTHENTICATED_PDF', 'FETCH_ERROR', false);
     }
