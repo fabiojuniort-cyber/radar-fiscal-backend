@@ -717,3 +717,299 @@ test(
     }
   },
 );
+
+
+test(
+  'origin metadata keeps the production-proven DOE-SP alternate PDF only on the valid origin',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(
+      adminUrl,
+      'DATABASE_ADMIN_URL is required for collection integration tests.',
+    );
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+
+    const sourceId = randomUUID();
+    const runGood = randomUUID();
+    const runBad = randomUUID();
+    const attemptGood = randomUUID();
+    const attemptBad = randomUUID();
+    const goodId =
+      '645399a3-5a4e-44f7-c5cd-08ddcdea30ea';
+    const badId =
+      '6098db3e-c841-40de-c0fc-08ddce07602e';
+    const productionSha =
+      '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30';
+    const productionSize = 466_065;
+    const validFile = {
+      url:
+        'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/2025.07.28.1.1.27.5.214.1229788',
+      mimeType: 'application/pdf',
+      rawSha256: productionSha,
+      sizeBytes: productionSize,
+      metadata: {
+        kind: 'AUTHENTICATED_PUBLICATION_PDF',
+        origin: 'DOE_SP',
+      },
+    };
+    const common = {
+      title:
+        'PORTARIA SRE 42, DE 28 DE JULHO DE 2025',
+      agency: 'SEFAZ-SP/SRE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '42/2025',
+      publishedAt:
+        new Date('2025-07-29T00:00:00Z'),
+      content:
+        'Texto canônico idêntico da Portaria SRE 42.',
+    };
+
+    try {
+      await db
+        .insertInto('sources')
+        .values({
+          id: sourceId,
+          code: `doe-sp-provenance-${sourceId}`,
+          name: 'DOE-SP provenance persistence fixture',
+          jurisdiction_level: 'STATE',
+          uf: 'SP',
+          agency: 'Imprensa Oficial / Prodesp',
+          base_url: 'https://doe.sp.gov.br/',
+          connector_key: 'doe-sp',
+        })
+        .execute();
+
+      await db
+        .insertInto('collection_runs')
+        .values([
+          {
+            id: runGood,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:00:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runBad,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:01:00Z'),
+            trigger_type: 'MANUAL',
+          },
+        ])
+        .execute();
+
+      await db
+        .insertInto('collection_attempts')
+        .values([
+          {
+            id: attemptGood,
+            collection_run_id: runGood,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptBad,
+            collection_run_id: runBad,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+        ])
+        .execute();
+
+      const good = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://doe.sp.gov.br/executivo/portaria-sre-42-valid',
+          externalId: goodId,
+          files: [validFile],
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authenticatedPdf: 'CAPTURED',
+          },
+        },
+      });
+
+      const bad = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://doe.sp.gov.br/executivo/portaria-sre-42-404',
+          externalId: badId,
+          versionFiles: [validFile],
+          metadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            equivalentRepresentation: {
+              externalId: goodId,
+              authenticatedPdf: {
+                ownerExternalId: goodId,
+                rawSha256: productionSha,
+                sizeBytes: productionSize,
+              },
+            },
+            authenticatedPdfError: {
+              code: 'DOE_SP_HTTP_ERROR',
+              httpStatus: 404,
+              endpoint:
+                '/v2/authentication/download/{authCode}',
+            },
+          },
+        },
+      });
+
+      const persistedGood = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runGood,
+            attemptId: attemptGood,
+            publication: good,
+          }),
+        );
+      const persistedBad = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runBad,
+            attemptId: attemptBad,
+            publication: bad,
+          }),
+        );
+
+      assert.equal(
+        persistedBad.publicationId,
+        persistedGood.publicationId,
+      );
+      assert.equal(
+        persistedBad.publicationVersionId,
+        persistedGood.publicationVersionId,
+      );
+
+      const origins = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'publication_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(origins.length, 2);
+      assert.equal(
+        new Set(
+          origins.map((row) => row.publication_id),
+        ).size,
+        1,
+      );
+
+      const goodOrigin = origins.find(
+        (row) => row.external_id === goodId,
+      )!;
+      const badOrigin = origins.find(
+        (row) => row.external_id === badId,
+      )!;
+      const goodMetadata =
+        goodOrigin.metadata as Record<string, unknown>;
+      const badMetadata =
+        badOrigin.metadata as Record<string, unknown>;
+      const goodFiles =
+        goodMetadata.files as Array<Record<string, unknown>>;
+
+      assert.equal(goodFiles.length, 1);
+      assert.equal(
+        goodFiles[0]?.rawSha256,
+        productionSha,
+      );
+      assert.equal(
+        goodFiles[0]?.sizeBytes,
+        productionSize,
+      );
+      assert.equal(
+        Object.hasOwn(badMetadata, 'files'),
+        false,
+      );
+      assert.equal(
+        badMetadata.authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+
+      const badItem = await db
+        .selectFrom('collection_items')
+        .select('raw_metadata')
+        .where('collection_run_id', '=', runBad)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const badItemMetadata =
+        badItem.raw_metadata as Record<string, unknown>;
+      assert.equal(
+        Object.hasOwn(badItemMetadata, 'files'),
+        false,
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select(['source_metadata'])
+        .where(
+          'publication_id',
+          '=',
+          persistedGood.publicationId,
+        )
+        .execute();
+      assert.equal(versions.length, 1);
+      const versionFiles =
+        (versions[0]!.source_metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        versionFiles[0]?.rawSha256,
+        productionSha,
+      );
+      assert.equal(
+        versionFiles[0]?.sizeBytes,
+        productionSize,
+      );
+    } finally {
+      const publicationIds = [
+        ...new Set(
+          (
+            await db
+              .selectFrom('publication_origins')
+              .select('publication_id')
+              .where('source_id', '=', sourceId)
+              .execute()
+          ).map((row) => row.publication_id),
+        ),
+      ];
+      await db
+        .deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db
+        .deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (publicationIds.length) {
+        await db
+          .deleteFrom('publications')
+          .where('id', 'in', publicationIds)
+          .execute();
+      }
+      await db
+        .deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
