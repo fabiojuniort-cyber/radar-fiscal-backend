@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { Kysely, PostgresDialect } from 'kysely';
@@ -11,7 +11,7 @@ import { processAcquiredCollectionRun } from '../src/modules/collection/collecti
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
 import { DoeSpConnector } from '../src/modules/collection/doe-sp.connector.js';
 import { readDoeSpSourceState } from '../src/modules/collection/doe-sp-source-state.repository.js';
-import { ID, authPdfEnvelope, list0901, list0902, list0904, structured0902, structured0904 } from './doe-sp.fixtures.js';
+import { ID, authPdfEnvelope, list0901, list0902, list0904, pdfBytes, structured0902, structured0904 } from './doe-sp.fixtures.js';
 import { portal } from './doe-sp.portal.js';
 
 test('DOE-SP through the collection engine: persistence, checkpoint reuse and forced replay without duplicates or versions', async () => {
@@ -163,6 +163,11 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
   const content = '<p>Texto oficial idêntico para as duas representações da Portaria SRE 42.</p>';
   const hierarchy = 'Executivo > Atos Normativos > Secretaria da Fazenda e Planejamento > Subsecretaria da Receita Estadual';
   const portariaType = 'cb4ba2b1-3c31-4d79-85be-0c348ef04c66';
+  const validPdfBytes = pdfBytes('auth ' + goodId);
+  const validPdfSha = createHash('sha256')
+    .update(validPdfBytes)
+    .digest('hex');
+  const validPdfSize = validPdfBytes.byteLength;
   const authResponses: NonNullable<Parameters<typeof portal>[0]['authResponses']> = {
     [badAuth]: {
       status: 404,
@@ -319,17 +324,52 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
     assert.equal(new Set(origins.map((row) => row.publication_id)).size, 1);
     assert.deepEqual(origins.map((row) => row.external_id).sort(), [badId, goodId].sort());
     const badOrigin = origins.find((row) => row.external_id === badId)!;
+    const goodOrigin = origins.find((row) => row.external_id === goodId)!;
+    const badMetadata = badOrigin.metadata as Record<string, unknown>;
+    const goodMetadata = goodOrigin.metadata as Record<string, unknown>;
     assert.equal(
-      (badOrigin.metadata as Record<string, unknown>).authenticatedPdf,
+      badMetadata.authenticatedPdf,
       'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+    );
+    assert.equal(
+      Object.hasOwn(badMetadata, 'files'),
+      false,
+    );
+    const equivalent = badMetadata.equivalentRepresentation as Record<string, unknown>;
+    assert.equal(equivalent.externalId, goodId);
+    const equivalentPdf = equivalent.authenticatedPdf as Record<string, unknown>;
+    assert.equal(equivalentPdf.ownerExternalId, goodId);
+    assert.equal(equivalentPdf.rawSha256, validPdfSha);
+    assert.equal(equivalentPdf.sizeBytes, validPdfSize);
+
+    const goodFiles = goodMetadata.files as Array<Record<string, unknown>>;
+    assert.equal(goodFiles.length, 1);
+    assert.equal(goodFiles[0]?.rawSha256, validPdfSha);
+    assert.equal(goodFiles[0]?.sizeBytes, validPdfSize);
+    assert.match(String(goodFiles[0]?.url ?? ''), new RegExp(goodAuth.replaceAll('.', '\\.')));
+
+    const badItem = await db.selectFrom('collection_items')
+      .select(['raw_metadata'])
+      .where('external_id', '=', badId)
+      .executeTakeFirstOrThrow();
+    const badItemMetadata = badItem.raw_metadata as Record<string, unknown>;
+    assert.equal(Object.hasOwn(badItemMetadata, 'files'), false);
+    assert.equal(
+      JSON.stringify(badItemMetadata).includes('/v2/authentication/download/'),
+      false,
     );
 
     const publicationId = origins[0]!.publication_id;
-    const versionCount = await db.selectFrom('publication_versions')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
+    const versionRows = await db.selectFrom('publication_versions')
+      .select(['source_metadata'])
       .where('publication_id', '=', publicationId)
-      .executeTakeFirstOrThrow();
-    assert.equal(Number(versionCount.count), 1);
+      .execute();
+    assert.equal(versionRows.length, 1);
+    const versionFiles =
+      (versionRows[0]!.source_metadata as Record<string, unknown>).files as Array<Record<string, unknown>>;
+    assert.equal(versionFiles.length, 1);
+    assert.equal(versionFiles[0]?.rawSha256, validPdfSha);
+    assert.equal(versionFiles[0]?.sizeBytes, validPdfSize);
 
     const replay = await run();
     assert.equal(replay.status, 'SUCCESS_NO_RESULTS');
@@ -341,6 +381,11 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
       .where('publication_id', '=', publicationId)
       .executeTakeFirstOrThrow();
     assert.equal(Number(afterReplayVersionCount.count), 1);
+    const originsAfterReplay = await db.selectFrom('publication_origins')
+      .select('id')
+      .where('source_id', '=', sourceId)
+      .execute();
+    assert.equal(originsAfterReplay.length, 2);
 
     authResponses[badAuth] = {
       status: 200,
@@ -359,9 +404,18 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
     assert.equal(healedOrigins.length, 2);
     assert.equal(new Set(healedOrigins.map((row) => row.publication_id)).size, 1);
     const healedBad = healedOrigins.find((row) => row.external_id === badId)!;
+    const healedBadMetadata = healedBad.metadata as Record<string, unknown>;
     assert.equal(
-      (healedBad.metadata as Record<string, unknown>).authenticatedPdf,
+      healedBadMetadata.authenticatedPdf,
       'CAPTURED',
+    );
+    const healedBadFiles = healedBadMetadata.files as Array<Record<string, unknown>>;
+    assert.equal(healedBadFiles.length, 1);
+    assert.equal(healedBadFiles[0]?.rawSha256, validPdfSha);
+    assert.equal(healedBadFiles[0]?.sizeBytes, validPdfSize);
+    assert.match(
+      String(healedBadFiles[0]?.url ?? ''),
+      new RegExp(badAuth.replaceAll('.', '\\.')),
     );
 
     const healedVersionCount = await db.selectFrom('publication_versions')
