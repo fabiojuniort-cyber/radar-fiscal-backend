@@ -47,7 +47,11 @@ export interface NormalizedPublication {
   officialUrl: string;
   externalId?: string;
   sourceItemKey: string;
+  /** Metadata persisted with the logical/canonical version. */
   metadata: Record<string, unknown>;
+  /** Metadata persisted with the concrete source origin and collection item. */
+  originMetadata: Record<string, unknown>;
+  /** Canonical/version artifact set. */
   files: NormalizedPublicationFile[];
   identityStrength: PublicationIdentityStrength;
   identityBasis: NormalizedPublicationIdentityBasis;
@@ -322,8 +326,12 @@ export function normalizePublication(
   const contentText = normalizeOptionalText(
     input.publication.content,
   );
-  const files = normalizeFiles(
+  const originFiles = normalizeFiles(
     input.publication.files,
+  );
+  const files = normalizeFiles(
+    input.publication.versionFiles ??
+      input.publication.files,
   );
 
   const publishedOn = normalizeDate(
@@ -413,6 +421,12 @@ export function normalizePublication(
       ...(input.publication.metadata ?? {}),
       ...(files.length > 0
         ? { files }
+        : {}),
+    },
+    originMetadata: {
+      ...(input.publication.metadata ?? {}),
+      ...(originFiles.length > 0
+        ? { files: originFiles }
         : {}),
     },
     files,
