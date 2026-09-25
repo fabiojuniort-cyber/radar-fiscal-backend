@@ -327,11 +327,15 @@ function sanitizeDoeSpItemReference(
 ): string | undefined {
   if (!value) return undefined;
 
-  const sanitized = value
-    .replace(/[^A-Za-z0-9._:#-]/g, '')
+  const trimmed = value
+    .trim()
     .slice(0, DOE_SP_HTTP_DIAGNOSTIC_MAX_ITEM_REFERENCE_CHARS);
 
-  return sanitized || undefined;
+  return /^\d{4}-\d{2}-\d{2}#[0-9a-fA-F-]{36}$/.test(
+    trimmed,
+  )
+    ? trimmed
+    : undefined;
 }
 
 function sanitizeDoeSpResponseSample(
