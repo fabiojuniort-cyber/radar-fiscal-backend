@@ -904,6 +904,8 @@ export class DoeSpConnector implements CollectionConnector {
               undefined &&
             candidate.strongIdentityKey ===
               built.prepared.strongIdentityKey &&
+            candidate.detail.title ===
+              built.prepared.detail.title &&
             candidate.textSha256 ===
               built.prepared.textSha256 &&
             candidate.attachmentSignature ===
