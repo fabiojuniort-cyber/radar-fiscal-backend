@@ -55,6 +55,13 @@ export const DOE_SP_SECTION = 'Atos Normativos';
  */
 export const DOE_SP_DEFAULT_LOOKBACK_DAYS = 3;
 const MAX_EXCLUDED_SAMPLES = 200;
+/**
+ * Days after the DOE date during which a not-yet-rendered authenticated PDF
+ * is retried (item fails and is reprocessed on the next run). Observed in
+ * production: act b8bec255-… of 05/02/2025 (7.5 MB HTML) is still
+ * "Processando" 19 months later.
+ */
+export const DOE_SP_AUTH_PDF_GRACE_DAYS = 7;
 const DAY_MS = 86_400_000;
 
 export interface DoeSpDayState {
@@ -287,7 +294,7 @@ export class DoeSpConnector implements CollectionConnector {
       discoveredCount: 0, includedCount: 0, excludedCount: 0,
       includedByCategory: {}, excludedByReason: {}, excludedSamples: [], excludedSamplesTruncated: 0,
     };
-    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0 };
+    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, authPdfNotRendered: 0 };
     const typeCache = new Map<string, Map<string, string>>();
 
     const typesFor = async (date: string): Promise<Map<string, string>> => {
@@ -341,8 +348,24 @@ export class DoeSpConnector implements CollectionConnector {
       const capturedAt = now.toISOString();
       const files: ConnectorFile[] = [];
 
-      if (detail.authCode) {
-        const pdf = await client.downloadAuthenticatedPdf(detail.authCode, context.signal);
+      let authenticatedPdf: 'CAPTURED' | 'NOT_RENDERED_BY_SOURCE' | 'NO_AUTH_CODE' = detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
+      const pdf = detail.authCode
+        ? await client.downloadAuthenticatedPdf(detail.authCode, context.signal).catch((error: unknown) => {
+            // A PDF the source never rendered must not block the act forever:
+            // after the grace period the act is kept (official HTML text) without it.
+            if (
+              error instanceof ConnectorError &&
+              error.code === 'DOE_SP_AUTHENTICATED_PDF_NOT_READY' &&
+              detail.date <= addDays(today, -DOE_SP_AUTH_PDF_GRACE_DAYS)
+            ) {
+              authenticatedPdf = 'NOT_RENDERED_BY_SOURCE';
+              counters.authPdfNotRendered += 1;
+              return undefined;
+            }
+            throw error;
+          })
+        : undefined;
+      if (detail.authCode && pdf) {
         counters.filesDownloaded += 1;
         counters.fileBytes += pdf.sizeBytes;
         files.push({
@@ -414,6 +437,7 @@ export class DoeSpConnector implements CollectionConnector {
           ...(edition.editionPdfUrl ? { editionPdfUrl: edition.editionPdfUrl } : {}),
           supplementaryEditionCount: edition.supplementaryEditionCount,
           textExtraction: contentText ? 'HTML_TEXT' : 'EMPTY',
+          authenticatedPdf,
           attachmentCount: detail.attachments.length,
         },
       };
