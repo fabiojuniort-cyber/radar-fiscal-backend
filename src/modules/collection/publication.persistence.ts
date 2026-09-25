@@ -466,11 +466,11 @@ async function upsertOrigin(
 ): Promise<void> {
   const originMetadata = reconciliation
     ? reconciledOriginMetadata(
-        originMetadata,
+        input.publication.originMetadata,
         reconciliation.evidence,
         reconciliation.versionReused,
       )
-    : originMetadata;
+    : input.publication.originMetadata;
   const pageReference = originMetadata.officialUrlGranularity === 'PAGE';
   if (pageReference && !input.publication.externalId) {
     throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
