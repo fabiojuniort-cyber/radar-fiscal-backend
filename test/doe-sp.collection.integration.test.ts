@@ -354,9 +354,16 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
       .executeTakeFirstOrThrow();
     const badItemMetadata = badItem.raw_metadata as Record<string, unknown>;
     assert.equal(Object.hasOwn(badItemMetadata, 'files'), false);
+    const badItemSerialized = JSON.stringify(badItemMetadata);
     assert.equal(
-      JSON.stringify(badItemMetadata).includes('/v2/authentication/download/'),
+      badItemSerialized.includes(
+        'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/',
+      ),
       false,
+    );
+    assert.match(
+      badItemSerialized,
+      /\/v2\/authentication\/download\/\{authCode\}/,
     );
 
     const publicationId = origins[0]!.publication_id;
