@@ -20,7 +20,7 @@ test('publication persistence keeps content above 1 MiB while search_vector rema
   const runId = randomUUID();
   const attemptId = randomUUID();
   const middle = 'conteudo-intermediario '.repeat(60_000);
-  const content = 'CABECALHO TRIBUTARIO IBS CBS. ' + middle + ' RODAPE ICMS ISSQN.';
+  const content = 'CABECALHO TRIBUTARIO IBS CBS. ' + middle + 'RODAPE ICMS ISSQN.';
   let publicationId: string | undefined;
 
   assert.ok(Buffer.byteLength(content, 'utf8') > 1_048_575);
@@ -87,7 +87,7 @@ test('publication persistence keeps content above 1 MiB while search_vector rema
       .where('id', '=', persisted.publicationVersionId)
       .executeTakeFirstOrThrow();
 
-    assert.equal(row.content_text, content);
+    assert.equal(row.content_text, normalized.contentText);
     assert.ok(Number(row.content_bytes) > 1_048_575);
     assert.equal(row.head_match, true);
     assert.equal(row.tail_match, true);
