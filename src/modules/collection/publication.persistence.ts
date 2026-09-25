@@ -903,17 +903,33 @@ export async function persistPublication(
     input.publication,
   );
 
-  await upsertOrigin(
-    trx,
-    input,
-    publication.publicationId,
-  );
+  const reconciliationEvidence =
+    await loadArtifactReconciliationEvidence(
+      trx,
+      input,
+      publication.publicationId,
+    );
 
   const version = await getOrCreateVersion(
     trx,
     publication.publicationId,
     input.publication,
     publication.inserted,
+    reconciliationEvidence,
+  );
+
+  await upsertOrigin(
+    trx,
+    input,
+    publication.publicationId,
+    reconciliationEvidence
+      ? {
+          evidence:
+            reconciliationEvidence,
+          versionReused:
+            version.artifactReconciliationApplied,
+        }
+      : undefined,
   );
 
   const result: PersistPublicationResult = {
