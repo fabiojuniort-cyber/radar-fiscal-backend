@@ -132,6 +132,10 @@ O texto dos anexos em PDF **não é extraído** (`textExtraction = NOT_EXTRACTED
 
 Se um arquivo falhar, o ato inteiro é adiado para o próximo run. Isso evita criar uma versão artificial quando o arquivo aparecer depois.
 
+Exceção estrita para PDF autenticado histórico com HTTP 404: o conector pode usar o PDF de outro registro da **mesma lista oficial do dia**, somente com identidade normativa forte, título/data/hierarquia iguais, HTML byte a byte idêntico e os mesmos anexos. Preserva o GUID e a URL de cada origem, e registra `equivalentPdfRecord` com a referência do PDF utilizado. Sem essa evidência, mantém a falha e o dia pendente. Não se aplica a atos recentes (até 7 dias), 403, 5xx nem a registros de identidade fraca.
+
+Caso comprovado em 25/09/2026: os GUIDs `6098db3e-c841-40de-c0fc-08ddce07602e` e `645399a3-5a4e-44f7-c5cd-08ddcdea30ea`, Portaria SRE 42/2025, DOE 29/07/2025. O primeiro PDF retorna 404; o segundo tem 466.065 bytes e SHA-256 `8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30`. A validação de leitura na fonte produziu a mesma identidade e o mesmo hash de conteúdo para ambos. Duas origens oficiais distintas de uma mesma identidade forte não são uma origem duplicada; o gate de duplicidade verifica repetição de `source_id` + `external_id` e versões artificiais.
+
 ## 7. Incremento, checkpoint e bootstrap
 
 - **Janela incremental**: `DOE_SP_LOOKBACK_DAYS` (padrão **3**, entre 1 e 30).
