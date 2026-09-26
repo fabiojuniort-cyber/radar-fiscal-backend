@@ -991,6 +991,216 @@ test(
 );
 
 test(
+  'HTML-primary v2 reuses reproducible legacy DOE-SP version without PDF while preserving new PDF only on its origin',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+    const sourceId = randomUUID();
+    const runIds = [randomUUID(), randomUUID()];
+    const attemptIds = [randomUUID(), randomUUID()];
+    const pdfHash = '9'.repeat(64);
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: 'doe-html-no-pdf-' + sourceId,
+        name: 'DOE HTML legacy no-PDF compatibility',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        base_url: 'https://doe.sp.gov.br/',
+        connector_key: 'test-doe-html-no-pdf',
+      }).execute();
+      await db.insertInto('collection_runs').values(
+        runIds.map((id, index) => ({
+          id,
+          source_id: sourceId,
+          scheduled_for: new Date(
+            `2026-09-26T1${index}:00:00Z`,
+          ),
+          trigger_type: 'MANUAL' as const,
+        })),
+      ).execute();
+      await db.insertInto('collection_attempts').values(
+        attemptIds.map((id, index) => ({
+          id,
+          collection_run_id: runIds[index]!,
+          attempt_no: 1,
+          status: 'RUNNING' as const,
+        })),
+      ).execute();
+
+      const shared = {
+        title:
+          'PORTARIA SRE 43, DE 29 DE JULHO DE 2025',
+        agency: 'SEFAZ-SP/SRE',
+        sphere: 'STATE' as const,
+        stateCode: 'SP',
+        actType: 'PORTARIA',
+        actNumber: '43/2025',
+        publishedAt:
+          new Date('2025-07-30T00:00:00Z'),
+        content:
+          'Texto oficial integral da Portaria SRE 43.',
+      };
+
+      const legacy = normalizePublication({
+        sourceId,
+        publication: {
+          ...shared,
+          officialUrl:
+            'https://doe.sp.gov.br/portaria-sre-43/legado-sem-pdf',
+          externalId: 'legacy-no-pdf',
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authenticatedPdf:
+              'NOT_RENDERED_BY_SOURCE',
+          },
+        },
+      });
+
+      const first = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runIds[0]!,
+          attemptId: attemptIds[0]!,
+          publication: legacy,
+        }),
+      );
+      assert.equal(first.disposition, 'NEW_PUBLICATION');
+
+      const legacyBefore = await db
+        .selectFrom('publication_versions')
+        .select([
+          'id',
+          'content_hash',
+          'source_metadata',
+        ])
+        .where('id', '=', first.publicationVersionId)
+        .executeTakeFirstOrThrow();
+
+      const v2WithPdf = normalizePublication({
+        sourceId,
+        publication: {
+          ...shared,
+          officialUrl:
+            'https://doe.sp.gov.br/portaria-sre-43/nova-origem-com-pdf',
+          externalId: 'v2-with-pdf',
+          contentHashPolicy:
+            'HTML_PRIMARY_MATERIAL_FILES',
+          files: [{
+            url:
+              'https://do-api-publication-pdf.doe.sp.gov.br/authenticated-43.pdf',
+            rawSha256: pdfHash,
+            sizeBytes: 123_456,
+            versionRole: 'PROVENANCE',
+            metadata: {
+              kind:
+                'AUTHENTICATED_PUBLICATION_PDF',
+              origin: 'DOE_SP',
+            },
+          }],
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authCode: 'auth-43',
+            authenticatedPdf: 'CAPTURED',
+          },
+        },
+      });
+
+      const second = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runIds[1]!,
+          attemptId: attemptIds[1]!,
+          publication: v2WithPdf,
+        }),
+      );
+
+      assert.equal(
+        second.disposition,
+        'EXISTING_PUBLICATION',
+      );
+      assert.equal(
+        second.publicationId,
+        first.publicationId,
+      );
+      assert.equal(
+        second.publicationVersionId,
+        first.publicationVersionId,
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select([
+          'id',
+          'content_hash',
+          'source_metadata',
+        ])
+        .where('publication_id', '=', first.publicationId)
+        .execute();
+      assert.equal(versions.length, 1);
+      assert.equal(
+        versions[0]?.content_hash,
+        legacyBefore.content_hash,
+      );
+      assert.deepEqual(
+        versions[0]?.source_metadata,
+        legacyBefore.source_metadata,
+      );
+
+      const origins = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('publication_id', '=', first.publicationId)
+        .execute();
+      assert.equal(origins.length, 2);
+      const newOrigin = origins.find(
+        (row) => row.external_id === 'v2-with-pdf',
+      )!;
+      const newFiles =
+        (newOrigin.metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(newFiles.length, 1);
+      assert.equal(newFiles[0]?.rawSha256, pdfHash);
+    } finally {
+      const publicationIds = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (publicationIds.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', publicationIds)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
+
+test(
   'HTML-primary legacy compatibility does not suppress real changes or insufficiently classified legacy files',
   async () => {
     const adminUrl = process.env.DATABASE_ADMIN_URL;
@@ -1010,6 +1220,7 @@ test(
       'effective',
       'attachment',
       'unknown-file',
+      'hash-evidence',
     ] as const;
     const runIds = variants.flatMap(() => [
       randomUUID(),
@@ -1130,6 +1341,16 @@ test(
             publication: legacy,
           }),
         );
+
+        if (variant === 'hash-evidence') {
+          await db
+            .updateTable('publication_versions')
+            .set({
+              content_hash: 'e'.repeat(64),
+            })
+            .where('id', '=', first.publicationVersionId)
+            .execute();
+        }
 
         const incomingFiles =
           variant === 'unknown-file'
