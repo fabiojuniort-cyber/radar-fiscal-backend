@@ -1290,19 +1290,33 @@ test(
         sourceId,
         publication: {
           ...shared,
-          files: [{
-            url:
-              'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/material-99',
-            rawSha256: pdfHash,
-            sizeBytes: 42_000,
-            versionRole: 'MATERIAL_CONTENT',
-            metadata: {
-              kind:
-                'AUTHENTICATED_PUBLICATION_PDF',
-              origin: 'DOE_SP',
-              materialContent: true,
+          files: [
+            {
+              url:
+                'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/material-99',
+              rawSha256: pdfHash,
+              sizeBytes: 42_000,
+              versionRole: 'MATERIAL_CONTENT',
+              metadata: {
+                kind:
+                  'AUTHENTICATED_PUBLICATION_PDF',
+                origin: 'DOE_SP',
+                materialContent: true,
+              },
             },
-          }],
+            {
+              url:
+                'https://do-api-web-search.doe.sp.gov.br/v2/publications/attachment/old-99',
+              rawSha256: '5'.repeat(64),
+              sizeBytes: 8_000,
+              versionRole: 'MATERIAL_CONTENT',
+              metadata: {
+                kind: 'ATTACHMENT',
+                origin: 'DOE_SP',
+                materialContent: true,
+              },
+            },
+          ],
           metadata: {
             sourceRole: 'PRIMARY',
             officialContentCompleteness:
@@ -1394,11 +1408,15 @@ test(
       const files =
         metadata.files as
           Array<Record<string, unknown>>;
-      assert.equal(files.length, 1);
+      assert.equal(
+        files.length,
+        1,
+        'stale attachments must not be resurrected in origin metadata',
+      );
       assert.equal(
         files[0]?.rawSha256,
         pdfHash,
-        'same-origin material PDF evidence must survive the later HTML observation',
+        'same-origin authenticated PDF evidence must survive the later HTML observation',
       );
     } finally {
       const publicationIds = await db
