@@ -125,8 +125,16 @@ A equivalência nunca altera `content_hash`, `source_metadata` ou arquivos da ve
 
 ### Proveniência por origem
 
-O normalizador passa a distinguir:
-- `metadata`: material da versão;
-- `originMetadata`: evidência completa observada naquela origem.
+O contrato e o normalizador distinguem:
+- `metadata`: material canônico da versão;
+- `originMetadata`: evidência observada exclusivamente naquela origem.
 
-Assim, um PDF autenticado disponível fica somente na origem que efetivamente o forneceu. Uma origem com PDF 404 mantém URL, authCode e diagnóstico da falha, sem receber arquivo de outra origem.
+No DOE-SP ficam em `originMetadata`:
+- `authCode`;
+- estado `authenticatedPdf`;
+- `authenticatedPdfError`;
+- o arquivo `AUTHENTICATED_PUBLICATION_PDF`, quando efetivamente capturado.
+
+Esses campos não participam do metadata/hash da versão v2. Um PDF autenticado disponível fica somente na origem que efetivamente o forneceu. Uma origem com PDF 404 mantém URL, referência de autenticidade e diagnóstico da falha, sem receber arquivo de outra origem.
+
+O teste ponta a ponta com os IDs observados da Portaria SRE 42/2025 exige duas origens oficiais, uma única publicação, uma única versão v2, nenhuma versão artificial no replay e nenhum empréstimo de PDF entre origens.
