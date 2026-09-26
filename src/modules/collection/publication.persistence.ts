@@ -331,7 +331,8 @@ function originMetadataWithPreservedFiles(
       );
       return (
         fileMetadata?.kind ===
-        'AUTHENTICATED_PUBLICATION_PDF'
+          'AUTHENTICATED_PUBLICATION_PDF' &&
+        fileMetadata?.origin === 'DOE_SP'
       );
     });
 
@@ -350,7 +351,8 @@ function originMetadataWithPreservedFiles(
       );
       return (
         fileMetadata?.kind ===
-        'AUTHENTICATED_PUBLICATION_PDF'
+          'AUTHENTICATED_PUBLICATION_PDF' &&
+        fileMetadata?.origin === 'DOE_SP'
       );
     });
 
