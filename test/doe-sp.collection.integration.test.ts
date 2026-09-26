@@ -167,3 +167,324 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
     await db.destroy();
   }
 });
+
+
+test('DOE-SP HTML-primary: Portaria SRE 42 duplicate origins persist as one publication/version without borrowing PDF provenance', async () => {
+  const adminUrl = process.env.DATABASE_ADMIN_URL;
+  assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for DOE-SP integration tests.');
+
+  const pool = new Pool({ connectionString: adminUrl, max: 3 });
+  const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+  const sourceId = randomUUID();
+  const date = '2025-07-29';
+  const badId = '6098db3e-c841-40de-c0fc-08ddce07602e';
+  const goodId = '645399a3-5a4e-44f7-c5cd-08ddcdea30ea';
+  const badAuth = '2025.07.28.1.1.27.5.214.1229474';
+  const goodAuth = '2025.07.28.1.1.27.5.214.1229788';
+  const publicationTypeId = 'cb4ba2b1-3c31-4d79-85be-0c348ef04c66';
+  const title = 'PORTARIA SRE 42, DE 28 DE JULHO DE 2025';
+  const hierarchy =
+    'Executivo > Atos Normativos > Secretaria da Fazenda e Planejamento > Subsecretaria da Receita Estadual';
+  const content =
+    '<p>Texto oficial integral e idêntico da Portaria SRE 42.</p>';
+  const items = [
+    {
+      isLegacy: false,
+      id: badId,
+      publicationTypeId,
+      date: date + 'T01:00:00',
+      title,
+      slug:
+        'executivo/secretaria-da-fazenda-e-planejamento/portaria-sre-42-html-primary-a',
+      excerpt: 'Altera disciplina tributária.',
+      hierarchy,
+      totalTermsFound: 0,
+    },
+    {
+      isLegacy: false,
+      id: goodId,
+      publicationTypeId,
+      date: date + 'T01:00:01',
+      title,
+      slug:
+        'executivo/secretaria-da-fazenda-e-planejamento/portaria-sre-42-html-primary-b',
+      excerpt: 'Altera disciplina tributária.',
+      hierarchy,
+      totalTermsFound: 0,
+    },
+  ];
+  const detailsFixture = {
+    [badId]: {
+      id: badId,
+      title,
+      slug: items[0]!.slug,
+      date,
+      journal: 'Executivo',
+      section: 'Subsecretaria da Receita Estadual',
+      firstLevelSectionName: 'Atos Normativos',
+      secondLevelSectionName: 'Secretaria da Fazenda e Planejamento',
+      publicationType: 'Portaria',
+      editionPages: [],
+      content,
+      attachments: [],
+      authCode: badAuth,
+    },
+    [goodId]: {
+      id: goodId,
+      title,
+      slug: items[1]!.slug,
+      date,
+      journal: 'Executivo',
+      section: 'Subsecretaria da Receita Estadual',
+      firstLevelSectionName: 'Atos Normativos',
+      secondLevelSectionName: 'Secretaria da Fazenda e Planejamento',
+      publicationType: 'Portaria',
+      editionPages: [],
+      content,
+      attachments: [],
+      authCode: goodAuth,
+    },
+  };
+  const api = portal({
+    days: {
+      [date]: {
+        structured: {
+          journalName: 'Executivo',
+          items: [{
+            id: '257b103f-1eb2-4f24-a170-4e553c7e4aac',
+            name: 'Atos Normativos',
+            children: [{
+              id: 'e0e06c19-4428-471f-7d57-08db6b94d2bf',
+              name: 'SECRETARIA DA FAZENDA E PLANEJAMENTO',
+              publications: items.map((item) => ({
+                id: item.id,
+                title: item.title,
+                slug: item.slug,
+              })),
+            }],
+          }],
+        },
+        list: {
+          pages: 1,
+          pageSize: 10,
+          publications: items,
+        },
+      },
+    },
+    details: detailsFixture,
+    failures: [{
+      match:
+        '/v2/authentication/download/' + badAuth,
+      status: 404,
+    }],
+  });
+
+  const registry = new ConnectorRegistry();
+  registry.register({
+    key: 'doe-sp',
+    collect: (context) =>
+      new DoeSpConnector({
+        fetch: api.fetch,
+        now: () =>
+          new Date(date + 'T15:00:00Z'),
+        readState: (source) =>
+          readDoeSpSourceState(db, source),
+        lookbackDays: 1,
+        bootstrapStartDate: date,
+        forceReprocess: true,
+      }).collect(context),
+  });
+
+  async function run(sequence: number) {
+    const runId = await createCollectionRun(db, {
+      sourceId,
+      scheduledFor: new Date(
+        Date.parse(date + 'T16:00:00Z') + sequence,
+      ),
+      triggerType: 'MANUAL',
+    });
+    const acquired = await acquireNextCollectionRun(
+      db,
+      `doe-sp-html-primary-${sourceId}`,
+    );
+    assert.ok(acquired);
+    assert.equal(acquired.id, runId);
+    return processAcquiredCollectionRun(
+      db,
+      registry,
+      acquired,
+      {
+        timeoutMs: 10_000,
+        heartbeatIntervalMs: 0,
+      },
+    );
+  }
+
+  try {
+    await db.insertInto('sources').values({
+      id: sourceId,
+      code: `doe-sp-html-primary-${sourceId}`,
+      name: 'DOE-SP HTML-primary duplicate-origin fixture',
+      jurisdiction_level: 'STATE',
+      uf: 'SP',
+      agency: 'Imprensa Oficial / Prodesp',
+      base_url: 'https://doe.sp.gov.br/',
+      connector_key: 'doe-sp',
+      max_attempts: 1,
+    }).execute();
+
+    const first = await run(0);
+    assert.equal(first.status, 'SUCCESS');
+    assert.equal(first.metrics.newPublications, 1);
+    assert.equal(first.metrics.existingPublications, 1);
+    assert.equal(first.metrics.newVersions, 0);
+
+    const origins = await db
+      .selectFrom('publication_origins')
+      .select([
+        'publication_id',
+        'external_id',
+        'metadata',
+      ])
+      .where('source_id', '=', sourceId)
+      .execute();
+    assert.equal(origins.length, 2);
+    assert.equal(
+      new Set(
+        origins.map((origin) => origin.publication_id),
+      ).size,
+      1,
+    );
+
+    const badOrigin = origins.find(
+      (origin) => origin.external_id === badId,
+    )!;
+    const goodOrigin = origins.find(
+      (origin) => origin.external_id === goodId,
+    )!;
+    const badMetadata =
+      badOrigin.metadata as Record<string, unknown>;
+    const goodMetadata =
+      goodOrigin.metadata as Record<string, unknown>;
+
+    assert.equal(
+      badMetadata.authenticatedPdf,
+      'UNAVAILABLE_REDUNDANT',
+    );
+    assert.equal(
+      (badMetadata.authenticatedPdfError as
+        Record<string, unknown>)?.httpStatus,
+      404,
+    );
+    assert.equal(
+      badMetadata.files,
+      undefined,
+      '404 origin must not receive the PDF owned by the other official origin',
+    );
+
+    const goodFiles =
+      goodMetadata.files as
+        Array<Record<string, unknown>>;
+    assert.equal(goodFiles.length, 1);
+    assert.equal(
+      (goodFiles[0]?.metadata as
+        Record<string, unknown>)?.kind,
+      'AUTHENTICATED_PUBLICATION_PDF',
+    );
+    assert.equal(
+      goodFiles[0]?.versionRole,
+      'PROVENANCE',
+    );
+
+    const versions = await db
+      .selectFrom('publication_versions')
+      .select([
+        'id',
+        'content_hash',
+        'source_metadata',
+      ])
+      .where(
+        'publication_id',
+        '=',
+        badOrigin.publication_id,
+      )
+      .execute();
+    assert.equal(
+      versions.length,
+      1,
+      'two equivalent official origins must not create an artificial content version',
+    );
+    const versionMetadata =
+      versions[0]!.source_metadata as
+        Record<string, unknown>;
+    assert.equal(
+      versionMetadata.contentHashVersion,
+      2,
+    );
+    assert.equal(
+      versionMetadata.files,
+      undefined,
+      'redundant authenticated PDF must stay out of canonical v2 version metadata',
+    );
+
+    const replay = await run(1);
+    assert.equal(replay.status, 'SUCCESS');
+    assert.equal(replay.metrics.newPublications, 0);
+    assert.equal(replay.metrics.newVersions, 0);
+    assert.equal(replay.metrics.existingPublications, 2);
+
+    const afterReplay = await db
+      .selectFrom('publication_versions')
+      .select(['id', 'content_hash'])
+      .where(
+        'publication_id',
+        '=',
+        badOrigin.publication_id,
+      )
+      .execute();
+    assert.equal(afterReplay.length, 1);
+    assert.equal(
+      afterReplay[0]?.id,
+      versions[0]?.id,
+    );
+    assert.equal(
+      afterReplay[0]?.content_hash,
+      versions[0]?.content_hash,
+    );
+  } finally {
+    const publicationIds = [
+      ...new Set(
+        (
+          await db
+            .selectFrom('publication_origins')
+            .select('publication_id')
+            .where('source_id', '=', sourceId)
+            .execute()
+        ).map((row) => row.publication_id),
+      ),
+    ];
+    await db
+      .deleteFrom('collection_checkpoints')
+      .where('source_id', '=', sourceId)
+      .execute();
+    await db
+      .deleteFrom('collection_runs')
+      .where('source_id', '=', sourceId)
+      .execute();
+    await db
+      .deleteFrom('publication_origins')
+      .where('source_id', '=', sourceId)
+      .execute();
+    if (publicationIds.length) {
+      await db
+        .deleteFrom('publications')
+        .where('id', 'in', publicationIds)
+        .execute();
+    }
+    await db
+      .deleteFrom('sources')
+      .where('id', '=', sourceId)
+      .execute();
+    await db.destroy();
+  }
+});
