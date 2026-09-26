@@ -89,9 +89,9 @@ test('connector: complete official HTML is published even while redundant authen
   const publication = result.publications[0]!;
   assert.equal(publication.contentHashPolicy, 'HTML_PRIMARY_MATERIAL_FILES');
   assert.equal(publication.metadata?.officialContentCompleteness, 'FULL_OFFICIAL_CONTENT');
-  assert.equal(publication.metadata?.authenticatedPdf, 'NOT_RENDERED_BY_SOURCE');
+  assert.equal(publication.originMetadata?.authenticatedPdf, 'NOT_RENDERED_BY_SOURCE');
   assert.equal(
-    (publication.metadata?.authenticatedPdfError as Record<string, unknown>)?.code,
+    (publication.originMetadata?.authenticatedPdfError as Record<string, unknown>)?.code,
     'DOE_SP_AUTHENTICATED_PDF_NOT_READY',
   );
   assert.equal(publication.files, undefined);
@@ -163,7 +163,7 @@ test('connector: old never-rendered PDF remains non-blocking and deterministic u
   const publication = first.publications[0]!;
   assert.equal(publication.externalId, ID);
   assert.equal(publication.files, undefined);
-  assert.equal(publication.metadata?.authenticatedPdf, 'NOT_RENDERED_BY_SOURCE');
+  assert.equal(publication.originMetadata?.authenticatedPdf, 'NOT_RENDERED_BY_SOURCE');
   assert.equal((first.metadata?.doeSp as { counters: { authPdfNotRendered: number } }).counters.authPdfNotRendered, 1);
 
   const second = await run();
@@ -242,11 +242,11 @@ test('connector: authenticated PDF HTTP diagnostics survive in the recorded part
   assert.equal(result.publications.length, 1);
   const publication = result.publications[0]!;
   assert.equal(
-    publication.metadata?.authenticatedPdf,
+    publication.originMetadata?.authenticatedPdf,
     'UNAVAILABLE_REDUNDANT',
   );
   const diagnostic =
-    publication.metadata?.authenticatedPdfError as
+    publication.originMetadata?.authenticatedPdfError as
       Record<string, unknown>;
   assert.equal(diagnostic.code, 'DOE_SP_HTTP_ERROR');
   assert.equal(diagnostic.kind, 'HTTP_ERROR');
@@ -294,11 +294,11 @@ test('connector: authenticated PDF 404 is recorded as provenance failure and doe
   const publication = result.publications[0]!;
   assert.ok(publication.content);
   assert.equal(
-    publication.metadata?.authenticatedPdf,
+    publication.originMetadata?.authenticatedPdf,
     'UNAVAILABLE_REDUNDANT',
   );
   assert.equal(
-    (publication.metadata?.authenticatedPdfError as Record<string, unknown>)
+    (publication.originMetadata?.authenticatedPdfError as Record<string, unknown>)
       ?.httpStatus,
     404,
   );
