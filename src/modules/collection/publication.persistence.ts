@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { sql, type Transaction } from 'kysely';
 
 import type {
@@ -320,25 +322,46 @@ function metadataRecord(
     : undefined;
 }
 
-function legacyMaterialFileHashes(
+interface LegacyFileEvidence {
+  allHashes: string[];
+  materialHashes: string[];
+}
+
+function legacyFileEvidence(
   metadata: unknown,
-): string[] | undefined {
+): LegacyFileEvidence | undefined {
   const row = metadataRecord(metadata);
   const files = row?.files;
   if (files === undefined) {
-    return [];
+    return {
+      allHashes: [],
+      materialHashes: [],
+    };
   }
   if (!Array.isArray(files)) {
     return undefined;
   }
 
-  const hashes: string[] = [];
+  const allHashes: string[] = [];
+  const materialHashes: string[] = [];
+
   for (const fileValue of files) {
     const file = metadataRecord(fileValue);
     const fileMetadata = metadataRecord(
       file?.metadata,
     );
     const kind = fileMetadata?.kind;
+    const hash = file?.rawSha256;
+
+    if (
+      typeof hash !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(hash)
+    ) {
+      return undefined;
+    }
+
+    const normalizedHash = hash.toLowerCase();
+    allHashes.push(normalizedHash);
 
     if (
       kind === 'AUTHENTICATED_PUBLICATION_PDF'
@@ -349,17 +372,33 @@ function legacyMaterialFileHashes(
       return undefined;
     }
 
-    const hash = file?.rawSha256;
-    if (
-      typeof hash !== 'string' ||
-      !/^[a-fA-F0-9]{64}$/.test(hash)
-    ) {
-      return undefined;
-    }
-    hashes.push(hash.toLowerCase());
+    materialHashes.push(normalizedHash);
   }
 
-  return hashes.sort();
+  return {
+    allHashes: allHashes.sort(),
+    materialHashes: materialHashes.sort(),
+  };
+}
+
+function legacyV1ContentHash(input: {
+  title: string;
+  contentText: string | null;
+  effectiveOn: string | null;
+  rawFileHashes: string[];
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: 1,
+        title: input.title,
+        contentText: input.contentText,
+        effectiveOn: input.effectiveOn,
+        rawFileHashes: input.rawFileHashes,
+      }),
+      'utf8',
+    )
+    .digest('hex');
 }
 
 function incomingMaterialFileHashes(
@@ -428,20 +467,44 @@ async function currentLegacyVersionEquivalent(
       .slice(0, 10) ?? null;
   const incomingEffectiveOn =
     publication.effectiveOn ?? null;
-  const legacyHashes = legacyMaterialFileHashes(
+  const legacyEvidence = legacyFileEvidence(
     currentVersion.source_metadata,
   );
   const incomingHashes =
     incomingMaterialFileHashes(publication);
 
+  if (
+    legacyEvidence === undefined ||
+    incomingHashes === undefined
+  ) {
+    return false;
+  }
+
+  /*
+   * Positive compatibility proof: the persisted v1 hash must be
+   * reproducible from the exact legacy title/text/effective date/files
+   * that are being used as evidence. This prevents incomplete or
+   * inconsistent legacy metadata from suppressing a real version.
+   */
+  const reconstructedLegacyHash =
+    legacyV1ContentHash({
+      title: canonical.title,
+      contentText: currentVersion.content_text,
+      effectiveOn: currentEffectiveOn,
+      rawFileHashes: legacyEvidence.allHashes,
+    });
+
   return (
+    reconstructedLegacyHash ===
+      currentVersion.content_hash &&
     canonical.title === publication.title &&
     currentVersion.content_text ===
       (publication.contentText ?? null) &&
     currentEffectiveOn === incomingEffectiveOn &&
-    legacyHashes !== undefined &&
-    incomingHashes !== undefined &&
-    sameHashes(legacyHashes, incomingHashes)
+    sameHashes(
+      legacyEvidence.materialHashes,
+      incomingHashes,
+    )
   );
 }
 
