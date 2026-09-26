@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 import { sql, type Transaction } from 'kysely';
 
 import type {
@@ -100,6 +102,15 @@ interface ArtifactReconciliationEvidence {
   alreadyReconciled: boolean;
 }
 
+interface ArtifactReconciliationHistoryEntry {
+  kind: 'ORIGIN_ARTIFACT_RECOVERY';
+  previousOriginMetadata: Record<string, unknown>;
+}
+
+const ARTIFACT_RECONCILIATION_HISTORY_MAX_ENTRIES = 8;
+const ARTIFACT_RECONCILIATION_HISTORY_MAX_BYTES = 4_096;
+const ARTIFACT_RECONCILIATION_HISTORY_MAX_TEXT = 256;
+
 function metadataRecord(
   value: unknown,
 ): Record<string, unknown> | undefined {
@@ -108,6 +119,228 @@ function metadataRecord(
     !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
+}
+
+function boundedAuditText(
+  value: unknown,
+): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized
+    ? normalized.slice(
+        0,
+        ARTIFACT_RECONCILIATION_HISTORY_MAX_TEXT,
+      )
+    : undefined;
+}
+
+function sanitizeHistoricalOriginMetadata(
+  metadata: unknown,
+): Record<string, unknown> {
+  const row = metadataRecord(metadata);
+  if (!row) return {};
+
+  const sanitized: Record<string, unknown> = {};
+  const sourceRole = publicationSourceRole(row);
+  if (sourceRole !== 'UNSPECIFIED') {
+    sanitized.sourceRole = sourceRole;
+  }
+
+  if (
+    row.authenticatedPdf === 'CAPTURED' ||
+    row.authenticatedPdf === 'NO_AUTH_CODE' ||
+    row.authenticatedPdf ===
+      'NOT_RENDERED_BY_SOURCE' ||
+    row.authenticatedPdf ===
+      'AUTH_PDF_404_EQUIVALENT_REPRESENTATION'
+  ) {
+    sanitized.authenticatedPdf =
+      row.authenticatedPdf;
+  }
+
+  const equivalence = metadataRecord(
+    row.artifactEquivalence,
+  );
+  const equivalenceExternalId =
+    boundedAuditText(
+      equivalence?.equivalentExternalId,
+    );
+  if (
+    equivalence?.kind ===
+      'PROVEN_EQUIVALENT_REPRESENTATION' &&
+    equivalenceExternalId
+  ) {
+    sanitized.artifactEquivalence = {
+      kind:
+        'PROVEN_EQUIVALENT_REPRESENTATION',
+      equivalentExternalId:
+        equivalenceExternalId,
+    };
+  }
+
+  const representation = metadataRecord(
+    row.equivalentRepresentation,
+  );
+  if (representation) {
+    const safeRepresentation:
+      Record<string, unknown> = {};
+    const externalId = boundedAuditText(
+      representation.externalId,
+    );
+    if (externalId) {
+      safeRepresentation.externalId =
+        externalId;
+    }
+
+    if (
+      typeof representation.textSha256 ===
+        'string' &&
+      /^[a-fA-F0-9]{64}$/.test(
+        representation.textSha256,
+      )
+    ) {
+      safeRepresentation.textSha256 =
+        representation.textSha256
+          .toLowerCase();
+    }
+
+    const authenticatedPdf = metadataRecord(
+      representation.authenticatedPdf,
+    );
+    const ownerExternalId =
+      boundedAuditText(
+        authenticatedPdf?.ownerExternalId,
+      );
+    if (ownerExternalId) {
+      safeRepresentation.authenticatedPdf = {
+        ownerExternalId,
+      };
+    }
+
+    if (
+      Object.keys(safeRepresentation)
+        .length > 0
+    ) {
+      sanitized.equivalentRepresentation =
+        safeRepresentation;
+    }
+  }
+
+  const pdfError = metadataRecord(
+    row.authenticatedPdfError,
+  );
+  if (
+    pdfError?.code === 'DOE_SP_HTTP_ERROR' &&
+    Number.isInteger(pdfError.httpStatus) &&
+    (pdfError.httpStatus as number) >= 100 &&
+    (pdfError.httpStatus as number) <= 599
+  ) {
+    sanitized.authenticatedPdfError = {
+      code: 'DOE_SP_HTTP_ERROR',
+      httpStatus: pdfError.httpStatus,
+    };
+  }
+
+  return sanitized;
+}
+
+function sanitizeHistoryEntry(
+  value: unknown,
+): ArtifactReconciliationHistoryEntry | undefined {
+  const row = metadataRecord(value);
+  if (
+    row?.kind !== 'ORIGIN_ARTIFACT_RECOVERY'
+  ) {
+    return undefined;
+  }
+
+  const previousOriginMetadata =
+    sanitizeHistoricalOriginMetadata(
+      row.previousOriginMetadata,
+    );
+  if (
+    Object.keys(previousOriginMetadata)
+      .length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: 'ORIGIN_ARTIFACT_RECOVERY',
+    previousOriginMetadata,
+  };
+}
+
+function boundArtifactReconciliationHistory(
+  entries: ArtifactReconciliationHistoryEntry[],
+): ArtifactReconciliationHistoryEntry[] {
+  let bounded = entries.slice(
+    -ARTIFACT_RECONCILIATION_HISTORY_MAX_ENTRIES,
+  );
+
+  while (
+    bounded.length > 0 &&
+    Buffer.byteLength(
+      JSON.stringify(bounded),
+      'utf8',
+    ) >
+      ARTIFACT_RECONCILIATION_HISTORY_MAX_BYTES
+  ) {
+    bounded = bounded.slice(1);
+  }
+
+  return bounded;
+}
+
+function sanitizeArtifactReconciliationHistory(
+  value: unknown,
+): ArtifactReconciliationHistoryEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return boundArtifactReconciliationHistory(
+    value
+      .map(sanitizeHistoryEntry)
+      .filter(
+        (
+          entry,
+        ): entry is ArtifactReconciliationHistoryEntry =>
+          entry !== undefined,
+      ),
+  );
+}
+
+function withoutIncomingReconciliationHistory(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
+  const safe = { ...metadata };
+  delete safe.artifactReconciliationHistory;
+  return safe;
+}
+
+function preserveExistingReconciliationHistory(
+  incoming: Record<string, unknown>,
+  persistedMetadata: unknown,
+): Record<string, unknown> {
+  const persisted = metadataRecord(
+    persistedMetadata,
+  );
+  const history =
+    sanitizeArtifactReconciliationHistory(
+      persisted?.artifactReconciliationHistory,
+    );
+
+  return history.length > 0
+    ? {
+        ...incoming,
+        artifactReconciliationHistory:
+          history,
+      }
+    : incoming;
 }
 
 function reconciliationEvidence(
@@ -272,30 +505,39 @@ async function canReuseCurrentVersionForArtifactReconciliation(
 
 function reconciliationHistory(
   evidence: ArtifactReconciliationEvidence,
-): unknown[] {
-  const current =
-    evidence.priorMetadata
-      .artifactReconciliationHistory;
-  const existing = Array.isArray(current)
-    ? current
-    : [];
+): ArtifactReconciliationHistoryEntry[] {
+  const existing =
+    sanitizeArtifactReconciliationHistory(
+      evidence.priorMetadata
+        .artifactReconciliationHistory,
+    );
 
   if (evidence.alreadyReconciled) {
     return existing;
   }
 
-  const snapshot = {
-    ...evidence.priorMetadata,
-  };
-  delete snapshot.artifactReconciliationHistory;
+  const snapshot =
+    sanitizeHistoricalOriginMetadata(
+      evidence.priorMetadata,
+    );
+  if (Object.keys(snapshot).length === 0) {
+    return existing;
+  }
 
-  return [
-    ...existing,
-    {
-      kind: 'ORIGIN_ARTIFACT_RECOVERY',
-      previousOriginMetadata: snapshot,
-    },
-  ];
+  const next: ArtifactReconciliationHistoryEntry = {
+    kind: 'ORIGIN_ARTIFACT_RECOVERY',
+    previousOriginMetadata: snapshot,
+  };
+  const serializedNext = JSON.stringify(next);
+  const withoutDuplicate = existing.filter(
+    (entry) =>
+      JSON.stringify(entry) !== serializedNext,
+  );
+
+  return boundArtifactReconciliationHistory([
+    ...withoutDuplicate,
+    next,
+  ]);
 }
 
 function reconciledOriginMetadata(
@@ -464,13 +706,17 @@ async function upsertOrigin(
       }
     | undefined,
 ): Promise<void> {
-  const originMetadata = reconciliation
+  const incomingOriginMetadata =
+    withoutIncomingReconciliationHistory(
+      input.publication.originMetadata,
+    );
+  let originMetadata = reconciliation
     ? reconciledOriginMetadata(
-        input.publication.originMetadata,
+        incomingOriginMetadata,
         reconciliation.evidence,
         reconciliation.versionReused,
       )
-    : input.publication.originMetadata;
+    : incomingOriginMetadata;
   const pageReference = originMetadata.officialUrlGranularity === 'PAGE';
   if (pageReference && !input.publication.externalId) {
     throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
@@ -478,7 +724,7 @@ async function upsertOrigin(
   const externalOrigin = input.publication.externalId
     ? await trx
         .selectFrom('publication_origins')
-        .select(['id', 'publication_id'])
+        .select(['id', 'publication_id', 'metadata'])
         .where('source_id', '=', input.sourceId)
         .where(
           'external_id',
@@ -490,7 +736,7 @@ async function upsertOrigin(
 
   const urlOrigin = pageReference ? undefined : await trx
     .selectFrom('publication_origins')
-    .select(['id', 'publication_id'])
+    .select(['id', 'publication_id', 'metadata'])
     .where('source_id', '=', input.sourceId)
     .where(sql<boolean>`metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'`)
     .where(
@@ -519,6 +765,14 @@ async function upsertOrigin(
     throw new PublicationOriginConflictError(
       'Publication origin is already linked to another publication identity.',
     );
+  }
+
+  if (origin && !reconciliation) {
+    originMetadata =
+      preserveExistingReconciliationHistory(
+        incomingOriginMetadata,
+        origin.metadata,
+      );
   }
 
   if (origin) {
