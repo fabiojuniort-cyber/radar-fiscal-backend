@@ -121,42 +121,21 @@ function metadataRecord(
     : undefined;
 }
 
-const AUDIT_CREDENTIAL_WORD =
-  /(?:^|[._:-])(authorization|bearer|basic|token|secret|password|passwd|credential|api[-_]?key)(?:[._:-]|$)/i;
-const AUDIT_SECRET_PREFIX =
-  /^(?:sk|ghp|gho|ghu|ghs|github_pat|xox[baprs])[-_]/i;
-const AUDIT_HASH_LIKE =
-  /^(?:[a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64}|[a-f0-9]{96}|[a-f0-9]{128})$/i;
-const AUDIT_URL_LIKE =
-  /^(?:[a-z][a-z0-9+.-]*:|\/\/|www\.)/i;
-const AUDIT_JWT_LIKE =
-  /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
-
-function safeAuditIdentifier(
+function boundedAuditLiteral<T extends string>(
   value: unknown,
-): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const normalized = value.trim();
+  allowed: readonly T[],
+): T | undefined {
   if (
-    !normalized ||
-    normalized.length >
-      ARTIFACT_RECONCILIATION_HISTORY_MAX_TEXT ||
-    !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(
-      normalized,
-    ) ||
-    AUDIT_URL_LIKE.test(normalized) ||
-    AUDIT_CREDENTIAL_WORD.test(normalized) ||
-    AUDIT_SECRET_PREFIX.test(normalized) ||
-    AUDIT_HASH_LIKE.test(normalized) ||
-    AUDIT_JWT_LIKE.test(normalized)
+    typeof value !== 'string' ||
+    value.length >
+      ARTIFACT_RECONCILIATION_HISTORY_MAX_TEXT
   ) {
     return undefined;
   }
 
-  return normalized;
+  return allowed.find(
+    (candidate) => candidate === value,
+  );
 }
 
 function sanitizeHistoricalOriginMetadata(
@@ -166,91 +145,65 @@ function sanitizeHistoricalOriginMetadata(
   if (!row) return {};
 
   const sanitized: Record<string, unknown> = {};
-  const sourceRole = publicationSourceRole(row);
-  if (sourceRole !== 'UNSPECIFIED') {
+  const sourceRole = boundedAuditLiteral(
+    row.sourceRole,
+    ['PRIMARY', 'ENRICHMENT', 'VALIDATION'] as const,
+  );
+  if (sourceRole) {
     sanitized.sourceRole = sourceRole;
   }
 
-  if (
-    row.authenticatedPdf === 'CAPTURED' ||
-    row.authenticatedPdf === 'NO_AUTH_CODE' ||
-    row.authenticatedPdf ===
-      'NOT_RENDERED_BY_SOURCE' ||
-    row.authenticatedPdf ===
-      'AUTH_PDF_404_EQUIVALENT_REPRESENTATION'
-  ) {
+  const authenticatedPdf = boundedAuditLiteral(
+    row.authenticatedPdf,
+    [
+      'CAPTURED',
+      'NO_AUTH_CODE',
+      'NOT_RENDERED_BY_SOURCE',
+      'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+    ] as const,
+  );
+  if (authenticatedPdf) {
     sanitized.authenticatedPdf =
-      row.authenticatedPdf;
+      authenticatedPdf;
   }
 
   const equivalence = metadataRecord(
     row.artifactEquivalence,
   );
-  const equivalenceExternalId =
-    safeAuditIdentifier(
-      equivalence?.equivalentExternalId,
-    );
-  if (
-    equivalence?.kind ===
-      'PROVEN_EQUIVALENT_REPRESENTATION' &&
-    equivalenceExternalId
-  ) {
+  const equivalenceKind = boundedAuditLiteral(
+    equivalence?.kind,
+    ['PROVEN_EQUIVALENT_REPRESENTATION'] as const,
+  );
+  if (equivalenceKind) {
     sanitized.artifactEquivalence = {
-      kind:
-        'PROVEN_EQUIVALENT_REPRESENTATION',
-      equivalentExternalId:
-        equivalenceExternalId,
+      kind: equivalenceKind,
     };
   }
 
-  const representation = metadataRecord(
-    row.equivalentRepresentation,
-  );
-  if (representation) {
-    const safeRepresentation:
-      Record<string, unknown> = {};
-    const externalId = safeAuditIdentifier(
-      representation.externalId,
-    );
-    if (externalId) {
-      safeRepresentation.externalId =
-        externalId;
-    }
-
-    const authenticatedPdf = metadataRecord(
-      representation.authenticatedPdf,
-    );
-    const ownerExternalId =
-      safeAuditIdentifier(
-        authenticatedPdf?.ownerExternalId,
-      );
-    if (ownerExternalId) {
-      safeRepresentation.authenticatedPdf = {
-        ownerExternalId,
-      };
-    }
-
-    if (
-      Object.keys(safeRepresentation)
-        .length > 0
-    ) {
-      sanitized.equivalentRepresentation =
-        safeRepresentation;
-    }
-  }
+  /*
+   * Historical snapshots intentionally omit every free-form identifier
+   * from artifact equivalence/representation metadata. The current
+   * reconciliation proof remains on publication_origins.metadata; the
+   * history retains only closed audit facts and can never become a
+   * transport for URLs, credentials, hashes, or opaque secrets.
+   */
 
   const pdfError = metadataRecord(
     row.authenticatedPdfError,
   );
+  const pdfErrorCode = boundedAuditLiteral(
+    pdfError?.code,
+    ['DOE_SP_HTTP_ERROR'] as const,
+  );
   if (
-    pdfError?.code === 'DOE_SP_HTTP_ERROR' &&
-    typeof pdfError.httpStatus === 'number' &&
+    pdfErrorCode &&
+    typeof pdfError?.httpStatus === 'number' &&
     Number.isInteger(pdfError.httpStatus) &&
     pdfError.httpStatus >= 100 &&
     pdfError.httpStatus <= 599
   ) {
     sanitized.authenticatedPdfError = {
-      code: 'DOE_SP_HTTP_ERROR',
+      code: pdfErrorCode,
       httpStatus: pdfError.httpStatus,
     };
   }
