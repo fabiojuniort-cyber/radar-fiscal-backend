@@ -479,9 +479,16 @@ test('DOE-SP equivalent authenticated-PDF 404: two origins, one publication/vers
       previousOriginMetadata.authenticatedPdf,
       'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
     );
-    const previousEquivalent =
-      previousOriginMetadata.equivalentRepresentation as Record<string, unknown>;
-    assert.equal(previousEquivalent.externalId, goodId);
+    const previousEquivalence =
+      previousOriginMetadata.artifactEquivalence as
+        Record<string, unknown>;
+    assert.deepEqual(previousEquivalence, {
+      kind: 'PROVEN_EQUIVALENT_REPRESENTATION',
+    });
+    assert.equal(
+      previousOriginMetadata.equivalentRepresentation,
+      undefined,
+    );
 
     const healedVersions = await db.selectFrom('publication_versions')
       .select(['id', 'content_hash', 'source_metadata'])
