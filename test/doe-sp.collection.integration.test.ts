@@ -82,12 +82,30 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
     assert.equal(first.metrics.newVersions, 0);
 
     const origins = await db.selectFrom('publication_origins')
-      .select(['publication_id', 'external_id', 'official_url'])
+      .select(['publication_id', 'external_id', 'official_url', 'metadata'])
       .where('source_id', '=', sourceId)
       .execute();
     assert.equal(origins.length, 3);
     assert.deepEqual(origins.map((origin) => origin.external_id).sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
     assert.ok(origins.every((origin) => origin.official_url.startsWith('https://doe.sp.gov.br/executivo/')));
+    const originFiles = origins.flatMap((origin) =>
+      (((origin.metadata as Record<string, unknown>).files as Array<Record<string, unknown>>) ?? []),
+    );
+    assert.equal(originFiles.length, 4); // 3 authenticated PDFs + 1 attachment remain provenance by origin
+    assert.equal(
+      originFiles.filter((file) =>
+        (file.metadata as Record<string, unknown> | undefined)?.kind ===
+        'AUTHENTICATED_PUBLICATION_PDF',
+      ).length,
+      3,
+    );
+    assert.equal(
+      originFiles.filter((file) =>
+        (file.metadata as Record<string, unknown> | undefined)?.kind ===
+        'ATTACHMENT',
+      ).length,
+      1,
+    );
 
     const publications = await db.selectFrom('publications as p')
       .innerJoin('publication_origins as po', 'po.publication_id', 'p.id')
@@ -106,7 +124,11 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
       .where('po.source_id', '=', sourceId)
       .execute();
     const files = versions.flatMap((row) => ((row.source_metadata as Record<string, unknown>).files as Array<Record<string, unknown>>) ?? []);
-    assert.equal(files.length, 4); // 3 authenticated PDFs + 1 attachment
+    assert.equal(files.length, 1); // only material attachment remains version-relevant
+    assert.equal(
+      (files[0]?.metadata as Record<string, unknown> | undefined)?.kind,
+      'ATTACHMENT',
+    );
     assert.ok(files.every((file) => /^[a-f0-9]{64}$/.test(String(file.rawSha256)) && Number(file.sizeBytes) > 0));
 
     const detailsBeforeReplay = api.count('/v2/publications/');

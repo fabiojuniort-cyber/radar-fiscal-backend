@@ -190,21 +190,42 @@ test('source unavailable is an error, never zero publications', async () => {
     error instanceof ConnectorError && error.kind === 'SOURCE_UNAVAILABLE');
 });
 
-test('an item failing does not block the day, is reported and retried next run without artificial versions', async () => {
+test('redundant authenticated PDF failure does not block the day or force a retry', async () => {
   const failing = connector({ failures: [{ match: '/v2/authentication/download/2026.09.03.1.1.28.3.214', status: 500 }] });
-  const partial = await failing.instance.collect(context());
-  assert.deepEqual(partial.publications.map((item) => item.externalId), []);
-  assert.equal(partial.partialFailures?.length, 1);
-  assert.equal(partial.partialFailures?.[0]?.code, 'DOE_SP_SOURCE_UNAVAILABLE');
-  assert.equal(partial.partialFailures?.[0]?.itemReference, `2026-09-04#${ID.sre43}`);
-  const state = checkpointState(partial);
-  assert.deepEqual(state.days['2026-09-04']?.included, []);
-  assert.equal(state.days['2026-09-04']?.idsHash, '');
+  const result = await failing.instance.collect(context());
 
-  const healed = connector({ state });
-  const retry = await healed.instance.collect(context());
-  assert.deepEqual(retry.publications.map((item) => item.externalId), [ID.sre43]);
-  assert.equal(healed.api.count('/v2/publications/'), 1);
+  assert.deepEqual(
+    result.publications.map((item) => item.externalId),
+    [ID.sre43],
+  );
+  assert.equal(result.partialFailures, undefined);
+  const publication = result.publications[0]!;
+  assert.equal(
+    publication.metadata?.authenticatedPdf,
+    'UNAVAILABLE_REDUNDANT',
+  );
+  assert.equal(
+    (publication.metadata?.authenticatedPdfError as Record<string, unknown>)?.code,
+    'DOE_SP_SOURCE_UNAVAILABLE',
+  );
+
+  const state = checkpointState(result);
+  assert.deepEqual(
+    state.days['2026-09-04']?.included,
+    [ID.sre43],
+  );
+  assert.ok(
+    (state.days['2026-09-04']?.idsHash ?? '').length > 0,
+  );
+
+  const replay = connector({ state });
+  const second = await replay.instance.collect(context());
+  assert.deepEqual(second.publications, []);
+  assert.equal(
+    replay.api.count('/v2/publications/'),
+    0,
+    'checkpoint must treat the HTML capture as complete even when redundant PDF failed',
+  );
 });
 
 test('malformed list items are isolated as partial failures', async () => {
