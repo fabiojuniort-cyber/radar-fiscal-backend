@@ -132,12 +132,12 @@ O contrato e o normalizador distinguem:
 No DOE-SP ficam em `originMetadata`:
 - `authCode`;
 - estado `authenticatedPdf`;
-- `authenticatedPdfError`;
-- o arquivo `AUTHENTICATED_PUBLICATION_PDF`, quando efetivamente capturado.
+- `authenticatedPdfError`, quando o PDF é material e a tentativa falha;
+- o arquivo `AUTHENTICATED_PUBLICATION_PDF`, quando ele foi efetivamente capturado como material.
 
-Esses campos não participam do metadata/hash da versão v2. Um PDF autenticado disponível fica somente na origem que efetivamente o forneceu. Uma origem com PDF 404 mantém URL, referência de autenticidade e diagnóstico da falha, sem receber arquivo de outra origem.
+Esses campos não participam do metadata/hash da versão v2 HTML-primary. PDF redundante não é solicitado. Quando um PDF material já foi capturado por uma origem e uma observação posterior da **mesma origem** passa a usar HTML completo, a persistência preserva somente a evidência desse PDF autenticado anterior; status e diagnóstico atuais continuam vindo da nova observação. Attachments antigos não são resurrectados por essa regra e nenhum arquivo é transferido entre origens.
 
-O teste ponta a ponta com os IDs observados da Portaria SRE 42/2025 exige duas origens oficiais, uma única publicação, uma única versão v2, nenhuma versão artificial no replay e nenhum empréstimo de PDF entre origens.
+O teste ponta a ponta com os IDs observados da Portaria SRE 42/2025 exige duas origens oficiais, uma única publicação, uma única versão v2, nenhuma versão artificial no replay e zero tentativa de download do PDF redundante.
 
 
 ## DOE-SP-24 — política page-first vigente
@@ -174,5 +174,7 @@ Isso não deve ser generalizado:
 - outros conectores podem ter PDF como conteúdo material;
 - DOE-SP pode precisar do PDF material quando o corpo HTML estiver ausente;
 - qualquer arquivo material continua exigindo proveniência e versionamento corretos.
+
+A reconstrução também **não elimina a necessidade de preservação same-origin** para PDF autenticado material: um PDF capturado enquanto a página está incompleta deve continuar auditável se, em replay futuro, a mesma página passar a fornecer HTML completo. Essa proteção é independente da compatibilidade v1→v2.
 
 A avaliação e o plano de reconstrução estão em `docs/doe-sp-rebuild-assessment.md`.
