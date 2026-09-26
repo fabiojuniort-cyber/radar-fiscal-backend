@@ -794,7 +794,7 @@ test(
           ...shared,
           officialUrl:
             'https://doe.sp.gov.br/portaria-sre-42/origem-com-pdf',
-          externalId: '645399a3-valid-pdf',
+          externalId: '645399a3-5a4e-44f7-c5cd-08ddcdea30ea',
           files: [{
             url:
               'https://do-api-publication-pdf.doe.sp.gov.br/authenticated.pdf',
@@ -843,7 +843,7 @@ test(
           ...shared,
           officialUrl:
             'https://doe.sp.gov.br/portaria-sre-42/origem-pdf-404',
-          externalId: '6098db3e-pdf-404',
+          externalId: '6098db3e-c841-40de-c0fc-08ddce07602e',
           contentHashPolicy:
             'HTML_PRIMARY_MATERIAL_FILES',
           metadata: {
@@ -933,12 +933,12 @@ test(
       const withPdf = origins.find(
         (row) =>
           row.external_id ===
-          '645399a3-valid-pdf',
+          '645399a3-5a4e-44f7-c5cd-08ddcdea30ea',
       )!;
       const withoutPdf = origins.find(
         (row) =>
           row.external_id ===
-          '6098db3e-pdf-404',
+          '6098db3e-c841-40de-c0fc-08ddce07602e',
       )!;
       const withPdfFiles =
         (withPdf.metadata as Record<string, unknown>)
