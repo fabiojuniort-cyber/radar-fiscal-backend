@@ -478,6 +478,51 @@ test(
       );
 
       await t.test(
+        'configured CORS answers browser preflight with GET only',
+        async () => {
+          const response = await app.inject({
+            method: 'OPTIONS',
+            url: '/public/v1/stats',
+            headers: {
+              origin:
+                'https://public.example',
+              'access-control-request-method':
+                'GET',
+            },
+          });
+
+          assert.equal(
+            response.statusCode,
+            204,
+          );
+          assert.equal(
+            response.headers[
+              'access-control-allow-origin'
+            ],
+            'https://public.example',
+          );
+          assert.equal(
+            response.headers[
+              'access-control-allow-methods'
+            ],
+            'GET',
+          );
+          assert.equal(
+            response.headers[
+              'access-control-allow-credentials'
+            ],
+            undefined,
+          );
+          assert.equal(
+            response.headers[
+              'cache-control'
+            ],
+            undefined,
+          );
+        },
+      );
+
+      await t.test(
         'configured CORS rejects unknown browser origins',
         async () => {
           const response = await app.inject({
@@ -499,6 +544,12 @@ test(
               error:
                 'origin_not_allowed',
             },
+          );
+          assert.equal(
+            response.headers[
+              'cache-control'
+            ],
+            undefined,
           );
         },
       );
