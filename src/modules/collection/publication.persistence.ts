@@ -131,7 +131,7 @@ async function upsertCollectionItem(
       source_url: input.publication.officialUrl,
       status: 'DISCOVERED',
       raw_metadata: asJson(
-        input.publication.metadata,
+        input.publication.originMetadata,
       ),
     })
     .onConflict((conflict) =>
@@ -225,7 +225,9 @@ async function upsertOrigin(
   input: PersistPublicationInput,
   publicationId: string,
 ): Promise<void> {
-  const pageReference = input.publication.metadata.officialUrlGranularity === 'PAGE';
+  const pageReference =
+    input.publication.originMetadata
+      .officialUrlGranularity === 'PAGE';
   if (pageReference && !input.publication.externalId) {
     throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
   }
@@ -302,10 +304,145 @@ async function upsertOrigin(
         input.publication.externalId ?? null,
       official_url: input.publication.officialUrl,
       metadata: asJson(
-        input.publication.metadata,
+        input.publication.originMetadata,
       ),
     })
     .execute();
+}
+
+function metadataRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function legacyMaterialFileHashes(
+  metadata: unknown,
+): string[] | undefined {
+  const row = metadataRecord(metadata);
+  const files = row?.files;
+  if (files === undefined) {
+    return [];
+  }
+  if (!Array.isArray(files)) {
+    return undefined;
+  }
+
+  const hashes: string[] = [];
+  for (const fileValue of files) {
+    const file = metadataRecord(fileValue);
+    const fileMetadata = metadataRecord(
+      file?.metadata,
+    );
+    const kind = fileMetadata?.kind;
+
+    if (
+      kind === 'AUTHENTICATED_PUBLICATION_PDF'
+    ) {
+      continue;
+    }
+    if (kind !== 'ATTACHMENT') {
+      return undefined;
+    }
+
+    const hash = file?.rawSha256;
+    if (
+      typeof hash !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(hash)
+    ) {
+      return undefined;
+    }
+    hashes.push(hash.toLowerCase());
+  }
+
+  return hashes.sort();
+}
+
+function incomingMaterialFileHashes(
+  publication: NormalizedPublication,
+): string[] | undefined {
+  const hashes: string[] = [];
+  for (const file of publication.files) {
+    if (file.versionRole === 'PROVENANCE') {
+      continue;
+    }
+    if (
+      typeof file.rawSha256 !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(
+        file.rawSha256,
+      )
+    ) {
+      return undefined;
+    }
+    hashes.push(file.rawSha256.toLowerCase());
+  }
+  return hashes.sort();
+}
+
+function sameHashes(
+  left: string[],
+  right: string[],
+): boolean {
+  return left.length === right.length &&
+    left.every(
+      (hash, index) => hash === right[index],
+    );
+}
+
+async function currentLegacyVersionEquivalent(
+  trx: Transaction<DB>,
+  publicationId: string,
+  publication: NormalizedPublication,
+  currentVersion: {
+    id: string;
+    content_hash: string;
+    content_text: string | null;
+    source_metadata: Json | null;
+  },
+): Promise<boolean> {
+  if (
+    publication.contentHashVersion !== 2 ||
+    metadataRecord(
+      currentVersion.source_metadata,
+    )?.contentHashVersion === 2
+  ) {
+    return false;
+  }
+
+  const canonical = await trx
+    .selectFrom('publications')
+    .select([
+      'title',
+      'effective_on',
+    ])
+    .where('id', '=', publicationId)
+    .executeTakeFirstOrThrow();
+
+  const currentEffectiveOn =
+    canonical.effective_on
+      ?.toISOString()
+      .slice(0, 10) ?? null;
+  const incomingEffectiveOn =
+    publication.effectiveOn ?? null;
+  const legacyHashes = legacyMaterialFileHashes(
+    currentVersion.source_metadata,
+  );
+  const incomingHashes =
+    incomingMaterialFileHashes(publication);
+
+  return (
+    canonical.title === publication.title &&
+    currentVersion.content_text ===
+      (publication.contentText ?? null) &&
+    currentEffectiveOn === incomingEffectiveOn &&
+    legacyHashes !== undefined &&
+    incomingHashes !== undefined &&
+    sameHashes(legacyHashes, incomingHashes)
+  );
 }
 
 async function getOrCreateVersion(
@@ -326,6 +463,7 @@ async function getOrCreateVersion(
     .select([
       'id',
       'content_hash',
+      'content_text',
       'source_metadata',
     ])
     .where('publication_id', '=', publicationId)
@@ -420,6 +558,48 @@ async function getOrCreateVersion(
 
     return {
       publicationVersionId: existingVersion.id,
+      disposition: 'EXISTING_PUBLICATION',
+    };
+  }
+
+  if (
+    currentVersion &&
+    !existingVersion &&
+    await currentLegacyVersionEquivalent(
+      trx,
+      publicationId,
+      publication,
+      currentVersion,
+    )
+  ) {
+    if (incomingRole === 'PRIMARY') {
+      await trx
+        .updateTable('publications')
+        .set({
+          title: publication.title,
+          ...(publication.effectiveOn !== undefined
+            ? {
+                effective_on:
+                  publication.effectiveOn,
+              }
+            : {}),
+          primary_official_url:
+            publication.officialUrl,
+          last_seen_at: new Date(),
+          updated_at: new Date(),
+        })
+        .where('id', '=', publicationId)
+        .execute();
+    }
+
+    await enrichCanonicalPublication(
+      trx,
+      publicationId,
+      publication,
+    );
+
+    return {
+      publicationVersionId: currentVersion.id,
       disposition: 'EXISTING_PUBLICATION',
     };
   }

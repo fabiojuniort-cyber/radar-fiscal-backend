@@ -77,3 +77,50 @@ Antes de alteração produtiva, exigir:
 
 Issue de governança: `tribusca-control#1`.
 Política global/inventário: `tribusca-control#6`.
+
+
+## Implementação aprovada — DOE-SP-22
+
+A opção A foi aprovada pelo Gerente. A implementação usa opt-in por publicação, sem alterar o comportamento dos demais conectores.
+
+### Hash novo (v2)
+
+Para publicações DOE-SP com `contentHashPolicy = HTML_PRIMARY_MATERIAL_FILES`:
+
+```text
+sha256(JSON.stringify({
+  version: 2,
+  title,
+  contentText,
+  effectiveOn,
+  materialFileHashes
+}))
+```
+
+`materialFileHashes` contém somente SHA-256 de arquivos com papel de conteúdo material. No DOE-SP:
+- `ATTACHMENT` => `MATERIAL_CONTENT`;
+- `AUTHENTICATED_PUBLICATION_PDF` => `PROVENANCE`.
+
+O PDF autenticado permanece no metadata da origem, mas fica fora do metadata/hash da versão v2.
+
+### Compatibilidade v1 sem reescrita histórica
+
+Uma versão atual v1 pode ser reutilizada por um replay v2 somente quando todos os critérios são demonstrados:
+1. mesmo `publication_id` obtido pela identidade normal do sistema;
+2. título canônico exatamente igual;
+3. texto canônico exatamente igual;
+4. vigência igual, inclusive ausência;
+5. hashes dos anexos `ATTACHMENT` legados exatamente iguais aos arquivos materiais recebidos;
+6. todos os arquivos legados não-PDF autenticado possuem classificação conhecida e hash válido.
+
+Se qualquer arquivo legado tiver classificação desconhecida, hash ausente, título/texto/vigência divergente ou anexos diferentes, a compatibilidade não é presumida e o fluxo normal de versionamento permanece explícito.
+
+A equivalência nunca altera `content_hash`, `source_metadata` ou arquivos da versão histórica. Ela apenas evita uma versão artificial no replay.
+
+### Proveniência por origem
+
+O normalizador passa a distinguir:
+- `metadata`: material da versão;
+- `originMetadata`: evidência completa observada naquela origem.
+
+Assim, um PDF autenticado disponível fica somente na origem que efetivamente o forneceu. Uma origem com PDF 404 mantém URL, authCode e diagnóstico da falha, sem receber arquivo de outra origem.

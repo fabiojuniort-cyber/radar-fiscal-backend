@@ -55,13 +55,6 @@ export const DOE_SP_SECTION = 'Atos Normativos';
  */
 export const DOE_SP_DEFAULT_LOOKBACK_DAYS = 3;
 const MAX_EXCLUDED_SAMPLES = 200;
-/**
- * Days after the DOE date during which a not-yet-rendered authenticated PDF
- * is retried (item fails and is reprocessed on the next run). Observed in
- * production: act b8bec255-… of 05/02/2025 (7.5 MB HTML) is still
- * "Processando" 19 months later.
- */
-export const DOE_SP_AUTH_PDF_GRACE_DAYS = 7;
 const DAY_MS = 86_400_000;
 
 export interface DoeSpDayState {
@@ -365,23 +358,72 @@ export class DoeSpConnector implements CollectionConnector {
       const detail = parseDoeSpDetail(response.body, item.id);
       const capturedAt = now.toISOString();
       const files: ConnectorFile[] = [];
+      const contentText =
+        doeSpHtmlText(detail.contentHtml);
+      const officialContentCompleteness =
+        contentText
+          ? 'FULL_OFFICIAL_CONTENT'
+          : 'PARTIAL_OFFICIAL_CONTENT';
 
-      let authenticatedPdf: 'CAPTURED' | 'NOT_RENDERED_BY_SOURCE' | 'NO_AUTH_CODE' = detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
+      let authenticatedPdf:
+        | 'CAPTURED'
+        | 'NOT_RENDERED_BY_SOURCE'
+        | 'UNAVAILABLE_REDUNDANT'
+        | 'NO_AUTH_CODE' =
+        detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
+      let authenticatedPdfError:
+        | Record<string, unknown>
+        | undefined;
       const pdf = detail.authCode
-        ? await client.downloadAuthenticatedPdf(detail.authCode, context.signal).catch((error: unknown) => {
-            // A PDF the source never rendered must not block the act forever:
-            // after the grace period the act is kept (official HTML text) without it.
-            if (
-              error instanceof ConnectorError &&
-              error.code === 'DOE_SP_AUTHENTICATED_PDF_NOT_READY' &&
-              detail.date <= addDays(today, -DOE_SP_AUTH_PDF_GRACE_DAYS)
-            ) {
-              authenticatedPdf = 'NOT_RENDERED_BY_SOURCE';
-              counters.authPdfNotRendered += 1;
-              return undefined;
-            }
-            throw error;
-          })
+        ? await client
+            .downloadAuthenticatedPdf(
+              detail.authCode,
+              context.signal,
+            )
+            .catch((error: unknown) => {
+              if (isCancel(error)) {
+                throw error;
+              }
+
+              /*
+               * D-017: the official HTML is the complete canonical
+               * content for DOE-SP. A failure isolated to the
+               * redundant authenticated PDF is provenance loss,
+               * not publication loss. If HTML is absent we cannot
+               * claim complete capture and retain the failure.
+               */
+              if (!contentText) {
+                throw error;
+              }
+
+              if (error instanceof ConnectorError) {
+                authenticatedPdf =
+                  error.code ===
+                  'DOE_SP_AUTHENTICATED_PDF_NOT_READY'
+                    ? 'NOT_RENDERED_BY_SOURCE'
+                    : 'UNAVAILABLE_REDUNDANT';
+                if (
+                  error.code ===
+                  'DOE_SP_AUTHENTICATED_PDF_NOT_READY'
+                ) {
+                  counters.authPdfNotRendered += 1;
+                }
+                authenticatedPdfError = {
+                  code: error.code,
+                  kind: error.kind,
+                  retryable: error.retryable,
+                  ...(error.httpStatus !== undefined
+                    ? {
+                        httpStatus:
+                          error.httpStatus,
+                      }
+                    : {}),
+                };
+                return undefined;
+              }
+
+              throw error;
+            })
         : undefined;
       if (detail.authCode && pdf) {
         counters.filesDownloaded += 1;
@@ -393,6 +435,7 @@ export class DoeSpConnector implements CollectionConnector {
           externalId: 'auth:' + detail.authCode,
           rawSha256: pdf.rawSha256,
           sizeBytes: pdf.sizeBytes,
+          versionRole: 'PROVENANCE',
           metadata: { kind: 'AUTHENTICATED_PUBLICATION_PDF', capturedAt, origin: 'DOE_SP', textExtraction: 'NOT_REQUIRED_HTML_TEXT_AVAILABLE' },
         });
       }
@@ -407,11 +450,11 @@ export class DoeSpConnector implements CollectionConnector {
           externalId: attachment.id,
           rawSha256: file.rawSha256,
           sizeBytes: file.sizeBytes,
-          metadata: { kind: 'ATTACHMENT', position: attachment.position, capturedAt, origin: 'DOE_SP', textExtraction: 'NOT_EXTRACTED' },
+          versionRole: 'MATERIAL_CONTENT',
+          metadata: { kind: 'ATTACHMENT', position: attachment.position, capturedAt, origin: 'DOE_SP', materialContent: true, textExtraction: 'NOT_EXTRACTED' },
         });
       }
 
-      const contentText = doeSpHtmlText(detail.contentHtml);
       const identity = doeSpNormativeIdentity({ title: detail.title, ...(typeName ? { typeName } : {}), category });
       const actType = identity?.actType ?? doeSpActType(detail.title, detail.publicationType ?? typeName);
       const organ = doeSpOrgan(item.hierarchy);
@@ -431,6 +474,8 @@ export class DoeSpConnector implements CollectionConnector {
         officialUrl: publicationPageUrl(detail.slug),
         externalId: detail.id,
         ...(isRetification ? { identityKey: `DOE_SP|RETIFICACAO|${detail.id}` } : {}),
+        contentHashPolicy:
+          'HTML_PRIMARY_MATERIAL_FILES',
         ...(files.length ? { files } : {}),
         metadata: {
           sourceRole: 'PRIMARY',
@@ -455,7 +500,11 @@ export class DoeSpConnector implements CollectionConnector {
           ...(edition.editionPdfUrl ? { editionPdfUrl: edition.editionPdfUrl } : {}),
           supplementaryEditionCount: edition.supplementaryEditionCount,
           textExtraction: contentText ? 'HTML_TEXT' : 'EMPTY',
+          officialContentCompleteness,
           authenticatedPdf,
+          ...(authenticatedPdfError
+            ? { authenticatedPdfError }
+            : {}),
           attachmentCount: detail.attachments.length,
         },
       };
