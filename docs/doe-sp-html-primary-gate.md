@@ -111,11 +111,12 @@ Uma versão atual v1 pode ser reutilizada por um replay v2 somente quando todos 
 3. texto canônico exatamente igual;
 4. vigência igual, inclusive ausência;
 5. hashes dos anexos `ATTACHMENT` legados exatamente iguais aos arquivos materiais recebidos;
-6. todos os arquivos legados não-PDF autenticado possuem classificação conhecida e hash válido.
+6. todos os arquivos legados possuem classificação conhecida (`AUTHENTICATED_PUBLICATION_PDF` ou `ATTACHMENT`) e SHA-256 válido;
+7. o `content_hash` v1 persistido pode ser **reconstruído exatamente** a partir do título, texto, vigência e hashes de todos os arquivos legados e coincide com o valor armazenado.
 
-Se qualquer arquivo legado tiver classificação desconhecida, hash ausente, título/texto/vigência divergente ou anexos diferentes, a compatibilidade não é presumida e o fluxo normal de versionamento permanece explícito.
+A identidade normativa, isoladamente, nunca é evidência suficiente. Se qualquer arquivo legado tiver classificação desconhecida, hash ausente, o hash v1 não puder ser reproduzido, título/texto/vigência divergirem ou anexos materiais forem diferentes, a compatibilidade não é presumida e o fluxo normal de versionamento permanece explícito como `NEW_VERSION`.
 
-A equivalência nunca altera `content_hash`, `source_metadata` ou arquivos da versão histórica. Ela apenas evita uma versão artificial no replay.
+A equivalência nunca altera `content_hash`, `source_metadata` ou arquivos da versão histórica. Ela apenas evita uma versão artificial no replay. O caminho cobre legado com e sem PDF autenticado; um PDF capturado posteriormente continua pertencendo somente à origem que efetivamente o forneceu.
 
 ### Proveniência por origem
 
