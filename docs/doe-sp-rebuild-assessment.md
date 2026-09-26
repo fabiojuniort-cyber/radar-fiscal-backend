@@ -274,14 +274,23 @@ Não elimina:
 - comportamento conservador quando uma página futura exigir PDF material;
 - problemas equivalentes em outras fontes.
 
-### A elimina o bloqueio DOE-SP-23?
+### A elimina o mecanismo de preservação do DOE-SP-23?
 
-**Para PDFs redundantes DOE-SP, sim:** após rebuild page-first, esses PDFs não são mais baixados, logo não existe proveniência redundante capturada que um replay HTML-first possa apagar.
+**Não integralmente.**
 
-Isso **não autoriza generalizar** o overwrite de `originMetadata`:
-- PDFs materiais continuam relevantes;
-- outros conectores podem capturar arquivos necessários;
-- a política global ainda exige preservação de proveniência disponível.
+A reconstrução page-first elimina o caso específico em que um **PDF redundante legado** precisa ser preservado: novos registros com HTML completo não baixam esse PDF.
+
+Porém o DOE-SP ainda admite **PDF material** quando a página oficial não trouxer o corpo necessário. Se a mesma origem:
+1. for capturada primeiro por PDF material; e
+2. em replay futuro passar a oferecer HTML integral,
+
+a observação HTML não terá arquivo novo e um overwrite integral de `publication_origins.metadata` poderia apagar a evidência do PDF material antes capturado.
+
+Por isso a preservação de arquivos já capturados **da mesma origem** continua necessária nos dois caminhos. O PR foi ajustado para preservar `files` anteriores quando a observação atual da mesma origem não fornece nova lista de arquivos, enquanto status/diagnóstico atuais continuam vencendo. Isso não transfere arquivos entre origens.
+
+Consequência:
+- **A/rebuild** pode eliminar a compatibilidade v1→v2 para o corpus reconstruído em HTML, mas **não elimina** a regra de preservação de proveniência da mesma origem;
+- **B/preservar** precisa de ambas: compatibilidade v1→v2 e preservação de origem.
 
 ### Caminho recomendado
 
@@ -290,7 +299,9 @@ Isso **não autoriza generalizar** o overwrite de `originMetadata`:
 - há 0 versões históricas no snapshot;
 - 517/517 versões possuem texto;
 - 516 downloads redundantes podem ser eliminados;
-- a solução final DOE-SP fica substancialmente mais simples, sem compatibilidade v1→v2 para o corpus reconstruído.
+- a solução final DOE-SP fica mais limpa, sem compatibilidade v1→v2 para os registros reconstruídos em HTML.
+
+A agora **também mantém** a proteção de proveniência same-origin para PDFs materiais, porque essa necessidade não depende do legado.
 
 Entretanto A **não está autorizado nem suficientemente provado ainda**. A decisão de executar deve ocorrer somente depois de rodar o novo audit read-only e confirmar zero vínculos tenant/company, zero compartilhamento cross-source e zero blockers.
 
