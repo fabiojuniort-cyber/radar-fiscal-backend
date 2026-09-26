@@ -84,7 +84,8 @@ try {
    * production SELECT.
    */
 
-  await client.query('BEGIN READ ONLY');
+  await client.query('BEGIN');
+  await client.query('SET TRANSACTION READ ONLY');
   await client.query(
     "SET LOCAL statement_timeout = '30s'",
   );
