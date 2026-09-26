@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type {
   CollectionConnector,
   ConnectorExecutionContext,
@@ -30,6 +32,7 @@ import {
   parseDoeSpStructured,
   parseDoeSpSupplementaryUrls,
   parseDoeSpTypeCatalogue,
+  type DoeSpDetail,
   type DoeSpListItem,
 } from './doe-sp.parser.js';
 import {
@@ -39,6 +42,7 @@ import {
   doeSpOrgan,
   doeSpTitleDate,
   type DoeSpInclusionCategory,
+  type DoeSpNormativeIdentity,
 } from './doe-sp.rules.js';
 
 export const DOE_SP_CONNECTOR_KEY = 'doe-sp';
@@ -248,6 +252,107 @@ interface EditionInfo {
   supplementaryPdfUrls: string[];
 }
 
+const AUTH_PDF_404_ENDPOINT = '/v2/authentication/download/{authCode}';
+const AUTH_PDF_404_PROCESSING_LOOKUP_SIGNATURE =
+  'Não foi possível consultar o status de processamento do documento solicitado.';
+
+export function isDoeSpEquivalentRepresentationAuthPdf404(
+  error: unknown,
+): error is ConnectorError {
+  if (
+    !(error instanceof ConnectorError) ||
+    error.code !== 'DOE_SP_HTTP_ERROR' ||
+    error.httpStatus !== 404
+  ) {
+    return false;
+  }
+
+  const endpoint =
+    typeof error.metadata?.endpoint === 'string'
+      ? error.metadata.endpoint
+      : undefined;
+  const contentType =
+    typeof error.metadata?.contentType === 'string'
+      ? error.metadata.contentType.toLowerCase()
+      : '';
+  const responseSample =
+    typeof error.metadata?.responseSample === 'string'
+      ? error.metadata.responseSample
+      : '';
+
+  return endpoint === AUTH_PDF_404_ENDPOINT &&
+    contentType.startsWith('application/json') &&
+    responseSample.includes(
+      AUTH_PDF_404_PROCESSING_LOOKUP_SIGNATURE,
+    );
+}
+
+function sha256Text(value: string): string {
+  return createHash('sha256')
+    .update(value, 'utf8')
+    .digest('hex');
+}
+
+function strongIdentityKey(
+  identity: DoeSpNormativeIdentity | undefined,
+  date: string,
+): string | undefined {
+  if (!identity) return undefined;
+  return [
+    date,
+    identity.agency,
+    identity.actType,
+    identity.actNumber,
+  ].join('|');
+}
+
+function attachmentSignature(
+  detail: DoeSpDetail,
+): string {
+  return JSON.stringify(
+    detail.attachments.map((item) => ({
+      id: item.id,
+      name: item.name,
+      position: item.position,
+    })),
+  );
+}
+
+type DoeSpAuthenticatedPdfState =
+  | 'CAPTURED'
+  | 'NOT_RENDERED_BY_SOURCE'
+  | 'NO_AUTH_CODE'
+  | 'AUTH_PDF_404_EQUIVALENT_REPRESENTATION';
+
+interface PreparedDoeSpPublication {
+  item: DoeSpListItem;
+  category: DoeSpInclusionCategory;
+  typeName?: string;
+  edition: EditionInfo;
+  detail: DoeSpDetail;
+  contentText: string;
+  textSha256: string;
+  identity?: DoeSpNormativeIdentity;
+  strongIdentityKey?: string;
+  attachmentSignature: string;
+  actType: string;
+  organ: string;
+  signedOn?: string;
+  ementa?: string;
+  isRetification: boolean;
+}
+
+interface BuiltDoeSpPublication {
+  prepared: PreparedDoeSpPublication;
+  publication: ConnectorPublication;
+  authenticatedPdfCaptured: boolean;
+}
+
+interface PendingEquivalent404 {
+  prepared: PreparedDoeSpPublication;
+  error: ConnectorError;
+}
+
 // ------------------------------------------------------------------ connector
 
 export class DoeSpConnector implements CollectionConnector {
@@ -312,7 +417,7 @@ export class DoeSpConnector implements CollectionConnector {
       discoveredCount: 0, includedCount: 0, excludedCount: 0,
       includedByCategory: {}, excludedByReason: {}, excludedSamples: [], excludedSamplesTruncated: 0,
     };
-    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, authPdfNotRendered: 0 };
+    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, authPdfNotRendered: 0, authPdfEquivalent404: 0 };
     const typeCache = new Map<string, Map<string, string>>();
 
     const typesFor = async (date: string): Promise<Map<string, string>> => {
@@ -354,70 +459,94 @@ export class DoeSpConnector implements CollectionConnector {
       return info;
     };
 
-    const buildPublication = async (
+    const preparePublication = async (
       item: DoeSpListItem,
       category: DoeSpInclusionCategory,
       typeName: string | undefined,
       edition: EditionInfo,
-    ): Promise<ConnectorPublication> => {
-      const response = await client.getJson(DOE_SP_SEARCH_API, 'v2/publications/' + item.id, {}, context.signal);
+    ): Promise<PreparedDoeSpPublication> => {
+      const response = await client.getJson(
+        DOE_SP_SEARCH_API,
+        'v2/publications/' + item.id,
+        {},
+        context.signal,
+      );
       counters.detailsFetched += 1;
-      const detail = parseDoeSpDetail(response.body, item.id);
-      const capturedAt = now.toISOString();
-      const files: ConnectorFile[] = [];
-
-      let authenticatedPdf: 'CAPTURED' | 'NOT_RENDERED_BY_SOURCE' | 'NO_AUTH_CODE' = detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
-      const pdf = detail.authCode
-        ? await client.downloadAuthenticatedPdf(detail.authCode, context.signal).catch((error: unknown) => {
-            // A PDF the source never rendered must not block the act forever:
-            // after the grace period the act is kept (official HTML text) without it.
-            if (
-              error instanceof ConnectorError &&
-              error.code === 'DOE_SP_AUTHENTICATED_PDF_NOT_READY' &&
-              detail.date <= addDays(today, -DOE_SP_AUTH_PDF_GRACE_DAYS)
-            ) {
-              authenticatedPdf = 'NOT_RENDERED_BY_SOURCE';
-              counters.authPdfNotRendered += 1;
-              return undefined;
-            }
-            throw error;
-          })
-        : undefined;
-      if (detail.authCode && pdf) {
-        counters.filesDownloaded += 1;
-        counters.fileBytes += pdf.sizeBytes;
-        files.push({
-          url: authenticatedPdfUrl(detail.authCode),
-          ...(pdf.name ? { name: pdf.name } : {}),
-          mimeType: pdf.mimeType,
-          externalId: 'auth:' + detail.authCode,
-          rawSha256: pdf.rawSha256,
-          sizeBytes: pdf.sizeBytes,
-          metadata: { kind: 'AUTHENTICATED_PUBLICATION_PDF', capturedAt, origin: 'DOE_SP', textExtraction: 'NOT_REQUIRED_HTML_TEXT_AVAILABLE' },
-        });
-      }
-      for (const attachment of detail.attachments) {
-        const file = await client.downloadAttachment(attachment.id, attachment.name, context.signal);
-        counters.filesDownloaded += 1;
-        counters.fileBytes += file.sizeBytes;
-        files.push({
-          url: attachmentUrl(attachment.id),
-          name: attachment.name,
-          mimeType: file.mimeType,
-          externalId: attachment.id,
-          rawSha256: file.rawSha256,
-          sizeBytes: file.sizeBytes,
-          metadata: { kind: 'ATTACHMENT', position: attachment.position, capturedAt, origin: 'DOE_SP', textExtraction: 'NOT_EXTRACTED' },
-        });
-      }
-
-      const contentText = doeSpHtmlText(detail.contentHtml);
-      const identity = doeSpNormativeIdentity({ title: detail.title, ...(typeName ? { typeName } : {}), category });
-      const actType = identity?.actType ?? doeSpActType(detail.title, detail.publicationType ?? typeName);
+      const detail = parseDoeSpDetail(
+        response.body,
+        item.id,
+      );
+      const contentText =
+        doeSpHtmlText(detail.contentHtml);
+      const identity = doeSpNormativeIdentity({
+        title: detail.title,
+        ...(typeName ? { typeName } : {}),
+        category,
+      });
+      const actType =
+        identity?.actType ??
+        doeSpActType(
+          detail.title,
+          detail.publicationType ?? typeName,
+        );
       const organ = doeSpOrgan(item.hierarchy);
-      const signedOn = identity?.signedOn ?? doeSpTitleDate(detail.title);
-      const ementa = contentText ? doeSpEmenta(contentText) : undefined;
-      const isRetification = actType === 'RETIFICAÇÃO';
+      const signedOn =
+        identity?.signedOn ??
+        doeSpTitleDate(detail.title);
+      const ementa = contentText
+        ? doeSpEmenta(contentText)
+        : undefined;
+      const isRetification =
+        actType === 'RETIFICAÇÃO';
+
+      return {
+        item,
+        category,
+        ...(typeName ? { typeName } : {}),
+        edition,
+        detail,
+        contentText,
+        textSha256: sha256Text(contentText),
+        ...(identity ? { identity } : {}),
+        ...(strongIdentityKey(identity, detail.date)
+          ? {
+              strongIdentityKey:
+                strongIdentityKey(
+                  identity,
+                  detail.date,
+                )!,
+            }
+          : {}),
+        attachmentSignature:
+          attachmentSignature(detail),
+        actType,
+        organ,
+        ...(signedOn ? { signedOn } : {}),
+        ...(ementa ? { ementa } : {}),
+        isRetification,
+      };
+    };
+
+    const composePublication = (
+      prepared: PreparedDoeSpPublication,
+      files: ConnectorFile[],
+      authenticatedPdf: DoeSpAuthenticatedPdfState,
+      sourceRole: 'PRIMARY' | 'VALIDATION' = 'PRIMARY',
+      extraMetadata: Record<string, unknown> = {},
+    ): ConnectorPublication => {
+      const {
+        item,
+        category,
+        edition,
+        detail,
+        contentText,
+        identity,
+        actType,
+        organ,
+        signedOn,
+        ementa,
+        isRetification,
+      } = prepared;
 
       return {
         title: detail.title,
@@ -425,39 +554,215 @@ export class DoeSpConnector implements CollectionConnector {
         sphere: 'STATE',
         stateCode: 'SP',
         actType,
-        ...(identity ? { actNumber: identity.actNumber } : {}),
-        publishedAt: new Date(detail.date + 'T00:00:00Z'),
-        ...(contentText ? { content: contentText } : {}),
-        officialUrl: publicationPageUrl(detail.slug),
+        ...(identity
+          ? { actNumber: identity.actNumber }
+          : {}),
+        publishedAt:
+          new Date(detail.date + 'T00:00:00Z'),
+        ...(contentText
+          ? { content: contentText }
+          : {}),
+        officialUrl:
+          publicationPageUrl(detail.slug),
         externalId: detail.id,
-        ...(isRetification ? { identityKey: `DOE_SP|RETIFICACAO|${detail.id}` } : {}),
+        ...(isRetification
+          ? {
+              identityKey:
+                `DOE_SP|RETIFICACAO|${detail.id}`,
+            }
+          : {}),
         ...(files.length ? { files } : {}),
         metadata: {
-          sourceRole: 'PRIMARY',
+          sourceRole,
           journal: detail.journal,
-          section: detail.firstLevelSectionName ?? DOE_SP_SECTION,
+          section:
+            detail.firstLevelSectionName ??
+            DOE_SP_SECTION,
           organ,
-          unit: item.hierarchy.slice(3).join(' > ') || organ,
-          hierarchy: item.hierarchy.join(' > '),
-          ...(detail.publicationType ? { publicationType: detail.publicationType } : {}),
+          unit:
+            item.hierarchy.slice(3).join(' > ') ||
+            organ,
+          hierarchy:
+            item.hierarchy.join(' > '),
+          ...(detail.publicationType
+            ? {
+                publicationType:
+                  detail.publicationType,
+              }
+            : {}),
           doeDate: detail.date,
           ...(signedOn ? { signedOn } : {}),
-          ...(identity?.designation ? { designation: identity.designation } : {}),
+          ...(identity?.designation
+            ? {
+                designation:
+                  identity.designation,
+              }
+            : {}),
           ...(ementa ? { ementa } : {}),
           captureCategory: category,
-          identityMode: identity ? 'NORMATIVE' : isRetification ? 'RETIFICATION' : 'DOE_PUBLICATION_ID',
+          identityMode: identity
+            ? 'NORMATIVE'
+            : isRetification
+              ? 'RETIFICATION'
+              : 'DOE_PUBLICATION_ID',
           slug: detail.slug,
-          ...(detail.authCode ? { authCode: detail.authCode } : {}),
+          ...(detail.authCode
+            ? { authCode: detail.authCode }
+            : {}),
           editionHint: editionHint(item),
-          ...(edition.editionAuthCode ? { editionAuthCode: edition.editionAuthCode } : {}),
-          ...(edition.number !== undefined ? { editionNumber: edition.number } : {}),
-          ...(edition.volume !== undefined ? { editionVolume: edition.volume } : {}),
-          ...(edition.editionPdfUrl ? { editionPdfUrl: edition.editionPdfUrl } : {}),
-          supplementaryEditionCount: edition.supplementaryEditionCount,
-          textExtraction: contentText ? 'HTML_TEXT' : 'EMPTY',
+          ...(edition.editionAuthCode
+            ? {
+                editionAuthCode:
+                  edition.editionAuthCode,
+              }
+            : {}),
+          ...(edition.number !== undefined
+            ? {
+                editionNumber: edition.number,
+              }
+            : {}),
+          ...(edition.volume !== undefined
+            ? {
+                editionVolume: edition.volume,
+              }
+            : {}),
+          ...(edition.editionPdfUrl
+            ? {
+                editionPdfUrl:
+                  edition.editionPdfUrl,
+              }
+            : {}),
+          supplementaryEditionCount:
+            edition.supplementaryEditionCount,
+          textExtraction: contentText
+            ? 'HTML_TEXT'
+            : 'EMPTY',
           authenticatedPdf,
-          attachmentCount: detail.attachments.length,
+          attachmentCount:
+            detail.attachments.length,
+          ...extraMetadata,
         },
+      };
+    };
+
+    const buildPreparedPublication = async (
+      prepared: PreparedDoeSpPublication,
+    ): Promise<BuiltDoeSpPublication> => {
+      const { detail } = prepared;
+      const capturedAt = now.toISOString();
+      const files: ConnectorFile[] = [];
+
+      let authenticatedPdf: DoeSpAuthenticatedPdfState =
+        detail.authCode
+          ? 'CAPTURED'
+          : 'NO_AUTH_CODE';
+      const pdf = detail.authCode
+        ? await client
+            .downloadAuthenticatedPdf(
+              detail.authCode,
+              context.signal,
+            )
+            .catch((error: unknown) => {
+              // A PDF the source never rendered must not
+              // block the act forever: after the grace
+              // period the act is kept (official HTML)
+              // without it. This rule is intentionally
+              // separate from the strict duplicate-404
+              // equivalence fallback below.
+              if (
+                error instanceof ConnectorError &&
+                error.code ===
+                  'DOE_SP_AUTHENTICATED_PDF_NOT_READY' &&
+                detail.date <=
+                  addDays(
+                    today,
+                    -DOE_SP_AUTH_PDF_GRACE_DAYS,
+                  )
+              ) {
+                authenticatedPdf =
+                  'NOT_RENDERED_BY_SOURCE';
+                counters.authPdfNotRendered += 1;
+                return undefined;
+              }
+              throw error;
+            })
+        : undefined;
+
+      if (detail.authCode && pdf) {
+        counters.filesDownloaded += 1;
+        counters.fileBytes += pdf.sizeBytes;
+        files.push({
+          url:
+            authenticatedPdfUrl(
+              detail.authCode,
+            ),
+          ...(pdf.name
+            ? { name: pdf.name }
+            : {}),
+          mimeType: pdf.mimeType,
+          externalId:
+            'auth:' + detail.authCode,
+          rawSha256: pdf.rawSha256,
+          sizeBytes: pdf.sizeBytes,
+          metadata: {
+            kind:
+              'AUTHENTICATED_PUBLICATION_PDF',
+            capturedAt,
+            origin: 'DOE_SP',
+            textExtraction:
+              'NOT_REQUIRED_HTML_TEXT_AVAILABLE',
+          },
+        });
+      }
+
+      for (
+        const attachment of detail.attachments
+      ) {
+        const file =
+          await client.downloadAttachment(
+            attachment.id,
+            attachment.name,
+            context.signal,
+          );
+        counters.filesDownloaded += 1;
+        counters.fileBytes += file.sizeBytes;
+        files.push({
+          url:
+            attachmentUrl(attachment.id),
+          name: attachment.name,
+          mimeType: file.mimeType,
+          externalId: attachment.id,
+          rawSha256: file.rawSha256,
+          sizeBytes: file.sizeBytes,
+          metadata: {
+            kind: 'ATTACHMENT',
+            position: attachment.position,
+            capturedAt,
+            origin: 'DOE_SP',
+            textExtraction:
+              'NOT_EXTRACTED',
+          },
+        });
+      }
+
+      const publication =
+        composePublication(
+          prepared,
+          files,
+          authenticatedPdf,
+        );
+
+      if (detail.authCode && pdf) {
+        publication.artifactReconciliation = {
+          kind: 'RECOVER_ORIGIN_ARTIFACT',
+        };
+      }
+
+      return {
+        prepared,
+        publication,
+        authenticatedPdfCaptured:
+          Boolean(detail.authCode && pdf),
       };
     };
 
@@ -530,24 +835,185 @@ export class DoeSpConnector implements CollectionConnector {
       }
       outcome.newIncluded = toProcess.length;
 
-      const edition = toProcess.length ? await editionFor(date) : { supplementaryEditionCount: 0, supplementaryPdfUrls: [] };
+      const edition = toProcess.length
+        ? await editionFor(date)
+        : {
+            supplementaryEditionCount: 0,
+            supplementaryPdfUrls: [],
+          };
+      const successful: BuiltDoeSpPublication[] = [];
+      const equivalent404: PendingEquivalent404[] = [];
+
       for (const next of toProcess) {
         if (context.budget?.shouldYield()) {
           outcome.yielded = true;
           break;
         }
+
+        let prepared:
+          | PreparedDoeSpPublication
+          | undefined;
         try {
-          publications.push(await buildPublication(next.item, next.category, next.typeName, edition));
+          prepared =
+            await preparePublication(
+              next.item,
+              next.category,
+              next.typeName,
+              edition,
+            );
+          const built =
+            await buildPreparedPublication(
+              prepared,
+            );
+          successful.push(built);
+          publications.push(
+            built.publication,
+          );
           processed.add(next.item.id);
           outcome.published += 1;
         } catch (error) {
           if (isCancel(error)) throw error;
-          if (isSourceLevel(error)) counters.sourceErrors += 1;
+
+          if (
+            prepared &&
+            isDoeSpEquivalentRepresentationAuthPdf404(
+              error,
+            )
+          ) {
+            equivalent404.push({
+              prepared,
+              error,
+            });
+            continue;
+          }
+
+          if (isSourceLevel(error)) {
+            counters.sourceErrors += 1;
+          }
           outcome.failed += 1;
           const info = failureInfo(error);
-          partialFailures.push({ code: info.code, message: info.message, itemReference: `${date}#${next.item.id}` });
+          partialFailures.push({
+            code: info.code,
+            message: info.message,
+            itemReference:
+              `${date}#${next.item.id}`,
+          });
         }
       }
+
+      for (const pending of equivalent404) {
+        const candidate =
+          pending.prepared;
+        const alternative =
+          successful.find((built) =>
+            built.authenticatedPdfCaptured &&
+            candidate.detail.date === date &&
+            built.prepared.detail.date === date &&
+            candidate.strongIdentityKey !==
+              undefined &&
+            candidate.strongIdentityKey ===
+              built.prepared.strongIdentityKey &&
+            candidate.detail.title ===
+              built.prepared.detail.title &&
+            candidate.textSha256 ===
+              built.prepared.textSha256 &&
+            candidate.attachmentSignature ===
+              built.prepared
+                .attachmentSignature,
+          );
+
+        if (!alternative) {
+          outcome.failed += 1;
+          const info =
+            failureInfo(pending.error);
+          partialFailures.push({
+            code: info.code,
+            message: info.message,
+            itemReference:
+              `${date}#${candidate.item.id}`,
+          });
+          continue;
+        }
+
+        const alternativeFiles =
+          alternative.publication.files ?? [];
+        const authFile =
+          alternativeFiles.find(
+            (file) =>
+              file.metadata?.kind ===
+                'AUTHENTICATED_PUBLICATION_PDF' &&
+              typeof file.rawSha256 ===
+                'string' &&
+              file.rawSha256.length === 64 &&
+              (file.sizeBytes ?? 0) > 0,
+          );
+
+        if (!authFile) {
+          outcome.failed += 1;
+          const info =
+            failureInfo(pending.error);
+          partialFailures.push({
+            code: info.code,
+            message: info.message,
+            itemReference:
+              `${date}#${candidate.item.id}`,
+          });
+          continue;
+        }
+
+        // Copy the canonical artifact set from the
+        // successfully rendered equivalent representation.
+        // This keeps the normalized content hash identical,
+        // while origin metadata below explicitly records that
+        // this authCode itself returned the known 404.
+        const fallback = composePublication(
+          candidate,
+          [],
+          'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+          'VALIDATION',
+          {
+            equivalentRepresentation: {
+              externalId:
+                alternative.publication.externalId,
+              officialUrl:
+                alternative.publication.officialUrl,
+              textSha256:
+                candidate.textSha256,
+              authenticatedPdf: {
+                ownerExternalId:
+                  alternative.publication.externalId,
+                rawSha256:
+                  authFile.rawSha256,
+                sizeBytes:
+                  authFile.sizeBytes,
+              },
+            },
+            authenticatedPdfError: {
+              code: 'DOE_SP_HTTP_ERROR',
+              httpStatus: 404,
+              endpoint:
+                AUTH_PDF_404_ENDPOINT,
+            },
+          },
+        );
+        fallback.versionFiles = alternativeFiles;
+        if (
+          alternative.publication.externalId
+        ) {
+          fallback.artifactEquivalence = {
+            kind:
+              'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId:
+              alternative.publication.externalId,
+          };
+        }
+
+        publications.push(fallback);
+        counters.authPdfEquivalent404 += 1;
+        processed.add(candidate.item.id);
+        outcome.published += 1;
+      }
+
       outcome.processedIds = [...processed].sort();
       outcome.complete = !outcome.yielded && outcome.failed === 0 && outcome.malformed === 0;
       return outcome;

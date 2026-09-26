@@ -12,6 +12,15 @@ export interface ConnectorFile {
   metadata?: Record<string, unknown>;
 }
 
+export interface ConnectorArtifactEquivalence {
+  kind: 'PROVEN_EQUIVALENT_REPRESENTATION';
+  equivalentExternalId: string;
+}
+
+export interface ConnectorArtifactReconciliationIntent {
+  kind: 'RECOVER_ORIGIN_ARTIFACT';
+}
+
 export interface ConnectorPublication {
   title: string;
 
@@ -41,7 +50,34 @@ export interface ConnectorPublication {
    */
   identityKey?: string;
 
+  /**
+   * Artefatos que pertencem a esta origem específica.
+   * Por padrão, também formam o conjunto canônico da versão.
+   */
   files?: ConnectorFile[];
+
+  /**
+   * Override opcional do conjunto de artefatos usado apenas para
+   * versionamento/conteúdo canônico quando ele difere dos arquivos
+   * pertencentes à origem. Não implica propriedade desses arquivos
+   * pela origem atual. Se omitido, `files` é usado.
+   */
+  versionFiles?: ConnectorFile[];
+
+  /**
+   * Evidência explícita de que a versão canônica usou artefato pertencente
+   * a outra representação oficial equivalente. É persistida somente na
+   * origem concreta e serve como gate para uma futura recuperação do
+   * artefato próprio.
+   */
+  artifactEquivalence?: ConnectorArtifactEquivalence;
+
+  /**
+   * Intenção explícita de reconciliar um artefato próprio recuperado.
+   * Sozinha não altera versionamento: a persistência ainda exige uma
+   * equivalência previamente comprovada e campos lógicos idênticos.
+   */
+  artifactReconciliation?: ConnectorArtifactReconciliationIntent;
 
   /**
    * Dados específicos da fonte que precisam ser preservados,

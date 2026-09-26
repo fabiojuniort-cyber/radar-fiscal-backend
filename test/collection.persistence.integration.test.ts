@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import {
@@ -10,7 +11,7 @@ import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
-import { persistPublication } from '../src/modules/collection/publication.persistence.js';
+import { persistPublication, PublicationOriginConflictError } from '../src/modules/collection/publication.persistence.js';
 
 test(
   'publication persistence deduplicates, versions and keeps weak identities separate',
@@ -713,6 +714,2382 @@ test(
         await db.deleteFrom('publications').where('id', 'in', publicationIds).execute();
       }
       await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+      await db.destroy();
+    }
+  },
+);
+
+
+test(
+  'origin metadata keeps the production-proven DOE-SP alternate PDF only on the valid origin',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(
+      adminUrl,
+      'DATABASE_ADMIN_URL is required for collection integration tests.',
+    );
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+
+    const sourceId = randomUUID();
+    const runGood = randomUUID();
+    const runBad = randomUUID();
+    const runRecover = randomUUID();
+    const runReplay = randomUUID();
+    const attemptGood = randomUUID();
+    const attemptBad = randomUUID();
+    const attemptRecover = randomUUID();
+    const attemptReplay = randomUUID();
+    const goodId =
+      '645399a3-5a4e-44f7-c5cd-08ddcdea30ea';
+    const badId =
+      '6098db3e-c841-40de-c0fc-08ddce07602e';
+    const productionSha =
+      '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30';
+    const productionSize = 466_065;
+    const validFile = {
+      url:
+        'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/2025.07.28.1.1.27.5.214.1229788',
+      mimeType: 'application/pdf',
+      rawSha256: productionSha,
+      sizeBytes: productionSize,
+      metadata: {
+        kind: 'AUTHENTICATED_PUBLICATION_PDF',
+        origin: 'DOE_SP',
+      },
+    };
+    const recoveredPdfBytes = Buffer.from(
+      '%PDF-1.4\n% recovered-own-6098\n%%EOF\n',
+      'utf8',
+    );
+    const recoveredSha = createHash('sha256')
+      .update(recoveredPdfBytes)
+      .digest('hex');
+    const recoveredSize =
+      recoveredPdfBytes.byteLength;
+    assert.notEqual(recoveredSha, productionSha);
+    const recoveredFile = {
+      url:
+        'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/2025.07.28.1.1.27.5.214.1229474',
+      mimeType: 'application/pdf',
+      rawSha256: recoveredSha,
+      sizeBytes: recoveredSize,
+      metadata: {
+        kind: 'AUTHENTICATED_PUBLICATION_PDF',
+        origin: 'DOE_SP',
+      },
+    };
+    const common = {
+      title:
+        'PORTARIA SRE 42, DE 28 DE JULHO DE 2025',
+      agency: 'SEFAZ-SP/SRE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '42/2025',
+      publishedAt:
+        new Date('2025-07-29T00:00:00Z'),
+      content:
+        'Texto canônico idêntico da Portaria SRE 42.',
+    };
+
+    try {
+      await db
+        .insertInto('sources')
+        .values({
+          id: sourceId,
+          code: `doe-sp-provenance-${sourceId}`,
+          name: 'DOE-SP provenance persistence fixture',
+          jurisdiction_level: 'STATE',
+          uf: 'SP',
+          agency: 'Imprensa Oficial / Prodesp',
+          base_url: 'https://doe.sp.gov.br/',
+          connector_key: 'doe-sp',
+        })
+        .execute();
+
+      await db
+        .insertInto('collection_runs')
+        .values([
+          {
+            id: runGood,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:00:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runBad,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:01:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runRecover,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:02:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runReplay,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T10:03:00Z'),
+            trigger_type: 'MANUAL',
+          },
+        ])
+        .execute();
+
+      await db
+        .insertInto('collection_attempts')
+        .values([
+          {
+            id: attemptGood,
+            collection_run_id: runGood,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptBad,
+            collection_run_id: runBad,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptRecover,
+            collection_run_id: runRecover,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptReplay,
+            collection_run_id: runReplay,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+        ])
+        .execute();
+
+      const good = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://doe.sp.gov.br/executivo/portaria-sre-42-valid',
+          externalId: goodId,
+          files: [validFile],
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authenticatedPdf: 'CAPTURED',
+          },
+        },
+      });
+
+      const bad = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://doe.sp.gov.br/executivo/portaria-sre-42-404',
+          externalId: badId,
+          versionFiles: [validFile],
+          artifactEquivalence: {
+            kind:
+              'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: goodId,
+          },
+          metadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            equivalentRepresentation: {
+              externalId: goodId,
+              authenticatedPdf: {
+                ownerExternalId: goodId,
+                rawSha256: productionSha,
+                sizeBytes: productionSize,
+              },
+            },
+            authenticatedPdfError: {
+              code: 'DOE_SP_HTTP_ERROR',
+              httpStatus: 404,
+              endpoint:
+                '/v2/authentication/download/{authCode}',
+            },
+          },
+        },
+      });
+
+      const persistedGood = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runGood,
+            attemptId: attemptGood,
+            publication: good,
+          }),
+        );
+      const persistedBad = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runBad,
+            attemptId: attemptBad,
+            publication: bad,
+          }),
+        );
+
+      assert.equal(
+        persistedBad.publicationId,
+        persistedGood.publicationId,
+      );
+      assert.equal(
+        persistedBad.publicationVersionId,
+        persistedGood.publicationVersionId,
+      );
+
+      const origins = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'publication_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(origins.length, 2);
+      assert.equal(
+        new Set(
+          origins.map((row) => row.publication_id),
+        ).size,
+        1,
+      );
+
+      const goodOrigin = origins.find(
+        (row) => row.external_id === goodId,
+      )!;
+      const badOrigin = origins.find(
+        (row) => row.external_id === badId,
+      )!;
+      const goodMetadata =
+        goodOrigin.metadata as Record<string, unknown>;
+      const badMetadata =
+        badOrigin.metadata as Record<string, unknown>;
+      const goodFiles =
+        goodMetadata.files as Array<Record<string, unknown>>;
+
+      assert.equal(goodFiles.length, 1);
+      assert.equal(
+        goodFiles[0]?.rawSha256,
+        productionSha,
+      );
+      assert.equal(
+        goodFiles[0]?.sizeBytes,
+        productionSize,
+      );
+      assert.equal(
+        Object.hasOwn(badMetadata, 'files'),
+        false,
+      );
+      assert.equal(
+        badMetadata.authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+
+      const badItem = await db
+        .selectFrom('collection_items')
+        .select('raw_metadata')
+        .where('collection_run_id', '=', runBad)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const badItemMetadata =
+        badItem.raw_metadata as Record<string, unknown>;
+      assert.equal(
+        Object.hasOwn(badItemMetadata, 'files'),
+        false,
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select(['source_metadata'])
+        .where(
+          'publication_id',
+          '=',
+          persistedGood.publicationId,
+        )
+        .execute();
+      assert.equal(versions.length, 1);
+      const versionFiles =
+        (versions[0]!.source_metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        versionFiles[0]?.rawSha256,
+        productionSha,
+      );
+      assert.equal(
+        versionFiles[0]?.sizeBytes,
+        productionSize,
+      );
+      const canonicalVersionId =
+        persistedGood.publicationVersionId;
+      const canonicalVersion = await db
+        .selectFrom('publication_versions')
+        .select(['content_hash'])
+        .where('id', '=', canonicalVersionId)
+        .executeTakeFirstOrThrow();
+
+      const recovered = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://doe.sp.gov.br/executivo/portaria-sre-42-404',
+          externalId: badId,
+          files: [recoveredFile],
+          artifactReconciliation: {
+            kind: 'RECOVER_ORIGIN_ARTIFACT',
+          },
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authenticatedPdf: 'CAPTURED',
+          },
+        },
+      });
+
+      const recoveredResult = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runRecover,
+            attemptId: attemptRecover,
+            publication: recovered,
+          }),
+        );
+
+      assert.equal(
+        recoveredResult.disposition,
+        'EXISTING_PUBLICATION',
+      );
+      assert.equal(
+        recoveredResult.publicationId,
+        persistedGood.publicationId,
+      );
+      assert.equal(
+        recoveredResult.publicationVersionId,
+        canonicalVersionId,
+      );
+
+      const afterRecoveryVersions = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'content_hash', 'source_metadata'])
+        .where(
+          'publication_id',
+          '=',
+          persistedGood.publicationId,
+        )
+        .execute();
+      assert.equal(afterRecoveryVersions.length, 1);
+      assert.equal(
+        afterRecoveryVersions[0]!.id,
+        canonicalVersionId,
+      );
+      assert.equal(
+        afterRecoveryVersions[0]!.content_hash,
+        canonicalVersion.content_hash,
+      );
+      const canonicalFilesAfterRecovery =
+        (afterRecoveryVersions[0]!.source_metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        canonicalFilesAfterRecovery[0]?.rawSha256,
+        productionSha,
+      );
+
+      const originsAfterRecovery = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(originsAfterRecovery.length, 2);
+      const recoveredBadOrigin =
+        originsAfterRecovery.find(
+          (row) => row.external_id === badId,
+        )!;
+      const recoveredGoodOrigin =
+        originsAfterRecovery.find(
+          (row) => row.external_id === goodId,
+        )!;
+      const recoveredBadMetadata =
+        recoveredBadOrigin.metadata as Record<string, unknown>;
+      const recoveredGoodMetadata =
+        recoveredGoodOrigin.metadata as Record<string, unknown>;
+      assert.equal(
+        recoveredBadMetadata.authenticatedPdf,
+        'CAPTURED',
+      );
+      const recoveredBadFiles =
+        recoveredBadMetadata.files as Array<Record<string, unknown>>;
+      assert.equal(
+        recoveredBadFiles[0]?.rawSha256,
+        recoveredSha,
+      );
+      assert.equal(
+        recoveredBadFiles[0]?.sizeBytes,
+        recoveredSize,
+      );
+      const recoveredGoodFiles =
+        recoveredGoodMetadata.files as Array<Record<string, unknown>>;
+      assert.equal(
+        recoveredGoodFiles[0]?.rawSha256,
+        productionSha,
+      );
+      assert.equal(
+        recoveredGoodFiles[0]?.sizeBytes,
+        productionSize,
+      );
+
+      const reconciliation =
+        recoveredBadMetadata.artifactReconciliation as Record<string, unknown>;
+      assert.equal(reconciliation.state, 'RECONCILED');
+      assert.equal(
+        reconciliation.equivalentExternalId,
+        goodId,
+      );
+      const history =
+        recoveredBadMetadata.artifactReconciliationHistory as Array<Record<string, unknown>>;
+      assert.equal(history.length, 1);
+      const previous =
+        history[0]?.previousOriginMetadata as Record<string, unknown>;
+      assert.equal(
+        previous.authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+      const previousEquivalence =
+        previous.artifactEquivalence as
+          Record<string, unknown>;
+      assert.deepEqual(
+        previousEquivalence,
+        {
+          kind:
+            'PROVEN_EQUIVALENT_REPRESENTATION',
+        },
+      );
+      assert.equal(
+        previous.equivalentRepresentation,
+        undefined,
+      );
+
+      const replayResult = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runReplay,
+            attemptId: attemptReplay,
+            publication: recovered,
+          }),
+        );
+      assert.equal(
+        replayResult.disposition,
+        'EXISTING_PUBLICATION',
+      );
+      assert.equal(
+        replayResult.publicationVersionId,
+        canonicalVersionId,
+      );
+      const replayVersions = await db
+        .selectFrom('publication_versions')
+        .select('id')
+        .where(
+          'publication_id',
+          '=',
+          persistedGood.publicationId,
+        )
+        .execute();
+      assert.equal(replayVersions.length, 1);
+      const replayOrigins = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(replayOrigins.length, 2);
+      const replayBadMetadata =
+        replayOrigins.find(
+          (row) => row.external_id === badId,
+        )!.metadata as Record<string, unknown>;
+      const replayHistory =
+        replayBadMetadata.artifactReconciliationHistory as Array<Record<string, unknown>>;
+      assert.equal(replayHistory.length, 1);
+    } finally {
+      const publicationIds = [
+        ...new Set(
+          (
+            await db
+              .selectFrom('publication_origins')
+              .select('publication_id')
+              .where('source_id', '=', sourceId)
+              .execute()
+          ).map((row) => row.publication_id),
+        ),
+      ];
+      await db
+        .deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db
+        .deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (publicationIds.length) {
+        await db
+          .deleteFrom('publications')
+          .where('id', 'in', publicationIds)
+          .execute();
+      }
+      await db
+        .deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
+
+
+test(
+  'artifact recovery intent without prior equivalence keeps normal file versioning',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+    const sourceId = randomUUID();
+    const run1 = randomUUID();
+    const run2 = randomUUID();
+    const attempt1 = randomUUID();
+    const attempt2 = randomUUID();
+    const externalId = 'ordinary-' + sourceId;
+    const common = {
+      title: 'PORTARIA TESTE 1/2026',
+      agency: 'SEFAZ-TESTE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '1/2026-' + sourceId,
+      publishedAt:
+        new Date('2026-09-25T00:00:00Z'),
+      content: 'Conteúdo lógico estável.',
+      officialUrl:
+        'https://example.test/ordinary/' + sourceId,
+      externalId,
+      metadata: {
+        sourceRole: 'PRIMARY',
+      },
+    };
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: 'ordinary-artifact-' + sourceId,
+        name: 'Ordinary artifact versioning',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        agency: 'Test',
+        base_url: 'https://example.test/',
+        connector_key: 'test',
+      }).execute();
+      await db.insertInto('collection_runs').values([
+        {
+          id: run1,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T11:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: run2,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T11:01:00Z'),
+          trigger_type: 'MANUAL',
+        },
+      ]).execute();
+      await db.insertInto('collection_attempts').values([
+        {
+          id: attempt1,
+          collection_run_id: run1,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attempt2,
+          collection_run_id: run2,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+      ]).execute();
+
+      const first = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          files: [{
+            url: 'https://example.test/a.pdf',
+            rawSha256: 'a'.repeat(64),
+            sizeBytes: 100,
+          }],
+        },
+      });
+      const second = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          files: [{
+            url: 'https://example.test/b.pdf',
+            rawSha256: 'b'.repeat(64),
+            sizeBytes: 101,
+          }],
+          artifactReconciliation: {
+            kind: 'RECOVER_ORIGIN_ARTIFACT',
+          },
+        },
+      });
+
+      const firstResult = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: run1,
+          attemptId: attempt1,
+          publication: first,
+        }),
+      );
+      const secondResult = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: run2,
+          attemptId: attempt2,
+          publication: second,
+        }),
+      );
+
+      assert.equal(
+        secondResult.publicationId,
+        firstResult.publicationId,
+      );
+      assert.equal(
+        secondResult.disposition,
+        'NEW_VERSION',
+      );
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select('id')
+        .where(
+          'publication_id',
+          '=',
+          firstResult.publicationId,
+        )
+        .execute();
+      assert.equal(versions.length, 2);
+    } finally {
+      const ids = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (ids.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', ids)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
+
+test(
+  'proven artifact equivalence cannot suppress title, text or effective-date changes',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const variants = [
+      {
+        name: 'title',
+        mutate: (publication: Record<string, unknown>) => ({
+          ...publication,
+          title: 'PORTARIA TESTE 99/2026 - ALTERADA',
+        }),
+      },
+      {
+        name: 'text',
+        mutate: (publication: Record<string, unknown>) => ({
+          ...publication,
+          content: 'Conteúdo lógico alterado.',
+        }),
+      },
+      {
+        name: 'effective',
+        mutate: (publication: Record<string, unknown>) => ({
+          ...publication,
+          effectiveAt:
+            new Date('2026-11-01T00:00:00Z'),
+        }),
+      },
+    ];
+
+    for (const variant of variants) {
+      const pool = new Pool({
+        connectionString: adminUrl,
+        max: 2,
+      });
+      const db = new Kysely<DB>({
+        dialect: new PostgresDialect({ pool }),
+      });
+      const sourceId = randomUUID();
+      const runGood = randomUUID();
+      const runFallback = randomUUID();
+      const runRecover = randomUUID();
+      const attemptGood = randomUUID();
+      const attemptFallback = randomUUID();
+      const attemptRecover = randomUUID();
+      const goodId = 'good-' + sourceId;
+      const badId = 'bad-' + sourceId;
+      const common = {
+        title: 'PORTARIA TESTE 99/2026',
+        agency: 'SEFAZ-TESTE',
+        sphere: 'STATE' as const,
+        stateCode: 'SP',
+        actType: 'PORTARIA',
+        actNumber: '99/2026-' + sourceId,
+        publishedAt:
+          new Date('2026-09-25T00:00:00Z'),
+        effectiveAt:
+          new Date('2026-10-01T00:00:00Z'),
+        content: 'Conteúdo lógico original.',
+      };
+      const canonicalFile = {
+        url: 'https://example.test/canonical.pdf',
+        rawSha256: 'c'.repeat(64),
+        sizeBytes: 200,
+      };
+      const recoveredFile = {
+        url: 'https://example.test/recovered.pdf',
+        rawSha256: 'd'.repeat(64),
+        sizeBytes: 201,
+      };
+
+      try {
+        await db.insertInto('sources').values({
+          id: sourceId,
+          code:
+            'reconciliation-divergence-' +
+            variant.name + '-' + sourceId,
+          name:
+            'Reconciliation divergence ' +
+            variant.name,
+          jurisdiction_level: 'STATE',
+          uf: 'SP',
+          agency: 'Test',
+          base_url: 'https://example.test/',
+          connector_key: 'test',
+        }).execute();
+        await db.insertInto('collection_runs').values([
+          {
+            id: runGood,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T12:00:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runFallback,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T12:01:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: runRecover,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T12:02:00Z'),
+            trigger_type: 'MANUAL',
+          },
+        ]).execute();
+        await db.insertInto('collection_attempts').values([
+          {
+            id: attemptGood,
+            collection_run_id: runGood,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptFallback,
+            collection_run_id: runFallback,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attemptRecover,
+            collection_run_id: runRecover,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+        ]).execute();
+
+        const good = normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            officialUrl:
+              'https://example.test/good/' + sourceId,
+            externalId: goodId,
+            files: [canonicalFile],
+            metadata: {
+              sourceRole: 'PRIMARY',
+            },
+          },
+        });
+        const fallback = normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            officialUrl:
+              'https://example.test/bad/' + sourceId,
+            externalId: badId,
+            versionFiles: [canonicalFile],
+            artifactEquivalence: {
+              kind:
+                'PROVEN_EQUIVALENT_REPRESENTATION',
+              equivalentExternalId: goodId,
+            },
+            metadata: {
+              sourceRole: 'VALIDATION',
+              authenticatedPdf:
+                'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+              equivalentRepresentation: {
+                externalId: goodId,
+              },
+            },
+          },
+        });
+
+        const first = await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runGood,
+            attemptId: attemptGood,
+            publication: good,
+          }),
+        );
+        await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runFallback,
+            attemptId: attemptFallback,
+            publication: fallback,
+          }),
+        );
+
+        const recoveredInput =
+          variant.mutate({
+            ...common,
+            officialUrl:
+              'https://example.test/bad/' + sourceId,
+            externalId: badId,
+            files: [recoveredFile],
+            artifactReconciliation: {
+              kind: 'RECOVER_ORIGIN_ARTIFACT',
+            },
+            metadata: {
+              sourceRole: 'PRIMARY',
+              authenticatedPdf: 'CAPTURED',
+            },
+          });
+        const recovered = normalizePublication({
+          sourceId,
+          publication:
+            recoveredInput as Parameters<
+              typeof normalizePublication
+            >[0]['publication'],
+        });
+
+        const result = await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runRecover,
+            attemptId: attemptRecover,
+            publication: recovered,
+          }),
+        );
+
+        assert.equal(
+          result.publicationId,
+          first.publicationId,
+          variant.name,
+        );
+        assert.equal(
+          result.disposition,
+          'NEW_VERSION',
+          variant.name,
+        );
+        const versions = await db
+          .selectFrom('publication_versions')
+          .select('id')
+          .where(
+            'publication_id',
+            '=',
+            first.publicationId,
+          )
+          .execute();
+        assert.equal(
+          versions.length,
+          2,
+          variant.name,
+        );
+        const badOrigin = await db
+          .selectFrom('publication_origins')
+          .select('metadata')
+          .where('source_id', '=', sourceId)
+          .where('external_id', '=', badId)
+          .executeTakeFirstOrThrow();
+        const state =
+          (badOrigin.metadata as Record<string, unknown>)
+            .artifactReconciliation as Record<string, unknown>;
+        assert.equal(
+          state.state,
+          'RECOVERED_WITH_VERSION_CHANGE',
+          variant.name,
+        );
+      } finally {
+        const ids = await db
+          .selectFrom('publication_origins')
+          .select('publication_id')
+          .where('source_id', '=', sourceId)
+          .execute()
+          .then((rows) => [
+            ...new Set(
+              rows.map((row) => row.publication_id),
+            ),
+          ]);
+        await db.deleteFrom('collection_runs')
+          .where('source_id', '=', sourceId)
+          .execute();
+        await db.deleteFrom('publication_origins')
+          .where('source_id', '=', sourceId)
+          .execute();
+        if (ids.length) {
+          await db.deleteFrom('publications')
+            .where('id', 'in', ids)
+            .execute();
+        }
+        await db.deleteFrom('sources')
+          .where('id', '=', sourceId)
+          .execute();
+        await db.destroy();
+      }
+    }
+  },
+);
+
+
+test(
+  'proven artifact equivalence cannot cross a divergent strong identity',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+    const sourceId = randomUUID();
+    const runGood = randomUUID();
+    const runFallback = randomUUID();
+    const runRecover = randomUUID();
+    const attemptGood = randomUUID();
+    const attemptFallback = randomUUID();
+    const attemptRecover = randomUUID();
+    const goodId = 'identity-good-' + sourceId;
+    const badId = 'identity-bad-' + sourceId;
+    const baseFile = {
+      url: 'https://example.test/identity-a.pdf',
+      rawSha256: 'e'.repeat(64),
+      sizeBytes: 300,
+    };
+    const ownFile = {
+      url: 'https://example.test/identity-b.pdf',
+      rawSha256: 'f'.repeat(64),
+      sizeBytes: 301,
+    };
+    const common = {
+      title: 'PORTARIA TESTE 77/2026',
+      agency: 'SEFAZ-TESTE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '77/2026-' + sourceId,
+      publishedAt:
+        new Date('2026-09-25T00:00:00Z'),
+      content: 'Conteúdo lógico original.',
+    };
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: 'identity-reconciliation-' + sourceId,
+        name: 'Identity reconciliation gate',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        agency: 'Test',
+        base_url: 'https://example.test/',
+        connector_key: 'test',
+      }).execute();
+      await db.insertInto('collection_runs').values([
+        {
+          id: runGood,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T13:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runFallback,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T13:01:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runRecover,
+          source_id: sourceId,
+          scheduled_for:
+            new Date('2026-09-25T13:02:00Z'),
+          trigger_type: 'MANUAL',
+        },
+      ]).execute();
+      await db.insertInto('collection_attempts').values([
+        {
+          id: attemptGood,
+          collection_run_id: runGood,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptFallback,
+          collection_run_id: runFallback,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptRecover,
+          collection_run_id: runRecover,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+      ]).execute();
+
+      const good = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://example.test/identity/good',
+          externalId: goodId,
+          files: [baseFile],
+          metadata: {
+            sourceRole: 'PRIMARY',
+          },
+        },
+      });
+      const fallback = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://example.test/identity/bad',
+          externalId: badId,
+          versionFiles: [baseFile],
+          artifactEquivalence: {
+            kind:
+              'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: goodId,
+          },
+          metadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+          },
+        },
+      });
+
+      await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runGood,
+          attemptId: attemptGood,
+          publication: good,
+        }),
+      );
+      const fallbackResult =
+        await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runFallback,
+            attemptId: attemptFallback,
+            publication: fallback,
+          }),
+        );
+
+      const divergentIdentity =
+        normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            actNumber:
+              '78/2026-' + sourceId,
+            officialUrl:
+              'https://example.test/identity/bad',
+            externalId: badId,
+            files: [ownFile],
+            artifactReconciliation: {
+              kind: 'RECOVER_ORIGIN_ARTIFACT',
+            },
+            metadata: {
+              sourceRole: 'PRIMARY',
+              authenticatedPdf: 'CAPTURED',
+            },
+          },
+        });
+
+      await assert.rejects(
+        db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runRecover,
+            attemptId: attemptRecover,
+            publication: divergentIdentity,
+          }),
+        ),
+        (error: unknown) =>
+          error instanceof
+            PublicationOriginConflictError,
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select('id')
+        .where(
+          'publication_id',
+          '=',
+          fallbackResult.publicationId,
+        )
+        .execute();
+      assert.equal(versions.length, 1);
+      const badOrigin = await db
+        .selectFrom('publication_origins')
+        .select('metadata')
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      assert.equal(
+        (badOrigin.metadata as Record<string, unknown>)
+          .authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+    } finally {
+      const ids = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (ids.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', ids)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
+
+
+test(
+  'generic metadata cannot forge artifact reconciliation proof',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const variants = [
+      {
+        name: 'artifactEquivalence',
+        controlKey: 'artifactEquivalence',
+        forgedMetadata: {
+          artifactEquivalence: {
+            kind: 'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: 'forged-equivalent',
+          },
+          artifactReconciliationHistory: [{
+            kind: 'ORIGIN_ARTIFACT_RECOVERY',
+            previousOriginMetadata: {
+              sourceRole: 'VALIDATION',
+            },
+          }],
+        },
+      },
+      {
+        name: 'artifactReconciliation',
+        controlKey: 'artifactReconciliation',
+        forgedMetadata: {
+          artifactReconciliation: {
+            kind: 'ORIGIN_ARTIFACT_RECOVERY',
+            state: 'RECONCILED',
+            equivalentExternalId: 'forged-equivalent',
+          },
+          artifactReconciliationHistory: [{
+            kind: 'ORIGIN_ARTIFACT_RECOVERY',
+            previousOriginMetadata: {
+              sourceRole: 'VALIDATION',
+            },
+          }],
+        },
+      },
+    ] as const;
+
+    for (const variant of variants) {
+      const pool = new Pool({
+        connectionString: adminUrl,
+        max: 2,
+      });
+      const db = new Kysely<DB>({
+        dialect: new PostgresDialect({ pool }),
+      });
+      const sourceId = randomUUID();
+      const run1 = randomUUID();
+      const run2 = randomUUID();
+      const attempt1 = randomUUID();
+      const attempt2 = randomUUID();
+      const externalId =
+        'forged-proof-' + variant.name + '-' + sourceId;
+      const common = {
+        title: 'PORTARIA TESTE 811/2026',
+        agency: 'SEFAZ-TESTE',
+        sphere: 'STATE' as const,
+        stateCode: 'SP',
+        actType: 'PORTARIA',
+        actNumber: '811/2026-' + sourceId,
+        publishedAt: new Date('2026-09-25T00:00:00Z'),
+        content: 'Conteúdo estável contra prova forjada.',
+        officialUrl:
+          'https://example.test/forged-proof/' + sourceId,
+        externalId,
+      };
+
+      try {
+        await db.insertInto('sources').values({
+          id: sourceId,
+          code:
+            'forged-proof-' + variant.name + '-' + sourceId,
+          name: 'Forged proof ' + variant.name,
+          jurisdiction_level: 'STATE',
+          uf: 'SP',
+          agency: 'Test',
+          base_url: 'https://example.test/',
+          connector_key: 'test',
+        }).execute();
+        await db.insertInto('collection_runs').values([
+          {
+            id: run1,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T16:00:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: run2,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T16:01:00Z'),
+            trigger_type: 'MANUAL',
+          },
+        ]).execute();
+        await db.insertInto('collection_attempts').values([
+          {
+            id: attempt1,
+            collection_run_id: run1,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attempt2,
+            collection_run_id: run2,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+        ]).execute();
+
+        const forged = normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            files: [{
+              url: 'https://example.test/forged-a.pdf',
+              rawSha256: 'c'.repeat(64),
+              sizeBytes: 610,
+            }],
+            metadata: {
+              sourceRole: 'PRIMARY',
+              ...variant.forgedMetadata,
+            },
+          },
+        });
+        assert.equal(
+          Object.hasOwn(
+            forged.metadata,
+            variant.controlKey,
+          ),
+          false,
+          variant.name +
+            ' must be reserved from canonical metadata',
+        );
+        assert.equal(
+          Object.hasOwn(
+            forged.originMetadata,
+            variant.controlKey,
+          ),
+          false,
+          variant.name +
+            ' must be reserved from origin metadata',
+        );
+        assert.equal(
+          Object.hasOwn(
+            forged.originMetadata,
+            'artifactReconciliationHistory',
+          ),
+          false,
+          'history must be reserved from generic metadata',
+        );
+
+        const first = await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: run1,
+            attemptId: attempt1,
+            publication: forged,
+          }),
+        );
+
+        const storedOrigin = await db
+          .selectFrom('publication_origins')
+          .select('metadata')
+          .where('source_id', '=', sourceId)
+          .where('external_id', '=', externalId)
+          .executeTakeFirstOrThrow();
+        const storedMetadata =
+          storedOrigin.metadata as Record<string, unknown>;
+        assert.equal(
+          Object.hasOwn(
+            storedMetadata,
+            variant.controlKey,
+          ),
+          false,
+          variant.name +
+            ' must not persist from generic metadata',
+        );
+        assert.equal(
+          Object.hasOwn(
+            storedMetadata,
+            'artifactReconciliationHistory',
+          ),
+          false,
+        );
+
+        const recovered = normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            files: [{
+              url: 'https://example.test/forged-b.pdf',
+              rawSha256: 'd'.repeat(64),
+              sizeBytes: 611,
+            }],
+            artifactReconciliation: {
+              kind: 'RECOVER_ORIGIN_ARTIFACT',
+            },
+            metadata: {
+              sourceRole: 'PRIMARY',
+            },
+          },
+        });
+        const second = await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: run2,
+            attemptId: attempt2,
+            publication: recovered,
+          }),
+        );
+        assert.equal(
+          second.publicationId,
+          first.publicationId,
+        );
+        assert.equal(
+          second.disposition,
+          'NEW_VERSION',
+          variant.name +
+            ' from generic metadata must not authorize reconciliation',
+        );
+        const versions = await db
+          .selectFrom('publication_versions')
+          .select('id')
+          .where('publication_id', '=', first.publicationId)
+          .execute();
+        assert.equal(versions.length, 2);
+      } finally {
+        const ids = await db
+          .selectFrom('publication_origins')
+          .select('publication_id')
+          .where('source_id', '=', sourceId)
+          .execute()
+          .then((rows) => [
+            ...new Set(
+              rows.map((row) => row.publication_id),
+            ),
+          ]);
+        await db.deleteFrom('collection_runs')
+          .where('source_id', '=', sourceId)
+          .execute();
+        await db.deleteFrom('publication_origins')
+          .where('source_id', '=', sourceId)
+          .execute();
+        if (ids.length) {
+          await db.deleteFrom('publications')
+            .where('id', 'in', ids)
+            .execute();
+        }
+        await db.deleteFrom('sources')
+          .where('id', '=', sourceId)
+          .execute();
+        await db.destroy();
+      }
+    }
+  },
+);
+
+test(
+  'artifact reconciliation history sanitizes sensitive metadata and enforces bounds',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+    const sourceId = randomUUID();
+    const runGood = randomUUID();
+    const runFallback = randomUUID();
+    const runRecover = randomUUID();
+    const attemptGood = randomUUID();
+    const attemptFallback = randomUUID();
+    const attemptRecover = randomUUID();
+    const goodId = 'history-good-' + sourceId;
+    const badId = 'history-bad-' + sourceId;
+    const opaqueEquivalenceSecret =
+      'rk_live_TEST123456789';
+    const opaqueRepresentationSecret =
+      'AIzaSyTEST1234567890';
+    const opaqueOwnerSecret =
+      'AKIATEST1234567890';
+    const canonicalFile = {
+      url: 'https://example.test/history-canonical.pdf',
+      rawSha256: '1'.repeat(64),
+      sizeBytes: 410,
+    };
+    const recoveredFile = {
+      url: 'https://example.test/history-recovered.pdf',
+      rawSha256: '2'.repeat(64),
+      sizeBytes: 411,
+    };
+    const common = {
+      title: 'PORTARIA TESTE 501/2026',
+      agency: 'SEFAZ-TESTE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '501/2026-' + sourceId,
+      publishedAt: new Date('2026-09-25T00:00:00Z'),
+      content: 'Conteúdo estável para auditoria.',
+    };
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: 'history-bounds-' + sourceId,
+        name: 'History bounds',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        agency: 'Test',
+        base_url: 'https://example.test/',
+        connector_key: 'test',
+      }).execute();
+      await db.insertInto('collection_runs').values([
+        {
+          id: runGood,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T14:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runFallback,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T14:01:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runRecover,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T14:02:00Z'),
+          trigger_type: 'MANUAL',
+        },
+      ]).execute();
+      await db.insertInto('collection_attempts').values([
+        {
+          id: attemptGood,
+          collection_run_id: runGood,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptFallback,
+          collection_run_id: runFallback,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptRecover,
+          collection_run_id: runRecover,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+      ]).execute();
+
+      const good = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl: 'https://example.test/history/good',
+          externalId: goodId,
+          files: [canonicalFile],
+          metadata: {
+            sourceRole: 'PRIMARY',
+          },
+        },
+      });
+      const fallback = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl: 'https://example.test/history/bad',
+          externalId: badId,
+          versionFiles: [canonicalFile],
+          artifactEquivalence: {
+            kind: 'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: goodId,
+          },
+          metadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            authCode: 'must-not-enter-history',
+            editionAuthCode: 'also-sensitive',
+            credential: 'secret-token',
+            officialUrl: 'https://secret.example/private',
+            files: [{
+              url: 'https://secret.example/file.pdf',
+              rawSha256: '3'.repeat(64),
+              sizeBytes: 9_999,
+            }],
+            equivalentRepresentation: {
+              externalId: goodId,
+              officialUrl: 'https://secret.example/equivalent',
+              textSha256: '4'.repeat(64),
+              authenticatedPdf: {
+                ownerExternalId: goodId,
+                rawSha256: '5'.repeat(64),
+                sizeBytes: 466_065,
+                url: 'https://secret.example/auth.pdf',
+              },
+            },
+            authenticatedPdfError: {
+              code: 'DOE_SP_HTTP_ERROR',
+              httpStatus: 404,
+              endpoint: 'https://secret.example/api/pdf',
+            },
+            artifactReconciliationHistory: [{
+              kind: 'ORIGIN_ARTIFACT_RECOVERY',
+              previousOriginMetadata: {
+                authenticatedPdf: 'CAPTURED',
+              },
+            }],
+          },
+        },
+      });
+
+      const first = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runGood,
+          attemptId: attemptGood,
+          publication: good,
+        }),
+      );
+      await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runFallback,
+          attemptId: attemptFallback,
+          publication: fallback,
+        }),
+      );
+
+      const fallbackOrigin = await db
+        .selectFrom('publication_origins')
+        .select(['id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const fallbackMetadata =
+        fallbackOrigin.metadata as Record<string, unknown>;
+      assert.equal(
+        fallbackMetadata.artifactReconciliationHistory,
+        undefined,
+        'incoming arbitrary history must never be trusted on insert',
+      );
+      const currentEquivalence =
+        fallbackMetadata.artifactEquivalence as
+          Record<string, unknown>;
+      assert.equal(
+        currentEquivalence.kind,
+        'PROVEN_EQUIVALENT_REPRESENTATION',
+      );
+      assert.equal(
+        currentEquivalence.equivalentExternalId,
+        goodId,
+        'current typed proof must keep its external ID',
+      );
+
+      const canonicalBefore = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'content_hash', 'source_metadata'])
+        .where('publication_id', '=', first.publicationId)
+        .where('is_current', '=', true)
+        .executeTakeFirstOrThrow();
+      const canonicalFilesBefore =
+        (canonicalBefore.source_metadata as
+          Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        canonicalFilesBefore[0]?.rawSha256,
+        canonicalFile.rawSha256,
+      );
+
+      const seededHistory = [
+        null,
+        'malformed',
+        { kind: 'WRONG_KIND' },
+        {
+          kind: 'ORIGIN_ARTIFACT_RECOVERY',
+          previousOriginMetadata: 'malformed',
+        },
+        ...Array.from({ length: 20 }, (_, index) => ({
+          kind: 'ORIGIN_ARTIFACT_RECOVERY',
+          previousOriginMetadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            authCode: 'secret-' + index,
+            credential: 'token-' + index,
+            officialUrl:
+              'https://secret.example/' + index,
+            files: [{
+              url: 'https://secret.example/file-' + index,
+              rawSha256: '6'.repeat(64),
+              sizeBytes: 100_000 + index,
+            }],
+            arbitrary: 'x'.repeat(10_000),
+            artifactEquivalence: {
+              kind:
+                'PROVEN_EQUIVALENT_REPRESENTATION',
+              equivalentExternalId:
+                index % 3 === 0
+                  ? 'https://secret.example/proof-' + index
+                  : index % 3 === 1
+                    ? 'token-secret-' + index
+                    : 'historical-' + index + '-' + 'y'.repeat(500),
+            },
+            equivalentRepresentation: {
+              externalId:
+                'https://secret.example/equivalent-' + index,
+              officialUrl:
+                'https://secret.example/equivalent-' + index,
+              textSha256: '7'.repeat(64),
+              authenticatedPdf: {
+                ownerExternalId:
+                  'Bearer-token-' + index,
+                rawSha256: '8'.repeat(64),
+                sizeBytes: 200_000 + index,
+              },
+            },
+            authenticatedPdfError: {
+              code: 'DOE_SP_HTTP_ERROR',
+              httpStatus: 404,
+              endpoint:
+                'https://secret.example/pdf-' + index,
+            },
+          },
+        })),
+        {
+          kind: 'ORIGIN_ARTIFACT_RECOVERY',
+          previousOriginMetadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            artifactEquivalence: {
+              kind:
+                'PROVEN_EQUIVALENT_REPRESENTATION',
+              equivalentExternalId:
+                opaqueEquivalenceSecret,
+            },
+            equivalentRepresentation: {
+              externalId:
+                opaqueRepresentationSecret,
+              authenticatedPdf: {
+                ownerExternalId:
+                  opaqueOwnerSecret,
+              },
+            },
+          },
+        },
+      ];
+
+      await db
+        .updateTable('publication_origins')
+        .set({
+          metadata: JSON.parse(JSON.stringify({
+            ...fallbackMetadata,
+            artifactReconciliationHistory:
+              seededHistory,
+          })),
+        })
+        .where('id', '=', fallbackOrigin.id)
+        .execute();
+
+      const recovered = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl: 'https://example.test/history/bad',
+          externalId: badId,
+          files: [recoveredFile],
+          artifactReconciliation: {
+            kind: 'RECOVER_ORIGIN_ARTIFACT',
+          },
+          metadata: {
+            sourceRole: 'PRIMARY',
+            authenticatedPdf: 'CAPTURED',
+          },
+        },
+      });
+
+      const result = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runRecover,
+          attemptId: attemptRecover,
+          publication: recovered,
+        }),
+      );
+      assert.equal(result.publicationId, first.publicationId);
+      assert.equal(
+        result.disposition,
+        'EXISTING_PUBLICATION',
+      );
+
+      const after = await db
+        .selectFrom('publication_origins')
+        .select('metadata')
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const afterMetadata =
+        after.metadata as Record<string, unknown>;
+      const history =
+        afterMetadata.artifactReconciliationHistory as
+          Array<Record<string, unknown>>;
+      assert.ok(Array.isArray(history));
+      assert.ok(history.length > 0);
+      assert.ok(
+        history.length <= 8,
+        'history entry count must be bounded',
+      );
+      const serialized = JSON.stringify(history);
+      assert.ok(
+        Buffer.byteLength(serialized, 'utf8') <= 4_096,
+        'serialized history must stay inside the byte bound',
+      );
+      for (const forbidden of [
+        'must-not-enter-history',
+        'also-sensitive',
+        'secret-token',
+        'https://',
+        'authCode',
+        'editionAuthCode',
+        'credential',
+        '"files"',
+        'rawSha256',
+        'sizeBytes',
+        'arbitrary',
+        'endpoint',
+        'textSha256',
+        'Bearer-token',
+        'token-secret-',
+        opaqueEquivalenceSecret,
+        opaqueRepresentationSecret,
+        opaqueOwnerSecret,
+        'equivalentExternalId',
+        'ownerExternalId',
+        '"equivalentRepresentation"',
+        '7'.repeat(64),
+        'y'.repeat(100),
+      ]) {
+        assert.equal(
+          serialized.includes(forbidden),
+          false,
+          'history leaked forbidden value/key: ' + forbidden,
+        );
+      }
+      for (const entry of history) {
+        assert.equal(
+          entry.kind,
+          'ORIGIN_ARTIFACT_RECOVERY',
+        );
+        assert.equal(
+          typeof entry.previousOriginMetadata,
+          'object',
+        );
+      }
+
+      const latest = history.at(-1)!;
+      const previous =
+        latest.previousOriginMetadata as
+          Record<string, unknown>;
+      assert.equal(
+        previous.authenticatedPdf,
+        'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+      );
+      const historicalEquivalence =
+        previous.artifactEquivalence as
+          Record<string, unknown>;
+      assert.deepEqual(
+        historicalEquivalence,
+        {
+          kind:
+            'PROVEN_EQUIVALENT_REPRESENTATION',
+        },
+      );
+      assert.equal(
+        previous.equivalentRepresentation,
+        undefined,
+      );
+
+      const currentReconciliation =
+        afterMetadata.artifactReconciliation as
+          Record<string, unknown>;
+      assert.equal(
+        currentReconciliation.state,
+        'RECONCILED',
+      );
+      assert.equal(
+        currentReconciliation.equivalentExternalId,
+        goodId,
+        'history redaction must not alter the current reconciliation proof',
+      );
+
+      const canonicalAfter = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'content_hash', 'source_metadata'])
+        .where('publication_id', '=', first.publicationId)
+        .where('is_current', '=', true)
+        .executeTakeFirstOrThrow();
+      assert.equal(
+        canonicalAfter.id,
+        canonicalBefore.id,
+      );
+      assert.equal(
+        canonicalAfter.content_hash,
+        canonicalBefore.content_hash,
+      );
+      const canonicalFilesAfter =
+        (canonicalAfter.source_metadata as
+          Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        canonicalFilesAfter[0]?.rawSha256,
+        canonicalFile.rawSha256,
+      );
+
+      const ownership = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      const goodOrigin = ownership.find(
+        (row) => row.external_id === goodId,
+      )!;
+      const badOrigin = ownership.find(
+        (row) => row.external_id === badId,
+      )!;
+      const goodOriginFiles =
+        (goodOrigin.metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      const badOriginFiles =
+        (badOrigin.metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        goodOriginFiles[0]?.rawSha256,
+        canonicalFile.rawSha256,
+      );
+      assert.equal(
+        badOriginFiles[0]?.rawSha256,
+        recoveredFile.rawSha256,
+      );
+    } finally {
+      const ids = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (ids.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', ids)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
+
+test(
+  'RECOVERED_WITH_VERSION_CHANGE history survives replay without authorizing later reconciliation',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+    const sourceId = randomUUID();
+    const runGood = randomUUID();
+    const runFallback = randomUUID();
+    const runRecover = randomUUID();
+    const runReplay = randomUUID();
+    const runAgain = randomUUID();
+    const attemptGood = randomUUID();
+    const attemptFallback = randomUUID();
+    const attemptRecover = randomUUID();
+    const attemptReplay = randomUUID();
+    const attemptAgain = randomUUID();
+    const goodId = 'version-change-good-' + sourceId;
+    const badId = 'version-change-bad-' + sourceId;
+    const canonicalFile = {
+      url: 'https://example.test/version-change-a.pdf',
+      rawSha256: '9'.repeat(64),
+      sizeBytes: 500,
+    };
+    const recoveredFile = {
+      url: 'https://example.test/version-change-b.pdf',
+      rawSha256: 'a'.repeat(64),
+      sizeBytes: 501,
+    };
+    const laterFile = {
+      url: 'https://example.test/version-change-c.pdf',
+      rawSha256: 'b'.repeat(64),
+      sizeBytes: 502,
+    };
+    const common = {
+      title: 'PORTARIA TESTE 777/2026',
+      agency: 'SEFAZ-TESTE',
+      sphere: 'STATE' as const,
+      stateCode: 'SP',
+      actType: 'PORTARIA',
+      actNumber: '777/2026-' + sourceId,
+      publishedAt: new Date('2026-09-25T00:00:00Z'),
+      effectiveAt: new Date('2026-10-01T00:00:00Z'),
+      content: 'Conteúdo lógico original.',
+    };
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: 'history-replay-' + sourceId,
+        name: 'History replay',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        agency: 'Test',
+        base_url: 'https://example.test/',
+        connector_key: 'test',
+      }).execute();
+      await db.insertInto('collection_runs').values([
+        {
+          id: runGood,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T15:00:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runFallback,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T15:01:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runRecover,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T15:02:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runReplay,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T15:03:00Z'),
+          trigger_type: 'MANUAL',
+        },
+        {
+          id: runAgain,
+          source_id: sourceId,
+          scheduled_for: new Date('2026-09-25T15:04:00Z'),
+          trigger_type: 'MANUAL',
+        },
+      ]).execute();
+      await db.insertInto('collection_attempts').values([
+        {
+          id: attemptGood,
+          collection_run_id: runGood,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptFallback,
+          collection_run_id: runFallback,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptRecover,
+          collection_run_id: runRecover,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptReplay,
+          collection_run_id: runReplay,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+        {
+          id: attemptAgain,
+          collection_run_id: runAgain,
+          attempt_no: 1,
+          status: 'RUNNING',
+        },
+      ]).execute();
+
+      const good = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://example.test/version-change/good',
+          externalId: goodId,
+          files: [canonicalFile],
+          metadata: {
+            sourceRole: 'PRIMARY',
+          },
+        },
+      });
+      const fallback = normalizePublication({
+        sourceId,
+        publication: {
+          ...common,
+          officialUrl:
+            'https://example.test/version-change/bad',
+          externalId: badId,
+          versionFiles: [canonicalFile],
+          artifactEquivalence: {
+            kind: 'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: goodId,
+          },
+          metadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            equivalentRepresentation: {
+              externalId: goodId,
+            },
+          },
+        },
+      });
+
+      const first = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runGood,
+          attemptId: attemptGood,
+          publication: good,
+        }),
+      );
+      await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runFallback,
+          attemptId: attemptFallback,
+          publication: fallback,
+        }),
+      );
+
+      const changedInput = {
+        ...common,
+        title: common.title + ' - ALTERADA',
+        officialUrl:
+          'https://example.test/version-change/bad',
+        externalId: badId,
+        files: [recoveredFile],
+        artifactReconciliation: {
+          kind: 'RECOVER_ORIGIN_ARTIFACT' as const,
+        },
+        metadata: {
+          sourceRole: 'PRIMARY',
+          authenticatedPdf: 'CAPTURED',
+        },
+      };
+      const changed = normalizePublication({
+        sourceId,
+        publication: changedInput,
+      });
+
+      const recoveredResult =
+        await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runRecover,
+            attemptId: attemptRecover,
+            publication: changed,
+          }),
+        );
+      assert.equal(
+        recoveredResult.publicationId,
+        first.publicationId,
+      );
+      assert.equal(
+        recoveredResult.disposition,
+        'NEW_VERSION',
+      );
+
+      const afterRecovery = await db
+        .selectFrom('publication_origins')
+        .select('metadata')
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const recoveryMetadata =
+        afterRecovery.metadata as
+          Record<string, unknown>;
+      const recoveryState =
+        recoveryMetadata.artifactReconciliation as
+          Record<string, unknown>;
+      assert.equal(
+        recoveryState.state,
+        'RECOVERED_WITH_VERSION_CHANGE',
+      );
+      const recoveryHistory =
+        recoveryMetadata.artifactReconciliationHistory as
+          Array<Record<string, unknown>>;
+      assert.equal(recoveryHistory.length, 1);
+
+      const replayResult =
+        await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runReplay,
+            attemptId: attemptReplay,
+            publication: changed,
+          }),
+        );
+      assert.equal(
+        replayResult.disposition,
+        'EXISTING_PUBLICATION',
+      );
+
+      const afterReplay = await db
+        .selectFrom('publication_origins')
+        .select('metadata')
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const replayMetadata =
+        afterReplay.metadata as
+          Record<string, unknown>;
+      const replayHistory =
+        replayMetadata.artifactReconciliationHistory as
+          Array<Record<string, unknown>>;
+      assert.equal(
+        replayHistory.length,
+        1,
+        'normal replay must preserve the audit history without duplication',
+      );
+      assert.deepEqual(
+        replayHistory,
+        recoveryHistory,
+      );
+
+      const later = normalizePublication({
+        sourceId,
+        publication: {
+          ...changedInput,
+          files: [laterFile],
+        },
+      });
+      const laterResult =
+        await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: runAgain,
+            attemptId: attemptAgain,
+            publication: later,
+          }),
+        );
+      assert.equal(
+        laterResult.disposition,
+        'NEW_VERSION',
+        'preserved history alone must not authorize canonical version reuse',
+      );
+
+      const versions = await db
+        .selectFrom('publication_versions')
+        .select('id')
+        .where('publication_id', '=', first.publicationId)
+        .execute();
+      assert.equal(
+        versions.length,
+        3,
+        'file change after the replay must follow ordinary versioning',
+      );
+
+      const finalOrigin = await db
+        .selectFrom('publication_origins')
+        .select('metadata')
+        .where('source_id', '=', sourceId)
+        .where('external_id', '=', badId)
+        .executeTakeFirstOrThrow();
+      const finalHistory =
+        (finalOrigin.metadata as Record<string, unknown>)
+          .artifactReconciliationHistory as
+            Array<Record<string, unknown>>;
+      assert.deepEqual(
+        finalHistory,
+        recoveryHistory,
+      );
+    } finally {
+      const ids = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (ids.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', ids)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
       await db.destroy();
     }
   },

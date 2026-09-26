@@ -47,8 +47,14 @@ export interface NormalizedPublication {
   officialUrl: string;
   externalId?: string;
   sourceItemKey: string;
+  /** Metadata persisted with the logical/canonical version. */
   metadata: Record<string, unknown>;
+  /** Metadata persisted with the concrete source origin and collection item. */
+  originMetadata: Record<string, unknown>;
+  /** Canonical/version artifact set. */
   files: NormalizedPublicationFile[];
+  /** Explicit origin-artifact recovery intent; never changes hashes by itself. */
+  artifactReconciliation?: ConnectorPublication['artifactReconciliation'];
   identityStrength: PublicationIdentityStrength;
   identityBasis: NormalizedPublicationIdentityBasis;
   identityHash: string;
@@ -210,6 +216,24 @@ function normalizeFiles(
   });
 }
 
+const RESERVED_PUBLICATION_METADATA_KEYS = [
+  'artifactEquivalence',
+  'artifactReconciliation',
+  'artifactReconciliationHistory',
+] as const;
+
+function withoutReservedPublicationMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const safe = { ...(metadata ?? {}) };
+
+  for (const key of RESERVED_PUBLICATION_METADATA_KEYS) {
+    delete safe[key];
+  }
+
+  return safe;
+}
+
 function buildIdentity(
   input: {
     sourceId: string;
@@ -322,9 +346,17 @@ export function normalizePublication(
   const contentText = normalizeOptionalText(
     input.publication.content,
   );
-  const files = normalizeFiles(
+  const originFiles = normalizeFiles(
     input.publication.files,
   );
+  const files = normalizeFiles(
+    input.publication.versionFiles ??
+      input.publication.files,
+  );
+  const publicationMetadata =
+    withoutReservedPublicationMetadata(
+      input.publication.metadata,
+    );
 
   const publishedOn = normalizeDate(
     input.publication.publishedAt,
@@ -410,12 +442,30 @@ export function normalizePublication(
     ...(externalId ? { externalId } : {}),
     sourceItemKey: externalId ?? officialUrl,
     metadata: {
-      ...(input.publication.metadata ?? {}),
+      ...publicationMetadata,
       ...(files.length > 0
         ? { files }
         : {}),
     },
+    originMetadata: {
+      ...publicationMetadata,
+      ...(originFiles.length > 0
+        ? { files: originFiles }
+        : {}),
+      ...(input.publication.artifactEquivalence
+        ? {
+            artifactEquivalence:
+              input.publication.artifactEquivalence,
+          }
+        : {}),
+    },
     files,
+    ...(input.publication.artifactReconciliation
+      ? {
+          artifactReconciliation:
+            input.publication.artifactReconciliation,
+        }
+      : {}),
     identityStrength: identity.strength,
     identityBasis: identity.basis,
     identityHash,
