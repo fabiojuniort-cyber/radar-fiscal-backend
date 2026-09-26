@@ -190,9 +190,14 @@ test('source unavailable is an error, never zero publications', async () => {
     error instanceof ConnectorError && error.kind === 'SOURCE_UNAVAILABLE');
 });
 
-test('redundant authenticated PDF failure does not block the day or force a retry', async () => {
-  const failing = connector({ failures: [{ match: '/v2/authentication/download/2026.09.03.1.1.28.3.214', status: 500 }] });
-  const result = await failing.instance.collect(context());
+test('complete official HTML skips redundant authenticated PDF and completes the day', async () => {
+  const guarded = connector({
+    failures: [{
+      match: '/v2/authentication/download/2026.09.03.1.1.28.3.214',
+      status: 500,
+    }],
+  });
+  const result = await guarded.instance.collect(context());
 
   assert.deepEqual(
     result.publications.map((item) => item.externalId),
@@ -202,11 +207,16 @@ test('redundant authenticated PDF failure does not block the day or force a retr
   const publication = result.publications[0]!;
   assert.equal(
     publication.originMetadata?.authenticatedPdf,
-    'UNAVAILABLE_REDUNDANT',
+    'NOT_REQUESTED_REDUNDANT',
   );
   assert.equal(
-    (publication.originMetadata?.authenticatedPdfError as Record<string, unknown>)?.code,
-    'DOE_SP_SOURCE_UNAVAILABLE',
+    publication.originMetadata?.contentRepresentation,
+    'OFFICIAL_HTML',
+  );
+  assert.equal(publication.files, undefined);
+  assert.equal(
+    guarded.api.count('/v2/authentication/download/'),
+    0,
   );
 
   const state = checkpointState(result);
@@ -224,7 +234,7 @@ test('redundant authenticated PDF failure does not block the day or force a retr
   assert.equal(
     replay.api.count('/v2/publications/'),
     0,
-    'checkpoint must treat the HTML capture as complete even when redundant PDF failed',
+    'checkpoint must reuse the complete HTML capture',
   );
 });
 
@@ -264,13 +274,8 @@ test('bootstrap walks back days once, with retifications isolated and attachment
 
   const dicar = result.publications.find((item) => item.externalId === ID.dicar59)!;
   assert.equal(dicar.agency, 'SEFAZ-SP/DICAR');
-  assert.equal(dicar.files?.length, 2);
+  assert.equal(dicar.files?.length, 1);
   const attachment = dicar.files?.find((file) => file.metadata?.kind === 'ATTACHMENT');
-  const authenticatedPdf = dicar.files?.find(
-    (file) =>
-      file.metadata?.kind ===
-      'AUTHENTICATED_PUBLICATION_PDF',
-  );
   assert.equal(
     dicar.metadata?.officialContentCompleteness,
     'PARTIAL_OFFICIAL_CONTENT',
@@ -281,7 +286,14 @@ test('bootstrap walks back days once, with retifications isolated and attachment
     'HTML_PRIMARY_MATERIAL_FILES',
   );
   assert.equal(attachment?.versionRole, 'MATERIAL_CONTENT');
-  assert.equal(authenticatedPdf?.versionRole, 'PROVENANCE');
+  assert.equal(
+    dicar.originMetadata?.authenticatedPdf,
+    'NOT_REQUESTED_REDUNDANT',
+  );
+  assert.equal(
+    dicar.originMetadata?.contentRepresentation,
+    'OFFICIAL_HTML',
+  );
   assert.equal(attachment?.name, 'Anexo_Com DICAR-59 - Publicação Juros ITCMD e IPVA - SET-26.pdf');
   assert.equal(attachment?.externalId, 'ede64d5b-2bdc-4c9b-bfd3-841a1c69eded');
   assert.match(attachment?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
