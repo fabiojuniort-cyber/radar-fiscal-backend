@@ -1951,6 +1951,268 @@ test(
 
 
 test(
+  'generic metadata cannot forge artifact reconciliation proof',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl);
+
+    const variants = [
+      {
+        name: 'artifactEquivalence',
+        controlKey: 'artifactEquivalence',
+        forgedMetadata: {
+          artifactEquivalence: {
+            kind: 'PROVEN_EQUIVALENT_REPRESENTATION',
+            equivalentExternalId: 'forged-equivalent',
+          },
+          artifactReconciliationHistory: [{
+            kind: 'ORIGIN_ARTIFACT_RECOVERY',
+            previousOriginMetadata: {
+              sourceRole: 'VALIDATION',
+            },
+          }],
+        },
+      },
+      {
+        name: 'artifactReconciliation',
+        controlKey: 'artifactReconciliation',
+        forgedMetadata: {
+          artifactReconciliation: {
+            kind: 'ORIGIN_ARTIFACT_RECOVERY',
+            state: 'RECONCILED',
+            equivalentExternalId: 'forged-equivalent',
+          },
+          artifactReconciliationHistory: [{
+            kind: 'ORIGIN_ARTIFACT_RECOVERY',
+            previousOriginMetadata: {
+              sourceRole: 'VALIDATION',
+            },
+          }],
+        },
+      },
+    ] as const;
+
+    for (const variant of variants) {
+      const pool = new Pool({
+        connectionString: adminUrl,
+        max: 2,
+      });
+      const db = new Kysely<DB>({
+        dialect: new PostgresDialect({ pool }),
+      });
+      const sourceId = randomUUID();
+      const run1 = randomUUID();
+      const run2 = randomUUID();
+      const attempt1 = randomUUID();
+      const attempt2 = randomUUID();
+      const externalId =
+        'forged-proof-' + variant.name + '-' + sourceId;
+      const common = {
+        title: 'PORTARIA TESTE 811/2026',
+        agency: 'SEFAZ-TESTE',
+        sphere: 'STATE' as const,
+        stateCode: 'SP',
+        actType: 'PORTARIA',
+        actNumber: '811/2026-' + sourceId,
+        publishedAt: new Date('2026-09-25T00:00:00Z'),
+        content: 'Conteúdo estável contra prova forjada.',
+        officialUrl:
+          'https://example.test/forged-proof/' + sourceId,
+        externalId,
+      };
+
+      try {
+        await db.insertInto('sources').values({
+          id: sourceId,
+          code:
+            'forged-proof-' + variant.name + '-' + sourceId,
+          name: 'Forged proof ' + variant.name,
+          jurisdiction_level: 'STATE',
+          uf: 'SP',
+          agency: 'Test',
+          base_url: 'https://example.test/',
+          connector_key: 'test',
+        }).execute();
+        await db.insertInto('collection_runs').values([
+          {
+            id: run1,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T16:00:00Z'),
+            trigger_type: 'MANUAL',
+          },
+          {
+            id: run2,
+            source_id: sourceId,
+            scheduled_for:
+              new Date('2026-09-25T16:01:00Z'),
+            trigger_type: 'MANUAL',
+          },
+        ]).execute();
+        await db.insertInto('collection_attempts').values([
+          {
+            id: attempt1,
+            collection_run_id: run1,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+          {
+            id: attempt2,
+            collection_run_id: run2,
+            attempt_no: 1,
+            status: 'RUNNING',
+          },
+        ]).execute();
+
+        const forged = normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            files: [{
+              url: 'https://example.test/forged-a.pdf',
+              rawSha256: 'c'.repeat(64),
+              sizeBytes: 610,
+            }],
+            metadata: {
+              sourceRole: 'PRIMARY',
+              ...variant.forgedMetadata,
+            },
+          },
+        });
+        assert.equal(
+          Object.hasOwn(
+            forged.metadata,
+            variant.controlKey,
+          ),
+          false,
+          variant.name +
+            ' must be reserved from canonical metadata',
+        );
+        assert.equal(
+          Object.hasOwn(
+            forged.originMetadata,
+            variant.controlKey,
+          ),
+          false,
+          variant.name +
+            ' must be reserved from origin metadata',
+        );
+        assert.equal(
+          Object.hasOwn(
+            forged.originMetadata,
+            'artifactReconciliationHistory',
+          ),
+          false,
+          'history must be reserved from generic metadata',
+        );
+
+        const first = await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: run1,
+            attemptId: attempt1,
+            publication: forged,
+          }),
+        );
+
+        const storedOrigin = await db
+          .selectFrom('publication_origins')
+          .select('metadata')
+          .where('source_id', '=', sourceId)
+          .where('external_id', '=', externalId)
+          .executeTakeFirstOrThrow();
+        const storedMetadata =
+          storedOrigin.metadata as Record<string, unknown>;
+        assert.equal(
+          Object.hasOwn(
+            storedMetadata,
+            variant.controlKey,
+          ),
+          false,
+          variant.name +
+            ' must not persist from generic metadata',
+        );
+        assert.equal(
+          Object.hasOwn(
+            storedMetadata,
+            'artifactReconciliationHistory',
+          ),
+          false,
+        );
+
+        const recovered = normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            files: [{
+              url: 'https://example.test/forged-b.pdf',
+              rawSha256: 'd'.repeat(64),
+              sizeBytes: 611,
+            }],
+            artifactReconciliation: {
+              kind: 'RECOVER_ORIGIN_ARTIFACT',
+            },
+            metadata: {
+              sourceRole: 'PRIMARY',
+            },
+          },
+        });
+        const second = await db.transaction().execute(
+          (trx) => persistPublication(trx, {
+            sourceId,
+            runId: run2,
+            attemptId: attempt2,
+            publication: recovered,
+          }),
+        );
+        assert.equal(
+          second.publicationId,
+          first.publicationId,
+        );
+        assert.equal(
+          second.disposition,
+          'NEW_VERSION',
+          variant.name +
+            ' from generic metadata must not authorize reconciliation',
+        );
+        const versions = await db
+          .selectFrom('publication_versions')
+          .select('id')
+          .where('publication_id', '=', first.publicationId)
+          .execute();
+        assert.equal(versions.length, 2);
+      } finally {
+        const ids = await db
+          .selectFrom('publication_origins')
+          .select('publication_id')
+          .where('source_id', '=', sourceId)
+          .execute()
+          .then((rows) => [
+            ...new Set(
+              rows.map((row) => row.publication_id),
+            ),
+          ]);
+        await db.deleteFrom('collection_runs')
+          .where('source_id', '=', sourceId)
+          .execute();
+        await db.deleteFrom('publication_origins')
+          .where('source_id', '=', sourceId)
+          .execute();
+        if (ids.length) {
+          await db.deleteFrom('publications')
+            .where('id', 'in', ids)
+            .execute();
+        }
+        await db.deleteFrom('sources')
+          .where('id', '=', sourceId)
+          .execute();
+        await db.destroy();
+      }
+    }
+  },
+);
+
+test(
   'artifact reconciliation history sanitizes sensitive metadata and enforces bounds',
   async () => {
     const adminUrl = process.env.DATABASE_ADMIN_URL;
@@ -2166,15 +2428,21 @@ test(
               kind:
                 'PROVEN_EQUIVALENT_REPRESENTATION',
               equivalentExternalId:
-                'historical-' + index + '-' + 'y'.repeat(500),
+                index % 3 === 0
+                  ? 'https://secret.example/proof-' + index
+                  : index % 3 === 1
+                    ? 'token-secret-' + index
+                    : 'historical-' + index + '-' + 'y'.repeat(500),
             },
             equivalentRepresentation: {
-              externalId: 'previous-' + index,
+              externalId:
+                'https://secret.example/equivalent-' + index,
               officialUrl:
                 'https://secret.example/equivalent-' + index,
               textSha256: '7'.repeat(64),
               authenticatedPdf: {
-                ownerExternalId: 'owner-' + index,
+                ownerExternalId:
+                  'Bearer-token-' + index,
                 rawSha256: '8'.repeat(64),
                 sizeBytes: 200_000 + index,
               },
@@ -2267,6 +2535,11 @@ test(
         'sizeBytes',
         'arbitrary',
         'endpoint',
+        'textSha256',
+        'Bearer-token',
+        'token-secret-',
+        '7'.repeat(64),
+        'y'.repeat(100),
       ]) {
         assert.equal(
           serialized.includes(forbidden),
@@ -2313,6 +2586,10 @@ test(
       );
       assert.equal(
         safePdf.sizeBytes,
+        undefined,
+      );
+      assert.equal(
+        representation.textSha256,
         undefined,
       );
     } finally {
