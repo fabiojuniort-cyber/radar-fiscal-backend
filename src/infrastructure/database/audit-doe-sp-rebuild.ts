@@ -42,6 +42,19 @@ function sha256(value: string): string {
 
 const client = await pool.connect();
 try {
+  await client.query(
+    'SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY',
+  );
+  await client.query(
+    "SET statement_timeout = '30s'",
+  );
+  await client.query(
+    "SET lock_timeout = '2s'",
+  );
+  await client.query(
+    "SET idle_in_transaction_session_timeout = '30s'",
+  );
+
   const sessionReadOnly = (
     await client.query<{ setting: string }>(
       'SHOW default_transaction_read_only',
