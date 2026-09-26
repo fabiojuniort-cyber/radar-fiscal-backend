@@ -236,7 +236,7 @@ async function upsertOrigin(
   const externalOrigin = input.publication.externalId
     ? await trx
         .selectFrom('publication_origins')
-        .select(['id', 'publication_id'])
+        .select(['id', 'publication_id', 'metadata'])
         .where('source_id', '=', input.sourceId)
         .where(
           'external_id',
@@ -248,7 +248,7 @@ async function upsertOrigin(
 
   const urlOrigin = pageReference ? undefined : await trx
     .selectFrom('publication_origins')
-    .select(['id', 'publication_id'])
+    .select(['id', 'publication_id', 'metadata'])
     .where('source_id', '=', input.sourceId)
     .where(sql<boolean>`metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'`)
     .where(
@@ -288,7 +288,10 @@ async function upsertOrigin(
         official_url: input.publication.officialUrl,
         last_seen_at: new Date(),
         metadata: asJson(
-          input.publication.originMetadata,
+          originMetadataWithPreservedFiles(
+            origin.metadata,
+            input.publication.originMetadata,
+          ),
         ),
       })
       .where('id', '=', origin.id)
@@ -310,6 +313,33 @@ async function upsertOrigin(
       ),
     })
     .execute();
+}
+
+function originMetadataWithPreservedFiles(
+  existing: unknown,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const previous = metadataRecord(existing);
+
+  /*
+   * Origin evidence belongs to one exact source/origin. A later observation
+   * may legitimately omit files (for example: DOE-SP page becomes complete
+   * and a formerly material PDF is no longer requested). Preserve the last
+   * captured files from this same origin unless the incoming observation
+   * explicitly provides a new files set. Current status/error fields still
+   * come from the incoming observation.
+   */
+  if (
+    incoming.files === undefined &&
+    previous?.files !== undefined
+  ) {
+    return {
+      ...incoming,
+      files: previous.files,
+    };
+  }
+
+  return incoming;
 }
 
 function metadataRecord(
