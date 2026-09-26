@@ -495,6 +495,13 @@ try {
       }),
   );
 
+  for (const row of safeRows) {
+    console.log(
+      'DOE_SP_REBUILD_AUDIT_SAFE_ROW=' +
+        JSON.stringify(row),
+    );
+  }
+
   const chunkSize = 100;
   for (
     let offset = 0;
