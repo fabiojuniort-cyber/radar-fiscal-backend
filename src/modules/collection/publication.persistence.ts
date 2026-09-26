@@ -320,26 +320,57 @@ function originMetadataWithPreservedFiles(
   incoming: Record<string, unknown>,
 ): Record<string, unknown> {
   const previous = metadataRecord(existing);
+  const previousFiles = Array.isArray(previous?.files)
+    ? previous.files
+    : [];
+  const previousAuthenticatedPdfs =
+    previousFiles.filter((value) => {
+      const file = metadataRecord(value);
+      const fileMetadata = metadataRecord(
+        file?.metadata,
+      );
+      return (
+        fileMetadata?.kind ===
+        'AUTHENTICATED_PUBLICATION_PDF'
+      );
+    });
 
-  /*
-   * Origin evidence belongs to one exact source/origin. A later observation
-   * may legitimately omit files (for example: DOE-SP page becomes complete
-   * and a formerly material PDF is no longer requested). Preserve the last
-   * captured files from this same origin unless the incoming observation
-   * explicitly provides a new files set. Current status/error fields still
-   * come from the incoming observation.
-   */
-  if (
-    incoming.files === undefined &&
-    previous?.files !== undefined
-  ) {
-    return {
-      ...incoming,
-      files: previous.files,
-    };
+  if (previousAuthenticatedPdfs.length === 0) {
+    return incoming;
   }
 
-  return incoming;
+  const incomingFiles = Array.isArray(incoming.files)
+    ? incoming.files
+    : [];
+  const incomingHasAuthenticatedPdf =
+    incomingFiles.some((value) => {
+      const file = metadataRecord(value);
+      const fileMetadata = metadataRecord(
+        file?.metadata,
+      );
+      return (
+        fileMetadata?.kind ===
+        'AUTHENTICATED_PUBLICATION_PDF'
+      );
+    });
+
+  /*
+   * Preserve only authenticated-PDF evidence captured from this exact
+   * origin. Attachments remain governed by the current observation/version
+   * and are never resurrected here. A newly captured authenticated PDF is
+   * authoritative and replaces the previously preserved PDF evidence.
+   */
+  if (incomingHasAuthenticatedPdf) {
+    return incoming;
+  }
+
+  return {
+    ...incoming,
+    files: [
+      ...incomingFiles,
+      ...previousAuthenticatedPdfs,
+    ],
+  };
 }
 
 function metadataRecord(
