@@ -66,10 +66,16 @@ export interface ConnectorPublication {
   files?: ConnectorFile[];
 
   /**
-   * Dados específicos da fonte que precisam ser preservados,
-   * mas que não pertencem ao modelo canônico comum.
+   * Dados específicos da fonte que podem compor metadata da versão.
    */
   metadata?: Record<string, unknown>;
+
+  /**
+   * Evidência específica da origem observada que não deve ser promovida
+   * ao metadata canônico da versão (ex.: authCode/status de PDF redundante).
+   * É persistida somente em collection_items/publication_origins.
+   */
+  originMetadata?: Record<string, unknown>;
 }
 
 export interface ConnectorPartialFailure {
