@@ -91,13 +91,13 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
     const originFiles = origins.flatMap((origin) =>
       (((origin.metadata as Record<string, unknown>).files as Array<Record<string, unknown>>) ?? []),
     );
-    assert.equal(originFiles.length, 4); // 3 authenticated PDFs + 1 attachment remain provenance by origin
+    assert.equal(originFiles.length, 1); // only the material attachment is downloaded
     assert.equal(
       originFiles.filter((file) =>
         (file.metadata as Record<string, unknown> | undefined)?.kind ===
         'AUTHENTICATED_PUBLICATION_PDF',
       ).length,
-      3,
+      0,
     );
     assert.equal(
       originFiles.filter((file) =>
@@ -105,6 +105,11 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
         'ATTACHMENT',
       ).length,
       1,
+    );
+    assert.equal(
+      api.count('/v2/authentication/download/'),
+      0,
+      'complete official HTML must not trigger redundant authenticated PDF downloads',
     );
 
     const publications = await db.selectFrom('publications as p')
@@ -369,31 +374,34 @@ test('DOE-SP HTML-primary: Portaria SRE 42 duplicate origins persist as one publ
 
     assert.equal(
       badMetadata.authenticatedPdf,
-      'UNAVAILABLE_REDUNDANT',
+      'NOT_REQUESTED_REDUNDANT',
     );
     assert.equal(
-      (badMetadata.authenticatedPdfError as
-        Record<string, unknown>)?.httpStatus,
-      404,
+      goodMetadata.authenticatedPdf,
+      'NOT_REQUESTED_REDUNDANT',
+    );
+    assert.equal(
+      badMetadata.contentRepresentation,
+      'OFFICIAL_HTML',
+    );
+    assert.equal(
+      goodMetadata.contentRepresentation,
+      'OFFICIAL_HTML',
     );
     assert.equal(
       badMetadata.files,
       undefined,
-      '404 origin must not receive the PDF owned by the other official origin',
-    );
-
-    const goodFiles =
-      goodMetadata.files as
-        Array<Record<string, unknown>>;
-    assert.equal(goodFiles.length, 1);
-    assert.equal(
-      (goodFiles[0]?.metadata as
-        Record<string, unknown>)?.kind,
-      'AUTHENTICATED_PUBLICATION_PDF',
+      'HTML-first origin must not receive a redundant authenticated PDF',
     );
     assert.equal(
-      goodFiles[0]?.versionRole,
-      'PROVENANCE',
+      goodMetadata.files,
+      undefined,
+      'HTML-first origin must not download the authenticated PDF even when available',
+    );
+    assert.equal(
+      api.count('/v2/authentication/download/'),
+      0,
+      'neither equivalent origin may request a redundant PDF',
     );
 
     const versions = await db
