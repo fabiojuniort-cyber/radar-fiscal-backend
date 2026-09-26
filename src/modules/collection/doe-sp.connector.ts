@@ -305,7 +305,7 @@ export class DoeSpConnector implements CollectionConnector {
       discoveredCount: 0, includedCount: 0, excludedCount: 0,
       includedByCategory: {}, excludedByReason: {}, excludedSamples: [], excludedSamplesTruncated: 0,
     };
-    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, authPdfNotRendered: 0 };
+    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, redundantPdfSkipped: 0, materialPdfDownloaded: 0 };
     const typeCache = new Map<string, Map<string, string>>();
 
     const typesFor = async (date: string): Promise<Map<string, string>> => {
@@ -367,66 +367,49 @@ export class DoeSpConnector implements CollectionConnector {
           : 'PARTIAL_OFFICIAL_CONTENT';
 
       let authenticatedPdf:
-        | 'CAPTURED'
-        | 'NOT_RENDERED_BY_SOURCE'
-        | 'UNAVAILABLE_REDUNDANT'
-        | 'NO_AUTH_CODE' =
-        detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
-      let authenticatedPdfError:
-        | Record<string, unknown>
-        | undefined;
-      const pdf = detail.authCode
-        ? await client
-            .downloadAuthenticatedPdf(
-              detail.authCode,
-              context.signal,
-            )
-            .catch((error: unknown) => {
-              if (isCancel(error)) {
-                throw error;
-              }
+        | 'NOT_REQUESTED_REDUNDANT'
+        | 'CAPTURED_MATERIAL'
+        | 'NO_AUTH_CODE';
 
-              /*
-               * D-017: the official HTML is the complete canonical
-               * content for DOE-SP. A failure isolated to the
-               * redundant authenticated PDF is provenance loss,
-               * not publication loss. If HTML is absent we cannot
-               * claim complete capture and retain the failure.
-               */
-              if (!contentText) {
-                throw error;
-              }
+      /*
+       * D-017 / DOE-SP-24:
+       * - complete official HTML is the canonical publication body;
+       * - a redundant authenticated PDF is not requested at all;
+       * - when the page has no usable body, the authenticated PDF becomes
+       *   material content and is required for a complete capture.
+       *
+       * Attachments remain independent material content and are handled
+       * separately below.
+       */
+      if (contentText) {
+        authenticatedPdf = detail.authCode
+          ? 'NOT_REQUESTED_REDUNDANT'
+          : 'NO_AUTH_CODE';
+        if (detail.authCode) {
+          counters.redundantPdfSkipped += 1;
+        }
+      } else {
+        if (!detail.authCode) {
+          throw new ConnectorError(
+            'DOE_SP_OFFICIAL_CONTENT_UNAVAILABLE',
+            {
+              code: 'DOE_SP_OFFICIAL_CONTENT_UNAVAILABLE',
+              kind: 'PROCESSING_ERROR',
+              retryable: true,
+              metadata: {
+                reason:
+                  'OFFICIAL_PAGE_EMPTY_AND_NO_AUTHENTICATED_PDF_REFERENCE',
+              },
+            },
+          );
+        }
 
-              if (error instanceof ConnectorError) {
-                authenticatedPdf =
-                  error.code ===
-                  'DOE_SP_AUTHENTICATED_PDF_NOT_READY'
-                    ? 'NOT_RENDERED_BY_SOURCE'
-                    : 'UNAVAILABLE_REDUNDANT';
-                if (
-                  error.code ===
-                  'DOE_SP_AUTHENTICATED_PDF_NOT_READY'
-                ) {
-                  counters.authPdfNotRendered += 1;
-                }
-                authenticatedPdfError = {
-                  code: error.code,
-                  kind: error.kind,
-                  retryable: error.retryable,
-                  ...(error.httpStatus !== undefined
-                    ? {
-                        httpStatus:
-                          error.httpStatus,
-                      }
-                    : {}),
-                };
-                return undefined;
-              }
-
-              throw error;
-            })
-        : undefined;
-      if (detail.authCode && pdf) {
+        const pdf = await client.downloadAuthenticatedPdf(
+          detail.authCode,
+          context.signal,
+        );
+        authenticatedPdf = 'CAPTURED_MATERIAL';
+        counters.materialPdfDownloaded += 1;
         counters.filesDownloaded += 1;
         counters.fileBytes += pdf.sizeBytes;
         files.push({
@@ -436,22 +419,14 @@ export class DoeSpConnector implements CollectionConnector {
           externalId: 'auth:' + detail.authCode,
           rawSha256: pdf.rawSha256,
           sizeBytes: pdf.sizeBytes,
-          versionRole: contentText
-            ? 'PROVENANCE'
-            : 'MATERIAL_CONTENT',
+          versionRole: 'MATERIAL_CONTENT',
           metadata: {
             kind: 'AUTHENTICATED_PUBLICATION_PDF',
             capturedAt,
             origin: 'DOE_SP',
-            ...(contentText
-              ? {
-                  textExtraction:
-                    'NOT_REQUIRED_HTML_TEXT_AVAILABLE',
-                }
-              : {
-                  materialContent: true,
-                  textExtraction: 'NOT_EXTRACTED',
-                }),
+            materialContent: true,
+            textExtraction: 'NOT_EXTRACTED',
+            contentFallback: 'OFFICIAL_PDF',
           },
         });
       }
@@ -525,9 +500,9 @@ export class DoeSpConnector implements CollectionConnector {
         originMetadata: {
           ...(detail.authCode ? { authCode: detail.authCode } : {}),
           authenticatedPdf,
-          ...(authenticatedPdfError
-            ? { authenticatedPdfError }
-            : {}),
+          contentRepresentation: contentText
+            ? 'OFFICIAL_HTML'
+            : 'OFFICIAL_PDF',
         },
       };
     };
