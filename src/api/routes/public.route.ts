@@ -196,12 +196,35 @@ export async function publicRoutes(
 
   app.addHook(
     'onSend',
-    async (_request, reply, payload) => {
-      reply.header(
-        'Cache-Control',
-        CACHE_CONTROL_VALUE,
-      );
+    async (request, reply, payload) => {
+      if (
+        request.method === 'GET' &&
+        reply.statusCode >= 200 &&
+        reply.statusCode < 300
+      ) {
+        reply.header(
+          'Cache-Control',
+          CACHE_CONTROL_VALUE,
+        );
+      }
+
       return payload;
+    },
+  );
+
+  typed.options(
+    '/public/v1/*',
+    async (_request, reply) => {
+      reply.header(
+        'Access-Control-Allow-Methods',
+        'GET',
+      );
+      reply.header(
+        'Access-Control-Max-Age',
+        '300',
+      );
+
+      return reply.status(204).send();
     },
   );
 
