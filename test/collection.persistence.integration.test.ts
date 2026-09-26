@@ -1217,6 +1217,220 @@ test(
 );
 
 test(
+  'origin replay preserves previously captured material PDF evidence when page later becomes HTML-primary',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(
+      adminUrl,
+      'DATABASE_ADMIN_URL is required for collection integration tests.',
+    );
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({ pool }),
+    });
+
+    const sourceId = randomUUID();
+    const runIds = [randomUUID(), randomUUID()];
+    const attemptIds = [randomUUID(), randomUUID()];
+    const externalId = 'doe-sp-material-to-html';
+    const pdfHash =
+      '4'.repeat(64);
+
+    try {
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: `doe-sp-origin-preservation-${sourceId}`,
+        name: 'DOE-SP origin preservation fixture',
+        jurisdiction_level: 'STATE',
+        uf: 'SP',
+        base_url: 'https://doe.sp.gov.br/',
+        connector_key: 'doe-sp',
+      }).execute();
+
+      await db.insertInto('collection_runs').values(
+        runIds.map((id, index) => ({
+          id,
+          source_id: sourceId,
+          scheduled_for: new Date(
+            `2026-09-26T2${index}:00:00Z`,
+          ),
+          trigger_type: 'MANUAL' as const,
+        })),
+      ).execute();
+
+      await db.insertInto('collection_attempts').values(
+        attemptIds.map((id, index) => ({
+          id,
+          collection_run_id: runIds[index]!,
+          attempt_no: 1,
+          status: 'RUNNING' as const,
+        })),
+      ).execute();
+
+      const shared = {
+        title:
+          'PORTARIA SRE 99, DE 25 DE SETEMBRO DE 2026',
+        agency: 'SEFAZ-SP/SRE',
+        sphere: 'STATE' as const,
+        stateCode: 'SP',
+        actType: 'PORTARIA',
+        actNumber: '99/2026',
+        publishedAt:
+          new Date('2026-09-26T00:00:00Z'),
+        officialUrl:
+          'https://doe.sp.gov.br/portaria-sre-99',
+        externalId,
+      };
+
+      const pdfFallback = normalizePublication({
+        sourceId,
+        publication: {
+          ...shared,
+          files: [{
+            url:
+              'https://do-api-web-search.doe.sp.gov.br/v2/authentication/download/material-99',
+            rawSha256: pdfHash,
+            sizeBytes: 42_000,
+            versionRole: 'MATERIAL_CONTENT',
+            metadata: {
+              kind:
+                'AUTHENTICATED_PUBLICATION_PDF',
+              origin: 'DOE_SP',
+              materialContent: true,
+            },
+          }],
+          metadata: {
+            sourceRole: 'PRIMARY',
+            officialContentCompleteness:
+              'PARTIAL_OFFICIAL_CONTENT',
+          },
+          originMetadata: {
+            authCode: 'material-99',
+            authenticatedPdf: 'CAPTURED_MATERIAL',
+            contentRepresentation: 'OFFICIAL_PDF',
+          },
+        },
+      });
+
+      const first = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runIds[0]!,
+          attemptId: attemptIds[0]!,
+          publication: pdfFallback,
+        }),
+      );
+      assert.equal(
+        first.disposition,
+        'NEW_PUBLICATION',
+      );
+
+      const htmlPrimary = normalizePublication({
+        sourceId,
+        publication: {
+          ...shared,
+          content:
+            'Texto oficial integral que passou a ser disponibilizado na página oficial.',
+          contentHashPolicy:
+            'HTML_PRIMARY_MATERIAL_FILES',
+          metadata: {
+            sourceRole: 'PRIMARY',
+            officialContentCompleteness:
+              'FULL_OFFICIAL_CONTENT',
+          },
+          originMetadata: {
+            authCode: 'material-99',
+            authenticatedPdf:
+              'NOT_REQUESTED_REDUNDANT',
+            contentRepresentation:
+              'OFFICIAL_HTML',
+          },
+        },
+      });
+
+      const second = await db.transaction().execute(
+        (trx) => persistPublication(trx, {
+          sourceId,
+          runId: runIds[1]!,
+          attemptId: attemptIds[1]!,
+          publication: htmlPrimary,
+        }),
+      );
+      assert.equal(
+        second.publicationId,
+        first.publicationId,
+      );
+
+      const origins = await db
+        .selectFrom('publication_origins')
+        .select([
+          'external_id',
+          'metadata',
+        ])
+        .where('source_id', '=', sourceId)
+        .execute();
+      assert.equal(origins.length, 1);
+      assert.equal(
+        origins[0]?.external_id,
+        externalId,
+      );
+
+      const metadata =
+        origins[0]?.metadata as
+          Record<string, unknown>;
+      assert.equal(
+        metadata.authenticatedPdf,
+        'NOT_REQUESTED_REDUNDANT',
+        'current observation status must win',
+      );
+      assert.equal(
+        metadata.contentRepresentation,
+        'OFFICIAL_HTML',
+      );
+      const files =
+        metadata.files as
+          Array<Record<string, unknown>>;
+      assert.equal(files.length, 1);
+      assert.equal(
+        files[0]?.rawSha256,
+        pdfHash,
+        'same-origin material PDF evidence must survive the later HTML observation',
+      );
+    } finally {
+      const publicationIds = await db
+        .selectFrom('publication_origins')
+        .select('publication_id')
+        .where('source_id', '=', sourceId)
+        .execute()
+        .then((rows) => [
+          ...new Set(
+            rows.map((row) => row.publication_id),
+          ),
+        ]);
+      await db.deleteFrom('collection_runs')
+        .where('source_id', '=', sourceId)
+        .execute();
+      await db.deleteFrom('publication_origins')
+        .where('source_id', '=', sourceId)
+        .execute();
+      if (publicationIds.length) {
+        await db.deleteFrom('publications')
+          .where('id', 'in', publicationIds)
+          .execute();
+      }
+      await db.deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+      await db.destroy();
+    }
+  },
+);
+
+test(
   'HTML-primary legacy compatibility does not suppress real changes or insufficiently classified legacy files',
   async () => {
     const adminUrl = process.env.DATABASE_ADMIN_URL;
