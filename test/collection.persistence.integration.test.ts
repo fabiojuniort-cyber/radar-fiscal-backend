@@ -848,6 +848,8 @@ test(
             'HTML_PRIMARY_MATERIAL_FILES',
           metadata: {
             sourceRole: 'PRIMARY',
+          },
+          originMetadata: {
             authCode: 'auth-404',
             authenticatedPdf:
               'UNAVAILABLE_REDUNDANT',
@@ -922,6 +924,18 @@ test(
         versions[0]?.source_metadata,
         legacyVersionBefore.source_metadata,
         'legacy version files/source_metadata must remain untouched',
+      );
+
+      const htmlOnlyVersionMetadata =
+        htmlOnly404.metadata as Record<string, unknown>;
+      assert.equal(htmlOnlyVersionMetadata.authCode, undefined);
+      assert.equal(
+        htmlOnlyVersionMetadata.authenticatedPdf,
+        undefined,
+      );
+      assert.equal(
+        htmlOnlyVersionMetadata.authenticatedPdfError,
+        undefined,
       );
 
       const origins = await db
@@ -1109,6 +1123,8 @@ test(
           }],
           metadata: {
             sourceRole: 'PRIMARY',
+          },
+          originMetadata: {
             authCode: 'auth-43',
             authenticatedPdf: 'CAPTURED',
           },
