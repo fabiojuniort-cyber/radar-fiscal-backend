@@ -2442,28 +2442,6 @@ test(
       );
 
       const seededHistory = [
-        {
-          kind: 'ORIGIN_ARTIFACT_RECOVERY',
-          previousOriginMetadata: {
-            sourceRole: 'VALIDATION',
-            authenticatedPdf:
-              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
-            artifactEquivalence: {
-              kind:
-                'PROVEN_EQUIVALENT_REPRESENTATION',
-              equivalentExternalId:
-                opaqueEquivalenceSecret,
-            },
-            equivalentRepresentation: {
-              externalId:
-                opaqueRepresentationSecret,
-              authenticatedPdf: {
-                ownerExternalId:
-                  opaqueOwnerSecret,
-              },
-            },
-          },
-        },
         null,
         'malformed',
         { kind: 'WRONG_KIND' },
@@ -2518,6 +2496,28 @@ test(
             },
           },
         })),
+        {
+          kind: 'ORIGIN_ARTIFACT_RECOVERY',
+          previousOriginMetadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            artifactEquivalence: {
+              kind:
+                'PROVEN_EQUIVALENT_REPRESENTATION',
+              equivalentExternalId:
+                opaqueEquivalenceSecret,
+            },
+            equivalentRepresentation: {
+              externalId:
+                opaqueRepresentationSecret,
+              authenticatedPdf: {
+                ownerExternalId:
+                  opaqueOwnerSecret,
+              },
+            },
+          },
+        },
       ];
 
       await db
