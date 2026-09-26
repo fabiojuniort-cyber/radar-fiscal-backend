@@ -85,6 +85,8 @@ A opção A foi aprovada pelo Gerente. A implementação usa opt-in por publica�
 
 ### Hash novo (v2)
 
+O opt-in v2 só é usado quando o detalhe oficial fornece texto HTML normalizado. Sem HTML canônico, a publicação não é tratada como HTML-primary e a compatibilidade v1→v2 não é presumida.
+
 Para publicações DOE-SP com `contentHashPolicy = HTML_PRIMARY_MATERIAL_FILES`:
 
 ```text
@@ -99,9 +101,12 @@ sha256(JSON.stringify({
 
 `materialFileHashes` contém somente SHA-256 de arquivos com papel de conteúdo material. No DOE-SP:
 - `ATTACHMENT` => `MATERIAL_CONTENT`;
-- `AUTHENTICATED_PUBLICATION_PDF` => `PROVENANCE`.
+- `AUTHENTICATED_PUBLICATION_PDF` => `PROVENANCE` quando o HTML oficial está presente e é a representação canônica;
+- se o HTML estiver ausente/incompleto a ponto de o PDF ser necessário como fonte material, ele não pode ser descartado do versionamento como mera proveniência.
 
-O PDF autenticado permanece no metadata da origem, mas fica fora do metadata/hash da versão v2.
+Uma página com anexo material próprio é marcada `PARTIAL_OFFICIAL_CONTENT`: o HTML sozinho não representa a captura integral. O item só é concluído quando os anexos materiais necessários forem capturados; falha nesses anexos mantém o item/dia incompleto.
+
+O PDF autenticado redundante permanece no metadata da origem, mas fica fora do metadata/hash da versão v2.
 
 ### Compatibilidade v1 sem reescrita histórica
 
