@@ -48,6 +48,10 @@ const envSchema = z.object({
     .min(1)
     .default('radar_refresh_token'),
 
+  PUBLIC_API_ALLOWED_ORIGINS: z
+    .string()
+    .default(''),
+
   DB_POOL_MAX: z.coerce
     .number()
     .int()
