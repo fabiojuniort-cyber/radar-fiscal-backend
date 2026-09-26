@@ -234,9 +234,10 @@ function sanitizeHistoricalOriginMetadata(
   );
   if (
     pdfError?.code === 'DOE_SP_HTTP_ERROR' &&
+    typeof pdfError.httpStatus === 'number' &&
     Number.isInteger(pdfError.httpStatus) &&
-    (pdfError.httpStatus as number) >= 100 &&
-    (pdfError.httpStatus as number) <= 599
+    pdfError.httpStatus >= 100 &&
+    pdfError.httpStatus <= 599
   ) {
     sanitized.authenticatedPdfError = {
       code: 'DOE_SP_HTTP_ERROR',
