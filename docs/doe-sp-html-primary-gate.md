@@ -138,3 +138,41 @@ No DOE-SP ficam em `originMetadata`:
 Esses campos não participam do metadata/hash da versão v2. Um PDF autenticado disponível fica somente na origem que efetivamente o forneceu. Uma origem com PDF 404 mantém URL, referência de autenticidade e diagnóstico da falha, sem receber arquivo de outra origem.
 
 O teste ponta a ponta com os IDs observados da Portaria SRE 42/2025 exige duas origens oficiais, uma única publicação, uma única versão v2, nenhuma versão artificial no replay e nenhum empréstimo de PDF entre origens.
+
+
+## DOE-SP-24 — política page-first vigente
+
+Esta seção substitui a interpretação anterior de que o PDF autenticado redundante poderia continuar sendo baixado por padrão como proveniência.
+
+A regra vigente é:
+
+1. **HTML/JSON oficial com corpo completo e fiel**:
+   - usar o texto oficial como conteúdo canônico;
+   - **não chamar** o endpoint de download do PDF autenticado redundante;
+   - preservar URL oficial, `externalId`, `authCode` e demais referências de autenticidade disponíveis;
+   - registrar `authenticatedPdf = NOT_REQUESTED_REDUNDANT` e `contentRepresentation = OFFICIAL_HTML`;
+   - anexos próprios continuam sendo baixados como `MATERIAL_CONTENT`.
+
+2. **Página sem corpo oficial utilizável**:
+   - o PDF autenticado deixa de ser redundante e passa a ser conteúdo material obrigatório;
+   - o conector tenta o PDF oficial;
+   - o arquivo é classificado `MATERIAL_CONTENT`, participa do hash legado/material e a publicação não é concluída se o PDF necessário falhar;
+   - se não houver nem corpo oficial nem referência de PDF, o item permanece falho/incompleto.
+
+3. **Página com corpo principal + anexos próprios**:
+   - o PDF autenticado do corpo principal continua redundante e não é solicitado;
+   - os attachments são necessários;
+   - `officialContentCompleteness = PARTIAL_OFFICIAL_CONTENT` descreve que a página isolada não contém os anexos; a captura só fica operacionalmente completa após baixar esses anexos.
+
+### Impacto sobre compatibilidade legada
+
+Enquanto o acervo atual permanecer preservado, a compatibilidade v1→v2 continua necessária porque versões já persistidas incluem hashes de PDFs autenticados redundantes.
+
+Uma reconstrução integral do domínio DOE-SP sob a nova política pode eliminar essa necessidade **somente para o acervo reconstruído**, desde que o preflight comprove que todas as versões v1 alvo foram retiradas e não existam dependências que exijam preservar os IDs/versões antigos.
+
+Isso não deve ser generalizado:
+- outros conectores podem ter PDF como conteúdo material;
+- DOE-SP pode precisar do PDF material quando o corpo HTML estiver ausente;
+- qualquer arquivo material continua exigindo proveniência e versionamento corretos.
+
+A avaliação e o plano de reconstrução estão em `docs/doe-sp-rebuild-assessment.md`.
