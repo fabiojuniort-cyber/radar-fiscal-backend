@@ -121,7 +121,18 @@ function metadataRecord(
     : undefined;
 }
 
-function boundedAuditText(
+const AUDIT_CREDENTIAL_WORD =
+  /(?:^|[._:-])(authorization|bearer|basic|token|secret|password|passwd|credential|api[-_]?key)(?:[._:-]|$)/i;
+const AUDIT_SECRET_PREFIX =
+  /^(?:sk|ghp|gho|ghu|ghs|github_pat|xox[baprs])[-_]/i;
+const AUDIT_HASH_LIKE =
+  /^(?:[a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64}|[a-f0-9]{96}|[a-f0-9]{128})$/i;
+const AUDIT_URL_LIKE =
+  /^(?:[a-z][a-z0-9+.-]*:|\/\/|www\.)/i;
+const AUDIT_JWT_LIKE =
+  /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+function safeAuditIdentifier(
   value: unknown,
 ): string | undefined {
   if (typeof value !== 'string') {
@@ -129,12 +140,23 @@ function boundedAuditText(
   }
 
   const normalized = value.trim();
-  return normalized
-    ? normalized.slice(
-        0,
-        ARTIFACT_RECONCILIATION_HISTORY_MAX_TEXT,
-      )
-    : undefined;
+  if (
+    !normalized ||
+    normalized.length >
+      ARTIFACT_RECONCILIATION_HISTORY_MAX_TEXT ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(
+      normalized,
+    ) ||
+    AUDIT_URL_LIKE.test(normalized) ||
+    AUDIT_CREDENTIAL_WORD.test(normalized) ||
+    AUDIT_SECRET_PREFIX.test(normalized) ||
+    AUDIT_HASH_LIKE.test(normalized) ||
+    AUDIT_JWT_LIKE.test(normalized)
+  ) {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 function sanitizeHistoricalOriginMetadata(
@@ -165,7 +187,7 @@ function sanitizeHistoricalOriginMetadata(
     row.artifactEquivalence,
   );
   const equivalenceExternalId =
-    boundedAuditText(
+    safeAuditIdentifier(
       equivalence?.equivalentExternalId,
     );
   if (
@@ -187,7 +209,7 @@ function sanitizeHistoricalOriginMetadata(
   if (representation) {
     const safeRepresentation:
       Record<string, unknown> = {};
-    const externalId = boundedAuditText(
+    const externalId = safeAuditIdentifier(
       representation.externalId,
     );
     if (externalId) {
@@ -195,23 +217,11 @@ function sanitizeHistoricalOriginMetadata(
         externalId;
     }
 
-    if (
-      typeof representation.textSha256 ===
-        'string' &&
-      /^[a-fA-F0-9]{64}$/.test(
-        representation.textSha256,
-      )
-    ) {
-      safeRepresentation.textSha256 =
-        representation.textSha256
-          .toLowerCase();
-    }
-
     const authenticatedPdf = metadataRecord(
       representation.authenticatedPdf,
     );
     const ownerExternalId =
-      boundedAuditText(
+      safeAuditIdentifier(
         authenticatedPdf?.ownerExternalId,
       );
     if (ownerExternalId) {
