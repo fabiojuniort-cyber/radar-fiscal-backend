@@ -188,3 +188,105 @@ test('connector: authenticated PDF HTTP diagnostics survive in the recorded part
   assert.ok(!(failure?.message ?? '').includes(marker));
   assert.ok(!(failure?.message ?? '').includes('B'.repeat(80)));
 });
+
+
+test('policy gate: redundant authenticated PDF changes legacy contentHash even when official HTML and identity are identical', () => {
+  const shared = {
+    title: 'PORTARIA SRE 42, DE 28 DE JULHO DE 2025',
+    agency: 'SEFAZ-SP/SRE',
+    sphere: 'STATE' as const,
+    stateCode: 'SP',
+    actType: 'PORTARIA',
+    actNumber: '42/2025',
+    publishedAt: new Date('2025-07-29T00:00:00Z'),
+    content: 'Texto oficial integral e idêntico publicado em HTML.',
+    officialUrl: 'https://doe.sp.gov.br/executivo/portaria-sre-42',
+    externalId: 'doe-sp-html-primary-gate',
+  };
+
+  const htmlOnly = normalizePublication({
+    sourceId: context().sourceId,
+    publication: shared,
+  });
+
+  const withRedundantAuthenticatedPdf = normalizePublication({
+    sourceId: context().sourceId,
+    publication: {
+      ...shared,
+      files: [{
+        url: 'https://do-api-publication-pdf.doe.sp.gov.br/authenticated.pdf',
+        mimeType: 'application/pdf',
+        rawSha256:
+          '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30',
+        sizeBytes: 466_065,
+        metadata: {
+          kind: 'AUTHENTICATED_PUBLICATION_PDF',
+          origin: 'DOE_SP',
+        },
+      }],
+    },
+  });
+
+  assert.equal(
+    htmlOnly.identityHash,
+    withRedundantAuthenticatedPdf.identityHash,
+  );
+  assert.equal(
+    htmlOnly.contentText,
+    withRedundantAuthenticatedPdf.contentText,
+  );
+  assert.notEqual(
+    htmlOnly.contentHash,
+    withRedundantAuthenticatedPdf.contentHash,
+    'legacy contentHash includes redundant authenticated-PDF hashes and is therefore incompatible with HTML-only replay',
+  );
+});
+
+test('policy gate: attachment with independent content remains version-relevant in the legacy hash model', () => {
+  const shared = {
+    title: 'ATO COM ANEXO MATERIAL',
+    agency: 'SEFAZ-SP/SRE',
+    sphere: 'STATE' as const,
+    stateCode: 'SP',
+    actType: 'PORTARIA',
+    actNumber: '99/2026',
+    publishedAt: new Date('2026-09-26T00:00:00Z'),
+    content: 'Texto principal integral em HTML; a tabela normativa está no anexo.',
+    officialUrl: 'https://doe.sp.gov.br/executivo/ato-com-anexo-material',
+    externalId: 'doe-sp-material-attachment-gate',
+  };
+
+  const withoutAttachment = normalizePublication({
+    sourceId: context().sourceId,
+    publication: shared,
+  });
+
+  const withMaterialAttachment = normalizePublication({
+    sourceId: context().sourceId,
+    publication: {
+      ...shared,
+      files: [{
+        url: 'https://doe.sp.gov.br/attachments/tabela-normativa.pdf',
+        mimeType: 'application/pdf',
+        rawSha256:
+          'b7a902c4f91381ba732525d83fb422e62156fc8040aa7862ef53c307caf7a341',
+        sizeBytes: 152_681,
+        metadata: {
+          kind: 'ATTACHMENT',
+          origin: 'DOE_SP',
+          materialContent: true,
+        },
+      }],
+    },
+  });
+
+  assert.equal(
+    withoutAttachment.identityHash,
+    withMaterialAttachment.identityHash,
+  );
+  assert.notEqual(
+    withoutAttachment.contentHash,
+    withMaterialAttachment.contentHash,
+    'material attachments must continue to influence version semantics',
+  );
+});
