@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+import { createHash } from 'node:crypto';
+
 import { Pool } from 'pg';
 
 /**
@@ -23,11 +25,72 @@ if (!databaseUrl) {
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 1,
+  connectionTimeoutMillis: 10_000,
+  options: [
+    '-c default_transaction_read_only=on',
+    '-c statement_timeout=30000',
+    '-c lock_timeout=2000',
+    '-c idle_in_transaction_session_timeout=30000',
+  ].join(' '),
 });
+
+function sha256(value: string): string {
+  return createHash('sha256')
+    .update(value)
+    .digest('hex');
+}
 
 const client = await pool.connect();
 try {
+  const sessionReadOnly = (
+    await client.query<{ setting: string }>(
+      'SHOW default_transaction_read_only',
+    )
+  ).rows[0]?.setting;
+  const sessionStatementTimeout = (
+    await client.query<{ setting: string }>(
+      'SHOW statement_timeout',
+    )
+  ).rows[0]?.setting;
+  const sessionLockTimeout = (
+    await client.query<{ setting: string }>(
+      'SHOW lock_timeout',
+    )
+  ).rows[0]?.setting;
+  const sessionIdleTransactionTimeout = (
+    await client.query<{ setting: string }>(
+      'SHOW idle_in_transaction_session_timeout',
+    )
+  ).rows[0]?.setting;
+
+  if (sessionReadOnly !== 'on') {
+    throw new Error(
+      'Refusing DOE-SP rebuild audit: session is not read-only.',
+    );
+  }
+
   await client.query('BEGIN READ ONLY');
+  await client.query(
+    "SET LOCAL statement_timeout = '30s'",
+  );
+  await client.query(
+    "SET LOCAL lock_timeout = '2s'",
+  );
+  await client.query(
+    "SET LOCAL idle_in_transaction_session_timeout = '30s'",
+  );
+
+  const transactionReadOnly = (
+    await client.query<{ setting: string }>(
+      'SHOW transaction_read_only',
+    )
+  ).rows[0]?.setting;
+
+  if (transactionReadOnly !== 'on') {
+    throw new Error(
+      'Refusing DOE-SP rebuild audit: transaction is not read-only.',
+    );
+  }
 
   const source = (
     await client.query<{
@@ -324,17 +387,7 @@ try {
     },
   );
 
-  console.log(
-    'DOE_SP_REBUILD_AUDIT_SUMMARY=' +
-      JSON.stringify({
-        source,
-        activeRuns,
-        checkpoints,
-        totals,
-      }),
-  );
-
-  for (const row of rows) {
+  const safeRows = rows.map((row) => {
     const contentClass =
       row.current_content_chars === 0
         ? 'PDF_FALLBACK_CANDIDATE'
@@ -342,11 +395,122 @@ try {
           ? 'HTML_PLUS_MATERIAL_ATTACHMENTS'
           : 'HTML_BODY_CANDIDATE';
 
+    return {
+      recordHash: sha256(row.publication_id),
+      identityHashDigest: sha256(
+        row.identity_hash,
+      ),
+      identityStrength: row.identity_strength,
+      originCount: row.total_origins,
+      otherSourceCount: row.other_source_ids.length,
+      versionCount: row.version_count,
+      contentClass,
+      currentContentChars:
+        row.current_content_chars,
+      versionFileEntries:
+        row.version_file_entries,
+      authenticatedPdfEntries:
+        row.authenticated_pdf_entries,
+      attachmentEntries: row.attachment_entries,
+      publicationFileRows:
+        row.publication_file_rows,
+      companyRefs: row.company_refs,
+      tenantRefs: row.tenant_refs,
+      matchRefs: row.match_refs,
+      collectionItemRefs:
+        row.collection_item_refs,
+      runRefs: row.run_refs,
+      foreignRunRefs: row.foreign_run_refs,
+      auditEntityRefs: row.audit_entity_refs,
+    };
+  });
+
+  const manifestCanonical = JSON.stringify(
+    safeRows
+      .slice()
+      .sort((a, b) =>
+        a.recordHash.localeCompare(b.recordHash),
+      ),
+  );
+  const manifestSha256 = sha256(
+    manifestCanonical,
+  );
+  const recordHashes = safeRows
+    .map((row) => row.recordHash)
+    .sort();
+
+  console.log(
+    'DOE_SP_REBUILD_AUDIT_SUMMARY=' +
+      JSON.stringify({
+        source: {
+          code: source.code,
+          isActive: source.is_active,
+          hasSchedule: Boolean(
+            source.schedule_cron,
+          ),
+        },
+        safety: {
+          defaultTransactionReadOnly:
+            sessionReadOnly,
+          transactionReadOnly,
+          connectionTimeoutMs: 10_000,
+          statementTimeout:
+            sessionStatementTimeout,
+          lockTimeout: sessionLockTimeout,
+          idleInTransactionSessionTimeout:
+            sessionIdleTransactionTimeout,
+        },
+        activeRuns: {
+          count: activeRuns.length,
+          byStatus: activeRuns.reduce<
+            Record<string, number>
+          >((acc, run) => {
+            acc[run.status] =
+              (acc[run.status] ?? 0) + 1;
+            return acc;
+          }, {}),
+        },
+        checkpoints: {
+          count: checkpoints.length,
+          latestGeneration:
+            checkpoints[0]?.generation ?? null,
+        },
+        totals: {
+          ...totals,
+          historicalVersions:
+            totals.versions -
+            totals.publications,
+          multiVersionPublications:
+            rows.filter(
+              (row) => row.version_count > 1,
+            ).length,
+        },
+        manifest: {
+          rowCount: safeRows.length,
+          sha256: manifestSha256,
+          hashAlgorithm: 'SHA-256',
+          recordIdentifier:
+            'SHA-256(publication_id)',
+        },
+      }),
+  );
+
+  const chunkSize = 100;
+  for (
+    let offset = 0;
+    offset < recordHashes.length;
+    offset += chunkSize
+  ) {
     console.log(
-      'DOE_SP_REBUILD_AUDIT_ROW=' +
+      'DOE_SP_REBUILD_AUDIT_MANIFEST=' +
         JSON.stringify({
-          ...row,
-          contentClass,
+          chunk:
+            Math.floor(offset / chunkSize) +
+            1,
+          hashes: recordHashes.slice(
+            offset,
+            offset + chunkSize,
+          ),
         }),
     );
   }
