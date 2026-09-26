@@ -445,6 +445,8 @@ async function currentLegacyVersionEquivalent(
 ): Promise<boolean> {
   if (
     publication.contentHashVersion !== 2 ||
+    publication.contentText === undefined ||
+    currentVersion.content_text === null ||
     metadataRecord(
       currentVersion.source_metadata,
     )?.contentHashVersion === 2
