@@ -1171,11 +1171,19 @@ test(
         previous.authenticatedPdf,
         'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
       );
-      const previousEquivalent =
-        previous.equivalentRepresentation as Record<string, unknown>;
+      const previousEquivalence =
+        previous.artifactEquivalence as
+          Record<string, unknown>;
+      assert.deepEqual(
+        previousEquivalence,
+        {
+          kind:
+            'PROVEN_EQUIVALENT_REPRESENTATION',
+        },
+      );
       assert.equal(
-        previousEquivalent.externalId,
-        goodId,
+        previous.equivalentRepresentation,
+        undefined,
       );
 
       const replayResult = await db
@@ -2234,6 +2242,12 @@ test(
     const attemptRecover = randomUUID();
     const goodId = 'history-good-' + sourceId;
     const badId = 'history-bad-' + sourceId;
+    const opaqueEquivalenceSecret =
+      'rk_live_TEST123456789';
+    const opaqueRepresentationSecret =
+      'AIzaSyTEST1234567890';
+    const opaqueOwnerSecret =
+      'AKIATEST1234567890';
     const canonicalFile = {
       url: 'https://example.test/history-canonical.pdf',
       rawSha256: '1'.repeat(64),
@@ -2399,8 +2413,57 @@ test(
         undefined,
         'incoming arbitrary history must never be trusted on insert',
       );
+      const currentEquivalence =
+        fallbackMetadata.artifactEquivalence as
+          Record<string, unknown>;
+      assert.equal(
+        currentEquivalence.kind,
+        'PROVEN_EQUIVALENT_REPRESENTATION',
+      );
+      assert.equal(
+        currentEquivalence.equivalentExternalId,
+        goodId,
+        'current typed proof must keep its external ID',
+      );
+
+      const canonicalBefore = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'content_hash', 'source_metadata'])
+        .where('publication_id', '=', first.publicationId)
+        .where('is_current', '=', true)
+        .executeTakeFirstOrThrow();
+      const canonicalFilesBefore =
+        (canonicalBefore.source_metadata as
+          Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        canonicalFilesBefore[0]?.rawSha256,
+        canonicalFile.rawSha256,
+      );
 
       const seededHistory = [
+        {
+          kind: 'ORIGIN_ARTIFACT_RECOVERY',
+          previousOriginMetadata: {
+            sourceRole: 'VALIDATION',
+            authenticatedPdf:
+              'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
+            artifactEquivalence: {
+              kind:
+                'PROVEN_EQUIVALENT_REPRESENTATION',
+              equivalentExternalId:
+                opaqueEquivalenceSecret,
+            },
+            equivalentRepresentation: {
+              externalId:
+                opaqueRepresentationSecret,
+              authenticatedPdf: {
+                ownerExternalId:
+                  opaqueOwnerSecret,
+              },
+            },
+          },
+        },
         null,
         'malformed',
         { kind: 'WRONG_KIND' },
@@ -2538,6 +2601,12 @@ test(
         'textSha256',
         'Bearer-token',
         'token-secret-',
+        opaqueEquivalenceSecret,
+        opaqueRepresentationSecret,
+        opaqueOwnerSecret,
+        'equivalentExternalId',
+        'ownerExternalId',
+        '"equivalentRepresentation"',
         '7'.repeat(64),
         'y'.repeat(100),
       ]) {
@@ -2566,31 +2635,81 @@ test(
         previous.authenticatedPdf,
         'AUTH_PDF_404_EQUIVALENT_REPRESENTATION',
       );
-      const representation =
-        previous.equivalentRepresentation as
+      const historicalEquivalence =
+        previous.artifactEquivalence as
+          Record<string, unknown>;
+      assert.deepEqual(
+        historicalEquivalence,
+        {
+          kind:
+            'PROVEN_EQUIVALENT_REPRESENTATION',
+        },
+      );
+      assert.equal(
+        previous.equivalentRepresentation,
+        undefined,
+      );
+
+      const currentReconciliation =
+        afterMetadata.artifactReconciliation as
           Record<string, unknown>;
       assert.equal(
-        representation.externalId,
+        currentReconciliation.state,
+        'RECONCILED',
+      );
+      assert.equal(
+        currentReconciliation.equivalentExternalId,
         goodId,
+        'history redaction must not alter the current reconciliation proof',
       );
-      const safePdf =
-        representation.authenticatedPdf as
-          Record<string, unknown>;
+
+      const canonicalAfter = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'content_hash', 'source_metadata'])
+        .where('publication_id', '=', first.publicationId)
+        .where('is_current', '=', true)
+        .executeTakeFirstOrThrow();
       assert.equal(
-        safePdf.ownerExternalId,
-        goodId,
-      );
-      assert.equal(
-        safePdf.rawSha256,
-        undefined,
-      );
-      assert.equal(
-        safePdf.sizeBytes,
-        undefined,
+        canonicalAfter.id,
+        canonicalBefore.id,
       );
       assert.equal(
-        representation.textSha256,
-        undefined,
+        canonicalAfter.content_hash,
+        canonicalBefore.content_hash,
+      );
+      const canonicalFilesAfter =
+        (canonicalAfter.source_metadata as
+          Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        canonicalFilesAfter[0]?.rawSha256,
+        canonicalFile.rawSha256,
+      );
+
+      const ownership = await db
+        .selectFrom('publication_origins')
+        .select(['external_id', 'metadata'])
+        .where('source_id', '=', sourceId)
+        .execute();
+      const goodOrigin = ownership.find(
+        (row) => row.external_id === goodId,
+      )!;
+      const badOrigin = ownership.find(
+        (row) => row.external_id === badId,
+      )!;
+      const goodOriginFiles =
+        (goodOrigin.metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      const badOriginFiles =
+        (badOrigin.metadata as Record<string, unknown>)
+          .files as Array<Record<string, unknown>>;
+      assert.equal(
+        goodOriginFiles[0]?.rawSha256,
+        canonicalFile.rawSha256,
+      );
+      assert.equal(
+        badOriginFiles[0]?.rawSha256,
+        recoveredFile.rawSha256,
       );
     } finally {
       const ids = await db
