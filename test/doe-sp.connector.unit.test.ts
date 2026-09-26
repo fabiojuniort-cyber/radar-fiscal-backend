@@ -14,6 +14,7 @@ import { parseDoeSpSourceState, reopenFailedItems } from '../src/modules/collect
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import {
   ID,
+  details,
   list0901,
   list0902,
   list0904,
@@ -82,10 +83,16 @@ test('first run: collects only included acts, as individual publications with fi
   assert.equal(sre.publishedAt?.toISOString(), '2026-09-04T00:00:00.000Z');
   assert.equal(sre.metadata?.editionNumber, 169);
   assert.equal(sre.metadata?.supplementaryEditionCount, 1);
-  assert.equal(sre.files?.length, 1);
-  assert.equal(sre.files?.[0]?.mimeType, 'application/pdf');
-  assert.match(sre.files?.[0]?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
-  assert.equal(sre.files?.[0]?.metadata?.kind, 'AUTHENTICATED_PUBLICATION_PDF');
+  assert.equal(sre.files, undefined);
+  assert.equal(
+    sre.originMetadata?.authenticatedPdf,
+    'NOT_REQUESTED_REDUNDANT',
+  );
+  assert.equal(
+    sre.originMetadata?.contentRepresentation,
+    'OFFICIAL_HTML',
+  );
+  assert.equal(api.count('/v2/authentication/download/'), 0);
   assert.equal(sre.metadata?.ementa, 'Altera a Portaria CAT 125/11, de 9 de setembro de 2011, que institui o Sistema Ambiente de Pagamentos e o Documento de Arrecadação de Receitas Estaduais - DARE-SP.');
 
   const meta = result.metadata?.doeSp as Record<string, any>;
@@ -236,6 +243,52 @@ test('complete official HTML skips redundant authenticated PDF and completes the
     0,
     'checkpoint must reuse the complete HTML capture',
   );
+});
+
+test('missing official HTML downloads authenticated PDF as material fallback', async () => {
+  const overridden = {
+    ...details[ID.sre43]!,
+    content: '',
+  };
+  const api = portal({
+    days: { '2026-09-04': DAY_0904 },
+    details: { [ID.sre43]: overridden },
+  });
+  const result = await new DoeSpConnector({
+    fetch: api.fetch,
+    now: () => NOW,
+    readState: async () => EMPTY_DOE_SP_STATE,
+    lookbackDays: 1,
+    forceReprocess: false,
+  }).collect(context());
+
+  assert.equal(result.partialFailures, undefined);
+  assert.equal(result.publications.length, 1);
+  const publication = result.publications[0]!;
+  assert.equal(publication.content, undefined);
+  assert.equal(publication.contentHashPolicy, undefined);
+  assert.equal(
+    publication.metadata?.officialContentCompleteness,
+    'PARTIAL_OFFICIAL_CONTENT',
+  );
+  assert.equal(
+    publication.originMetadata?.authenticatedPdf,
+    'CAPTURED_MATERIAL',
+  );
+  assert.equal(
+    publication.originMetadata?.contentRepresentation,
+    'OFFICIAL_PDF',
+  );
+  assert.equal(publication.files?.length, 1);
+  assert.equal(
+    publication.files?.[0]?.metadata?.kind,
+    'AUTHENTICATED_PUBLICATION_PDF',
+  );
+  assert.equal(
+    publication.files?.[0]?.versionRole,
+    'MATERIAL_CONTENT',
+  );
+  assert.equal(api.count('/v2/authentication/download/'), 1);
 });
 
 test('malformed list items are isolated as partial failures', async () => {
