@@ -79,16 +79,25 @@ test('client: "Processando" envelope is a retryable NOT_READY error, not an inva
     String(error.metadata?.sourceMessage).includes('Processando'));
 });
 
-test('connector: a recent act whose PDF is still rendering is retried (not published yet)', async () => {
+test('connector: complete official HTML is published even while redundant authenticated PDF is still rendering', async () => {
   const result = await new DoeSpConnector({
     fetch: api('2026-09-24'), now: () => new Date('2026-09-24T15:00:00Z'), lookbackDays: 1,
     forceReprocess: false, readState: async () => EMPTY_DOE_SP_STATE,
   }).collect(context());
-  assert.equal(result.publications.length, 0);
-  assert.equal(result.partialFailures?.[0]?.code, 'DOE_SP_AUTHENTICATED_PDF_NOT_READY');
+  assert.equal(result.partialFailures, undefined);
+  assert.equal(result.publications.length, 1);
+  const publication = result.publications[0]!;
+  assert.equal(publication.contentHashPolicy, 'HTML_PRIMARY_MATERIAL_FILES');
+  assert.equal(publication.metadata?.officialContentCompleteness, 'FULL_OFFICIAL_CONTENT');
+  assert.equal(publication.metadata?.authenticatedPdf, 'NOT_RENDERED_BY_SOURCE');
+  assert.equal(
+    (publication.metadata?.authenticatedPdfError as Record<string, unknown>)?.code,
+    'DOE_SP_AUTHENTICATED_PDF_NOT_READY',
+  );
+  assert.equal(publication.files, undefined);
 });
 
-test('connector: after the grace period the act is published without the never-rendered PDF, deterministically', async () => {
+test('connector: old never-rendered PDF remains non-blocking and deterministic under HTML-primary policy', async () => {
   const run = () => new DoeSpConnector({
     fetch: api('2025-02-05'), now: () => new Date('2026-09-24T15:00:00Z'), lookbackDays: 1,
     bootstrapStartDate: '2025-02-05', forceReprocess: false, readState: async () => ({
@@ -178,19 +187,130 @@ test('connector: authenticated PDF HTTP diagnostics survive in the recorded part
     readState: async () => EMPTY_DOE_SP_STATE,
   }).collect(context());
 
-  assert.equal(result.publications.length, 0);
-  const failure = result.partialFailures?.[0];
-  assert.equal(failure?.code, 'DOE_SP_HTTP_ERROR');
-  assert.match(failure?.message ?? '', /status=403/);
-  assert.match(failure?.message ?? '', /endpoint=\/v2\/authentication\/download\/\{authCode\}/);
-  assert.match(failure?.message ?? '', /contentType=application\/problem\+json; charset=utf-8/);
-  assert.match(failure?.message ?? '', /Forbidden by upstream/);
-  assert.ok(!(failure?.message ?? '').includes(marker));
-  assert.ok(!(failure?.message ?? '').includes('B'.repeat(80)));
+  assert.equal(result.partialFailures, undefined);
+  assert.equal(result.publications.length, 1);
+  const publication = result.publications[0]!;
+  assert.equal(
+    publication.metadata?.authenticatedPdf,
+    'UNAVAILABLE_REDUNDANT',
+  );
+  const diagnostic =
+    publication.metadata?.authenticatedPdfError as
+      Record<string, unknown>;
+  assert.equal(diagnostic.code, 'DOE_SP_HTTP_ERROR');
+  assert.equal(diagnostic.kind, 'HTTP_ERROR');
+  assert.equal(diagnostic.httpStatus, 403);
+  assert.ok(!JSON.stringify(diagnostic).includes(marker));
+  assert.ok(!JSON.stringify(diagnostic).includes('B'.repeat(80)));
 });
 
 
-test('policy gate: redundant authenticated PDF changes legacy contentHash even when official HTML and identity are identical', () => {
+test('connector: authenticated PDF 404 is recorded as provenance failure and does not block complete official HTML', async () => {
+  const date = '2026-09-24';
+  const regular = api(date);
+  const notFoundFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = new URL(input.toString());
+    if (
+      url.pathname.startsWith(
+        '/v2/authentication/download/',
+      )
+    ) {
+      return json(
+        {
+          title: 'HTTP 404 Not Found',
+          message:
+            'Documento autenticado não disponível.',
+        },
+        404,
+      );
+    }
+    return regular(input, init);
+  }) as typeof fetch;
+
+  const result = await new DoeSpConnector({
+    fetch: notFoundFetch,
+    now: () => new Date('2026-09-24T15:00:00Z'),
+    lookbackDays: 1,
+    forceReprocess: false,
+    readState: async () => EMPTY_DOE_SP_STATE,
+  }).collect(context());
+
+  assert.equal(result.partialFailures, undefined);
+  assert.equal(result.publications.length, 1);
+  const publication = result.publications[0]!;
+  assert.ok(publication.content);
+  assert.equal(
+    publication.metadata?.authenticatedPdf,
+    'UNAVAILABLE_REDUNDANT',
+  );
+  assert.equal(
+    (publication.metadata?.authenticatedPdfError as Record<string, unknown>)
+      ?.httpStatus,
+    404,
+  );
+  assert.equal(publication.files, undefined);
+});
+
+test('connector: missing material attachment keeps the item/day incomplete instead of claiming integral capture', async () => {
+  const date = '2026-09-24';
+  const regular = api(date);
+  const attachmentId = 'material-attachment-1';
+  const fetchWithMissingAttachment = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = new URL(input.toString());
+    if (url.pathname === `/v2/publications/${ID}`) {
+      return json({
+        id: ID,
+        title:
+          'COMUNICADO, DE 4 DE FEVEREIRO DE 2025',
+        slug: SLUG,
+        date,
+        journal: 'Executivo',
+        section: 'Diretoria de Inteligência de Dados',
+        firstLevelSectionName: 'Atos Normativos',
+        secondLevelSectionName:
+          'Secretaria da Fazenda e Planejamento',
+        publicationType: 'Comunicado',
+        editionPages: [],
+        content:
+          '<p>Texto principal integral; tabela normativa no anexo.</p>',
+        attachments: [{
+          id: attachmentId,
+          name: 'tabela.pdf',
+          position: 1,
+        }],
+        authCode: undefined,
+      });
+    }
+    if (url.pathname.includes(attachmentId)) {
+      return json({ title: 'Not Found' }, 404);
+    }
+    return regular(input, init);
+  }) as typeof fetch;
+
+  const result = await new DoeSpConnector({
+    fetch: fetchWithMissingAttachment,
+    now: () => new Date('2026-09-24T15:00:00Z'),
+    lookbackDays: 1,
+    forceReprocess: false,
+    readState: async () => EMPTY_DOE_SP_STATE,
+  }).collect(context());
+
+  assert.equal(result.publications.length, 0);
+  assert.ok((result.partialFailures?.length ?? 0) > 0);
+  const doeSp = result.metadata?.doeSp as {
+    days: Array<{ complete: boolean; failed: number }>;
+  };
+  assert.equal(doeSp.days[0]?.complete, false);
+  assert.equal(doeSp.days[0]?.failed, 1);
+});
+
+test('HTML-primary v2 excludes redundant authenticated PDF from contentHash while legacy v1 remains unchanged', () => {
   const shared = {
     title: 'PORTARIA SRE 42, DE 28 DE JULHO DE 2025',
     agency: 'SEFAZ-SP/SRE',
@@ -204,15 +324,51 @@ test('policy gate: redundant authenticated PDF changes legacy contentHash even w
     externalId: 'doe-sp-html-primary-gate',
   };
 
-  const htmlOnly = normalizePublication({
+  const legacyHtmlOnly = normalizePublication({
     sourceId: context().sourceId,
     publication: shared,
+  });
+  const legacyWithPdf = normalizePublication({
+    sourceId: context().sourceId,
+    publication: {
+      ...shared,
+      contentHashPolicy:
+        'HTML_PRIMARY_MATERIAL_FILES',
+      files: [{
+        url: 'https://do-api-publication-pdf.doe.sp.gov.br/authenticated.pdf',
+        mimeType: 'application/pdf',
+        rawSha256:
+          '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30',
+        sizeBytes: 466_065,
+        versionRole: 'PROVENANCE',
+        metadata: {
+          kind: 'AUTHENTICATED_PUBLICATION_PDF',
+          origin: 'DOE_SP',
+        },
+      }],
+    },
+  });
+  assert.notEqual(
+    legacyHtmlOnly.contentHash,
+    legacyWithPdf.contentHash,
+    'v1 compatibility must remain byte-for-byte all-files semantics',
+  );
+
+  const htmlOnly = normalizePublication({
+    sourceId: context().sourceId,
+    publication: {
+      ...shared,
+      contentHashPolicy:
+        'HTML_PRIMARY_MATERIAL_FILES',
+    },
   });
 
   const withRedundantAuthenticatedPdf = normalizePublication({
     sourceId: context().sourceId,
     publication: {
       ...shared,
+      contentHashPolicy:
+        'HTML_PRIMARY_MATERIAL_FILES',
       files: [{
         url: 'https://do-api-publication-pdf.doe.sp.gov.br/authenticated.pdf',
         mimeType: 'application/pdf',
@@ -235,10 +391,22 @@ test('policy gate: redundant authenticated PDF changes legacy contentHash even w
     htmlOnly.contentText,
     withRedundantAuthenticatedPdf.contentText,
   );
-  assert.notEqual(
+  assert.equal(
     htmlOnly.contentHash,
     withRedundantAuthenticatedPdf.contentHash,
-    'legacy contentHash includes redundant authenticated-PDF hashes and is therefore incompatible with HTML-only replay',
+    'v2 must ignore redundant provenance-only PDFs',
+  );
+  assert.equal(htmlOnly.contentHashVersion, 2);
+  assert.equal(withRedundantAuthenticatedPdf.contentHashVersion, 2);
+  assert.equal(
+    (withRedundantAuthenticatedPdf.metadata.files as unknown[] | undefined),
+    undefined,
+    'provenance-only PDF must not be copied into version metadata',
+  );
+  assert.equal(
+    ((withRedundantAuthenticatedPdf.originMetadata.files as unknown[]) ?? []).length,
+    1,
+    'provenance-only PDF remains attached to its source origin',
   );
 });
 
@@ -258,7 +426,11 @@ test('policy gate: attachment with independent content remains version-relevant 
 
   const withoutAttachment = normalizePublication({
     sourceId: context().sourceId,
-    publication: shared,
+    publication: {
+      ...shared,
+      contentHashPolicy:
+        'HTML_PRIMARY_MATERIAL_FILES',
+    },
   });
 
   const withMaterialAttachment = normalizePublication({
@@ -271,6 +443,7 @@ test('policy gate: attachment with independent content remains version-relevant 
         rawSha256:
           'b7a902c4f91381ba732525d83fb422e62156fc8040aa7862ef53c307caf7a341',
         sizeBytes: 152_681,
+        versionRole: 'MATERIAL_CONTENT',
         metadata: {
           kind: 'ATTACHMENT',
           origin: 'DOE_SP',

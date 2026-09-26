@@ -146,7 +146,7 @@ async function upsertCollectionItem(
           source_url:
             input.publication.officialUrl,
           raw_metadata: asJson(
-            input.publication.metadata,
+            input.publication.originMetadata,
           ),
           updated_at: new Date(),
         }),
@@ -286,7 +286,7 @@ async function upsertOrigin(
         official_url: input.publication.officialUrl,
         last_seen_at: new Date(),
         metadata: asJson(
-          input.publication.metadata,
+          input.publication.originMetadata,
         ),
       })
       .where('id', '=', origin.id)
