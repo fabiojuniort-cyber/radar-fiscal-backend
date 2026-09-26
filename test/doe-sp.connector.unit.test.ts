@@ -201,11 +201,11 @@ test('redundant authenticated PDF failure does not block the day or force a retr
   assert.equal(result.partialFailures, undefined);
   const publication = result.publications[0]!;
   assert.equal(
-    publication.metadata?.authenticatedPdf,
+    publication.originMetadata?.authenticatedPdf,
     'UNAVAILABLE_REDUNDANT',
   );
   assert.equal(
-    (publication.metadata?.authenticatedPdfError as Record<string, unknown>)?.code,
+    (publication.originMetadata?.authenticatedPdfError as Record<string, unknown>)?.code,
     'DOE_SP_SOURCE_UNAVAILABLE',
   );
 
