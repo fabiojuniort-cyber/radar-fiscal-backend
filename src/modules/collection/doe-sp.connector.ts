@@ -55,13 +55,6 @@ export const DOE_SP_SECTION = 'Atos Normativos';
  */
 export const DOE_SP_DEFAULT_LOOKBACK_DAYS = 3;
 const MAX_EXCLUDED_SAMPLES = 200;
-/**
- * Days after the DOE date during which a not-yet-rendered authenticated PDF
- * is retried (item fails and is reprocessed on the next run). Observed in
- * production: act b8bec255-… of 05/02/2025 (7.5 MB HTML) is still
- * "Processando" 19 months later.
- */
-export const DOE_SP_AUTH_PDF_GRACE_DAYS = 7;
 const DAY_MS = 86_400_000;
 
 export interface DoeSpDayState {
@@ -312,7 +305,14 @@ export class DoeSpConnector implements CollectionConnector {
       discoveredCount: 0, includedCount: 0, excludedCount: 0,
       includedByCategory: {}, excludedByReason: {}, excludedSamples: [], excludedSamplesTruncated: 0,
     };
-    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, authPdfNotRendered: 0 };
+    const counters = {
+      detailsFetched: 0,
+      filesDownloaded: 0,
+      fileBytes: 0,
+      editionLookups: 0,
+      sourceErrors: 0,
+      authPdfUnavailable: 0,
+    };
     const typeCache = new Map<string, Map<string, string>>();
 
     const typesFor = async (date: string): Promise<Map<string, string>> => {
@@ -365,23 +365,63 @@ export class DoeSpConnector implements CollectionConnector {
       const detail = parseDoeSpDetail(response.body, item.id);
       const capturedAt = now.toISOString();
       const files: ConnectorFile[] = [];
+      const contentText = doeSpHtmlText(detail.contentHtml);
 
-      let authenticatedPdf: 'CAPTURED' | 'NOT_RENDERED_BY_SOURCE' | 'NO_AUTH_CODE' = detail.authCode ? 'CAPTURED' : 'NO_AUTH_CODE';
+      let authenticatedPdf:
+        | 'CAPTURED'
+        | 'UNAVAILABLE_REDUNDANT'
+        | 'NO_AUTH_CODE' = detail.authCode
+          ? 'CAPTURED'
+          : 'NO_AUTH_CODE';
+      let authenticatedPdfError:
+        | { code: string; httpStatus?: number }
+        | undefined;
+
       const pdf = detail.authCode
-        ? await client.downloadAuthenticatedPdf(detail.authCode, context.signal).catch((error: unknown) => {
-            // A PDF the source never rendered must not block the act forever:
-            // after the grace period the act is kept (official HTML text) without it.
-            if (
-              error instanceof ConnectorError &&
-              error.code === 'DOE_SP_AUTHENTICATED_PDF_NOT_READY' &&
-              detail.date <= addDays(today, -DOE_SP_AUTH_PDF_GRACE_DAYS)
-            ) {
-              authenticatedPdf = 'NOT_RENDERED_BY_SOURCE';
-              counters.authPdfNotRendered += 1;
+        ? await client
+            .downloadAuthenticatedPdf(
+              detail.authCode,
+              context.signal,
+            )
+            .catch((error: unknown) => {
+              if (isCancel(error)) {
+                throw error;
+              }
+
+              /*
+               * D-017 / DOE-SP: the official detail page already contains
+               * the full act text. An isolated authenticated-PDF failure is
+               * provenance degradation, not publication failure.
+               *
+               * If the official page has no text, we cannot claim a full
+               * capture and keep the existing failure behavior instead.
+               */
+              if (!contentText) {
+                throw error;
+              }
+
+              authenticatedPdf =
+                'UNAVAILABLE_REDUNDANT';
+              counters.authPdfUnavailable += 1;
+              authenticatedPdfError =
+                error instanceof ConnectorError
+                  ? {
+                      code: error.code,
+                      ...(error.httpStatus !==
+                      undefined
+                        ? {
+                            httpStatus:
+                              error.httpStatus,
+                          }
+                        : {}),
+                    }
+                  : {
+                      code:
+                        'DOE_SP_AUTHENTICATED_PDF_UNAVAILABLE',
+                    };
+
               return undefined;
-            }
-            throw error;
-          })
+            })
         : undefined;
       if (detail.authCode && pdf) {
         counters.filesDownloaded += 1;
@@ -411,7 +451,6 @@ export class DoeSpConnector implements CollectionConnector {
         });
       }
 
-      const contentText = doeSpHtmlText(detail.contentHtml);
       const identity = doeSpNormativeIdentity({ title: detail.title, ...(typeName ? { typeName } : {}), category });
       const actType = identity?.actType ?? doeSpActType(detail.title, detail.publicationType ?? typeName);
       const organ = doeSpOrgan(item.hierarchy);
@@ -455,7 +494,13 @@ export class DoeSpConnector implements CollectionConnector {
           ...(edition.editionPdfUrl ? { editionPdfUrl: edition.editionPdfUrl } : {}),
           supplementaryEditionCount: edition.supplementaryEditionCount,
           textExtraction: contentText ? 'HTML_TEXT' : 'EMPTY',
+          contentPolicy: contentText
+            ? 'FULL_OFFICIAL_PAGE'
+            : 'PARTIAL_OFFICIAL_PAGE',
           authenticatedPdf,
+          ...(authenticatedPdfError
+            ? { authenticatedPdfError }
+            : {}),
           attachmentCount: detail.attachments.length,
         },
       };
