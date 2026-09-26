@@ -361,7 +361,8 @@ export class DoeSpConnector implements CollectionConnector {
       const contentText =
         doeSpHtmlText(detail.contentHtml);
       const officialContentCompleteness =
-        contentText
+        contentText &&
+        detail.attachments.length === 0
           ? 'FULL_OFFICIAL_CONTENT'
           : 'PARTIAL_OFFICIAL_CONTENT';
 
@@ -435,8 +436,23 @@ export class DoeSpConnector implements CollectionConnector {
           externalId: 'auth:' + detail.authCode,
           rawSha256: pdf.rawSha256,
           sizeBytes: pdf.sizeBytes,
-          versionRole: 'PROVENANCE',
-          metadata: { kind: 'AUTHENTICATED_PUBLICATION_PDF', capturedAt, origin: 'DOE_SP', textExtraction: 'NOT_REQUIRED_HTML_TEXT_AVAILABLE' },
+          versionRole: contentText
+            ? 'PROVENANCE'
+            : 'MATERIAL_CONTENT',
+          metadata: {
+            kind: 'AUTHENTICATED_PUBLICATION_PDF',
+            capturedAt,
+            origin: 'DOE_SP',
+            ...(contentText
+              ? {
+                  textExtraction:
+                    'NOT_REQUIRED_HTML_TEXT_AVAILABLE',
+                }
+              : {
+                  materialContent: true,
+                  textExtraction: 'NOT_EXTRACTED',
+                }),
+          },
         });
       }
       for (const attachment of detail.attachments) {
@@ -474,8 +490,12 @@ export class DoeSpConnector implements CollectionConnector {
         officialUrl: publicationPageUrl(detail.slug),
         externalId: detail.id,
         ...(isRetification ? { identityKey: `DOE_SP|RETIFICACAO|${detail.id}` } : {}),
-        contentHashPolicy:
-          'HTML_PRIMARY_MATERIAL_FILES',
+        ...(contentText
+          ? {
+              contentHashPolicy:
+                'HTML_PRIMARY_MATERIAL_FILES' as const,
+            }
+          : {}),
         ...(files.length ? { files } : {}),
         metadata: {
           sourceRole: 'PRIMARY',
