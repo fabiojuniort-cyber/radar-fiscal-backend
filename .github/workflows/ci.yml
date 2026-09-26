@@ -35,6 +35,7 @@ jobs:
       DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
       JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
       AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
       DB_POOL_MAX: 1
 
     steps:
