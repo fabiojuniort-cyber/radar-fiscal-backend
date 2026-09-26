@@ -103,10 +103,10 @@ Endpoints:
 Browser CORS is restricted by:
 
 ```text
-PUBLIC_API_ALLOWED_ORIGINS=https://prototype.example,https://www.tribusca.com.br
+PUBLIC_API_ALLOWED_ORIGINS=https://<railway-prototype-host>,https://<final-site-host>
 ```
 
-The value is a comma-separated allowlist. Public routes never emit `Access-Control-Allow-Credentials`. Requests without an `Origin` header remain allowed for same-origin/server-to-server access; a browser `Origin` outside the allowlist receives HTTP 403.
+The value is a comma-separated allowlist. The exact Railway prototype and final-site origins are deployment inputs and are intentionally not hard-coded before those domains are confirmed. Public routes never emit `Access-Control-Allow-Credentials`. Allowed browser preflight requests advertise only `GET`; requests without an `Origin` header remain allowed for same-origin/server-to-server access; a browser `Origin` outside the allowlist receives HTTP 403.
 
 Responses use:
 
