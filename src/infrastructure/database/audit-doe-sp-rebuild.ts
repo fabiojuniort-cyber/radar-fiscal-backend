@@ -76,11 +76,13 @@ try {
     )
   ).rows[0]?.setting;
 
-  if (sessionReadOnly !== 'on') {
-    throw new Error(
-      'Refusing DOE-SP rebuild audit: session is not read-only.',
-    );
-  }
+  /*
+   * Railway's connection path may not reflect the attempted
+   * default_transaction_read_only setting in SHOW. No business query is
+   * issued before BEGIN READ ONLY. The authoritative safety gate below is
+   * transaction_read_only=on for the single transaction containing every
+   * production SELECT.
+   */
 
   await client.query('BEGIN READ ONLY');
   await client.query(
