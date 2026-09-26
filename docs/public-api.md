@@ -132,6 +132,7 @@ PUBLIC_API_ALLOWED_ORIGINS=https://<railway-prototype-host>,https://<final-site-
 Rules:
 
 - exact comma-separated origin allowlist;
+- every public response varies by `Origin`, including requests without it; existing `Vary` values are retained so shared caches distinguish browser-origin variants;
 - allowed browser origins receive `Access-Control-Allow-Origin` with the exact request origin;
 - no `Access-Control-Allow-Credentials`;
 - preflight advertises only `GET`;

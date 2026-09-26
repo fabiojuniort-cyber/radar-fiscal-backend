@@ -478,6 +478,51 @@ test(
       );
 
       await t.test(
+        'public cache varies between requests with and without Origin',
+        async () => {
+          const withoutOrigin = await app.inject({
+            method: 'GET',
+            url: '/public/v1/stats',
+          });
+          const withAllowedOrigin = await app.inject({
+            method: 'GET',
+            url: '/public/v1/stats',
+            headers: {
+              origin: 'https://public.example',
+            },
+          });
+
+          for (const response of [
+            withoutOrigin,
+            withAllowedOrigin,
+          ]) {
+            assert.equal(response.statusCode, 200);
+            assert.match(
+              String(response.headers.vary),
+              /(?:^|,\s*)Origin(?:,|$)/i,
+            );
+            assert.equal(
+              response.headers['cache-control'],
+              'public, max-age=300',
+            );
+          }
+
+          assert.equal(
+            withoutOrigin.headers[
+              'access-control-allow-origin'
+            ],
+            undefined,
+          );
+          assert.equal(
+            withAllowedOrigin.headers[
+              'access-control-allow-origin'
+            ],
+            'https://public.example',
+          );
+        },
+      );
+
+      await t.test(
         'configured CORS answers browser preflight with GET only',
         async () => {
           const response = await app.inject({
@@ -519,6 +564,10 @@ test(
             ],
             undefined,
           );
+          assert.match(
+            String(response.headers.vary),
+            /(?:^|,\s*)Origin(?:,|$)/i,
+          );
         },
       );
 
@@ -548,6 +597,16 @@ test(
           assert.equal(
             response.headers[
               'cache-control'
+            ],
+            undefined,
+          );
+          assert.match(
+            String(response.headers.vary),
+            /(?:^|,\s*)Origin(?:,|$)/i,
+          );
+          assert.equal(
+            response.headers[
+              'access-control-allow-origin'
             ],
             undefined,
           );

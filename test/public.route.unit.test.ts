@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   derivePublicSourceStatus,
+  withOriginVary,
 } from '../src/api/routes/public.route.js';
 
 const NOW = new Date('2026-09-26T15:00:00-03:00');
@@ -127,4 +128,31 @@ test('running and pending sources use the 48-hour success window', () => {
       'UNAVAILABLE',
     );
   }
+});
+
+
+test('public CORS preserves other Vary values and avoids duplicate Origin', () => {
+  assert.equal(
+    withOriginVary(undefined),
+    'Origin',
+  );
+  assert.equal(
+    withOriginVary('Accept-Encoding'),
+    'Accept-Encoding, Origin',
+  );
+  assert.equal(
+    withOriginVary([
+      'Accept-Encoding',
+      'Accept-Language',
+    ]),
+    'Accept-Encoding, Accept-Language, Origin',
+  );
+  assert.equal(
+    withOriginVary('Accept-Encoding, origin'),
+    'Accept-Encoding, origin',
+  );
+  assert.equal(
+    withOriginVary('*'),
+    '*',
+  );
 });

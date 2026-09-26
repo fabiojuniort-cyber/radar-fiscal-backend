@@ -137,10 +137,39 @@ function allowedOrigins(): Set<string> {
   );
 }
 
+export function withOriginVary(
+  current: string | number | string[] | undefined,
+): string {
+  const raw = Array.isArray(current)
+    ? current.join(', ')
+    : String(current ?? '');
+  const values = raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (
+    values.some(
+      (value) =>
+        value === '*' ||
+        value.toLowerCase() === 'origin',
+    )
+  ) {
+    return values.join(', ');
+  }
+
+  return [...values, 'Origin'].join(', ');
+}
+
 async function enforcePublicCors(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
+  reply.header(
+    'Vary',
+    withOriginVary(reply.getHeader('Vary')),
+  );
+
   const origin = request.headers.origin;
 
   if (!origin) {
@@ -160,7 +189,6 @@ async function enforcePublicCors(
     'Access-Control-Allow-Origin',
     origin,
   );
-  reply.header('Vary', 'Origin');
 }
 
 interface SourceRow {
