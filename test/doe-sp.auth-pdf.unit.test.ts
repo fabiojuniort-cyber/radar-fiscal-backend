@@ -97,6 +97,57 @@ test('connector: complete official HTML is published even while redundant authen
   assert.equal(publication.files, undefined);
 });
 
+test('connector: missing official HTML does not opt into HTML-primary and still requires the material PDF', async () => {
+  const date = '2026-09-24';
+  const regular = api(date);
+  const noHtmlFetch = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = new URL(input.toString());
+    if (url.pathname === `/v2/publications/${ID}`) {
+      return json({
+        id: ID,
+        title:
+          'COMUNICADO, DE 4 DE FEVEREIRO DE 2025',
+        slug: SLUG,
+        date,
+        journal: 'Executivo',
+        section: 'Diretoria de Inteligência de Dados',
+        firstLevelSectionName: 'Atos Normativos',
+        secondLevelSectionName:
+          'Secretaria da Fazenda e Planejamento',
+        publicationType: 'Comunicado',
+        editionPages: [],
+        content: '',
+        attachments: [],
+        authCode:
+          '2025.02.04.1.1.27.5.3.4.199.861381',
+      });
+    }
+    return regular(input, init);
+  }) as typeof fetch;
+
+  const result = await new DoeSpConnector({
+    fetch: noHtmlFetch,
+    now: () => new Date('2026-09-24T15:00:00Z'),
+    lookbackDays: 1,
+    forceReprocess: false,
+    readState: async () => EMPTY_DOE_SP_STATE,
+  }).collect(context());
+
+  assert.equal(result.publications.length, 0);
+  assert.equal(
+    result.partialFailures?.[0]?.code,
+    'DOE_SP_AUTHENTICATED_PDF_NOT_READY',
+  );
+  const day = (result.metadata?.doeSp as {
+    days: Array<{ complete: boolean; failed: number }>;
+  }).days[0];
+  assert.equal(day?.complete, false);
+  assert.equal(day?.failed, 1);
+});
+
 test('connector: old never-rendered PDF remains non-blocking and deterministic under HTML-primary policy', async () => {
   const run = () => new DoeSpConnector({
     fetch: api('2025-02-05'), now: () => new Date('2026-09-24T15:00:00Z'), lookbackDays: 1,
