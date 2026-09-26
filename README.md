@@ -88,3 +88,34 @@ npm run test:collection-integration
 The Worker and Scheduler use the dedicated PostgreSQL role `radar_worker_runtime`. Real government connectors are intentionally not part of this phase.
 
 See [docs/phase-3-collection-engine.md](docs/phase-3-collection-engine.md) for the architecture and handoff decisions.
+
+
+## Public read-only API
+
+API-01 exposes official/public data for the public TriBusca website under `/public/v1`.
+
+Endpoints:
+
+- `GET /public/v1/sources`
+- `GET /public/v1/publications?uf=SP&limit=3`
+- `GET /public/v1/stats`
+
+The public API exposes only source health and publication metadata already public by nature. It does **not** expose publication `content_text`, tenants, companies, users, monitoring profiles, matches or authentication/session data.
+
+Browser CORS is restricted by:
+
+```bash
+PUBLIC_API_ALLOWED_ORIGINS=https://site.example,https://prototype.example
+```
+
+The value is a comma-separated allowlist. If it is empty, cross-origin browser requests are denied by default; same-origin/server-to-server requests without an `Origin` header remain possible. Credentials are never enabled for these routes.
+
+Public GET responses use:
+
+```text
+Cache-Control: public, max-age=300
+```
+
+Rate limiting per IP is **pending** because the backend does not currently include a rate-limit plugin. This does not change private/authenticated route behavior.
+
+See [docs/public-api.md](docs/public-api.md) for the contract and status mapping.
