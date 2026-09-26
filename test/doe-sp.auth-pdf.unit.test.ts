@@ -332,15 +332,12 @@ test('HTML-primary v2 excludes redundant authenticated PDF from contentHash whil
     sourceId: context().sourceId,
     publication: {
       ...shared,
-      contentHashPolicy:
-        'HTML_PRIMARY_MATERIAL_FILES',
       files: [{
         url: 'https://do-api-publication-pdf.doe.sp.gov.br/authenticated.pdf',
         mimeType: 'application/pdf',
         rawSha256:
           '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30',
         sizeBytes: 466_065,
-        versionRole: 'PROVENANCE',
         metadata: {
           kind: 'AUTHENTICATED_PUBLICATION_PDF',
           origin: 'DOE_SP',
@@ -375,6 +372,7 @@ test('HTML-primary v2 excludes redundant authenticated PDF from contentHash whil
         rawSha256:
           '8a7e747ac3233fb9dd33df41416086c2860b5c2f2099d7bd0df106bfa26f4f30',
         sizeBytes: 466_065,
+        versionRole: 'PROVENANCE',
         metadata: {
           kind: 'AUTHENTICATED_PUBLICATION_PDF',
           origin: 'DOE_SP',
