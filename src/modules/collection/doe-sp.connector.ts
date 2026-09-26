@@ -512,7 +512,6 @@ export class DoeSpConnector implements CollectionConnector {
           captureCategory: category,
           identityMode: identity ? 'NORMATIVE' : isRetification ? 'RETIFICATION' : 'DOE_PUBLICATION_ID',
           slug: detail.slug,
-          ...(detail.authCode ? { authCode: detail.authCode } : {}),
           editionHint: editionHint(item),
           ...(edition.editionAuthCode ? { editionAuthCode: edition.editionAuthCode } : {}),
           ...(edition.number !== undefined ? { editionNumber: edition.number } : {}),
@@ -521,11 +520,14 @@ export class DoeSpConnector implements CollectionConnector {
           supplementaryEditionCount: edition.supplementaryEditionCount,
           textExtraction: contentText ? 'HTML_TEXT' : 'EMPTY',
           officialContentCompleteness,
+          attachmentCount: detail.attachments.length,
+        },
+        originMetadata: {
+          ...(detail.authCode ? { authCode: detail.authCode } : {}),
           authenticatedPdf,
           ...(authenticatedPdfError
             ? { authenticatedPdfError }
             : {}),
-          attachmentCount: detail.attachments.length,
         },
       };
     };
