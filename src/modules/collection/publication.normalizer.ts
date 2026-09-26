@@ -436,6 +436,10 @@ export function normalizePublication(
   const baseMetadata = {
     ...(input.publication.metadata ?? {}),
   };
+  const baseOriginMetadata = {
+    ...baseMetadata,
+    ...(input.publication.originMetadata ?? {}),
+  };
   const metadata =
     contentHashVersion === 1
       ? {
@@ -454,9 +458,14 @@ export function normalizePublication(
         };
   const originMetadata =
     contentHashVersion === 1
-      ? metadata
+      ? {
+          ...baseOriginMetadata,
+          ...(files.length > 0
+            ? { files }
+            : {}),
+        }
       : {
-          ...baseMetadata,
+          ...baseOriginMetadata,
           contentHashVersion: 2,
           contentHashPolicy,
           ...(files.length > 0
