@@ -216,6 +216,24 @@ function normalizeFiles(
   });
 }
 
+const RESERVED_PUBLICATION_METADATA_KEYS = [
+  'artifactEquivalence',
+  'artifactReconciliation',
+  'artifactReconciliationHistory',
+] as const;
+
+function withoutReservedPublicationMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const safe = { ...(metadata ?? {}) };
+
+  for (const key of RESERVED_PUBLICATION_METADATA_KEYS) {
+    delete safe[key];
+  }
+
+  return safe;
+}
+
 function buildIdentity(
   input: {
     sourceId: string;
@@ -335,6 +353,10 @@ export function normalizePublication(
     input.publication.versionFiles ??
       input.publication.files,
   );
+  const publicationMetadata =
+    withoutReservedPublicationMetadata(
+      input.publication.metadata,
+    );
 
   const publishedOn = normalizeDate(
     input.publication.publishedAt,
@@ -420,13 +442,13 @@ export function normalizePublication(
     ...(externalId ? { externalId } : {}),
     sourceItemKey: externalId ?? officialUrl,
     metadata: {
-      ...(input.publication.metadata ?? {}),
+      ...publicationMetadata,
       ...(files.length > 0
         ? { files }
         : {}),
     },
     originMetadata: {
-      ...(input.publication.metadata ?? {}),
+      ...publicationMetadata,
       ...(originFiles.length > 0
         ? { files: originFiles }
         : {}),
