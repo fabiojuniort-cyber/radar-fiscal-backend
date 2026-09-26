@@ -266,6 +266,22 @@ test('bootstrap walks back days once, with retifications isolated and attachment
   assert.equal(dicar.agency, 'SEFAZ-SP/DICAR');
   assert.equal(dicar.files?.length, 2);
   const attachment = dicar.files?.find((file) => file.metadata?.kind === 'ATTACHMENT');
+  const authenticatedPdf = dicar.files?.find(
+    (file) =>
+      file.metadata?.kind ===
+      'AUTHENTICATED_PUBLICATION_PDF',
+  );
+  assert.equal(
+    dicar.metadata?.officialContentCompleteness,
+    'PARTIAL_OFFICIAL_CONTENT',
+    'page alone is not integral when a material attachment exists',
+  );
+  assert.equal(
+    dicar.contentHashPolicy,
+    'HTML_PRIMARY_MATERIAL_FILES',
+  );
+  assert.equal(attachment?.versionRole, 'MATERIAL_CONTENT');
+  assert.equal(authenticatedPdf?.versionRole, 'PROVENANCE');
   assert.equal(attachment?.name, 'Anexo_Com DICAR-59 - Publicação Juros ITCMD e IPVA - SET-26.pdf');
   assert.equal(attachment?.externalId, 'ede64d5b-2bdc-4c9b-bfd3-841a1c69eded');
   assert.match(attachment?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
