@@ -93,6 +93,196 @@ function isPrimaryAuthoritativeVersionPolicy(
     .versionPolicy === 'PRIMARY_AUTHORITATIVE';
 }
 
+
+function metadataRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
+    return undefined;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function metadataFiles(
+  metadata: unknown,
+): Array<Record<string, unknown>> {
+  const files = metadataRecord(metadata)?.files;
+
+  if (!Array.isArray(files)) {
+    return [];
+  }
+
+  return files
+    .map((file) => metadataRecord(file))
+    .filter(
+      (
+        file,
+      ): file is Record<string, unknown> =>
+        file !== undefined,
+    );
+}
+
+function fileKind(
+  file: Record<string, unknown>,
+): string | undefined {
+  const kind = metadataRecord(file.metadata)?.kind;
+
+  return typeof kind === 'string'
+    ? kind
+    : undefined;
+}
+
+function isFullOfficialPageContentPolicy(
+  metadata: unknown,
+): boolean {
+  return (
+    metadataRecord(metadata)?.contentPolicy ===
+    'FULL_OFFICIAL_PAGE'
+  );
+}
+
+function materialFileHashes(
+  metadata: unknown,
+): string[] {
+  return metadataFiles(metadata)
+    .filter(
+      (file) =>
+        fileKind(file) !==
+        'AUTHENTICATED_PUBLICATION_PDF',
+    )
+    .map((file) => file.rawSha256)
+    .filter(
+      (hash): hash is string =>
+        typeof hash === 'string',
+    )
+    .map((hash) => hash.toLowerCase())
+    .sort();
+}
+
+function dateOnly(
+  value: Date | string | null | undefined,
+): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return value.slice(0, 10);
+}
+
+function sameStringList(
+  left: string[],
+  right: string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (value, index) => value === right[index],
+    )
+  );
+}
+
+function sameOfficialPageMaterial(
+  current: {
+    title: string;
+    effectiveOn: Date | string | null;
+    contentText: string | null;
+    sourceMetadata: unknown;
+  },
+  incoming: NormalizedPublication,
+): boolean {
+  if (
+    !isFullOfficialPageContentPolicy(
+      incoming.metadata,
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    current.title === incoming.title &&
+    (current.contentText ?? null) ===
+      (incoming.contentText ?? null) &&
+    dateOnly(current.effectiveOn) ===
+      dateOnly(incoming.effectiveOn) &&
+    sameStringList(
+      materialFileHashes(current.sourceMetadata),
+      materialFileHashes(incoming.metadata),
+    )
+  );
+}
+
+function mergeOwnAuthenticatedPdfProvenance(
+  priorMetadata: unknown,
+  incomingMetadata: Record<string, unknown>,
+): Record<string, unknown> {
+  if (
+    !isFullOfficialPageContentPolicy(
+      incomingMetadata,
+    ) ||
+    incomingMetadata.authenticatedPdf !==
+      'UNAVAILABLE_REDUNDANT'
+  ) {
+    return incomingMetadata;
+  }
+
+  const priorAuthenticatedPdfs =
+    metadataFiles(priorMetadata).filter(
+      (file) =>
+        fileKind(file) ===
+        'AUTHENTICATED_PUBLICATION_PDF',
+    );
+
+  if (priorAuthenticatedPdfs.length === 0) {
+    return incomingMetadata;
+  }
+
+  const incomingFiles = metadataFiles(
+    incomingMetadata,
+  );
+  const keys = new Set(
+    incomingFiles.map(
+      (file) =>
+        String(
+          file.rawSha256 ??
+            file.externalId ??
+            file.url ??
+            '',
+        ),
+    ),
+  );
+
+  const preserved = priorAuthenticatedPdfs.filter(
+    (file) => {
+      const key = String(
+        file.rawSha256 ??
+          file.externalId ??
+          file.url ??
+          '',
+      );
+
+      return !keys.has(key);
+    },
+  );
+
+  if (preserved.length === 0) {
+    return incomingMetadata;
+  }
+
+  return {
+    ...incomingMetadata,
+    files: [...incomingFiles, ...preserved],
+  };
+}
+
 async function enrichCanonicalPublication(
   trx: Transaction<DB>,
   publicationId: string,
@@ -232,7 +422,7 @@ async function upsertOrigin(
   const externalOrigin = input.publication.externalId
     ? await trx
         .selectFrom('publication_origins')
-        .select(['id', 'publication_id'])
+        .select(['id', 'publication_id', 'metadata'])
         .where('source_id', '=', input.sourceId)
         .where(
           'external_id',
@@ -244,7 +434,7 @@ async function upsertOrigin(
 
   const urlOrigin = pageReference ? undefined : await trx
     .selectFrom('publication_origins')
-    .select(['id', 'publication_id'])
+    .select(['id', 'publication_id', 'metadata'])
     .where('source_id', '=', input.sourceId)
     .where(sql<boolean>`metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'`)
     .where(
@@ -284,7 +474,10 @@ async function upsertOrigin(
         official_url: input.publication.officialUrl,
         last_seen_at: new Date(),
         metadata: asJson(
-          input.publication.metadata,
+          mergeOwnAuthenticatedPdfProvenance(
+            origin.metadata,
+            input.publication.metadata,
+          ),
         ),
       })
       .where('id', '=', origin.id)
@@ -326,6 +519,7 @@ async function getOrCreateVersion(
     .select([
       'id',
       'content_hash',
+      'content_text',
       'source_metadata',
     ])
     .where('publication_id', '=', publicationId)
@@ -422,6 +616,45 @@ async function getOrCreateVersion(
       publicationVersionId: existingVersion.id,
       disposition: 'EXISTING_PUBLICATION',
     };
+  }
+
+  if (
+    currentVersion &&
+    isFullOfficialPageContentPolicy(
+      publication.metadata,
+    )
+  ) {
+    const canonical = await trx
+      .selectFrom('publications')
+      .select(['title', 'effective_on'])
+      .where('id', '=', publicationId)
+      .executeTakeFirstOrThrow();
+
+    if (
+      sameOfficialPageMaterial(
+        {
+          title: canonical.title,
+          effectiveOn: canonical.effective_on,
+          contentText:
+            currentVersion.content_text,
+          sourceMetadata:
+            currentVersion.source_metadata,
+        },
+        publication,
+      )
+    ) {
+      /*
+       * D-017 compatibility bridge:
+       * presence/absence of a redundant authenticated PDF must not create a
+       * version when the official-page content and material attachments are
+       * unchanged. Keep the persisted legacy content_hash immutable.
+       */
+      return {
+        publicationVersionId:
+          currentVersion.id,
+        disposition: 'EXISTING_PUBLICATION',
+      };
+    }
   }
 
   if (
