@@ -30,8 +30,8 @@ const pool = new Pool({
   connectionString: databaseUrl,
   max: 1,
   connectionTimeoutMillis: 10_000,
-  query_timeout: 35_000,
-  statement_timeout: 30_000,
+  query_timeout: 100_000,
+  statement_timeout: 90_000,
   lock_timeout: 2_000,
 });
 
@@ -131,6 +131,129 @@ doe_publications AS (
   FROM publication_origins po
   JOIN source s ON s.id = po.source_id
 ),
+origin_stats AS (
+  SELECT
+    po.publication_id,
+    array_agg(DISTINCT po.external_id ORDER BY po.external_id)
+      FILTER (
+        WHERE po.source_id = s.id
+          AND po.external_id IS NOT NULL
+      ) AS doe_external_ids,
+    array_agg(po.id::text ORDER BY po.id::text)
+      FILTER (WHERE po.source_id = s.id)
+      AS doe_origin_ids,
+    array_agg(DISTINCT po.official_url ORDER BY po.official_url)
+      FILTER (WHERE po.source_id = s.id)
+      AS doe_official_urls,
+    count(*)::int AS total_origins,
+    array_agg(
+      DISTINCT po.source_id::text
+      ORDER BY po.source_id::text
+    ) FILTER (WHERE po.source_id <> s.id)
+      AS other_source_ids
+  FROM publication_origins po
+  JOIN doe_publications d
+    ON d.publication_id = po.publication_id
+  CROSS JOIN source s
+  GROUP BY po.publication_id
+),
+version_stats AS (
+  SELECT
+    pv.publication_id,
+    count(*)::int AS version_count
+  FROM publication_versions pv
+  JOIN doe_publications d
+    ON d.publication_id = pv.publication_id
+  GROUP BY pv.publication_id
+),
+current_versions AS (
+  SELECT DISTINCT ON (pv.publication_id)
+    pv.publication_id,
+    pv.id,
+    pv.version_no,
+    pv.content_hash,
+    pv.content_text,
+    pv.source_metadata
+  FROM publication_versions pv
+  JOIN doe_publications d
+    ON d.publication_id = pv.publication_id
+  WHERE pv.is_current = true
+  ORDER BY pv.publication_id, pv.version_no DESC
+),
+publication_file_stats AS (
+  SELECT
+    pv.publication_id,
+    count(*)::int AS publication_file_rows
+  FROM publication_files pf
+  JOIN publication_versions pv
+    ON pv.id = pf.publication_version_id
+  JOIN doe_publications d
+    ON d.publication_id = pv.publication_id
+  GROUP BY pv.publication_id
+),
+company_stats AS (
+  SELECT
+    cp.publication_id,
+    count(*)::int AS company_refs,
+    count(DISTINCT c.tenant_id)::int AS tenant_refs,
+    jsonb_agg(
+      jsonb_build_object(
+        'companyId', cp.company_id,
+        'tenantId', c.tenant_id,
+        'status', cp.status
+      )
+      ORDER BY cp.company_id
+    ) AS tenant_links
+  FROM company_publications cp
+  JOIN doe_publications d
+    ON d.publication_id = cp.publication_id
+  JOIN companies c ON c.id = cp.company_id
+  GROUP BY cp.publication_id
+),
+match_stats AS (
+  SELECT
+    cp.publication_id,
+    count(*)::int AS match_refs
+  FROM publication_matches pm
+  JOIN company_publications cp
+    ON cp.id = pm.company_publication_id
+  JOIN doe_publications d
+    ON d.publication_id = cp.publication_id
+  GROUP BY cp.publication_id
+),
+item_stats AS (
+  SELECT
+    ci.publication_id,
+    count(*)::int AS collection_item_refs
+  FROM collection_items ci
+  JOIN doe_publications d
+    ON d.publication_id = ci.publication_id
+  GROUP BY ci.publication_id
+),
+run_stats AS (
+  SELECT
+    crp.publication_id,
+    count(*)::int AS run_refs,
+    count(*) FILTER (
+      WHERE cr.source_id <> s.id
+    )::int AS foreign_run_refs
+  FROM collection_run_publications crp
+  JOIN doe_publications d
+    ON d.publication_id = crp.publication_id
+  JOIN collection_runs cr
+    ON cr.id = crp.collection_run_id
+  CROSS JOIN source s
+  GROUP BY crp.publication_id
+),
+audit_stats AS (
+  SELECT
+    d.publication_id,
+    count(al.*)::int AS audit_entity_refs
+  FROM doe_publications d
+  LEFT JOIN audit_log al
+    ON al.entity_id = d.publication_id::text
+  GROUP BY d.publication_id
+),
 audit_rows AS (
   SELECT
     p.id::text AS publication_id,
@@ -139,55 +262,28 @@ audit_rows AS (
     p.title,
     p.published_on::text,
     p.effective_on::text,
-    COALESCE((
-      SELECT array_agg(DISTINCT po.external_id ORDER BY po.external_id)
-      FILTER (WHERE po.external_id IS NOT NULL)
-      FROM publication_origins po
-      JOIN source s ON s.id = po.source_id
-      WHERE po.publication_id = p.id
-    ), ARRAY[]::text[]) AS doe_external_ids,
-    COALESCE((
-      SELECT array_agg(po.id::text ORDER BY po.id::text)
-      FROM publication_origins po
-      JOIN source s ON s.id = po.source_id
-      WHERE po.publication_id = p.id
-    ), ARRAY[]::text[]) AS doe_origin_ids,
-    COALESCE((
-      SELECT array_agg(DISTINCT po.official_url ORDER BY po.official_url)
-      FROM publication_origins po
-      JOIN source s ON s.id = po.source_id
-      WHERE po.publication_id = p.id
-    ), ARRAY[]::text[]) AS doe_official_urls,
-    (
-      SELECT count(*)::int
-      FROM publication_origins po
-      WHERE po.publication_id = p.id
-    ) AS total_origins,
-    COALESCE((
-      SELECT array_agg(
-        DISTINCT po.source_id::text
-        ORDER BY po.source_id::text
-      )
-      FROM publication_origins po
-      CROSS JOIN source s
-      WHERE po.publication_id = p.id
-        AND po.source_id <> s.id
-    ), ARRAY[]::text[]) AS other_source_ids,
-    (
-      SELECT count(*)::int
-      FROM publication_versions pv
-      WHERE pv.publication_id = p.id
-    ) AS version_count,
-    current_v.id::text AS current_version_id,
-    current_v.version_no AS current_version_no,
-    current_v.content_hash AS current_content_hash,
-    COALESCE(length(current_v.content_text), 0)::int
+    COALESCE(os.doe_external_ids, ARRAY[]::text[])
+      AS doe_external_ids,
+    COALESCE(os.doe_origin_ids, ARRAY[]::text[])
+      AS doe_origin_ids,
+    COALESCE(os.doe_official_urls, ARRAY[]::text[])
+      AS doe_official_urls,
+    COALESCE(os.total_origins, 0)::int
+      AS total_origins,
+    COALESCE(os.other_source_ids, ARRAY[]::text[])
+      AS other_source_ids,
+    COALESCE(vs.version_count, 0)::int
+      AS version_count,
+    cv.id::text AS current_version_id,
+    cv.version_no AS current_version_no,
+    cv.content_hash AS current_content_hash,
+    COALESCE(length(cv.content_text), 0)::int
       AS current_content_chars,
     COALESCE((
       SELECT count(*)::int
       FROM jsonb_array_elements(
         COALESCE(
-          current_v.source_metadata->'files',
+          cv.source_metadata->'files',
           '[]'::jsonb
         )
       ) f
@@ -196,7 +292,7 @@ audit_rows AS (
       SELECT count(*)::int
       FROM jsonb_array_elements(
         COALESCE(
-          current_v.source_metadata->'files',
+          cv.source_metadata->'files',
           '[]'::jsonb
         )
       ) f
@@ -208,88 +304,50 @@ audit_rows AS (
       SELECT count(*)::int
       FROM jsonb_array_elements(
         COALESCE(
-          current_v.source_metadata->'files',
+          cv.source_metadata->'files',
           '[]'::jsonb
         )
       ) f
       WHERE f->'metadata'->>'kind' = 'ATTACHMENT'
     ), 0) AS attachment_entries,
-    (
-      SELECT count(*)::int
-      FROM publication_files pf
-      JOIN publication_versions pv
-        ON pv.id = pf.publication_version_id
-      WHERE pv.publication_id = p.id
-    ) AS publication_file_rows,
-    (
-      SELECT count(*)::int
-      FROM company_publications cp
-      WHERE cp.publication_id = p.id
-    ) AS company_refs,
-    (
-      SELECT count(DISTINCT c.tenant_id)::int
-      FROM company_publications cp
-      JOIN companies c ON c.id = cp.company_id
-      WHERE cp.publication_id = p.id
-    ) AS tenant_refs,
-    COALESCE((
-      SELECT jsonb_agg(
-        jsonb_build_object(
-          'companyId', cp.company_id,
-          'tenantId', c.tenant_id,
-          'status', cp.status
-        )
-        ORDER BY cp.company_id
-      )
-      FROM company_publications cp
-      JOIN companies c ON c.id = cp.company_id
-      WHERE cp.publication_id = p.id
-    ), '[]'::jsonb) AS tenant_links,
-    (
-      SELECT count(*)::int
-      FROM publication_matches pm
-      JOIN company_publications cp
-        ON cp.id = pm.company_publication_id
-      WHERE cp.publication_id = p.id
-    ) AS match_refs,
-    (
-      SELECT count(*)::int
-      FROM collection_items ci
-      WHERE ci.publication_id = p.id
-    ) AS collection_item_refs,
-    (
-      SELECT count(*)::int
-      FROM collection_run_publications crp
-      WHERE crp.publication_id = p.id
-    ) AS run_refs,
-    (
-      SELECT count(*)::int
-      FROM collection_run_publications crp
-      JOIN collection_runs cr
-        ON cr.id = crp.collection_run_id
-      CROSS JOIN source s
-      WHERE crp.publication_id = p.id
-        AND cr.source_id <> s.id
-    ) AS foreign_run_refs,
-    (
-      SELECT count(*)::int
-      FROM audit_log al
-      WHERE al.entity_id = p.id::text
-    ) AS audit_entity_refs
+    COALESCE(pfs.publication_file_rows, 0)::int
+      AS publication_file_rows,
+    COALESCE(cs.company_refs, 0)::int
+      AS company_refs,
+    COALESCE(cs.tenant_refs, 0)::int
+      AS tenant_refs,
+    COALESCE(cs.tenant_links, '[]'::jsonb)
+      AS tenant_links,
+    COALESCE(ms.match_refs, 0)::int
+      AS match_refs,
+    COALESCE(its.collection_item_refs, 0)::int
+      AS collection_item_refs,
+    COALESCE(rs.run_refs, 0)::int
+      AS run_refs,
+    COALESCE(rs.foreign_run_refs, 0)::int
+      AS foreign_run_refs,
+    COALESCE(ast.audit_entity_refs, 0)::int
+      AS audit_entity_refs
   FROM doe_publications d
   JOIN publications p ON p.id = d.publication_id
-  LEFT JOIN LATERAL (
-    SELECT
-      pv.id,
-      pv.version_no,
-      pv.content_hash,
-      pv.content_text,
-      pv.source_metadata
-    FROM publication_versions pv
-    WHERE pv.publication_id = p.id
-      AND pv.is_current = true
-    LIMIT 1
-  ) current_v ON true
+  LEFT JOIN origin_stats os
+    ON os.publication_id = p.id
+  LEFT JOIN version_stats vs
+    ON vs.publication_id = p.id
+  LEFT JOIN current_versions cv
+    ON cv.publication_id = p.id
+  LEFT JOIN publication_file_stats pfs
+    ON pfs.publication_id = p.id
+  LEFT JOIN company_stats cs
+    ON cs.publication_id = p.id
+  LEFT JOIN match_stats ms
+    ON ms.publication_id = p.id
+  LEFT JOIN item_stats its
+    ON its.publication_id = p.id
+  LEFT JOIN run_stats rs
+    ON rs.publication_id = p.id
+  LEFT JOIN audit_stats ast
+    ON ast.publication_id = p.id
 )
 SELECT
   (
@@ -450,8 +508,8 @@ try {
           businessStatementType:
             'SELECT_ONLY_SINGLE_SNAPSHOT',
           connectionTimeoutMs: 10_000,
-          queryTimeoutMs: 35_000,
-          statementTimeoutMs: 30_000,
+          queryTimeoutMs: 100_000,
+          statementTimeoutMs: 90_000,
           lockTimeoutMs: 2_000,
         },
         activeRuns: {
