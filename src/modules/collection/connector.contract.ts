@@ -93,7 +93,9 @@ export interface ConnectorPartialFailure {
  */
 export type ConnectorIncompleteReason =
   | 'TIME_BUDGET_REACHED'
-  | 'PARTIAL_FAILURE_RETRY_REQUIRED';
+  | 'PARTIAL_FAILURE_RETRY_REQUIRED'
+  /** Known included items whose material content the source has not rendered yet. */
+  | 'MATERIAL_CONTENT_DEFERRED';
 
 export interface ConnectorCompletion {
   /**

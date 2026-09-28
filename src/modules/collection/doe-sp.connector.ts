@@ -764,11 +764,17 @@ export class DoeSpConnector implements CollectionConnector {
 
     const pendingDays = ranges.reduce((sum, range) => sum + datesBetween(range.from, range.to).length, 0);
     const retryRequired = !yielded && days.some((day) => !day.complete);
+    // Deferred acts are known, included and not yet captured: a run that still
+    // holds them is never "complete" (so never SUCCESS_NO_RESULTS/SUCCESS).
+    const deferredPending = deferred.size;
+    const pendingCounters = { pendingDays, ...(deferredPending ? { deferredItems: deferredPending } : {}) };
     const completion: ConnectorResult['completion'] | undefined = yielded
-      ? { complete: false, reason: 'TIME_BUDGET_REACHED', pending: { pendingDays } }
+      ? { complete: false, reason: 'TIME_BUDGET_REACHED', pending: pendingCounters }
       : retryRequired && pendingDays > 0
-        ? { complete: false, reason: 'PARTIAL_FAILURE_RETRY_REQUIRED', pending: { pendingDays } }
-        : undefined;
+        ? { complete: false, reason: 'PARTIAL_FAILURE_RETRY_REQUIRED', pending: pendingCounters }
+        : deferredPending > 0
+          ? { complete: false, reason: 'MATERIAL_CONTENT_DEFERRED', pending: pendingCounters }
+          : undefined;
 
     const windowComplete = datesBetween(windowStart, today).every((date) => days.some((day) => day.date === date && day.mode === 'WINDOW' && day.complete));
     const nextState: DoeSpSourceState = {

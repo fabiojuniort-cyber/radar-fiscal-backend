@@ -5,6 +5,7 @@ import { ConnectorError } from '../src/modules/collection/connector.error.js';
 import { DOE_SP_SEARCH_API, DoeSpClient } from '../src/modules/collection/doe-sp.client.js';
 import { DoeSpConnector, EMPTY_DOE_SP_STATE } from '../src/modules/collection/doe-sp.connector.js';
 import { parseDoeSpSourceState } from '../src/modules/collection/doe-sp-source-state.repository.js';
+import { resolveCollectionRunStatus } from '../src/modules/collection/run-status.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 
 /*
@@ -629,7 +630,8 @@ test('connector: material PDF still "Processando" after the timeout is deferred,
   assert.equal(doeSp.deferredItems, 1);
   const day = doeSp.days.find((entry) => entry.date === OLD_DATE);
   assert.deepEqual({ complete: day?.complete, deferred: day?.deferred, failed: day?.failed }, { complete: true, deferred: 1, failed: 0 });
-  assert.equal(result.completion, undefined);
+  assert.deepEqual(result.completion, { complete: false, reason: 'MATERIAL_CONTENT_DEFERRED', pending: { pendingDays: 0, deferredItems: 1 } });
+  assert.equal(resolveCollectionRunStatus({ ok: true, status: 'SUCCESS', result, durationMs: 1 }), 'PARTIAL_SUCCESS');
 
   // Round-trip through the persisted checkpoint parser keeps the item.
   const reparsed = parseDoeSpSourceState(JSON.parse(JSON.stringify(result.checkpoint?.state)) as Record<string, unknown>);
@@ -670,6 +672,15 @@ test('connector: deferred act is retried after 24h and published once the materi
   assert.equal(kept.deferredItems?.[0]?.attempts, 4);
   assert.equal(kept.deferredItems?.[0]?.firstDeferredAt, '2026-09-20T15:00:00.000Z');
   assert.equal(stillProcessing.partialFailures, undefined, 'a known deferred act does not re-alert every run');
+  assert.equal(stillProcessing.publications.length, 0, 'a deferred act is never reported as captured');
+  assert.equal(stillProcessing.completion?.reason, 'MATERIAL_CONTENT_DEFERRED');
+  assert.equal(stillProcessing.completion?.pending?.deferredItems, 1);
+  assert.notEqual(
+    resolveCollectionRunStatus({ ok: true, status: 'SUCCESS', result: stillProcessing, durationMs: 1 }),
+    'SUCCESS_NO_RESULTS',
+    'a run holding a known material pendency is not "no results"',
+  );
+  assert.equal(resolveCollectionRunStatus({ ok: true, status: 'SUCCESS', result: stillProcessing, durationMs: 1 }), 'PARTIAL_SUCCESS');
 
   const counter = { pdf: 0 };
   const tooSoon = await new DoeSpConnector({
@@ -678,6 +689,7 @@ test('connector: deferred act is retried after 24h and published once the materi
   }).collect(context());
   assert.equal(counter.pdf, 0, 'retry is rate-limited to once per 24h');
   assert.equal((tooSoon.checkpoint?.state as unknown as DeferredState).deferredItems?.length, 1);
+  assert.equal(resolveCollectionRunStatus({ ok: true, status: 'SUCCESS', result: tooSoon, durationMs: 1 }), 'PARTIAL_SUCCESS');
 
   const ready = await new DoeSpConnector({
     fetch: noHtmlApi('READY'), now: () => NOW, lookbackDays: 1, forceReprocess: false,
@@ -689,4 +701,6 @@ test('connector: deferred act is retried after 24h and published once the materi
   assert.equal(ready.publications[0]?.files?.[0]?.versionRole, 'MATERIAL_CONTENT');
   assert.equal((ready.checkpoint?.state as unknown as DeferredState).deferredItems, undefined);
   assert.equal((ready.metadata?.doeSp as { counters: { deferredCaptured: number } }).counters.deferredCaptured, 1);
+  assert.equal(ready.completion, undefined, 'captured: nothing pending any more');
+  assert.equal(resolveCollectionRunStatus({ ok: true, status: 'SUCCESS', result: ready, durationMs: 1 }), 'SUCCESS');
 });
