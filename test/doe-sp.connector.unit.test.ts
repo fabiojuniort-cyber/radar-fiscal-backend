@@ -14,6 +14,7 @@ import { parseDoeSpSourceState, reopenFailedItems } from '../src/modules/collect
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import {
   ID,
+  details,
   list0901,
   list0902,
   list0904,
@@ -82,10 +83,16 @@ test('first run: collects only included acts, as individual publications with fi
   assert.equal(sre.publishedAt?.toISOString(), '2026-09-04T00:00:00.000Z');
   assert.equal(sre.metadata?.editionNumber, 169);
   assert.equal(sre.metadata?.supplementaryEditionCount, 1);
-  assert.equal(sre.files?.length, 1);
-  assert.equal(sre.files?.[0]?.mimeType, 'application/pdf');
-  assert.match(sre.files?.[0]?.rawSha256 ?? '', /^[a-f0-9]{64}$/);
-  assert.equal(sre.files?.[0]?.metadata?.kind, 'AUTHENTICATED_PUBLICATION_PDF');
+  assert.equal(sre.files, undefined);
+  assert.equal(
+    sre.originMetadata?.authenticatedPdf,
+    'NOT_REQUESTED_REDUNDANT',
+  );
+  assert.equal(
+    sre.originMetadata?.contentRepresentation,
+    'OFFICIAL_HTML',
+  );
+  assert.equal(api.count('/v2/authentication/download/'), 0);
   assert.equal(sre.metadata?.ementa, 'Altera a Portaria CAT 125/11, de 9 de setembro de 2011, que institui o Sistema Ambiente de Pagamentos e o Documento de Arrecadação de Receitas Estaduais - DARE-SP.');
 
   const meta = result.metadata?.doeSp as Record<string, any>;
@@ -190,21 +197,98 @@ test('source unavailable is an error, never zero publications', async () => {
     error instanceof ConnectorError && error.kind === 'SOURCE_UNAVAILABLE');
 });
 
-test('an item failing does not block the day, is reported and retried next run without artificial versions', async () => {
-  const failing = connector({ failures: [{ match: '/v2/authentication/download/2026.09.03.1.1.28.3.214', status: 500 }] });
-  const partial = await failing.instance.collect(context());
-  assert.deepEqual(partial.publications.map((item) => item.externalId), []);
-  assert.equal(partial.partialFailures?.length, 1);
-  assert.equal(partial.partialFailures?.[0]?.code, 'DOE_SP_SOURCE_UNAVAILABLE');
-  assert.equal(partial.partialFailures?.[0]?.itemReference, `2026-09-04#${ID.sre43}`);
-  const state = checkpointState(partial);
-  assert.deepEqual(state.days['2026-09-04']?.included, []);
-  assert.equal(state.days['2026-09-04']?.idsHash, '');
+test('complete official HTML skips redundant authenticated PDF and completes the day', async () => {
+  const guarded = connector({
+    failures: [{
+      match: '/v2/authentication/download/2026.09.03.1.1.28.3.214',
+      status: 500,
+    }],
+  });
+  const result = await guarded.instance.collect(context());
 
-  const healed = connector({ state });
-  const retry = await healed.instance.collect(context());
-  assert.deepEqual(retry.publications.map((item) => item.externalId), [ID.sre43]);
-  assert.equal(healed.api.count('/v2/publications/'), 1);
+  assert.deepEqual(
+    result.publications.map((item) => item.externalId),
+    [ID.sre43],
+  );
+  assert.equal(result.partialFailures, undefined);
+  const publication = result.publications[0]!;
+  assert.equal(
+    publication.originMetadata?.authenticatedPdf,
+    'NOT_REQUESTED_REDUNDANT',
+  );
+  assert.equal(
+    publication.originMetadata?.contentRepresentation,
+    'OFFICIAL_HTML',
+  );
+  assert.equal(publication.files, undefined);
+  assert.equal(
+    guarded.api.count('/v2/authentication/download/'),
+    0,
+  );
+
+  const state = checkpointState(result);
+  assert.deepEqual(
+    state.days['2026-09-04']?.included,
+    [ID.sre43],
+  );
+  assert.ok(
+    (state.days['2026-09-04']?.idsHash ?? '').length > 0,
+  );
+
+  const replay = connector({ state });
+  const second = await replay.instance.collect(context());
+  assert.deepEqual(second.publications, []);
+  assert.equal(
+    replay.api.count('/v2/publications/'),
+    0,
+    'checkpoint must reuse the complete HTML capture',
+  );
+});
+
+test('missing official HTML downloads authenticated PDF as material fallback', async () => {
+  const overridden = {
+    ...details[ID.sre43]!,
+    content: '',
+  };
+  const api = portal({
+    days: { '2026-09-04': DAY_0904 },
+    details: { [ID.sre43]: overridden },
+  });
+  const result = await new DoeSpConnector({
+    fetch: api.fetch,
+    now: () => NOW,
+    readState: async () => EMPTY_DOE_SP_STATE,
+    lookbackDays: 1,
+    forceReprocess: false,
+  }).collect(context());
+
+  assert.equal(result.partialFailures, undefined);
+  assert.equal(result.publications.length, 1);
+  const publication = result.publications[0]!;
+  assert.equal(publication.content, undefined);
+  assert.equal(publication.contentHashPolicy, undefined);
+  assert.equal(
+    publication.metadata?.officialContentCompleteness,
+    'PARTIAL_OFFICIAL_CONTENT',
+  );
+  assert.equal(
+    publication.originMetadata?.authenticatedPdf,
+    'CAPTURED_MATERIAL',
+  );
+  assert.equal(
+    publication.originMetadata?.contentRepresentation,
+    'OFFICIAL_PDF',
+  );
+  assert.equal(publication.files?.length, 1);
+  assert.equal(
+    publication.files?.[0]?.metadata?.kind,
+    'AUTHENTICATED_PUBLICATION_PDF',
+  );
+  assert.equal(
+    publication.files?.[0]?.versionRole,
+    'MATERIAL_CONTENT',
+  );
+  assert.equal(api.count('/v2/authentication/download/'), 1);
 });
 
 test('malformed list items are isolated as partial failures', async () => {
@@ -243,8 +327,26 @@ test('bootstrap walks back days once, with retifications isolated and attachment
 
   const dicar = result.publications.find((item) => item.externalId === ID.dicar59)!;
   assert.equal(dicar.agency, 'SEFAZ-SP/DICAR');
-  assert.equal(dicar.files?.length, 2);
+  assert.equal(dicar.files?.length, 1);
   const attachment = dicar.files?.find((file) => file.metadata?.kind === 'ATTACHMENT');
+  assert.equal(
+    dicar.metadata?.officialContentCompleteness,
+    'PARTIAL_OFFICIAL_CONTENT',
+    'page alone is not integral when a material attachment exists',
+  );
+  assert.equal(
+    dicar.contentHashPolicy,
+    'HTML_PRIMARY_MATERIAL_FILES',
+  );
+  assert.equal(attachment?.versionRole, 'MATERIAL_CONTENT');
+  assert.equal(
+    dicar.originMetadata?.authenticatedPdf,
+    'NOT_REQUESTED_REDUNDANT',
+  );
+  assert.equal(
+    dicar.originMetadata?.contentRepresentation,
+    'OFFICIAL_HTML',
+  );
   assert.equal(attachment?.name, 'Anexo_Com DICAR-59 - Publicação Juros ITCMD e IPVA - SET-26.pdf');
   assert.equal(attachment?.externalId, 'ede64d5b-2bdc-4c9b-bfd3-841a1c69eded');
   assert.match(attachment?.rawSha256 ?? '', /^[a-f0-9]{64}$/);

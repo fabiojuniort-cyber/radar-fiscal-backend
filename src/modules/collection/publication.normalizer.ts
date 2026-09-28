@@ -31,6 +31,7 @@ export interface NormalizedPublicationFile {
   sizeBytes?: number;
   sourceEtag?: string;
   sourceLastModified?: string;
+  versionRole?: 'MATERIAL_CONTENT' | 'PROVENANCE';
   metadata?: Record<string, unknown>;
 }
 
@@ -48,7 +49,12 @@ export interface NormalizedPublication {
   externalId?: string;
   sourceItemKey: string;
   metadata: Record<string, unknown>;
+  originMetadata: Record<string, unknown>;
   files: NormalizedPublicationFile[];
+  contentHashPolicy:
+    | 'LEGACY_ALL_FILES'
+    | 'HTML_PRIMARY_MATERIAL_FILES';
+  contentHashVersion: 1 | 2;
   identityStrength: PublicationIdentityStrength;
   identityBasis: NormalizedPublicationIdentityBasis;
   identityHash: string;
@@ -203,6 +209,9 @@ function normalizeFiles(
               )!,
           }
         : {}),
+      ...(file.versionRole
+        ? { versionRole: file.versionRole }
+        : {}),
       ...(file.metadata
         ? { metadata: file.metadata }
         : {}),
@@ -325,6 +334,22 @@ export function normalizePublication(
   const files = normalizeFiles(
     input.publication.files,
   );
+  const contentHashPolicy =
+    input.publication.contentHashPolicy ??
+    'LEGACY_ALL_FILES';
+  const contentHashVersion =
+    contentHashPolicy ===
+      'HTML_PRIMARY_MATERIAL_FILES'
+      ? 2
+      : 1;
+  const versionFiles =
+    contentHashPolicy ===
+      'HTML_PRIMARY_MATERIAL_FILES'
+      ? files.filter(
+          (file) =>
+            file.versionRole !== 'PROVENANCE',
+        )
+      : files;
 
   const publishedOn = normalizeDate(
     input.publication.publishedAt,
@@ -375,26 +400,78 @@ export function normalizePublication(
   );
 
   /*
-   * Intentionally excludes source metadata and official URL.
-   * Source metadata may contain volatile crawl fields and URLs may
-   * differ between mirrors. A version changes when the canonical
-   * title/content/effective date changes.
+   * v1 is byte-for-byte compatible with the historical all-files hash.
+   * v2 is opt-in and hashes only files explicitly material to content.
+   * Source metadata, provenance-only artifacts and official URL remain
+   * outside canonical version identity.
    */
+  const rawVersionFileHashes = versionFiles
+    .map((file) => file.rawSha256)
+    .filter(
+      (hash): hash is string =>
+        hash !== undefined,
+    )
+    .sort();
   const contentHash = sha256(
-    JSON.stringify({
-      version: 1,
-      title,
-      contentText: contentText ?? null,
-      effectiveOn: effectiveOn ?? null,
-      rawFileHashes: files
-        .map((file) => file.rawSha256)
-        .filter(
-          (hash): hash is string =>
-            hash !== undefined,
-        )
-        .sort(),
-    }),
+    JSON.stringify(
+      contentHashVersion === 1
+        ? {
+            version: 1,
+            title,
+            contentText: contentText ?? null,
+            effectiveOn: effectiveOn ?? null,
+            rawFileHashes: rawVersionFileHashes,
+          }
+        : {
+            version: 2,
+            title,
+            contentText: contentText ?? null,
+            effectiveOn: effectiveOn ?? null,
+            materialFileHashes:
+              rawVersionFileHashes,
+          },
+    ),
   );
+
+  const baseMetadata = {
+    ...(input.publication.metadata ?? {}),
+  };
+  const baseOriginMetadata = {
+    ...baseMetadata,
+    ...(input.publication.originMetadata ?? {}),
+  };
+  const metadata =
+    contentHashVersion === 1
+      ? {
+          ...baseMetadata,
+          ...(files.length > 0
+            ? { files }
+            : {}),
+        }
+      : {
+          ...baseMetadata,
+          contentHashVersion: 2,
+          contentHashPolicy,
+          ...(versionFiles.length > 0
+            ? { files: versionFiles }
+            : {}),
+        };
+  const originMetadata =
+    contentHashVersion === 1
+      ? {
+          ...baseOriginMetadata,
+          ...(files.length > 0
+            ? { files }
+            : {}),
+        }
+      : {
+          ...baseOriginMetadata,
+          contentHashVersion: 2,
+          contentHashPolicy,
+          ...(files.length > 0
+            ? { files }
+            : {}),
+        };
 
   return {
     title,
@@ -409,13 +486,11 @@ export function normalizePublication(
     officialUrl,
     ...(externalId ? { externalId } : {}),
     sourceItemKey: externalId ?? officialUrl,
-    metadata: {
-      ...(input.publication.metadata ?? {}),
-      ...(files.length > 0
-        ? { files }
-        : {}),
-    },
+    metadata,
+    originMetadata,
     files,
+    contentHashPolicy,
+    contentHashVersion,
     identityStrength: identity.strength,
     identityBasis: identity.basis,
     identityHash,

@@ -46,7 +46,8 @@
     "db:inspect-rfb-normas": "node dist/infrastructure/database/inspect-rfb-normas.js",
     "db:ensure-doe-sp-source": "node dist/infrastructure/database/ensure-doe-sp-source.js",
     "db:trigger-doe-sp-run": "node dist/infrastructure/database/trigger-doe-sp-run.js",
-    "db:inspect-doe-sp": "node dist/infrastructure/database/inspect-doe-sp.js"
+    "db:inspect-doe-sp": "node dist/infrastructure/database/inspect-doe-sp.js",
+    "db:audit-doe-sp-rebuild": "node dist/infrastructure/database/audit-doe-sp-rebuild.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

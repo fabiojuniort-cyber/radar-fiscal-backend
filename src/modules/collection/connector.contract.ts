@@ -1,5 +1,13 @@
 export type ConnectorSphere = 'FEDERAL' | 'STATE';
 
+export type ConnectorFileVersionRole =
+  | 'MATERIAL_CONTENT'
+  | 'PROVENANCE';
+
+export type ConnectorContentHashPolicy =
+  | 'LEGACY_ALL_FILES'
+  | 'HTML_PRIMARY_MATERIAL_FILES';
+
 export interface ConnectorFile {
   url: string;
   name?: string;
@@ -9,6 +17,14 @@ export interface ConnectorFile {
   sizeBytes?: number;
   sourceEtag?: string;
   sourceLastModified?: string;
+
+  /**
+   * MATERIAL_CONTENT participates in semantic versioning.
+   * PROVENANCE is preserved for the source/origin but does not define
+   * the canonical content version under an opt-in content hash policy.
+   * Omitted files keep the legacy all-files behavior.
+   */
+  versionRole?: ConnectorFileVersionRole;
   metadata?: Record<string, unknown>;
 }
 
@@ -41,13 +57,25 @@ export interface ConnectorPublication {
    */
   identityKey?: string;
 
+  /**
+   * Opt-in version semantics. Omitted publications preserve the exact
+   * legacy v1 hash behavior used by all existing connectors.
+   */
+  contentHashPolicy?: ConnectorContentHashPolicy;
+
   files?: ConnectorFile[];
 
   /**
-   * Dados específicos da fonte que precisam ser preservados,
-   * mas que não pertencem ao modelo canônico comum.
+   * Dados específicos da fonte que podem compor metadata da versão.
    */
   metadata?: Record<string, unknown>;
+
+  /**
+   * Evidência específica da origem observada que não deve ser promovida
+   * ao metadata canônico da versão (ex.: authCode/status de PDF redundante).
+   * É persistida somente em collection_items/publication_origins.
+   */
+  originMetadata?: Record<string, unknown>;
 }
 
 export interface ConnectorPartialFailure {

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { sql, type Transaction } from 'kysely';
 
 import type {
@@ -131,7 +133,7 @@ async function upsertCollectionItem(
       source_url: input.publication.officialUrl,
       status: 'DISCOVERED',
       raw_metadata: asJson(
-        input.publication.metadata,
+        input.publication.originMetadata,
       ),
     })
     .onConflict((conflict) =>
@@ -146,7 +148,7 @@ async function upsertCollectionItem(
           source_url:
             input.publication.officialUrl,
           raw_metadata: asJson(
-            input.publication.metadata,
+            input.publication.originMetadata,
           ),
           updated_at: new Date(),
         }),
@@ -225,14 +227,16 @@ async function upsertOrigin(
   input: PersistPublicationInput,
   publicationId: string,
 ): Promise<void> {
-  const pageReference = input.publication.metadata.officialUrlGranularity === 'PAGE';
+  const pageReference =
+    input.publication.originMetadata
+      .officialUrlGranularity === 'PAGE';
   if (pageReference && !input.publication.externalId) {
     throw new PublicationOriginConflictError('A page reference requires an official external identifier.');
   }
   const externalOrigin = input.publication.externalId
     ? await trx
         .selectFrom('publication_origins')
-        .select(['id', 'publication_id'])
+        .select(['id', 'publication_id', 'metadata'])
         .where('source_id', '=', input.sourceId)
         .where(
           'external_id',
@@ -244,7 +248,7 @@ async function upsertOrigin(
 
   const urlOrigin = pageReference ? undefined : await trx
     .selectFrom('publication_origins')
-    .select(['id', 'publication_id'])
+    .select(['id', 'publication_id', 'metadata'])
     .where('source_id', '=', input.sourceId)
     .where(sql<boolean>`metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'`)
     .where(
@@ -284,7 +288,10 @@ async function upsertOrigin(
         official_url: input.publication.officialUrl,
         last_seen_at: new Date(),
         metadata: asJson(
-          input.publication.metadata,
+          originMetadataWithPreservedFiles(
+            origin.metadata,
+            input.publication.originMetadata,
+          ),
         ),
       })
       .where('id', '=', origin.id)
@@ -302,10 +309,268 @@ async function upsertOrigin(
         input.publication.externalId ?? null,
       official_url: input.publication.officialUrl,
       metadata: asJson(
-        input.publication.metadata,
+        input.publication.originMetadata,
       ),
     })
     .execute();
+}
+
+function originMetadataWithPreservedFiles(
+  existing: unknown,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const previous = metadataRecord(existing);
+  const previousFiles = Array.isArray(previous?.files)
+    ? previous.files
+    : [];
+  const previousAuthenticatedPdfs =
+    previousFiles.filter((value) => {
+      const file = metadataRecord(value);
+      const fileMetadata = metadataRecord(
+        file?.metadata,
+      );
+      return (
+        fileMetadata?.kind ===
+          'AUTHENTICATED_PUBLICATION_PDF' &&
+        fileMetadata?.origin === 'DOE_SP'
+      );
+    });
+
+  if (previousAuthenticatedPdfs.length === 0) {
+    return incoming;
+  }
+
+  const incomingFiles = Array.isArray(incoming.files)
+    ? incoming.files
+    : [];
+  const incomingHasAuthenticatedPdf =
+    incomingFiles.some((value) => {
+      const file = metadataRecord(value);
+      const fileMetadata = metadataRecord(
+        file?.metadata,
+      );
+      return (
+        fileMetadata?.kind ===
+          'AUTHENTICATED_PUBLICATION_PDF' &&
+        fileMetadata?.origin === 'DOE_SP'
+      );
+    });
+
+  /*
+   * Preserve only authenticated-PDF evidence captured from this exact
+   * origin. Attachments remain governed by the current observation/version
+   * and are never resurrected here. A newly captured authenticated PDF is
+   * authoritative and replaces the previously preserved PDF evidence.
+   */
+  if (incomingHasAuthenticatedPdf) {
+    return incoming;
+  }
+
+  return {
+    ...incoming,
+    files: [
+      ...incomingFiles,
+      ...previousAuthenticatedPdfs,
+    ],
+  };
+}
+
+function metadataRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+interface LegacyFileEvidence {
+  allHashes: string[];
+  materialHashes: string[];
+}
+
+function legacyFileEvidence(
+  metadata: unknown,
+): LegacyFileEvidence | undefined {
+  const row = metadataRecord(metadata);
+  const files = row?.files;
+  if (files === undefined) {
+    return {
+      allHashes: [],
+      materialHashes: [],
+    };
+  }
+  if (!Array.isArray(files)) {
+    return undefined;
+  }
+
+  const allHashes: string[] = [];
+  const materialHashes: string[] = [];
+
+  for (const fileValue of files) {
+    const file = metadataRecord(fileValue);
+    const fileMetadata = metadataRecord(
+      file?.metadata,
+    );
+    const kind = fileMetadata?.kind;
+    const hash = file?.rawSha256;
+
+    if (
+      typeof hash !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(hash)
+    ) {
+      return undefined;
+    }
+
+    const normalizedHash = hash.toLowerCase();
+    allHashes.push(normalizedHash);
+
+    if (
+      kind === 'AUTHENTICATED_PUBLICATION_PDF'
+    ) {
+      continue;
+    }
+    if (kind !== 'ATTACHMENT') {
+      return undefined;
+    }
+
+    materialHashes.push(normalizedHash);
+  }
+
+  return {
+    allHashes: allHashes.sort(),
+    materialHashes: materialHashes.sort(),
+  };
+}
+
+function legacyV1ContentHash(input: {
+  title: string;
+  contentText: string | null;
+  effectiveOn: string | null;
+  rawFileHashes: string[];
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: 1,
+        title: input.title,
+        contentText: input.contentText,
+        effectiveOn: input.effectiveOn,
+        rawFileHashes: input.rawFileHashes,
+      }),
+      'utf8',
+    )
+    .digest('hex');
+}
+
+function incomingMaterialFileHashes(
+  publication: NormalizedPublication,
+): string[] | undefined {
+  const hashes: string[] = [];
+  for (const file of publication.files) {
+    if (file.versionRole === 'PROVENANCE') {
+      continue;
+    }
+    if (
+      typeof file.rawSha256 !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(
+        file.rawSha256,
+      )
+    ) {
+      return undefined;
+    }
+    hashes.push(file.rawSha256.toLowerCase());
+  }
+  return hashes.sort();
+}
+
+function sameHashes(
+  left: string[],
+  right: string[],
+): boolean {
+  return left.length === right.length &&
+    left.every(
+      (hash, index) => hash === right[index],
+    );
+}
+
+async function currentLegacyVersionEquivalent(
+  trx: Transaction<DB>,
+  publicationId: string,
+  publication: NormalizedPublication,
+  currentVersion: {
+    id: string;
+    content_hash: string;
+    content_text: string | null;
+    source_metadata: Json | null;
+  },
+): Promise<boolean> {
+  if (
+    publication.contentHashVersion !== 2 ||
+    publication.contentText === undefined ||
+    currentVersion.content_text === null ||
+    metadataRecord(
+      currentVersion.source_metadata,
+    )?.contentHashVersion === 2
+  ) {
+    return false;
+  }
+
+  const canonical = await trx
+    .selectFrom('publications')
+    .select([
+      'title',
+      'effective_on',
+    ])
+    .where('id', '=', publicationId)
+    .executeTakeFirstOrThrow();
+
+  const currentEffectiveOn =
+    canonical.effective_on
+      ?.toISOString()
+      .slice(0, 10) ?? null;
+  const incomingEffectiveOn =
+    publication.effectiveOn ?? null;
+  const legacyEvidence = legacyFileEvidence(
+    currentVersion.source_metadata,
+  );
+  const incomingHashes =
+    incomingMaterialFileHashes(publication);
+
+  if (
+    legacyEvidence === undefined ||
+    incomingHashes === undefined
+  ) {
+    return false;
+  }
+
+  /*
+   * Positive compatibility proof: the persisted v1 hash must be
+   * reproducible from the exact legacy title/text/effective date/files
+   * that are being used as evidence. This prevents incomplete or
+   * inconsistent legacy metadata from suppressing a real version.
+   */
+  const reconstructedLegacyHash =
+    legacyV1ContentHash({
+      title: canonical.title,
+      contentText: currentVersion.content_text,
+      effectiveOn: currentEffectiveOn,
+      rawFileHashes: legacyEvidence.allHashes,
+    });
+
+  return (
+    reconstructedLegacyHash ===
+      currentVersion.content_hash &&
+    canonical.title === publication.title &&
+    currentVersion.content_text ===
+      (publication.contentText ?? null) &&
+    currentEffectiveOn === incomingEffectiveOn &&
+    sameHashes(
+      legacyEvidence.materialHashes,
+      incomingHashes,
+    )
+  );
 }
 
 async function getOrCreateVersion(
@@ -326,6 +591,7 @@ async function getOrCreateVersion(
     .select([
       'id',
       'content_hash',
+      'content_text',
       'source_metadata',
     ])
     .where('publication_id', '=', publicationId)
@@ -420,6 +686,48 @@ async function getOrCreateVersion(
 
     return {
       publicationVersionId: existingVersion.id,
+      disposition: 'EXISTING_PUBLICATION',
+    };
+  }
+
+  if (
+    currentVersion &&
+    !existingVersion &&
+    await currentLegacyVersionEquivalent(
+      trx,
+      publicationId,
+      publication,
+      currentVersion,
+    )
+  ) {
+    if (incomingRole === 'PRIMARY') {
+      await trx
+        .updateTable('publications')
+        .set({
+          title: publication.title,
+          ...(publication.effectiveOn !== undefined
+            ? {
+                effective_on:
+                  publication.effectiveOn,
+              }
+            : {}),
+          primary_official_url:
+            publication.officialUrl,
+          last_seen_at: new Date(),
+          updated_at: new Date(),
+        })
+        .where('id', '=', publicationId)
+        .execute();
+    }
+
+    await enrichCanonicalPublication(
+      trx,
+      publicationId,
+      publication,
+    );
+
+    return {
+      publicationVersionId: currentVersion.id,
       disposition: 'EXISTING_PUBLICATION',
     };
   }
