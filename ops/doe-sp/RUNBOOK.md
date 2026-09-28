@@ -1,8 +1,8 @@
 # DOE-SP — reconstrução restrita do acervo (D-052)
 
-Estado: **CORRIGIDO (DOE-SP-33, validado e ajustado na DOE-SP-34)** após o parecer DOE-SP-32. Aguarda novo gate
-de PREPARAÇÃO (backup/restauração/ensaio no novo SHA) e revisão independente. Nada aqui autoriza, por si só, pausa,
-exclusão, merge, deploy ou recaptura.
+Estado: PR #73 **mergeado** (`e2c4f9a`, árvore = `4917cdc` aprovado na DOE-SP-36) e implantado na DOE-SP-37.
+Runner de execução (§11) adicionado na DOE-SP-38; aguarda revisão independente. Nada aqui autoriza, por si só,
+pausa, exclusão ou recaptura.
 
 Governança: [Issue #1](https://github.com/fabiojuniort-cyber/tribusca-control/issues/1),
 D-017/D-036/D-052 no `tribusca-control`. Código: PR #73.
@@ -77,6 +77,7 @@ efeitos são esperados e devem ser comunicados antes do passo 7 do §6.
 | `sql/60_rollback_import.sql` | rollback ao estado do backup, também após recaptura parcial | produção (só em incidente) |
 | `rehearsal/partial_recapture_sim.sql` | simula uma recaptura parcial; recusa rodar fora de bancos de ensaio | cópia temporária do runner |
 | `runner/prep.sh` | orquestra DOE-SP-31 (preflight, backup, restauração e ensaio) | serviço temporário Railway |
+| `runner/execute.sh` | **único meio** de rodar `25`/`20`/`30`/`40`/`50`/`41`/`60` na produção: um passo por deploy (§11) | serviço temporário Railway |
 | `runner/rollback-stage.sh` | prepara o `schema doe_sp_rollback` a partir do backup | Railway |
 | `runner/Dockerfile` | `postgres:18` + `jq` | Railway |
 
@@ -156,26 +157,33 @@ para a fase destrutiva; merge/deploy do PR #73 decididos pelo responsável.
    com o `LOCK` da pausa `25`, fecha a corrida pausa × criação de run. Com
    a fonte ainda ativa, o conector novo roda sobre o acervo legado pelo
    caminho de compatibilidade v1→v2 (aprovado na DOE-SP-26).
-3. **Pausa**: `psql "$DATABASE_URL" -f sql/25_pause_source.sql`. Repetir o
-   `20` até `blockers.active_runs = 0` (um run `RUNNING` termina normalmente).
+Cada passo abaixo marcado **[runner]** é um deploy do runner de execução
+(§11) com `DOE_SP_STEP` indicado; nada é digitado à mão contra a produção.
+
+3. **Pausa** [runner `pause`, `DOE_SP_CONFIRM=PAUSE_DOE_SP`]. Repetir
+   [runner `dry_run`] até `blockers.active_runs = 0` (um run `RUNNING`
+   termina normalmente).
 4. **Backup novo + restauração + ensaio**: redeploy do runner (`prep.sh`)
    pinado no SHA revisado. Exigir `DOE_SP_31_RESULT` com todos os passos PASS.
    Os passos `rehearsal_*` rodam apenas no Postgres temporário.
-5. **Dry-run**: `PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -q -t -A -f sql/20_dry_run_readonly.sql`.
-   Todos os `blockers` = 0, inclusive `scope_translations`; `expected`
+5. **Dry-run** [runner `dry_run`]. Todos os `blockers` = 0, inclusive `scope_translations`; `expected`
    compatível com o preflight revisado (diferença só se houve run entre os
    dois; nesse caso explicar). Comunicar o efeito na API (§2).
-6. **Execução seca em produção**: `psql "$DATABASE_URL" -X -q -t -A -v ON_ERROR_STOP=1 <DOE_SP_REBUILD_ARGS> -f sql/30_rebuild_destructive.sql`
-   → `mode=DRY`, `postConditions=PASS`, `ROLLED_BACK`.
-7. **Execução real**: mesmo comando `+ -v confirm=REBUILD_DOE_SP` →
-   `DOE_SP_REBUILD_COMMITTED`.
-8. **Validação**: `40` com `-v expected_publications_kept=<n>` → `PASS`.
-9. **Retomada**: `50_resume_source.sql` → `DOE_SP_RESUMED`. O Scheduler cria
+6. **Execução seca em produção** [runner `rebuild_dry`,
+   `DOE_SP_REBUILD_ARGS` = linha do passo 5] → o runner refaz o `20`, exige
+   bloqueadores 0 e argumentos idênticos; `30` → `mode=DRY`,
+   `postConditions=PASS`, `ROLLED_BACK`.
+7. **Execução real** [runner `rebuild_commit`, mesmos argumentos,
+   `DOE_SP_CONFIRM=REBUILD_DOE_SP`] → `DOE_SP_REBUILD_COMMITTED` e, na mesma
+   execução, `40` → `DOE_SP_POST_REBUILD=PASS`.
+8. **Validação** (repetível) [runner `validate_40`].
+9. **Retomada** [runner `resume`, `DOE_SP_CONFIRM=RESUME_DOE_SP`] →
+   `DOE_SP_RESUMED`. O Scheduler cria
    o próximo run; o conector faz bootstrap desde 2025-01-01 com orçamento de
    tempo por run (vários runs).
 10. **Acompanhamento**: por run, `pendingDays` decrescente e `deferredItems`
     conhecido. Não iniciar run manual sem autorização.
-11. **Fechamento da recaptura**: `41` com `checkpoint.pendingRanges = []`,
+11. **Fechamento da recaptura** [runner `validate_41`]: `41` com `checkpoint.pendingRanges = []`,
     `publicationsWithoutVersionOrOrigin = 0`, `redundantPdfInVersion = 0`,
     `crossOriginFiles = 0` e `historicalVersions = 0`. Depois, um run
     SCHEDULED seguinte como prova de replay: 0 publicações novas e
@@ -186,9 +194,11 @@ para a fase destrutiva; merge/deploy do PR #73 decididos pelo responsável.
 - **Antes do COMMIT de `30`**: automático (transação única).
 - **Depois do COMMIT, com ou sem recaptura parcial** (incidente, com
   autorização):
-  1. `25` (pausa) e aguardar zero runs `PENDING/RUNNING`;
-  2. restaurar o backup verificado num Postgres temporário na Railway (como
-     o runner faz) e executar `runner/rollback-stage.sh <restaurado> <produção>`.
+  1. [runner `pause`] e aguardar zero runs `PENDING/RUNNING` ([runner `dry_run`]);
+  2. [runner `rollback`, `DOE_SP_CONFIRM=ROLLBACK_DOE_SP`,
+     `DOE_SP_ROLLBACK_DUMP_SHA256` = SHA do `DOE_SP_BACKUP` do backup
+     verificado] — o runner restaura o dump num Postgres temporário dentro do
+     próprio container e executa `runner/rollback-stage.sh <restaurado> <produção>`.
      O staging leva as linhas completas de `publications` do escopo, origens,
      versões, arquivos, links, checkpoints, traduções e a lista de runs DOE-SP
      existentes no backup;
@@ -200,11 +210,14 @@ para a fase destrutiva; merge/deploy do PR #73 decididos pelo responsável.
      etc.); reinsere o escopo com os **mesmos IDs**; confere que nada fora do
      DOE-SP mudou. Aborta se, na janela, outra fonte, empresa ou item
      estrangeiro passou a apontar para o escopo. A fonte permanece pausada;
-  4. `11` na produção deve ter o SHA do manifesto do backup e `13` o
+  4. o runner exige que o `11` da produção fique igual ao `11` do backup
+     restaurado (`DOE_SP_EXEC_RESULT` `PASS manifest_equals_backup`); o `13` o
      fingerprint das outras fontes do momento do backup (se outra fonte
      coletou nesse intervalo, o `13` muda legitimamente: comparar com um `13`
      tirado imediatamente antes do rollback). Retomar com `50` só após revisão.
-- Provas: teste de integração `test/doe-sp.rebuild-ops.integration.test.ts`
+- Provas: `test/doe-sp.exec-runner.integration.test.ts` (o próprio
+  `execute.sh`: recusas, sequência completa e rollback a partir do dump) e
+  `test/doe-sp.rebuild-ops.integration.test.ts`
   (recaptura parcial com a persistência real → rollback → manifesto, outras
   fontes e contagens iguais; guardas de item estrangeiro e de tradução) e
   runner (`rehearsal_partial_recapture` → `rehearsal_rollback_manifest_equal`,
@@ -237,3 +250,42 @@ Ensaio (DOE-SP-33): guardas negativas (item estrangeiro, tradução no escopo),
 fingerprint das outras fontes e contagens. Localmente, o runner foi validado
 contra um banco sintético (Postgres 16,
 migrations do repositório).
+
+## 11. Runner de execução (DOE-SP-38)
+
+`runner/execute.sh` roda no **mesmo** serviço `tmp-doe-sp-31-runner` (o volume
+`/data` guarda os dumps que o rollback usa). O `prep.sh`, o Dockerfile e os
+SQLs revisados não mudam: a EXECUÇÃO só troca o *start command*.
+
+Um passo = um deploy:
+1. pinar o serviço no SHA revisado do runner (`commitSha`);
+2. definir as variáveis do passo e o start command
+   `/opt/doe-sp/runner/execute.sh`;
+3. redeploy; ler nos logs as linhas `DOE_SP_*` e a final
+   `DOE_SP_EXEC_RESULT={"status":"PASS"|"FAILED"|"REFUSED",...}`;
+4. ao fim da fase, remover o start command (volta ao `prep.sh`) e as
+   variáveis `DOE_SP_*` do passo.
+
+| Variável | Uso |
+|---|---|
+| `DOE_SP_STEP` | `pause` · `dry_run` · `rebuild_dry` · `rebuild_commit` · `validate_40` · `resume` · `validate_41` · `rollback` |
+| `DOE_SP_EXEC_ID` | id único por execução (`[a-z0-9-]`, 3–64). Um marcador em `/data/doe-sp-exec/` impede que o mesmo id rode duas vezes: redeploy acidental é recusado |
+| `DOE_SP_NOT_AFTER` | prazo UTC (`AAAA-MM-DDTHH:MM:SSZ`); depois dele o passo é recusado |
+| `DOE_SP_CONFIRM` | só nos passos de escrita, igual ao passo: `PAUSE_DOE_SP`, `REBUILD_DOE_SP`, `RESUME_DOE_SP`, `ROLLBACK_DOE_SP` |
+| `DOE_SP_REBUILD_ARGS` | `rebuild_dry`/`rebuild_commit`/`validate_40`: a linha `DOE_SP_REBUILD_ARGS` do dry-run revisado, validada por expressão exata |
+| `DOE_SP_ROLLBACK_DUMP_SHA256` | `rollback`: SHA-256 do dump no volume |
+
+Garantias:
+- passo, id, prazo, confirmação ou argumentos inválidos ⇒ `REFUSED` **antes**
+  de qualquer conexão com o banco;
+- passos de leitura com `default_transaction_read_only=on`; `ON_ERROR_STOP`
+  sempre; cada execução registra o SHA-256 dos SQLs que usou;
+- `rebuild_dry`/`rebuild_commit` refazem o `20` na mesma execução: todos os
+  bloqueadores 0 e argumentos idênticos, senão `FAILED` sem tocar o `30`;
+- `rebuild_commit` roda o `40` logo depois; um segundo commit é barrado pelo
+  próprio dry-run (a contagem mudou);
+- `rollback` restaura o dump num Postgres temporário local ao container,
+  executa `rollback-stage.sh` e `60`, exige manifesto da produção = manifesto
+  do backup e remove o Postgres temporário;
+- logs só com linhas `DOE_SP_*` agregadas e SHA-256 (§9).
+
