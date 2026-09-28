@@ -246,6 +246,34 @@ test(
       );
 
       await t.test(
+        'unknown user is rejected with the same response as a wrong password',
+        async () => {
+          const response = await app.inject({
+            method: 'POST',
+            url: '/auth/login',
+            payload: {
+              email: 'unknown@example.test',
+              password: PASSWORD,
+            },
+          });
+          assert.equal(response.statusCode, 401);
+          assert.deepEqual(response.json(), {
+            error: 'invalid_credentials',
+          });
+        },
+      );
+
+      await t.test(
+        'account details require authentication',
+        async () => {
+          const response = await app.inject({
+            method: 'GET', url: '/auth/me',
+          });
+          assert.equal(response.statusCode, 401);
+        },
+      );
+
+      await t.test(
         'valid access token works and lists only authorized active tenants',
         async () => {
           const session = await login(
@@ -583,6 +611,25 @@ test(
               ),
             TenantAccessDeniedError,
           );
+        },
+      );
+
+      await t.test(
+        'a tenant owner cannot promote a membership in another tenant',
+        async () => {
+          const changed = await withTenantContext(
+            app.db,
+            userAId,
+            tenantAId,
+            async (trx) => trx
+              .updateTable('tenant_memberships')
+              .set({ role: 'OWNER' })
+              .where('tenant_id', '=', tenantBId)
+              .where('user_id', '=', userBId)
+              .returning('role')
+              .execute(),
+          );
+          assert.deepEqual(changed, []);
         },
       );
 
