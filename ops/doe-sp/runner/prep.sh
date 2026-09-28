@@ -40,6 +40,8 @@ summary() {
 trap 'fail "unexpected_error_line_$LINENO"' ERR
 
 umask 077
+# Temporary restore copies of earlier failed runs are not evidence: free the volume.
+rm -rf "$DATA_DIR"/doe-sp-31/*/pgtmp
 mkdir -p "$PRIVATE" "$BACKUP" "$PGTMP" "$LOCAL_SOCKET"
 
 # ---------------------------------------------------------------- production (read only)
