@@ -284,6 +284,9 @@ Garantias:
   bloqueadores 0 e argumentos idênticos, senão `FAILED` sem tocar o `30`;
 - `rebuild_commit` roda o `40` logo depois; um segundo commit é barrado pelo
   próprio dry-run (a contagem mudou);
+- `validate_41` só dá `PASS` com todos os critérios do §6 passo 11; senão
+  `FAILED` (`post_recapture_criteria_not_met`) e a linha
+  `DOE_SP_POST_RECAPTURE_UNMET` com os critérios pendentes;
 - `rollback` restaura o dump num Postgres temporário local ao container,
   executa `rollback-stage.sh` e `60`, exige manifesto da produção = manifesto
   do backup e remove o Postgres temporário;

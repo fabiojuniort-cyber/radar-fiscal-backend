@@ -136,7 +136,20 @@ case "$STEP" in
     result PASS ;;
 
   validate_41)
-    ro -f "$SQL/41_post_recapture_validation.sql" | grep -E '^DOE_SP_POST_RECAPTURE' || fail "post_recapture_validation_failed"
+    out=$(ro -f "$SQL/41_post_recapture_validation.sql") || fail "post_recapture_validation_failed"
+    line=$(grep '^DOE_SP_POST_RECAPTURE=' <<<"$out") || fail "post_recapture_validation_failed"
+    log "$line"
+    # RUNBOOK §6 step 11: the recapture is closed only when every criterion holds.
+    unmet=$(sed 's/^DOE_SP_POST_RECAPTURE=//' <<<"$line" | jq -c '[
+      (if .checkpoint.pendingRanges == [] then empty else "pendingRanges" end),
+      (if .publicationsWithoutVersionOrOrigin == 0 then empty else "publicationsWithoutVersionOrOrigin" end),
+      (if .redundantPdfInVersion == 0 then empty else "redundantPdfInVersion" end),
+      (if .crossOriginFiles == 0 then empty else "crossOriginFiles" end),
+      (if .historicalVersions == 0 then empty else "historicalVersions" end)]') || fail "post_recapture_validation_failed"
+    if [ "$unmet" != "[]" ]; then
+      log "DOE_SP_POST_RECAPTURE_UNMET=$unmet"
+      fail "post_recapture_criteria_not_met"
+    fi
     result PASS ;;
 
   rollback)

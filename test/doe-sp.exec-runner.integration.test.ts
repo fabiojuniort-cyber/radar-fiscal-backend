@@ -13,6 +13,7 @@ import type { DB } from '../src/infrastructure/database/database.types.js';
 import type { ConnectorPublication } from '../src/modules/collection/connector.contract.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { persistPublication } from '../src/modules/collection/publication.persistence.js';
+import { dropScratchDatabase, ignoreIdleClientErrors } from './scratch-database.js';
 
 /*
  * DOE-SP-38: ops/doe-sp/runner/execute.sh is the only way the rebuild steps
@@ -51,7 +52,7 @@ test('DOE-SP-38: execute.sh refuses unsafe input and runs pause -> rebuild -> re
   const opsUrl = withDatabase(adminUrl, opsDb);
   const dataDir = mkdtempSync(join(tmpdir(), 'doe-sp-exec-'));
   chmodSync(dataDir, 0o711);
-  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  const admin = ignoreIdleClientErrors(new Pool({ connectionString: adminUrl, max: 1 }));
   let db: Kysely<DB> | undefined;
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` };
   const psql = (file: string, readOnly = false) => execFileSync('psql', [opsUrl, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-f', file], {
@@ -82,7 +83,7 @@ test('DOE-SP-38: execute.sh refuses unsafe input and runs pause -> rebuild -> re
     await admin.query(`CREATE DATABASE ${opsDb}`);
     const schema = execFileSync('pg_dump', ['--schema-only', '--no-owner', '--no-privileges', adminUrl], { encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024 });
     execFileSync('psql', [opsUrl, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: schema, env, stdio: ['pipe', 'ignore', 'pipe'] });
-    const pool = new Pool({ connectionString: opsUrl, max: 2 });
+    const pool = ignoreIdleClientErrors(new Pool({ connectionString: opsUrl, max: 2 }));
     db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
     await pool.query(`CREATE TABLE norma_clara_translations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       publication_version_id UUID NOT NULL REFERENCES publication_versions(id) ON DELETE CASCADE, segment_hash CHAR(64) NOT NULL,
@@ -174,7 +175,26 @@ test('DOE-SP-38: execute.sh refuses unsafe input and runs pause -> rebuild -> re
     assert.equal(run('resume', { DOE_SP_CONFIRM: 'RESUME_DOE_SP' }).result.status, 'PASS');
     assert.match(psql(join(OPS, 'rehearsal/partial_recapture_sim.sql')), /DOE_SP_SIM_RECAPTURE=/);
     assert.notEqual(manifest(), manifest0);
-    assert.match(run('validate_41').out, /^DOE_SP_POST_RECAPTURE=/m);
+    // 41 closes the recapture only on RUNBOOK §6 step 11: a partial one fails.
+    const partial = run('validate_41');
+    assert.equal(partial.result.status, 'FAILED', partial.out);
+    assert.equal(partial.result.detail, 'post_recapture_criteria_not_met');
+    assert.match(partial.out, /^DOE_SP_POST_RECAPTURE=/m);
+    assert.match(partial.out, /^DOE_SP_POST_RECAPTURE_UNMET=\["pendingRanges","publicationsWithoutVersionOrOrigin"\]$/m);
+    // Converge it: the last preserved publication recaptured, no pending range.
+    await sql`WITH orphan AS (
+        SELECT p.id, gen_random_uuid() AS version_id FROM publications p
+        WHERE NOT EXISTS (SELECT 1 FROM publication_origins po WHERE po.publication_id = p.id)),
+      origin AS (INSERT INTO publication_origins (publication_id, source_id, external_id, official_url, metadata)
+        SELECT o.id, ${doeSp}, 'conv-' || o.id, 'https://doe.sp.gov.br/conv/' || o.id, '{}' FROM orphan o)
+      INSERT INTO publication_versions (id, publication_id, version_no, content_hash, content_text, source_metadata, is_current)
+      SELECT o.version_id, o.id, 1, encode(sha256(convert_to('conv' || o.id, 'UTF8')), 'hex'), 'texto recapturado', '{"contentHashVersion":2}', true FROM orphan o`.execute(db);
+    await sql`INSERT INTO collection_checkpoints (source_id, connector_key, state_version, generation, payload, payload_sha256, payload_bytes, produced_by_run_id)
+      SELECT ${doeSp}, 'doe-sp', 1, 2, '{"coverageFrom":"2025-01-01","pendingRanges":[],"days":{}}', ${'c'.repeat(64)}, 60, cr.id
+      FROM collection_runs cr WHERE cr.source_id = ${doeSp} ORDER BY cr.created_at DESC LIMIT 1`.execute(db);
+    const converged = run('validate_41');
+    assert.equal(converged.result.status, 'PASS', converged.out);
+    assert.doesNotMatch(converged.out, /DOE_SP_POST_RECAPTURE_UNMET/);
     assert.equal(run('pause', { DOE_SP_CONFIRM: 'PAUSE_DOE_SP' }).result.status, 'PASS');
     assert.equal(run('rollback', { DOE_SP_CONFIRM: 'ROLLBACK_DOE_SP', DOE_SP_ROLLBACK_DUMP_SHA256: 'f'.repeat(64) }).result.detail, 'dump_not_found_on_volume');
     const rollback = run('rollback', { DOE_SP_CONFIRM: 'ROLLBACK_DOE_SP', DOE_SP_ROLLBACK_DUMP_SHA256: dumpSha });
@@ -188,7 +208,7 @@ test('DOE-SP-38: execute.sh refuses unsafe input and runs pause -> rebuild -> re
     assert.equal(readdirSync(dataDir).filter((d) => d.startsWith('doe-sp-exec-pgtmp')).length, 0, 'temporary PostgreSQL removed');
   } finally {
     await db?.destroy();
-    await admin.query(`DROP DATABASE IF EXISTS ${opsDb} WITH (FORCE)`).catch(() => undefined);
+    await dropScratchDatabase(admin, opsDb).catch(() => undefined);
     await admin.end();
     rmSync(dataDir, { recursive: true, force: true });
   }
