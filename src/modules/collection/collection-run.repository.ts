@@ -106,13 +106,16 @@ export async function createCollectionRun(
 }
 
 /**
- * Scheduler path: creates the run only if the source is still active at
- * insert time. The source row is read `FOR SHARE`, so an operator pause
- * (`UPDATE sources SET is_active = false`) either waits for this insert to
- * commit (the run then exists before the pause completes and is visible to
- * the pause's active-run check) or, if the pause committed first, makes this
- * insert a no-op. A paused source never receives a new scheduled run.
- * Returns undefined when the source is inactive.
+ * Scheduler path: creates the run only if the source is still active in the
+ * insert's own snapshot. No row lock is taken on `sources`: the Scheduler
+ * runs as radar_worker_runtime, which has only SELECT there, and any
+ * FOR SHARE/KEY SHARE/UPDATE on it is denied. The pause × Scheduler race is
+ * closed on the operator side instead: the pause (ops/doe-sp/sql/25) takes
+ * `LOCK TABLE collection_runs IN SHARE MODE` in the same transaction as the
+ * UPDATE, so an insert already in flight commits before the pause completes
+ * (and is visible to its active-run check), and a later insert waits for the
+ * pause and then reads is_active = false. Returns undefined when the source
+ * is inactive.
  */
 export async function createScheduledCollectionRun(
   db: Kysely<DB>,
@@ -123,7 +126,6 @@ export async function createScheduledCollectionRun(
     SELECT s.id, ${input.scheduledFor}, ${input.triggerType}, 'PENDING'
     FROM sources s
     WHERE s.id = ${input.sourceId} AND s.is_active = true
-    FOR SHARE
     ON CONFLICT (source_id, scheduled_for, trigger_type) DO NOTHING
     RETURNING id
   `.execute(db);
