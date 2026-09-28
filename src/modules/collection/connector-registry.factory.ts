@@ -2,7 +2,7 @@ import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { CgibsConnector } from './cgibs.connector.js';
-import { DoeSpConnector } from './doe-sp.connector.js';
+import { DoeSpConnector, resolveDoeSpSourceLimits } from './doe-sp.connector.js';
 import { readDoeSpSourceState } from './doe-sp-source-state.repository.js';
 import { RfbNormasConnector } from './rfb-normas.connector.js';
 import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.js';
@@ -63,8 +63,11 @@ export function buildConnectorRegistry(
     }),
   );
 
+  const doeSpLimits = resolveDoeSpSourceLimits();
   registry.register(
     new DoeSpConnector({
+      client: { minRequestIntervalMs: doeSpLimits.minRequestIntervalMs },
+      maxDownloadBytesPerRun: doeSpLimits.maxDownloadBytesPerRun,
       ...(options.db
         ? {
             readState: (sourceId) =>
