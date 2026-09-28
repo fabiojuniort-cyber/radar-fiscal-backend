@@ -4,6 +4,7 @@ import test from 'node:test';
 import { ConnectorError } from '../src/modules/collection/connector.error.js';
 import { DOE_SP_SEARCH_API, DoeSpClient } from '../src/modules/collection/doe-sp.client.js';
 import { DoeSpConnector, EMPTY_DOE_SP_STATE } from '../src/modules/collection/doe-sp.connector.js';
+import { parseDoeSpSourceState } from '../src/modules/collection/doe-sp-source-state.repository.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 
 /*
@@ -568,4 +569,124 @@ test('policy gate: attachment with independent content remains version-relevant 
     withMaterialAttachment.contentHash,
     'material attachments must continue to influence version semantics',
   );
+});
+
+// ---- DOE-SP-31: material PDF "Processando" -> timeout -> deferred, cursor advances, never lost
+
+const OLD_DATE = '2025-02-05';
+const PDF_BYTES = Buffer.from('%PDF-1.4\n% deferred material fixture\n%%EOF\n');
+
+function noHtmlApi(pdf: 'PROCESSING' | 'READY', counter?: { pdf: number }) {
+  const regular = api(OLD_DATE);
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input.toString());
+    if (url.pathname === `/v2/publications/${ID}`) {
+      return json({
+        id: ID, title: 'COMUNICADO, DE 4 DE FEVEREIRO DE 2025', slug: SLUG, date: OLD_DATE, journal: 'Executivo',
+        section: 'Diretoria de Inteligência de Dados', firstLevelSectionName: 'Atos Normativos',
+        secondLevelSectionName: 'Secretaria da Fazenda e Planejamento', publicationType: 'Comunicado',
+        editionPages: [], content: '', attachments: [], authCode: '2025.02.04.1.1.27.5.3.4.199.861381',
+      });
+    }
+    if (url.pathname.startsWith('/v2/authentication/download/')) {
+      if (counter) counter.pdf += 1;
+      return pdf === 'PROCESSING'
+        ? json(PROCESSING)
+        : json({ name: 'comunicado.pdf', contentType: 'application/pdf', content: PDF_BYTES.toString('base64') });
+    }
+    return regular(input, init);
+  }) as typeof fetch;
+}
+
+const NOW = new Date('2026-09-28T15:00:00Z');
+const BACKFILL_STATE = {
+  coverageFrom: OLD_DATE,
+  windowEnd: '2026-09-27',
+  pendingRanges: [{ from: OLD_DATE, to: '2025-02-06' }],
+  days: {},
+};
+
+type DeferredState = {
+  pendingRanges: Array<{ from: string; to: string }>;
+  deferredItems?: Array<{ id: string; doeDate: string; attempts: number; firstDeferredAt: string; lastAttemptAt: string }>;
+};
+
+test('connector: material PDF still "Processando" after the timeout is deferred, the day completes and the cursor advances', async () => {
+  const result = await new DoeSpConnector({
+    fetch: noHtmlApi('PROCESSING'), now: () => NOW, lookbackDays: 1, forceReprocess: false,
+    readState: async () => BACKFILL_STATE,
+  }).collect(context());
+
+  assert.equal(result.publications.length, 0);
+  assert.deepEqual(result.partialFailures?.map((failure) => failure.code), ['DOE_SP_MATERIAL_PDF_DEFERRED']);
+  const state = result.checkpoint?.state as unknown as DeferredState;
+  assert.deepEqual(state.pendingRanges, [], 'bootstrap cursor must move past the deferred date');
+  assert.equal(state.deferredItems?.length, 1, 'the act must stay under control in the checkpoint');
+  assert.equal(state.deferredItems?.[0]?.id, ID);
+  assert.equal(state.deferredItems?.[0]?.doeDate, OLD_DATE);
+  assert.equal(state.deferredItems?.[0]?.attempts, 1);
+  const doeSp = result.metadata?.doeSp as { deferredItems: number; days: Array<{ date: string; complete: boolean; deferred: number; failed: number }> };
+  assert.equal(doeSp.deferredItems, 1);
+  const day = doeSp.days.find((entry) => entry.date === OLD_DATE);
+  assert.deepEqual({ complete: day?.complete, deferred: day?.deferred, failed: day?.failed }, { complete: true, deferred: 1, failed: 0 });
+  assert.equal(result.completion, undefined);
+
+  // Round-trip through the persisted checkpoint parser keeps the item.
+  const reparsed = parseDoeSpSourceState(JSON.parse(JSON.stringify(result.checkpoint?.state)) as Record<string, unknown>);
+  assert.equal(reparsed.deferredItems?.[0]?.id, ID);
+  assert.equal(reparsed.deferredItems?.[0]?.item.slug, SLUG);
+});
+
+test('connector: material PDF "Processando" inside the timeout still fails the day (retry, no deferral)', async () => {
+  // Clock 3 days after the DOE date: still inside DOE_SP_MATERIAL_PDF_GRACE_DAYS.
+  const shifted = await new DoeSpConnector({
+    fetch: noHtmlApi('PROCESSING'), now: () => new Date('2025-02-08T15:00:00Z'), lookbackDays: 1, forceReprocess: false,
+    readState: async () => ({ coverageFrom: OLD_DATE, windowEnd: '2025-02-07', pendingRanges: [{ from: OLD_DATE, to: OLD_DATE }], days: {} }),
+  }).collect(context());
+
+  assert.equal(shifted.publications.length, 0);
+  const state = shifted.checkpoint?.state as unknown as DeferredState;
+  assert.deepEqual(state.pendingRanges, [{ from: OLD_DATE, to: OLD_DATE }], 'within the timeout the date stays pending');
+  assert.equal(state.deferredItems, undefined);
+  assert.equal(shifted.partialFailures?.[0]?.code, 'DOE_SP_AUTHENTICATED_PDF_NOT_READY');
+});
+
+test('connector: deferred act is retried after 24h and published once the material PDF is rendered', async () => {
+  const deferredState = {
+    coverageFrom: OLD_DATE, windowEnd: '2026-09-27', pendingRanges: [], days: {},
+    deferredItems: [{
+      id: ID, doeDate: OLD_DATE, reason: 'MATERIAL_PDF_NOT_READY' as const,
+      item: { id: ID, publicationTypeId: TYPE_COMUNICADO, date: `${OLD_DATE}T01:00:40.1`, title: 'COMUNICADO, DE 4 DE FEVEREIRO DE 2025', slug: SLUG, excerpt: 'Divulga relação de contribuintes', hierarchy: HIERARCHY.split(' > '), isLegacy: false },
+      category: 'SEFAZ_TAX_ADMINISTRATION' as const, typeName: 'Comunicado',
+      firstDeferredAt: '2026-09-20T15:00:00.000Z', lastAttemptAt: '2026-09-26T15:00:00.000Z', attempts: 3,
+    }],
+  };
+
+  const stillProcessing = await new DoeSpConnector({
+    fetch: noHtmlApi('PROCESSING'), now: () => NOW, lookbackDays: 1, forceReprocess: false,
+    readState: async () => deferredState,
+  }).collect(context());
+  const kept = stillProcessing.checkpoint?.state as unknown as DeferredState;
+  assert.equal(kept.deferredItems?.[0]?.attempts, 4);
+  assert.equal(kept.deferredItems?.[0]?.firstDeferredAt, '2026-09-20T15:00:00.000Z');
+  assert.equal(stillProcessing.partialFailures, undefined, 'a known deferred act does not re-alert every run');
+
+  const counter = { pdf: 0 };
+  const tooSoon = await new DoeSpConnector({
+    fetch: noHtmlApi('READY', counter), now: () => new Date('2026-09-26T20:00:00Z'), lookbackDays: 1, forceReprocess: false,
+    readState: async () => ({ ...deferredState, windowEnd: '2026-09-25' }),
+  }).collect(context());
+  assert.equal(counter.pdf, 0, 'retry is rate-limited to once per 24h');
+  assert.equal((tooSoon.checkpoint?.state as unknown as DeferredState).deferredItems?.length, 1);
+
+  const ready = await new DoeSpConnector({
+    fetch: noHtmlApi('READY'), now: () => NOW, lookbackDays: 1, forceReprocess: false,
+    readState: async () => deferredState,
+  }).collect(context());
+  assert.equal(ready.publications.length, 1);
+  assert.equal(ready.publications[0]?.externalId, ID);
+  assert.equal(ready.publications[0]?.originMetadata?.authenticatedPdf, 'CAPTURED_MATERIAL');
+  assert.equal(ready.publications[0]?.files?.[0]?.versionRole, 'MATERIAL_CONTENT');
+  assert.equal((ready.checkpoint?.state as unknown as DeferredState).deferredItems, undefined);
+  assert.equal((ready.metadata?.doeSp as { counters: { deferredCaptured: number } }).counters.deferredCaptured, 1);
 });

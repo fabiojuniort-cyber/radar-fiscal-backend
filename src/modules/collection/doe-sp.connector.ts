@@ -55,6 +55,19 @@ export const DOE_SP_SECTION = 'Atos Normativos';
  */
 export const DOE_SP_DEFAULT_LOOKBACK_DAYS = 3;
 const MAX_EXCLUDED_SAMPLES = 200;
+/**
+ * Timeout for a *material* authenticated PDF (page without official body)
+ * that the source keeps answering "Processando". Within this many days after
+ * the DOE date the item fails and the day is retried. After it, the item is
+ * moved to `deferredItems` in the checkpoint: the day completes (the bootstrap
+ * cursor advances) and the item is retried at most once per
+ * DOE_SP_DEFERRED_RETRY_HOURS until captured. It never leaves the checkpoint
+ * without being published. Observed case: b8bec255-… (DOE 05/02/2025) still
+ * "Processando" 19 months later — that act has official HTML, so page-first
+ * does not request its PDF at all.
+ */
+export const DOE_SP_MATERIAL_PDF_GRACE_DAYS = 7;
+export const DOE_SP_DEFERRED_RETRY_HOURS = 24;
 const DAY_MS = 86_400_000;
 
 export interface DoeSpDayState {
@@ -68,6 +81,19 @@ export interface DoeSpDayState {
 
 export interface DoeSpDateRange { from: string; to: string }
 
+/** Included act whose material content is not yet available at the source. */
+export interface DoeSpDeferredItem {
+  id: string;
+  doeDate: string;
+  reason: 'MATERIAL_PDF_NOT_READY';
+  item: DoeSpListItem;
+  category: DoeSpInclusionCategory;
+  typeName?: string;
+  firstDeferredAt: string;
+  lastAttemptAt: string;
+  attempts: number;
+}
+
 export interface DoeSpSourceState {
   /** Earliest date the source must cover (bootstrap target). */
   coverageFrom: string | null;
@@ -77,6 +103,8 @@ export interface DoeSpSourceState {
   pendingRanges: DoeSpDateRange[];
   /** Incremental window only (pruned every run). */
   days: Record<string, DoeSpDayState>;
+  /** Acts kept under control until their material content can be captured. */
+  deferredItems?: DoeSpDeferredItem[];
   lastSuccessAt?: string;
 }
 
@@ -108,6 +136,7 @@ interface DayOutcome {
   published: number;
   failed: number;
   malformed: number;
+  deferred: number;
   skippedUnchanged: boolean;
   complete: boolean;
   yielded: boolean;
@@ -126,6 +155,11 @@ interface Filtering {
 }
 
 class BudgetReached extends Error {}
+
+function isMaterialPdfNotReady(error: unknown): boolean {
+  return error instanceof ConnectorError &&
+    error.code === 'DOE_SP_AUTHENTICATED_PDF_NOT_READY';
+}
 
 // ------------------------------------------------------------------ dates
 
@@ -260,6 +294,7 @@ export class DoeSpConnector implements CollectionConnector {
       windowEnd: loaded.windowEnd,
       pendingRanges: loaded.pendingRanges.map((range) => ({ ...range })),
       days: { ...loaded.days },
+      deferredItems: (loaded.deferredItems ?? []).map((entry) => ({ ...entry })),
       ...(loaded.lastSuccessAt ? { lastSuccessAt: loaded.lastSuccessAt } : {}),
     };
     const lookbackDays = resolveLookbackDays(this.#options.lookbackDays);
@@ -305,7 +340,7 @@ export class DoeSpConnector implements CollectionConnector {
       discoveredCount: 0, includedCount: 0, excludedCount: 0,
       includedByCategory: {}, excludedByReason: {}, excludedSamples: [], excludedSamplesTruncated: 0,
     };
-    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, redundantPdfSkipped: 0, materialPdfDownloaded: 0 };
+    const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, redundantPdfSkipped: 0, materialPdfDownloaded: 0, materialPdfDeferred: 0, deferredRetried: 0, deferredCaptured: 0 };
     const typeCache = new Map<string, Map<string, string>>();
 
     const typesFor = async (date: string): Promise<Map<string, string>> => {
@@ -507,11 +542,36 @@ export class DoeSpConnector implements CollectionConnector {
       };
     };
 
+    const materialPdfTimeoutDate = addDays(today, -DOE_SP_MATERIAL_PDF_GRACE_DAYS);
+    const deferred = new Map(
+      (state.deferredItems ?? []).map((entry) => [entry.id, entry]),
+    );
+    const deferItem = (
+      item: DoeSpListItem,
+      category: DoeSpInclusionCategory,
+      typeName: string | undefined,
+      doeDate: string,
+    ): void => {
+      const prior = deferred.get(item.id);
+      counters.materialPdfDeferred += prior ? 0 : 1;
+      deferred.set(item.id, {
+        id: item.id,
+        doeDate,
+        reason: 'MATERIAL_PDF_NOT_READY',
+        item,
+        category,
+        ...(typeName ? { typeName } : {}),
+        firstDeferredAt: prior?.firstDeferredAt ?? now.toISOString(),
+        lastAttemptAt: now.toISOString(),
+        attempts: (prior?.attempts ?? 0) + 1,
+      });
+    };
+
     const processDay = async (date: string, mode: 'WINDOW' | 'BACKFILL'): Promise<DayOutcome> => {
       const previous = mode === 'WINDOW' && !force ? state.days[date] : undefined;
       const outcome: DayOutcome = {
         date, mode, discovered: 0, included: 0, excluded: 0, newIncluded: 0, published: 0, failed: 0,
-        malformed: 0, skippedUnchanged: false, complete: false, yielded: false, processedIds: [],
+        malformed: 0, deferred: 0, skippedUnchanged: false, complete: false, yielded: false, processedIds: [],
       };
 
       if (mode === 'WINDOW') {
@@ -584,10 +644,24 @@ export class DoeSpConnector implements CollectionConnector {
         }
         try {
           publications.push(await buildPublication(next.item, next.category, next.typeName, edition));
+          deferred.delete(next.item.id);
           processed.add(next.item.id);
           outcome.published += 1;
         } catch (error) {
           if (isCancel(error)) throw error;
+          if (isMaterialPdfNotReady(error) && date <= materialPdfTimeoutDate) {
+            // Timeout reached: keep the act under control, let the day complete.
+            deferItem(next.item, next.category, next.typeName, date);
+            processed.add(next.item.id);
+            outcome.deferred += 1;
+            partialFailures.push({
+              code: 'DOE_SP_MATERIAL_PDF_DEFERRED',
+              message: 'Material authenticated PDF still "Processando" after ' +
+                DOE_SP_MATERIAL_PDF_GRACE_DAYS + ' days; kept in deferredItems for retry.',
+              itemReference: `${date}#${next.item.id}`,
+            });
+            continue;
+          }
           if (isSourceLevel(error)) counters.sourceErrors += 1;
           outcome.failed += 1;
           const info = failureInfo(error);
@@ -642,6 +716,28 @@ export class DoeSpConnector implements CollectionConnector {
       });
     }
 
+    // ---- deferred acts (material content not yet rendered by the source)
+    const retryBefore = now.getTime() - DOE_SP_DEFERRED_RETRY_HOURS * 3_600_000;
+    for (const entry of [...deferred.values()].sort((a, b) => a.doeDate.localeCompare(b.doeDate))) {
+      if (yielded || context.budget?.shouldYield()) { yielded = true; break; }
+      if (Date.parse(entry.lastAttemptAt) > retryBefore) continue;
+      counters.deferredRetried += 1;
+      try {
+        publications.push(await buildPublication(
+          entry.item, entry.category, entry.typeName, await editionFor(entry.doeDate),
+        ));
+        deferred.delete(entry.id);
+        counters.deferredCaptured += 1;
+      } catch (error) {
+        if (isCancel(error)) throw error;
+        deferred.set(entry.id, { ...entry, lastAttemptAt: now.toISOString(), attempts: entry.attempts + 1 });
+        if (!isMaterialPdfNotReady(error)) {
+          const info = failureInfo(error);
+          partialFailures.push({ code: info.code, message: info.message, itemReference: `${entry.doeDate}#${entry.id}` });
+        }
+      }
+    }
+
     // ---- bootstrap / gap ranges with the remaining budget
     let ranges = state.pendingRanges.map((range) => ({ ...range }));
     let backfillDaysProcessed = 0;
@@ -680,6 +776,9 @@ export class DoeSpConnector implements CollectionConnector {
       windowEnd: windowComplete ? today : state.windowEnd,
       pendingRanges: ranges,
       days: nextDays,
+      ...(deferred.size
+        ? { deferredItems: [...deferred.values()].sort((a, b) => a.doeDate.localeCompare(b.doeDate) || a.id.localeCompare(b.id)) }
+        : {}),
       ...(!partialFailures.length && !completion ? { lastSuccessAt: now.toISOString() } : state.lastSuccessAt ? { lastSuccessAt: state.lastSuccessAt } : {}),
     };
 
@@ -697,10 +796,11 @@ export class DoeSpConnector implements CollectionConnector {
           coverageFrom: nextState.coverageFrom,
           pendingDays,
           backfillDaysProcessed,
+          deferredItems: deferred.size,
           days: days.map((day) => ({
             date: day.date, mode: day.mode, discovered: day.discovered, included: day.included,
             excluded: day.excluded, newIncluded: day.newIncluded, published: day.published,
-            failed: day.failed, malformed: day.malformed, skippedUnchanged: day.skippedUnchanged,
+            failed: day.failed, malformed: day.malformed, deferred: day.deferred, skippedUnchanged: day.skippedUnchanged,
             complete: day.complete,
           })),
           filtering,
