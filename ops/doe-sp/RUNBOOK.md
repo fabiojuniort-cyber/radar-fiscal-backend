@@ -1,6 +1,6 @@
 # DOE-SP — reconstrução restrita do acervo (D-052)
 
-Estado: **CORRIGIDO (DOE-SP-33)** após o parecer DOE-SP-32. Aguarda novo gate
+Estado: **CORRIGIDO (DOE-SP-33, validado e ajustado na DOE-SP-34)** após o parecer DOE-SP-32. Aguarda novo gate
 de PREPARAÇÃO (backup/restauração/ensaio no novo SHA) e revisão independente. Nada aqui autoriza, por si só, pausa,
 exclusão, merge, deploy ou recaptura.
 
@@ -48,7 +48,12 @@ recaptura** (o contrato público não expõe `content_text`):
 - `/public/v1/publications` sem filtro de fonte: continua listando os IDs e
   metadados preservados (título, tipo, número, datas), com `official_url` vindo
   de `primary_official_url`;
-- `/public/v1/stats`: o total global de publicações não muda.
+- `/public/v1/stats`: o total global de publicações não muda;
+- `/public/v1/sources`, **status** da DOE-SP: `PARTIAL_SUCCESS` no último run
+  é exposto como `UNSTABLE` (`src/api/routes/public.route.ts`). Durante a
+  recaptura, os runs que param por orçamento de tempo (`TIME_BUDGET_REACHED`)
+  deixam a fonte `UNSTABLE`. Depois dela, a fonte continua `UNSTABLE`
+  enquanto houver `deferredItems` (§5), até o ato adiado ser capturado.
 
 O protótipo do site (`tribusca-site-prototype`), que lê o banco diretamente,
 mostra essas publicações sem versão atual até serem recapturadas. Esses
@@ -77,19 +82,28 @@ efeitos são esperados e devem ser comunicados antes do passo 7 do §6.
 
 ## 4. Garantias do script destrutivo (`30`)
 
-- Uma transação `SERIALIZABLE`. `SELECT … FOR UPDATE` na linha da fonte
-  `doe-sp` conflita com o `FOR SHARE` do Scheduler
-  (`createScheduledCollectionRun`), com o `FOR UPDATE` do gatilho manual e com
-  o `FOR KEY SHARE` da FK de `collection_runs`. Nenhum run DOE-SP é criado
-  durante `30`, e depois dele a fonte segue pausada. `LOCK` nas tabelas do
-  escopo, em `collection_runs` e em `collection_items` mantém tudo estável.
-- **Pausa × Scheduler (corrida fechada):** o Scheduler só insere o run se a
-  fonte estiver ativa **no instante da inserção** (`INSERT … SELECT … FROM
-  sources WHERE is_active FOR SHARE`). Se a pausa (`25`) está em curso, a
-  inserção espera e depois não insere. Se a inserção está em curso, a pausa
-  espera, e o run já existe quando `25` e `30` contam os runs ativos. Teste
-  concorrente: `DOE-SP-33: a paused source never receives a scheduled run`.
-  **Exige o código deste PR em produção antes da pausa** (§6, passo 2).
+- Uma transação `SERIALIZABLE`. Os `LOCK TABLE` (escopo, `collection_runs`,
+  `collection_items` e `norma_clara_translations`) vêm **antes da primeira
+  consulta**: o snapshot só é tirado depois das esperas, então uma escrita de
+  outra fonte commitada enquanto `30` aguardava o lock (por exemplo, um item
+  apontando para o escopo) é vista pelas guardas e aborta a execução. Depois,
+  os locks mantêm o escopo estável. Em seguida, `SELECT … FOR UPDATE` na linha
+  da fonte serializa com pausa/retomada e com o gatilho manual. Teste:
+  `DOE-SP-34: 30 sees writes committed while it waits for its table locks`.
+  O `60` segue a mesma ordem.
+- **Pausa × Scheduler (corrida fechada, DOE-SP-34):** o Scheduler roda como
+  `radar_worker_runtime`, que só tem `SELECT` em `sources`. Qualquer lock de
+  linha ali (`FOR SHARE`/`FOR KEY SHARE`/`FOR UPDATE`) é negado a esse role,
+  então o Scheduler insere com `INSERT … SELECT … FROM sources WHERE
+  is_active`, sem lock. A corrida é fechada na pausa: `25` toma `FOR NO KEY
+  UPDATE` na fonte e `LOCK TABLE collection_runs IN SHARE MODE` na mesma
+  transação do `UPDATE`. Uma inserção em curso termina antes e o run aparece
+  na contagem de runs ativos. Uma inserção posterior espera o COMMIT da pausa
+  e lê `is_active = false`. `NO KEY UPDATE` não conflita com o `FOR KEY SHARE`
+  da FK de `collection_runs`, o que evita deadlock com a inserção em curso.
+  Teste concorrente, com o Scheduler no role real: `DOE-SP-33/34: a paused
+  source never receives a scheduled run`. **Exige o código deste PR em
+  produção antes da pausa** (§6, passo 2).
 - Guardas: fonte pausada; zero runs `PENDING/RUNNING`; zero origens de outra
   fonte; zero `company_publications`; zero links de run **e zero
   `collection_items`** de runs de outra fonte apontando para o escopo; **zero
@@ -125,7 +139,8 @@ efeitos são esperados e devem ser comunicados antes do passo 7 do §6.
     `completion = { complete: false, reason: 'MATERIAL_CONTENT_DEFERRED',
     pending.deferredItems = n }`, ou seja, `PARTIAL_SUCCESS`, **nunca**
     `SUCCESS_NO_RESULTS`/`SUCCESS`. Um item adiado nunca é contado como
-    publicação capturada.
+    publicação capturada. Na API pública, a fonte aparece como `UNSTABLE`
+    enquanto isso durar (§2).
 
 ## 6. Procedimento da fase destrutiva (gate futuro; cada passo registra evidência)
 
@@ -137,7 +152,8 @@ para a fase destrutiva; merge/deploy do PR #73 decididos pelo responsável.
    ajustar **antes** de `50` (mudança autorizada no gate).
 2. **Merge/deploy do PR #73**: Backend/Worker/Scheduler SUCCESS no commit
    da main. **Obrigatório antes da pausa**: o Scheduler com
-   `createScheduledCollectionRun` fecha a corrida pausa × criação de run. Com
+   `createScheduledCollectionRun` (inserção condicionada a `is_active`), junto
+   com o `LOCK` da pausa `25`, fecha a corrida pausa × criação de run. Com
    a fonte ainda ativa, o conector novo roda sobre o acervo legado pelo
    caminho de compatibilidade v1→v2 (aprovado na DOE-SP-26).
 3. **Pausa**: `psql "$DATABASE_URL" -f sql/25_pause_source.sql`. Repetir o
