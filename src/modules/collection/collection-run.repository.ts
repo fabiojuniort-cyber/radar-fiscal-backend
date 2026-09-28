@@ -105,6 +105,48 @@ export async function createCollectionRun(
   return existing.id;
 }
 
+/**
+ * Scheduler path: creates the run only if the source is still active in the
+ * insert's own snapshot. No row lock is taken on `sources`: the Scheduler
+ * runs as radar_worker_runtime, which has only SELECT there, and any
+ * FOR SHARE/KEY SHARE/UPDATE on it is denied. The pause × Scheduler race is
+ * closed on the operator side instead: the pause (ops/doe-sp/sql/25) takes
+ * `LOCK TABLE collection_runs IN SHARE MODE` in the same transaction as the
+ * UPDATE, so an insert already in flight commits before the pause completes
+ * (and is visible to its active-run check), and a later insert waits for the
+ * pause and then reads is_active = false. Returns undefined when the source
+ * is inactive.
+ */
+export async function createScheduledCollectionRun(
+  db: Kysely<DB>,
+  input: CreateCollectionRunInput,
+): Promise<string | undefined> {
+  const inserted = await sql<{ id: string }>`
+    INSERT INTO collection_runs (source_id, scheduled_for, trigger_type, status)
+    SELECT s.id, ${input.scheduledFor}, ${input.triggerType}, 'PENDING'
+    FROM sources s
+    WHERE s.id = ${input.sourceId} AND s.is_active = true
+    ON CONFLICT (source_id, scheduled_for, trigger_type) DO NOTHING
+    RETURNING id
+  `.execute(db);
+
+  if (inserted.rows[0]) {
+    return inserted.rows[0].id;
+  }
+
+  const existing = await sql<{ id: string }>`
+    SELECT cr.id
+    FROM collection_runs cr
+    JOIN sources s ON s.id = cr.source_id
+    WHERE cr.source_id = ${input.sourceId}
+      AND cr.scheduled_for = ${input.scheduledFor}
+      AND cr.trigger_type = ${input.triggerType}
+      AND s.is_active = true
+  `.execute(db);
+
+  return existing.rows[0]?.id;
+}
+
 export async function acquireNextCollectionRun(
   db: Kysely<DB>,
   workerId: string,

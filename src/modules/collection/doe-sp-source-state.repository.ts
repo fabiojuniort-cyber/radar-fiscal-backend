@@ -2,12 +2,14 @@ import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { readCurrentCheckpoint } from './checkpoint.repository.js';
+import type { DoeSpInclusionCategory } from './doe-sp.rules.js';
 import {
   DOE_SP_CONNECTOR_KEY,
   DOE_SP_STATE_VERSION,
   EMPTY_DOE_SP_STATE,
   type DoeSpDateRange,
   type DoeSpDayState,
+  type DoeSpDeferredItem,
   type DoeSpSourceState,
 } from './doe-sp.connector.js';
 
@@ -51,6 +53,55 @@ function ranges(value: unknown): DoeSpDateRange[] {
   return out.sort((a, b) => a.from.localeCompare(b.from));
 }
 
+const CATEGORIES = new Set<string>([
+  'LEGISLATION', 'NUMBERED_DECREE', 'DECREES_SECTION', 'GOVERNOR_ACT_TAX_TERMS', 'VETO_TAX_TERMS',
+  'SEFAZ_TAX_ADMINISTRATION', 'SEFAZ_CABINET', 'SEFAZ_OTHER_TAX_TERMS', 'PGE_TAX', 'OTHER_ORGAN_TAX_TERMS',
+] satisfies DoeSpInclusionCategory[]);
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** Structurally invalid entries are ignored (same policy as days/pendingRanges). */
+function deferredItems(value: unknown): DoeSpDeferredItem[] {
+  if (!Array.isArray(value)) return [];
+  const out: DoeSpDeferredItem[] = [];
+  for (const raw of value) {
+    const row = record(raw);
+    const item = record(row?.item);
+    const id = text(row?.id);
+    const doeDate = date(row?.doeDate);
+    const category = text(row?.category) as DoeSpInclusionCategory | undefined;
+    if (!row || !item || !id || !GUID.test(id) || !doeDate || !category || !CATEGORIES.has(category) || text(item.id) !== id) continue;
+    const hierarchy = Array.isArray(item.hierarchy)
+      ? item.hierarchy.filter((part): part is string => typeof part === 'string')
+      : [];
+    const typeName = text(row.typeName);
+    const publicationTypeId = text(item.publicationTypeId);
+    out.push({
+      id,
+      doeDate,
+      reason: 'MATERIAL_PDF_NOT_READY',
+      item: {
+        id,
+        ...(publicationTypeId ? { publicationTypeId } : {}),
+        date: text(item.date) ?? doeDate,
+        title: text(item.title) ?? '',
+        slug: text(item.slug) ?? '',
+        excerpt: text(item.excerpt) ?? '',
+        hierarchy,
+        isLegacy: item.isLegacy === true,
+      },
+      category,
+      ...(typeName ? { typeName } : {}),
+      firstDeferredAt: text(row.firstDeferredAt) ?? new Date(0).toISOString(),
+      lastAttemptAt: text(row.lastAttemptAt) ?? new Date(0).toISOString(),
+      attempts: typeof row.attempts === 'number' && Number.isSafeInteger(row.attempts) && row.attempts >= 0 ? row.attempts : 0,
+    });
+  }
+  return out.sort((a, b) => a.doeDate.localeCompare(b.doeDate) || a.id.localeCompare(b.id));
+}
+
 export function parseDoeSpSourceState(raw: Record<string, unknown> | undefined): DoeSpSourceState {
   if (!raw) return { ...EMPTY_DOE_SP_STATE, pendingRanges: [], days: {} };
   const days: Record<string, DoeSpDayState> = {};
@@ -66,6 +117,7 @@ export function parseDoeSpSourceState(raw: Record<string, unknown> | undefined):
     windowEnd: date(raw.windowEnd),
     pendingRanges: ranges(raw.pendingRanges),
     days,
+    ...(deferredItems(raw.deferredItems).length ? { deferredItems: deferredItems(raw.deferredItems) } : {}),
     ...(typeof raw.lastSuccessAt === 'string' ? { lastSuccessAt: raw.lastSuccessAt } : {}),
   };
 }

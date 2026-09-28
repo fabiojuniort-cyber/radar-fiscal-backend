@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   Kysely,
   PostgresDialect,
+  sql,
 } from 'kysely';
 import { Pool } from 'pg';
 
@@ -12,6 +13,7 @@ import type { DB } from '../src/infrastructure/database/database.types.js';
 import {
   runSchedulerTick,
 } from '../src/modules/collection/scheduler.service.js';
+import { createScheduledCollectionRun } from '../src/modules/collection/collection-run.repository.js';
 
 test(
   'scheduler creates due runs idempotently and isolates invalid schedules',
@@ -236,3 +238,127 @@ for (const connectorKey of ['dou', 'nfe-encat', 'sped', 'cgibs', 'rfb-normas', '
     },
   );
 }
+
+const pending = <T>(promise: Promise<T>, ms: number): Promise<boolean> =>
+  Promise.race([
+    promise.then(() => false, () => false),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(true), ms)),
+  ]);
+
+/**
+ * The Scheduler connects as radar_worker_runtime, which has only SELECT on
+ * sources: any row lock on sources (FOR SHARE/KEY SHARE/UPDATE) is denied.
+ * These connections reproduce that least privilege.
+ */
+function schedulerPool(url: string, max = 4): Pool {
+  const pool = new Pool({ connectionString: url, max });
+  pool.on('connect', (client) => {
+    void client.query('SET ROLE radar_worker_runtime');
+  });
+  return pool;
+}
+
+/** The statements of ops/doe-sp/sql/25_pause_source.sql, held open in `client`. */
+async function beginPause(client: { query: (text: string, values?: unknown[]) => Promise<unknown> }, sourceId: string): Promise<void> {
+  await client.query('BEGIN');
+  await client.query("SET LOCAL lock_timeout = '30s'");
+  await client.query('SELECT is_active FROM sources WHERE id = $1 FOR NO KEY UPDATE', [sourceId]);
+  await client.query('LOCK TABLE collection_runs IN SHARE MODE');
+  await client.query('UPDATE sources SET is_active = false, updated_at = now() WHERE id = $1', [sourceId]);
+}
+
+test(
+  'DOE-SP-33/34: a paused source never receives a scheduled run (pause x scheduler race, worker role)',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for scheduler integration tests.');
+    const pool = new Pool({ connectionString: adminUrl, max: 4 });
+    const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+    const schedulerDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: schedulerPool(adminUrl) }) });
+    const operator = await pool.connect();
+    const sourceId = randomUUID();
+    const runsOf = async () => Number((await db.selectFrom('collection_runs').select((eb) => eb.fn.countAll().as('n')).where('source_id', '=', sourceId).executeTakeFirstOrThrow()).n);
+    const setActive = (active: boolean) => db.updateTable('sources').set({ is_active: active }).where('id', '=', sourceId).execute();
+
+    try {
+      assert.equal(
+        (await sql<{ u: string }>`SELECT current_user AS u`.execute(schedulerDb)).rows[0]?.u,
+        'radar_worker_runtime',
+      );
+      await db.insertInto('sources').values({
+        id: sourceId,
+        code: `scheduler-pause-${sourceId}`,
+        name: 'Scheduler Pause Race Source',
+        jurisdiction_level: 'FEDERAL',
+        base_url: 'https://scheduler.example.test/pause',
+        connector_key: `scheduler-pause-${sourceId}`,
+        schedule_cron: '* * * * *',
+        schedule_timezone: 'America/Sao_Paulo',
+      }).execute();
+
+      // 0) Least privilege: the scheduler role creates runs for an active source.
+      const created = await createScheduledCollectionRun(schedulerDb, {
+        sourceId, scheduledFor: new Date('2026-09-28T02:59:00Z'), triggerType: 'SCHEDULED',
+      });
+      assert.ok(created, 'radar_worker_runtime can schedule a run of an active source');
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+
+      // A) Pause in flight first: the scheduler insert waits for it and then
+      //    re-evaluates is_active=false -> no run.
+      await beginPause(operator, sourceId);
+      const blockedInsert = createScheduledCollectionRun(schedulerDb, {
+        sourceId, scheduledFor: new Date('2026-09-28T03:00:00Z'), triggerType: 'SCHEDULED',
+      });
+      assert.equal(await pending(blockedInsert, 400), true, 'scheduler insert must wait for the in-flight pause');
+      await operator.query('COMMIT');
+      assert.equal(await blockedInsert, undefined);
+      assert.equal(await runsOf(), 0, 'no run after the pause committed');
+
+      // B) Scheduler insert in flight first: the pause waits for it, so the run
+      //    exists before the pause completes and the pause/30 guards see it.
+      await setActive(true);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      let insertedInTx: string | undefined;
+      let signalInserted!: () => void;
+      const inserted = new Promise<void>((resolve) => { signalInserted = resolve; });
+      const schedulerTx = schedulerDb.transaction().execute(async (trx) => {
+        insertedInTx = await createScheduledCollectionRun(trx, {
+          sourceId, scheduledFor: new Date('2026-09-28T03:01:00Z'), triggerType: 'SCHEDULED',
+        });
+        signalInserted();
+        await gate;
+      });
+      await inserted;
+      assert.ok(insertedInTx);
+      const pause = beginPause(operator, sourceId);
+      assert.equal(await pending(pause, 400), true, 'pause must wait for the in-flight scheduler insert');
+      release();
+      await schedulerTx;
+      await pause;
+      await operator.query('COMMIT');
+      const active = await operator.query(
+        "SELECT count(*)::int AS n FROM collection_runs WHERE source_id = $1 AND status IN ('PENDING', 'RUNNING')",
+        [sourceId],
+      );
+      assert.equal(active.rows[0].n, 1, 'the run created before the pause is visible to the active-run guard');
+
+      // C) After the pause, a full scheduler tick creates nothing for the source.
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+      const tick = await runSchedulerTick(schedulerDb, new Date('2026-09-28T03:02:00Z'));
+      assert.equal(tick.runIds.length, 0);
+      assert.equal(
+        await createScheduledCollectionRun(schedulerDb, { sourceId, scheduledFor: new Date('2026-09-28T03:03:00Z'), triggerType: 'SCHEDULED' }),
+        undefined,
+      );
+      assert.equal(await runsOf(), 0, '0 runs created after the pause');
+    } finally {
+      await operator.query('ROLLBACK').catch(() => undefined);
+      operator.release();
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+      await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+      await schedulerDb.destroy();
+      await db.destroy();
+    }
+  },
+);

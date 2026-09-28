@@ -2,7 +2,7 @@ import type { Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import type { ProcessLogger } from '../../infrastructure/logging/process-logger.js';
-import { createCollectionRun } from './collection-run.repository.js';
+import { createScheduledCollectionRun } from './collection-run.repository.js';
 import {
   floorToUtcMinute,
   isCronDue,
@@ -111,7 +111,7 @@ export async function runSchedulerTick(
         }
       }
 
-      const runId = await createCollectionRun(
+      const runId = await createScheduledCollectionRun(
         db,
         {
           sourceId: source.id,
@@ -119,6 +119,21 @@ export async function runSchedulerTick(
           triggerType: 'SCHEDULED',
         },
       );
+
+      if (!runId) {
+        // Paused between the source listing and the insert: no run.
+        logger?.info(
+          {
+            sourceId: source.id,
+            sourceCode: source.code,
+            scheduledFor:
+              scheduledFor.toISOString(),
+          },
+          'Scheduled source run skipped because the source was paused',
+        );
+
+        continue;
+      }
 
       runIds.push(runId);
 
