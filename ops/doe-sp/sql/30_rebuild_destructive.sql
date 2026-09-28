@@ -33,21 +33,33 @@
 \set confirm DRY
 \endif
 
+-- Detected outside the transaction: every table lock below must be taken
+-- before the first query of the SERIALIZABLE transaction (see below).
+SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
+
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '300s';
 SET LOCAL lock_timeout = '10s';
 
--- Serialize with Scheduler/Worker/manual triggers. FOR UPDATE on the DOE-SP
--- source row conflicts with the FOR SHARE taken by the scheduler insert
--- (createScheduledCollectionRun), the FOR UPDATE of trigger-doe-sp-run and
--- the FOR KEY SHARE of the collection_runs FK check: no DOE-SP run can be
--- created until this transaction ends, and afterwards the source is still
--- paused, so none is created at all. Table locks keep the scope stable.
-SELECT id FROM sources WHERE code = 'doe-sp' AND connector_key = 'doe-sp' FOR UPDATE;
+-- Table locks FIRST. The SERIALIZABLE snapshot is taken by the first query,
+-- so taking the locks before it makes every write committed while 30 waited
+-- for them (e.g. another source's item pointing at the scope) visible to the
+-- guards; afterwards the locks keep the scope stable. A lock taken after the
+-- first query would leave such a write invisible and let 30 commit over it.
 LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE collection_items IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE publications, publication_origins, publication_versions, publication_files,
   collection_run_publications, collection_checkpoints IN SHARE ROW EXCLUSIVE MODE;
+\if :has_translations
+LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
+\endif
+
+-- Serialize with pause/resume and manual triggers (trigger-doe-sp-run takes
+-- FOR UPDATE on this row). The Scheduler takes no row lock (its role is
+-- SELECT-only on sources); it cannot insert a DOE-SP run while collection_runs
+-- is locked above, and afterwards the source is still paused, so it inserts
+-- none (the pause in 25 closes the earlier race window).
+SELECT id FROM sources WHERE code = 'doe-sp' AND connector_key = 'doe-sp' FOR UPDATE;
 
 CREATE TEMP TABLE doe_sp_rebuild_scope ON COMMIT DROP AS
 SELECT DISTINCT po.publication_id AS id
@@ -153,9 +165,7 @@ SELECT 1/0 AS abort_expected_mismatch;
 SELECT 1/0 AS abort_expected_mismatch;
 \endif
 
-SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
 \if :has_translations
-LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
 SELECT count(*) = :expected_translations_deleted AS ok_translations
 FROM norma_clara_translations t JOIN publication_versions pv ON pv.id = t.publication_version_id
 JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id \gset

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -214,5 +214,92 @@ test('DOE-SP-33: 30 -> real partial recapture -> rollback restores the backup ma
     await admin.query(`DROP DATABASE IF EXISTS ${bakDb} WITH (FORCE)`).catch(() => undefined);
     await admin.end();
     rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+function psqlAsync(url: string, file: string, vars: Record<string, string>): Promise<string> {
+  const args = [url, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1'];
+  for (const [key, value] of Object.entries(vars)) args.push('-v', `${key}=${value}`);
+  args.push('-f', file);
+  return new Promise((resolvePromise, reject) => {
+    execFile('psql', args, { encoding: 'utf8' }, (error, stdout, stderr) => {
+      if (error) reject(new Error(stderr || error.message));
+      else resolvePromise(stdout);
+    });
+  });
+}
+
+test('DOE-SP-34: 30 sees writes committed while it waits for its table locks (foreign item aborts)', async () => {
+  const adminUrl = process.env.DATABASE_ADMIN_URL;
+  assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for the DOE-SP ops rehearsal.');
+  const suffix = randomBytes(4).toString('hex');
+  const opsDb = 'doe_sp_ops_race_' + suffix;
+  const opsUrl = withDatabase(adminUrl, opsDb);
+  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  let pool: Pool | undefined;
+  let db: Kysely<DB> | undefined;
+
+  try {
+    await admin.query(`CREATE DATABASE ${opsDb}`);
+    const schema = execFileSync('pg_dump', ['--schema-only', '--no-owner', '--no-privileges', adminUrl], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    execFileSync('psql', [opsUrl, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: schema, stdio: ['pipe', 'ignore', 'pipe'] });
+    pool = new Pool({ connectionString: opsUrl, max: 3 });
+    db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+
+    const doeSp = randomUUID();
+    const dou = randomUUID();
+    await db.insertInto('sources').values([
+      { id: doeSp, code: 'doe-sp', name: 'DOE SP', jurisdiction_level: 'STATE', uf: 'SP', base_url: 'https://doe.sp.gov.br', connector_key: 'doe-sp', schedule_cron: '0 7 * * *' },
+      { id: dou, code: 'dou', name: 'DOU', jurisdiction_level: 'FEDERAL', base_url: 'https://in.gov.br', connector_key: 'dou', schedule_cron: '0 8 * * *' },
+    ]).execute();
+    const run = async (sourceId: string, at: string) => {
+      const runId = (await db!.insertInto('collection_runs').values({ source_id: sourceId, scheduled_for: new Date(at), status: 'SUCCESS' }).returning('id').executeTakeFirstOrThrow()).id;
+      const attemptId = (await db!.insertInto('collection_attempts').values({ collection_run_id: runId, attempt_no: 1, status: 'SUCCESS' }).returning('id').executeTakeFirstOrThrow()).id;
+      return { runId, attemptId };
+    };
+    const doeRun = await run(doeSp, '2026-09-01T10:00:00Z');
+    const p1 = await db.transaction().execute((trx) => persistPublication(trx, {
+      sourceId: doeSp, runId: doeRun.runId, attemptId: doeRun.attemptId,
+      publication: normalizePublication({ sourceId: doeSp, publication: doeSpAct(1, 'PORTARIA SRE 1', 'https://doe.sp.gov.br/a1') }),
+    }));
+    const douRun = await run(dou, '2026-09-01T11:00:00Z');
+
+    psql(opsUrl, join(SQL, '25_pause_source.sql'));
+    const dry = rebuildArgs(opsUrl);
+    assert.ok(Object.values(dry.blockers).every((value) => value === 0), JSON.stringify(dry.blockers));
+    const manifest0 = manifest(opsUrl);
+
+    // Another source's worker is writing an item that points at the scope and
+    // commits only while 30 is already running and waiting for its locks.
+    const writer = await pool.connect();
+    try {
+      await writer.query('BEGIN');
+      await writer.query(
+        "INSERT INTO collection_items (collection_run_id, source_item_key, status, publication_id) VALUES ($1, 'foreign-late', 'PROCESSED_EXISTING', $2)",
+        [douRun.runId, p1.publicationId],
+      );
+      const rebuild = psqlAsync(opsUrl, join(SQL, '30_rebuild_destructive.sql'), { ...dry.vars, confirm: 'REBUILD_DOE_SP' });
+      let waiting = false;
+      for (let i = 0; i < 100 && !waiting; i += 1) {
+        await new Promise((r) => setTimeout(r, 50));
+        const w = await admin.query(
+          "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1 AND wait_event_type = 'Lock'",
+          [opsDb],
+        );
+        waiting = w.rows[0].n > 0;
+      }
+      assert.ok(waiting, '30 is waiting for the in-flight writer');
+      await writer.query('COMMIT');
+      await assert.rejects(rebuild, /collection_items of other sources/, '30 must see the item committed during its lock wait');
+    } finally {
+      await writer.query('ROLLBACK').catch(() => undefined);
+      writer.release();
+    }
+    await db.deleteFrom('collection_items').where('source_item_key', '=', 'foreign-late').execute();
+    assert.equal(manifest(opsUrl), manifest0, 'aborted 30 changed nothing');
+  } finally {
+    await db?.destroy();
+    await admin.query(`DROP DATABASE IF EXISTS ${opsDb} WITH (FORCE)`).catch(() => undefined);
+    await admin.end();
   }
 });

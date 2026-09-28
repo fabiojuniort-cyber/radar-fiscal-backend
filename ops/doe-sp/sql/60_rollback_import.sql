@@ -25,20 +25,25 @@
 --   6. re-insert origins, versions, files, translations, checkpoints and
 --      re-point the backup-era run links, with row-count assertions.
 \set ON_ERROR_STOP 1
+-- Detected outside the transaction: the table locks must precede its first query.
+SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations,
+       to_regclass('doe_sp_rollback.translations') IS NOT NULL AS has_staged_translations \gset
+
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '600s';
 SET LOCAL lock_timeout = '10s';
 SET LOCAL client_min_messages = warning;
 
-SELECT id FROM sources WHERE code = 'doe-sp' AND connector_key = 'doe-sp' FOR UPDATE;
+-- Table locks before the first query: the SERIALIZABLE snapshot then includes
+-- every write committed while this transaction waited for them, so the guards
+-- below see it (same reasoning as 30).
 LOCK TABLE collection_runs, collection_items IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE publications, publication_origins, publication_versions, publication_files,
   collection_run_publications, collection_checkpoints IN SHARE ROW EXCLUSIVE MODE;
-SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations,
-       to_regclass('doe_sp_rollback.translations') IS NOT NULL AS has_staged_translations \gset
 \if :has_translations
 LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
 \endif
+SELECT id FROM sources WHERE code = 'doe-sp' AND connector_key = 'doe-sp' FOR UPDATE;
 
 CREATE TEMP TABLE rb_src ON COMMIT DROP AS
   SELECT id FROM sources WHERE code = 'doe-sp' AND connector_key = 'doe-sp';
