@@ -77,7 +77,9 @@ SELECT 'DOE_SP_DRY_RUN=' || jsonb_build_object(
     'foreign_items', :blocker_foreign_items,
     'active_runs', :blocker_active_runs,
     'source_active', :blocker_source_active,
-    'unknown_foreign_keys', :blocker_unknown_foreign_keys),
+    'unknown_foreign_keys', :blocker_unknown_foreign_keys,
+    -- 30 aborts: deleting old AI translations has no preservation design yet.
+    'scope_translations', :expected_translations_deleted),
   'globalBefore', jsonb_build_object(
     'publications', :global_publications, 'publication_versions', :global_versions,
     'publication_files', :global_files, 'publication_origins', :global_origins,

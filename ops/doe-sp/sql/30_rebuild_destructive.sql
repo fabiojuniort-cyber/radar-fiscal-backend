@@ -9,7 +9,7 @@
 --   expected_publications_kept, expected_versions_deleted,
 --   expected_files_deleted, expected_origins_deleted,
 --   expected_run_links_version_cleared, expected_checkpoints_deleted,
---   expected_translations_deleted
+--   expected_translations_deleted (must be 0: see ABORT below)
 -- Optional: -v confirm=REBUILD_DOE_SP  (anything else => dry execution:
 --   every statement runs, every assertion is checked, then ROLLBACK).
 --
@@ -20,8 +20,9 @@
 --   KEEP     collection_run_publications rows, version pointer set to NULL
 --   DELETE   publication_versions of the scope (publication_files cascade)
 --   DELETE   publication_origins of source doe-sp
---   DELETE   norma_clara_translations of the scope's versions (prototype AI
---            cache, FK ON DELETE CASCADE; deleted explicitly and counted)
+--   ABORT    if any norma_clara_translations row references a scope version
+--            (prototype AI cache, FK ON DELETE CASCADE): deleting it would
+--            lose data whose preservation is not designed yet
 --   DELETE   collection_checkpoints of connector doe-sp (next run bootstraps
 --            from DOE_SP_BOOTSTRAP_START_DATE)
 --   KEEP     sources row paused; reactivation is a separate step (runbook)
@@ -36,10 +37,15 @@ BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '300s';
 SET LOCAL lock_timeout = '10s';
 
--- Serialize with Scheduler/Worker: they read sources and claim runs through
--- sources/collection_runs. Holding these locks blocks new claims for DOE-SP
--- and any concurrent write to the scope until COMMIT/ROLLBACK.
-LOCK TABLE sources IN SHARE ROW EXCLUSIVE MODE;
+-- Serialize with Scheduler/Worker/manual triggers. FOR UPDATE on the DOE-SP
+-- source row conflicts with the FOR SHARE taken by the scheduler insert
+-- (createScheduledCollectionRun), the FOR UPDATE of trigger-doe-sp-run and
+-- the FOR KEY SHARE of the collection_runs FK check: no DOE-SP run can be
+-- created until this transaction ends, and afterwards the source is still
+-- paused, so none is created at all. Table locks keep the scope stable.
+SELECT id FROM sources WHERE code = 'doe-sp' AND connector_key = 'doe-sp' FOR UPDATE;
+LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE collection_items IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE publications, publication_origins, publication_versions, publication_files,
   collection_run_publications, collection_checkpoints IN SHARE ROW EXCLUSIVE MODE;
 
@@ -85,6 +91,16 @@ BEGIN
   SELECT count(*) INTO v_n FROM collection_run_publications crp JOIN doe_sp_rebuild_scope d ON d.id = crp.publication_id
   JOIN collection_runs cr ON cr.id = crp.collection_run_id JOIN sources s ON s.id = cr.source_id WHERE s.code <> 'doe-sp';
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % foreign run links in scope', v_n; END IF;
+
+  SELECT count(*) INTO v_n FROM collection_items ci JOIN doe_sp_rebuild_scope d ON d.id = ci.publication_id
+  JOIN collection_runs cr ON cr.id = ci.collection_run_id JOIN sources s ON s.id = cr.source_id WHERE s.code <> 'doe-sp';
+  IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % collection_items of other sources reference the scope', v_n; END IF;
+
+  IF to_regclass('public.norma_clara_translations') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM norma_clara_translations t JOIN publication_versions pv ON pv.id = t.publication_version_id
+             JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % norma_clara_translations reference scope versions (preservation not designed; do not delete)', v_n; END IF;
+  END IF;
 
   SELECT count(*) INTO v_n FROM pg_constraint WHERE contype = 'f'
     AND confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
@@ -162,18 +178,6 @@ SELECT count(*) = :expected_run_links_version_cleared AS ok_step FROM x \gset
 \if :ok_step
 \else
 SELECT 1/0 AS abort_run_links_update;
-\endif
-
-\if :has_translations
-WITH x AS (
-  DELETE FROM norma_clara_translations t USING publication_versions pv, doe_sp_rebuild_scope d
-  WHERE pv.id = t.publication_version_id AND pv.publication_id = d.id
-  RETURNING 1)
-SELECT count(*) = :expected_translations_deleted AS ok_step FROM x \gset
-\if :ok_step
-\else
-SELECT 1/0 AS abort_translations_delete;
-\endif
 \endif
 
 WITH x AS (

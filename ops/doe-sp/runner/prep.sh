@@ -51,7 +51,7 @@ PROD="$PROD_DATABASE_URL"
 prod_sql() { # allowlisted read-only files only
   local file="$1"; shift
   case "$file" in
-    10_preflight_readonly.sql|11_private_manifest_readonly.sql|12_table_counts_readonly.sql|20_dry_run_readonly.sql) ;;
+    10_preflight_readonly.sql|11_private_manifest_readonly.sql|12_table_counts_readonly.sql|13_other_sources_fingerprint_readonly.sql|20_dry_run_readonly.sql) ;;
     *) fail "prod_sql_not_allowlisted_$file" ;;
   esac
   psql "$PROD" -X -q -t -A -v ON_ERROR_STOP=1 "$@" -f "$SQL/$file"
@@ -81,6 +81,10 @@ pass manifest_prod
 prod_sql 12_table_counts_readonly.sql -v snapshot="$SNAPSHOT" | grep '^DOE_SP_TABLE_COUNTS=' > "$WORK/counts.prod.txt" || fail table_counts_prod
 log "DOE_SP_TABLE_COUNTS_PROD_SHA256=$(sha256sum "$WORK/counts.prod.txt" | cut -d' ' -f1)"
 pass table_counts_prod
+
+prod_sql 13_other_sources_fingerprint_readonly.sql -v snapshot="$SNAPSHOT" | grep '^DOE_SP_OTHER_' > "$WORK/others.prod.txt" || fail others_fingerprint_prod
+log "DOE_SP_OTHER_SOURCES_PROD=$(sha256sum "$WORK/others.prod.txt" | cut -d' ' -f1)"
+pass others_fingerprint_prod
 
 prod_sql 20_dry_run_readonly.sql -v snapshot="$SNAPSHOT" > "$WORK/dryrun.prod.txt" || fail dry_run_prod
 grep -E '^DOE_SP_(DRY_RUN|REBUILD_ARGS)=' "$WORK/dryrun.prod.txt"
@@ -136,6 +140,10 @@ psql "$RESTORED" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/12_table_counts_readonl
 cmp -s "$WORK/counts.prod.txt" "$WORK/counts.restored.txt" || fail restore_table_counts_equal
 pass restore_table_counts_equal
 
+psql "$RESTORED" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/13_other_sources_fingerprint_readonly.sql" | grep '^DOE_SP_OTHER_' > "$WORK/others.restored.txt" || fail others_fingerprint_restored
+cmp -s "$WORK/others.prod.txt" "$WORK/others.restored.txt" || fail restore_other_sources_equal
+pass restore_other_sources_equal
+
 psql "$RESTORED" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/11_private_manifest_readonly.sql" > "$PRIVATE/manifest.restored.jsonl" || fail manifest_restored
 [ "$(sha256sum "$PRIVATE/manifest.restored.jsonl" | cut -d' ' -f1)" = "$MANIFEST_SHA" ] || fail restore_manifest_equal
 pass restore_manifest_equal
@@ -177,6 +185,30 @@ if psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 $REH_ARGS -v expected_versions_del
 fi
 pass rehearsal_30_mismatch_aborts
 
+# 30 must abort when something outside DOE-SP references the scope.
+expect_30_abort() { # <step> <setup sql> <cleanup sql>
+  psql "$REH" -X -q -v ON_ERROR_STOP=1 -c "$2" >/dev/null || fail "$1_setup"
+  # shellcheck disable=SC2086
+  if psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 $REH_ARGS -v confirm=REBUILD_DOE_SP -f "$SQL/30_rebuild_destructive.sql" >/dev/null 2>&1; then
+    fail "$1"
+  fi
+  psql "$REH" -X -q -v ON_ERROR_STOP=1 -c "$3" >/dev/null || fail "$1_cleanup"
+  pass "$1"
+}
+SCOPE_PUB="(SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id AND s.code = 'doe-sp' ORDER BY 1 LIMIT 1)"
+expect_30_abort rehearsal_30_aborts_on_foreign_item \
+  "INSERT INTO sources (code, name, jurisdiction_level, base_url, connector_key) VALUES ('doe-sp-31-probe', 'probe', 'FEDERAL', 'https://probe.invalid', 'doe-sp-31-probe');
+   INSERT INTO collection_runs (source_id, scheduled_for, status) SELECT id, now(), 'SUCCESS' FROM sources WHERE code = 'doe-sp-31-probe';
+   INSERT INTO collection_items (collection_run_id, source_item_key, status, publication_id) SELECT cr.id, 'probe', 'PROCESSED_EXISTING', $SCOPE_PUB FROM collection_runs cr JOIN sources s ON s.id = cr.source_id AND s.code = 'doe-sp-31-probe';" \
+  "DELETE FROM collection_runs WHERE source_id = (SELECT id FROM sources WHERE code = 'doe-sp-31-probe'); DELETE FROM sources WHERE code = 'doe-sp-31-probe';"
+if [ "$(psql "$REH" -X -t -A -c "SELECT to_regclass('public.norma_clara_translations') IS NOT NULL")" = t ]; then
+  expect_30_abort rehearsal_30_aborts_on_scope_translation \
+    "INSERT INTO norma_clara_translations (publication_version_id, segment_hash, engine_version, model, translation_text) SELECT pv.id, repeat('c', 64), 'probe', 'probe', 'probe' FROM publication_versions pv WHERE pv.publication_id = $SCOPE_PUB LIMIT 1;" \
+    "DELETE FROM norma_clara_translations WHERE engine_version = 'probe';"
+fi
+[ "$(PGOPTIONS="-c default_transaction_read_only=on" psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/11_private_manifest_readonly.sql" | sha256sum | cut -d' ' -f1)" = "$MANIFEST_SHA" ] || fail rehearsal_guards_left_data_intact
+pass rehearsal_guards_left_data_intact
+
 # 30 committed.
 # shellcheck disable=SC2086
 psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 $REH_ARGS -v confirm=REBUILD_DOE_SP -f "$SQL/30_rebuild_destructive.sql" | tee "$WORK/rebuild.rehearsal.txt" | grep -E '^DOE_SP_REBUILD' || fail rehearsal_30_commit
@@ -187,14 +219,22 @@ KEPT=$(sed -n 's/.*-v expected_publications_kept=\([0-9]*\).*/\1/p' <<<"$REH_ARG
 PGOPTIONS="-c default_transaction_read_only=on" psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -v expected_publications_kept="$KEPT" -f "$SQL/40_post_rebuild_validation.sql" | grep '^DOE_SP_POST_REBUILD=' || fail rehearsal_40
 pass rehearsal_40_post_rebuild
 
-# Rollback after COMMIT: stage from the pristine restore, import, compare manifest.
+# Partial recapture after 30, then rollback to the backup state.
+psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/50_resume_source.sql" | grep DOE_SP_RESUMED >/dev/null || fail rehearsal_resume_for_recapture
+psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$OPS/rehearsal/partial_recapture_sim.sql" | grep '^DOE_SP_SIM_RECAPTURE=' || fail rehearsal_partial_recapture
+[ "$(PGOPTIONS="-c default_transaction_read_only=on" psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/11_private_manifest_readonly.sql" | sha256sum | cut -d' ' -f1)" != "$MANIFEST_SHA" ] || fail rehearsal_partial_recapture_changed_state
+pass rehearsal_partial_recapture
+psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/25_pause_source.sql" | grep DOE_SP_PAUSED >/dev/null || fail rehearsal_pause_for_rollback
 "$OPS/runner/rollback-stage.sh" "$RESTORED" "$REH" || fail rehearsal_rollback_stage
 psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/60_rollback_import.sql" | grep -E '^DOE_SP_ROLLBACK' || fail rehearsal_60_rollback
 PGOPTIONS="-c default_transaction_read_only=on" psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/11_private_manifest_readonly.sql" | sha256sum | cut -d' ' -f1 > "$WORK/reh.after-rollback.sha"
 [ "$(cat "$WORK/reh.after-rollback.sha")" = "$MANIFEST_SHA" ] || fail rehearsal_rollback_manifest_equal
 pass rehearsal_rollback_manifest_equal
+PGOPTIONS="-c default_transaction_read_only=on" psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/13_other_sources_fingerprint_readonly.sql" | grep '^DOE_SP_OTHER_' > "$WORK/others.rehearsal-final.txt"
+cmp -s "$WORK/others.prod.txt" "$WORK/others.rehearsal-final.txt" || fail rehearsal_other_sources_untouched
+pass rehearsal_other_sources_untouched
 
-psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/50_resume_source.sql" | grep -q DOE_SP_RESUMED || fail rehearsal_resume
+psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/50_resume_source.sql" | grep DOE_SP_RESUMED >/dev/null || fail rehearsal_resume
 PGOPTIONS="-c default_transaction_read_only=on" psql "$REH" -X -q -t -A -v ON_ERROR_STOP=1 -f "$SQL/12_table_counts_readonly.sql" | grep '^DOE_SP_TABLE_COUNTS=' > "$WORK/counts.rehearsal-final.txt"
 cmp -s "$WORK/counts.prod.txt" "$WORK/counts.rehearsal-final.txt" || fail rehearsal_final_counts_equal
 pass rehearsal_final_counts_equal
