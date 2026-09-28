@@ -88,3 +88,32 @@ npm run test:collection-integration
 The Worker and Scheduler use the dedicated PostgreSQL role `radar_worker_runtime`. Real government connectors are intentionally not part of this phase.
 
 See [docs/phase-3-collection-engine.md](docs/phase-3-collection-engine.md) for the architecture and handoff decisions.
+
+
+## Public read-only API
+
+API-01 exposes only global official metadata that is public by nature. It does not require authentication and must never expose tenant, company, user, credentials, or publication `content_text`.
+
+Endpoints:
+
+- `GET /public/v1/sources`
+- `GET /public/v1/publications?uf=SP&limit=3`
+- `GET /public/v1/stats`
+
+Browser CORS is restricted by:
+
+```text
+PUBLIC_API_ALLOWED_ORIGINS=https://<railway-prototype-host>,https://<final-site-host>
+```
+
+The value is a comma-separated allowlist. The exact Railway prototype and final-site origins are deployment inputs and are intentionally not hard-coded before those domains are confirmed. Public routes never emit `Access-Control-Allow-Credentials`. Allowed browser preflight requests advertise only `GET`; requests without an `Origin` header remain allowed for same-origin/server-to-server access; a browser `Origin` outside the allowlist receives HTTP 403.
+
+Responses use:
+
+```text
+Cache-Control: public, max-age=300
+```
+
+The backend currently has no rate-limit plugin, so per-IP rate limiting remains an API-01 follow-up before high-volume public exposure.
+
+See [docs/public-api.md](docs/public-api.md) for the full contract and status mapping.
