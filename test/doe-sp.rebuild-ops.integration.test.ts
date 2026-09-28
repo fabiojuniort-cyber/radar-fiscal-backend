@@ -303,3 +303,65 @@ test('DOE-SP-34: 30 sees writes committed while it waits for its table locks (fo
     await admin.end();
   }
 });
+
+test('DOE-SP-35: 13 fingerprint is equal across collation and time zone (production en_US vs runner C.UTF-8 restore)', async () => {
+  const adminUrl = process.env.DATABASE_ADMIN_URL;
+  assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for the DOE-SP ops rehearsal.');
+  const suffix = randomBytes(4).toString('hex');
+  const enDb = 'doe_sp_fp_en_' + suffix;
+  const cDb = 'doe_sp_fp_c_' + suffix;
+  const enUrl = withDatabase(adminUrl, enDb);
+  const cUrl = withDatabase(adminUrl, cDb);
+  const tmp = mkdtempSync(join(tmpdir(), 'doe-sp-fp-'));
+  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  let db: Kysely<DB> | undefined;
+
+  try {
+    // Production runs the official image default (en_US.utf8); the runner's
+    // temporary server is initdb --locale=C.UTF-8.
+    await admin.query(`CREATE DATABASE ${enDb} TEMPLATE template0 LC_COLLATE 'en_US.utf8' LC_CTYPE 'en_US.utf8'`);
+    await admin.query(`CREATE DATABASE ${cDb} TEMPLATE template0 LC_COLLATE 'C.UTF-8' LC_CTYPE 'C.UTF-8'`);
+    const schema = execFileSync('pg_dump', ['--schema-only', '--no-owner', '--no-privileges', adminUrl], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    execFileSync('psql', [enUrl, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: schema, stdio: ['pipe', 'ignore', 'pipe'] });
+    db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: enUrl, max: 2 }) }) });
+
+    // Other-source data with both 'run:' and 'run-link:' parts (their order
+    // differs between en_US.utf8 and C) and timestamptz columns.
+    const dou = randomUUID();
+    await db.insertInto('sources').values({ id: dou, code: 'dou', name: 'DOU', jurisdiction_level: 'FEDERAL', base_url: 'https://in.gov.br', connector_key: 'dou', schedule_cron: '0 8 * * *' }).execute();
+    for (let r = 0; r < 3; r += 1) {
+      const runId = (await db.insertInto('collection_runs').values({ source_id: dou, scheduled_for: new Date(Date.UTC(2026, 8, 1 + r, 11)), status: 'SUCCESS' }).returning('id').executeTakeFirstOrThrow()).id;
+      const attemptId = (await db.insertInto('collection_attempts').values({ collection_run_id: runId, attempt_no: 1, status: 'SUCCESS' }).returning('id').executeTakeFirstOrThrow()).id;
+      for (let n = 0; n < 4; n += 1) {
+        await db.transaction().execute((trx) => persistPublication(trx, {
+          sourceId: dou, runId, attemptId,
+          publication: normalizePublication({ sourceId: dou, publication: {
+            title: `LEI ${r}-${n}`, agency: 'Congresso', sphere: 'FEDERAL', actType: 'LEI', actNumber: `${r}${n}`,
+            publishedAt: new Date('2026-01-10T00:00:00Z'), content: `lei ${r}-${n}`, officialUrl: `https://in.gov.br/l${r}${n}`,
+            externalId: `l${r}${n}`, metadata: { sourceRole: 'PRIMARY' },
+          } }),
+        }));
+      }
+    }
+
+    const dump = join(tmp, 'fp.dump');
+    execFileSync('pg_dump', [enUrl, '--format=custom', '--file=' + dump]);
+    execFileSync('pg_restore', ['--exit-on-error', '--no-owner', '--dbname=' + cUrl, dump]);
+
+    const fingerprint = (url: string, tz: string) => execFileSync('psql', [url, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-f', join(SQL, '13_other_sources_fingerprint_readonly.sql')], {
+      encoding: 'utf8', env: { ...process.env, PGTZ: tz, PGOPTIONS: '-c default_transaction_read_only=on' }, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const reference = fingerprint(enUrl, 'UTC');
+    assert.match(reference, /^DOE_SP_OTHER_SOURCES_FINGERPRINT=[0-9a-f]{64}$/m);
+    assert.equal(counts(cUrl), counts(enUrl), 'restore has the same table counts');
+    assert.equal(fingerprint(cUrl, 'UTC'), reference, 'C.UTF-8 restore reproduces the en_US fingerprint');
+    assert.equal(fingerprint(enUrl, 'America/Sao_Paulo'), reference, 'session time zone does not change the fingerprint');
+    assert.equal(fingerprint(cUrl, 'America/Sao_Paulo'), reference);
+  } finally {
+    await db?.destroy();
+    await admin.query(`DROP DATABASE IF EXISTS ${enDb} WITH (FORCE)`).catch(() => undefined);
+    await admin.query(`DROP DATABASE IF EXISTS ${cDb} WITH (FORCE)`).catch(() => undefined);
+    await admin.end();
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -1,12 +1,19 @@
 -- DOE-SP rebuild — 13 fingerprint of everything OUTSIDE the DOE-SP scope
 -- (READ ONLY, one SHA-256; safe to publish). Equal before/after a step proves
 -- that step did not touch other sources, tenants, matches or their caches.
+--
+-- The fingerprint is compared ACROSS servers (production vs. the runner's
+-- temporary PostgreSQL, initdb --locale=C.UTF-8), so it must not depend on
+-- server settings: parts are ordered by byte (COLLATE "C"; en_US.utf8 ignores
+-- punctuation and orders 'run:' and 'run-link:' parts differently) and
+-- row_to_json renders timestamptz in UTC.
 \set ON_ERROR_STOP 1
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
 \if :{?snapshot}
 SET TRANSACTION SNAPSHOT :'snapshot';
 \endif
 SET LOCAL statement_timeout = '300s';
+SET LOCAL TimeZone = 'UTC';
 \ir 00_assert_read_only.sql
 
 SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
@@ -16,7 +23,7 @@ doe_sp_fp_pub AS (
   SELECT DISTINCT po.publication_id AS id FROM publication_origins po WHERE po.source_id IS DISTINCT FROM (SELECT id FROM doe_sp_fp_src)),
 doe_sp_fp_runs AS (
   SELECT id FROM collection_runs WHERE source_id IS DISTINCT FROM (SELECT id FROM doe_sp_fp_src))
-SELECT 'DOE_SP_OTHER_SOURCES_FINGERPRINT=' || encode(sha256(convert_to(COALESCE(string_agg(part, E'\n' ORDER BY part), ''), 'UTF8')), 'hex')
+SELECT 'DOE_SP_OTHER_SOURCES_FINGERPRINT=' || encode(sha256(convert_to(COALESCE(string_agg(part, E'\n' ORDER BY part COLLATE "C"), ''), 'UTF8')), 'hex')
 FROM (
   SELECT 'source:' || md5(row_to_json(s)::text) AS part FROM sources s WHERE s.id IS DISTINCT FROM (SELECT id FROM doe_sp_fp_src)
   UNION ALL SELECT 'origin:' || md5(row_to_json(po)::text) FROM publication_origins po WHERE po.source_id IS DISTINCT FROM (SELECT id FROM doe_sp_fp_src)
