@@ -22,6 +22,10 @@ CREATE TABLE doe_sp_rollback.files (LIKE public.publication_files);
 CREATE TABLE doe_sp_rollback.run_links (collection_run_id uuid NOT NULL, publication_id uuid NOT NULL, publication_version_id uuid);
 CREATE TABLE doe_sp_rollback.checkpoints (LIKE public.collection_checkpoints);
 SQL
+HAS_TRANSLATIONS=$(psql "$SOURCE" -X -t -A -c "SELECT to_regclass('public.norma_clara_translations') IS NOT NULL")
+if [ "$HAS_TRANSLATIONS" = t ]; then
+  psql "$TARGET" -v ON_ERROR_STOP=1 -X -q -c "CREATE TABLE doe_sp_rollback.translations (LIKE public.norma_clara_translations)"
+fi
 
 copy() {
   local table="$1" query="$2"
@@ -37,10 +41,14 @@ copy versions "SELECT id, publication_id, version_no, content_hash, content_text
 copy files "SELECT pf.* FROM publication_files pf JOIN publication_versions pv ON pv.id = pf.publication_version_id WHERE pv.publication_id IN ($scope)"
 copy run_links "SELECT collection_run_id, publication_id, publication_version_id FROM collection_run_publications WHERE publication_id IN ($scope)"
 copy checkpoints "SELECT cc.* FROM collection_checkpoints cc JOIN sources s ON s.id = cc.source_id WHERE s.code = 'doe-sp' AND cc.connector_key = 'doe-sp'"
+if [ "$HAS_TRANSLATIONS" = t ]; then
+  copy translations "SELECT t.* FROM norma_clara_translations t JOIN publication_versions pv ON pv.id = t.publication_version_id WHERE pv.publication_id IN ($scope)"
+fi
 
 psql "$TARGET" -X -q -t -A -v ON_ERROR_STOP=1 -c "SELECT 'DOE_SP_ROLLBACK_STAGED=' || jsonb_build_object(
   'origins', (SELECT count(*) FROM doe_sp_rollback.origins),
   'versions', (SELECT count(*) FROM doe_sp_rollback.versions),
   'files', (SELECT count(*) FROM doe_sp_rollback.files),
   'runLinks', (SELECT count(*) FROM doe_sp_rollback.run_links),
-  'checkpoints', (SELECT count(*) FROM doe_sp_rollback.checkpoints))::text"
+  'checkpoints', (SELECT count(*) FROM doe_sp_rollback.checkpoints),
+  'translations', CASE WHEN to_regclass('doe_sp_rollback.translations') IS NULL THEN 0 ELSE (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM doe_sp_rollback.translations', false, true, '')))[1]::text::bigint END)::text"

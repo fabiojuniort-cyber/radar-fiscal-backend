@@ -88,9 +88,23 @@ SELECT count(*) = :staged_checkpoints AS ok_step FROM x \gset
 SELECT 1/0 AS abort_checkpoints;
 \endif
 
+SELECT to_regclass('doe_sp_rollback.translations') IS NOT NULL AS has_staged_translations \gset
+\if :has_staged_translations
+SELECT count(*) AS staged_translations FROM doe_sp_rollback.translations \gset
+WITH x AS (INSERT INTO norma_clara_translations SELECT * FROM doe_sp_rollback.translations RETURNING 1)
+SELECT count(*) = :staged_translations AS ok_step FROM x \gset
+\if :ok_step
+\else
+SELECT 1/0 AS abort_translations;
+\endif
+\else
+\set staged_translations 0
+\endif
+
 DROP SCHEMA doe_sp_rollback CASCADE;
 SELECT 'DOE_SP_ROLLBACK_RESULT=' || jsonb_build_object(
   'origins', :staged_origins, 'versions', :staged_versions, 'files', :staged_files,
-  'runLinks', :staged_run_links, 'checkpoints', :staged_checkpoints)::text;
+  'runLinks', :staged_run_links, 'checkpoints', :staged_checkpoints,
+  'translations', :staged_translations)::text;
 COMMIT;
 \echo 'DOE_SP_ROLLBACK_COMMITTED (source stays paused; resume with 50 only after review)'

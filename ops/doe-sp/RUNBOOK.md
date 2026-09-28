@@ -29,6 +29,7 @@ link de run ou item de outra fonte **aborta** o processo.
 | `collection_run_publications` | **mantidas**, `publication_version_id := NULL` | preserva o histórico run↔publicação |
 | `collection_runs`, `collection_attempts`, `collection_items` | **mantidas** | histórico operacional |
 | `collection_checkpoints` do conector `doe-sp` | apagados | o próximo run faz bootstrap desde `DOE_SP_BOOTSTRAP_START_DATE` |
+| `norma_clara_translations` das versões do escopo | apagadas explicitamente e contadas (a FK é `ON DELETE CASCADE`) | tabela criada em runtime pelo serviço `tribusca-site-prototype` (fora das migrations deste repositório): cache de traduções por IA ligado ao `id` da versão. As novas versões terão novos IDs, então o cache é regenerado sob demanda. As linhas antigas ficam no backup e voltam no rollback |
 | `sources` (`doe-sp`) | mantida; `is_active` alternado pela pausa/retomada | — |
 | demais fontes | intocadas; totais globais verificados dentro da transação | — |
 

@@ -24,6 +24,13 @@ SELECT
   (SELECT count(*) FROM collection_run_publications crp JOIN doe_pub d ON d.id = crp.publication_id) AS expected_run_links_kept,
   (SELECT count(*) FROM collection_items ci JOIN doe_pub d ON d.id = ci.publication_id) AS expected_collection_items_kept,
   (SELECT count(*) FROM collection_checkpoints cc JOIN src ON src.id = cc.source_id WHERE cc.connector_key = 'doe-sp') AS expected_checkpoints_deleted,
+  CASE WHEN to_regclass('public.norma_clara_translations') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml(
+      'SELECT count(*) AS c FROM norma_clara_translations t WHERE t.publication_version_id IN (
+         SELECT pv.id FROM publication_versions pv WHERE pv.publication_id IN (
+           SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id
+           WHERE s.code = ''doe-sp'' AND s.connector_key = ''doe-sp''))',
+      false, true, '')))[1]::text::bigint END AS expected_translations_deleted,
   -- blockers (all must be 0 for 30 to proceed)
   (SELECT count(*) FROM publication_origins po JOIN doe_pub d ON d.id = po.publication_id JOIN src ON po.source_id <> src.id) AS blocker_cross_source_origins,
   (SELECT count(*) FROM company_publications cp JOIN doe_pub d ON d.id = cp.publication_id) AS blocker_company_publications,
@@ -40,7 +47,8 @@ SELECT
        'collection_run_publications_publication_id_fkey',
        'collection_run_publications_publication_version_id_fkey',
        'fk_collection_item_publication',
-       'company_publications_publication_id_fkey')) AS blocker_unknown_foreign_keys,
+       'company_publications_publication_id_fkey',
+       'norma_clara_translations_publication_version_id_fkey')) AS blocker_unknown_foreign_keys,
   -- global totals before (30 asserts totals after = before - deleted)
   (SELECT count(*) FROM publications) AS global_publications,
   (SELECT count(*) FROM publication_versions) AS global_versions,
@@ -60,7 +68,8 @@ SELECT 'DOE_SP_DRY_RUN=' || jsonb_build_object(
     'collection_run_publications_version_cleared', :expected_run_links_version_cleared,
     'collection_run_publications_kept', :expected_run_links_kept,
     'collection_items_kept', :expected_collection_items_kept,
-    'collection_checkpoints_deleted', :expected_checkpoints_deleted),
+    'collection_checkpoints_deleted', :expected_checkpoints_deleted,
+    'norma_clara_translations_deleted', :expected_translations_deleted),
   'blockers', jsonb_build_object(
     'cross_source_origins', :blocker_cross_source_origins,
     'company_publications', :blocker_company_publications,
@@ -91,6 +100,7 @@ SELECT 'DOE_SP_REBUILD_ARGS=' ||
   ' -v expected_files_deleted=' || :expected_files_deleted ||
   ' -v expected_origins_deleted=' || :expected_origins_deleted ||
   ' -v expected_run_links_version_cleared=' || :expected_run_links_version_cleared ||
-  ' -v expected_checkpoints_deleted=' || :expected_checkpoints_deleted;
+  ' -v expected_checkpoints_deleted=' || :expected_checkpoints_deleted ||
+  ' -v expected_translations_deleted=' || :expected_translations_deleted;
 
 COMMIT;

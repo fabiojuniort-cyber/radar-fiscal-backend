@@ -8,7 +8,8 @@
 -- Required psql variables (from 20's DOE_SP_REBUILD_ARGS line):
 --   expected_publications_kept, expected_versions_deleted,
 --   expected_files_deleted, expected_origins_deleted,
---   expected_run_links_version_cleared, expected_checkpoints_deleted
+--   expected_run_links_version_cleared, expected_checkpoints_deleted,
+--   expected_translations_deleted
 -- Optional: -v confirm=REBUILD_DOE_SP  (anything else => dry execution:
 --   every statement runs, every assertion is checked, then ROLLBACK).
 --
@@ -19,6 +20,8 @@
 --   KEEP     collection_run_publications rows, version pointer set to NULL
 --   DELETE   publication_versions of the scope (publication_files cascade)
 --   DELETE   publication_origins of source doe-sp
+--   DELETE   norma_clara_translations of the scope's versions (prototype AI
+--            cache, FK ON DELETE CASCADE; deleted explicitly and counted)
 --   DELETE   collection_checkpoints of connector doe-sp (next run bootstraps
 --            from DOE_SP_BOOTSTRAP_START_DATE)
 --   KEEP     sources row paused; reactivation is a separate step (runbook)
@@ -89,7 +92,7 @@ BEGIN
       'publication_origins_publication_id_fkey', 'publication_versions_publication_id_fkey',
       'publication_files_publication_version_id_fkey', 'collection_run_publications_publication_id_fkey',
       'collection_run_publications_publication_version_id_fkey', 'fk_collection_item_publication',
-      'company_publications_publication_id_fkey');
+      'company_publications_publication_id_fkey', 'norma_clara_translations_publication_version_id_fkey');
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % unknown foreign keys reference publications/versions (schema drift)', v_n; END IF;
 END
 $$;
@@ -134,6 +137,21 @@ SELECT 1/0 AS abort_expected_mismatch;
 SELECT 1/0 AS abort_expected_mismatch;
 \endif
 
+SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
+\if :has_translations
+LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
+SELECT count(*) = :expected_translations_deleted AS ok_translations
+FROM norma_clara_translations t JOIN publication_versions pv ON pv.id = t.publication_version_id
+JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id \gset
+\else
+SELECT :expected_translations_deleted = 0 AS ok_translations \gset
+\endif
+\if :ok_translations
+\else
+\echo 'ABORT: norma_clara_translations differ from dry-run'
+SELECT 1/0 AS abort_expected_mismatch;
+\endif
+
 -- ---- destructive phase (each statement's row count is asserted)
 WITH x AS (
   UPDATE collection_run_publications crp SET publication_version_id = NULL
@@ -144,6 +162,18 @@ SELECT count(*) = :expected_run_links_version_cleared AS ok_step FROM x \gset
 \if :ok_step
 \else
 SELECT 1/0 AS abort_run_links_update;
+\endif
+
+\if :has_translations
+WITH x AS (
+  DELETE FROM norma_clara_translations t USING publication_versions pv, doe_sp_rebuild_scope d
+  WHERE pv.id = t.publication_version_id AND pv.publication_id = d.id
+  RETURNING 1)
+SELECT count(*) = :expected_translations_deleted AS ok_step FROM x \gset
+\if :ok_step
+\else
+SELECT 1/0 AS abort_translations_delete;
+\endif
 \endif
 
 WITH x AS (
@@ -205,6 +235,7 @@ SELECT 'DOE_SP_REBUILD_RESULT=' || jsonb_build_object(
   'originsDeleted', :expected_origins_deleted,
   'runLinksVersionCleared', :expected_run_links_version_cleared,
   'checkpointsDeleted', :expected_checkpoints_deleted,
+  'translationsDeleted', :expected_translations_deleted,
   'postConditions', 'PASS')::text;
 
 SELECT :'confirm' = 'REBUILD_DOE_SP' AS do_commit \gset

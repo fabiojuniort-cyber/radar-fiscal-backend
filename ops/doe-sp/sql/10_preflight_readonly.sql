@@ -60,6 +60,14 @@ SELECT 'DOE_SP_PREFLIGHT=' || jsonb_build_object(
   'attachmentEntries', (SELECT count(*) FROM files_meta WHERE f->'metadata'->>'kind' = 'ATTACHMENT'),
   'publicationFiles', (SELECT count(*) FROM publication_files pf JOIN ver ON ver.id = pf.publication_version_id),
   'crossOriginFiles', (SELECT count(*) FROM publication_origins po JOIN src ON src.id = po.source_id, jsonb_array_elements(COALESCE(po.metadata->'files', '[]'::jsonb)) f WHERE f->'metadata'->>'kind' = 'AUTHENTICATED_PUBLICATION_PDF' AND f->>'externalId' IS DISTINCT FROM 'auth:' || (po.metadata->>'authCode')),
+  -- Prototype-owned cache (tribusca-site-prototype), FK ON DELETE CASCADE to publication_versions.
+  'normaClaraTranslations', CASE WHEN to_regclass('public.norma_clara_translations') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml(
+      'SELECT count(*) AS c FROM norma_clara_translations t WHERE t.publication_version_id IN (
+         SELECT pv.id FROM publication_versions pv WHERE pv.publication_id IN (
+           SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id
+           WHERE s.code = ''doe-sp'' AND s.connector_key = ''doe-sp''))',
+      false, true, '')))[1]::text::bigint END,
   'companyPublications', (SELECT count(*) FROM company_publications cp JOIN doe_pub d ON d.id = cp.publication_id),
   'tenantsLinked', (SELECT count(DISTINCT c.tenant_id) FROM company_publications cp JOIN doe_pub d ON d.id = cp.publication_id JOIN companies c ON c.id = cp.company_id),
   'publicationMatches', (SELECT count(*) FROM publication_matches pm JOIN company_publications cp ON cp.id = pm.company_publication_id JOIN doe_pub d ON d.id = cp.publication_id),
