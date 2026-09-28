@@ -105,6 +105,46 @@ export async function createCollectionRun(
   return existing.id;
 }
 
+/**
+ * Scheduler path: creates the run only if the source is still active at
+ * insert time. The source row is read `FOR SHARE`, so an operator pause
+ * (`UPDATE sources SET is_active = false`) either waits for this insert to
+ * commit (the run then exists before the pause completes and is visible to
+ * the pause's active-run check) or, if the pause committed first, makes this
+ * insert a no-op. A paused source never receives a new scheduled run.
+ * Returns undefined when the source is inactive.
+ */
+export async function createScheduledCollectionRun(
+  db: Kysely<DB>,
+  input: CreateCollectionRunInput,
+): Promise<string | undefined> {
+  const inserted = await sql<{ id: string }>`
+    INSERT INTO collection_runs (source_id, scheduled_for, trigger_type, status)
+    SELECT s.id, ${input.scheduledFor}, ${input.triggerType}, 'PENDING'
+    FROM sources s
+    WHERE s.id = ${input.sourceId} AND s.is_active = true
+    FOR SHARE
+    ON CONFLICT (source_id, scheduled_for, trigger_type) DO NOTHING
+    RETURNING id
+  `.execute(db);
+
+  if (inserted.rows[0]) {
+    return inserted.rows[0].id;
+  }
+
+  const existing = await sql<{ id: string }>`
+    SELECT cr.id
+    FROM collection_runs cr
+    JOIN sources s ON s.id = cr.source_id
+    WHERE cr.source_id = ${input.sourceId}
+      AND cr.scheduled_for = ${input.scheduledFor}
+      AND cr.trigger_type = ${input.triggerType}
+      AND s.is_active = true
+  `.execute(db);
+
+  return existing.rows[0]?.id;
+}
+
 export async function acquireNextCollectionRun(
   db: Kysely<DB>,
   workerId: string,
