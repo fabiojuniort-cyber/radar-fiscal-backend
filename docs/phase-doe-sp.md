@@ -149,6 +149,10 @@ Se um arquivo falhar, o ato inteiro é adiado para o próximo run. Isso evita cr
   - Queda maior que a janela vira gap enfileirado.
   - As datas são processadas uma única vez, depois da janela, com o time budget.
   - `TIME_BUDGET_REACHED` gera `PARTIAL_SUCCESS` sem retry. O run seguinte continua do checkpoint.
+- **Limites de respeito à fonte** (DOE-SP-42), aplicados pelo Worker (`resolveDoeSpSourceLimits`):
+  - `DOE_SP_MIN_REQUEST_INTERVAL_MS` (padrão **1000**, 0–10000): intervalo mínimo entre o início de duas requisições à API oficial. O cancelamento interrompe a espera.
+  - `DOE_SP_MAX_DOWNLOAD_BYTES_PER_RUN` (padrão **50 MiB**; 0 = sem limite): depois do **primeiro** dia de backfill do run, nenhum dia novo começa quando os bytes baixados no run atingem o limite. Um dia começado sempre termina, a janela recente e as retentativas de itens adiados não são cortadas, e cada run avança pelo menos um dia. O run termina `PARTIAL_SUCCESS` com `completion.reason = SOURCE_BUDGET_REACHED`; `metadata.doeSp.sourceLimits` registra os valores e se o limite foi atingido.
+  - Motivo: em 28/09/2026, depois de runs de bootstrap com centenas de requisições e dezenas de MB, os workers passaram a receber *connect timeout* da API enquanto outro serviço ainda a acessava (Issue #1, DOE-SP-41).
 - **Falha de persistência**: itens `FAILED` no run que produziu o checkpoint são reabertos na leitura do estado (`reopenFailedItems`).
 - **Replay forçado** (gate): `DOE_SP_FORCE_REPROCESS_UNTIL=<ISO>` ignora fingerprints e IDs conhecidos até o instante indicado e expira sozinho.
 

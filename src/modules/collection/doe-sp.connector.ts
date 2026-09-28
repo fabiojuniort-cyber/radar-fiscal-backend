@@ -54,6 +54,9 @@ export const DOE_SP_SECTION = 'Atos Normativos';
  * Three days cover a Friday -> Monday gap plus one re-check of each date.
  */
 export const DOE_SP_DEFAULT_LOOKBACK_DAYS = 3;
+/** Production politeness towards the official API (DOE-SP-42). */
+export const DOE_SP_DEFAULT_MIN_REQUEST_INTERVAL_MS = 1_000;
+export const DOE_SP_DEFAULT_MAX_DOWNLOAD_BYTES_PER_RUN = 50 * 1024 * 1024;
 const MAX_EXCLUDED_SAMPLES = 200;
 /**
  * Timeout for a *material* authenticated PDF (page without official body)
@@ -124,6 +127,38 @@ export interface DoeSpConnectorOptions {
   /** Ignore day fingerprints/known ids (replay gate). Also DOE_SP_FORCE_REPROCESS_UNTIL. */
   forceReprocess?: boolean;
   client?: Omit<DoeSpClientOptions, 'fetch'>;
+  /**
+   * Stop starting new backfill days once this many bytes were downloaded in
+   * the run (0 or undefined = no limit). Checked only between backfill days
+   * and only after the first one, so a started day always completes, every
+   * run advances at least one day, and the recent window and the deferred
+   * retries (already limited to 1×/24 h) are never cut.
+   */
+  maxDownloadBytesPerRun?: number;
+}
+
+function envInteger(name: string, fallback: number, min: number, max: number, env: NodeJS.ProcessEnv): number {
+  const raw = env[name];
+  const value = raw === undefined || raw === '' ? fallback : Number(raw);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new RangeError(`${name} must be an integer between ${min} and ${max}`);
+  }
+  return value;
+}
+
+/**
+ * Worker-side limits so a bootstrap/recapture does not hammer the source:
+ * DOE_SP_MIN_REQUEST_INTERVAL_MS (default 1000) and
+ * DOE_SP_MAX_DOWNLOAD_BYTES_PER_RUN (default 50 MiB; 0 = unlimited).
+ */
+export function resolveDoeSpSourceLimits(env: NodeJS.ProcessEnv = process.env): {
+  minRequestIntervalMs: number;
+  maxDownloadBytesPerRun: number;
+} {
+  return {
+    minRequestIntervalMs: envInteger('DOE_SP_MIN_REQUEST_INTERVAL_MS', DOE_SP_DEFAULT_MIN_REQUEST_INTERVAL_MS, 0, 10_000, env),
+    maxDownloadBytesPerRun: envInteger('DOE_SP_MAX_DOWNLOAD_BYTES_PER_RUN', DOE_SP_DEFAULT_MAX_DOWNLOAD_BYTES_PER_RUN, 0, 10 * 1024 * 1024 * 1024, env),
+  };
 }
 
 interface DayOutcome {
@@ -342,6 +377,13 @@ export class DoeSpConnector implements CollectionConnector {
     };
     const counters = { detailsFetched: 0, filesDownloaded: 0, fileBytes: 0, editionLookups: 0, sourceErrors: 0, redundantPdfSkipped: 0, materialPdfDownloaded: 0, materialPdfDeferred: 0, deferredRetried: 0, deferredCaptured: 0 };
     const typeCache = new Map<string, Map<string, string>>();
+    const maxDownloadBytesPerRun = this.#options.maxDownloadBytesPerRun ?? 0;
+    let sourceBudgetReached = false;
+    /** Byte budget of the run, checked only between backfill days. */
+    const sourceBudgetExhausted = (): boolean => {
+      if (maxDownloadBytesPerRun > 0 && client.downloadedBytes >= maxDownloadBytesPerRun) sourceBudgetReached = true;
+      return sourceBudgetReached;
+    };
 
     const typesFor = async (date: string): Promise<Map<string, string>> => {
       const cached = typeCache.get(date);
@@ -744,7 +786,9 @@ export class DoeSpConnector implements CollectionConnector {
     try {
       while (ranges.length && !yielded) {
         const range = ranges[0]!;
-        if (context.budget?.shouldYield()) throw new BudgetReached();
+        // Byte budget only after the first backfill day of the run: every run
+        // advances at least one day, whatever the window downloaded.
+        if (context.budget?.shouldYield() || (backfillDaysProcessed > 0 && sourceBudgetExhausted())) throw new BudgetReached();
         const outcome = await processDay(range.from, 'BACKFILL');
         days.push(outcome);
         if (outcome.yielded) throw new BudgetReached();
@@ -769,7 +813,7 @@ export class DoeSpConnector implements CollectionConnector {
     const deferredPending = deferred.size;
     const pendingCounters = { pendingDays, ...(deferredPending ? { deferredItems: deferredPending } : {}) };
     const completion: ConnectorResult['completion'] | undefined = yielded
-      ? { complete: false, reason: 'TIME_BUDGET_REACHED', pending: pendingCounters }
+      ? { complete: false, reason: sourceBudgetReached ? 'SOURCE_BUDGET_REACHED' : 'TIME_BUDGET_REACHED', pending: pendingCounters }
       : retryRequired && pendingDays > 0
         ? { complete: false, reason: 'PARTIAL_FAILURE_RETRY_REQUIRED', pending: pendingCounters }
         : deferredPending > 0
@@ -811,6 +855,11 @@ export class DoeSpConnector implements CollectionConnector {
           })),
           filtering,
           counters: { ...counters, requests: client.requestCount, downloadedBytes: client.downloadedBytes },
+          sourceLimits: {
+            minRequestIntervalMs: this.#options.client?.minRequestIntervalMs ?? 0,
+            maxDownloadBytesPerRun,
+            reached: sourceBudgetReached,
+          },
           partialFailureCount: partialFailures.length,
         },
       },

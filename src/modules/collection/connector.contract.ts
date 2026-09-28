@@ -95,7 +95,9 @@ export type ConnectorIncompleteReason =
   | 'TIME_BUDGET_REACHED'
   | 'PARTIAL_FAILURE_RETRY_REQUIRED'
   /** Known included items whose material content the source has not rendered yet. */
-  | 'MATERIAL_CONTENT_DEFERRED';
+  | 'MATERIAL_CONTENT_DEFERRED'
+  /** Download budget of the run spent (source politeness); resumes next run. */
+  | 'SOURCE_BUDGET_REACHED';
 
 export interface ConnectorCompletion {
   /**

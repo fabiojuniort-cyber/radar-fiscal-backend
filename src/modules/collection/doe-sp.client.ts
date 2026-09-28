@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { ConnectorError, type ConnectorErrorKind } from './connector.error.js';
 
@@ -31,6 +32,11 @@ export interface DoeSpClientOptions {
   timeoutMs?: number;
   maxJsonBytes?: number;
   maxFileBytes?: number;
+  /**
+   * Minimum spacing between the start of two requests to the source
+   * (politeness towards the official API). 0 = no spacing (tests).
+   */
+  minRequestIntervalMs?: number;
 }
 
 export interface DoeSpJsonResponse {
@@ -119,6 +125,8 @@ export class DoeSpClient {
   readonly #timeoutMs: number;
   readonly #maxJsonBytes: number;
   readonly #maxFileBytes: number;
+  readonly #minRequestIntervalMs: number;
+  #nextRequestAt = 0;
   requestCount = 0;
   downloadedBytes = 0;
 
@@ -127,6 +135,7 @@ export class DoeSpClient {
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#maxJsonBytes = options.maxJsonBytes ?? DEFAULT_MAX_JSON_BYTES;
     this.#maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
+    this.#minRequestIntervalMs = options.minRequestIntervalMs ?? 0;
   }
 
   async #request(url: string, signal: AbortSignal, accept: string): Promise<Response> {
@@ -135,6 +144,17 @@ export class DoeSpClient {
       throw failure('DOE_SP_CROSS_ORIGIN_REQUEST', 'PROCESSING_ERROR', false, { metadata: { origin: parsed.origin } });
     }
     if (signal.aborted) throw failure('DOE_SP_CANCELLED', 'CANCELLED', false);
+    if (this.#minRequestIntervalMs > 0) {
+      const wait = this.#nextRequestAt - Date.now();
+      if (wait > 0) {
+        try {
+          await delay(wait, undefined, { signal });
+        } catch {
+          throw failure('DOE_SP_CANCELLED', 'CANCELLED', false);
+        }
+      }
+      this.#nextRequestAt = Date.now() + this.#minRequestIntervalMs;
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     timer.unref();
