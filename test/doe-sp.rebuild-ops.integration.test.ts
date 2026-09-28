@@ -14,6 +14,7 @@ import type { ConnectorPublication } from '../src/modules/collection/connector.c
 import { createScheduledCollectionRun } from '../src/modules/collection/collection-run.repository.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { persistPublication } from '../src/modules/collection/publication.persistence.js';
+import { dropScratchDatabase, ignoreIdleClientErrors } from './scratch-database.js';
 
 /*
  * DOE-SP-33: end-to-end rehearsal of ops/doe-sp against a disposable
@@ -84,7 +85,7 @@ test('DOE-SP-33: 30 -> real partial recapture -> rollback restores the backup ma
   const opsUrl = withDatabase(adminUrl, opsDb);
   const bakUrl = withDatabase(adminUrl, bakDb);
   const tmp = mkdtempSync(join(tmpdir(), 'doe-sp-ops-'));
-  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  const admin = ignoreIdleClientErrors(new Pool({ connectionString: adminUrl, max: 1 }));
   let pool: Pool | undefined;
   let db: Kysely<DB> | undefined;
 
@@ -93,7 +94,7 @@ test('DOE-SP-33: 30 -> real partial recapture -> rollback restores the backup ma
     await admin.query(`CREATE DATABASE ${bakDb}`);
     const schema = execFileSync('pg_dump', ['--schema-only', '--no-owner', '--no-privileges', adminUrl], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     execFileSync('psql', [opsUrl, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: schema, stdio: ['pipe', 'ignore', 'pipe'] });
-    pool = new Pool({ connectionString: opsUrl, max: 3 });
+    pool = ignoreIdleClientErrors(new Pool({ connectionString: opsUrl, max: 3 }));
     await pool.query(`
       CREATE TABLE IF NOT EXISTS norma_clara_translations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -210,8 +211,8 @@ test('DOE-SP-33: 30 -> real partial recapture -> rollback restores the backup ma
     assert.equal(counts(opsUrl), counts0, 'every table count back to the backup');
   } finally {
     await db?.destroy();
-    await admin.query(`DROP DATABASE IF EXISTS ${opsDb} WITH (FORCE)`).catch(() => undefined);
-    await admin.query(`DROP DATABASE IF EXISTS ${bakDb} WITH (FORCE)`).catch(() => undefined);
+    await dropScratchDatabase(admin, opsDb).catch(() => undefined);
+    await dropScratchDatabase(admin, bakDb).catch(() => undefined);
     await admin.end();
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -235,7 +236,7 @@ test('DOE-SP-34: 30 sees writes committed while it waits for its table locks (fo
   const suffix = randomBytes(4).toString('hex');
   const opsDb = 'doe_sp_ops_race_' + suffix;
   const opsUrl = withDatabase(adminUrl, opsDb);
-  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  const admin = ignoreIdleClientErrors(new Pool({ connectionString: adminUrl, max: 1 }));
   let pool: Pool | undefined;
   let db: Kysely<DB> | undefined;
 
@@ -243,7 +244,7 @@ test('DOE-SP-34: 30 sees writes committed while it waits for its table locks (fo
     await admin.query(`CREATE DATABASE ${opsDb}`);
     const schema = execFileSync('pg_dump', ['--schema-only', '--no-owner', '--no-privileges', adminUrl], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     execFileSync('psql', [opsUrl, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: schema, stdio: ['pipe', 'ignore', 'pipe'] });
-    pool = new Pool({ connectionString: opsUrl, max: 3 });
+    pool = ignoreIdleClientErrors(new Pool({ connectionString: opsUrl, max: 3 }));
     db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
 
     const doeSp = randomUUID();
@@ -299,7 +300,7 @@ test('DOE-SP-34: 30 sees writes committed while it waits for its table locks (fo
     assert.equal(manifest(opsUrl), manifest0, 'aborted 30 changed nothing');
   } finally {
     await db?.destroy();
-    await admin.query(`DROP DATABASE IF EXISTS ${opsDb} WITH (FORCE)`).catch(() => undefined);
+    await dropScratchDatabase(admin, opsDb).catch(() => undefined);
     await admin.end();
   }
 });
@@ -313,7 +314,7 @@ test('DOE-SP-35: 13 fingerprint is equal across collation and time zone (product
   const enUrl = withDatabase(adminUrl, enDb);
   const cUrl = withDatabase(adminUrl, cDb);
   const tmp = mkdtempSync(join(tmpdir(), 'doe-sp-fp-'));
-  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  const admin = ignoreIdleClientErrors(new Pool({ connectionString: adminUrl, max: 1 }));
   let db: Kysely<DB> | undefined;
 
   try {
@@ -323,7 +324,7 @@ test('DOE-SP-35: 13 fingerprint is equal across collation and time zone (product
     await admin.query(`CREATE DATABASE ${cDb} TEMPLATE template0 LC_COLLATE 'C.UTF-8' LC_CTYPE 'C.UTF-8'`);
     const schema = execFileSync('pg_dump', ['--schema-only', '--no-owner', '--no-privileges', adminUrl], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     execFileSync('psql', [enUrl, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: schema, stdio: ['pipe', 'ignore', 'pipe'] });
-    db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: enUrl, max: 2 }) }) });
+    db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: ignoreIdleClientErrors(new Pool({ connectionString: enUrl, max: 2 })) }) });
 
     // Other-source data with both 'run:' and 'run-link:' parts (their order
     // differs between en_US.utf8 and C) and timestamptz columns.
@@ -359,8 +360,8 @@ test('DOE-SP-35: 13 fingerprint is equal across collation and time zone (product
     assert.equal(fingerprint(cUrl, 'America/Sao_Paulo'), reference);
   } finally {
     await db?.destroy();
-    await admin.query(`DROP DATABASE IF EXISTS ${enDb} WITH (FORCE)`).catch(() => undefined);
-    await admin.query(`DROP DATABASE IF EXISTS ${cDb} WITH (FORCE)`).catch(() => undefined);
+    await dropScratchDatabase(admin, enDb).catch(() => undefined);
+    await dropScratchDatabase(admin, cDb).catch(() => undefined);
     await admin.end();
     rmSync(tmp, { recursive: true, force: true });
   }
