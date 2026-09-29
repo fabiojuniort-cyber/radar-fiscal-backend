@@ -256,9 +256,14 @@ export async function importBaseline(
       plan.releaseAction === 'VERSION_CONFLICT' ||
       plan.conflicts.length > 0
     ) {
+      const code = plan.conflicts.includes(
+        'NON_DETERMINISTIC_DERIVATION',
+      )
+        ? 'NON_DETERMINISTIC_DERIVATION'
+        : 'TARGET_VERSION_ALREADY_BOUND';
+
       throw new Error(
-        'TARGET_VERSION_ALREADY_BOUND: ' +
-          plan.conflicts.join('; '),
+        code + ': ' + plan.conflicts.join('; '),
       );
     }
 
