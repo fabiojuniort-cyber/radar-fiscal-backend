@@ -303,6 +303,64 @@ test('taxonomy core schema enforces identity, revisions and release lifecycle', 
       );
     });
 
+    await t.test(
+      'APPROVED requires approved_at and accepts it when provided',
+      async () => {
+        const approvedReleaseId = randomUUID();
+
+        await pool.query(
+          `
+            INSERT INTO taxonomy_releases (
+              id,
+              version_major,
+              version_minor,
+              version_patch,
+              created_by_actor
+            )
+            VALUES ($1, $2, 1, 1, 'approved-test')
+          `,
+          [approvedReleaseId, versionBase],
+        );
+
+        await assert.rejects(
+          pool.query(
+            `
+              UPDATE taxonomy_releases
+              SET status = 'APPROVED'
+              WHERE id = $1
+            `,
+            [approvedReleaseId],
+          ),
+        );
+
+        await pool.query(
+          `
+            UPDATE taxonomy_releases
+            SET
+              status = 'APPROVED',
+              approved_at = now()
+            WHERE id = $1
+          `,
+          [approvedReleaseId],
+        );
+
+        const approved = await pool.query<{
+          status: string;
+          approved_at: Date | null;
+        }>(
+          `
+            SELECT status, approved_at
+            FROM taxonomy_releases
+            WHERE id = $1
+          `,
+          [approvedReleaseId],
+        );
+
+        assert.equal(approved.rows[0]?.status, 'APPROVED');
+        assert.ok(approved.rows[0]?.approved_at);
+      },
+    );
+
     await t.test('release ancestry rejects self/cycle', async () => {
       await assert.rejects(
         pool.query(
