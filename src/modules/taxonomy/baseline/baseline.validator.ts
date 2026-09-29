@@ -1,10 +1,19 @@
 import {
+  ALIAS_TYPES,
+  BASELINE_MANIFEST_VERSION,
+  BASELINE_PARSER_VERSION,
   CONCEPT_CODE_PATTERN,
   DIMENSIONS,
   EXPECTED,
   FORBIDDEN_MIT_CODES,
+  R6_APPROVED_PROVENANCE,
+  RELATION_SEED_CONTRACT_VERSION,
+  TAX04_APPROVED_PROVENANCE,
 } from './baseline.constants.js';
-import { canonicalJson } from './baseline.canonical-json.js';
+import {
+  canonicalJson,
+  sha256Hex,
+} from './baseline.canonical-json.js';
 import type {
   BaselineManifest,
   ValidationIssue,
@@ -79,6 +88,105 @@ export function validateManifest(
   const add = (code: string, message: string): void => {
     issues.push({ code, message });
   };
+
+
+  const expectedMetadata = {
+    dimensions: EXPECTED.dimensions,
+    concepts: EXPECTED.concepts,
+    needsEvidence: EXPECTED.needsEvidence,
+    lexicalAliasCount: EXPECTED.lexicalAliases,
+    aliasBindingCount: EXPECTED.aliasBindings,
+    multiBindLexicalAliasCount:
+      EXPECTED.multiBindLexicalAliases,
+  };
+
+  if (
+    canonicalJson(manifest.expected) !==
+    canonicalJson(expectedMetadata)
+  ) {
+    add(
+      'MANIFEST_EXPECTED_COUNTS_MISMATCH',
+      canonicalJson(manifest.expected),
+    );
+  }
+
+  if (
+    manifest.manifestVersion !==
+      BASELINE_MANIFEST_VERSION ||
+    manifest.derivation.parserVersion !==
+      BASELINE_PARSER_VERSION ||
+    manifest.derivation.relationSeedContractVersion !==
+      RELATION_SEED_CONTRACT_VERSION
+  ) {
+    add(
+      'DERIVATION_VERSION_MISMATCH',
+      canonicalJson(manifest.derivation),
+    );
+  }
+
+  const approvedSource = {
+    repository: R6_APPROVED_PROVENANCE.canonicalRepository,
+    path: R6_APPROVED_PROVENANCE.canonicalPath,
+    gitSha: R6_APPROVED_PROVENANCE.canonicalGitSha,
+    blobSha: R6_APPROVED_PROVENANCE.canonicalBlobSha,
+    sha256: R6_APPROVED_PROVENANCE.canonicalSha256,
+  };
+  const approvedContract = {
+    contractVersion: 'tax-04/v1',
+    repository:
+      TAX04_APPROVED_PROVENANCE.canonicalRepository,
+    path: TAX04_APPROVED_PROVENANCE.canonicalPath,
+    gitSha: TAX04_APPROVED_PROVENANCE.canonicalGitSha,
+    blobSha: TAX04_APPROVED_PROVENANCE.canonicalBlobSha,
+    sha256: TAX04_APPROVED_PROVENANCE.canonicalSha256,
+  };
+
+  if (
+    canonicalJson(manifest.source) !==
+    canonicalJson(approvedSource)
+  ) {
+    add(
+      'SOURCE_FINGERPRINT_MISMATCH',
+      canonicalJson(manifest.source),
+    );
+  }
+
+  if (
+    canonicalJson(manifest.technicalContract) !==
+    canonicalJson(approvedContract)
+  ) {
+    add(
+      'TECHNICAL_CONTRACT_FINGERPRINT_MISMATCH',
+      canonicalJson(manifest.technicalContract),
+    );
+  }
+
+  const expectedDerivationFingerprint = sha256Hex(
+    canonicalJson({
+      sourceFingerprint: manifest.source,
+      technicalContractFingerprint: {
+        repository: manifest.technicalContract.repository,
+        path: manifest.technicalContract.path,
+        gitSha: manifest.technicalContract.gitSha,
+        blobSha: manifest.technicalContract.blobSha,
+        sha256: manifest.technicalContract.sha256,
+      },
+      parserVersion: manifest.derivation.parserVersion,
+      manifestVersion: manifest.manifestVersion,
+      relationSeedContractVersion:
+        manifest.derivation.relationSeedContractVersion,
+    }),
+  );
+
+  if (
+    manifest.derivation.fingerprint !==
+    expectedDerivationFingerprint
+  ) {
+    add(
+      'DERIVATION_FINGERPRINT_MISMATCH',
+      manifest.derivation.fingerprint,
+    );
+  }
 
   if (manifest.dimensions.length !== EXPECTED.dimensions) {
     add(
@@ -195,6 +303,17 @@ export function validateManifest(
 
   for (const alias of manifest.aliases) {
     for (const binding of alias.bindings) {
+      if (
+        !ALIAS_TYPES.includes(
+          binding.aliasType as (typeof ALIAS_TYPES)[number],
+        )
+      ) {
+        add(
+          'INVALID_ALIAS_TYPE',
+          alias.text + ' -> ' + binding.aliasType,
+        );
+      }
+
       if (!conceptSet.has(binding.targetConceptCode)) {
         add(
           'UNRESOLVED_ALIAS_TARGET',
@@ -234,9 +353,33 @@ export function validateManifest(
     );
   }
 
+  const relationTypeByCode = new Map(
+    manifest.relationTypes.map((type) => [
+      type.code,
+      type,
+    ]),
+  );
   const relationKeys = new Set<string>();
 
   for (const relation of manifest.relations) {
+    const relationType = relationTypeByCode.get(
+      relation.relationType,
+    );
+
+    if (!relationType) {
+      add(
+        'UNRESOLVED_RELATION_TYPE',
+        relation.relationType,
+      );
+    } else if (
+      relation.relationType !==
+      relationType.canonicalStorageCode
+    ) {
+      add(
+        'NON_CANONICAL_RELATION_DIRECTION',
+        relation.relationType,
+      );
+    }
     if (
       !conceptSet.has(relation.sourceConceptCode) ||
       !conceptSet.has(relation.targetConceptCode)
@@ -295,6 +438,37 @@ export function validateManifest(
       ].join('|');
     }),
   );
+
+  const actualRuleKeys = new Set(
+    manifest.relationRules.map((rule) =>
+      [
+        rule.relationType,
+        rule.sourceDimension,
+        rule.targetDimension,
+      ].join('|'),
+    ),
+  );
+
+  for (const relation of manifest.relations) {
+    const source = conceptByCode.get(
+      relation.sourceConceptCode,
+    );
+    const target = conceptByCode.get(
+      relation.targetConceptCode,
+    );
+
+    if (source && target) {
+      const key = [
+        relation.relationType,
+        source.dimensionCode,
+        target.dimensionCode,
+      ].join('|');
+
+      if (!actualRuleKeys.has(key)) {
+        add('MISSING_RELATION_RULE', key);
+      }
+    }
+  }
 
   for (const rule of manifest.relationRules) {
     const key = [
