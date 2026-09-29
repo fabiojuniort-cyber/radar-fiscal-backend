@@ -15,6 +15,10 @@ test('taxonomy core schema enforces identity, revisions and release lifecycle', 
   const pool = new Pool({ connectionString: adminUrl, max: 1 });
 
   try {
+    const versionSeed = randomUUID().replaceAll('-', '').slice(0, 5);
+    const versionBase =
+      500000 + Number.parseInt(versionSeed, 16) % 100000;
+
     const dimensionId = randomUUID();
     const otherDimensionId = randomUUID();
     const dimensionRevisionId = randomUUID();
@@ -66,10 +70,10 @@ test('taxonomy core schema enforces identity, revisions and release lifecycle', 
           created_by_actor
         )
         VALUES
-          ($1, 90, 0, 1, 'taxonomy-test'),
-          ($2, 90, 0, 2, 'taxonomy-test')
+          ($1, $3, 0, 1, 'taxonomy-test'),
+          ($2, $3, 0, 2, 'taxonomy-test')
       `,
-      [releaseId, otherReleaseId],
+      [releaseId, otherReleaseId, versionBase],
     );
 
     await pool.query(
@@ -131,8 +135,9 @@ test('taxonomy core schema enforces identity, revisions and release lifecycle', 
               version_patch,
               created_by_actor
             )
-            VALUES (90, 0, 1, 'duplicate-test')
+            VALUES ($1, 0, 1, 'duplicate-test')
           `,
+          [versionBase],
         ),
       );
     });
