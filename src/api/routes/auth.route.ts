@@ -20,6 +20,7 @@ import {
   rotateRefreshToken,
 } from '../../modules/auth/auth.service.js';
 import {
+  PublicSignupCompanyExistsError,
   PublicSignupEmailExistsError,
   PublicSignupRateLimitedError,
   publicSignupBodySchema,
@@ -131,6 +132,16 @@ export async function authRoutes(
           return reply.status(409).send({
             error:
               'email_already_registered',
+          });
+        }
+
+        if (
+          error instanceof
+          PublicSignupCompanyExistsError
+        ) {
+          return reply.status(409).send({
+            error:
+              'company_already_registered',
           });
         }
 
