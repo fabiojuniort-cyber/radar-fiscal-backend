@@ -18,12 +18,15 @@ const CSRF_HEADERS = {
   'x-csrf-protection': '1',
 };
 
-function signupPayload(email: string) {
+function signupPayload(
+  email: string,
+  cnpj = '',
+) {
   return {
     name: 'Pessoa Cadastro',
     email,
     company: 'Empresa Cadastro',
-    cnpj: '12.345.678/0001-95',
+    cnpj,
     password: PASSWORD,
     confirmPassword: PASSWORD,
     acceptedTerms: true,
@@ -33,11 +36,12 @@ function signupPayload(email: string) {
 async function register(
   app: FastifyInstance,
   email: string,
+  cnpj = '',
 ) {
   return app.inject({
     method: 'POST',
     url: '/auth/register',
-    payload: signupPayload(email),
+    payload: signupPayload(email, cnpj),
   });
 }
 
@@ -97,6 +101,7 @@ test(
           const response = await register(
             app,
             email,
+            '12.345.678/0001-95',
           );
 
           assert.equal(
@@ -582,7 +587,11 @@ test(
           );
 
           const first =
-            await register(app, firstEmail);
+            await register(
+              app,
+              firstEmail,
+              '12.345.678/0001-95',
+            );
 
           assert.equal(first.statusCode, 201);
 
@@ -596,7 +605,11 @@ test(
           tenantIds.push(firstBody.tenant.id);
 
           const second =
-            await register(app, secondEmail);
+            await register(
+              app,
+              secondEmail,
+              '12.345.678/0001-95',
+            );
 
           assert.equal(second.statusCode, 409);
           assert.deepEqual(second.json(), {
