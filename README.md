@@ -47,7 +47,7 @@ Available endpoints:
 - `GET /auth/me`
 - `GET /auth/tenants`
 
-Public signup validates the AUTH-02 password policy, stores only Argon2id hashes, uses a narrow transactional database function for tenant/OWNER creation, and applies a persistent hashed-email rate limit. See [docs/auth-public-signup.md](docs/auth-public-signup.md).
+Public signup validates the AUTH-02 password policy, stores only Argon2id hashes, uses a narrow transactional database function for tenant/OWNER creation, blocks duplicate self-service CNPJ onboarding when CNPJ is provided, and applies a persistent hashed-email rate limit. See [docs/auth-public-signup.md](docs/auth-public-signup.md).
 
 The refresh cookie is host-only because no `Domain` attribute is set. In production it is `Secure`, always `HttpOnly`, uses `SameSite=Strict`, and is scoped to `/auth`.
 
