@@ -204,6 +204,28 @@ CREATE INDEX ix_taxonomy_relations_type
 ON taxonomy_concept_relations(release_id, relation_type_id);
 
 
+CREATE OR REPLACE FUNCTION taxonomy_guard_alias_identity()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+    IF NEW.text IS DISTINCT FROM OLD.text
+       OR NEW.normalized_text IS DISTINCT FROM OLD.normalized_text
+       OR NEW.language IS DISTINCT FROM OLD.language THEN
+        RAISE EXCEPTION 'taxonomy alias lexical identity is immutable';
+    END IF;
+
+    RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER trg_taxonomy_alias_identity
+BEFORE UPDATE OF text, normalized_text, language
+ON taxonomy_aliases
+FOR EACH ROW
+EXECUTE FUNCTION taxonomy_guard_alias_identity();
+
+
 CREATE OR REPLACE FUNCTION taxonomy_guard_relation_type_identity()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -395,6 +417,8 @@ REVOKE ALL ON
     taxonomy_concept_relations
 FROM PUBLIC;
 
+REVOKE ALL ON FUNCTION taxonomy_guard_alias_identity()
+FROM PUBLIC;
 REVOKE ALL ON FUNCTION taxonomy_guard_relation_type_identity()
 FROM PUBLIC;
 REVOKE ALL ON FUNCTION taxonomy_check_relation_compatibility()
