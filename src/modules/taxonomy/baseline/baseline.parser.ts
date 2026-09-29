@@ -1,4 +1,7 @@
 import {
+  compareCanonicalText,
+} from './baseline.canonical-json.js';
+import {
   ALIAS_TYPES,
   DIMENSIONS,
   DIMENSION_CODES,
@@ -103,7 +106,7 @@ function parseConcepts(lines: string[]): BaselineConcept[] {
   }
 
   const codePattern =
-    /^\\|\\s*`?([a-z][a-z0-9_]*(?:\\.[a-z0-9_]+)+)`?\\s*\\|/;
+    /^\|\s*`?([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)`?\s*\|/;
 
   const concepts: BaselineConcept[] = [];
 
@@ -158,7 +161,7 @@ function parseConcepts(lines: string[]): BaselineConcept[] {
   }
 
   return concepts.sort((left, right) =>
-    left.code.localeCompare(right.code),
+    compareCanonicalText(left.code, right.code),
   );
 }
 
@@ -166,7 +169,7 @@ export function normalizeAliasText(value: string): string {
   return value
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
-    .toLocaleLowerCase('pt-BR')
+    .toLowerCase()
     .replace(/[‐‑‒–—―]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
@@ -251,7 +254,8 @@ function parseAliases(lines: string[]): BaselineAlias[] {
           aliasType,
         }))
         .sort((left, right) =>
-          left.targetConceptCode.localeCompare(
+          compareCanonicalText(
+            left.targetConceptCode,
             right.targetConceptCode,
           ),
         ),
@@ -269,11 +273,10 @@ function parseAliases(lines: string[]): BaselineAlias[] {
   }
 
   return aliases.sort((left, right) =>
-    [left.normalizedText, left.language]
-      .join('|')
-      .localeCompare(
-        [right.normalizedText, right.language].join('|'),
-      ),
+    compareCanonicalText(
+      [left.normalizedText, left.language].join('|'),
+      [right.normalizedText, right.language].join('|'),
+    ),
   );
 }
 
@@ -309,7 +312,7 @@ function parseGaps(lines: string[]): BaselineGap[] {
       }];
     })
     .sort((left, right) =>
-      left.code.localeCompare(right.code),
+      compareCanonicalText(left.code, right.code),
     );
 }
 
@@ -344,7 +347,9 @@ function parseCorpus(lines: string[]): BaselineCorpusEntry[] {
           'R6 line ' + String(start + offset + 1),
       }];
     })
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) =>
+      compareCanonicalText(left.id, right.id),
+    );
 }
 
 function deriveRelationRules(
@@ -399,19 +404,18 @@ function deriveRelationRules(
   }
 
   return [...byKey.values()].sort((left, right) =>
-    [
-      left.relationType,
-      left.sourceDimension,
-      left.targetDimension,
-    ]
-      .join('|')
-      .localeCompare(
-        [
-          right.relationType,
-          right.sourceDimension,
-          right.targetDimension,
-        ].join('|'),
-      ),
+    compareCanonicalText(
+      [
+        left.relationType,
+        left.sourceDimension,
+        left.targetDimension,
+      ].join('|'),
+      [
+        right.relationType,
+        right.sourceDimension,
+        right.targetDimension,
+      ].join('|'),
+    ),
   );
 }
 
