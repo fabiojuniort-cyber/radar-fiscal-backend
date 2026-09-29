@@ -152,7 +152,7 @@ WITH CHECK (
 
 -- The runtime logins are provisioned after db:migrate on fresh databases.
 -- If they already exist, explicitly remove any curator membership.
-DO $
+DO $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM pg_roles WHERE rolname = 'radar_app_runtime'
@@ -166,4 +166,4 @@ BEGIN
         REVOKE radar_taxonomy_curator FROM radar_worker_runtime;
     END IF;
 END;
-$;
+$$;
