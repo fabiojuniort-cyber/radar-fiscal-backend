@@ -288,6 +288,11 @@ BEGIN
         RAISE EXCEPTION 'withdrawn taxonomy release is immutable';
     END IF;
 
+    IF NEW.status = 'WITHDRAWN'
+       AND OLD.status <> 'PUBLISHED' THEN
+        RAISE EXCEPTION 'only a published taxonomy release may be withdrawn';
+    END IF;
+
     IF OLD.status = 'PUBLISHED' THEN
         IF NEW.status <> 'WITHDRAWN' THEN
             RAISE EXCEPTION 'published taxonomy release only allows PUBLISHED -> WITHDRAWN';
@@ -392,29 +397,36 @@ EXECUTE FUNCTION taxonomy_revision_append_only();
 CREATE OR REPLACE FUNCTION taxonomy_guard_release_membership()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+AS $
 DECLARE
-    target_release_id UUID;
-    target_status TEXT;
+    old_status TEXT;
+    new_status TEXT;
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        target_release_id := OLD.release_id;
-    ELSE
-        target_release_id := NEW.release_id;
+    IF TG_OP IN ('UPDATE', 'DELETE') THEN
+        SELECT status
+        INTO old_status
+        FROM taxonomy_releases
+        WHERE id = OLD.release_id;
+
+        IF old_status IN ('PUBLISHED', 'WITHDRAWN') THEN
+            RAISE EXCEPTION 'published/withdrawn taxonomy release snapshot is immutable';
+        END IF;
     END IF;
 
-    SELECT status
-    INTO target_status
-    FROM taxonomy_releases
-    WHERE id = target_release_id;
+    IF TG_OP IN ('INSERT', 'UPDATE') THEN
+        SELECT status
+        INTO new_status
+        FROM taxonomy_releases
+        WHERE id = NEW.release_id;
 
-    IF target_status IN ('PUBLISHED', 'WITHDRAWN') THEN
-        RAISE EXCEPTION 'published/withdrawn taxonomy release snapshot is immutable';
+        IF new_status IN ('PUBLISHED', 'WITHDRAWN') THEN
+            RAISE EXCEPTION 'published/withdrawn taxonomy release snapshot is immutable';
+        END IF;
     END IF;
 
     RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
 END;
-$$;
+$;
 
 CREATE TRIGGER trg_taxonomy_release_dimensions_guard
 BEFORE INSERT OR UPDATE OR DELETE
