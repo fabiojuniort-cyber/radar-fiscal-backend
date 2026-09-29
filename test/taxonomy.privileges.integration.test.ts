@@ -232,6 +232,245 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
       assert.equal(privileges.rows[0]?.can_delete_revision, false);
     });
 
+    await t.test(
+      'curator cannot rewrite identity or creation audit columns',
+      async () => {
+        const seed = randomUUID().replaceAll('-', '').slice(0, 10);
+        const releaseId = randomUUID();
+        const dimensionId = randomUUID();
+        const otherDimensionId = randomUUID();
+        const conceptId = randomUUID();
+
+        await client.query(
+          `
+            INSERT INTO taxonomy_releases (
+              id,
+              version_major,
+              version_minor,
+              version_patch,
+              created_by_actor
+            )
+            VALUES ($1, $2, 0, 1, 'immutable-test')
+          `,
+          [
+            releaseId,
+            910000 + Number.parseInt(seed.slice(0, 5), 16) % 50000,
+          ],
+        );
+
+        await client.query(
+          `
+            INSERT INTO taxonomy_dimensions (id, code)
+            VALUES ($1, $2), ($3, $4)
+          `,
+          [
+            dimensionId,
+            `immut_${seed}`,
+            otherDimensionId,
+            `immut_other_${seed}`,
+          ],
+        );
+
+        await client.query(
+          `
+            INSERT INTO taxonomy_concepts (id, code, dimension_id)
+            VALUES ($1, $2, $3)
+          `,
+          [conceptId, `immut_${seed}.concept`, dimensionId],
+        );
+
+        const forbiddenStatements: Array<{
+          sql: string;
+          params: unknown[];
+        }> = [
+          {
+            sql: 'UPDATE taxonomy_releases SET id = $2 WHERE id = $1',
+            params: [releaseId, randomUUID()],
+          },
+          {
+            sql: 'UPDATE taxonomy_releases SET created_at = now() + interval \'1 second\' WHERE id = $1',
+            params: [releaseId],
+          },
+          {
+            sql: 'UPDATE taxonomy_releases SET created_by_actor = \'rewritten\' WHERE id = $1',
+            params: [releaseId],
+          },
+          {
+            sql: 'UPDATE taxonomy_dimensions SET id = $2 WHERE id = $1',
+            params: [dimensionId, randomUUID()],
+          },
+          {
+            sql: 'UPDATE taxonomy_dimensions SET code = $2 WHERE id = $1',
+            params: [dimensionId, `changed_${seed}`],
+          },
+          {
+            sql: 'UPDATE taxonomy_dimensions SET created_at = now() + interval \'1 second\' WHERE id = $1',
+            params: [dimensionId],
+          },
+          {
+            sql: 'UPDATE taxonomy_concepts SET id = $2 WHERE id = $1',
+            params: [conceptId, randomUUID()],
+          },
+          {
+            sql: 'UPDATE taxonomy_concepts SET code = $2 WHERE id = $1',
+            params: [conceptId, `immut_${seed}.changed`],
+          },
+          {
+            sql: 'UPDATE taxonomy_concepts SET dimension_id = $2 WHERE id = $1',
+            params: [conceptId, otherDimensionId],
+          },
+          {
+            sql: 'UPDATE taxonomy_concepts SET created_at = now() + interval \'1 second\' WHERE id = $1',
+            params: [conceptId],
+          },
+        ];
+
+        for (const statement of forbiddenStatements) {
+          await assert.rejects(
+            withRole(client, 'radar_taxonomy_curator', async () => {
+              await client.query(statement.sql, statement.params);
+            }),
+            /permission denied/,
+          );
+        }
+
+        await withRole(client, 'radar_taxonomy_curator', async () => {
+          await client.query(
+            `
+              UPDATE taxonomy_dimensions
+              SET identity_status = 'RETIRED',
+                  retired_at = now()
+              WHERE id = $1
+            `,
+            [dimensionId],
+          );
+
+          await client.query(
+            `
+              UPDATE taxonomy_concepts
+              SET identity_status = 'RETIRED',
+                  retired_at = now()
+              WHERE id = $1
+            `,
+            [conceptId],
+          );
+
+          await client.query(
+            `
+              UPDATE taxonomy_releases
+              SET status = 'APPROVED',
+                  approved_at = now()
+              WHERE id = $1
+            `,
+            [releaseId],
+          );
+        });
+      },
+    );
+
+    await t.test(
+      'curator governs official catalog edition lifecycle only',
+      async () => {
+        const seed = randomUUID().replaceAll('-', '').slice(0, 10);
+        const catalogId = randomUUID();
+        const supersededEditionId = randomUUID();
+        const withdrawnEditionId = randomUUID();
+
+        await client.query(
+          `
+            INSERT INTO official_catalogs (id, code, name, maintainer)
+            VALUES ($1, $2, 'Lifecycle Catalog', 'TriBusca Test')
+          `,
+          [catalogId, `LIFE_${seed.toUpperCase()}`],
+        );
+
+        await client.query(
+          `
+            INSERT INTO official_catalog_editions (
+              id, catalog_id, edition_code
+            )
+            VALUES
+              ($1, $3, 'CURRENT-A'),
+              ($2, $3, 'CURRENT-B')
+          `,
+          [supersededEditionId, withdrawnEditionId, catalogId],
+        );
+
+        await withRole(client, 'radar_taxonomy_curator', async () => {
+          await client.query(
+            `
+              UPDATE official_catalog_editions
+              SET status = 'SUPERSEDED',
+                  valid_to = current_date
+              WHERE id = $1
+            `,
+            [supersededEditionId],
+          );
+
+          await client.query(
+            `
+              UPDATE official_catalog_editions
+              SET status = 'WITHDRAWN',
+                  valid_to = current_date
+              WHERE id = $1
+            `,
+            [withdrawnEditionId],
+          );
+
+          await client.query(
+            `
+              UPDATE official_catalog_editions
+              SET status = 'WITHDRAWN'
+              WHERE id = $1
+            `,
+            [supersededEditionId],
+          );
+        });
+
+        await assert.rejects(
+          withRole(client, 'radar_taxonomy_curator', async () => {
+            await client.query(
+              `
+                UPDATE official_catalog_editions
+                SET status = 'CURRENT',
+                    valid_to = NULL
+                WHERE id = $1
+              `,
+              [supersededEditionId],
+            );
+          }),
+          /cannot return to CURRENT|immutable/,
+        );
+
+        await assert.rejects(
+          withRole(client, 'radar_taxonomy_curator', async () => {
+            await client.query(
+              `
+                UPDATE official_catalog_editions
+                SET edition_code = 'REWRITTEN'
+                WHERE id = $1
+              `,
+              [withdrawnEditionId],
+            );
+          }),
+          /permission denied/,
+        );
+
+        await assert.rejects(
+          withRole(client, 'radar_taxonomy_curator', async () => {
+            await client.query(
+              `
+                DELETE FROM official_catalog_editions
+                WHERE id = $1
+              `,
+              [withdrawnEditionId],
+            );
+          }),
+          /permission denied/,
+        );
+      },
+    );
+
     await t.test('curator can write global audit but not tenant audit', async () => {
       const tenantId = randomUUID();
       const globalAuditId = randomUUID();
