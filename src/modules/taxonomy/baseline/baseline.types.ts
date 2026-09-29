@@ -226,6 +226,9 @@ export interface BaselineReadback {
   needsEvidence: number;
   lexicalAliases: number;
   aliasBindings: number;
+  relationTypes: number;
+  relationRules: number;
+  relations: number;
   creditAliasIdentities: number;
   creditAmbiguousBindings: number;
   forbiddenMit: number;
