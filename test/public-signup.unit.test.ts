@@ -12,7 +12,7 @@ test('public signup validation accepts the required contract and normalizes CNPJ
     name: '  Pessoa Teste  ',
     email: ' PESSOA@Example.Test ',
     company: '  Empresa Teste  ',
-    cnpj: '12.345.678/0001-99',
+    cnpj: '12.345.678/0001-95',
     password: strongPassword,
     confirmPassword: strongPassword,
     acceptedTerms: true,
@@ -21,7 +21,7 @@ test('public signup validation accepts the required contract and normalizes CNPJ
   assert.equal(parsed.name, 'Pessoa Teste');
   assert.equal(parsed.email, 'PESSOA@Example.Test');
   assert.equal(parsed.company, 'Empresa Teste');
-  assert.equal(parsed.cnpj, '12345678000199');
+  assert.equal(parsed.cnpj, '12345678000195');
 });
 
 test('public signup validation rejects weak/mismatched passwords and missing consent', () => {
@@ -53,6 +53,20 @@ test('public signup validation rejects weak/mismatched passwords and missing con
 
     assert.equal(parsed.success, false);
   }
+});
+
+test('public signup validation rejects invalid CNPJ check digits', () => {
+  const parsed = publicSignupBodySchema.safeParse({
+    name: 'Pessoa Teste',
+    email: 'pessoa@example.test',
+    company: 'Empresa Teste',
+    cnpj: '12.345.678/0001-99',
+    password: strongPassword,
+    confirmPassword: strongPassword,
+    acceptedTerms: true,
+  });
+
+  assert.equal(parsed.success, false);
 });
 
 test('public signup validation rejects malformed optional CNPJ', () => {
