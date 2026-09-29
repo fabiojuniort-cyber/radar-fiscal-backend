@@ -590,7 +590,7 @@ test(
             await register(
               app,
               firstEmail,
-              '12.345.678/0001-95',
+              '11.222.333/0001-81',
             );
 
           assert.equal(first.statusCode, 201);
@@ -608,7 +608,7 @@ test(
             await register(
               app,
               secondEmail,
-              '12.345.678/0001-95',
+              '11.222.333/0001-81',
             );
 
           assert.equal(second.statusCode, 409);
@@ -635,7 +635,7 @@ test(
               `
                 SELECT count(*)::text AS total
                 FROM tenant_onboarding_profiles
-                WHERE cnpj = '12345678000195'
+                WHERE cnpj = '11222333000181'
               `,
             );
 
