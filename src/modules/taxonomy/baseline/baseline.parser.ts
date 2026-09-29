@@ -432,8 +432,7 @@ export function parseR6(
       ([code, name, expectedConceptCount]) => ({
         code,
         name,
-        description:
-          'Dimensão canônica R6: ' + name + '.',
+        description: null,
         identityStatus: 'CURRENT',
         governanceStatus: 'PROPOSED',
         expectedConceptCount,
