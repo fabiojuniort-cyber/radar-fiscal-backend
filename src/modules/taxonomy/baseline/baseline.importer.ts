@@ -18,8 +18,9 @@ import {
 import type {
   ImportResult,
 } from './baseline.types.js';
-import type {
-  LoadedBaseline,
+import {
+  loadBaseline,
+  type LoadedBaseline,
 } from './baseline.source-reader.js';
 
 export interface BaselineImportOptions {
@@ -179,6 +180,24 @@ function injectFailure(
   }
 }
 
+async function reverifyBaseline(
+  loaded: LoadedBaseline,
+  expectedManifestSha256: string,
+): Promise<void> {
+  const verified = await loadBaseline();
+
+  if (
+    verified.manifestSha256 !== expectedManifestSha256 ||
+    verified.manifestSha256 !== loaded.manifestSha256 ||
+    verified.manifest.derivation.fingerprint !==
+      loaded.manifest.derivation.fingerprint
+  ) {
+    throw new Error(
+      'NON_DETERMINISTIC_DERIVATION: baseline changed between preflight and locked import',
+    );
+  }
+}
+
 export async function importBaseline(
   pool: Pool,
   loaded: LoadedBaseline,
@@ -207,6 +226,11 @@ export async function importBaseline(
     await acquireLock(
       client,
       loaded.manifest.targetTaxonomyVersion,
+    );
+
+    await reverifyBaseline(
+      loaded,
+      options.expectedManifestSha256,
     );
 
     if ((options.holdAfterLockMs ?? 0) > 0) {
