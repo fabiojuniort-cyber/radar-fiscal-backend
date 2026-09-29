@@ -50,7 +50,14 @@
     "db:trigger-doe-sp-run": "node dist/infrastructure/database/trigger-doe-sp-run.js",
     "db:inspect-doe-sp": "node dist/infrastructure/database/inspect-doe-sp.js",
     "db:audit-doe-sp-rebuild": "node dist/infrastructure/database/audit-doe-sp-rebuild.js",
-    "db:verify-taxonomy-curator": "node dist/infrastructure/database/verify-taxonomy-curator-role.js"
+    "db:verify-taxonomy-curator": "node dist/infrastructure/database/verify-taxonomy-curator-role.js",
+    "taxonomy:baseline:manifest": "node dist/infrastructure/database/taxonomy-baseline-manifest.js",
+    "taxonomy:baseline:validate": "node dist/infrastructure/database/taxonomy-baseline-validate.js",
+    "taxonomy:baseline:dry-run": "node dist/infrastructure/database/taxonomy-baseline-dry-run.js",
+    "taxonomy:baseline:import": "node dist/infrastructure/database/taxonomy-baseline-import.js",
+    "taxonomy:baseline:inspect": "node dist/infrastructure/database/taxonomy-baseline-inspect.js",
+    "test:taxonomy-baseline-unit": "tsx --test test/taxonomy.baseline.source.unit.test.ts test/taxonomy.baseline.parser.unit.test.ts test/taxonomy.baseline.manifest.unit.test.ts test/taxonomy.baseline.validator.unit.test.ts",
+    "test:taxonomy-baseline-integration": "tsx --test test/taxonomy.baseline.integration.test.ts test/taxonomy.baseline.concurrency.integration.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
