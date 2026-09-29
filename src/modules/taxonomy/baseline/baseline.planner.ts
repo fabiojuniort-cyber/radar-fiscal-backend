@@ -131,7 +131,15 @@ export async function planBaselinePersistence(
       releaseAction = 'IDEMPOTENT_EXISTING_RELEASE';
     } else {
       releaseAction = 'VERSION_CONFLICT';
-      conflicts.push('TARGET_VERSION_ALREADY_BOUND');
+
+      if (
+        storedFingerprint === manifest.derivation.fingerprint &&
+        storedHash !== manifestHash
+      ) {
+        conflicts.push('NON_DETERMINISTIC_DERIVATION');
+      } else {
+        conflicts.push('TARGET_VERSION_ALREADY_BOUND');
+      }
     }
 
   }
