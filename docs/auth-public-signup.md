@@ -20,7 +20,7 @@ Body:
 }
 ```
 
-`cnpj` é opcional e, quando informado, é normalizado para 14 dígitos.
+`cnpj` é opcional e, quando informado, é normalizado para 14 dígitos e validado pelos dígitos verificadores.
 
 Sucesso: HTTP 201. A resposta contém somente identificadores públicos da conta criada, role `OWNER` e `next: "LOGIN"`. O cadastro **não cria sessão e não retorna JWT/refresh token**. O usuário entra pelo contrato existente `POST /auth/login`.
 
