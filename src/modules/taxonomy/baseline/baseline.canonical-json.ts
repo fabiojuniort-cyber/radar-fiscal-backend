@@ -8,7 +8,9 @@ function normalize(value: unknown): unknown {
   if (value && typeof value === 'object') {
     const entries = Object.entries(
       value as Record<string, unknown>,
-    ).sort(([left], [right]) => left.localeCompare(right));
+    ).sort(([left], [right]) =>
+      left < right ? -1 : left > right ? 1 : 0,
+    );
 
     return Object.fromEntries(
       entries.map(([key, item]) => [key, normalize(item)]),
@@ -37,4 +39,11 @@ export function gitBlobSha(buffer: Buffer): string {
   );
 
   return sha1Hex(Buffer.concat([header, buffer]));
+}
+
+export function compareCanonicalText(
+  left: string,
+  right: string,
+): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
