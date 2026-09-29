@@ -80,3 +80,29 @@ export const EVIDENCE_STATUSES = [
   'NEEDS_EVIDENCE',
   'NOT_ASSESSED',
 ] as const;
+
+export const R6_APPROVED_PROVENANCE = {
+  schemaVersion: 'tribusca.taxonomy.source-lock/v1',
+  canonicalRepository: 'fabiojuniort-cyber/tribusca-control',
+  canonicalPath:
+    'docs/taxonomy/TAX-02_DICIONARIO_FUNCIONAL_TAXONOMIA_TRIBUSCA_V1_R6.md',
+  canonicalGitSha:
+    'fee931cb212de808fa3fee1a06c833d746637c8c',
+  canonicalBlobSha:
+    '4f3b906d5ca2044ed05b3397890a5fc45c44e8c1',
+  canonicalSha256:
+    '7f68d7be2dfc5486f4fb5c88259de629976b1daa54b62cf9248f4e6efbbadfd2',
+} as const;
+
+export const TAX04_APPROVED_PROVENANCE = {
+  schemaVersion: 'tribusca.taxonomy.source-lock/v1',
+  canonicalRepository: 'fabiojuniort-cyber/tribusca-control',
+  canonicalPath:
+    'docs/taxonomy/TAX-04_MODELO_TECNICO_TAXONOMIA_TRIBUSCA_V1.md',
+  canonicalGitSha:
+    '12fe8d2cd7729d9a69695ed39af74969ba219a56',
+  canonicalBlobSha:
+    '0fbd4d0759954978fc81e208e3f3f2f02c8239b4',
+  canonicalSha256:
+    '55eaf16dde93d2904e77e3c706afff73db106c1472c4e23205cddf8b903cac0b',
+} as const;
