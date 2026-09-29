@@ -209,7 +209,7 @@ BEGIN
        OR char_length(v_email) > 320
        OR char_length(v_company_name) < 2
        OR char_length(v_company_name) > 200
-       OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+
+       OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+$' THEN
         RAISE EXCEPTION 'invalid_public_signup_identity'
             USING ERRCODE = '22023';
     END IF;
@@ -231,7 +231,8 @@ BEGIN
     END IF;
 
     IF p_tenant_slug IS NULL
-       OR p_tenant_slug !~ '^[a-z0-9]+(?:-[a-z0-9]+)*
+       OR p_tenant_slug !~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+       OR char_length(p_tenant_slug) > 120 THEN
         RAISE EXCEPTION 'invalid_public_signup_tenant_slug'
             USING ERRCODE = '22023';
     END IF;
