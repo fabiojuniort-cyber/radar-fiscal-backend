@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  R6_APPROVED_PROVENANCE,
   R6_LOCK_PATH,
   R6_MIRROR_PATH,
   TAX04_LOCK_PATH,
@@ -127,6 +128,38 @@ test('one-byte TAX-04 tamper is blocked', async () => {
         join(dir, 'lock.json'),
       ),
       /BASELINE_SOURCE_INTEGRITY_FAILURE/,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('mirror plus altered provenance lock is blocked even when bytes are unchanged', async () => {
+  const dir = await mkdtemp(
+    join(tmpdir(), 'taxonomy-provenance-tamper-'),
+  );
+
+  try {
+    const [source, lockRaw] = await Promise.all([
+      readFile(R6_MIRROR_PATH),
+      readFile(R6_LOCK_PATH, 'utf8'),
+    ]);
+    const lock = JSON.parse(lockRaw) as Record<string, unknown>;
+    lock['canonicalGitSha'] = '0'.repeat(40);
+
+    await writeFile(join(dir, 'source.md'), source);
+    await writeFile(
+      join(dir, 'lock.json'),
+      JSON.stringify(lock),
+    );
+
+    await assert.rejects(
+      verifyMirror(
+        join(dir, 'source.md'),
+        join(dir, 'lock.json'),
+        R6_APPROVED_PROVENANCE,
+      ),
+      /source-lock provenance does not match approved contract/,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });
