@@ -1,6 +1,8 @@
 import {
+  R6_APPROVED_PROVENANCE,
   R6_LOCK_PATH,
   R6_MIRROR_PATH,
+  TAX04_APPROVED_PROVENANCE,
   TAX04_LOCK_PATH,
   TAX04_MIRROR_PATH,
 } from './baseline.constants.js';
@@ -27,8 +29,16 @@ export interface LoadedBaseline {
 
 export async function loadBaseline(): Promise<LoadedBaseline> {
   const [source, technicalContract] = await Promise.all([
-    verifyMirror(R6_MIRROR_PATH, R6_LOCK_PATH),
-    verifyMirror(TAX04_MIRROR_PATH, TAX04_LOCK_PATH),
+    verifyMirror(
+      R6_MIRROR_PATH,
+      R6_LOCK_PATH,
+      R6_APPROVED_PROVENANCE,
+    ),
+    verifyMirror(
+      TAX04_MIRROR_PATH,
+      TAX04_LOCK_PATH,
+      TAX04_APPROVED_PROVENANCE,
+    ),
   ]);
 
   const model = parseR6(source.text);
