@@ -8,6 +8,9 @@ import {
   parseR6,
 } from '../src/modules/taxonomy/baseline/baseline.parser.js';
 import {
+  normalizeRelationDeclaration,
+} from '../src/modules/taxonomy/baseline/baseline.relation-seeds.js';
+import {
   loadBaseline,
 } from '../src/modules/taxonomy/baseline/baseline.source-reader.js';
 
@@ -144,5 +147,41 @@ test('parser rejects a structural dictionary row change', async () => {
   assert.throws(
     () => parseR6(malformed),
     /PARSER_SCHEMA_MISMATCH/,
+  );
+});
+
+test('inverse relation declarations normalize to canonical storage direction', () => {
+  assert.deepEqual(
+    normalizeRelationDeclaration(
+      'tax.cide',
+      'broader_than',
+      'tax.cide_fuels',
+      'test',
+    ),
+    {
+      sourceConceptCode: 'tax.cide_fuels',
+      relationType: 'narrower_than',
+      targetConceptCode: 'tax.cide',
+      qualifiers: {},
+      evidenceStatus: 'NOT_ASSESSED',
+      sourceLocator: 'test',
+    },
+  );
+
+  assert.deepEqual(
+    normalizeRelationDeclaration(
+      'tax.new',
+      'supersedes',
+      'tax.old',
+      'test',
+    ),
+    {
+      sourceConceptCode: 'tax.old',
+      relationType: 'replaced_by',
+      targetConceptCode: 'tax.new',
+      qualifiers: {},
+      evidenceStatus: 'NOT_ASSESSED',
+      sourceLocator: 'test',
+    },
   );
 });
