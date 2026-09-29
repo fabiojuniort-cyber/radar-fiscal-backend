@@ -270,6 +270,38 @@ export interface MonitoringProfiles {
   updated_at: Generated<Timestamp>;
 }
 
+export interface OfficialCatalogEditions {
+  catalog_id: string;
+  created_at: Generated<Timestamp>;
+  edition_code: string;
+  id: Generated<string>;
+  published_on: Timestamp | null;
+  source_sha256: string | null;
+  source_url: string | null;
+  status: Generated<string>;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface OfficialCatalogEntries {
+  catalog_edition_id: string;
+  created_at: Generated<Timestamp>;
+  description: string;
+  id: Generated<string>;
+  metadata: Generated<Json>;
+  official_code: string;
+  parent_entry_id: string | null;
+}
+
+export interface OfficialCatalogs {
+  code: string;
+  created_at: Generated<Timestamp>;
+  description: string | null;
+  id: Generated<string>;
+  maintainer: string;
+  name: string;
+}
+
 export interface PublicationFiles {
   bucket: string;
   created_at: Generated<Timestamp>;
@@ -365,6 +397,231 @@ export interface Sources {
   updated_at: Generated<Timestamp>;
 }
 
+export interface TaxonomyAliasBindingEvidence {
+  alias_binding_id: string;
+  created_at: Generated<Timestamp>;
+  evidence_id: string;
+  id: Generated<string>;
+  note: string | null;
+  role: string;
+}
+
+export interface TaxonomyAliases {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  language: Generated<string>;
+  normalized_text: string;
+  text: string;
+}
+
+export interface TaxonomyConceptRelations {
+  created_at: Generated<Timestamp>;
+  evidence_status: Generated<string>;
+  id: Generated<string>;
+  justification: string | null;
+  qualifiers: Generated<Json>;
+  relation_type_id: string;
+  release_id: string;
+  source_release_concept_id: string;
+  status: Generated<string>;
+  target_release_concept_id: string;
+  updated_at: Generated<Timestamp>;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface TaxonomyConceptRevisionEvidence {
+  concept_revision_id: string;
+  created_at: Generated<Timestamp>;
+  evidence_id: string;
+  id: Generated<string>;
+  note: string | null;
+  role: string;
+}
+
+export interface TaxonomyConceptRevisions {
+  concept_id: string;
+  created_at: Generated<Timestamp>;
+  definition: string;
+  evidence_status: Generated<string>;
+  governance_status: Generated<string>;
+  id: Generated<string>;
+  label: string;
+  negative_example: string | null;
+  notes: string | null;
+  positive_example: string | null;
+  revision_no: number;
+  source_metadata: Generated<Json>;
+}
+
+export interface TaxonomyConcepts {
+  code: string;
+  created_at: Generated<Timestamp>;
+  dimension_id: string;
+  id: Generated<string>;
+  identity_status: Generated<string>;
+  retired_at: Timestamp | null;
+}
+
+export interface TaxonomyDimensionRevisions {
+  constraints: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  description: string | null;
+  dimension_id: string;
+  governance_status: Generated<string>;
+  id: Generated<string>;
+  name: string;
+  revision_no: number;
+}
+
+export interface TaxonomyDimensions {
+  code: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  identity_status: Generated<string>;
+  retired_at: Timestamp | null;
+}
+
+export interface TaxonomyEvidence {
+  act_number: string | null;
+  act_type: string | null;
+  artifact_sha256: string | null;
+  basis_type: string;
+  consulted_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  document_title: string | null;
+  edition: string | null;
+  excerpt: string | null;
+  id: Generated<string>;
+  interpretation_note: string | null;
+  jurisdiction_level: string | null;
+  locator: string | null;
+  maintainer: string | null;
+  metadata: Generated<Json>;
+  municipality_ibge_code: string | null;
+  official_url: string | null;
+  published_on: Timestamp | null;
+  uf: string | null;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface TaxonomyOfficialMappingEvidence {
+  created_at: Generated<Timestamp>;
+  evidence_id: string;
+  id: Generated<string>;
+  note: string | null;
+  official_mapping_id: string;
+  role: string;
+}
+
+export interface TaxonomyOfficialMappings {
+  created_at: Generated<Timestamp>;
+  evidence_status: Generated<string>;
+  id: Generated<string>;
+  justification: string | null;
+  mapping_type: string;
+  official_catalog_entry_id: string;
+  release_concept_id: string;
+  release_id: string;
+  updated_at: Generated<Timestamp>;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface TaxonomyRelationEvidence {
+  created_at: Generated<Timestamp>;
+  evidence_id: string;
+  id: Generated<string>;
+  note: string | null;
+  relation_id: string;
+  role: string;
+}
+
+export interface TaxonomyRelationTypes {
+  acyclic: Generated<boolean>;
+  canonical_storage_code: string;
+  code: string;
+  created_at: Generated<Timestamp>;
+  description: string | null;
+  directed: Generated<boolean>;
+  hierarchical: Generated<boolean>;
+  id: Generated<string>;
+  inverse_code: string | null;
+}
+
+export interface TaxonomyReleaseAliasBindings {
+  alias_id: string;
+  alias_type: string;
+  context: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  decision_status: Generated<string>;
+  evidence_status: Generated<string>;
+  id: Generated<string>;
+  jurisdiction_level: string | null;
+  justification: string | null;
+  municipality_ibge_code: string | null;
+  release_concept_id: string;
+  release_id: string;
+  temporal_basis: string | null;
+  uf: string | null;
+  updated_at: Generated<Timestamp>;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface TaxonomyReleaseConcepts {
+  concept_id: string;
+  concept_revision_id: string;
+  id: Generated<string>;
+  membership_status: Generated<string>;
+  release_id: string;
+  release_notes: string | null;
+}
+
+export interface TaxonomyReleaseDimensions {
+  dimension_id: string;
+  dimension_revision_id: string;
+  membership_status: Generated<string>;
+  release_id: string;
+}
+
+export interface TaxonomyReleaseRelationRules {
+  acyclic_override: boolean | null;
+  allowed: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  notes: string | null;
+  relation_type_id: string;
+  release_id: string;
+  requires_evidence: Generated<boolean>;
+  source_dimension_id: string;
+  target_dimension_id: string;
+}
+
+export interface TaxonomyReleases {
+  approved_at: Timestamp | null;
+  artifact_git_sha: string | null;
+  artifact_path: string | null;
+  artifact_repository: string | null;
+  artifact_sha256: string | null;
+  change_notes: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_actor: string;
+  id: Generated<string>;
+  manifest: Generated<Json>;
+  previous_release_id: string | null;
+  published_at: Timestamp | null;
+  status: Generated<string>;
+  version: Generated<string | null>;
+  version_major: number;
+  version_minor: number;
+  version_patch: number;
+  withdrawal_reason: string | null;
+  withdrawn_at: Timestamp | null;
+  withdrawn_by_actor: string | null;
+}
+
 export interface TenantMemberships {
   created_at: Generated<Timestamp>;
   role: string;
@@ -424,6 +681,9 @@ export interface DB {
   establishment_types: EstablishmentTypes;
   establishments: Establishments;
   monitoring_profiles: MonitoringProfiles;
+  official_catalog_editions: OfficialCatalogEditions;
+  official_catalog_entries: OfficialCatalogEntries;
+  official_catalogs: OfficialCatalogs;
   publication_files: PublicationFiles;
   publication_matches: PublicationMatches;
   publication_origins: PublicationOrigins;
@@ -431,6 +691,24 @@ export interface DB {
   publications: Publications;
   schema_migrations: SchemaMigrations;
   sources: Sources;
+  taxonomy_alias_binding_evidence: TaxonomyAliasBindingEvidence;
+  taxonomy_aliases: TaxonomyAliases;
+  taxonomy_concept_relations: TaxonomyConceptRelations;
+  taxonomy_concept_revision_evidence: TaxonomyConceptRevisionEvidence;
+  taxonomy_concept_revisions: TaxonomyConceptRevisions;
+  taxonomy_concepts: TaxonomyConcepts;
+  taxonomy_dimension_revisions: TaxonomyDimensionRevisions;
+  taxonomy_dimensions: TaxonomyDimensions;
+  taxonomy_evidence: TaxonomyEvidence;
+  taxonomy_official_mapping_evidence: TaxonomyOfficialMappingEvidence;
+  taxonomy_official_mappings: TaxonomyOfficialMappings;
+  taxonomy_relation_evidence: TaxonomyRelationEvidence;
+  taxonomy_relation_types: TaxonomyRelationTypes;
+  taxonomy_release_alias_bindings: TaxonomyReleaseAliasBindings;
+  taxonomy_release_concepts: TaxonomyReleaseConcepts;
+  taxonomy_release_dimensions: TaxonomyReleaseDimensions;
+  taxonomy_release_relation_rules: TaxonomyReleaseRelationRules;
+  taxonomy_releases: TaxonomyReleases;
   tenant_memberships: TenantMemberships;
   tenants: Tenants;
   user_credentials: UserCredentials;
