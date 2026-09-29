@@ -93,6 +93,7 @@ interface ConceptRow {
 export async function planBaselinePersistence(
   client: PoolClient,
   manifest: BaselineManifest,
+  manifestHash: string,
 ): Promise<BaselinePersistencePlan> {
   const release = await client.query<{
     id: string;
@@ -123,14 +124,9 @@ export async function planBaselinePersistence(
         ? stored.derivationFingerprint
         : null;
 
-    const expectedHash =
-      typeof manifest.expected === 'object'
-        ? undefined
-        : undefined;
-
     if (
       storedFingerprint === manifest.derivation.fingerprint &&
-      typeof storedHash === 'string'
+      storedHash === manifestHash
     ) {
       releaseAction = 'IDEMPOTENT_EXISTING_RELEASE';
     } else {
@@ -138,7 +134,6 @@ export async function planBaselinePersistence(
       conflicts.push('TARGET_VERSION_ALREADY_BOUND');
     }
 
-    void expectedHash;
   }
 
   const dimensionCodes = manifest.dimensions.map(
