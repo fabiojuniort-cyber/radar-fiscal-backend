@@ -133,8 +133,8 @@ function tenantSlug(companyName: string): string {
 function databaseErrorInfo(
   error: unknown,
 ): {
-  code?: string;
-  constraint?: string;
+  code: string | undefined;
+  constraint: string | undefined;
 } {
   if (
     typeof error !== 'object' ||
@@ -164,7 +164,7 @@ export function publicSignupErrorMetadata(
   error: unknown,
 ): {
   errorName: string;
-  dbCode?: string;
+  dbCode: string | undefined;
 } {
   const db = databaseErrorInfo(error);
 
