@@ -11,7 +11,10 @@ import {
   persistRelations,
   persistReleaseMemberships,
 } from './baseline.repository.js';
-import { readBaselineState } from './baseline.readback.js';
+import {
+  assertBaselineSemanticReadback,
+  readBaselineState,
+} from './baseline.readback.js';
 import type {
   ImportResult,
 } from './baseline.types.js';
@@ -243,6 +246,11 @@ export async function importBaseline(
 
       const readback = await readBaselineState(client);
       assertReadback(loaded, readback);
+      await assertBaselineSemanticReadback(
+        client,
+        loaded.manifest,
+        releaseId,
+      );
       await client.query('COMMIT');
 
       return {
@@ -342,6 +350,11 @@ export async function importBaseline(
 
     const readback = await readBaselineState(client);
     assertReadback(loaded, readback);
+    await assertBaselineSemanticReadback(
+      client,
+      loaded.manifest,
+      releaseId,
+    );
 
     await writeBaselineAudit(client, {
       action: 'BASELINE_IMPORT_VALIDATED',
