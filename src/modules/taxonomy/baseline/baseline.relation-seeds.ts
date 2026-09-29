@@ -1,3 +1,6 @@
+import {
+  compareCanonicalText,
+} from './baseline.canonical-json.js';
 import type {
   BaselineRelation,
   RelationTypeSeed,
@@ -13,7 +16,7 @@ export const RELATION_TYPE_SEEDS: readonly RelationTypeSeed[] = [
   { code: 'applies_to', inverseCode: null, directed: true, acyclic: false, hierarchical: false, canonicalStorageCode: 'applies_to' },
 ] as const;
 
-type RelationDeclarationType =
+export type RelationDeclarationType =
   | 'narrower_than'
   | 'broader_than'
   | 'part_of'
@@ -84,7 +87,7 @@ function related(
   let source = declarationValue.source;
   let target = declarationValue.target;
 
-  if (source.localeCompare(target) > 0) {
+  if (compareCanonicalText(source, target) > 0) {
     [source, target] = [target, source];
   }
 
@@ -98,51 +101,72 @@ function related(
   };
 }
 
-export function buildBaselineRelations(): BaselineRelation[] {
-  const relations = DECLARATIONS.map((item) => {
-    if (item.type === 'broader_than') {
-      return {
-        sourceConceptCode: item.target,
-        relationType: 'narrower_than',
-        targetConceptCode: item.source,
-        qualifiers: {},
-        evidenceStatus: 'NOT_ASSESSED',
-        sourceLocator: item.sourceLocator,
-      } satisfies BaselineRelation;
-    }
+export function normalizeRelationDeclaration(
+  source: string,
+  type: RelationDeclarationType,
+  target: string,
+  sourceLocator = 'test',
+): BaselineRelation {
+  const item: RelationDeclaration = {
+    source,
+    type,
+    target,
+    sourceLocator,
+  };
 
-    if (item.type === 'supersedes') {
-      return {
-        sourceConceptCode: item.target,
-        relationType: 'replaced_by',
-        targetConceptCode: item.source,
-        qualifiers: {},
-        evidenceStatus: 'NOT_ASSESSED',
-        sourceLocator: item.sourceLocator,
-      } satisfies BaselineRelation;
-    }
-
-    if (
-      item.type === 'about' ||
-      item.type === 'hosted_by' ||
-      item.type === 'fulfills'
-    ) {
-      return related(item, item.type);
-    }
-
-    if (item.type === 'related_to') {
-      return related(item);
-    }
-
+  if (item.type === 'broader_than') {
     return {
-      sourceConceptCode: item.source,
-      relationType: item.type,
-      targetConceptCode: item.target,
+      sourceConceptCode: item.target,
+      relationType: 'narrower_than',
+      targetConceptCode: item.source,
       qualifiers: {},
       evidenceStatus: 'NOT_ASSESSED',
       sourceLocator: item.sourceLocator,
-    } satisfies BaselineRelation;
-  });
+    };
+  }
+
+  if (item.type === 'supersedes') {
+    return {
+      sourceConceptCode: item.target,
+      relationType: 'replaced_by',
+      targetConceptCode: item.source,
+      qualifiers: {},
+      evidenceStatus: 'NOT_ASSESSED',
+      sourceLocator: item.sourceLocator,
+    };
+  }
+
+  if (
+    item.type === 'about' ||
+    item.type === 'hosted_by' ||
+    item.type === 'fulfills'
+  ) {
+    return related(item, item.type);
+  }
+
+  if (item.type === 'related_to') {
+    return related(item);
+  }
+
+  return {
+    sourceConceptCode: item.source,
+    relationType: item.type,
+    targetConceptCode: item.target,
+    qualifiers: {},
+    evidenceStatus: 'NOT_ASSESSED',
+    sourceLocator: item.sourceLocator,
+  };
+}
+
+export function buildBaselineRelations(): BaselineRelation[] {
+  const relations = DECLARATIONS.map((item) =>
+    normalizeRelationDeclaration(
+      item.source,
+      item.type,
+      item.target,
+      item.sourceLocator,
+    ),
+  );
 
   return relations.sort((left, right) =>
     [
@@ -150,7 +174,13 @@ export function buildBaselineRelations(): BaselineRelation[] {
       left.sourceConceptCode,
       left.targetConceptCode,
       JSON.stringify(left.qualifiers),
-    ].join('|').localeCompare(
+    compareCanonicalText(
+      [
+        left.relationType,
+        left.sourceConceptCode,
+        left.targetConceptCode,
+        JSON.stringify(left.qualifiers),
+      ].join('|'),
       [
         right.relationType,
         right.sourceConceptCode,
