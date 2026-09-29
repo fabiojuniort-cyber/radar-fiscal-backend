@@ -118,6 +118,8 @@ export interface DoeSpLegacyConnectorOptions {
   client?: Omit<DoeSpLegacyClientOptions, 'fetch'>;
   /** Stop reading new pages after this many bytes in the run (0 = unlimited). */
   maxDownloadBytesPerRun?: number;
+  /** Stop listing new periods after this many in the run (0/undefined = unlimited). */
+  maxPeriodsPerRun?: number;
   /** Test seam: text extraction. */
   extractText?: (bytes: Uint8Array) => Promise<DoeSpLegacyPageText>;
 }
@@ -293,15 +295,17 @@ export class DoeSpLegacyConnector implements CollectionConnector {
       }
     };
 
-    /** Reads a queue in order; failed pages stay in it for the next run. */
-    const drain = async (queue: DoeSpLegacyPendingPage[]): Promise<DoeSpLegacyPendingPage[]> => {
-      const left: DoeSpLegacyPendingPage[] = [];
-      for (let index = 0; index < queue.length; index += 1) {
-        const page = queue[index]!;
-        if (yieldReason || shouldStop()) { left.push(...queue.slice(index)); break; }
-        if ((await readPage(page)) === 'RETRY') left.push(page);
+    /**
+     * Reads a queue in place, in order: finished pages leave it, failed pages
+     * stay (for the next run). An exception leaves the unread pages in it.
+     */
+    const drain = async (queue: DoeSpLegacyPendingPage[]): Promise<void> => {
+      let index = 0;
+      while (index < queue.length) {
+        if (yieldReason || shouldStop()) return;
+        if ((await readPage(queue[index]!)) === 'DONE') queue.splice(index, 1);
+        else index += 1;
       }
-      return left;
     };
 
     const listScreens = async (firstUrl: string, discovery: DoeSpLegacyPendingPage['discovery'], into: Map<string, DoeSpLegacyPendingPage>): Promise<void> => {
@@ -360,10 +364,12 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     };
 
     try {
-      state.retry = await drain(state.retry);
-      state.pending = await drain(state.pending);
+      await drain(state.retry);
+      await drain(state.pending);
+      const maxPeriods = this.#options.maxPeriodsPerRun ?? 0;
       while (!yieldReason && state.cursor !== null && !state.pending.length) {
         if (shouldStop()) break;
+        if (maxPeriods > 0 && counters.periodsListed >= maxPeriods) { yieldReason = 'TIME_BUDGET_REACHED'; break; }
         const period = doeSpLegacyPeriod(state.cursor, state.coverageTo);
         let pages: DoeSpLegacyPendingPage[];
         try {
@@ -379,7 +385,8 @@ export class DoeSpLegacyConnector implements CollectionConnector {
         counters.periodsListed += 1;
         periods.push({ mode: period.mode, from: period.from, to: period.to, listed: pages.length });
         state.cursor = period.next;
-        state.pending = await drain(pages);
+        state.pending = pages;
+        await drain(state.pending);
       }
     } catch (error) {
       if (error instanceof SourceDown) {

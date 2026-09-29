@@ -50,7 +50,7 @@ export function isoFromBr(value: string): string | undefined {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
   if (!match) return undefined;
   const iso = `${match[3]}-${match[2]}-${match[1]}`;
-  return new Date(iso + 'T00:00:00Z').toISOString().slice(0, 10) === iso ? iso : undefined;
+  return isIsoDate(iso) ? iso : undefined;
 }
 
 export function brFromIso(date: string): string {
@@ -223,5 +223,7 @@ export function doeSpLegacyPdfUrl(ref: DoeSpLegacyPageRef): string {
 }
 
 export function isIsoDate(value: string): boolean {
-  return ISO_DATE.test(value) && new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value;
+  if (!ISO_DATE.test(value)) return false;
+  const time = Date.parse(value + 'T00:00:00Z');
+  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
 }
