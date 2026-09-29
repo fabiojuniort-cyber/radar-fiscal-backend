@@ -222,25 +222,32 @@ export async function importBaseline(
       plan.releaseAction ===
       'IDEMPOTENT_EXISTING_RELEASE'
     ) {
+      const existingRelease = await client.query<{
+        id: string;
+      }>(
+        [
+          'SELECT id',
+          'FROM taxonomy_releases',
+          'WHERE version_major = 1',
+          '  AND version_minor = 0',
+          '  AND version_patch = 0',
+        ].join('\n'),
+      );
+      const releaseId = existingRelease.rows[0]?.id;
+
+      if (!releaseId) {
+        throw new Error(
+          'BASELINE_PERSISTENCE_FAILURE: idempotent release disappeared',
+        );
+      }
+
       const readback = await readBaselineState(client);
       assertReadback(loaded, readback);
       await client.query('COMMIT');
 
       return {
         status: 'IDEMPOTENT_ALREADY_IMPORTED',
-        releaseId: (
-          await client
-            .query<{ id: string }>(
-              [
-                'SELECT id',
-                'FROM taxonomy_releases',
-                'WHERE version_major = 1',
-                '  AND version_minor = 0',
-                '  AND version_patch = 0',
-              ].join('\n'),
-            )
-            .catch(() => ({ rows: [] }))
-        ).rows[0]?.id ?? '',
+        releaseId,
         readback,
       };
     }
