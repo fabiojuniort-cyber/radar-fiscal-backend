@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   ConfazConnector,
+  classifyConfazNetworkFailure,
   extractConfazIndexLinks,
   parseConfazPublicationHtml,
 } from '../src/modules/collection/confaz.connector.js';
@@ -342,4 +343,180 @@ test('network failures preserve the underlying fetch cause for production diagno
       return true;
     },
   );
+});
+
+function connectTimeoutFetch(requested: string[]): typeof fetch {
+  return (async (input: string | URL | Request) => {
+    requested.push(input.toString());
+    const cause = Object.assign(new Error('Connect Timeout Error'), {
+      code: 'UND_ERR_CONNECT_TIMEOUT',
+    });
+    throw new TypeError('fetch failed', { cause });
+  }) as typeof fetch;
+}
+
+test('an unreachable host short-circuits the attempt after the first index', async () => {
+  const requested: string[] = [];
+  const connector = new ConfazConnector({
+    fetchImpl: connectTimeoutFetch(requested),
+    now: () => new Date('2026-01-19T17:00:00Z'),
+    requestSpacingMs: 0,
+  });
+
+  await assert.rejects(
+    () => connector.collect({
+      sourceId: SOURCE_ID,
+      runId: '44444444-4444-4444-8444-444444444444',
+      attemptId: '55555555-5555-4555-8555-555555555555',
+      signal: new AbortController().signal,
+    }),
+    (error: unknown) => {
+      const connectorError = error as {
+        code?: string;
+        kind?: string;
+        retryable?: boolean;
+        metadata?: Record<string, unknown>;
+      };
+      assert.equal(connectorError.code, 'CONFAZ_HOST_UNREACHABLE');
+      assert.equal(connectorError.kind, 'SOURCE_UNAVAILABLE');
+      assert.equal(connectorError.retryable, true);
+      assert.equal(connectorError.metadata?.failureClass, 'TCP_CONNECT_TIMEOUT');
+      assert.equal(connectorError.metadata?.route, 'DIRECT');
+      assert.equal(connectorError.metadata?.sourceConsulted, false);
+      // January: current and previous year, four families each.
+      assert.equal(connectorError.metadata?.indexesPlanned, 8);
+      assert.equal(connectorError.metadata?.indexesAttempted, 1);
+      return true;
+    },
+  );
+
+  assert.equal(requested.length, 1);
+});
+
+test('HTTP-level index failures do not short-circuit and keep per-index diagnostics', async () => {
+  const requested: string[] = [];
+  const connector = new ConfazConnector({
+    fetchImpl: (async (input: string | URL | Request) => {
+      requested.push(input.toString());
+      return new Response('unavailable', {
+        status: 503,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }) as typeof fetch,
+    now: () => new Date('2026-09-19T17:00:00Z'),
+    requestSpacingMs: 0,
+  });
+
+  await assert.rejects(
+    () => connector.collect({
+      sourceId: SOURCE_ID,
+      runId: '44444444-4444-4444-8444-444444444444',
+      attemptId: '55555555-5555-4555-8555-555555555555',
+      signal: new AbortController().signal,
+    }),
+    (error: unknown) => {
+      const connectorError = error as { code?: string; metadata?: Record<string, unknown> };
+      assert.equal(connectorError.code, 'CONFAZ_ALL_INDEXES_FAILED');
+      assert.equal(connectorError.metadata?.sourceConsulted, false);
+      assert.equal(connectorError.metadata?.indexFailureCount, 4);
+      return true;
+    },
+  );
+
+  assert.equal(requested.length, 4);
+});
+
+test('an unreachable detail page after a reachable index stays a partial failure', async () => {
+  const connector = new ConfazConnector({
+    fetchImpl: (async (input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.endsWith('/legislacao/protocolos/2026/2026')) {
+        return new Response(
+          '<a href="/legislacao/protocolos/2026/pt088_26">PROTOCOLO ICMS 88/26</a>',
+          { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+        );
+      }
+      if (url.endsWith('/pt088_26')) {
+        const cause = Object.assign(new Error('Connect Timeout Error'), {
+          code: 'UND_ERR_CONNECT_TIMEOUT',
+        });
+        throw new TypeError('fetch failed', { cause });
+      }
+      return new Response('<html><body><h1>2026</h1></body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }) as typeof fetch,
+    now: () => new Date('2026-09-19T17:00:00Z'),
+    requestSpacingMs: 0,
+  });
+
+  const result = await connector.collect({
+    sourceId: SOURCE_ID,
+    runId: '44444444-4444-4444-8444-444444444444',
+    attemptId: '55555555-5555-4555-8555-555555555555',
+    signal: new AbortController().signal,
+  });
+
+  assert.equal(result.publications.length, 0);
+  assert.equal(result.partialFailures?.length, 1);
+  assert.match(result.partialFailures?.[0]?.message ?? '', /TCP_CONNECT_TIMEOUT/);
+  assert.equal(result.metadata?.sourceConsulted, true);
+  assert.equal(result.metadata?.route, 'DIRECT');
+});
+
+test('classifies transport failures without collapsing them into one bucket', () => {
+  const wrap = (code: string) =>
+    new TypeError('fetch failed', { cause: Object.assign(new Error(code), { code }) });
+
+  assert.equal(classifyConfazNetworkFailure(wrap('ENOTFOUND')), 'DNS_FAILURE');
+  assert.equal(classifyConfazNetworkFailure(wrap('UND_ERR_CONNECT_TIMEOUT')), 'TCP_CONNECT_TIMEOUT');
+  assert.equal(classifyConfazNetworkFailure(wrap('ECONNREFUSED')), 'CONNECTION_REFUSED');
+  assert.equal(classifyConfazNetworkFailure(wrap('EHOSTUNREACH')), 'NETWORK_UNREACHABLE');
+  assert.equal(classifyConfazNetworkFailure(wrap('CERT_HAS_EXPIRED')), 'TLS_FAILURE');
+  assert.equal(classifyConfazNetworkFailure(wrap('ECONNRESET')), 'CONNECTION_RESET');
+  assert.equal(classifyConfazNetworkFailure(wrap('UND_ERR_HEADERS_TIMEOUT')), 'RESPONSE_TIMEOUT');
+  assert.equal(classifyConfazNetworkFailure(new Error('boom')), 'UNKNOWN_NETWORK_ERROR');
+});
+
+test('DOU (PRIMARY) and portal (ENRICHMENT) parses of the same act share one global identity', async () => {
+  const { extractEmbeddedConfazPublications } = await import('../src/modules/collection/dou.parser.js');
+  const [fromDou] = extractEmbeddedConfazPublications({
+    title: 'DESPACHO Nº 34, DE 28 DE JULHO DE 2026',
+    agency: 'CONFAZ',
+    sphere: 'FEDERAL',
+    actType: 'DESPACHO',
+    actNumber: '34/2026',
+    publishedAt: new Date('2026-07-29T00:00:00Z'),
+    content: [
+      'O Secretário Executivo do CONFAZ torna público:',
+      'PROTOCOLO ICMS Nº 88, DE 27 DE JULHO DE 2026',
+      'Cláusula primeira O Protocolo ICMS nº 100 fica revogado.',
+    ].join('\n'),
+    officialUrl: 'https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=29/07/2026&jornal=600&pagina=1',
+    externalId: '2026-07-29:DO1E:143-A:123456',
+    metadata: { dou: { publicationDate: '2026-07-29', section: 'DO1E' } },
+  });
+  assert.ok(fromDou);
+
+  const fromPortal = parseConfazPublicationHtml(
+    protocolo88,
+    'https://www.confaz.fazenda.gov.br/legislacao/protocolos/2026/pt088_26',
+    'protocolos',
+  );
+
+  const dou = normalizePublication({ sourceId: '11111111-1111-4111-8111-111111111111', publication: fromDou });
+  const portal = normalizePublication({ sourceId: SOURCE_ID, publication: fromPortal });
+
+  assert.equal(dou.identityStrength, 'STRONG');
+  assert.equal(portal.identityStrength, 'STRONG');
+  assert.equal(dou.identityHash, portal.identityHash);
+
+  const correction = parseConfazPublicationHtml(
+    protocolo88.replace('<h1>PROTOCOLO ICMS 88/26</h1>', '<h1>PROTOCOLO ICMS 88/26 - RETIFICAÇÃO</h1>'),
+    'https://www.confaz.fazenda.gov.br/legislacao/protocolos/2026/pt088_26-retificacao',
+    'protocolos',
+  );
+  const normalizedCorrection = normalizePublication({ sourceId: SOURCE_ID, publication: correction });
+  assert.notEqual(normalizedCorrection.identityHash, portal.identityHash);
 });

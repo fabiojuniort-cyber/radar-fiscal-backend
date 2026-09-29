@@ -15,6 +15,13 @@ const DEFAULT_BOOTSTRAP_WINDOW_PER_FAMILY = 3;
 
 export const CONFAZ_CONNECTOR_KEY = 'confaz';
 
+/**
+ * Egress route used to reach the portal. Only direct egress exists today; the
+ * field is persisted so monitoring can distinguish it from a future relay and
+ * from CONFAZ acts captured through the DOU source (D-006).
+ */
+const CONFAZ_ROUTE = 'DIRECT';
+
 export type ConfazFamilyKey =
   | 'convenios'
   | 'ajustes'
@@ -1104,21 +1111,77 @@ function networkFailureDetail(error: unknown): string | undefined {
   return details.filter(Boolean).join(' <- ');
 }
 
+/**
+ * Transport failure classes. Only the first group happens before any byte is
+ * exchanged with the host (no DNS answer, no TCP handshake); those prove the
+ * route is unusable for this attempt and justify skipping the remaining
+ * indexes. TLS, reset and response timeouts reached the host and keep the
+ * normal per-index behaviour.
+ */
+export type ConfazNetworkFailureClass =
+  | 'DNS_FAILURE'
+  | 'TCP_CONNECT_TIMEOUT'
+  | 'CONNECTION_REFUSED'
+  | 'NETWORK_UNREACHABLE'
+  | 'TLS_FAILURE'
+  | 'CONNECTION_RESET'
+  | 'RESPONSE_TIMEOUT'
+  | 'UNKNOWN_NETWORK_ERROR';
+
+const UNREACHABLE_FAILURE_CLASSES: ReadonlySet<ConfazNetworkFailureClass> = new Set([
+  'DNS_FAILURE',
+  'TCP_CONNECT_TIMEOUT',
+  'CONNECTION_REFUSED',
+  'NETWORK_UNREACHABLE',
+]);
+
+function errorCodes(error: unknown): string[] {
+  const codes: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    const code = (current as Error & { code?: unknown }).code;
+    if (typeof code === 'string') {
+      codes.push(code);
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return codes;
+}
+
+export function classifyConfazNetworkFailure(error: unknown): ConfazNetworkFailureClass {
+  const codes = errorCodes(error);
+  const has = (...candidates: string[]) => codes.some((code) => candidates.includes(code));
+
+  if (has('ENOTFOUND', 'EAI_AGAIN', 'EAI_FAIL', 'EAI_NONAME')) return 'DNS_FAILURE';
+  if (has('UND_ERR_CONNECT_TIMEOUT', 'ETIMEDOUT')) return 'TCP_CONNECT_TIMEOUT';
+  if (has('ECONNREFUSED')) return 'CONNECTION_REFUSED';
+  if (has('ENETUNREACH', 'EHOSTUNREACH', 'EADDRNOTAVAIL')) return 'NETWORK_UNREACHABLE';
+  if (codes.some((code) => code.startsWith('ERR_TLS') || code.startsWith('ERR_SSL') || code.includes('CERT') || code === 'EPROTO')) {
+    return 'TLS_FAILURE';
+  }
+  if (has('ECONNRESET', 'UND_ERR_SOCKET', 'EPIPE')) return 'CONNECTION_RESET';
+  if (has('UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT')) return 'RESPONSE_TIMEOUT';
+  return 'UNKNOWN_NETWORK_ERROR';
+}
+
 function networkConnectorError(error: unknown, url: string): ConnectorError {
   if (error instanceof ConnectorError) {
     return error;
   }
 
   const detail = networkFailureDetail(error);
+  const failureClass = classifyConfazNetworkFailure(error);
 
   return new ConnectorError(
-    `CONFAZ network request failed for ${url}${detail ? `: ${detail}` : ''}`,
+    `CONFAZ network request failed for ${url} [${failureClass}]${detail ? `: ${detail}` : ''}`,
     {
       kind: 'NETWORK_ERROR',
       code: 'CONFAZ_NETWORK_ERROR',
       retryable: true,
       metadata: {
         url,
+        route: CONFAZ_ROUTE,
+        failureClass,
         ...(detail ? { networkFailureDetail: detail } : {}),
       },
       cause: error,
@@ -1155,7 +1218,7 @@ class RequestGate {
 
 export class ConfazConnector implements CollectionConnector {
   readonly key = CONFAZ_CONNECTOR_KEY;
-  readonly version = 'confaz-1.0.0';
+  readonly version = 'confaz-1.1.0';
 
   private readonly fetchImpl: typeof fetch;
   private readonly readSourceState: ConfazSourceStateReader | undefined;
@@ -1280,6 +1343,41 @@ export class ConfazConnector implements CollectionConnector {
             message: connectorError.message,
             itemReference: indexUrl,
           });
+
+          // The host was never reached in this attempt: repeating the same
+          // connect against the remaining indexes only burns the run budget
+          // (4 x 10 s per attempt observed in production). Fail the attempt
+          // now; the engine still applies the normal retry policy.
+          const failureClass = connectorError.metadata?.failureClass as
+            | ConfazNetworkFailureClass
+            | undefined;
+          if (
+            indexesSucceeded === 0 &&
+            failureClass !== undefined &&
+            UNREACHABLE_FAILURE_CLASSES.has(failureClass)
+          ) {
+            throw new ConnectorError(
+              `CONFAZ host unreachable via ${CONFAZ_ROUTE} route (${failureClass}); remaining indexes skipped in this attempt. ${connectorError.message}`,
+              {
+                kind: 'SOURCE_UNAVAILABLE',
+                code: 'CONFAZ_HOST_UNREACHABLE',
+                retryable: true,
+                metadata: {
+                  route: CONFAZ_ROUTE,
+                  failureClass,
+                  sourceConsulted: false,
+                  years,
+                  indexesAttempted,
+                  indexesPlanned: years.length * FAMILIES.length,
+                  failedUrl: indexUrl,
+                  ...(connectorError.metadata?.networkFailureDetail
+                    ? { networkFailureDetail: connectorError.metadata.networkFailureDetail }
+                    : {}),
+                },
+                cause: error,
+              },
+            );
+          }
           continue;
         }
 
@@ -1341,6 +1439,8 @@ export class ConfazConnector implements CollectionConnector {
           code: 'CONFAZ_ALL_INDEXES_FAILED',
           retryable: true,
           metadata: {
+            route: CONFAZ_ROUTE,
+            sourceConsulted: false,
             years,
             indexFailureCount: partialFailures.length,
             failureSamples,
@@ -1355,6 +1455,8 @@ export class ConfazConnector implements CollectionConnector {
       metadata: {
         source: 'CONFAZ',
         connectorVersion: this.version,
+        route: CONFAZ_ROUTE,
+        sourceConsulted: true,
         years,
         indexesAttempted,
         indexesSucceeded,

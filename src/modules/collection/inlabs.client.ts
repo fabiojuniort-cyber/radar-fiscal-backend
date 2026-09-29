@@ -31,13 +31,38 @@ export type InlabsDownload = {
 };
 
 function fail(code: string, kind: ConstructorParameters<typeof ConnectorError>[1]['kind'],
-  retryable = false, httpStatus?: number, retryAfterSeconds?: number): ConnectorError {
+  retryable = false, httpStatus?: number, retryAfterSeconds?: number,
+  metadata?: Record<string, unknown>): ConnectorError {
   // Never propagate HTTP bodies, request headers, credentials or low-level causes.
   return new ConnectorError(code, {
     code, kind, retryable,
     ...(httpStatus !== undefined ? { httpStatus } : {}),
     ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+    ...(metadata !== undefined ? { metadata } : {}),
   });
+}
+
+/**
+ * Shape-only description of an unexpected download body: never the body
+ * itself, only what is needed to tell an HTML error page from a truncated or
+ * foreign binary in production logs.
+ */
+function describeInvalidBody(bytes: Uint8Array, response: Response, filename: string): Record<string, unknown> {
+  const head = new TextDecoder().decode(bytes.subarray(0, 512)).trimStart().toLowerCase();
+  const bodyKind = bytes.byteLength === 0
+    ? 'EMPTY'
+    : head.startsWith('<!doctype html') || head.startsWith('<html') || head.includes('<body')
+      ? 'HTML'
+      : head.startsWith('{') || head.startsWith('[')
+        ? 'JSON'
+        : 'OTHER';
+  return {
+    filename,
+    contentType: response.headers.get('content-type')?.slice(0, 100) ?? null,
+    byteLength: bytes.byteLength,
+    magicHex: Buffer.from(bytes.subarray(0, 4)).toString('hex'),
+    bodyKind,
+  };
 }
 
 function validateDate(date: string): void {
@@ -347,6 +372,7 @@ export class InlabsClient {
         true,
         response.status,
         20,
+        describeInvalidBody(bytes, response, filename),
       );
     }
     // Magic validation is transport validation only; ZIP integrity/XML parsing follows

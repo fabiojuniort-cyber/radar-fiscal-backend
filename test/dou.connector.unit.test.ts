@@ -44,3 +44,51 @@ test('no available editions raises explicit pending-availability error',async()=
     : String(input).includes('&dl=') ? new Response(null,{status:404}) : new Response('<html>Index</html>')) as typeof globalThis.fetch;
   await assert.rejects(new DouConnector({credentials,now:()=>new Date("2026-09-21T12:00:00Z"),fetch,dates:['2026-09-18']}).collect(context()),/INLABS_EDITIONS_NOT_AVAILABLE/);
 });
+
+test('one archive answering with a non-ZIP body is isolated instead of failing the whole run', async () => {
+  const base = await fixtureFetch();
+  const fetch = (async (input, init) => {
+    const url = new URL(String(input));
+    if (url.searchParams.get('dl') === '2026-09-18-DO1E.zip') {
+      return new Response('<!doctype html><html><body>Erro inesperado</body></html>', {
+        status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+    return base(input, init);
+  }) as typeof globalThis.fetch;
+
+  const result = await new DouConnector({ credentials, now: () => new Date('2026-09-21T12:00:00Z'), fetch, dates: ['2026-09-18'] }).collect(context());
+
+  assert.ok(result.publications.length > 0);
+  assert.deepEqual(result.partialFailures, [{
+    code: 'INLABS_INVALID_DOWNLOAD',
+    message: '2026-09-18-DO1E.zip: INLABS_INVALID_DOWNLOAD',
+    itemReference: '2026-09-18-DO1E.zip',
+  }]);
+  const archives = (result.metadata!.dou as any).archives as Array<Record<string, unknown>>;
+  const invalid = archives.find(a => a.section === 'DO1E')!;
+  assert.equal(invalid.state, 'INVALID_DOWNLOAD');
+  assert.equal(invalid.bodyKind, 'HTML');
+  assert.equal(invalid.httpStatus, 200);
+  assert.equal(typeof invalid.byteLength, 'number');
+  assert.equal('body' in invalid, false);
+  const receipts = result.metadata!.douArchives as Record<string, string>;
+  assert.ok(receipts['2026-09-18-DO1.zip']);
+  assert.equal(receipts['2026-09-18-DO1E.zip'], undefined);
+});
+
+test('session loss disguised as an archive still fails the attempt', async () => {
+  const base = await fixtureFetch();
+  const fetch = (async (input, init) => {
+    const url = new URL(String(input));
+    if (url.searchParams.get('dl') === '2026-09-18-DO1E.zip') {
+      return new Response('<html><form action="logar.php"><input name="password"></form></html>', { status: 200 });
+    }
+    return base(input, init);
+  }) as typeof globalThis.fetch;
+
+  await assert.rejects(
+    new DouConnector({ credentials, now: () => new Date('2026-09-21T12:00:00Z'), fetch, dates: ['2026-09-18'] }).collect(context()),
+    /INLABS_AUTH_FAILED/,
+  );
+});

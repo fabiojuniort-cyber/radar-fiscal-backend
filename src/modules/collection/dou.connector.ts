@@ -58,7 +58,20 @@ export class DouConnector implements CollectionConnector {
         for (const section of DOU_XML_SECTIONS) {
           context.signal.throwIfAborted();
           const filename = `${date}-${section}.zip`;
-          const download = await client.downloadXml(date, section, context.signal);
+          let download: Awaited<ReturnType<InlabsClient['downloadXml']>>;
+          try {
+            download = await client.downloadXml(date, section, context.signal);
+          } catch (e) {
+            // One archive answering 200 with a non-ZIP body (login, session,
+            // maintenance and WAF pages are recognised earlier and still fail
+            // the attempt) must not hold every other edition hostage: a run
+            // stuck in persistent retry on it stopped all DOU persistence.
+            // Record it without a receipt so every later run tries it again.
+            if (!(e instanceof ConnectorError) || e.code !== 'INLABS_INVALID_DOWNLOAD') throw e;
+            partialFailures.push({ code: e.code, message: `${filename}: ${e.code}`, itemReference: filename });
+            archives.push({ filename, state: 'INVALID_DOWNLOAD', date, section, httpStatus: e.httpStatus ?? null, ...(e.metadata ?? {}) });
+            continue;
+          }
           if (download.status === 'NOT_AVAILABLE') {
             archives.push({ filename, state: 'NOT_AVAILABLE', date, section });
             continue;
