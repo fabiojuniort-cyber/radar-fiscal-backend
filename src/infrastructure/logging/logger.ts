@@ -14,12 +14,17 @@ export const loggerOptions: NonNullable<
       'res.headers["set-cookie"]',
 
       'password',
+      'confirmPassword',
       'accessToken',
       'refreshToken',
 
       '*.password',
+      '*.confirmPassword',
       '*.accessToken',
       '*.refreshToken',
+
+      'req.body.password',
+      'req.body.confirmPassword',
     ],
 
     censor: '[REDACTED]',
