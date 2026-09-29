@@ -140,7 +140,10 @@ function databaseErrorInfo(
     typeof error !== 'object' ||
     error === null
   ) {
-    return {};
+    return {
+      code: undefined,
+      constraint: undefined,
+    };
   }
 
   const candidate = error as {
