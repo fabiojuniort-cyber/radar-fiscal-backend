@@ -93,12 +93,47 @@ GRANT SELECT ON
 TO radar_app, radar_worker;
 
 
--- Curator: identities may be created and retired, but canonical identity
--- columns are protected by triggers and no historical DELETE is granted.
-GRANT SELECT, INSERT, UPDATE ON
+-- Curator may create identities, but UPDATE is column-scoped.
+-- Immutable identity/audit columns never receive UPDATE privilege.
+GRANT SELECT, INSERT ON
     taxonomy_releases,
     taxonomy_dimensions,
     taxonomy_concepts
+TO radar_taxonomy_curator;
+
+GRANT UPDATE (
+    version_major,
+    version_minor,
+    version_patch,
+    status,
+    previous_release_id,
+    approved_at,
+    published_at,
+    withdrawn_at,
+    withdrawn_by_actor,
+    withdrawal_reason,
+    artifact_repository,
+    artifact_path,
+    artifact_git_sha,
+    artifact_sha256,
+    manifest,
+    change_notes
+)
+ON taxonomy_releases
+TO radar_taxonomy_curator;
+
+GRANT UPDATE (
+    identity_status,
+    retired_at
+)
+ON taxonomy_dimensions
+TO radar_taxonomy_curator;
+
+GRANT UPDATE (
+    identity_status,
+    retired_at
+)
+ON taxonomy_concepts
 TO radar_taxonomy_curator;
 
 -- Draft release memberships, bindings, rules, relations and mappings need
@@ -126,6 +161,15 @@ GRANT SELECT, INSERT ON
     official_catalog_editions,
     official_catalog_entries,
     taxonomy_official_mapping_evidence
+TO radar_taxonomy_curator;
+
+-- Catalog editions keep immutable identity/content, while lifecycle is
+-- explicitly governable through status + valid_to only.
+GRANT UPDATE (
+    status,
+    valid_to
+)
+ON official_catalog_editions
 TO radar_taxonomy_curator;
 
 
