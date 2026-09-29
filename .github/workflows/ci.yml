@@ -73,13 +73,6 @@ jobs:
           path: docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json
           retention-days: 1
 
-      - name: Expose generated TAX-06 manifest for controlled commit
-        shell: bash
-        run: |
-          manifest="docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json"
-          echo "TAX06_MANIFEST_SHA:$(sha256sum "$manifest" | awk '{print $1}')"
-          base64 -w 0 "$manifest" | fold -w 4096 | sed 's/^/TAX06_B64:/'
-
       - name: Verify committed TAX-06 manifest is byte-identical
         shell: bash
         run: |
