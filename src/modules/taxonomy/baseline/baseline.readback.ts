@@ -105,7 +105,20 @@ export async function readBaselineState(
       [releaseRow.id],
     ),
     client.query<{ count: string }>(
-      'SELECT count(*)::text AS count FROM taxonomy_relation_types',
+      [
+        'SELECT count(*)::text AS count',
+        'FROM taxonomy_relation_types',
+        'WHERE code = ANY($1::text[])',
+      ].join('\n'),
+      [[
+        'narrower_than',
+        'broader_than',
+        'part_of',
+        'related_to',
+        'replaced_by',
+        'supersedes',
+        'applies_to',
+      ]],
     ),
     client.query<{ count: string }>(
       [
