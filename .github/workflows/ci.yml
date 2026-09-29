@@ -57,6 +57,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Generate TAX-06 baseline manifest
+        run: npm run taxonomy:baseline:manifest -- --write
+
+      - name: Validate TAX-06 baseline
+        run: npm run taxonomy:baseline:validate
+
+      - name: TAX-06 baseline unit tests
+        run: npm run test:taxonomy-baseline-unit
+
+      - name: Upload generated TAX-06 manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: tax-06-baseline-manifest
+          path: docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json
+          retention-days: 1
+
       - name: Unit tests
         run: npm test
 
@@ -68,3 +84,10 @@ jobs:
 
       - name: Authentication and RLS integration tests
         run: npm run test:integration
+
+      - name: TAX-06 baseline dry-run
+        run: npm run taxonomy:baseline:dry-run
+
+      - name: TAX-06 baseline integration tests
+        run: npm run test:taxonomy-baseline-integration
+
