@@ -453,11 +453,48 @@ ON official_catalogs
 FOR EACH ROW
 EXECUTE FUNCTION taxonomy_guard_catalog_code();
 
-CREATE TRIGGER trg_official_catalog_edition_append_only
+CREATE OR REPLACE FUNCTION taxonomy_guard_catalog_edition_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'official catalog editions are historical and cannot be deleted';
+    END IF;
+
+    IF OLD.status = 'WITHDRAWN' THEN
+        RAISE EXCEPTION 'withdrawn official catalog edition is immutable';
+    END IF;
+
+    IF OLD.status = 'CURRENT'
+       AND NEW.status NOT IN ('CURRENT', 'SUPERSEDED', 'WITHDRAWN') THEN
+        RAISE EXCEPTION 'invalid official catalog edition lifecycle transition';
+    END IF;
+
+    IF OLD.status = 'SUPERSEDED'
+       AND NEW.status NOT IN ('SUPERSEDED', 'WITHDRAWN') THEN
+        RAISE EXCEPTION 'superseded official catalog edition cannot return to CURRENT';
+    END IF;
+
+    IF NEW.status IN ('SUPERSEDED', 'WITHDRAWN')
+       AND NEW.valid_to IS NULL THEN
+        RAISE EXCEPTION 'closed official catalog edition requires valid_to';
+    END IF;
+
+    IF NEW.status = 'CURRENT'
+       AND NEW.valid_to IS NOT NULL THEN
+        RAISE EXCEPTION 'current official catalog edition cannot have valid_to';
+    END IF;
+
+    RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER trg_official_catalog_edition_lifecycle
 BEFORE UPDATE OR DELETE
 ON official_catalog_editions
 FOR EACH ROW
-EXECUTE FUNCTION taxonomy_append_only_record();
+EXECUTE FUNCTION taxonomy_guard_catalog_edition_lifecycle();
 
 CREATE TRIGGER trg_official_catalog_entry_append_only
 BEFORE UPDATE OR DELETE
@@ -489,4 +526,6 @@ FROM PUBLIC;
 REVOKE ALL ON FUNCTION taxonomy_guard_mapping_evidence_insert()
 FROM PUBLIC;
 REVOKE ALL ON FUNCTION taxonomy_guard_catalog_code()
+FROM PUBLIC;
+REVOKE ALL ON FUNCTION taxonomy_guard_catalog_edition_lifecycle()
 FROM PUBLIC;
