@@ -114,6 +114,25 @@ const schema = z.object({
     .min(1_000)
     .default(30_000),
 
+  // Source health watchdog (Scheduler). Logs "Source health alert" at error
+  // level for stale sources, stuck runs and persistent partial runs.
+  SOURCE_HEALTH_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+
+  SOURCE_HEALTH_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(3_600_000),
+
+  SOURCE_HEALTH_REALERT_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(6 * 3_600_000),
+
   COLLECTION_ENABLE_SIMULATED_CONNECTORS: z
     .enum(['true', 'false'])
     .default('false')
