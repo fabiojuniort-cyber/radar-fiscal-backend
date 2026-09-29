@@ -6,8 +6,6 @@ import {
 import { Pool } from 'pg';
 import { z } from 'zod';
 
-import { env } from '../../config/env.js';
-
 const smokeEnvSchema = z.object({
   AUTH02_SMOKE_BASE_URL: z
     .string()
@@ -16,6 +14,25 @@ const smokeEnvSchema = z.object({
       (value) => value.startsWith('https://'),
       'AUTH02_SMOKE_BASE_URL must use HTTPS.',
     ),
+  DATABASE_ADMIN_URL: z
+    .string()
+    .min(1)
+    .refine(
+      (value) =>
+        value.startsWith('postgres://') ||
+        value.startsWith('postgresql://'),
+      'DATABASE_ADMIN_URL must be a PostgreSQL URL.',
+    ),
+  DB_IDLE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(10_000),
+  DB_CONNECTION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(500)
+    .default(5_000),
 });
 
 const parsedSmokeEnv =
@@ -241,13 +258,12 @@ async function run(): Promise<void> {
 
   const pool = new Pool({
     connectionString:
-      env.DATABASE_ADMIN_URL ??
-      env.DATABASE_URL,
+      parsedSmokeEnv.data.DATABASE_ADMIN_URL,
     max: 1,
     idleTimeoutMillis:
-      env.DB_IDLE_TIMEOUT_MS,
+      parsedSmokeEnv.data.DB_IDLE_TIMEOUT_MS,
     connectionTimeoutMillis:
-      env.DB_CONNECTION_TIMEOUT_MS,
+      parsedSmokeEnv.data.DB_CONNECTION_TIMEOUT_MS,
   });
 
   try {
