@@ -258,3 +258,47 @@ export interface ImportResult {
   releaseId: string;
   readback: BaselineReadback;
 }
+
+export interface ExistingDimensionState {
+  id: string;
+  code: string;
+  latestRevision: {
+    id: string;
+    revisionNo: number;
+    name: string;
+    description: string | null;
+    governanceStatus: string;
+    constraints: unknown;
+  } | null;
+}
+
+export interface ExistingConceptState {
+  id: string;
+  code: string;
+  dimensionCode: string;
+  dimensionId: string;
+  latestRevision: {
+    id: string;
+    revisionNo: number;
+    label: string;
+    definition: string;
+    positiveExample: string | null;
+    negativeExample: string | null;
+    governanceStatus: string;
+    evidenceStatus: string;
+    sourceMetadata: unknown;
+  } | null;
+}
+
+export interface ExistingReleaseState {
+  id: string;
+  version: string;
+  status: string;
+  manifest: Record<string, unknown>;
+}
+
+export interface BaselineDatabaseState {
+  dimensions: ExistingDimensionState[];
+  concepts: ExistingConceptState[];
+  release: ExistingReleaseState | null;
+}
