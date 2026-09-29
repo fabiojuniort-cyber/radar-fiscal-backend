@@ -21,7 +21,7 @@ export const PUBLIC_SIGNUP_CONSENT_VERSION =
 const PUBLIC_SIGNUP_RATE_WINDOW_SECONDS = 15 * 60;
 const PUBLIC_SIGNUP_RATE_MAX_ATTEMPTS = 5;
 
-function isValidCnpj(
+export function isValidCnpj(
   value: string,
 ): boolean {
   if (
