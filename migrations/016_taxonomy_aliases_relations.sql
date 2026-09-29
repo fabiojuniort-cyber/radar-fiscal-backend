@@ -207,7 +207,7 @@ ON taxonomy_concept_relations(release_id, relation_type_id);
 CREATE OR REPLACE FUNCTION taxonomy_guard_alias_identity()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
     IF NEW.text IS DISTINCT FROM OLD.text
        OR NEW.normalized_text IS DISTINCT FROM OLD.normalized_text
@@ -217,7 +217,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER trg_taxonomy_alias_identity
 BEFORE UPDATE OF text, normalized_text, language
