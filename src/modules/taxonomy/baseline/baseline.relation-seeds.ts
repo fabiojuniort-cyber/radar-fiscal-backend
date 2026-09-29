@@ -96,6 +96,7 @@ function related(
     relationType: 'related_to',
     targetConceptCode: target,
     qualifiers: semanticHint ? { semanticHint } : {},
+    status: 'PROPOSED',
     evidenceStatus: 'NOT_ASSESSED',
     sourceLocator: declarationValue.sourceLocator,
   };
@@ -120,6 +121,7 @@ export function normalizeRelationDeclaration(
       relationType: 'narrower_than',
       targetConceptCode: item.source,
       qualifiers: {},
+      status: 'PROPOSED',
       evidenceStatus: 'NOT_ASSESSED',
       sourceLocator: item.sourceLocator,
     };
@@ -131,6 +133,7 @@ export function normalizeRelationDeclaration(
       relationType: 'replaced_by',
       targetConceptCode: item.source,
       qualifiers: {},
+      status: 'PROPOSED',
       evidenceStatus: 'NOT_ASSESSED',
       sourceLocator: item.sourceLocator,
     };
@@ -153,6 +156,7 @@ export function normalizeRelationDeclaration(
     relationType: item.type,
     targetConceptCode: item.target,
     qualifiers: {},
+    status: 'PROPOSED',
     evidenceStatus: 'NOT_ASSESSED',
     sourceLocator: item.sourceLocator,
   };
