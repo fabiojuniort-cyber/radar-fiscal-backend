@@ -40,11 +40,14 @@ Authentication uses:
 
 Available endpoints:
 
+- `POST /auth/register` — public self-service signup; creates a tenant and OWNER account but does not create a session;
 - `POST /auth/login`
 - `POST /auth/refresh`
 - `POST /auth/logout`
 - `GET /auth/me`
 - `GET /auth/tenants`
+
+Public signup validates the AUTH-02 password policy, stores only Argon2id hashes, uses a narrow transactional database function for tenant/OWNER creation, and applies a persistent hashed-email rate limit. See [docs/auth-public-signup.md](docs/auth-public-signup.md).
 
 The refresh cookie is host-only because no `Domain` attribute is set. In production it is `Secure`, always `HttpOnly`, uses `SameSite=Strict`, and is scoped to `/auth`.
 
