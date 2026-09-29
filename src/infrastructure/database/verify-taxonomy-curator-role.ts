@@ -25,7 +25,7 @@ if (!parsed.success) {
 
 const { DATABASE_ADMIN_URL } = parsed.data;
 
-const UPDATE_NO_DELETE_TABLES = [
+const IDENTITY_TABLES = [
   'taxonomy_releases',
   'taxonomy_dimensions',
   'taxonomy_concepts',
@@ -50,7 +50,6 @@ const APPEND_ONLY_TABLES = [
   'taxonomy_alias_binding_evidence',
   'taxonomy_relation_evidence',
   'official_catalogs',
-  'official_catalog_editions',
   'official_catalog_entries',
   'taxonomy_official_mapping_evidence',
 ] as const;
@@ -155,23 +154,187 @@ async function run(): Promise<void> {
       );
     }
 
-    const updateNoDelete = await readPrivileges(
-      pool,
-      UPDATE_NO_DELETE_TABLES,
-    );
+    const identities = await readPrivileges(pool, IDENTITY_TABLES);
 
     if (
-      updateNoDelete.length !== UPDATE_NO_DELETE_TABLES.length ||
-      updateNoDelete.some(
+      identities.length !== IDENTITY_TABLES.length ||
+      identities.some(
         (row) =>
           !row.can_select ||
           !row.can_insert ||
-          !row.can_update ||
+          row.can_update ||
           row.can_delete,
       )
     ) {
       throw new Error(
-        'Curator identity/release privileges are invalid.',
+        'Curator identity tables must use column-level UPDATE only.',
+      );
+    }
+
+    const columns = await pool.query<{
+      release_status: boolean;
+      release_id: boolean;
+      release_created_at: boolean;
+      release_created_by_actor: boolean;
+      dimension_status: boolean;
+      dimension_id: boolean;
+      dimension_code: boolean;
+      dimension_created_at: boolean;
+      concept_status: boolean;
+      concept_id: boolean;
+      concept_code: boolean;
+      concept_dimension_id: boolean;
+      concept_created_at: boolean;
+      edition_status: boolean;
+      edition_valid_to: boolean;
+      edition_id: boolean;
+      edition_catalog_id: boolean;
+      edition_code: boolean;
+      edition_created_at: boolean;
+    }>(`
+      SELECT
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_releases',
+          'status',
+          'UPDATE'
+        ) AS release_status,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_releases',
+          'id',
+          'UPDATE'
+        ) AS release_id,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_releases',
+          'created_at',
+          'UPDATE'
+        ) AS release_created_at,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_releases',
+          'created_by_actor',
+          'UPDATE'
+        ) AS release_created_by_actor,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_dimensions',
+          'identity_status',
+          'UPDATE'
+        ) AS dimension_status,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_dimensions',
+          'id',
+          'UPDATE'
+        ) AS dimension_id,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_dimensions',
+          'code',
+          'UPDATE'
+        ) AS dimension_code,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_dimensions',
+          'created_at',
+          'UPDATE'
+        ) AS dimension_created_at,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_concepts',
+          'identity_status',
+          'UPDATE'
+        ) AS concept_status,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_concepts',
+          'id',
+          'UPDATE'
+        ) AS concept_id,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_concepts',
+          'code',
+          'UPDATE'
+        ) AS concept_code,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_concepts',
+          'dimension_id',
+          'UPDATE'
+        ) AS concept_dimension_id,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'taxonomy_concepts',
+          'created_at',
+          'UPDATE'
+        ) AS concept_created_at,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'official_catalog_editions',
+          'status',
+          'UPDATE'
+        ) AS edition_status,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'official_catalog_editions',
+          'valid_to',
+          'UPDATE'
+        ) AS edition_valid_to,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'official_catalog_editions',
+          'id',
+          'UPDATE'
+        ) AS edition_id,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'official_catalog_editions',
+          'catalog_id',
+          'UPDATE'
+        ) AS edition_catalog_id,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'official_catalog_editions',
+          'edition_code',
+          'UPDATE'
+        ) AS edition_code,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'official_catalog_editions',
+          'created_at',
+          'UPDATE'
+        ) AS edition_created_at
+    `);
+
+    const columnPolicy = columns.rows[0];
+
+    if (
+      !columnPolicy ||
+      !columnPolicy.release_status ||
+      columnPolicy.release_id ||
+      columnPolicy.release_created_at ||
+      columnPolicy.release_created_by_actor ||
+      !columnPolicy.dimension_status ||
+      columnPolicy.dimension_id ||
+      columnPolicy.dimension_code ||
+      columnPolicy.dimension_created_at ||
+      !columnPolicy.concept_status ||
+      columnPolicy.concept_id ||
+      columnPolicy.concept_code ||
+      columnPolicy.concept_dimension_id ||
+      columnPolicy.concept_created_at ||
+      !columnPolicy.edition_status ||
+      !columnPolicy.edition_valid_to ||
+      columnPolicy.edition_id ||
+      columnPolicy.edition_catalog_id ||
+      columnPolicy.edition_code ||
+      columnPolicy.edition_created_at
+    ) {
+      throw new Error(
+        'Curator column-level UPDATE privileges are invalid.',
       );
     }
 
@@ -212,6 +375,23 @@ async function run(): Promise<void> {
     ) {
       throw new Error(
         'Curator append-only privileges are invalid.',
+      );
+    }
+
+    const editionTable = await readPrivileges(
+      pool,
+      ['official_catalog_editions'],
+    );
+
+    if (
+      editionTable.length !== 1 ||
+      !editionTable[0]?.can_select ||
+      !editionTable[0]?.can_insert ||
+      editionTable[0]?.can_update ||
+      editionTable[0]?.can_delete
+    ) {
+      throw new Error(
+        'Catalog editions must use lifecycle column-level UPDATE only.',
       );
     }
 
