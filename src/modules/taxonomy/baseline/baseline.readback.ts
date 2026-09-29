@@ -219,9 +219,39 @@ function assertSemanticEqual(
   actual: unknown,
   expected: unknown,
 ): void {
-  if (canonicalJson(actual) !== canonicalJson(expected)) {
+  const actualJson = canonicalJson(actual);
+  const expectedJson = canonicalJson(expected);
+
+  if (actualJson !== expectedJson) {
+    let detail = '';
+
+    if (Array.isArray(actual) && Array.isArray(expected)) {
+      const limit = Math.max(actual.length, expected.length);
+
+      for (let index = 0; index < limit; index += 1) {
+        const actualItem = actual[index];
+        const expectedItem = expected[index];
+
+        if (
+          canonicalJson(actualItem) !==
+          canonicalJson(expectedItem)
+        ) {
+          detail =
+            ' firstDifferenceIndex=' +
+            String(index) +
+            ' actual=' +
+            canonicalJson(actualItem) +
+            ' expected=' +
+            canonicalJson(expectedItem);
+          break;
+        }
+      }
+    }
+
     throw new Error(
-      'BASELINE_SEMANTIC_READBACK_MISMATCH: ' + label,
+      'BASELINE_SEMANTIC_READBACK_MISMATCH: ' +
+        label +
+        detail,
     );
   }
 }
