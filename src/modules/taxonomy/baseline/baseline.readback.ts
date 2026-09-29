@@ -282,15 +282,19 @@ export async function assertBaselineSemanticReadback(
     [releaseId],
   );
 
-  const actualDimensions = dimensionRows.rows.map((row) => ({
-    code: row.code,
-    ...{
-      name: row.name,
-      description: row.description,
-      governance_status: row.governance_status,
-      constraints: row.constraints,
-    },
-  }));
+  const actualDimensions = dimensionRows.rows
+    .map((row) => ({
+      code: row.code,
+      ...{
+        name: row.name,
+        description: row.description,
+        governance_status: row.governance_status,
+        constraints: row.constraints,
+      },
+    }))
+    .sort((left, right) =>
+      compareCanonicalText(left.code, right.code),
+    );
   const expectedDimensions = manifest.dimensions
     .map((dimension) => ({
       code: dimension.code,
@@ -336,20 +340,24 @@ export async function assertBaselineSemanticReadback(
     [releaseId],
   );
 
-  const actualConcepts = conceptRows.rows.map((row) => ({
-    code: row.code,
-    dimensionCode: row.dimension_code,
-    revision: {
-      label: row.label,
-      definition: row.definition,
-      positive_example: row.positive_example ?? '',
-      negative_example: row.negative_example ?? '',
-      governance_status: row.governance_status,
-      evidence_status: row.evidence_status,
-      notes: row.notes,
-      source_metadata: row.source_metadata,
-    },
-  }));
+  const actualConcepts = conceptRows.rows
+    .map((row) => ({
+      code: row.code,
+      dimensionCode: row.dimension_code,
+      revision: {
+        label: row.label,
+        definition: row.definition,
+        positive_example: row.positive_example ?? '',
+        negative_example: row.negative_example ?? '',
+        governance_status: row.governance_status,
+        evidence_status: row.evidence_status,
+        notes: row.notes,
+        source_metadata: row.source_metadata,
+      },
+    }))
+    .sort((left, right) =>
+      compareCanonicalText(left.code, right.code),
+    );
   const expectedConcepts = manifest.concepts
     .map((concept) => ({
       code: concept.code,
