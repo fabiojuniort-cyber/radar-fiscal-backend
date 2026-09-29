@@ -13,7 +13,7 @@ export function expectedDimensionRevision(
   dimension: BaselineDimension,
 ): {
   name: string;
-  description: string;
+  description: string | null;
   governance_status: string;
   constraints: Record<string, unknown>;
 } {
@@ -204,7 +204,7 @@ export async function planBaselinePersistence(
 
       const current = {
         name: existing.name ?? '',
-        description: existing.description ?? '',
+        description: existing.description,
         governance_status:
           existing.governance_status ?? '',
         constraints: existing.constraints ?? {},
