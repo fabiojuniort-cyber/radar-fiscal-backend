@@ -8,6 +8,7 @@ import {
   DOE_SP_LEGACY_END,
   DOE_SP_LEGACY_STATE_VERSION,
   emptyDoeSpLegacyState,
+  type DoeSpLegacyListing,
   type DoeSpLegacyPendingPage,
   type DoeSpLegacySourceState,
 } from './doe-sp-legacy.connector.js';
@@ -53,6 +54,45 @@ function pendingPages(value: unknown): DoeSpLegacyPendingPage[] {
   return out;
 }
 
+function caderno(value: unknown): { id: string; name: string } | null | undefined {
+  if (value === null) return null;
+  const row = record(value);
+  const id = text(row?.id);
+  const name = text(row?.name);
+  return id && name ? { id, name } : undefined;
+}
+
+/**
+ * A listing in progress. An invalid one is dropped: its period is listed
+ * again from the start (the cursor never moved past it).
+ */
+function listing(value: unknown): DoeSpLegacyListing | null {
+  const row = record(value);
+  if (!row) return null;
+  const mode = row.mode === 'BROWSE' || row.mode === 'SEARCH' ? row.mode : undefined;
+  const from = text(row.from);
+  const to = text(row.to);
+  const next = row.next === null ? null : text(row.next);
+  const screen = count(row.screen);
+  if (!mode || !from || !isIsoDate(from) || !to || !isIsoDate(to) || to < from) return null;
+  if (next === undefined || (next !== null && !isIsoDate(next)) || screen < 1) return null;
+  const browseCaderno = caderno(row.browseCaderno);
+  const screens = count(row.screens);
+  return {
+    mode,
+    from,
+    to,
+    next,
+    vocabularyVersion: count(row.vocabularyVersion),
+    ...(browseCaderno !== undefined ? { browseCaderno } : {}),
+    query: count(row.query),
+    screen,
+    ...(screens ? { screens } : {}),
+    found: pendingPages(row.found),
+    attempts: count(row.attempts),
+  };
+}
+
 /** Structurally invalid entries are dropped (same policy as the doe-sp state). */
 export function parseDoeSpLegacySourceState(raw: Record<string, unknown> | undefined): DoeSpLegacySourceState {
   if (!raw) return emptyDoeSpLegacyState();
@@ -65,10 +105,10 @@ export function parseDoeSpLegacySourceState(raw: Record<string, unknown> | undef
     coverageFrom,
     coverageTo: DOE_SP_LEGACY_END,
     cursor,
+    listing: listing(raw.listing),
     pending: pendingPages(raw.pending),
     retry: pendingPages(raw.retry),
     needsOcr: Array.isArray(raw.needsOcr) ? raw.needsOcr.map(pageRef).filter((ref): ref is DoeSpLegacyPageRef => ref !== undefined) : [],
-    needsOcrTruncated: count(raw.needsOcrTruncated),
     totals: {
       pagesRead: count(totals?.pagesRead),
       pagesKept: count(totals?.pagesKept),

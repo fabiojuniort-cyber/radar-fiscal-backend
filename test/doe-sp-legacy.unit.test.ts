@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { ConnectorTimeBudget } from '../src/modules/collection/connector.contract.js';
 import { ConnectorError } from '../src/modules/collection/connector.error.js';
+import { createTimeBudget } from '../src/modules/collection/connector.executor.js';
 import {
   DOE_SP_LEGACY_END,
+  DOE_SP_LEGACY_LISTING_BLOCKED_AFTER,
   DOE_SP_LEGACY_MAX_PAGE_ATTEMPTS,
+  DOE_SP_LEGACY_SEARCH_CADERNOS,
   DoeSpLegacyConnector,
+  MAX_NEEDS_OCR_KEPT,
   doeSpLegacyPeriod,
   emptyDoeSpLegacyState,
   resolveDoeSpLegacySourceLimits,
@@ -20,7 +25,14 @@ import {
   parseDoeSpLegacyCadernos,
   parseDoeSpLegacyResults,
 } from '../src/modules/collection/doe-sp-legacy.parser.js';
-import { doeSpLegacyTaxTerms, isDoeSpLegacyNewsPage } from '../src/modules/collection/doe-sp-legacy.rules.js';
+import {
+  DOE_SP_LEGACY_SEARCH_TERMS,
+  DOE_SP_LEGACY_TAX_VOCABULARY,
+  doeSpLegacyTaxTerms,
+  isDoeSpLegacyNewsPage,
+} from '../src/modules/collection/doe-sp-legacy.rules.js';
+import { asciiUpper } from '../src/modules/collection/doe-sp.parser.js';
+import { DOE_SP_TAX_TERMS } from '../src/modules/collection/doe-sp.rules.js';
 import {
   parseDoeSpLegacySourceState,
   reopenFailedLegacyPages,
@@ -30,11 +42,12 @@ import { normalizePublication } from '../src/modules/collection/publication.norm
 import { legacyPortal, scanPdf, textPdf, type LegacyPage, type LegacyPortalOptions } from './doe-sp-legacy.portal.js';
 
 const SOURCE_ID = '11111111-1111-4111-8111-111111111111';
-const context = () => ({
+const context = (budget?: ConnectorTimeBudget) => ({
   sourceId: SOURCE_ID,
   runId: '22222222-2222-4222-8222-222222222222',
   attemptId: '33333333-3333-4333-8333-333333333333',
   signal: new AbortController().signal,
+  ...(budget ? { budget } : {}),
 });
 const NOW = new Date('2026-09-29T12:00:00Z');
 const EX1 = [{ id: 'ex1', name: 'Executivo I' }, { id: 'ex2', name: 'Executivo II' }];
@@ -132,10 +145,90 @@ test('parser: URLs keep the portal shapes (viewer link preserved, GatewayPDF, sc
 test('rules: tax vocabulary of the current connector plus legacy terms; ambiguous words alone do not qualify', () => {
   assert.deepEqual(doeSpLegacyTaxTerms('Decreto nº 1 — dispõe sobre o ICMS e o IPVA.'), ['ICMS', 'IPVA']);
   assert.deepEqual(doeSpLegacyTaxTerms('Portaria CAT 12, de 1988: recolhimento do ICM.'), ['PORTARIA CAT', 'ICM']);
-  assert.deepEqual(doeSpLegacyTaxTerms('Tribunal de Impostos e Taxas — sessão'), ['IMPOSTOS', 'TRIBUNAL DE IMPOSTOS E TAXAS']);
+  assert.deepEqual(doeSpLegacyTaxTerms('Tribunal de Impostos e Taxas — sessão'), ['IMPOSTOS']);
+  assert.deepEqual(doeSpLegacyTaxTerms('Emissão de NFC-e, CT-e e MDFe; obrigações acessórias; taxa judiciária'), ['NFC-E', 'CT-E', 'MDFE', 'OBRIGACOES ACESSORIAS', 'TAXA JUDICIARIA']);
+  // Whole words only: no match inside another word.
+  assert.deepEqual(doeSpLegacyTaxTerms('ICMSX e PREIPI e AICM'), []);
   assert.deepEqual(doeSpLegacyTaxTerms('Concurso: taxa de inscrição. Secretaria da Fazenda — férias de servidor.'), []);
   assert.equal(isDoeSpLegacyNewsPage('/2005/executivo secao i/marco/02/pagnot_0001_X.pdf'), true);
   assert.equal(isDoeSpLegacyNewsPage('/2005/executivo secao i/marco/02/pag_0001_X.pdf'), false);
+});
+
+/** Top-level alternatives of `\b(?:A|B|C)\b`. */
+function alternatives(pattern: RegExp): string[] {
+  const body = pattern.source.replace(/^\\b\(\?:/, '').replace(/\)\\b$/, '');
+  const out: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of body) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (char === '|' && depth === 0) { out.push(current); current = ''; continue; }
+    current += char;
+  }
+  out.push(current);
+  return out;
+}
+
+/** Every family accepted by the current connector, with the spellings that must be found. */
+const FAMILY_SAMPLES: Record<string, string[]> = {
+  'ICMS': ['ICMS'], 'IPVA': ['IPVA'], 'ITCMD': ['ITCMD'], 'ITCD': ['ITCD'], 'IBS': ['IBS'], 'CBS': ['CBS'],
+  'IPI': ['IPI'], 'RICMS': ['RICMS'], 'CONFAZ': ['CONFAZ'], 'SIMPLES NACIONAL': ['Simples Nacional'],
+  'SUBSTITUICAO TRIBUTARIA': ['substituição tributária'], 'DIFAL': ['DIFAL'],
+  'TRIBUTAR\\w*': ['tributar', 'tributária', 'tributárias', 'tributário', 'tributários', 'tributaria'],
+  'TRIBUTO\\w*': ['tributo', 'tributos'],
+  'TRIBUTAC\\w*': ['tributação', 'tributações', 'tributacao'],
+  'IMPOSTOS?': ['imposto', 'impostos'],
+  'NOTAS? FISCA\\w*': ['nota fiscal', 'notas fiscais'],
+  'NF-?E': ['NF-e', 'NFe'], 'NFC-?E': ['NFC-e', 'NFCe'], 'CT-?E': ['CT-e', 'CTe'], 'MDF-?E': ['MDF-e', 'MDFe'],
+  'EFD': ['EFD'], 'SPED': ['SPED'],
+  'DOCUMENTOS? FISCA\\w*': ['documento fiscal', 'documentos fiscais'],
+  'OBRIGAC\\w* ACESSORIA\\w*': ['obrigação acessória', 'obrigações acessórias'],
+  'BENEFICIOS? FISCA\\w*': ['benefício fiscal', 'benefícios fiscais'],
+  'INCENTIVOS? FISCA\\w*': ['incentivo fiscal', 'incentivos fiscais'],
+  'CREDITOS? (?:PRESUMIDO|OUTORGADO|ACUMULADO)\\w*': [
+    'crédito presumido', 'créditos presumidos', 'crédito outorgado', 'créditos outorgados', 'crédito acumulado', 'créditos acumulados',
+  ],
+  'DIVIDA ATIVA': ['dívida ativa'], 'REFORMA TRIBUTARIA': ['reforma tributária'],
+  'CONTRIBUINTES? DO ICMS': ['contribuinte do ICMS', 'contribuintes do ICMS'],
+  'CADASTRO DE CONTRIBUINTES': ['cadastro de contribuintes'],
+  'SUBSECRETARIA DA RECEITA ESTADUAL': ['Subsecretaria da Receita Estadual'],
+};
+
+/** Legacy administration vocabulary (pre-2023). */
+const LEGACY_SAMPLES = [
+  'ICM', 'Portaria CAT', 'Portarias CAT', 'Coordenação da Administração Tributária', 'Tribunal de Impostos e Taxas',
+  'taxa estadual', 'taxas estaduais', 'taxa judiciária', 'taxas judiciárias', 'taxa de fiscalização',
+  'taxas de fiscalização', 'taxa de polícia', 'taxas de polícia',
+];
+
+const queryKey = (value: string) => asciiUpper(value).replace(/-/g, '');
+
+test('rules (B1): discovery is a superset of the local filter; every family of DOE_SP_TAX_TERMS is reachable by a query', () => {
+  const families = alternatives(DOE_SP_TAX_TERMS);
+  // A family added to the current connector must get samples (and query terms) here.
+  assert.deepEqual(Object.keys(FAMILY_SAMPLES).sort(), [...families].sort());
+  const queried = new Set(DOE_SP_LEGACY_SEARCH_TERMS.map(queryKey));
+  const reachable = (sample: string) => {
+    const terms = doeSpLegacyTaxTerms(sample);
+    assert.ok(terms.length > 0, `"${sample}" must be kept locally`);
+    for (const term of terms) assert.ok(queried.has(queryKey(term)), `"${term}" (from "${sample}") must be a query`);
+  };
+  for (const [family, samples] of Object.entries(FAMILY_SAMPLES)) {
+    const pattern = new RegExp(`^(?:${family})$`);
+    for (const sample of samples) {
+      assert.ok(pattern.test(asciiUpper(sample)), `sample "${sample}" belongs to ${family}`);
+      reachable(sample);
+    }
+  }
+  for (const sample of LEGACY_SAMPLES) reachable(sample);
+  // By construction: every vocabulary term is kept as itself and queried in every spelling variant.
+  for (const term of DOE_SP_LEGACY_TAX_VOCABULARY) {
+    assert.deepEqual(doeSpLegacyTaxTerms(term).map(queryKey), [queryKey(term)]);
+    assert.ok(DOE_SP_LEGACY_SEARCH_TERMS.includes(term));
+    assert.ok(DOE_SP_LEGACY_SEARCH_TERMS.includes(term.normalize('NFD').replace(/[̀-ͯ]/g, '')));
+  }
+  assert.ok(DOE_SP_LEGACY_SEARCH_TERMS.includes('NFCe') && DOE_SP_LEGACY_SEARCH_TERMS.includes('obrigacoes acessorias'));
 });
 
 test('text: native page vs scan without text layer; invalid bytes fail as processing error', async () => {
@@ -328,4 +421,146 @@ test('state: invalid entries dropped; failed persistence reopens the page in ret
     { externalId: 'garbage', metadata: {} },
   ]);
   assert.deepEqual(reopened.retry.map((p) => p.link), ['/1991/c/d.pdf']);
+});
+
+// ---------------------------------------------------------------- listing (B2/B3)
+
+/** 17 ICMS hits in Executivo I (two result screens). */
+function icmsMonth(): ReturnType<typeof page>[] {
+  return Array.from({ length: 17 }, (_, i) => page('2015-03-02', 20 + i, [`Portaria CAT ${i} — ICMS`]));
+}
+
+test('listing (B2): a malformed item on screen 2 blocks the period; the next run resumes on that screen and loses nothing', async () => {
+  const hits = icmsMonth();
+  let faulty = true;
+  const portal: LegacyPortalOptions = {
+    search: { 'ICMS|Executivo I': hits },
+    screenFault: ({ keyword, caderno, screen }) => faulty && keyword === 'ICMS' && caderno === 'Executivo I' && screen === 2 ? 'MALFORMED_ONE' : undefined,
+  };
+  const first = await connector(portal, stateAt('2015-03-01')).instance.collect(context());
+  assert.deepEqual(first.publications, []);
+  assert.equal(first.partialFailures?.[0]?.code, 'DOE_SP_LEGACY_MALFORMED_RESULT_ITEM');
+  assert.equal(first.completion?.reason, 'PARTIAL_FAILURE_RETRY_REQUIRED');
+  let state = parseDoeSpLegacySourceState(first.checkpoint!.state);
+  assert.equal(state.cursor, '2015-03-01');
+  assert.deepEqual({ query: state.listing?.query, screen: state.listing?.screen, found: state.listing?.found.length, attempts: state.listing?.attempts },
+    { query: 0, screen: 2, found: 15, attempts: 1 });
+
+  faulty = false;
+  const { api, instance } = connector(portal, state);
+  const second = await instance.collect(context());
+  // Resumed on screen 2 of the ICMS query: screen 1 is not listed again.
+  const firstList = api.requests.find((r) => r.includes('BuscaDO2001Resultado_11_3'))!;
+  assert.equal(new URL('https://x' + firstList.slice(4)).searchParams.get('xhitlist_vpc'), '2');
+  assert.equal(second.partialFailures, undefined);
+  assert.deepEqual(second.publications.map((p) => p.externalId).sort(), hits.map((h) => h.link).sort());
+  state = parseDoeSpLegacySourceState(second.checkpoint!.state);
+  assert.equal(state.cursor, '2015-04-01');
+  assert.equal(state.listing, null);
+});
+
+test('listing (B2): an all-malformed or empty screen never advances the cursor; repeated failures are reported as blocked', async () => {
+  const date = '1994-04-04';
+  const pages = [page(date, 1, ['ICMS'])];
+  const portal: LegacyPortalOptions = {
+    cadernos: { [date]: EX1 },
+    editions: { [`${date}|Executivo I`]: pages },
+    screenFault: () => 'ALL_MALFORMED',
+  };
+  let state = stateAt(date);
+  for (let attempt = 1; attempt <= DOE_SP_LEGACY_LISTING_BLOCKED_AFTER + 1; attempt += 1) {
+    const run = await connector(portal, state).instance.collect(context());
+    state = parseDoeSpLegacySourceState(run.checkpoint!.state);
+    assert.equal(state.cursor, date);
+    assert.equal(run.completion?.reason, 'PARTIAL_FAILURE_RETRY_REQUIRED');
+    assert.equal(run.partialFailures?.[0]?.code,
+      attempt >= DOE_SP_LEGACY_LISTING_BLOCKED_AFTER ? 'DOE_SP_LEGACY_LISTING_BLOCKED' : 'DOE_SP_LEGACY_MALFORMED_RESULT_ITEM');
+    assert.equal(state.listing?.attempts, attempt);
+  }
+
+  const hits = icmsMonth();
+  for (const fault of ['EMPTY', 'NEGATIVE'] as const) {
+    const run = await connector({
+      search: { 'ICMS|Executivo I': hits },
+      screenFault: ({ keyword, screen }) => keyword === 'ICMS' && screen === 2 ? fault : undefined,
+    }, stateAt('2015-03-01')).instance.collect(context());
+    const after = parseDoeSpLegacySourceState(run.checkpoint!.state);
+    assert.equal(run.partialFailures?.[0]?.code, fault === 'EMPTY' ? 'DOE_SP_LEGACY_EMPTY_RESULT_SCREEN' : 'DOE_SP_LEGACY_RESULT_SCREEN_MISSING');
+    assert.equal(after.cursor, '2015-03-01');
+    assert.equal(after.listing?.screen, 2);
+    assert.deepEqual(after.pending, []);
+  }
+});
+
+test('listing (B3): the time budget stops a SEARCH month between queries; runs resume without listing any screen twice', async () => {
+  const hits = icmsMonth();
+  const ipva = page('2015-03-20', 5, ['Resolução — IPVA']);
+  let clock = 0;
+  const portal: LegacyPortalOptions = {
+    search: { 'ICMS|Executivo I': hits, 'IPVA|Executivo III': [ipva] },
+    onRequest: () => { clock += 1_000; },
+  };
+  const queries = DOE_SP_LEGACY_SEARCH_CADERNOS.length * DOE_SP_LEGACY_SEARCH_TERMS.length;
+  let state = stateAt('2015-03-01');
+  const listed: string[] = [];
+  const kept: string[] = [];
+  let runs = 0;
+  while (state.cursor === '2015-03-01') {
+    runs += 1;
+    assert.ok(runs < 50, 'no progress');
+    // Real executor budget: 100 s hard timeout, soft deadline after 60 s (60 requests at 1 req/s).
+    const budget = createTimeBudget(clock, 100_000, 40_000, () => clock);
+    const { api, instance } = connector(portal, state);
+    const run = await instance.collect(context(budget));
+    listed.push(...api.requests.filter((r) => r.includes('BuscaDO2001Resultado_11_3')));
+    kept.push(...run.publications.map((p) => p.externalId!));
+    state = parseDoeSpLegacySourceState(run.checkpoint!.state);
+    if (state.cursor === '2015-03-01') {
+      assert.equal(run.completion?.reason, 'TIME_BUDGET_REACHED');
+      assert.ok(state.listing && state.listing.query > 0 && state.listing.query < queries);
+      assert.ok(api.requests.length <= 61);
+    }
+  }
+  assert.ok(runs >= 4);
+  // Every query listed once, plus screen 2 of the ICMS query; the negative redirects are followed, not re-listed.
+  const screens = listed.filter((r) => !r.includes('ResultadoNegativo'));
+  assert.equal(new Set(screens).size, screens.length);
+  assert.equal(screens.length, queries + 1);
+  assert.deepEqual([...new Set(kept)].sort(), [...hits.map((h) => h.link), ipva.link].sort());
+});
+
+test('needsOcr full (gate): the scanned page stays pending instead of being dropped', async () => {
+  const date = '1990-05-05';
+  const scan = page(date, 1, 'scan');
+  const full = Array.from({ length: MAX_NEEDS_OCR_KEPT }, (_, i) => ({
+    link: `/1989/x/pag_${i}.pdf`, pagina: '1', date: '1989-01-02', caderno: 'Executivo I', paginaOrdenacao: String(i),
+  }));
+  const state: DoeSpLegacySourceState = {
+    ...stateAt('1990-05-06'),
+    needsOcr: full,
+    pending: [{ link: scan.link, pagina: '1', date, caderno: 'Executivo I', paginaOrdenacao: '100001', discovery: 'EDITION_BROWSE' }],
+  };
+  const { instance } = connector({ editions: { [`${date}|Executivo I`]: [scan] } }, state);
+  const run = await instance.collect(context());
+  const after = parseDoeSpLegacySourceState(run.checkpoint!.state);
+  assert.deepEqual(after.pending.map((p) => p.link), [scan.link]);
+  assert.equal(after.needsOcr.length, MAX_NEEDS_OCR_KEPT);
+  assert.equal(after.totals.pagesRead, 0);
+  assert.equal(after.cursor, '1990-05-06');
+  assert.equal(run.partialFailures?.[0]?.code, 'DOE_SP_LEGACY_NEEDS_OCR_FULL');
+  assert.equal(run.completion?.reason, 'PARTIAL_FAILURE_RETRY_REQUIRED');
+});
+
+test('state: a listing in progress round-trips; an invalid one is dropped', () => {
+  const listing = {
+    mode: 'SEARCH', from: '2015-03-01', to: '2015-03-31', next: '2015-04-01', vocabularyVersion: 2,
+    query: 7, screen: 3, screens: 4, attempts: 1,
+    found: [{ link: '/2015/a/b.pdf', pagina: '2', date: '2015-03-02', caderno: 'Executivo I', paginaOrdenacao: '100002', discovery: 'KEYWORD_SEARCH' }],
+  };
+  const parsed = parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing });
+  assert.deepEqual(parsed.listing, listing);
+  const browse = parseDoeSpLegacySourceState({ cursor: '1990-01-01', listing: { ...listing, mode: 'BROWSE', browseCaderno: null } }).listing;
+  assert.equal(browse?.browseCaderno, null);
+  assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing: { ...listing, from: 'x' } }).listing, null);
+  assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing: { ...listing, screen: 0 } }).listing, null);
 });

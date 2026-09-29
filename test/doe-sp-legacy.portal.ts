@@ -90,6 +90,14 @@ export interface LegacyPortalOptions {
   failStatus?: { match: RegExp; status: number };
   /** Result screen HTML without the "Documentos encontrados" marker. */
   brokenResults?: boolean;
+  /**
+   * Fault on one result screen (keyword '' = whole-edition browse):
+   * MALFORMED_ONE adds an unparseable link, ALL_MALFORMED breaks every link,
+   * EMPTY lists no document, NEGATIVE answers "no results".
+   */
+  screenFault?: (at: { keyword: string; caderno: string; screen: number }) => 'MALFORMED_ONE' | 'ALL_MALFORMED' | 'EMPTY' | 'NEGATIVE' | undefined;
+  /** Called on every request (e.g. to advance a fake clock). */
+  onRequest?: (url: URL) => void;
 }
 
 function br(iso: string): string {
@@ -102,12 +110,16 @@ function docHref(page: LegacyPage, index: number): string {
     `&amp;caderno=${page.caderno}&amp;paginaordenacao=${100000 + index + 1}`;
 }
 
-function resultHtml(total: number, pages: LegacyPage[], offset: number): string {
-  const rows = pages.map((page, i) =>
-    `<div class="resultado"><a href="${docHref(page, offset + i)}">${br(page.date)} - ${page.caderno} - Pag. ${page.pagina}</a>` +
+const BAD_HREF = '/DO/BuscaDO2001Documento_11_4.aspx?link=javascript:x&amp;pagina=1&amp;data=99/99/2015&amp;caderno=Executivo I&amp;paginaordenacao=1';
+
+function resultHtml(total: number, pages: LegacyPage[], offset: number, fault?: 'MALFORMED_ONE' | 'ALL_MALFORMED' | 'EMPTY'): string {
+  const href = (page: LegacyPage, index: number) => fault === 'ALL_MALFORMED' ? BAD_HREF : docHref(page, index);
+  const rows = (fault === 'EMPTY' ? [] : pages).map((page, i) =>
+    `<div class="resultado"><a href="${href(page, offset + i)}">${br(page.date)} - ${page.caderno} - Pag. ${page.pagina}</a>` +
     ` <a href="/Certificacao/Certificador.aspx?link=x">Certificar</a>` +
     // Each item is linked twice on the real page (title + thumbnail).
-    ` <a href="${docHref(page, offset + i)}"><img src="thumb.png"></a></div>`).join('\n');
+    ` <a href="${href(page, offset + i)}"><img src="thumb.png"></a></div>`).join('\n') +
+    (fault === 'MALFORMED_ONE' ? `\n<div class="resultado"><a href="${BAD_HREF}">?</a></div>` : '');
   return `<html><body><div>Resultado de busca por:</div><div>Documentos encontrados: ${total}</div>\n${rows}\n` +
     `<a href="/DO/BuscaDO2001Resultado_11_3.aspx?xhitlist_vpc=2">pr&#243;xima</a></body></html>`;
 }
@@ -127,6 +139,7 @@ export function legacyPortal(options: LegacyPortalOptions): LegacyPortal {
   const impl = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
     requests.push(`${init?.method ?? 'GET'} ${url.pathname}${url.search}`);
+    options.onRequest?.(url);
     if (url.origin !== ORIGIN) throw new Error('unexpected origin ' + url.origin);
     if (options.failStatus?.match.test(url.pathname + url.search)) {
       return new Response('down', { status: options.failStatus.status });
@@ -165,7 +178,11 @@ export function legacyPortal(options: LegacyPortalOptions): LegacyPortal {
       const vpc = params.get('xhitlist_vpc');
       const screen = vpc === 'first' || vpc === null ? 1 : Number(vpc);
       const offset = (screen - 1) * 15;
-      return new Response(resultHtml(hits.length, hits.slice(offset, offset + 15), offset), {
+      const fault = options.screenFault?.({ keyword, caderno, screen });
+      if (fault === 'NEGATIVE') {
+        return new Response(null, { status: 302, headers: { location: '/DO/BuscaDO2001ResultadoNegativo_11_3a.aspx?x=1' } });
+      }
+      return new Response(resultHtml(hits.length, hits.slice(offset, offset + 15), offset, fault), {
         status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'set-cookie': 'ASP.NET_SessionId=abc; path=/' },
       });
     }

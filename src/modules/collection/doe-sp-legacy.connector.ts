@@ -20,7 +20,12 @@ import {
   type DoeSpLegacyCaderno,
   type DoeSpLegacyPageRef,
 } from './doe-sp-legacy.parser.js';
-import { DOE_SP_LEGACY_SEARCH_TERMS, doeSpLegacyTaxTerms, isDoeSpLegacyNewsPage } from './doe-sp-legacy.rules.js';
+import {
+  DOE_SP_LEGACY_SEARCH_TERMS,
+  DOE_SP_LEGACY_VOCABULARY_VERSION,
+  doeSpLegacyTaxTerms,
+  isDoeSpLegacyNewsPage,
+} from './doe-sp-legacy.rules.js';
 import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-legacy.text.js';
 
 /*
@@ -40,8 +45,13 @@ import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-le
  * - before 2003 (BROWSE): the index does not answer, so each edition of
  *   Executivo I (Seção I, where normative acts are printed) is listed whole
  *   per date and every page is read and filtered locally.
- * Every downloaded page is confirmed locally with the tax vocabulary before
- * it becomes a publication.
+ * Every downloaded page is confirmed locally with the same tax vocabulary
+ * that drives the queries before it becomes a publication.
+ *
+ * Listing a period is resumable (review DOE-SP-LEGACY-04, B2/B3): the query and
+ * screen being listed are kept in the checkpoint, the time budget is checked
+ * before every request, and a screen that cannot be fully parsed blocks the
+ * period (retried every run, the cursor never skips it).
  */
 
 export const DOE_SP_LEGACY_CONNECTOR_KEY = 'doe-sp-legacy';
@@ -57,6 +67,8 @@ export const DOE_SP_LEGACY_DEFAULT_MIN_REQUEST_INTERVAL_MS = 1_000;
 export const DOE_SP_LEGACY_DEFAULT_MAX_DOWNLOAD_BYTES_PER_RUN = 200 * 1024 * 1024;
 /** Attempts before a page that keeps failing is abandoned (reported, not retried). */
 export const DOE_SP_LEGACY_MAX_PAGE_ATTEMPTS = 3;
+/** Failed attempts on the same result screen before the listing is reported as blocked (still retried). */
+export const DOE_SP_LEGACY_LISTING_BLOCKED_AFTER = 3;
 
 /** Executivo cadernos queried in SEARCH mode (the index filters by name + id). */
 export const DOE_SP_LEGACY_SEARCH_CADERNOS: readonly DoeSpLegacyCaderno[] = [
@@ -75,6 +87,28 @@ export interface DoeSpLegacyPendingPage extends DoeSpLegacyPageRef {
   attempts?: number;
 }
 
+/** A period being listed (kept in the checkpoint until every query is listed). */
+export interface DoeSpLegacyListing {
+  mode: 'BROWSE' | 'SEARCH';
+  from: string;
+  to: string;
+  /** Cursor after this period. */
+  next: string | null;
+  vocabularyVersion: number;
+  /** BROWSE: Executivo I of the date (null = no edition); absent = not looked up yet. */
+  browseCaderno?: DoeSpLegacyCaderno | null;
+  /** Index of the query being listed (see doeSpLegacyListingQueries). */
+  query: number;
+  /** Next result screen of that query (1-based). */
+  screen: number;
+  /** Screens of that query, known after its first screen. */
+  screens?: number;
+  /** Pages found so far in the period (merged by link). */
+  found: DoeSpLegacyPendingPage[];
+  /** Consecutive failed attempts on the current screen. */
+  attempts: number;
+}
+
 export interface DoeSpLegacySourceState {
   coverageFrom: string;
   coverageTo: string;
@@ -83,13 +117,18 @@ export interface DoeSpLegacySourceState {
    * day of a month (SEARCH). null = the whole archive range was listed.
    */
   cursor: string | null;
+  /** Period being listed; null when no listing is in progress. */
+  listing: DoeSpLegacyListing | null;
   /** Listed pages still to be read (from the last listed period). */
   pending: DoeSpLegacyPendingPage[];
   /** Pages whose publication failed to persist in the engine (reopened). */
   retry: DoeSpLegacyPendingPage[];
-  /** Pages kept for a later OCR pass (scan without any text layer). */
+  /**
+   * Pages kept for a later OCR pass (scan without any text layer). When the
+   * list is full, the run stops at the next such page (gate) instead of
+   * dropping it.
+   */
   needsOcr: DoeSpLegacyPageRef[];
-  needsOcrTruncated: number;
   totals: { pagesRead: number; pagesKept: number; pagesWithoutTaxTerms: number; newsPagesSkipped: number };
   lastSuccessAt?: string;
 }
@@ -101,10 +140,10 @@ export function emptyDoeSpLegacyState(coverageFrom = DOE_SP_LEGACY_DEFAULT_START
     coverageFrom,
     coverageTo: DOE_SP_LEGACY_END,
     cursor: coverageFrom,
+    listing: null,
     pending: [],
     retry: [],
     needsOcr: [],
-    needsOcrTruncated: 0,
     totals: { pagesRead: 0, pagesKept: 0, pagesWithoutTaxTerms: 0, newsPagesSkipped: 0 },
   };
 }
@@ -180,6 +219,23 @@ export function doeSpLegacyPeriod(cursor: string, coverageTo: string): { mode: '
   return { mode: 'SEARCH', from: cursor, to: end, next: next > coverageTo ? null : monthStart(next) };
 }
 
+export interface DoeSpLegacyQuery { caderno: DoeSpLegacyCaderno; keyword?: string }
+
+/** Queries of a listing, in order: SEARCH = caderno x term; BROWSE = the whole Executivo I edition. */
+export function doeSpLegacyListingQueries(listing: DoeSpLegacyListing): DoeSpLegacyQuery[] {
+  if (listing.mode === 'BROWSE') return listing.browseCaderno ? [{ caderno: listing.browseCaderno }] : [];
+  return DOE_SP_LEGACY_SEARCH_CADERNOS.flatMap((caderno) => DOE_SP_LEGACY_SEARCH_TERMS.map((keyword) => ({ caderno, keyword })));
+}
+
+function newListing(cursor: string, coverageTo: string): DoeSpLegacyListing {
+  const period = doeSpLegacyPeriod(cursor, coverageTo);
+  return { ...period, vocabularyVersion: DOE_SP_LEGACY_VOCABULARY_VERSION, query: 0, screen: 1, found: [], attempts: 0 };
+}
+
+function listingError(code: string, metadata: Record<string, unknown>): ConnectorError {
+  return new ConnectorError(code, { code, kind: 'PROCESSING_ERROR', retryable: false, metadata });
+}
+
 function failureInfo(error: unknown): { code: string; message: string } {
   if (error instanceof ConnectorError) {
     const status = error.httpStatus !== undefined ? ` [status=${error.httpStatus}]` : '';
@@ -217,6 +273,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     const loaded = await this.#options.readState?.(context.sourceId) ?? emptyDoeSpLegacyState(start);
     const state: DoeSpLegacySourceState = {
       ...loaded,
+      listing: loaded.listing ? { ...loaded.listing, found: loaded.listing.found.map((page) => ({ ...page })) } : null,
       pending: loaded.pending.map((page) => ({ ...page })),
       retry: loaded.retry.map((page) => ({ ...page })),
       needsOcr: [...loaded.needsOcr],
@@ -226,6 +283,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     if (start < state.coverageFrom) {
       state.coverageFrom = start;
       state.cursor = start;
+      state.listing = null;
     }
 
     const client = new DoeSpLegacyClient({
@@ -244,6 +302,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     const periods: Array<{ mode: string; from: string; to: string; listed: number }> = [];
     let yieldReason: 'TIME_BUDGET_REACHED' | 'SOURCE_BUDGET_REACHED' | undefined;
     let sourceDown: unknown;
+    let ocrGate = false;
 
     const shouldStop = (): boolean => {
       if (context.budget?.shouldYield()) { yieldReason = 'TIME_BUDGET_REACHED'; return true; }
@@ -255,17 +314,21 @@ export class DoeSpLegacyConnector implements CollectionConnector {
       return false;
     };
 
-    const readPage = async (page: DoeSpLegacyPendingPage): Promise<'DONE' | 'RETRY'> => {
+    const readPage = async (page: DoeSpLegacyPendingPage): Promise<'DONE' | 'RETRY' | 'GATE'> => {
       try {
         const pdf = await client.downloadPdf(doeSpLegacyPdfUrl(page), context.signal);
         const extracted = await extract(pdf.bytes);
         counters.pagesRead += 1;
+        if (!extracted.text && state.needsOcr.length >= MAX_NEEDS_OCR_KEPT) {
+          // OCR queue full: the page stays pending (gate), never dropped.
+          ocrGate = true;
+          return 'GATE';
+        }
         state.totals.pagesRead += 1;
         if (extracted.scanned) counters.scannedPages += 1; else counters.nativeTextPages += 1;
         if (!extracted.text) {
           counters.pagesNeedingOcr += 1;
-          if (state.needsOcr.length < MAX_NEEDS_OCR_KEPT) state.needsOcr.push(stripPage(page));
-          else state.needsOcrTruncated += 1;
+          state.needsOcr.push(stripPage(page));
           return 'DONE';
         }
         const terms = doeSpLegacyTaxTerms(extracted.text);
@@ -297,62 +360,79 @@ export class DoeSpLegacyConnector implements CollectionConnector {
 
     /**
      * Reads a queue in place, in order: finished pages leave it, failed pages
-     * stay (for the next run). An exception leaves the unread pages in it.
+     * stay (for the next run). An exception or a gate leaves the unread pages in it.
      */
     const drain = async (queue: DoeSpLegacyPendingPage[]): Promise<void> => {
       let index = 0;
       while (index < queue.length) {
-        if (yieldReason || shouldStop()) return;
-        if ((await readPage(queue[index]!)) === 'DONE') queue.splice(index, 1);
-        else index += 1;
+        if (yieldReason || ocrGate || shouldStop()) return;
+        const outcome = await readPage(queue[index]!);
+        if (outcome === 'DONE') queue.splice(index, 1);
+        else if (outcome === 'RETRY') index += 1;
+        else return;
       }
     };
 
-    const listScreens = async (firstUrl: string, discovery: DoeSpLegacyPendingPage['discovery'], into: Map<string, DoeSpLegacyPendingPage>): Promise<void> => {
-      const first = await client.getHtml(firstUrl, context.signal);
-      counters.listScreens += 1;
-      const page1 = parseDoeSpLegacyResults(first.html, first.url);
-      if (!page1.found) return;
-      const add = (items: DoeSpLegacyPageRef[]) => {
-        for (const item of items) {
-          if (into.has(item.link)) continue;
-          into.set(item.link, { ...item, discovery });
-        }
-      };
-      add(page1.items);
-      const screens = Math.ceil(page1.total / DOE_SP_LEGACY_RESULTS_PER_SCREEN);
-      for (let screen = 2; screen <= screens; screen += 1) {
-        const next = await client.getHtml(doeSpLegacyResultScreenUrl(firstUrl, screen), context.signal);
-        counters.listScreens += 1;
-        const parsed = parseDoeSpLegacyResults(next.html, next.url);
-        if (!parsed.found || !parsed.items.length) break;
-        add(parsed.items);
+    /**
+     * Lists the period of `listing` from where it stopped (query + screen).
+     * Every screen is fully parsed or the listing stops with a processing
+     * error (kept for the next run); the time budget is checked before every
+     * request. Returns 'YIELD' when the budget stopped it.
+     */
+    const continueListing = async (listing: DoeSpLegacyListing): Promise<'DONE' | 'YIELD'> => {
+      if (listing.mode === 'SEARCH' && listing.vocabularyVersion !== DOE_SP_LEGACY_VOCABULARY_VERSION) {
+        // Vocabulary changed mid-period: list every query again (pages found so far are kept).
+        Object.assign(listing, { vocabularyVersion: DOE_SP_LEGACY_VOCABULARY_VERSION, query: 0, screen: 1, attempts: 0 });
+        delete listing.screens;
       }
-      if (page1.malformed) {
-        partialFailures.push({ code: 'DOE_SP_LEGACY_MALFORMED_RESULT_ITEM', message: `${page1.malformed} result link(s) not parsed`, itemReference: firstUrl });
-      }
-    };
-
-    /** Lists every candidate page of a period (no page is read here). */
-    const listPeriod = async (period: ReturnType<typeof doeSpLegacyPeriod>): Promise<DoeSpLegacyPendingPage[]> => {
-      const found = new Map<string, DoeSpLegacyPendingPage>();
-      if (period.mode === 'BROWSE') {
+      if (listing.mode === 'BROWSE' && listing.browseCaderno === undefined) {
+        if (shouldStop()) return 'YIELD';
+        const raw = await client.postAjax(CADERNOS_AJAX, `strData=${brFromIso(listing.from)}\r\nstrBuscaEsp=true`, context.signal);
         counters.cadernoLookups += 1;
-        const raw = await client.postAjax(CADERNOS_AJAX, `strData=${brFromIso(period.from)}\r\nstrBuscaEsp=true`, context.signal);
-        const caderno = parseDoeSpLegacyCadernos(raw).find((entry) => entry.name === DOE_SP_LEGACY_BROWSE_CADERNO);
-        if (caderno) {
-          await listScreens(doeSpLegacyResultUrl({ from: period.from, to: period.to, caderno }), 'EDITION_BROWSE', found);
-        }
-      } else {
-        for (const caderno of DOE_SP_LEGACY_SEARCH_CADERNOS) {
-          for (const term of DOE_SP_LEGACY_SEARCH_TERMS) {
-            await listScreens(doeSpLegacyResultUrl({ from: period.from, to: period.to, caderno, keyword: term }), 'KEYWORD_SEARCH', found);
-          }
-        }
+        listing.browseCaderno = parseDoeSpLegacyCadernos(raw).find((entry) => entry.name === DOE_SP_LEGACY_BROWSE_CADERNO) ?? null;
       }
+      const queries = doeSpLegacyListingQueries(listing);
+      const seen = new Set(listing.found.map((page) => page.link));
+      const discovery: DoeSpLegacyPendingPage['discovery'] = listing.mode === 'SEARCH' ? 'KEYWORD_SEARCH' : 'EDITION_BROWSE';
+      const nextQuery = () => {
+        listing.query += 1;
+        listing.screen = 1;
+        delete listing.screens;
+      };
+      while (listing.query < queries.length) {
+        if (shouldStop()) return 'YIELD';
+        const query = queries[listing.query]!;
+        const firstUrl = doeSpLegacyResultUrl({ from: listing.from, to: listing.to, caderno: query.caderno, ...(query.keyword ? { keyword: query.keyword } : {}) });
+        const response = await client.getHtml(doeSpLegacyResultScreenUrl(firstUrl, listing.screen), context.signal);
+        counters.listScreens += 1;
+        const parsed = parseDoeSpLegacyResults(response.html, response.url);
+        const where = { caderno: query.caderno.id, ...(query.keyword ? { keyword: query.keyword } : {}), screen: listing.screen };
+        if (!parsed.found || (listing.screen === 1 && parsed.total === 0 && !parsed.items.length)) {
+          // "No results" is only an answer for the first screen of a query.
+          if (listing.screen > 1) throw listingError('DOE_SP_LEGACY_RESULT_SCREEN_MISSING', where);
+          nextQuery();
+          continue;
+        }
+        if (parsed.malformed > 0) throw listingError('DOE_SP_LEGACY_MALFORMED_RESULT_ITEM', { ...where, malformed: parsed.malformed });
+        if (!parsed.items.length) throw listingError('DOE_SP_LEGACY_EMPTY_RESULT_SCREEN', where);
+        if (listing.screen === 1) listing.screens = Math.ceil(parsed.total / DOE_SP_LEGACY_RESULTS_PER_SCREEN);
+        for (const item of parsed.items) {
+          if (seen.has(item.link)) continue;
+          seen.add(item.link);
+          listing.found.push({ ...item, discovery });
+        }
+        listing.attempts = 0;
+        if (listing.screen >= (listing.screens ?? 1)) nextQuery();
+        else listing.screen += 1;
+      }
+      return 'DONE';
+    };
+
+    /** Pages of a fully listed period that are read (in the period, not news). */
+    const listedPages = (listing: DoeSpLegacyListing): DoeSpLegacyPendingPage[] => {
       const pages: DoeSpLegacyPendingPage[] = [];
-      for (const page of found.values()) {
-        if (page.date < period.from || page.date > period.to) continue; // defensive: index outside the filter
+      for (const page of listing.found) {
+        if (page.date < listing.from || page.date > listing.to) continue; // defensive: index outside the filter
         if (isDoeSpLegacyNewsPage(page.link)) {
           counters.newsPagesSkipped += 1;
           state.totals.newsPagesSkipped += 1;
@@ -367,24 +447,35 @@ export class DoeSpLegacyConnector implements CollectionConnector {
       await drain(state.retry);
       await drain(state.pending);
       const maxPeriods = this.#options.maxPeriodsPerRun ?? 0;
-      while (!yieldReason && state.cursor !== null && !state.pending.length) {
+      while (!yieldReason && !ocrGate && !state.pending.length && (state.listing || state.cursor !== null)) {
         if (shouldStop()) break;
-        if (maxPeriods > 0 && counters.periodsListed >= maxPeriods) { yieldReason = 'TIME_BUDGET_REACHED'; break; }
-        const period = doeSpLegacyPeriod(state.cursor, state.coverageTo);
-        let pages: DoeSpLegacyPendingPage[];
+        if (!state.listing) {
+          if (maxPeriods > 0 && counters.periodsListed >= maxPeriods) { yieldReason = 'TIME_BUDGET_REACHED'; break; }
+          state.listing = newListing(state.cursor!, state.coverageTo);
+        }
+        const listing = state.listing;
+        let outcome: 'DONE' | 'YIELD';
         try {
-          pages = await listPeriod(period);
+          outcome = await continueListing(listing);
         } catch (error) {
           if (isCancel(error)) throw error;
           if (isSourceLevel(error)) throw new SourceDown(error);
-          // Unknown page shape: stop here, the period is listed again next run.
+          // The screen could not be fully read: the period stays blocked on it
+          // (same query and screen next run), the cursor does not move.
+          listing.attempts += 1;
           const info = failureInfo(error);
-          partialFailures.push({ code: info.code, message: info.message, itemReference: `${period.from}..${period.to}` });
+          const at = `${listing.from}..${listing.to} query=${listing.query} screen=${listing.screen}`;
+          partialFailures.push(listing.attempts >= DOE_SP_LEGACY_LISTING_BLOCKED_AFTER
+            ? { code: 'DOE_SP_LEGACY_LISTING_BLOCKED', message: `${info.code}: ${info.message} (after ${listing.attempts} attempts)`, itemReference: at }
+            : { code: info.code, message: info.message, itemReference: at });
           break;
         }
+        if (outcome === 'YIELD') break;
+        const pages = listedPages(listing);
         counters.periodsListed += 1;
-        periods.push({ mode: period.mode, from: period.from, to: period.to, listed: pages.length });
-        state.cursor = period.next;
+        periods.push({ mode: listing.mode, from: listing.from, to: listing.to, listed: pages.length });
+        state.cursor = listing.next;
+        state.listing = null;
         state.pending = pages;
         await drain(state.pending);
       }
@@ -398,18 +489,29 @@ export class DoeSpLegacyConnector implements CollectionConnector {
       }
     }
 
+    if (ocrGate) {
+      partialFailures.push({
+        code: 'DOE_SP_LEGACY_NEEDS_OCR_FULL',
+        message: `needsOcr holds ${state.needsOcr.length} pages (limit ${MAX_NEEDS_OCR_KEPT}); the OCR pass must drain it before more pages are read`,
+        itemReference: 'needsOcr',
+      });
+    }
+
     // Nothing at all could be read from the archive: unavailability, never "0 results".
-    if (sourceDown instanceof ConnectorError && counters.pagesRead === 0 && counters.periodsListed === 0) {
+    const anyProgress = counters.pagesRead > 0 || counters.listScreens > 0 || counters.cadernoLookups > 0;
+    if (sourceDown instanceof ConnectorError && !anyProgress) {
       throw sourceDown;
     }
 
     const pendingPages = state.pending.length + state.retry.length;
-    const archiveListed = state.cursor === null;
-    const pending = { pendingPages, ...(archiveListed ? {} : { cursorDate: Number(state.cursor!.replace(/-/g, '')) }) };
-    // Abandoned pages and unparsed result links are reported, not retried.
-    const retryRequired = sourceDown !== undefined || partialFailures.some(
-      (failure) => failure.code !== 'DOE_SP_LEGACY_PAGE_ABANDONED' && failure.code !== 'DOE_SP_LEGACY_MALFORMED_RESULT_ITEM',
-    );
+    const archiveListed = state.cursor === null && state.listing === null;
+    const pending: Record<string, number> = {
+      pendingPages,
+      ...(state.cursor !== null ? { cursorDate: Number(state.cursor.replace(/-/g, '')) } : {}),
+      ...(state.listing ? { listingQuery: state.listing.query, listingScreen: state.listing.screen } : {}),
+    };
+    // Abandoned pages are reported, not retried; everything else asks for a retry.
+    const retryRequired = sourceDown !== undefined || partialFailures.some((failure) => failure.code !== 'DOE_SP_LEGACY_PAGE_ABANDONED');
     const completion: ConnectorResult['completion'] | undefined = yieldReason
       ? { complete: false, reason: yieldReason, pending }
       : retryRequired || !archiveListed || pendingPages > 0
@@ -430,8 +532,12 @@ export class DoeSpLegacyConnector implements CollectionConnector {
           cursor: state.cursor,
           archiveListed,
           periods,
+          listing: state.listing
+            ? { mode: state.listing.mode, from: state.listing.from, to: state.listing.to, query: state.listing.query, queries: doeSpLegacyListingQueries(state.listing).length, screen: state.listing.screen, found: state.listing.found.length, attempts: state.listing.attempts }
+            : null,
           pendingPages,
-          needsOcr: state.needsOcr.length + state.needsOcrTruncated,
+          needsOcr: state.needsOcr.length,
+          ocrGate,
           totals: state.totals,
           counters: { ...counters, requests: client.requestCount, downloadedBytes: client.downloadedBytes },
           sourceLimits: {
