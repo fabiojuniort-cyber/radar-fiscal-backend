@@ -397,7 +397,7 @@ EXECUTE FUNCTION taxonomy_revision_append_only();
 CREATE OR REPLACE FUNCTION taxonomy_guard_release_membership()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 DECLARE
     old_status TEXT;
     new_status TEXT;
@@ -426,7 +426,7 @@ BEGIN
 
     RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
 END;
-$;
+$$;
 
 CREATE TRIGGER trg_taxonomy_release_dimensions_guard
 BEFORE INSERT OR UPDATE OR DELETE
