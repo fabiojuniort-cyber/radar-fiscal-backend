@@ -170,6 +170,14 @@ CREATE TABLE official_catalog_editions (
             valid_to IS NULL OR
             valid_from IS NULL OR
             valid_to >= valid_from
+        ),
+    CONSTRAINT chk_official_catalog_edition_lifecycle_state
+        CHECK (
+            (status = 'CURRENT' AND valid_to IS NULL)
+            OR (
+                status IN ('SUPERSEDED', 'WITHDRAWN')
+                AND valid_to IS NOT NULL
+            )
         )
 );
 
@@ -474,16 +482,6 @@ BEGIN
     IF OLD.status = 'SUPERSEDED'
        AND NEW.status NOT IN ('SUPERSEDED', 'WITHDRAWN') THEN
         RAISE EXCEPTION 'superseded official catalog edition cannot return to CURRENT';
-    END IF;
-
-    IF NEW.status IN ('SUPERSEDED', 'WITHDRAWN')
-       AND NEW.valid_to IS NULL THEN
-        RAISE EXCEPTION 'closed official catalog edition requires valid_to';
-    END IF;
-
-    IF NEW.status = 'CURRENT'
-       AND NEW.valid_to IS NOT NULL THEN
-        RAISE EXCEPTION 'current official catalog edition cannot have valid_to';
     END IF;
 
     RETURN NEW;
