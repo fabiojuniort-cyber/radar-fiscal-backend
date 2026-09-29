@@ -56,7 +56,7 @@
     "taxonomy:baseline:dry-run": "node dist/infrastructure/database/taxonomy-baseline-dry-run.js",
     "taxonomy:baseline:import": "node dist/infrastructure/database/taxonomy-baseline-import.js",
     "taxonomy:baseline:inspect": "node dist/infrastructure/database/taxonomy-baseline-inspect.js",
-    "test:taxonomy-baseline-unit": "tsx --test test/taxonomy.baseline.source.unit.test.ts test/taxonomy.baseline.parser.unit.test.ts test/taxonomy.baseline.manifest.unit.test.ts test/taxonomy.baseline.validator.unit.test.ts",
+    "test:taxonomy-baseline-unit": "tsx --test test/taxonomy.baseline.source.unit.test.ts test/taxonomy.baseline.parser.unit.test.ts test/taxonomy.baseline.manifest.unit.test.ts test/taxonomy.baseline.validator.unit.test.ts test/taxonomy.baseline.planner.unit.test.ts",
     "test:taxonomy-baseline-integration": "tsx --test test/taxonomy.baseline.integration.test.ts && tsx --test test/taxonomy.baseline.concurrency.integration.test.ts"
   },
   "dependencies": {
