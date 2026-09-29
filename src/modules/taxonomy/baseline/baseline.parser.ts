@@ -102,12 +102,8 @@ function parseConcepts(lines: string[]): BaselineConcept[] {
     );
   }
 
-  const dimensionPattern = DIMENSION_CODES.join('|');
-  const codePattern = new RegExp(
-    '^\\|\\s*`?((?:' +
-      dimensionPattern +
-      ')\\.[a-z0-9_]+)`?\\s*\\|',
-  );
+  const codePattern =
+    /^\\|\\s*`?([a-z][a-z0-9_]*(?:\\.[a-z0-9_]+)+)`?\\s*\\|/;
 
   const concepts: BaselineConcept[] = [];
 
