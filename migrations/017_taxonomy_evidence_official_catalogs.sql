@@ -456,7 +456,7 @@ EXECUTE FUNCTION taxonomy_guard_catalog_code();
 CREATE OR REPLACE FUNCTION taxonomy_guard_catalog_edition_lifecycle()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION 'official catalog editions are historical and cannot be deleted';
@@ -488,7 +488,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$;
+$$;
 
 CREATE TRIGGER trg_official_catalog_edition_lifecycle
 BEFORE UPDATE OR DELETE
