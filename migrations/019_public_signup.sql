@@ -30,6 +30,10 @@ CREATE TABLE tenant_onboarding_profiles (
         )
 );
 
+CREATE UNIQUE INDEX uq_tenant_onboarding_profiles_cnpj
+ON tenant_onboarding_profiles(cnpj)
+WHERE cnpj IS NOT NULL;
+
 
 CREATE TABLE public_signup_rate_limits (
     key_hash CHAR(64) PRIMARY KEY,
