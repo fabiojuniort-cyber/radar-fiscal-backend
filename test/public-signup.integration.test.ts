@@ -23,7 +23,7 @@ function signupPayload(email: string) {
     name: 'Pessoa Cadastro',
     email,
     company: 'Empresa Cadastro',
-    cnpj: '12.345.678/0001-99',
+    cnpj: '12.345.678/0001-95',
     password: PASSWORD,
     confirmPassword: PASSWORD,
     acceptedTerms: true,
@@ -209,7 +209,7 @@ test(
           );
           assert.equal(
             row.cnpj,
-            '12345678000199',
+            '12345678000195',
           );
           assert.ok(
             row.terms_accepted_at,
