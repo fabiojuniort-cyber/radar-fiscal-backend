@@ -150,6 +150,20 @@ WITH CHECK (
 );
 
 
--- The runtime logins must never inherit curator powers.
-REVOKE radar_taxonomy_curator
-FROM radar_app_runtime, radar_worker_runtime;
+-- The runtime logins are provisioned after db:migrate on fresh databases.
+-- If they already exist, explicitly remove any curator membership.
+DO $
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_roles WHERE rolname = 'radar_app_runtime'
+    ) THEN
+        REVOKE radar_taxonomy_curator FROM radar_app_runtime;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM pg_roles WHERE rolname = 'radar_worker_runtime'
+    ) THEN
+        REVOKE radar_taxonomy_curator FROM radar_worker_runtime;
+    END IF;
+END;
+$;
