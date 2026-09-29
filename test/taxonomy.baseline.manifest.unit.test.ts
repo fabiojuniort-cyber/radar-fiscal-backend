@@ -98,3 +98,17 @@ test('technical contract and relation seed version participate in derivation fin
   assert.notEqual(baseline, relationV2);
   assert.notEqual(baseline, contractChanged);
 });
+
+test('manifest excludes runtime-specific timestamp and physical UUID fields', async () => {
+  const loaded = await loadBaseline();
+  const bytes = manifestBytes(loaded.manifest);
+
+  assert.equal(bytes.includes('generated_at'), false);
+  assert.equal(bytes.includes('hostname'), false);
+  assert.equal(bytes.includes('"pid"'), false);
+  assert.equal(
+    /"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"/i
+      .test(bytes),
+    false,
+  );
+});
