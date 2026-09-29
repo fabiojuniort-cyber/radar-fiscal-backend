@@ -20,7 +20,7 @@ Body:
 }
 ```
 
-`cnpj` é opcional e, quando informado, é normalizado para 14 dígitos e validado pelos dígitos verificadores.
+`cnpj` é opcional e, quando informado, é normalizado para 14 dígitos, validado pelos dígitos verificadores e não pode já estar associado a outro tenant criado pelo autosserviço.
 
 Sucesso: HTTP 201. A resposta contém somente identificadores públicos da conta criada, role `OWNER` e `next: "LOGIN"`. O cadastro **não cria sessão e não retorna JWT/refresh token**. O usuário entra pelo contrato existente `POST /auth/login`.
 
@@ -28,6 +28,7 @@ Erros de aplicação:
 - `400 invalid_signup_data`;
 - `400 invalid_password`;
 - `409 email_already_registered`;
+- `409 company_already_registered`;
 - `429 too_many_requests`;
 - `500 signup_failed`.
 
@@ -63,7 +64,7 @@ O modelo preserva a decisão arquitetural de que tenant não é a entidade `comp
 
 Não existe infraestrutura de confirmação de e-mail nesta fase. Nenhum fluxo fictício foi criado; confirmação de e-mail permanece evolução futura.
 
-O código registra o aceite com `consent_version = auth-02-unversioned-v1`. **Antes do deploy público definitivo**, Termos de Uso e Política de Privacidade devem existir em URLs/documentos publicáveis e a versão de consentimento deve ser substituída por uma versão jurídica real. Isso é gate de exposição, não motivo para inventar documentos nesta implementação.
+O código registra o aceite com `consent_version = 2026-09-29-v1`. **Antes do deploy público definitivo**, Termos de Uso e Política de Privacidade devem existir em URLs/documentos publicáveis e a versão de consentimento deve ser substituída por uma versão jurídica real. Isso é gate de exposição, não motivo para inventar documentos nesta implementação.
 
 ## Não escopo
 
