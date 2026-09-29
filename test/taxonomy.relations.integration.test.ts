@@ -361,6 +361,116 @@ test('taxonomy aliases, relations and catalogs enforce scoped integrity', async 
       [catalogId, `CAT_${seed.toUpperCase()}`],
     );
 
+    await t.test('catalog edition CURRENT insert accepts null valid_to', async () => {
+      await pool.query(
+        `
+          INSERT INTO official_catalog_editions (
+            catalog_id, edition_code, status, valid_to
+          )
+          VALUES ($1, 'STATE-CURRENT-VALID', 'CURRENT', NULL)
+        `,
+        [catalogId],
+      );
+    });
+
+    await t.test('catalog edition CURRENT insert rejects populated valid_to', async () => {
+      await assert.rejects(
+        pool.query(
+          `
+            INSERT INTO official_catalog_editions (
+              catalog_id, edition_code, status, valid_to
+            )
+            VALUES ($1, 'STATE-CURRENT-INVALID', 'CURRENT', DATE '2026-01-01')
+          `,
+          [catalogId],
+        ),
+      );
+    });
+
+    await t.test('catalog edition SUPERSEDED insert rejects null valid_to', async () => {
+      await assert.rejects(
+        pool.query(
+          `
+            INSERT INTO official_catalog_editions (
+              catalog_id, edition_code, status, valid_to
+            )
+            VALUES ($1, 'STATE-SUPERSEDED-INVALID', 'SUPERSEDED', NULL)
+          `,
+          [catalogId],
+        ),
+      );
+    });
+
+    await t.test('catalog edition WITHDRAWN insert rejects null valid_to', async () => {
+      await assert.rejects(
+        pool.query(
+          `
+            INSERT INTO official_catalog_editions (
+              catalog_id, edition_code, status, valid_to
+            )
+            VALUES ($1, 'STATE-WITHDRAWN-INVALID', 'WITHDRAWN', NULL)
+          `,
+          [catalogId],
+        ),
+      );
+    });
+
+    await t.test('catalog edition SUPERSEDED insert accepts valid valid_to', async () => {
+      await pool.query(
+        `
+          INSERT INTO official_catalog_editions (
+            catalog_id, edition_code, status, valid_from, valid_to
+          )
+          VALUES (
+            $1,
+            'STATE-SUPERSEDED-VALID',
+            'SUPERSEDED',
+            DATE '2025-01-01',
+            DATE '2026-01-01'
+          )
+        `,
+        [catalogId],
+      );
+    });
+
+    await t.test('catalog edition WITHDRAWN insert accepts valid valid_to', async () => {
+      await pool.query(
+        `
+          INSERT INTO official_catalog_editions (
+            catalog_id, edition_code, status, valid_from, valid_to
+          )
+          VALUES (
+            $1,
+            'STATE-WITHDRAWN-VALID',
+            'WITHDRAWN',
+            DATE '2025-01-01',
+            DATE '2026-01-01'
+          )
+        `,
+        [catalogId],
+      );
+    });
+
+    await t.test('catalog edition insert rejects valid_from after valid_to', async () => {
+      await assert.rejects(
+        pool.query(
+          `
+            INSERT INTO official_catalog_editions (
+              catalog_id, edition_code, status, valid_from, valid_to
+            )
+            VALUES (
+              $1,
+              'STATE-RANGE-INVALID',
+              'SUPERSEDED',
+              DATE '2026-02-01',
+              DATE '2026-01-01'
+            )
+          `,
+          [catalogId],
+        ),
+      );
+    });
+
     await pool.query(
       `
         INSERT INTO official_catalog_editions (
