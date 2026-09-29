@@ -34,7 +34,7 @@ export type AliasType =
 export interface BaselineDimension {
   code: DimensionCode;
   name: string;
-  description: string;
+  description: string | null;
   identityStatus: 'CURRENT';
   governanceStatus: 'PROPOSED';
   expectedConceptCount: number;
