@@ -63,6 +63,16 @@ jobs:
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
+      - name: Generate database types for TAX-05
+        run: npm run db:types
+
+      - name: Upload generated database types
+        uses: actions/upload-artifact@v4
+        with:
+          name: taxonomy-database-types
+          path: src/infrastructure/database/database.types.ts
+          retention-days: 1
+
       - name: Collection persistence integration tests
         run: npm run test:collection-integration
 
