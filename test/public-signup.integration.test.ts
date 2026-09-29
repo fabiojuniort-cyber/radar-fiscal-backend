@@ -219,7 +219,7 @@ test(
           );
           assert.equal(
             row.consent_version,
-            'auth-02-unversioned-v1',
+            '2026-09-29-v1',
           );
           assert.match(
             row.password_hash,
@@ -564,6 +564,71 @@ test(
               tenants: '1',
               memberships: '1',
             },
+          );
+        },
+      );
+
+      await t.test(
+        'duplicate company CNPJ cannot create a second tenant OWNER account',
+        async () => {
+          const firstEmail =
+            `company-a-${randomUUID()}@example.test`;
+          const secondEmail =
+            `company-b-${randomUUID()}@example.test`;
+
+          rateHashes.push(
+            normalizedRateHash(firstEmail),
+            normalizedRateHash(secondEmail),
+          );
+
+          const first =
+            await register(app, firstEmail);
+
+          assert.equal(first.statusCode, 201);
+
+          const firstBody =
+            first.json<{
+              user: { id: string };
+              tenant: { id: string };
+            }>();
+
+          userIds.push(firstBody.user.id);
+          tenantIds.push(firstBody.tenant.id);
+
+          const second =
+            await register(app, secondEmail);
+
+          assert.equal(second.statusCode, 409);
+          assert.deepEqual(second.json(), {
+            error: 'company_already_registered',
+          });
+
+          const secondUser =
+            await admin.query(
+              `
+                SELECT 1
+                FROM app_users
+                WHERE lower(email) = $1
+              `,
+              [secondEmail.toLowerCase()],
+            );
+
+          assert.equal(secondUser.rowCount, 0);
+
+          const tenantsForCnpj =
+            await admin.query<{
+              total: string;
+            }>(
+              `
+                SELECT count(*)::text AS total
+                FROM tenant_onboarding_profiles
+                WHERE cnpj = '12345678000195'
+              `,
+            );
+
+          assert.equal(
+            tenantsForCnpj.rows[0]?.total,
+            '1',
           );
         },
       );
