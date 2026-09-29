@@ -16,7 +16,7 @@ import {
 } from './auth.service.js';
 
 export const PUBLIC_SIGNUP_CONSENT_VERSION =
-  'auth-02-unversioned-v1';
+  '2026-09-29-v1';
 
 const PUBLIC_SIGNUP_RATE_WINDOW_SECONDS = 15 * 60;
 const PUBLIC_SIGNUP_RATE_MAX_ATTEMPTS = 5;
@@ -130,6 +130,14 @@ export interface PublicSignupResult {
   membership: {
     role: 'OWNER';
   };
+}
+
+export class PublicSignupCompanyExistsError
+  extends Error {
+  constructor() {
+    super('company_already_registered');
+    this.name = 'PublicSignupCompanyExistsError';
+  }
 }
 
 export class PublicSignupEmailExistsError
@@ -314,6 +322,14 @@ export async function registerPublicAccount(
         'uq_app_users_email_lower'
     ) {
       throw new PublicSignupEmailExistsError();
+    }
+
+    if (
+      dbError.code === '23505' &&
+      dbError.constraint ===
+        'uq_tenant_onboarding_profiles_cnpj'
+    ) {
+      throw new PublicSignupCompanyExistsError();
     }
 
     throw error;
