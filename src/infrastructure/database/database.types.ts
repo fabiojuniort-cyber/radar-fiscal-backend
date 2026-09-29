@@ -318,6 +318,13 @@ export interface PublicationFiles {
   storage_provider: string;
 }
 
+export interface PublicSignupRateLimits {
+  attempt_count: number;
+  key_hash: string;
+  updated_at: Generated<Timestamp>;
+  window_started_at: Timestamp;
+}
+
 export interface PublicationMatches {
   company_publication_id: string;
   created_at: Generated<Timestamp>;
@@ -622,6 +629,16 @@ export interface TaxonomyReleases {
   withdrawn_by_actor: string | null;
 }
 
+export interface TenantOnboardingProfiles {
+  cnpj: string | null;
+  company_name: string;
+  consent_version: string;
+  created_at: Generated<Timestamp>;
+  privacy_policy_accepted_at: Timestamp;
+  tenant_id: string;
+  terms_accepted_at: Timestamp;
+}
+
 export interface TenantMemberships {
   created_at: Generated<Timestamp>;
   role: string;
@@ -685,6 +702,7 @@ export interface DB {
   official_catalog_entries: OfficialCatalogEntries;
   official_catalogs: OfficialCatalogs;
   publication_files: PublicationFiles;
+  public_signup_rate_limits: PublicSignupRateLimits;
   publication_matches: PublicationMatches;
   publication_origins: PublicationOrigins;
   publication_versions: PublicationVersions;
@@ -710,6 +728,7 @@ export interface DB {
   taxonomy_release_relation_rules: TaxonomyReleaseRelationRules;
   taxonomy_releases: TaxonomyReleases;
   tenant_memberships: TenantMemberships;
+  tenant_onboarding_profiles: TenantOnboardingProfiles;
   tenants: Tenants;
   user_credentials: UserCredentials;
   v_source_monitoring: VSourceMonitoring;
