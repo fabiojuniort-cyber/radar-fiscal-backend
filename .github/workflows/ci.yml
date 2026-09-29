@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: write
+
 on:
   pull_request:
     branches:
@@ -72,6 +75,20 @@ jobs:
           name: tax-06-baseline-manifest
           path: docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json
           retention-days: 1
+
+      - name: Bootstrap versioned TAX-06 manifest on implementation branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/tax-06-baseline-importer'
+        shell: bash
+        run: |
+          manifest="docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json"
+          if git ls-files --error-unmatch "$manifest" >/dev/null 2>&1; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$manifest"
+          git commit -m "feat(taxonomy): commit generated R6 baseline manifest"
+          git push origin "HEAD:$GITHUB_HEAD_REF"
 
       - name: Verify committed TAX-06 manifest is byte-identical
         shell: bash
