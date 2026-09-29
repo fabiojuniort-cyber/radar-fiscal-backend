@@ -86,6 +86,7 @@ test('unapproved official mappings and relation cycle block manifest', async () 
       relationType: 'narrower_than',
       targetConceptCode: 'theme.fine',
       qualifiers: {},
+      status: 'PROPOSED',
       evidenceStatus: 'NOT_ASSESSED',
       sourceLocator: 'negative test',
     },
