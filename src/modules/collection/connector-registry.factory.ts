@@ -4,6 +4,8 @@ import type { DB } from '../../infrastructure/database/database.types.js';
 import { CgibsConnector } from './cgibs.connector.js';
 import { DoeSpConnector, resolveDoeSpSourceLimits } from './doe-sp.connector.js';
 import { readDoeSpSourceState } from './doe-sp-source-state.repository.js';
+import { DoeSpLegacyConnector, resolveDoeSpLegacySourceLimits } from './doe-sp-legacy.connector.js';
+import { readDoeSpLegacySourceState } from './doe-sp-legacy-source-state.repository.js';
 import { RfbNormasConnector } from './rfb-normas.connector.js';
 import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.js';
 import { readCgibsSourceState } from './cgibs-source-state.repository.js';
@@ -72,6 +74,20 @@ export function buildConnectorRegistry(
         ? {
             readState: (sourceId) =>
               readDoeSpSourceState(options.db!, sourceId),
+          }
+        : {}),
+    }),
+  );
+
+  const doeSpLegacyLimits = resolveDoeSpLegacySourceLimits();
+  registry.register(
+    new DoeSpLegacyConnector({
+      client: { minRequestIntervalMs: doeSpLegacyLimits.minRequestIntervalMs },
+      maxDownloadBytesPerRun: doeSpLegacyLimits.maxDownloadBytesPerRun,
+      ...(options.db
+        ? {
+            readState: (sourceId) =>
+              readDoeSpLegacySourceState(options.db!, sourceId),
           }
         : {}),
     }),

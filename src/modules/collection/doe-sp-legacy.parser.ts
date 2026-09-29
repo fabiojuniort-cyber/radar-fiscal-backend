@@ -7,7 +7,9 @@ import { DOE_SP_LEGACY_ORIGIN } from './doe-sp-legacy.client.js';
  * DOE-SP-LEGACY-02/03):
  * - the same result page lists a whole edition (empty keyword, mode FE) or a
  *   keyword search over a period (mode UP), 15 page-documents per screen,
- *   paginated by `xhitlist_vpc=<n>`;
+ *   paginated by `xhitlist_vpc=<n>` (`first` for the first screen);
+ * - keyword search only covers editions from 2003 on; older editions are
+ *   listed whole (per date) and filtered locally;
  * - every item links to `BuscaDO2001Documento_11_4.aspx?link=<path>&pagina=
  *   &data=&caderno=&paginaordenacao=` (public viewer) and the page PDF is
  *   served by `GatewayPDF.aspx` with the same parameters;
@@ -135,9 +137,10 @@ export interface DoeSpLegacyResultPage {
   items: DoeSpLegacyPageRef[];
   /** Number of result links that could not be parsed. */
   malformed: number;
-  /** Absolute URL of the next result screen, if any. */
-  nextUrl?: string;
 }
+
+/** Documents per result screen (measured). */
+export const DOE_SP_LEGACY_RESULTS_PER_SCREEN = 15;
 
 export function parseDoeSpLegacyResults(html: string, finalUrl: string): DoeSpLegacyResultPage {
   const text = plainText(html);
@@ -156,15 +159,7 @@ export function parseDoeSpLegacyResults(html: string, finalUrl: string): DoeSpLe
     seen.add(ref.link);
     items.push(ref);
   }
-  let nextUrl: string | undefined;
-  for (const match of html.matchAll(/<a[^>]*href="([^"]*)"[^>]*>\s*(?:próxima|pr&#243;xima|pr&oacute;xima)\s*<\/a>/gi)) {
-    const href = decodeEntities(match[1]!);
-    if (/BuscaDO2001Resultado_11_3\.aspx\?/i.test(href) && /xhitlist_vpc=\d+/i.test(href)) {
-      nextUrl = new URL(href, finalUrl).toString();
-      break;
-    }
-  }
-  return { found: true, total: Number(total[1]), items, malformed, ...(nextUrl ? { nextUrl } : {}) };
+  return { found: true, total: Number(total[1]), items, malformed };
 }
 
 // ---------------------------------------------------------------- urls
@@ -194,6 +189,13 @@ export function doeSpLegacyResultUrl(input: {
     filtrotodoscadernos: ' ',
   });
   return `${DOE_SP_LEGACY_ORIGIN}/DO/BuscaDO2001Resultado_11_3.aspx?${params}`;
+}
+
+/** Result screen `n` (1-based) of a result URL built by doeSpLegacyResultUrl. */
+export function doeSpLegacyResultScreenUrl(firstUrl: string, screen: number): string {
+  const url = new URL(firstUrl);
+  url.searchParams.set('xhitlist_vpc', screen <= 1 ? 'first' : String(screen));
+  return url.toString();
 }
 
 function linkParam(link: string): string {

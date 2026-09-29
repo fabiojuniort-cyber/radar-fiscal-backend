@@ -49,7 +49,9 @@
     "db:ensure-doe-sp-source": "node dist/infrastructure/database/ensure-doe-sp-source.js",
     "db:trigger-doe-sp-run": "node dist/infrastructure/database/trigger-doe-sp-run.js",
     "db:inspect-doe-sp": "node dist/infrastructure/database/inspect-doe-sp.js",
-    "db:audit-doe-sp-rebuild": "node dist/infrastructure/database/audit-doe-sp-rebuild.js"
+    "db:audit-doe-sp-rebuild": "node dist/infrastructure/database/audit-doe-sp-rebuild.js",
+    "db:ensure-doe-sp-legacy-source": "node dist/infrastructure/database/ensure-doe-sp-legacy-source.js",
+    "db:trigger-doe-sp-legacy-run": "node dist/infrastructure/database/trigger-doe-sp-legacy-run.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

@@ -45,7 +45,6 @@ export async function extractDoeSpLegacyPdfText(bytes: Uint8Array): Promise<DoeS
   // pdf.js transfers (detaches) the buffer it receives.
   const task = getDocument({
     data: new Uint8Array(bytes),
-    isEvalSupported: false,
     disableFontFace: true,
     useSystemFonts: false,
     stopAtErrors: false,
