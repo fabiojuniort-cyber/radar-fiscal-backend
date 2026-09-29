@@ -48,6 +48,11 @@ CREATE TABLE taxonomy_releases (
         UNIQUE (version),
     CONSTRAINT chk_taxonomy_release_not_self_previous
         CHECK (previous_release_id IS NULL OR previous_release_id <> id),
+    CONSTRAINT chk_taxonomy_release_approved_at
+        CHECK (
+            status NOT IN ('APPROVED', 'PUBLISHED', 'WITHDRAWN')
+            OR approved_at IS NOT NULL
+        ),
     CONSTRAINT chk_taxonomy_release_published_fields
         CHECK (
             status NOT IN ('PUBLISHED', 'WITHDRAWN')
