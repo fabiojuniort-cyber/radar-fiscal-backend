@@ -91,6 +91,7 @@ export interface BaselineRelation {
   relationType: string;
   targetConceptCode: string;
   qualifiers: Record<string, unknown>;
+  status: 'PROPOSED';
   evidenceStatus: 'NOT_ASSESSED';
   sourceLocator: string;
 }
