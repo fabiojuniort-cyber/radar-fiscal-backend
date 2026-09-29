@@ -169,11 +169,6 @@ export function buildBaselineRelations(): BaselineRelation[] {
   );
 
   return relations.sort((left, right) =>
-    [
-      left.relationType,
-      left.sourceConceptCode,
-      left.targetConceptCode,
-      JSON.stringify(left.qualifiers),
     compareCanonicalText(
       [
         left.relationType,
@@ -189,4 +184,5 @@ export function buildBaselineRelations(): BaselineRelation[] {
       ].join('|'),
     ),
   );
+
 }
