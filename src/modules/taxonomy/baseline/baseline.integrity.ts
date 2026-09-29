@@ -22,6 +22,7 @@ function assertHex(value: string, size: number, label: string): void {
 export async function verifyMirror(
   mirrorPath: string,
   lockPath: string,
+  expectedLock?: SourceLock,
 ): Promise<VerifiedSource> {
   const [bytes, lockRaw] = await Promise.all([
     readFile(resolve(process.cwd(), mirrorPath)),
@@ -49,6 +50,23 @@ export async function verifyMirror(
 
   assertHex(lock.canonicalBlobSha, 40, 'blob SHA');
   assertHex(lock.canonicalSha256, 64, 'SHA-256');
+
+  if (
+    expectedLock &&
+    (
+      lock.schemaVersion !== expectedLock.schemaVersion ||
+      lock.canonicalRepository !==
+        expectedLock.canonicalRepository ||
+      lock.canonicalPath !== expectedLock.canonicalPath ||
+      lock.canonicalGitSha !== expectedLock.canonicalGitSha ||
+      lock.canonicalBlobSha !== expectedLock.canonicalBlobSha ||
+      lock.canonicalSha256 !== expectedLock.canonicalSha256
+    )
+  ) {
+    throw new Error(
+      'BASELINE_SOURCE_INTEGRITY_FAILURE: source-lock provenance does not match approved contract',
+    );
+  }
 
   let text: string;
 
