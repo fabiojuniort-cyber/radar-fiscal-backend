@@ -361,6 +361,40 @@ test('taxonomy core schema enforces identity, revisions and release lifecycle', 
       },
     );
 
+    await t.test(
+      'PUBLISHED rejects missing publication requirements',
+      async () => {
+        const invalidPublishedReleaseId = randomUUID();
+
+        await pool.query(
+          `
+            INSERT INTO taxonomy_releases (
+              id,
+              version_major,
+              version_minor,
+              version_patch,
+              created_by_actor
+            )
+            VALUES ($1, $2, 1, 2, 'published-invalid-test')
+          `,
+          [invalidPublishedReleaseId, versionBase],
+        );
+
+        await assert.rejects(
+          pool.query(
+            `
+              UPDATE taxonomy_releases
+              SET
+                status = 'PUBLISHED',
+                approved_at = now()
+              WHERE id = $1
+            `,
+            [invalidPublishedReleaseId],
+          ),
+        );
+      },
+    );
+
     await t.test('release ancestry rejects self/cycle', async () => {
       await assert.rejects(
         pool.query(
