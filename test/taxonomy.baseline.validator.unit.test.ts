@@ -156,3 +156,42 @@ test('relation rules are derived only from actual baseline edges', async () => {
     true,
   );
 });
+
+test('part_of and replaced_by cycles are blocked before persistence', async () => {
+  const loaded = await loadBaseline();
+
+  for (const [relationType, left, right] of [
+    ['part_of', 'product.soy', 'product.grains'],
+    ['replaced_by', 'tax.icms', 'tax.ibs'],
+  ] as const) {
+    const manifest = clone(loaded.manifest);
+    manifest.relations.push(
+      {
+        sourceConceptCode: left,
+        relationType,
+        targetConceptCode: right,
+        qualifiers: {},
+        evidenceStatus: 'NOT_ASSESSED',
+        sourceLocator: 'negative cycle test',
+      },
+      {
+        sourceConceptCode: right,
+        relationType,
+        targetConceptCode: left,
+        qualifiers: {},
+        evidenceStatus: 'NOT_ASSESSED',
+        sourceLocator: 'negative cycle test',
+      },
+    );
+
+    const result = validateManifest(manifest);
+    assert.ok(
+      result.issues.some(
+        (issue) =>
+          issue.code === 'RELATION_CYCLE' &&
+          issue.message === relationType,
+      ),
+      relationType,
+    );
+  }
+});
