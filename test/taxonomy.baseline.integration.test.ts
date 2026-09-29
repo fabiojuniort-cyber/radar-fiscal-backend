@@ -219,6 +219,29 @@ test('TAX-06 baseline dry-run/import/idempotency/rollback', async (t) => {
       assert.deepEqual(after, before);
     });
 
+    await t.test('idempotent rerun rejects same-count semantic drift', async () => {
+      await pool.query(
+        [
+          'UPDATE taxonomy_concept_relations',
+          "SET status = 'APPROVED'",
+          'WHERE id = (',
+          '  SELECT id',
+          '  FROM taxonomy_concept_relations',
+          '  ORDER BY id',
+          '  LIMIT 1',
+          ')',
+        ].join('\n'),
+      );
+
+      await assert.rejects(
+        importBaseline(pool, loaded, {
+          expectedManifestSha256:
+            loaded.manifestSha256,
+        }),
+        /BASELINE_SEMANTIC_READBACK_MISMATCH/,
+      );
+    });
+
     await t.test('same target with different stored fingerprint is blocked', async () => {
       await pool.query(
         [
