@@ -4,7 +4,6 @@ CREATE TABLE tenant_onboarding_profiles (
         ON DELETE CASCADE,
 
     company_name TEXT NOT NULL,
-
     cnpj CHAR(14),
 
     terms_accepted_at TIMESTAMPTZ NOT NULL,
@@ -86,12 +85,15 @@ DECLARE
     v_window_started_at TIMESTAMPTZ;
     v_attempt_count INTEGER;
 BEGIN
-    IF p_key_hash !~ '^[0-9a-f]{64}$' THEN
+    IF p_key_hash IS NULL
+       OR p_key_hash !~ '^[0-9a-f]{64}$' THEN
         RAISE EXCEPTION 'invalid_rate_limit_key'
             USING ERRCODE = '22023';
     END IF;
 
-    IF p_window_seconds < 60
+    IF p_window_seconds IS NULL
+       OR p_max_attempts IS NULL
+       OR p_window_seconds < 60
        OR p_window_seconds > 86400
        OR p_max_attempts < 1
        OR p_max_attempts > 100 THEN
@@ -203,7 +205,10 @@ DECLARE
     v_cnpj TEXT := NULLIF(btrim(p_cnpj), '');
     v_consent_at TIMESTAMPTZ := clock_timestamp();
 BEGIN
-    IF char_length(v_name) < 2
+    IF v_name IS NULL
+       OR v_email IS NULL
+       OR v_company_name IS NULL
+       OR char_length(v_name) < 2
        OR char_length(v_name) > 160
        OR char_length(v_email) < 3
        OR char_length(v_email) > 320
@@ -220,7 +225,8 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    IF p_password_hash !~ '^[$]argon2id[$]' THEN
+    IF p_password_hash IS NULL
+       OR p_password_hash NOT LIKE '$argon2id$%' THEN
         RAISE EXCEPTION 'invalid_public_signup_password_hash'
             USING ERRCODE = '22023';
     END IF;
@@ -231,7 +237,7 @@ BEGIN
     END IF;
 
     IF p_tenant_slug IS NULL
-       OR p_tenant_slug !~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+       OR p_tenant_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$'
        OR char_length(p_tenant_slug) > 120 THEN
         RAISE EXCEPTION 'invalid_public_signup_tenant_slug'
             USING ERRCODE = '22023';
@@ -239,355 +245,6 @@ BEGIN
 
     IF p_consent_version IS NULL
        OR char_length(btrim(p_consent_version)) = 0 THEN
-        RAISE EXCEPTION 'invalid_public_signup_consent_version'
-            USING ERRCODE = '22023';
-    END IF;
-
-    INSERT INTO app_users (
-        email,
-        name,
-        status
-    )
-    VALUES (
-        v_email,
-        v_name,
-        'ACTIVE'
-    )
-    RETURNING id
-    INTO v_user_id;
-
-    INSERT INTO tenants (
-        name,
-        slug,
-        status
-    )
-    VALUES (
-        v_company_name,
-        p_tenant_slug,
-        'ACTIVE'
-    )
-    RETURNING id
-    INTO v_tenant_id;
-
-    INSERT INTO user_credentials (
-        user_id,
-        password_hash,
-        password_algorithm
-    )
-    VALUES (
-        v_user_id,
-        p_password_hash,
-        'argon2id'
-    );
-
-    INSERT INTO tenant_memberships (
-        tenant_id,
-        user_id,
-        role
-    )
-    VALUES (
-        v_tenant_id,
-        v_user_id,
-        'OWNER'
-    );
-
-    INSERT INTO tenant_onboarding_profiles (
-        tenant_id,
-        company_name,
-        cnpj,
-        terms_accepted_at,
-        privacy_policy_accepted_at,
-        consent_version
-    )
-    VALUES (
-        v_tenant_id,
-        v_company_name,
-        v_cnpj,
-        v_consent_at,
-        v_consent_at,
-        btrim(p_consent_version)
-    );
-
-    user_id := v_user_id;
-    tenant_id := v_tenant_id;
-    tenant_slug := p_tenant_slug;
-
-    RETURN NEXT;
-END;
-$$;
-
-REVOKE ALL
-ON FUNCTION auth_public_signup_create_account(
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    BOOLEAN,
-    TEXT,
-    TEXT
-)
-FROM PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION auth_public_signup_create_account(
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    BOOLEAN,
-    TEXT,
-    TEXT
-)
-TO radar_app;
-
-       OR char_length(p_tenant_slug) > 120 THEN
-        RAISE EXCEPTION 'invalid_public_signup_tenant_slug'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF char_length(btrim(p_consent_version)) = 0 THEN
-        RAISE EXCEPTION 'invalid_public_signup_consent_version'
-            USING ERRCODE = '22023';
-    END IF;
-
-    INSERT INTO app_users (
-        email,
-        name,
-        status
-    )
-    VALUES (
-        v_email,
-        v_name,
-        'ACTIVE'
-    )
-    RETURNING id
-    INTO v_user_id;
-
-    INSERT INTO tenants (
-        name,
-        slug,
-        status
-    )
-    VALUES (
-        v_company_name,
-        p_tenant_slug,
-        'ACTIVE'
-    )
-    RETURNING id
-    INTO v_tenant_id;
-
-    INSERT INTO user_credentials (
-        user_id,
-        password_hash,
-        password_algorithm
-    )
-    VALUES (
-        v_user_id,
-        p_password_hash,
-        'argon2id'
-    );
-
-    INSERT INTO tenant_memberships (
-        tenant_id,
-        user_id,
-        role
-    )
-    VALUES (
-        v_tenant_id,
-        v_user_id,
-        'OWNER'
-    );
-
-    INSERT INTO tenant_onboarding_profiles (
-        tenant_id,
-        company_name,
-        cnpj,
-        terms_accepted_at,
-        privacy_policy_accepted_at,
-        consent_version
-    )
-    VALUES (
-        v_tenant_id,
-        v_company_name,
-        v_cnpj,
-        v_consent_at,
-        v_consent_at,
-        btrim(p_consent_version)
-    );
-
-    user_id := v_user_id;
-    tenant_id := v_tenant_id;
-    tenant_slug := p_tenant_slug;
-
-    RETURN NEXT;
-END;
-$$;
-
-REVOKE ALL
-ON FUNCTION auth_public_signup_create_account(
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    BOOLEAN,
-    TEXT,
-    TEXT
-)
-FROM PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION auth_public_signup_create_account(
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    BOOLEAN,
-    TEXT,
-    TEXT
-)
-TO radar_app;
- THEN
-        RAISE EXCEPTION 'invalid_public_signup_identity'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF v_cnpj IS NOT NULL
-       AND v_cnpj !~ '^[0-9]{14}$' THEN
-        RAISE EXCEPTION 'invalid_public_signup_cnpj'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF p_password_hash !~ '^[$]argon2id[$]' THEN
-        RAISE EXCEPTION 'invalid_public_signup_password_hash'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF p_terms_accepted IS DISTINCT FROM TRUE THEN
-        RAISE EXCEPTION 'public_signup_consent_required'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF p_tenant_slug IS NULL
-       OR p_tenant_slug !~ '^[a-z0-9]+(?:-[a-z0-9]+)*
-        RAISE EXCEPTION 'invalid_public_signup_tenant_slug'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF p_consent_version IS NULL
-       OR char_length(btrim(p_consent_version)) = 0 THEN
-        RAISE EXCEPTION 'invalid_public_signup_consent_version'
-            USING ERRCODE = '22023';
-    END IF;
-
-    INSERT INTO app_users (
-        email,
-        name,
-        status
-    )
-    VALUES (
-        v_email,
-        v_name,
-        'ACTIVE'
-    )
-    RETURNING id
-    INTO v_user_id;
-
-    INSERT INTO tenants (
-        name,
-        slug,
-        status
-    )
-    VALUES (
-        v_company_name,
-        p_tenant_slug,
-        'ACTIVE'
-    )
-    RETURNING id
-    INTO v_tenant_id;
-
-    INSERT INTO user_credentials (
-        user_id,
-        password_hash,
-        password_algorithm
-    )
-    VALUES (
-        v_user_id,
-        p_password_hash,
-        'argon2id'
-    );
-
-    INSERT INTO tenant_memberships (
-        tenant_id,
-        user_id,
-        role
-    )
-    VALUES (
-        v_tenant_id,
-        v_user_id,
-        'OWNER'
-    );
-
-    INSERT INTO tenant_onboarding_profiles (
-        tenant_id,
-        company_name,
-        cnpj,
-        terms_accepted_at,
-        privacy_policy_accepted_at,
-        consent_version
-    )
-    VALUES (
-        v_tenant_id,
-        v_company_name,
-        v_cnpj,
-        v_consent_at,
-        v_consent_at,
-        btrim(p_consent_version)
-    );
-
-    user_id := v_user_id;
-    tenant_id := v_tenant_id;
-    tenant_slug := p_tenant_slug;
-
-    RETURN NEXT;
-END;
-$$;
-
-REVOKE ALL
-ON FUNCTION auth_public_signup_create_account(
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    BOOLEAN,
-    TEXT,
-    TEXT
-)
-FROM PUBLIC;
-
-GRANT EXECUTE
-ON FUNCTION auth_public_signup_create_account(
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    TEXT,
-    BOOLEAN,
-    TEXT,
-    TEXT
-)
-TO radar_app;
-
-       OR char_length(p_tenant_slug) > 120 THEN
-        RAISE EXCEPTION 'invalid_public_signup_tenant_slug'
-            USING ERRCODE = '22023';
-    END IF;
-
-    IF char_length(btrim(p_consent_version)) = 0 THEN
         RAISE EXCEPTION 'invalid_public_signup_consent_version'
             USING ERRCODE = '22023';
     END IF;
