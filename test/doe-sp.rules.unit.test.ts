@@ -122,6 +122,16 @@ test('DOE-SP normative identity: strong only for unambiguous numbering series', 
   assert.deepEqual(sefaz('PORTARIA SRE 43, DE 3 DE SETEMBRO DE 2026'), {
     agency: 'SEFAZ-SP/SRE', actType: 'PORTARIA', actNumber: '43/2026', designation: 'SRE', signedOn: '2026-09-03',
   });
+  // DOE-SP-40: a stray space after the thousands separator must not truncate the number
+  // (Leis 17.834 and 17.839 collided as "17/2023").
+  const lei = (title: string) => doeSpNormativeIdentity({ title, category: 'LEGISLATION' })?.actNumber;
+  assert.equal(lei('LEI Nº 17. 839, DE 1º DE NOVEMBRO DE 2023'), '17839/2023');
+  assert.equal(lei('LEI Nº 17.834, DE 1º DE NOVEMBRO DE 2023'), '17834/2023');
+  assert.equal(lei('LEI Nº 17839, DE 1º DE NOVEMBRO DE 2023'), '17839/2023');
+  assert.equal(lei('LEI Nº 17 .839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  assert.equal(lei('LEI Nº 17, 839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  assert.equal(lei('LEI Nº 1.234.567, DE 1º DE NOVEMBRO DE 2023'), '1234567/2023');
+  assert.equal(sefaz('RESOLUÇÃO SFP Nº 1.234, DE 3 DE SETEMBRO DE 2026'), undefined);
   assert.equal(sefaz('PORTARIA CONJUNTA SRE/STE 05, DE 3 DE SETEMBRO DE 2026')?.agency, 'SEFAZ-SP/SRE/STE');
   assert.equal(sefaz('PORTARIA CONJUNTA SRE/STE 05, DE 3 DE SETEMBRO DE 2026')?.actNumber, '5/2026');
   assert.equal(sefaz('COMUNICADO DICAR Nº 59, DE 1 DE SETEMBRO DE 2026')?.actNumber, '59/2026');
