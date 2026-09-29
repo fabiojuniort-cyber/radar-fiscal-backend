@@ -21,6 +21,49 @@ export const PUBLIC_SIGNUP_CONSENT_VERSION =
 const PUBLIC_SIGNUP_RATE_WINDOW_SECONDS = 15 * 60;
 const PUBLIC_SIGNUP_RATE_MAX_ATTEMPTS = 5;
 
+function isValidCnpj(
+  value: string,
+): boolean {
+  if (
+    !/^\d{14}$/.test(value) ||
+    /^(\d)\1{13}$/.test(value)
+  ) {
+    return false;
+  }
+
+  const calculateDigit = (
+    digits: string,
+    weights: number[],
+  ): number => {
+    const sum = weights.reduce(
+      (total, weight, index) =>
+        total +
+        Number(digits[index]) * weight,
+      0,
+    );
+    const remainder = sum % 11;
+    return remainder < 2
+      ? 0
+      : 11 - remainder;
+  };
+
+  const first = calculateDigit(
+    value.slice(0, 12),
+    [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
+  );
+
+  if (first !== Number(value[12])) {
+    return false;
+  }
+
+  const second = calculateDigit(
+    value.slice(0, 13),
+    [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
+  );
+
+  return second === Number(value[13]);
+}
+
 const optionalCnpjSchema = z
   .string()
   .trim()
@@ -39,7 +82,7 @@ const optionalCnpjSchema = z
   .refine(
     (value) =>
       value === null ||
-      value.length === 14,
+      isValidCnpj(value),
     'invalid_cnpj',
   );
 
