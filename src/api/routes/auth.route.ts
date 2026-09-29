@@ -19,6 +19,14 @@ import {
   revokeSession,
   rotateRefreshToken,
 } from '../../modules/auth/auth.service.js';
+import {
+  PublicSignupCompanyExistsError,
+  PublicSignupEmailExistsError,
+  PublicSignupRateLimitedError,
+  publicSignupBodySchema,
+  publicSignupErrorMetadata,
+  registerPublicAccount,
+} from '../../modules/auth/public-signup.service.js';
 
 const loginBodySchema = z.object({
   email: z.string().email().max(320),
@@ -80,6 +88,90 @@ export async function authRoutes(
   app: FastifyInstance,
 ): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.post(
+    '/auth/register',
+    async (request, reply) => {
+      const parsed =
+        publicSignupBodySchema.safeParse(
+          request.body,
+        );
+
+      if (!parsed.success) {
+        const invalidPassword =
+          parsed.error.issues.some(
+            (issue) =>
+              issue.path[0] === 'password' ||
+              issue.path[0] ===
+                'confirmPassword',
+          );
+
+        return reply.status(400).send({
+          error: invalidPassword
+            ? 'invalid_password'
+            : 'invalid_signup_data',
+        });
+      }
+
+      try {
+        const account =
+          await registerPublicAccount(
+            app.db,
+            parsed.data,
+          );
+
+        return reply.status(201).send({
+          ...account,
+          next: 'LOGIN',
+        });
+      } catch (error) {
+        if (
+          error instanceof
+          PublicSignupEmailExistsError
+        ) {
+          return reply.status(409).send({
+            error:
+              'email_already_registered',
+          });
+        }
+
+        if (
+          error instanceof
+          PublicSignupCompanyExistsError
+        ) {
+          return reply.status(409).send({
+            error:
+              'company_already_registered',
+          });
+        }
+
+        if (
+          error instanceof
+          PublicSignupRateLimitedError
+        ) {
+          reply.header(
+            'Retry-After',
+            String(
+              error.retryAfterSeconds,
+            ),
+          );
+
+          return reply.status(429).send({
+            error: 'too_many_requests',
+          });
+        }
+
+        request.log.error(
+          publicSignupErrorMetadata(error),
+          'Public signup failed',
+        );
+
+        return reply.status(500).send({
+          error: 'signup_failed',
+        });
+      }
+    },
+  );
 
   typed.post(
     '/auth/login',
