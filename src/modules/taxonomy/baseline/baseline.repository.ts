@@ -768,7 +768,7 @@ export async function persistRelations(
         '  status, qualifiers, justification, evidence_status',
         ') VALUES (',
         '  $1, $2, $3, $4,',
-        "  'APPROVED', $5::jsonb, $6, $7",
+        '  $5, $6::jsonb, $7, $8',
         ')',
       ].join('\n'),
       [
@@ -776,6 +776,7 @@ export async function persistRelations(
         sourceReleaseConceptId,
         targetReleaseConceptId,
         relationTypeId,
+        relation.status,
         JSON.stringify(relation.qualifiers),
         relation.sourceLocator,
         relation.evidenceStatus,
