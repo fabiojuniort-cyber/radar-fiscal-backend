@@ -27,6 +27,31 @@ if (!parsed.success) {
 
 const runtimeDatabaseUrl = parsed.data.DATABASE_URL;
 
+
+const TAXONOMY_TABLES = [
+  'taxonomy_releases',
+  'taxonomy_dimensions',
+  'taxonomy_dimension_revisions',
+  'taxonomy_release_dimensions',
+  'taxonomy_concepts',
+  'taxonomy_concept_revisions',
+  'taxonomy_release_concepts',
+  'taxonomy_aliases',
+  'taxonomy_release_alias_bindings',
+  'taxonomy_relation_types',
+  'taxonomy_release_relation_rules',
+  'taxonomy_concept_relations',
+  'taxonomy_evidence',
+  'taxonomy_concept_revision_evidence',
+  'taxonomy_alias_binding_evidence',
+  'taxonomy_relation_evidence',
+  'official_catalogs',
+  'official_catalog_editions',
+  'official_catalog_entries',
+  'taxonomy_official_mappings',
+  'taxonomy_official_mapping_evidence',
+] as const;
+
 const PROTECTED_TABLES = [
   'tenants',
   'tenant_memberships',
@@ -184,6 +209,72 @@ async function run(): Promise<void> {
     ) {
       throw new Error(
         'Runtime database privileges do not match the expected policy.',
+      );
+    }
+
+    const taxonomyPrivileges = await pool.query<{
+      table_name: string;
+      can_select: boolean;
+      can_insert: boolean;
+      can_update: boolean;
+      can_delete: boolean;
+    }>(
+      `
+        SELECT
+          table_name,
+          has_table_privilege(
+            current_user,
+            format('public.%I', table_name),
+            'SELECT'
+          ) AS can_select,
+          has_table_privilege(
+            current_user,
+            format('public.%I', table_name),
+            'INSERT'
+          ) AS can_insert,
+          has_table_privilege(
+            current_user,
+            format('public.%I', table_name),
+            'UPDATE'
+          ) AS can_update,
+          has_table_privilege(
+            current_user,
+            format('public.%I', table_name),
+            'DELETE'
+          ) AS can_delete
+        FROM unnest($1::text[]) AS t(table_name)
+      `,
+      [TAXONOMY_TABLES],
+    );
+
+    if (
+      taxonomyPrivileges.rows.length !== TAXONOMY_TABLES.length ||
+      taxonomyPrivileges.rows.some(
+        (row) =>
+          !row.can_select ||
+          row.can_insert ||
+          row.can_update ||
+          row.can_delete,
+      )
+    ) {
+      throw new Error(
+        'App runtime taxonomy privileges do not match read-only policy.',
+      );
+    }
+
+    const curatorMembership = await pool.query<{
+      is_curator_member: boolean;
+    }>(`
+      SELECT pg_has_role(
+        current_user,
+        'radar_taxonomy_curator',
+        'MEMBER'
+      ) AS is_curator_member
+    `);
+
+    if (curatorMembership.rows[0]?.is_curator_member) {
+      throw new Error(
+        'App runtime must not inherit taxonomy curator privileges.',
       );
     }
 
