@@ -202,6 +202,10 @@ test('HTML masquerading as archive is retried as a transient fetch failure', asy
       assert.equal(error.kind, 'FETCH_ERROR');
       assert.equal(error.retryable, true);
       assert.equal(error.retryAfterSeconds, 20);
+      assert.equal(error.metadata?.filename, '2026-09-18-DO1.zip');
+      assert.equal(error.metadata?.bodyKind, 'HTML');
+      assert.equal(error.metadata?.byteLength, 24);
+      assert.equal(JSON.stringify(error.metadata).includes('maintenance'), false);
       return true;
     },
   );

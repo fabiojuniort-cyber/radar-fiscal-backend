@@ -216,3 +216,58 @@ Decisão nesta frente:
 - não criar nova `identity_version` agora;
 - manter o ponto sob observação durante backfill/amostras futuras;
 - se surgir caso oficial em que a própria data original seja corrigida sem nova identidade editorial de retificação/republicação, retornar ao Gerente Geral antes de qualquer mudança estrutural.
+
+## CONFAZ-RECOVERY — diagnóstico e correção (2026-09-29)
+
+### Causa raiz comprovada
+
+Probe controlado no Railway (região `sfo`, egress Railway, sem secrets e sem banco):
+
+| Host | IP | DNS | TCP 443 | TCP 80 |
+| --- | --- | --- | --- | --- |
+| `www.confaz.fazenda.gov.br` | 189.9.128.86 (sem AAAA) | ok | timeout 12 s | timeout 12 s |
+| `www.fazenda.gov.br` | 189.9.129.173 | ok | timeout | timeout |
+| `www25.receita.fazenda.gov.br` | 189.9.113.x | ok | ok (~190 ms) | ok |
+| `normas.receita.fazenda.gov.br` | 189.9.177.66 | ok | ok | ok |
+| `www.nfe.fazenda.gov.br` | 200.198.239.19 | ok | ok | ok |
+| `inlabs.in.gov.br` / `www.in.gov.br` | 170.246.254.40 / 179.191.x | ok | ok | ok |
+
+- A falha acontece **antes do TLS**: nenhum SYN-ACK do host. TLS (HTTP/1.1 e h2) e HTTP com user-agent do Radar ou de navegador expiram igualmente.
+- Não é DNS, TLS, 403, 429 nem 5xx. É descarte de rede no segmento `189.9.128–129.x` (CONFAZ e portal da Fazenda) para esta origem, enquanto outros hosts federais da mesma operadora respondem normalmente.
+- O mesmo comportamento já havia sido observado em SFO, IAD, AMS e através de proxy de datacenter nos EUA. Trocar o IP por outro IP estrangeiro/de datacenter não é evidência de solução.
+- `https://www.gov.br/confaz/pt-br` existe, mas redireciona para login (não é espelho público do acervo).
+
+### Arquitetura escolhida
+
+D-006 continua valendo: **DOU é a fonte PRIMARY dos atos CONFAZ formalmente publicados**; o portal CONFAZ é ENRICHMENT.
+
+- O conector DOU já extrai Convênios ICMS, Ajustes SINIEF, Protocolos ICMS e Atos COTEPE/ICMS publicados diretamente ou embutidos em Despachos do CONFAZ, com URL certificada do DOU e `sourceRole: PRIMARY`.
+- DOU e portal geram a **mesma identidade forte** (`FEDERAL + CONFAZ + tipo + número/ano + publishedOn`). Quando o portal voltar a ser alcançável, o mesmo ato recebe um segundo `publication_origin`, sem duplicar a publicação global. Isso é coberto por teste com os parsers reais das duas fontes.
+- Retificação/republicação: no portal recebe tipo próprio (`RETIFICAÇÃO DE …`), com identidade distinta do ato original. No DOU, retificações não recebem número de ato e ficam com identidade source-scoped. Nunca são colapsadas no original.
+- Relay/egress brasileiro (GRU) fica como enriquecimento opcional e só deve ser adotado com probe real bem-sucedido a partir do Brasil.
+
+### Mudanças no conector CONFAZ (`confaz-1.1.0`)
+
+- Classificação da falha de transporte: `DNS_FAILURE`, `TCP_CONNECT_TIMEOUT`, `CONNECTION_REFUSED`, `NETWORK_UNREACHABLE`, `TLS_FAILURE`, `CONNECTION_RESET`, `RESPONSE_TIMEOUT`, `UNKNOWN_NETWORK_ERROR`.
+- **Curto-circuito:** se o primeiro índice da tentativa falha antes de alcançar o host (DNS/TCP/refused/unreachable), a tentativa termina com `SOURCE_UNAVAILABLE / CONFAZ_HOST_UNREACHABLE`, retryable, em vez de repetir o mesmo connect nos demais índices (≈10 s em vez de ≈42 s por tentativa). A política de retry do motor e `max_attempts` continuam iguais.
+- Falhas HTTP (5xx/429) e falhas de páginas de detalhe após um índice alcançado **não** entram em curto-circuito.
+- Metadata de attempt: `route` (`DIRECT`), `sourceConsulted` (`true` somente quando ao menos um índice respondeu), `failureClass`, `indexesPlanned`/`indexesAttempted`.
+- Timeout de conexão, retries e agenda (`35 * * * *`) não foram reduzidos nem alterados.
+
+### Mudanças no conector DOU (rota PRIMARY)
+
+Em 29/09/2026, o run DOU de produção estava em retry persistente havia vários dias (tentativa nº 9.514) com `INLABS_INVALID_DOWNLOAD`. Um único pacote respondia 200 com corpo não-ZIP, e isso impedia a persistência de todos os demais, inclusive dos atos CONFAZ.
+
+- `INLABS_INVALID_DOWNLOAD` passa a carregar diagnóstico apenas de forma: `filename`, `contentType`, `byteLength`, `magicHex` (4 bytes) e `bodyKind` (`HTML`/`JSON`/`EMPTY`/`OTHER`). O corpo nunca é propagado.
+- No conector DOU, esse erro isola o pacote afetado: ele entra em `partialFailures` e `archives[].state = INVALID_DOWNLOAD`, **sem receipt** (é retentado em toda execução seguinte), e os demais pacotes seguem para persistência. O run termina `PARTIAL_SUCCESS`, nunca `SUCCESS_NO_RESULTS`.
+- Login, sessão expirada, manutenção e bloqueio WAF continuam falhando a tentativa inteira, como antes.
+- `readDouSourceState` continua **sem** aceitar `PARTIAL_SUCCESS` como checkpoint, porque o run parcial pode ter falhado também na persistência de itens. Enquanto um pacote permanecer inválido, os demais pacotes serão reprocessados a cada run, o que é idempotente pela deduplicação global. As datas recentes saem da janela em até três dias.
+
+### Monitoramento (`npm run db:inspect-confaz`)
+
+Além de fonte, runs, publicações e versões do portal, o comando agora mostra:
+
+- `summary.portalLastRunStatus`, `portalConsulted`, `portalRoute`, `portalFailureClass` e `portalErrorCode`;
+- `summary.douLastRunStatus` e `summary.confazActsViaDou`;
+- `summary.publications_with_portal_and_dou_origins` (sobreposição sem duplicidade);
+- `dou.confazCoverageByActType`, `dou.latestConfazActs` e `dou.runs`.
