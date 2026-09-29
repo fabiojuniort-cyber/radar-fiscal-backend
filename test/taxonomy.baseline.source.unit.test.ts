@@ -102,3 +102,33 @@ test('divergent source lock is blocked', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('one-byte TAX-04 tamper is blocked', async () => {
+  const dir = await mkdtemp(
+    join(tmpdir(), 'taxonomy-tax04-tamper-'),
+  );
+
+  try {
+    const [source, lock] = await Promise.all([
+      readFile(TAX04_MIRROR_PATH),
+      readFile(TAX04_LOCK_PATH, 'utf8'),
+    ]);
+    const tampered = Buffer.from(source);
+    const index = Math.max(0, tampered.length - 2);
+    tampered[index] =
+      tampered[index] === 32 ? 33 : 32;
+
+    await writeFile(join(dir, 'source.md'), tampered);
+    await writeFile(join(dir, 'lock.json'), lock);
+
+    await assert.rejects(
+      verifyMirror(
+        join(dir, 'source.md'),
+        join(dir, 'lock.json'),
+      ),
+      /BASELINE_SOURCE_INTEGRITY_FAILURE/,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
