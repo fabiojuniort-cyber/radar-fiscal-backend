@@ -1,0 +1,4 @@
+FROM postgres:18
+COPY ops/taxonomy/tax-act-clone.sh /usr/local/bin/tax-act-clone
+RUN chmod +x /usr/local/bin/tax-act-clone
+ENTRYPOINT ["/usr/local/bin/tax-act-clone"]
