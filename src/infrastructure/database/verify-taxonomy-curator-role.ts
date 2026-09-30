@@ -407,7 +407,7 @@ async function run(): Promise<void> {
       review_update: boolean;
       review_delete: boolean;
       effective_select: boolean;
-    }>(\`
+    }>(`
       SELECT
         has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_runs','SELECT') AS run_select,
         has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_runs','INSERT') AS run_insert,
@@ -420,7 +420,7 @@ async function run(): Promise<void> {
         has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_reviews','UPDATE') AS review_update,
         has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_reviews','DELETE') AS review_delete,
         has_table_privilege('radar_taxonomy_curator','public.v_publication_taxonomy_effective_assertions','SELECT') AS effective_select
-    \`);
+    `);
     const classPolicy = classification.rows[0];
     if (
       !classPolicy ||
