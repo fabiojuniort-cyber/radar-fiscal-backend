@@ -293,6 +293,7 @@ try {
         run_id,
         taxonomy_release_id,
         release_concept_id,
+        assertion_status,
         confidence,
         decision_origin,
         reason_code
@@ -301,6 +302,7 @@ try {
         $1,
         $2,
         $3,
+        'CONFIRMED',
         1,
         'RULE',
         'TAX_ACT_SMOKE'
