@@ -13,6 +13,7 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 
 const companyBodySchema = z.object({
   legalName: z.string().trim().min(2).max(200),
@@ -76,6 +77,54 @@ const taxProfileBodySchema = z.object({
     keywords: z.array(z.string().trim().min(1).max(120)).max(100).default([]),
   }),
 });
+
+function recordValue(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function publicationPresentation(
+  sourceMetadata: unknown,
+): {
+  version: 1;
+  format: 'SANITIZED_HTML' | 'PRESERVED_TEXT';
+  preservesWhitespace: boolean;
+  html?: string;
+} {
+  const rawPresentation = recordValue(
+    recordValue(sourceMetadata)?.presentation,
+  );
+
+  if (
+    rawPresentation?.format === 'SANITIZED_HTML' &&
+    typeof rawPresentation.html === 'string'
+  ) {
+    const sanitized =
+      sanitizeLegalPresentationHtml(
+        rawPresentation.html,
+      );
+
+    if (sanitized) {
+      return {
+        version: 1,
+        format: 'SANITIZED_HTML',
+        preservesWhitespace: true,
+        html: sanitized,
+      };
+    }
+  }
+
+  return {
+    version: 1,
+    format: 'PRESERVED_TEXT',
+    preservesWhitespace: true,
+  };
+}
 
 const companyIdParamsSchema = z.object({
   companyId: z.string().uuid(),
@@ -799,6 +848,7 @@ export async function productRoutes(
           'pv.version_no',
           'pv.content_text',
           'pv.relevant_excerpt',
+          'pv.source_metadata',
           'pv.captured_at',
         ])
         .where('p.id', '=', request.params.publicationId)
@@ -863,11 +913,10 @@ export async function productRoutes(
               capturedAt: row.captured_at
                 ? new Date(row.captured_at).toISOString()
                 : null,
-              presentation: {
-                version: 1,
-                format: 'PRESERVED_TEXT',
-                preservesWhitespace: true,
-              },
+              presentation:
+                publicationPresentation(
+                  row.source_metadata,
+                ),
             }
           : null,
         origins: origins.map((origin) => ({
