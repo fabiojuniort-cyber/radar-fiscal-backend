@@ -1471,6 +1471,157 @@ export async function productRoutes(
   );
 
   typed.get(
+    '/api/v1/taxonomy/profile-options',
+    {
+      preHandler: app.authenticate,
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select([
+                'id',
+                'version',
+                'published_at',
+              ])
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+
+            if (!release) {
+              return {
+                release: null,
+                dimensions: [],
+              };
+            }
+
+            const allowedDimensions = [
+              'tax',
+              'theme',
+              'treatment',
+              'regime',
+              'operation',
+              'operation_scope',
+              'operation_purpose',
+              'operation_channel',
+              'document',
+              'obligation',
+              'sector',
+              'product',
+              'subject',
+              'event',
+              'impact_operational',
+              'impact_system',
+            ];
+
+            const dimensions = await trx
+              .selectFrom('taxonomy_release_dimensions as rd')
+              .innerJoin(
+                'taxonomy_dimensions as d',
+                'd.id',
+                'rd.dimension_id',
+              )
+              .innerJoin(
+                'taxonomy_dimension_revisions as dr',
+                'dr.id',
+                'rd.dimension_revision_id',
+              )
+              .select([
+                'd.id',
+                'd.code',
+                'dr.name',
+                'dr.description',
+              ])
+              .where('rd.release_id', '=', release.id)
+              .where('rd.membership_status', '=', 'INCLUDED')
+              .where('d.code', 'in', allowedDimensions)
+              .orderBy('dr.name')
+              .execute();
+
+            const concepts = await trx
+              .selectFrom('taxonomy_release_concepts as rc')
+              .innerJoin(
+                'taxonomy_concepts as c',
+                'c.id',
+                'rc.concept_id',
+              )
+              .innerJoin(
+                'taxonomy_concept_revisions as cr',
+                'cr.id',
+                'rc.concept_revision_id',
+              )
+              .innerJoin(
+                'taxonomy_dimensions as d',
+                'd.id',
+                'c.dimension_id',
+              )
+              .select([
+                'd.code as dimension_code',
+                'c.code',
+                'cr.label',
+                'cr.definition',
+              ])
+              .where('rc.release_id', '=', release.id)
+              .where('rc.membership_status', '=', 'INCLUDED')
+              .where('d.code', 'in', allowedDimensions)
+              .orderBy('d.code')
+              .orderBy('cr.label')
+              .execute();
+
+            return {
+              release: {
+                id: release.id,
+                version: release.version,
+                publishedAt: release.published_at
+                  ? new Date(release.published_at).toISOString()
+                  : null,
+              },
+              dimensions: dimensions.map((dimension) => ({
+                code: dimension.code,
+                name: dimension.name,
+                description: dimension.description,
+                concepts: concepts
+                  .filter(
+                    (concept) =>
+                      concept.dimension_code === dimension.code,
+                  )
+                  .map((concept) => ({
+                    code: concept.code,
+                    label: concept.label,
+                    definition: concept.definition,
+                  })),
+              })),
+            };
+          },
+        );
+
+        return reply.status(200).send(result);
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
     '/api/v1/companies/:companyId/tax-profile',
     {
       preHandler: app.authenticate,
@@ -1584,6 +1735,45 @@ export async function productRoutes(
               return 'COMPANY_NOT_FOUND' as const;
             }
 
+            const taxonomy =
+              request.body.personalization.taxonomy;
+
+            if (taxonomy) {
+              const release = await trx
+                .selectFrom('taxonomy_releases')
+                .select(['id', 'version'])
+                .where('id', '=', taxonomy.releaseId)
+                .where('version', '=', taxonomy.releaseVersion)
+                .where('status', '=', 'PUBLISHED')
+                .executeTakeFirst();
+
+              if (!release) {
+                return 'INVALID_TAXONOMY_RELEASE' as const;
+              }
+
+              if (taxonomy.conceptCodes.length > 0) {
+                const concepts = await trx
+                  .selectFrom('taxonomy_release_concepts as rc')
+                  .innerJoin(
+                    'taxonomy_concepts as c',
+                    'c.id',
+                    'rc.concept_id',
+                  )
+                  .select('c.code')
+                  .where('rc.release_id', '=', taxonomy.releaseId)
+                  .where('rc.membership_status', '=', 'INCLUDED')
+                  .where('c.code', 'in', taxonomy.conceptCodes)
+                  .execute();
+
+                if (
+                  new Set(concepts.map((concept) => concept.code)).size !==
+                  new Set(taxonomy.conceptCodes).size
+                ) {
+                  return 'INVALID_TAXONOMY_SELECTION' as const;
+                }
+              }
+            }
+
             const current = await trx
               .selectFrom('company_tax_profiles')
               .select(['id', 'version_no'])
@@ -1637,6 +1827,14 @@ export async function productRoutes(
 
         if (profile === 'COMPANY_NOT_FOUND') {
           return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        if (profile === 'INVALID_TAXONOMY_RELEASE') {
+          return reply.status(409).send({ error: 'taxonomy_release_not_available' });
+        }
+
+        if (profile === 'INVALID_TAXONOMY_SELECTION') {
+          return reply.status(400).send({ error: 'invalid_taxonomy_selection' });
         }
 
         return reply.status(200).send({
