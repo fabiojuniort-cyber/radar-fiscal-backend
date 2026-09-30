@@ -9,6 +9,7 @@ import {
 import { authRoutes } from './api/routes/auth.route.js';
 import { healthRoutes } from './api/routes/health.route.js';
 import { publicRoutes } from './api/routes/public.route.js';
+import { productRoutes } from './api/routes/product.route.js';
 import { createDatabase } from './infrastructure/database/client.js';
 import { loggerOptions } from './infrastructure/logging/logger.js';
 import { registerAuthSupport } from './modules/auth/auth.plugin.js';
@@ -34,6 +35,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(healthRoutes);
   await app.register(publicRoutes);
   await app.register(authRoutes);
+  await app.register(productRoutes);
 
   return app;
 }
