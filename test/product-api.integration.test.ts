@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import {
+  randomBytes,
+  randomUUID,
+} from 'node:crypto';
 import test from 'node:test';
 
 import type { FastifyInstance } from 'fastify';
@@ -112,6 +115,7 @@ test(
     const app = await buildApp();
     const users: string[] = [];
     const tenants: string[] = [];
+    const publications: string[] = [];
 
     try {
       await app.ready();
@@ -331,6 +335,120 @@ test(
         1,
       );
 
+      const archivePublication =
+        await admin.query<{
+          id: string;
+        }>(
+          `
+            INSERT INTO publications (
+              identity_hash,
+              identity_strength,
+              identity_basis,
+              jurisdiction_level,
+              title,
+              published_on
+            )
+            VALUES (
+              $1,
+              'STRONG',
+              '{}'::jsonb,
+              'FEDERAL',
+              'Ato oficial para busca do Acervo',
+              DATE '2026-09-30'
+            )
+            RETURNING id
+          `,
+          [
+            randomBytes(32).toString(
+              'hex',
+            ),
+          ],
+        );
+
+      const archivePublicationId =
+        archivePublication.rows[0]?.id;
+
+      assert.ok(archivePublicationId);
+      publications.push(
+        archivePublicationId,
+      );
+
+      await admin.query(
+        `
+          INSERT INTO publication_versions (
+            publication_id,
+            version_no,
+            content_hash,
+            content_text,
+            relevant_excerpt,
+            is_current
+          )
+          VALUES (
+            $1,
+            1,
+            $2,
+            $3,
+            $4,
+            true
+          )
+        `,
+        [
+          archivePublicationId,
+          randomBytes(32).toString(
+            'hex',
+          ),
+          'Norma sobre crédito presumido aplicável a fertilizantes.',
+          'Crédito presumido para fertilizantes.',
+        ],
+      );
+
+      const archiveSearch =
+        await app.inject({
+          method: 'GET',
+          url:
+            '/api/v1/archive?q=fertilizantes&page=1&limit=1',
+          headers: {
+            authorization:
+              'Bearer ' +
+              first.accessToken,
+          },
+        });
+
+      assert.equal(
+        archiveSearch.statusCode,
+        200,
+      );
+
+      const archiveBody =
+        archiveSearch.json<{
+          page: number;
+          limit: number;
+          hasMore: boolean;
+          items: Array<{
+            id: string;
+            title: string;
+            excerpt: string | null;
+          }>;
+        }>();
+
+      assert.equal(
+        archiveBody.page,
+        1,
+      );
+      assert.equal(
+        archiveBody.limit,
+        1,
+      );
+      assert.equal(
+        archiveBody.items[0]?.id,
+        archivePublicationId,
+      );
+      assert.match(
+        archiveBody.items[0]?.excerpt ??
+          '',
+        /fertilizantes/i,
+      );
+
       const crossTenantCompanyRead =
         await app.inject({
           method: 'GET',
@@ -357,6 +475,13 @@ test(
       );
     } finally {
       await app.close();
+
+      if (publications.length > 0) {
+        await admin.query(
+          'DELETE FROM publications WHERE id = ANY($1::uuid[])',
+          [publications],
+        );
+      }
 
       if (users.length > 0) {
         await admin.query(
