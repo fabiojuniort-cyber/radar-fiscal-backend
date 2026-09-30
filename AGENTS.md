@@ -21,3 +21,14 @@ Regras para cadastro por CNPJ e perfil do Sonar:
 - exclusão de empresa/estabelecimento é lógica (`is_active=false`) para preservar histórico; matriz só é desativada junto com a empresa;
 - o Perfil Tributário mistura contexto cadastral automático com seleção manual baseada em conceitos de uma release `PUBLISHED` da Taxonomia TriBusca;
 - salvar códigos canônicos e `releaseId/releaseVersion` no perfil para permitir matching reprodutível; nunca converter a taxonomia em tags livres.
+
+
+### Inscrição Estadual
+
+- Inscrição Estadual é dado estadual e não deve ser inferida a partir do cadastro CNPJ/RFB.
+- Após resolver o CNPJ e a UF, a aplicação pode consultar a fonte oficial estadual (SEFAZ/SINTEGRA) por conector independente da UF.
+- Persistir IE junto com proveniência: fonte, horário, situação retornada e estado da tentativa.
+- Estados mínimos da tentativa: `SUCCESS`, `NOT_FOUND`, `UNAVAILABLE` e `NOT_SUPPORTED`; nunca converter indisponibilidade em ausência de IE.
+- Consulta estadual não deve bloquear a criação do estabelecimento quando a RFB já respondeu; falha estadual é enriquecimento incompleto.
+- UFs com CAPTCHA, Gov.br ou outro desafio humano não podem ser automatizadas por bypass. Nesses casos, manter IE editável/manual e informar que a automação está indisponível ou em implementação.
+- Reconsulta cadastral deve atualizar RFB e tentar novamente a consulta estadual suportada.
