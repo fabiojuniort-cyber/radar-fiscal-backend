@@ -21,7 +21,8 @@ export type CnpjRegistryRecord = {
   cnaes: CnpjRegistryCnae[];
   source:
     | 'BRASILAPI_MINHA_RECEITA'
-    | 'MINHA_RECEITA_DIRECT';
+    | 'MINHA_RECEITA_DIRECT'
+    | 'CNPJ_WS_PUBLIC';
   consultedAt: string;
 };
 
@@ -260,34 +261,152 @@ export function parseBrasilApiCnpj(
   };
 }
 
+export function parseCnpjWsCnpj(
+  payload: unknown,
+  consultedAt = new Date(),
+): CnpjRegistryRecord {
+  const row = recordValue(payload);
+  const establishment = recordValue(
+    row?.estabelecimento,
+  );
+  const state = recordValue(
+    establishment?.estado,
+  );
+  const city = recordValue(
+    establishment?.cidade,
+  );
+  const primaryActivity = recordValue(
+    establishment?.atividade_principal,
+  );
+
+  if (!row || !establishment) {
+    throw new CnpjRegistryError(
+      'cnpj_provider_invalid_response',
+    );
+  }
+
+  const streetType = textValue(
+    establishment.tipo_logradouro,
+  );
+  const streetName = textValue(
+    establishment.logradouro,
+  );
+  const street = [streetType, streetName]
+    .filter((value): value is string =>
+      Boolean(value),
+    )
+    .join(' ') || null;
+
+  return parseBrasilApiCnpj(
+    {
+      cnpj: establishment.cnpj,
+      razao_social: row.razao_social,
+      nome_fantasia:
+        establishment.nome_fantasia,
+      uf: state?.sigla,
+      municipio: city?.nome,
+      codigo_municipio_ibge:
+        city?.ibge_id,
+      cep: establishment.cep,
+      logradouro: street,
+      numero: establishment.numero,
+      complemento:
+        establishment.complemento,
+      bairro: establishment.bairro,
+      descricao_situacao_cadastral:
+        establishment.situacao_cadastral,
+      data_inicio_atividade:
+        establishment.data_inicio_atividade,
+      cnae_fiscal:
+        primaryActivity?.id,
+      cnae_fiscal_descricao:
+        primaryActivity?.descricao,
+      cnaes_secundarios:
+        Array.isArray(
+          establishment.atividades_secundarias,
+        )
+          ? establishment.atividades_secundarias.map(
+              (activity) => {
+                const item =
+                  recordValue(activity);
+
+                return {
+                  codigo: item?.id,
+                  descricao:
+                    item?.descricao,
+                };
+              },
+            )
+          : [],
+    },
+    consultedAt,
+    'CNPJ_WS_PUBLIC',
+  );
+}
+
 type RegistryProvider = {
   url: (cnpj: string) => string;
   source: CnpjRegistryRecord['source'];
+  parse: (
+    payload: unknown,
+    consultedAt: Date,
+  ) => CnpjRegistryRecord;
 };
 
-const REGISTRY_PROVIDERS: RegistryProvider[] = [
-  {
-    url: (cnpj) =>
-      `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,
-    source: 'BRASILAPI_MINHA_RECEITA',
-  },
-  {
-    url: (cnpj) =>
-      `https://minhareceita.org/${cnpj}`,
-    source: 'MINHA_RECEITA_DIRECT',
-  },
-];
+const PRIMARY_REGISTRY_PROVIDERS:
+  RegistryProvider[] = [
+    {
+      url: (cnpj) =>
+        `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,
+      source: 'BRASILAPI_MINHA_RECEITA',
+      parse: (payload, consultedAt) =>
+        parseBrasilApiCnpj(
+          payload,
+          consultedAt,
+          'BRASILAPI_MINHA_RECEITA',
+        ),
+    },
+    {
+      url: (cnpj) =>
+        `https://minhareceita.org/${cnpj}`,
+      source: 'MINHA_RECEITA_DIRECT',
+      parse: (payload, consultedAt) =>
+        parseBrasilApiCnpj(
+          payload,
+          consultedAt,
+          'MINHA_RECEITA_DIRECT',
+        ),
+    },
+  ];
+
+const FALLBACK_REGISTRY_PROVIDERS:
+  RegistryProvider[] = [
+    {
+      url: (cnpj) =>
+        `https://publica.cnpj.ws/cnpj/${cnpj}`,
+      source: 'CNPJ_WS_PUBLIC',
+      parse: (payload, consultedAt) =>
+        parseCnpjWsCnpj(
+          payload,
+          consultedAt,
+        ),
+    },
+  ];
+
+type RegistryProviderResult =
+  | {
+      kind: 'success';
+      record: CnpjRegistryRecord;
+    }
+  | { kind: 'not_found' }
+  | { kind: 'invalid' }
+  | { kind: 'unavailable' };
 
 async function fetchRegistryProvider(
   provider: RegistryProvider,
   normalizedCnpj: string,
   fetcher: RegistryFetch,
-): Promise<
-  | { kind: 'success'; record: CnpjRegistryRecord }
-  | { kind: 'not_found' }
-  | { kind: 'invalid' }
-  | { kind: 'unavailable' }
-> {
+): Promise<RegistryProviderResult> {
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
@@ -324,10 +443,9 @@ async function fetchRegistryProvider(
     }
 
     try {
-      const record = parseBrasilApiCnpj(
+      const record = provider.parse(
         payload,
         new Date(),
-        provider.source,
       );
 
       if (record.cnpj !== normalizedCnpj) {
@@ -356,6 +474,72 @@ async function fetchRegistryProvider(
   }
 }
 
+async function fetchFirstSuccessfulProvider(
+  providers: RegistryProvider[],
+  normalizedCnpj: string,
+  fetcher: RegistryFetch,
+): Promise<{
+  success?: CnpjRegistryRecord;
+  outcomes: RegistryProviderResult[];
+}> {
+  const outcomes = new Array<
+    RegistryProviderResult | undefined
+  >(providers.length);
+
+  return new Promise((resolve) => {
+    let pending = providers.length;
+    let settled = false;
+
+    const finishWithoutSuccess = () => {
+      if (pending !== 0 || settled) return;
+
+      settled = true;
+      resolve({
+        outcomes:
+          outcomes.filter(
+            (
+              outcome,
+            ): outcome is RegistryProviderResult =>
+              outcome !== undefined,
+          ),
+      });
+    };
+
+    providers.forEach(
+      (provider, index) => {
+        void fetchRegistryProvider(
+          provider,
+          normalizedCnpj,
+          fetcher,
+        ).then((outcome) => {
+          outcomes[index] = outcome;
+          pending -= 1;
+
+          if (
+            outcome.kind === 'success' &&
+            !settled
+          ) {
+            settled = true;
+            resolve({
+              success: outcome.record,
+              outcomes:
+                outcomes.filter(
+                  (
+                    current,
+                  ): current is RegistryProviderResult =>
+                    current !== undefined,
+                ),
+            });
+            return;
+          }
+
+          finishWithoutSuccess();
+        });
+      },
+    );
+  });
+}
+
 export async function lookupCnpjRegistry(
   cnpj: string,
   fetcher: RegistryFetch = fetch,
@@ -363,38 +547,50 @@ export async function lookupCnpjRegistry(
   const normalized =
     cnpj.replace(/\D/g, '');
 
-  let sawNotFound = false;
-  let sawInvalid = false;
+  const primary =
+    await fetchFirstSuccessfulProvider(
+      PRIMARY_REGISTRY_PROVIDERS,
+      normalized,
+      fetcher,
+    );
 
-  for (const provider of REGISTRY_PROVIDERS) {
-    const result =
-      await fetchRegistryProvider(
-        provider,
-        normalized,
-        fetcher,
-      );
-
-    if (result.kind === 'success') {
-      return result.record;
-    }
-
-    if (result.kind === 'not_found') {
-      sawNotFound = true;
-      continue;
-    }
-
-    if (result.kind === 'invalid') {
-      sawInvalid = true;
-    }
+  if (primary.success) {
+    return primary.success;
   }
 
-  if (sawNotFound) {
+  const fallback =
+    await fetchFirstSuccessfulProvider(
+      FALLBACK_REGISTRY_PROVIDERS,
+      normalized,
+      fetcher,
+    );
+
+  if (fallback.success) {
+    return fallback.success;
+  }
+
+  const outcomes = [
+    ...primary.outcomes,
+    ...fallback.outcomes,
+  ];
+
+  if (
+    outcomes.some(
+      (outcome) =>
+        outcome.kind === 'not_found',
+    )
+  ) {
     throw new CnpjRegistryError(
       'cnpj_not_found',
     );
   }
 
-  if (sawInvalid) {
+  if (
+    outcomes.some(
+      (outcome) =>
+        outcome.kind === 'invalid',
+    )
+  ) {
     throw new CnpjRegistryError(
       'cnpj_provider_invalid_response',
     );
