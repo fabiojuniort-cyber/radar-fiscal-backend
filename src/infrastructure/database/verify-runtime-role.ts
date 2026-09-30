@@ -55,6 +55,7 @@ const TAXONOMY_TABLES = [
 const PROTECTED_TABLES = [
   'tenants',
   'tenant_memberships',
+  'tenant_onboarding_profiles',
   'companies',
   'company_tax_profiles',
   'establishments',
@@ -155,6 +156,11 @@ async function run(): Promise<void> {
       can_update_audit: boolean;
       can_read_checkpoints: boolean;
       can_read_capacity: boolean;
+      can_read_signup_profile: boolean;
+      can_insert_signup_profile: boolean;
+      can_read_signup_rate_limits: boolean;
+      can_execute_signup_create: boolean;
+      can_execute_signup_rate_limit: boolean;
       is_monitor_member: boolean;
     }>(`
       SELECT
@@ -188,6 +194,31 @@ async function run(): Promise<void> {
           'public.db_capacity_snapshots',
           'SELECT'
         ) AS can_read_capacity,
+        has_table_privilege(
+          current_user,
+          'public.tenant_onboarding_profiles',
+          'SELECT'
+        ) AS can_read_signup_profile,
+        has_table_privilege(
+          current_user,
+          'public.tenant_onboarding_profiles',
+          'INSERT'
+        ) AS can_insert_signup_profile,
+        has_table_privilege(
+          current_user,
+          'public.public_signup_rate_limits',
+          'SELECT'
+        ) AS can_read_signup_rate_limits,
+        has_function_privilege(
+          current_user,
+          'public.auth_public_signup_create_account(text,text,text,text,text,boolean,text,text)',
+          'EXECUTE'
+        ) AS can_execute_signup_create,
+        has_function_privilege(
+          current_user,
+          'public.auth_public_signup_rate_limit(text,integer,integer)',
+          'EXECUTE'
+        ) AS can_execute_signup_rate_limit,
         pg_has_role(
           current_user,
           'pg_monitor',
@@ -205,6 +236,11 @@ async function run(): Promise<void> {
       privilege.can_update_audit ||
       privilege.can_read_checkpoints ||
       privilege.can_read_capacity ||
+      !privilege.can_read_signup_profile ||
+      privilege.can_insert_signup_profile ||
+      privilege.can_read_signup_rate_limits ||
+      !privilege.can_execute_signup_create ||
+      !privilege.can_execute_signup_rate_limit ||
       privilege.is_monitor_member
     ) {
       throw new Error(
