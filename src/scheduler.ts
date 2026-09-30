@@ -8,6 +8,7 @@ import { Pool } from 'pg';
 
 import { processLogger } from './infrastructure/logging/process-logger.js';
 import { runCapacitySnapshotIfDue } from './modules/operations/db-capacity.js';
+import { SourceHealthWatchdog } from './modules/operations/source-health.js';
 import {
   floorToUtcMinute,
 } from './modules/collection/cron.js';
@@ -55,6 +56,14 @@ async function run(): Promise<void> {
   });
 
   let lastEvaluatedMinute: string | undefined;
+
+  const sourceHealth = env.SOURCE_HEALTH_ENABLED
+    ? new SourceHealthWatchdog({
+        intervalMs: env.SOURCE_HEALTH_INTERVAL_MS,
+        realertAfterMs: env.SOURCE_HEALTH_REALERT_MS,
+        logger: processLogger,
+      })
+    : undefined;
 
   // Optional dedicated monitoring connection, used only to measure WAL.
   const monitor = env.CAPACITY_SNAPSHOTS_ENABLED && env.DATABASE_MONITOR_URL
@@ -113,6 +122,23 @@ async function run(): Promise<void> {
             },
             'Collection scheduler tick failed',
           );
+        }
+
+        // Source health: read-only and isolated from run creation.
+        if (sourceHealth) {
+          try {
+            await sourceHealth.runIfDue(db, now);
+          } catch (error) {
+            processLogger.error(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Unknown source health error',
+              },
+              'Source health check failed',
+            );
+          }
         }
 
         // Storage telemetry: isolated from collection scheduling (a failure
