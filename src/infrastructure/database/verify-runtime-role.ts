@@ -50,6 +50,11 @@ const TAXONOMY_TABLES = [
   'official_catalog_entries',
   'taxonomy_official_mappings',
   'taxonomy_official_mapping_evidence',
+  'publication_taxonomy_runs',
+  'publication_taxonomy_assertions',
+  'publication_taxonomy_spans',
+  'publication_taxonomy_reviews',
+  'v_publication_taxonomy_effective_assertions',
 ] as const;
 
 const PROTECTED_TABLES = [
