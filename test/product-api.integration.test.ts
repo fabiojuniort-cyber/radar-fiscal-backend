@@ -622,6 +622,45 @@ test(
         { items: [] },
       );
 
+      const monitoringRuns =
+        await app.inject({
+          method: 'GET',
+          url: '/api/v1/monitoring/runs',
+          headers: firstHeaders,
+        });
+
+      assert.equal(
+        monitoringRuns.statusCode,
+        200,
+      );
+      const monitoringBody =
+        monitoringRuns.json<{
+          windowHours: number;
+          items: Array<{
+            importedDocuments:
+              number;
+          }>;
+        }>();
+
+      assert.equal(
+        monitoringBody.windowHours,
+        24,
+      );
+      assert.ok(
+        Array.isArray(
+          monitoringBody.items,
+        ),
+      );
+      assert.ok(
+        monitoringBody.items.every(
+          (item) =>
+            Number.isInteger(
+              item.importedDocuments,
+            ) &&
+            item.importedDocuments >= 0,
+        ),
+      );
+
       const taxonomyOptions =
         await app.inject({
           method: 'GET',
