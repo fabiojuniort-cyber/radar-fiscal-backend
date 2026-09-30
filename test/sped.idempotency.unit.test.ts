@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
-import { SpedConnector, spedBaseIdentityKey } from '../src/modules/collection/sped.connector.js';
+import { SpedConnector, sameIdentityExceptTitleFamily, spedBaseIdentityKey } from '../src/modules/collection/sped.connector.js';
 import { descriptorFromPage, parseSpedPage } from '../src/modules/collection/sped.parser.js';
 import type { ConnectorPublication } from '../src/modules/collection/connector.contract.js';
 import {
@@ -205,4 +205,137 @@ test('gov.br folder pages are containers: children are captured and new children
   // The CNPJ package and the classic package are distinct publications.
   const keys = new Set([...first.publications, ...incremental.publications].map((publication) => publication.identityKey));
   assert.equal(keys.size, new Set([...first.publications, ...incremental.publications].map((publication) => publication.externalId)).size - 1);
+});
+
+// ---------------------------------------------------------------------------
+// Production 2026-09-28: gov.br reworded the title of the same DeRE XSD file
+// ("06-Arquivos XSD (v.1.2.0)" -> "06-Arquivos XSD (v.1.2.0 PRODUÇÃO)").
+// ---------------------------------------------------------------------------
+
+test('a reworded title keeps the origin identity; a new edition still gets a new one', async () => {
+  const folder = '/assuntos/documentos-fiscais/dere/manuais-e-documentos-tecnicos/versao-atual-1';
+  const xsd: FakeDocument = {
+    path: folder + '/06-arquivos-xsd-v-1-2-0.zip',
+    title: '06-Arquivos XSD (v.1.2.0)',
+    type: 'File',
+    created: '05/09/2026',
+    file: 'dere-xsd-120',
+  };
+  const listing = () => ({ path: folder, title: 'Versão atual', items: [xsd.path] });
+  const portal = fakePortal({ listings: [listing()], documents: [xsd] });
+
+  const first = await new SpedConnector({ fetch: portal.fetch }).collect(CONTEXT);
+  assert.equal(first.publications.length, 1);
+  const originalKey = first.publications[0]!.identityKey!;
+  const originalHash = normalizePublication({ sourceId: CONTEXT.sourceId, publication: first.publications[0]! }).contentHash;
+  const state = first.checkpoint!.state as never;
+
+  // Same file, same URL, same version: only the title changed.
+  xsd.title = '06-Arquivos XSD (v.1.2.0 PRODUÇÃO)';
+  const renamedPortal = fakePortal({ listings: [listing()], documents: [xsd] });
+  const renamed = await new SpedConnector({
+    fetch: renamedPortal.fetch,
+    readState: async () => state,
+    revisitAfterMs: 0,
+    maxRechecksPerRun: 100,
+  }).collect(CONTEXT);
+  const renamedPublication = renamed.publications.find((publication) => publication.externalId === first.publications[0]!.externalId)!;
+  assert.ok(renamedPublication, 'the reworded document is still emitted');
+  assert.notEqual(spedBaseIdentityKey(descriptorFor('DERE', xsd)), originalKey, 'the derived base key really changed');
+  assert.equal(renamedPublication.identityKey, originalKey, 'identity is kept for the same origin');
+  assert.notEqual(
+    normalizePublication({ sourceId: CONTEXT.sourceId, publication: renamedPublication }).contentHash,
+    originalHash,
+    'the new title becomes a new version',
+  );
+
+  // A new official edition at the same URL is a different document.
+  xsd.title = '06-Arquivos XSD (v.1.3.0 PRODUÇÃO)';
+  const newEditionPortal = fakePortal({ listings: [listing()], documents: [xsd] });
+  const newEdition = await new SpedConnector({
+    fetch: newEditionPortal.fetch,
+    readState: async () => state,
+    revisitAfterMs: 0,
+    maxRechecksPerRun: 100,
+  }).collect(CONTEXT);
+  const newEditionKey = newEdition.publications.find((publication) => publication.externalId === first.publications[0]!.externalId)?.identityKey;
+  assert.ok(newEditionKey);
+  assert.notEqual(newEditionKey, originalKey);
+});
+
+test('a reworded title keeps the persisted identity when the checkpoint dropped it (failed item)', async () => {
+  const folder = '/assuntos/documentos-fiscais/dere/manuais-e-documentos-tecnicos/versao-atual-1';
+  const xsd: FakeDocument = {
+    path: folder + '/06-arquivos-xsd-v-1-2-0.zip',
+    title: '06-Arquivos XSD (v.1.2.0)',
+    type: 'File',
+    created: '05/09/2026',
+    file: 'dere-xsd-120',
+  };
+  const listing = () => ({ path: folder, title: 'Versão atual', items: [xsd.path] });
+  const first = await new SpedConnector({ fetch: fakePortal({ listings: [listing()], documents: [xsd] }).fetch }).collect(CONTEXT);
+  const original = first.publications[0]!;
+  const checkpoint = first.checkpoint!.state as { identities: Record<string, unknown> };
+
+  // Production state after the item failed: readSpedSourceState removed the
+  // origin's identity from the checkpoint, but the origin is still linked to
+  // the publication persisted with the original key.
+  const withoutIdentity = { ...checkpoint, identities: {} };
+  xsd.title = '06-Arquivos XSD (v.1.2.0 PRODUÇÃO)';
+  const run = (persistedIdentityKeys: Record<string, string>) => new SpedConnector({
+    fetch: fakePortal({ listings: [listing()], documents: [xsd] }).fetch,
+    readState: async () => ({ ...withoutIdentity, persistedIdentityKeys }) as never,
+    revisitAfterMs: 0,
+    maxRechecksPerRun: 100,
+  }).collect(CONTEXT);
+
+  const withoutReference = await run({});
+  assert.notEqual(
+    withoutReference.publications.find((publication) => publication.externalId === original.externalId)?.identityKey,
+    original.identityKey,
+    'without the persisted reference the new title derives a different key (the production conflict)',
+  );
+
+  const recovered = await run({ [original.externalId!]: original.identityKey! });
+  const publication = recovered.publications.find((item) => item.externalId === original.externalId)!;
+  assert.equal(publication.identityKey, original.identityKey, 'the persisted identity is kept');
+  const stored = (recovered.checkpoint!.state as { identities: Record<string, { key: string }> }).identities[original.externalId!];
+  assert.equal(stored?.key, original.identityKey, 'the checkpoint records the kept identity for next runs');
+  assert.equal(
+    'persistedIdentityKeys' in (recovered.checkpoint!.state as object),
+    false,
+    'persisted keys are transient, never written to the checkpoint',
+  );
+
+  // A persisted key of another edition is not reused.
+  xsd.title = '06-Arquivos XSD (v.1.3.0 PRODUÇÃO)';
+  const newEdition = await run({ [original.externalId!]: original.identityKey! });
+  assert.notEqual(
+    newEdition.publications.find((item) => item.externalId === original.externalId)?.identityKey,
+    original.identityKey,
+  );
+});
+
+test('the title rule accepts exactly one differing token', () => {
+  const descriptor = {
+    module: 'DERE', carrier: 'DOCUMENT', kind: 'XSD_SCHEMA', documentNumber: undefined,
+    officialVersion: '1.2.0', revisionKind: 'ORIGINAL', canonicalPath: '/x',
+  } as never;
+  const candidate = { descriptor, baseKey: 'SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|NEW|1.2.0|ORIGINAL' };
+  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|1.2.0|ORIGINAL', candidate), true);
+  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|EXTRA|1.2.0|ORIGINAL', candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|1.2.0|ORIGINAL|PATH:/y', candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|MANUAL|OLD|1.2.0|ORIGINAL', candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily(candidate.baseKey, candidate), false);
+});
+
+test('numbered documents never reuse an identity through the title rule', () => {
+  const base = {
+    module: 'DERE', carrier: 'DOCUMENT', kind: 'TECHNICAL_NOTE', documentNumber: '2026.001',
+    officialVersion: undefined, revisionKind: 'ORIGINAL', canonicalPath: '/x',
+  } as never;
+  assert.equal(
+    sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|TECHNICAL_NOTE|OTHER||ORIGINAL|PATH:/x', { descriptor: base, baseKey: 'different' }),
+    false,
+  );
 });

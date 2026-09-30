@@ -122,6 +122,13 @@ test('A: bootstrap then replay through the collection engine is incremental and 
     // 13 document pages + 1 gov.br folder, which stays a CONTAINER.
     assert.equal(Object.values(state.pages).filter((page) => page.kind === 'DOCUMENT').length, 13);
     assert.equal(Object.values(state.pages).filter((page) => page.kind === 'CONTAINER' && page.canonicalUrl.endsWith('/versao-atual/esquemas-xsd')).length > 0, true);
+    // Every persisted origin exposes the identity it is linked to, matching
+    // the checkpoint identity (the reference if the checkpoint drops it).
+    const persistedKeys = state.persistedIdentityKeys ?? {};
+    assert.equal(Object.keys(persistedKeys).length, 14);
+    for (const [externalId, identity] of Object.entries(state.identities ?? {})) {
+      assert.equal(persistedKeys[externalId], identity.key);
+    }
 
     portal.reset();
     const replay = await h.run();

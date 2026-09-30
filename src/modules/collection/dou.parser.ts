@@ -281,8 +281,18 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
   parts.sort((a, b) => a.part - b.part);
   const first = parts[0]!; const a = first.attrs;
   if (parts.some((p, i) => p.part !== i + 1)) throw error('DOU_MISSING_OR_DUPLICATE_PART');
-  const title = douHtmlText(first.fields.Identifica ?? '');
-  if (!title) throw error('DOU_MISSING_TITLE');
+  const officialTitle = douHtmlText(first.fields.Identifica ?? '');
+  // Some official matters carry an empty <Identifica>. The matter is still an
+  // official publication: it gets a descriptive title from its own official
+  // attributes (type and publishing unit), flagged in metadata. The fallback
+  // never feeds act classification, so no act number or normative identity
+  // is inferred from it; identity stays scoped to the official matter id.
+  const titleFallback = officialTitle
+    ? undefined
+    : [a.artType?.trim() || 'Matéria', a.artCategory?.split('/').at(-1)?.trim()]
+        .filter((value): value is string => Boolean(value))
+        .join(' - ');
+  const title = officialTitle || titleFallback!;
   const date = brazilDate(a.pubDate!);
   if (date !== context.date || a.pubName !== context.section) throw error('DOU_ARCHIVE_CONTEXT_MISMATCH');
   const pages: string[] = [];
@@ -293,7 +303,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
     }
     if (p.part > 1) {
       const continuationTitle = douHtmlText(p.fields.Identifica ?? '');
-      if (continuationTitle && continuationTitle !== title) {
+      if (continuationTitle && continuationTitle !== officialTitle) {
         continuationTitles.add(continuationTitle);
       }
     }
@@ -304,7 +314,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
         url.searchParams.get('jornal') !== p.journal || url.searchParams.get('pagina') !== p.attrs.numberPage) throw error('DOU_INVALID_CERTIFIED_REFERENCE');
     pages.push(p.attrs.pdfPage!);
   }
-  const structural = classifyDouAct(title, a.artCategory!, a.artType ?? '');
+  const structural = classifyDouAct(officialTitle, a.artCategory!, a.artType ?? '');
   const text = parts.map(p => douHtmlText(p.fields.Texto ?? '')).join('\n');
   if (parts.some(p => !douHtmlText(p.fields.Texto ?? ''))) throw error('DOU_MISSING_CONTENT');
   return {
@@ -323,6 +333,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
         actDate: structural.actDate ?? null, actYear: structural.actDate?.slice(0, 4) ?? null,
         structuralFamily: structural.family ?? null, abstract: douHtmlText(first.fields.Ementa ?? ''),
         continuationTitles: [...continuationTitles],
+        ...(titleFallback ? { titleFallback: 'ART_TYPE_AND_UNIT' } : {}),
         certifiedPageUrls: [...new Set(pages)], officialHtmlUrl: null,
         archive: context,
         parts: parts.map(p => ({ filename: p.entry.name, rawSha256: hash(p.entry.bytes), sizeBytes: p.entry.bytes.byteLength,

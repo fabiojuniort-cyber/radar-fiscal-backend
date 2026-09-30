@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { ConnectorError } from '../src/modules/collection/connector.error.js';
 import { executeConnector } from '../src/modules/collection/connector.executor.js';
-import { InlabsClient } from '../src/modules/collection/inlabs.client.js';
+import { InlabsClient, pageTitle } from '../src/modules/collection/inlabs.client.js';
 
 const signal = () => new AbortController().signal;
 const credentials = () => ({ email: 'test@example.invalid', password: 'private-test-value' });
@@ -192,7 +192,9 @@ test('redirects back to login remain retryable session failures', async () => {
 });
 
 test('HTML masquerading as archive is retried as a transient fetch failure', async () => {
-  const { client } = stub([loginResponse(), new Response('<html>maintenance</html>')]);
+  // The daily index lists the file: the HTML answer is a broken download.
+  const { client } = stub([loginResponse(), new Response('<html>maintenance</html>'),
+    new Response('<html><a href="index.php?p=2026-09-18&dl=2026-09-18-DO1.zip">DO1</a></html>')]);
   await client.login(signal());
   await assert.rejects(
     client.downloadXml('2026-09-18', 'DO1', signal()),
@@ -209,6 +211,62 @@ test('HTML masquerading as archive is retried as a transient fetch failure', asy
       return true;
     },
   );
+});
+
+// Shape of the production answer on Sunday 2026-09-27: every section returned
+// the same 38,679-byte text/html page with HTTP 200 (synthetic body here).
+const noEditionPage = () => new Response(
+  '<!DOCTYPE html><html><head><title>INLABS - Imprensa Nacional &amp; contato@example.invalid</title></head>' +
+  '<body><p>Selecione uma data</p></body></html>',
+  { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+);
+const emptyIndex = () => new Response('<!DOCTYPE html><html><body><div>Nenhum arquivo</div></body></html>');
+
+test('HTML 200 for a file the daily index does not list is absence, not a failed download', async () => {
+  const { client, calls } = stub([loginResponse(), noEditionPage(), emptyIndex(), noEditionPage()]);
+  await client.login(signal());
+  const first = await client.downloadXml('2026-09-27', 'DO1', signal());
+  assert.equal(first.status, 'NOT_AVAILABLE');
+  assert.equal(first.status === 'NOT_AVAILABLE' && first.evidence, 'NOT_IN_DAILY_INDEX');
+  const metadata = first.status === 'NOT_AVAILABLE' ? first.metadata! : {};
+  assert.equal(metadata.bodyKind, 'HTML');
+  assert.equal(metadata.indexListsArchives, false);
+  assert.equal(metadata.pageTitle, 'INLABS - Imprensa Nacional [email]');
+  assert.equal(JSON.stringify(metadata).includes('Selecione'), false, 'never the page body');
+  assert.equal(JSON.stringify(metadata).includes('example.invalid'), false, 'e-mail redacted');
+
+  // The index of the date is read once per attempt.
+  const second = await client.downloadXml('2026-09-27', 'DO2', signal());
+  assert.equal(second.status, 'NOT_AVAILABLE');
+  assert.equal(calls.length, 4);
+  assert.equal(calls[2]!.url, 'https://inlabs.in.gov.br/index.php?p=2026-09-27');
+});
+
+test('HTML 200 is still a failure when the daily index shows an expired session or maintenance', async () => {
+  const expired = stub([loginResponse(), noEditionPage(),
+    new Response('<html><form action="logar.php"><input name="password"></form></html>')]);
+  await expired.client.login(signal());
+  await assert.rejects(expired.client.downloadXml('2026-09-27', 'DO1', signal()), code('INLABS_AUTH_FAILED'));
+
+  const maintenance = stub([loginResponse(), noEditionPage(), new Response(maintenanceHtml)]);
+  await maintenance.client.login(signal());
+  await assert.rejects(maintenance.client.downloadXml('2026-09-27', 'DO1', signal()), maintenanceError);
+});
+
+test('non-HTML invalid bodies never consult the index', async () => {
+  const { client, calls } = stub([loginResponse(), new Response(Uint8Array.from([1, 2, 3, 4]))]);
+  await client.login(signal());
+  await assert.rejects(client.downloadXml('2026-09-18', 'DO1', signal()), code('INLABS_INVALID_DOWNLOAD'));
+  assert.equal(calls.length, 2);
+});
+
+test('page titles are bounded, markup-free and redact e-mail addresses', () => {
+  const encode = (value: string) => new TextEncoder().encode(value);
+  assert.equal(pageTitle(encode('<html><body>no title</body></html>')), undefined);
+  assert.equal(pageTitle(encode('<title>  a <b>b</b>\n c  </title>')), 'a b c');
+  assert.equal(pageTitle(encode('<title>user.name+x@mail.gov.br</title>')), '[email]');
+  assert.equal(pageTitle(encode(`<title>${'x'.repeat(500)}</title>`))!.length, 120);
+  assert.equal(pageTitle(encode('<title><script>alert(1)</script>"\'`</title>')), 'alert(1)');
 });
 
 test('WAF rejection is distinguished from invalid credentials', async () => {

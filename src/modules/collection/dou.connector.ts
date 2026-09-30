@@ -73,7 +73,11 @@ export class DouConnector implements CollectionConnector {
             continue;
           }
           if (download.status === 'NOT_AVAILABLE') {
-            archives.push({ filename, state: 'NOT_AVAILABLE', date, section });
+            archives.push({
+              filename, state: 'NOT_AVAILABLE', date, section,
+              ...(download.evidence ? { evidence: download.evidence } : {}),
+              ...(download.metadata ?? {}),
+            });
             continue;
           }
           available++;

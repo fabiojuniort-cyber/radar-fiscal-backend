@@ -57,6 +57,30 @@ test('multipart continuation may carry a distinct official heading without losin
   );
 });
 
+test('a matter with an empty official title is kept with a flagged descriptive title, never an inferred act', async () => {
+  const entries = await fixtureEntries('DO1');
+  const original = parseDouEntries(entries, archiveContext('DO1')).publications.find(p => p.actNumber === '119/2026')!;
+  const officialId = (original.metadata!.dou as any).officialMatterId as string;
+  const changed = entries.map(entry => {
+    const xml = Buffer.from(entry.bytes).toString('utf8');
+    if (!xml.includes(`idMateria="${officialId}"`)) return entry;
+    return { ...entry, bytes: Buffer.from(xml.replace(/<Identifica>[\s\S]*?<\/Identifica>/, '<Identifica />')) };
+  });
+
+  const result = parseDouEntries(changed, archiveContext('DO1'));
+  assert.deepEqual(result.partialFailures, [], 'no DOU_MISSING_TITLE');
+  const kept = result.publications.find(p => p.externalId === original.externalId)!;
+  assert.ok(kept, 'the official matter is still collected');
+  const data = kept.metadata!.dou as any;
+  assert.equal(data.titleFallback, 'ART_TYPE_AND_UNIT');
+  assert.equal(kept.title, [data.sourceActType, data.unit].filter(Boolean).join(' - '));
+  assert.equal(kept.actNumber, undefined, 'no act number is inferred without an official heading');
+  assert.equal(kept.content, original.content);
+  assert.equal(normalizePublication({ sourceId: 'dou', publication: kept }).identityStrength, 'SOURCE_SCOPED');
+  // Matters with an official title are untouched.
+  assert.equal((original.metadata!.dou as any).titleFallback, undefined);
+});
+
 test('missing/corrupted continuation rejects the entire matter while preserving other real articles', async () => {
   const entries = (await fixtureEntries('DO1E')).filter(e => !e.name.endsWith('24378456-2.xml'));
   const result = parseDouEntries(entries, archiveContext('DO1E'));

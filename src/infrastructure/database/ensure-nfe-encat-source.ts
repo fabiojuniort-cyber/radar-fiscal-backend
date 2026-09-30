@@ -2,6 +2,8 @@ import 'dotenv/config';
 
 import { Pool } from 'pg';
 
+import { d056ScheduleFor } from '../../modules/collection/schedule-policy.js';
+
 const databaseUrl =
   process.env.DATABASE_ADMIN_URL ??
   process.env.DATABASE_URL;
@@ -13,8 +15,15 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
+// --scheduled applies the D-056 cycles (06h/10h/14h/18h BRT); --hourly is
+// kept only for an explicit, recorded exception.
+const scheduled = process.argv.includes('--scheduled');
 const hourly = process.argv.includes('--hourly');
-const scheduleCron = hourly ? '0 * * * *' : null;
+if (scheduled && hourly) {
+  console.error('Use either --scheduled or --hourly, not both.');
+  process.exit(1);
+}
+const scheduleCron = scheduled ? d056ScheduleFor('nfe-encat') : hourly ? '0 * * * *' : null;
 
 const pool = new Pool({
   connectionString: databaseUrl,

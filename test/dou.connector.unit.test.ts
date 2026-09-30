@@ -54,6 +54,10 @@ test('one archive answering with a non-ZIP body is isolated instead of failing t
         status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
       });
     }
+    // The daily index lists the package: its HTML answer is a real failure.
+    if (!url.searchParams.get('dl') && url.pathname === '/index.php') {
+      return new Response('<html><a href="index.php?p=2026-09-18&dl=2026-09-18-DO1E.zip">DO1E</a></html>');
+    }
     return base(input, init);
   }) as typeof globalThis.fetch;
 
@@ -75,6 +79,46 @@ test('one archive answering with a non-ZIP body is isolated instead of failing t
   const receipts = result.metadata!.douArchives as Record<string, string>;
   assert.ok(receipts['2026-09-18-DO1.zip']);
   assert.equal(receipts['2026-09-18-DO1E.zip'], undefined);
+});
+
+test('a date without editions answered with HTML 200 is NOT_AVAILABLE, not a partial failure', async () => {
+  // Production, Sunday 2026-09-27: every package of the date returned the same
+  // text/html page with HTTP 200, and the daily index lists no package.
+  const base = await fixtureFetch();
+  const indexRequests: string[] = [];
+  const fetch = (async (input, init) => {
+    const url = new URL(String(input));
+    const dl = url.searchParams.get('dl');
+    if (url.searchParams.get('p') === '2026-09-20') {
+      if (!dl) {
+        indexRequests.push(url.toString());
+        return new Response('<!DOCTYPE html><html><body><div>Nenhum arquivo</div></body></html>');
+      }
+      return new Response('<!DOCTYPE html><html><head><title>INLABS</title></head><body>Selecione</body></html>', {
+        status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+    return base(input, init);
+  }) as typeof globalThis.fetch;
+
+  const result = await new DouConnector({
+    credentials, now: () => new Date('2026-09-21T12:00:00Z'), fetch, dates: ['2026-09-20', '2026-09-18'],
+  }).collect(context());
+
+  assert.deepEqual(result.partialFailures, []);
+  assert.ok(result.publications.length > 0, 'the other date is still collected');
+  assert.equal(indexRequests.length, 1, 'the index of the date is read once');
+  const archives = (result.metadata!.dou as any).archives as Array<Record<string, unknown>>;
+  const sunday = archives.filter(a => a.date === '2026-09-20');
+  assert.equal(sunday.length, DOU_XML_SECTIONS.length);
+  for (const archive of sunday) {
+    assert.equal(archive.state, 'NOT_AVAILABLE');
+    assert.equal(archive.evidence, 'NOT_IN_DAILY_INDEX');
+    assert.equal(archive.pageTitle, 'INLABS');
+    assert.equal(JSON.stringify(archive).includes('Selecione'), false);
+  }
+  const receipts = result.metadata!.douArchives as Record<string, string>;
+  assert.equal(Object.keys(receipts).some(name => name.startsWith('2026-09-20')), false, 'absence never gets a receipt');
 });
 
 test('session loss disguised as an archive still fails the attempt', async () => {

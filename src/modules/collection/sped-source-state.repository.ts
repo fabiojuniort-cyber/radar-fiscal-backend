@@ -142,6 +142,33 @@ function crawlCycle(value: unknown): SpedCrawlCycle | undefined {
 }
 
 /**
+ * Identity key each persisted origin of the source is linked to. It is the
+ * reference when the checkpoint identity was dropped (failed item, missing or
+ * untrusted checkpoint): persistence rejects any other key for that origin.
+ */
+async function readPersistedIdentityKeys(
+  db: Kysely<DB>,
+  sourceId: string,
+): Promise<Record<string, string>> {
+  const linked = await db
+    .selectFrom('publication_origins as o')
+    .innerJoin('publications as p', 'p.id', 'o.publication_id')
+    .select(['o.external_id', sql<string | null>`p.identity_basis ->> 'sourceKey'`.as('source_key')])
+    .where('o.source_id', '=', sourceId)
+    .where('o.external_id', 'is not', null)
+    .where(sql<boolean>`p.identity_basis ->> 'sourceKeyType' = 'CANONICAL_KEY'`)
+    .execute();
+  const keys: Record<string, string> = {};
+  for (const row of linked) {
+    const key = row.source_key;
+    if (row.external_id && key && key.startsWith('SPED|') && key.length <= 4096) {
+      keys[row.external_id] = key;
+    }
+  }
+  return keys;
+}
+
+/**
  * Loads the SPED incremental checkpoint.
  *
  * Only checkpoints written with SPED_STATE_VERSION semantics are trusted: in
@@ -182,7 +209,15 @@ export async function readSpedSourceState(
     : legacy
       ? { run_id: legacy.run_id, run_status: legacy.run_status }
       : undefined;
-  if (!last) return { version: SPED_STATE_VERSION, items: {}, pages: {}, identities: {} };
+  if (!last) {
+    return {
+      version: SPED_STATE_VERSION,
+      items: {},
+      pages: {},
+      identities: {},
+      persistedIdentityKeys: await readPersistedIdentityKeys(db, sourceId),
+    };
+  }
 
   const state = stored ? stored.state : record(record(legacy?.metadata)?.spedState);
 
@@ -203,6 +238,7 @@ export async function readSpedSourceState(
     .where('source_id', '=', sourceId)
     .execute();
   const persistedExternalIds = new Set(origins.map((origin) => origin.external_id).filter((value): value is string => !!value));
+  const persistedIdentityKeys = await readPersistedIdentityKeys(db, sourceId);
   const persistedUrls = new Set(
     origins
       .map((origin) => allowedSpedUrl(origin.official_url))
@@ -263,5 +299,12 @@ export async function readSpedSourceState(
   // of the table store (never from legacy metadata).
   const cycle = stored ? crawlCycle(state?.cycle) : undefined;
 
-  return { version: SPED_STATE_VERSION, items, pages, identities, ...(cycle ? { cycle } : {}) };
+  return {
+    version: SPED_STATE_VERSION,
+    items,
+    pages,
+    identities,
+    persistedIdentityKeys,
+    ...(cycle ? { cycle } : {}),
+  };
 }

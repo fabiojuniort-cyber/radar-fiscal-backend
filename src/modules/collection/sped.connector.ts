@@ -183,6 +183,13 @@ export interface SpedSourceState {
   pages: Record<string, SpedKnownPage>;
   identities?: Record<string, SpedIdentityRecord>;
   /**
+   * Identity key each persisted origin (external id) is linked to, read from
+   * publications.identity_basis. Transient: loaded with the checkpoint, never
+   * written back. Lets an origin whose checkpoint identity was dropped (e.g.
+   * it failed in the last run) keep the identity it already owns.
+   */
+  persistedIdentityKeys?: Record<string, string>;
+  /**
    * Present only while a discovery cycle is interrupted by the time budget:
    * the next run resumes from this frontier instead of restarting from the
    * seeds (so a slow portal cannot starve discovery). Cleared when a run
@@ -923,6 +930,40 @@ export function spedBaseIdentityKey(descriptor: SpedDocumentDescriptor): string 
   ].join('|');
 }
 
+/**
+ * True when `storedBaseKey` was built for the same document as `candidate`
+ * and only the title-derived family token differs. Documents identified by an
+ * official number never qualify: their family does not come from the title.
+ */
+export function sameIdentityExceptTitleFamily(
+  storedBaseKey: string,
+  candidate: { descriptor: SpedDocumentDescriptor; baseKey: string },
+): boolean {
+  const descriptor = candidate.descriptor;
+  if (descriptor.documentNumber !== undefined) return false;
+  const weak = descriptor.officialVersion === undefined;
+  const prefix = [
+    'SPED',
+    SPED_IDENTITY_VERSION,
+    descriptor.module,
+    descriptor.carrier,
+    descriptor.kind,
+  ].join('|') + '|';
+  const suffix = '|' + [
+    descriptor.officialVersion ?? '',
+    descriptor.revisionKind,
+    ...(weak ? ['PATH:' + descriptor.canonicalPath] : []),
+  ].join('|');
+  if (
+    storedBaseKey === candidate.baseKey ||
+    !storedBaseKey.startsWith(prefix) ||
+    !storedBaseKey.endsWith(suffix) ||
+    storedBaseKey.length <= prefix.length + suffix.length
+  ) return false;
+  // Exactly one differing token (the family); never a key with extra segments.
+  return !storedBaseKey.slice(prefix.length, storedBaseKey.length - suffix.length).includes('|');
+}
+
 function collisionKey(baseKey: string, descriptor: SpedDocumentDescriptor): string {
   return baseKey.includes('|PATH:') ? baseKey : baseKey + '|PATH:' + descriptor.canonicalPath;
 }
@@ -956,6 +997,7 @@ interface IdentityResolution {
 function resolveIdentities(
   candidates: IdentityCandidate[],
   previous: Record<string, SpedIdentityRecord>,
+  persisted: Record<string, string> = {},
 ): IdentityResolution {
   const keys = new Map<string, string>();
   const identities: Record<string, SpedIdentityRecord> = { ...previous };
@@ -987,11 +1029,27 @@ function resolveIdentities(
     left.descriptor.officialUrl.localeCompare(right.descriptor.officialUrl),
   );
 
-  // 1. Origins that already own an identity derived from the same base keep it.
+  // 1. Origins that already own an identity keep it when the base key is the
+  // same, or differs only in the title-derived family (the portal reworded
+  // the title of the same file, e.g. "(v.1.2.0)" -> "(v.1.2.0 PRODUÇÃO)").
+  // Module, carrier, kind, version, revision and fallback path must match,
+  // so a new edition still gets a new identity; the reworded title becomes
+  // a new version of the same publication.
+  // When the checkpoint no longer holds a matching identity for the origin
+  // (it is dropped for items that failed in the last run), the identity
+  // already persisted for that origin is the reference, under the same
+  // title-only rule: persistence accepts no other key for that origin.
   for (const candidate of ordered) {
     const stored = previous[candidate.descriptor.externalId];
-    if (stored && stored.baseKey === candidate.baseKey) {
+    const persistedKey = persisted[candidate.descriptor.externalId];
+    if (
+      stored &&
+      (stored.baseKey === candidate.baseKey ||
+        sameIdentityExceptTitleFamily(stored.baseKey, candidate))
+    ) {
       keys.set(candidate.descriptor.externalId, stored.key);
+    } else if (persistedKey && sameIdentityExceptTitleFamily(persistedKey, candidate)) {
+      keys.set(candidate.descriptor.externalId, persistedKey);
     }
   }
 
@@ -1501,7 +1559,11 @@ export class SpedConnector implements CollectionConnector {
         });
       }
 
-      const identity = resolveIdentities(candidates, state.identities ?? {});
+      const identity = resolveIdentities(
+        candidates,
+        state.identities ?? {},
+        state.persistedIdentityKeys ?? {},
+      );
       const publications: ConnectorPublication[] = candidates.map((candidate) =>
         publicationFor(
           candidate.descriptor,
