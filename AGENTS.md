@@ -56,7 +56,10 @@ Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro 
 
 ### Resiliência da consulta CNPJ
 
-- A consulta cadastral server-side usa BrasilAPI/Minha Receita como caminho primário e pode usar a API pública direta do Minha Receita como fallback quando o primeiro host estiver indisponível.
+- A consulta cadastral server-side usa BrasilAPI e Minha Receita como providers primários e pode recorrer ao CNPJ.ws público como fallback independente quando ambos falharem.
+- Os providers primários podem ser consultados concorrentemente para reduzir indisponibilidade percebida; o CNPJ.ws não deve ser chamado quando algum primário já respondeu com sucesso.
+- O CNPJ.ws público é apenas fallback cadastral e possui limite público documentado; não deve ser tratado como capacidade ilimitada de produção.
+- Dados de IE eventualmente presentes no CNPJ.ws não entram no cadastro estadual: IE continua vinculada à consulta oficial SEFAZ/SINTEGRA e à sua proveniência própria.
 - Diferenciar `cnpj_not_found`, `cnpj_provider_unavailable` e `cnpj_provider_invalid_response`.
 - Falha de um host não deve ser tratada como CNPJ inexistente sem esgotar o fallback disponível.
-- Persistir somente os campos necessários ao produto; o fallback não amplia o conjunto de dados expostos.
+- Persistir somente os campos necessários ao produto; nenhum provider cadastral autoriza expor QSA ou ampliar o conjunto de dados sem escopo específico.
