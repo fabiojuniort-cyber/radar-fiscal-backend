@@ -887,26 +887,26 @@ test(
           3,
         );
 
-        const companiesAfterRecreate =
+        const accountAfterRecreate =
           await app.inject({
             method: 'GET',
-            url: '/api/v1/companies',
+            url: '/api/v1/account',
             headers: firstHeaders,
           });
 
         assert.equal(
-          companiesAfterRecreate.statusCode,
+          accountAfterRecreate.statusCode,
           200,
         );
         assert.ok(
-          companiesAfterRecreate
+          accountAfterRecreate
             .json<{
-              items: Array<{
+              companies: Array<{
                 id: string;
                 cnpj: string;
               }>;
             }>()
-            .items
+            .companies
             .some(
               (item) =>
                 item.id ===
