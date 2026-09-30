@@ -61,6 +61,39 @@ const cnaeBodySchema = z.object({
   isPrimary: z.boolean().default(false),
 });
 
+const cnaesBodySchema = z
+  .array(cnaeBodySchema)
+  .max(100)
+  .superRefine((items, ctx) => {
+    const codes = new Set<string>();
+    let primaryCount = 0;
+
+    for (const item of items) {
+      if (codes.has(item.code)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'duplicate_cnae',
+        });
+      }
+
+      codes.add(item.code);
+
+      if (item.isPrimary) {
+        primaryCount += 1;
+      }
+    }
+
+    if (
+      items.length > 0 &&
+      primaryCount !== 1
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'one_primary_cnae_required',
+      });
+    }
+  });
+
 const establishmentUpdateBodySchema = z.object({
   name: z.string().trim().min(2).max(200),
   typeCode: z.string().trim().min(1).max(50),
@@ -85,7 +118,7 @@ const establishmentUpdateBodySchema = z.object({
   streetNumber: z.string().trim().max(30).nullable().optional(),
   complement: z.string().trim().max(160).nullable().optional(),
   district: z.string().trim().max(160).nullable().optional(),
-  cnaes: z.array(cnaeBodySchema).max(100).default([]),
+  cnaes: cnaesBodySchema.default([]),
 });
 
 const establishmentBodySchema = z.object({
@@ -114,7 +147,7 @@ const establishmentBodySchema = z.object({
   streetNumber: z.string().trim().max(30).optional(),
   complement: z.string().trim().max(160).optional(),
   district: z.string().trim().max(160).optional(),
-  cnaes: z.array(cnaeBodySchema).max(100).default([]),
+  cnaes: cnaesBodySchema.default([]),
 });
 
 const taxProfileBodySchema = z.object({
