@@ -621,6 +621,155 @@ test(
         crossTenantCompanyRead.json(),
         { items: [] },
       );
+
+      const taxonomyOptions =
+        await app.inject({
+          method: 'GET',
+          url: '/api/v1/taxonomy/profile-options',
+          headers: firstHeaders,
+        });
+
+      assert.equal(
+        taxonomyOptions.statusCode,
+        200,
+      );
+      assert.ok(
+        Array.isArray(
+          taxonomyOptions.json<{
+            dimensions: unknown[];
+          }>().dimensions,
+        ),
+      );
+
+      const registryCnpj =
+        cnpjFromSeed('887760000001');
+      const originalFetch =
+        globalThis.fetch;
+
+      try {
+        globalThis.fetch =
+          async () =>
+            new Response(
+              JSON.stringify({
+                cnpj: registryCnpj,
+                razao_social:
+                  'Empresa Registry de Teste S.A.',
+                nome_fantasia:
+                  'Registry Teste',
+                uf: 'GO',
+                municipio: 'Rio Verde',
+                codigo_municipio_ibge:
+                  5218805,
+                cep: '75900000',
+                logradouro:
+                  'Avenida das Empresas',
+                numero: '100',
+                bairro: 'Centro',
+                cnae_fiscal: 4683400,
+                cnae_fiscal_descricao:
+                  'Comércio atacadista de defensivos agrícolas',
+                cnaes_secundarios: [
+                  {
+                    codigo: 4623108,
+                    descricao:
+                      'Comércio atacadista de matérias-primas agrícolas',
+                  },
+                  {
+                    codigo: 4632001,
+                    descricao:
+                      'Comércio atacadista de cereais',
+                  },
+                ],
+              }),
+              {
+                status: 200,
+                headers: {
+                  'content-type':
+                    'application/json',
+                },
+              },
+            );
+
+        const registryCreate =
+          await app.inject({
+            method: 'POST',
+            url: '/api/v1/companies/from-cnpj',
+            headers: firstHeaders,
+            payload: {
+              cnpj: registryCnpj,
+            },
+          });
+
+        assert.equal(
+          registryCreate.statusCode,
+          201,
+        );
+
+        const registryBody =
+          registryCreate.json<{
+            company: {
+              id: string;
+              cnpj: string;
+            };
+            establishment: {
+              id: string;
+              cnaes: Array<{
+                code: string;
+                isPrimary: boolean;
+              }>;
+            };
+          }>();
+
+        assert.equal(
+          registryBody.company.cnpj,
+          registryCnpj,
+        );
+        assert.equal(
+          registryBody.establishment
+            .cnaes.length,
+          3,
+        );
+        assert.equal(
+          registryBody.establishment
+            .cnaes[0]?.isPrimary,
+          true,
+        );
+
+        const registryEstablishments =
+          await app.inject({
+            method: 'GET',
+            url:
+              '/api/v1/companies/' +
+              registryBody.company.id +
+              '/establishments',
+            headers: firstHeaders,
+          });
+
+        assert.equal(
+          registryEstablishments.statusCode,
+          200,
+        );
+        const persisted =
+          registryEstablishments.json<{
+            items: Array<{
+              municipalityName:
+                string | null;
+              cnaes: unknown[];
+            }>;
+          }>().items[0];
+
+        assert.equal(
+          persisted?.municipalityName,
+          'Rio Verde',
+        );
+        assert.equal(
+          persisted?.cnaes.length,
+          3,
+        );
+      } finally {
+        globalThis.fetch =
+          originalFetch;
+      }
     } finally {
       await app.close();
 
