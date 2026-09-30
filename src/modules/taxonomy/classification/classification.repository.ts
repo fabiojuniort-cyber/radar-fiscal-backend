@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 
+import { sha256Hex } from '../baseline/baseline.canonical-json.js';
+
 import {
   planLexicalClassification,
   type LexicalClassificationPlan,
@@ -189,7 +191,7 @@ async function persistAssertions(
   plan: LexicalClassificationPlan,
 ): Promise<void> {
   for (const assertion of plan.assertions) {
-    await client.query(
+    const inserted = await client.query<{ id: string }>(
       `
         INSERT INTO publication_taxonomy_assertions (
           run_id,
@@ -201,6 +203,7 @@ async function persistAssertions(
           reason_code
         )
         VALUES ($1, $2, $3, 'CONFIRMED', $4, 'RULE_ENGINE', $5)
+        RETURNING id
       `,
       [
         runId,
@@ -208,6 +211,35 @@ async function persistAssertions(
         assertion.releaseConceptId,
         assertion.confidence,
         assertion.reasonCode,
+      ],
+    );
+
+    const assertionId = inserted.rows[0]?.id;
+    if (!assertionId) {
+      throw new Error(
+        'classification assertion insert did not return id',
+      );
+    }
+
+    await client.query(
+      `
+        INSERT INTO publication_taxonomy_spans (
+          assertion_id,
+          excerpt,
+          selector,
+          source_fragment_hash
+        )
+        VALUES ($1, $2, $3::jsonb, $4)
+      `,
+      [
+        assertionId,
+        assertion.matchedTerm,
+        JSON.stringify({
+          strategy: 'NFD_LOWER_ALNUM_TOKENS',
+          term: assertion.matchedTerm,
+          reasonCode: assertion.reasonCode,
+        }),
+        sha256Hex(assertion.matchedTerm),
       ],
     );
   }
