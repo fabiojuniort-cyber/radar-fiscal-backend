@@ -256,6 +256,19 @@ export async function matchPublicationByTaxonomy(
       };
     }
 
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [
+        [
+          'taxonomy-match-v1',
+          input.tenantId,
+          input.monitoringProfileId,
+          input.publicationVersionId,
+          releaseRow.id,
+        ].join(':'),
+      ],
+    );
+
     const concepts =
       await client.query<ReleaseConceptRow>(
         [
