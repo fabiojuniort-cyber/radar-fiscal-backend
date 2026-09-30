@@ -14,6 +14,13 @@ const smokeEnvSchema = z.object({
       (value) => value.startsWith('https://'),
       'LAUNCH01_SMOKE_BASE_URL must use HTTPS.',
     ),
+  LAUNCH01_API_BASE_URL: z
+    .string()
+    .url()
+    .refine(
+      (value) => value.startsWith('https://'),
+      'LAUNCH01_API_BASE_URL must use HTTPS.',
+    ),
   DATABASE_ADMIN_URL: z
     .string()
     .min(1)
@@ -46,6 +53,8 @@ if (!parsed.success) {
 const env = parsed.data;
 const baseUrl =
   env.LAUNCH01_SMOKE_BASE_URL.replace(/\/$/, '');
+const apiBaseUrl =
+  env.LAUNCH01_API_BASE_URL.replace(/\/$/, '');
 
 const SMOKE_COMPANY =
   'LAUNCH01 Smoke Test';
@@ -631,7 +640,7 @@ async function run(): Promise<void> {
     );
 
     const stats = await fetch(
-      baseUrl + '/public/v1/stats',
+      apiBaseUrl + '/public/v1/stats',
     );
     await expectStatus(
       summary,
@@ -641,7 +650,7 @@ async function run(): Promise<void> {
     );
 
     const sources = await fetch(
-      baseUrl + '/public/v1/sources',
+      apiBaseUrl + '/public/v1/sources',
     );
     await expectStatus(
       summary,
