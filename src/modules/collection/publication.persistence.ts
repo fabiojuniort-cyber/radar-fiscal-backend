@@ -444,6 +444,17 @@ function legacyFileEvidence(
   };
 }
 
+function canonicalContentText(
+  value: string | null | undefined,
+): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized || null;
+}
+
 function legacyV1ContentHash(input: {
   title: string;
   contentText: string | null;
@@ -455,7 +466,7 @@ function legacyV1ContentHash(input: {
       JSON.stringify({
         version: 1,
         title: input.title,
-        contentText: input.contentText,
+        contentText: canonicalContentText(input.contentText),
         effectiveOn: input.effectiveOn,
         rawFileHashes: input.rawFileHashes,
       }),
@@ -563,8 +574,8 @@ async function currentLegacyVersionEquivalent(
     reconstructedLegacyHash ===
       currentVersion.content_hash &&
     canonical.title === publication.title &&
-    currentVersion.content_text ===
-      (publication.contentText ?? null) &&
+    canonicalContentText(currentVersion.content_text) ===
+      canonicalContentText(publication.contentText) &&
     currentEffectiveOn === incomingEffectiveOn &&
     sameHashes(
       legacyEvidence.materialHashes,
@@ -603,6 +614,7 @@ async function getOrCreateVersion(
     .select([
       'id',
       'is_current',
+      'content_text',
       'source_metadata',
     ])
     .where('publication_id', '=', publicationId)
@@ -631,6 +643,27 @@ async function getOrCreateVersion(
 
   if (existingVersion) {
     if (incomingRole === 'PRIMARY') {
+      const incomingContent =
+        publication.contentText ?? null;
+      const sameCanonicalContent =
+        canonicalContentText(existingVersion.content_text) ===
+        canonicalContentText(incomingContent);
+      const hasRicherLayout =
+        sameCanonicalContent &&
+        incomingContent !== null &&
+        incomingContent !== existingVersion.content_text &&
+        /\n/.test(incomingContent);
+
+      if (hasRicherLayout) {
+        await trx
+          .updateTable('publication_versions')
+          .set({
+            content_text: incomingContent,
+            source_metadata: asJson(publication.metadata),
+          })
+          .where('id', '=', existingVersion.id)
+          .execute();
+      }
       if (!existingVersion.is_current) {
         await trx
           .updateTable('publication_versions')
