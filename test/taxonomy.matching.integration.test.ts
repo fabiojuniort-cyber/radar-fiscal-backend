@@ -248,17 +248,12 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
     await admin.query(
       [
         'INSERT INTO taxonomy_releases (',
-        'id,version_major,version_minor,version_patch,status,',
-        'approved_at,published_at,artifact_repository,artifact_path,',
-        'artifact_git_sha,artifact_sha256,created_by_actor',
-        ') VALUES ($1,$2,0,0,',
-        "'PUBLISHED',now(),now(),'tax09-test','fixture',$3,$4,'tax09-test')",
+        'id,version_major,version_minor,version_patch,created_by_actor',
+        ') VALUES ($1,$2,0,0,\'tax09-test\')',
       ].join(' '),
       [
         releaseId,
         versionMajor,
-        'c'.repeat(40),
-        'd'.repeat(64),
       ],
     );
 
@@ -405,6 +400,25 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
         childReleaseConceptId,
         parentReleaseConceptId,
         actualRelationTypeId,
+      ],
+    );
+
+    await admin.query(
+      [
+        'UPDATE taxonomy_releases',
+        "SET status = 'PUBLISHED',",
+        'approved_at = now(),',
+        'published_at = now(),',
+        "artifact_repository = 'tax09-test',",
+        "artifact_path = 'fixture',",
+        'artifact_git_sha = $2,',
+        'artifact_sha256 = $3',
+        'WHERE id = $1',
+      ].join(' '),
+      [
+        releaseId,
+        'c'.repeat(40),
+        'd'.repeat(64),
       ],
     );
 
