@@ -318,9 +318,12 @@ CREATE TABLE publication_taxonomy_spans (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT chk_publication_taxonomy_span_range
         CHECK (
-            span_start IS NULL
-            OR span_end IS NULL
-            OR span_end >= span_start
+            (span_start IS NULL AND span_end IS NULL)
+            OR (
+                span_start IS NOT NULL
+                AND span_end IS NOT NULL
+                AND span_end > span_start
+            )
         ),
     CONSTRAINT chk_publication_taxonomy_span_selector
         CHECK (jsonb_typeof(selector) = 'object'),
