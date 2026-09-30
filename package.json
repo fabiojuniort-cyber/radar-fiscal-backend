@@ -11,7 +11,7 @@
     "dev:worker": "tsx watch src/worker.ts",
     "dev:scheduler": "tsx watch src/scheduler.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node --input-type=module -e \"import pg from 'pg'; const pool=new pg.Pool({connectionString:process.env.DATABASE_ADMIN_URL||process.env.DATABASE_URL,max:1}); const c=await pool.connect(); try{await c.query('BEGIN READ ONLY'); const m=await c.query('SELECT filename FROM schema_migrations ORDER BY filename'); const t=await c.query(\\\"SELECT count(*)::int n FROM information_schema.tables WHERE table_schema='public' AND (table_name LIKE 'taxonomy_%' OR table_name LIKE 'official_catalog%')\\\"); const role=await c.query(\\\"SELECT rolname,rolcanlogin,rolsuper,rolcreaterole,rolcreatedb FROM pg_roles WHERE rolname='radar_taxonomy_curator'\\\"); const rel=await c.query(\\\"SELECT CASE WHEN to_regclass('public.taxonomy_releases') IS NULL THEN NULL ELSE (SELECT count(*)::int FROM taxonomy_releases) END n\\\"); console.log('TAX_P1_READBACK='+JSON.stringify({migrations:m.rows.map(r=>r.filename),taxonomyTables:t.rows[0].n,curator:role.rows[0]??null,releases:rel.rows[0].n})); await c.query('ROLLBACK');}finally{c.release();await pool.end();}\"",
     "start:worker": "node dist/worker.js",
     "start:scheduler": "node dist/scheduler.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
