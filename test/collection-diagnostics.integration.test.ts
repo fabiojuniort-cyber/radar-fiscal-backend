@@ -6,7 +6,7 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
-import { readCollectionDiagnostics } from '../src/modules/operations/collection-diagnostics.js';
+import { RECENT_RUNS_PER_SOURCE, readCollectionDiagnostics } from '../src/modules/operations/collection-diagnostics.js';
 
 test('collection diagnostics groups item failures and resolves the linked identity of an origin conflict', async () => {
   const adminUrl = process.env.DATABASE_ADMIN_URL;
@@ -84,6 +84,57 @@ test('collection diagnostics groups item failures and resolves the linked identi
     }
     if (publicationId) await db.deleteFrom('publications').where('id', '=', publicationId).execute();
     if (sourceId) await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+    await db.destroy();
+  }
+});
+
+test('collection diagnostics only examines a bounded set of recent runs per source', async () => {
+  const adminUrl = process.env.DATABASE_ADMIN_URL;
+  assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for collection diagnostics integration tests.');
+
+  const pool = new Pool({ connectionString: adminUrl, max: 2 });
+  const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+  const suffix = randomUUID().slice(0, 8);
+  let sourceId: string | undefined;
+
+  try {
+    sourceId = (await db.insertInto('sources').values({
+      code: `diag-bound-${suffix}`,
+      name: 'diag-bound',
+      jurisdiction_level: 'FEDERAL',
+      base_url: 'https://diag.example.test',
+      connector_key: `diag-bound-${suffix}`,
+    }).returning('id').executeTakeFirstOrThrow()).id;
+
+    // 30 runs inside the window (only the 24 most recent may be examined)
+    // plus one run outside the window.
+    const offsets = [...Array.from({ length: 30 }, (_, i) => i + 1), 24 * 10];
+    for (const hours of offsets) {
+      const run = await db.insertInto('collection_runs').values({
+        source_id: sourceId,
+        scheduled_for: new Date(Date.now() - hours * 3_600_000),
+        status: 'PARTIAL_SUCCESS',
+        finished_at: new Date(Date.now() - hours * 3_600_000 + 60_000),
+      }).returning('id').executeTakeFirstOrThrow();
+      await db.insertInto('collection_items').values({
+        collection_run_id: run.id,
+        source_item_key: `item-${hours}`,
+        status: 'FAILED',
+        error_code: 'X',
+        error_message: 'bounded failure',
+      }).execute();
+    }
+
+    const diagnostics = await readCollectionDiagnostics(db, 48);
+    const group = diagnostics.itemFailures.find((item) => item.sourceCode === `diag-bound-${suffix}`);
+    assert.ok(group);
+    assert.equal(group.failures, RECENT_RUNS_PER_SOURCE);
+    assert.equal(group.sampleItemKeys.includes('item-240'), false);
+  } finally {
+    if (sourceId) {
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+      await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+    }
     await db.destroy();
   }
 });

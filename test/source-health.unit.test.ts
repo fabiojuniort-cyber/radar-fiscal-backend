@@ -136,3 +136,29 @@ test('watchdog throttles repeated alerts and re-alerts after resolution', async 
   await dog.runIfDue(db, at(10));
   assert.equal(errors.length, 3);
 });
+
+test('time thresholds compare exact elapsed time, not the rounded display value', () => {
+  const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
+
+  // 23h57m would display as 24.0 but is still inside the 24h window.
+  for (const minutes of [23 * 60 + 57, 23 * 60 + 59]) {
+    const report = evaluateSourceHealth([row({ lastConsultedAt: minutesAgo(minutes) })], NOW);
+    assert.deepEqual(report.alerts, [], `stale must not fire at ${minutes} min`);
+  }
+  const atStale = evaluateSourceHealth([row({ lastConsultedAt: minutesAgo(24 * 60) })], NOW);
+  assert.deepEqual(atStale.alerts.map((alert) => alert.kind), ['STALE_SOURCE']);
+  assert.equal(atStale.alerts[0]?.detail.hoursSinceConsulted, 24);
+
+  // 5h57m / 5h59m would display as 6.0 but the run is not stuck yet.
+  for (const minutes of [5 * 60 + 57, 5 * 60 + 59]) {
+    const report = evaluateSourceHealth([
+      row({ openRunId: 'r', openRunStartedAt: minutesAgo(minutes), openRunAttempts: 3 }),
+    ], NOW);
+    assert.deepEqual(report.alerts, [], `stuck must not fire at ${minutes} min`);
+  }
+  const atStuck = evaluateSourceHealth([
+    row({ openRunId: 'r', openRunStartedAt: minutesAgo(6 * 60), openRunAttempts: 3 }),
+  ], NOW);
+  assert.deepEqual(atStuck.alerts.map((alert) => alert.kind), ['STUCK_RUN']);
+  assert.equal(atStuck.alerts[0]?.detail.openHours, 6);
+});

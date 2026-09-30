@@ -57,6 +57,9 @@ export interface CollectionDiagnostics {
   dou: DouPartialDiagnostics | null;
 }
 
+/** Upper bound of runs examined per source (hourly sources: ~1 day). */
+export const RECENT_RUNS_PER_SOURCE = 24;
+
 const CONFLICT_MESSAGE = 'Publication origin is already linked to another publication identity.';
 
 const METADATA_KEYS = [
@@ -86,6 +89,23 @@ export async function readCollectionDiagnostics(
     last_seen_at: Date;
     sample_keys: string[];
   }>`
+    WITH recent_runs AS (
+      -- Bounded candidate set: at most RECENT_RUNS_PER_SOURCE runs per source
+      -- inside the window, via ix_collection_runs_source_history
+      -- (source_id, scheduled_for DESC). Items are then reached through
+      -- uq_collection_item (collection_run_id, ...), so the work is bounded
+      -- by sources x runs, never a scan of all collection_items.
+      SELECT r.id, r.source_id
+      FROM sources src
+      CROSS JOIN LATERAL (
+        SELECT cr.id, cr.source_id
+        FROM collection_runs cr
+        WHERE cr.source_id = src.id
+          AND cr.scheduled_for >= ${since}
+        ORDER BY cr.scheduled_for DESC
+        LIMIT ${RECENT_RUNS_PER_SOURCE}
+      ) r
+    )
     SELECT
       s.code AS source_code,
       ci.error_code,
@@ -94,11 +114,10 @@ export async function readCollectionDiagnostics(
       COUNT(DISTINCT ci.source_item_key)::int AS distinct_items,
       MAX(ci.updated_at) AS last_seen_at,
       (ARRAY_AGG(DISTINCT ci.source_item_key))[1:5] AS sample_keys
-    FROM collection_items ci
-    JOIN collection_runs cr ON cr.id = ci.collection_run_id
+    FROM recent_runs cr
     JOIN sources s ON s.id = cr.source_id
+    JOIN collection_items ci ON ci.collection_run_id = cr.id
     WHERE ci.status = 'FAILED'
-      AND ci.updated_at >= ${since}
     GROUP BY s.code, ci.error_code, LEFT(ci.error_message, 300)
     ORDER BY failures DESC
     LIMIT 50
@@ -122,6 +141,23 @@ export async function readCollectionDiagnostics(
     first_seen_at: Date | null;
     origin_last_seen_at: Date | null;
   }>`
+    WITH recent_runs AS (
+      -- Bounded candidate set: at most RECENT_RUNS_PER_SOURCE runs per source
+      -- inside the window, via ix_collection_runs_source_history
+      -- (source_id, scheduled_for DESC). Items are then reached through
+      -- uq_collection_item (collection_run_id, ...), so the work is bounded
+      -- by sources x runs, never a scan of all collection_items.
+      SELECT r.id, r.source_id
+      FROM sources src
+      CROSS JOIN LATERAL (
+        SELECT cr.id, cr.source_id
+        FROM collection_runs cr
+        WHERE cr.source_id = src.id
+          AND cr.scheduled_for >= ${since}
+        ORDER BY cr.scheduled_for DESC
+        LIMIT ${RECENT_RUNS_PER_SOURCE}
+      ) r
+    )
     SELECT DISTINCT ON (cr.source_id, ci.source_item_key)
       s.code AS source_code,
       ci.external_id,
@@ -139,16 +175,15 @@ export async function readCollectionDiagnostics(
       o.official_url,
       o.first_seen_at,
       o.last_seen_at AS origin_last_seen_at
-    FROM collection_items ci
-    JOIN collection_runs cr ON cr.id = ci.collection_run_id
+    FROM recent_runs cr
     JOIN sources s ON s.id = cr.source_id
+    JOIN collection_items ci ON ci.collection_run_id = cr.id
     LEFT JOIN publication_origins o
       ON o.source_id = cr.source_id
      AND (o.external_id = ci.external_id OR (ci.external_id IS NULL AND o.official_url = ci.source_url))
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE ci.status = 'FAILED'
       AND ci.error_message = ${CONFLICT_MESSAGE}
-      AND ci.updated_at >= ${since}
     ORDER BY cr.source_id, ci.source_item_key, ci.updated_at DESC
     LIMIT 20
   `.execute(db);

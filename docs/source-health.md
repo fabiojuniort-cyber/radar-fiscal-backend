@@ -44,3 +44,11 @@ Canal: por ora o alerta é o log estruturado (pesquisável no Railway por `"Sour
   - DOU: `partialFailures` e pacotes não processados da última tentativa bem-sucedida.
 
 Ambos usam `DATABASE_URL` (role de runtime) e não alteram dados.
+
+### Custo das consultas
+
+- **Limiares do watchdog:** a comparação usa o tempo decorrido exato; o arredondamento para uma casa decimal só aparece no detalhe do alerta. Assim, 23h57m não dispara `STALE_SOURCE`, nem 5h57m dispara `STUCK_RUN`.
+- **Diagnóstico sem varredura de `collection_items`:** o conjunto candidato são os runs da janela, no máximo `RECENT_RUNS_PER_SOURCE` (24) por fonte, obtidos por `ix_collection_runs_source_history (source_id, scheduled_for DESC)`. Os itens são acessados por `uq_collection_item (collection_run_id, …)`. O custo é proporcional a fontes × 24 runs × itens por run, independente do tamanho histórico da tabela. Não há migration nem índice novo.
+- **Evidência (PostgreSQL 16, 10 fontes × 300 runs × 100 itens = 300.000 linhas em `collection_items`, após `ANALYZE`):**
+  - consulta anterior (`status`/`updated_at` direto em `collection_items`): `Parallel Seq Scan on collection_items`, 4.805 buffers, ~21,8 ms;
+  - consulta atual: `Index Scan using ix_collection_runs_source_history` (24 runs × 10 fontes) e acesso por índice a `collection_items` somente nesses 240 runs, 1.466 buffers, ~4,9 ms.

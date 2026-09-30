@@ -64,8 +64,15 @@ export interface SourceHealthReport {
 
 const HOUR_MS = 3_600_000;
 
-function hoursBetween(from: Date, to: Date): number {
-  return Math.round(((to.getTime() - from.getTime()) / HOUR_MS) * 10) / 10;
+// Thresholds are compared against the exact elapsed time; rounding is only
+// for the value shown in alert details (rounding first would fire minutes
+// before a threshold, e.g. 23h57m shown as 24.0).
+function elapsedMs(from: Date, to: Date): number {
+  return to.getTime() - from.getTime();
+}
+
+function displayHours(ms: number): number {
+  return Math.round((ms / HOUR_MS) * 10) / 10;
 }
 
 function truncate(value: string | null, max = 300): string | null {
@@ -82,15 +89,15 @@ export function evaluateSourceHealth(
   for (const row of rows) {
     // A source created recently is not stale just because it never ran yet.
     const reference = row.lastConsultedAt ?? row.sourceCreatedAt;
-    const hoursSinceConsulted = hoursBetween(reference, now);
-    if (hoursSinceConsulted >= thresholds.staleAfterHours) {
+    const sinceConsultedMs = elapsedMs(reference, now);
+    if (sinceConsultedMs >= thresholds.staleAfterHours * HOUR_MS) {
       alerts.push({
         kind: 'STALE_SOURCE',
         sourceId: row.sourceId,
         sourceCode: row.sourceCode,
         detail: {
           lastConsultedAt: row.lastConsultedAt?.toISOString() ?? null,
-          hoursSinceConsulted,
+          hoursSinceConsulted: displayHours(sinceConsultedMs),
           lastFinishedStatus: row.lastFinishedStatus,
           lastError: truncate(row.lastFinishedError ?? row.openRunLastError),
           thresholdHours: thresholds.staleAfterHours,
@@ -99,10 +106,10 @@ export function evaluateSourceHealth(
     }
 
     if (row.openRunId && row.openRunStartedAt) {
-      const openHours = hoursBetween(row.openRunStartedAt, now);
+      const openMs = elapsedMs(row.openRunStartedAt, now);
       if (
         row.openRunAttempts >= thresholds.stuckRunAttempts ||
-        openHours >= thresholds.stuckRunHours
+        openMs >= thresholds.stuckRunHours * HOUR_MS
       ) {
         alerts.push({
           kind: 'STUCK_RUN',
@@ -111,7 +118,7 @@ export function evaluateSourceHealth(
           detail: {
             runId: row.openRunId,
             startedAt: row.openRunStartedAt.toISOString(),
-            openHours,
+            openHours: displayHours(openMs),
             attempts: row.openRunAttempts,
             lastError: truncate(row.openRunLastError),
             thresholdAttempts: thresholds.stuckRunAttempts,
