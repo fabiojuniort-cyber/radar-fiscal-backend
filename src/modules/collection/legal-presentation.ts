@@ -264,7 +264,7 @@ export function sanitizeLegalPresentationHtml(
     },
   );
 
-  parser.end();
+  parser.end(value);
 
   while (
     openAllowedTags.length > 0
