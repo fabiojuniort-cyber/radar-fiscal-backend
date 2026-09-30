@@ -35,7 +35,68 @@ test('same source publication normalizes to stable identity and content hashes',
   assert.equal(first.contentHash, second.contentHash);
   assert.equal(first.identityStrength, 'STRONG');
   assert.equal(first.title, 'Ajuste SINIEF 10/2026');
-  assert.equal(first.contentText, 'Texto integral da norma.');
+  assert.equal(first.contentText, 'Texto   integral da norma.');
+});
+
+test('document layout is preserved without changing canonical content hash semantics', () => {
+  const structured = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Portaria 10/2026',
+      agency: 'Órgão X',
+      sphere: 'FEDERAL',
+      actType: 'Portaria',
+      actNumber: '10/2026',
+      publishedAt: new Date('2026-09-30T00:00:00Z'),
+      officialUrl: 'https://example.gov/portaria-10',
+      content: [
+        'CAPÍTULO I',
+        '',
+        'Art. 1º  Esta Portaria dispõe sobre:',
+        '    I - primeiro item;',
+        '    II - segundo item.',
+      ].join('\n'),
+    },
+  });
+
+  const flattened = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Portaria 10/2026',
+      agency: 'Órgão X',
+      sphere: 'FEDERAL',
+      actType: 'Portaria',
+      actNumber: '10/2026',
+      publishedAt: new Date('2026-09-30T00:00:00Z'),
+      officialUrl: 'https://example.gov/portaria-10',
+      content:
+        'CAPÍTULO I Art. 1º Esta Portaria dispõe sobre: I - primeiro item; II - segundo item.',
+    },
+  });
+
+  assert.equal(
+    structured.contentText,
+    [
+      'CAPÍTULO I',
+      '',
+      'Art. 1º  Esta Portaria dispõe sobre:',
+      '    I - primeiro item;',
+      '    II - segundo item.',
+    ].join('\n'),
+  );
+  assert.equal(
+    structured.contentHash,
+    flattened.contentHash,
+    'presentation whitespace must not create a semantic version',
+  );
+  assert.deepEqual(
+    structured.metadata.presentation,
+    {
+      version: 1,
+      format: 'PRESERVED_TEXT',
+      preservesWhitespace: true,
+    },
+  );
 });
 
 test('same strong identity with changed content produces a new content hash', () => {
