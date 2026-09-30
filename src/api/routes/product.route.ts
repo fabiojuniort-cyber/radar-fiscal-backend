@@ -81,6 +81,20 @@ const companyIdParamsSchema = z.object({
   companyId: z.string().uuid(),
 });
 
+const archiveQuerySchema = z.object({
+  q: z.string().trim().min(2).max(200).optional(),
+  uf: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2}$/)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
+  source: z.string().trim().min(1).max(100).optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(25),
+});
+
 function tenantIdFromRequest(request: FastifyRequest): string | null {
   const raw = request.headers['x-tenant-id'];
 
@@ -741,4 +755,148 @@ export async function productRoutes(
       }
     },
   );
+
+  typed.get(
+    '/api/v1/archive',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        querystring: archiveQuerySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      let query = app.db
+        .selectFrom('publications as p')
+        .leftJoin(
+          'publication_versions as pv',
+          (join) =>
+            join
+              .onRef('pv.publication_id', '=', 'p.id')
+              .on('pv.is_current', '=', true),
+        )
+        .select([
+          'p.id',
+          'p.title',
+          'p.act_type',
+          'p.act_number',
+          'p.agency',
+          'p.jurisdiction_level',
+          'p.uf',
+          'p.published_on',
+          'p.effective_on',
+          'p.primary_official_url',
+          'pv.relevant_excerpt',
+        ]);
+
+      if (request.query.uf) {
+        query = query.where('p.uf', '=', request.query.uf);
+      }
+
+      if (request.query.jurisdiction) {
+        query = query.where(
+          'p.jurisdiction_level',
+          '=',
+          request.query.jurisdiction,
+        );
+      }
+
+      if (request.query.source) {
+        const sourceCode = request.query.source;
+
+        query = query.where(({ exists, selectFrom }) =>
+          exists(
+            selectFrom('publication_origins as po_filter')
+              .innerJoin(
+                'sources as s_filter',
+                's_filter.id',
+                'po_filter.source_id',
+              )
+              .select('po_filter.id')
+              .whereRef(
+                'po_filter.publication_id',
+                '=',
+                'p.id',
+              )
+              .where('s_filter.code', '=', sourceCode),
+          ),
+        );
+      }
+
+      if (request.query.q) {
+        const pattern = '%' + request.query.q + '%';
+
+        query = query.where((eb) =>
+          eb.or([
+            eb('p.title', 'ilike', pattern),
+            eb('p.act_type', 'ilike', pattern),
+            eb('p.act_number', 'ilike', pattern),
+            eb('p.agency', 'ilike', pattern),
+            eb('pv.relevant_excerpt', 'ilike', pattern),
+            eb('pv.content_text', 'ilike', pattern),
+          ]),
+        );
+      }
+
+      const offset =
+        (request.query.page - 1) * request.query.limit;
+
+      const rows = await query
+        .orderBy('p.published_on', 'desc')
+        .orderBy('p.first_collected_at', 'desc')
+        .limit(request.query.limit + 1)
+        .offset(offset)
+        .execute();
+
+      const hasMore = rows.length > request.query.limit;
+      const pageRows = rows.slice(0, request.query.limit);
+
+      const items = [];
+
+      for (const row of pageRows) {
+        const origin = await app.db
+          .selectFrom('publication_origins as po')
+          .innerJoin('sources as s', 's.id', 'po.source_id')
+          .select([
+            'po.official_url',
+            's.code as source_code',
+            's.name as source_name',
+          ])
+          .where('po.publication_id', '=', row.id)
+          .orderBy('po.first_seen_at')
+          .executeTakeFirst();
+
+        items.push({
+          id: row.id,
+          title: row.title,
+          actType: row.act_type,
+          actNumber: row.act_number,
+          agency: row.agency,
+          jurisdictionLevel: row.jurisdiction_level,
+          uf: row.uf,
+          publishedOn: row.published_on
+            ? new Date(row.published_on).toISOString().slice(0, 10)
+            : null,
+          effectiveOn: row.effective_on
+            ? new Date(row.effective_on).toISOString().slice(0, 10)
+            : null,
+          officialUrl: row.primary_official_url ?? origin?.official_url ?? null,
+          sourceCode: origin?.source_code ?? null,
+          sourceName: origin?.source_name ?? null,
+          excerpt: row.relevant_excerpt,
+        });
+      }
+
+      return reply.status(200).send({
+        page: request.query.page,
+        limit: request.query.limit,
+        hasMore,
+        items,
+      });
+    },
+  );
+
 }
