@@ -130,8 +130,21 @@ test('DOE-SP normative identity: strong only for unambiguous numbering series', 
   assert.equal(lei('LEI Nº 17839, DE 1º DE NOVEMBRO DE 2023'), '17839/2023');
   assert.equal(lei('LEI Nº 17 .839, DE 1º DE NOVEMBRO DE 2023'), undefined);
   assert.equal(lei('LEI Nº 17, 839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  // N1 (DOE-SP-40 review): any run of spaces/separators before more digits -> SOURCE_SCOPED.
+  assert.equal(lei('LEI Nº 17 839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  assert.equal(lei('LEI Nº 17..839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  assert.equal(lei('LEI Nº 17.,839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  assert.equal(lei('LEI Nº 17 , . 839, DE 1º DE NOVEMBRO DE 2023'), undefined);
+  assert.equal(doeSpNormativeIdentity({ title: 'DECRETO Nº 70 843, DE 3 DE SETEMBRO DE 2026', category: 'NUMBERED_DECREE' }), undefined);
+  // The title date after the comma is not trailing digits.
+  assert.equal(lei('LEI Nº 17.839, DE 1º DE NOVEMBRO DE 2023'), '17839/2023');
+  assert.equal(lei('LEI Nº 17.839,DE 1º DE NOVEMBRO DE 2023'), '17839/2023');
+  assert.equal(lei('LEI COMPLEMENTAR Nº 1.437 , DE 23 DE DEZEMBRO DE 2025'), '1437/2025');
   assert.equal(lei('LEI Nº 1.234.567, DE 1º DE NOVEMBRO DE 2023'), '1234567/2023');
   assert.equal(sefaz('RESOLUÇÃO SFP Nº 1.234, DE 3 DE SETEMBRO DE 2026'), undefined);
+  assert.equal(sefaz('COMUNICADO DICAR Nº 59 123, DE 1 DE SETEMBRO DE 2026'), undefined);
+  assert.equal(sefaz('COMUNICADO DICAR Nº 59..123, DE 1 DE SETEMBRO DE 2026'), undefined);
+  assert.equal(sefaz('COMUNICADO DICAR Nº 59,123, DE 1 DE SETEMBRO DE 2026'), undefined);
   assert.equal(sefaz('PORTARIA CONJUNTA SRE/STE 05, DE 3 DE SETEMBRO DE 2026')?.agency, 'SEFAZ-SP/SRE/STE');
   assert.equal(sefaz('PORTARIA CONJUNTA SRE/STE 05, DE 3 DE SETEMBRO DE 2026')?.actNumber, '5/2026');
   assert.equal(sefaz('COMUNICADO DICAR Nº 59, DE 1 DE SETEMBRO DE 2026')?.actNumber, '59/2026');
