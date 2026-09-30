@@ -248,7 +248,7 @@ export async function companyManualRoutes(
             tradeName: null,
             cnpj: request.body.cnpj,
             businessLocationCode:
-              request.body.businessLocationCode ?? null,
+              created.businessLocationCode,
           },
           establishment: {
             id: created.establishmentId,
@@ -274,15 +274,13 @@ export async function companyManualRoutes(
             district:
               request.body.district ?? null,
             businessLocationCode:
-              request.body.businessLocationCode ?? null,
+              created.businessLocationCode,
             stateRegistration:
-              request.body.stateRegistration ?? null,
+              created.stateRegistration,
             stateRegistrationStatus: null,
             stateRegistrationLookupStatus: null,
             stateRegistrationSource:
-              request.body.stateRegistration
-                ? 'MANUAL'
-                : null,
+              created.stateRegistrationSource,
             stateRegistrationCheckedAt: null,
             cnaes,
           },
