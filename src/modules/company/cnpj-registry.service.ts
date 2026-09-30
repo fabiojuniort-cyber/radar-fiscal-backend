@@ -406,12 +406,25 @@ async function fetchRegistryProvider(
   provider: RegistryProvider,
   normalizedCnpj: string,
   fetcher: RegistryFetch,
+  externalSignal?: AbortSignal,
 ): Promise<RegistryProviderResult> {
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
     8_000,
   );
+  const abortFromExternal = () =>
+    controller.abort();
+
+  if (externalSignal?.aborted) {
+    controller.abort();
+  } else {
+    externalSignal?.addEventListener(
+      'abort',
+      abortFromExternal,
+      { once: true },
+    );
+  }
 
   try {
     const response = await fetcher(
@@ -471,6 +484,10 @@ async function fetchRegistryProvider(
     return { kind: 'unavailable' };
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener(
+      'abort',
+      abortFromExternal,
+    );
   }
 }
 
@@ -485,6 +502,8 @@ async function fetchFirstSuccessfulProvider(
   const outcomes = new Array<
     RegistryProviderResult | undefined
   >(providers.length);
+  const groupController =
+    new AbortController();
 
   return new Promise((resolve) => {
     let pending = providers.length;
@@ -511,6 +530,7 @@ async function fetchFirstSuccessfulProvider(
           provider,
           normalizedCnpj,
           fetcher,
+          groupController.signal,
         ).then((outcome) => {
           outcomes[index] = outcome;
           pending -= 1;
@@ -520,6 +540,7 @@ async function fetchFirstSuccessfulProvider(
             !settled
           ) {
             settled = true;
+            groupController.abort();
             resolve({
               success: outcome.record,
               outcomes:
