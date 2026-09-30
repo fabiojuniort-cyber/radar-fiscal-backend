@@ -436,6 +436,124 @@ async function run(): Promise<void> {
       );
     }
 
+    const candidatePrivileges = await pool.query<{
+      occurrence_select: boolean;
+      occurrence_insert: boolean;
+      candidate_select: boolean;
+      candidate_insert: boolean;
+      candidate_table_update: boolean;
+      candidate_status_update: boolean;
+      candidate_key_update: boolean;
+      candidate_delete: boolean;
+      link_select: boolean;
+      link_insert: boolean;
+      link_table_update: boolean;
+      link_status_update: boolean;
+      link_occurrence_update: boolean;
+      link_delete: boolean;
+    }>(`
+      SELECT
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_unmapped_occurrences',
+          'SELECT'
+        ) AS occurrence_select,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_unmapped_occurrences',
+          'INSERT'
+        ) AS occurrence_insert,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidates',
+          'SELECT'
+        ) AS candidate_select,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidates',
+          'INSERT'
+        ) AS candidate_insert,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidates',
+          'UPDATE'
+        ) AS candidate_table_update,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidates',
+          'status',
+          'UPDATE'
+        ) AS candidate_status_update,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidates',
+          'normalized_key',
+          'UPDATE'
+        ) AS candidate_key_update,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidates',
+          'DELETE'
+        ) AS candidate_delete,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidate_occurrence_links',
+          'SELECT'
+        ) AS link_select,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidate_occurrence_links',
+          'INSERT'
+        ) AS link_insert,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidate_occurrence_links',
+          'UPDATE'
+        ) AS link_table_update,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidate_occurrence_links',
+          'link_status',
+          'UPDATE'
+        ) AS link_status_update,
+        has_column_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidate_occurrence_links',
+          'occurrence_id',
+          'UPDATE'
+        ) AS link_occurrence_update,
+        has_table_privilege(
+          'radar_taxonomy_curator',
+          'public.taxonomy_candidate_occurrence_links',
+          'DELETE'
+        ) AS link_delete
+    `);
+
+    const candidatePolicy =
+      candidatePrivileges.rows[0];
+
+    if (
+      !candidatePolicy ||
+      !candidatePolicy.occurrence_select ||
+      candidatePolicy.occurrence_insert ||
+      !candidatePolicy.candidate_select ||
+      !candidatePolicy.candidate_insert ||
+      candidatePolicy.candidate_table_update ||
+      !candidatePolicy.candidate_status_update ||
+      candidatePolicy.candidate_key_update ||
+      candidatePolicy.candidate_delete ||
+      !candidatePolicy.link_select ||
+      !candidatePolicy.link_insert ||
+      candidatePolicy.link_table_update ||
+      !candidatePolicy.link_status_update ||
+      candidatePolicy.link_occurrence_update ||
+      candidatePolicy.link_delete
+    ) {
+      throw new Error(
+        'Taxonomy curator candidate privileges are invalid.',
+      );
+    }
+
     const audit = await pool.query<{
       can_select: boolean;
       can_insert: boolean;
