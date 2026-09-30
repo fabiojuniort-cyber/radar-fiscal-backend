@@ -41,8 +41,14 @@ const VOID_TAGS = new Set([
 ]);
 
 const HIDDEN_TAGS = new Set([
+  'aside',
+  'button',
+  'footer',
+  'form',
   'head',
+  'header',
   'iframe',
+  'nav',
   'noscript',
   'object',
   'script',
