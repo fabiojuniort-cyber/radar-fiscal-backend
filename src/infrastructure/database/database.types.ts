@@ -492,6 +492,58 @@ export interface TaxonomyAliases {
   text: string;
 }
 
+
+export interface TaxonomyUnmappedOccurrences {
+  confidence: Numeric | null;
+  context_excerpt: string | null;
+  created_at: Generated<Timestamp>;
+  extractor_key: string;
+  extractor_version: string;
+  id: Generated<string>;
+  jurisdiction_metadata: Generated<Json>;
+  language: Generated<string>;
+  metadata: Generated<Json>;
+  normalized_term: string;
+  observed_at: Generated<Timestamp>;
+  occurrence_fingerprint: string;
+  probable_dimension_id: string | null;
+  raw_term: string;
+  run_id: string;
+  span_end: number | null;
+  span_start: number | null;
+}
+
+export interface TaxonomyCandidates {
+  candidate_fingerprint: string;
+  context_signature: string;
+  created_at: Generated<Timestamp>;
+  decision_actor_id: string | null;
+  decision_at: Timestamp | null;
+  decision_reason: string | null;
+  first_seen_at: Generated<Timestamp>;
+  id: Generated<string>;
+  jurisdiction_scope: Generated<Json>;
+  last_seen_at: Generated<Timestamp>;
+  normalized_key: string;
+  parent_candidate_id: string | null;
+  preferred_term: string;
+  probable_dimension_id: string | null;
+  resolved_release_concept_id: string | null;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface TaxonomyCandidateOccurrenceLinks {
+  candidate_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  justification: string | null;
+  link_status: Generated<string>;
+  linked_at: Generated<Timestamp>;
+  occurrence_id: string;
+  superseded_at: Timestamp | null;
+}
+
 export interface TaxonomyConceptRelations {
   created_at: Generated<Timestamp>;
   evidence_status: Generated<string>;
@@ -785,6 +837,8 @@ export interface DB {
   schema_migrations: SchemaMigrations;
   sources: Sources;
   taxonomy_alias_binding_evidence: TaxonomyAliasBindingEvidence;
+  taxonomy_candidate_occurrence_links: TaxonomyCandidateOccurrenceLinks;
+  taxonomy_candidates: TaxonomyCandidates;
   taxonomy_aliases: TaxonomyAliases;
   taxonomy_concept_relations: TaxonomyConceptRelations;
   taxonomy_concept_revision_evidence: TaxonomyConceptRevisionEvidence;
@@ -802,6 +856,7 @@ export interface DB {
   taxonomy_release_dimensions: TaxonomyReleaseDimensions;
   taxonomy_release_relation_rules: TaxonomyReleaseRelationRules;
   taxonomy_releases: TaxonomyReleases;
+  taxonomy_unmapped_occurrences: TaxonomyUnmappedOccurrences;
   tenant_memberships: TenantMemberships;
   tenant_onboarding_profiles: TenantOnboardingProfiles;
   tenants: Tenants;
