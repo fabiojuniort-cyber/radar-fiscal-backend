@@ -194,46 +194,63 @@ async function lookupGoSintegra(
     const cookie = responseCookies(landing);
     const normalized = onlyDigits(cnpj);
 
-    const body = new URLSearchParams({
-      rTipoDoc: '2',
-      tDoc: normalized,
-      tCCE: '',
-      tCNPJ: normalized,
-      tCPF: '',
-      btCGC: 'Consulta=',
-      'zion.SystemAction': 'consultaSintegra()',
-      'zion.OnSubmited': '',
-      'zion.FormElementPosted': 'zionFormID_1',
-      zionPostMethod: '',
-      zionRichValidator: 'true',
-    });
+    const buttonValues = [
+      'Consulta=',
+      'Consulta',
+      'Consultar',
+    ];
 
-    const response = await fetcher(GO_RESULT_URL, {
-      method: 'POST',
-      headers: {
-        ...browserHeaders,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Referer: landingUrl,
-        ...(cookie ? { Cookie: cookie } : {}),
-      },
-      body,
-      signal: controller.signal,
-    });
+    for (const buttonValue of buttonValues) {
+      const body = new URLSearchParams({
+        rTipoDoc: '2',
+        tDoc: normalized,
+        tCCE: '',
+        tCNPJ: normalized,
+        tCPF: '',
+        btCGC: buttonValue,
+        'zion.SystemAction': 'consultaSintegra()',
+        'zion.OnSubmited': '',
+        'zion.FormElementPosted': 'zionFormID_1',
+        zionPostMethod: '',
+        zionRichValidator: 'true',
+      });
 
-    if (!response.ok) {
-      return {
-        registration: null,
-        registrationStatus: null,
-        lookupStatus: 'UNAVAILABLE',
-        source: 'SEFAZ_GO_SINTEGRA',
-        checkedAt: checkedAt.toISOString(),
-      };
+      const response = await fetcher(GO_RESULT_URL, {
+        method: 'POST',
+        headers: {
+          ...browserHeaders,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Referer: landingUrl,
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+        body,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const parsed = parseGoSintegraResult(
+        await response.text(),
+        checkedAt,
+      );
+
+      if (
+        parsed.lookupStatus === 'SUCCESS' ||
+        parsed.lookupStatus === 'NOT_FOUND'
+      ) {
+        return parsed;
+      }
     }
 
-    return parseGoSintegraResult(
-      await response.text(),
-      checkedAt,
-    );
+    return {
+      registration: null,
+      registrationStatus: null,
+      lookupStatus: 'UNAVAILABLE',
+      source: 'SEFAZ_GO_SINTEGRA',
+      checkedAt: checkedAt.toISOString(),
+    };
   } catch {
     return {
       registration: null,
