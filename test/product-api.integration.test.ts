@@ -179,6 +179,60 @@ test(
         403,
       );
 
+      await admin.query(
+        `
+          INSERT INTO tenant_memberships (
+            tenant_id,
+            user_id,
+            role
+          )
+          VALUES ($1, $2, 'ANALYST')
+          ON CONFLICT (tenant_id, user_id)
+          DO UPDATE SET role = EXCLUDED.role
+        `,
+        [
+          first.tenantId,
+          second.userId,
+        ],
+      );
+
+      const analystHeaders = {
+        authorization:
+          'Bearer ' + second.accessToken,
+        'x-tenant-id': first.tenantId,
+      };
+
+      const analystRead =
+        await app.inject({
+          method: 'GET',
+          url: '/api/v1/account',
+          headers: analystHeaders,
+        });
+
+      assert.equal(
+        analystRead.statusCode,
+        200,
+      );
+
+      const analystWrite =
+        await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies',
+          headers: analystHeaders,
+          payload: {
+            legalName:
+              'Empresa não autorizada',
+            cnpj: cnpjFromSeed(
+              '987650000001',
+            ),
+          },
+        });
+
+      assert.equal(
+        analystWrite.statusCode,
+        403,
+      );
+
       const companyCnpj = cnpjFromSeed(
         '123450000001',
       );
