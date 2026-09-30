@@ -166,7 +166,8 @@ async function lookupGoSintegra(
 
   try {
     let landing: Response | null = null;
-    let landingUrl = GO_LANDING_URLS[0];
+    let landingUrl: string =
+      GO_LANDING_URLS[0];
 
     for (const candidate of GO_LANDING_URLS) {
       const response = await fetcher(candidate, {
