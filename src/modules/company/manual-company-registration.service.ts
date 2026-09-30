@@ -7,18 +7,18 @@ import { replaceManualEstablishmentCnaes } from './company-registration.service.
 export type ManualCompanyRegistrationInput = {
   cnpj: string;
   legalName: string;
-  establishmentName?: string | null;
+  establishmentName?: string | null | undefined;
   uf: string;
-  municipalityName?: string | null;
-  municipalityIbgeCode?: string | null;
-  postalCode?: string | null;
-  street?: string | null;
-  streetNumber?: string | null;
-  complement?: string | null;
-  district?: string | null;
-  stateRegistration?: string | null;
-  businessLocationCode?: string | null;
-  cnaes?: CnpjRegistryCnae[];
+  municipalityName?: string | null | undefined;
+  municipalityIbgeCode?: string | null | undefined;
+  postalCode?: string | null | undefined;
+  street?: string | null | undefined;
+  streetNumber?: string | null | undefined;
+  complement?: string | null | undefined;
+  district?: string | null | undefined;
+  stateRegistration?: string | null | undefined;
+  businessLocationCode?: string | null | undefined;
+  cnaes?: CnpjRegistryCnae[] | undefined;
 };
 
 export type ManualCompanyRegistrationResult = {
