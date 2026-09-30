@@ -96,3 +96,32 @@ test('lookupCnpjRegistry does not expose QSA or provider extras', async () => {
   assert.equal('qsa' in result, false);
   assert.equal(result.cnaes[0]?.code, '9430800');
 });
+
+
+test('lookupCnpjRegistry rejects a mismatched provider CNPJ', async () => {
+  await assert.rejects(
+    () =>
+      lookupCnpjRegistry(
+        '19131243000197',
+        async () =>
+          new Response(
+            JSON.stringify({
+              cnpj: '11222333000181',
+              razao_social: 'OUTRA EMPRESA',
+              uf: 'GO',
+              cnae_fiscal: 4683400,
+              cnae_fiscal_descricao: 'Comércio atacadista',
+            }),
+            {
+              status: 200,
+              headers: {
+                'content-type': 'application/json',
+              },
+            },
+          ),
+      ),
+    (error: unknown) =>
+      error instanceof CnpjRegistryError &&
+      error.code === 'cnpj_provider_invalid_response',
+  );
+});
