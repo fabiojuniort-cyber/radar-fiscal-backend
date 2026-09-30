@@ -305,6 +305,41 @@ test('TAX-07 classification schema preserves lineage, release scope and idempote
     );
     assert.deepEqual(effective.rows.map((row) => row.assertion_id), [assertion1]);
 
+    const run3 = randomUUID();
+    await pool.query(
+      `
+        INSERT INTO publication_taxonomy_runs (
+          id, publication_version_id, taxonomy_release_id, method_type,
+          engine_key, engine_version, config_snapshot, config_sha256,
+          input_sha256, run_fingerprint, status, started_at, finished_at
+        )
+        VALUES ($1,$2,$3,'HUMAN','human','1','{}',$4,$5,$6,'SUCCESS',now(),now())
+      `,
+      [run3, publicationVersionId, releaseId, hex('{}'), hex('input-3'), hex('run-3-' + suffix)],
+    );
+
+    const assertion3 = randomUUID();
+    await pool.query(
+      `
+        INSERT INTO publication_taxonomy_assertions (
+          id, run_id, taxonomy_release_id, release_concept_id,
+          supersedes_assertion_id, assertion_status, decision_origin
+        )
+        VALUES ($1,$2,$3,$4,$5,'CONFIRMED','HUMAN')
+      `,
+      [assertion3, run3, releaseId, rc(releaseId, conceptBId), assertion1],
+    );
+
+    effective = await pool.query<{ assertion_id: string }>(
+      `
+        SELECT assertion_id
+        FROM v_publication_taxonomy_effective_assertions
+        WHERE publication_version_id=$1 AND taxonomy_release_id=$2
+      `,
+      [publicationVersionId, releaseId],
+    );
+    assert.deepEqual(effective.rows.map((row) => row.assertion_id), [assertion3]);
+
     const first = await classifyPublicationVersionLexically(pool, {
       publicationVersionId,
       taxonomyReleaseId: releaseId,
