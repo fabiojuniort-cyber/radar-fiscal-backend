@@ -539,6 +539,9 @@ export class DoeSpConnector implements CollectionConnector {
         ...(identity ? { actNumber: identity.actNumber } : {}),
         publishedAt: new Date(detail.date + 'T00:00:00Z'),
         ...(contentText ? { content: contentText } : {}),
+        ...(detail.contentHtml
+          ? { presentationHtml: detail.contentHtml }
+          : {}),
         officialUrl: publicationPageUrl(detail.slug),
         externalId: detail.id,
         ...(isRetification ? { identityKey: `DOE_SP|RETIFICACAO|${detail.id}` } : {}),
