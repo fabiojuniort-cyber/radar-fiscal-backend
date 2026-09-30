@@ -278,3 +278,288 @@ test(
     }
   },
 );
+
+
+test(
+  'primary promotion preserves higher-rank sanitized HTML presentation',
+  async () => {
+    const adminUrl =
+      process.env.DATABASE_ADMIN_URL;
+
+    assert.ok(
+      adminUrl,
+      'DATABASE_ADMIN_URL is required.',
+    );
+
+    const pool = new Pool({
+      connectionString: adminUrl,
+      max: 2,
+    });
+    const db = new Kysely<DB>({
+      dialect: new PostgresDialect({
+        pool,
+      }),
+    });
+
+    const sourceId = randomUUID();
+    const runIds = [
+      randomUUID(),
+      randomUUID(),
+    ];
+    const attemptIds = [
+      randomUUID(),
+      randomUUID(),
+    ];
+
+    try {
+      await db
+        .insertInto('sources')
+        .values({
+          id: sourceId,
+          code:
+            'presentation-promotion-' +
+            sourceId,
+          name:
+            'Presentation promotion source',
+          jurisdiction_level:
+            'FEDERAL',
+          base_url:
+            'https://example.test',
+          connector_key:
+            'presentation-promotion-test',
+        })
+        .execute();
+
+      await db
+        .insertInto('collection_runs')
+        .values(
+          runIds.map((id, index) => ({
+            id,
+            source_id: sourceId,
+            scheduled_for: new Date(
+              `2026-09-30T0${index}:00:00Z`,
+            ),
+            trigger_type:
+              'MANUAL' as const,
+          })),
+        )
+        .execute();
+
+      await db
+        .insertInto('collection_attempts')
+        .values(
+          attemptIds.map(
+            (id, index) => ({
+              id,
+              collection_run_id:
+                runIds[index]!,
+              attempt_no: 1,
+              status:
+                'RUNNING' as const,
+            }),
+          ),
+        )
+        .execute();
+
+      const common = {
+        title: 'Instrução Normativa 20/2026',
+        agency: 'Órgão Y',
+        sphere: 'FEDERAL' as const,
+        actType:
+          'Instrução Normativa',
+        actNumber: '20/2026',
+        publishedAt: new Date(
+          '2026-09-30T00:00:00Z',
+        ),
+        officialUrl:
+          'https://example.test/in-20',
+        externalId:
+          'in-20-2026',
+        content:
+          'CAPÍTULO I Art. 1º Texto oficial.',
+      };
+
+      const enrichment =
+        normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            presentationHtml:
+              '<h2>CAPÍTULO I</h2><p>Art. 1º Texto oficial.</p><table><tbody><tr><th>Tributo</th></tr><tr><td>ICMS</td></tr></tbody></table>',
+            metadata: {
+              sourceRole:
+                'ENRICHMENT',
+            },
+          },
+        });
+
+      const primary =
+        normalizePublication({
+          sourceId,
+          publication: {
+            ...common,
+            metadata: {
+              sourceRole:
+                'PRIMARY',
+            },
+          },
+        });
+
+      assert.equal(
+        enrichment.contentHash,
+        primary.contentHash,
+      );
+
+      const first = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runIds[0]!,
+            attemptId:
+              attemptIds[0]!,
+            publication:
+              enrichment,
+          }),
+        );
+
+      const second = await db
+        .transaction()
+        .execute((trx) =>
+          persistPublication(trx, {
+            sourceId,
+            runId: runIds[1]!,
+            attemptId:
+              attemptIds[1]!,
+            publication: primary,
+          }),
+        );
+
+      assert.equal(
+        second.disposition,
+        'EXISTING_PUBLICATION',
+      );
+      assert.equal(
+        second.publicationVersionId,
+        first.publicationVersionId,
+      );
+
+      const versions = await db
+        .selectFrom(
+          'publication_versions',
+        )
+        .select([
+          'id',
+          'source_metadata',
+        ])
+        .where(
+          'publication_id',
+          '=',
+          first.publicationId,
+        )
+        .execute();
+
+      assert.equal(
+        versions.length,
+        1,
+      );
+
+      const metadata =
+        versions[0]
+          ?.source_metadata as
+          | Record<string, unknown>
+          | null
+          | undefined;
+
+      assert.equal(
+        metadata?.sourceRole,
+        'PRIMARY',
+      );
+
+      const presentation =
+        metadata?.presentation as
+          | Record<string, unknown>
+          | undefined;
+
+      assert.equal(
+        presentation?.format,
+        'SANITIZED_HTML',
+      );
+      assert.match(
+        String(
+          presentation?.html ?? '',
+        ),
+        /<table>/,
+      );
+      assert.doesNotMatch(
+        String(
+          presentation?.html ?? '',
+        ),
+        /script|onclick/i,
+      );
+    } finally {
+      const publicationIds =
+        await db
+          .selectFrom(
+            'publication_origins',
+          )
+          .select(
+            'publication_id',
+          )
+          .where(
+            'source_id',
+            '=',
+            sourceId,
+          )
+          .execute()
+          .then((rows) => [
+            ...new Set(
+              rows.map(
+                (row) =>
+                  row.publication_id,
+              ),
+            ),
+          ]);
+
+      await db
+        .deleteFrom('collection_runs')
+        .where(
+          'source_id',
+          '=',
+          sourceId,
+        )
+        .execute();
+
+      await db
+        .deleteFrom(
+          'publication_origins',
+        )
+        .where(
+          'source_id',
+          '=',
+          sourceId,
+        )
+        .execute();
+
+      if (
+        publicationIds.length > 0
+      ) {
+        await db
+          .deleteFrom('publications')
+          .where(
+            'id',
+            'in',
+            publicationIds,
+          )
+          .execute();
+      }
+
+      await db
+        .deleteFrom('sources')
+        .where('id', '=', sourceId)
+        .execute();
+
+      await db.destroy();
+    }
+  },
+);
