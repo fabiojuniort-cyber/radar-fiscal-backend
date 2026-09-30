@@ -92,7 +92,7 @@
     "@types/node": "^24.1.0",
     "@types/pg": "^8.23.1",
     "@types/sax": "1.2.7",
-    "@types/yauzl": "1.4.0",
+    "@types/yauzl": "1.2.7",
     "kysely-codegen": "^0.20.0",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
