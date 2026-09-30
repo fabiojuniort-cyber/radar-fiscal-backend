@@ -124,6 +124,12 @@ function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile)
     ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
     ...(item.effectiveAt ? { effectiveAt: item.effectiveAt } : {}),
     ...(item.content ? { content: item.content } : {}),
+    ...(item.presentationHtml
+      ? {
+          presentationHtml:
+            item.presentationHtml,
+        }
+      : {}),
     officialUrl: item.officialUrl,
     ...(item.externalId ? { externalId: item.externalId } : {}),
     ...(!canUseStrongIdentity ? { identityKey: item.identityKey } : {}),

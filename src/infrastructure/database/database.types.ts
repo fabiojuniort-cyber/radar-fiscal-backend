@@ -380,6 +380,77 @@ export interface PublicationVersions {
   version_no: number;
 }
 
+
+export interface PublicationTaxonomyRuns {
+  code_git_sha: string | null;
+  config_sha256: string;
+  config_snapshot: Json;
+  created_at: Generated<Timestamp>;
+  engine_key: string;
+  engine_version: string;
+  error_code: string | null;
+  error_message: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  input_sha256: string;
+  lifecycle_metadata: Generated<Json>;
+  method_type: string;
+  model_key: string | null;
+  model_version: string | null;
+  publication_version_id: string;
+  run_fingerprint: string;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+  supersedes_run_id: string | null;
+  taxonomy_release_id: string;
+}
+
+export interface PublicationTaxonomyAssertions {
+  assertion_status: Generated<string>;
+  confidence: Numeric | null;
+  created_at: Generated<Timestamp>;
+  decision_origin: string;
+  id: Generated<string>;
+  reason_code: string | null;
+  release_concept_id: string;
+  run_id: string;
+  supersedes_assertion_id: string | null;
+  taxonomy_release_id: string;
+}
+
+export interface PublicationTaxonomySpans {
+  assertion_id: string;
+  created_at: Generated<Timestamp>;
+  excerpt: string | null;
+  id: Generated<string>;
+  selector: Generated<Json>;
+  source_fragment_hash: string | null;
+  span_end: number | null;
+  span_start: number | null;
+}
+
+export interface PublicationTaxonomyReviews {
+  assertion_id: string;
+  created_at: Generated<Timestamp>;
+  decision: string;
+  id: Generated<string>;
+  rationale: string;
+  reviewer_actor_id: string;
+}
+
+export interface VPublicationTaxonomyEffectiveAssertions {
+  assertion_id: string | null;
+  assertion_status: string | null;
+  confidence: Numeric | null;
+  created_at: Timestamp | null;
+  decision_origin: string | null;
+  publication_version_id: string | null;
+  reason_code: string | null;
+  release_concept_id: string | null;
+  run_id: string | null;
+  taxonomy_release_id: string | null;
+}
+
 export interface SchemaMigrations {
   applied_at: Generated<Timestamp>;
   checksum: string;
@@ -419,6 +490,58 @@ export interface TaxonomyAliases {
   language: Generated<string>;
   normalized_text: string;
   text: string;
+}
+
+
+export interface TaxonomyUnmappedOccurrences {
+  confidence: Numeric | null;
+  context_excerpt: string | null;
+  created_at: Generated<Timestamp>;
+  extractor_key: string;
+  extractor_version: string;
+  id: Generated<string>;
+  jurisdiction_metadata: Generated<Json>;
+  language: Generated<string>;
+  metadata: Generated<Json>;
+  normalized_term: string;
+  observed_at: Generated<Timestamp>;
+  occurrence_fingerprint: string;
+  probable_dimension_id: string | null;
+  raw_term: string;
+  run_id: string;
+  span_end: number | null;
+  span_start: number | null;
+}
+
+export interface TaxonomyCandidates {
+  candidate_fingerprint: string;
+  context_signature: string;
+  created_at: Generated<Timestamp>;
+  decision_actor_id: string | null;
+  decision_at: Timestamp | null;
+  decision_reason: string | null;
+  first_seen_at: Generated<Timestamp>;
+  id: Generated<string>;
+  jurisdiction_scope: Generated<Json>;
+  last_seen_at: Generated<Timestamp>;
+  normalized_key: string;
+  parent_candidate_id: string | null;
+  preferred_term: string;
+  probable_dimension_id: string | null;
+  resolved_release_concept_id: string | null;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface TaxonomyCandidateOccurrenceLinks {
+  candidate_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  justification: string | null;
+  link_status: Generated<string>;
+  linked_at: Generated<Timestamp>;
+  occurrence_id: string;
+  superseded_at: Timestamp | null;
 }
 
 export interface TaxonomyConceptRelations {
@@ -705,11 +828,17 @@ export interface DB {
   public_signup_rate_limits: PublicSignupRateLimits;
   publication_matches: PublicationMatches;
   publication_origins: PublicationOrigins;
+  publication_taxonomy_assertions: PublicationTaxonomyAssertions;
+  publication_taxonomy_reviews: PublicationTaxonomyReviews;
+  publication_taxonomy_runs: PublicationTaxonomyRuns;
+  publication_taxonomy_spans: PublicationTaxonomySpans;
   publication_versions: PublicationVersions;
   publications: Publications;
   schema_migrations: SchemaMigrations;
   sources: Sources;
   taxonomy_alias_binding_evidence: TaxonomyAliasBindingEvidence;
+  taxonomy_candidate_occurrence_links: TaxonomyCandidateOccurrenceLinks;
+  taxonomy_candidates: TaxonomyCandidates;
   taxonomy_aliases: TaxonomyAliases;
   taxonomy_concept_relations: TaxonomyConceptRelations;
   taxonomy_concept_revision_evidence: TaxonomyConceptRevisionEvidence;
@@ -727,9 +856,11 @@ export interface DB {
   taxonomy_release_dimensions: TaxonomyReleaseDimensions;
   taxonomy_release_relation_rules: TaxonomyReleaseRelationRules;
   taxonomy_releases: TaxonomyReleases;
+  taxonomy_unmapped_occurrences: TaxonomyUnmappedOccurrences;
   tenant_memberships: TenantMemberships;
   tenant_onboarding_profiles: TenantOnboardingProfiles;
   tenants: Tenants;
   user_credentials: UserCredentials;
+  v_publication_taxonomy_effective_assertions: VPublicationTaxonomyEffectiveAssertions;
   v_source_monitoring: VSourceMonitoring;
 }

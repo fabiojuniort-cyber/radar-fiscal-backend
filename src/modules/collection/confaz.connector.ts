@@ -835,6 +835,7 @@ export function parseConfazPublicationHtml(
     ...(publishedAt ? { publishedAt } : {}),
     ...(effective.date ? { effectiveAt: effective.date } : {}),
     content,
+    presentationHtml: mainHtml,
     officialUrl,
     externalId: sourcePath,
     ...(files.length > 0 ? { files } : {}),

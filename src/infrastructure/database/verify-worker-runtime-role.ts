@@ -290,6 +290,109 @@ async function run(): Promise<void> {
       );
     }
 
+    const classificationPrivileges = await pool.query<{
+      run_select: boolean;
+      run_insert: boolean;
+      run_table_update: boolean;
+      run_status_update: boolean;
+      run_engine_update: boolean;
+      run_delete: boolean;
+      assertion_select: boolean;
+      assertion_insert: boolean;
+      assertion_update: boolean;
+      span_select: boolean;
+      span_insert: boolean;
+      span_update: boolean;
+      review_select: boolean;
+      review_insert: boolean;
+      effective_select: boolean;
+    }>(`
+      SELECT
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','SELECT') AS run_select,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','INSERT') AS run_insert,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','UPDATE') AS run_table_update,
+        has_column_privilege('radar_worker_runtime','public.publication_taxonomy_runs','status','UPDATE') AS run_status_update,
+        has_column_privilege('radar_worker_runtime','public.publication_taxonomy_runs','engine_version','UPDATE') AS run_engine_update,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','DELETE') AS run_delete,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_assertions','SELECT') AS assertion_select,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_assertions','INSERT') AS assertion_insert,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_assertions','UPDATE') AS assertion_update,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_spans','SELECT') AS span_select,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_spans','INSERT') AS span_insert,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_spans','UPDATE') AS span_update,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_reviews','SELECT') AS review_select,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_reviews','INSERT') AS review_insert,
+        has_table_privilege('radar_worker_runtime','public.v_publication_taxonomy_effective_assertions','SELECT') AS effective_select
+    `);
+
+    const cp = classificationPrivileges.rows[0];
+    if (
+      !cp ||
+      !cp.run_select || !cp.run_insert || cp.run_table_update ||
+      !cp.run_status_update || cp.run_engine_update || cp.run_delete ||
+      !cp.assertion_select || !cp.assertion_insert || cp.assertion_update ||
+      !cp.span_select || !cp.span_insert || cp.span_update ||
+      cp.review_select || cp.review_insert ||
+      !cp.effective_select
+    ) {
+      throw new Error(
+        'Worker classification privileges do not match the expected policy.',
+      );
+    }
+
+    const candidatePrivileges = await pool.query<{
+      table_name: string;
+      can_select: boolean;
+      can_insert: boolean;
+      can_update: boolean;
+      can_delete: boolean;
+    }>(`
+      SELECT
+        table_name,
+        has_table_privilege(
+          'radar_worker_runtime',
+          format('public.%I', table_name),
+          'SELECT'
+        ) AS can_select,
+        has_table_privilege(
+          'radar_worker_runtime',
+          format('public.%I', table_name),
+          'INSERT'
+        ) AS can_insert,
+        has_table_privilege(
+          'radar_worker_runtime',
+          format('public.%I', table_name),
+          'UPDATE'
+        ) AS can_update,
+        has_table_privilege(
+          'radar_worker_runtime',
+          format('public.%I', table_name),
+          'DELETE'
+        ) AS can_delete
+      FROM unnest(
+        ARRAY[
+          'taxonomy_unmapped_occurrences',
+          'taxonomy_candidates',
+          'taxonomy_candidate_occurrence_links'
+        ]::text[]
+      ) AS t(table_name)
+    `);
+
+    if (
+      candidatePrivileges.rows.length !== 3 ||
+      candidatePrivileges.rows.some(
+        (row) =>
+          !row.can_select ||
+          !row.can_insert ||
+          row.can_update ||
+          row.can_delete,
+      )
+    ) {
+      throw new Error(
+        'Worker taxonomy candidate privileges do not match observation-only write policy.',
+      );
+    }
+
     const curatorMembership = await pool.query<{
       is_curator_member: boolean;
     }>(`

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { sanitizeLegalPresentationHtml } from '../src/modules/collection/legal-presentation.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 
 const sourceA =
@@ -35,7 +36,68 @@ test('same source publication normalizes to stable identity and content hashes',
   assert.equal(first.contentHash, second.contentHash);
   assert.equal(first.identityStrength, 'STRONG');
   assert.equal(first.title, 'Ajuste SINIEF 10/2026');
-  assert.equal(first.contentText, 'Texto integral da norma.');
+  assert.equal(first.contentText, 'Texto   integral da norma.');
+});
+
+test('document layout is preserved without changing canonical content hash semantics', () => {
+  const structured = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Portaria 10/2026',
+      agency: 'Órgão X',
+      sphere: 'FEDERAL',
+      actType: 'Portaria',
+      actNumber: '10/2026',
+      publishedAt: new Date('2026-09-30T00:00:00Z'),
+      officialUrl: 'https://example.gov/portaria-10',
+      content: [
+        'CAPÍTULO I',
+        '',
+        'Art. 1º  Esta Portaria dispõe sobre:',
+        '    I - primeiro item;',
+        '    II - segundo item.',
+      ].join('\n'),
+    },
+  });
+
+  const flattened = normalizePublication({
+    sourceId: sourceA,
+    publication: {
+      title: 'Portaria 10/2026',
+      agency: 'Órgão X',
+      sphere: 'FEDERAL',
+      actType: 'Portaria',
+      actNumber: '10/2026',
+      publishedAt: new Date('2026-09-30T00:00:00Z'),
+      officialUrl: 'https://example.gov/portaria-10',
+      content:
+        'CAPÍTULO I Art. 1º Esta Portaria dispõe sobre: I - primeiro item; II - segundo item.',
+    },
+  });
+
+  assert.equal(
+    structured.contentText,
+    [
+      'CAPÍTULO I',
+      '',
+      'Art. 1º  Esta Portaria dispõe sobre:',
+      '    I - primeiro item;',
+      '    II - segundo item.',
+    ].join('\n'),
+  );
+  assert.equal(
+    structured.contentHash,
+    flattened.contentHash,
+    'presentation whitespace must not create a semantic version',
+  );
+  assert.deepEqual(
+    structured.metadata.presentation,
+    {
+      version: 1,
+      format: 'PRESERVED_TEXT',
+      preservesWhitespace: true,
+    },
+  );
 });
 
 test('same strong identity with changed content produces a new content hash', () => {
@@ -328,4 +390,44 @@ test('canonical identity key correlates mirrored origins inside one logical sour
   assert.equal(primary.identityBasis.sourceKeyType, 'CANONICAL_KEY');
   assert.equal(primary.identityHash, legacy.identityHash);
   assert.notEqual(primary.sourceItemKey, legacy.sourceItemKey);
+});
+
+
+test('sanitizes source presentation HTML while preserving legal structure', () => {
+  const sanitized =
+    sanitizeLegalPresentationHtml(
+      [
+        '<script>alert(1)</script>',
+        '<h2 onclick="evil()">CAPÍTULO I</h2>',
+        '<p style="position:fixed">Art. 1º Texto.</p>',
+        '<table>',
+        '<tr><th scope="col">Tributo</th><th colspan="2">Alíquota</th></tr>',
+        '<tr><td>ICMS</td><td>18%</td></tr>',
+        '</table>',
+        '<a href="javascript:alert(1)">ruim</a>',
+        '<a href="https://example.gov/ato">oficial</a>',
+      ].join(''),
+    );
+
+  assert.ok(sanitized);
+  assert.doesNotMatch(
+    sanitized,
+    /script|onclick|style=|javascript:/i,
+  );
+  assert.match(
+    sanitized,
+    /<h2>CAPÍTULO I<\/h2>/,
+  );
+  assert.match(
+    sanitized,
+    /<table>/,
+  );
+  assert.match(
+    sanitized,
+    /colspan="2"/,
+  );
+  assert.match(
+    sanitized,
+    /href="https:\/\/example\.gov\/ato"/,
+  );
 });

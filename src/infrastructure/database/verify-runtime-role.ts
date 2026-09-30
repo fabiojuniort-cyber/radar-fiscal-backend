@@ -50,6 +50,11 @@ const TAXONOMY_TABLES = [
   'official_catalog_entries',
   'taxonomy_official_mappings',
   'taxonomy_official_mapping_evidence',
+  'publication_taxonomy_runs',
+  'publication_taxonomy_assertions',
+  'publication_taxonomy_spans',
+  'publication_taxonomy_reviews',
+  'v_publication_taxonomy_effective_assertions',
 ] as const;
 
 const PROTECTED_TABLES = [
@@ -295,6 +300,59 @@ async function run(): Promise<void> {
     ) {
       throw new Error(
         'App runtime taxonomy privileges do not match read-only policy.',
+      );
+    }
+
+    const candidatePrivileges = await pool.query<{
+      table_name: string;
+      can_select: boolean;
+      can_insert: boolean;
+      can_update: boolean;
+      can_delete: boolean;
+    }>(`
+      SELECT
+        table_name,
+        has_table_privilege(
+          current_user,
+          format('public.%I', table_name),
+          'SELECT'
+        ) AS can_select,
+        has_table_privilege(
+          current_user,
+          format('public.%I', table_name),
+          'INSERT'
+        ) AS can_insert,
+        has_table_privilege(
+          current_user,
+          format('public.%I', table_name),
+          'UPDATE'
+        ) AS can_update,
+        has_table_privilege(
+          current_user,
+          format('public.%I', table_name),
+          'DELETE'
+        ) AS can_delete
+      FROM unnest(
+        ARRAY[
+          'taxonomy_unmapped_occurrences',
+          'taxonomy_candidates',
+          'taxonomy_candidate_occurrence_links'
+        ]::text[]
+      ) AS t(table_name)
+    `);
+
+    if (
+      candidatePrivileges.rows.length !== 3 ||
+      candidatePrivileges.rows.some(
+        (row) =>
+          !row.can_select ||
+          row.can_insert ||
+          row.can_update ||
+          row.can_delete,
+      )
+    ) {
+      throw new Error(
+        'App runtime taxonomy candidate privileges do not match read-only policy.',
       );
     }
 

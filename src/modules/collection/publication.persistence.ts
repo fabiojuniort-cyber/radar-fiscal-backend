@@ -444,6 +444,124 @@ function legacyFileEvidence(
   };
 }
 
+function presentationRank(
+  metadata: unknown,
+): number {
+  const presentation = metadataRecord(
+    metadataRecord(metadata)?.presentation,
+  );
+
+  switch (presentation?.format) {
+    case 'SANITIZED_HTML':
+      return 2;
+    case 'PRESERVED_TEXT':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function presentationUpgrade(
+  existingMetadata: unknown,
+  incomingMetadata: unknown,
+): Json | undefined {
+  const existing =
+    metadataRecord(existingMetadata) ?? {};
+  const incoming =
+    metadataRecord(incomingMetadata);
+  const incomingPresentation =
+    metadataRecord(
+      incoming?.presentation,
+    );
+
+  if (!incomingPresentation) {
+    return undefined;
+  }
+
+  const currentRank =
+    presentationRank(existingMetadata);
+  const incomingRank =
+    presentationRank(incomingMetadata);
+
+  if (incomingRank < currentRank) {
+    return undefined;
+  }
+
+  const existingPresentation =
+    metadataRecord(
+      existing.presentation,
+    );
+
+  if (
+    incomingRank === currentRank &&
+    JSON.stringify(
+      existingPresentation ?? null,
+    ) ===
+      JSON.stringify(
+        incomingPresentation,
+      )
+  ) {
+    return undefined;
+  }
+
+  return asJson({
+    ...existing,
+    presentation:
+      incomingPresentation,
+  });
+}
+
+function primaryMetadataPreservingBestPresentation(
+  existingMetadata: unknown,
+  incomingMetadata: unknown,
+): Json {
+  const existing =
+    metadataRecord(existingMetadata) ?? {};
+  const incoming =
+    metadataRecord(incomingMetadata) ?? {};
+
+  const existingPresentation =
+    metadataRecord(
+      existing.presentation,
+    );
+  const incomingPresentation =
+    metadataRecord(
+      incoming.presentation,
+    );
+
+  const keepExistingPresentation =
+    presentationRank(existingMetadata) >
+    presentationRank(incomingMetadata);
+
+  return asJson({
+    ...incoming,
+    ...(keepExistingPresentation &&
+    existingPresentation
+      ? {
+          presentation:
+            existingPresentation,
+        }
+      : incomingPresentation
+        ? {
+            presentation:
+              incomingPresentation,
+          }
+        : {}),
+  });
+}
+
+
+function canonicalContentText(
+  value: string | null | undefined,
+): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized || null;
+}
+
 function legacyV1ContentHash(input: {
   title: string;
   contentText: string | null;
@@ -455,7 +573,7 @@ function legacyV1ContentHash(input: {
       JSON.stringify({
         version: 1,
         title: input.title,
-        contentText: input.contentText,
+        contentText: canonicalContentText(input.contentText),
         effectiveOn: input.effectiveOn,
         rawFileHashes: input.rawFileHashes,
       }),
@@ -563,8 +681,8 @@ async function currentLegacyVersionEquivalent(
     reconstructedLegacyHash ===
       currentVersion.content_hash &&
     canonical.title === publication.title &&
-    currentVersion.content_text ===
-      (publication.contentText ?? null) &&
+    canonicalContentText(currentVersion.content_text) ===
+      canonicalContentText(publication.contentText) &&
     currentEffectiveOn === incomingEffectiveOn &&
     sameHashes(
       legacyEvidence.materialHashes,
@@ -603,6 +721,7 @@ async function getOrCreateVersion(
     .select([
       'id',
       'is_current',
+      'content_text',
       'source_metadata',
     ])
     .where('publication_id', '=', publicationId)
@@ -631,6 +750,45 @@ async function getOrCreateVersion(
 
   if (existingVersion) {
     if (incomingRole === 'PRIMARY') {
+      const incomingContent =
+        publication.contentText ?? null;
+      const sameCanonicalContent =
+        canonicalContentText(existingVersion.content_text) ===
+        canonicalContentText(incomingContent);
+      const hasRicherLayout =
+        sameCanonicalContent &&
+        incomingContent !== null &&
+        incomingContent !== existingVersion.content_text &&
+        /\n/.test(incomingContent);
+      const upgradedMetadata =
+        presentationUpgrade(
+          existingVersion.source_metadata,
+          publication.metadata,
+        );
+
+      if (
+        hasRicherLayout ||
+        upgradedMetadata
+      ) {
+        await trx
+          .updateTable('publication_versions')
+          .set({
+            ...(hasRicherLayout
+              ? {
+                  content_text:
+                    incomingContent,
+                }
+              : {}),
+            ...(upgradedMetadata
+              ? {
+                  source_metadata:
+                    upgradedMetadata,
+                }
+              : {}),
+          })
+          .where('id', '=', existingVersion.id)
+          .execute();
+      }
       if (!existingVersion.is_current) {
         await trx
           .updateTable('publication_versions')
@@ -654,9 +812,11 @@ async function getOrCreateVersion(
         await trx
           .updateTable('publication_versions')
           .set({
-            source_metadata: asJson(
-              publication.metadata,
-            ),
+            source_metadata:
+              primaryMetadataPreservingBestPresentation(
+                existingVersion.source_metadata,
+                publication.metadata,
+              ),
           })
           .where('id', '=', existingVersion.id)
           .execute();
@@ -701,6 +861,57 @@ async function getOrCreateVersion(
     )
   ) {
     if (incomingRole === 'PRIMARY') {
+      const incomingContent =
+        publication.contentText ?? null;
+      const sameCanonicalContent =
+        canonicalContentText(
+          currentVersion.content_text,
+        ) ===
+        canonicalContentText(
+          incomingContent,
+        );
+      const hasRicherLayout =
+        sameCanonicalContent &&
+        incomingContent !== null &&
+        incomingContent !==
+          currentVersion.content_text &&
+        /\n/.test(incomingContent);
+      const upgradedMetadata =
+        presentationUpgrade(
+          currentVersion.source_metadata,
+          publication.metadata,
+        );
+
+      if (
+        hasRicherLayout ||
+        upgradedMetadata
+      ) {
+        await trx
+          .updateTable(
+            'publication_versions',
+          )
+          .set({
+            ...(hasRicherLayout
+              ? {
+                  content_text:
+                    incomingContent,
+                }
+              : {}),
+            ...(upgradedMetadata
+              ? {
+                  source_metadata:
+                    upgradedMetadata,
+                }
+              : {}),
+          })
+          .where(
+            'id',
+            '=',
+            currentVersion.id,
+          )
+          .execute();
+      }
+
       await trx
         .updateTable('publications')
         .set({
@@ -763,9 +974,11 @@ async function getOrCreateVersion(
         content_text:
           publication.contentText ?? null,
         relevant_excerpt: null,
-        source_metadata: asJson(
-          publication.metadata,
-        ),
+        source_metadata:
+          primaryMetadataPreservingBestPresentation(
+            currentVersion.source_metadata,
+            publication.metadata,
+          ),
         is_current: true,
       })
       .where('id', '=', currentVersion.id)
