@@ -1,6 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
+import { publicationPageUrl } from './doe-sp.client.js';
 import { doeSpNormativeIdentity, type DoeSpInclusionCategory } from './doe-sp.rules.js';
 import { normalizePublication } from './publication.normalizer.js';
 
@@ -12,7 +13,9 @@ import { normalizePublication } from './publication.normalizer.js';
  * became "version 2" of the first law.
  *
  * This repair splits such a publication in one SERIALIZABLE transaction:
- * - each DOE-SP origin is paired with the version it produced (same DOE slug);
+ * - each DOE-SP origin is paired with the version it produced: the official
+ *   URL of the origin is the page of the version's DOE slug (the slug is the
+ *   whole path, e.g. `executivo/leis/lei-n-...`);
  * - the official title of each origin is read again from the source (never
  *   guessed) and the identity is recomputed with the fixed rules and the real
  *   normalizer;
@@ -69,9 +72,6 @@ function metadata(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function slugOf(url: string): string {
-  return new URL(url).pathname.split('/').filter(Boolean).at(-1) ?? '';
-}
 
 function isoDate(value: Date | string | null): string | undefined {
   if (value === null) return undefined;
@@ -113,12 +113,14 @@ export async function repairDoeSpIdentityCollision(
         .where('publication_id', '=', publication.id).executeTakeFirstOrThrow();
       if (Number(companies.n) !== 0) fail('LINKED', `company_publications=${companies.n}`);
 
-      // Pair each origin with its version through the DOE slug of the capture.
+      // Pair each origin with its version: the origin URL is the page of the version's slug.
       const pairs = origins.map((origin) => {
-        const slug = slugOf(origin.official_url);
-        const matched = versions.filter((version) => metadata(version.source_metadata).slug === slug);
+        const matched = versions.filter((version) => {
+          const slug = metadata(version.source_metadata).slug;
+          return typeof slug === 'string' && publicationPageUrl(slug) === origin.official_url;
+        });
         if (matched.length !== 1) fail('UNPAIRED', `origin ${origin.external_id} matches ${matched.length} version(s)`);
-        return { origin, version: matched[0]!, slug };
+        return { origin, version: matched[0]! };
       });
       if (new Set(pairs.map((pair) => pair.version.id)).size !== pairs.length) fail('UNPAIRED', 'two origins share a version');
 
@@ -127,7 +129,9 @@ export async function repairDoeSpIdentityCollision(
       const computed = [];
       for (const pair of pairs) {
         const act = await input.fetchAct(pair.origin.external_id!);
-        if (act.slug !== pair.slug) fail('SLUG_MISMATCH', `source slug ${act.slug} vs origin ${pair.slug}`);
+        if (publicationPageUrl(act.slug) !== pair.origin.official_url) {
+          fail('SLUG_MISMATCH', `source page ${publicationPageUrl(act.slug)} vs origin ${pair.origin.official_url}`);
+        }
         const category = metadata(pair.version.source_metadata).captureCategory as DoeSpInclusionCategory | undefined;
         if (!category) fail('NO_CATEGORY', `version ${pair.version.id}`);
         const identity = doeSpNormativeIdentity({ title: act.title, ...(act.publicationType ? { typeName: act.publicationType } : {}), category });
