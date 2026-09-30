@@ -825,6 +825,96 @@ test(
           persisted?.cnaes.length,
           3,
         );
+
+        const deleteRegistryCompany =
+          await app.inject({
+            method: 'DELETE',
+            url:
+              '/api/v1/companies/' +
+              registryBody.company.id,
+            headers: firstHeaders,
+          });
+
+        assert.equal(
+          deleteRegistryCompany.statusCode,
+          204,
+        );
+
+        const registryRecreate =
+          await app.inject({
+            method: 'POST',
+            url: '/api/v1/companies/from-cnpj',
+            headers: firstHeaders,
+            payload: {
+              cnpj: registryCnpj,
+            },
+          });
+
+        assert.equal(
+          registryRecreate.statusCode,
+          201,
+        );
+
+        const recreatedBody =
+          registryRecreate.json<{
+            company: {
+              id: string;
+            };
+            establishment: {
+              id: string;
+              stateRegistration:
+                string | null;
+              cnaes: unknown[];
+            };
+          }>();
+
+        assert.equal(
+          recreatedBody.company.id,
+          registryBody.company.id,
+        );
+        assert.equal(
+          recreatedBody.establishment.id,
+          registryBody.establishment.id,
+        );
+        assert.equal(
+          recreatedBody.establishment
+            .stateRegistration,
+          '10.999.888-7',
+        );
+        assert.equal(
+          recreatedBody.establishment
+            .cnaes.length,
+          3,
+        );
+
+        const companiesAfterRecreate =
+          await app.inject({
+            method: 'GET',
+            url: '/api/v1/companies',
+            headers: firstHeaders,
+          });
+
+        assert.equal(
+          companiesAfterRecreate.statusCode,
+          200,
+        );
+        assert.ok(
+          companiesAfterRecreate
+            .json<{
+              items: Array<{
+                id: string;
+                cnpj: string;
+              }>;
+            }>()
+            .items
+            .some(
+              (item) =>
+                item.id ===
+                  registryBody.company.id &&
+                item.cnpj ===
+                  registryCnpj,
+            ),
+        );
       } finally {
         globalThis.fetch =
           originalFetch;
