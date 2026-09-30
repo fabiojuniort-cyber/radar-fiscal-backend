@@ -42,6 +42,13 @@ export interface ConnectorPublication {
   effectiveAt?: Date;
 
   content?: string;
+
+  /**
+   * HTML de apresentação observado na fonte oficial. O normalizador
+   * sanitiza este fragmento antes de persistir; HTML bruto nunca é exposto.
+   */
+  presentationHtml?: string;
+
   officialUrl: string;
 
   /**

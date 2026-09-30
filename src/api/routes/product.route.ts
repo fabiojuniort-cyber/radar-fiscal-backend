@@ -13,6 +13,7 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 
 const companyBodySchema = z.object({
   legalName: z.string().trim().min(2).max(200),
@@ -77,8 +78,60 @@ const taxProfileBodySchema = z.object({
   }),
 });
 
+function recordValue(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function publicationPresentation(
+  sourceMetadata: unknown,
+): {
+  version: 1;
+  format: 'SANITIZED_HTML' | 'PRESERVED_TEXT';
+  preservesWhitespace: boolean;
+  html?: string;
+} {
+  const rawPresentation = recordValue(
+    recordValue(sourceMetadata)?.presentation,
+  );
+
+  if (
+    rawPresentation?.format === 'SANITIZED_HTML' &&
+    typeof rawPresentation.html === 'string'
+  ) {
+    const sanitized =
+      sanitizeLegalPresentationHtml(
+        rawPresentation.html,
+      );
+
+    if (sanitized) {
+      return {
+        version: 1,
+        format: 'SANITIZED_HTML',
+        preservesWhitespace: true,
+        html: sanitized,
+      };
+    }
+  }
+
+  return {
+    version: 1,
+    format: 'PRESERVED_TEXT',
+    preservesWhitespace: true,
+  };
+}
+
 const companyIdParamsSchema = z.object({
   companyId: z.string().uuid(),
+});
+
+const publicationIdParamsSchema = z.object({
+  publicationId: z.string().uuid(),
 });
 
 const archiveQuerySchema = z.object({
@@ -753,6 +806,128 @@ export async function productRoutes(
         if (handled) return handled;
         throw error;
       }
+    },
+  );
+
+  typed.get(
+    '/api/v1/publications/:publicationId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: publicationIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const row = await app.db
+        .selectFrom('publications as p')
+        .leftJoin(
+          'publication_versions as pv',
+          (join) =>
+            join
+              .onRef('pv.publication_id', '=', 'p.id')
+              .on('pv.is_current', '=', true),
+        )
+        .select([
+          'p.id',
+          'p.title',
+          'p.act_type',
+          'p.act_number',
+          'p.agency',
+          'p.jurisdiction_level',
+          'p.uf',
+          'p.published_on',
+          'p.effective_on',
+          'p.primary_official_url',
+          'p.first_collected_at',
+          'p.last_seen_at',
+          'pv.id as version_id',
+          'pv.version_no',
+          'pv.content_text',
+          'pv.relevant_excerpt',
+          'pv.source_metadata',
+          'pv.captured_at',
+        ])
+        .where('p.id', '=', request.params.publicationId)
+        .executeTakeFirst();
+
+      if (!row) {
+        return reply.status(404).send({ error: 'publication_not_found' });
+      }
+
+      const origins = await app.db
+        .selectFrom('publication_origins as po')
+        .innerJoin('sources as s', 's.id', 'po.source_id')
+        .select([
+          's.code as source_code',
+          's.name as source_name',
+          'po.official_url',
+          'po.external_id',
+          'po.first_seen_at',
+          'po.last_seen_at',
+        ])
+        .where('po.publication_id', '=', row.id)
+        .orderBy('po.first_seen_at')
+        .execute();
+
+      const versions = await app.db
+        .selectFrom('publication_versions')
+        .select(({ fn }) => fn.countAll<number>().as('count'))
+        .where('publication_id', '=', row.id)
+        .executeTakeFirst();
+
+      const officialUrl =
+        row.primary_official_url ??
+        origins[0]?.official_url ??
+        null;
+
+      return reply.status(200).send({
+        publication: {
+          id: row.id,
+          title: row.title,
+          actType: row.act_type,
+          actNumber: row.act_number,
+          agency: row.agency,
+          jurisdictionLevel: row.jurisdiction_level,
+          uf: row.uf,
+          publishedOn: row.published_on
+            ? new Date(row.published_on).toISOString().slice(0, 10)
+            : null,
+          effectiveOn: row.effective_on
+            ? new Date(row.effective_on).toISOString().slice(0, 10)
+            : null,
+          officialUrl,
+          firstCollectedAt: new Date(row.first_collected_at).toISOString(),
+          lastSeenAt: new Date(row.last_seen_at).toISOString(),
+        },
+        version: row.version_id
+          ? {
+              id: row.version_id,
+              versionNo: row.version_no,
+              versionCount: Number(versions?.count ?? 0),
+              contentText: row.content_text,
+              excerpt: row.relevant_excerpt,
+              capturedAt: row.captured_at
+                ? new Date(row.captured_at).toISOString()
+                : null,
+              presentation:
+                publicationPresentation(
+                  row.source_metadata,
+                ),
+            }
+          : null,
+        origins: origins.map((origin) => ({
+          sourceCode: origin.source_code,
+          sourceName: origin.source_name,
+          officialUrl: origin.official_url,
+          externalId: origin.external_id,
+          firstSeenAt: new Date(origin.first_seen_at).toISOString(),
+          lastSeenAt: new Date(origin.last_seen_at).toISOString(),
+        })),
+      });
     },
   );
 

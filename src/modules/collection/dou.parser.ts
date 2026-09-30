@@ -306,11 +306,17 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
   }
   const structural = classifyDouAct(title, a.artCategory!, a.artType ?? '');
   const text = parts.map(p => douHtmlText(p.fields.Texto ?? '')).join('\n');
+  const presentationHtml = parts
+    .map(p => p.fields.Texto ?? '')
+    .filter(Boolean)
+    .map(fragment => `<section>${fragment}</section>`)
+    .join('<hr>');
   if (parts.some(p => !douHtmlText(p.fields.Texto ?? ''))) throw error('DOU_MISSING_CONTENT');
   return {
     title, sphere: 'FEDERAL', agency: structural.agency, actType: structural.actType,
     ...(structural.actNumber ? { actNumber: structural.actNumber } : {}),
     publishedAt: new Date(`${date}T00:00:00Z`), content: text,
+    ...(presentationHtml ? { presentationHtml } : {}),
     officialUrl: pages[0]!,
     // A composite of observed official fields distinguishes later editorial occurrences
     // of the same idMateria. The unmodified official ID is also retained below.
