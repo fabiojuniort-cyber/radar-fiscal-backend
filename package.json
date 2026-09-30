@@ -39,6 +39,8 @@
     "db:sanitize-sped": "node dist/infrastructure/database/sanitize-sped-activation.js",
     "db:prune-collection-metadata": "node dist/infrastructure/database/prune-collection-metadata.js",
     "db:capacity-report": "node dist/infrastructure/database/capacity-report.js",
+    "db:source-health": "node dist/infrastructure/database/source-health-report.js",
+    "db:diagnose-collection": "node dist/infrastructure/database/diagnose-collection.js",
     "db:gate-hardening": "node dist/infrastructure/database/gate-hardening.js",
     "db:ensure-cgibs-source": "node dist/infrastructure/database/ensure-cgibs-source.js",
     "db:trigger-cgibs-run": "node dist/infrastructure/database/trigger-cgibs-run.js",
