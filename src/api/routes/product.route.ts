@@ -611,6 +611,163 @@ export async function productRoutes(
     },
   );
 
+  typed.put(
+    '/api/v1/companies/:companyId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+        body: companyUpdateBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const company = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            return trx
+              .updateTable('companies')
+              .set({
+                legal_name: request.body.legalName,
+                trade_name: request.body.tradeName ?? null,
+              })
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .returning([
+                'id',
+                'legal_name',
+                'trade_name',
+                'head_office_cnpj',
+              ])
+              .executeTakeFirst();
+          },
+        );
+
+        if (company === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (!company) {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        return reply.status(200).send({
+          company: {
+            id: company.id,
+            legalName: company.legal_name,
+            tradeName: company.trade_name,
+            cnpj: company.head_office_cnpj,
+          },
+        });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.delete(
+    '/api/v1/companies/:companyId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const company = await trx
+              .selectFrom('companies')
+              .select('id')
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!company) {
+              return 'COMPANY_NOT_FOUND' as const;
+            }
+
+            await trx
+              .updateTable('establishments')
+              .set({ is_active: false })
+              .where('company_id', '=', request.params.companyId)
+              .execute();
+
+            await trx
+              .updateTable('companies')
+              .set({ is_active: false })
+              .where('id', '=', request.params.companyId)
+              .execute();
+
+            return 'DELETED' as const;
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'COMPANY_NOT_FOUND') {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        return reply.status(204).send();
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
   typed.get(
     '/api/v1/establishment-types',
     {
@@ -997,6 +1154,317 @@ export async function productRoutes(
           return reply.status(409).send({ error: 'establishment_conflict' });
         }
 
+        throw error;
+      }
+    },
+  );
+
+  typed.put(
+    '/api/v1/establishments/:establishmentId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: establishmentIdParamsSchema,
+        body: establishmentUpdateBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const existing = await trx
+              .selectFrom('establishments')
+              .select(['id', 'company_id', 'is_head_office'])
+              .where('id', '=', request.params.establishmentId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!existing) {
+              return 'ESTABLISHMENT_NOT_FOUND' as const;
+            }
+
+            const type = await trx
+              .selectFrom('establishment_types')
+              .select('code')
+              .where('code', '=', request.body.typeCode)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!type) {
+              return 'TYPE_NOT_FOUND' as const;
+            }
+
+            await trx
+              .updateTable('establishments')
+              .set({
+                name: request.body.name,
+                establishment_type_code: request.body.typeCode,
+                uf: request.body.uf,
+                municipality_name: request.body.municipalityName ?? null,
+                municipality_ibge_code: request.body.municipalityIbgeCode ?? null,
+                postal_code: request.body.postalCode || null,
+                street: request.body.street ?? null,
+                street_number: request.body.streetNumber ?? null,
+                complement: request.body.complement ?? null,
+                district: request.body.district ?? null,
+              })
+              .where('id', '=', existing.id)
+              .execute();
+
+            await replaceManualEstablishmentCnaes(
+              trx,
+              existing.company_id,
+              existing.id,
+              request.body.cnaes,
+            );
+
+            return {
+              companyId: existing.company_id,
+            };
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'ESTABLISHMENT_NOT_FOUND') {
+          return reply.status(404).send({ error: 'establishment_not_found' });
+        }
+
+        if (result === 'TYPE_NOT_FOUND') {
+          return reply.status(400).send({ error: 'invalid_establishment_type' });
+        }
+
+        return reply.status(200).send({ ok: true });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.post(
+    '/api/v1/establishments/:establishmentId/refresh-cnpj',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: establishmentIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const target = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const row = await trx
+              .selectFrom('establishments')
+              .select(['id', 'company_id', 'cnpj', 'is_head_office'])
+              .where('id', '=', request.params.establishmentId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            return row ?? 'ESTABLISHMENT_NOT_FOUND' as const;
+          },
+        );
+
+        if (target === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (target === 'ESTABLISHMENT_NOT_FOUND') {
+          return reply.status(404).send({ error: 'establishment_not_found' });
+        }
+
+        const registry = await lookupCnpjRegistry(target.cnpj);
+
+        await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            await trx
+              .updateTable('establishments')
+              .set({
+                name: registry.tradeName ?? registry.legalName,
+                uf: registry.uf,
+                municipality_name: registry.municipalityName,
+                municipality_ibge_code: registry.municipalityIbgeCode,
+                postal_code: registry.postalCode,
+                street: registry.street,
+                street_number: registry.streetNumber,
+                complement: registry.complement,
+                district: registry.district,
+              })
+              .where('id', '=', target.id)
+              .execute();
+
+            if (target.is_head_office) {
+              await trx
+                .updateTable('companies')
+                .set({
+                  legal_name: registry.legalName,
+                  trade_name: registry.tradeName,
+                })
+                .where('id', '=', target.company_id)
+                .execute();
+            }
+
+            await replaceManualEstablishmentCnaes(
+              trx,
+              target.company_id,
+              target.id,
+              registry.cnaes,
+            );
+          },
+        );
+
+        return reply.status(200).send({
+          ok: true,
+          registry: {
+            source: registry.source,
+            consultedAt: registry.consultedAt,
+          },
+        });
+      } catch (error) {
+        const handledTenant = handleTenantError(error, reply);
+        if (handledTenant) return handledTenant;
+
+        const handledRegistry = handleCnpjRegistryError(error, reply);
+        if (handledRegistry) return handledRegistry;
+
+        throw error;
+      }
+    },
+  );
+
+  typed.delete(
+    '/api/v1/establishments/:establishmentId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: establishmentIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const row = await trx
+              .selectFrom('establishments')
+              .select(['id', 'company_id', 'is_head_office'])
+              .where('id', '=', request.params.establishmentId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!row) {
+              return 'ESTABLISHMENT_NOT_FOUND' as const;
+            }
+
+            if (row.is_head_office) {
+              return 'HEAD_OFFICE' as const;
+            }
+
+            await trx
+              .updateTable('establishments')
+              .set({ is_active: false })
+              .where('id', '=', row.id)
+              .execute();
+
+            await rebuildCompanyCnaes(
+              trx,
+              row.company_id,
+            );
+
+            return 'DELETED' as const;
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'ESTABLISHMENT_NOT_FOUND') {
+          return reply.status(404).send({ error: 'establishment_not_found' });
+        }
+
+        if (result === 'HEAD_OFFICE') {
+          return reply.status(409).send({ error: 'head_office_requires_company_delete' });
+        }
+
+        return reply.status(204).send();
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
         throw error;
       }
     },
