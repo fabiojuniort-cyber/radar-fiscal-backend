@@ -395,6 +395,47 @@ async function run(): Promise<void> {
       );
     }
 
+    const classification = await pool.query<{
+      run_select: boolean;
+      run_insert: boolean;
+      assertion_select: boolean;
+      assertion_insert: boolean;
+      span_select: boolean;
+      span_insert: boolean;
+      review_select: boolean;
+      review_insert: boolean;
+      review_update: boolean;
+      review_delete: boolean;
+      effective_select: boolean;
+    }>(\`
+      SELECT
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_runs','SELECT') AS run_select,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_runs','INSERT') AS run_insert,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_assertions','SELECT') AS assertion_select,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_assertions','INSERT') AS assertion_insert,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_spans','SELECT') AS span_select,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_spans','INSERT') AS span_insert,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_reviews','SELECT') AS review_select,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_reviews','INSERT') AS review_insert,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_reviews','UPDATE') AS review_update,
+        has_table_privilege('radar_taxonomy_curator','public.publication_taxonomy_reviews','DELETE') AS review_delete,
+        has_table_privilege('radar_taxonomy_curator','public.v_publication_taxonomy_effective_assertions','SELECT') AS effective_select
+    \`);
+    const classPolicy = classification.rows[0];
+    if (
+      !classPolicy ||
+      !classPolicy.run_select || classPolicy.run_insert ||
+      !classPolicy.assertion_select || classPolicy.assertion_insert ||
+      !classPolicy.span_select || classPolicy.span_insert ||
+      !classPolicy.review_select || !classPolicy.review_insert ||
+      classPolicy.review_update || classPolicy.review_delete ||
+      !classPolicy.effective_select
+    ) {
+      throw new Error(
+        'Taxonomy curator classification privileges are invalid.',
+      );
+    }
+
     const audit = await pool.query<{
       can_select: boolean;
       can_insert: boolean;
