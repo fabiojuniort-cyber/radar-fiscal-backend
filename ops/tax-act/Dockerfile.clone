@@ -1,0 +1,4 @@
+FROM postgres:18
+COPY ops/tax-act/clone-production.sh /usr/local/bin/clone-production.sh
+RUN chmod +x /usr/local/bin/clone-production.sh
+ENTRYPOINT ["/usr/local/bin/clone-production.sh"]
