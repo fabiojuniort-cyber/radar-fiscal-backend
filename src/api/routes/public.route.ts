@@ -28,6 +28,9 @@ const publicationsQuerySchema = z.object({
     .min(1)
     .max(100)
     .optional(),
+  order: z
+    .enum(['published', 'collected'])
+    .default('published'),
   limit: z.coerce
     .number()
     .int()
@@ -377,6 +380,82 @@ export async function publicRoutes(
               )
             )
           `.as('official_url'),
+        )
+        .select(
+          sql<Date | string>`
+            COALESCE(
+              (
+                SELECT max(crp_latest.detected_at)
+                FROM collection_run_publications crp_latest
+                WHERE crp_latest.publication_id = p.id
+                  AND crp_latest.disposition IN (
+                    'NEW_PUBLICATION',
+                    'NEW_VERSION'
+                  )
+              ),
+              p.first_collected_at
+            )
+          `.as('latest_collected_at'),
+        )
+        .select(
+          sql<string | null>`
+            COALESCE(
+              (
+                SELECT s_latest.code
+                FROM collection_run_publications crp_latest
+                JOIN collection_runs cr_latest
+                  ON cr_latest.id = crp_latest.collection_run_id
+                JOIN sources s_latest
+                  ON s_latest.id = cr_latest.source_id
+                WHERE crp_latest.publication_id = p.id
+                  AND crp_latest.disposition IN (
+                    'NEW_PUBLICATION',
+                    'NEW_VERSION'
+                  )
+                ORDER BY crp_latest.detected_at DESC
+                LIMIT 1
+              ),
+              (
+                SELECT s_origin.code
+                FROM publication_origins po_origin
+                JOIN sources s_origin
+                  ON s_origin.id = po_origin.source_id
+                WHERE po_origin.publication_id = p.id
+                ORDER BY po_origin.first_seen_at DESC
+                LIMIT 1
+              )
+            )
+          `.as('source_code'),
+        )
+        .select(
+          sql<string | null>`
+            COALESCE(
+              (
+                SELECT s_latest.name
+                FROM collection_run_publications crp_latest
+                JOIN collection_runs cr_latest
+                  ON cr_latest.id = crp_latest.collection_run_id
+                JOIN sources s_latest
+                  ON s_latest.id = cr_latest.source_id
+                WHERE crp_latest.publication_id = p.id
+                  AND crp_latest.disposition IN (
+                    'NEW_PUBLICATION',
+                    'NEW_VERSION'
+                  )
+                ORDER BY crp_latest.detected_at DESC
+                LIMIT 1
+              ),
+              (
+                SELECT s_origin.name
+                FROM publication_origins po_origin
+                JOIN sources s_origin
+                  ON s_origin.id = po_origin.source_id
+                WHERE po_origin.publication_id = p.id
+                ORDER BY po_origin.first_seen_at DESC
+                LIMIT 1
+              )
+            )
+          `.as('source_name'),
         );
 
       if (request.query.uf) {
@@ -424,14 +503,39 @@ export async function publicRoutes(
         );
       }
 
+      if (request.query.order === 'collected') {
+        query = query
+          .orderBy(
+            sql`
+              COALESCE(
+                (
+                  SELECT max(crp_latest.detected_at)
+                  FROM collection_run_publications crp_latest
+                  WHERE crp_latest.publication_id = p.id
+                    AND crp_latest.disposition IN (
+                      'NEW_PUBLICATION',
+                      'NEW_VERSION'
+                    )
+                ),
+                p.first_collected_at
+              ) DESC
+            `,
+          )
+          .orderBy(
+            sql`p.published_on DESC NULLS LAST`,
+          );
+      } else {
+        query = query
+          .orderBy(
+            sql`p.published_on DESC NULLS LAST`,
+          )
+          .orderBy(
+            'p.first_collected_at',
+            'desc',
+          );
+      }
+
       const rows = await query
-        .orderBy(
-          sql`p.published_on DESC NULLS LAST`,
-        )
-        .orderBy(
-          'p.first_collected_at',
-          'desc',
-        )
         .limit(request.query.limit)
         .execute();
 
@@ -450,6 +554,11 @@ export async function publicRoutes(
             row.effective_on,
           ),
           officialUrl: row.official_url,
+          sourceCode: row.source_code,
+          sourceName: row.source_name,
+          collectedAt: toIsoTimestamp(
+            row.latest_collected_at,
+          ),
         })),
       });
     },
