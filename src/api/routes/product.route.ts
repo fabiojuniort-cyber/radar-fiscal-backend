@@ -548,9 +548,6 @@ export async function productRoutes(
             legalName: company.legal_name,
             tradeName: company.trade_name,
             cnpj: company.head_office_cnpj,
-            businessLocationCode:
-              request.body.businessLocationCode ??
-              null,
           },
         });
       } catch (error) {
