@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import type { ConnectorPublication } from '../src/modules/collection/connector.contract.js';
+import { publicationPageUrl } from '../src/modules/collection/doe-sp.client.js';
 import { DoeSpIdentityRepairError, repairDoeSpIdentityCollision, type DoeSpOfficialAct } from '../src/modules/collection/doe-sp-identity-repair.js';
 import { doeSpNormativeIdentity } from '../src/modules/collection/doe-sp.rules.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
@@ -134,8 +135,8 @@ test('DOE-SP-40 A: 70 deletes only the 6 orphans, keeps run history, dry executi
   }
 });
 
-const LAW_A = { id: '4135051d-80c1-410d-a127-4bb80330a516', title: 'LEI Nº 17.834, DE 1º DE NOVEMBRO DE 2023', slug: 'lei-n-17-834-de-1-de-novembro-de-2023-8344217', text: 'Institui o Endereçamento Rural Digital.' };
-const LAW_B = { id: '7b252fbe-ab50-4e8a-8a48-937cdfa0109f', title: 'LEI Nº 17. 839, DE 1º DE NOVEMBRO DE 2023', slug: 'lei-n-17-839-de-1-de-novembro-de-2023-8344222', text: 'Declara de utilidade pública o Instituto Boas Novas.' };
+const LAW_A = { id: '4135051d-80c1-410d-a127-4bb80330a516', title: 'LEI Nº 17.834, DE 1º DE NOVEMBRO DE 2023', slug: 'executivo/leis/lei-n-17-834-de-1-de-novembro-de-2023-8344217', text: 'Institui o Endereçamento Rural Digital.' };
+const LAW_B = { id: '7b252fbe-ab50-4e8a-8a48-937cdfa0109f', title: 'LEI Nº 17. 839, DE 1º DE NOVEMBRO DE 2023', slug: 'executivo/leis/lei-n-17-839-de-1-de-novembro-de-2023-8344222', text: 'Declara de utilidade pública o Instituto Boas Novas.' };
 
 /** DOE-SP law as the connector builds it; `actNumber` forced to reproduce the pre-fix collision. */
 function law(act: typeof LAW_A, actNumber?: string): ConnectorPublication {
@@ -143,7 +144,7 @@ function law(act: typeof LAW_A, actNumber?: string): ConnectorPublication {
   return {
     title: act.title, agency: identity.agency, sphere: 'STATE', stateCode: 'SP', actType: identity.actType,
     actNumber: actNumber ?? identity.actNumber, publishedAt: new Date('2023-11-06T00:00:00Z'), content: act.text,
-    officialUrl: 'https://doe.sp.gov.br/executivo/leis/' + act.slug, externalId: act.id, contentHashPolicy: 'HTML_PRIMARY_MATERIAL_FILES',
+    officialUrl: publicationPageUrl(act.slug), externalId: act.id, contentHashPolicy: 'HTML_PRIMARY_MATERIAL_FILES',
     metadata: { sourceRole: 'PRIMARY', doeDate: '2023-11-06', slug: act.slug, captureCategory: 'LEGISLATION' },
     originMetadata: { authenticatedPdf: 'NOT_REQUESTED_REDUNDANT', contentRepresentation: 'OFFICIAL_HTML' },
   };
