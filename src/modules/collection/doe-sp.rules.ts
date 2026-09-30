@@ -308,7 +308,9 @@ export function doeSpNormativeIdentity(input: {
 
   if (input.category === 'LEGISLATION' || input.category === 'NUMBERED_DECREE') {
     if (!['LEI', 'LEI COMPLEMENTAR', 'EMENDA CONSTITUCIONAL', 'DECRETO'].includes(actType)) return undefined;
-    const match = /^(?:LEI COMPLEMENTAR|LEI|EMENDA CONSTITUCIONAL|DECRETO)\s+(?:N[O.]?\s*|NUMERO\s+)(\d{1,3}(?:\.\d{3})*|\d+)\b/.exec(upper);
+    // Thousands separator as printed, also with a stray space ("LEI Nº 17. 839",
+    // DOE-SP-40). A number still followed by digits is not trusted (no strong identity).
+    const match = /^(?:LEI COMPLEMENTAR|LEI|EMENDA CONSTITUCIONAL|DECRETO)\s+(?:N[O.]?\s*|NUMERO\s+)(\d{1,3}(?:\.\s?\d{3})+|\d+)\b(?!\s*[.,]\s*\d)/.exec(upper);
     const value = match ? number(match[1]!) : undefined;
     const year = signedOn ? Number(signedOn.slice(0, 4)) : undefined;
     if (!value || !year) return undefined;
@@ -323,7 +325,8 @@ export function doeSpNormativeIdentity(input: {
   if (!typeMatch) return undefined;
   const rest = upper.slice(typeMatch[0].length);
   // "[Nº] <DESIG>[-/ ]<DESIG2>... [Nº] <number>[/<year>]"
-  const designated = /^(?:NO?\.?\s+)?([A-Z]{2,}(?:\s?[/-]\s?[A-Z]{2,})*)[\s-]*(?:NO?\.?\s*)?(\d{1,6})(?:\s*\/\s*(\d{4}|\d{2}))?\b/.exec(rest);
+  // A number followed by a thousands separator ("1.234") is not trusted (DOE-SP-40).
+  const designated = /^(?:NO?\.?\s+)?([A-Z]{2,}(?:\s?[/-]\s?[A-Z]{2,})*)[\s-]*(?:NO?\.?\s*)?(\d{1,6})(?:\s*\/\s*(\d{4}|\d{2}))?\b(?!\s*[.,]\s*\d)/.exec(rest);
   if (!designated) return undefined;
   const designation = designated[1]!.replace(/\s+/g, '');
   if (NOT_DESIGNATIONS.has(designation) || designation.split(/[/-]/).some((part) => NOT_DESIGNATIONS.has(part))) return undefined;
