@@ -40,6 +40,7 @@ export interface CgibsDocumentDescriptor {
   externalId?: string;
   identityKey: string;
   content?: string;
+  presentationHtml?: string;
   fileUrl?: string;
   fileName?: string;
   pageUrl?: string;
@@ -559,6 +560,7 @@ export function parseCgibsDetailPage(
       externalId: stablePath(officialUrl),
       identityKey: identityFor(family, title, actType, formal.actNumber, docFamily, version, undefined),
       content: parsed.pageText,
+      presentationHtml: html,
       pageUrl: officialUrl,
       metadata: {
         family,
