@@ -444,6 +444,73 @@ function legacyFileEvidence(
   };
 }
 
+function presentationRank(
+  metadata: unknown,
+): number {
+  const presentation = metadataRecord(
+    metadataRecord(metadata)?.presentation,
+  );
+
+  switch (presentation?.format) {
+    case 'SANITIZED_HTML':
+      return 2;
+    case 'PRESERVED_TEXT':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function presentationUpgrade(
+  existingMetadata: unknown,
+  incomingMetadata: unknown,
+): Json | undefined {
+  const existing =
+    metadataRecord(existingMetadata) ?? {};
+  const incoming =
+    metadataRecord(incomingMetadata);
+  const incomingPresentation =
+    metadataRecord(
+      incoming?.presentation,
+    );
+
+  if (!incomingPresentation) {
+    return undefined;
+  }
+
+  const currentRank =
+    presentationRank(existingMetadata);
+  const incomingRank =
+    presentationRank(incomingMetadata);
+
+  if (incomingRank < currentRank) {
+    return undefined;
+  }
+
+  const existingPresentation =
+    metadataRecord(
+      existing.presentation,
+    );
+
+  if (
+    incomingRank === currentRank &&
+    JSON.stringify(
+      existingPresentation ?? null,
+    ) ===
+      JSON.stringify(
+        incomingPresentation,
+      )
+  ) {
+    return undefined;
+  }
+
+  return asJson({
+    ...existing,
+    presentation:
+      incomingPresentation,
+  });
+}
+
 function canonicalContentText(
   value: string | null | undefined,
 ): string | null {
@@ -653,13 +720,31 @@ async function getOrCreateVersion(
         incomingContent !== null &&
         incomingContent !== existingVersion.content_text &&
         /\n/.test(incomingContent);
+      const upgradedMetadata =
+        presentationUpgrade(
+          existingVersion.source_metadata,
+          publication.metadata,
+        );
 
-      if (hasRicherLayout) {
+      if (
+        hasRicherLayout ||
+        upgradedMetadata
+      ) {
         await trx
           .updateTable('publication_versions')
           .set({
-            content_text: incomingContent,
-            source_metadata: asJson(publication.metadata),
+            ...(hasRicherLayout
+              ? {
+                  content_text:
+                    incomingContent,
+                }
+              : {}),
+            ...(upgradedMetadata
+              ? {
+                  source_metadata:
+                    upgradedMetadata,
+                }
+              : {}),
           })
           .where('id', '=', existingVersion.id)
           .execute();
@@ -734,6 +819,57 @@ async function getOrCreateVersion(
     )
   ) {
     if (incomingRole === 'PRIMARY') {
+      const incomingContent =
+        publication.contentText ?? null;
+      const sameCanonicalContent =
+        canonicalContentText(
+          currentVersion.content_text,
+        ) ===
+        canonicalContentText(
+          incomingContent,
+        );
+      const hasRicherLayout =
+        sameCanonicalContent &&
+        incomingContent !== null &&
+        incomingContent !==
+          currentVersion.content_text &&
+        /\n/.test(incomingContent);
+      const upgradedMetadata =
+        presentationUpgrade(
+          currentVersion.source_metadata,
+          publication.metadata,
+        );
+
+      if (
+        hasRicherLayout ||
+        upgradedMetadata
+      ) {
+        await trx
+          .updateTable(
+            'publication_versions',
+          )
+          .set({
+            ...(hasRicherLayout
+              ? {
+                  content_text:
+                    incomingContent,
+                }
+              : {}),
+            ...(upgradedMetadata
+              ? {
+                  source_metadata:
+                    upgradedMetadata,
+                }
+              : {}),
+          })
+          .where(
+            'id',
+            '=',
+            currentVersion.id,
+          )
+          .execute();
+      }
+
       await trx
         .updateTable('publications')
         .set({
