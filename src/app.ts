@@ -8,6 +8,7 @@ import {
 
 import { authRoutes } from './api/routes/auth.route.js';
 import { companyManualRoutes } from './api/routes/company-manual.route.js';
+import { establishmentManualRoutes } from './api/routes/establishment-manual.route.js';
 import { healthRoutes } from './api/routes/health.route.js';
 import { publicRoutes } from './api/routes/public.route.js';
 import { productRoutes } from './api/routes/product.route.js';
@@ -38,6 +39,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes);
   await app.register(productRoutes);
   await app.register(companyManualRoutes);
+  await app.register(establishmentManualRoutes);
 
   return app;
 }
