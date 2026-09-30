@@ -57,6 +57,7 @@
     "db:verify-taxonomy-curator": "node dist/infrastructure/database/verify-taxonomy-curator-role.js",
     "db:ensure-doe-sp-legacy-source": "node dist/infrastructure/database/ensure-doe-sp-legacy-source.js",
     "db:trigger-doe-sp-legacy-run": "node dist/infrastructure/database/trigger-doe-sp-legacy-run.js",
+    "doe-sp-legacy:pilot": "node dist/infrastructure/database/doe-sp-legacy-pilot.js",
     "taxonomy:baseline:manifest": "node dist/infrastructure/database/taxonomy-baseline-manifest.js",
     "taxonomy:baseline:validate": "node dist/infrastructure/database/taxonomy-baseline-validate.js",
     "taxonomy:baseline:dry-run": "node dist/infrastructure/database/taxonomy-baseline-dry-run.js",

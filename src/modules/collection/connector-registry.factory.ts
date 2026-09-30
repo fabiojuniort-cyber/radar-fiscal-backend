@@ -84,6 +84,7 @@ export function buildConnectorRegistry(
     new DoeSpLegacyConnector({
       client: { minRequestIntervalMs: doeSpLegacyLimits.minRequestIntervalMs },
       maxDownloadBytesPerRun: doeSpLegacyLimits.maxDownloadBytesPerRun,
+      ...(doeSpLegacyLimits.maxPeriodsPerRun > 0 ? { maxPeriodsPerRun: doeSpLegacyLimits.maxPeriodsPerRun } : {}),
       ...(options.db
         ? {
             readState: (sourceId) =>
