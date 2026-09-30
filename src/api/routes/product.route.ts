@@ -186,7 +186,14 @@ export async function productRoutes(
               .orderBy('legal_name')
               .execute();
 
-            const companyItems = [];
+            const companyItems: Array<{
+              id: string;
+              legalName: string;
+              tradeName: string | null;
+              cnpj: string;
+              isActive: boolean;
+              establishmentCount: number;
+            }> = [];
 
             for (const company of companies) {
               const establishments = await trx
