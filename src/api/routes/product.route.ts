@@ -118,6 +118,7 @@ const establishmentUpdateBodySchema = z.object({
   streetNumber: z.string().trim().max(30).nullable().optional(),
   complement: z.string().trim().max(160).nullable().optional(),
   district: z.string().trim().max(160).nullable().optional(),
+  stateRegistration: z.string().trim().max(30).nullable().optional(),
   cnaes: cnaesBodySchema.default([]),
 });
 
@@ -147,6 +148,7 @@ const establishmentBodySchema = z.object({
   streetNumber: z.string().trim().max(30).optional(),
   complement: z.string().trim().max(160).optional(),
   district: z.string().trim().max(160).optional(),
+  stateRegistration: z.string().trim().max(30).optional(),
   cnaes: cnaesBodySchema.default([]),
 });
 
@@ -606,6 +608,7 @@ export async function productRoutes(
             complement:
               registry.complement,
             district: registry.district,
+            stateRegistration: null,
             cnaes: registry.cnaes,
           },
           registry: {
@@ -864,6 +867,7 @@ export async function productRoutes(
                 'street_number',
                 'complement',
                 'district',
+                'state_registration',
                 'is_active',
               ])
               .where('company_id', '=', request.params.companyId)
@@ -903,6 +907,7 @@ export async function productRoutes(
                 streetNumber: row.street_number,
                 complement: row.complement,
                 district: row.district,
+                stateRegistration: row.state_registration,
                 isActive: row.is_active,
                 cnaes: cnaes.map((cnae) => ({
                   code: cnae.code,
@@ -998,6 +1003,7 @@ export async function productRoutes(
                 street_number: request.body.streetNumber ?? null,
                 complement: request.body.complement ?? null,
                 district: request.body.district ?? null,
+                state_registration: request.body.stateRegistration ?? null,
                 is_active: true,
               })
               .returning([
@@ -1167,6 +1173,7 @@ export async function productRoutes(
             streetNumber: registry.streetNumber,
             complement: registry.complement,
             district: registry.district,
+            stateRegistration: null,
             cnaes: registry.cnaes,
           },
           registry: {
@@ -1263,6 +1270,7 @@ export async function productRoutes(
                 street_number: request.body.streetNumber ?? null,
                 complement: request.body.complement ?? null,
                 district: request.body.district ?? null,
+                state_registration: request.body.stateRegistration ?? null,
               })
               .where('id', '=', existing.id)
               .execute();
