@@ -23,6 +23,7 @@ const GO_LANDING_URLS = [
 ] as const;
 const GO_RESULT_URL =
   'https://appasp.sefaz.go.gov.br/Sintegra/Consulta/consultar.asp';
+const GO_LOOKUP_TIMEOUT_MS = 4_000;
 
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, '');
@@ -156,7 +157,10 @@ async function lookupGoSintegra(
 ): Promise<StateRegistrationLookup> {
   const checkedAt = new Date();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12_000);
+  const timer = setTimeout(
+    () => controller.abort(),
+    GO_LOOKUP_TIMEOUT_MS,
+  );
   const browserHeaders = {
     Accept: 'text/html,application/xhtml+xml',
     'Accept-Language': 'pt-BR,pt;q=0.9',

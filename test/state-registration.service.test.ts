@@ -87,6 +87,22 @@ test('lookupStateRegistration posts CNPJ to GO SINTEGRA', async () => {
   assert.match(requests[1]?.body ?? '', /btCGC=Consulta%3D/);
 });
 
+test('GO lookup failure stays UNAVAILABLE instead of being treated as missing IE', async () => {
+  const result = await lookupStateRegistration(
+    '12.345.678/0001-95',
+    'GO',
+    async () => {
+      throw new Error('network unavailable');
+    },
+  );
+
+  assert.equal(result.registration, null);
+  assert.equal(result.registrationStatus, null);
+  assert.equal(result.lookupStatus, 'UNAVAILABLE');
+  assert.equal(result.source, 'SEFAZ_GO_SINTEGRA');
+  assert.ok(result.checkedAt.length > 0);
+});
+
 test('unsupported UFs stay explicit instead of inventing IE', async () => {
   const result = await lookupStateRegistration(
     '12.345.678/0001-95',
@@ -97,7 +113,6 @@ test('unsupported UFs stay explicit instead of inventing IE', async () => {
   assert.equal(result.lookupStatus, 'NOT_SUPPORTED');
   assert.equal(result.source, null);
 });
-
 
 test('lookupStateRegistration falls back to legacy GO landing page', async () => {
   const urls: string[] = [];

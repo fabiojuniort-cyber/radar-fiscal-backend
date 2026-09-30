@@ -56,7 +56,11 @@ Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro 
 
 ### Resiliência da consulta CNPJ
 
-- A consulta cadastral server-side usa BrasilAPI/Minha Receita como caminho primário e pode usar a API pública direta do Minha Receita como fallback quando o primeiro host estiver indisponível.
-- Diferenciar `cnpj_not_found`, `cnpj_provider_unavailable` e `cnpj_provider_invalid_response`.
-- Falha de um host não deve ser tratada como CNPJ inexistente sem esgotar o fallback disponível.
-- Persistir somente os campos necessários ao produto; o fallback não amplia o conjunto de dados expostos.
+- A consulta cadastral server-side usa BrasilAPI e Minha Receita como providers primários concorrentes para reduzir a indisponibilidade percebida.
+- A indisponibilidade dos providers não deve tornar o produto inutilizável: a experiência pode oferecer cadastro manual controlado da empresa/matriz ou do estabelecimento, preservando o CNPJ validado como identidade.
+- `cnpj_not_found`, `cnpj_provider_unavailable` e `cnpj_provider_invalid_response` continuam semanticamente distintos; resposta 404 isolada junto com falha de outro provider não deve ser promovida automaticamente a inexistência definitiva.
+- Cada tentativa de provider deve gerar observabilidade estruturada com provider, duração, outcome, HTTP status quando houver e classe de erro, sem registrar CNPJ, credenciais ou dados pessoais desnecessários.
+- Providers futuros devem implementar o contrato `CnpjRegistryProvider`; o código reserva integração oficial/comercial futura (por exemplo SERPRO) sem ativar credenciais ou endpoints do Conecta GOV por padrão.
+- Provider de terceiro não deve ser adicionado a produção quando seus termos de uso/licenciamento forem incompatíveis ou não comprovados para um SaaS multi-tenant.
+- Persistir somente os campos necessários ao produto; nenhum provider cadastral autoriza expor QSA ou ampliar o conjunto de dados sem escopo específico.
+- Cadastro manual de matriz deve ser atômico: empresa e estabelecimento matriz são criados/reativados na mesma transação; Local Negócio e IE manuais mantêm proveniência manual e não são sobrescritos por indisponibilidade externa.
