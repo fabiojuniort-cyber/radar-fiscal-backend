@@ -75,6 +75,7 @@ efeitos são esperados e devem ser comunicados antes do passo 7 do §6.
 | `sql/50_resume_source.sql` | escrita: `is_active=true` | produção (gate futuro) |
 | `sql/41_post_recapture_validation.sql` | validação da recaptura | produção (RO) |
 | `sql/60_rollback_import.sql` | rollback ao estado do backup, também após recaptura parcial | produção (só em incidente) |
+| `sql/70_delete_orphan_publications.sql` | **destrutivo, transação única**: apaga as 6 publicações órfãs do DOE-SP-40 (seção 11) | produção (gate DOE-SP-40) |
 | `rehearsal/partial_recapture_sim.sql` | simula uma recaptura parcial; recusa rodar fora de bancos de ensaio | cópia temporária do runner |
 | `runner/prep.sh` | orquestra DOE-SP-31 (preflight, backup, restauração e ensaio) | serviço temporário Railway |
 | `runner/rollback-stage.sh` | prepara o `schema doe_sp_rollback` a partir do backup | Railway |
@@ -237,3 +238,45 @@ Ensaio (DOE-SP-33): guardas negativas (item estrangeiro, tradução no escopo),
 fingerprint das outras fontes e contagens. Localmente, o runner foi validado
 contra um banco sintético (Postgres 16,
 migrations do repositório).
+
+## 11. Reparos DOE-SP-40 (Issue #1)
+
+Achados do diagnóstico somente leitura de 29/09/2026 (Issue #1):
+
+1. **6 publicações órfãs**: criadas por um run do DOE-SP em 24/09, antes do rebuild. Não têm versão nem origem e correspondem a atos que as regras atuais excluem.
+2. **Colisão de identidade** na publicação `41715dc8…`: as Leis 17.834 e 17.839, de 01/11/2023 (DOE de 06/11/2023), ficaram numa publicação só. O título oficial `LEI Nº 17. 839` (espaço depois do ponto de milhar) era lido como número 17, e as duas leis ganharam a mesma identidade STRONG `17/2023`.
+
+A correção de código (`doeSpNormativeIdentity`) aceita o espaço depois do ponto. Um número ainda seguido de dígitos (`17 .839`, `17, 839`, `SFP Nº 1.234`) deixa de gerar identidade forte e o ato fica SOURCE_SCOPED. Ela precisa estar **em produção antes** do reparo B, que usa as mesmas regras.
+
+**Reparo A** — `sql/70_delete_orphan_publications.sql`:
+- Os ids estão fixos no arquivo.
+- Guardas: as 6 publicações existem, continuam sem versão, sem origem e sem `company_publications`, e só o histórico do DOE-SP aponta para elas. Também há guarda de drift de FKs.
+- `collection_items.publication_id` vira `NULL`: o histórico dos runs é mantido. Os vínculos `collection_run_publications` caem em cascata.
+- Sem `confirm`, executa tudo e faz `ROLLBACK`, imprimindo `DOE_SP_ORPHANS_RESULT`.
+- O commit exige `-v confirm=DELETE_DOE_SP_ORPHANS -v expected_items=<n> -v expected_run_links=<n>`, com os números da execução seca.
+
+**Reparo B** — `npm run db:repair-doe-sp-identity-collision -- --publication=41715dc8-64fa-4702-ab4f-6ceee12fd5ab [--confirm]`:
+- Pareia cada origem DOE-SP com a versão que ela produziu, pelo slug do DOE.
+- Relê o título oficial de cada origem na API pública do DOE: 1 requisição por origem, e o slug precisa bater.
+- Recalcula a identidade com as regras corrigidas e o normalizador real.
+- Em uma transação SERIALIZABLE:
+  - a origem da versão 1 fica na publicação, que recebe título e identidade corrigidos;
+  - a outra origem vai para uma publicação nova com a sua versão (renumerada para 1 e atual), os seus `collection_items` (a primeira captura passa de `NEW_VERSION` para `PROCESSED_NEW`) e o seu vínculo de run (`NEW_PUBLICATION`).
+- Guardas:
+  - identidade STRONG;
+  - só origens DOE-SP;
+  - pareamento 1:1;
+  - identidades novas distintas e livres;
+  - sem `company_publications`;
+  - pós-condições de contagem e de forma (1 origem, 1 versão, 1 atual).
+- Sem `--confirm`, faz tudo, imprime `DOE_SP_IDENTITY_REPAIR` e desfaz.
+- Precisa de Node e do build, então roda num serviço temporário a partir do commit revisado, e não no runner `postgres:18`.
+
+Ordem no gate (cada passo registra evidência na Issue #1):
+1. merge e deploy da correção;
+2. execução seca de A e de B;
+3. commit de A e de B com os números da execução seca;
+4. revalidar com o diagnóstico somente leitura: 0 publicações sem versão/origem e nenhuma publicação STRONG do `GOVERNO-SP` com duas leis diferentes.
+
+Teste: `test/doe-sp.repair-40.integration.test.ts` (banco descartável). A colisão é reproduzida pelo normalizador e pela persistência reais. Uma captura posterior, com as regras corrigidas, encontra cada lei sem conflito de origem.
+

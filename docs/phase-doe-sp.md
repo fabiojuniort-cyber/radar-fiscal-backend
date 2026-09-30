@@ -107,6 +107,7 @@ Regras que valem para todos os casos:
 - O GUID do DOE é sempre o `externalId` da origem.
 - A URL canônica é `https://doe.sp.gov.br/{slug}`.
 - Não há fuzzy merge. Cross-source só acontece com identidade forte idêntica.
+- O número é lido como está impresso, com ponto de milhar e também com um espaço depois do ponto (`LEI Nº 17. 839` → `17839`). Um número ainda seguido de dígitos (`17 .839`, `17, 839`) não gera identidade forte e o ato fica SOURCE_SCOPED, para evitar colisão entre leis diferentes (DOE-SP-40: Leis 17.834 e 17.839/2023 colidiram como `17/2023`; reparo em `ops/doe-sp/RUNBOOK.md` §11).
 
 ## 5. Versionamento
 
