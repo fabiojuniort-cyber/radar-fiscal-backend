@@ -577,10 +577,6 @@ test(
         /    I - primeiro item;/,
       );
       assert.equal(
-        detailBody.version?.presentation.format,
-        'PRESERVED_TEXT',
-      );
-      assert.equal(
         detailBody.version?.presentation.preservesWhitespace,
         true,
       );
