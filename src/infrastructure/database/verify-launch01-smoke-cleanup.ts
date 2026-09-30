@@ -34,6 +34,14 @@ async function run(): Promise<void> {
 
     const row = result.rows[0];
 
+    console.log(
+      'LAUNCH01_SMOKE_RESIDUAL_COUNTS=' +
+        JSON.stringify({
+          onboarding: row?.onboarding_count ?? null,
+          companies: row?.company_count ?? null,
+        }),
+    );
+
     if (
       !row ||
       row.onboarding_count !== '0' ||
