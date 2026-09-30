@@ -310,6 +310,107 @@ test('TAX-08 preserves UNMAPPED history, MIT negative case and human terminal ga
       ),
       /terminal taxonomy candidate is immutable/,
     );
+
+    const secondRunId = randomUUID();
+    await pool.query(
+      [
+        'INSERT INTO publication_taxonomy_runs (',
+        'id, publication_version_id, taxonomy_release_id, method_type,',
+        'engine_key, engine_version, config_snapshot, config_sha256,',
+        'input_sha256, run_fingerprint, status, started_at, finished_at',
+        ') VALUES (',
+        "$1,$2,$3,'EXTRACTOR','tax08-unmapped-test','1','{}'::jsonb,$4,$5,$6,",
+        "'SUCCESS',now(),now())",
+      ].join(' '),
+      [
+        secondRunId,
+        publicationVersionId,
+        releaseId,
+        sha('{}'),
+        sha('MIT-second-observation'),
+        sha(
+          'tax08-run-second-' + suffix,
+        ),
+      ],
+    );
+
+    const afterTerminal =
+      await recordUnmappedOccurrence(
+        pool,
+        {
+          ...request,
+          runId: secondRunId,
+        },
+      );
+
+    assert.equal(
+      afterTerminal.occurrenceDisposition,
+      'CREATED',
+    );
+    assert.equal(
+      afterTerminal.candidateDisposition,
+      'EXISTING',
+    );
+    assert.equal(
+      afterTerminal.candidateId,
+      first.candidateId,
+    );
+    assert.notEqual(
+      afterTerminal.occurrenceId,
+      first.occurrenceId,
+    );
+
+    const terminalAfterObservation =
+      await pool.query<{
+        status: string;
+        decision_actor_id: string;
+        decision_reason: string;
+        decision_at: Date;
+      }>(
+        [
+          'SELECT status, decision_actor_id, decision_reason, decision_at',
+          'FROM taxonomy_candidates',
+          'WHERE id = $1',
+        ].join(' '),
+        [first.candidateId],
+      );
+
+    assert.equal(
+      terminalAfterObservation.rows[0]?.status,
+      'REJECTED',
+    );
+    assert.equal(
+      terminalAfterObservation.rows[0]
+        ?.decision_actor_id,
+      'tax08-human-curator',
+    );
+    assert.equal(
+      terminalAfterObservation.rows[0]
+        ?.decision_reason,
+      'MIT remains unmapped until formal taxonomy governance decides otherwise.',
+    );
+    assert.ok(
+      terminalAfterObservation.rows[0]
+        ?.decision_at,
+    );
+
+    const secondActiveLink =
+      await pool.query<{
+        n: number;
+      }>(
+        [
+          'SELECT count(*)::int AS n',
+          'FROM taxonomy_candidate_occurrence_links',
+          'WHERE occurrence_id = $1',
+          "AND link_status = 'ACTIVE'",
+        ].join(' '),
+        [afterTerminal.occurrenceId],
+      );
+
+    assert.equal(
+      secondActiveLink.rows[0]?.n,
+      1,
+    );
   } finally {
     await pool.end();
   }
