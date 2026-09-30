@@ -511,6 +511,46 @@ function presentationUpgrade(
   });
 }
 
+function primaryMetadataPreservingBestPresentation(
+  existingMetadata: unknown,
+  incomingMetadata: unknown,
+): Json {
+  const existing =
+    metadataRecord(existingMetadata) ?? {};
+  const incoming =
+    metadataRecord(incomingMetadata) ?? {};
+
+  const existingPresentation =
+    metadataRecord(
+      existing.presentation,
+    );
+  const incomingPresentation =
+    metadataRecord(
+      incoming.presentation,
+    );
+
+  const keepExistingPresentation =
+    presentationRank(existingMetadata) >
+    presentationRank(incomingMetadata);
+
+  return asJson({
+    ...incoming,
+    ...(keepExistingPresentation &&
+    existingPresentation
+      ? {
+          presentation:
+            existingPresentation,
+        }
+      : incomingPresentation
+        ? {
+            presentation:
+              incomingPresentation,
+          }
+        : {}),
+  });
+}
+
+
 function canonicalContentText(
   value: string | null | undefined,
 ): string | null {
@@ -772,9 +812,11 @@ async function getOrCreateVersion(
         await trx
           .updateTable('publication_versions')
           .set({
-            source_metadata: asJson(
-              publication.metadata,
-            ),
+            source_metadata:
+              primaryMetadataPreservingBestPresentation(
+                existingVersion.source_metadata,
+                publication.metadata,
+              ),
           })
           .where('id', '=', existingVersion.id)
           .execute();
@@ -932,9 +974,11 @@ async function getOrCreateVersion(
         content_text:
           publication.contentText ?? null,
         relevant_excerpt: null,
-        source_metadata: asJson(
-          publication.metadata,
-        ),
+        source_metadata:
+          primaryMetadataPreservingBestPresentation(
+            currentVersion.source_metadata,
+            publication.metadata,
+          ),
         is_current: true,
       })
       .where('id', '=', currentVersion.id)
