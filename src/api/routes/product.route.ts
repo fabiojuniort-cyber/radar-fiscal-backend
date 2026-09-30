@@ -24,6 +24,9 @@ import {
   rebuildCompanyCnaes,
   replaceManualEstablishmentCnaes,
 } from '../../modules/company/company-registration.service.js';
+import {
+  lookupStateRegistration,
+} from '../../modules/company/state-registration.service.js';
 
 const cnpjValueSchema = z
   .string()
@@ -552,6 +555,11 @@ export async function productRoutes(
         const registry = await lookupCnpjRegistry(
           request.body.cnpj,
         );
+        const stateRegistration =
+          await lookupStateRegistration(
+            registry.cnpj,
+            registry.uf,
+          );
 
         const created = await withTenantContext(
           app.db,
@@ -572,6 +580,7 @@ export async function productRoutes(
               trx,
               tenantId,
               registry,
+              stateRegistration,
             );
           },
         );
@@ -608,7 +617,16 @@ export async function productRoutes(
             complement:
               registry.complement,
             district: registry.district,
-            stateRegistration: null,
+            stateRegistration:
+              stateRegistration.registration,
+            stateRegistrationStatus:
+              stateRegistration.registrationStatus,
+            stateRegistrationLookupStatus:
+              stateRegistration.lookupStatus,
+            stateRegistrationSource:
+              stateRegistration.source,
+            stateRegistrationCheckedAt:
+              stateRegistration.checkedAt,
             cnaes: registry.cnaes,
           },
           registry: {
@@ -1095,6 +1113,11 @@ export async function productRoutes(
 
       try {
         const registry = await lookupCnpjRegistry(request.body.cnpj);
+        const stateRegistration =
+          await lookupStateRegistration(
+            registry.cnpj,
+            registry.uf,
+          );
 
         const result = await withTenantContext(
           app.db,
@@ -1139,6 +1162,7 @@ export async function productRoutes(
                 request.params.companyId,
                 registry,
                 request.body.typeCode,
+                stateRegistration,
               );
 
             return { establishmentId };
@@ -1173,7 +1197,16 @@ export async function productRoutes(
             streetNumber: registry.streetNumber,
             complement: registry.complement,
             district: registry.district,
-            stateRegistration: null,
+            stateRegistration:
+              stateRegistration.registration,
+            stateRegistrationStatus:
+              stateRegistration.registrationStatus,
+            stateRegistrationLookupStatus:
+              stateRegistration.lookupStatus,
+            stateRegistrationSource:
+              stateRegistration.source,
+            stateRegistrationCheckedAt:
+              stateRegistration.checkedAt,
             cnaes: registry.cnaes,
           },
           registry: {
@@ -1271,6 +1304,13 @@ export async function productRoutes(
                 complement: request.body.complement ?? null,
                 district: request.body.district ?? null,
                 state_registration: request.body.stateRegistration ?? null,
+                state_registration_status: null,
+                state_registration_source:
+                  request.body.stateRegistration
+                    ? 'MANUAL'
+                    : null,
+                state_registration_checked_at: null,
+                state_registration_lookup_status: null,
               })
               .where('id', '=', existing.id)
               .execute();
@@ -1364,6 +1404,11 @@ export async function productRoutes(
         }
 
         const registry = await lookupCnpjRegistry(target.cnpj);
+        const stateRegistration =
+          await lookupStateRegistration(
+            registry.cnpj,
+            registry.uf,
+          );
 
         await withTenantContext(
           app.db,
@@ -1382,6 +1427,16 @@ export async function productRoutes(
                 street_number: registry.streetNumber,
                 complement: registry.complement,
                 district: registry.district,
+                state_registration:
+                  stateRegistration.registration,
+                state_registration_status:
+                  stateRegistration.registrationStatus,
+                state_registration_source:
+                  stateRegistration.source,
+                state_registration_checked_at:
+                  stateRegistration.checkedAt,
+                state_registration_lookup_status:
+                  stateRegistration.lookupStatus,
               })
               .where('id', '=', target.id)
               .execute();
@@ -1411,6 +1466,18 @@ export async function productRoutes(
           registry: {
             source: registry.source,
             consultedAt: registry.consultedAt,
+          },
+          stateRegistration: {
+            registration:
+              stateRegistration.registration,
+            status:
+              stateRegistration.registrationStatus,
+            lookupStatus:
+              stateRegistration.lookupStatus,
+            source:
+              stateRegistration.source,
+            checkedAt:
+              stateRegistration.checkedAt,
           },
         });
       } catch (error) {
