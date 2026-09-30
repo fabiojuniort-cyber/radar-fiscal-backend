@@ -620,12 +620,12 @@ export async function productRoutes(
       }
 
       try {
-        const rows = await withTenantContext(
+        const items = await withTenantContext(
           app.db,
           request.auth.userId,
           tenantId,
-          async (trx) =>
-            trx
+          async (trx) => {
+            const rows = await trx
               .selectFrom('establishments')
               .select([
                 'id',
@@ -645,30 +645,56 @@ export async function productRoutes(
                 'is_active',
               ])
               .where('company_id', '=', request.params.companyId)
+              .where('is_active', '=', true)
               .orderBy('is_head_office', 'desc')
               .orderBy('name')
-              .execute(),
+              .execute();
+
+            const result = [];
+
+            for (const row of rows) {
+              const cnaes = await trx
+                .selectFrom('establishment_cnaes as ec')
+                .innerJoin('cnaes as c', 'c.code', 'ec.cnae_code')
+                .select([
+                  'c.code',
+                  'c.description',
+                  'ec.is_primary',
+                ])
+                .where('ec.establishment_id', '=', row.id)
+                .orderBy('ec.is_primary', 'desc')
+                .orderBy('c.code')
+                .execute();
+
+              result.push({
+                id: row.id,
+                companyId: row.company_id,
+                cnpj: row.cnpj,
+                name: row.name,
+                typeCode: row.establishment_type_code,
+                isHeadOffice: row.is_head_office,
+                uf: row.uf,
+                municipalityName: row.municipality_name,
+                municipalityIbgeCode: row.municipality_ibge_code,
+                postalCode: row.postal_code,
+                street: row.street,
+                streetNumber: row.street_number,
+                complement: row.complement,
+                district: row.district,
+                isActive: row.is_active,
+                cnaes: cnaes.map((cnae) => ({
+                  code: cnae.code,
+                  description: cnae.description,
+                  isPrimary: cnae.is_primary,
+                })),
+              });
+            }
+
+            return result;
+          },
         );
 
-        return reply.status(200).send({
-          items: rows.map((row) => ({
-            id: row.id,
-            companyId: row.company_id,
-            cnpj: row.cnpj,
-            name: row.name,
-            typeCode: row.establishment_type_code,
-            isHeadOffice: row.is_head_office,
-            uf: row.uf,
-            municipalityName: row.municipality_name,
-            municipalityIbgeCode: row.municipality_ibge_code,
-            postalCode: row.postal_code,
-            street: row.street,
-            streetNumber: row.street_number,
-            complement: row.complement,
-            district: row.district,
-            isActive: row.is_active,
-          })),
-        });
+        return reply.status(200).send({ items });
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
