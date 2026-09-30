@@ -360,7 +360,7 @@ test(
         async () => {
           const sp = await app.inject({
             method: 'GET',
-            url: '/public/v1/publications?uf=SP&limit=3',
+            url: '/public/v1/publications?uf=SP&order=collected&limit=3',
           });
 
           assert.equal(sp.statusCode, 200);
@@ -381,6 +381,23 @@ test(
           assert.equal(
             statePublication.officialUrl,
             'https://example.test/sp/99',
+          );
+          assert.equal(
+            statePublication.sourceCode,
+            sourceSpCode,
+          );
+          assert.equal(
+            statePublication.sourceName,
+            'API SP Test',
+          );
+          assert.ok(
+            !Number.isNaN(
+              Date.parse(
+                String(
+                  statePublication.collectedAt,
+                ),
+              ),
+            ),
           );
           assert.equal(
             'contentText' in
