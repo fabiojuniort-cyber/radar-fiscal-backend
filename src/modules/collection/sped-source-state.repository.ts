@@ -4,6 +4,7 @@ import type { DB } from '../../infrastructure/database/database.types.js';
 import { readCurrentCheckpoint } from './checkpoint.repository.js';
 import {
   SPED_CONNECTOR_KEY,
+  SPED_IDENTITY_VERSION,
   SPED_MAX_FRONTIER,
   SPED_STATE_VERSION,
   type SpedCrawlCycle,
@@ -107,6 +108,9 @@ function identityRecord(value: unknown): SpedIdentityRecord | undefined {
     title: item.title,
     ...(typeof item.content === 'string' ? { content: item.content } : {}),
     fileSha256s: [...item.fileSha256s as string[]].sort(),
+    ...(item.familySource === 'TITLE' || item.familySource === 'NUMBER'
+      ? { familySource: item.familySource }
+      : {}),
   };
 }
 
@@ -139,6 +143,39 @@ function crawlCycle(value: unknown): SpedCrawlCycle | undefined {
     });
   }
   return { completedModules, frontier };
+}
+
+/**
+ * Identity key each persisted origin of the source is linked to, for origins
+ * whose persisted metadata proves a title-derived identity: written with the
+ * current identity version and without an official document number. It is
+ * the reference when the checkpoint identity was dropped (failed item,
+ * missing or untrusted checkpoint): persistence rejects any other key for
+ * that origin. Numbered identities are never returned.
+ */
+async function readPersistedTitleFamilyKeys(
+  db: Kysely<DB>,
+  sourceId: string,
+): Promise<Record<string, string>> {
+  const linked = await db
+    .selectFrom('publication_origins as o')
+    .innerJoin('publications as p', 'p.id', 'o.publication_id')
+    .select(['o.external_id', sql<string | null>`p.identity_basis ->> 'sourceKey'`.as('source_key')])
+    .where('o.source_id', '=', sourceId)
+    .where('o.external_id', 'is not', null)
+    .where(sql<boolean>`p.identity_basis ->> 'sourceKeyType' = 'CANONICAL_KEY'`)
+    .where(sql<boolean>`o.metadata ->> 'identityVersion' = ${SPED_IDENTITY_VERSION}`)
+    .where(sql<boolean>`o.metadata ? 'documentFamily'`)
+    .where(sql<boolean>`NOT (o.metadata ? 'documentNumber')`)
+    .execute();
+  const keys: Record<string, string> = {};
+  for (const row of linked) {
+    const key = row.source_key;
+    if (row.external_id && key && key.startsWith('SPED|') && key.length <= 4096) {
+      keys[row.external_id] = key;
+    }
+  }
+  return keys;
 }
 
 /**
@@ -182,7 +219,15 @@ export async function readSpedSourceState(
     : legacy
       ? { run_id: legacy.run_id, run_status: legacy.run_status }
       : undefined;
-  if (!last) return { version: SPED_STATE_VERSION, items: {}, pages: {}, identities: {} };
+  if (!last) {
+    return {
+      version: SPED_STATE_VERSION,
+      items: {},
+      pages: {},
+      identities: {},
+      persistedTitleFamilyKeys: await readPersistedTitleFamilyKeys(db, sourceId),
+    };
+  }
 
   const state = stored ? stored.state : record(record(legacy?.metadata)?.spedState);
 
@@ -203,6 +248,7 @@ export async function readSpedSourceState(
     .where('source_id', '=', sourceId)
     .execute();
   const persistedExternalIds = new Set(origins.map((origin) => origin.external_id).filter((value): value is string => !!value));
+  const persistedTitleFamilyKeys = await readPersistedTitleFamilyKeys(db, sourceId);
   const persistedUrls = new Set(
     origins
       .map((origin) => allowedSpedUrl(origin.official_url))
@@ -263,5 +309,12 @@ export async function readSpedSourceState(
   // of the table store (never from legacy metadata).
   const cycle = stored ? crawlCycle(state?.cycle) : undefined;
 
-  return { version: SPED_STATE_VERSION, items, pages, identities, ...(cycle ? { cycle } : {}) };
+  return {
+    version: SPED_STATE_VERSION,
+    items,
+    pages,
+    identities,
+    persistedTitleFamilyKeys,
+    ...(cycle ? { cycle } : {}),
+  };
 }

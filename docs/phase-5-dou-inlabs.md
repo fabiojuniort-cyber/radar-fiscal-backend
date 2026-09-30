@@ -142,3 +142,19 @@ Railway: `INLABS_EMAIL` e `INLABS_PASSWORD` estão ativos no `radar-fiscal-worke
 ### Critério de conclusão da frente
 
 A frente DOU/INLABS é considerada tecnicamente concluída quando o PR final estiver com CI verde e mergeado. A ativação produtiva é um passo operacional separado e reversível, deliberadamente mantido fora do merge para evitar começar coletas antes da migration 010 e da decisão do Gerente Geral.
+
+## Correção 2026-09-30: datas sem edição e matérias sem título
+
+Governança: tribusca-control Issue #35.
+
+**Datas sem edição (HTML 200).** Em produção, no domingo 2026-09-27, todos os seis pacotes da data responderam HTTP 200 com a mesma página `text/html` de 38.679 bytes, em vez de 404. Desde a PR #80 isso era isolado como `INLABS_INVALID_DOWNLOAD` (partial failure), o que deixava a run DOU `PARTIAL_SUCCESS` em todo fim de semana. Agora, diante de uma resposta HTML 200 no lugar de um pacote, o cliente consulta o **índice diário autenticado** (`index.php?p=<data>`, lido uma vez por data e tentativa):
+
+- se o índice **não lista** o arquivo → `NOT_AVAILABLE` com `evidence: 'NOT_IN_DAILY_INDEX'`;
+- se o índice **lista** o arquivo → continua `INLABS_INVALID_DOWNLOAD` (falha real de download, retentada);
+- login/sessão expirada, manutenção e WAF, tanto no pacote quanto no índice, continuam falhando a tentativa.
+
+Ausência nunca gera receipt: a próxima run pergunta de novo, então uma classificação errada se corrige sozinha dentro da janela de reconciliação. O `archives[]` registra `evidence`, a forma da resposta (`contentType`, `byteLength`, `magicHex`, `bodyKind`), `indexListsArchives` e `pageTitle` — o `<title>` da página, sem marcação, com e-mails mascarados e no máximo 120 caracteres. O corpo nunca é registrado. 404 continua revalidando a sessão pelo índice (`evidence: 'HTTP_404'`).
+
+**Matéria sem título.** Uma matéria oficial com `<Identifica>` vazio era descartada (`DOU_MISSING_TITLE`). Agora recebe título descritivo formado pelos próprios atributos oficiais (`artType - unidade`), com `metadata.dou.titleFallback = 'ART_TYPE_AND_UNIT'`. O título de reserva não entra na classificação: nenhum número de ato ou identidade normativa é inferido; a identidade permanece a da matéria oficial (`SOURCE_SCOPED`).
+
+**Agenda.** Pela D-056 a fonte `dou` passa a `0 6,10,14,18 * * *` (`America/Sao_Paulo`); ver `docs/collection-schedules.md`.

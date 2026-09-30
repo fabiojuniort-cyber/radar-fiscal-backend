@@ -286,10 +286,12 @@ Cada módulo é isolado.
 - usa `https://www.gov.br/sped/pt-br/`;
 - mantém `schedule_cron = NULL`.
 
-`npm run db:ensure-sped-source -- --hourly` ativa:
+`npm run db:ensure-sped-source -- --scheduled` ativa a agenda D-056 (ver `docs/collection-schedules.md`):
 
-- cron `0 * * * *`;
+- cron `5 6,10,14,18 * * *`;
 - timezone `America/Sao_Paulo`.
+
+`--hourly` (cron `0 * * * *`) permanece apenas como exceção explícita e registrada.
 
 `npm run db:trigger-sped-run` cria run manual somente quando não existe run `PENDING`/`RUNNING` da fonte.
 
@@ -370,3 +372,21 @@ Correção:
 
 - página-pasta passa a ser sempre CONTAINER; os filhos são seguidos em toda execução, e a própria pasta continua capturada como publicação;
 - `SPED_STATE_VERSION` sobe para 3, então checkpoints v2, que podiam esconder pastas, são ignorados uma vez.
+
+## Correção 2026-09-30: título reescrito não troca a identidade
+
+Governança: tribusca-control Issue #35.
+
+**Problema em produção.** Um item DeRE (`06-Arquivos XSD`, mesma URL, mesmo arquivo, versão `1.2.0`) falhava em toda execução com `Publication origin is already linked to another publication identity.`, deixando a fonte em `PARTIAL_SUCCESS` contínuo (alerta `sped:PERSISTENT_PARTIAL` do watchdog). O portal reescreveu o título (ex.: `(v.1.2.0)` → `(v.1.2.0 PRODUÇÃO)`); a família do documento é derivada do título, então a chave-base mudou, e a origem já estava vinculada à publicação com a chave antiga.
+
+**Por que a regra anterior não bastava.** `readSpedSourceState` descarta do checkpoint a identidade dos itens que falharam na última run (para que sejam reprocessados). Com isso, a identidade original daquela origem já não estava disponível para a resolução.
+
+**Correção.**
+
+- `sameIdentityExceptTitleFamily`: a origem mantém a identidade que já possui quando a chave difere **apenas** no token de família derivado do título. Módulo, portador, tipo, versão oficial, revisão e caminho de fallback precisam coincidir; exatamente um token pode diferir. Nova versão oficial (ex.: `1.3.0`) continua gerando nova identidade.
+- **Prova de origem do token (revisão R2, B1).** A string da chave não diz se o token variável era família do título ou número oficial. Por isso a regra exige prova de que a identidade armazenada foi construída **sem número oficial**; identidade numerada ou sem prova nunca é reaproveitada, nem quando o número some do título atual:
+  - no checkpoint, cada identidade passa a registrar `familySource: 'TITLE' | 'NUMBER'`; registros antigos, sem o campo, não qualificam;
+  - `readSpedSourceState` carrega `persistedTitleFamilyKeys`: a `identity_basis.sourceKey` da publicação vinculada a cada origem persistida **somente** quando o `metadata` da própria origem tem `identityVersion` atual, `documentFamily` e **nenhum** `documentNumber`. É a referência quando o checkpoint não tem a identidade; é transitório e nunca é gravado de volta no checkpoint.
+- O título novo vira nova versão da mesma publicação (conteúdo muda), sem duplicar publicação nem violar `publication_origins`.
+
+**Validação esperada em produção.** Na primeira run SPED após o deploy, o item DeRE é processado como `NEW_VERSION`/`PROCESSED_EXISTING` e a run termina `SUCCESS`; o alerta `PERSISTENT_PARTIAL` deixa de aparecer após seis runs sem parcial.

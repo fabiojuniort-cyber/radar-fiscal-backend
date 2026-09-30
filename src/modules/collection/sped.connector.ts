@@ -148,6 +148,12 @@ export interface SpedIdentityRecord {
   /** Canonical content emitted for this origin (omitted when very large). */
   content?: string;
   fileSha256s: string[];
+  /**
+   * Where the variable token of `baseKey` came from: the title-derived family
+   * or an official document number. Only TITLE identities may be kept across
+   * a reworded title. Absent in records written before this field existed.
+   */
+  familySource?: 'TITLE' | 'NUMBER';
 }
 
 /**
@@ -182,6 +188,15 @@ export interface SpedSourceState {
   items: Record<string, SpedStoredFile>;
   pages: Record<string, SpedKnownPage>;
   identities?: Record<string, SpedIdentityRecord>;
+  /**
+   * Identity key each persisted origin (external id) is linked to, read from
+   * publications.identity_basis, restricted to origins whose persisted
+   * metadata proves a title-derived (never numbered) identity. Transient:
+   * loaded with the checkpoint, never written back. Lets an origin whose
+   * checkpoint identity was dropped (e.g. it failed in the last run) keep the
+   * identity it already owns.
+   */
+  persistedTitleFamilyKeys?: Record<string, string>;
   /**
    * Present only while a discovery cycle is interrupted by the time budget:
    * the next run resumes from this frontier instead of restarting from the
@@ -923,6 +938,47 @@ export function spedBaseIdentityKey(descriptor: SpedDocumentDescriptor): string 
   ].join('|');
 }
 
+/**
+ * True when `storedBaseKey` was built for the same document as `candidate`
+ * and only the title-derived family token differs. Documents identified by an
+ * official number never qualify: their family does not come from the title.
+ * The key string alone cannot tell whether the stored token was a family or a
+ * number, so the stored identity must carry that proof: `familySource` is
+ * 'TITLE' only for identities built without an official document number
+ * (checkpoint records, or persisted origins whose metadata proves it). A
+ * numbered or unproven stored identity never qualifies.
+ */
+export function sameIdentityExceptTitleFamily(
+  stored: { baseKey: string; familySource?: 'TITLE' | 'NUMBER' },
+  candidate: { descriptor: SpedDocumentDescriptor; baseKey: string },
+): boolean {
+  if (stored.familySource !== 'TITLE') return false;
+  const storedBaseKey = stored.baseKey;
+  const descriptor = candidate.descriptor;
+  if (descriptor.documentNumber !== undefined) return false;
+  const weak = descriptor.officialVersion === undefined;
+  const prefix = [
+    'SPED',
+    SPED_IDENTITY_VERSION,
+    descriptor.module,
+    descriptor.carrier,
+    descriptor.kind,
+  ].join('|') + '|';
+  const suffix = '|' + [
+    descriptor.officialVersion ?? '',
+    descriptor.revisionKind,
+    ...(weak ? ['PATH:' + descriptor.canonicalPath] : []),
+  ].join('|');
+  if (
+    storedBaseKey === candidate.baseKey ||
+    !storedBaseKey.startsWith(prefix) ||
+    !storedBaseKey.endsWith(suffix) ||
+    storedBaseKey.length <= prefix.length + suffix.length
+  ) return false;
+  // Exactly one differing token (the family); never a key with extra segments.
+  return !storedBaseKey.slice(prefix.length, storedBaseKey.length - suffix.length).includes('|');
+}
+
 function collisionKey(baseKey: string, descriptor: SpedDocumentDescriptor): string {
   return baseKey.includes('|PATH:') ? baseKey : baseKey + '|PATH:' + descriptor.canonicalPath;
 }
@@ -956,6 +1012,7 @@ interface IdentityResolution {
 function resolveIdentities(
   candidates: IdentityCandidate[],
   previous: Record<string, SpedIdentityRecord>,
+  persistedTitleFamily: Record<string, string> = {},
 ): IdentityResolution {
   const keys = new Map<string, string>();
   const identities: Record<string, SpedIdentityRecord> = { ...previous };
@@ -987,11 +1044,32 @@ function resolveIdentities(
     left.descriptor.officialUrl.localeCompare(right.descriptor.officialUrl),
   );
 
-  // 1. Origins that already own an identity derived from the same base keep it.
+  // 1. Origins that already own an identity keep it when the base key is the
+  // same, or differs only in the title-derived family (the portal reworded
+  // the title of the same file, e.g. "(v.1.2.0)" -> "(v.1.2.0 PRODUÇÃO)").
+  // Module, carrier, kind, version, revision and fallback path must match,
+  // so a new edition still gets a new identity; the reworded title becomes
+  // a new version of the same publication. The title rule only applies to a
+  // stored identity proven title-derived: a numbered identity is never
+  // reused by an unnumbered candidate.
+  // When the checkpoint holds no such identity (it is dropped for items that
+  // failed in the last run), the identity already persisted for that origin
+  // is the reference, when its persisted metadata proves it title-derived:
+  // persistence accepts no other key for that origin.
   for (const candidate of ordered) {
-    const stored = previous[candidate.descriptor.externalId];
+    const externalId = candidate.descriptor.externalId;
+    const stored = previous[externalId];
+    const persistedKey = persistedTitleFamily[externalId];
     if (stored && stored.baseKey === candidate.baseKey) {
-      keys.set(candidate.descriptor.externalId, stored.key);
+      keys.set(externalId, stored.key);
+    } else if (stored && sameIdentityExceptTitleFamily(stored, candidate)) {
+      keys.set(externalId, stored.key);
+    } else if (
+      persistedKey &&
+      // Proven title-derived by readPersistedTitleFamilyKeys.
+      sameIdentityExceptTitleFamily({ baseKey: persistedKey, familySource: 'TITLE' }, candidate)
+    ) {
+      keys.set(externalId, persistedKey);
     }
   }
 
@@ -1089,6 +1167,7 @@ function resolveIdentities(
         ? { content: candidate.descriptor.description }
         : {}),
       fileSha256s: candidate.fileSha256s,
+      familySource: candidate.descriptor.documentNumber === undefined ? 'TITLE' : 'NUMBER',
     };
   }
 
@@ -1501,7 +1580,11 @@ export class SpedConnector implements CollectionConnector {
         });
       }
 
-      const identity = resolveIdentities(candidates, state.identities ?? {});
+      const identity = resolveIdentities(
+        candidates,
+        state.identities ?? {},
+        state.persistedTitleFamilyKeys ?? {},
+      );
       const publications: ConnectorPublication[] = candidates.map((candidate) =>
         publicationFor(
           candidate.descriptor,

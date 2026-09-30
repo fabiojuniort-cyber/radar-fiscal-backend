@@ -2,6 +2,8 @@ import 'dotenv/config';
 
 import { Pool } from 'pg';
 
+import { d056ScheduleFor } from '../../modules/collection/schedule-policy.js';
+
 const databaseUrl =
   process.env.DATABASE_ADMIN_URL ??
   process.env.DATABASE_URL;
@@ -28,7 +30,7 @@ if (!process.env.INLABS_EMAIL || !process.env.INLABS_PASSWORD) {
 }
 
 const scheduleCron =
-  process.env.DOU_SCHEDULE_CRON?.trim() || '0 8,12,16,20 * * *';
+  process.env.DOU_SCHEDULE_CRON?.trim() || d056ScheduleFor('dou');
 
 const pool = new Pool({
   connectionString: databaseUrl,

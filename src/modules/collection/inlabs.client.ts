@@ -28,6 +28,14 @@ export type InlabsDownload = {
   status: 'NOT_AVAILABLE';
   officialUrl: string;
   filename: string;
+  /**
+   * How absence was established: HTTP 404, or an HTML page answered with 200
+   * for a file the authenticated daily index does not list (INLABS does this
+   * for dates without editions, e.g. Sundays).
+   */
+  evidence?: 'HTTP_404' | 'NOT_IN_DAILY_INDEX';
+  /** Shape-only description of the HTML answer (NOT_IN_DAILY_INDEX only). */
+  metadata?: Record<string, unknown>;
 };
 
 function fail(code: string, kind: ConstructorParameters<typeof ConnectorError>[1]['kind'],
@@ -56,13 +64,39 @@ function describeInvalidBody(bytes: Uint8Array, response: Response, filename: st
       : head.startsWith('{') || head.startsWith('[')
         ? 'JSON'
         : 'OTHER';
+  const title = bodyKind === 'HTML' ? pageTitle(bytes) : undefined;
   return {
     filename,
     contentType: response.headers.get('content-type')?.slice(0, 100) ?? null,
     byteLength: bytes.byteLength,
     magicHex: Buffer.from(bytes.subarray(0, 4)).toString('hex'),
     bodyKind,
+    ...(title ? { pageTitle: title } : {}),
   };
+}
+
+/**
+ * The <title> of an HTML answer, to tell which page INLABS served. Markup and
+ * entities are dropped, e-mail addresses redacted and the length bounded: a
+ * page title is generic text, never the page body or user data.
+ */
+export function pageTitle(bytes: Uint8Array): string | undefined {
+  const head = new TextDecoder().decode(bytes.subarray(0, 64 * 1024));
+  const match = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  if (!match) return undefined;
+  const text = match[1]!
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&[#a-z0-9]+;/gi, ' ')
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[email]')
+    .replace(/[^\p{L}\p{N}\s.,:;()\[\]\/|-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text ? text.slice(0, 120) : undefined;
+}
+
+/** True when the daily index links to `filename` (as `dl=<filename>` or the bare name). */
+export function dailyIndexListsFile(indexHtml: string, filename: string): boolean {
+  return indexHtml.includes(filename) || indexHtml.includes(encodeURIComponent(filename));
 }
 
 function validateDate(date: string): void {
@@ -105,6 +139,8 @@ export class InlabsClient {
   readonly #credentials: InlabsClientOptions['credentials'];
   readonly #maxBytes: number;
   #cookie: string | undefined;
+  // Daily index pages read in this attempt (the client lives for one attempt).
+  readonly #indexes = new Map<string, string>();
 
   constructor(options: InlabsClientOptions) {
     this.#fetch = options.fetch ?? fetch;
@@ -115,7 +151,7 @@ export class InlabsClient {
     }
   }
 
-  close(): void { this.#cookie = undefined; }
+  close(): void { this.#cookie = undefined; this.#indexes.clear(); }
 
   #sessionCookie(response: Response): string | undefined {
     return response.headers.getSetCookie()
@@ -324,6 +360,14 @@ export class InlabsClient {
     return html;
   }
 
+  async #dailyIndex(date: string, signal: AbortSignal): Promise<string> {
+    const cached = this.#indexes.get(date);
+    if (cached !== undefined) return cached;
+    const html = await this.readDailyIndex(date, signal);
+    this.#indexes.set(date, html);
+    return html;
+  }
+
   async downloadXml(date: string, section: InlabsXmlSection, signal: AbortSignal): Promise<InlabsDownload> {
     validateDate(date);
     if (!/^DO[123]E?$/.test(section)) throw fail('INLABS_INVALID_SECTION', 'PROCESSING_ERROR');
@@ -347,8 +391,8 @@ export class InlabsClient {
       await this.#discard(response);
       // Validate the session independently; login redirects disguised as 404 must not
       // make a failed consultation look like an unpublished edition.
-      await this.readDailyIndex(date, signal);
-      return { status: 'NOT_AVAILABLE', officialUrl, filename };
+      this.#indexes.set(date, await this.readDailyIndex(date, signal));
+      return { status: 'NOT_AVAILABLE', officialUrl, filename, evidence: 'HTTP_404' };
     }
     await this.#checkStatus(response);
     const bytes = await this.#read(response, this.#maxBytes, signal);
@@ -364,6 +408,26 @@ export class InlabsClient {
     }
     if (/requested URL was rejected|access denied|request rejected/i.test(prefix)) {
       throw fail('INLABS_ACCESS_DENIED', 'SOURCE_UNAVAILABLE');
+    }
+    if (!valid && response.status === 200 && describeInvalidBody(bytes, response, filename).bodyKind === 'HTML') {
+      // INLABS answers 200 with an HTML page (not 404) for files of dates
+      // without editions. The authenticated daily index decides: a file it
+      // does not list is absent; a listed file that downloads as HTML is a
+      // real download failure. Absence carries no receipt, so the next run
+      // asks again; nothing is marked as collected.
+      const index = await this.#dailyIndex(date, signal);
+      if (!dailyIndexListsFile(index, filename)) {
+        return {
+          status: 'NOT_AVAILABLE',
+          officialUrl,
+          filename,
+          evidence: 'NOT_IN_DAILY_INDEX',
+          metadata: {
+            ...describeInvalidBody(bytes, response, filename),
+            indexListsArchives: /\.zip\b/i.test(index),
+          },
+        };
+      }
     }
     if (!valid) {
       throw fail(

@@ -122,6 +122,19 @@ test('A: bootstrap then replay through the collection engine is incremental and 
     // 13 document pages + 1 gov.br folder, which stays a CONTAINER.
     assert.equal(Object.values(state.pages).filter((page) => page.kind === 'DOCUMENT').length, 13);
     assert.equal(Object.values(state.pages).filter((page) => page.kind === 'CONTAINER' && page.canonicalUrl.endsWith('/versao-atual/esquemas-xsd')).length > 0, true);
+    // Persisted origins expose their identity only when their metadata proves
+    // it title-derived; numbered identities are never offered to the title rule.
+    const persistedKeys = state.persistedTitleFamilyKeys ?? {};
+    const identities = Object.entries(state.identities ?? {});
+    assert.ok(identities.some(([, identity]) => identity.familySource === 'NUMBER'), 'fixture has numbered documents');
+    assert.ok(identities.some(([, identity]) => identity.familySource === 'TITLE'), 'fixture has title-derived documents');
+    for (const [externalId, identity] of identities) {
+      if (identity.familySource === 'TITLE') {
+        assert.equal(persistedKeys[externalId], identity.key, externalId);
+      } else {
+        assert.equal(persistedKeys[externalId], undefined, `numbered ${externalId} must not be offered`);
+      }
+    }
 
     portal.reset();
     const replay = await h.run();
