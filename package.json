@@ -69,7 +69,10 @@
     "launch01:production-smoke": "tsx src/infrastructure/database/run-launch01-production-smoke.ts",
     "test:taxonomy-classification": "tsx --test test/taxonomy.classification.unit.test.ts test/taxonomy.classification.integration.test.ts",
     "test:taxonomy-candidates": "tsx --test test/taxonomy.candidates.unit.test.ts test/taxonomy.candidates.integration.test.ts",
-    "test:taxonomy-matching": "tsx --test test/taxonomy.matching.unit.test.ts test/taxonomy.matching.integration.test.ts"
+    "test:taxonomy-matching": "tsx --test test/taxonomy.matching.unit.test.ts test/taxonomy.matching.integration.test.ts",
+    "tax:act:migrate": "node dist/infrastructure/database/migrate.js",
+    "tax:act:publish": "node dist/infrastructure/database/taxonomy-release-publish.js",
+    "tax:act:verify": "npm run db:verify-runtime && npm run db:verify-worker-runtime && npm run db:verify-taxonomy-curator"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
