@@ -248,6 +248,33 @@ function databaseConstraint(error: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function handleCnpjRegistryError(
+  error: unknown,
+  reply: FastifyReply,
+): FastifyReply | null {
+  if (!(error instanceof CnpjRegistryError)) {
+    return null;
+  }
+
+  if (error.code === 'cnpj_not_found') {
+    return reply.status(404).send({
+      error: error.code,
+    });
+  }
+
+  if (
+    error.code === 'cnpj_provider_invalid_response'
+  ) {
+    return reply.status(502).send({
+      error: error.code,
+    });
+  }
+
+  return reply.status(503).send({
+    error: error.code,
+  });
+}
+
 export async function productRoutes(
   app: FastifyInstance,
 ): Promise<void> {
@@ -297,6 +324,7 @@ export async function productRoutes(
                 'is_active',
               ])
               .where('tenant_id', '=', tenantId)
+              .where('is_active', '=', true)
               .orderBy('legal_name')
               .execute();
 
@@ -427,6 +455,123 @@ export async function productRoutes(
 
         if (databaseConstraint(error) === 'uq_company_cnpj_per_tenant') {
           return reply.status(409).send({ error: 'company_cnpj_exists' });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  typed.post(
+    '/api/v1/companies/from-cnpj',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        body: companyFromCnpjBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const registry = await lookupCnpjRegistry(
+          request.body.cnpj,
+        );
+
+        const created = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            return createCompanyFromRegistry(
+              trx,
+              tenantId,
+              registry,
+            );
+          },
+        );
+
+        if (!created) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        return reply.status(201).send({
+          company: {
+            id: created.companyId,
+            legalName: registry.legalName,
+            tradeName: registry.tradeName,
+            cnpj: registry.cnpj,
+          },
+          establishment: {
+            id: created.establishmentId,
+            cnpj: registry.cnpj,
+            name:
+              registry.tradeName ??
+              registry.legalName,
+            typeCode: 'HEAD_OFFICE',
+            isHeadOffice: true,
+            uf: registry.uf,
+            municipalityName:
+              registry.municipalityName,
+            municipalityIbgeCode:
+              registry.municipalityIbgeCode,
+            postalCode:
+              registry.postalCode,
+            street: registry.street,
+            streetNumber:
+              registry.streetNumber,
+            complement:
+              registry.complement,
+            district: registry.district,
+            cnaes: registry.cnaes,
+          },
+          registry: {
+            source: registry.source,
+            consultedAt:
+              registry.consultedAt,
+            registrationStatus:
+              registry.registrationStatus,
+            openedOn:
+              registry.openedOn,
+          },
+        });
+      } catch (error) {
+        const handledTenant =
+          handleTenantError(error, reply);
+        if (handledTenant) return handledTenant;
+
+        const handledRegistry =
+          handleCnpjRegistryError(
+            error,
+            reply,
+          );
+        if (handledRegistry) return handledRegistry;
+
+        if (
+          databaseConstraint(error) ===
+          'uq_company_cnpj_per_tenant'
+        ) {
+          return reply.status(409).send({
+            error: 'company_cnpj_exists',
+          });
         }
 
         throw error;
