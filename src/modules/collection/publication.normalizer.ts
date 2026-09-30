@@ -104,6 +104,25 @@ function normalizeOptionalText(
   return normalized || undefined;
 }
 
+function normalizeDocumentText(
+  value: string | undefined,
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+$/g, ''))
+    .join('\n')
+    .replace(/\n{4,}/g, '\n\n\n')
+    .trim();
+
+  return normalized || undefined;
+}
+
 function normalizeIdentityToken(
   value: string | undefined,
 ): string | undefined {
@@ -328,7 +347,10 @@ export function normalizePublication(
   const identityKey = normalizeOptionalText(
     input.publication.identityKey,
   );
-  const contentText = normalizeOptionalText(
+  const contentText = normalizeDocumentText(
+    input.publication.content,
+  );
+  const canonicalContentText = normalizeOptionalText(
     input.publication.content,
   );
   const files = normalizeFiles(
@@ -418,14 +440,14 @@ export function normalizePublication(
         ? {
             version: 1,
             title,
-            contentText: contentText ?? null,
+            contentText: canonicalContentText ?? null,
             effectiveOn: effectiveOn ?? null,
             rawFileHashes: rawVersionFileHashes,
           }
         : {
             version: 2,
             title,
-            contentText: contentText ?? null,
+            contentText: canonicalContentText ?? null,
             effectiveOn: effectiveOn ?? null,
             materialFileHashes:
               rawVersionFileHashes,
@@ -436,6 +458,15 @@ export function normalizePublication(
   const baseMetadata = {
     ...(input.publication.metadata ?? {}),
   };
+  const presentationMetadata =
+    baseMetadata.presentation ??
+    (contentText
+      ? {
+          version: 1,
+          format: 'PRESERVED_TEXT',
+          preservesWhitespace: true,
+        }
+      : undefined);
   const baseOriginMetadata = {
     ...baseMetadata,
     ...(input.publication.originMetadata ?? {}),
@@ -444,12 +475,18 @@ export function normalizePublication(
     contentHashVersion === 1
       ? {
           ...baseMetadata,
+          ...(presentationMetadata
+            ? { presentation: presentationMetadata }
+            : {}),
           ...(files.length > 0
             ? { files }
             : {}),
         }
       : {
           ...baseMetadata,
+          ...(presentationMetadata
+            ? { presentation: presentationMetadata }
+            : {}),
           contentHashVersion: 2,
           contentHashPolicy,
           ...(versionFiles.length > 0
