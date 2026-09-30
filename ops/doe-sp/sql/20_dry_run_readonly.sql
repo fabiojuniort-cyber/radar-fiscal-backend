@@ -38,6 +38,7 @@ SELECT
   (SELECT count(*) FROM collection_items ci JOIN doe_pub d ON d.id = ci.publication_id JOIN collection_runs cr ON cr.id = ci.collection_run_id JOIN src ON cr.source_id <> src.id) AS blocker_foreign_items,
   (SELECT count(*) FROM collection_runs cr JOIN src ON src.id = cr.source_id WHERE cr.status IN ('PENDING', 'RUNNING')) AS blocker_active_runs,
   (SELECT count(*) FROM src WHERE is_active) AS blocker_source_active,
+  (SELECT count(*) FROM publication_taxonomy_runs ptr JOIN ver ON ver.id = ptr.publication_version_id) AS blocker_classification_runs,
   (SELECT count(*) FROM pg_constraint WHERE contype = 'f'
      AND confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
      AND conname NOT IN (
@@ -48,6 +49,7 @@ SELECT
        'collection_run_publications_publication_version_id_fkey',
        'fk_collection_item_publication',
        'company_publications_publication_id_fkey',
+       'publication_taxonomy_runs_publication_version_id_fkey',
        'norma_clara_translations_publication_version_id_fkey')) AS blocker_unknown_foreign_keys,
   -- global totals before (30 asserts totals after = before - deleted)
   (SELECT count(*) FROM publications) AS global_publications,
@@ -77,6 +79,7 @@ SELECT 'DOE_SP_DRY_RUN=' || jsonb_build_object(
     'foreign_items', :blocker_foreign_items,
     'active_runs', :blocker_active_runs,
     'source_active', :blocker_source_active,
+    'classification_runs', :blocker_classification_runs,
     'unknown_foreign_keys', :blocker_unknown_foreign_keys,
     -- 30 aborts: deleting old AI translations has no preservation design yet.
     'scope_translations', :expected_translations_deleted),

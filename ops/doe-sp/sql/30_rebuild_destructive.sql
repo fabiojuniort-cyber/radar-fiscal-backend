@@ -36,6 +36,7 @@
 -- Detected outside the transaction: every table lock below must be taken
 -- before the first query of the SERIALIZABLE transaction (see below).
 SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
+SELECT to_regclass('public.publication_taxonomy_runs') IS NOT NULL AS has_taxonomy_classification \gset
 
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '300s';
@@ -52,6 +53,9 @@ LOCK TABLE publications, publication_origins, publication_versions, publication_
   collection_run_publications, collection_checkpoints IN SHARE ROW EXCLUSIVE MODE;
 \if :has_translations
 LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
+\endif
+\if :has_taxonomy_classification
+LOCK TABLE publication_taxonomy_runs IN SHARE ROW EXCLUSIVE MODE;
 \endif
 
 -- Serialize with pause/resume and manual triggers (trigger-doe-sp-run takes
@@ -108,6 +112,12 @@ BEGIN
   JOIN collection_runs cr ON cr.id = ci.collection_run_id JOIN sources s ON s.id = cr.source_id WHERE s.code <> 'doe-sp';
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % collection_items of other sources reference the scope', v_n; END IF;
 
+  IF to_regclass('public.publication_taxonomy_runs') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM publication_taxonomy_runs ptr JOIN publication_versions pv ON pv.id = ptr.publication_version_id
+             JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % classification runs reference scope versions (preserve classification history; do not delete)', v_n; END IF;
+  END IF;
+
   IF to_regclass('public.norma_clara_translations') IS NOT NULL THEN
     EXECUTE 'SELECT count(*) FROM norma_clara_translations t JOIN publication_versions pv ON pv.id = t.publication_version_id
              JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
@@ -120,7 +130,8 @@ BEGIN
       'publication_origins_publication_id_fkey', 'publication_versions_publication_id_fkey',
       'publication_files_publication_version_id_fkey', 'collection_run_publications_publication_id_fkey',
       'collection_run_publications_publication_version_id_fkey', 'fk_collection_item_publication',
-      'company_publications_publication_id_fkey', 'norma_clara_translations_publication_version_id_fkey');
+      'company_publications_publication_id_fkey', 'publication_taxonomy_runs_publication_version_id_fkey',
+      'norma_clara_translations_publication_version_id_fkey');
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % unknown foreign keys reference publications/versions (schema drift)', v_n; END IF;
 END
 $$;
