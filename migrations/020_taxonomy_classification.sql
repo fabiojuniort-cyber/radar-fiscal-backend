@@ -276,6 +276,13 @@ BEGIN
         FROM publication_taxonomy_assertions successor
         WHERE successor.supersedes_assertion_id = NEW.supersedes_assertion_id
           AND successor.assertion_status IN ('PROPOSED', 'CONFIRMED')
+          AND (
+              SELECT review.decision
+              FROM publication_taxonomy_reviews review
+              WHERE review.assertion_id = successor.id
+              ORDER BY review.created_at DESC, review.id DESC
+              LIMIT 1
+          ) IS DISTINCT FROM 'REJECT'
     ) THEN
         RAISE EXCEPTION
             'assertion already has an active successor';
