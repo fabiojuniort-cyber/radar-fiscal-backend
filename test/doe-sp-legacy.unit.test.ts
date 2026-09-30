@@ -38,6 +38,7 @@ import {
   reopenFailedLegacyPages,
 } from '../src/modules/collection/doe-sp-legacy-source-state.repository.js';
 import { extractDoeSpLegacyPdfText } from '../src/modules/collection/doe-sp-legacy.text.js';
+import { runDoeSpLegacyPilot } from '../src/modules/collection/doe-sp-legacy.pilot.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { legacyPortal, scanPdf, textPdf, type LegacyPage, type LegacyPortalOptions } from './doe-sp-legacy.portal.js';
 
@@ -252,7 +253,7 @@ test('periods: one date before the index start, one month after; the range ends 
 });
 
 test('limits: politeness defaults and validation', () => {
-  assert.deepEqual(resolveDoeSpLegacySourceLimits({}), { minRequestIntervalMs: 1000, maxDownloadBytesPerRun: 200 * 1024 * 1024 });
+  assert.deepEqual(resolveDoeSpLegacySourceLimits({}), { minRequestIntervalMs: 1000, maxDownloadBytesPerRun: 200 * 1024 * 1024, maxPeriodsPerRun: 0 });
   assert.throws(() => resolveDoeSpLegacySourceLimits({ DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS: '-1' }), RangeError);
 });
 
@@ -563,4 +564,62 @@ test('state: a listing in progress round-trips; an invalid one is dropped', () =
   assert.equal(browse?.browseCaderno, null);
   assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing: { ...listing, from: 'x' } }).listing, null);
   assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing: { ...listing, screen: 0 } }).listing, null);
+});
+
+// ---------------------------------------------------------------- pilot
+
+test('limits: DOE_SP_LEGACY_MAX_PERIODS_PER_RUN bounds a pilot run (default unlimited)', () => {
+  assert.equal(resolveDoeSpLegacySourceLimits({}).maxPeriodsPerRun, 0);
+  assert.equal(resolveDoeSpLegacySourceLimits({ DOE_SP_LEGACY_MAX_PERIODS_PER_RUN: '3' }).maxPeriodsPerRun, 3);
+  assert.throws(() => resolveDoeSpLegacySourceLimits({ DOE_SP_LEGACY_MAX_PERIODS_PER_RUN: '-1' }), RangeError);
+});
+
+test('pilot: classifies every page of a browse day and reports kept pages the keyword search misses', async () => {
+  const old = '1995-09-06';
+  const oldPages = [
+    page(old, 1, ['DECRETO N. 40.000', 'Regulamento do ICMS']),
+    page(old, 2, ['Nomeações de servidores']),
+    page(old, 3, 'scan'),
+  ];
+  const recent = '2010-03-03';
+  const kept = page(recent, 1, ['Portaria CAT 10 — ICMS']);
+  const keptOnlyByNfce = page(recent, 2, ['Emissão de NFC-e pelos contribuintes']);
+  const other = page(recent, 3, ['Concurso público: taxa de inscrição']);
+  const news = page(recent, 4, ['Notícia do ICMS'], { link: '/2010/executivo secao i/marco/03/pagnot_0004_N.pdf' });
+  const api = legacyPortal({
+    cadernos: { [old]: EX1, [recent]: EX1 },
+    editions: { [`${old}|Executivo I`]: oldPages, [`${recent}|Executivo I`]: [kept, keptOnlyByNfce, other, news] },
+    // The index answers ICMS but (in this fixture) not NFC-e: the pilot must flag the miss.
+    search: { 'ICMS|Executivo I': [kept, page('2010-03-04', 9, ['ICMS'])] },
+  });
+  const seen: string[] = [];
+  const report = await runDoeSpLegacyPilot({
+    browseDates: [old],
+    compareDates: [recent],
+    fetch: api.fetch,
+    client: { timeoutMs: 5_000 },
+    onPage: (p) => seen.push(p.outcome),
+  });
+
+  const [browse, compare] = report.days;
+  assert.deepEqual(browse!.counts, { KEPT: 1, NO_TAX_TERMS: 1, NEEDS_OCR: 1, NEWS: 0, ERROR: 0 });
+  assert.equal(browse!.pages[0]!.viewerUrl, doeSpLegacyViewerUrl({ ...oldPages[0]!, paginaOrdenacao: '100001' }));
+  assert.deepEqual(browse!.pages[0]!.matchedTaxTerms, ['ICMS']);
+  assert.equal(compare!.counts.KEPT, 2);
+  assert.equal(compare!.counts.NEWS, 1);
+  assert.deepEqual(compare!.search, {
+    queries: DOE_SP_LEGACY_SEARCH_TERMS.length,
+    hits: 1, // the off-day hit is ignored
+    keptFoundBySearch: 1,
+    missedBySearch: [keptOnlyByNfce.link],
+  });
+  assert.equal(report.totals.missedBySearch, 1);
+  assert.equal(seen.length, 7);
+  // Nothing is downloaded for news pages; no page text in the report.
+  assert.ok(!api.requests.some((r) => r.includes('GatewayPDF') && r.includes('pagnot_')));
+  assert.ok(!JSON.stringify(report).includes('contribuintes'));
+});
+
+test('pilot: compare dates must be in the keyword-index era', async () => {
+  await assert.rejects(() => runDoeSpLegacyPilot({ browseDates: [], compareDates: ['2001-05-05'] }), RangeError);
 });

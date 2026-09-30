@@ -174,16 +174,20 @@ function envInteger(name: string, fallback: number, min: number, max: number, en
 
 /**
  * Worker-side politeness towards the archive:
- * DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS (default 1000) and
- * DOE_SP_LEGACY_MAX_DOWNLOAD_BYTES_PER_RUN (default 200 MiB; 0 = unlimited).
+ * DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS (default 1000),
+ * DOE_SP_LEGACY_MAX_DOWNLOAD_BYTES_PER_RUN (default 200 MiB; 0 = unlimited) and
+ * DOE_SP_LEGACY_MAX_PERIODS_PER_RUN (default 0 = unlimited; bounds a pilot run).
  */
 export function resolveDoeSpLegacySourceLimits(env: NodeJS.ProcessEnv = process.env): {
   minRequestIntervalMs: number;
   maxDownloadBytesPerRun: number;
+  maxPeriodsPerRun: number;
 } {
   return {
     minRequestIntervalMs: envInteger('DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS', DOE_SP_LEGACY_DEFAULT_MIN_REQUEST_INTERVAL_MS, 0, 10_000, env),
     maxDownloadBytesPerRun: envInteger('DOE_SP_LEGACY_MAX_DOWNLOAD_BYTES_PER_RUN', DOE_SP_LEGACY_DEFAULT_MAX_DOWNLOAD_BYTES_PER_RUN, 0, 10 * 1024 * 1024 * 1024, env),
+    // Pilot bound: periods (days before 2003, months after) listed per run; 0 = unlimited.
+    maxPeriodsPerRun: envInteger('DOE_SP_LEGACY_MAX_PERIODS_PER_RUN', 0, 0, 100_000, env),
   };
 }
 

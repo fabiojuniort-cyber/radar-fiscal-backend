@@ -148,3 +148,51 @@ Além disso vale o time budget do executor, com parada segura entre páginas e e
   - `counters` (requisições, bytes, telas, páginas lidas, mantidas, sem termos, escaneadas, nativas);
   - `sourceLimits`.
 - **Fim:** com `cursor = null`, sem `listing` e sem pendências, o run fica completo e sem publicações. Depois da validação do backfill, a fonte é desativada. O conector e a fonte podem ser removidos em PR posterior.
+
+## 8. Piloto (antes do backfill)
+
+O piloto tem duas etapas. Cada uma exige autorização própria do responsável e deixa evidência na Issue #20.
+
+### P1 — piloto seco (não grava nada no banco)
+
+`npm run doe-sp-legacy:pilot -- --browse=<datas> --compare=<datas>` (`src/modules/collection/doe-sp-legacy.pilot.ts`). Só lê o portal, a 1 req/s (`DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS`), e não precisa de `DATABASE_URL`.
+
+- **`--browse`**: lista a edição inteira do Executivo I do dia, lê cada página e classifica com as regras do conector:
+  - `KEPT`, com os termos encontrados;
+  - `NO_TAX_TERMS`;
+  - `NEEDS_OCR`;
+  - `NEWS` (`pagnot_*`, sem download);
+  - `ERROR`.
+
+  Cada página sai numa linha `DOE_SP_LEGACY_PILOT_PAGE`, com o **link público do visualizador**, para a auditoria humana das páginas mantidas × descartadas. O texto da página nunca é impresso.
+- **`--compare`** (só 2003 em diante): faz a classificação acima e, além disso, consulta o índice do portal no mesmo dia com todas as `DOE_SP_LEGACY_SEARCH_TERMS` (Executivo I). Toda página mantida pelo filtro local precisa estar entre os resultados da busca; as que não estiverem saem em `missedBySearch`. É a medição pendente da revisão DOE-SP-LEGACY-04: como o índice trata acentos e hífens.
+- **Critério para seguir:**
+  - `missedBySearch = 0` em todos os dias de comparação;
+  - `ERROR = 0`;
+  - amostra de `KEPT` e `NO_TAX_TERMS` conferida por uma pessoa (sem falso positivo grosseiro nem página fiscal descartada).
+
+  Se `missedBySearch > 0`, os termos que faltam entram no vocabulário (o que aumenta `DOE_SP_LEGACY_VOCABULARY_VERSION`) antes do backfill.
+- **Amostra sugerida:**
+  - BROWSE: `1988-03-02`, `1995-09-06`, `1998-03-03`, `2002-03-05`, cobrindo as camadas OCR de 1988 e 1995 e o texto nativo;
+  - COMPARE: `2005-03-02`, `2012-06-13`, `2021-08-11`.
+  - Custo estimado: ~25–35 min a 1 req/s e algumas centenas de MB trafegados, nada armazenado.
+- **Onde roda:** num serviço temporário da Railway, a partir do commit revisado, com start command `npm run doe-sp-legacy:pilot -- …` e `restartPolicy=NEVER`. Não precisa de variáveis de banco. O serviço é removido ao final.
+
+### P2 — piloto pelo Motor (grava no banco)
+
+1. `npm run db:ensure-doe-sp-legacy-source`: cria a fonte **inativa** (idempotente).
+2. No worker: `DOE_SP_LEGACY_MAX_PERIODS_PER_RUN=5`, para que um run liste no máximo 5 períodos (5 dias antes de 2003). `DOE_SP_LEGACY_START_DATE` fica no padrão `1988-01-01`, e o piloto cobre os primeiros dias do acervo, o caso mais difícil (OCR de 1988).
+3. `npm run db:ensure-doe-sp-legacy-source -- --activate` (sem `--hourly`), depois `npm run db:trigger-doe-sp-legacy-run`: **um** run manual.
+4. `npm run db:ensure-doe-sp-legacy-source -- --deactivate`: a fonte volta a ficar inativa ao fim do run.
+5. Auditoria somente leitura: `ops/doe-sp-legacy/pilot_audit_readonly.sql`, com `PGOPTIONS='-c default_transaction_read_only=on'`. Mostra:
+   - fonte, runs (status, `completion`, contadores `doeSpLegacy`) e checkpoint (cursor, pendentes, OCR);
+   - páginas gravadas: por extração, tamanho do texto, `storedFiles = 0` (PDF não armazenado), link oficial presente;
+   - amostra pública (título, visualizador, termos) para conferência humana no site.
+6. **Critério:**
+   - run `SUCCESS`, `PARTIAL_SUCCESS` ou `TIME_BUDGET_REACHED` com cursor avançando;
+   - `storedFiles = 0`;
+   - toda página com `officialUrl`;
+   - amostra conferida;
+   - as páginas aparecem no site com o link preservado.
+
+As páginas do piloto são publicações reais e ficam. O backfill continua de onde o piloto parou. `DOE_SP_LEGACY_MAX_PERIODS_PER_RUN` volta a `0` (ou é removida) e a fonte passa a `--hourly` só com uma nova autorização.
