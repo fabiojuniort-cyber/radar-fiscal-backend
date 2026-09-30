@@ -5,6 +5,9 @@ import type {
   CnpjRegistryCnae,
   CnpjRegistryRecord,
 } from './cnpj-registry.service.js';
+import type {
+  StateRegistrationLookup,
+} from './state-registration.service.js';
 
 async function upsertCnaes(
   trx: Transaction<DB>,
@@ -122,6 +125,7 @@ export async function createCompanyFromRegistry(
   trx: Transaction<DB>,
   tenantId: string,
   record: CnpjRegistryRecord,
+  stateRegistration?: StateRegistrationLookup,
 ): Promise<{
   companyId: string;
   establishmentId: string;
@@ -162,6 +166,16 @@ export async function createCompanyFromRegistry(
         record.streetNumber,
       complement: record.complement,
       district: record.district,
+      state_registration:
+        stateRegistration?.registration ?? null,
+      state_registration_status:
+        stateRegistration?.registrationStatus ?? null,
+      state_registration_source:
+        stateRegistration?.source ?? null,
+      state_registration_checked_at:
+        stateRegistration?.checkedAt ?? null,
+      state_registration_lookup_status:
+        stateRegistration?.lookupStatus ?? null,
       is_active: true,
     })
     .returning('id')
@@ -190,6 +204,7 @@ export async function createEstablishmentFromRegistry(
   companyId: string,
   record: CnpjRegistryRecord,
   typeCode: string,
+  stateRegistration?: StateRegistrationLookup,
 ): Promise<string> {
   await upsertCnaes(trx, record.cnaes);
 
@@ -215,6 +230,16 @@ export async function createEstablishmentFromRegistry(
         record.streetNumber,
       complement: record.complement,
       district: record.district,
+      state_registration:
+        stateRegistration?.registration ?? null,
+      state_registration_status:
+        stateRegistration?.registrationStatus ?? null,
+      state_registration_source:
+        stateRegistration?.source ?? null,
+      state_registration_checked_at:
+        stateRegistration?.checkedAt ?? null,
+      state_registration_lookup_status:
+        stateRegistration?.lookupStatus ?? null,
       is_active: true,
     })
     .returning('id')
