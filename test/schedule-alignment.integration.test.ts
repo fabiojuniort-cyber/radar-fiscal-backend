@@ -32,6 +32,9 @@ test('schedule alignment is dry-run by default, idempotent on apply and reversib
   const schedules = async () => Object.fromEntries((await pool.query<{ code: string; schedule_cron: string | null }>(
     'SELECT code, schedule_cron FROM sources WHERE code = ANY($1::text[])', [codes],
   )).rows.map((row) => [row.code, row.schedule_cron]));
+  const timezones = async () => Object.fromEntries((await pool.query<{ code: string; schedule_timezone: string }>(
+    'SELECT code, schedule_timezone FROM sources WHERE code = ANY($1::text[])', [codes],
+  )).rows.map((row) => [row.code, row.schedule_timezone]));
 
   try {
     for (const entry of D056_SCHEDULES) {
@@ -48,6 +51,7 @@ test('schedule alignment is dry-run by default, idempotent on apply and reversib
       if (result.rows[0]?.inserted) inserted.push(entry.code);
     }
     const before = await schedules();
+    const timezonesBefore = await timezones();
 
     const dry = run();
     assert.equal(dry.mode, 'DRY_RUN');
@@ -67,6 +71,7 @@ test('schedule alignment is dry-run by default, idempotent on apply and reversib
     const restored = run('--restore-previous');
     assert.equal(restored.mode, 'RESTORE_PREVIOUS');
     assert.deepEqual(await schedules(), before, 'rollback restores the previous schedules');
+    assert.deepEqual(await timezones(), timezonesBefore, 'rollback restores the previous timezones');
   } finally {
     if (inserted.length) await pool.query('DELETE FROM sources WHERE code = ANY($1::text[])', [inserted]);
     for (const row of snapshot.rows) {

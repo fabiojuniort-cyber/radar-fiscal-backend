@@ -282,9 +282,9 @@ test('a reworded title keeps the persisted identity when the checkpoint dropped 
   // the publication persisted with the original key.
   const withoutIdentity = { ...checkpoint, identities: {} };
   xsd.title = '06-Arquivos XSD (v.1.2.0 PRODUÇÃO)';
-  const run = (persistedIdentityKeys: Record<string, string>) => new SpedConnector({
+  const run = (persistedTitleFamilyKeys: Record<string, string>) => new SpedConnector({
     fetch: fakePortal({ listings: [listing()], documents: [xsd] }).fetch,
-    readState: async () => ({ ...withoutIdentity, persistedIdentityKeys }) as never,
+    readState: async () => ({ ...withoutIdentity, persistedTitleFamilyKeys }) as never,
     revisitAfterMs: 0,
     maxRechecksPerRun: 100,
   }).collect(CONTEXT);
@@ -299,10 +299,11 @@ test('a reworded title keeps the persisted identity when the checkpoint dropped 
   const recovered = await run({ [original.externalId!]: original.identityKey! });
   const publication = recovered.publications.find((item) => item.externalId === original.externalId)!;
   assert.equal(publication.identityKey, original.identityKey, 'the persisted identity is kept');
-  const stored = (recovered.checkpoint!.state as { identities: Record<string, { key: string }> }).identities[original.externalId!];
+  const stored = (recovered.checkpoint!.state as { identities: Record<string, { key: string; familySource?: string }> }).identities[original.externalId!];
   assert.equal(stored?.key, original.identityKey, 'the checkpoint records the kept identity for next runs');
+  assert.equal(stored?.familySource, 'TITLE');
   assert.equal(
-    'persistedIdentityKeys' in (recovered.checkpoint!.state as object),
+    'persistedTitleFamilyKeys' in (recovered.checkpoint!.state as object),
     false,
     'persisted keys are transient, never written to the checkpoint',
   );
@@ -322,20 +323,72 @@ test('the title rule accepts exactly one differing token', () => {
     officialVersion: '1.2.0', revisionKind: 'ORIGINAL', canonicalPath: '/x',
   } as never;
   const candidate = { descriptor, baseKey: 'SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|NEW|1.2.0|ORIGINAL' };
-  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|1.2.0|ORIGINAL', candidate), true);
-  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|EXTRA|1.2.0|ORIGINAL', candidate), false);
-  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|1.2.0|ORIGINAL|PATH:/y', candidate), false);
-  assert.equal(sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|MANUAL|OLD|1.2.0|ORIGINAL', candidate), false);
-  assert.equal(sameIdentityExceptTitleFamily(candidate.baseKey, candidate), false);
+  const title = (baseKey: string) => ({ baseKey, familySource: 'TITLE' as const });
+  assert.equal(sameIdentityExceptTitleFamily(title('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|1.2.0|ORIGINAL'), candidate), true);
+  assert.equal(sameIdentityExceptTitleFamily(title('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|EXTRA|1.2.0|ORIGINAL'), candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily(title('SPED|v2|DERE|DOCUMENT|XSD_SCHEMA|OLD|1.2.0|ORIGINAL|PATH:/y'), candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily(title('SPED|v2|DERE|DOCUMENT|MANUAL|OLD|1.2.0|ORIGINAL'), candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily(title(candidate.baseKey), candidate), false);
 });
 
 test('numbered documents never reuse an identity through the title rule', () => {
-  const base = {
+  // Current candidate numbered.
+  const numbered = {
     module: 'DERE', carrier: 'DOCUMENT', kind: 'TECHNICAL_NOTE', documentNumber: '2026.001',
     officialVersion: undefined, revisionKind: 'ORIGINAL', canonicalPath: '/x',
   } as never;
   assert.equal(
-    sameIdentityExceptTitleFamily('SPED|v2|DERE|DOCUMENT|TECHNICAL_NOTE|OTHER||ORIGINAL|PATH:/x', { descriptor: base, baseKey: 'different' }),
+    sameIdentityExceptTitleFamily(
+      { baseKey: 'SPED|v2|DERE|DOCUMENT|TECHNICAL_NOTE|OTHER||ORIGINAL|PATH:/x', familySource: 'TITLE' },
+      { descriptor: numbered, baseKey: 'different' },
+    ),
     false,
   );
+
+  // Review B1: stored identity numbered (with official version), current
+  // candidate unnumbered. Prefix and suffix match and the stored middle is a
+  // single token, so only the proof of the stored token's origin rejects it.
+  const unnumbered = {
+    module: 'DERE', carrier: 'DOCUMENT', kind: 'TECHNICAL_NOTE', documentNumber: undefined,
+    officialVersion: '1.0', revisionKind: 'ORIGINAL', canonicalPath: '/x',
+  } as never;
+  const candidate = { descriptor: unnumbered, baseKey: 'SPED|v2|DERE|DOCUMENT|TECHNICAL_NOTE|TITULO REESCRITO|1.0|ORIGINAL' };
+  const storedNumbered = 'SPED|v2|DERE|DOCUMENT|TECHNICAL_NOTE|2026.001|1.0|ORIGINAL';
+  assert.equal(sameIdentityExceptTitleFamily({ baseKey: storedNumbered, familySource: 'NUMBER' }, candidate), false);
+  assert.equal(sameIdentityExceptTitleFamily({ baseKey: storedNumbered }, candidate), false, 'unproven (legacy record) never qualifies');
+});
+
+test('a numbered checkpoint identity is not reused when the number disappears from the title', async () => {
+  const folder = '/assuntos/documentos-fiscais/dere/manuais-e-documentos-tecnicos/versao-atual-1';
+  const xsd: FakeDocument = {
+    path: folder + '/06-arquivos-xsd-v-1-2-0.zip',
+    title: '06-Arquivos XSD (v.1.2.0)',
+    type: 'File',
+    created: '05/09/2026',
+    file: 'dere-xsd-120',
+  };
+  const listing = () => ({ path: folder, title: 'Versão atual', items: [xsd.path] });
+  const first = await new SpedConnector({ fetch: fakePortal({ listings: [listing()], documents: [xsd] }).fetch }).collect(CONTEXT);
+  const original = first.publications[0]!;
+  const state = first.checkpoint!.state as { identities: Record<string, Record<string, unknown>> };
+  const record = state.identities[original.externalId!]!;
+  // Same module/carrier/kind/version/revision; the stored token is a number.
+  const numberedKey = original.identityKey!.replace(/\|[^|]+\|1\.2\.0\|/, '|2026.001|1.2.0|');
+  assert.notEqual(numberedKey, original.identityKey);
+  const run = (override: Record<string, unknown>, persistedTitleFamilyKeys: Record<string, string> = {}) => new SpedConnector({
+    fetch: fakePortal({ listings: [listing()], documents: [xsd] }).fetch,
+    readState: async () => ({
+      ...state,
+      identities: { [original.externalId!]: { ...record, key: numberedKey, baseKey: numberedKey, ...override } },
+      persistedTitleFamilyKeys,
+    }) as never,
+    revisitAfterMs: 0,
+    maxRechecksPerRun: 100,
+  }).collect(CONTEXT);
+  const keyOf = (result: Awaited<ReturnType<typeof run>>) =>
+    result.publications.find((item) => item.externalId === original.externalId)?.identityKey;
+
+  assert.notEqual(keyOf(await run({ familySource: 'NUMBER' })), numberedKey, 'numbered identity is not reused');
+  assert.notEqual(keyOf(await run({ familySource: undefined })), numberedKey, 'unproven legacy record is not reused');
+  assert.equal(keyOf(await run({ familySource: 'TITLE' })), numberedKey, 'control: a proven title identity is kept');
 });

@@ -383,8 +383,10 @@ Governança: tribusca-control Issue #35.
 
 **Correção.**
 
-- `sameIdentityExceptTitleFamily`: a origem mantém a identidade que já possui quando a chave difere **apenas** no token de família derivado do título. Módulo, portador, tipo, versão oficial, revisão e caminho de fallback precisam coincidir; exatamente um token pode diferir. Documentos com número oficial nunca usam essa regra. Nova versão oficial (ex.: `1.3.0`) continua gerando nova identidade.
-- `readSpedSourceState` passa a carregar `persistedIdentityKeys`: para cada origem persistida da fonte, a `identity_basis.sourceKey` da publicação à qual ela está vinculada. É a referência quando o checkpoint não tem a identidade; é transitório e nunca é gravado de volta no checkpoint.
+- `sameIdentityExceptTitleFamily`: a origem mantém a identidade que já possui quando a chave difere **apenas** no token de família derivado do título. Módulo, portador, tipo, versão oficial, revisão e caminho de fallback precisam coincidir; exatamente um token pode diferir. Nova versão oficial (ex.: `1.3.0`) continua gerando nova identidade.
+- **Prova de origem do token (revisão R2, B1).** A string da chave não diz se o token variável era família do título ou número oficial. Por isso a regra exige prova de que a identidade armazenada foi construída **sem número oficial**; identidade numerada ou sem prova nunca é reaproveitada, nem quando o número some do título atual:
+  - no checkpoint, cada identidade passa a registrar `familySource: 'TITLE' | 'NUMBER'`; registros antigos, sem o campo, não qualificam;
+  - `readSpedSourceState` carrega `persistedTitleFamilyKeys`: a `identity_basis.sourceKey` da publicação vinculada a cada origem persistida **somente** quando o `metadata` da própria origem tem `identityVersion` atual, `documentFamily` e **nenhum** `documentNumber`. É a referência quando o checkpoint não tem a identidade; é transitório e nunca é gravado de volta no checkpoint.
 - O título novo vira nova versão da mesma publicação (conteúdo muda), sem duplicar publicação nem violar `publication_origins`.
 
 **Validação esperada em produção.** Na primeira run SPED após o deploy, o item DeRE é processado como `NEW_VERSION`/`PROCESSED_EXISTING` e a run termina `SUCCESS`; o alerta `PERSISTENT_PARTIAL` deixa de aparecer após seis runs sem parcial.
