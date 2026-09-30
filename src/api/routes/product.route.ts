@@ -41,6 +41,11 @@ const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
 });
 
+const companyUpdateBodySchema = z.object({
+  legalName: z.string().trim().min(2).max(200),
+  tradeName: z.string().trim().min(2).max(200).nullable().optional(),
+});
+
 const establishmentFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
@@ -54,6 +59,33 @@ const cnaeBodySchema = z.object({
     .refine((value) => /^\d{7}$/.test(value), 'invalid_cnae'),
   description: z.string().trim().min(1).max(300),
   isPrimary: z.boolean().default(false),
+});
+
+const establishmentUpdateBodySchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  typeCode: z.string().trim().min(1).max(50),
+  uf: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2}$/)
+    .transform((value) => value.toUpperCase()),
+  municipalityName: z.string().trim().max(160).nullable().optional(),
+  municipalityIbgeCode: z.string().trim().regex(/^\d{7}$/).nullable().optional(),
+  postalCode: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\D/g, ''))
+    .refine(
+      (value) => value.length === 0 || /^\d{8}$/.test(value),
+      'invalid_postal_code',
+    )
+    .nullable()
+    .optional(),
+  street: z.string().trim().max(200).nullable().optional(),
+  streetNumber: z.string().trim().max(30).nullable().optional(),
+  complement: z.string().trim().max(160).nullable().optional(),
+  district: z.string().trim().max(160).nullable().optional(),
+  cnaes: z.array(cnaeBodySchema).max(100).default([]),
 });
 
 const establishmentBodySchema = z.object({
