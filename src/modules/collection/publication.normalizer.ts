@@ -4,6 +4,7 @@ import type {
   ConnectorPublication,
   ConnectorSphere,
 } from './connector.contract.js';
+import { sanitizeLegalPresentationHtml } from './legal-presentation.js';
 
 export type PublicationIdentityStrength =
   | 'STRONG'
@@ -458,15 +459,26 @@ export function normalizePublication(
   const baseMetadata = {
     ...(input.publication.metadata ?? {}),
   };
+  const sanitizedPresentationHtml =
+    sanitizeLegalPresentationHtml(
+      input.publication.presentationHtml,
+    );
   const presentationMetadata =
-    baseMetadata.presentation ??
-    (contentText
+    sanitizedPresentationHtml
       ? {
           version: 1,
-          format: 'PRESERVED_TEXT',
+          format: 'SANITIZED_HTML',
+          html: sanitizedPresentationHtml,
           preservesWhitespace: true,
         }
-      : undefined);
+      : baseMetadata.presentation ??
+        (contentText
+          ? {
+              version: 1,
+              format: 'PRESERVED_TEXT',
+              preservesWhitespace: true,
+            }
+          : undefined);
   const baseOriginMetadata = {
     ...baseMetadata,
     ...(input.publication.originMetadata ?? {}),
