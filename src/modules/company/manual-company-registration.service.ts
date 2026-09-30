@@ -25,6 +25,9 @@ export type ManualCompanyRegistrationResult = {
   companyId: string;
   establishmentId: string;
   establishmentName: string;
+  businessLocationCode: string | null;
+  stateRegistration: string | null;
+  stateRegistrationSource: string | null;
 };
 
 export async function createManualCompanyRegistration(
@@ -34,7 +37,7 @@ export async function createManualCompanyRegistration(
 ): Promise<ManualCompanyRegistrationResult> {
   const existingCompany = await trx
     .selectFrom('companies')
-    .select(['id', 'trade_name'])
+    .select('id')
     .where('tenant_id', '=', tenantId)
     .where('head_office_cnpj', '=', input.cnpj)
     .executeTakeFirst();
@@ -65,6 +68,13 @@ export async function createManualCompanyRegistration(
     .selectFrom('establishments')
     .select([
       'id',
+      'municipality_name',
+      'municipality_ibge_code',
+      'postal_code',
+      'street',
+      'street_number',
+      'complement',
+      'district',
       'business_location_code',
       'state_registration',
       'state_registration_status',
@@ -79,6 +89,14 @@ export async function createManualCompanyRegistration(
   const establishmentName =
     input.establishmentName?.trim() ||
     input.legalName;
+
+  const preserve = <T>(
+    incoming: T | undefined,
+    current: T,
+  ): T =>
+    incoming === undefined
+      ? current
+      : incoming;
 
   const stateRegistrationPatch =
     input.stateRegistration === undefined
@@ -123,27 +141,48 @@ export async function createManualCompanyRegistration(
             'HEAD_OFFICE',
           is_head_office: true,
           uf: input.uf,
-          municipality_name:
-            input.municipalityName ?? null,
-          municipality_ibge_code:
-            input.municipalityIbgeCode ?? null,
-          postal_code:
-            input.postalCode ?? null,
-          street: input.street ?? null,
-          street_number:
-            input.streetNumber ?? null,
-          complement:
-            input.complement ?? null,
-          district: input.district ?? null,
+          municipality_name: preserve(
+            input.municipalityName,
+            existingEstablishment.municipality_name,
+          ),
+          municipality_ibge_code: preserve(
+            input.municipalityIbgeCode,
+            existingEstablishment.municipality_ibge_code,
+          ),
+          postal_code: preserve(
+            input.postalCode,
+            existingEstablishment.postal_code,
+          ),
+          street: preserve(
+            input.street,
+            existingEstablishment.street,
+          ),
+          street_number: preserve(
+            input.streetNumber,
+            existingEstablishment.street_number,
+          ),
+          complement: preserve(
+            input.complement,
+            existingEstablishment.complement,
+          ),
+          district: preserve(
+            input.district,
+            existingEstablishment.district,
+          ),
           business_location_code:
-            input.businessLocationCode === undefined
+            input.businessLocationCode == null
               ? existingEstablishment.business_location_code
               : input.businessLocationCode,
           ...stateRegistrationPatch,
           is_active: true,
         })
         .where('id', '=', existingEstablishment.id)
-        .returning('id')
+        .returning([
+          'id',
+          'business_location_code',
+          'state_registration',
+          'state_registration_source',
+        ])
         .executeTakeFirstOrThrow()
     : await trx
         .insertInto('establishments')
@@ -172,7 +211,12 @@ export async function createManualCompanyRegistration(
           ...stateRegistrationPatch,
           is_active: true,
         })
-        .returning('id')
+        .returning([
+          'id',
+          'business_location_code',
+          'state_registration',
+          'state_registration_source',
+        ])
         .executeTakeFirstOrThrow();
 
   if (input.cnaes !== undefined) {
@@ -189,5 +233,11 @@ export async function createManualCompanyRegistration(
     establishmentId:
       establishment.id,
     establishmentName,
+    businessLocationCode:
+      establishment.business_location_code,
+    stateRegistration:
+      establishment.state_registration,
+    stateRegistrationSource:
+      establishment.state_registration_source,
   };
 }
