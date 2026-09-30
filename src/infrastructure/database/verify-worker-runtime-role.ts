@@ -293,7 +293,9 @@ async function run(): Promise<void> {
     const classificationPrivileges = await pool.query<{
       run_select: boolean;
       run_insert: boolean;
-      run_update: boolean;
+      run_table_update: boolean;
+      run_status_update: boolean;
+      run_engine_update: boolean;
       run_delete: boolean;
       assertion_select: boolean;
       assertion_insert: boolean;
@@ -304,11 +306,13 @@ async function run(): Promise<void> {
       review_select: boolean;
       review_insert: boolean;
       effective_select: boolean;
-    }>(\`
+    }>(`
       SELECT
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','SELECT') AS run_select,
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','INSERT') AS run_insert,
-        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','UPDATE') AS run_update,
+        has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','UPDATE') AS run_table_update,
+        has_column_privilege('radar_worker_runtime','public.publication_taxonomy_runs','status','UPDATE') AS run_status_update,
+        has_column_privilege('radar_worker_runtime','public.publication_taxonomy_runs','engine_version','UPDATE') AS run_engine_update,
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_runs','DELETE') AS run_delete,
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_assertions','SELECT') AS assertion_select,
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_assertions','INSERT') AS assertion_insert,
@@ -319,12 +323,13 @@ async function run(): Promise<void> {
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_reviews','SELECT') AS review_select,
         has_table_privilege('radar_worker_runtime','public.publication_taxonomy_reviews','INSERT') AS review_insert,
         has_table_privilege('radar_worker_runtime','public.v_publication_taxonomy_effective_assertions','SELECT') AS effective_select
-    \`);
+    `);
 
     const cp = classificationPrivileges.rows[0];
     if (
       !cp ||
-      !cp.run_select || !cp.run_insert || !cp.run_update || cp.run_delete ||
+      !cp.run_select || !cp.run_insert || cp.run_table_update ||
+      !cp.run_status_update || cp.run_engine_update || cp.run_delete ||
       !cp.assertion_select || !cp.assertion_insert || cp.assertion_update ||
       !cp.span_select || !cp.span_insert || cp.span_update ||
       cp.review_select || cp.review_insert ||
