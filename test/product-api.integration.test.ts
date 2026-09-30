@@ -643,6 +643,8 @@ test(
 
       const registryCnpj =
         cnpjFromSeed('887760000001');
+      const branchRegistryCnpj =
+        cnpjFromSeed('887760000002');
       const originalFetch =
         globalThis.fetch;
 
@@ -652,9 +654,13 @@ test(
             const url = String(input);
 
             if (url.includes('brasilapi.com.br/api/cnpj/v1/')) {
+              const requestedCnpj =
+                url.split('/').pop() ??
+                registryCnpj;
+
               return new Response(
                 JSON.stringify({
-                  cnpj: registryCnpj,
+                  cnpj: requestedCnpj,
                   razao_social: 'Empresa Registry de Teste S.A.',
                   nome_fantasia: 'Registry Teste',
                   uf: 'GO',
@@ -687,6 +693,7 @@ test(
             }
 
             if (
+              url.includes('appasp.sefaz.go.gov.br/Sintegra/Consulta/default.html') ||
               url.includes('appasp.sefaz.go.gov.br/Sintegra/Consulta/default.asp')
             ) {
               return new Response(
@@ -726,6 +733,7 @@ test(
             headers: firstHeaders,
             payload: {
               cnpj: registryCnpj,
+              businessLocationCode: 'MATRIZ-001',
             },
           });
 
@@ -745,6 +753,7 @@ test(
               stateRegistration: string | null;
               stateRegistrationStatus: string | null;
               stateRegistrationLookupStatus: string | null;
+              businessLocationCode: string | null;
               cnaes: Array<{
                 code: string;
                 isPrimary: boolean;
@@ -755,6 +764,11 @@ test(
         assert.equal(
           registryBody.company.cnpj,
           registryCnpj,
+        );
+        assert.equal(
+          registryBody.establishment
+            .businessLocationCode,
+          'MATRIZ-001',
         );
         assert.equal(
           registryBody.establishment
@@ -805,6 +819,8 @@ test(
                 string | null;
               stateRegistrationLookupStatus:
                 string | null;
+              businessLocationCode:
+                string | null;
               cnaes: unknown[];
             }>;
           }>().items[0];
@@ -812,6 +828,10 @@ test(
         assert.equal(
           persisted?.municipalityName,
           'Rio Verde',
+        );
+        assert.equal(
+          persisted?.businessLocationCode,
+          'MATRIZ-001',
         );
         assert.equal(
           persisted?.stateRegistration,
@@ -823,6 +843,58 @@ test(
         );
         assert.equal(
           persisted?.cnaes.length,
+          3,
+        );
+
+        const branchRegistryCreate =
+          await app.inject({
+            method: 'POST',
+            url:
+              '/api/v1/companies/' +
+              registryBody.company.id +
+              '/establishments/from-cnpj',
+            headers: firstHeaders,
+            payload: {
+              cnpj: branchRegistryCnpj,
+              typeCode: 'OTHER',
+              businessLocationCode: 'FILIAL-003',
+            },
+          });
+
+        assert.equal(
+          branchRegistryCreate.statusCode,
+          201,
+        );
+
+        const branchBody =
+          branchRegistryCreate.json<{
+            establishment: {
+              cnpj: string;
+              businessLocationCode:
+                string | null;
+              stateRegistration:
+                string | null;
+              cnaes: unknown[];
+            };
+          }>();
+
+        assert.equal(
+          branchBody.establishment.cnpj,
+          branchRegistryCnpj,
+        );
+        assert.equal(
+          branchBody.establishment
+            .businessLocationCode,
+          'FILIAL-003',
+        );
+        assert.equal(
+          branchBody.establishment
+            .stateRegistration,
+          '10.999.888-7',
+        );
+        assert.equal(
+          branchBody.establishment
+            .cnaes.length,
           3,
         );
 
