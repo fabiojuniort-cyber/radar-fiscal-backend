@@ -246,6 +246,11 @@ export interface Establishments {
   postal_code: string | null;
   street: string | null;
   street_number: string | null;
+  state_registration: string | null;
+  state_registration_checked_at: Timestamp | null;
+  state_registration_lookup_status: string | null;
+  state_registration_source: string | null;
+  state_registration_status: string | null;
   uf: string;
   updated_at: Generated<Timestamp>;
 }
