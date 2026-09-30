@@ -349,7 +349,7 @@ try {
     `
       SELECT count(*)::int AS n
       FROM v_publication_taxonomy_effective_assertions
-      WHERE id = $1
+      WHERE assertion_id = $1
     `,
     [assertionId],
   );
