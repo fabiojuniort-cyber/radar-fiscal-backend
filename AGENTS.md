@@ -43,3 +43,20 @@ Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro 
 - estabelecimento existente na mesma empresa deve ser atualizado e reativado;
 - CNAEs e dados de RFB/IE devem ser atualizados na reativação;
 - não remover histórico nem contornar unicidade com novos UUIDs.
+
+
+### Local Negócio
+
+- `Local Negócio` é um código interno informado manualmente pelo cliente para identificar matriz/filial; não é dado da RFB nem da SEFAZ.
+- Persistir o código no estabelecimento (`business_location_code`), inclusive para a matriz; não duplicar o dado na tabela `companies`.
+- No cadastro de empresa, o campo representa o Local Negócio da matriz.
+- Reconsultas de CNPJ/RFB/IE não podem apagar nem sobrescrever o Local Negócio informado manualmente.
+- O código deve ser único entre estabelecimentos ativos da mesma empresa quando preenchido.
+- Valor vazio deve ser persistido como `NULL`.
+
+### Resiliência da consulta CNPJ
+
+- A consulta cadastral server-side usa BrasilAPI/Minha Receita como caminho primário e pode usar a API pública direta do Minha Receita como fallback quando o primeiro host estiver indisponível.
+- Diferenciar `cnpj_not_found`, `cnpj_provider_unavailable` e `cnpj_provider_invalid_response`.
+- Falha de um host não deve ser tratada como CNPJ inexistente sem esgotar o fallback disponível.
+- Persistir somente os campos necessários ao produto; o fallback não amplia o conjunto de dados expostos.
