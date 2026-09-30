@@ -208,6 +208,13 @@ BEGIN
             'APPROVED_ALIAS',
             'APPROVED_NEW_CONCEPT',
             'REJECTED'
+        ) AND (
+            NEW.status IS DISTINCT FROM OLD.status
+            OR NEW.preferred_term IS DISTINCT FROM OLD.preferred_term
+            OR NEW.decision_actor_id IS DISTINCT FROM OLD.decision_actor_id
+            OR NEW.decision_at IS DISTINCT FROM OLD.decision_at
+            OR NEW.decision_reason IS DISTINCT FROM OLD.decision_reason
+            OR NEW.resolved_release_concept_id IS DISTINCT FROM OLD.resolved_release_concept_id
         ) THEN
             RAISE EXCEPTION
                 'terminal taxonomy candidate is immutable';
@@ -229,6 +236,15 @@ BEGIN
     END IF;
 
     IF terminal_status
+       AND (
+           TG_OP = 'INSERT'
+           OR OLD.status NOT IN (
+               'MAPPED_TO_EXISTING',
+               'APPROVED_ALIAS',
+               'APPROVED_NEW_CONCEPT',
+               'REJECTED'
+           )
+       )
        AND current_user <> 'radar_taxonomy_curator' THEN
         RAISE EXCEPTION
             'terminal taxonomy candidate decision requires curator role';
