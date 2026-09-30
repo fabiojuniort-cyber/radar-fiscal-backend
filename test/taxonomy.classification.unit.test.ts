@@ -90,7 +90,7 @@ test('lexical engine maps canonical/exact/abbreviation but never ambiguous/searc
 
   assert.equal(assertions.length, 1);
   assert.equal(assertions[0]?.conceptCode, 'tax.icms');
-  assert.equal(assertions[0]?.reasonCode, 'ABBREVIATION_ALIAS');
+  assert.equal(assertions[0]?.reasonCode, 'EXACT_LEXICAL_ALIAS');
 });
 
 test('lexical classification plan is reproducible and input-sensitive', () => {
