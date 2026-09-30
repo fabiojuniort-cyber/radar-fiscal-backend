@@ -319,6 +319,19 @@ test('TAX-07 classification schema preserves lineage, release scope and idempote
     assert.equal(first.disposition, 'CREATED');
     assert.equal(first.status, 'SUCCESS');
     assert.equal(first.assertionCount, 2);
+
+    const spans = await pool.query<{ count: string }>(
+      `
+        SELECT count(*)::text AS count
+        FROM publication_taxonomy_spans s
+        JOIN publication_taxonomy_assertions a
+          ON a.id = s.assertion_id
+        WHERE a.run_id = $1
+      `,
+      [first.runId],
+    );
+    assert.equal(Number(spans.rows[0]?.count ?? 0), 2);
+
     assert.equal(second.disposition, 'EXISTING');
     assert.equal(second.runId, first.runId);
     assert.equal(second.runFingerprint, first.runFingerprint);
