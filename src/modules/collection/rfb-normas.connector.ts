@@ -543,6 +543,12 @@ export class RfbNormasConnector implements CollectionConnector {
         ...(!isRetification && canonical.actNumber ? { actNumber: canonical.actNumber } : {}),
         publishedAt,
         content: canonicalContent,
+        ...(original.presentationHtml
+          ? {
+              presentationHtml:
+                original.presentationHtml,
+            }
+          : {}),
         officialUrl,
         externalId: item.idAto,
         ...(retificationIdentity

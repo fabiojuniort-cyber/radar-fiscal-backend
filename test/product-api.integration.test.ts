@@ -400,7 +400,8 @@ test(
               identity_basis,
               jurisdiction_level,
               title,
-              published_on
+              published_on,
+              primary_official_url
             )
             VALUES (
               $1,
@@ -408,7 +409,8 @@ test(
               '{}'::jsonb,
               'FEDERAL',
               'Ato oficial para busca do Acervo',
-              DATE '2026-09-30'
+              DATE '2026-09-30',
+              'https://example.test/ato-oficial'
             )
             RETURNING id
           `,
@@ -435,6 +437,7 @@ test(
             content_hash,
             content_text,
             relevant_excerpt,
+            source_metadata,
             is_current
           )
           VALUES (
@@ -443,6 +446,7 @@ test(
             $2,
             $3,
             $4,
+            $5::jsonb,
             true
           )
         `,
@@ -451,8 +455,27 @@ test(
           randomBytes(32).toString(
             'hex',
           ),
-          'Norma sobre crédito presumido aplicável a fertilizantes.',
+          [
+            'CAPÍTULO I',
+            '',
+            'Art. 1º  Norma sobre crédito presumido aplicável a fertilizantes.',
+            '    I - primeiro item;',
+            '    II - segundo item.',
+          ].join('\n'),
           'Crédito presumido para fertilizantes.',
+          JSON.stringify({
+            presentation: {
+              version: 1,
+              format: 'SANITIZED_HTML',
+              preservesWhitespace: true,
+              html: [
+                '<script>alert(1)</script>',
+                '<h2 onclick="evil()">CAPÍTULO I</h2>',
+                '<p>Art. 1º Texto oficial.</p>',
+                '<table><tr><th>Tributo</th></tr><tr><td>ICMS</td></tr></table>',
+              ].join(''),
+            },
+          }),
         ],
       );
 
@@ -501,6 +524,77 @@ test(
         archiveBody.items[0]?.excerpt ??
           '',
         /fertilizantes/i,
+      );
+
+      const detail =
+        await app.inject({
+          method: 'GET',
+          url:
+            '/api/v1/publications/' +
+            archivePublicationId,
+          headers: {
+            authorization:
+              'Bearer ' +
+              first.accessToken,
+          },
+        });
+
+      assert.equal(
+        detail.statusCode,
+        200,
+      );
+
+      const detailBody =
+        detail.json<{
+          publication: {
+            id: string;
+            officialUrl: string | null;
+          };
+          version: {
+            contentText: string | null;
+            presentation: {
+              format: string;
+              preservesWhitespace: boolean;
+              html?: string;
+            };
+          } | null;
+        }>();
+
+      assert.equal(
+        detailBody.publication.id,
+        archivePublicationId,
+      );
+      assert.equal(
+        detailBody.publication.officialUrl,
+        'https://example.test/ato-oficial',
+      );
+      assert.match(
+        detailBody.version?.contentText ?? '',
+        /CAPÍTULO I\n\nArt\. 1º/,
+      );
+      assert.match(
+        detailBody.version?.contentText ?? '',
+        /    I - primeiro item;/,
+      );
+      assert.equal(
+        detailBody.version?.presentation.preservesWhitespace,
+        true,
+      );
+      assert.equal(
+        detailBody.version?.presentation.format,
+        'SANITIZED_HTML',
+      );
+      assert.match(
+        detailBody.version?.presentation.html ?? '',
+        /<h2>CAPÍTULO I<\/h2>/,
+      );
+      assert.match(
+        detailBody.version?.presentation.html ?? '',
+        /<table>/,
+      );
+      assert.doesNotMatch(
+        detailBody.version?.presentation.html ?? '',
+        /script|onclick/i,
       );
 
       const crossTenantCompanyRead =
