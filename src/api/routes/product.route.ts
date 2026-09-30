@@ -14,24 +14,83 @@ import {
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
 import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
+import {
+  CnpjRegistryError,
+  lookupCnpjRegistry,
+} from '../../modules/company/cnpj-registry.service.js';
+import {
+  createCompanyFromRegistry,
+  createEstablishmentFromRegistry,
+  rebuildCompanyCnaes,
+  replaceManualEstablishmentCnaes,
+} from '../../modules/company/company-registration.service.js';
+
+const cnpjValueSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/\D/g, ''))
+  .refine(isValidCnpj, 'invalid_cnpj');
 
 const companyBodySchema = z.object({
   legalName: z.string().trim().min(2).max(200),
   tradeName: z.string().trim().min(2).max(200).optional(),
-  cnpj: z
+  cnpj: cnpjValueSchema,
+});
+
+const companyFromCnpjBodySchema = z.object({
+  cnpj: cnpjValueSchema,
+});
+
+const companyUpdateBodySchema = z.object({
+  legalName: z.string().trim().min(2).max(200),
+  tradeName: z.string().trim().min(2).max(200).nullable().optional(),
+});
+
+const establishmentFromCnpjBodySchema = z.object({
+  cnpj: cnpjValueSchema,
+  typeCode: z.string().trim().min(1).max(50).default('OTHER'),
+});
+
+const cnaeBodySchema = z.object({
+  code: z
     .string()
     .trim()
     .transform((value) => value.replace(/\D/g, ''))
-    .refine(isValidCnpj, 'invalid_cnpj'),
+    .refine((value) => /^\d{7}$/.test(value), 'invalid_cnae'),
+  description: z.string().trim().min(1).max(300),
+  isPrimary: z.boolean().default(false),
+});
+
+const establishmentUpdateBodySchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  typeCode: z.string().trim().min(1).max(50),
+  uf: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2}$/)
+    .transform((value) => value.toUpperCase()),
+  municipalityName: z.string().trim().max(160).nullable().optional(),
+  municipalityIbgeCode: z.string().trim().regex(/^\d{7}$/).nullable().optional(),
+  postalCode: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\D/g, ''))
+    .refine(
+      (value) => value.length === 0 || /^\d{8}$/.test(value),
+      'invalid_postal_code',
+    )
+    .nullable()
+    .optional(),
+  street: z.string().trim().max(200).nullable().optional(),
+  streetNumber: z.string().trim().max(30).nullable().optional(),
+  complement: z.string().trim().max(160).nullable().optional(),
+  district: z.string().trim().max(160).nullable().optional(),
+  cnaes: z.array(cnaeBodySchema).max(100).default([]),
 });
 
 const establishmentBodySchema = z.object({
   companyId: z.string().uuid(),
-  cnpj: z
-    .string()
-    .trim()
-    .transform((value) => value.replace(/\D/g, ''))
-    .refine(isValidCnpj, 'invalid_cnpj'),
+  cnpj: cnpjValueSchema,
   name: z.string().trim().min(2).max(200),
   typeCode: z.string().trim().min(1).max(50),
   isHeadOffice: z.boolean().default(false),
@@ -55,6 +114,7 @@ const establishmentBodySchema = z.object({
   streetNumber: z.string().trim().max(30).optional(),
   complement: z.string().trim().max(160).optional(),
   district: z.string().trim().max(160).optional(),
+  cnaes: z.array(cnaeBodySchema).max(100).default([]),
 });
 
 const taxProfileBodySchema = z.object({
@@ -75,6 +135,21 @@ const taxProfileBodySchema = z.object({
     documents: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
     obligations: z.array(z.string().trim().min(1).max(120)).max(60).default([]),
     keywords: z.array(z.string().trim().min(1).max(120)).max(100).default([]),
+    taxonomy: z
+      .object({
+        releaseId: z.string().uuid(),
+        releaseVersion: z.string().trim().min(1).max(30),
+        conceptCodes: z
+          .array(
+            z
+              .string()
+              .trim()
+              .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/),
+          )
+          .max(500),
+      })
+      .nullable()
+      .default(null),
   }),
 });
 
@@ -128,6 +203,10 @@ function publicationPresentation(
 
 const companyIdParamsSchema = z.object({
   companyId: z.string().uuid(),
+});
+
+const establishmentIdParamsSchema = z.object({
+  establishmentId: z.string().uuid(),
 });
 
 const publicationIdParamsSchema = z.object({
@@ -201,6 +280,33 @@ function databaseConstraint(error: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function handleCnpjRegistryError(
+  error: unknown,
+  reply: FastifyReply,
+): FastifyReply | null {
+  if (!(error instanceof CnpjRegistryError)) {
+    return null;
+  }
+
+  if (error.code === 'cnpj_not_found') {
+    return reply.status(404).send({
+      error: error.code,
+    });
+  }
+
+  if (
+    error.code === 'cnpj_provider_invalid_response'
+  ) {
+    return reply.status(502).send({
+      error: error.code,
+    });
+  }
+
+  return reply.status(503).send({
+    error: error.code,
+  });
+}
+
 export async function productRoutes(
   app: FastifyInstance,
 ): Promise<void> {
@@ -250,6 +356,7 @@ export async function productRoutes(
                 'is_active',
               ])
               .where('tenant_id', '=', tenantId)
+              .where('is_active', '=', true)
               .orderBy('legal_name')
               .execute();
 
@@ -387,6 +494,280 @@ export async function productRoutes(
     },
   );
 
+  typed.post(
+    '/api/v1/companies/from-cnpj',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        body: companyFromCnpjBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const registry = await lookupCnpjRegistry(
+          request.body.cnpj,
+        );
+
+        const created = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            return createCompanyFromRegistry(
+              trx,
+              tenantId,
+              registry,
+            );
+          },
+        );
+
+        if (!created) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        return reply.status(201).send({
+          company: {
+            id: created.companyId,
+            legalName: registry.legalName,
+            tradeName: registry.tradeName,
+            cnpj: registry.cnpj,
+          },
+          establishment: {
+            id: created.establishmentId,
+            cnpj: registry.cnpj,
+            name:
+              registry.tradeName ??
+              registry.legalName,
+            typeCode: 'HEAD_OFFICE',
+            isHeadOffice: true,
+            uf: registry.uf,
+            municipalityName:
+              registry.municipalityName,
+            municipalityIbgeCode:
+              registry.municipalityIbgeCode,
+            postalCode:
+              registry.postalCode,
+            street: registry.street,
+            streetNumber:
+              registry.streetNumber,
+            complement:
+              registry.complement,
+            district: registry.district,
+            cnaes: registry.cnaes,
+          },
+          registry: {
+            source: registry.source,
+            consultedAt:
+              registry.consultedAt,
+            registrationStatus:
+              registry.registrationStatus,
+            openedOn:
+              registry.openedOn,
+          },
+        });
+      } catch (error) {
+        const handledTenant =
+          handleTenantError(error, reply);
+        if (handledTenant) return handledTenant;
+
+        const handledRegistry =
+          handleCnpjRegistryError(
+            error,
+            reply,
+          );
+        if (handledRegistry) return handledRegistry;
+
+        if (
+          databaseConstraint(error) ===
+          'uq_company_cnpj_per_tenant'
+        ) {
+          return reply.status(409).send({
+            error: 'company_cnpj_exists',
+          });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  typed.put(
+    '/api/v1/companies/:companyId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+        body: companyUpdateBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const company = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            return trx
+              .updateTable('companies')
+              .set({
+                legal_name: request.body.legalName,
+                trade_name: request.body.tradeName ?? null,
+              })
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .returning([
+                'id',
+                'legal_name',
+                'trade_name',
+                'head_office_cnpj',
+              ])
+              .executeTakeFirst();
+          },
+        );
+
+        if (company === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (!company) {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        return reply.status(200).send({
+          company: {
+            id: company.id,
+            legalName: company.legal_name,
+            tradeName: company.trade_name,
+            cnpj: company.head_office_cnpj,
+          },
+        });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.delete(
+    '/api/v1/companies/:companyId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const company = await trx
+              .selectFrom('companies')
+              .select('id')
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!company) {
+              return 'COMPANY_NOT_FOUND' as const;
+            }
+
+            await trx
+              .updateTable('establishments')
+              .set({ is_active: false })
+              .where('company_id', '=', request.params.companyId)
+              .execute();
+
+            await trx
+              .updateTable('companies')
+              .set({ is_active: false })
+              .where('id', '=', request.params.companyId)
+              .execute();
+
+            return 'DELETED' as const;
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'COMPANY_NOT_FOUND') {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        return reply.status(204).send();
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
   typed.get(
     '/api/v1/establishment-types',
     {
@@ -428,12 +809,12 @@ export async function productRoutes(
       }
 
       try {
-        const rows = await withTenantContext(
+        const items = await withTenantContext(
           app.db,
           request.auth.userId,
           tenantId,
-          async (trx) =>
-            trx
+          async (trx) => {
+            const rows = await trx
               .selectFrom('establishments')
               .select([
                 'id',
@@ -453,30 +834,56 @@ export async function productRoutes(
                 'is_active',
               ])
               .where('company_id', '=', request.params.companyId)
+              .where('is_active', '=', true)
               .orderBy('is_head_office', 'desc')
               .orderBy('name')
-              .execute(),
+              .execute();
+
+            const result = [];
+
+            for (const row of rows) {
+              const cnaes = await trx
+                .selectFrom('establishment_cnaes as ec')
+                .innerJoin('cnaes as c', 'c.code', 'ec.cnae_code')
+                .select([
+                  'c.code',
+                  'c.description',
+                  'ec.is_primary',
+                ])
+                .where('ec.establishment_id', '=', row.id)
+                .orderBy('ec.is_primary', 'desc')
+                .orderBy('c.code')
+                .execute();
+
+              result.push({
+                id: row.id,
+                companyId: row.company_id,
+                cnpj: row.cnpj,
+                name: row.name,
+                typeCode: row.establishment_type_code,
+                isHeadOffice: row.is_head_office,
+                uf: row.uf,
+                municipalityName: row.municipality_name,
+                municipalityIbgeCode: row.municipality_ibge_code,
+                postalCode: row.postal_code,
+                street: row.street,
+                streetNumber: row.street_number,
+                complement: row.complement,
+                district: row.district,
+                isActive: row.is_active,
+                cnaes: cnaes.map((cnae) => ({
+                  code: cnae.code,
+                  description: cnae.description,
+                  isPrimary: cnae.is_primary,
+                })),
+              });
+            }
+
+            return result;
+          },
         );
 
-        return reply.status(200).send({
-          items: rows.map((row) => ({
-            id: row.id,
-            companyId: row.company_id,
-            cnpj: row.cnpj,
-            name: row.name,
-            typeCode: row.establishment_type_code,
-            isHeadOffice: row.is_head_office,
-            uf: row.uf,
-            municipalityName: row.municipality_name,
-            municipalityIbgeCode: row.municipality_ibge_code,
-            postalCode: row.postal_code,
-            street: row.street,
-            streetNumber: row.street_number,
-            complement: row.complement,
-            district: row.district,
-            isActive: row.is_active,
-          })),
-        });
+        return reply.status(200).send({ items });
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
@@ -541,7 +948,7 @@ export async function productRoutes(
               return 'TYPE_NOT_FOUND' as const;
             }
 
-            return trx
+            const created = await trx
               .insertInto('establishments')
               .values({
                 company_id: request.body.companyId,
@@ -571,6 +978,15 @@ export async function productRoutes(
                 'municipality_name',
               ])
               .executeTakeFirstOrThrow();
+
+            await replaceManualEstablishmentCnaes(
+              trx,
+              request.body.companyId,
+              created.id,
+              request.body.cnaes,
+            );
+
+            return created;
           },
         );
 
@@ -613,6 +1029,593 @@ export async function productRoutes(
           return reply.status(409).send({ error: 'establishment_conflict' });
         }
 
+        throw error;
+      }
+    },
+  );
+
+  typed.post(
+    '/api/v1/companies/:companyId/establishments/from-cnpj',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+        body: establishmentFromCnpjBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const registry = await lookupCnpjRegistry(request.body.cnpj);
+
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const company = await trx
+              .selectFrom('companies')
+              .select('id')
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!company) {
+              return 'COMPANY_NOT_FOUND' as const;
+            }
+
+            const establishmentType = await trx
+              .selectFrom('establishment_types')
+              .select('code')
+              .where('code', '=', request.body.typeCode)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!establishmentType) {
+              return 'TYPE_NOT_FOUND' as const;
+            }
+
+            const establishmentId =
+              await createEstablishmentFromRegistry(
+                trx,
+                request.params.companyId,
+                registry,
+                request.body.typeCode,
+              );
+
+            return { establishmentId };
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'COMPANY_NOT_FOUND') {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        if (result === 'TYPE_NOT_FOUND') {
+          return reply.status(400).send({ error: 'invalid_establishment_type' });
+        }
+
+        return reply.status(201).send({
+          establishment: {
+            id: result.establishmentId,
+            companyId: request.params.companyId,
+            cnpj: registry.cnpj,
+            name: registry.tradeName ?? registry.legalName,
+            typeCode: request.body.typeCode,
+            isHeadOffice: false,
+            uf: registry.uf,
+            municipalityName: registry.municipalityName,
+            municipalityIbgeCode: registry.municipalityIbgeCode,
+            postalCode: registry.postalCode,
+            street: registry.street,
+            streetNumber: registry.streetNumber,
+            complement: registry.complement,
+            district: registry.district,
+            cnaes: registry.cnaes,
+          },
+          registry: {
+            source: registry.source,
+            consultedAt: registry.consultedAt,
+            registrationStatus: registry.registrationStatus,
+            openedOn: registry.openedOn,
+          },
+        });
+      } catch (error) {
+        const handledTenant = handleTenantError(error, reply);
+        if (handledTenant) return handledTenant;
+
+        const handledRegistry = handleCnpjRegistryError(error, reply);
+        if (handledRegistry) return handledRegistry;
+
+        if (databaseConstraint(error) === 'uq_establishment_company_cnpj') {
+          return reply.status(409).send({ error: 'establishment_conflict' });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  typed.put(
+    '/api/v1/establishments/:establishmentId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: establishmentIdParamsSchema,
+        body: establishmentUpdateBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const existing = await trx
+              .selectFrom('establishments')
+              .select(['id', 'company_id', 'is_head_office'])
+              .where('id', '=', request.params.establishmentId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!existing) {
+              return 'ESTABLISHMENT_NOT_FOUND' as const;
+            }
+
+            const type = await trx
+              .selectFrom('establishment_types')
+              .select('code')
+              .where('code', '=', request.body.typeCode)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!type) {
+              return 'TYPE_NOT_FOUND' as const;
+            }
+
+            await trx
+              .updateTable('establishments')
+              .set({
+                name: request.body.name,
+                establishment_type_code: request.body.typeCode,
+                uf: request.body.uf,
+                municipality_name: request.body.municipalityName ?? null,
+                municipality_ibge_code: request.body.municipalityIbgeCode ?? null,
+                postal_code: request.body.postalCode || null,
+                street: request.body.street ?? null,
+                street_number: request.body.streetNumber ?? null,
+                complement: request.body.complement ?? null,
+                district: request.body.district ?? null,
+              })
+              .where('id', '=', existing.id)
+              .execute();
+
+            await replaceManualEstablishmentCnaes(
+              trx,
+              existing.company_id,
+              existing.id,
+              request.body.cnaes,
+            );
+
+            return {
+              companyId: existing.company_id,
+            };
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'ESTABLISHMENT_NOT_FOUND') {
+          return reply.status(404).send({ error: 'establishment_not_found' });
+        }
+
+        if (result === 'TYPE_NOT_FOUND') {
+          return reply.status(400).send({ error: 'invalid_establishment_type' });
+        }
+
+        return reply.status(200).send({ ok: true });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.post(
+    '/api/v1/establishments/:establishmentId/refresh-cnpj',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: establishmentIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const target = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const row = await trx
+              .selectFrom('establishments')
+              .select(['id', 'company_id', 'cnpj', 'is_head_office'])
+              .where('id', '=', request.params.establishmentId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            return row ?? 'ESTABLISHMENT_NOT_FOUND' as const;
+          },
+        );
+
+        if (target === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (target === 'ESTABLISHMENT_NOT_FOUND') {
+          return reply.status(404).send({ error: 'establishment_not_found' });
+        }
+
+        const registry = await lookupCnpjRegistry(target.cnpj);
+
+        await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            await trx
+              .updateTable('establishments')
+              .set({
+                name: registry.tradeName ?? registry.legalName,
+                uf: registry.uf,
+                municipality_name: registry.municipalityName,
+                municipality_ibge_code: registry.municipalityIbgeCode,
+                postal_code: registry.postalCode,
+                street: registry.street,
+                street_number: registry.streetNumber,
+                complement: registry.complement,
+                district: registry.district,
+              })
+              .where('id', '=', target.id)
+              .execute();
+
+            if (target.is_head_office) {
+              await trx
+                .updateTable('companies')
+                .set({
+                  legal_name: registry.legalName,
+                  trade_name: registry.tradeName,
+                })
+                .where('id', '=', target.company_id)
+                .execute();
+            }
+
+            await replaceManualEstablishmentCnaes(
+              trx,
+              target.company_id,
+              target.id,
+              registry.cnaes,
+            );
+          },
+        );
+
+        return reply.status(200).send({
+          ok: true,
+          registry: {
+            source: registry.source,
+            consultedAt: registry.consultedAt,
+          },
+        });
+      } catch (error) {
+        const handledTenant = handleTenantError(error, reply);
+        if (handledTenant) return handledTenant;
+
+        const handledRegistry = handleCnpjRegistryError(error, reply);
+        if (handledRegistry) return handledRegistry;
+
+        throw error;
+      }
+    },
+  );
+
+  typed.delete(
+    '/api/v1/establishments/:establishmentId',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: establishmentIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const row = await trx
+              .selectFrom('establishments')
+              .select(['id', 'company_id', 'is_head_office'])
+              .where('id', '=', request.params.establishmentId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!row) {
+              return 'ESTABLISHMENT_NOT_FOUND' as const;
+            }
+
+            if (row.is_head_office) {
+              return 'HEAD_OFFICE' as const;
+            }
+
+            await trx
+              .updateTable('establishments')
+              .set({ is_active: false })
+              .where('id', '=', row.id)
+              .execute();
+
+            await rebuildCompanyCnaes(
+              trx,
+              row.company_id,
+            );
+
+            return 'DELETED' as const;
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'ESTABLISHMENT_NOT_FOUND') {
+          return reply.status(404).send({ error: 'establishment_not_found' });
+        }
+
+        if (result === 'HEAD_OFFICE') {
+          return reply.status(409).send({ error: 'head_office_requires_company_delete' });
+        }
+
+        return reply.status(204).send();
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
+    '/api/v1/taxonomy/profile-options',
+    {
+      preHandler: app.authenticate,
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select([
+                'id',
+                'version',
+                'published_at',
+              ])
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+
+            if (!release) {
+              return {
+                release: null,
+                dimensions: [],
+              };
+            }
+
+            const allowedDimensions = [
+              'tax',
+              'theme',
+              'treatment',
+              'regime',
+              'operation',
+              'operation_scope',
+              'operation_purpose',
+              'operation_channel',
+              'document',
+              'obligation',
+              'sector',
+              'product',
+              'subject',
+              'event',
+              'impact_operational',
+              'impact_system',
+            ];
+
+            const dimensions = await trx
+              .selectFrom('taxonomy_release_dimensions as rd')
+              .innerJoin(
+                'taxonomy_dimensions as d',
+                'd.id',
+                'rd.dimension_id',
+              )
+              .innerJoin(
+                'taxonomy_dimension_revisions as dr',
+                'dr.id',
+                'rd.dimension_revision_id',
+              )
+              .select([
+                'd.id',
+                'd.code',
+                'dr.name',
+                'dr.description',
+              ])
+              .where('rd.release_id', '=', release.id)
+              .where('rd.membership_status', '=', 'INCLUDED')
+              .where('d.code', 'in', allowedDimensions)
+              .orderBy('dr.name')
+              .execute();
+
+            const concepts = await trx
+              .selectFrom('taxonomy_release_concepts as rc')
+              .innerJoin(
+                'taxonomy_concepts as c',
+                'c.id',
+                'rc.concept_id',
+              )
+              .innerJoin(
+                'taxonomy_concept_revisions as cr',
+                'cr.id',
+                'rc.concept_revision_id',
+              )
+              .innerJoin(
+                'taxonomy_dimensions as d',
+                'd.id',
+                'c.dimension_id',
+              )
+              .select([
+                'd.code as dimension_code',
+                'c.code',
+                'cr.label',
+                'cr.definition',
+              ])
+              .where('rc.release_id', '=', release.id)
+              .where('rc.membership_status', '=', 'INCLUDED')
+              .where('d.code', 'in', allowedDimensions)
+              .orderBy('d.code')
+              .orderBy('cr.label')
+              .execute();
+
+            return {
+              release: {
+                id: release.id,
+                version: release.version,
+                publishedAt: release.published_at
+                  ? new Date(release.published_at).toISOString()
+                  : null,
+              },
+              dimensions: dimensions.map((dimension) => ({
+                code: dimension.code,
+                name: dimension.name,
+                description: dimension.description,
+                concepts: concepts
+                  .filter(
+                    (concept) =>
+                      concept.dimension_code === dimension.code,
+                  )
+                  .map((concept) => ({
+                    code: concept.code,
+                    label: concept.label,
+                    definition: concept.definition,
+                  })),
+              })),
+            };
+          },
+        );
+
+        return reply.status(200).send(result);
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
         throw error;
       }
     },
@@ -732,6 +1735,45 @@ export async function productRoutes(
               return 'COMPANY_NOT_FOUND' as const;
             }
 
+            const taxonomy =
+              request.body.personalization.taxonomy;
+
+            if (taxonomy) {
+              const release = await trx
+                .selectFrom('taxonomy_releases')
+                .select(['id', 'version'])
+                .where('id', '=', taxonomy.releaseId)
+                .where('version', '=', taxonomy.releaseVersion)
+                .where('status', '=', 'PUBLISHED')
+                .executeTakeFirst();
+
+              if (!release) {
+                return 'INVALID_TAXONOMY_RELEASE' as const;
+              }
+
+              if (taxonomy.conceptCodes.length > 0) {
+                const concepts = await trx
+                  .selectFrom('taxonomy_release_concepts as rc')
+                  .innerJoin(
+                    'taxonomy_concepts as c',
+                    'c.id',
+                    'rc.concept_id',
+                  )
+                  .select('c.code')
+                  .where('rc.release_id', '=', taxonomy.releaseId)
+                  .where('rc.membership_status', '=', 'INCLUDED')
+                  .where('c.code', 'in', taxonomy.conceptCodes)
+                  .execute();
+
+                if (
+                  new Set(concepts.map((concept) => concept.code)).size !==
+                  new Set(taxonomy.conceptCodes).size
+                ) {
+                  return 'INVALID_TAXONOMY_SELECTION' as const;
+                }
+              }
+            }
+
             const current = await trx
               .selectFrom('company_tax_profiles')
               .select(['id', 'version_no'])
@@ -785,6 +1827,14 @@ export async function productRoutes(
 
         if (profile === 'COMPANY_NOT_FOUND') {
           return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        if (profile === 'INVALID_TAXONOMY_RELEASE') {
+          return reply.status(409).send({ error: 'taxonomy_release_not_available' });
+        }
+
+        if (profile === 'INVALID_TAXONOMY_SELECTION') {
+          return reply.status(400).send({ error: 'invalid_taxonomy_selection' });
         }
 
         return reply.status(200).send({
