@@ -32,3 +32,14 @@ Regras para cadastro por CNPJ e perfil do Sonar:
 - Consulta estadual não deve bloquear a criação do estabelecimento quando a RFB já respondeu; falha estadual é enriquecimento incompleto.
 - UFs com CAPTCHA, Gov.br ou outro desafio humano não podem ser automatizadas por bypass. Nesses casos, manter IE editável/manual e informar que a automação está indisponível ou em implementação.
 - Reconsulta cadastral deve atualizar RFB e tentar novamente a consulta estadual suportada.
+
+## Reativação de cadastros soft-deleted
+
+Empresas e estabelecimentos são desativados com `is_active = false` para preservar histórico. As restrições únicas de CNPJ continuam válidas para registros inativos.
+
+Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro quando o mesmo identificador já existir:
+- empresa existente no mesmo tenant deve ser atualizada e reativada;
+- matriz existente deve ser atualizada e reativada;
+- estabelecimento existente na mesma empresa deve ser atualizado e reativado;
+- CNAEs e dados de RFB/IE devem ser atualizados na reativação;
+- não remover histórico nem contornar unicidade com novos UUIDs.

@@ -132,54 +132,115 @@ export async function createCompanyFromRegistry(
 }> {
   await upsertCnaes(trx, record.cnaes);
 
-  const company = await trx
-    .insertInto('companies')
-    .values({
-      tenant_id: tenantId,
-      legal_name: record.legalName,
-      trade_name: record.tradeName,
-      head_office_cnpj: record.cnpj,
-      is_active: true,
-    })
-    .returning('id')
-    .executeTakeFirstOrThrow();
+  const existingCompany = await trx
+    .selectFrom('companies')
+    .select(['id', 'is_active'])
+    .where('tenant_id', '=', tenantId)
+    .where('head_office_cnpj', '=', record.cnpj)
+    .executeTakeFirst();
 
-  const establishment = await trx
-    .insertInto('establishments')
-    .values({
-      company_id: company.id,
-      cnpj: record.cnpj,
-      name:
-        record.tradeName ??
-        record.legalName,
-      establishment_type_code:
-        'HEAD_OFFICE',
-      is_head_office: true,
-      uf: record.uf,
-      municipality_name:
-        record.municipalityName,
-      municipality_ibge_code:
-        record.municipalityIbgeCode,
-      postal_code: record.postalCode,
-      street: record.street,
-      street_number:
-        record.streetNumber,
-      complement: record.complement,
-      district: record.district,
-      state_registration:
-        stateRegistration?.registration ?? null,
-      state_registration_status:
-        stateRegistration?.registrationStatus ?? null,
-      state_registration_source:
-        stateRegistration?.source ?? null,
-      state_registration_checked_at:
-        stateRegistration?.checkedAt ?? null,
-      state_registration_lookup_status:
-        stateRegistration?.lookupStatus ?? null,
-      is_active: true,
-    })
-    .returning('id')
-    .executeTakeFirstOrThrow();
+  const company = existingCompany
+    ? await trx
+        .updateTable('companies')
+        .set({
+          legal_name: record.legalName,
+          trade_name: record.tradeName,
+          is_active: true,
+        })
+        .where('id', '=', existingCompany.id)
+        .returning('id')
+        .executeTakeFirstOrThrow()
+    : await trx
+        .insertInto('companies')
+        .values({
+          tenant_id: tenantId,
+          legal_name: record.legalName,
+          trade_name: record.tradeName,
+          head_office_cnpj: record.cnpj,
+          is_active: true,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+
+  const existingEstablishment = await trx
+    .selectFrom('establishments')
+    .select(['id', 'is_head_office'])
+    .where('company_id', '=', company.id)
+    .where('cnpj', '=', record.cnpj)
+    .executeTakeFirst();
+
+  const establishment = existingEstablishment
+    ? await trx
+        .updateTable('establishments')
+        .set({
+          name:
+            record.tradeName ??
+            record.legalName,
+          establishment_type_code:
+            'HEAD_OFFICE',
+          is_head_office: true,
+          uf: record.uf,
+          municipality_name:
+            record.municipalityName,
+          municipality_ibge_code:
+            record.municipalityIbgeCode,
+          postal_code: record.postalCode,
+          street: record.street,
+          street_number:
+            record.streetNumber,
+          complement: record.complement,
+          district: record.district,
+          state_registration:
+            stateRegistration?.registration ?? null,
+          state_registration_status:
+            stateRegistration?.registrationStatus ?? null,
+          state_registration_source:
+            stateRegistration?.source ?? null,
+          state_registration_checked_at:
+            stateRegistration?.checkedAt ?? null,
+          state_registration_lookup_status:
+            stateRegistration?.lookupStatus ?? null,
+          is_active: true,
+        })
+        .where('id', '=', existingEstablishment.id)
+        .returning('id')
+        .executeTakeFirstOrThrow()
+    : await trx
+        .insertInto('establishments')
+        .values({
+          company_id: company.id,
+          cnpj: record.cnpj,
+          name:
+            record.tradeName ??
+            record.legalName,
+          establishment_type_code:
+            'HEAD_OFFICE',
+          is_head_office: true,
+          uf: record.uf,
+          municipality_name:
+            record.municipalityName,
+          municipality_ibge_code:
+            record.municipalityIbgeCode,
+          postal_code: record.postalCode,
+          street: record.street,
+          street_number:
+            record.streetNumber,
+          complement: record.complement,
+          district: record.district,
+          state_registration:
+            stateRegistration?.registration ?? null,
+          state_registration_status:
+            stateRegistration?.registrationStatus ?? null,
+          state_registration_source:
+            stateRegistration?.source ?? null,
+          state_registration_checked_at:
+            stateRegistration?.checkedAt ?? null,
+          state_registration_lookup_status:
+            stateRegistration?.lookupStatus ?? null,
+          is_active: true,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
 
   await replaceEstablishmentCnaes(
     trx,
@@ -208,42 +269,88 @@ export async function createEstablishmentFromRegistry(
 ): Promise<string> {
   await upsertCnaes(trx, record.cnaes);
 
-  const establishment = await trx
-    .insertInto('establishments')
-    .values({
-      company_id: companyId,
-      cnpj: record.cnpj,
-      name:
-        record.tradeName ??
-        record.legalName,
-      establishment_type_code:
-        typeCode,
-      is_head_office: false,
-      uf: record.uf,
-      municipality_name:
-        record.municipalityName,
-      municipality_ibge_code:
-        record.municipalityIbgeCode,
-      postal_code: record.postalCode,
-      street: record.street,
-      street_number:
-        record.streetNumber,
-      complement: record.complement,
-      district: record.district,
-      state_registration:
-        stateRegistration?.registration ?? null,
-      state_registration_status:
-        stateRegistration?.registrationStatus ?? null,
-      state_registration_source:
-        stateRegistration?.source ?? null,
-      state_registration_checked_at:
-        stateRegistration?.checkedAt ?? null,
-      state_registration_lookup_status:
-        stateRegistration?.lookupStatus ?? null,
-      is_active: true,
-    })
-    .returning('id')
-    .executeTakeFirstOrThrow();
+  const existingEstablishment = await trx
+    .selectFrom('establishments')
+    .select(['id', 'is_head_office'])
+    .where('company_id', '=', companyId)
+    .where('cnpj', '=', record.cnpj)
+    .executeTakeFirst();
+
+  const establishment = existingEstablishment
+    ? await trx
+        .updateTable('establishments')
+        .set({
+          name:
+            record.tradeName ??
+            record.legalName,
+          establishment_type_code:
+            existingEstablishment.is_head_office
+              ? 'HEAD_OFFICE'
+              : typeCode,
+          is_head_office:
+            existingEstablishment.is_head_office,
+          uf: record.uf,
+          municipality_name:
+            record.municipalityName,
+          municipality_ibge_code:
+            record.municipalityIbgeCode,
+          postal_code: record.postalCode,
+          street: record.street,
+          street_number:
+            record.streetNumber,
+          complement: record.complement,
+          district: record.district,
+          state_registration:
+            stateRegistration?.registration ?? null,
+          state_registration_status:
+            stateRegistration?.registrationStatus ?? null,
+          state_registration_source:
+            stateRegistration?.source ?? null,
+          state_registration_checked_at:
+            stateRegistration?.checkedAt ?? null,
+          state_registration_lookup_status:
+            stateRegistration?.lookupStatus ?? null,
+          is_active: true,
+        })
+        .where('id', '=', existingEstablishment.id)
+        .returning('id')
+        .executeTakeFirstOrThrow()
+    : await trx
+        .insertInto('establishments')
+        .values({
+          company_id: companyId,
+          cnpj: record.cnpj,
+          name:
+            record.tradeName ??
+            record.legalName,
+          establishment_type_code:
+            typeCode,
+          is_head_office: false,
+          uf: record.uf,
+          municipality_name:
+            record.municipalityName,
+          municipality_ibge_code:
+            record.municipalityIbgeCode,
+          postal_code: record.postalCode,
+          street: record.street,
+          street_number:
+            record.streetNumber,
+          complement: record.complement,
+          district: record.district,
+          state_registration:
+            stateRegistration?.registration ?? null,
+          state_registration_status:
+            stateRegistration?.registrationStatus ?? null,
+          state_registration_source:
+            stateRegistration?.source ?? null,
+          state_registration_checked_at:
+            stateRegistration?.checkedAt ?? null,
+          state_registration_lookup_status:
+            stateRegistration?.lookupStatus ?? null,
+          is_active: true,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
 
   await replaceEstablishmentCnaes(
     trx,
