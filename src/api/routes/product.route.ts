@@ -548,6 +548,7 @@ export async function productRoutes(
             legalName: company.legal_name,
             tradeName: company.trade_name,
             cnpj: company.head_office_cnpj,
+            businessLocationCode: null,
           },
         });
       } catch (error) {
@@ -687,12 +688,24 @@ export async function productRoutes(
           );
         if (handledRegistry) return handledRegistry;
 
+        const constraint =
+          databaseConstraint(error);
+
         if (
-          databaseConstraint(error) ===
+          constraint ===
           'uq_company_cnpj_per_tenant'
         ) {
           return reply.status(409).send({
             error: 'company_cnpj_exists',
+          });
+        }
+
+        if (
+          constraint ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
           });
         }
 
@@ -801,6 +814,16 @@ export async function productRoutes(
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
+
+        if (
+          databaseConstraint(error) ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
+        }
+
         throw error;
       }
     },
@@ -1177,6 +1200,15 @@ export async function productRoutes(
           return reply.status(409).send({ error: 'establishment_conflict' });
         }
 
+        if (
+          constraint ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
+        }
+
         throw error;
       }
     },
@@ -1317,8 +1349,23 @@ export async function productRoutes(
         const handledRegistry = handleCnpjRegistryError(error, reply);
         if (handledRegistry) return handledRegistry;
 
-        if (databaseConstraint(error) === 'uq_establishment_company_cnpj') {
+        const constraint =
+          databaseConstraint(error);
+
+        if (
+          constraint ===
+          'uq_establishment_company_cnpj'
+        ) {
           return reply.status(409).send({ error: 'establishment_conflict' });
+        }
+
+        if (
+          constraint ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
         }
 
         throw error;
@@ -1440,6 +1487,16 @@ export async function productRoutes(
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
+
+        if (
+          databaseConstraint(error) ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
+        }
+
         throw error;
       }
     },
