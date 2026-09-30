@@ -51,6 +51,7 @@ export interface RfbAttachment {
 
 export interface RfbRepresentation {
   normalizedText: string;
+  presentationHtml?: string;
   normalizedHash: string;
   title?: string;
   attachments: RfbAttachment[];
@@ -409,6 +410,7 @@ function validIsoDate(value: unknown): string | undefined {
 interface ApiSegment {
   order: number;
   text: string;
+  presentationHtml?: string;
   attachment?: RfbAttachment;
 }
 
@@ -423,8 +425,12 @@ function apiSegments(payload: Record<string, unknown>): ApiSegment[] {
         ? item.ordemSegmentoAto
         : Number.MAX_SAFE_INTEGER;
       const omit = item.omitir === true;
-      const text = !omit && typeof item.textoIntegra === 'string'
-        ? htmlFragmentText(item.textoIntegra)
+      const rawHtml =
+        !omit && typeof item.textoIntegra === 'string'
+          ? item.textoIntegra
+          : '';
+      const text = rawHtml
+        ? htmlFragmentText(rawHtml)
         : '';
       const file = record(item.arquivoBinario);
       const id = file && typeof file.idArquivoBinario === 'number' && Number.isSafeInteger(file.idArquivoBinario)
@@ -437,6 +443,9 @@ function apiSegments(payload: Record<string, unknown>): ApiSegment[] {
         segments.push({
           order,
           text,
+          ...(rawHtml
+            ? { presentationHtml: rawHtml }
+            : {}),
           ...(id
             ? {
                 attachment: {
@@ -498,6 +507,17 @@ export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentatio
     .filter(Boolean)
     .join('\n')
     .trim();
+  const presentationHtml = segments
+    .map((segment) => segment.presentationHtml)
+    .filter(
+      (value): value is string =>
+        Boolean(value),
+    )
+    .map(
+      (value) =>
+        '<section>' + value + '</section>',
+    )
+    .join('<hr>');
 
   const attachments: RfbAttachment[] = [];
   const seen = new Set<string>();
@@ -538,6 +558,9 @@ export function parseRfbApiRepresentation(payload: unknown): RfbApiRepresentatio
 
   return {
     normalizedText,
+    ...(presentationHtml
+      ? { presentationHtml }
+      : {}),
     normalizedHash: relationshipDigest,
     ...(title ? { title } : {}),
     attachments,
