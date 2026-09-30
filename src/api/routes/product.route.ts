@@ -886,6 +886,10 @@ export async function productRoutes(
                 'complement',
                 'district',
                 'state_registration',
+                'state_registration_status',
+                'state_registration_source',
+                'state_registration_checked_at',
+                'state_registration_lookup_status',
                 'is_active',
               ])
               .where('company_id', '=', request.params.companyId)
@@ -926,6 +930,18 @@ export async function productRoutes(
                 complement: row.complement,
                 district: row.district,
                 stateRegistration: row.state_registration,
+                stateRegistrationStatus:
+                  row.state_registration_status,
+                stateRegistrationSource:
+                  row.state_registration_source,
+                stateRegistrationCheckedAt:
+                  row.state_registration_checked_at
+                    ? new Date(
+                        row.state_registration_checked_at,
+                      ).toISOString()
+                    : null,
+                stateRegistrationLookupStatus:
+                  row.state_registration_lookup_status,
                 isActive: row.is_active,
                 cnaes: cnaes.map((cnae) => ({
                   code: cnae.code,
@@ -1022,6 +1038,13 @@ export async function productRoutes(
                 complement: request.body.complement ?? null,
                 district: request.body.district ?? null,
                 state_registration: request.body.stateRegistration ?? null,
+                state_registration_status: null,
+                state_registration_source:
+                  request.body.stateRegistration
+                    ? 'MANUAL'
+                    : null,
+                state_registration_checked_at: null,
+                state_registration_lookup_status: null,
                 is_active: true,
               })
               .returning([
