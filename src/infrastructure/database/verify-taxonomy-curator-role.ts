@@ -451,7 +451,7 @@ async function run(): Promise<void> {
       link_status_update: boolean;
       link_occurrence_update: boolean;
       link_delete: boolean;
-    }>(\`
+    }>(`
       SELECT
         has_table_privilege(
           'radar_taxonomy_curator',
@@ -527,7 +527,7 @@ async function run(): Promise<void> {
           'public.taxonomy_candidate_occurrence_links',
           'DELETE'
         ) AS link_delete
-    \`);
+    `);
 
     const candidatePolicy =
       candidatePrivileges.rows[0];

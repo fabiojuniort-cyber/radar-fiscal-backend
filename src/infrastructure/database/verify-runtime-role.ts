@@ -309,7 +309,7 @@ async function run(): Promise<void> {
       can_insert: boolean;
       can_update: boolean;
       can_delete: boolean;
-    }>(\`
+    }>(`
       SELECT
         table_name,
         has_table_privilege(
@@ -339,7 +339,7 @@ async function run(): Promise<void> {
           'taxonomy_candidate_occurrence_links'
         ]::text[]
       ) AS t(table_name)
-    \`);
+    `);
 
     if (
       candidatePrivileges.rows.length !== 3 ||
