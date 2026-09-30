@@ -759,7 +759,7 @@ export async function productRoutes(
               return 'TYPE_NOT_FOUND' as const;
             }
 
-            return trx
+            const created = await trx
               .insertInto('establishments')
               .values({
                 company_id: request.body.companyId,
@@ -789,6 +789,15 @@ export async function productRoutes(
                 'municipality_name',
               ])
               .executeTakeFirstOrThrow();
+
+            await replaceManualEstablishmentCnaes(
+              trx,
+              request.body.companyId,
+              created.id,
+              request.body.cnaes,
+            );
+
+            return created;
           },
         );
 
@@ -828,6 +837,131 @@ export async function productRoutes(
           constraint === 'uq_establishment_company_cnpj' ||
           constraint === 'uq_company_head_office'
         ) {
+          return reply.status(409).send({ error: 'establishment_conflict' });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  typed.post(
+    '/api/v1/companies/:companyId/establishments/from-cnpj',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+        body: establishmentFromCnpjBodySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const registry = await lookupCnpjRegistry(request.body.cnpj);
+
+        const result = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            if (
+              !(await requireTenantAdmin(
+                trx,
+                request.auth!.userId,
+                tenantId,
+              ))
+            ) {
+              return null;
+            }
+
+            const company = await trx
+              .selectFrom('companies')
+              .select('id')
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!company) {
+              return 'COMPANY_NOT_FOUND' as const;
+            }
+
+            const establishmentType = await trx
+              .selectFrom('establishment_types')
+              .select('code')
+              .where('code', '=', request.body.typeCode)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+
+            if (!establishmentType) {
+              return 'TYPE_NOT_FOUND' as const;
+            }
+
+            const establishmentId =
+              await createEstablishmentFromRegistry(
+                trx,
+                request.params.companyId,
+                registry,
+                request.body.typeCode,
+              );
+
+            return { establishmentId };
+          },
+        );
+
+        if (result === null) {
+          return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'COMPANY_NOT_FOUND') {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        if (result === 'TYPE_NOT_FOUND') {
+          return reply.status(400).send({ error: 'invalid_establishment_type' });
+        }
+
+        return reply.status(201).send({
+          establishment: {
+            id: result.establishmentId,
+            companyId: request.params.companyId,
+            cnpj: registry.cnpj,
+            name: registry.tradeName ?? registry.legalName,
+            typeCode: request.body.typeCode,
+            isHeadOffice: false,
+            uf: registry.uf,
+            municipalityName: registry.municipalityName,
+            municipalityIbgeCode: registry.municipalityIbgeCode,
+            postalCode: registry.postalCode,
+            street: registry.street,
+            streetNumber: registry.streetNumber,
+            complement: registry.complement,
+            district: registry.district,
+            cnaes: registry.cnaes,
+          },
+          registry: {
+            source: registry.source,
+            consultedAt: registry.consultedAt,
+            registrationStatus: registry.registrationStatus,
+            openedOn: registry.openedOn,
+          },
+        });
+      } catch (error) {
+        const handledTenant = handleTenantError(error, reply);
+        if (handledTenant) return handledTenant;
+
+        const handledRegistry = handleCnpjRegistryError(error, reply);
+        if (handledRegistry) return handledRegistry;
+
+        if (databaseConstraint(error) === 'uq_establishment_company_cnpj') {
           return reply.status(409).send({ error: 'establishment_conflict' });
         }
 
