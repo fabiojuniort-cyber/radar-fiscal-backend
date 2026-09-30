@@ -40,18 +40,34 @@ const companyBodySchema = z.object({
   cnpj: cnpjValueSchema,
 });
 
+const businessLocationCodeSchema = z
+  .string()
+  .trim()
+  .max(80)
+  .transform((value) =>
+    value.length > 0 ? value : null,
+  )
+  .nullable()
+  .optional();
+
 const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
+  businessLocationCode:
+    businessLocationCodeSchema,
 });
 
 const companyUpdateBodySchema = z.object({
   legalName: z.string().trim().min(2).max(200),
   tradeName: z.string().trim().min(2).max(200).nullable().optional(),
+  businessLocationCode:
+    businessLocationCodeSchema,
 });
 
 const establishmentFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
+  businessLocationCode:
+    businessLocationCodeSchema,
 });
 
 const cnaeBodySchema = z.object({
@@ -122,6 +138,8 @@ const establishmentUpdateBodySchema = z.object({
   complement: z.string().trim().max(160).nullable().optional(),
   district: z.string().trim().max(160).nullable().optional(),
   stateRegistration: z.string().trim().max(30).nullable().optional(),
+  businessLocationCode:
+    businessLocationCodeSchema,
   cnaes: cnaesBodySchema.default([]),
 });
 
@@ -152,6 +170,8 @@ const establishmentBodySchema = z.object({
   complement: z.string().trim().max(160).optional(),
   district: z.string().trim().max(160).optional(),
   stateRegistration: z.string().trim().max(30).optional(),
+  businessLocationCode:
+    businessLocationCodeSchema,
   cnaes: cnaesBodySchema.default([]),
 });
 
@@ -405,6 +425,7 @@ export async function productRoutes(
               cnpj: string;
               isActive: boolean;
               establishmentCount: number;
+              businessLocationCode: string | null;
             }> = [];
 
             for (const company of companies) {
@@ -415,6 +436,14 @@ export async function productRoutes(
                 .where('is_active', '=', true)
                 .executeTakeFirst();
 
+              const headOffice = await trx
+                .selectFrom('establishments')
+                .select('business_location_code')
+                .where('company_id', '=', company.id)
+                .where('is_head_office', '=', true)
+                .where('is_active', '=', true)
+                .executeTakeFirst();
+
               companyItems.push({
                 id: company.id,
                 legalName: company.legal_name,
@@ -422,6 +451,8 @@ export async function productRoutes(
                 cnpj: company.head_office_cnpj,
                 isActive: company.is_active,
                 establishmentCount: Number(establishments?.count ?? 0),
+                businessLocationCode:
+                  headOffice?.business_location_code ?? null,
               });
             }
 
@@ -517,6 +548,7 @@ export async function productRoutes(
             legalName: company.legal_name,
             tradeName: company.trade_name,
             cnpj: company.head_office_cnpj,
+            businessLocationCode: null,
           },
         });
       } catch (error) {
@@ -581,6 +613,7 @@ export async function productRoutes(
               tenantId,
               registry,
               stateRegistration,
+              request.body.businessLocationCode,
             );
           },
         );
@@ -595,6 +628,8 @@ export async function productRoutes(
             legalName: registry.legalName,
             tradeName: registry.tradeName,
             cnpj: registry.cnpj,
+            businessLocationCode:
+              request.body.businessLocationCode ?? null,
           },
           establishment: {
             id: created.establishmentId,
@@ -617,6 +652,8 @@ export async function productRoutes(
             complement:
               registry.complement,
             district: registry.district,
+            businessLocationCode:
+              request.body.businessLocationCode ?? null,
             stateRegistration:
               stateRegistration.registration,
             stateRegistrationStatus:
@@ -651,12 +688,24 @@ export async function productRoutes(
           );
         if (handledRegistry) return handledRegistry;
 
+        const constraint =
+          databaseConstraint(error);
+
         if (
-          databaseConstraint(error) ===
+          constraint ===
           'uq_company_cnpj_per_tenant'
         ) {
           return reply.status(409).send({
             error: 'company_cnpj_exists',
+          });
+        }
+
+        if (
+          constraint ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
           });
         }
 
@@ -701,11 +750,16 @@ export async function productRoutes(
               return null;
             }
 
-            return trx
+            const company = await trx
               .updateTable('companies')
               .set({
                 legal_name: request.body.legalName,
-                trade_name: request.body.tradeName ?? null,
+                ...(request.body.tradeName !== undefined
+                  ? {
+                      trade_name:
+                        request.body.tradeName,
+                    }
+                  : {}),
               })
               .where('id', '=', request.params.companyId)
               .where('is_active', '=', true)
@@ -716,6 +770,28 @@ export async function productRoutes(
                 'head_office_cnpj',
               ])
               .executeTakeFirst();
+
+            if (
+              company &&
+              request.body.businessLocationCode !== undefined
+            ) {
+              await trx
+                .updateTable('establishments')
+                .set({
+                  business_location_code:
+                    request.body.businessLocationCode,
+                })
+                .where(
+                  'company_id',
+                  '=',
+                  request.params.companyId,
+                )
+                .where('is_head_office', '=', true)
+                .where('is_active', '=', true)
+                .execute();
+            }
+
+            return company;
           },
         );
 
@@ -738,6 +814,16 @@ export async function productRoutes(
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
+
+        if (
+          databaseConstraint(error) ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
+        }
+
         throw error;
       }
     },
@@ -885,6 +971,7 @@ export async function productRoutes(
                 'street_number',
                 'complement',
                 'district',
+                'business_location_code',
                 'state_registration',
                 'state_registration_status',
                 'state_registration_source',
@@ -929,6 +1016,8 @@ export async function productRoutes(
                 streetNumber: row.street_number,
                 complement: row.complement,
                 district: row.district,
+                businessLocationCode:
+                  row.business_location_code,
                 stateRegistration: row.state_registration,
                 stateRegistrationStatus:
                   row.state_registration_status,
@@ -1037,6 +1126,8 @@ export async function productRoutes(
                 street_number: request.body.streetNumber ?? null,
                 complement: request.body.complement ?? null,
                 district: request.body.district ?? null,
+                business_location_code:
+                  request.body.businessLocationCode ?? null,
                 state_registration: request.body.stateRegistration ?? null,
                 state_registration_status: null,
                 state_registration_source:
@@ -1107,6 +1198,15 @@ export async function productRoutes(
           constraint === 'uq_company_head_office'
         ) {
           return reply.status(409).send({ error: 'establishment_conflict' });
+        }
+
+        if (
+          constraint ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
         }
 
         throw error;
@@ -1186,6 +1286,7 @@ export async function productRoutes(
                 registry,
                 request.body.typeCode,
                 stateRegistration,
+                request.body.businessLocationCode,
               );
 
             return { establishmentId };
@@ -1220,6 +1321,8 @@ export async function productRoutes(
             streetNumber: registry.streetNumber,
             complement: registry.complement,
             district: registry.district,
+            businessLocationCode:
+              request.body.businessLocationCode ?? null,
             stateRegistration:
               stateRegistration.registration,
             stateRegistrationStatus:
@@ -1246,8 +1349,23 @@ export async function productRoutes(
         const handledRegistry = handleCnpjRegistryError(error, reply);
         if (handledRegistry) return handledRegistry;
 
-        if (databaseConstraint(error) === 'uq_establishment_company_cnpj') {
+        const constraint =
+          databaseConstraint(error);
+
+        if (
+          constraint ===
+          'uq_establishment_company_cnpj'
+        ) {
           return reply.status(409).send({ error: 'establishment_conflict' });
+        }
+
+        if (
+          constraint ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
         }
 
         throw error;
@@ -1326,6 +1444,8 @@ export async function productRoutes(
                 street_number: request.body.streetNumber ?? null,
                 complement: request.body.complement ?? null,
                 district: request.body.district ?? null,
+                business_location_code:
+                  request.body.businessLocationCode ?? null,
                 state_registration: request.body.stateRegistration ?? null,
                 state_registration_status: null,
                 state_registration_source:
@@ -1367,6 +1487,16 @@ export async function productRoutes(
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
+
+        if (
+          databaseConstraint(error) ===
+          'uq_establishment_business_location_per_company'
+        ) {
+          return reply.status(409).send({
+            error: 'business_location_code_exists',
+          });
+        }
+
         throw error;
       }
     },

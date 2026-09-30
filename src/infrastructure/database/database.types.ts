@@ -229,6 +229,7 @@ export interface EstablishmentCnaes {
 }
 
 export interface Establishments {
+  business_location_code: string | null;
   cnpj: string;
   company_id: string;
   complement: string | null;

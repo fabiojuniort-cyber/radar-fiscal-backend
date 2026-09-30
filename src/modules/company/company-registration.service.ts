@@ -126,6 +126,7 @@ export async function createCompanyFromRegistry(
   tenantId: string,
   record: CnpjRegistryRecord,
   stateRegistration?: StateRegistrationLookup,
+  businessLocationCode?: string | null,
 ): Promise<{
   companyId: string;
   establishmentId: string;
@@ -164,7 +165,11 @@ export async function createCompanyFromRegistry(
 
   const existingEstablishment = await trx
     .selectFrom('establishments')
-    .select(['id', 'is_head_office'])
+    .select([
+      'id',
+      'is_head_office',
+      'business_location_code',
+    ])
     .where('company_id', '=', company.id)
     .where('cnpj', '=', record.cnpj)
     .executeTakeFirst();
@@ -190,6 +195,10 @@ export async function createCompanyFromRegistry(
             record.streetNumber,
           complement: record.complement,
           district: record.district,
+          business_location_code:
+            businessLocationCode === undefined
+              ? existingEstablishment.business_location_code
+              : businessLocationCode,
           state_registration:
             stateRegistration?.registration ?? null,
           state_registration_status:
@@ -227,6 +236,8 @@ export async function createCompanyFromRegistry(
             record.streetNumber,
           complement: record.complement,
           district: record.district,
+          business_location_code:
+            businessLocationCode ?? null,
           state_registration:
             stateRegistration?.registration ?? null,
           state_registration_status:
@@ -266,12 +277,17 @@ export async function createEstablishmentFromRegistry(
   record: CnpjRegistryRecord,
   typeCode: string,
   stateRegistration?: StateRegistrationLookup,
+  businessLocationCode?: string | null,
 ): Promise<string> {
   await upsertCnaes(trx, record.cnaes);
 
   const existingEstablishment = await trx
     .selectFrom('establishments')
-    .select(['id', 'is_head_office'])
+    .select([
+      'id',
+      'is_head_office',
+      'business_location_code',
+    ])
     .where('company_id', '=', companyId)
     .where('cnpj', '=', record.cnpj)
     .executeTakeFirst();
@@ -300,6 +316,10 @@ export async function createEstablishmentFromRegistry(
             record.streetNumber,
           complement: record.complement,
           district: record.district,
+          business_location_code:
+            businessLocationCode === undefined
+              ? existingEstablishment.business_location_code
+              : businessLocationCode,
           state_registration:
             stateRegistration?.registration ?? null,
           state_registration_status:
@@ -337,6 +357,8 @@ export async function createEstablishmentFromRegistry(
             record.streetNumber,
           complement: record.complement,
           district: record.district,
+          business_location_code:
+            businessLocationCode ?? null,
           state_registration:
             stateRegistration?.registration ?? null,
           state_registration_status:

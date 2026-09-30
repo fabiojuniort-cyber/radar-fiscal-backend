@@ -17,8 +17,10 @@ type RegistryFetch = (
   init?: RequestInit,
 ) => Promise<Response>;
 
-const GO_LANDING_URL =
-  'https://appasp.sefaz.go.gov.br/Sintegra/Consulta/default.asp';
+const GO_LANDING_URLS = [
+  'https://appasp.sefaz.go.gov.br/Sintegra/Consulta/default.html',
+  'https://appasp.sefaz.go.gov.br/Sintegra/Consulta/default.asp',
+] as const;
 const GO_RESULT_URL =
   'https://appasp.sefaz.go.gov.br/Sintegra/Consulta/consultar.asp';
 
@@ -154,19 +156,33 @@ async function lookupGoSintegra(
 ): Promise<StateRegistrationLookup> {
   const checkedAt = new Date();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10_000);
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  const browserHeaders = {
+    Accept: 'text/html,application/xhtml+xml',
+    'Accept-Language': 'pt-BR,pt;q=0.9',
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36',
+  };
 
   try {
-    const landing = await fetcher(GO_LANDING_URL, {
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'pt-BR,pt;q=0.9',
-        'User-Agent': 'TriBusca-Radar-Fiscal/1.0',
-      },
-      signal: controller.signal,
-    });
+    let landing: Response | null = null;
+    let landingUrl: string =
+      GO_LANDING_URLS[0];
 
-    if (!landing.ok) {
+    for (const candidate of GO_LANDING_URLS) {
+      const response = await fetcher(candidate, {
+        headers: browserHeaders,
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        landing = response;
+        landingUrl = candidate;
+        break;
+      }
+    }
+
+    if (!landing) {
       return {
         registration: null,
         registrationStatus: null,
@@ -179,47 +195,63 @@ async function lookupGoSintegra(
     const cookie = responseCookies(landing);
     const normalized = onlyDigits(cnpj);
 
-    const body = new URLSearchParams({
-      rTipoDoc: '2',
-      tDoc: normalized,
-      tCCE: '',
-      tCNPJ: normalized,
-      tCPF: '',
-      btCGC: 'Consulta',
-      'zion.SystemAction': 'consultaSintegra()',
-      'zion.OnSubmited': '',
-      'zion.FormElementPosted': 'zionFormID_1',
-      zionPostMethod: '',
-      zionRichValidator: 'true',
-    });
+    const buttonValues = [
+      'Consulta=',
+      'Consulta',
+      'Consultar',
+    ];
 
-    const response = await fetcher(GO_RESULT_URL, {
-      method: 'POST',
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'pt-BR,pt;q=0.9',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'TriBusca-Radar-Fiscal/1.0',
-        ...(cookie ? { Cookie: cookie } : {}),
-      },
-      body,
-      signal: controller.signal,
-    });
+    for (const buttonValue of buttonValues) {
+      const body = new URLSearchParams({
+        rTipoDoc: '2',
+        tDoc: normalized,
+        tCCE: '',
+        tCNPJ: normalized,
+        tCPF: '',
+        btCGC: buttonValue,
+        'zion.SystemAction': 'consultaSintegra()',
+        'zion.OnSubmited': '',
+        'zion.FormElementPosted': 'zionFormID_1',
+        zionPostMethod: '',
+        zionRichValidator: 'true',
+      });
 
-    if (!response.ok) {
-      return {
-        registration: null,
-        registrationStatus: null,
-        lookupStatus: 'UNAVAILABLE',
-        source: 'SEFAZ_GO_SINTEGRA',
-        checkedAt: checkedAt.toISOString(),
-      };
+      const response = await fetcher(GO_RESULT_URL, {
+        method: 'POST',
+        headers: {
+          ...browserHeaders,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Referer: landingUrl,
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+        body,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const parsed = parseGoSintegraResult(
+        await response.text(),
+        checkedAt,
+      );
+
+      if (
+        parsed.lookupStatus === 'SUCCESS' ||
+        parsed.lookupStatus === 'NOT_FOUND'
+      ) {
+        return parsed;
+      }
     }
 
-    return parseGoSintegraResult(
-      await response.text(),
-      checkedAt,
-    );
+    return {
+      registration: null,
+      registrationStatus: null,
+      lookupStatus: 'UNAVAILABLE',
+      source: 'SEFAZ_GO_SINTEGRA',
+      checkedAt: checkedAt.toISOString(),
+    };
   } catch {
     return {
       registration: null,

@@ -125,3 +125,58 @@ test('lookupCnpjRegistry rejects a mismatched provider CNPJ', async () => {
       error.code === 'cnpj_provider_invalid_response',
   );
 });
+
+test('lookupCnpjRegistry falls back to Minha Receita when BrasilAPI is unavailable', async () => {
+  const urls: string[] = [];
+
+  const result = await lookupCnpjRegistry(
+    '10515785000350',
+    async (input) => {
+      const url = String(input);
+      urls.push(url);
+
+      if (url.includes('brasilapi.com.br')) {
+        return new Response(
+          JSON.stringify({ message: 'unavailable' }),
+          {
+            status: 503,
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          cnpj: '10515785000350',
+          razao_social: 'AGREX DO BRASIL LTDA.',
+          nome_fantasia: 'AGREX',
+          uf: 'GO',
+          municipio: 'GOIATUBA',
+          codigo_municipio_ibge: 5209101,
+          cep: '75600000',
+          logradouro: 'RODOVIA GO 320 KM 3,0',
+          numero: 'SN',
+          bairro: 'ZONA RURAL',
+          cnae_fiscal: 1069400,
+          cnae_fiscal_descricao:
+            'Moagem e fabricação de produtos de origem vegetal não especificados anteriormente',
+          cnaes_secundarios: [],
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        },
+      );
+    },
+  );
+
+  assert.equal(result.cnpj, '10515785000350');
+  assert.equal(result.source, 'MINHA_RECEITA_DIRECT');
+  assert.equal(urls.length, 2);
+  assert.match(urls[0] ?? '', /brasilapi\.com\.br/);
+  assert.match(urls[1] ?? '', /minhareceita\.org/);
+});
