@@ -437,6 +437,7 @@ test(
             content_hash,
             content_text,
             relevant_excerpt,
+            source_metadata,
             is_current
           )
           VALUES (
@@ -445,6 +446,7 @@ test(
             $2,
             $3,
             $4,
+            $5::jsonb,
             true
           )
         `,
@@ -461,6 +463,19 @@ test(
             '    II - segundo item.',
           ].join('\n'),
           'Crédito presumido para fertilizantes.',
+          JSON.stringify({
+            presentation: {
+              version: 1,
+              format: 'SANITIZED_HTML',
+              preservesWhitespace: true,
+              html: [
+                '<script>alert(1)</script>',
+                '<h2 onclick="evil()">CAPÍTULO I</h2>',
+                '<p>Art. 1º Texto oficial.</p>',
+                '<table><tr><th>Tributo</th></tr><tr><td>ICMS</td></tr></table>',
+              ].join(''),
+            },
+          }),
         ],
       );
 
@@ -540,6 +555,7 @@ test(
             presentation: {
               format: string;
               preservesWhitespace: boolean;
+              html?: string;
             };
           } | null;
         }>();
@@ -567,6 +583,22 @@ test(
       assert.equal(
         detailBody.version?.presentation.preservesWhitespace,
         true,
+      );
+      assert.equal(
+        detailBody.version?.presentation.format,
+        'SANITIZED_HTML',
+      );
+      assert.match(
+        detailBody.version?.presentation.html ?? '',
+        /<h2>CAPÍTULO I<\/h2>/,
+      );
+      assert.match(
+        detailBody.version?.presentation.html ?? '',
+        /<table>/,
+      );
+      assert.doesNotMatch(
+        detailBody.version?.presentation.html ?? '',
+        /script|onclick/i,
       );
 
       const crossTenantCompanyRead =
