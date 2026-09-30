@@ -648,47 +648,76 @@ test(
 
       try {
         globalThis.fetch =
-          async () =>
-            new Response(
-              JSON.stringify({
-                cnpj: registryCnpj,
-                razao_social:
-                  'Empresa Registry de Teste S.A.',
-                nome_fantasia:
-                  'Registry Teste',
-                uf: 'GO',
-                municipio: 'Rio Verde',
-                codigo_municipio_ibge:
-                  5218805,
-                cep: '75900000',
-                logradouro:
-                  'Avenida das Empresas',
-                numero: '100',
-                bairro: 'Centro',
-                cnae_fiscal: 4683400,
-                cnae_fiscal_descricao:
-                  'Comércio atacadista de defensivos agrícolas',
-                cnaes_secundarios: [
-                  {
-                    codigo: 4623108,
-                    descricao:
-                      'Comércio atacadista de matérias-primas agrícolas',
+          async (input, init) => {
+            const url = String(input);
+
+            if (url.includes('brasilapi.com.br/api/cnpj/v1/')) {
+              return new Response(
+                JSON.stringify({
+                  cnpj: registryCnpj,
+                  razao_social: 'Empresa Registry de Teste S.A.',
+                  nome_fantasia: 'Registry Teste',
+                  uf: 'GO',
+                  municipio: 'Rio Verde',
+                  codigo_municipio_ibge: 5218805,
+                  cep: '75900000',
+                  logradouro: 'Avenida das Empresas',
+                  numero: '100',
+                  bairro: 'Centro',
+                  cnae_fiscal: 4683400,
+                  cnae_fiscal_descricao: 'Comércio atacadista de defensivos agrícolas',
+                  cnaes_secundarios: [
+                    {
+                      codigo: 4623108,
+                      descricao: 'Comércio atacadista de matérias-primas agrícolas',
+                    },
+                    {
+                      codigo: 4632001,
+                      descricao: 'Comércio atacadista de cereais',
+                    },
+                  ],
+                }),
+                {
+                  status: 200,
+                  headers: {
+                    'content-type': 'application/json',
                   },
-                  {
-                    codigo: 4632001,
-                    descricao:
-                      'Comércio atacadista de cereais',
-                  },
-                ],
-              }),
-              {
-                status: 200,
-                headers: {
-                  'content-type':
-                    'application/json',
                 },
-              },
-            );
+              );
+            }
+
+            if (
+              url.includes('appasp.sefaz.go.gov.br/Sintegra/Consulta/default.asp')
+            ) {
+              return new Response(
+                '<html>Consulta SINTEGRA Goiás</html>',
+                {
+                  status: 200,
+                  headers: {
+                    'content-type': 'text/html',
+                  },
+                },
+              );
+            }
+
+            if (
+              url.includes('appasp.sefaz.go.gov.br/Sintegra/Consulta/consultar.asp') &&
+              init?.method === 'POST'
+            ) {
+              return new Response(
+                '<td>Inscrição Estadual</td><td>10.999.888-7</td>' +
+                  '<td>Situação Cadastral Vigente</td><td>Ativo - HABILITADO</td>',
+                {
+                  status: 200,
+                  headers: {
+                    'content-type': 'text/html',
+                  },
+                },
+              );
+            }
+
+            return new Response('unexpected request', { status: 500 });
+          };
 
         const registryCreate =
           await app.inject({
@@ -713,6 +742,9 @@ test(
             };
             establishment: {
               id: string;
+              stateRegistration: string | null;
+              stateRegistrationStatus: string | null;
+              stateRegistrationLookupStatus: string | null;
               cnaes: Array<{
                 code: string;
                 isPrimary: boolean;
@@ -723,6 +755,21 @@ test(
         assert.equal(
           registryBody.company.cnpj,
           registryCnpj,
+        );
+        assert.equal(
+          registryBody.establishment
+            .stateRegistration,
+          '10.999.888-7',
+        );
+        assert.equal(
+          registryBody.establishment
+            .stateRegistrationStatus,
+          'Ativo - HABILITADO',
+        );
+        assert.equal(
+          registryBody.establishment
+            .stateRegistrationLookupStatus,
+          'SUCCESS',
         );
         assert.equal(
           registryBody.establishment
@@ -754,6 +801,10 @@ test(
             items: Array<{
               municipalityName:
                 string | null;
+              stateRegistration:
+                string | null;
+              stateRegistrationLookupStatus:
+                string | null;
               cnaes: unknown[];
             }>;
           }>().items[0];
@@ -761,6 +812,14 @@ test(
         assert.equal(
           persisted?.municipalityName,
           'Rio Verde',
+        );
+        assert.equal(
+          persisted?.stateRegistration,
+          '10.999.888-7',
+        );
+        assert.equal(
+          persisted?.stateRegistrationLookupStatus,
+          'SUCCESS',
         );
         assert.equal(
           persisted?.cnaes.length,
