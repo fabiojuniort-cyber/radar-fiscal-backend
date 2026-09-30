@@ -298,9 +298,17 @@ export async function lookupCnpjRegistry(
     const payload =
       await response.json();
 
-    return parseBrasilApiCnpj(
+    const record = parseBrasilApiCnpj(
       payload,
     );
+
+    if (record.cnpj !== normalized) {
+      throw new CnpjRegistryError(
+        'cnpj_provider_invalid_response',
+      );
+    }
+
+    return record;
   } catch (error) {
     if (
       error instanceof CnpjRegistryError
