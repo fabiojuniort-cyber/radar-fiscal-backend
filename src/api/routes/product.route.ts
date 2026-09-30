@@ -14,24 +14,51 @@ import {
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
 import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
+import {
+  CnpjRegistryError,
+  lookupCnpjRegistry,
+} from '../../modules/company/cnpj-registry.service.js';
+import {
+  createCompanyFromRegistry,
+  createEstablishmentFromRegistry,
+  rebuildCompanyCnaes,
+  replaceManualEstablishmentCnaes,
+} from '../../modules/company/company-registration.service.js';
+
+const cnpjValueSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/\D/g, ''))
+  .refine(isValidCnpj, 'invalid_cnpj');
 
 const companyBodySchema = z.object({
   legalName: z.string().trim().min(2).max(200),
   tradeName: z.string().trim().min(2).max(200).optional(),
-  cnpj: z
+  cnpj: cnpjValueSchema,
+});
+
+const companyFromCnpjBodySchema = z.object({
+  cnpj: cnpjValueSchema,
+});
+
+const establishmentFromCnpjBodySchema = z.object({
+  cnpj: cnpjValueSchema,
+  typeCode: z.string().trim().min(1).max(50).default('OTHER'),
+});
+
+const cnaeBodySchema = z.object({
+  code: z
     .string()
     .trim()
     .transform((value) => value.replace(/\D/g, ''))
-    .refine(isValidCnpj, 'invalid_cnpj'),
+    .refine((value) => /^\d{7}$/.test(value), 'invalid_cnae'),
+  description: z.string().trim().min(1).max(300),
+  isPrimary: z.boolean().default(false),
 });
 
 const establishmentBodySchema = z.object({
   companyId: z.string().uuid(),
-  cnpj: z
-    .string()
-    .trim()
-    .transform((value) => value.replace(/\D/g, ''))
-    .refine(isValidCnpj, 'invalid_cnpj'),
+  cnpj: cnpjValueSchema,
   name: z.string().trim().min(2).max(200),
   typeCode: z.string().trim().min(1).max(50),
   isHeadOffice: z.boolean().default(false),
@@ -55,6 +82,7 @@ const establishmentBodySchema = z.object({
   streetNumber: z.string().trim().max(30).optional(),
   complement: z.string().trim().max(160).optional(),
   district: z.string().trim().max(160).optional(),
+  cnaes: z.array(cnaeBodySchema).max(100).default([]),
 });
 
 const taxProfileBodySchema = z.object({
@@ -75,6 +103,21 @@ const taxProfileBodySchema = z.object({
     documents: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
     obligations: z.array(z.string().trim().min(1).max(120)).max(60).default([]),
     keywords: z.array(z.string().trim().min(1).max(120)).max(100).default([]),
+    taxonomy: z
+      .object({
+        releaseId: z.string().uuid(),
+        releaseVersion: z.string().trim().min(1).max(30),
+        conceptCodes: z
+          .array(
+            z
+              .string()
+              .trim()
+              .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/),
+          )
+          .max(500),
+      })
+      .nullable()
+      .default(null),
   }),
 });
 
@@ -128,6 +171,10 @@ function publicationPresentation(
 
 const companyIdParamsSchema = z.object({
   companyId: z.string().uuid(),
+});
+
+const establishmentIdParamsSchema = z.object({
+  establishmentId: z.string().uuid(),
 });
 
 const publicationIdParamsSchema = z.object({
