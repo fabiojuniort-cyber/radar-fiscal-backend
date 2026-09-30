@@ -4,7 +4,7 @@ import type {
   FastifyRequest,
 } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { z } from 'zod';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
@@ -271,6 +271,15 @@ const publicationIdParamsSchema = z.object({
   publicationId: z.string().uuid(),
 });
 
+const monitoringRunsQuerySchema = z.object({
+  source: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional(),
+});
+
 const archiveQuerySchema = z.object({
   q: z.string().trim().min(2).max(200).optional(),
   uf: z
@@ -478,6 +487,224 @@ export async function productRoutes(
         return reply.status(200).send(result);
       } catch (error) {
         const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
+    '/api/v1/monitoring/runs',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        querystring:
+          monitoringRunsQuerySchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({
+          error: 'unauthorized',
+        });
+      }
+
+      const tenantId =
+        tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({
+          error: 'tenant_required',
+        });
+      }
+
+      try {
+        const items =
+          await withTenantContext(
+            app.db,
+            request.auth.userId,
+            tenantId,
+            async (trx) => {
+              const membership =
+                await trx
+                  .selectFrom(
+                    'tenant_memberships',
+                  )
+                  .select('tenant_id')
+                  .where(
+                    'tenant_id',
+                    '=',
+                    tenantId,
+                  )
+                  .where(
+                    'user_id',
+                    '=',
+                    request.auth!.userId,
+                  )
+                  .executeTakeFirst();
+
+              if (!membership) {
+                throw new TenantAccessDeniedError();
+              }
+
+              const sourceCode =
+                request.query.source ??
+                null;
+
+              const result = await sql<{
+                id: string;
+                source_code: string;
+                source_name: string;
+                jurisdiction_level: string;
+                uf: string | null;
+                status: string;
+                trigger_type: string;
+                scheduled_for:
+                  | Date
+                  | string;
+                started_at:
+                  | Date
+                  | string
+                  | null;
+                finished_at:
+                  | Date
+                  | string
+                  | null;
+                duration_ms: number | null;
+                attempt_count: number;
+                found_items: number;
+                imported_documents: number;
+              }>`
+                SELECT
+                  cr.id,
+                  s.code AS source_code,
+                  s.name AS source_name,
+                  s.jurisdiction_level,
+                  s.uf,
+                  cr.status,
+                  cr.trigger_type,
+                  cr.scheduled_for,
+                  cr.started_at,
+                  cr.finished_at,
+                  CASE
+                    WHEN
+                      cr.started_at IS NOT NULL
+                      AND cr.finished_at IS NOT NULL
+                    THEN round(
+                      extract(
+                        epoch
+                        FROM (
+                          cr.finished_at -
+                          cr.started_at
+                        )
+                      ) * 1000
+                    )::int
+                    ELSE NULL
+                  END AS duration_ms,
+                  (
+                    SELECT count(*)::int
+                    FROM collection_attempts ca
+                    WHERE
+                      ca.collection_run_id =
+                      cr.id
+                  ) AS attempt_count,
+                  (
+                    SELECT count(*)::int
+                    FROM collection_items ci
+                    WHERE
+                      ci.collection_run_id =
+                      cr.id
+                  ) AS found_items,
+                  (
+                    SELECT count(*)::int
+                    FROM collection_run_publications crp
+                    WHERE
+                      crp.collection_run_id =
+                      cr.id
+                      AND crp.disposition IN (
+                        'NEW_PUBLICATION',
+                        'NEW_VERSION'
+                      )
+                  ) AS imported_documents
+                FROM collection_runs cr
+                JOIN sources s
+                  ON s.id = cr.source_id
+                WHERE
+                  coalesce(
+                    cr.started_at,
+                    cr.scheduled_for,
+                    cr.created_at
+                  ) >=
+                    now() -
+                    interval '24 hours'
+                  AND (
+                    ${sourceCode}::text
+                      IS NULL
+                    OR s.code =
+                      ${sourceCode}
+                  )
+                ORDER BY
+                  coalesce(
+                    cr.started_at,
+                    cr.scheduled_for,
+                    cr.created_at
+                  ) DESC,
+                  cr.id DESC
+                LIMIT 500
+              `.execute(trx);
+
+              return result.rows;
+            },
+          );
+
+        return reply.status(200).send({
+          generatedAt:
+            new Date().toISOString(),
+          windowHours: 24,
+          items: items.map((row) => ({
+            id: row.id,
+            sourceCode:
+              row.source_code,
+            sourceName:
+              row.source_name,
+            jurisdictionLevel:
+              row.jurisdiction_level,
+            uf: row.uf,
+            status: row.status,
+            triggerType:
+              row.trigger_type,
+            scheduledFor:
+              new Date(
+                row.scheduled_for,
+              ).toISOString(),
+            startedAt:
+              row.started_at
+                ? new Date(
+                    row.started_at,
+                  ).toISOString()
+                : null,
+            finishedAt:
+              row.finished_at
+                ? new Date(
+                    row.finished_at,
+                  ).toISOString()
+                : null,
+            durationMs:
+              row.duration_ms,
+            attemptCount:
+              row.attempt_count,
+            foundItems:
+              row.found_items,
+            importedDocuments:
+              row.imported_documents,
+          })),
+        });
+      } catch (error) {
+        const handled =
+          handleTenantError(
+            error,
+            reply,
+          );
         if (handled) return handled;
         throw error;
       }
