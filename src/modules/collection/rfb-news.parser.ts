@@ -16,6 +16,7 @@ export interface RfbNewsArticle {
   category?: string;
   publishedAt?: Date;
   updatedAt?: Date;
+  imageUrl?: string;
   tags: string[];
   url: string;
 }
@@ -28,6 +29,18 @@ function absoluteUrl(value: string, baseUrl: string): string | undefined {
   try {
     const url = new URL(value, baseUrl);
     if (url.origin !== RFB_ORIGIN) return undefined;
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function imageUrl(value: string | undefined, baseUrl: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value, baseUrl);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
     url.hash = '';
     return url.toString();
   } catch {
@@ -210,6 +223,10 @@ export function parseRfbNewsArticle(
   const category = normalizeSpace(
     metaValue(meta, 'article:section', 'section', 'dc.type') ?? '',
   ) || undefined;
+  const articleImageUrl = imageUrl(
+    metaValue(meta, 'og:image', 'twitter:image', 'twitter:image:src'),
+    url,
+  );
 
   const content = visible || undefined;
 
@@ -220,6 +237,7 @@ export function parseRfbNewsArticle(
     ...(category ? { category } : {}),
     ...(publishedAt ? { publishedAt } : {}),
     ...(updatedAt ? { updatedAt } : {}),
+    ...(articleImageUrl ? { imageUrl: articleImageUrl } : {}),
     tags: [...tags],
     url,
   };
