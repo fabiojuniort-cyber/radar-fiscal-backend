@@ -8,7 +8,7 @@ import { buildApp } from '../src/app.js';
 
 const PASSWORD = 'News-Test-2026!Safe';
 
-test('news API requires auth and returns latest official news with search', async () => {
+test('news API requires auth and returns latest official news with search and image', async () => {
   const adminUrl = process.env.DATABASE_ADMIN_URL;
   assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for news API integration tests.');
 
@@ -18,6 +18,7 @@ test('news API requires auth and returns latest official news with search', asyn
   const email = `news-${suffix}@example.test`;
   const sourceId = randomUUID();
   const newsId = randomUUID();
+  const imageUrl = 'https://www.gov.br/receitafederal/imagens/noticias/ibs-cbs.jpg';
 
   try {
     await app.ready();
@@ -76,7 +77,7 @@ test('news API requires auth and returns latest official news with search', asyn
       `INSERT INTO news_item_versions (
          news_item_id, version_no, content_hash, title, summary, category,
          published_at, official_url, tags, source_metadata
-       ) VALUES ($1, 1, $2, $3, $4, 'Tributação', $5, $6, $7, '{}'::jsonb)`,
+       ) VALUES ($1, 1, $2, $3, $4, 'Tributação', $5, $6, $7, $8::jsonb)`,
       [
         newsId,
         'b'.repeat(64),
@@ -85,6 +86,7 @@ test('news API requires auth and returns latest official news with search', asyn
         new Date('2026-09-20T13:00:00Z'),
         'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/ibs-cbs-test',
         ['IBS', 'CBS', 'RTC'],
+        JSON.stringify({ imageUrl }),
       ],
     );
 
@@ -102,6 +104,7 @@ test('news API requires auth and returns latest official news with search', asyn
         title: string;
         category: string | null;
         officialUrl: string;
+        imageUrl: string | null;
         tags: string[];
       }>;
       totalItems: number;
@@ -113,6 +116,7 @@ test('news API requires auth and returns latest official news with search', asyn
     assert.equal(body.items[0]?.id, newsId);
     assert.equal(body.items[0]?.sourceName, 'Receita Federal — Notícias');
     assert.equal(body.items[0]?.category, 'Tributação');
+    assert.equal(body.items[0]?.imageUrl, imageUrl);
     assert.deepEqual(body.items[0]?.tags, ['IBS', 'CBS', 'RTC']);
     assert.match(body.items[0]?.officialUrl ?? '', /gov\.br\/receitafederal/);
 
