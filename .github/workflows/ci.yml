@@ -88,6 +88,9 @@ jobs:
       - name: NCM catalog parser unit tests
         run: npx tsx --test test/ncm-catalog.source.unit.test.ts
 
+      - name: Publication NCM detector unit tests
+        run: npx tsx --test test/publication-ncm.detector.unit.test.ts
+
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
@@ -98,7 +101,10 @@ jobs:
         run: npx tsx --test test/news.worker-runtime.integration.test.ts
 
       - name: Collection persistence integration tests
-        run: npm run test:collection-integration
+        shell: bash
+        run: |
+          export DATABASE_URL="postgresql://radar_worker_runtime:${DB_RUNTIME_PASSWORD}@localhost:5432/radar_fiscal_test"
+          npm run test:collection-integration
 
       - name: DOE-SP NCM evidence rebuild guard
         run: npx tsx --test test/doe-sp.ncm-rebuild-guard.integration.test.ts
@@ -117,6 +123,12 @@ jobs:
 
       - name: NCM official catalog idempotency
         run: npx tsx --test test/ncm-catalog.import.integration.test.ts
+
+      - name: Publication NCM enrichment integration
+        run: npx tsx --test test/publication-ncm.enrichment.integration.test.ts
+
+      - name: Archive NCM filter integration
+        run: npx tsx --test test/archive-ncm-filter.integration.test.ts
 
       - name: Product/NCM API integration test
         shell: bash

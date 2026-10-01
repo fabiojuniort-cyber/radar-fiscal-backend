@@ -18,7 +18,8 @@
 --   KEEP     publications rows (ids exposed by the public API stay valid)
 --   KEEP     collection_runs, collection_attempts, collection_items
 --   KEEP     collection_run_publications rows, version pointer set to NULL
---   DELETE   publication_versions of the scope (publication_files cascade)
+--   DELETE   publication_versions of the scope (publication_files and derived
+--            publication_ncm_scans cascade)
 --   DELETE   publication_origins of source doe-sp
 --   ABORT    if any publication_ncm_mentions row references a scope version
 --            (derived tax evidence must be preserved or recomputed explicitly)
@@ -144,6 +145,7 @@ BEGIN
       'collection_run_publications_publication_version_id_fkey', 'fk_collection_item_publication',
       'company_publications_publication_id_fkey', 'publication_taxonomy_runs_publication_version_id_fkey',
       'publication_ncm_mentions_publication_version_id_fkey',
+      'publication_ncm_scans_publication_version_id_fkey',
       'norma_clara_translations_publication_version_id_fkey');
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % unknown foreign keys reference publications/versions (schema drift)', v_n; END IF;
 END

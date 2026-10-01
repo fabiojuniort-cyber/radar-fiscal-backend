@@ -9,6 +9,9 @@ import {
   buildConnectorRegistry,
 } from './modules/collection/connector-registry.factory.js';
 import {
+  processPublicationNcmEnrichmentBatch,
+} from './modules/taxonomy/ncm/publication-ncm.detector.js';
+import {
   assertStandaloneDatabaseConnection,
   assertWorkerRuntimeConnection,
   createStandaloneDatabase,
@@ -16,6 +19,9 @@ import {
 import { processLogger } from './infrastructure/logging/process-logger.js';
 
 let stopping = false;
+
+const NCM_IDLE_BATCH_SIZE = 10;
+const NCM_AFTER_COLLECTION_BATCH_SIZE = 5;
 
 function requestShutdown(signal: string): void {
   stopping = true;
@@ -37,6 +43,41 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) =>
     setTimeout(resolve, ms),
   );
+}
+
+async function enrichPublicationNcms(
+  db: ReturnType<typeof createStandaloneDatabase>,
+  limit: number,
+): Promise<void> {
+  try {
+    const result = await processPublicationNcmEnrichmentBatch(
+      db,
+      { limit },
+    );
+
+    if (result.selected > 0) {
+      processLogger.info(
+        {
+          selected: result.selected,
+          succeeded: result.succeeded,
+          failed: result.failed,
+          candidates: result.candidates,
+          matches: result.matches,
+        },
+        'Publication NCM enrichment batch completed',
+      );
+    }
+  } catch (error) {
+    processLogger.warn(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown NCM enrichment error',
+      },
+      'Publication NCM enrichment batch failed',
+    );
+  }
 }
 
 async function run(): Promise<void> {
@@ -77,6 +118,9 @@ async function run(): Promise<void> {
           env.COLLECTION_STALE_AFTER_MS,
         simulatedConnectors:
           env.COLLECTION_ENABLE_SIMULATED_CONNECTORS,
+        ncmIdleBatchSize: NCM_IDLE_BATCH_SIZE,
+        ncmAfterCollectionBatchSize:
+          NCM_AFTER_COLLECTION_BATCH_SIZE,
       },
       'Collection worker started',
     );
@@ -94,6 +138,10 @@ async function run(): Promise<void> {
           );
 
         if (!acquired) {
+          await enrichPublicationNcms(
+            db,
+            NCM_IDLE_BATCH_SIZE,
+          );
           await sleep(
             env.COLLECTION_POLL_INTERVAL_MS,
           );
@@ -114,6 +162,11 @@ async function run(): Promise<void> {
               env.COLLECTION_HEARTBEAT_INTERVAL_MS,
             logger: processLogger,
           },
+        );
+
+        await enrichPublicationNcms(
+          db,
+          NCM_AFTER_COLLECTION_BATCH_SIZE,
         );
       } catch (error) {
         processLogger.error(
