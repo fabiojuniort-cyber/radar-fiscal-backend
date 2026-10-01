@@ -325,7 +325,7 @@ async function selectBatch(
       )
     ORDER BY
       p.published_on DESC NULLS LAST,
-      pv.collected_at DESC,
+      pv.captured_at DESC,
       pv.id
     LIMIT ${limit}
   `.execute(db);
