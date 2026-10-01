@@ -48,7 +48,7 @@ function failureInfo(error: unknown): { code: string; message: string } {
 
 export class RfbNewsConnector implements CollectionConnector {
   readonly key = RFB_NEWS_CONNECTOR_KEY;
-  readonly version = '0.1.0';
+  readonly version = '0.2.0';
   readonly #client: RfbNewsClient;
   readonly #maxArticlesPerRun: number;
 
@@ -101,6 +101,7 @@ export class RfbNewsConnector implements CollectionConnector {
           tags: article.tags,
           metadata: {
             source: 'RFB_NEWS',
+            ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
             relevance: {
               reason: relevance.reason,
               matchedTerms: relevance.matchedTerms,
