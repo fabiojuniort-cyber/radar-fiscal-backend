@@ -169,6 +169,9 @@ Preconditions (all required before authorization):
    timing it (this is the window estimate) and confirming that
    `pg_dump`/`pg_restore` of the migrated copy restores `pt_unaccent` before
    the generated columns, plus indexes, triggers and feed.
+   `ops/catalog/rehearse-028.mjs` runs these steps inside Railway
+   (`MODE=preflight|rehearse|dumpcheck`); it only targets a
+   `tmp-perf-028-restore.*` host and prints counts, sizes and timings only.
 4. Capacity: free disk/WAL for two table rewrites, the GIN indexes, the
    ordered index and the feed (≈ size of `publications` + `publication_versions`
    + 20%).
