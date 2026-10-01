@@ -13,4 +13,11 @@ AGGREGATE_CACHE_TTL_MS=0 DATABASE_URL=... DATABASE_ADMIN_URL=... JWT_ACCESS_SECR
 ```
 
 `AGGREGATE_CACHE_TTL_MS=0` measures the cold queries the aggregate cache
-hides. Results and the scaling plan: `docs/catalog-scale-plan.md`.
+hides. To time the proposed schema changes (PERF-02):
+
+```bash
+psql postgresql://.../radar_perf -f ops/perf/experiment-build.sql
+psql postgresql://.../radar_perf -f ops/perf/experiment-measure.sql
+```
+
+Results and the scaling plan: `docs/catalog-scale-plan.md`.
