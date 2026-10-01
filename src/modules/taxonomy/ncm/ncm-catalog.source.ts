@@ -45,13 +45,13 @@ export function isAssignableNcmCode(value: string): boolean {
   return normalizeNcmDigits(value).length === 8;
 }
 
-function parseBrazilianDate(value: string, label: string): string {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
-  if (!match) {
-    throw new Error(`NCM_SOURCE_INVALID_DATE:${label}:${value}`);
-  }
-
-  const [, day, month, year] = match;
+function datePartsToIso(
+  day: string,
+  month: string,
+  year: string,
+  label: string,
+  originalValue: string,
+): string {
   const iso = `${year}-${month}-${day}`;
   const date = new Date(`${iso}T00:00:00.000Z`);
 
@@ -61,10 +61,42 @@ function parseBrazilianDate(value: string, label: string): string {
     date.getUTCMonth() + 1 !== Number(month) ||
     date.getUTCDate() !== Number(day)
   ) {
-    throw new Error(`NCM_SOURCE_INVALID_DATE:${label}:${value}`);
+    throw new Error(
+      `NCM_SOURCE_INVALID_DATE:${label}:${originalValue}`,
+    );
   }
 
   return iso;
+}
+
+function parseBrazilianDate(value: string, label: string): string {
+  const trimmed = value.trim();
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  if (!match) {
+    throw new Error(`NCM_SOURCE_INVALID_DATE:${label}:${value}`);
+  }
+
+  const [, day, month, year] = match;
+  return datePartsToIso(day, month, year, label, value);
+}
+
+function parseCatalogUpdatedOn(value: string): string {
+  const trimmed = value.trim();
+  const match = /^(?:Vigente em )?(\d{2})\/(\d{2})\/(\d{4})$/i.exec(trimmed);
+  if (!match) {
+    throw new Error(
+      `NCM_SOURCE_INVALID_DATE:Data_Ultima_Atualizacao_NCM:${value}`,
+    );
+  }
+
+  const [, day, month, year] = match;
+  return datePartsToIso(
+    day,
+    month,
+    year,
+    'Data_Ultima_Atualizacao_NCM',
+    value,
+  );
 }
 
 function optionalDate(value: string | undefined, label: string): string | null {
@@ -124,9 +156,8 @@ export function parseNcmCatalogPayload(input: unknown): ParsedNcmCatalog {
 
   return {
     sourceUpdatedOn: payload.Data_Ultima_Atualizacao_NCM,
-    sourceUpdatedOnIso: parseBrazilianDate(
+    sourceUpdatedOnIso: parseCatalogUpdatedOn(
       payload.Data_Ultima_Atualizacao_NCM,
-      'Data_Ultima_Atualizacao_NCM',
     ),
     act: payload.Ato ?? null,
     entries,
