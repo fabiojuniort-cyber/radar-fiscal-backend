@@ -119,4 +119,16 @@ jobs:
         run: npx tsx --test test/ncm-catalog.import.integration.test.ts
 
       - name: Product/NCM API integration test
-        run: npx tsx --test test/product-ncm.integration.test.ts
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tsx --test test/product-ncm.integration.test.ts 2>&1 | tee product-ncm-integration.log
+
+      - name: Upload Product/NCM integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-ncm-integration-diagnostics
+          path: product-ncm-integration.log
+          retention-days: 1
+          if-no-files-found: ignore
