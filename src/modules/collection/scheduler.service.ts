@@ -16,7 +16,7 @@ export interface SchedulerTickResult {
 }
 
 function preventsOverlappingRuns(connectorKey: string): boolean {
-  return connectorKey === 'dou' || connectorKey === 'nfe-encat' || connectorKey === 'sped' || connectorKey === 'cgibs' || connectorKey === 'rfb-normas' || connectorKey === 'doe-sp';
+  return connectorKey === 'dou' || connectorKey === 'nfe-encat' || connectorKey === 'sped' || connectorKey === 'cgibs' || connectorKey === 'rfb-normas' || connectorKey === 'rfb-news' || connectorKey === 'doe-sp';
 }
 
 export async function runSchedulerTick(
