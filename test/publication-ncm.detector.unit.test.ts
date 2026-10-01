@@ -9,7 +9,7 @@ test('extractNcmCandidates normalizes formatted and plain NCMs and counts repeat
   const text = [
     'A tabela alcança o NCM 1006.30.11 para arroz branqueado.',
     'Também menciona 10062099 e repete 1006.30.11 em outra linha.',
-    'O código 9999-99-99 tem formato plausível, mas será validado pelo catálogo.',
+    'O código 9999.99.99 tem formato plausível, mas será validado pelo catálogo.',
     'A sequência 123456789 não pode ser recortada como oito dígitos.',
   ].join(' ');
 
@@ -24,7 +24,11 @@ test('extractNcmCandidates normalizes formatted and plain NCMs and counts repeat
   assert.equal(byCode.has('12345678'), false);
 });
 
-test('extractNcmCandidates returns no candidates for unrelated numeric text', () => {
-  const text = 'Lei nº 14.133/2021, publicada em 01/10/2026, processo 12345.';
+test('extractNcmCandidates ignores date-shaped and unrelated numeric text', () => {
+  const text = [
+    'Lei nº 14.133/2021, publicada em 01/10/2026, processo 12345.',
+    'Datas ISO como 2026-10-01 também não são códigos NCM.',
+    'Separações livres como 1006 30 11 não entram no detector conservador.',
+  ].join(' ');
   assert.deepEqual(extractNcmCandidates(text), []);
 });
