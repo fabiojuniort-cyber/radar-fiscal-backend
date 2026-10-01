@@ -29,11 +29,12 @@ test('RFB news listing keeps only article links and deduplicates them', () => {
   ]);
 });
 
-test('RFB news article uses official metadata and visible main content', () => {
+test('RFB news article uses official metadata, image and visible main content', () => {
   const html = `
     <html><head>
       <meta property="og:title" content="Receita regulamenta IBS e CBS">
       <meta property="og:description" content="Novas regras para documentos fiscais.">
+      <meta property="og:image" content="https://www.gov.br/receitafederal/imagens/noticias/ibs-cbs.jpg#preview">
       <meta property="article:published_time" content="2026-09-01T10:18:00-03:00">
       <meta property="article:modified_time" content="2026-09-02T09:25:00-03:00">
       <meta property="article:section" content="Tributação">
@@ -58,8 +59,21 @@ test('RFB news article uses official metadata and visible main content', () => {
   assert.equal(article.category, 'Tributação');
   assert.equal(article.publishedAt?.toISOString(), '2026-09-01T13:18:00.000Z');
   assert.equal(article.updatedAt?.toISOString(), '2026-09-02T12:25:00.000Z');
+  assert.equal(article.imageUrl, 'https://www.gov.br/receitafederal/imagens/noticias/ibs-cbs.jpg');
   assert.ok(article.content?.includes('Reforma Tributária do Consumo'));
   assert.deepEqual(new Set(article.tags), new Set(['RTC', 'IBS', 'CBS', 'Documentos fiscais']));
+});
+
+test('RFB news article resolves a relative social image URL', () => {
+  const html = `
+    <head><meta name="twitter:image" content="/receitafederal/imagens/noticias/cbs.png"></head>
+    <main><h1>Notícia com imagem</h1><p>CBS e Reforma Tributária.</p></main>
+  `;
+  const article = parseRfbNewsArticle(
+    html,
+    'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/exemplo',
+  );
+  assert.equal(article.imageUrl, 'https://www.gov.br/receitafederal/imagens/noticias/cbs.png');
 });
 
 test('RFB news article falls back to visible published timestamp', () => {
