@@ -33,3 +33,10 @@ SELECT p.id FROM publication_versions pv JOIN publications p ON p.id = pv.public
 \echo == P6b broad term (worst case for full-text: many matches)
 SELECT count(*) FROM publication_versions pv WHERE pv.is_current AND pv.search_vector @@ websearch_to_tsquery('portuguese', 'portaria');
 SELECT p.id FROM publication_versions pv JOIN publications p ON p.id = pv.publication_id WHERE pv.is_current AND NOT p.is_hidden AND pv.search_vector @@ websearch_to_tsquery('portuguese', 'portaria') ORDER BY p.published_on DESC NULLS LAST LIMIT 25;
+
+\echo == P7 archive by source via publication_source_feed (same meaning as today)
+SELECT pg_size_pretty(pg_total_relation_size('publication_source_feed'));
+SELECT publication_id FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='dou') AND NOT is_confaz ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25;
+SELECT publication_id FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='dou') AND NOT is_confaz ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25 OFFSET 975;
+SELECT publication_id FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='sped') ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25 OFFSET 975;
+SELECT count(*) FROM (SELECT 1 FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='sped') LIMIT 10001) t;

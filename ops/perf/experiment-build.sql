@@ -29,3 +29,10 @@ SELECT po.source_id, count(DISTINCT po.publication_id) AS all_visible,
 FROM publication_origins po JOIN publications p ON p.id = po.publication_id
 WHERE NOT p.is_hidden GROUP BY po.source_id;
 ANALYZE publications;
+
+-- P7: per-source feed keeping today's filter meaning (one row per origin)
+CREATE TABLE publication_source_feed AS
+SELECT po.source_id, p.id AS publication_id, p.published_on, p.first_collected_at, p.is_confaz
+FROM publication_origins po JOIN publications p ON p.id = po.publication_id
+WHERE NOT p.is_hidden;
+CREATE INDEX ix_feed_source_order ON publication_source_feed (source_id, published_on DESC NULLS LAST, first_collected_at DESC);
