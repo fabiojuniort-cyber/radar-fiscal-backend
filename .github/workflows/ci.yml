@@ -125,19 +125,7 @@ jobs:
         run: npx tsx --test test/ncm-catalog.import.integration.test.ts
 
       - name: Publication NCM enrichment integration
-        shell: bash
-        run: |
-          set -o pipefail
-          npx tsx --test test/publication-ncm.enrichment.integration.test.ts 2>&1 | tee publication-ncm-enrichment.log
-
-      - name: Upload Publication NCM enrichment diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: publication-ncm-enrichment-diagnostics
-          path: publication-ncm-enrichment.log
-          retention-days: 1
-          if-no-files-found: ignore
+        run: npx tsx --test test/publication-ncm.enrichment.integration.test.ts
 
       - name: Archive NCM filter integration
         run: npx tsx --test test/archive-ncm-filter.integration.test.ts
