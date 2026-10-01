@@ -63,7 +63,6 @@ test('news collection is isolated from publications, idempotent on replay and ve
   const sourceCode = `news-integration-${sourceId}`;
   const registry = new ConnectorRegistry();
   let revision = 1;
-  const runIds: string[] = [];
 
   registry.register({
     key: connectorKey,
@@ -119,7 +118,6 @@ test('news collection is isolated from publications, idempotent on replay and ve
       sourceId,
       new Date('2026-10-01T13:00:00Z'),
     );
-    runIds.push(first.runId);
 
     assert.equal(first.result.status, 'SUCCESS');
     assert.equal(first.result.metrics.found, 1);
@@ -158,7 +156,6 @@ test('news collection is isolated from publications, idempotent on replay and ve
       sourceId,
       new Date('2026-10-01T14:00:00Z'),
     );
-    runIds.push(replay.runId);
 
     assert.equal(replay.result.status, 'SUCCESS');
     const replayVersions = await sql<{ count: number }>`
@@ -176,7 +173,6 @@ test('news collection is isolated from publications, idempotent on replay and ve
       sourceId,
       new Date('2026-10-01T15:00:00Z'),
     );
-    runIds.push(changed.runId);
 
     assert.equal(changed.result.status, 'SUCCESS');
     const changedState = await sql<{
@@ -198,12 +194,13 @@ test('news collection is isolated from publications, idempotent on replay and ve
       status: 'NEW_VERSION',
     });
   } finally {
-    if (runIds.length > 0) {
-      await db
-        .deleteFrom('collection_runs')
-        .where('id', 'in', runIds)
-        .execute();
-    }
+    // Clean every run owned by this isolated source. Using source_id is more
+    // robust than a local list because the engine/scheduler contract may add
+    // source-owned runs while integration suites execute concurrently.
+    await db
+      .deleteFrom('collection_runs')
+      .where('source_id', '=', sourceId)
+      .execute();
 
     await sql`
       DELETE FROM news_item_versions
