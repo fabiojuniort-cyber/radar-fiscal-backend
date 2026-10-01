@@ -52,6 +52,18 @@ test('NCM parser preserves hierarchy and marks only 8-digit codes assignable', (
   );
 });
 
+test('NCM parser accepts the real Siscomex vigente date label', () => {
+  const parsed = parseNcmCatalogPayload({
+    ...fixture,
+    Data_Ultima_Atualizacao_NCM: 'Vigente em 01/10/2026',
+    Ato: 'Resolução Gecex nº 926/2026',
+  });
+
+  assert.equal(parsed.sourceUpdatedOn, 'Vigente em 01/10/2026');
+  assert.equal(parsed.sourceUpdatedOnIso, '2026-10-01');
+  assert.equal(parsed.act, 'Resolução Gecex nº 926/2026');
+});
+
 test('NCM helpers normalize formatted codes', () => {
   assert.equal(normalizeNcmDigits('1006.30.11'), '10063011');
   assert.equal(isAssignableNcmCode('1006.30.11'), true);
@@ -75,8 +87,23 @@ test('NCM parser rejects invalid source dates', () => {
   assert.throws(
     () => parseNcmCatalogPayload({
       ...fixture,
-      Data_Ultima_Atualizacao_NCM: '31/02/2026',
+      Data_Ultima_Atualizacao_NCM: 'Vigente em 31/02/2026',
     }),
     /NCM_SOURCE_INVALID_DATE/,
+  );
+});
+
+test('NCM parser does not loosen row validity dates', () => {
+  assert.throws(
+    () => parseNcmCatalogPayload({
+      ...fixture,
+      Nomenclaturas: [
+        {
+          ...fixture.Nomenclaturas[1],
+          Data_Inicio: 'Vigente em 01/04/2022',
+        },
+      ],
+    }),
+    /NCM_SOURCE_INVALID_DATE:Nomenclaturas\[0\]\.Data_Inicio/,
   );
 });
