@@ -187,12 +187,9 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
       match_count: 0,
     });
 
-    const replay = await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
-    assert.notEqual(
-      replay.selected > 0 && replay.matches > 0,
-      true,
-      'already successful fixture must not generate duplicate NCM mentions',
-    );
+    // A later global batch may legitimately select another CI publication.
+    // Our already-successful version must nevertheless remain idempotent.
+    await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
 
     const duplicateCount = await admin.query<{ count: number }>(
       `SELECT count(*)::int AS count
