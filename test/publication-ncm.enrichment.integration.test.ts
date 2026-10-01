@@ -57,16 +57,8 @@ async function createPublicationFixture(
       input.text,
     ],
   );
-  const versionId = version.rows[0]!.id;
 
-  await admin.query(
-    `UPDATE publications
-     SET current_version_id = $2::uuid
-     WHERE id = $1::uuid`,
-    [publicationId, versionId],
-  );
-
-  return { publicationId, versionId };
+  return { publicationId, versionId: version.rows[0]!.id };
 }
 
 test('publication NCM enrichment stores only CURRENT catalog matches and marks zero-match scans', async () => {
@@ -133,7 +125,7 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
 
     const matched = await createPublicationFixture(admin, {
       title: 'NCM detector matched fixture',
-      publishedOn: '2099-12-31',
+      publishedOn: '9999-12-31',
       text: 'Tabela: NCM 1006.30.11 e 10062099. Repete 1006.30.11. Ignorar 9999.99.99.',
     });
     fixtures.push(matched);
@@ -201,7 +193,7 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
 
     const zeroMatch = await createPublicationFixture(admin, {
       title: 'NCM detector zero-match fixture',
-      publishedOn: '2099-12-30',
+      publishedOn: '9999-12-30',
       text: 'Texto com candidato 9999.99.99 que não existe na edição CURRENT da fixture.',
     });
     fixtures.push(zeroMatch);
@@ -255,10 +247,6 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
       await admin.query(
         'DELETE FROM publication_ncm_scans WHERE publication_version_id = $1::uuid',
         [fixture.versionId],
-      );
-      await admin.query(
-        'UPDATE publications SET current_version_id = NULL WHERE id = $1::uuid',
-        [fixture.publicationId],
       );
       await admin.query(
         'DELETE FROM publication_versions WHERE id = $1::uuid',
