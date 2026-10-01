@@ -71,6 +71,45 @@ test('news identity is source-scoped and content changes create a new content ha
   assert.notEqual(base.identityHash, otherSource.identityHash);
 });
 
+test('official image is normalized and changes content version without changing identity', () => {
+  const withoutImage = normalizeNewsItem({
+    sourceId,
+    item: {
+      title: 'CBS em destaque',
+      officialUrl: 'https://www.gov.br/receitafederal/noticia-imagem',
+      metadata: { source: 'RFB_NEWS' },
+    },
+  });
+  const withImage = normalizeNewsItem({
+    sourceId,
+    item: {
+      title: 'CBS em destaque',
+      officialUrl: 'https://www.gov.br/receitafederal/noticia-imagem',
+      metadata: {
+        source: 'RFB_NEWS',
+        imageUrl: 'https://www.gov.br/receitafederal/imagens/cbs.jpg#preview',
+      },
+    },
+  });
+  const changedImage = normalizeNewsItem({
+    sourceId,
+    item: {
+      title: 'CBS em destaque',
+      officialUrl: 'https://www.gov.br/receitafederal/noticia-imagem',
+      metadata: {
+        source: 'RFB_NEWS',
+        imageUrl: 'https://www.gov.br/receitafederal/imagens/cbs-v2.jpg',
+      },
+    },
+  });
+
+  assert.equal(withoutImage.identityHash, withImage.identityHash);
+  assert.equal(withImage.identityHash, changedImage.identityHash);
+  assert.notEqual(withoutImage.contentHash, withImage.contentHash);
+  assert.notEqual(withImage.contentHash, changedImage.contentHash);
+  assert.equal(withImage.metadata.imageUrl, 'https://www.gov.br/receitafederal/imagens/cbs.jpg');
+});
+
 test('news normalizer rejects unsupported URL protocols and invalid dates', () => {
   assert.throws(
     () => normalizeNewsItem({
