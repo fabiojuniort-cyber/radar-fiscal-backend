@@ -33,17 +33,30 @@ measurements and decisions: [catalog-scale-plan.md](catalog-scale-plan.md).
   with a confaz origin; `dou` = dou origin and not CONFAZ-typed; other codes =
   any origin from a source with that code (second origins included).
   `publication_source_feed_expected(uuid[])` computes the authoritative rows.
-- Maintenance: triggers on `publication_origins` (insert/delete statement
-  level; update of `publication_id`/`source_id` row level), `publications`
-  (update of `published_on`/`first_collected_at`/`act_type`/`title` row level
-  with `WHEN`; delete statement level) and `sources` (case-insensitive code
-  change) call `refresh_publication_source_feed(uuid[])` (`SECURITY DEFINER`,
-  fixed `search_path`; runtime roles only have `SELECT` on the table).
-  Refreshes are serialized per publication with transaction-scoped advisory
-  locks taken in id order (batches above 1,000 ids take one exclusive batch
-  lock; single refreshes hold it shared), then rebuild from a snapshot taken
-  after the lock, so two writers on one publication cannot leave stale rows.
-  Updates of `last_seen_at` never invoke the triggers.
+- Maintenance: statement-level triggers on `publication_origins`
+  (insert/update/delete) and `publications` (update/delete), and a row-level
+  trigger on `sources` (case-insensitive code change), call
+  `refresh_publication_source_feed(uuid[])` once per statement with the
+  publications whose feed-relevant columns changed (updates of
+  `last_seen_at` produce an empty set). Refreshes are serialized per
+  publication with transaction-scoped advisory locks taken in id order;
+  statements touching more than 1,000 publications take one exclusive batch
+  lock instead (single refreshes hold it shared), so bulk writes never
+  accumulate thousands of locks. The rebuild reads a snapshot taken after the
+  lock, so two writers on one publication cannot leave stale rows.
+  Two transactions that refresh the same publications in opposite order
+  across *different* statements can still deadlock; PostgreSQL aborts one of
+  them (as it would for their row locks) and the caller retries. Callers in
+  `REPEATABLE READ`/`SERIALIZABLE` (DOE-SP/SPED repair flows) get a
+  serialization failure instead of a stale write and must retry the
+  transaction; the worker uses `READ COMMITTED`.
+- Security: every function is `SECURITY DEFINER` with
+  `search_path = pg_catalog, public, pg_temp` (pg_temp last, so a session's
+  temporary objects cannot shadow these relations) and schema-qualified
+  relations; runtime roles only have `SELECT` on the feed, and `EXECUTE` is
+  revoked from `PUBLIC`. A regression test creates a temporary
+  `publication_source_feed` as `radar_worker` and proves the trigger writes
+  only to `public.publication_source_feed`.
 - There is intentionally no foreign key to `publications`: the DOE-SP rebuild
   guard blocks on unknown foreign keys, and the delete trigger keeps the
   table clean.
@@ -67,8 +80,9 @@ Query parameters: `q` (2–200 chars), `scope` (`title` default | `full`),
   than `totalItems`"), `hasMore`. `hasMore` comes from fetching `limit + 1`
   rows, so a stale total never blocks navigation.
 - Ordering is `published_on DESC NULLS LAST, first_collected_at DESC, id`:
-  the id tie-breaker makes pagination stable (an incremental sort on top of
-  the date indexes; measured cost < 1 ms).
+  the id tie-breaker makes pagination stable. Both ordered indexes end with
+  the id, so pages are read with an index-only scan and no sort, however
+  large the groups of tied rows are.
 
 ## Aggregates and cache
 
@@ -118,14 +132,14 @@ Intentional differences: totals above 10,000 are capped for filtered views,
 search ignores accents and matches words (prefix on the last one) instead of
 substrings.
 
-Trigger cost (300k publications, local):
+Trigger cost (300k publications, local, statement-level triggers):
 
 | Operation | Without triggers | With triggers |
 | --- | ---: | ---: |
-| 50k origins in one `INSERT` | 1.8 s | 7.8 s |
-| 5k single-row origin `INSERT`s (worker pattern) | 0.26 s | 2.9 s (+~0.5 ms each) |
-| 50k origin `UPDATE last_seen_at` | 2.0–2.3 s | 2.2 s (not invoked) |
-| 50k publication `UPDATE last_seen_at` | 4.7 s | 4.4 s (not invoked) |
+| 50k origins in one `INSERT` (batch lock) | 1.3–1.6 s | 4.0–4.6 s |
+| 5k single-row origin `INSERT`s (worker pattern) | 0.22–0.28 s | 3.0 s (+~0.55 ms each) |
+| 50k origin `UPDATE last_seen_at` (no refresh) | 1.4 s | 1.8 s |
+| 50k publication `UPDATE last_seen_at` (no refresh) | 3.6–4.4 s | 4.3–5.0 s |
 
 For the historical load, prefer multi-row inserts (one refresh per
 statement) or load with the feed triggers disabled and rebuild the feed with

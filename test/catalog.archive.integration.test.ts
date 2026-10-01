@@ -364,6 +364,92 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
       assert.deepEqual(await expectedFeedOf(id), expected);
     });
 
+    await t.test('SEC-01: a temporary table cannot shadow the feed in SECURITY DEFINER code', async () => {
+      const shadowSource = await createSource(`${marker}tmp`);
+      const id = await publication('tmp', 'Portaria', `Portaria sombra ${marker}`, []);
+      const client = await admin.connect();
+      try {
+        await client.query('SET ROLE radar_worker');
+        await client.query(
+          `CREATE TEMP TABLE publication_source_feed (
+             source_code TEXT, publication_id UUID, published_on DATE,
+             first_collected_at TIMESTAMPTZ, is_hidden BOOLEAN,
+             PRIMARY KEY (source_code, publication_id))`,
+        );
+        await addOrigin(id, shadowSource, client);
+        const shadow = await client.query<{ count: string }>(
+          `SELECT count(*) FROM pg_temp.publication_source_feed`,
+        );
+        assert.equal(Number(shadow.rows[0]?.count), 0, 'trigger wrote into the temp table');
+      } finally {
+        await client.query('DROP TABLE IF EXISTS pg_temp.publication_source_feed');
+        await client.query('RESET ROLE');
+        client.release();
+      }
+      assert.deepEqual(await feedOf(id), [`${marker}tmp`]);
+    });
+
+    await t.test('bulk updates refresh once per statement and opposite orders do not deadlock', async () => {
+      const bulkSource = await createSource(`${marker}bulk`);
+      const created = await admin.query<{ id: string }>(
+        `INSERT INTO publications (identity_hash, identity_strength, identity_basis,
+           jurisdiction_level, act_type, title, published_on)
+         SELECT md5($1 || g) || md5(g || $1), 'STRONG', '{}'::jsonb, 'FEDERAL',
+                'Portaria', 'Bulk ' || g || ' ' || $1, current_date
+         FROM generate_series(1, 1200) g
+         RETURNING id`,
+        [marker],
+      );
+      const bulkIds = created.rows.map((row) => row.id);
+      await admin.query(
+        `INSERT INTO publication_origins (publication_id, source_id, external_id, official_url)
+         SELECT id, $2, 'bulk-' || id, 'https://example.invalid/bulk/' || id
+         FROM unnest($1::uuid[]) AS id`,
+        [bulkIds, bulkSource],
+      );
+      // > 1,000 rows in one statement: CONFAZ-typed now, one batch refresh.
+      await admin.query(
+        `UPDATE publications SET act_type = 'Convênio ICMS' WHERE id = ANY($1::uuid[])`,
+        [bulkIds],
+      );
+      const mismatch = await admin.query<{ count: string }>(
+        `SELECT count(*) FROM (
+           (SELECT source_code, publication_id FROM publication_source_feed
+            WHERE publication_id = ANY($1::uuid[])
+            EXCEPT SELECT source_code, publication_id FROM publication_source_feed_expected($1::uuid[]))
+           UNION ALL
+           (SELECT source_code, publication_id FROM publication_source_feed_expected($1::uuid[])
+            EXCEPT SELECT source_code, publication_id FROM publication_source_feed
+            WHERE publication_id = ANY($1::uuid[]))
+         ) diff`,
+        [bulkIds],
+      );
+      assert.equal(Number(mismatch.rows[0]?.count), 0);
+
+      // Two statements touching the same two publications in opposite order.
+      const [first, second] = [bulkIds[0]!, bulkIds[1]!];
+      const one = new Pool({ connectionString: adminUrl, max: 1 });
+      const two = new Pool({ connectionString: adminUrl, max: 1 });
+      try {
+        await Promise.all([
+          one.query(
+            `UPDATE publications SET title = title || ' a' WHERE id = ANY($1::uuid[])`,
+            [[first, second]],
+          ),
+          two.query(
+            `UPDATE publications SET title = title || ' b' WHERE id = ANY($1::uuid[])`,
+            [[second, first]],
+          ),
+        ]);
+      } finally {
+        await one.end();
+        await two.end();
+      }
+      for (const id of [first, second]) {
+        assert.deepEqual(await feedOf(id), await expectedFeedOf(id));
+      }
+    });
+
     await t.test('hasMore comes from the rows, stopword-only searches are empty', async () => {
       const page1 = await app.inject({
         method: 'GET',
@@ -371,8 +457,8 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
         headers,
       });
       assert.equal(page1.json<{ hasMore: boolean }>().hasMore, true);
-      const last = await archive(`${q(marker)}&page=1`);
-      assert.equal((last as unknown as { hasMore: boolean }).hasMore, false);
+      const single = await archive(q(`Portaria 1216 ${marker}`));
+      assert.equal((single as unknown as { hasMore: boolean }).hasMore, false);
 
       const stopwords = await archive(q('de da do'));
       assert.equal(stopwords.totalItems, 0);

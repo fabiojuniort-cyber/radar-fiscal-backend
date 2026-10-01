@@ -81,7 +81,8 @@ GENERATED ALWAYS AS (
 CREATE INDEX ix_publications_visible_order
 ON publications(
     published_on DESC NULLS LAST,
-    first_collected_at DESC
+    first_collected_at DESC,
+    id
 )
 WHERE NOT is_hidden;
 
@@ -116,8 +117,13 @@ USING GIN(search_vector)
 WHERE is_current;
 
 -- 3. Source feed ---------------------------------------------------------------
+--
+-- Security: every function below is SECURITY DEFINER, so each one pins
+-- search_path = pg_catalog, public, pg_temp (pg_temp last: otherwise a
+-- session's temporary tables are searched first and could shadow these
+-- relations) and schema-qualifies every relation and function it uses.
 
-CREATE TABLE publication_source_feed (
+CREATE TABLE public.publication_source_feed (
     -- lower(sources.code), or 'confaz' for CONFAZ-typed acts.
     source_code TEXT NOT NULL
         CHECK (source_code = lower(source_code)),
@@ -137,19 +143,20 @@ CREATE TABLE publication_source_feed (
 );
 
 CREATE INDEX ix_publication_source_feed_order
-ON publication_source_feed(
+ON public.publication_source_feed(
     source_code,
     published_on DESC NULLS LAST,
-    first_collected_at DESC
+    first_collected_at DESC,
+    publication_id
 )
 WHERE NOT is_hidden;
 
 CREATE INDEX ix_publication_source_feed_publication
-ON publication_source_feed(publication_id);
+ON public.publication_source_feed(publication_id);
 
 -- Feed rows a set of publications must have, computed from publications,
 -- publication_origins and sources (the authoritative state).
-CREATE FUNCTION publication_source_feed_expected(p_publication_ids UUID[])
+CREATE FUNCTION public.publication_source_feed_expected(p_publication_ids UUID[])
 RETURNS TABLE (
     source_code TEXT,
     publication_id UUID,
@@ -159,19 +166,19 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 STABLE
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     SELECT lower(s.code), p.id, p.published_on, p.first_collected_at, p.is_hidden
-    FROM publications p
-    JOIN publication_origins po
+    FROM public.publications p
+    JOIN public.publication_origins po
       ON po.publication_id = p.id
-    JOIN sources s
+    JOIN public.sources s
       ON s.id = po.source_id
     WHERE p.id = ANY(p_publication_ids)
       AND NOT (lower(s.code) = 'dou' AND p.is_confaz)
     UNION
     SELECT 'confaz', p.id, p.published_on, p.first_collected_at, p.is_hidden
-    FROM publications p
+    FROM public.publications p
     WHERE p.id = ANY(p_publication_ids)
       AND p.is_confaz;
 $$;
@@ -179,16 +186,18 @@ $$;
 -- Recomputes the feed rows of the given publications. Refreshes of the same
 -- publication are serialized: each refresh takes a transaction-scoped
 -- advisory lock per publication (sorted, to avoid lock-order deadlocks
--- between refreshes) and rebuilds from a snapshot taken after the lock, so a
--- concurrent writer's committed change is never overwritten by an older
--- view. Large batches take one exclusive batch lock instead of thousands of
--- per-publication locks; single refreshes hold that batch lock in shared
--- mode, so both kinds still exclude each other.
-CREATE FUNCTION refresh_publication_source_feed(p_publication_ids UUID[])
+-- inside one refresh) and rebuilds from a snapshot taken after the lock, so
+-- a concurrent writer's committed change is never overwritten by an older
+-- view. Batches above 1,000 ids take one exclusive batch lock instead of
+-- thousands of per-publication locks; single refreshes hold that batch lock
+-- in shared mode, so both kinds still exclude each other. All triggers are
+-- statement level, so one statement means one refresh call (bulk writes
+-- never accumulate one lock per row).
+CREATE FUNCTION public.refresh_publication_source_feed(p_publication_ids UUID[])
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     ids UUID[];
@@ -204,18 +213,21 @@ BEGIN
     END IF;
 
     IF cardinality(ids) > 1000 THEN
-        PERFORM pg_advisory_xact_lock(28028, 0);
+        PERFORM pg_catalog.pg_advisory_xact_lock(28028, 0);
     ELSE
-        PERFORM pg_advisory_xact_lock_shared(28028, 0);
+        PERFORM pg_catalog.pg_advisory_xact_lock_shared(28028, 0);
         FOREACH publication IN ARRAY ids LOOP
-            PERFORM pg_advisory_xact_lock(28029, hashtext(publication::text));
+            PERFORM pg_catalog.pg_advisory_xact_lock(
+                28029,
+                pg_catalog.hashtext(publication::text)
+            );
         END LOOP;
     END IF;
 
-    DELETE FROM publication_source_feed
+    DELETE FROM public.publication_source_feed
     WHERE publication_id = ANY(ids);
 
-    INSERT INTO publication_source_feed (
+    INSERT INTO public.publication_source_feed (
         source_code,
         publication_id,
         published_on,
@@ -223,102 +235,102 @@ BEGIN
         is_hidden
     )
     SELECT *
-    FROM publication_source_feed_expected(ids)
+    FROM public.publication_source_feed_expected(ids)
     ON CONFLICT DO NOTHING;
 END;
 $$;
 
-CREATE FUNCTION trg_publication_origins_source_feed()
+CREATE FUNCTION public.trg_publication_origins_source_feed()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     ids UUID[];
 BEGIN
     IF TG_OP = 'INSERT' THEN
         SELECT array_agg(publication_id) INTO ids FROM new_rows;
-    ELSE
+    ELSIF TG_OP = 'DELETE' THEN
         SELECT array_agg(publication_id) INTO ids FROM old_rows;
+    ELSE
+        -- Only publication/source changes matter (not last_seen_at).
+        SELECT array_agg(changed.publication_id) INTO ids
+        FROM (
+            SELECT o.publication_id
+            FROM old_rows o
+            JOIN new_rows n ON n.id = o.id
+            WHERE o.publication_id IS DISTINCT FROM n.publication_id
+               OR o.source_id IS DISTINCT FROM n.source_id
+            UNION ALL
+            SELECT n.publication_id
+            FROM old_rows o
+            JOIN new_rows n ON n.id = o.id
+            WHERE o.publication_id IS DISTINCT FROM n.publication_id
+               OR o.source_id IS DISTINCT FROM n.source_id
+        ) changed;
     END IF;
 
-    PERFORM refresh_publication_source_feed(ids);
-    RETURN NULL;
-END;
-$$;
-
-CREATE FUNCTION trg_publication_origins_source_feed_update()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, public
-AS $$
-BEGIN
-    PERFORM refresh_publication_source_feed(
-        ARRAY[OLD.publication_id, NEW.publication_id]
-    );
+    PERFORM public.refresh_publication_source_feed(ids);
     RETURN NULL;
 END;
 $$;
 
 CREATE TRIGGER publication_origins_source_feed_insert
-AFTER INSERT ON publication_origins
+AFTER INSERT ON public.publication_origins
 REFERENCING NEW TABLE AS new_rows
 FOR EACH STATEMENT
-EXECUTE FUNCTION trg_publication_origins_source_feed();
+EXECUTE FUNCTION public.trg_publication_origins_source_feed();
 
--- Only source/publication changes matter; last_seen_at updates never invoke
--- the function (column list + WHEN).
 CREATE TRIGGER publication_origins_source_feed_update
-AFTER UPDATE OF publication_id, source_id ON publication_origins
-FOR EACH ROW
-WHEN (
-    OLD.publication_id IS DISTINCT FROM NEW.publication_id
-    OR OLD.source_id IS DISTINCT FROM NEW.source_id
-)
-EXECUTE FUNCTION trg_publication_origins_source_feed_update();
+AFTER UPDATE ON public.publication_origins
+REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.trg_publication_origins_source_feed();
 
 CREATE TRIGGER publication_origins_source_feed_delete
-AFTER DELETE ON publication_origins
+AFTER DELETE ON public.publication_origins
 REFERENCING OLD TABLE AS old_rows
 FOR EACH STATEMENT
-EXECUTE FUNCTION trg_publication_origins_source_feed();
+EXECUTE FUNCTION public.trg_publication_origins_source_feed();
 
-CREATE FUNCTION trg_publications_source_feed_update()
+CREATE FUNCTION public.trg_publications_source_feed_update()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
+DECLARE
+    ids UUID[];
 BEGIN
-    PERFORM refresh_publication_source_feed(ARRAY[NEW.id]);
+    -- Only changes that affect feed rows (not last_seen_at/updated_at).
+    SELECT array_agg(n.id) INTO ids
+    FROM old_rows o
+    JOIN new_rows n ON n.id = o.id
+    WHERE o.published_on IS DISTINCT FROM n.published_on
+       OR o.first_collected_at IS DISTINCT FROM n.first_collected_at
+       OR o.is_hidden IS DISTINCT FROM n.is_hidden
+       OR o.is_confaz IS DISTINCT FROM n.is_confaz;
+
+    PERFORM public.refresh_publication_source_feed(ids);
     RETURN NULL;
 END;
 $$;
 
--- Row-level with a column list and WHEN: frequent last_seen_at/updated_at
--- updates never invoke the function.
 CREATE TRIGGER publications_source_feed_update
-AFTER UPDATE OF published_on, first_collected_at, act_type, title
-ON publications
-FOR EACH ROW
-WHEN (
-    OLD.published_on IS DISTINCT FROM NEW.published_on
-    OR OLD.first_collected_at IS DISTINCT FROM NEW.first_collected_at
-    OR OLD.act_type IS DISTINCT FROM NEW.act_type
-    OR OLD.title IS DISTINCT FROM NEW.title
-)
-EXECUTE FUNCTION trg_publications_source_feed_update();
+AFTER UPDATE ON public.publications
+REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.trg_publications_source_feed_update();
 
-CREATE FUNCTION trg_publications_source_feed_delete()
+CREATE FUNCTION public.trg_publications_source_feed_delete()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
-    DELETE FROM publication_source_feed f
+    DELETE FROM public.publication_source_feed f
     USING old_rows o
     WHERE f.publication_id = o.id;
     RETURN NULL;
@@ -326,24 +338,24 @@ END;
 $$;
 
 CREATE TRIGGER publications_source_feed_delete
-AFTER DELETE ON publications
+AFTER DELETE ON public.publications
 REFERENCING OLD TABLE AS old_rows
 FOR EACH STATEMENT
-EXECUTE FUNCTION trg_publications_source_feed_delete();
+EXECUTE FUNCTION public.trg_publications_source_feed_delete();
 
 -- A source whose code changes (case-insensitively) moves its publications to
 -- another feed code. Rare administrative operation.
-CREATE FUNCTION trg_sources_source_feed()
+CREATE FUNCTION public.trg_sources_source_feed()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
-    PERFORM refresh_publication_source_feed(
+    PERFORM public.refresh_publication_source_feed(
         ARRAY(
             SELECT DISTINCT po.publication_id
-            FROM publication_origins po
+            FROM public.publication_origins po
             WHERE po.source_id = NEW.id
         )
     );
@@ -352,13 +364,13 @@ END;
 $$;
 
 CREATE TRIGGER sources_source_feed_update
-AFTER UPDATE OF code ON sources
+AFTER UPDATE OF code ON public.sources
 FOR EACH ROW
 WHEN (lower(OLD.code) IS DISTINCT FROM lower(NEW.code))
-EXECUTE FUNCTION trg_sources_source_feed();
+EXECUTE FUNCTION public.trg_sources_source_feed();
 
 -- Backfill (same rule as publication_source_feed_expected, all rows).
-INSERT INTO publication_source_feed (
+INSERT INTO public.publication_source_feed (
     source_code,
     publication_id,
     published_on,
@@ -366,28 +378,27 @@ INSERT INTO publication_source_feed (
     is_hidden
 )
 SELECT lower(s.code), p.id, p.published_on, p.first_collected_at, p.is_hidden
-FROM publications p
-JOIN publication_origins po
+FROM public.publications p
+JOIN public.publication_origins po
   ON po.publication_id = p.id
-JOIN sources s
+JOIN public.sources s
   ON s.id = po.source_id
 WHERE NOT (lower(s.code) = 'dou' AND p.is_confaz)
 UNION
 SELECT 'confaz', p.id, p.published_on, p.first_collected_at, p.is_hidden
-FROM publications p
+FROM public.publications p
 WHERE p.is_confaz
 ON CONFLICT DO NOTHING;
 
-REVOKE ALL ON publication_source_feed FROM PUBLIC;
+REVOKE ALL ON public.publication_source_feed FROM PUBLIC;
 
 GRANT SELECT
-ON publication_source_feed
+ON public.publication_source_feed
 TO radar_app, radar_worker;
 
-REVOKE ALL ON FUNCTION publication_source_feed_expected(UUID[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION refresh_publication_source_feed(UUID[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION trg_publication_origins_source_feed() FROM PUBLIC;
-REVOKE ALL ON FUNCTION trg_publication_origins_source_feed_update() FROM PUBLIC;
-REVOKE ALL ON FUNCTION trg_publications_source_feed_update() FROM PUBLIC;
-REVOKE ALL ON FUNCTION trg_publications_source_feed_delete() FROM PUBLIC;
-REVOKE ALL ON FUNCTION trg_sources_source_feed() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.publication_source_feed_expected(UUID[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.refresh_publication_source_feed(UUID[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.trg_publication_origins_source_feed() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.trg_publications_source_feed_update() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.trg_publications_source_feed_delete() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.trg_sources_source_feed() FROM PUBLIC;
