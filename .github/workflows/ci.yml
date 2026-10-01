@@ -97,6 +97,9 @@ jobs:
       - name: Authentication and RLS integration tests
         run: npm run test:integration
 
+      - name: News API integration test
+        run: npx tsx --test test/news.api.integration.test.ts
+
       - name: TAX-06 baseline dry-run
         run: npm run taxonomy:baseline:dry-run
 
