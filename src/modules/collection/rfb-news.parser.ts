@@ -48,6 +48,20 @@ function imageUrl(value: string | undefined, baseUrl: string): string | undefine
   }
 }
 
+function imageSourceFromAttributes(attributes: Record<string, string>): string | undefined {
+  const direct =
+    attributes.src ??
+    attributes['data-src'] ??
+    attributes['data-lazy-src'] ??
+    attributes['data-original'];
+  if (direct) return direct;
+
+  const srcset = attributes.srcset ?? attributes['data-srcset'];
+  if (!srcset) return undefined;
+  const first = srcset.split(',')[0]?.trim().split(/\s+/)[0];
+  return first || undefined;
+}
+
 function isArticleUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -148,6 +162,7 @@ export function parseRfbNewsArticle(
   let h1Depth = 0;
   let tagAnchor = false;
   let tagAnchorText = '';
+  let mainImageUrl: string | undefined;
 
   const parser = new Parser({
     onopentag(name, attributes) {
@@ -156,6 +171,10 @@ export function parseRfbNewsArticle(
 
       if (tag === 'main') mainDepth += 1;
       if (tag === 'h1' && mainDepth > 0) h1Depth += 1;
+
+      if (tag === 'img' && mainDepth > 0 && !mainImageUrl) {
+        mainImageUrl = imageUrl(imageSourceFromAttributes(attributes), url);
+      }
 
       if (tag === 'meta') {
         const key = (attributes.property ?? attributes.name ?? '').trim().toLowerCase();
@@ -223,10 +242,9 @@ export function parseRfbNewsArticle(
   const category = normalizeSpace(
     metaValue(meta, 'article:section', 'section', 'dc.type') ?? '',
   ) || undefined;
-  const articleImageUrl = imageUrl(
-    metaValue(meta, 'og:image', 'twitter:image', 'twitter:image:src'),
-    url,
-  );
+  const articleImageUrl =
+    imageUrl(metaValue(meta, 'og:image', 'twitter:image', 'twitter:image:src'), url) ??
+    mainImageUrl;
 
   const content = visible || undefined;
 
