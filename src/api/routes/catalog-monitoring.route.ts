@@ -6,6 +6,8 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { sql } from 'kysely';
 import { z } from 'zod';
 
+import { aggregateCacheOptions } from '../../infrastructure/cache/aggregate-cache.js';
+import { TtlCache } from '../../infrastructure/cache/ttl-cache.js';
 import {
   TenantAccessDeniedError,
   withTenantContext,
@@ -51,8 +53,19 @@ const excludedPublicationFamilySql = sql<boolean>`
   )
 `;
 
-const visiblePublicationSql = sql<boolean>`
+// Keep in sync with the partial index ix_publications_visible_order
+// (migrations/028_publication_visible_order_index.sql): PostgreSQL only uses
+// it when this predicate matches the index predicate.
+export const visiblePublicationSql = sql<boolean>`
   NOT (${excludedPublicationFamilySql})
+`;
+
+const startOfTodaySql = sql<Date>`
+  (date_trunc('day', now() AT TIME ZONE ${SAO_PAULO_TZ}) AT TIME ZONE ${SAO_PAULO_TZ})
+`;
+
+const startOfTomorrowSql = sql<Date>`
+  ((date_trunc('day', now() AT TIME ZONE ${SAO_PAULO_TZ}) + interval '1 day') AT TIME ZONE ${SAO_PAULO_TZ})
 `;
 
 const confazPublicationSql = sql<boolean>`
@@ -153,6 +166,36 @@ interface ArchiveRow {
   source_name: string | null;
 }
 
+interface ArchiveFacets {
+  ufs: string[];
+  sources: Array<{ code: string; name: string }>;
+}
+
+interface PublicStatsV2 {
+  totalPublications: number;
+  totalSources: number;
+  activeSources: number;
+  importedToday: number;
+  generatedAt: string;
+}
+
+interface PublicSourcesV2 {
+  generatedAt: string;
+  items: Array<{
+    code: string;
+    name: string;
+    jurisdictionLevel: string;
+    uf: string | null;
+    isActive: boolean;
+    status: ReturnType<typeof derivePublicSourceStatus>;
+    lastRunStatus: string | null;
+    lastSuccessAt: string | null;
+    lastAttemptAt: string | null;
+    importedToday: number;
+    totalPublications: number;
+  }>;
+}
+
 function toDateOnly(value: Date | string | null): string | null {
   if (!value) return null;
   return new Date(value).toISOString().slice(0, 10);
@@ -188,6 +231,17 @@ export async function catalogMonitoringRoutes(
   app: FastifyInstance,
 ): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  // Catalog aggregates are global (not tenant-scoped) and change only when a
+  // collection run lands, so a short TTL removes them from the hot path.
+  const cacheOptions = aggregateCacheOptions(app);
+  const archiveCountCache = new TtlCache<number>({
+    ...cacheOptions,
+    maxEntries: 500,
+  });
+  const facetsCache = new TtlCache<ArchiveFacets>(cacheOptions);
+  const statsCache = new TtlCache<PublicStatsV2>(cacheOptions);
+  const sourcesCache = new TtlCache<PublicSourcesV2>(cacheOptions);
 
   typed.get(
     '/api/v1/monitoring/runs',
@@ -304,21 +358,42 @@ export async function catalogMonitoringRoutes(
       const offset =
         (request.query.page - 1) * request.query.limit;
 
-      const countResult = await sql<{ count: string }>`
-        SELECT count(*)::text AS count
-        FROM publications p
-        LEFT JOIN publication_versions pv
-          ON pv.publication_id = p.id
-         AND pv.is_current = true
-        WHERE ${where}
-      `.execute(app.db);
+      // The current version is only needed by the text search predicate.
+      const versionJoin = request.query.q
+        ? sql`
+          LEFT JOIN publication_versions pv
+            ON pv.publication_id = p.id
+           AND pv.is_current = true
+        `
+        : sql``;
 
-      const totalItems = Number(countResult.rows[0]?.count ?? 0);
+      const countKey = JSON.stringify([
+        request.query.q ?? null,
+        request.query.uf ?? null,
+        request.query.jurisdiction ?? null,
+        request.query.source?.toLowerCase() ?? null,
+      ]);
+
+      const totalItems = await archiveCountCache.get(
+        countKey,
+        async () => {
+          const countResult = await sql<{ count: string }>`
+            SELECT count(*)::text AS count
+            FROM publications p
+            ${versionJoin}
+            WHERE ${where}
+          `.execute(app.db);
+
+          return Number(countResult.rows[0]?.count ?? 0);
+        },
+      );
       const totalPages = Math.max(
         1,
         Math.ceil(totalItems / request.query.limit),
       );
 
+      // Paginate first, then resolve version/origin details only for the
+      // rows actually returned.
       const rows = await sql<ArchiveRow>`
         SELECT
           p.id,
@@ -330,49 +405,47 @@ export async function catalogMonitoringRoutes(
           p.uf,
           p.published_on,
           p.effective_on,
-          pv.relevant_excerpt,
+          cv.relevant_excerpt,
           COALESCE(
             p.primary_official_url,
-            (
-              SELECT po.official_url
-              FROM publication_origins po
-              WHERE po.publication_id = p.id
-              ORDER BY po.first_seen_at ASC
-              LIMIT 1
-            )
+            first_origin.official_url
           ) AS official_url,
           CASE
             WHEN ${confazPublicationSql} THEN 'confaz'
-            ELSE (
-              SELECT s.code
-              FROM publication_origins po
-              JOIN sources s ON s.id = po.source_id
-              WHERE po.publication_id = p.id
-              ORDER BY po.first_seen_at ASC
-              LIMIT 1
-            )
+            ELSE first_origin.source_code
           END AS source_code,
           CASE
             WHEN ${confazPublicationSql} THEN 'CONFAZ'
-            ELSE (
-              SELECT s.name
-              FROM publication_origins po
-              JOIN sources s ON s.id = po.source_id
-              WHERE po.publication_id = p.id
-              ORDER BY po.first_seen_at ASC
-              LIMIT 1
-            )
+            ELSE first_origin.source_name
           END AS source_name
-        FROM publications p
-        LEFT JOIN publication_versions pv
-          ON pv.publication_id = p.id
-         AND pv.is_current = true
-        WHERE ${where}
+        FROM (
+          SELECT p.*
+          FROM publications p
+          ${versionJoin}
+          WHERE ${where}
+          ORDER BY
+            p.published_on DESC NULLS LAST,
+            p.first_collected_at DESC
+          LIMIT ${request.query.limit}
+          OFFSET ${offset}
+        ) p
+        LEFT JOIN publication_versions cv
+          ON cv.publication_id = p.id
+         AND cv.is_current = true
+        LEFT JOIN LATERAL (
+          SELECT
+            po.official_url,
+            s.code AS source_code,
+            s.name AS source_name
+          FROM publication_origins po
+          JOIN sources s ON s.id = po.source_id
+          WHERE po.publication_id = p.id
+          ORDER BY po.first_seen_at ASC
+          LIMIT 1
+        ) first_origin ON true
         ORDER BY
           p.published_on DESC NULLS LAST,
           p.first_collected_at DESC
-        LIMIT ${request.query.limit}
-        OFFSET ${offset}
       `.execute(app.db);
 
       return reply.status(200).send({
@@ -408,183 +481,194 @@ export async function catalogMonitoringRoutes(
         return reply.status(401).send({ error: 'unauthorized' });
       }
 
-      const ufs = await sql<{ uf: string }>`
-        SELECT DISTINCT p.uf
-        FROM publications p
-        WHERE ${visiblePublicationSql}
-          AND p.uf IS NOT NULL
-        ORDER BY p.uf
-      `.execute(app.db);
-
-      const sources = await sql<{ code: string; name: string }>`
-        SELECT DISTINCT source_code AS code, source_name AS name
-        FROM (
-          SELECT
-            CASE
-              WHEN ${confazPublicationSql} THEN 'confaz'
-              ELSE (
-                SELECT s.code
-                FROM publication_origins po
-                JOIN sources s ON s.id = po.source_id
-                WHERE po.publication_id = p.id
-                ORDER BY po.first_seen_at ASC
-                LIMIT 1
-              )
-            END AS source_code,
-            CASE
-              WHEN ${confazPublicationSql} THEN 'CONFAZ'
-              ELSE (
-                SELECT s.name
-                FROM publication_origins po
-                JOIN sources s ON s.id = po.source_id
-                WHERE po.publication_id = p.id
-                ORDER BY po.first_seen_at ASC
-                LIMIT 1
-              )
-            END AS source_name
+      const facets = await facetsCache.get('facets', async () => {
+        const ufs = await sql<{ uf: string }>`
+          SELECT DISTINCT p.uf
           FROM publications p
           WHERE ${visiblePublicationSql}
-        ) visible_sources
-        WHERE source_code IS NOT NULL
-        ORDER BY source_name
-      `.execute(app.db);
+            AND p.uf IS NOT NULL
+          ORDER BY p.uf
+        `.execute(app.db);
 
-      return reply.status(200).send({
-        ufs: ufs.rows.map((row) => row.uf),
-        sources: sources.rows,
+        // Same result as resolving each visible publication's first origin,
+        // but with a single pass over publication_origins instead of two
+        // correlated subqueries per publication.
+        const sources = await sql<{ code: string; name: string }>`
+          SELECT DISTINCT source_code AS code, source_name AS name
+          FROM (
+            SELECT
+              CASE
+                WHEN ${confazPublicationSql} THEN 'confaz'
+                ELSE s.code
+              END AS source_code,
+              CASE
+                WHEN ${confazPublicationSql} THEN 'CONFAZ'
+                ELSE s.name
+              END AS source_name
+            FROM publications p
+            LEFT JOIN (
+              SELECT DISTINCT ON (po.publication_id)
+                po.publication_id,
+                po.source_id
+              FROM publication_origins po
+              ORDER BY po.publication_id, po.first_seen_at ASC
+            ) first_origin ON first_origin.publication_id = p.id
+            LEFT JOIN sources s ON s.id = first_origin.source_id
+            WHERE ${visiblePublicationSql}
+          ) visible_sources
+          WHERE source_code IS NOT NULL
+          ORDER BY source_name
+        `.execute(app.db);
+
+        return {
+          ufs: ufs.rows.map((row) => row.uf),
+          sources: sources.rows,
+        };
       });
+
+      return reply.status(200).send(facets);
     },
   );
 
   typed.get('/public/v2/stats', async (_request, reply) => {
-    const result = await sql<{
-      total_publications: number;
-      total_sources: number;
-      active_sources: number;
-      imported_today: number;
-    }>`
-      SELECT
-        (
-          SELECT count(*)::int
+    const stats = await statsCache.get('stats', async () => {
+      const result = await sql<{
+        total_publications: number;
+        total_sources: number;
+        active_sources: number;
+        imported_today: number;
+      }>`
+        SELECT
+          visible.total_publications,
+          visible.imported_today,
+          (
+            SELECT count(*)::int
+            FROM sources
+          ) AS total_sources,
+          (
+            SELECT count(*)::int
+            FROM sources
+            WHERE is_active = true
+          ) AS active_sources
+        FROM (
+          SELECT
+            count(*)::int AS total_publications,
+            count(*) FILTER (
+              WHERE p.first_collected_at >= ${startOfTodaySql}
+                AND p.first_collected_at < ${startOfTomorrowSql}
+            )::int AS imported_today
           FROM publications p
           WHERE ${visiblePublicationSql}
-        ) AS total_publications,
-        (
-          SELECT count(*)::int
-          FROM sources
-        ) AS total_sources,
-        (
-          SELECT count(*)::int
-          FROM sources
-          WHERE is_active = true
-        ) AS active_sources,
-        (
-          SELECT count(*)::int
-          FROM publications p
-          WHERE ${visiblePublicationSql}
-            AND (
-              p.first_collected_at AT TIME ZONE ${SAO_PAULO_TZ}
-            )::date = (
-              now() AT TIME ZONE ${SAO_PAULO_TZ}
-            )::date
-        ) AS imported_today
-    `.execute(app.db);
+        ) visible
+      `.execute(app.db);
 
-    const row = result.rows[0];
-    return reply.status(200).send({
-      totalPublications: row?.total_publications ?? 0,
-      totalSources: row?.total_sources ?? 0,
-      activeSources: row?.active_sources ?? 0,
-      importedToday: row?.imported_today ?? 0,
-      generatedAt: new Date().toISOString(),
+      const row = result.rows[0];
+      return {
+        totalPublications: row?.total_publications ?? 0,
+        totalSources: row?.total_sources ?? 0,
+        activeSources: row?.active_sources ?? 0,
+        importedToday: row?.imported_today ?? 0,
+        generatedAt: new Date().toISOString(),
+      };
     });
+
+    return reply.status(200).send(stats);
   });
 
   typed.get('/public/v2/sources', async (_request, reply) => {
-    const generatedAt = new Date();
-    const result = await sql<{
-      code: string;
-      name: string;
-      jurisdiction_level: string;
-      uf: string | null;
-      is_active: boolean;
-      last_run_status: string | null;
-      last_success_at: Date | string | null;
-      last_attempt_at: Date | string | null;
-      total_publications: number;
-    }>`
-      SELECT
-        s.code,
-        s.name,
-        s.jurisdiction_level,
-        s.uf,
-        s.is_active,
-        vsm.last_run_status,
-        vsm.last_success_at,
-        vsm.last_attempt_at,
-        CASE
-          WHEN lower(s.code) = 'confaz' THEN (
-            SELECT count(*)::int
-            FROM publications p
-            WHERE ${visiblePublicationSql}
-              AND (
-                ${confazPublicationSql}
-                OR EXISTS (
-                  SELECT 1
-                  FROM publication_origins po
-                  WHERE po.publication_id = p.id
-                    AND po.source_id = s.id
-                )
-              )
-          )
-          WHEN lower(s.code) = 'dou' THEN (
-            SELECT count(DISTINCT po.publication_id)::int
-            FROM publication_origins po
-            JOIN publications p ON p.id = po.publication_id
-            WHERE po.source_id = s.id
-              AND ${visiblePublicationSql}
-              AND NOT (${confazPublicationSql})
-          )
-          ELSE (
-            SELECT count(DISTINCT po.publication_id)::int
-            FROM publication_origins po
-            JOIN publications p ON p.id = po.publication_id
-            WHERE po.source_id = s.id
-              AND ${visiblePublicationSql}
-          )
-        END AS total_publications
-      FROM sources s
-      LEFT JOIN v_source_monitoring vsm ON vsm.source_id = s.id
-      ORDER BY
-        CASE WHEN s.jurisdiction_level = 'FEDERAL' THEN 0 ELSE 1 END,
-        s.uf NULLS FIRST,
-        s.name
-    `.execute(app.db);
+    const payload = await sourcesCache.get('sources', async () => {
+      const generatedAt = new Date();
+      // One pass over the visible publications computes every source count:
+      // - confaz: CONFAZ-typed acts plus other acts with a confaz origin;
+      // - dou: acts with a dou origin that are not CONFAZ-typed;
+      // - others: acts with an origin from that source.
+      const result = await sql<{
+        code: string;
+        name: string;
+        jurisdiction_level: string;
+        uf: string | null;
+        is_active: boolean;
+        last_run_status: string | null;
+        last_success_at: Date | string | null;
+        last_attempt_at: Date | string | null;
+        total_publications: number;
+      }>`
+        WITH visible AS MATERIALIZED (
+          SELECT
+            p.id,
+            ${confazPublicationSql} AS is_confaz
+          FROM publications p
+          WHERE ${visiblePublicationSql}
+        ),
+        origin_counts AS (
+          SELECT
+            po.source_id,
+            count(DISTINCT po.publication_id)::int AS all_visible,
+            count(DISTINCT po.publication_id) FILTER (
+              WHERE NOT v.is_confaz
+            )::int AS non_confaz_visible
+          FROM publication_origins po
+          JOIN visible v ON v.id = po.publication_id
+          GROUP BY po.source_id
+        ),
+        confaz_typed AS (
+          SELECT count(*)::int AS total
+          FROM visible
+          WHERE is_confaz
+        )
+        SELECT
+          s.code,
+          s.name,
+          s.jurisdiction_level,
+          s.uf,
+          s.is_active,
+          vsm.last_run_status,
+          vsm.last_success_at,
+          vsm.last_attempt_at,
+          CASE
+            WHEN lower(s.code) = 'confaz'
+              THEN ct.total + coalesce(oc.non_confaz_visible, 0)
+            WHEN lower(s.code) = 'dou'
+              THEN coalesce(oc.non_confaz_visible, 0)
+            ELSE coalesce(oc.all_visible, 0)
+          END AS total_publications
+        FROM sources s
+        LEFT JOIN v_source_monitoring vsm ON vsm.source_id = s.id
+        LEFT JOIN origin_counts oc ON oc.source_id = s.id
+        CROSS JOIN confaz_typed ct
+        ORDER BY
+          CASE WHEN s.jurisdiction_level = 'FEDERAL' THEN 0 ELSE 1 END,
+          s.uf NULLS FIRST,
+          s.name
+      `.execute(app.db);
 
-    return reply.status(200).send({
-      generatedAt: generatedAt.toISOString(),
-      items: result.rows.map((row) => ({
-        code: row.code,
-        name: row.name,
-        jurisdictionLevel: row.jurisdiction_level,
-        uf: row.uf,
-        isActive: row.is_active,
-        status: derivePublicSourceStatus({
+      return {
+        generatedAt: generatedAt.toISOString(),
+        items: result.rows.map((row) => ({
+          code: row.code,
+          name: row.name,
+          jurisdictionLevel: row.jurisdiction_level,
+          uf: row.uf,
           isActive: row.is_active,
+          status: derivePublicSourceStatus({
+            isActive: row.is_active,
+            lastRunStatus: row.last_run_status,
+            lastSuccessAt: row.last_success_at,
+            now: generatedAt,
+          }),
           lastRunStatus: row.last_run_status,
-          lastSuccessAt: row.last_success_at,
-          now: generatedAt,
-        }),
-        lastRunStatus: row.last_run_status,
-        lastSuccessAt: row.last_success_at
-          ? new Date(row.last_success_at).toISOString()
-          : null,
-        lastAttemptAt: row.last_attempt_at
-          ? new Date(row.last_attempt_at).toISOString()
-          : null,
-        importedToday: 0,
-        totalPublications: row.total_publications,
-      })),
+          lastSuccessAt: row.last_success_at
+            ? new Date(row.last_success_at).toISOString()
+            : null,
+          lastAttemptAt: row.last_attempt_at
+            ? new Date(row.last_attempt_at).toISOString()
+            : null,
+          importedToday: 0,
+          totalPublications: row.total_publications,
+        })),
+      };
     });
+
+    return reply.status(200).send(payload);
   });
 }
