@@ -132,6 +132,9 @@ async function latestVersion(
   trx: Transaction<DB>,
   newsItemId: string,
 ): Promise<{ id: string; versionNo: number; contentHash: string } | undefined> {
+  // The parent news_items row is the serialization lock for this identity.
+  // Keep versions immutable: SELECT ... FOR UPDATE here would require UPDATE
+  // privilege on news_item_versions even though versions are never mutated.
   const result = await sql<{
     id: string;
     version_no: number;
@@ -142,7 +145,6 @@ async function latestVersion(
     WHERE news_item_id = ${newsItemId}::uuid
     ORDER BY version_no DESC
     LIMIT 1
-    FOR UPDATE
   `.execute(trx);
 
   const row = result.rows[0];
