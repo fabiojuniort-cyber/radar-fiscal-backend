@@ -48,6 +48,18 @@ function canonicalOfficialUrl(value: string): string {
   return url.toString();
 }
 
+function canonicalImageUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 function stableTags(tags: string[] | undefined): string[] {
   const values = (tags ?? [])
     .map(normalizeSpace)
@@ -82,7 +94,10 @@ export function normalizeNewsItem(input: {
   const publishedAt = validDate(input.item.publishedAt, 'publishedAt');
   const updatedAtSource = validDate(input.item.updatedAtSource, 'updatedAtSource');
   const tags = stableTags(input.item.tags);
-  const metadata = input.item.metadata ?? {};
+  const metadata: Record<string, unknown> = { ...(input.item.metadata ?? {}) };
+  const imageUrl = canonicalImageUrl(metadata.imageUrl);
+  if (imageUrl) metadata.imageUrl = imageUrl;
+  else delete metadata.imageUrl;
 
   const sourceIdentity = externalId
     ? `external:${externalId}`
@@ -91,20 +106,20 @@ export function normalizeNewsItem(input: {
     .update(`${input.sourceId}\n${sourceIdentity}`, 'utf8')
     .digest('hex');
 
+  const semanticContent: Record<string, unknown> = {
+    version: 1,
+    title,
+    summary: summary ?? null,
+    content: content ?? null,
+    category: category ?? null,
+    publishedAt: publishedAt?.toISOString() ?? null,
+    updatedAtSource: updatedAtSource?.toISOString() ?? null,
+    tags,
+  };
+  if (imageUrl) semanticContent.imageUrl = imageUrl;
+
   const contentHash = createHash('sha256')
-    .update(
-      JSON.stringify({
-        version: 1,
-        title,
-        summary: summary ?? null,
-        content: content ?? null,
-        category: category ?? null,
-        publishedAt: publishedAt?.toISOString() ?? null,
-        updatedAtSource: updatedAtSource?.toISOString() ?? null,
-        tags,
-      }),
-      'utf8',
-    )
+    .update(JSON.stringify(semanticContent), 'utf8')
     .digest('hex');
 
   return {
