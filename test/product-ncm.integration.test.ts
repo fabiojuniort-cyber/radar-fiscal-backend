@@ -123,7 +123,11 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
 
     await admin.query(
       `UPDATE official_catalog_editions
-       SET status = 'SUPERSEDED'
+       SET status = 'SUPERSEDED',
+           valid_to = COALESCE(
+             valid_to,
+             GREATEST(COALESCE(valid_from, DATE '2026-10-01'), DATE '2026-10-01')
+           )
        WHERE catalog_id = $1::uuid AND status = 'CURRENT'`,
       [catalogId],
     );
