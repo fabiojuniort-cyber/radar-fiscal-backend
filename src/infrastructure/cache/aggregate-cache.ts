@@ -5,8 +5,9 @@ import type { TtlCacheOptions } from './ttl-cache.js';
 
 /**
  * Shared settings for caches of global catalog aggregates. A value is fresh
- * for AGGREGATE_CACHE_TTL_MS and may be served for up to 5x that long while
- * one background reload refreshes it.
+ * for AGGREGATE_CACHE_TTL_MS (default 1 h) and, once expired, is still served
+ * for up to another AGGREGATE_CACHE_TTL_MS while one background reload
+ * refreshes it. Catalog totals are not real-time data.
  */
 export function aggregateCacheOptions(
   app: FastifyInstance,
@@ -15,7 +16,7 @@ export function aggregateCacheOptions(
 
   return {
     ttlMs,
-    staleMs: ttlMs * 5,
+    staleMs: ttlMs,
     onBackgroundError: (error, key) => {
       app.log.warn(
         { err: error, cacheKey: key },

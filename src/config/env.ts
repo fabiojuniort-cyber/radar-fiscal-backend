@@ -75,8 +75,8 @@ const envSchema = z.object({
     .number()
     .int()
     .min(0)
-    .max(600_000)
-    .default(60_000),
+    .max(6 * 60 * 60_000)
+    .default(60 * 60_000),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

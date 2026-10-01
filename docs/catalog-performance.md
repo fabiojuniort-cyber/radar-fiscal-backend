@@ -28,10 +28,14 @@ waited behind it.
      publications instead of one scan per source.
 3. **In-process aggregate cache** (`src/infrastructure/cache/ttl-cache.ts`):
    global, tenant-independent payloads only. Fresh for
-   `AGGREGATE_CACHE_TTL_MS` (default 60 000; `0` disables); afterwards the
-   previous value is served for up to 5x that while one background reload
-   runs. Concurrent misses share one query. Failed loads are not cached.
-   `generatedAt` reflects when the payload was computed.
+   `AGGREGATE_CACHE_TTL_MS` (default 3 600 000 = 1 h, max 6 h; `0` disables);
+   afterwards the previous value is served for up to another TTL while one
+   background reload runs, so a payload is at most ~2 TTLs old. Concurrent
+   misses share one query. Failed loads are not cached. `generatedAt`
+   reflects when the payload was computed. The cache lives in process memory:
+   a restart/deploy starts empty and the first request pays the cold query.
+   Product decision (01/10/2026): catalog totals are not real-time, 1 h is
+   acceptable.
 
 ## Local measurement (300k publications, PostgreSQL 16)
 
