@@ -88,6 +88,9 @@ jobs:
       - name: NCM catalog parser unit tests
         run: npx tsx --test test/ncm-catalog.source.unit.test.ts
 
+      - name: Publication NCM detector unit tests
+        run: npx tsx --test test/publication-ncm.detector.unit.test.ts
+
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
@@ -117,6 +120,12 @@ jobs:
 
       - name: NCM official catalog idempotency
         run: npx tsx --test test/ncm-catalog.import.integration.test.ts
+
+      - name: Publication NCM enrichment integration
+        run: npx tsx --test test/publication-ncm.enrichment.integration.test.ts
+
+      - name: Archive NCM filter integration
+        run: npx tsx --test test/archive-ncm-filter.integration.test.ts
 
       - name: Product/NCM API integration test
         shell: bash
