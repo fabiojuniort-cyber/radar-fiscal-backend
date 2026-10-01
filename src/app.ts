@@ -7,6 +7,7 @@ import {
 } from 'fastify-type-provider-zod';
 
 import { authRoutes } from './api/routes/auth.route.js';
+import { catalogMonitoringRoutes } from './api/routes/catalog-monitoring.route.js';
 import { companyManualRoutes } from './api/routes/company-manual.route.js';
 import { establishmentManualRoutes } from './api/routes/establishment-manual.route.js';
 import { healthRoutes } from './api/routes/health.route.js';
@@ -38,6 +39,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(publicRoutes);
   await app.register(authRoutes);
   await app.register(productRoutes);
+  await app.register(catalogMonitoringRoutes);
   await app.register(companyManualRoutes);
   await app.register(establishmentManualRoutes);
 
