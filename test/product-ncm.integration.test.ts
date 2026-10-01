@@ -98,7 +98,7 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       },
     });
     assert.equal(companyResponse.statusCode, 201);
-    const companyId = companyResponse.json<{ id: string }>().id;
+    const companyId = companyResponse.json<{ company: { id: string } }>().company.id;
 
     await admin.query(
       `INSERT INTO cnaes (code, description, is_active)
