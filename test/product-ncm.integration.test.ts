@@ -69,7 +69,6 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
   const app = await buildApp();
   const users: string[] = [];
   const tenants: string[] = [];
-  let catalogId: string | undefined;
   let publicationId: string | undefined;
 
   try {
@@ -113,51 +112,25 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       [companyId],
     );
 
-    const catalog = await admin.query<{ id: string }>(
-      `INSERT INTO official_catalogs (code, name, maintainer, description)
-       VALUES ('NCM', 'NCM Test', 'Test', 'Integration test catalog')
-       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
-       RETURNING id`,
-    );
-    catalogId = catalog.rows[0]!.id;
-
-    await admin.query(
-      `UPDATE official_catalog_editions
-       SET status = 'SUPERSEDED',
-           valid_to = COALESCE(
-             valid_to,
-             GREATEST(COALESCE(valid_from, DATE '2026-10-01'), DATE '2026-10-01')
-           )
-       WHERE catalog_id = $1::uuid AND status = 'CURRENT'`,
-      [catalogId],
-    );
-
-    const edition = await admin.query<{ id: string }>(
-      `INSERT INTO official_catalog_editions (
-         catalog_id, edition_code, source_url, source_sha256,
-         valid_from, status
-       ) VALUES (
-         $1::uuid, $2, 'https://example.test/ncm', $3,
-         DATE '2026-10-01', 'CURRENT'
-       ) RETURNING id`,
-      [
-        catalogId,
-        `test-${randomUUID()}`,
-        createHash('sha256').update(randomUUID()).digest('hex'),
-      ],
-    );
-    const editionId = edition.rows[0]!.id;
-
+    // The immediately preceding CI gate imports an idempotent CURRENT NCM
+    // edition. Reuse that official catalog instead of mutating its lifecycle.
     const entries = await admin.query<{ id: string; official_code: string }>(
-      `INSERT INTO official_catalog_entries (
-         catalog_edition_id, official_code, description, metadata
-       ) VALUES
-         ($1::uuid, '1006.30.11', 'Arroz semibranqueado', '{"assignable":true}'::jsonb),
-         ($1::uuid, '1006.20.99', 'Outro arroz descascado', '{"assignable":true}'::jsonb)
-       RETURNING id, official_code`,
-      [editionId],
+      `SELECT e.id, e.official_code
+       FROM official_catalog_entries e
+       INNER JOIN official_catalog_editions ed
+         ON ed.id = e.catalog_edition_id
+       INNER JOIN official_catalogs c
+         ON c.id = ed.catalog_id
+       WHERE c.code = 'NCM'
+         AND ed.status = 'CURRENT'
+         AND e.official_code = ANY($1::text[])
+       ORDER BY e.official_code`,
+      [['1006.30.11', '1006.20.99']],
     );
-    const firstEntry = entries.rows.find((row) => row.official_code === '1006.30.11');
+    assert.equal(entries.rows.length, 2);
+    const firstEntry = entries.rows.find(
+      (row) => row.official_code === '1006.30.11',
+    );
     assert.ok(firstEntry);
 
     const unauthenticated = await app.inject({
@@ -172,7 +145,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       headers: firstHeaders,
     });
     assert.equal(search.statusCode, 200);
-    assert.equal(search.json<{ items: Array<{ code: string }> }>().items[0]?.code, '10063011');
+    assert.equal(
+      search.json<{ items: Array<{ code: string }> }>().items[0]?.code,
+      '10063011',
+    );
 
     const invalidCnae = await app.inject({
       method: 'POST',
@@ -185,7 +161,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       },
     });
     assert.equal(invalidCnae.statusCode, 400);
-    assert.equal(invalidCnae.json<{ error: string }>().error, 'cnae_not_linked');
+    assert.equal(
+      invalidCnae.json<{ error: string }>().error,
+      'cnae_not_linked',
+    );
 
     const invalidNcm = await app.inject({
       method: 'POST',
@@ -198,7 +177,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       },
     });
     assert.equal(invalidNcm.statusCode, 400);
-    assert.equal(invalidNcm.json<{ error: string }>().error, 'invalid_ncm_codes');
+    assert.equal(
+      invalidNcm.json<{ error: string }>().error,
+      'invalid_ncm_codes',
+    );
 
     const create = await app.inject({
       method: 'POST',
@@ -219,7 +201,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
     }>();
     assert.equal(profile.cnaeCode, '0111301');
     assert.equal(profile.productLabel, 'Arroz');
-    assert.deepEqual(profile.ncms.map((item) => item.code), ['10063011']);
+    assert.deepEqual(
+      profile.ncms.map((item) => item.code),
+      ['10063011'],
+    );
 
     const crossTenant = await app.inject({
       method: 'GET',
@@ -239,9 +224,14 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       },
     });
     assert.equal(update.statusCode, 200);
-    assert.equal(update.json<{ productLabel: string }>().productLabel, 'Arroz beneficiado');
+    assert.equal(
+      update.json<{ productLabel: string }>().productLabel,
+      'Arroz beneficiado',
+    );
     assert.deepEqual(
-      update.json<{ ncms: Array<{ code: string }> }>().ncms.map((item) => item.code),
+      update
+        .json<{ ncms: Array<{ code: string }> }>()
+        .ncms.map((item) => item.code),
       ['10062099'],
     );
 
@@ -249,7 +239,14 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       `INSERT INTO publications (
          identity_hash, identity_strength, identity_basis,
          jurisdiction_level, title, published_on
-       ) VALUES ($1, 'STRONG', '{}'::jsonb, 'FEDERAL', 'Norma com NCM', DATE '2026-10-01')
+       ) VALUES (
+         $1,
+         'STRONG',
+         '{}'::jsonb,
+         'FEDERAL',
+         'Norma com NCM',
+         DATE '2026-10-01'
+       )
        RETURNING id`,
       [createHash('sha256').update(randomUUID()).digest('hex')],
     );
@@ -258,9 +255,18 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
     const version = await admin.query<{ id: string }>(
       `INSERT INTO publication_versions (
          publication_id, version_no, content_hash, content_text, is_current
-       ) VALUES ($1::uuid, 1, $2, 'Tabela NCM 1006.30.11', TRUE)
+       ) VALUES (
+         $1::uuid,
+         1,
+         $2,
+         'Tabela NCM 1006.30.11',
+         TRUE
+       )
        RETURNING id`,
-      [publicationId, createHash('sha256').update(randomUUID()).digest('hex')],
+      [
+        publicationId,
+        createHash('sha256').update(randomUUID()).digest('hex'),
+      ],
     );
 
     await admin.query(
@@ -269,9 +275,15 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
          verification_status, method_type, detector_key, detector_version,
          confidence, excerpt
        ) VALUES (
-         $1::uuid, '10063011', $2::uuid,
-         'CATALOG_MATCHED', 'RULE', 'ncm-regex', '1',
-         0.99, 'NCM 1006.30.11'
+         $1::uuid,
+         '10063011',
+         $2::uuid,
+         'CATALOG_MATCHED',
+         'RULE',
+         'ncm-regex',
+         '1',
+         0.99,
+         'NCM 1006.30.11'
        )`,
       [version.rows[0]!.id, firstEntry.id],
     );
@@ -286,7 +298,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       items: Array<{ code: string; description: string | null }>;
     }>().items[0];
     assert.equal(mention?.code, '10063011');
-    assert.equal(mention?.description, 'Arroz semibranqueado');
+    assert.equal(
+      mention?.description,
+      'Arroz semibranqueado ou branqueado.',
+    );
 
     const remove = await app.inject({
       method: 'DELETE',
@@ -301,7 +316,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       headers: firstHeaders,
     });
     assert.equal(afterDelete.statusCode, 200);
-    assert.deepEqual(afterDelete.json<{ items: unknown[] }>().items, []);
+    assert.deepEqual(
+      afterDelete.json<{ items: unknown[] }>().items,
+      [],
+    );
   } finally {
     await app.close();
 
@@ -309,24 +327,30 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       await admin.query(
         `DELETE FROM publication_ncm_mentions
          WHERE publication_version_id IN (
-           SELECT id FROM publication_versions WHERE publication_id = $1::uuid
+           SELECT id
+           FROM publication_versions
+           WHERE publication_id = $1::uuid
          )`,
         [publicationId],
       );
-      await admin.query('DELETE FROM publications WHERE id = $1::uuid', [publicationId]);
+      await admin.query(
+        'DELETE FROM publications WHERE id = $1::uuid',
+        [publicationId],
+      );
     }
 
     if (tenants.length > 0) {
-      await admin.query('DELETE FROM tenants WHERE id = ANY($1::uuid[])', [tenants]);
+      await admin.query(
+        'DELETE FROM tenants WHERE id = ANY($1::uuid[])',
+        [tenants],
+      );
     }
     if (users.length > 0) {
-      await admin.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);
+      await admin.query(
+        'DELETE FROM app_users WHERE id = ANY($1::uuid[])',
+        [users],
+      );
     }
-
-    // official_catalog_entries are append-only by production contract. The
-    // integration database is disposable, so these catalog fixtures are left
-    // intact rather than weakening or bypassing the immutability trigger.
-    void catalogId;
 
     await admin.end();
   }
