@@ -59,5 +59,11 @@ EXECUTE FUNCTION set_updated_at();
 REVOKE ALL ON publication_ncm_scans
 FROM PUBLIC;
 
+-- NCM enrichment is a Worker responsibility. Reassert the read policy for
+-- the canonical publication source tables here so a fresh database does not
+-- depend on an implicit grant from an older migration.
+GRANT SELECT ON publications, publication_versions
+TO radar_worker;
+
 GRANT SELECT, INSERT, UPDATE ON publication_ncm_scans
 TO radar_worker;
