@@ -85,6 +85,9 @@ jobs:
       - name: RFB news unit tests
         run: npx tsx --test test/rfb-news.parser.unit.test.ts test/rfb-news.filter.unit.test.ts test/rfb-news.connector.unit.test.ts
 
+      - name: NCM catalog parser unit tests
+        run: npx tsx --test test/ncm-catalog.source.unit.test.ts
+
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
@@ -111,3 +114,6 @@ jobs:
 
       - name: TAX-06 baseline integration tests
         run: npm run test:taxonomy-baseline-integration
+
+      - name: NCM official catalog idempotency
+        run: npx tsx --test test/ncm-catalog.import.integration.test.ts
