@@ -235,7 +235,7 @@ export async function importNcmCatalog(
        ) VALUES (
          $1::uuid,
          $2,
-         $3::date,
+         NULL,
          $3::date,
          $4,
          $5,
