@@ -36,3 +36,13 @@ SELECT po.source_id, p.id AS publication_id, p.published_on, p.first_collected_a
 FROM publication_origins po JOIN publications p ON p.id = po.publication_id
 WHERE NOT p.is_hidden;
 CREATE INDEX ix_feed_source_order ON publication_source_feed (source_id, published_on DESC NULLS LAST, first_collected_at DESC);
+
+-- P8: accent-insensitive, prefix-friendly search over act type/number/title
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE TEXT SEARCH CONFIGURATION pt_unaccent (COPY = portuguese);
+ALTER TEXT SEARCH CONFIGURATION pt_unaccent ALTER MAPPING FOR hword, hword_part, word WITH unaccent, portuguese_stem;
+CREATE FUNCTION perf_title_tsv(a text, n text, t text) RETURNS tsvector LANGUAGE sql IMMUTABLE AS $$ SELECT to_tsvector('public.pt_unaccent'::regconfig, coalesce(a,'') || ' ' || coalesce(n,'') || ' ' || coalesce(t,'')) $$;
+ALTER TABLE publications ADD COLUMN title_vector tsvector GENERATED ALWAYS AS (perf_title_tsv(act_type, act_number, title)) STORED;
+CREATE INDEX ix_pub_title_vector ON publications USING gin (title_vector) WHERE NOT is_hidden;
+CREATE INDEX ix_pub_visible_order2 ON publications (published_on DESC NULLS LAST, first_collected_at DESC) WHERE NOT is_hidden;
+ANALYZE publications;

@@ -50,6 +50,9 @@ ficariam inutilizáveis.
 | P5 | Filtros do Acervo a partir da fonte gravada | 48 s | 0,3 s (ou ms via P1) | ms via P1 |
 | P7 | **Índice "fonte → publicações por data"** (`publication_source_feed`, uma linha por origem): Acervo por fonte **com o significado atual** (inclui 2ª origem) — página 1 / 40 do DOU | 15 s / 2 min 14 s (banco frio) | **1 ms / 5 ms** | ~1–5 ms |
 | P7b | Mesmo índice: contagem limitada "mais de 10.000" por fonte | 6–33 s (banco frio) | **21 ms** | ~21 ms |
+| P8 | Busca na caixa por **título/tipo/número do ato**, sem acento e por começo de palavra (`title_vector`, config `pt_unaccent`) — "Conv", 25 mais recentes | 12 s (índice do texto completo) | **3 ms** | ~3 ms |
+| P8b | Idem, "convenio" digitado sem acento | não achava | **1 ms** | ~1 ms |
+| P8c | Termo raro ("portaria 4242") em duas etapas: contagem limitada pelo índice de texto e, se < 10.000, ordenação só dos achados | 16,8 s (caminho errado) | **7 ms** | ~7–20 ms |
 | P6 | Busca pelo índice textual já existente (`search_vector`) — termo raro | 5,8–27 s | **20 ms** | ~20–50 ms |
 | P6b | Idem — termo muito comum (900 mil resultados) | — | 0,5–1 s | ~2–4 s (precisa limite) |
 
@@ -61,6 +64,7 @@ Custos de migração medidos (5 milhões; a produção hoje é muito menor):
 | Preencher `primary_source_id` | 17,6 min | em lotes não trava; hoje leva segundos |
 | Índice por fonte (P3, descartado) | 4 s | |
 | Tabela + índice `publication_source_feed` (P7) | 22 s + 4 s | ~444 MB em 5 mi |
+| Coluna `title_vector` + índice GIN (P8) | 2 min + 41 s | reescreve `publications`; hoje leva segundos |
 | Recalcular a tabela de totais inteira | 4 s | com as flags gravadas; antes eram 37 s |
 
 **Conclusão:** essas mudanças são baratas **agora**, enquanto o banco é
@@ -74,7 +78,7 @@ pequeno, e caras depois da carga histórica. Por isso devem entrar antes dela.
 | F2 | Gravar na publicação `is_hidden`, `is_confaz` (colunas geradas) e `primary_source_id` (preenchido pela persistência e backfill), com índices | R3 (migration com reescrita) | — |
 | F3 | Tabela de totais por fonte/UF, recalculada pelo worker ao fim de cada coleta (e não na requisição); `/public/v2/sources`, `/stats` e facets leem dela | R2 | — |
 | F4 | Acervo: filtro por fonte via índice próprio `publication_source_feed` (P7), mantido pela persistência a cada origem gravada — **mesmo significado de hoje**, inclusive regra CONFAZ/DOU; contagem limitada a 10.000 ("mais de 10.000"); total exato por fonte via F3. Custo: ~0,4 GB por 5 mi (~1,8 GB em 20 mi). Substitui a ideia de "fonte principal" (P3), que mudaria o significado do filtro | R2 (+ migration R3) | Decidido (01/10/2026): **manter o seletor de fonte com o significado atual** |
-| F5 | Busca do Acervo pelo índice textual (`search_vector`), com nº do ato por igualdade exata; resultados por data; limite para termos muito comuns | R2 | **Sim:** a busca passa a ser por palavras inteiras com variações ("tributos" acha "tributo"), em vez de trechos de texto. Corrige falsos positivos atuais ("1216" hoje acha "12160"). |
+| F5 | Caixa de busca: texto do ato ("lei…", "Convênio…", "Conv…"), nunca nome de fonte. Busca por **começo de palavra**, **sem diferenciar acento** (`pt_unaccent` = `portuguese` + `unaccent`) e com variações ("tributos" ≈ "tributo"), em `title_vector` (tipo + número + título). Duas etapas: contagem limitada a 10.000 e depois a estratégia certa (P8–P8c). O índice do texto completo (`search_vector`) também passa a usar `pt_unaccent` | R2 (+ migration R3) | Decidido (01/10/2026): caixa de busca é para o texto do ato; fonte só pelo seletor. **Em aberto:** buscar também dentro do texto completo do ato? |
 | F6 | Infra: `pg_stat_statements`, log de consultas > 500 ms, `DB_POOL_MAX`, dimensionar RAM do PostgreSQL para o volume histórico | R3 (infra) | Custo do Railway |
 | F7 | Carga histórica em lotes, fora do horário de coleta, `ANALYZE` e recálculo de totais ao final de cada lote; repetir o benchmark com a produção espelhada | R3 | Janela de carga |
 

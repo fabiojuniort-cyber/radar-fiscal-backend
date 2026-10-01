@@ -40,3 +40,11 @@ SELECT publication_id FROM publication_source_feed WHERE source_id = (SELECT id 
 SELECT publication_id FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='dou') AND NOT is_confaz ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25 OFFSET 975;
 SELECT publication_id FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='sped') ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25 OFFSET 975;
 SELECT count(*) FROM (SELECT 1 FROM publication_source_feed WHERE source_id = (SELECT id FROM sources WHERE code='sped') LIMIT 10001) t;
+
+\echo == P8 title search, common prefix, newest 25
+SELECT id FROM publications WHERE NOT is_hidden AND title_vector @@ to_tsquery('public.pt_unaccent', 'conv:*') ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25;
+\echo == P8b without accent
+SELECT id FROM publications WHERE NOT is_hidden AND title_vector @@ to_tsquery('public.pt_unaccent', 'convenio') ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25;
+\echo == P8c rare term, two steps: capped count, then sort only the matches
+SELECT count(*) FROM (SELECT 1 FROM publications WHERE NOT is_hidden AND title_vector @@ to_tsquery('public.pt_unaccent', 'portaria & 4242') LIMIT 10001) t;
+SELECT id FROM (SELECT id, published_on, first_collected_at FROM publications WHERE NOT is_hidden AND title_vector @@ to_tsquery('public.pt_unaccent', 'portaria & 4242') OFFSET 0) m ORDER BY published_on DESC NULLS LAST, first_collected_at DESC LIMIT 25;
