@@ -149,9 +149,12 @@ the backfill statement afterwards, then run `ops/catalog/028-validate.sql`.
 
 Migration 028 rewrites `publications` and `publication_versions`, builds GIN
 and ordered indexes and backfills the feed, holding locks on those tables
-(5M publications: 10 min 37 s locally for the final version; the read-only
-validation script took 17 min 42 s there and reported 0 differences;
-production is far smaller today but must be measured on a restored copy). The runner wraps it in one transaction and
+(local measurements with 5M synthetic publications: 10 min 37 s at
+`44f3b51`; 11 min 12 s for the final migration at `37096e5`, whose
+read-only validation took 17 min 14 s and reported 0 differences in every
+section). These are local indications only: the window estimate used for
+authorization must come from the restore rehearsal on a copy of
+production (precondition 3). The runner wraps it in one transaction and
 rolls back on error; after commit there is no down migration — recovery is a
 forward fix or a restore.
 
