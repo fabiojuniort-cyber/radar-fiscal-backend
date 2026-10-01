@@ -20,6 +20,8 @@
 --   KEEP     collection_run_publications rows, version pointer set to NULL
 --   DELETE   publication_versions of the scope (publication_files cascade)
 --   DELETE   publication_origins of source doe-sp
+--   ABORT    if any publication_ncm_mentions row references a scope version
+--            (derived tax evidence must be preserved or recomputed explicitly)
 --   ABORT    if any norma_clara_translations row references a scope version
 --            (prototype AI cache, FK ON DELETE CASCADE): deleting it would
 --            lose data whose preservation is not designed yet
@@ -37,6 +39,7 @@
 -- before the first query of the SERIALIZABLE transaction (see below).
 SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
 SELECT to_regclass('public.publication_taxonomy_runs') IS NOT NULL AS has_taxonomy_classification \gset
+SELECT to_regclass('public.publication_ncm_mentions') IS NOT NULL AS has_ncm_mentions \gset
 
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '300s';
@@ -56,6 +59,9 @@ LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
 \endif
 \if :has_taxonomy_classification
 LOCK TABLE publication_taxonomy_runs IN SHARE ROW EXCLUSIVE MODE;
+\endif
+\if :has_ncm_mentions
+LOCK TABLE publication_ncm_mentions IN SHARE ROW EXCLUSIVE MODE;
 \endif
 
 -- Serialize with pause/resume and manual triggers (trigger-doe-sp-run takes
@@ -118,6 +124,12 @@ BEGIN
     IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % classification runs reference scope versions (preserve classification history; do not delete)', v_n; END IF;
   END IF;
 
+  IF to_regclass('public.publication_ncm_mentions') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM publication_ncm_mentions pnm JOIN publication_versions pv ON pv.id = pnm.publication_version_id
+             JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % NCM mentions reference scope versions (preserve tax evidence; do not delete)', v_n; END IF;
+  END IF;
+
   IF to_regclass('public.norma_clara_translations') IS NOT NULL THEN
     EXECUTE 'SELECT count(*) FROM norma_clara_translations t JOIN publication_versions pv ON pv.id = t.publication_version_id
              JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
@@ -131,6 +143,7 @@ BEGIN
       'publication_files_publication_version_id_fkey', 'collection_run_publications_publication_id_fkey',
       'collection_run_publications_publication_version_id_fkey', 'fk_collection_item_publication',
       'company_publications_publication_id_fkey', 'publication_taxonomy_runs_publication_version_id_fkey',
+      'publication_ncm_mentions_publication_version_id_fkey',
       'norma_clara_translations_publication_version_id_fkey');
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % unknown foreign keys reference publications/versions (schema drift)', v_n; END IF;
 END

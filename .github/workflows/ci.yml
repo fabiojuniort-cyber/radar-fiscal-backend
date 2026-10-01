@@ -88,6 +88,9 @@ jobs:
       - name: Collection persistence integration tests
         run: npm run test:collection-integration
 
+      - name: DOE-SP NCM evidence rebuild guard
+        run: npx tsx --test test/doe-sp.ncm-rebuild-guard.integration.test.ts
+
       - name: Authentication and RLS integration tests
         run: npm run test:integration
 
@@ -96,4 +99,3 @@ jobs:
 
       - name: TAX-06 baseline integration tests
         run: npm run test:taxonomy-baseline-integration
-

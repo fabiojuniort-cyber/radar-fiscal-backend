@@ -39,6 +39,13 @@ SELECT
   (SELECT count(*) FROM collection_runs cr JOIN src ON src.id = cr.source_id WHERE cr.status IN ('PENDING', 'RUNNING')) AS blocker_active_runs,
   (SELECT count(*) FROM src WHERE is_active) AS blocker_source_active,
   (SELECT count(*) FROM publication_taxonomy_runs ptr JOIN ver ON ver.id = ptr.publication_version_id) AS blocker_classification_runs,
+  CASE WHEN to_regclass('public.publication_ncm_mentions') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml(
+      'SELECT count(*) AS c FROM publication_ncm_mentions pnm WHERE pnm.publication_version_id IN (
+         SELECT pv.id FROM publication_versions pv WHERE pv.publication_id IN (
+           SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id
+           WHERE s.code = ''doe-sp'' AND s.connector_key = ''doe-sp''))',
+      false, true, '')))[1]::text::bigint END AS blocker_ncm_mentions,
   (SELECT count(*) FROM pg_constraint WHERE contype = 'f'
      AND confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
      AND conname NOT IN (
@@ -50,6 +57,7 @@ SELECT
        'fk_collection_item_publication',
        'company_publications_publication_id_fkey',
        'publication_taxonomy_runs_publication_version_id_fkey',
+       'publication_ncm_mentions_publication_version_id_fkey',
        'norma_clara_translations_publication_version_id_fkey')) AS blocker_unknown_foreign_keys,
   -- global totals before (30 asserts totals after = before - deleted)
   (SELECT count(*) FROM publications) AS global_publications,
@@ -80,6 +88,7 @@ SELECT 'DOE_SP_DRY_RUN=' || jsonb_build_object(
     'active_runs', :blocker_active_runs,
     'source_active', :blocker_source_active,
     'classification_runs', :blocker_classification_runs,
+    'ncm_mentions', :blocker_ncm_mentions,
     'unknown_foreign_keys', :blocker_unknown_foreign_keys,
     -- 30 aborts: deleting old AI translations has no preservation design yet.
     'scope_translations', :expected_translations_deleted),
