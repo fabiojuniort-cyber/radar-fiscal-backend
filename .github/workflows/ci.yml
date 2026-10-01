@@ -85,11 +85,26 @@ jobs:
       - name: RFB news unit tests
         run: npx tsx --test test/rfb-news.parser.unit.test.ts test/rfb-news.filter.unit.test.ts test/rfb-news.connector.unit.test.ts
 
+      - name: NCM catalog parser unit tests
+        run: npx tsx --test test/ncm-catalog.source.unit.test.ts
+
+      - name: Publication NCM detector unit tests
+        run: npx tsx --test test/publication-ncm.detector.unit.test.ts
+
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
+      - name: NEWS worker privilege policy
+        run: node dist/infrastructure/database/verify-news-worker-runtime-role.js
+
+      - name: NEWS worker runtime persistence
+        run: npx tsx --test test/news.worker-runtime.integration.test.ts
+
       - name: Collection persistence integration tests
-        run: npm run test:collection-integration
+        shell: bash
+        run: |
+          export DATABASE_URL="postgresql://radar_worker_runtime:${DB_RUNTIME_PASSWORD}@localhost:5432/radar_fiscal_test"
+          npm run test:collection-integration
 
       - name: DOE-SP NCM evidence rebuild guard
         run: npx tsx --test test/doe-sp.ncm-rebuild-guard.integration.test.ts
@@ -105,3 +120,27 @@ jobs:
 
       - name: TAX-06 baseline integration tests
         run: npm run test:taxonomy-baseline-integration
+
+      - name: NCM official catalog idempotency
+        run: npx tsx --test test/ncm-catalog.import.integration.test.ts
+
+      - name: Publication NCM enrichment integration
+        run: npx tsx --test test/publication-ncm.enrichment.integration.test.ts
+
+      - name: Archive NCM filter integration
+        run: npx tsx --test test/archive-ncm-filter.integration.test.ts
+
+      - name: Product/NCM API integration test
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tsx --test test/product-ncm.integration.test.ts 2>&1 | tee product-ncm-integration.log
+
+      - name: Upload Product/NCM integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-ncm-integration-diagnostics
+          path: product-ncm-integration.log
+          retention-days: 1
+          if-no-files-found: ignore

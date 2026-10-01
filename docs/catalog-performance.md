@@ -13,7 +13,7 @@ publication; and search used `ILIKE` over the full content. A burst saturated
 the 10-connection pool and even trivial endpoints waited behind it. Scaling
 measurements and decisions: [catalog-scale-plan.md](catalog-scale-plan.md).
 
-## Schema (migration 028_catalog_scale)
+## Schema (migration 029_catalog_scale)
 
 - `publications.is_hidden`, `publications.is_confaz`: stored generated flags.
   The migration is the single source of truth for both rules; changing a
@@ -143,11 +143,11 @@ Trigger cost (300k publications, local, statement-level triggers):
 
 For the historical load, prefer multi-row inserts (one refresh per
 statement) or load with the feed triggers disabled and rebuild the feed with
-the backfill statement afterwards, then run `ops/catalog/028-validate.sql`.
+the backfill statement afterwards, then run `ops/catalog/029-validate.sql`.
 
-## Runbook — applying migration 028 (R3)
+## Runbook — applying migration 029 (R3)
 
-Migration 028 rewrites `publications` and `publication_versions`, builds GIN
+Migration 029 rewrites `publications` and `publication_versions`, builds GIN
 and ordered indexes and backfills the feed, holding locks on those tables
 (local measurements with 5M synthetic publications: 10 min 37 s at
 `44f3b51`; 11 min 12 s for the final migration at `37096e5`, whose
@@ -158,6 +158,21 @@ production (precondition 3). The runner wraps it in one transaction and
 rolls back on error; after commit there is no down migration — recovery is a
 forward fix or a restore.
 
+Numbering: the file was reviewed as `028_catalog_scale.sql` and renamed to
+`029_catalog_scale.sql` (content byte-identical, sha256 `5dae80d6…5cae8`;
+its header comment still says 028) after NCM-03 shipped
+`028_publication_ncm_scans.sql` to production on 01/10/2026.
+
+Restore rehearsal (01/10/2026, PITR copy of production at 20:15 UTC, before
+NCM-03's 028, tribusca-control#55): migration 61 s, database 1.84 → 2.68 GB
+peak (+0.54 GB WAL with `max_wal_size` 512 MB), `db:prepare` OK, validation
+and `pg_dump`/`pg_restore` fingerprints with 0 differences.
+
+Production applies migrations in the backend's `preDeployCommand`
+(`npm run db:prepare`): merging this PR into `main` applies 029 on the next
+backend deploy, while the worker and scheduler deploy from `main` too. Plan
+the window around the merge.
+
 Preconditions (all required before authorization):
 
 1. Governance: R3 Issue + LOCK; frozen SHA with review approval.
@@ -165,13 +180,13 @@ Preconditions (all required before authorization):
    EXISTS unaccent` allowed (`SELECT * FROM pg_available_extensions WHERE
    name = 'unaccent'` and role privileges).
 3. Backup taken and a full restore rehearsed on scratch; on the restored copy
-   run the migration, `npm run db:prepare` and `ops/catalog/028-validate.sql`,
+   run the migration, `npm run db:prepare` and `ops/catalog/029-validate.sql`,
    timing it (this is the window estimate) and confirming that
    `pg_dump`/`pg_restore` of the migrated copy restores `pt_unaccent` before
    the generated columns, plus indexes, triggers and feed.
-   `ops/catalog/rehearse-028.mjs` runs these steps inside Railway
+   `ops/catalog/rehearse-029.mjs` runs these steps inside Railway
    (`MODE=preflight|rehearse|dumpcheck`); it only targets a
-   `tmp-perf-028-restore.*` host and prints counts, sizes and timings only.
+   `tmp-perf-029-restore.*` host and prints counts, sizes and timings only.
 4. Capacity: free disk/WAL for two table rewrites, the GIN indexes, the
    ordered index and the feed (≈ size of `publications` + `publication_versions`
    + 20%).
@@ -179,8 +194,9 @@ Preconditions (all required before authorization):
    transactions/locks on the rewritten tables (`pg_stat_activity`,
    `pg_locks`). Abort criterion: if `lock_timeout`/expected window is
    exceeded before commit, cancel (the transaction rolls back).
-6. Apply: `npm run db:migrate`.
-7. Validate: `npm run db:prepare`; `psql -f ops/catalog/028-validate.sql`
+6. Apply: merge to `main` (the backend pre-deploy runs `npm run db:prepare`)
+   or `npm run db:migrate` from a runner, with workers/scheduler paused.
+7. Validate: `npm run db:prepare`; `psql -f ops/catalog/029-validate.sql`
    (every mismatch/missing/stale = 0, plans use the new indexes); API smoke
    for search with/without accent, `scope=full`, source filter, totals and
    facets; DOE-SP rebuild dry-run (`ops/doe-sp/sql/20_dry_run_readonly.sql`)

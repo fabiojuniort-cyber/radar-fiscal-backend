@@ -58,6 +58,7 @@ SELECT
        'company_publications_publication_id_fkey',
        'publication_taxonomy_runs_publication_version_id_fkey',
        'publication_ncm_mentions_publication_version_id_fkey',
+       'publication_ncm_scans_publication_version_id_fkey',
        'norma_clara_translations_publication_version_id_fkey')) AS blocker_unknown_foreign_keys,
   -- global totals before (30 asserts totals after = before - deleted)
   (SELECT count(*) FROM publications) AS global_publications,

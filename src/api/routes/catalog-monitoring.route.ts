@@ -39,6 +39,13 @@ const archiveQuerySchema = z.object({
     .optional(),
   jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
   source: z.string().trim().min(1).max(100).optional(),
+  ncm: z.preprocess(
+    (value) =>
+      typeof value === 'string'
+        ? value.replace(/\D/g, '')
+        : value,
+    z.string().regex(/^\d{8}$/).optional(),
+  ),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 });
@@ -54,7 +61,7 @@ function tenantIdFromRequest(
 }
 
 // Hidden families and CONFAZ-typed acts are stored flags on publications
-// (is_hidden / is_confaz, migrations/028_catalog_scale.sql), and
+// (is_hidden / is_confaz, migrations/029_catalog_scale.sql), and
 // publication_source_feed holds the source-filter membership.
 
 const startOfTodaySql = sql<Date>`
@@ -107,9 +114,37 @@ function buildArchivePlan(
       sql<boolean>`p.jurisdiction_level = ${input.jurisdiction}`,
     );
   }
+  if (input.ncm) {
+    // Same meaning as the NCM-03 filter: a catalog-matched mention on the
+    // current version.
+    conditions.push(sql<boolean>`
+      EXISTS (
+        SELECT 1
+        FROM publication_versions ncm_pv
+        JOIN publication_ncm_mentions pnm_filter
+          ON pnm_filter.publication_version_id = ncm_pv.id
+        WHERE ncm_pv.publication_id = p.id
+          AND ncm_pv.is_current = true
+          AND pnm_filter.verification_status = 'CATALOG_MATCHED'
+          AND pnm_filter.ncm_code = ${input.ncm}
+      )
+    `);
+  }
 
   const filters = sql.join(conditions, sql` AND `) as RawBuilder<boolean>;
-  let searchIds: RawBuilder<unknown> | null = null;
+  // Without a text search, an NCM filter is the selective condition: fetch
+  // its publications through the mention code index first.
+  let searchIds: RawBuilder<unknown> | null = input.ncm
+    ? sql`
+        SELECT DISTINCT ncm_pv.publication_id
+        FROM publication_ncm_mentions pnm
+        JOIN publication_versions ncm_pv
+          ON ncm_pv.id = pnm.publication_version_id
+        WHERE pnm.ncm_code = ${input.ncm}
+          AND pnm.verification_status = 'CATALOG_MATCHED'
+          AND ncm_pv.is_current = true
+      `
+    : null;
 
   if (tsquery) {
     const query = sql`to_tsquery('public.pt_unaccent', ${tsquery})`;
@@ -587,16 +622,17 @@ export async function catalogMonitoringRoutes(
       let totalItems: number;
       let totalIsCapped = false;
 
-      if (!input.q && !input.uf && !input.jurisdiction) {
+      if (!input.q && !input.ncm && !input.uf && !input.jurisdiction) {
         totalItems = sourceCode
           ? ((await sourceCountsCache.get('counts', loadSourceCounts)).get(
               sourceCode,
             ) ?? 0)
           : (await statsCache.get('stats', loadStats)).totalPublications;
       } else {
-        // Searches count live: the same count picks the query strategy below
-        // and must not be stale while collections add matches.
-        const capped = tsquery
+        // Searches and NCM filters count live: the same count picks the query
+        // strategy below and must not be stale while collections and the NCM
+        // enrichment add matches.
+        const capped = plan.searchIds
           ? await cappedArchiveCount(plan)
           : await archiveCountCache.get(
               JSON.stringify([

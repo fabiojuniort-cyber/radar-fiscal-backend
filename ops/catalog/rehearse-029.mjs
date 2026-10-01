@@ -1,17 +1,17 @@
-// PERF-02 / migration 028 — R3 rehearsal runner (Issue tribusca-control#55).
+// PERF-02 / migration 029 — R3 rehearsal runner (Issue tribusca-control#55).
 //
 // Runs inside Railway only. It prints counts, sizes, timings and object names;
 // never row contents or connection strings.
 //
 // MODE=preflight  read-only checks against production (PROD_DATABASE_ADMIN_URL),
 //                 every statement inside a READ ONLY transaction.
-// MODE=rehearse   on the PITR restore: migration 028 timed with disk sampling,
-//                 then `npm run db:prepare` and ops/catalog/028-validate.sql.
+// MODE=rehearse   on the PITR restore: migration 029 timed with disk sampling,
+//                 then `npm run db:prepare` and ops/catalog/029-validate.sql.
 // MODE=dumpcheck  compares the migrated restore with its pg_dump/pg_restore copy
-//                 (database perf028_dumpcheck on the same restore server).
+//                 (database perf029_dumpcheck on the same restore server).
 //
 // The restore target is derived from the production URLs by replacing host
-// and port with RESTORE_HOST, which must be a tmp-perf-028-* private domain.
+// and port with RESTORE_HOST, which must be a tmp-perf-029-* private domain.
 // Child processes never receive the production URLs.
 
 import { spawn } from 'node:child_process';
@@ -20,13 +20,13 @@ import { readFile } from 'node:fs/promises';
 
 import pg from 'pg';
 
-const RESTORE_HOST_PREFIX = 'tmp-perf-028-restore.';
-const DUMPCHECK_DATABASE = 'perf028_dumpcheck';
+const RESTORE_HOST_PREFIX = 'tmp-perf-029-restore.';
+const DUMPCHECK_DATABASE = 'perf029_dumpcheck';
 const EXPECTED_MIGRATION_SHA256 = process.env.EXPECTED_MIGRATION_SHA256;
 
 function log(label, value) {
   console.log(
-    `[rehearse-028] ${label}${value === undefined ? '' : ` ${JSON.stringify(value)}`}`,
+    `[rehearse-029] ${label}${value === undefined ? '' : ` ${JSON.stringify(value)}`}`,
   );
 }
 
@@ -54,7 +54,7 @@ function restoreTargets() {
   const prodApp = new URL(requireEnv('PROD_DATABASE_URL'));
 
   if (!restoreHost.startsWith(RESTORE_HOST_PREFIX)) {
-    throw new Error('RESTORE_HOST is not a tmp-perf-028-restore domain');
+    throw new Error('RESTORE_HOST is not a tmp-perf-029-restore domain');
   }
   if (
     restoreHost === prodAdmin.hostname
@@ -74,7 +74,7 @@ async function withClient(connectionString, fn) {
   const client = new pg.Client({
     connectionString,
     statement_timeout: 0,
-    application_name: 'perf-028-rehearsal',
+    application_name: 'perf-029-rehearsal',
   });
   await client.connect();
   try {
@@ -87,7 +87,7 @@ async function withClient(connectionString, fn) {
 async function readOnly(connectionString, fn) {
   const client = new pg.Client({
     connectionString,
-    application_name: 'perf-028-preflight',
+    application_name: 'perf-029-preflight',
     options: '-c default_transaction_read_only=on -c statement_timeout=60000 -c lock_timeout=2000',
   });
   await client.connect();
@@ -160,7 +160,7 @@ async function describeServer(client) {
   const migrations = await client.query(`
     SELECT count(*)::int AS applied,
            max(filename) AS latest,
-           count(*) FILTER (WHERE filename = '028_catalog_scale.sql')::int AS has_028
+           count(*) FILTER (WHERE filename = '029_catalog_scale.sql')::int AS has_029
     FROM schema_migrations`);
   log('schema_migrations', migrations.rows[0]);
 }
@@ -256,7 +256,7 @@ async function sampleDisk(connectionString, stopSignal) {
   const samples = [];
   const client = new pg.Client({
     connectionString,
-    application_name: 'perf-028-disk-sampler',
+    application_name: 'perf-029-disk-sampler',
   });
   await client.connect();
   try {
@@ -321,7 +321,7 @@ function splitValidationSql(text) {
 }
 
 async function runValidation(connectionString, label) {
-  const text = await readFile(new URL('./028-validate.sql', import.meta.url), 'utf8');
+  const text = await readFile(new URL('./029-validate.sql', import.meta.url), 'utf8');
   const started = Date.now();
   await withClient(connectionString, async (client) => {
     for (const step of splitValidationSql(text)) {
@@ -343,12 +343,12 @@ async function runValidation(connectionString, label) {
 
 async function rehearse() {
   const migration = await readFile(
-    new URL('../../migrations/028_catalog_scale.sql', import.meta.url),
+    new URL('../../migrations/029_catalog_scale.sql', import.meta.url),
   );
   const sha256 = createHash('sha256').update(migration).digest('hex');
-  log('migration_028_sha256', sha256);
+  log('migration_029_sha256', sha256);
   if (EXPECTED_MIGRATION_SHA256 && EXPECTED_MIGRATION_SHA256 !== sha256) {
-    throw new Error('migration 028 checksum differs from the frozen artifact');
+    throw new Error('migration 029 checksum differs from the frozen artifact');
   }
 
   const targets = restoreTargets();
@@ -450,13 +450,13 @@ const modes = { preflight, rehearse, dumpcheck };
 const mode = process.env.MODE;
 
 if (!modes[mode]) {
-  console.error(`[rehearse-028] unknown MODE ${mode}`);
+  console.error(`[rehearse-029] unknown MODE ${mode}`);
   process.exit(2);
 }
 
 modes[mode]()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error(`[rehearse-028] failed: ${error.message}`);
+    console.error(`[rehearse-029] failed: ${error.message}`);
     process.exit(1);
   });

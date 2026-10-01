@@ -1,5 +1,5 @@
--- PERF-02 / migration 028 — read-only post-migration validation.
--- Usage: psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -f ops/catalog/028-validate.sql
+-- PERF-02 / migration 029 — read-only post-migration validation.
+-- Usage: psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -f ops/catalog/029-validate.sql
 -- Every *_mismatch / missing / stale value must be 0. Runs in a READ ONLY
 -- transaction that is rolled back.
 
@@ -10,7 +10,7 @@ SELECT
   (SELECT count(*) FROM pg_extension WHERE extname = 'unaccent') AS unaccent_extension,
   (SELECT count(*) FROM pg_ts_config WHERE cfgname = 'pt_unaccent') AS pt_unaccent_config,
   (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE '%source_feed%') AS feed_triggers,
-  (SELECT count(*) FROM schema_migrations WHERE filename = '028_catalog_scale.sql') AS migration_recorded;
+  (SELECT count(*) FROM schema_migrations WHERE filename = '029_catalog_scale.sql') AS migration_recorded;
 
 \echo == 2. stored flags equal the previous LIKE rules
 SELECT

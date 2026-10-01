@@ -9,7 +9,7 @@ histórica do DOU (2002–2026)**. Complementa o PERF-01
 | Fase | Status |
 | --- | --- |
 | F1 | Implementada (PERF-01) |
-| F2 | Implementada: `is_hidden`, `is_confaz`, `title_vector` (migration 028) |
+| F2 | Implementada: `is_hidden`, `is_confaz`, `title_vector` (migration 029) |
 | F3 | Implementada **sem tabela própria**: as contagens por fonte saem de `publication_source_feed` (0,26 s com 5 mi, a cada 1 h no cache), o que dispensou manter uma tabela de totais separada |
 | F4 | Implementada com `publication_source_feed` (P7), mesmo significado do filtro atual |
 | F5 | Implementada: título por padrão + opção "texto completo", sem acento, prefixo na última palavra, duas etapas |
@@ -88,7 +88,7 @@ pequeno, e caras depois da carga histórica. Por isso devem entrar antes dela.
 
 | Fase | O que | Risco | Decisão de produto necessária |
 | --- | --- | --- | --- |
-| F1 | PERF-01: índice de visíveis, consultas reescritas, cache 1 h, frontend sem rajada | R2 + R3 (migration 028) | Já tomada (cache 1 h) |
+| F1 | PERF-01: índice de visíveis, consultas reescritas, cache 1 h, frontend sem rajada | R2 + R3 (migration 029) | Já tomada (cache 1 h) |
 | F2 | Gravar na publicação `is_hidden`, `is_confaz` (colunas geradas) e `primary_source_id` (preenchido pela persistência e backfill), com índices | R3 (migration com reescrita) | — |
 | F3 | Tabela de totais por fonte/UF, recalculada pelo worker ao fim de cada coleta (e não na requisição); `/public/v2/sources`, `/stats` e facets leem dela | R2 | — |
 | F4 | Acervo: filtro por fonte via índice próprio `publication_source_feed` (P7), mantido pela persistência a cada origem gravada — **mesmo significado de hoje**, inclusive regra CONFAZ/DOU; contagem limitada a 10.000 ("mais de 10.000"); total exato por fonte via F3. Custo: ~0,4 GB por 5 mi (~1,8 GB em 20 mi). Substitui a ideia de "fonte principal" (P3), que mudaria o significado do filtro | R2 (+ migration R3) | Decidido (01/10/2026): **manter o seletor de fonte com o significado atual** |
