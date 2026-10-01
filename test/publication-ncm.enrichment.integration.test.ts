@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
+import { sql } from 'kysely';
 import { Pool } from 'pg';
 
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
@@ -13,6 +14,19 @@ import {
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
 if (!adminUrl) throw new Error('DATABASE_ADMIN_URL is required');
+
+const workerPassword =
+  process.env.DB_WORKER_RUNTIME_PASSWORD ?? process.env.DB_RUNTIME_PASSWORD;
+if (!workerPassword) {
+  throw new Error('DB worker runtime password is required');
+}
+
+function runtimeUrl(databaseUrl: string, password: string): string {
+  const url = new URL(databaseUrl);
+  url.username = 'radar_worker_runtime';
+  url.password = password;
+  return url.toString();
+}
 
 async function createPublicationFixture(
   admin: Pool,
@@ -58,7 +72,7 @@ async function createPublicationFixture(
 test('publication NCM enrichment stores only CURRENT catalog matches and marks zero-match scans', async () => {
   const admin = new Pool({ connectionString: adminUrl, max: 1 });
   const db = createStandaloneDatabase({
-    connectionString: adminUrl,
+    connectionString: runtimeUrl(adminUrl, workerPassword),
     poolMax: 1,
     idleTimeoutMs: 5_000,
     connectionTimeoutMs: 5_000,
@@ -84,6 +98,38 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
       ['10062099', '10063011'],
       'NCM catalog fixture must be imported by the preceding CI gate',
     );
+
+    const runtimePolicy = await sql<{
+      current_user: string;
+      can_read_catalogs: boolean;
+      can_read_editions: boolean;
+      can_read_entries: boolean;
+    }>`
+      SELECT
+        current_user,
+        has_table_privilege(
+          current_user,
+          'public.official_catalogs',
+          'SELECT'
+        ) AS can_read_catalogs,
+        has_table_privilege(
+          current_user,
+          'public.official_catalog_editions',
+          'SELECT'
+        ) AS can_read_editions,
+        has_table_privilege(
+          current_user,
+          'public.official_catalog_entries',
+          'SELECT'
+        ) AS can_read_entries
+    `.execute(db);
+
+    assert.deepEqual(runtimePolicy.rows[0], {
+      current_user: 'radar_worker_runtime',
+      can_read_catalogs: true,
+      can_read_editions: true,
+      can_read_entries: true,
+    });
 
     const matched = await createPublicationFixture(admin, {
       title: 'NCM detector matched fixture',
