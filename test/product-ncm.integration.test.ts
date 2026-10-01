@@ -319,17 +319,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       await admin.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);
     }
 
-    if (catalogId) {
-      await admin.query(
-        `DELETE FROM official_catalog_entries
-         WHERE catalog_edition_id IN (
-           SELECT id FROM official_catalog_editions WHERE catalog_id = $1::uuid
-         )`,
-        [catalogId],
-      );
-      await admin.query('DELETE FROM official_catalog_editions WHERE catalog_id = $1::uuid', [catalogId]);
-      await admin.query('DELETE FROM official_catalogs WHERE id = $1::uuid', [catalogId]);
-    }
+    // official_catalog_entries are append-only by production contract. The
+    // integration database is disposable, so these catalog fixtures are left
+    // intact rather than weakening or bypassing the immutability trigger.
+    void catalogId;
 
     await admin.end();
   }
