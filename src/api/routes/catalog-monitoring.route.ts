@@ -36,19 +36,23 @@ function tenantIdFromRequest(
   return z.string().uuid().safeParse(raw).success ? raw : null;
 }
 
+const excludedPublicationFamilySql = sql<boolean>`
+  (
+    upper(coalesce(p.act_type, '')) LIKE '%AVISO DE LICITAÇÃO%'
+    OR upper(coalesce(p.title, '')) LIKE '%AVISO DE LICITAÇÃO%'
+    OR upper(coalesce(p.act_type, '')) LIKE '%COMUNICADO DGFIN%'
+    OR upper(coalesce(p.title, '')) LIKE '%COMUNICADO DGFIN%'
+    OR upper(coalesce(p.act_type, '')) LIKE '%PORTARIA DO COORDENADOR GERAL%'
+    OR upper(coalesce(p.title, '')) LIKE '%PORTARIA DO COORDENADOR GERAL%'
+    OR upper(coalesce(p.act_type, '')) LIKE '%COMISSÃO DE ANÁLISE DE PROJETOS%'
+    OR upper(coalesce(p.title, '')) LIKE '%COMISSÃO DE ANÁLISE DE PROJETOS%'
+    OR upper(coalesce(p.act_type, '')) LIKE '%COMISSAO DE ANALISE DE PROJETOS%'
+    OR upper(coalesce(p.title, '')) LIKE '%COMISSAO DE ANALISE DE PROJETOS%'
+  )
+`;
+
 const visiblePublicationSql = sql<boolean>`
-  upper(coalesce(p.act_type, '')) NOT IN (
-    'AVISO DE LICITAÇÃO',
-    'COMUNICADO DGFIN',
-    'PORTARIA DO COORDENADOR GERAL',
-    'COMISSÃO DE ANÁLISE DE PROJETOS'
-  )
-  AND upper(coalesce(p.title, '')) NOT IN (
-    'AVISO DE LICITAÇÃO',
-    'COMUNICADO DGFIN',
-    'PORTARIA DO COORDENADOR GERAL',
-    'COMISSÃO DE ANÁLISE DE PROJETOS'
-  )
+  NOT (${excludedPublicationFamilySql})
 `;
 
 const confazPublicationSql = sql<boolean>`
