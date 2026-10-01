@@ -21,6 +21,7 @@ interface NewsRow {
   updated_at_source: Date | string | null;
   official_url: string;
   tags: string[];
+  source_metadata: Record<string, unknown> | null;
   total_count: number;
 }
 
@@ -28,6 +29,18 @@ function iso(value: Date | string | null): string | null {
   if (value === null) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function imageUrl(metadata: Record<string, unknown> | null): string | null {
+  const value = metadata?.imageUrl;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 export async function newsRoutes(app: FastifyInstance): Promise<void> {
@@ -75,6 +88,7 @@ export async function newsRoutes(app: FastifyInstance): Promise<void> {
             niv.updated_at_source,
             niv.official_url,
             niv.tags,
+            niv.source_metadata,
             niv.collected_at
           FROM news_items ni
           INNER JOIN sources s
@@ -95,6 +109,7 @@ export async function newsRoutes(app: FastifyInstance): Promise<void> {
           latest.updated_at_source,
           latest.official_url,
           latest.tags,
+          latest.source_metadata,
           COUNT(*) OVER()::int AS total_count
         FROM latest
         WHERE ${predicate}
@@ -122,6 +137,7 @@ export async function newsRoutes(app: FastifyInstance): Promise<void> {
           publishedAt: iso(row.published_at),
           updatedAt: iso(row.updated_at_source),
           officialUrl: row.official_url,
+          imageUrl: imageUrl(row.source_metadata),
           tags: row.tags,
         })),
         page,
