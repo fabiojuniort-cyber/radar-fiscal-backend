@@ -107,7 +107,8 @@ lives in process memory: a restart/deploy starts empty. Product decision
 | Search "conv" (title) | 27 s (ILIKE) | 0.16 s | — |
 | Search "portaria 4242" (title) | — | 0.05 s | — |
 | Search rare term, `scope=full` | — | 0.5 s | — |
-| Search very common term, `scope=full` | — | 3–4 s | — |
+| Search very common term, `scope=full` | — | 3–5 s | — |
+| Search "conv" + source or UF filter | — | 0.8–1.1 s | — |
 
 Equivalence (300k): for every source, the set of publications returned by the
 previous filter and by `publication_source_feed` is identical, and
@@ -134,8 +135,9 @@ the backfill statement afterwards, then run `ops/catalog/028-validate.sql`.
 
 Migration 028 rewrites `publications` and `publication_versions`, builds GIN
 and ordered indexes and backfills the feed, holding locks on those tables
-(5M publications: ~12.5 min locally; production is far smaller today but must
-be measured on a restored copy). The runner wraps it in one transaction and
+(5M publications: 10 min 37 s locally for the final version; the read-only
+validation script took 17 min 42 s there and reported 0 differences;
+production is far smaller today but must be measured on a restored copy). The runner wraps it in one transaction and
 rolls back on error; after commit there is no down migration — recovery is a
 forward fix or a restore.
 

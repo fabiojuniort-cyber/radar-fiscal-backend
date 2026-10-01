@@ -68,6 +68,9 @@ const startOfTomorrowSql = sql<Date>`
 interface ArchivePlan {
   /** Joins the source feed as `f` when filtering by source (else empty). */
   feedJoin: RawBuilder<unknown>;
+  /** Visibility, source, UF and jurisdiction filters (no search). */
+  filters: RawBuilder<boolean>;
+  /** filters AND the per-row search condition, for the date-walk strategy. */
   where: RawBuilder<boolean>;
   order: RawBuilder<unknown>;
   /** Publications matching the search, for the match-first strategy. */
@@ -105,6 +108,7 @@ function buildArchivePlan(
     );
   }
 
+  const filters = sql.join(conditions, sql` AND `) as RawBuilder<boolean>;
   let searchIds: RawBuilder<unknown> | null = null;
 
   if (tsquery) {
@@ -147,6 +151,7 @@ function buildArchivePlan(
 
   return {
     feedJoin,
+    filters,
     where: sql.join(conditions, sql` AND `) as RawBuilder<boolean>,
     order,
     searchIds,
@@ -397,10 +402,13 @@ export async function catalogMonitoringRoutes(
         GROUP BY candidate.code
       ) c
       CROSS JOIN LATERAL (
+        -- Ordered like ix_publication_source_feed_order so the probe is an
+        -- index lookup rather than a scan.
         SELECT 1
         FROM publication_source_feed f
         WHERE f.source_code = c.code
           AND NOT f.is_hidden
+        ORDER BY f.published_on DESC NULLS LAST, f.first_collected_at DESC
         LIMIT 1
       ) hit
       ORDER BY 2
@@ -423,7 +431,7 @@ export async function catalogMonitoringRoutes(
             FROM (${plan.searchIds}) m
             JOIN publications p ON p.id = m.publication_id
             ${plan.feedJoin}
-            WHERE ${plan.where}
+            WHERE ${plan.filters}
             LIMIT ${limit}
           ) capped
         `.execute(app.db)
@@ -613,7 +621,7 @@ export async function catalogMonitoringRoutes(
                 FROM (${plan.searchIds}) m
                 JOIN publications p ON p.id = m.publication_id
                 ${plan.feedJoin}
-                WHERE ${plan.where}
+                WHERE ${plan.filters}
                 OFFSET 0
               ) matched
               ORDER BY
