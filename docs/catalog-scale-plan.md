@@ -4,6 +4,20 @@ Estado observado em 01/10/2026 (BRT). Proposta de gate **antes da carga
 histórica do DOU (2002–2026)**. Complementa o PERF-01
 ([catalog-performance.md](catalog-performance.md)).
 
+## 0. Status (01/10/2026)
+
+| Fase | Status |
+| --- | --- |
+| F1 | Implementada (PERF-01) |
+| F2 | Implementada: `is_hidden`, `is_confaz`, `title_vector` (migration 028) |
+| F3 | Implementada **sem tabela própria**: as contagens por fonte saem de `publication_source_feed` (0,26 s com 5 mi, a cada 1 h no cache), o que dispensou manter uma tabela de totais separada |
+| F4 | Implementada com `publication_source_feed` (P7), mesmo significado do filtro atual |
+| F5 | Implementada: título por padrão + opção "texto completo", sem acento, prefixo na última palavra, duas etapas |
+| F6 | Pendente (infra, R3) |
+| F7 | Pendente (carga histórica, R3) |
+
+Resultados finais com 5 milhões e o contrato da API: [catalog-performance.md](catalog-performance.md).
+
 ## 1. Como foi medido
 
 - Banco local PostgreSQL 16 com **5 milhões** de publicações sintéticas

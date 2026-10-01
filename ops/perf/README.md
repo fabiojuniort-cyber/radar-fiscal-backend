@@ -13,7 +13,8 @@ AGGREGATE_CACHE_TTL_MS=0 DATABASE_URL=... DATABASE_ADMIN_URL=... JWT_ACCESS_SECR
 ```
 
 `AGGREGATE_CACHE_TTL_MS=0` measures the cold queries the aggregate cache
-hides. To time the proposed schema changes (PERF-02):
+hides. To time the proposed schema changes (PERF-02) — these experiments target the
+pre-028 schema; on a database migrated with 028 the structures already exist:
 
 ```bash
 psql postgresql://.../radar_perf -f ops/perf/experiment-build.sql
