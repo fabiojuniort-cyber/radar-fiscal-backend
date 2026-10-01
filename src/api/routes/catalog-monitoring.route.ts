@@ -24,6 +24,13 @@ const archiveQuerySchema = z.object({
     .optional(),
   jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
   source: z.string().trim().min(1).max(100).optional(),
+  ncm: z.preprocess(
+    (value) =>
+      typeof value === 'string'
+        ? value.replace(/\D/g, '')
+        : value,
+    z.string().regex(/^\d{8}$/).optional(),
+  ),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 });
@@ -119,6 +126,17 @@ function archiveWhere(input: z.infer<typeof archiveQuerySchema>) {
   }
   if (input.source) {
     conditions.push(sourceFilterSql(input.source));
+  }
+  if (input.ncm) {
+    conditions.push(sql<boolean>`
+      EXISTS (
+        SELECT 1
+        FROM publication_ncm_mentions pnm_filter
+        WHERE pnm_filter.publication_version_id = pv.id
+          AND pnm_filter.verification_status = 'CATALOG_MATCHED'
+          AND pnm_filter.ncm_code = ${input.ncm}
+      )
+    `);
   }
   if (input.q) {
     const pattern = `%${input.q}%`;
