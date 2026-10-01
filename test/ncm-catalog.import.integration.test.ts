@@ -14,8 +14,8 @@ const adminUrl = process.env.DATABASE_ADMIN_URL;
 if (!adminUrl) throw new Error('DATABASE_ADMIN_URL is required');
 
 const parsed = parseNcmCatalogPayload({
-  Data_Ultima_Atualizacao_NCM: '01/10/2026',
-  Ato: { Tipo: 'Res Gecex', Numero: '999' },
+  Data_Ultima_Atualizacao_NCM: 'Vigente em 01/10/2026',
+  Ato: 'Resolução Gecex nº 999/2026',
   Nomenclaturas: [
     { Codigo: '01', Descricao: 'Animais vivos.', Data_Inicio: '01/04/2022', Data_Fim: '31/12/9999' },
     { Codigo: '1006.30.11', Descricao: 'Arroz semibranqueado ou branqueado.', Data_Inicio: '01/04/2022', Data_Fim: '31/12/9999' },
@@ -54,6 +54,8 @@ test('official NCM catalog import is idempotent and uses curator privileges', as
       catalogs: number;
       current_editions: number;
       entries: number;
+      published_on: string | null;
+      valid_from: string | null;
     }>(`
       SELECT
         (SELECT count(*)::int FROM official_catalogs WHERE code = 'NCM') AS catalogs,
@@ -69,13 +71,29 @@ test('official NCM catalog import is idempotent and uses curator privileges', as
           JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
           JOIN official_catalogs c ON c.id = ed.catalog_id
           WHERE c.code = 'NCM'
-        ) AS entries
+        ) AS entries,
+        (
+          SELECT ed.published_on::text
+          FROM official_catalog_editions ed
+          JOIN official_catalogs c ON c.id = ed.catalog_id
+          WHERE c.code = 'NCM' AND ed.status = 'CURRENT'
+          LIMIT 1
+        ) AS published_on,
+        (
+          SELECT ed.valid_from::text
+          FROM official_catalog_editions ed
+          JOIN official_catalogs c ON c.id = ed.catalog_id
+          WHERE c.code = 'NCM' AND ed.status = 'CURRENT'
+          LIMIT 1
+        ) AS valid_from
     `);
 
     assert.deepEqual(state.rows[0], {
       catalogs: 1,
       current_editions: 1,
       entries: 3,
+      published_on: null,
+      valid_from: '2026-10-01',
     });
 
     const runtimeWrite = await client.query<{ can_insert: boolean }>(`
