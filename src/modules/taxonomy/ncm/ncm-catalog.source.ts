@@ -69,6 +69,22 @@ function datePartsToIso(
   return iso;
 }
 
+function parsedDateParts(
+  match: RegExpExecArray,
+  label: string,
+  value: string,
+): [string, string, string] {
+  const day = match[1];
+  const month = match[2];
+  const year = match[3];
+
+  if (!day || !month || !year) {
+    throw new Error(`NCM_SOURCE_INVALID_DATE:${label}:${value}`);
+  }
+
+  return [day, month, year];
+}
+
 function parseBrazilianDate(value: string, label: string): string {
   const trimmed = value.trim();
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
@@ -76,27 +92,20 @@ function parseBrazilianDate(value: string, label: string): string {
     throw new Error(`NCM_SOURCE_INVALID_DATE:${label}:${value}`);
   }
 
-  const [, day, month, year] = match;
+  const [day, month, year] = parsedDateParts(match, label, value);
   return datePartsToIso(day, month, year, label, value);
 }
 
 function parseCatalogUpdatedOn(value: string): string {
+  const label = 'Data_Ultima_Atualizacao_NCM';
   const trimmed = value.trim();
   const match = /^(?:Vigente em )?(\d{2})\/(\d{2})\/(\d{4})$/i.exec(trimmed);
   if (!match) {
-    throw new Error(
-      `NCM_SOURCE_INVALID_DATE:Data_Ultima_Atualizacao_NCM:${value}`,
-    );
+    throw new Error(`NCM_SOURCE_INVALID_DATE:${label}:${value}`);
   }
 
-  const [, day, month, year] = match;
-  return datePartsToIso(
-    day,
-    month,
-    year,
-    'Data_Ultima_Atualizacao_NCM',
-    value,
-  );
+  const [day, month, year] = parsedDateParts(match, label, value);
+  return datePartsToIso(day, month, year, label, value);
 }
 
 function optionalDate(value: string | undefined, label: string): string | null {
