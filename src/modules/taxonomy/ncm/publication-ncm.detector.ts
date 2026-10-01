@@ -311,18 +311,17 @@ async function selectBatch(
       pv.relevant_excerpt
     FROM publications p
     JOIN publication_versions pv
-      ON pv.id = p.current_version_id
+      ON pv.publication_id = p.id
+     AND pv.is_current = true
     LEFT JOIN publication_ncm_scans pns
       ON pns.publication_version_id = pv.id
      AND pns.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
      AND pns.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
-    WHERE p.current_version_id IS NOT NULL
-      AND (
-        pns.id IS NULL
-        OR (
-          pns.status = 'FAILED'
-          AND pns.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
-        )
+    WHERE
+      pns.id IS NULL
+      OR (
+        pns.status = 'FAILED'
+        AND pns.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
       )
     ORDER BY
       p.published_on DESC NULLS LAST,
