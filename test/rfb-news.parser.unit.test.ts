@@ -76,6 +76,29 @@ test('RFB news article resolves a relative social image URL', () => {
   assert.equal(article.imageUrl, 'https://www.gov.br/receitafederal/imagens/noticias/cbs.png');
 });
 
+test('RFB news article falls back to the first editorial image inside main content', () => {
+  const html = `
+    <body>
+      <header><img src="/assets/logo.png" alt="Logo"></header>
+      <main>
+        <h1>Notícia com capa no conteúdo</h1>
+        <figure>
+          <img data-src="/receitafederal/imagens/noticias/capa.jpg#crop" alt="capa">
+        </figure>
+        <p>IBS, CBS e Reforma Tributária.</p>
+      </main>
+    </body>
+  `;
+  const article = parseRfbNewsArticle(
+    html,
+    'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/exemplo-capa',
+  );
+  assert.equal(
+    article.imageUrl,
+    'https://www.gov.br/receitafederal/imagens/noticias/capa.jpg',
+  );
+});
+
 test('RFB news article falls back to visible published timestamp', () => {
   const html = `
     <main>
