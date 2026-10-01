@@ -82,6 +82,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: RFB news unit tests
+        run: npx tsx --test test/rfb-news.parser.unit.test.ts test/rfb-news.filter.unit.test.ts test/rfb-news.connector.unit.test.ts
+
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
