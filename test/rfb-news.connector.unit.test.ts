@@ -19,9 +19,10 @@ function context() {
   };
 }
 
-test('RFB news connector returns only tax-relevant official news', async () => {
+test('RFB news connector returns only tax-relevant official news with image metadata', async () => {
   const relevantUrl = 'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/ibs-cbs';
   const unrelatedUrl = 'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/contrabando';
+  const imageUrl = 'https://www.gov.br/receitafederal/imagens/noticias/ibs-cbs.jpg';
 
   const listing = `
     <main>
@@ -32,6 +33,7 @@ test('RFB news connector returns only tax-relevant official news', async () => {
     <head>
       <meta property="og:title" content="Receita publica regras para IBS e CBS">
       <meta property="og:description" content="Regras da Reforma Tributária para documentos fiscais.">
+      <meta property="og:image" content="${imageUrl}">
       <meta property="article:published_time" content="2026-09-20T10:00:00-03:00">
       <meta property="article:section" content="Tributação">
     </head>
@@ -59,6 +61,7 @@ test('RFB news connector returns only tax-relevant official news', async () => {
   assert.equal(result.newsItems?.length, 1);
   assert.equal(result.newsItems?.[0]?.officialUrl, relevantUrl);
   assert.equal(result.newsItems?.[0]?.agency, 'Receita Federal');
+  assert.equal(result.newsItems?.[0]?.metadata?.imageUrl, imageUrl);
   assert.equal(result.metadata?.discoveredCount, 2);
   assert.equal(result.metadata?.includedCount, 1);
   assert.equal(result.metadata?.excludedCount, 1);
