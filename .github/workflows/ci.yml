@@ -88,6 +88,12 @@ jobs:
       - name: Prepare PostgreSQL test database
         run: npm run db:prepare
 
+      - name: NEWS worker privilege policy
+        run: node dist/infrastructure/database/verify-news-worker-runtime-role.js
+
+      - name: NEWS worker runtime persistence
+        run: npx tsx --test test/news.worker-runtime.integration.test.ts
+
       - name: Collection persistence integration tests
         run: npm run test:collection-integration
 
