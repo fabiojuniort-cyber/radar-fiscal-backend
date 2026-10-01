@@ -389,7 +389,7 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
       assert.deepEqual(await feedOf(id), [`${marker}tmp`]);
     });
 
-    await t.test('bulk updates refresh once per statement and opposite orders do not deadlock', async () => {
+    await t.test('bulk updates refresh once per statement; opposite orders wait instead of deadlocking', async () => {
       const bulkSource = await createSource(`${marker}bulk`);
       const created = await admin.query<{ id: string }>(
         `INSERT INTO publications (identity_hash, identity_strength, identity_basis,
@@ -426,21 +426,62 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
       );
       assert.equal(Number(mismatch.rows[0]?.count), 0);
 
-      // Two statements touching the same two publications in opposite order.
+      // Two statements touching the same two publications in opposite order,
+      // changing a feed-relevant column so both really call the refresh.
       const [first, second] = [bulkIds[0]!, bulkIds[1]!];
       const one = new Pool({ connectionString: adminUrl, max: 1 });
       const two = new Pool({ connectionString: adminUrl, max: 1 });
       try {
         await Promise.all([
           one.query(
-            `UPDATE publications SET title = title || ' a' WHERE id = ANY($1::uuid[])`,
+            `UPDATE publications SET published_on = published_on - 1 WHERE id = ANY($1::uuid[])`,
             [[first, second]],
           ),
           two.query(
-            `UPDATE publications SET title = title || ' b' WHERE id = ANY($1::uuid[])`,
+            `UPDATE publications SET published_on = published_on - 2 WHERE id = ANY($1::uuid[])`,
             [[second, first]],
           ),
         ]);
+
+        // The advisory locks themselves: a refresh of [first, second] holds
+        // both publications until commit; a refresh of [second, first] in
+        // another transaction must wait (ids are locked in sorted order, so
+        // the opposite input order cannot deadlock).
+        const a = await one.connect();
+        const b = await two.connect();
+        try {
+          await a.query('BEGIN');
+          await a.query(
+            'SELECT public.refresh_publication_source_feed($1::uuid[])',
+            [[first, second]],
+          );
+          await b.query('BEGIN');
+          let waited = true;
+          const blocked = b
+            .query('SELECT public.refresh_publication_source_feed($1::uuid[])', [[second, first]])
+            .then(() => {
+              waited = false;
+            });
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          assert.equal(waited, true, 'second refresh must wait');
+          // ...and it waits on a per-publication advisory lock (classid
+          // 28029), not merely on the feed rows the first refresh rewrote.
+          const locks = await admin.query<{ held: string; waiting: string }>(
+            `SELECT
+               count(*) FILTER (WHERE granted) AS held,
+               count(*) FILTER (WHERE NOT granted) AS waiting
+             FROM pg_locks
+             WHERE locktype = 'advisory' AND classid = 28029`,
+          );
+          assert.equal(Number(locks.rows[0]?.held), 2, 'first refresh holds one lock per publication');
+          assert.equal(Number(locks.rows[0]?.waiting), 1, 'second refresh waits on an advisory lock');
+          await a.query('COMMIT');
+          await blocked;
+          await b.query('COMMIT');
+        } finally {
+          a.release();
+          b.release();
+        }
       } finally {
         await one.end();
         await two.end();
