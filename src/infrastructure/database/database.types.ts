@@ -364,13 +364,24 @@ export interface Publications {
   identity_hash: string;
   identity_strength: string;
   identity_version: Generated<number>;
+  is_confaz: Generated<boolean>;
+  is_hidden: Generated<boolean>;
   jurisdiction_level: string;
   last_seen_at: Generated<Timestamp>;
   primary_official_url: string | null;
   published_on: Timestamp | null;
   title: string;
+  title_vector: Generated<string | null>;
   uf: string | null;
   updated_at: Generated<Timestamp>;
+}
+
+export interface PublicationSourceFeed {
+  first_collected_at: Timestamp;
+  is_hidden: boolean;
+  publication_id: string;
+  published_on: Timestamp | null;
+  source_id: string;
 }
 
 export interface PublicationVersions {
@@ -834,6 +845,7 @@ export interface DB {
   public_signup_rate_limits: PublicSignupRateLimits;
   publication_matches: PublicationMatches;
   publication_origins: PublicationOrigins;
+  publication_source_feed: PublicationSourceFeed;
   publication_taxonomy_assertions: PublicationTaxonomyAssertions;
   publication_taxonomy_reviews: PublicationTaxonomyReviews;
   publication_taxonomy_runs: PublicationTaxonomyRuns;

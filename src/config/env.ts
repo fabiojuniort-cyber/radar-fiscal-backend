@@ -70,6 +70,13 @@ const envSchema = z.object({
     .int()
     .min(500)
     .default(5_000),
+
+  AGGREGATE_CACHE_TTL_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(6 * 60 * 60_000)
+    .default(60 * 60_000),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

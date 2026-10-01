@@ -149,7 +149,11 @@ Successful GET responses send:
 Cache-Control: public, max-age=300
 ```
 
-No application-memory cache is required for API-01.
+Since PERF-01, the server also keeps an in-process copy of the global
+aggregates (`/public/v1/sources`, `/public/v1/stats`, `/public/v1/publications`,
+`/public/v2/stats`, `/public/v2/sources` and the authenticated
+`/api/v2/archive/facets` and archive totals). See
+[catalog-performance.md](catalog-performance.md).
 
 ## Rate limit
 
