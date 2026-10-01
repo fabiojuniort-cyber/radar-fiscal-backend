@@ -76,26 +76,24 @@ interface ArchivePlan {
 
 function buildArchivePlan(
   input: ArchiveQuery,
-  sourceIds: string[] | null,
+  sourceCode: string | null,
   tsquery: string | null,
 ): ArchivePlan {
   const conditions: RawBuilder<boolean>[] = [];
   let feedJoin: RawBuilder<unknown>;
   let order: RawBuilder<unknown>;
 
-  if (sourceIds) {
+  if (sourceCode) {
+    // One feed row per (semantic source code, publication): no duplicates
+    // even when sources.code has case variants; "confaz" needs no sources row.
     feedJoin = sql`JOIN publication_source_feed f ON f.publication_id = p.id`;
-    conditions.push(
-      sourceIds.length === 1
-        ? sql<boolean>`f.source_id = ${sourceIds[0]}`
-        : sql<boolean>`f.source_id = ANY(${sourceIds}::uuid[])`,
-    );
+    conditions.push(sql<boolean>`f.source_code = ${sourceCode}`);
     conditions.push(sql<boolean>`NOT f.is_hidden`);
-    order = sql`f.published_on DESC NULLS LAST, f.first_collected_at DESC`;
+    order = sql`f.published_on DESC NULLS LAST, f.first_collected_at DESC, f.publication_id`;
   } else {
     feedJoin = sql``;
     conditions.push(sql<boolean>`NOT p.is_hidden`);
-    order = sql`p.published_on DESC NULLS LAST, p.first_collected_at DESC`;
+    order = sql`p.published_on DESC NULLS LAST, p.first_collected_at DESC, p.id`;
   }
 
   if (input.uf) {
@@ -247,6 +245,21 @@ export async function catalogMonitoringRoutes(
   const facetsCache = new TtlCache<ArchiveFacets>(cacheOptions);
   const statsCache = new TtlCache<PublicStatsV2>(cacheOptions);
   const sourcesCache = new TtlCache<PublicSourcesV2>(cacheOptions);
+  const sourceCountsCache = new TtlCache<Map<string, number>>(cacheOptions);
+
+  /** Visible publications per semantic source code (feed rows). */
+  async function loadSourceCounts(): Promise<Map<string, number>> {
+    const result = await sql<{ source_code: string; total: number }>`
+      SELECT f.source_code, count(*)::int AS total
+      FROM publication_source_feed f
+      WHERE NOT f.is_hidden
+      GROUP BY f.source_code
+    `.execute(app.db);
+
+    return new Map(
+      result.rows.map((row) => [row.source_code, row.total]),
+    );
+  }
 
   async function loadStats(): Promise<PublicStatsV2> {
     const result = await sql<{
@@ -292,7 +305,8 @@ export async function catalogMonitoringRoutes(
   async function loadSources(): Promise<PublicSourcesV2> {
     const generatedAt = new Date();
     // publication_source_feed already applies the CONFAZ/DOU membership
-    // rule, so a source's total is its count of visible feed rows.
+    // rule; a card shows the count of its semantic (lower-case) code.
+    const counts = await sourceCountsCache.get('counts', loadSourceCounts);
     const result = await sql<{
       code: string;
       name: string;
@@ -302,14 +316,7 @@ export async function catalogMonitoringRoutes(
       last_run_status: string | null;
       last_success_at: Date | string | null;
       last_attempt_at: Date | string | null;
-      total_publications: number;
     }>`
-      WITH feed_counts AS (
-        SELECT f.source_id, count(*)::int AS total
-        FROM publication_source_feed f
-        WHERE NOT f.is_hidden
-        GROUP BY f.source_id
-      )
       SELECT
         s.code,
         s.name,
@@ -318,11 +325,9 @@ export async function catalogMonitoringRoutes(
         s.is_active,
         vsm.last_run_status,
         vsm.last_success_at,
-        vsm.last_attempt_at,
-        coalesce(fc.total, 0) AS total_publications
+        vsm.last_attempt_at
       FROM sources s
       LEFT JOIN v_source_monitoring vsm ON vsm.source_id = s.id
-      LEFT JOIN feed_counts fc ON fc.source_id = s.id
       ORDER BY
         CASE WHEN s.jurisdiction_level = 'FEDERAL' THEN 0 ELSE 1 END,
         s.uf NULLS FIRST,
@@ -351,7 +356,7 @@ export async function catalogMonitoringRoutes(
           ? new Date(row.last_attempt_at).toISOString()
           : null,
         importedToday: 0,
-        totalPublications: row.total_publications,
+        totalPublications: counts.get(row.code.toLowerCase()) ?? 0,
       })),
     };
   }
@@ -375,17 +380,29 @@ export async function catalogMonitoringRoutes(
       ORDER BY u.uf
     `.execute(app.db);
 
+    // Candidate codes: every source code (case-folded) plus the virtual
+    // "confaz", kept when the feed has a visible row for it.
     const sources = await sql<{ code: string; name: string }>`
       SELECT
-        CASE WHEN lower(s.code) = 'confaz' THEN 'confaz' ELSE s.code END AS code,
-        CASE WHEN lower(s.code) = 'confaz' THEN 'CONFAZ' ELSE s.name END AS name
-      FROM sources s
-      WHERE EXISTS (
+        c.code,
+        CASE WHEN c.code = 'confaz' THEN 'CONFAZ' ELSE c.name END AS name
+      FROM (
+        SELECT candidate.code, min(candidate.name) AS name
+        FROM (
+          SELECT lower(s.code) AS code, s.name
+          FROM sources s
+          UNION ALL
+          SELECT 'confaz', 'CONFAZ'
+        ) candidate
+        GROUP BY candidate.code
+      ) c
+      CROSS JOIN LATERAL (
         SELECT 1
         FROM publication_source_feed f
-        WHERE f.source_id = s.id
+        WHERE f.source_code = c.code
           AND NOT f.is_hidden
-      )
+        LIMIT 1
+      ) hit
       ORDER BY 2
     `.execute(app.db);
 
@@ -539,13 +556,7 @@ export async function catalogMonitoringRoutes(
       const offset = (input.page - 1) * input.limit;
       const tsquery = input.q ? buildSearchTsquery(input.q) : null;
 
-      let sourceIds: string[] | null = null;
-      if (input.source) {
-        const sources = await sql<{ id: string }>`
-          SELECT id FROM sources WHERE lower(code) = ${input.source.toLowerCase()}
-        `.execute(app.db);
-        sourceIds = sources.rows.map((row) => row.id);
-      }
+      const sourceCode = input.source?.toLowerCase() ?? null;
 
       const emptyPage = {
         page: input.page,
@@ -557,11 +568,11 @@ export async function catalogMonitoringRoutes(
         items: [],
       };
 
-      if ((input.q && !tsquery) || sourceIds?.length === 0) {
+      if (input.q && !tsquery) {
         return reply.status(200).send(emptyPage);
       }
 
-      const plan = buildArchivePlan(input, sourceIds, tsquery);
+      const plan = buildArchivePlan(input, sourceCode, tsquery);
 
       // Exact totals come from the cached aggregates when no other filter
       // applies; otherwise count up to the cap ("more than 10,000").
@@ -569,27 +580,24 @@ export async function catalogMonitoringRoutes(
       let totalIsCapped = false;
 
       if (!input.q && !input.uf && !input.jurisdiction) {
-        if (input.source) {
-          const sources = await sourcesCache.get('sources', loadSources);
-          const code = input.source.toLowerCase();
-          totalItems = sources.items
-            .filter((item) => item.code.toLowerCase() === code)
-            .reduce((sum, item) => sum + item.totalPublications, 0);
-        } else {
-          totalItems = (await statsCache.get('stats', loadStats))
-            .totalPublications;
-        }
+        totalItems = sourceCode
+          ? ((await sourceCountsCache.get('counts', loadSourceCounts)).get(
+              sourceCode,
+            ) ?? 0)
+          : (await statsCache.get('stats', loadStats)).totalPublications;
       } else {
-        const countKey = JSON.stringify([
-          tsquery,
-          tsquery ? input.scope : null,
-          input.uf ?? null,
-          input.jurisdiction ?? null,
-          input.source?.toLowerCase() ?? null,
-        ]);
-        const capped = await archiveCountCache.get(countKey, () =>
-          cappedArchiveCount(plan),
-        );
+        // Searches count live: the same count picks the query strategy below
+        // and must not be stale while collections add matches.
+        const capped = tsquery
+          ? await cappedArchiveCount(plan)
+          : await archiveCountCache.get(
+              JSON.stringify([
+                input.uf ?? null,
+                input.jurisdiction ?? null,
+                sourceCode,
+              ]),
+              () => cappedArchiveCount(plan),
+            );
         totalIsCapped = capped > ARCHIVE_COUNT_CAP;
         totalItems = Math.min(capped, ARCHIVE_COUNT_CAP);
       }
@@ -610,8 +618,9 @@ export async function catalogMonitoringRoutes(
               ) matched
               ORDER BY
                 matched.published_on DESC NULLS LAST,
-                matched.first_collected_at DESC
-              LIMIT ${input.limit}
+                matched.first_collected_at DESC,
+                matched.id
+              LIMIT ${input.limit + 1}
               OFFSET ${offset}
             `
           : sql`
@@ -620,7 +629,7 @@ export async function catalogMonitoringRoutes(
               ${plan.feedJoin}
               WHERE ${plan.where}
               ORDER BY ${plan.order}
-              LIMIT ${input.limit}
+              LIMIT ${input.limit + 1}
               OFFSET ${offset}
             `;
 
@@ -666,9 +675,14 @@ export async function catalogMonitoringRoutes(
         ) first_origin ON true
         ORDER BY
           p.published_on DESC NULLS LAST,
-          p.first_collected_at DESC
+          p.first_collected_at DESC,
+          p.id
       `.execute(app.db);
 
+      // One extra row tells whether a next page exists, independently of
+      // the (possibly cached or capped) total.
+      const hasMore = rows.rows.length > input.limit;
+      const items = rows.rows.slice(0, input.limit);
       const totalPages = Math.max(
         1,
         Math.ceil(totalItems / input.limit),
@@ -680,10 +694,8 @@ export async function catalogMonitoringRoutes(
         totalItems,
         totalPages,
         totalIsCapped,
-        hasMore: totalIsCapped
-          ? rows.rows.length === input.limit
-          : input.page < totalPages,
-        items: rows.rows.map((row) => ({
+        hasMore,
+        items: items.map((row) => ({
           id: row.id,
           title: row.title,
           actType: row.act_type,

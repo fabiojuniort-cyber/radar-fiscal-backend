@@ -33,3 +33,11 @@ test('at most 12 terms are used', () => {
   );
   assert.equal(query?.split(' & ').length, 12);
 });
+
+test('stopwords are passed through for PostgreSQL to drop', () => {
+  // The pt_unaccent configuration removes "de"; an all-stopword query
+  // becomes empty in PostgreSQL and matches nothing (covered by the
+  // integration test).
+  assert.equal(buildSearchTsquery('Lei de'), 'lei & de:*');
+  assert.equal(buildSearchTsquery('de da'), 'de & da:*');
+});

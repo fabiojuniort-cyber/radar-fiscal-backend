@@ -216,6 +216,171 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
       assert.equal(Number(after.rows[0]?.count), 0);
     });
 
+    async function createSource(code: string): Promise<string> {
+      const row = await admin.query<{ id: string }>(
+        `INSERT INTO sources (code, name, jurisdiction_level, base_url, connector_key, is_active)
+         VALUES ($1, $1, 'FEDERAL', 'https://example.invalid/' || $1, 'acervo-test-' || $1, false)
+         RETURNING id`,
+        [code],
+      );
+      return row.rows[0]!.id;
+    }
+
+    async function addOrigin(
+      publicationId: string,
+      sourceId: string,
+      client: { query: Pool['query'] } = admin,
+    ): Promise<string> {
+      const row = await client.query<{ id: string }>(
+        `INSERT INTO publication_origins (publication_id, source_id, external_id, official_url)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [publicationId, sourceId, randomUUID(), `https://example.invalid/${randomUUID()}`],
+      );
+      return row.rows[0]!.id;
+    }
+
+    async function feedOf(publicationId: string): Promise<string[]> {
+      const rows = await admin.query<{ source_code: string }>(
+        `SELECT source_code FROM publication_source_feed WHERE publication_id = $1 ORDER BY 1`,
+        [publicationId],
+      );
+      return rows.rows.map((row) => row.source_code);
+    }
+
+    async function expectedFeedOf(publicationId: string): Promise<string[]> {
+      const rows = await admin.query<{ source_code: string }>(
+        `SELECT source_code FROM publication_source_feed_expected(ARRAY[$1::uuid]) ORDER BY 1`,
+        [publicationId],
+      );
+      return rows.rows.map((row) => row.source_code);
+    }
+
+    await t.test('B1: CONFAZ membership does not depend on a sources row named confaz', async () => {
+      const client = await admin.connect();
+      try {
+        await client.query('BEGIN');
+        // Hide every confaz-coded source for this transaction only.
+        await client.query(
+          `UPDATE sources SET code = code || '-hidden-' || left(id::text, 8)
+           WHERE lower(code) = 'confaz'`,
+        );
+        const id = randomUUID();
+        await client.query(
+          `INSERT INTO publications (id, identity_hash, identity_strength, identity_basis,
+             jurisdiction_level, act_type, title, published_on)
+           VALUES ($1, $2, 'STRONG', '{}'::jsonb, 'FEDERAL', 'Convênio ICMS', $3, current_date)`,
+          [id, createHash('sha256').update(id).digest('hex'), `Convênio ICMS ${marker}`],
+        );
+        await addOrigin(id, source.dou, client);
+        const feed = await client.query<{ source_code: string }>(
+          `SELECT source_code FROM publication_source_feed WHERE publication_id = $1`,
+          [id],
+        );
+        assert.deepEqual(feed.rows.map((row) => row.source_code), ['confaz']);
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    });
+
+    await t.test('B2: case variants of a source code never duplicate a publication', async () => {
+      const lower = `${marker}cs`;
+      const upperId = await createSource(lower.toUpperCase());
+      const lowerId = await createSource(lower);
+      const id = await publication('cs', 'Portaria', `Portaria case ${marker}`, []);
+      await addOrigin(id, upperId);
+      await addOrigin(id, lowerId);
+
+      assert.deepEqual(await feedOf(id), [lower]);
+      for (const code of [lower, lower.toUpperCase()]) {
+        const body = await archive(`${q(marker)}&source=${code}`);
+        assert.deepEqual(ids(body), [id]);
+        assert.equal(body.totalItems, 1);
+      }
+
+      // A fresh app has empty caches: source-only totals and cards count once.
+      const fresh = await buildApp();
+      try {
+        await fresh.ready();
+        const response = await fresh.inject({
+          method: 'GET',
+          url: `/api/v2/archive?source=${lower}`,
+          headers,
+        });
+        assert.equal(response.json<ArchiveBody>().totalItems, 1);
+        const cards = await fresh.inject({ method: 'GET', url: '/public/v2/sources' });
+        const totals = cards
+          .json<{ items: Array<{ code: string; totalPublications: number }> }>()
+          .items.filter((item) => item.code.toLowerCase() === lower)
+          .map((item) => item.totalPublications);
+        assert.deepEqual(totals, [1, 1]);
+      } finally {
+        await fresh.close();
+      }
+
+      // Renaming a source re-files its publications under the new code.
+      await admin.query(`UPDATE sources SET code = $2 WHERE id = $1`, [upperId, `${lower}x`]);
+      assert.deepEqual(await feedOf(id), [lower, `${lower}x`]);
+    });
+
+    await t.test('B3: concurrent writers on one publication leave the authoritative feed', async () => {
+      const [a, b, c, d] = await Promise.all(
+        ['a', 'b', 'c', 'd'].map((suffix) => createSource(`${marker}w${suffix}`)),
+      );
+      const id = await publication('w', 'Portaria', `Portaria concorrente ${marker}`, []);
+      const originA = await addOrigin(id, a!);
+      const originB = await addOrigin(id, b!);
+
+      const first = await admin.connect();
+      const second = new Pool({ connectionString: adminUrl, max: 1 });
+      try {
+        await first.query('BEGIN');
+        await first.query(`UPDATE publication_origins SET source_id = $2 WHERE id = $1`, [originA, c]);
+
+        let secondDone = false;
+        const secondTx = (async () => {
+          const client = await second.connect();
+          try {
+            await client.query('BEGIN');
+            await client.query(`UPDATE publication_origins SET source_id = $2 WHERE id = $1`, [originB, d]);
+            await client.query('COMMIT');
+          } finally {
+            client.release();
+            secondDone = true;
+          }
+        })();
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        assert.equal(secondDone, false, 'second refresh must wait for the first');
+        await first.query('COMMIT');
+        await secondTx;
+      } finally {
+        first.release();
+        await second.end();
+      }
+
+      const expected = [`${marker}wc`, `${marker}wd`];
+      assert.deepEqual(await feedOf(id), expected);
+      assert.deepEqual(await expectedFeedOf(id), expected);
+    });
+
+    await t.test('hasMore comes from the rows, stopword-only searches are empty', async () => {
+      const page1 = await app.inject({
+        method: 'GET',
+        url: `/api/v2/archive?limit=2&page=1&${q(marker)}`,
+        headers,
+      });
+      assert.equal(page1.json<{ hasMore: boolean }>().hasMore, true);
+      const last = await archive(`${q(marker)}&page=1`);
+      assert.equal((last as unknown as { hasMore: boolean }).hasMore, false);
+
+      const stopwords = await archive(q('de da do'));
+      assert.equal(stopwords.totalItems, 0);
+      assert.deepEqual(stopwords.items, []);
+      // A stopword next to a real term is ignored, not required.
+      assert.deepEqual(ids(await archive(q(`Portaria de 1216 ${marker}`))), [portaria1216]);
+    });
+
     await t.test('facets list sources present in the feed', async () => {
       const response = await app.inject({
         method: 'GET',
@@ -229,6 +394,7 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
       for (const code of ['dou', 'confaz', 'sped']) {
         assert.ok(codes.includes(code), `${code} missing from ${codes.join(',')}`);
       }
+      assert.equal(new Set(codes).size, codes.length, `duplicated codes: ${codes.join(',')}`);
     });
   } finally {
     await app.close();
