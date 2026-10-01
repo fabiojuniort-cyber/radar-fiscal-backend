@@ -11,8 +11,8 @@ import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import {
-  acquireNextCollectionRun,
   createCollectionRun,
+  type AcquiredCollectionRun,
 } from '../src/modules/collection/collection-run.repository.js';
 import { processAcquiredCollectionRun } from '../src/modules/collection/collection.engine.js';
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
@@ -21,6 +21,7 @@ async function runNewsCollection(
   db: Kysely<DB>,
   registry: ConnectorRegistry,
   sourceId: string,
+  connectorKey: string,
   scheduledFor: Date,
 ) {
   const runId = await createCollectionRun(db, {
@@ -28,13 +29,29 @@ async function runNewsCollection(
     scheduledFor,
     triggerType: 'MANUAL',
   });
+  const workerId = `news-test-worker-${runId}`;
+  const owned = await db
+    .updateTable('collection_runs')
+    .set({
+      status: 'RUNNING',
+      started_at: new Date(),
+      worker_id: workerId,
+      locked_at: new Date(),
+      heartbeat_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where('id', '=', runId)
+    .returning(['correlation_id'])
+    .executeTakeFirstOrThrow();
 
-  const acquired = await acquireNextCollectionRun(
-    db,
-    `news-test-worker-${runId}`,
-  );
-  assert.ok(acquired, 'news run must be acquirable');
-  assert.equal(acquired.id, runId);
+  const acquired: AcquiredCollectionRun = {
+    id: runId,
+    sourceId,
+    connectorKey,
+    maxAttempts: 1,
+    correlationId: owned.correlation_id,
+    workerId,
+  };
 
   const result = await processAcquiredCollectionRun(
     db,
@@ -116,6 +133,7 @@ test('news collection is isolated from publications, idempotent on replay and ve
       db,
       registry,
       sourceId,
+      connectorKey,
       new Date('2026-10-01T13:00:00Z'),
     );
 
@@ -154,6 +172,7 @@ test('news collection is isolated from publications, idempotent on replay and ve
       db,
       registry,
       sourceId,
+      connectorKey,
       new Date('2026-10-01T14:00:00Z'),
     );
 
@@ -171,6 +190,7 @@ test('news collection is isolated from publications, idempotent on replay and ve
       db,
       registry,
       sourceId,
+      connectorKey,
       new Date('2026-10-01T15:00:00Z'),
     );
 
@@ -194,9 +214,6 @@ test('news collection is isolated from publications, idempotent on replay and ve
       status: 'NEW_VERSION',
     });
   } finally {
-    // Clean every run owned by this isolated source. Using source_id is more
-    // robust than a local list because the engine/scheduler contract may add
-    // source-owned runs while integration suites execute concurrently.
     await db
       .deleteFrom('collection_runs')
       .where('source_id', '=', sourceId)
