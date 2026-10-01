@@ -11,13 +11,21 @@ import {
   startCollectionAttempt,
   type AcquiredCollectionRun,
 } from './collection-run.repository.js';
-import type { ConnectorPublication } from './connector.contract.js';
+import type {
+  ConnectorNewsItem,
+  ConnectorPublication,
+} from './connector.contract.js';
 import {
   executeConnector,
   type ConnectorExecutionFailure,
   type ConnectorExecutionOutcome,
 } from './connector.executor.js';
 import { ConnectorRegistry } from './connector.registry.js';
+import { normalizeNewsItem } from './news.normalizer.js';
+import {
+  persistNewsItem,
+  recordNewsCollectionItemFailure,
+} from './news.persistence.js';
 import {
   normalizePublication,
 } from './publication.normalizer.js';
@@ -63,7 +71,9 @@ export interface CollectionEngineOptions {
 }
 
 export interface CollectionEngineMetrics {
+  /** Publications + news items returned by the connector. */
   found: number;
+  /** Publications + news items persisted or recognized as existing. */
   processed: number;
   newPublications: number;
   existingPublications: number;
@@ -124,7 +134,7 @@ function dispositionMetric(
 function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
-    : 'Unknown publication processing error';
+    : 'Unknown collection item processing error';
 }
 
 function sourceItemKey(
@@ -157,6 +167,35 @@ function sourceItemKey(
     .digest('hex')}`;
 }
 
+function newsSourceItemKey(
+  item: ConnectorNewsItem,
+  index: number,
+): string {
+  const externalId = item.externalId?.trim();
+  if (externalId) return externalId;
+
+  const officialUrl = item.officialUrl?.trim();
+  if (officialUrl) return officialUrl;
+
+  return `invalid-news:${index}:${createHash('sha256')
+    .update(
+      JSON.stringify({
+        title: item.title,
+        agency: item.agency ?? null,
+        category: item.category ?? null,
+      }),
+      'utf8',
+    )
+    .digest('hex')}`;
+}
+
+function resultItemCount(
+  outcome: Extract<ConnectorExecutionOutcome, { ok: true }>,
+): number {
+  return outcome.result.publications.length +
+    (outcome.result.newsItems?.length ?? 0);
+}
+
 function missingConnectorOutcome(
   connectorKey: string,
 ): ConnectorExecutionFailure {
@@ -177,10 +216,12 @@ function terminalStatusAfterProcessing(
   >,
   metrics: CollectionEngineMetrics,
 ): CollectionRunTerminalStatus {
+  const itemCount = resultItemCount(outcome);
+
   if (
     metrics.itemErrors > 0 &&
     metrics.processed === 0 &&
-    outcome.result.publications.length > 0 &&
+    itemCount > 0 &&
     metrics.connectorPartialFailures === 0
   ) {
     return 'PROCESSING_FAILED';
@@ -194,7 +235,7 @@ function terminalStatusAfterProcessing(
     return 'PARTIAL_SUCCESS';
   }
 
-  return outcome.result.publications.length > 0
+  return itemCount > 0
     ? 'SUCCESS'
     : 'SUCCESS_NO_RESULTS';
 }
@@ -423,7 +464,8 @@ export async function processAcquiredCollectionRun(
       };
     }
 
-    metrics.found = outcome.result.publications.length;
+    const newsItems = outcome.result.newsItems ?? [];
+    metrics.found = outcome.result.publications.length + newsItems.length;
     metrics.connectorPartialFailures =
       outcome.result.partialFailures?.length ?? 0;
 
@@ -502,6 +544,58 @@ export async function processAcquiredCollectionRun(
       }
     }
 
+    for (let index = 0; index < newsItems.length; index += 1) {
+      const item = newsItems[index]!;
+
+      try {
+        const normalized = normalizeNewsItem({
+          sourceId: run.sourceId,
+          item,
+        });
+
+        await db.transaction().execute((trx) =>
+          persistNewsItem(trx, {
+            sourceId: run.sourceId,
+            runId: run.id,
+            attemptId: attempt.id,
+            item: normalized,
+          }),
+        );
+
+        metrics.processed += 1;
+      } catch (error) {
+        metrics.itemErrors += 1;
+
+        await db.transaction().execute((trx) =>
+          recordNewsCollectionItemFailure(trx, {
+            runId: run.id,
+            attemptId: attempt.id,
+            sourceItemKey: newsSourceItemKey(item, index),
+            ...(item.externalId
+              ? { externalId: item.externalId }
+              : {}),
+            ...(item.officialUrl
+              ? { sourceUrl: item.officialUrl }
+              : {}),
+            metadata: item.metadata ?? {},
+            errorCode: 'NEWS_PROCESSING_ERROR',
+            errorMessage: errorMessage(error),
+          }),
+        );
+
+        logger.warn(
+          {
+            sourceId: run.sourceId,
+            runId: run.id,
+            attemptId: attempt.id,
+            itemReference: newsSourceItemKey(item, index),
+            error: errorMessage(error),
+          },
+          'News processing failed',
+        );
+      }
+    }
+
     const status = terminalStatusAfterProcessing(
       outcome,
       metrics,
@@ -525,6 +619,7 @@ export async function processAcquiredCollectionRun(
         status,
         durationMs: outcome.durationMs,
         ...metrics,
+        newsFound: newsItems.length,
         ...(outcome.result.completion?.complete === false
           ? {
               incompleteReason: outcome.result.completion.reason ?? 'UNSPECIFIED',
@@ -546,4 +641,3 @@ export async function processAcquiredCollectionRun(
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   }
 }
-

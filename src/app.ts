@@ -11,6 +11,7 @@ import { catalogMonitoringRoutes } from './api/routes/catalog-monitoring.route.j
 import { companyManualRoutes } from './api/routes/company-manual.route.js';
 import { establishmentManualRoutes } from './api/routes/establishment-manual.route.js';
 import { healthRoutes } from './api/routes/health.route.js';
+import { newsRoutes } from './api/routes/news.route.js';
 import { publicRoutes } from './api/routes/public.route.js';
 import { productRoutes } from './api/routes/product.route.js';
 import { createDatabase } from './infrastructure/database/client.js';
@@ -39,6 +40,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(publicRoutes);
   await app.register(authRoutes);
   await app.register(productRoutes);
+  await app.register(newsRoutes);
   await app.register(catalogMonitoringRoutes);
   await app.register(companyManualRoutes);
   await app.register(establishmentManualRoutes);

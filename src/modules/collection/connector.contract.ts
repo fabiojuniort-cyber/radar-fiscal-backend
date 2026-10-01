@@ -85,6 +85,24 @@ export interface ConnectorPublication {
   originMetadata?: Record<string, unknown>;
 }
 
+/**
+ * Conteúdo editorial oficial coletado da fonte. Notícias são persistidas em
+ * news_items/news_item_versions e nunca promovidas para publications.
+ */
+export interface ConnectorNewsItem {
+  title: string;
+  summary?: string;
+  content?: string;
+  category?: string;
+  publishedAt?: Date;
+  updatedAtSource?: Date;
+  officialUrl: string;
+  externalId?: string;
+  agency?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
 export interface ConnectorPartialFailure {
   code: string;
   message: string;
@@ -130,6 +148,9 @@ export interface ConnectorCheckpoint {
 
 export interface ConnectorResult {
   publications: ConnectorPublication[];
+
+  /** Notícias oficiais coletadas pela mesma infraestrutura de runs/attempts. */
+  newsItems?: ConnectorNewsItem[];
 
   /**
    * Permite ao conector informar que parte da fonte foi processada
