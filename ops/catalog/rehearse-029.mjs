@@ -9,6 +9,8 @@
 //                 then `npm run db:prepare` and ops/catalog/029-validate.sql.
 // MODE=dumpcheck  compares the migrated restore with its pg_dump/pg_restore copy
 //                 (database perf029_dumpcheck on the same restore server).
+// MODE=validate-production  after the production migration: 029-validate.sql
+//                 against production in a read-only session.
 //
 // The restore target is derived from the production URLs by replacing host
 // and port with RESTORE_HOST, which must be a tmp-perf-029-* private domain.
@@ -96,6 +98,21 @@ async function readOnly(connectionString, fn) {
     const result = await fn(client);
     await client.query('ROLLBACK');
     return result;
+  } finally {
+    await client.end();
+  }
+}
+
+/** Session that can only read: the validation file opens its own READ ONLY transaction. */
+async function withReadOnlySession(connectionString, fn) {
+  const client = new pg.Client({
+    connectionString,
+    application_name: 'perf-029-validate',
+    options: '-c default_transaction_read_only=on -c statement_timeout=600000 -c lock_timeout=2000',
+  });
+  await client.connect();
+  try {
+    return await fn(client);
   } finally {
     await client.end();
   }
@@ -320,10 +337,11 @@ function splitValidationSql(text) {
   return steps;
 }
 
-async function runValidation(connectionString, label) {
+async function runValidation(connectionString, label, { readOnlySession = false } = {}) {
   const text = await readFile(new URL('./029-validate.sql', import.meta.url), 'utf8');
   const started = Date.now();
-  await withClient(connectionString, async (client) => {
+  const connect = readOnlySession ? withReadOnlySession : withClient;
+  await connect(connectionString, async (client) => {
     for (const step of splitValidationSql(text)) {
       if (step.echo) {
         log(`${label} ${step.echo}`);
@@ -446,7 +464,22 @@ async function dumpcheck() {
   log('dumpcheck done');
 }
 
-const modes = { preflight, rehearse, dumpcheck };
+// Post-migration check on production: read-only session, validation file only.
+async function validateProduction() {
+  const prod = requireEnv('PROD_DATABASE_ADMIN_URL');
+  await readOnly(prod, async (client) => {
+    await describeServer(client);
+  });
+  await runValidation(prod, 'validate_production', { readOnlySession: true });
+  log('validate-production done');
+}
+
+const modes = {
+  preflight,
+  rehearse,
+  dumpcheck,
+  'validate-production': validateProduction,
+};
 const mode = process.env.MODE;
 
 if (!modes[mode]) {
