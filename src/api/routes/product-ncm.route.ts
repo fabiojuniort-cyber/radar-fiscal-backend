@@ -13,19 +13,12 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 
-const companyParamsSchema = z.object({
-  companyId: z.string().uuid(),
-});
-
+const companyParamsSchema = z.object({ companyId: z.string().uuid() });
 const productParamsSchema = z.object({
   companyId: z.string().uuid(),
   profileId: z.string().uuid(),
 });
-
-const publicationParamsSchema = z.object({
-  publicationId: z.string().uuid(),
-});
-
+const publicationParamsSchema = z.object({ publicationId: z.string().uuid() });
 const ncmQuerySchema = z.object({
   q: z.string().trim().max(160).default(''),
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -43,19 +36,17 @@ const ncmCodeSchema = z
   .transform((value) => value.replace(/\D/g, ''))
   .refine((value) => /^\d{8}$/.test(value), 'invalid_ncm');
 
-const productProfileBodySchema = z.object({
-  cnaeCode: cnaeSchema.nullable().default(null),
-  productLabel: z.string().trim().min(1).max(160),
-  ncmCodes: z.array(ncmCodeSchema).max(100).default([]),
-}).superRefine((value, ctx) => {
-  if (new Set(value.ncmCodes).size !== value.ncmCodes.length) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'duplicate_ncm',
-      path: ['ncmCodes'],
-    });
-  }
-});
+const productProfileBodySchema = z
+  .object({
+    cnaeCode: cnaeSchema.nullable().default(null),
+    productLabel: z.string().trim().min(1).max(160),
+    ncmCodes: z.array(ncmCodeSchema).max(100).default([]),
+  })
+  .superRefine((value, ctx) => {
+    if (new Set(value.ncmCodes).size !== value.ncmCodes.length) {
+      ctx.addIssue({ code: 'custom', message: 'duplicate_ncm', path: ['ncmCodes'] });
+    }
+  });
 
 interface ProfileRow {
   id: string;
@@ -92,33 +83,27 @@ interface PublicationNcmRow {
 }
 
 function tenantIdFromRequest(request: FastifyRequest): string | null {
-  const raw = request.headers['x-tenant-id'];
-  if (typeof raw !== 'string') return null;
-  return z.string().uuid().safeParse(raw).success ? raw : null;
+  const value = request.headers['x-tenant-id'];
+  if (typeof value !== 'string') return null;
+  return z.string().uuid().safeParse(value).success ? value : null;
 }
 
-function handleTenantError(
-  error: unknown,
-  reply: FastifyReply,
-): FastifyReply | null {
-  if (error instanceof TenantAccessDeniedError) {
-    return reply.status(403).send({ error: 'tenant_access_denied' });
-  }
-  return null;
+function handleTenantError(error: unknown, reply: FastifyReply): FastifyReply | null {
+  return error instanceof TenantAccessDeniedError
+    ? reply.status(403).send({ error: 'tenant_access_denied' })
+    : null;
+}
+
+function databaseCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+  const value = (error as { code?: unknown }).code;
+  return typeof value === 'string' ? value : undefined;
 }
 
 function iso(value: Date | string | null): string | null {
   if (value === null) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
-}
-
-function databaseCode(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('code' in error)) {
-    return undefined;
-  }
-  const code = (error as { code?: unknown }).code;
-  return typeof code === 'string' ? code : undefined;
 }
 
 function normalizeNcms(value: unknown): Array<{
@@ -177,14 +162,14 @@ async function assertCompany(
   companyId: string,
   tenantId: string,
 ): Promise<boolean> {
-  const company = await trx
+  const row = await trx
     .selectFrom('companies')
     .select('id')
     .where('id', '=', companyId)
     .where('tenant_id', '=', tenantId)
     .where('is_active', '=', true)
     .executeTakeFirst();
-  return Boolean(company);
+  return Boolean(row);
 }
 
 async function assertCompanyCnae(
@@ -193,7 +178,6 @@ async function assertCompanyCnae(
   cnaeCode: string | null,
 ): Promise<boolean> {
   if (!cnaeCode) return true;
-
   const result = await sql<{ ok: boolean }>`
     SELECT EXISTS (
       SELECT 1
@@ -203,102 +187,94 @@ async function assertCompanyCnae(
       UNION ALL
       SELECT 1
       FROM establishment_cnaes ec
-      INNER JOIN establishments e
-        ON e.id = ec.establishment_id
+      INNER JOIN establishments e ON e.id = ec.establishment_id
       WHERE e.company_id = ${companyId}::uuid
         AND e.is_active = TRUE
         AND ec.cnae_code = ${cnaeCode}
     ) AS ok
   `.execute(trx);
-
   return result.rows[0]?.ok === true;
 }
 
 async function resolveNcmEntries(
-  executor: Transaction<DB>,
-  ncmCodes: string[],
+  trx: Transaction<DB>,
+  codes: string[],
 ): Promise<NcmEntryRow[]> {
-  if (ncmCodes.length === 0) return [];
-
-  const result = await sql<NcmEntryRow>`
-    SELECT
-      e.id,
-      e.official_code,
-      regexp_replace(e.official_code, '[^0-9]', '', 'g') AS code,
-      e.description,
-      ed.edition_code,
-      ed.valid_from
-    FROM official_catalog_entries e
-    INNER JOIN official_catalog_editions ed
-      ON ed.id = e.catalog_edition_id
-    INNER JOIN official_catalogs c
-      ON c.id = ed.catalog_id
-    WHERE c.code = 'NCM'
-      AND ed.status = 'CURRENT'
-      AND COALESCE((e.metadata ->> 'assignable')::boolean, FALSE) = TRUE
-      AND regexp_replace(e.official_code, '[^0-9]', '', 'g') = ANY(${ncmCodes}::text[])
-  `.execute(executor);
-
-  return result.rows;
+  if (codes.length === 0) return [];
+  return (
+    await sql<NcmEntryRow>`
+      SELECT
+        e.id,
+        e.official_code,
+        regexp_replace(e.official_code, '[^0-9]', '', 'g') AS code,
+        e.description,
+        ed.edition_code,
+        ed.valid_from
+      FROM official_catalog_entries e
+      INNER JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
+      INNER JOIN official_catalogs c ON c.id = ed.catalog_id
+      WHERE c.code = 'NCM'
+        AND ed.status = 'CURRENT'
+        AND COALESCE((e.metadata ->> 'assignable')::boolean, FALSE) = TRUE
+        AND regexp_replace(e.official_code, '[^0-9]', '', 'g') = ANY(${codes}::text[])
+    `.execute(trx)
+  ).rows;
 }
 
 async function readProfiles(
   trx: Transaction<DB>,
   companyId: string,
 ): Promise<ProfileRow[]> {
-  const result = await sql<ProfileRow>`
-    SELECT
-      cpp.id,
-      cpp.company_id,
-      cpp.cnae_code::text AS cnae_code,
-      c.description AS cnae_description,
-      cpp.taxonomy_release_id,
-      cpp.sector_release_concept_id,
-      cpp.product_release_concept_id,
-      cpp.product_label,
-      cpp.created_at,
-      cpp.updated_at,
-      COALESCE(
-        jsonb_agg(
-          jsonb_build_object(
-            'entryId', e.id,
-            'code', regexp_replace(e.official_code, '[^0-9]', '', 'g'),
-            'officialCode', e.official_code,
-            'description', e.description,
-            'isPrimary', cpn.is_primary,
-            'assignmentSource', cpn.assignment_source
-          )
-          ORDER BY cpn.is_primary DESC, e.official_code
-        ) FILTER (WHERE e.id IS NOT NULL),
-        '[]'::jsonb
-      ) AS ncms
-    FROM company_product_profiles cpp
-    LEFT JOIN cnaes c
-      ON c.code = cpp.cnae_code
-    LEFT JOIN company_product_ncms cpn
-      ON cpn.company_product_profile_id = cpp.id
-    LEFT JOIN official_catalog_entries e
-      ON e.id = cpn.official_catalog_entry_id
-    WHERE cpp.company_id = ${companyId}::uuid
-      AND cpp.is_active = TRUE
-    GROUP BY
-      cpp.id,
-      cpp.company_id,
-      cpp.cnae_code,
-      c.description,
-      cpp.taxonomy_release_id,
-      cpp.sector_release_concept_id,
-      cpp.product_release_concept_id,
-      cpp.product_label,
-      cpp.created_at,
-      cpp.updated_at
-    ORDER BY cpp.cnae_code NULLS LAST, lower(cpp.product_label), cpp.id
-  `.execute(trx);
-
-  return result.rows;
+  return (
+    await sql<ProfileRow>`
+      SELECT
+        cpp.id,
+        cpp.company_id,
+        cpp.cnae_code::text AS cnae_code,
+        c.description AS cnae_description,
+        cpp.taxonomy_release_id,
+        cpp.sector_release_concept_id,
+        cpp.product_release_concept_id,
+        cpp.product_label,
+        cpp.created_at,
+        cpp.updated_at,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'entryId', e.id,
+              'code', regexp_replace(e.official_code, '[^0-9]', '', 'g'),
+              'officialCode', e.official_code,
+              'description', e.description,
+              'isPrimary', cpn.is_primary,
+              'assignmentSource', cpn.assignment_source
+            )
+            ORDER BY cpn.is_primary DESC, e.official_code
+          ) FILTER (WHERE e.id IS NOT NULL),
+          '[]'::jsonb
+        ) AS ncms
+      FROM company_product_profiles cpp
+      LEFT JOIN cnaes c ON c.code = cpp.cnae_code
+      LEFT JOIN company_product_ncms cpn ON cpn.company_product_profile_id = cpp.id
+      LEFT JOIN official_catalog_entries e ON e.id = cpn.official_catalog_entry_id
+      WHERE cpp.company_id = ${companyId}::uuid
+        AND cpp.is_active = TRUE
+      GROUP BY
+        cpp.id,
+        cpp.company_id,
+        cpp.cnae_code,
+        c.description,
+        cpp.taxonomy_release_id,
+        cpp.sector_release_concept_id,
+        cpp.product_release_concept_id,
+        cpp.product_label,
+        cpp.created_at,
+        cpp.updated_at
+      ORDER BY cpp.cnae_code NULLS LAST, lower(cpp.product_label), cpp.id
+    `.execute(trx)
+  ).rows;
 }
 
-async function replaceProfileNcms(
+async function replaceNcms(
   trx: Transaction<DB>,
   profileId: string,
   entries: NcmEntryRow[],
@@ -307,7 +283,6 @@ async function replaceProfileNcms(
     DELETE FROM company_product_ncms
     WHERE company_product_profile_id = ${profileId}::uuid
   `.execute(trx);
-
   for (const entry of entries) {
     await sql`
       INSERT INTO company_product_ncms (
@@ -315,12 +290,7 @@ async function replaceProfileNcms(
         official_catalog_entry_id,
         is_primary,
         assignment_source
-      ) VALUES (
-        ${profileId}::uuid,
-        ${entry.id}::uuid,
-        FALSE,
-        'MANUAL'
-      )
+      ) VALUES (${profileId}::uuid, ${entry.id}::uuid, FALSE, 'MANUAL')
     `.execute(trx);
   }
 }
@@ -335,15 +305,9 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
       schema: { querystring: ncmQuerySchema },
     },
     async (request, reply) => {
-      if (!request.auth) {
-        return reply.status(401).send({ error: 'unauthorized' });
-      }
-
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const q = request.query.q.trim();
       const digits = q.replace(/\D/g, '');
-      const search = `%${q}%`;
-      const digitSearch = `%${digits}%`;
-
       const result = await sql<NcmEntryRow>`
         SELECT
           e.id,
@@ -353,17 +317,15 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
           ed.edition_code,
           ed.valid_from
         FROM official_catalog_entries e
-        INNER JOIN official_catalog_editions ed
-          ON ed.id = e.catalog_edition_id
-        INNER JOIN official_catalogs c
-          ON c.id = ed.catalog_id
+        INNER JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
+        INNER JOIN official_catalogs c ON c.id = ed.catalog_id
         WHERE c.code = 'NCM'
           AND ed.status = 'CURRENT'
           AND COALESCE((e.metadata ->> 'assignable')::boolean, FALSE) = TRUE
           AND (
             ${q.length === 0}
-            OR e.description ILIKE ${search}
-            OR regexp_replace(e.official_code, '[^0-9]', '', 'g') LIKE ${digitSearch}
+            OR e.description ILIKE ${`%${q}%`}
+            OR regexp_replace(e.official_code, '[^0-9]', '', 'g') LIKE ${`%${digits}%`}
           )
         ORDER BY e.official_code
         LIMIT ${request.query.limit}
@@ -393,31 +355,20 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: companyParamsSchema },
     },
     async (request, reply) => {
-      if (!request.auth) {
-        return reply.status(401).send({ error: 'unauthorized' });
-      }
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const tenantId = tenantIdFromRequest(request);
-      if (!tenantId) {
-        return reply.status(400).send({ error: 'tenant_required' });
-      }
-
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
       try {
         const rows = await withTenantContext(
           app.db,
           request.auth.userId,
           tenantId,
           async (trx) => {
-            if (!(await assertCompany(trx, request.params.companyId, tenantId))) {
-              return null;
-            }
+            if (!(await assertCompany(trx, request.params.companyId, tenantId))) return null;
             return readProfiles(trx, request.params.companyId);
           },
         );
-
-        if (rows === null) {
-          return reply.status(404).send({ error: 'company_not_found' });
-        }
-
+        if (rows === null) return reply.status(404).send({ error: 'company_not_found' });
         return reply.status(200).send({ items: rows.map(profileResponse) });
       } catch (error) {
         const handled = handleTenantError(error, reply);
@@ -431,20 +382,12 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
     '/api/v1/companies/:companyId/product-profiles',
     {
       preHandler: app.authenticate,
-      schema: {
-        params: companyParamsSchema,
-        body: productProfileBodySchema,
-      },
+      schema: { params: companyParamsSchema, body: productProfileBodySchema },
     },
     async (request, reply) => {
-      if (!request.auth) {
-        return reply.status(401).send({ error: 'unauthorized' });
-      }
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const tenantId = tenantIdFromRequest(request);
-      if (!tenantId) {
-        return reply.status(400).send({ error: 'tenant_required' });
-      }
-
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
       try {
         const created = await withTenantContext(
           app.db,
@@ -457,38 +400,30 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
             if (!(await assertCompanyCnae(trx, request.params.companyId, request.body.cnaeCode))) {
               return { kind: 'cnae_not_linked' as const };
             }
-
             const entries = await resolveNcmEntries(trx, request.body.ncmCodes);
             const resolved = new Set(entries.map((entry) => entry.code));
             const invalidCodes = request.body.ncmCodes.filter((code) => !resolved.has(code));
             if (invalidCodes.length > 0) {
               return { kind: 'invalid_ncm_codes' as const, invalidCodes };
             }
-
             const inserted = await sql<{ id: string }>`
-              INSERT INTO company_product_profiles (
-                company_id,
-                cnae_code,
-                product_label
-              ) VALUES (
+              INSERT INTO company_product_profiles (company_id, cnae_code, product_label)
+              VALUES (
                 ${request.params.companyId}::uuid,
                 ${request.body.cnaeCode},
                 ${request.body.productLabel}
               )
               RETURNING id
             `.execute(trx);
-
             const profileId = inserted.rows[0]?.id;
             if (!profileId) throw new Error('product_profile_insert_failed');
-            await replaceProfileNcms(trx, profileId, entries);
-
-            const rows = await readProfiles(trx, request.params.companyId);
-            const profile = rows.find((row) => row.id === profileId);
-            if (!profile) throw new Error('product_profile_readback_failed');
-            return { kind: 'ok' as const, profile };
+            await replaceNcms(trx, profileId, entries);
+            const row = (await readProfiles(trx, request.params.companyId))
+              .find((candidate) => candidate.id === profileId);
+            if (!row) throw new Error('product_profile_readback_failed');
+            return { kind: 'ok' as const, row };
           },
         );
-
         if (created.kind === 'company_not_found') {
           return reply.status(404).send({ error: created.kind });
         }
@@ -496,13 +431,9 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
           return reply.status(400).send({ error: created.kind });
         }
         if (created.kind === 'invalid_ncm_codes') {
-          return reply.status(400).send({
-            error: created.kind,
-            invalidCodes: created.invalidCodes,
-          });
+          return reply.status(400).send({ error: created.kind, invalidCodes: created.invalidCodes });
         }
-
-        return reply.status(201).send(profileResponse(created.profile));
+        return reply.status(201).send(profileResponse(created.row));
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
@@ -518,20 +449,12 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
     '/api/v1/companies/:companyId/product-profiles/:profileId',
     {
       preHandler: app.authenticate,
-      schema: {
-        params: productParamsSchema,
-        body: productProfileBodySchema,
-      },
+      schema: { params: productParamsSchema, body: productProfileBodySchema },
     },
     async (request, reply) => {
-      if (!request.auth) {
-        return reply.status(401).send({ error: 'unauthorized' });
-      }
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const tenantId = tenantIdFromRequest(request);
-      if (!tenantId) {
-        return reply.status(400).send({ error: 'tenant_required' });
-      }
-
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
       try {
         const updated = await withTenantContext(
           app.db,
@@ -544,8 +467,7 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
             if (!(await assertCompanyCnae(trx, request.params.companyId, request.body.cnaeCode))) {
               return { kind: 'cnae_not_linked' as const };
             }
-
-            const profile = await sql<{ id: string }>`
+            const existing = await sql<{ id: string }>`
               SELECT id
               FROM company_product_profiles
               WHERE id = ${request.params.profileId}::uuid
@@ -553,17 +475,13 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
                 AND is_active = TRUE
               FOR UPDATE
             `.execute(trx);
-            if (!profile.rows[0]) {
-              return { kind: 'profile_not_found' as const };
-            }
-
+            if (!existing.rows[0]) return { kind: 'profile_not_found' as const };
             const entries = await resolveNcmEntries(trx, request.body.ncmCodes);
             const resolved = new Set(entries.map((entry) => entry.code));
             const invalidCodes = request.body.ncmCodes.filter((code) => !resolved.has(code));
             if (invalidCodes.length > 0) {
               return { kind: 'invalid_ncm_codes' as const, invalidCodes };
             }
-
             await sql`
               UPDATE company_product_profiles
               SET
@@ -572,32 +490,23 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
                 updated_at = now()
               WHERE id = ${request.params.profileId}::uuid
             `.execute(trx);
-            await replaceProfileNcms(trx, request.params.profileId, entries);
-
-            const rows = await readProfiles(trx, request.params.companyId);
-            const row = rows.find((candidate) => candidate.id === request.params.profileId);
+            await replaceNcms(trx, request.params.profileId, entries);
+            const row = (await readProfiles(trx, request.params.companyId))
+              .find((candidate) => candidate.id === request.params.profileId);
             if (!row) throw new Error('product_profile_readback_failed');
-            return { kind: 'ok' as const, profile: row };
+            return { kind: 'ok' as const, row };
           },
         );
-
-        if (updated.kind === 'company_not_found') {
-          return reply.status(404).send({ error: updated.kind });
-        }
-        if (updated.kind === 'profile_not_found') {
+        if (updated.kind === 'company_not_found' || updated.kind === 'profile_not_found') {
           return reply.status(404).send({ error: updated.kind });
         }
         if (updated.kind === 'cnae_not_linked') {
           return reply.status(400).send({ error: updated.kind });
         }
         if (updated.kind === 'invalid_ncm_codes') {
-          return reply.status(400).send({
-            error: updated.kind,
-            invalidCodes: updated.invalidCodes,
-          });
+          return reply.status(400).send({ error: updated.kind, invalidCodes: updated.invalidCodes });
         }
-
-        return reply.status(200).send(profileResponse(updated.profile));
+        return reply.status(200).send(profileResponse(updated.row));
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
@@ -616,16 +525,11 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: productParamsSchema },
     },
     async (request, reply) => {
-      if (!request.auth) {
-        return reply.status(401).send({ error: 'unauthorized' });
-      }
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const tenantId = tenantIdFromRequest(request);
-      if (!tenantId) {
-        return reply.status(400).send({ error: 'tenant_required' });
-      }
-
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
       try {
-        const removed = await withTenantContext(
+        const outcome = await withTenantContext(
           app.db,
           request.auth.userId,
           tenantId,
@@ -640,16 +544,12 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
                 AND company_id = ${request.params.companyId}::uuid
                 AND is_active = TRUE
             `.execute(trx);
-            return result.numAffectedRows > 0n ? 'ok' as const : 'profile_not_found' as const;
+            return (result.numAffectedRows ?? 0n) > 0n
+              ? 'ok' as const
+              : 'profile_not_found' as const;
           },
         );
-
-        if (removed === 'company_not_found') {
-          return reply.status(404).send({ error: removed });
-        }
-        if (removed === 'profile_not_found') {
-          return reply.status(404).send({ error: removed });
-        }
+        if (outcome !== 'ok') return reply.status(404).send({ error: outcome });
         return reply.status(204).send();
       } catch (error) {
         const handled = handleTenantError(error, reply);
@@ -666,10 +566,7 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: publicationParamsSchema },
     },
     async (request, reply) => {
-      if (!request.auth) {
-        return reply.status(401).send({ error: 'unauthorized' });
-      }
-
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const result = await sql<PublicationNcmRow>`
         SELECT DISTINCT ON (pnm.ncm_code)
           pnm.ncm_code,
@@ -694,7 +591,6 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
           pnm.confidence DESC NULLS LAST,
           pnm.created_at DESC
       `.execute(app.db);
-
       return reply.status(200).send({
         items: result.rows.map((row) => ({
           code: row.ncm_code,
