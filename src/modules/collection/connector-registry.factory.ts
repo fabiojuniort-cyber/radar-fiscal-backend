@@ -7,6 +7,7 @@ import { readDoeSpSourceState } from './doe-sp-source-state.repository.js';
 import { DoeSpLegacyConnector, resolveDoeSpLegacySourceLimits } from './doe-sp-legacy.connector.js';
 import { readDoeSpLegacySourceState } from './doe-sp-legacy-source-state.repository.js';
 import { RfbNormasConnector } from './rfb-normas.connector.js';
+import { RfbNewsConnector } from './rfb-news.connector.js';
 import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.js';
 import { readCgibsSourceState } from './cgibs-source-state.repository.js';
 import { ConfazConnector } from './confaz.connector.js';
@@ -53,6 +54,8 @@ export function buildConnectorRegistry(
         : {}),
     }),
   );
+
+  registry.register(new RfbNewsConnector());
 
   registry.register(
     new CgibsConnector({
