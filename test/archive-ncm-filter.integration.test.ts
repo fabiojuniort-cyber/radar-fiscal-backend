@@ -51,7 +51,7 @@ test('archive v2 filters current publications by catalog-matched NCM mentions', 
          jurisdiction_level, title, published_on
        ) VALUES (
          $1, 'STRONG', '{}'::jsonb,
-         'FEDERAL', 'Norma para filtro NCM', DATE '2099-12-29'
+         'FEDERAL', 'Norma para filtro NCM', DATE '9999-12-29'
        )
        RETURNING id`,
       [createHash('sha256').update(randomUUID()).digest('hex')],
@@ -74,13 +74,6 @@ test('archive v2 filters current publications by catalog-matched NCM mentions', 
       ],
     );
     versionId = version.rows[0]!.id;
-
-    await admin.query(
-      `UPDATE publications
-       SET current_version_id = $2::uuid
-       WHERE id = $1::uuid`,
-      [publicationId, versionId],
-    );
 
     await admin.query(
       `INSERT INTO publication_ncm_mentions (
@@ -155,10 +148,6 @@ test('archive v2 filters current publications by catalog-matched NCM mentions', 
       );
     }
     if (publicationId) {
-      await admin.query(
-        'UPDATE publications SET current_version_id = NULL WHERE id = $1::uuid',
-        [publicationId],
-      );
       await admin.query(
         'DELETE FROM publication_versions WHERE publication_id = $1::uuid',
         [publicationId],
