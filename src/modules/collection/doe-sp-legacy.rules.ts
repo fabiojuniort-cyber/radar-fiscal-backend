@@ -8,8 +8,8 @@ import { asciiUpper } from './doe-sp.parser.js';
  *
  * One vocabulary drives both steps, so discovery is a superset of what is kept
  * (review DOE-SP-LEGACY-04, B1):
- * - every term is sent to the portal's keyword index (Executivo II and III,
- *   from 2003 on; Executivo I is read whole) as a separate query (the index
+ * - every term is sent to the portal's keyword index (Executivo III, from
+ *   2003 on; Executivo I and II are read whole) as a separate query (the index
  *   matches words; a multi-word query behaves like AND, which only widens
  *   the hits); spelling variants that the index
  *   might treat as different words (without accents, without hyphen) are

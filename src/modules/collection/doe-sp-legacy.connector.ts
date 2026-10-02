@@ -39,15 +39,17 @@ import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-le
  *   (only its SHA-256/size stay as provenance);
  * - the official link of the page is preserved (`officialUrl`).
  *
- * Discovery (measured on the source, DOE-SP-LEGACY-02/03/08):
- * - Executivo I (Seção I, where normative acts are printed), the whole range
- *   (BROWSE): each edition is listed whole per date and every page is read
- *   and filtered locally. Before 2003 the keyword index does not answer; from
- *   2003 on the dry pilot P1 found a kept page the index did not return
- *   (missedBySearch = 1 in 118), so the owner chose to read every page there
- *   too (DOE-SP-LEGACY-09);
- * - Executivo II and III, from 2003 on (SEARCH): the portal's keyword index,
- *   one query per tax term, per month and per caderno; results merged by page.
+ * Discovery (measured on the source, DOE-SP-LEGACY-02/03/08/10):
+ * - Executivo I (Seção I, where normative acts are printed) and Executivo II,
+ *   the whole range (BROWSE): each edition is listed whole per date and every
+ *   page is read and filtered locally. Before 2003 the keyword index does not
+ *   answer; from 2003 on the dry pilot P1 found a kept page the index did not
+ *   return (missedBySearch = 1 in 118), so the owner chose to read every page
+ *   (DOE-SP-LEGACY-09). The pilot P1b found tax mentions in Executivo II
+ *   before 2003, which only browsing reaches, so it is browsed too
+ *   (DOE-SP-LEGACY-11);
+ * - Executivo III, from 2003 on (SEARCH): the portal's keyword index, one
+ *   query per tax term and per month; results merged by page.
  *   The two cursors advance together: the search month runs when the browse
  *   cursor reaches it.
  * Every downloaded page is confirmed locally with the same tax vocabulary
@@ -60,7 +62,7 @@ import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-le
  */
 
 export const DOE_SP_LEGACY_CONNECTOR_KEY = 'doe-sp-legacy';
-/** 2: Executivo I browsed in the whole range + searchCursor (DOE-SP-LEGACY-09). */
+/** 2: Executivo I and II browsed in the whole range + searchCursor (DOE-SP-LEGACY-09/11). */
 export const DOE_SP_LEGACY_STATE_VERSION = 2;
 
 export const DOE_SP_LEGACY_DEFAULT_START = '1988-01-01';
@@ -76,13 +78,12 @@ export const DOE_SP_LEGACY_MAX_PAGE_ATTEMPTS = 3;
 /** Failed attempts on the same result screen before the listing is reported as blocked (still retried). */
 export const DOE_SP_LEGACY_LISTING_BLOCKED_AFTER = 3;
 
-/** Executivo cadernos queried in SEARCH mode (the index filters by name + id); Executivo I is browsed. */
+/** Executivo cadernos queried in SEARCH mode (the index filters by name + id); Executivo I and II are browsed. */
 export const DOE_SP_LEGACY_SEARCH_CADERNOS: readonly DoeSpLegacyCaderno[] = [
-  { id: 'ex2', name: 'Executivo II' },
   { id: 'ex3', name: 'Executivo III' },
 ];
-/** Caderno listed whole in BROWSE mode (every date of the archive). */
-export const DOE_SP_LEGACY_BROWSE_CADERNO = 'Executivo I';
+/** Cadernos listed whole in BROWSE mode (every date of the archive), in this order. */
+export const DOE_SP_LEGACY_BROWSE_CADERNOS: readonly string[] = ['Executivo I', 'Executivo II'];
 
 const CADERNOS_AJAX = '/ajax/ImprensaOficial.PortalIO.DODigitalAjax,PortalIO.ashx?_method=GetCadernos&_session=no';
 const DAY_MS = 86_400_000;
@@ -100,8 +101,8 @@ export interface DoeSpLegacyListing {
   /** Cursor after this period. */
   next: string | null;
   vocabularyVersion: number;
-  /** BROWSE: Executivo I of the date (null = no edition); absent = not looked up yet. */
-  browseCaderno?: DoeSpLegacyCaderno | null;
+  /** BROWSE: browsed cadernos of the date ([] = no edition); absent = not looked up yet. */
+  browseCadernos?: DoeSpLegacyCaderno[];
   /** Index of the query being listed (see doeSpLegacyListingQueries). */
   query: number;
   /** Next result screen of that query (1-based). */
@@ -248,9 +249,9 @@ export function doeSpLegacyNextPeriod(
 
 export interface DoeSpLegacyQuery { caderno: DoeSpLegacyCaderno; keyword?: string }
 
-/** Queries of a listing, in order: SEARCH = caderno x term; BROWSE = the whole Executivo I edition. */
+/** Queries of a listing, in order: SEARCH = caderno x term; BROWSE = each browsed caderno of the date, whole. */
 export function doeSpLegacyListingQueries(listing: DoeSpLegacyListing): DoeSpLegacyQuery[] {
-  if (listing.mode === 'BROWSE') return listing.browseCaderno ? [{ caderno: listing.browseCaderno }] : [];
+  if (listing.mode === 'BROWSE') return (listing.browseCadernos ?? []).map((caderno) => ({ caderno }));
   return DOE_SP_LEGACY_SEARCH_CADERNOS.flatMap((caderno) => DOE_SP_LEGACY_SEARCH_TERMS.map((keyword) => ({ caderno, keyword })));
 }
 
@@ -412,11 +413,14 @@ export class DoeSpLegacyConnector implements CollectionConnector {
         Object.assign(listing, { vocabularyVersion: DOE_SP_LEGACY_VOCABULARY_VERSION, query: 0, screen: 1, attempts: 0 });
         delete listing.screens;
       }
-      if (listing.mode === 'BROWSE' && listing.browseCaderno === undefined) {
+      if (listing.mode === 'BROWSE' && listing.browseCadernos === undefined) {
         if (shouldStop()) return 'YIELD';
         const raw = await client.postAjax(CADERNOS_AJAX, `strData=${brFromIso(listing.from)}\r\nstrBuscaEsp=true`, context.signal);
         counters.cadernoLookups += 1;
-        listing.browseCaderno = parseDoeSpLegacyCadernos(raw).find((entry) => entry.name === DOE_SP_LEGACY_BROWSE_CADERNO) ?? null;
+        const available = parseDoeSpLegacyCadernos(raw);
+        listing.browseCadernos = DOE_SP_LEGACY_BROWSE_CADERNOS
+          .map((name) => available.find((entry) => entry.name === name))
+          .filter((entry): entry is DoeSpLegacyCaderno => entry !== undefined);
       }
       const queries = doeSpLegacyListingQueries(listing);
       const seen = new Set(listing.found.map((page) => page.link));

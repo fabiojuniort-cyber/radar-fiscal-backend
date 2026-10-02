@@ -1,6 +1,6 @@
 # Fase DOE-SP (acervo legado): Diário Oficial de São Paulo, 1988 – 30/06/2023
 
-Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da revisão DOE-SP-LEGACY-04 em DOE-SP-LEGACY-05; piloto seco P1 em DOE-SP-LEGACY-08; ajustes pós-P1 em DOE-SP-LEGACY-09). Este conector é **separado** do `doe-sp`. O `doe-sp` cobre a plataforma atual (doe.sp.gov.br, a partir de 01/07/2023) e não é alterado aqui. A arquitetura é a do Motor de Coleta, sem componente novo. O acervo é **finito**: quando o backfill termina e é comprovado, a fonte é desativada.
+Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da revisão DOE-SP-LEGACY-04 em DOE-SP-LEGACY-05; piloto seco P1 em DOE-SP-LEGACY-08; ajustes pós-P1 em DOE-SP-LEGACY-09; piloto P1b do Executivo II e III em DOE-SP-LEGACY-10; Executivo II navegado em DOE-SP-LEGACY-11). Este conector é **separado** do `doe-sp`. O `doe-sp` cobre a plataforma atual (doe.sp.gov.br, a partir de 01/07/2023) e não é alterado aqui. A arquitetura é a do Motor de Coleta, sem componente novo. O acervo é **finito**: quando o backfill termina e é comprovado, a fonte é desativada.
 
 ## 1. Decisões do responsável (2026-09-29)
 
@@ -35,16 +35,17 @@ As páginas `pagnot_*` (noticiário do governo no Executivo I, ~2004–2015) sã
 
 | Caderno | Datas | Modo | Como |
 |---|---|---|---|
-| **Executivo I** (Seção I, onde saem os atos normativos) | 1988-01-01 … 2023-06-30 | **BROWSE** (por data) | Para cada data: `GetCadernos`; se houver Executivo I, lista a edição inteira (`FE`, palavra vazia) e **lê todas as páginas** |
-| **Executivo II e III** | 2003-01-01 … 2023-06-30 | **SEARCH** (por mês) | Índice de palavra-chave do portal (`UP`): **uma consulta por termo** de `DOE_SP_LEGACY_SEARCH_TERMS` × caderno. O índice casa palavras, então os termos vão separados e os resultados são unidos por página. Uma consulta de várias palavras funciona como E, o que só amplia os resultados. Resultados fora do período pedido são descartados |
+| **Executivo I** (Seção I, onde saem os atos normativos) e **Executivo II** | 1988-01-01 … 2023-06-30 | **BROWSE** (por data) | Para cada data: `GetCadernos`; para cada um desses cadernos que houver no dia (`DOE_SP_LEGACY_BROWSE_CADERNOS`, nessa ordem), lista a edição inteira (`FE`, palavra vazia) e **lê todas as páginas** |
+| **Executivo III** | 2003-01-01 … 2023-06-30 | **SEARCH** (por mês) | Índice de palavra-chave do portal (`UP`): **uma consulta por termo** de `DOE_SP_LEGACY_SEARCH_TERMS`. O índice casa palavras, então os termos vão separados e os resultados são unidos por página. Uma consulta de várias palavras funciona como E, o que só amplia os resultados. Resultados fora do período pedido são descartados |
 
-Por que o Executivo I é lido inteiro em todo o período:
-- antes de 2003 a busca por palavra não responde (medido: negativa de 1988 a 2002);
-- de 2003 em diante, o piloto seco P1 (DOE-SP-LEGACY-08) achou 1 página mantida pelo filtro que a busca do mesmo dia não devolveu, em 118 (13/06/2012, p. 302, termo `IPI`). O responsável decidiu ler o dia inteiro também nesse período (DOE-SP-LEGACY-09).
+Por que o Executivo I e o II são lidos inteiros em todo o período (o foco do responsável é "toda legislação tributária e as menções"):
+- antes de 2003 a busca por palavra não responde (medido: negativa de 1988 a 2002), então só a navegação alcança esse período;
+- de 2003 em diante, o piloto seco P1 (DOE-SP-LEGACY-08) achou no Executivo I 1 página mantida pelo filtro que a busca do mesmo dia não devolveu, em 118 (13/06/2012, p. 302, termo `IPI`). O responsável decidiu ler o dia inteiro (DOE-SP-LEGACY-09);
+- o piloto P1b (DOE-SP-LEGACY-10) mediu o Executivo II: 48 a 70 páginas por dia, 29 de 298 com termo fiscal e a busca achando 21 de 21 de 2003 em diante. Mas antes de 2003 o caderno ficaria de fora (8 páginas fiscais só em 1995-09-06 e 2002-03-05). O responsável decidiu navegá-lo também (DOE-SP-LEGACY-11).
 
-Os cadernos II e III continuam pela busca, como antes: a cobertura deles não muda.
+O Executivo III segue pela busca de 2003 em diante. Ele não teve edição em nenhuma das 5 datas do P1b, e a busca não achou nada nele.
 
-Os dois cursores andam juntos. O mês de busca roda quando o cursor da navegação chega nele: em 2003-01-01 roda a busca de janeiro/2003 (II e III), depois os dias de janeiro (Executivo I), e assim por diante. Assim, "o acervo até a data X" fica completo nos três cadernos ao mesmo tempo.
+Os dois cursores andam juntos. O mês de busca roda quando o cursor da navegação chega nele: em 2003-01-01 roda a busca de janeiro/2003 (Executivo III), depois os dias de janeiro (Executivo I e II), e assim por diante. Assim, "o acervo até a data X" fica completo nos três cadernos ao mesmo tempo.
 
 ### Vocabulário fiscal único (revisão DOE-SP-LEGACY-04, B1)
 
@@ -80,7 +81,7 @@ No P1, 19 das 158 páginas mantidas vieram só de uma sigla curta, e várias era
 
 Antes da data, a sigla é ignorada naquela página, mas qualquer outro termo continua mantendo a página. A data comparada é a da edição (`doeSpLegacyTaxTerms(texto, data)`). As demais siglas (IPI, ICMS etc.) não mudam. `DOE_SP_LEGACY_VOCABULARY_VERSION` passou a 3.
 
-**Medido no piloto P1:** o índice achou 117 das 118 páginas mantidas nos três dias comparados. Isso não afeta o Executivo I, que agora é lido inteiro. Nos cadernos II e III, que seguem pela busca, o risco medido é dessa ordem.
+**Medido nos pilotos:** o índice achou 117 de 118 páginas mantidas no Executivo I (P1) e 21 de 21 no Executivo II (P1b). Os dois agora são lidos inteiros; só o Executivo III depende do índice.
 
 ## 4. Modelo de publicação
 
@@ -103,13 +104,13 @@ A fila `needsOcr` guarda até 5.000 referências. Quando está cheia, a próxima
 ## 5. Checkpoint e retomada
 
 Estado (`collection_checkpoints`, `connector_key = doe-sp-legacy`, versão 2; nenhum estado existe em produção, a fonte nunca foi ativada; um checkpoint de outra versão é ignorado):
-- `cursor`: próxima data a navegar (Executivo I); `null` = todas as datas navegadas;
-- `searchCursor`: início do próximo mês a buscar (Executivo II e III, de 2003), normalmente o dia 1; `null` = todos os meses buscados;
+- `cursor`: próxima data a navegar (Executivo I e II); `null` = todas as datas navegadas;
+- `searchCursor`: início do próximo mês a buscar (Executivo III, de 2003), normalmente o dia 1; `null` = todos os meses buscados;
 - `listing`: o período em listagem, retomável (revisão DOE-SP-LEGACY-04, B3):
   - `mode`, `from`, `to`, `next`;
   - `vocabularyVersion`;
-  - no BROWSE, `browseCaderno` (o caderno encontrado pelo `GetCadernos`);
-  - `query`, o índice da consulta: no SEARCH, caderno × termo, 2 × 85 = 170 por mês; no BROWSE, uma;
+  - no BROWSE, `browseCadernos` (os cadernos navegados que o `GetCadernos` devolveu para a data; `[]` = sem edição; um caderno ilegível descarta a listagem, que recomeça);
+  - `query`, o índice da consulta: no SEARCH, um termo, 85 por mês; no BROWSE, um caderno (até duas por data);
   - `screen`, a próxima tela, e `screens`, o total da consulta;
   - `found`, as páginas achadas até ali, unidas por link;
   - `attempts`;
@@ -150,8 +151,9 @@ Além disso vale o time budget do executor, com parada segura entre páginas e e
 **Estimativa** (páginas por edição medidas no P1: 40–64 até 2002; 184–348 de 2005 a 2021):
 - BROWSE 1988–2002: ~15 anos × ~250 edições × ~40–70 páginas ≈ 150–250 mil páginas, ~2–3 dias a 1 req/s.
 - BROWSE 2003–06/2023: ~20,5 anos × ~250 edições × ~250 páginas ≈ 1,3 milhão de páginas, ~15 dias a 1 req/s.
-- SEARCH II e III (2003–06/2023): ~246 meses × 85 consultas × 2 cadernos ≈ 42 mil consultas (~12 h), mais as telas adicionais e as páginas encontradas.
-- Total: ~3 semanas de runs contínuos, ~200–300 GB trafegados e nada de PDF armazenado. O ritmo real depende da frequência dos runs e do time budget de cada um.
+- BROWSE do Executivo II (1988–06/2023; 48–70 páginas por dia no P1b): ~35,5 anos × ~250 edições × ~60 páginas ≈ 530 mil páginas, ~6–7 dias.
+- SEARCH do Executivo III (2003–06/2023): ~246 meses × 85 consultas ≈ 21 mil consultas (~6 h), mais as telas adicionais e as páginas encontradas.
+- Total: ~4 semanas de runs contínuos, ~200–300 GB trafegados e nada de PDF armazenado. O ritmo real depende da frequência dos runs e do time budget de cada um.
 
 ### Dependência `pdfjs-dist` (6.3.289, fixada)
 
@@ -180,7 +182,7 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
 
 `npm run doe-sp-legacy:pilot -- --browse=<datas> --compare=<datas>` (`src/modules/collection/doe-sp-legacy.pilot.ts`). Só lê o portal, a 1 req/s (`DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS`), e não precisa de `DATABASE_URL`.
 
-- **`--browse`**: lista a edição inteira do Executivo I do dia, lê cada página e classifica com as regras do conector:
+- **`--browse`**: lista a edição inteira do dia no caderno medido (padrão Executivo I; ver `--cadernos`), lê cada página e classifica com as regras do conector:
   - `KEPT`, com os termos encontrados;
   - `NO_TAX_TERMS`;
   - `NEEDS_OCR`;
@@ -198,6 +200,7 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
   Se `missedBySearch > 0`, os termos que faltam entram no vocabulário (o que aumenta `DOE_SP_LEGACY_VOCABULARY_VERSION`) antes do backfill.
 - **Resultado (DOE-SP-LEGACY-08, commit `aa960a1`):** 956 páginas, 158 `KEPT`, 790 `NO_TAX_TERMS`, 8 `NEWS`, 0 `NEEDS_OCR`, 0 `ERROR`; `missedBySearch = 1` (a página tinha o termo consultado `IPI`, então o vocabulário não resolvia). Decisões (DOE-SP-LEGACY-09): Executivo I lido inteiro em todo o período e siglas com data mínima (§3). O `--compare` continua disponível como diagnóstico do índice.
 - **P1b (DOE-SP-LEGACY-10):** o mesmo piloto seco só do Executivo II e III (`--cadernos=ex2,ex3`), nas datas do P1 (navegação em 1995-09-06 e 2002-03-05; comparação em 2005-03-02, 2012-06-13 e 2021-08-11). Mede o tamanho desses cadernos e o `missedBySearch` neles, para decidir se também passam a ser lidos inteiros. O foco do responsável é "toda legislação tributária e as menções".
+  - **Resultado (commit `72f39ee`):** Executivo II com 298 páginas em 5 dias, 29 `KEPT`, 8 `NEWS`, 0 `ERROR` e `missedBySearch = 0`. Executivo III sem edição nas 5 datas. Decisão (DOE-SP-LEGACY-11): o Executivo II passa a ser navegado em todo o período (§3).
 - **Amostra sugerida:**
   - BROWSE: `1988-03-02`, `1995-09-06`, `1998-03-03`, `2002-03-05`, cobrindo as camadas OCR de 1988 e 1995 e o texto nativo;
   - COMPARE: `2005-03-02`, `2012-06-13`, `2021-08-11`.
