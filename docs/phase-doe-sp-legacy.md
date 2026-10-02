@@ -5,7 +5,7 @@ Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da r
 ## 1. Decisões do responsável (2026-09-29)
 
 1. **Escopo:** só as **páginas com termos fiscais**.
-2. **Sem guardar PDF:** a página é baixada em memória, convertida em texto e descartada. Ficam só o SHA-256 e o tamanho, como proveniência, nos metadados da versão (`source_metadata.files`, com `versionRole: PROVENANCE` e `metadata.stored: false`). `publication_files`, onde ficaria um arquivo armazenado, fica vazio para o acervo (conferido por `storedFiles` na auditoria).
+2. **Sem guardar PDF:** a página é baixada em memória, convertida em texto e descartada. Ficam só a URL, o SHA-256 e o tamanho, como proveniência, nos metadados da **origem** (`publication_origins.metadata.files`, com `versionRole: PROVENANCE` e `metadata.stored: false`). Com `contentHashPolicy: HTML_PRIMARY_MATERIAL_FILES`, o normalizador tira os arquivos `PROVENANCE` dos metadados da versão (`publication_versions.source_metadata` fica sem `files`), e a versão é só o texto. `publication_files`, onde ficaria um arquivo armazenado, fica vazio para o acervo (conferido por `storedFiles` na auditoria).
 3. **Link preservado:** `officialUrl` é o visualizador público da página no portal.
 4. **OCR autorizado** para páginas escaneadas.
 

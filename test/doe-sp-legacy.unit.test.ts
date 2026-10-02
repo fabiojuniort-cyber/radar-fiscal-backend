@@ -165,6 +165,9 @@ test('rules: tax vocabulary of the current connector plus legacy terms; ambiguou
   assert.deepEqual(doeSpLegacyTaxTerms('ICMSX e PREIPI e AICM', RECENT), []);
   assert.deepEqual(doeSpLegacyTaxTerms('Concurso: taxa de inscrição. Secretaria da Fazenda — férias de servidor.', RECENT), []);
   assert.throws(() => doeSpLegacyTaxTerms('ICMS', '02/03/1988'), RangeError);
+  // Calendar-invalid dates are refused too (review DOE-SP-LEGACY-09R, N1).
+  assert.throws(() => doeSpLegacyTaxTerms('ICMS', '2007-02-30'), RangeError);
+  assert.throws(() => doeSpLegacyTaxTerms('ICMS', '2019-13-01'), RangeError);
   assert.equal(isDoeSpLegacyNewsPage('/2005/executivo secao i/marco/02/pagnot_0001_X.pdf'), true);
   assert.equal(isDoeSpLegacyNewsPage('/2005/executivo secao i/marco/02/pag_0001_X.pdf'), false);
 });

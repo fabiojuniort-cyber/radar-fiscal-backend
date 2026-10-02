@@ -1,3 +1,4 @@
+import { isIsoDate } from './doe-sp-legacy.parser.js';
 import { asciiUpper } from './doe-sp.parser.js';
 
 /*
@@ -108,7 +109,7 @@ const MAX_MATCHED_TERMS = 20;
  * only on pages from their date on.
  */
 export function doeSpLegacyTaxTerms(text: string, date: string): string[] {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new RangeError(`invalid page date ${date}`);
+  if (!isIsoDate(date)) throw new RangeError(`invalid page date ${date}`);
   const upper = asciiUpper(text);
   const found = new Set<string>();
   for (const match of upper.matchAll(new RegExp(DOE_SP_LEGACY_TAX_PATTERN))) {
