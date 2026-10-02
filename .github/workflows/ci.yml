@@ -121,6 +121,9 @@ jobs:
       - name: TAX-06 baseline integration tests
         run: npm run test:taxonomy-baseline-integration
 
+      - name: TAX-10 v1.1 successor integration
+        run: npx tsx --test test/taxonomy.v1-1.integration.test.ts
+
       - name: NCM official catalog idempotency
         run: npx tsx --test test/ncm-catalog.import.integration.test.ts
 
