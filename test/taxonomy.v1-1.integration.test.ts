@@ -291,6 +291,17 @@ test('TAX-10 creates, validates and publishes v1.1 without retired dimensions', 
 
   try {
     await client.query('BEGIN');
+    await client.query(`
+      TRUNCATE TABLE
+        taxonomy_releases,
+        taxonomy_dimensions,
+        taxonomy_concepts,
+        taxonomy_aliases,
+        taxonomy_relation_types,
+        taxonomy_evidence,
+        official_catalogs
+      CASCADE
+    `);
     await client.query('SET LOCAL ROLE radar_taxonomy_curator');
 
     const fixture = await insertFixtureSource(client);
