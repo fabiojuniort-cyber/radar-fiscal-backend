@@ -9,9 +9,11 @@ import {
   DOE_SP_LEGACY_LISTING_BLOCKED_AFTER,
   DOE_SP_LEGACY_MAX_PAGE_ATTEMPTS,
   DOE_SP_LEGACY_SEARCH_CADERNOS,
+  DOE_SP_LEGACY_STATE_VERSION,
   DoeSpLegacyConnector,
   MAX_NEEDS_OCR_KEPT,
-  doeSpLegacyPeriod,
+  doeSpLegacyNextPeriod,
+  doeSpLegacySearchStart,
   emptyDoeSpLegacyState,
   resolveDoeSpLegacySourceLimits,
   type DoeSpLegacySourceState,
@@ -28,6 +30,7 @@ import {
 import {
   DOE_SP_LEGACY_SEARCH_TERMS,
   DOE_SP_LEGACY_TAX_VOCABULARY,
+  DOE_SP_LEGACY_TERM_SINCE,
   doeSpLegacyTaxTerms,
   isDoeSpLegacyNewsPage,
 } from '../src/modules/collection/doe-sp-legacy.rules.js';
@@ -78,9 +81,19 @@ function connector(portal: LegacyPortalOptions, state: DoeSpLegacySourceState, o
   return { api, instance };
 }
 
-function stateAt(cursor: string): DoeSpLegacySourceState {
-  return { ...emptyDoeSpLegacyState('1988-01-01'), cursor };
+/** Browse cursor at `cursor`; the search cursor where a run that got there would be. */
+function stateAt(cursor: string, searchCursor: string | null = doeSpLegacySearchStart(cursor)): DoeSpLegacySourceState {
+  return { ...emptyDoeSpLegacyState('1988-01-01'), cursor, searchCursor };
 }
+
+/** A page of Executivo II/III (found by the keyword index from 2003 on). */
+function exPage(caderno: 'Executivo II' | 'Executivo III', date: string, n: number, lines: string[]): LegacyPage {
+  const base = page(date, n, lines);
+  return { ...base, caderno, link: base.link.replace('executivo secao i/', caderno === 'Executivo II' ? 'executivo secao ii/' : 'executivo secao iii/') };
+}
+
+/** A date on which every term of the vocabulary is in force. */
+const RECENT = '2023-06-30';
 
 // ---------------------------------------------------------------- parser
 
@@ -144,15 +157,29 @@ test('parser: URLs keep the portal shapes (viewer link preserved, GatewayPDF, sc
 // ---------------------------------------------------------------- rules / text
 
 test('rules: tax vocabulary of the current connector plus legacy terms; ambiguous words alone do not qualify', () => {
-  assert.deepEqual(doeSpLegacyTaxTerms('Decreto nº 1 — dispõe sobre o ICMS e o IPVA.'), ['ICMS', 'IPVA']);
-  assert.deepEqual(doeSpLegacyTaxTerms('Portaria CAT 12, de 1988: recolhimento do ICM.'), ['PORTARIA CAT', 'ICM']);
-  assert.deepEqual(doeSpLegacyTaxTerms('Tribunal de Impostos e Taxas — sessão'), ['IMPOSTOS']);
-  assert.deepEqual(doeSpLegacyTaxTerms('Emissão de NFC-e, CT-e e MDFe; obrigações acessórias; taxa judiciária'), ['NFC-E', 'CT-E', 'MDFE', 'OBRIGACOES ACESSORIAS', 'TAXA JUDICIARIA']);
+  assert.deepEqual(doeSpLegacyTaxTerms('Decreto nº 1 — dispõe sobre o ICMS e o IPVA.', RECENT), ['ICMS', 'IPVA']);
+  assert.deepEqual(doeSpLegacyTaxTerms('Portaria CAT 12, de 1988: recolhimento do ICM.', '1988-03-02'), ['PORTARIA CAT', 'ICM']);
+  assert.deepEqual(doeSpLegacyTaxTerms('Tribunal de Impostos e Taxas — sessão', RECENT), ['IMPOSTOS']);
+  assert.deepEqual(doeSpLegacyTaxTerms('Emissão de NFC-e, CT-e e MDFe; obrigações acessórias; taxa judiciária', RECENT), ['NFC-E', 'CT-E', 'MDFE', 'OBRIGACOES ACESSORIAS', 'TAXA JUDICIARIA']);
   // Whole words only: no match inside another word.
-  assert.deepEqual(doeSpLegacyTaxTerms('ICMSX e PREIPI e AICM'), []);
-  assert.deepEqual(doeSpLegacyTaxTerms('Concurso: taxa de inscrição. Secretaria da Fazenda — férias de servidor.'), []);
+  assert.deepEqual(doeSpLegacyTaxTerms('ICMSX e PREIPI e AICM', RECENT), []);
+  assert.deepEqual(doeSpLegacyTaxTerms('Concurso: taxa de inscrição. Secretaria da Fazenda — férias de servidor.', RECENT), []);
+  assert.throws(() => doeSpLegacyTaxTerms('ICMS', '02/03/1988'), RangeError);
   assert.equal(isDoeSpLegacyNewsPage('/2005/executivo secao i/marco/02/pagnot_0001_X.pdf'), true);
   assert.equal(isDoeSpLegacyNewsPage('/2005/executivo secao i/marco/02/pag_0001_X.pdf'), false);
+});
+
+test('rules: CT-e, IBS and CBS count only from 2007, 2019 and 2020 (P1: the acronym alone is another word on older pages)', () => {
+  assert.deepEqual(DOE_SP_LEGACY_TERM_SINCE, { CTE: '2007-01-01', IBS: '2019-01-01', CBS: '2020-01-01' });
+  const text = 'Cte. da Polícia Militar; CBS e IBS (siglas); CT-e';
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '1995-09-06'), []);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2006-12-31'), []);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2007-01-01'), ['CTE', 'CT-E']);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2018-12-31'), ['CTE', 'CT-E']);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2019-01-01'), ['CTE', 'IBS', 'CT-E']);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2020-01-01'), ['CTE', 'CBS', 'IBS', 'CT-E']);
+  // Another term still keeps an older page; undated acronyms (IPI, ICMS) are unchanged.
+  assert.deepEqual(doeSpLegacyTaxTerms('CBS — recolhimento do IPI e do ICM', '1988-03-02'), ['IPI', 'ICM']);
 });
 
 /** Top-level alternatives of `\b(?:A|B|C)\b`. */
@@ -211,7 +238,7 @@ test('rules (B1): discovery is a superset of the local filter; every family of D
   assert.deepEqual(Object.keys(FAMILY_SAMPLES).sort(), [...families].sort());
   const queried = new Set(DOE_SP_LEGACY_SEARCH_TERMS.map(queryKey));
   const reachable = (sample: string) => {
-    const terms = doeSpLegacyTaxTerms(sample);
+    const terms = doeSpLegacyTaxTerms(sample, RECENT);
     assert.ok(terms.length > 0, `"${sample}" must be kept locally`);
     for (const term of terms) assert.ok(queried.has(queryKey(term)), `"${term}" (from "${sample}") must be a query`);
   };
@@ -225,7 +252,7 @@ test('rules (B1): discovery is a superset of the local filter; every family of D
   for (const sample of LEGACY_SAMPLES) reachable(sample);
   // By construction: every vocabulary term is kept as itself and queried in every spelling variant.
   for (const term of DOE_SP_LEGACY_TAX_VOCABULARY) {
-    assert.deepEqual(doeSpLegacyTaxTerms(term).map(queryKey), [queryKey(term)]);
+    assert.deepEqual(doeSpLegacyTaxTerms(term, RECENT).map(queryKey), [queryKey(term)]);
     assert.ok(DOE_SP_LEGACY_SEARCH_TERMS.includes(term));
     assert.ok(DOE_SP_LEGACY_SEARCH_TERMS.includes(term.normalize('NFD').replace(/[̀-ͯ]/g, '')));
   }
@@ -246,10 +273,20 @@ test('text: native page vs scan without text layer; invalid bytes fail as proces
     error instanceof ConnectorError && error.code === 'DOE_SP_LEGACY_INVALID_PDF');
 });
 
-test('periods: one date before the index start, one month after; the range ends at 30/06/2023', () => {
-  assert.deepEqual(doeSpLegacyPeriod('2002-12-31', DOE_SP_LEGACY_END), { mode: 'BROWSE', from: '2002-12-31', to: '2002-12-31', next: '2003-01-01' });
-  assert.deepEqual(doeSpLegacyPeriod('2003-01-01', DOE_SP_LEGACY_END), { mode: 'SEARCH', from: '2003-01-01', to: '2003-01-31', next: '2003-02-01' });
-  assert.deepEqual(doeSpLegacyPeriod('2023-06-01', DOE_SP_LEGACY_END), { mode: 'SEARCH', from: '2023-06-01', to: '2023-06-30', next: null });
+test('periods: one browse date over the whole range; one search month from 2003 when the browse cursor reaches it; ends at 30/06/2023', () => {
+  const at = (cursor: string | null, searchCursor: string | null) => doeSpLegacyNextPeriod({ cursor, searchCursor, coverageTo: DOE_SP_LEGACY_END });
+  assert.deepEqual(at('2002-12-31', '2003-01-01'), { mode: 'BROWSE', from: '2002-12-31', to: '2002-12-31', next: '2003-01-01' });
+  assert.deepEqual(at('2003-01-01', '2003-01-01'), { mode: 'SEARCH', from: '2003-01-01', to: '2003-01-31', next: '2003-02-01' });
+  assert.deepEqual(at('2003-01-01', '2003-02-01'), { mode: 'BROWSE', from: '2003-01-01', to: '2003-01-01', next: '2003-01-02' });
+  assert.deepEqual(at('2023-06-30', null), { mode: 'BROWSE', from: '2023-06-30', to: '2023-06-30', next: null });
+  assert.deepEqual(at(null, '2023-06-01'), { mode: 'SEARCH', from: '2023-06-01', to: '2023-06-30', next: null });
+  assert.equal(at(null, null), null);
+  // The search starts at 2003 or at a later coverage start (inside its month).
+  assert.equal(doeSpLegacySearchStart('1988-01-01'), '2003-01-01');
+  assert.equal(doeSpLegacySearchStart('2010-05-17'), '2010-05-17');
+  assert.deepEqual(at('2010-05-17', '2010-05-17'), { mode: 'SEARCH', from: '2010-05-17', to: '2010-05-31', next: '2010-06-01' });
+  assert.deepEqual(DOE_SP_LEGACY_SEARCH_CADERNOS.map((c) => c.name), ['Executivo II', 'Executivo III']);
+  assert.equal(DOE_SP_LEGACY_STATE_VERSION, 2);
 });
 
 test('limits: politeness defaults and validation', () => {
@@ -292,7 +329,7 @@ test('browse (before 2003): lists the whole edition, reads every page, keeps onl
   assert.deepEqual(state.needsOcr.map((ref) => ref.link), [pages[2]!.link]);
   assert.equal(state.totals.pagesKept, 1);
   assert.equal(state.totals.pagesWithoutTaxTerms, 15);
-  assert.deepEqual(result.completion, { complete: false, reason: 'TIME_BUDGET_REACHED', pending: { pendingPages: 0, cursorDate: 19950907 } });
+  assert.deepEqual(result.completion, { complete: false, reason: 'TIME_BUDGET_REACHED', pending: { pendingPages: 0, cursorDate: 19950907, searchCursorDate: 20030101 } });
 
   // Page persisted as a normalized STATE publication, PDF as provenance only.
   const normalized = normalizePublication({ sourceId: SOURCE_ID, publication: kept });
@@ -308,37 +345,77 @@ test('browse: a day without Executivo I edition is listed as empty and the curso
   assert.equal(api.requests.length, 1);
 });
 
-test('search (from 2003): one query per term and caderno, hits merged by page, off-period hits and news pages ignored', async () => {
-  const icms = page('2015-03-04', 10, ['PORTARIA CAT 30 — ICMS substituição tributária']);
-  const ipva = page('2015-03-05', 11, ['Resolução SFP — IPVA 2015']);
-  const outside = page('2015-04-01', 12, ['ICMS']);
-  const news = page('2015-03-04', 1, ['Notícia sobre o ICMS'], { link: '/2015/executivo secao i/marco/04/pagnot_0001_N.pdf' });
-  const exII = { ...page('2015-03-06', 3, ['Crédito acumulado de ICMS']), caderno: 'Executivo II' };
+test('search (Executivo II and III, from 2003): one query per term and caderno, hits merged by page, off-period hits and news pages ignored', async () => {
+  const icms = exPage('Executivo II', '2015-03-04', 10, ['PORTARIA CAT 30 — ICMS substituição tributária']);
+  const ipva = exPage('Executivo II', '2015-03-05', 11, ['Resolução SFP — IPVA 2015']);
+  const outside = exPage('Executivo II', '2015-04-01', 12, ['ICMS']);
+  const news = { ...icms, pagina: '1', link: '/2015/executivo secao ii/marco/04/pagnot_0001_N.pdf' };
+  const exIII = exPage('Executivo III', '2015-03-06', 3, ['Crédito acumulado de ICMS']);
   const { api, instance } = connector({
     search: {
-      'ICMS|Executivo I': [icms, outside, news],
-      'IPVA|Executivo I': [ipva, icms],
-      'tributária|Executivo I': [icms],
-      'ICMS|Executivo II': [exII],
+      'ICMS|Executivo II': [icms, outside, news],
+      'IPVA|Executivo II': [ipva, icms],
+      'tributária|Executivo II': [icms],
+      'ICMS|Executivo III': [exIII],
     },
   }, stateAt('2015-03-01'));
   const result = await instance.collect(context());
 
-  assert.deepEqual(result.publications.map((p) => p.externalId).sort(), [icms.link, ipva.link, exII.link].sort());
+  assert.deepEqual(result.publications.map((p) => p.externalId).sort(), [icms.link, ipva.link, exIII.link].sort());
   assert.ok(result.publications.every((p) => p.metadata?.discovery === 'KEYWORD_SEARCH'));
   // Merged: the ICMS page returned by three terms is downloaded once; news and off-period never.
   assert.equal(api.requests.filter((r) => r.includes('GatewayPDF') && r.includes('pag_0010')).length, 1);
   assert.ok(!api.requests.some((r) => r.includes('GatewayPDF') && (r.includes('pagnot_') || r.includes('pag_0012'))));
+  // Executivo I is never sent to the index: it is browsed.
+  const listed = api.requests.filter((r) => r.includes('BuscaDO2001Resultado_11_3.aspx?'));
+  assert.equal(listed.length, DOE_SP_LEGACY_SEARCH_CADERNOS.length * DOE_SP_LEGACY_SEARCH_TERMS.length);
+  assert.ok(listed.every((r) => new URL('https://x' + r.slice(4)).searchParams.get('filtrocadernos') !== 'Executivo I'));
   const state = parseDoeSpLegacySourceState(result.checkpoint!.state);
-  assert.equal(state.cursor, '2015-04-01');
+  assert.equal(state.searchCursor, '2015-04-01');
+  assert.equal(state.cursor, '2015-03-01');
   assert.equal(state.totals.newsPagesSkipped, 1);
 });
 
-test('the last period of the archive closes it: cursor null and a complete run', async () => {
-  const { instance } = connector({ search: {} }, stateAt('2023-06-01'));
+test('browse (from 2003, DOE-SP-LEGACY-09): Executivo I is read whole, so a page the index would miss is kept', async () => {
+  const date = '2012-06-13';
+  const ipi = page(date, 302, ['Lei complementar — IPI']);
+  const other = page(date, 303, ['Nomeações']);
+  const oldCte = page('2005-03-02', 34, ['Cte. Geral da Polícia Militar']);
+  const { api, instance } = connector({
+    cadernos: { [date]: EX1, '2005-03-02': EX1 },
+    editions: { [`${date}|Executivo I`]: [ipi, other], '2005-03-02|Executivo I': [oldCte] },
+    search: {}, // the index answers nothing for this day
+  }, stateAt(date, '2012-07-01'));
+  const result = await instance.collect(context());
+  assert.deepEqual(result.publications.map((p) => p.externalId), [ipi.link]);
+  assert.equal(result.publications[0]!.metadata?.discovery, 'EDITION_BROWSE');
+  assert.ok(!api.requests.some((r) => /filtropalavraschave=(?!%20|\+|&|$)/.test(r)), 'no keyword query');
+  const state = parseDoeSpLegacySourceState(result.checkpoint!.state);
+  assert.equal(state.cursor, '2012-06-14');
+  assert.equal(state.searchCursor, '2012-07-01');
+
+  // P1 false positive: "Cte." on a 2005 page alone no longer keeps it.
+  const old = await connector({ cadernos: { '2005-03-02': EX1 }, editions: { '2005-03-02|Executivo I': [oldCte] } }, stateAt('2005-03-02', '2005-04-01')).instance.collect(context());
+  assert.deepEqual(old.publications, []);
+  assert.equal(parseDoeSpLegacySourceState(old.checkpoint!.state).totals.pagesWithoutTaxTerms, 1);
+});
+
+test('browse and search advance together: the search month runs when the browse cursor reaches it', async () => {
+  const { instance } = connector({ cadernos: {}, search: {} }, stateAt('2010-03-30', '2010-04-01'), { maxPeriodsPerRun: 4 });
+  const result = await instance.collect(context());
+  const periods = (result.metadata?.doeSpLegacy as { periods: Array<{ mode: string; from: string }> }).periods;
+  assert.deepEqual(periods.map((p) => `${p.mode} ${p.from}`), ['BROWSE 2010-03-30', 'BROWSE 2010-03-31', 'SEARCH 2010-04-01', 'BROWSE 2010-04-01']);
+  const state = parseDoeSpLegacySourceState(result.checkpoint!.state);
+  assert.deepEqual([state.cursor, state.searchCursor], ['2010-04-02', '2010-05-01']);
+  assert.deepEqual(result.completion?.pending, { pendingPages: 0, cursorDate: 20100402, searchCursorDate: 20100501 });
+});
+
+test('the last period of the archive closes it: both cursors null and a complete run', async () => {
+  const { instance } = connector({ search: {} }, stateAt('2023-06-30', '2023-06-01'), { maxPeriodsPerRun: 0 });
   const result = await instance.collect(context());
   const state = parseDoeSpLegacySourceState(result.checkpoint!.state);
   assert.equal(state.cursor, null);
+  assert.equal(state.searchCursor, null);
   assert.equal(result.completion, undefined);
   assert.equal(result.partialFailures, undefined);
   assert.equal(typeof state.lastSuccessAt, 'string');
@@ -398,11 +475,13 @@ test('byte budget: stops after the first page read and keeps the rest pending; t
   const state = parseDoeSpLegacySourceState(first.checkpoint!.state);
   assert.deepEqual(state.pending.map((p) => p.pagina), ['2', '3']);
 
-  const { api, instance } = connector(portal, state, { maxPeriodsPerRun: 0 });
+  const { api, instance } = connector(portal, state);
   const second = await instance.collect(context());
   assert.deepEqual(second.publications.map((p) => p.metadata?.pagina), ['2', '3']);
-  assert.equal(api.requests.filter((r) => r.includes('BuscaDO2001Resultado')).length > 0, true); // next period listed
-  assert.equal(api.requests.filter((r) => r.includes('GetCadernos') && r.includes('1999-03-03')).length, 0);
+  // The pending pages are read without listing 03/03 again; then the next date is listed.
+  assert.equal(api.requests.filter((r) => r.includes('GetCadernos')).length, 1);
+  assert.equal(api.requests.filter((r) => r.includes('BuscaDO2001Resultado')).length, 0);
+  assert.deepEqual((second.metadata?.doeSpLegacy as { periods: Array<{ from: string }> }).periods.map((p) => p.from), ['1999-03-04']);
 });
 
 test('state: invalid entries dropped; failed persistence reopens the page in retry', () => {
@@ -426,24 +505,24 @@ test('state: invalid entries dropped; failed persistence reopens the page in ret
 
 // ---------------------------------------------------------------- listing (B2/B3)
 
-/** 17 ICMS hits in Executivo I (two result screens). */
-function icmsMonth(): ReturnType<typeof page>[] {
-  return Array.from({ length: 17 }, (_, i) => page('2015-03-02', 20 + i, [`Portaria CAT ${i} — ICMS`]));
+/** 17 ICMS hits in Executivo II (two result screens). */
+function icmsMonth(): LegacyPage[] {
+  return Array.from({ length: 17 }, (_, i) => exPage('Executivo II', '2015-03-02', 20 + i, [`Portaria CAT ${i} — ICMS`]));
 }
 
 test('listing (B2): a malformed item on screen 2 blocks the period; the next run resumes on that screen and loses nothing', async () => {
   const hits = icmsMonth();
   let faulty = true;
   const portal: LegacyPortalOptions = {
-    search: { 'ICMS|Executivo I': hits },
-    screenFault: ({ keyword, caderno, screen }) => faulty && keyword === 'ICMS' && caderno === 'Executivo I' && screen === 2 ? 'MALFORMED_ONE' : undefined,
+    search: { 'ICMS|Executivo II': hits },
+    screenFault: ({ keyword, caderno, screen }) => faulty && keyword === 'ICMS' && caderno === 'Executivo II' && screen === 2 ? 'MALFORMED_ONE' : undefined,
   };
   const first = await connector(portal, stateAt('2015-03-01')).instance.collect(context());
   assert.deepEqual(first.publications, []);
   assert.equal(first.partialFailures?.[0]?.code, 'DOE_SP_LEGACY_MALFORMED_RESULT_ITEM');
   assert.equal(first.completion?.reason, 'PARTIAL_FAILURE_RETRY_REQUIRED');
   let state = parseDoeSpLegacySourceState(first.checkpoint!.state);
-  assert.equal(state.cursor, '2015-03-01');
+  assert.equal(state.searchCursor, '2015-03-01');
   assert.deepEqual({ query: state.listing?.query, screen: state.listing?.screen, found: state.listing?.found.length, attempts: state.listing?.attempts },
     { query: 0, screen: 2, found: 15, attempts: 1 });
 
@@ -456,7 +535,7 @@ test('listing (B2): a malformed item on screen 2 blocks the period; the next run
   assert.equal(second.partialFailures, undefined);
   assert.deepEqual(second.publications.map((p) => p.externalId).sort(), hits.map((h) => h.link).sort());
   state = parseDoeSpLegacySourceState(second.checkpoint!.state);
-  assert.equal(state.cursor, '2015-04-01');
+  assert.equal(state.searchCursor, '2015-04-01');
   assert.equal(state.listing, null);
 });
 
@@ -482,12 +561,12 @@ test('listing (B2): an all-malformed or empty screen never advances the cursor; 
   const hits = icmsMonth();
   for (const fault of ['EMPTY', 'NEGATIVE'] as const) {
     const run = await connector({
-      search: { 'ICMS|Executivo I': hits },
+      search: { 'ICMS|Executivo II': hits },
       screenFault: ({ keyword, screen }) => keyword === 'ICMS' && screen === 2 ? fault : undefined,
     }, stateAt('2015-03-01')).instance.collect(context());
     const after = parseDoeSpLegacySourceState(run.checkpoint!.state);
     assert.equal(run.partialFailures?.[0]?.code, fault === 'EMPTY' ? 'DOE_SP_LEGACY_EMPTY_RESULT_SCREEN' : 'DOE_SP_LEGACY_RESULT_SCREEN_MISSING');
-    assert.equal(after.cursor, '2015-03-01');
+    assert.equal(after.searchCursor, '2015-03-01');
     assert.equal(after.listing?.screen, 2);
     assert.deepEqual(after.pending, []);
   }
@@ -495,10 +574,10 @@ test('listing (B2): an all-malformed or empty screen never advances the cursor; 
 
 test('listing (B3): the time budget stops a SEARCH month between queries; runs resume without listing any screen twice', async () => {
   const hits = icmsMonth();
-  const ipva = page('2015-03-20', 5, ['Resolução — IPVA']);
+  const ipva = exPage('Executivo III', '2015-03-20', 5, ['Resolução — IPVA']);
   let clock = 0;
   const portal: LegacyPortalOptions = {
-    search: { 'ICMS|Executivo I': hits, 'IPVA|Executivo III': [ipva] },
+    search: { 'ICMS|Executivo II': hits, 'IPVA|Executivo III': [ipva] },
     onRequest: () => { clock += 1_000; },
   };
   const queries = DOE_SP_LEGACY_SEARCH_CADERNOS.length * DOE_SP_LEGACY_SEARCH_TERMS.length;
@@ -506,7 +585,7 @@ test('listing (B3): the time budget stops a SEARCH month between queries; runs r
   const listed: string[] = [];
   const kept: string[] = [];
   let runs = 0;
-  while (state.cursor === '2015-03-01') {
+  while (state.searchCursor === '2015-03-01') {
     runs += 1;
     assert.ok(runs < 50, 'no progress');
     // Real executor budget: 100 s hard timeout, soft deadline after 60 s (60 requests at 1 req/s).
@@ -516,7 +595,7 @@ test('listing (B3): the time budget stops a SEARCH month between queries; runs r
     listed.push(...api.requests.filter((r) => r.includes('BuscaDO2001Resultado_11_3')));
     kept.push(...run.publications.map((p) => p.externalId!));
     state = parseDoeSpLegacySourceState(run.checkpoint!.state);
-    if (state.cursor === '2015-03-01') {
+    if (state.searchCursor === '2015-03-01') {
       assert.equal(run.completion?.reason, 'TIME_BUDGET_REACHED');
       assert.ok(state.listing && state.listing.query > 0 && state.listing.query < queries);
       assert.ok(api.requests.length <= 61);
@@ -564,6 +643,11 @@ test('state: a listing in progress round-trips; an invalid one is dropped', () =
   assert.equal(browse?.browseCaderno, null);
   assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing: { ...listing, from: 'x' } }).listing, null);
   assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', listing: { ...listing, screen: 0 } }).listing, null);
+  // searchCursor: kept, null = done, missing/invalid = start of the search for the coverage.
+  assert.equal(parseDoeSpLegacySourceState({ cursor: '2015-03-01', searchCursor: '2015-04-01' }).searchCursor, '2015-04-01');
+  assert.equal(parseDoeSpLegacySourceState({ cursor: null, searchCursor: null }).searchCursor, null);
+  assert.equal(parseDoeSpLegacySourceState({ cursor: '1990-01-01' }).searchCursor, '2003-01-01');
+  assert.equal(parseDoeSpLegacySourceState({ coverageFrom: '2010-05-17', cursor: '2010-05-17', searchCursor: 'x' }).searchCursor, '2010-05-17');
 });
 
 // ---------------------------------------------------------------- pilot

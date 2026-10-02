@@ -39,12 +39,17 @@ import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-le
  *   (only its SHA-256/size stay as provenance);
  * - the official link of the page is preserved (`officialUrl`).
  *
- * Discovery (measured on the source, DOE-SP-LEGACY-02/03):
- * - from 2003 on (SEARCH): the portal's keyword index, one query per tax term,
- *   per month and per Executivo caderno; results merged by page;
- * - before 2003 (BROWSE): the index does not answer, so each edition of
- *   Executivo I (Seção I, where normative acts are printed) is listed whole
- *   per date and every page is read and filtered locally.
+ * Discovery (measured on the source, DOE-SP-LEGACY-02/03/08):
+ * - Executivo I (Seção I, where normative acts are printed), the whole range
+ *   (BROWSE): each edition is listed whole per date and every page is read
+ *   and filtered locally. Before 2003 the keyword index does not answer; from
+ *   2003 on the dry pilot P1 found a kept page the index did not return
+ *   (missedBySearch = 1 in 118), so the owner chose to read every page there
+ *   too (DOE-SP-LEGACY-09);
+ * - Executivo II and III, from 2003 on (SEARCH): the portal's keyword index,
+ *   one query per tax term, per month and per caderno; results merged by page.
+ *   The two cursors advance together: the search month runs when the browse
+ *   cursor reaches it.
  * Every downloaded page is confirmed locally with the same tax vocabulary
  * that drives the queries before it becomes a publication.
  *
@@ -55,7 +60,8 @@ import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-le
  */
 
 export const DOE_SP_LEGACY_CONNECTOR_KEY = 'doe-sp-legacy';
-export const DOE_SP_LEGACY_STATE_VERSION = 1;
+/** 2: Executivo I browsed in the whole range + searchCursor (DOE-SP-LEGACY-09). */
+export const DOE_SP_LEGACY_STATE_VERSION = 2;
 
 export const DOE_SP_LEGACY_DEFAULT_START = '1988-01-01';
 /** Day before the current platform (doe-sp DOE_SP_PLATFORM_START). */
@@ -70,13 +76,12 @@ export const DOE_SP_LEGACY_MAX_PAGE_ATTEMPTS = 3;
 /** Failed attempts on the same result screen before the listing is reported as blocked (still retried). */
 export const DOE_SP_LEGACY_LISTING_BLOCKED_AFTER = 3;
 
-/** Executivo cadernos queried in SEARCH mode (the index filters by name + id). */
+/** Executivo cadernos queried in SEARCH mode (the index filters by name + id); Executivo I is browsed. */
 export const DOE_SP_LEGACY_SEARCH_CADERNOS: readonly DoeSpLegacyCaderno[] = [
-  { id: 'ex1', name: 'Executivo I' },
   { id: 'ex2', name: 'Executivo II' },
   { id: 'ex3', name: 'Executivo III' },
 ];
-/** Caderno listed whole in BROWSE mode. */
+/** Caderno listed whole in BROWSE mode (every date of the archive). */
 export const DOE_SP_LEGACY_BROWSE_CADERNO = 'Executivo I';
 
 const CADERNOS_AJAX = '/ajax/ImprensaOficial.PortalIO.DODigitalAjax,PortalIO.ashx?_method=GetCadernos&_session=no';
@@ -112,11 +117,14 @@ export interface DoeSpLegacyListing {
 export interface DoeSpLegacySourceState {
   coverageFrom: string;
   coverageTo: string;
-  /**
-   * Next period to list: a date (BROWSE, before the index start) or the first
-   * day of a month (SEARCH). null = the whole archive range was listed.
-   */
+  /** Next date to browse (Executivo I). null = every date was browsed. */
   cursor: string | null;
+  /**
+   * Start of the next month to search (Executivo II and III, from 2003): the
+   * first day of a month, or the coverage start inside its first month.
+   * null = every month was searched.
+   */
+  searchCursor: string | null;
   /** Period being listed; null when no listing is in progress. */
   listing: DoeSpLegacyListing | null;
   /** Listed pages still to be read (from the last listed period). */
@@ -135,11 +143,17 @@ export interface DoeSpLegacySourceState {
 
 export const MAX_NEEDS_OCR_KEPT = 5_000;
 
+/** First date searched for a coverage starting at `coverageFrom` (its month runs to the month end). */
+export function doeSpLegacySearchStart(coverageFrom: string): string {
+  return coverageFrom > DOE_SP_LEGACY_SEARCH_INDEX_START ? coverageFrom : DOE_SP_LEGACY_SEARCH_INDEX_START;
+}
+
 export function emptyDoeSpLegacyState(coverageFrom = DOE_SP_LEGACY_DEFAULT_START): DoeSpLegacySourceState {
   return {
     coverageFrom,
     coverageTo: DOE_SP_LEGACY_END,
     cursor: coverageFrom,
+    searchCursor: doeSpLegacySearchStart(coverageFrom),
     listing: null,
     pending: [],
     retry: [],
@@ -212,15 +226,24 @@ function monthStart(date: string): string {
   return date.slice(0, 8) + '01';
 }
 
-/** Period starting at `cursor`: one day (BROWSE) or the rest of its month (SEARCH). */
-export function doeSpLegacyPeriod(cursor: string, coverageTo: string): { mode: 'BROWSE' | 'SEARCH'; from: string; to: string; next: string | null } {
-  if (cursor < DOE_SP_LEGACY_SEARCH_INDEX_START) {
-    const next = addLegacyDays(cursor, 1);
-    return { mode: 'BROWSE', from: cursor, to: cursor, next: next > coverageTo ? null : next };
+export interface DoeSpLegacyPeriod { mode: 'BROWSE' | 'SEARCH'; from: string; to: string; next: string | null }
+
+/**
+ * Next period to list: the search month when the browse cursor has reached it
+ * (or browsing is over), otherwise the browse date. null = archive listed.
+ */
+export function doeSpLegacyNextPeriod(
+  state: Pick<DoeSpLegacySourceState, 'cursor' | 'searchCursor' | 'coverageTo'>,
+): DoeSpLegacyPeriod | null {
+  const { cursor, searchCursor, coverageTo } = state;
+  if (searchCursor !== null && (cursor === null || searchCursor <= cursor)) {
+    const end = monthEnd(searchCursor) < coverageTo ? monthEnd(searchCursor) : coverageTo;
+    const next = addLegacyDays(end, 1);
+    return { mode: 'SEARCH', from: searchCursor, to: end, next: next > coverageTo ? null : monthStart(next) };
   }
-  const end = monthEnd(cursor) < coverageTo ? monthEnd(cursor) : coverageTo;
-  const next = addLegacyDays(end, 1);
-  return { mode: 'SEARCH', from: cursor, to: end, next: next > coverageTo ? null : monthStart(next) };
+  if (cursor === null) return null;
+  const next = addLegacyDays(cursor, 1);
+  return { mode: 'BROWSE', from: cursor, to: cursor, next: next > coverageTo ? null : next };
 }
 
 export interface DoeSpLegacyQuery { caderno: DoeSpLegacyCaderno; keyword?: string }
@@ -231,8 +254,7 @@ export function doeSpLegacyListingQueries(listing: DoeSpLegacyListing): DoeSpLeg
   return DOE_SP_LEGACY_SEARCH_CADERNOS.flatMap((caderno) => DOE_SP_LEGACY_SEARCH_TERMS.map((keyword) => ({ caderno, keyword })));
 }
 
-function newListing(cursor: string, coverageTo: string): DoeSpLegacyListing {
-  const period = doeSpLegacyPeriod(cursor, coverageTo);
+function newListing(period: DoeSpLegacyPeriod): DoeSpLegacyListing {
   return { ...period, vocabularyVersion: DOE_SP_LEGACY_VOCABULARY_VERSION, query: 0, screen: 1, found: [], attempts: 0 };
 }
 
@@ -287,6 +309,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     if (start < state.coverageFrom) {
       state.coverageFrom = start;
       state.cursor = start;
+      state.searchCursor = doeSpLegacySearchStart(start);
       state.listing = null;
     }
 
@@ -335,7 +358,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
           state.needsOcr.push(stripPage(page));
           return 'DONE';
         }
-        const terms = doeSpLegacyTaxTerms(extracted.text);
+        const terms = doeSpLegacyTaxTerms(extracted.text, page.date);
         if (!terms.length) {
           counters.pagesWithoutTaxTerms += 1;
           state.totals.pagesWithoutTaxTerms += 1;
@@ -451,11 +474,11 @@ export class DoeSpLegacyConnector implements CollectionConnector {
       await drain(state.retry);
       await drain(state.pending);
       const maxPeriods = this.#options.maxPeriodsPerRun ?? 0;
-      while (!yieldReason && !ocrGate && !state.pending.length && (state.listing || state.cursor !== null)) {
+      while (!yieldReason && !ocrGate && !state.pending.length && (state.listing || state.cursor !== null || state.searchCursor !== null)) {
         if (shouldStop()) break;
         if (!state.listing) {
           if (maxPeriods > 0 && counters.periodsListed >= maxPeriods) { yieldReason = 'TIME_BUDGET_REACHED'; break; }
-          state.listing = newListing(state.cursor!, state.coverageTo);
+          state.listing = newListing(doeSpLegacyNextPeriod(state)!);
         }
         const listing = state.listing;
         let outcome: 'DONE' | 'YIELD';
@@ -478,7 +501,8 @@ export class DoeSpLegacyConnector implements CollectionConnector {
         const pages = listedPages(listing);
         counters.periodsListed += 1;
         periods.push({ mode: listing.mode, from: listing.from, to: listing.to, listed: pages.length });
-        state.cursor = listing.next;
+        if (listing.mode === 'SEARCH') state.searchCursor = listing.next;
+        else state.cursor = listing.next;
         state.listing = null;
         state.pending = pages;
         await drain(state.pending);
@@ -508,10 +532,11 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     }
 
     const pendingPages = state.pending.length + state.retry.length;
-    const archiveListed = state.cursor === null && state.listing === null;
+    const archiveListed = state.cursor === null && state.searchCursor === null && state.listing === null;
     const pending: Record<string, number> = {
       pendingPages,
       ...(state.cursor !== null ? { cursorDate: Number(state.cursor.replace(/-/g, '')) } : {}),
+      ...(state.searchCursor !== null ? { searchCursorDate: Number(state.searchCursor.replace(/-/g, '')) } : {}),
       ...(state.listing ? { listingQuery: state.listing.query, listingScreen: state.listing.screen } : {}),
     };
     // Abandoned pages are reported, not retried; everything else asks for a retry.
@@ -534,6 +559,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
         doeSpLegacy: {
           coverage: { from: state.coverageFrom, to: state.coverageTo },
           cursor: state.cursor,
+          searchCursor: state.searchCursor,
           archiveListed,
           periods,
           listing: state.listing

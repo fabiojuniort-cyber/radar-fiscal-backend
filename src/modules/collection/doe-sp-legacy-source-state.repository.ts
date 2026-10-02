@@ -7,6 +7,7 @@ import {
   DOE_SP_LEGACY_DEFAULT_START,
   DOE_SP_LEGACY_END,
   DOE_SP_LEGACY_STATE_VERSION,
+  doeSpLegacySearchStart,
   emptyDoeSpLegacyState,
   type DoeSpLegacyListing,
   type DoeSpLegacyPendingPage,
@@ -100,11 +101,15 @@ export function parseDoeSpLegacySourceState(raw: Record<string, unknown> | undef
   const cursor = raw.cursor === null
     ? null
     : text(raw.cursor) && isIsoDate(raw.cursor as string) ? raw.cursor as string : coverageFrom;
+  const searchCursor = raw.searchCursor === null
+    ? null
+    : text(raw.searchCursor) && isIsoDate(raw.searchCursor as string) ? raw.searchCursor as string : doeSpLegacySearchStart(coverageFrom);
   const totals = record(raw.totals);
   return {
     coverageFrom,
     coverageTo: DOE_SP_LEGACY_END,
     cursor,
+    searchCursor,
     listing: listing(raw.listing),
     pending: pendingPages(raw.pending),
     retry: pendingPages(raw.retry),

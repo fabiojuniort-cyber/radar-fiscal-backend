@@ -1,11 +1,11 @@
 # Fase DOE-SP (acervo legado): Diário Oficial de São Paulo, 1988 – 30/06/2023
 
-Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da revisão DOE-SP-LEGACY-04 em DOE-SP-LEGACY-05). Este conector é **separado** do `doe-sp`. O `doe-sp` cobre a plataforma atual (doe.sp.gov.br, a partir de 01/07/2023) e não é alterado aqui. A arquitetura é a do Motor de Coleta, sem componente novo. O acervo é **finito**: quando o backfill termina e é comprovado, a fonte é desativada.
+Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da revisão DOE-SP-LEGACY-04 em DOE-SP-LEGACY-05; piloto seco P1 em DOE-SP-LEGACY-08; ajustes pós-P1 em DOE-SP-LEGACY-09). Este conector é **separado** do `doe-sp`. O `doe-sp` cobre a plataforma atual (doe.sp.gov.br, a partir de 01/07/2023) e não é alterado aqui. A arquitetura é a do Motor de Coleta, sem componente novo. O acervo é **finito**: quando o backfill termina e é comprovado, a fonte é desativada.
 
 ## 1. Decisões do responsável (2026-09-29)
 
 1. **Escopo:** só as **páginas com termos fiscais**.
-2. **Sem guardar PDF:** a página é baixada em memória, convertida em texto e descartada. Em `publication_files` ficam só o SHA-256 e o tamanho, como proveniência (`versionRole: PROVENANCE`, `metadata.stored: false`).
+2. **Sem guardar PDF:** a página é baixada em memória, convertida em texto e descartada. Ficam só o SHA-256 e o tamanho, como proveniência, nos metadados da versão (`source_metadata.files`, com `versionRole: PROVENANCE` e `metadata.stored: false`). `publication_files`, onde ficaria um arquivo armazenado, fica vazio para o acervo (conferido por `storedFiles` na auditoria).
 3. **Link preservado:** `officialUrl` é o visualizador público da página no portal.
 4. **OCR autorizado** para páginas escaneadas.
 
@@ -33,10 +33,18 @@ As páginas `pagnot_*` (noticiário do governo no Executivo I, ~2004–2015) sã
 
 ## 3. Descoberta
 
-| Datas | Modo | Como |
-|---|---|---|
-| 1988-01-01 … 2002-12-31 | **BROWSE** (por data) | A busca por palavra não responde para essas edições (medido: negativa de 1988 a 2002). Para cada data: `GetCadernos`; se houver **Executivo I** (Seção I, onde saem os atos normativos), lista a edição inteira (`FE`, palavra vazia) e **lê todas as páginas** |
-| 2003-01-01 … 2023-06-30 | **SEARCH** (por mês) | Índice de palavra-chave do portal (`UP`): **uma consulta por termo** de `DOE_SP_LEGACY_SEARCH_TERMS` × caderno (Executivo I, II e III). O índice casa palavras, então os termos vão separados e os resultados são unidos por página. Uma consulta de várias palavras funciona como E, o que só amplia os resultados. Resultados fora do período pedido são descartados |
+| Caderno | Datas | Modo | Como |
+|---|---|---|---|
+| **Executivo I** (Seção I, onde saem os atos normativos) | 1988-01-01 … 2023-06-30 | **BROWSE** (por data) | Para cada data: `GetCadernos`; se houver Executivo I, lista a edição inteira (`FE`, palavra vazia) e **lê todas as páginas** |
+| **Executivo II e III** | 2003-01-01 … 2023-06-30 | **SEARCH** (por mês) | Índice de palavra-chave do portal (`UP`): **uma consulta por termo** de `DOE_SP_LEGACY_SEARCH_TERMS` × caderno. O índice casa palavras, então os termos vão separados e os resultados são unidos por página. Uma consulta de várias palavras funciona como E, o que só amplia os resultados. Resultados fora do período pedido são descartados |
+
+Por que o Executivo I é lido inteiro em todo o período:
+- antes de 2003 a busca por palavra não responde (medido: negativa de 1988 a 2002);
+- de 2003 em diante, o piloto seco P1 (DOE-SP-LEGACY-08) achou 1 página mantida pelo filtro que a busca do mesmo dia não devolveu, em 118 (13/06/2012, p. 302, termo `IPI`). O responsável decidiu ler o dia inteiro também nesse período (DOE-SP-LEGACY-09).
+
+Os cadernos II e III continuam pela busca, como antes: a cobertura deles não muda.
+
+Os dois cursores andam juntos. O mês de busca roda quando o cursor da navegação chega nele: em 2003-01-01 roda a busca de janeiro/2003 (II e III), depois os dias de janeiro (Executivo I), e assim por diante. Assim, "o acervo até a data X" fica completo nos três cadernos ao mesmo tempo.
 
 ### Vocabulário fiscal único (revisão DOE-SP-LEGACY-04, B1)
 
@@ -48,7 +56,7 @@ Um só vocabulário, `DOE_SP_LEGACY_TAX_VOCABULARY` (58 termos), define as consu
 Assim, **toda página mantida contém um termo que foi consultado**: a descoberta é um superconjunto do que se guarda. O teste `rules (B1)` exige amostras para cada família de `DOE_SP_TAX_TERMS` (o vocabulário do `doe-sp`) e verifica que cada uma é aceita localmente e alcançada por uma consulta. Se uma família nova entrar no `doe-sp`, o teste falha até o vocabulário do acervo cobri-la.
 
 O vocabulário cobre:
-- ICMS, ICM, IPVA, ITCMD/ITCD, IPI, IBS, CBS, RICMS, CONFAZ, DIFAL, Simples Nacional;
+- ICMS, ICM, IPVA, ITCMD/ITCD, IPI, IBS, CBS, RICMS, CONFAZ, DIFAL, Simples Nacional (IBS e CBS com data mínima, abaixo);
 - tributo/tributos/tributar/tributação/tributações/tributária(s)/tributário(s), imposto(s);
 - nota(s) fiscal(is), NF-e, NFC-e, CT-e, MDF-e, EFD, SPED, documento(s) fiscal(is), obrigação(ões) acessória(s);
 - benefício(s)/incentivo(s) fiscal(is), crédito(s) outorgado(s)/presumido(s)/acumulado(s), dívida ativa, cadastro de contribuintes, Receita Estadual;
@@ -58,9 +66,21 @@ O vocabulário cobre:
 
 Palavras ambíguas sozinhas **não** tornam a página fiscal: um "taxa" isolado ("taxa de inscrição") ou "Secretaria da Fazenda" (atos de pessoal). A página sem nenhum termo é contada em `pagesWithoutTaxTerms` e não vira publicação.
 
-O mesmo filtro vale para as páginas do BROWSE (antes de 2003).
+O mesmo filtro vale para as páginas do BROWSE.
 
-**A confirmar no piloto:** o comportamento do índice com acentos e hífens foi coberto consultando as duas grafias, mas não foi medido. O piloto deve comparar, em alguns dias de 2003+, a listagem da edição inteira (BROWSE) com a busca (SEARCH) e confirmar que toda página mantida pelo filtro foi achada pela busca.
+### Siglas com data mínima (DOE-SP-LEGACY-09)
+
+No P1, 19 das 158 páginas mantidas vieram só de uma sigla curta, e várias eram de antes de o tributo ou documento existir (por exemplo "Cte." em 1995, "CBS" em 1988). Por decisão do responsável, a sigla sozinha só conta a partir da data em que passa a nomear o tributo ou documento (`DOE_SP_LEGACY_TERM_SINCE`):
+
+| Sigla | Conta a partir de |
+|---|---|
+| `CT-e` / `CTe` | 2007-01-01 |
+| `IBS` | 2019-01-01 |
+| `CBS` | 2020-01-01 |
+
+Antes da data, a sigla é ignorada naquela página, mas qualquer outro termo continua mantendo a página. A data comparada é a da edição (`doeSpLegacyTaxTerms(texto, data)`). As demais siglas (IPI, ICMS etc.) não mudam. `DOE_SP_LEGACY_VOCABULARY_VERSION` passou a 3.
+
+**Medido no piloto P1:** o índice achou 117 das 118 páginas mantidas nos três dias comparados. Isso não afeta o Executivo I, que agora é lido inteiro. Nos cadernos II e III, que seguem pela busca, o risco medido é dessa ordem.
 
 ## 4. Modelo de publicação
 
@@ -82,13 +102,14 @@ A fila `needsOcr` guarda até 5.000 referências. Quando está cheia, a próxima
 
 ## 5. Checkpoint e retomada
 
-Estado (`collection_checkpoints`, `connector_key = doe-sp-legacy`, versão 1; nenhum estado existe em produção, a fonte nunca foi ativada):
-- `cursor`: próxima data (BROWSE) ou primeiro dia do mês (SEARCH); `null` = acervo todo listado;
+Estado (`collection_checkpoints`, `connector_key = doe-sp-legacy`, versão 2; nenhum estado existe em produção, a fonte nunca foi ativada; um checkpoint de outra versão é ignorado):
+- `cursor`: próxima data a navegar (Executivo I); `null` = todas as datas navegadas;
+- `searchCursor`: início do próximo mês a buscar (Executivo II e III, de 2003), normalmente o dia 1; `null` = todos os meses buscados;
 - `listing`: o período em listagem, retomável (revisão DOE-SP-LEGACY-04, B3):
   - `mode`, `from`, `to`, `next`;
   - `vocabularyVersion`;
   - no BROWSE, `browseCaderno` (o caderno encontrado pelo `GetCadernos`);
-  - `query`, o índice da consulta: no SEARCH, caderno × termo, 3 × 85 = 255 por mês; no BROWSE, uma;
+  - `query`, o índice da consulta: no SEARCH, caderno × termo, 2 × 85 = 170 por mês; no BROWSE, uma;
   - `screen`, a próxima tela, e `screens`, o total da consulta;
   - `found`, as páginas achadas até ali, unidas por link;
   - `attempts`;
@@ -98,9 +119,9 @@ Estado (`collection_checkpoints`, `connector_key = doe-sp-legacy`, versão 1; ne
 
 Ordem de cada run:
 1. lê `retry` e depois `pending`;
-2. só lista quando `pending` está vazio. Retoma o `listing` em curso ou abre o período do `cursor`;
+2. só lista quando `pending` está vazio. Retoma o `listing` em curso ou abre o próximo período: o mês do `searchCursor` quando o `cursor` já chegou nele (ou a navegação acabou), senão a data do `cursor`;
 3. o **time budget** (e o orçamento de bytes) é checado **antes de cada requisição** da listagem. Ao parar, a consulta e a tela ficam no checkpoint, e o próximo run segue dali sem repetir telas;
-4. quando todas as consultas do período foram listadas, as páginas achadas vão para `pending`, o `cursor` avança e o `listing` é apagado.
+4. quando todas as consultas do período foram listadas, as páginas achadas vão para `pending`, o cursor daquele modo (`cursor` ou `searchCursor`) avança e o `listing` é apagado.
 
 Se o vocabulário mudar no meio de um mês (`vocabularyVersion`), as consultas do mês recomeçam, mantendo as páginas já achadas.
 
@@ -113,7 +134,7 @@ Falhas:
   - tela 2+ respondendo "sem resultados" (`DOE_SP_LEGACY_RESULT_SCREEN_MISSING`);
   - página desconhecida (`DOE_SP_LEGACY_INVALID_RESULT_PAGE`).
 
-  O **período fica bloqueado** nessa tela: o `listing` é mantido, o `cursor` não avança e o run termina com `PARTIAL_FAILURE_RETRY_REQUIRED`. Cada run tenta a mesma tela de novo. A partir da 3ª falha seguida, o código passa a ser `DOE_SP_LEGACY_LISTING_BLOCKED` e pede correção do parser. Nenhuma página é perdida em silêncio.
+  O **período fica bloqueado** nessa tela: o `listing` é mantido, o cursor não avança e o run termina com `PARTIAL_FAILURE_RETRY_REQUIRED`. Cada run tenta a mesma tela de novo. A partir da 3ª falha seguida, o código passa a ser `DOE_SP_LEGACY_LISTING_BLOCKED` e pede correção do parser. Nenhuma página é perdida em silêncio.
 
 ## 6. Limites (educação com a fonte)
 
@@ -122,13 +143,15 @@ Falhas:
 | `DOE_SP_LEGACY_MIN_REQUEST_INTERVAL_MS` | 1000 | espaçamento mínimo entre requisições |
 | `DOE_SP_LEGACY_MAX_DOWNLOAD_BYTES_PER_RUN` | 200 MiB (0 = sem limite) | para de ler páginas novas no run. Checado só depois da primeira página, para que todo run avance |
 | `DOE_SP_LEGACY_START_DATE` | 1988-01-01 | primeira data do acervo coberta |
+| `DOE_SP_LEGACY_MAX_PERIODS_PER_RUN` | 0 (sem limite) | máximo de períodos listados por run (datas de navegação e meses de busca); usado no piloto |
 
 Além disso vale o time budget do executor, com parada segura entre páginas e entre telas da listagem.
 
-**Estimativa:**
-- BROWSE (1988–2002): ~15 anos × ~250 edições × ~40–70 páginas ≈ 150–250 mil páginas lidas em memória (~40 GB trafegados, nada armazenado).
-- SEARCH (2003–06/2023): ~246 meses × 85 consultas × 3 cadernos ≈ 63 mil consultas (~17 h a 1 req/s), mais as telas adicionais e as páginas encontradas.
-- A 1 requisição/s, ~6–8 dias de runs contínuos.
+**Estimativa** (páginas por edição medidas no P1: 40–64 até 2002; 184–348 de 2005 a 2021):
+- BROWSE 1988–2002: ~15 anos × ~250 edições × ~40–70 páginas ≈ 150–250 mil páginas, ~2–3 dias a 1 req/s.
+- BROWSE 2003–06/2023: ~20,5 anos × ~250 edições × ~250 páginas ≈ 1,3 milhão de páginas, ~15 dias a 1 req/s.
+- SEARCH II e III (2003–06/2023): ~246 meses × 85 consultas × 2 cadernos ≈ 42 mil consultas (~12 h), mais as telas adicionais e as páginas encontradas.
+- Total: ~3 semanas de runs contínuos, ~200–300 GB trafegados e nada de PDF armazenado. O ritmo real depende da frequência dos runs e do time budget de cada um.
 
 ### Dependência `pdfjs-dist` (6.3.289, fixada)
 
@@ -147,7 +170,7 @@ Além disso vale o time budget do executor, com parada segura entre páginas e e
   - `pendingPages`, `needsOcr`, `ocrGate`, `totals`;
   - `counters` (requisições, bytes, telas, páginas lidas, mantidas, sem termos, escaneadas, nativas);
   - `sourceLimits`.
-- **Fim:** com `cursor = null`, sem `listing` e sem pendências, o run fica completo e sem publicações. Depois da validação do backfill, a fonte é desativada. O conector e a fonte podem ser removidos em PR posterior.
+- **Fim:** com `cursor = null` e `searchCursor = null`, sem `listing` e sem pendências, o run fica completo e sem publicações. Depois da validação do backfill, a fonte é desativada. O conector e a fonte podem ser removidos em PR posterior.
 
 ## 8. Piloto (antes do backfill)
 
@@ -172,6 +195,7 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
   - amostra de `KEPT` e `NO_TAX_TERMS` conferida por uma pessoa (sem falso positivo grosseiro nem página fiscal descartada).
 
   Se `missedBySearch > 0`, os termos que faltam entram no vocabulário (o que aumenta `DOE_SP_LEGACY_VOCABULARY_VERSION`) antes do backfill.
+- **Resultado (DOE-SP-LEGACY-08, commit `aa960a1`):** 956 páginas, 158 `KEPT`, 790 `NO_TAX_TERMS`, 8 `NEWS`, 0 `NEEDS_OCR`, 0 `ERROR`; `missedBySearch = 1` (a página tinha o termo consultado `IPI`, então o vocabulário não resolvia). Decisões (DOE-SP-LEGACY-09): Executivo I lido inteiro em todo o período e siglas com data mínima (§3). O `--compare` continua disponível como diagnóstico do índice.
 - **Amostra sugerida:**
   - BROWSE: `1988-03-02`, `1995-09-06`, `1998-03-03`, `2002-03-05`, cobrindo as camadas OCR de 1988 e 1995 e o texto nativo;
   - COMPARE: `2005-03-02`, `2012-06-13`, `2021-08-11`.
@@ -181,12 +205,12 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
 ### P2 — piloto pelo Motor (grava no banco)
 
 1. `npm run db:ensure-doe-sp-legacy-source`: cria a fonte **inativa** (idempotente).
-2. No worker: `DOE_SP_LEGACY_MAX_PERIODS_PER_RUN=5`, para que um run liste no máximo 5 períodos (5 dias antes de 2003). `DOE_SP_LEGACY_START_DATE` fica no padrão `1988-01-01`, e o piloto cobre os primeiros dias do acervo, o caso mais difícil (OCR de 1988).
+2. No worker: `DOE_SP_LEGACY_MAX_PERIODS_PER_RUN=5`, para que um run liste no máximo 5 períodos (5 datas de navegação a partir de 1988). `DOE_SP_LEGACY_START_DATE` fica no padrão `1988-01-01`, e o piloto cobre os primeiros dias do acervo, o caso mais difícil (OCR de 1988).
 3. `npm run db:ensure-doe-sp-legacy-source -- --activate` (sem `--hourly`), depois `npm run db:trigger-doe-sp-legacy-run`: **um** run manual.
 4. `npm run db:ensure-doe-sp-legacy-source -- --deactivate`: a fonte volta a ficar inativa ao fim do run.
 5. Auditoria somente leitura: `ops/doe-sp-legacy/pilot_audit_readonly.sql`, com `PGOPTIONS='-c default_transaction_read_only=on'`. Mostra:
-   - fonte, runs (status, `completion`, contadores `doeSpLegacy`) e checkpoint (cursor, pendentes, OCR);
-   - páginas gravadas: por extração, tamanho do texto, `storedFiles = 0` (PDF não armazenado), link oficial presente;
+   - fonte, runs (status, `completion`, contadores `doeSpLegacy`) e checkpoint (`cursor`, `searchCursor`, pendentes, OCR);
+   - páginas gravadas: por extração, tamanho do texto, `storedFiles = 0` (linhas em `publication_files` de versões do acervo; o PDF não é armazenado), link oficial presente;
    - amostra pública (título, visualizador, termos) para conferência humana no site.
 6. **Critério:**
    - run `SUCCESS`, `PARTIAL_SUCCESS` ou `TIME_BUDGET_REACHED` com cursor avançando;

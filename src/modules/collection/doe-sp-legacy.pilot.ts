@@ -139,7 +139,7 @@ export async function runDoeSpLegacyPilot(options: DoeSpLegacyPilotOptions): Pro
       const text = await extract(pdf.bytes);
       const common = { extraction: text.extraction, scanned: text.scanned, textChars: text.text.length, pdfBytes: pdf.sizeBytes };
       if (!text.text) return { ...base, ...common, outcome: 'NEEDS_OCR' };
-      const terms = doeSpLegacyTaxTerms(text.text);
+      const terms = doeSpLegacyTaxTerms(text.text, page.date);
       return terms.length
         ? { ...base, ...common, outcome: 'KEPT', matchedTaxTerms: terms }
         : { ...base, ...common, outcome: 'NO_TAX_TERMS' };
