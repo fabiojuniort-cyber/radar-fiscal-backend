@@ -21,10 +21,11 @@ SELECT 'LEGACY_PILOT_RUN=' || jsonb_build_object(
 FROM collection_runs cr JOIN sources s ON s.id = cr.source_id
 WHERE s.code = 'doe-sp-legado' ORDER BY cr.created_at;
 
--- Current checkpoint (cursor, pending pages, listing in progress, OCR queue).
+-- Current checkpoint (browse/search cursors, pending pages, listing in progress, OCR queue).
 SELECT 'LEGACY_PILOT_CHECKPOINT=' || jsonb_build_object(
   'generation', cc.generation, 'version', cc.state_version,
   'cursor', cc.payload::jsonb->'cursor',
+  'searchCursor', cc.payload::jsonb->'searchCursor',
   'pending', jsonb_array_length(coalesce(cc.payload::jsonb->'pending', '[]')),
   'retry', jsonb_array_length(coalesce(cc.payload::jsonb->'retry', '[]')),
   'listing', cc.payload::jsonb->'listing' IS NOT NULL AND cc.payload::jsonb->'listing' <> 'null'::jsonb,
@@ -45,7 +46,10 @@ SELECT 'LEGACY_PILOT_PAGES=' || jsonb_build_object(
   'avgChars', round(avg(length(pv.content_text))),
   'minChars', min(length(pv.content_text)),
   -- Decision of 2026-09-29: the PDF is never stored (publication_files must stay empty).
-  'storedFiles', count(*) FILTER (WHERE EXISTS (SELECT 1 FROM publication_files pf WHERE pf.publication_version_id = pv.id)),
+  'storedFiles', (SELECT count(*) FROM publication_files pf
+      JOIN publication_versions pvf ON pvf.id = pf.publication_version_id
+      WHERE EXISTS (SELECT 1 FROM publication_origins pof JOIN sources sf ON sf.id = pof.source_id
+        WHERE pof.publication_id = pvf.publication_id AND sf.code = 'doe-sp-legado')),
   'withoutOfficialUrl', count(*) FILTER (WHERE p.primary_official_url IS NULL))::text
 FROM publications p
 JOIN publication_origins po ON po.publication_id = p.id

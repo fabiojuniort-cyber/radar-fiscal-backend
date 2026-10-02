@@ -7,6 +7,7 @@ import {
   DOE_SP_LEGACY_DEFAULT_START,
   DOE_SP_LEGACY_END,
   DOE_SP_LEGACY_STATE_VERSION,
+  doeSpLegacySearchStart,
   emptyDoeSpLegacyState,
   type DoeSpLegacyListing,
   type DoeSpLegacyPendingPage,
@@ -54,8 +55,7 @@ function pendingPages(value: unknown): DoeSpLegacyPendingPage[] {
   return out;
 }
 
-function caderno(value: unknown): { id: string; name: string } | null | undefined {
-  if (value === null) return null;
+function caderno(value: unknown): { id: string; name: string } | undefined {
   const row = record(value);
   const id = text(row?.id);
   const name = text(row?.name);
@@ -76,7 +76,13 @@ function listing(value: unknown): DoeSpLegacyListing | null {
   const screen = count(row.screen);
   if (!mode || !from || !isIsoDate(from) || !to || !isIsoDate(to) || to < from) return null;
   if (next === undefined || (next !== null && !isIsoDate(next)) || screen < 1) return null;
-  const browseCaderno = caderno(row.browseCaderno);
+  // Browsed cadernos of the date: an unreadable entry drops the listing (it is listed again).
+  let browseCadernos: Array<{ id: string; name: string }> | undefined;
+  if (Array.isArray(row.browseCadernos)) {
+    const parsed = row.browseCadernos.map(caderno);
+    if (parsed.some((entry) => !entry)) return null;
+    browseCadernos = parsed as Array<{ id: string; name: string }>;
+  }
   const screens = count(row.screens);
   return {
     mode,
@@ -84,7 +90,7 @@ function listing(value: unknown): DoeSpLegacyListing | null {
     to,
     next,
     vocabularyVersion: count(row.vocabularyVersion),
-    ...(browseCaderno !== undefined ? { browseCaderno } : {}),
+    ...(browseCadernos !== undefined ? { browseCadernos } : {}),
     query: count(row.query),
     screen,
     ...(screens ? { screens } : {}),
@@ -100,11 +106,15 @@ export function parseDoeSpLegacySourceState(raw: Record<string, unknown> | undef
   const cursor = raw.cursor === null
     ? null
     : text(raw.cursor) && isIsoDate(raw.cursor as string) ? raw.cursor as string : coverageFrom;
+  const searchCursor = raw.searchCursor === null
+    ? null
+    : text(raw.searchCursor) && isIsoDate(raw.searchCursor as string) ? raw.searchCursor as string : doeSpLegacySearchStart(coverageFrom);
   const totals = record(raw.totals);
   return {
     coverageFrom,
     coverageTo: DOE_SP_LEGACY_END,
     cursor,
+    searchCursor,
     listing: listing(raw.listing),
     pending: pendingPages(raw.pending),
     retry: pendingPages(raw.retry),
