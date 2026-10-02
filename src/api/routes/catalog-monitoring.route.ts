@@ -39,6 +39,7 @@ const archiveQuerySchema = z.object({
     .optional(),
   jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
   source: z.string().trim().min(1).max(100).optional(),
+  actType: z.string().trim().min(1).max(200).optional(),
   ncm: z.preprocess(
     (value) =>
       typeof value === 'string'
@@ -75,7 +76,7 @@ const startOfTomorrowSql = sql<Date>`
 interface ArchivePlan {
   /** Joins the source feed as `f` when filtering by source (else empty). */
   feedJoin: RawBuilder<unknown>;
-  /** Visibility, source, UF and jurisdiction filters (no search). */
+  /** Visibility, source, UF, jurisdiction and act-type filters (no search). */
   filters: RawBuilder<boolean>;
   /** filters AND the per-row search condition, for the date-walk strategy. */
   where: RawBuilder<boolean>;
@@ -113,6 +114,12 @@ function buildArchivePlan(
     conditions.push(
       sql<boolean>`p.jurisdiction_level = ${input.jurisdiction}`,
     );
+  }
+  if (input.actType) {
+    // The Acervo deliberately filters on the exact official value collected
+    // in publications.act_type. Normalization belongs to a separate taxonomy
+    // decision and must not silently rewrite the legal reference here.
+    conditions.push(sql<boolean>`p.act_type = ${input.actType}`);
   }
   if (input.ncm) {
     // Same meaning as the NCM-03 filter: a catalog-matched mention on the
@@ -212,6 +219,7 @@ interface ArchiveRow {
 interface ArchiveFacets {
   ufs: string[];
   sources: Array<{ code: string; name: string }>;
+  actTypes: string[];
 }
 
 interface PublicStatsV2 {
@@ -449,9 +457,22 @@ export async function catalogMonitoringRoutes(
       ORDER BY 2
     `.execute(app.db);
 
+    // This is intentionally the collected value, not a normalized taxonomy.
+    // The aggregate is cached with the other facets, so a complete scan to
+    // discover the small set of official act types does not run per request.
+    const actTypes = await sql<{ act_type: string }>`
+      SELECT DISTINCT p.act_type
+      FROM publications p
+      WHERE NOT p.is_hidden
+        AND p.act_type IS NOT NULL
+        AND btrim(p.act_type) <> ''
+      ORDER BY p.act_type
+    `.execute(app.db);
+
     return {
       ufs: ufs.rows.map((row) => row.uf),
       sources: sources.rows,
+      actTypes: actTypes.rows.map((row) => row.act_type),
     };
   }
 
@@ -622,7 +643,13 @@ export async function catalogMonitoringRoutes(
       let totalItems: number;
       let totalIsCapped = false;
 
-      if (!input.q && !input.ncm && !input.uf && !input.jurisdiction) {
+      if (
+        !input.q &&
+        !input.ncm &&
+        !input.uf &&
+        !input.jurisdiction &&
+        !input.actType
+      ) {
         totalItems = sourceCode
           ? ((await sourceCountsCache.get('counts', loadSourceCounts)).get(
               sourceCode,
@@ -639,6 +666,7 @@ export async function catalogMonitoringRoutes(
                 input.uf ?? null,
                 input.jurisdiction ?? null,
                 sourceCode,
+                input.actType ?? null,
               ]),
               () => cappedArchiveCount(plan),
             );
