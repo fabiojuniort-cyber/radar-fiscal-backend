@@ -74,7 +74,7 @@ const startOfTomorrowSql = sql<Date>`
 `;
 
 interface ArchivePlan {
-  /** Joins the source feed as `f` when filtering by source (else empty). */
+  /** Joins the source feed as `f` only when that is the best driving index. */
   feedJoin: RawBuilder<unknown>;
   /** Visibility, source, UF, jurisdiction and act-type filters (no search). */
   filters: RawBuilder<boolean>;
@@ -94,7 +94,23 @@ function buildArchivePlan(
   let feedJoin: RawBuilder<unknown>;
   let order: RawBuilder<unknown>;
 
-  if (sourceCode) {
+  if (sourceCode && input.actType) {
+    // When actType is present, drive the date walk from the dedicated
+    // act-type index and probe source membership by the feed primary key.
+    // This avoids scanning a very large source feed to find a selective type.
+    feedJoin = sql``;
+    conditions.push(sql<boolean>`NOT p.is_hidden`);
+    conditions.push(sql<boolean>`
+      EXISTS (
+        SELECT 1
+        FROM publication_source_feed sf
+        WHERE sf.source_code = ${sourceCode}
+          AND sf.publication_id = p.id
+          AND NOT sf.is_hidden
+      )
+    `);
+    order = sql`p.published_on DESC NULLS LAST, p.first_collected_at DESC, p.id`;
+  } else if (sourceCode) {
     // One feed row per (semantic source code, publication): no duplicates
     // even when sources.code has case variants; "confaz" needs no sources row.
     feedJoin = sql`JOIN publication_source_feed f ON f.publication_id = p.id`;
@@ -410,10 +426,9 @@ export async function catalogMonitoringRoutes(
   }
 
   async function loadFacets(): Promise<ArchiveFacets> {
-    // One indexed probe per UF / source instead of scanning publications.
-    // LATERAL ... LIMIT 1 keeps the planner from turning the probes into a
-    // semi-join over the whole table; char(2) matches publications.uf so
-    // ix_publications_scope_date applies.
+    // One indexed probe per UF / source / act type instead of scanning the
+    // growing publications table. The small act-type candidate catalog is
+    // maintained by migration 030 and stale candidates are filtered here.
     const ufs = await sql<{ uf: string }>`
       SELECT u.uf
       FROM unnest(${BRAZILIAN_UFS}::char(2)[]) AS u(uf)
@@ -457,16 +472,24 @@ export async function catalogMonitoringRoutes(
       ORDER BY 2
     `.execute(app.db);
 
-    // This is intentionally the collected value, not a normalized taxonomy.
-    // The aggregate is cached with the other facets, so a complete scan to
-    // discover the small set of official act types does not run per request.
+    // Exact collected values only. publication_act_type_catalog is tiny and
+    // each candidate is validated through ix_publications_act_type_visible_order,
+    // so the facet cost stays independent of the historical corpus size.
     const actTypes = await sql<{ act_type: string }>`
-      SELECT DISTINCT p.act_type
-      FROM publications p
-      WHERE NOT p.is_hidden
-        AND p.act_type IS NOT NULL
-        AND btrim(p.act_type) <> ''
-      ORDER BY p.act_type
+      SELECT c.act_type
+      FROM publication_act_type_catalog c
+      CROSS JOIN LATERAL (
+        SELECT 1
+        FROM publications p
+        WHERE p.act_type = c.act_type
+          AND NOT p.is_hidden
+        ORDER BY
+          p.published_on DESC NULLS LAST,
+          p.first_collected_at DESC,
+          p.id
+        LIMIT 1
+      ) hit
+      ORDER BY c.act_type
     `.execute(app.db);
 
     return {
