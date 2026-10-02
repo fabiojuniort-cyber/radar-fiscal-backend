@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "taxonomy-v1.1-retire-dimensions/v1",
+  "sourceVersion": "v1.0.0",
+  "targetVersion": "v1.1.0",
+  "retiredDimensionCodes": [
+    "operation_scope",
+    "operation_channel",
+    "event",
+    "impact_operational",
+    "impact_system"
+  ],
+  "requiredPreservedDimensionCodes": [
+    "theme",
+    "treatment",
+    "subject"
+  ],
+  "expected": {
+    "sourceDimensions": 20,
+    "sourceConcepts": 628,
+    "retainedDimensions": 15,
+    "retainedConcepts": 590,
+    "retiredDimensions": 5,
+    "retiredConcepts": 38
+  },
+  "historyPolicy": "v1.0.0 remains immutable and historically addressable; v1.1.0 is a new release snapshot.",
+  "copyPolicy": "Only release-scoped bindings, relation rules, relations, official mappings and their evidence whose referenced dimensions/concepts remain in v1.1.0 are copied."
+}
