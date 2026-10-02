@@ -26,30 +26,100 @@ const BRAZILIAN_UFS = [
   'SE', 'SP', 'TO',
 ];
 
-const archiveQuerySchema = z.object({
-  q: z.string().trim().min(2).max(200).optional(),
-  // title: act type, number, agency and title (default); full: also the
-  // full content.
-  scope: z.enum(['title', 'full']).default('title'),
-  uf: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z]{2}$/)
-    .transform((value) => value.toUpperCase())
-    .optional(),
-  jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
-  source: z.string().trim().min(1).max(100).optional(),
-  actType: z.string().trim().min(1).max(200).optional(),
-  ncm: z.preprocess(
-    (value) =>
-      typeof value === 'string'
-        ? value.replace(/\D/g, '')
-        : value,
-    z.string().regex(/^\d{8}$/).optional(),
-  ),
-  page: z.coerce.number().int().min(1).max(100000).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(25),
-});
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
+
+function saoPauloDateToday(): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SAO_PAULO_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  if (!year || !month || !day) {
+    throw new Error('Unable to derive Sao Paulo current date.');
+  }
+  return `${year}-${month}-${day}`;
+}
+
+const archiveDateSchema = z
+  .string()
+  .trim()
+  .refine(isCalendarDate, 'invalid_calendar_date');
+
+const archiveQuerySchema = z
+  .object({
+    q: z.string().trim().min(2).max(200).optional(),
+    // title: act type, number, agency and title (default); full: also the
+    // full content.
+    scope: z.enum(['title', 'full']).default('title'),
+    uf: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z]{2}$/)
+      .transform((value) => value.toUpperCase())
+      .optional(),
+    jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
+    source: z.string().trim().min(1).max(100).optional(),
+    actType: z.string().trim().min(1).max(200).optional(),
+    publishedOn: archiveDateSchema.optional(),
+    publishedFrom: archiveDateSchema.optional(),
+    publishedTo: archiveDateSchema.optional(),
+    ncm: z.preprocess(
+      (value) =>
+        typeof value === 'string'
+          ? value.replace(/\D/g, '')
+          : value,
+      z.string().regex(/^\d{8}$/).optional(),
+    ),
+    page: z.coerce.number().int().min(1).max(100000).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(25),
+  })
+  .superRefine((value, ctx) => {
+    if (value.publishedOn && (value.publishedFrom || value.publishedTo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'publishedOn_cannot_be_combined_with_range',
+        path: ['publishedOn'],
+      });
+    }
+
+    if (
+      value.publishedFrom &&
+      value.publishedTo &&
+      value.publishedFrom > value.publishedTo
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'publishedFrom_must_not_be_after_publishedTo',
+        path: ['publishedFrom'],
+      });
+    }
+
+    const today = saoPauloDateToday();
+    for (const [field, date] of [
+      ['publishedOn', value.publishedOn],
+      ['publishedFrom', value.publishedFrom],
+      ['publishedTo', value.publishedTo],
+    ] as const) {
+      if (date && date > today) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'future_publication_date_not_allowed',
+          path: [field],
+        });
+      }
+    }
+  });
 
 type ArchiveQuery = z.infer<typeof archiveQuerySchema>;
 
@@ -76,7 +146,7 @@ const startOfTomorrowSql = sql<Date>`
 interface ArchivePlan {
   /** Joins the source feed as `f` only when that is the best driving index. */
   feedJoin: RawBuilder<unknown>;
-  /** Visibility, source, UF, jurisdiction and act-type filters (no search). */
+  /** Visibility, source, UF, jurisdiction, act-type and date filters (no search). */
   filters: RawBuilder<boolean>;
   /** filters AND the per-row search condition, for the date-walk strategy. */
   where: RawBuilder<boolean>;
@@ -137,6 +207,30 @@ function buildArchivePlan(
     // decision and must not silently rewrite the legal reference here.
     conditions.push(sql<boolean>`p.act_type = ${input.actType}`);
   }
+
+  // source + actType deliberately avoids joining the feed, so publication
+  // dates must come from p in that path. Source-only can use the feed's
+  // indexed date directly. Both columns represent the same official date.
+  const publishedColumn = sourceCode && !input.actType
+    ? sql`f.published_on`
+    : sql`p.published_on`;
+  if (input.publishedOn) {
+    conditions.push(
+      sql<boolean>`${publishedColumn} = ${input.publishedOn}::date`,
+    );
+  } else {
+    if (input.publishedFrom) {
+      conditions.push(
+        sql<boolean>`${publishedColumn} >= ${input.publishedFrom}::date`,
+      );
+    }
+    if (input.publishedTo) {
+      conditions.push(
+        sql<boolean>`${publishedColumn} <= ${input.publishedTo}::date`,
+      );
+    }
+  }
+
   if (input.ncm) {
     // Same meaning as the NCM-03 filter: a catalog-matched mention on the
     // current version.
@@ -671,7 +765,10 @@ export async function catalogMonitoringRoutes(
         !input.ncm &&
         !input.uf &&
         !input.jurisdiction &&
-        !input.actType
+        !input.actType &&
+        !input.publishedOn &&
+        !input.publishedFrom &&
+        !input.publishedTo
       ) {
         totalItems = sourceCode
           ? ((await sourceCountsCache.get('counts', loadSourceCounts)).get(
@@ -690,6 +787,9 @@ export async function catalogMonitoringRoutes(
                 input.jurisdiction ?? null,
                 sourceCode,
                 input.actType ?? null,
+                input.publishedOn ?? null,
+                input.publishedFrom ?? null,
+                input.publishedTo ?? null,
               ]),
               () => cappedArchiveCount(plan),
             );
