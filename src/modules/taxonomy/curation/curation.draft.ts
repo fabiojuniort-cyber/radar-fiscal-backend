@@ -551,6 +551,40 @@ async function applyInitialCuration(
     view.dimensions.map((dimension) => [dimension.code, dimension]),
   );
 
+  // The PO calls the sector dimension "Segmento" (Segmento -> Grupo -> Produto).
+  const sector = dimensionByCode.get('sector')
+  if (sector && sector.name === 'Setor') {
+    const current = await client.query<{
+      governance_status: string;
+      constraints: Record<string, unknown>;
+    }>(
+      `SELECT dr.governance_status, dr.constraints
+       FROM taxonomy_release_dimensions rd
+       JOIN taxonomy_dimension_revisions dr ON dr.id = rd.dimension_revision_id
+       WHERE rd.release_id = $1::uuid AND rd.dimension_id = $2::uuid`,
+      [draftId, sector.id],
+    );
+    const revision = await client.query<{ id: string }>(
+      `INSERT INTO taxonomy_dimension_revisions (
+         dimension_id, revision_no, name, description, governance_status, constraints
+       )
+       SELECT $1::uuid, COALESCE(max(revision_no), 0) + 1, 'Segmento', $2, $3, $4::jsonb
+       FROM taxonomy_dimension_revisions WHERE dimension_id = $1::uuid
+       RETURNING id`,
+      [
+        sector.id,
+        sector.description,
+        current.rows[0]?.governance_status ?? 'PROPOSED',
+        JSON.stringify(current.rows[0]?.constraints ?? {}),
+      ],
+    );
+    await client.query(
+      `UPDATE taxonomy_release_dimensions SET dimension_revision_id = $3::uuid
+       WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
+      [draftId, sector.id, revision.rows[0]!.id],
+    );
+  }
+
   for (const [dimensionCode, seed] of Object.entries(DIMENSION_SEEDS)) {
     const dimension = dimensionByCode.get(dimensionCode);
     if (!dimension) continue;

@@ -197,6 +197,14 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
 
   try {
     assert.ok(app.curatorPool, 'curator pool must be configured');
+    // Start from the migration defaults regardless of earlier runs.
+    await admin.query(
+      `UPDATE taxonomy_runtime_settings
+       SET value = CASE key
+         WHEN 'classification_enabled' THEN 'false'::jsonb
+         ELSE '["doe-sp"]'::jsonb END,
+           updated_by = 'tax-11-test'`,
+    );
     await insertFixtureRelease(admin);
 
     const curator = await registerAndLogin(app, 'curator');
@@ -317,11 +325,14 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.equal(imported.json().groupsCreated, 1);
     assert.deepEqual(imported.json().errors, []);
 
+    const sectorDraft = draftView.dimensions.find((d: { code: string }) => d.code === 'sector');
+    assert.equal(sectorDraft.name, 'Segmento', 'initial curation renames Setor');
+
     const dimensionPatch = await app.inject({
       method: 'PATCH',
       url: '/api/v1/admin/taxonomy/drafts/current/dimensions/sector',
       headers: curator.headers,
-      payload: { justification: 'Renomear', name: 'Segmento', helpText: 'Onde a empresa atua.' },
+      payload: { justification: 'Ajuda', helpText: 'Onde a empresa atua.' },
     });
     assert.equal(dimensionPatch.statusCode, 204, dimensionPatch.body);
 
