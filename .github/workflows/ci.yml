@@ -130,6 +130,9 @@ jobs:
       - name: Archive NCM filter integration
         run: npx tsx --test test/archive-ncm-filter.integration.test.ts
 
+      - name: Archive act-type scale/filter integration
+        run: npx tsx --test test/archive-act-type-filter.integration.test.ts
+
       - name: Product/NCM API integration test
         shell: bash
         run: |
