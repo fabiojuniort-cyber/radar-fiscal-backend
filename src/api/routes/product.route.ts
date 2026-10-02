@@ -1779,17 +1779,12 @@ export async function productRoutes(
               'treatment',
               'regime',
               'operation',
-              'operation_scope',
               'operation_purpose',
-              'operation_channel',
               'document',
               'obligation',
               'sector',
               'product',
               'subject',
-              'event',
-              'impact_operational',
-              'impact_system',
             ];
 
             const dimensions = await trx
@@ -2003,12 +1998,17 @@ export async function productRoutes(
               const release = await trx
                 .selectFrom('taxonomy_releases')
                 .select(['id', 'version'])
-                .where('id', '=', taxonomy.releaseId)
-                .where('version', '=', taxonomy.releaseVersion)
                 .where('status', '=', 'PUBLISHED')
+                .orderBy('version_major', 'desc')
+                .orderBy('version_minor', 'desc')
+                .orderBy('version_patch', 'desc')
                 .executeTakeFirst();
 
-              if (!release) {
+              if (
+                !release ||
+                release.id !== taxonomy.releaseId ||
+                release.version !== taxonomy.releaseVersion
+              ) {
                 return 'INVALID_TAXONOMY_RELEASE' as const;
               }
 
