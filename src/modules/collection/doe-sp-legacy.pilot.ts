@@ -14,7 +14,7 @@ import {
   type DoeSpLegacyCaderno,
   type DoeSpLegacyPageRef,
 } from './doe-sp-legacy.parser.js';
-import { DOE_SP_LEGACY_SEARCH_TERMS, doeSpLegacyTaxTerms, isDoeSpLegacyNewsPage } from './doe-sp-legacy.rules.js';
+import { DOE_SP_LEGACY_SEARCH_TERMS, doeSpLegacyKeepsPage, doeSpLegacyTaxTerms, isDoeSpLegacyNewsPage } from './doe-sp-legacy.rules.js';
 import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-legacy.text.js';
 
 /*
@@ -157,9 +157,9 @@ export async function runDoeSpLegacyPilot(options: DoeSpLegacyPilotOptions): Pro
       const common = { extraction: text.extraction, scanned: text.scanned, textChars: text.text.length, pdfBytes: pdf.sizeBytes };
       if (!text.text) return { ...base, ...common, outcome: 'NEEDS_OCR' };
       const terms = doeSpLegacyTaxTerms(text.text, page.date);
-      return terms.length
-        ? { ...base, ...common, outcome: 'KEPT', matchedTaxTerms: terms }
-        : { ...base, ...common, outcome: 'NO_TAX_TERMS' };
+      if (doeSpLegacyKeepsPage(terms, text.scanned)) return { ...base, ...common, outcome: 'KEPT', matchedTaxTerms: terms };
+      // A scanned page with only weak OCR acronyms is not kept; the terms are reported for the audit.
+      return { ...base, ...common, outcome: 'NO_TAX_TERMS', ...(terms.length ? { matchedTaxTerms: terms } : {}) };
     } catch (error) {
       if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
       return { ...base, outcome: 'ERROR', error: errorText(error) };

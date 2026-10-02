@@ -29,7 +29,8 @@ const config = {
   archive: 'https://www.imprensaoficial.com.br/DO/',
   coverage: { from: '1988-01-01', to: '2023-06-30' },
   searchIndexFrom: '2003-01-01',
-  cadernos: { search: ['Executivo I', 'Executivo II', 'Executivo III'], browse: ['Executivo I'] },
+  // Descriptive only (the connector does not read it): DOE-SP-LEGACY-09/11.
+  cadernos: { browse: ['Executivo I', 'Executivo II'], search: ['Executivo III'] },
   scope: 'PAGES_WITH_TAX_TERMS',
   pdfStored: false,
   startEnv: 'DOE_SP_LEGACY_START_DATE',
