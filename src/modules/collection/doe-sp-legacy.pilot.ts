@@ -1,9 +1,6 @@
 import { ConnectorError } from './connector.error.js';
 import { DoeSpLegacyClient, type DoeSpLegacyClientOptions } from './doe-sp-legacy.client.js';
-import {
-  DOE_SP_LEGACY_BROWSE_CADERNO,
-  DOE_SP_LEGACY_SEARCH_INDEX_START,
-} from './doe-sp-legacy.connector.js';
+import { DOE_SP_LEGACY_SEARCH_INDEX_START } from './doe-sp-legacy.connector.js';
 import {
   DOE_SP_LEGACY_RESULTS_PER_SCREEN,
   brFromIso,
@@ -29,17 +26,27 @@ import { extractDoeSpLegacyPdfText, type DoeSpLegacyPageText } from './doe-sp-le
  *   page is read and classified (KEPT / NO_TAX_TERMS / NEEDS_OCR / NEWS /
  *   ERROR), with the public viewer link so a person can audit the decision;
  * - compare dates (2003 on): the same edition is classified AND the keyword
- *   index is queried for the day with every search term (Executivo I). Every
- *   page kept by the local filter must be among the search hits; the pages
- *   that are not are reported as `missedBySearch` (review DOE-SP-LEGACY-04:
- *   index behaviour with accents/hyphens must be measured before the backfill).
+ *   index is queried for the day with every search term, in the same caderno.
+ *   Every page kept by the local filter must be among the search hits; the
+ *   pages that are not are reported as `missedBySearch` (review
+ *   DOE-SP-LEGACY-04: index behaviour with accents/hyphens must be measured
+ *   before the backfill).
+ *
+ * Each date is run for every caderno asked (default Executivo I; Executivo II
+ * and III measured in DOE-SP-LEGACY-10 to decide whether they are browsed too).
  *
  * The report carries public data only (links, page numbers, matched terms,
  * sizes); no page text is printed.
  */
 
 const CADERNOS_AJAX = '/ajax/ImprensaOficial.PortalIO.DODigitalAjax,PortalIO.ashx?_method=GetCadernos&_session=no';
-const EXECUTIVO_I_SEARCH: DoeSpLegacyCaderno = { id: 'ex1', name: 'Executivo I' };
+
+/** Executivo cadernos the pilot can measure (id as used by the keyword index). */
+export const DOE_SP_LEGACY_PILOT_CADERNOS: readonly DoeSpLegacyCaderno[] = [
+  { id: 'ex1', name: 'Executivo I' },
+  { id: 'ex2', name: 'Executivo II' },
+  { id: 'ex3', name: 'Executivo III' },
+];
 
 export type DoeSpLegacyPilotOutcome = 'KEPT' | 'NO_TAX_TERMS' | 'NEEDS_OCR' | 'NEWS' | 'ERROR';
 
@@ -59,6 +66,7 @@ export interface DoeSpLegacyPilotPage {
 
 export interface DoeSpLegacyPilotDay {
   date: string;
+  caderno: string;
   mode: 'BROWSE' | 'COMPARE';
   edition: boolean;
   pages: DoeSpLegacyPilotPage[];
@@ -77,6 +85,8 @@ export interface DoeSpLegacyPilotReport {
 export interface DoeSpLegacyPilotOptions {
   browseDates: string[];
   compareDates: string[];
+  /** Caderno ids (ex1/ex2/ex3) to measure on every date; default ex1. */
+  cadernos?: string[];
   fetch?: typeof fetch;
   client?: Omit<DoeSpLegacyClientOptions, 'fetch'>;
   signal?: AbortSignal;
@@ -104,6 +114,13 @@ export async function runDoeSpLegacyPilot(options: DoeSpLegacyPilotOptions): Pro
       throw new RangeError(`compare dates must be on or after ${DOE_SP_LEGACY_SEARCH_INDEX_START} (keyword index): ${date}`);
     }
   }
+  const cadernoIds = options.cadernos?.length ? options.cadernos : ['ex1'];
+  const cadernos = cadernoIds.map((id) => {
+    const caderno = DOE_SP_LEGACY_PILOT_CADERNOS.find((entry) => entry.id === id);
+    if (!caderno) throw new RangeError(`unknown caderno ${id} (use ${DOE_SP_LEGACY_PILOT_CADERNOS.map((c) => c.id).join(', ')})`);
+    return caderno;
+  });
+  if (new Set(cadernoIds).size !== cadernoIds.length) throw new RangeError('duplicate caderno');
   const signal = options.signal ?? new AbortController().signal;
   const client = new DoeSpLegacyClient({
     ...(options.fetch ? { fetch: options.fetch } : {}),
@@ -149,9 +166,9 @@ export async function runDoeSpLegacyPilot(options: DoeSpLegacyPilotOptions): Pro
     }
   };
 
-  const edition = async (date: string): Promise<{ edition: boolean; pages: DoeSpLegacyPilotPage[] }> => {
+  const edition = async (date: string, name: string): Promise<{ edition: boolean; pages: DoeSpLegacyPilotPage[] }> => {
     const raw = await client.postAjax(CADERNOS_AJAX, `strData=${brFromIso(date)}\r\nstrBuscaEsp=true`, signal);
-    const caderno = parseDoeSpLegacyCadernos(raw).find((entry) => entry.name === DOE_SP_LEGACY_BROWSE_CADERNO);
+    const caderno = parseDoeSpLegacyCadernos(raw).find((entry) => entry.name === name);
     if (!caderno) return { edition: false, pages: [] };
     const refs = (await listAll(doeSpLegacyResultUrl({ from: date, to: date, caderno })))
       .filter((ref) => ref.date === date)
@@ -167,15 +184,15 @@ export async function runDoeSpLegacyPilot(options: DoeSpLegacyPilotOptions): Pro
 
   const days: DoeSpLegacyPilotDay[] = [];
   for (const [mode, dates] of [['BROWSE', options.browseDates], ['COMPARE', options.compareDates]] as const) {
-    for (const date of dates) {
-      const listed = await edition(date);
+    for (const date of dates) for (const caderno of cadernos) {
+      const listed = await edition(date, caderno.name);
       const counts = emptyCounts();
       for (const page of listed.pages) counts[page.outcome] += 1;
-      const day: DoeSpLegacyPilotDay = { date, mode, edition: listed.edition, pages: listed.pages, counts };
+      const day: DoeSpLegacyPilotDay = { date, caderno: caderno.name, mode, edition: listed.edition, pages: listed.pages, counts };
       if (mode === 'COMPARE') {
         const hits = new Set<string>();
         for (const keyword of DOE_SP_LEGACY_SEARCH_TERMS) {
-          const refs = await listAll(doeSpLegacyResultUrl({ from: date, to: date, caderno: EXECUTIVO_I_SEARCH, keyword }));
+          const refs = await listAll(doeSpLegacyResultUrl({ from: date, to: date, caderno, keyword }));
           for (const ref of refs) if (ref.date === date) hits.add(ref.link);
         }
         const kept = listed.pages.filter((page) => page.outcome === 'KEPT');

@@ -188,7 +188,8 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
   - `ERROR`.
 
   Cada página sai numa linha `DOE_SP_LEGACY_PILOT_PAGE`, com o **link público do visualizador**, para a auditoria humana das páginas mantidas × descartadas. O texto da página nunca é impresso.
-- **`--compare`** (só 2003 em diante): faz a classificação acima e, além disso, consulta o índice do portal no mesmo dia com todas as `DOE_SP_LEGACY_SEARCH_TERMS` (Executivo I). Toda página mantida pelo filtro local precisa estar entre os resultados da busca; as que não estiverem saem em `missedBySearch`. É a medição pendente da revisão DOE-SP-LEGACY-04: como o índice trata acentos e hífens.
+- **`--cadernos=ex1,ex2,ex3`** (padrão `ex1`): cadernos medidos em cada data (Executivo I, II, III). Cada linha `DOE_SP_LEGACY_PILOT_DAY` traz o `caderno`.
+- **`--compare`** (só 2003 em diante): faz a classificação acima e, além disso, consulta o índice do portal no mesmo dia, no mesmo caderno, com todas as `DOE_SP_LEGACY_SEARCH_TERMS`. Toda página mantida pelo filtro local precisa estar entre os resultados da busca; as que não estiverem saem em `missedBySearch`. É a medição pendente da revisão DOE-SP-LEGACY-04: como o índice trata acentos e hífens.
 - **Critério para seguir:**
   - `missedBySearch = 0` em todos os dias de comparação;
   - `ERROR = 0`;
@@ -196,6 +197,7 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
 
   Se `missedBySearch > 0`, os termos que faltam entram no vocabulário (o que aumenta `DOE_SP_LEGACY_VOCABULARY_VERSION`) antes do backfill.
 - **Resultado (DOE-SP-LEGACY-08, commit `aa960a1`):** 956 páginas, 158 `KEPT`, 790 `NO_TAX_TERMS`, 8 `NEWS`, 0 `NEEDS_OCR`, 0 `ERROR`; `missedBySearch = 1` (a página tinha o termo consultado `IPI`, então o vocabulário não resolvia). Decisões (DOE-SP-LEGACY-09): Executivo I lido inteiro em todo o período e siglas com data mínima (§3). O `--compare` continua disponível como diagnóstico do índice.
+- **P1b (DOE-SP-LEGACY-10):** o mesmo piloto seco só do Executivo II e III (`--cadernos=ex2,ex3`), nas datas do P1 (navegação em 1995-09-06 e 2002-03-05; comparação em 2005-03-02, 2012-06-13 e 2021-08-11). Mede o tamanho desses cadernos e o `missedBySearch` neles, para decidir se também passam a ser lidos inteiros. O foco do responsável é "toda legislação tributária e as menções".
 - **Amostra sugerida:**
   - BROWSE: `1988-03-02`, `1995-09-06`, `1998-03-03`, `2002-03-05`, cobrindo as camadas OCR de 1988 e 1995 e o texto nativo;
   - COMPARE: `2005-03-02`, `2012-06-13`, `2021-08-11`.

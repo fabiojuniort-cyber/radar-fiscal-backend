@@ -704,6 +704,28 @@ test('pilot: classifies every page of a browse day and reports kept pages the ke
   assert.ok(!JSON.stringify(report).includes('contribuintes'));
 });
 
+test('pilot: --cadernos measures Executivo II/III (browse and compare in the same caderno); unknown ids are refused', async () => {
+  const date = '2012-06-13';
+  const exII = [exPage('Executivo II', date, 1, ['Nomeação de servidor']), exPage('Executivo II', date, 2, ['Dívida ativa — inscrição'])];
+  const exIII = [exPage('Executivo III', date, 1, ['Edital — ICMS'])];
+  const api = legacyPortal({
+    cadernos: { [date]: [...EX1, { id: 'ex3', name: 'Executivo III' }] },
+    editions: { [`${date}|Executivo II`]: exII, [`${date}|Executivo III`]: exIII, [`${date}|Executivo I`]: [page(date, 1, ['ICMS'])] },
+    search: { 'ICMS|Executivo III': exIII, 'ICMS|Executivo I': [page(date, 1, ['ICMS'])] },
+  });
+  const report = await runDoeSpLegacyPilot({ browseDates: [], compareDates: [date], cadernos: ['ex2', 'ex3'], fetch: api.fetch, client: { timeoutMs: 5_000 } });
+  assert.deepEqual(report.days.map((d) => [d.caderno, d.counts.KEPT, d.search?.missedBySearch.length]), [['Executivo II', 1, 1], ['Executivo III', 1, 0]]);
+  assert.equal(report.days[0]!.search?.missedBySearch[0], exII[1]!.link);
+  // Executivo I is not touched; every keyword query goes to the caderno being measured.
+  const pdfs = api.requests.filter((r) => r.includes('GatewayPDF'));
+  assert.equal(pdfs.length, 3);
+  assert.ok(!pdfs.some((r) => r.includes('caderno=Executivo%20I&')));
+  const queried = api.requests.filter((r) => r.includes('BuscaDO2001Resultado_11_3.aspx?')).map((r) => new URL('https://x' + r.slice(4)).searchParams.get('filtrocadernos'));
+  assert.deepEqual([...new Set(queried)].sort(), ['Executivo II', 'Executivo III']);
+  await assert.rejects(() => runDoeSpLegacyPilot({ browseDates: [date], compareDates: [], cadernos: ['ex4'] }), RangeError);
+  await assert.rejects(() => runDoeSpLegacyPilot({ browseDates: [date], compareDates: [], cadernos: ['ex2', 'ex2'] }), RangeError);
+});
+
 test('pilot: compare dates must be in the keyword-index era', async () => {
   await assert.rejects(() => runDoeSpLegacyPilot({ browseDates: [], compareDates: ['2001-05-05'] }), RangeError);
 });
