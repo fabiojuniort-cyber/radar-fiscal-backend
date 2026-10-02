@@ -52,6 +52,21 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
   try {
     await app.ready();
 
+    await admin.query(
+      `INSERT INTO sources (
+         code, name, jurisdiction_level, base_url, connector_key, is_active
+       ) VALUES (
+         'cat01-dou', 'CAT-01 DOU', 'FEDERAL',
+         'https://example.invalid/cat01-dou', 'cat01-dou', false
+       )
+       ON CONFLICT (code) DO NOTHING`,
+    );
+    const source = await admin.query<{ id: string }>(
+      `SELECT id FROM sources WHERE code = 'cat01-dou'`,
+    );
+    const sourceId = source.rows[0]?.id;
+    assert.ok(sourceId, 'test source must exist');
+
     const complementaryLaw = await publication(
       'Lei Complementar',
       `Lei Complementar ${marker}`,
@@ -63,6 +78,30 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
     await publication(
       'Aviso de Licitação',
       `Aviso de Licitação ${marker}`,
+    );
+
+    await admin.query(
+      `INSERT INTO publication_origins (
+         publication_id, source_id, external_id, official_url
+       ) VALUES ($1, $2, $3, $4)`,
+      [
+        complementaryLaw,
+        sourceId,
+        `cat01-${marker}`,
+        `https://example.invalid/cat01/${complementaryLaw}`,
+      ],
+    );
+
+    const catalog = await admin.query<{ act_type: string }>(
+      `SELECT act_type
+       FROM publication_act_type_catalog
+       WHERE act_type IN ('Lei Complementar', 'Decreto', 'Aviso de Licitação')
+       ORDER BY act_type`,
+    );
+    assert.deepEqual(
+      catalog.rows.map((row) => row.act_type),
+      ['Aviso de Licitação', 'Decreto', 'Lei Complementar'],
+      'insert trigger must register collected act types without normalizing them',
     );
 
     const register = await app.inject({
@@ -119,6 +158,20 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
     assert.deepEqual(body.items.map((item) => item.id), [complementaryLaw]);
     assert.equal(body.items[0]?.actType, 'Lei Complementar');
     assert.ok(!body.items.some((item) => item.id === decree));
+
+    const sourceAndType = await app.inject({
+      method: 'GET',
+      url:
+        '/api/v2/archive?limit=50&source=cat01-dou&actType=' +
+        encodeURIComponent('Lei Complementar'),
+      headers,
+    });
+    assert.equal(sourceAndType.statusCode, 200, sourceAndType.body);
+    assert.deepEqual(
+      sourceAndType.json<ArchiveBody>().items.map((item) => item.id),
+      [complementaryLaw],
+      'source + actType must preserve publication_source_feed semantics',
+    );
 
     const absent = await app.inject({
       method: 'GET',
