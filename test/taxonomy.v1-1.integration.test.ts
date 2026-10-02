@@ -117,11 +117,11 @@ async function insertFixtureSource(client: PoolClient): Promise<{
 
   const aliasRetained = await client.query<{ id: string }>(
     `INSERT INTO taxonomy_aliases (text, normalized_text, language)
-     VALUES ('TAX10 retained', 'tax10 retained', 'pt-BR') RETURNING id`,
+     VALUES ('TAX10 retained', taxonomy_normalize_text('TAX10 retained'), 'pt-BR') RETURNING id`,
   );
   const aliasRetired = await client.query<{ id: string }>(
     `INSERT INTO taxonomy_aliases (text, normalized_text, language)
-     VALUES ('TAX10 retired', 'tax10 retired', 'pt-BR') RETURNING id`,
+     VALUES ('TAX10 retired', taxonomy_normalize_text('TAX10 retired'), 'pt-BR') RETURNING id`,
   );
 
   const bindingRetained = await client.query<{ id: string }>(
