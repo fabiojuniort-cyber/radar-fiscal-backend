@@ -13,6 +13,7 @@ const provisionEnvSchema = z.object({
     ),
   DB_RUNTIME_PASSWORD: z.string().min(32),
   DB_WORKER_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DB_CURATOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
 });
 
 const parsed = provisionEnvSchema.safeParse(
@@ -36,11 +37,28 @@ const DB_WORKER_RUNTIME_PASSWORD =
   parsed.data.DB_WORKER_RUNTIME_PASSWORD ??
   DB_RUNTIME_PASSWORD;
 
+// TAX-11: optional dedicated login for taxonomy curation. Never shares the
+// app/worker passwords; skipped entirely when the secret is not configured.
+const DB_CURATOR_RUNTIME_PASSWORD =
+  parsed.data.DB_CURATOR_RUNTIME_PASSWORD;
+
+if (
+  DB_CURATOR_RUNTIME_PASSWORD &&
+  (DB_CURATOR_RUNTIME_PASSWORD === DB_RUNTIME_PASSWORD ||
+    DB_CURATOR_RUNTIME_PASSWORD === DB_WORKER_RUNTIME_PASSWORD)
+) {
+  console.error(
+    'DB_CURATOR_RUNTIME_PASSWORD must differ from the app and worker runtime passwords.',
+  );
+  process.exit(1);
+}
+
 async function setPassword(
   client: PoolClient,
   roleName:
     | 'radar_app_runtime'
-    | 'radar_worker_runtime',
+    | 'radar_worker_runtime'
+    | 'radar_taxonomy_curator_runtime',
   password: string,
 ): Promise<void> {
   const formatted = await client.query<{
@@ -171,6 +189,61 @@ async function run(): Promise<void> {
     await client.query(
       "ALTER ROLE radar_worker_runtime SET timezone = 'UTC'",
     );
+
+    if (DB_CURATOR_RUNTIME_PASSWORD) {
+      // NOINHERIT: the login holds no privilege until a transaction runs
+      // SET LOCAL ROLE radar_taxonomy_curator.
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_roles
+            WHERE rolname = 'radar_taxonomy_curator_runtime'
+          ) THEN
+            CREATE ROLE radar_taxonomy_curator_runtime
+              LOGIN
+              NOINHERIT
+              NOSUPERUSER
+              NOCREATEDB
+              NOCREATEROLE
+              NOREPLICATION
+              NOBYPASSRLS;
+          END IF;
+        END;
+        $$;
+      `);
+
+      await client.query(`
+        ALTER ROLE radar_taxonomy_curator_runtime
+          LOGIN
+          NOINHERIT
+          NOSUPERUSER
+          NOCREATEDB
+          NOCREATEROLE
+          NOREPLICATION
+          NOBYPASSRLS
+      `);
+
+      await setPassword(
+        client,
+        'radar_taxonomy_curator_runtime',
+        DB_CURATOR_RUNTIME_PASSWORD,
+      );
+
+      await client.query(
+        'GRANT radar_taxonomy_curator TO radar_taxonomy_curator_runtime',
+      );
+      await client.query(
+        'REVOKE radar_app FROM radar_taxonomy_curator_runtime',
+      );
+      await client.query(
+        'REVOKE radar_worker FROM radar_taxonomy_curator_runtime',
+      );
+      await client.query(
+        "ALTER ROLE radar_taxonomy_curator_runtime SET timezone = 'UTC'",
+      );
+    }
 
     await client.query('COMMIT');
 

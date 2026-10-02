@@ -1,0 +1,1926 @@
+import { createHash, randomUUID } from 'node:crypto';
+
+import type { Pool, PoolClient } from 'pg';
+
+import { canonicalJson } from '../baseline/baseline.canonical-json.js';
+import { normalizeAliasText } from '../baseline/baseline.parser.js';
+import {
+  GENERIC_LABEL_CODES,
+  OFFICIAL_CODE_TYPES,
+  isValidOfficialCode,
+  normalizeOfficialCode,
+  type OfficialCodeType,
+} from './curation.constants.js';
+import {
+  CURATED_RELEASE_KIND,
+  findLatestPublishedRelease,
+  findOpenDraft,
+  findRelease,
+  legacyDimensionDefaults,
+  loadReleaseView,
+  pgRunner,
+  type ConceptView,
+  type DimensionView,
+  type GroupView,
+  type ReleaseSummary,
+  type ReleaseView,
+} from './curation.read.js';
+import {
+  DIMENSION_SEEDS,
+  DOCUMENT_LABEL_FIXES,
+  OFFICIAL_CODE_SEEDS,
+  SEED_NOTE,
+} from './curation.seed.js';
+
+export class CurationError extends Error {
+  constructor(
+    readonly code: string,
+    readonly status = 400,
+    message?: string,
+  ) {
+    super(message ?? code);
+    this.name = 'CurationError';
+  }
+}
+
+export interface CuratorActor {
+  userId: string;
+  justification: string;
+}
+
+const CURATION_LOCK_KEY = 'tribusca.taxonomy.curation';
+
+export const ALIAS_TYPES = [
+  'EXACT_LEXICAL',
+  'ABBREVIATION',
+  'HISTORICAL_LABEL',
+  'SEARCH_RELATED',
+  'AMBIGUOUS',
+] as const;
+
+export type AliasType = (typeof ALIAS_TYPES)[number];
+
+const GOVERNANCE_STATUSES = [
+  'PROPOSED',
+  'UNDER_REVIEW',
+  'APPROVED',
+  'DEPRECATED',
+  'REJECTED',
+] as const;
+
+const EVIDENCE_STATUSES = [
+  'DOCUMENTED',
+  'NEEDS_EVIDENCE',
+  'NOT_ASSESSED',
+] as const;
+
+/**
+ * Runs `fn` in one transaction as radar_taxonomy_curator, serialized with
+ * every other curation write through a transaction-scoped advisory lock.
+ */
+export async function withCuratorTransaction<T>(
+  pool: Pool,
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [CURATION_LOCK_KEY],
+    );
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function assertJustification(actor: CuratorActor): void {
+  if (!actor.justification.trim()) {
+    throw new CurationError('JUSTIFICATION_REQUIRED');
+  }
+}
+
+async function writeAudit(
+  client: PoolClient,
+  actor: CuratorActor,
+  action: string,
+  entityId: string | null,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO audit_log (
+        tenant_id, actor_type, actor_id, action,
+        entity_type, entity_id, after_data, correlation_id
+      ) VALUES (
+        NULL, 'ADMIN', $1, $2,
+        'taxonomy_curation', $3::uuid, $4::jsonb, $5::uuid
+      )
+    `,
+    [
+      actor.userId,
+      action,
+      entityId,
+      JSON.stringify({ ...payload, justification: actor.justification }),
+      randomUUID(),
+    ],
+  );
+}
+
+export async function requireOpenDraft(
+  client: PoolClient,
+): Promise<ReleaseSummary> {
+  const draft = await findOpenDraft(pgRunner(client));
+  if (!draft) throw new CurationError('NO_OPEN_DRAFT', 409);
+  if (draft.status !== 'DRAFT') {
+    throw new CurationError('DRAFT_NOT_EDITABLE', 409);
+  }
+  return draft;
+}
+
+function slugify(value: string): string {
+  return normalizeAliasText(value)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+}
+
+function cleanText(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function normalizeCodes(
+  type: OfficialCodeType | null,
+  codes: readonly string[],
+): string[] {
+  const normalized = [
+    ...new Set(codes.map(normalizeOfficialCode).filter(Boolean)),
+  ];
+  const invalid = normalized.filter(
+    (code) => !isValidOfficialCode(type, code),
+  );
+  if (invalid.length > 0) {
+    throw new CurationError(
+      'INVALID_OFFICIAL_CODE',
+      400,
+      `Código(s) oficial(is) inválido(s) para ${type ?? 'texto livre'}: ${invalid.join(', ')}`,
+    );
+  }
+  return normalized;
+}
+
+// ---------------------------------------------------------------------------
+// Draft creation
+// ---------------------------------------------------------------------------
+
+async function nextVersion(
+  client: PoolClient,
+  source: ReleaseSummary,
+): Promise<[number, number, number]> {
+  const parts = /^v(\d+)\.(\d+)\.(\d+)$/.exec(source.version);
+  if (!parts) throw new CurationError('INVALID_SOURCE_VERSION', 500);
+  const major = Number(parts[1]);
+  let minor = Number(parts[2]) + 1;
+
+  for (;;) {
+    const taken = await client.query(
+      `SELECT 1 FROM taxonomy_releases
+       WHERE version_major = $1 AND version_minor = $2 AND version_patch = 0`,
+      [major, minor],
+    );
+    if (taken.rowCount === 0) return [major, minor, 0];
+    minor += 1;
+  }
+}
+
+async function copyReleaseGraph(
+  client: PoolClient,
+  sourceId: string,
+  targetId: string,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_dimensions (
+        release_id, dimension_id, dimension_revision_id, membership_status,
+        profile_visible, profile_order, help_text, detail_section,
+        detail_order, uses_groups, official_code_type
+      )
+      SELECT
+        $2::uuid, dimension_id, dimension_revision_id, membership_status,
+        profile_visible, profile_order, help_text, detail_section,
+        detail_order, uses_groups, official_code_type
+      FROM taxonomy_release_dimensions
+      WHERE release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_groups (
+        release_id, dimension_id, code, label, display_order,
+        help_text, detail_section, official_codes
+      )
+      SELECT
+        $2::uuid, dimension_id, code, label, display_order,
+        help_text, detail_section, official_codes
+      FROM taxonomy_release_groups
+      WHERE release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_concepts (
+        release_id, concept_id, concept_revision_id, membership_status,
+        release_notes, group_id, profile_visible, display_order,
+        help_text, classify_by_label, official_codes
+      )
+      SELECT
+        $2::uuid, rc.concept_id, rc.concept_revision_id, rc.membership_status,
+        rc.release_notes, tg.id, rc.profile_visible, rc.display_order,
+        rc.help_text, rc.classify_by_label, rc.official_codes
+      FROM taxonomy_release_concepts rc
+      LEFT JOIN taxonomy_release_groups sg ON sg.id = rc.group_id
+      LEFT JOIN taxonomy_release_groups tg
+        ON tg.release_id = $2::uuid
+       AND tg.dimension_id = sg.dimension_id
+       AND tg.code = sg.code
+      WHERE rc.release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_group_segments (
+        release_id, group_id, segment_release_concept_id
+      )
+      SELECT $2::uuid, tg.id, trc.id
+      FROM taxonomy_release_group_segments gs
+      JOIN taxonomy_release_groups sg ON sg.id = gs.group_id
+      JOIN taxonomy_release_groups tg
+        ON tg.release_id = $2::uuid
+       AND tg.dimension_id = sg.dimension_id
+       AND tg.code = sg.code
+      JOIN taxonomy_release_concepts src ON src.id = gs.segment_release_concept_id
+      JOIN taxonomy_release_concepts trc
+        ON trc.release_id = $2::uuid
+       AND trc.concept_id = src.concept_id
+      WHERE gs.release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_relation_rules (
+        release_id, relation_type_id, source_dimension_id,
+        target_dimension_id, allowed, requires_evidence,
+        acyclic_override, notes
+      )
+      SELECT
+        $2::uuid, relation_type_id, source_dimension_id,
+        target_dimension_id, allowed, requires_evidence,
+        acyclic_override, notes
+      FROM taxonomy_release_relation_rules
+      WHERE release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
+  const bindings = await client.query<{ id: string }>(
+    `
+      INSERT INTO taxonomy_release_alias_bindings (
+        release_id, alias_id, release_concept_id, alias_type,
+        decision_status, jurisdiction_level, uf, municipality_ibge_code,
+        context, valid_from, valid_to, temporal_basis, justification,
+        evidence_status
+      )
+      SELECT
+        $2::uuid, b.alias_id, trc.id, b.alias_type,
+        b.decision_status, b.jurisdiction_level, b.uf,
+        b.municipality_ibge_code, b.context, b.valid_from, b.valid_to,
+        b.temporal_basis, b.justification, b.evidence_status
+      FROM taxonomy_release_alias_bindings b
+      JOIN taxonomy_release_concepts src ON src.id = b.release_concept_id
+      JOIN taxonomy_release_concepts trc
+        ON trc.release_id = $2::uuid
+       AND trc.concept_id = src.concept_id
+      WHERE b.release_id = $1::uuid
+      RETURNING id
+    `,
+    [sourceId, targetId],
+  );
+
+  await client.query(
+    `
+      INSERT INTO taxonomy_concept_relations (
+        release_id, source_release_concept_id, target_release_concept_id,
+        relation_type_id, status, valid_from, valid_to, qualifiers,
+        justification, evidence_status
+      )
+      SELECT
+        $2::uuid, tsrc.id, ttgt.id, rel.relation_type_id, rel.status,
+        rel.valid_from, rel.valid_to, rel.qualifiers, rel.justification,
+        rel.evidence_status
+      FROM taxonomy_concept_relations rel
+      JOIN taxonomy_release_concepts ssrc ON ssrc.id = rel.source_release_concept_id
+      JOIN taxonomy_release_concepts stgt ON stgt.id = rel.target_release_concept_id
+      JOIN taxonomy_release_concepts tsrc
+        ON tsrc.release_id = $2::uuid AND tsrc.concept_id = ssrc.concept_id
+      JOIN taxonomy_release_concepts ttgt
+        ON ttgt.release_id = $2::uuid AND ttgt.concept_id = stgt.concept_id
+      WHERE rel.release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
+  // Evidence rows are append-only and keyed by binding/relation/mapping ids.
+  // R6 materialized none (see baseline limitations); refuse silently losing
+  // them if a future release ever carries evidence.
+  const evidence = await client.query<{ count: number }>(
+    `
+      SELECT (
+        (SELECT count(*) FROM taxonomy_alias_binding_evidence e
+           JOIN taxonomy_release_alias_bindings b ON b.id = e.alias_binding_id
+          WHERE b.release_id = $1::uuid)
+        + (SELECT count(*) FROM taxonomy_relation_evidence e
+           JOIN taxonomy_concept_relations r ON r.id = e.relation_id
+          WHERE r.release_id = $1::uuid)
+        + (SELECT count(*) FROM taxonomy_official_mappings m
+          WHERE m.release_id = $1::uuid)
+      )::int AS count
+    `,
+    [sourceId],
+  );
+  if ((evidence.rows[0]?.count ?? 0) > 0) {
+    throw new CurationError(
+      'SOURCE_EVIDENCE_COPY_NOT_SUPPORTED',
+      409,
+      'A versão de origem possui evidências/mapeamentos oficiais que esta cópia não sabe preservar.',
+    );
+  }
+
+  void bindings;
+}
+
+async function insertConceptRevision(
+  client: PoolClient,
+  releaseConceptId: string,
+  patch: Partial<{
+    label: string;
+    definition: string;
+    positiveExample: string | null;
+    negativeExample: string | null;
+    governanceStatus: string;
+    evidenceStatus: string;
+    notes: string | null;
+  }>,
+): Promise<boolean> {
+  const current = await client.query<{
+    concept_id: string;
+    revision_id: string;
+    label: string;
+    definition: string;
+    positive_example: string | null;
+    negative_example: string | null;
+    governance_status: string;
+    evidence_status: string;
+    notes: string | null;
+    source_metadata: Record<string, unknown>;
+  }>(
+    `
+      SELECT
+        rc.concept_id, cr.id AS revision_id, cr.label, cr.definition,
+        cr.positive_example, cr.negative_example, cr.governance_status,
+        cr.evidence_status, cr.notes, cr.source_metadata
+      FROM taxonomy_release_concepts rc
+      JOIN taxonomy_concept_revisions cr ON cr.id = rc.concept_revision_id
+      WHERE rc.id = $1::uuid
+    `,
+    [releaseConceptId],
+  );
+  const row = current.rows[0];
+  if (!row) throw new CurationError('CONCEPT_NOT_FOUND', 404);
+
+  const next = {
+    label: patch.label ?? row.label,
+    definition: patch.definition ?? row.definition,
+    positive_example:
+      patch.positiveExample !== undefined
+        ? patch.positiveExample
+        : row.positive_example,
+    negative_example:
+      patch.negativeExample !== undefined
+        ? patch.negativeExample
+        : row.negative_example,
+    governance_status: patch.governanceStatus ?? row.governance_status,
+    evidence_status: patch.evidenceStatus ?? row.evidence_status,
+    notes: patch.notes !== undefined ? patch.notes : row.notes,
+  };
+
+  const changed =
+    next.label !== row.label ||
+    next.definition !== row.definition ||
+    next.positive_example !== row.positive_example ||
+    next.negative_example !== row.negative_example ||
+    next.governance_status !== row.governance_status ||
+    next.evidence_status !== row.evidence_status ||
+    next.notes !== row.notes;
+  if (!changed) return false;
+
+  const inserted = await client.query<{ id: string }>(
+    `
+      INSERT INTO taxonomy_concept_revisions (
+        concept_id, revision_no, label, definition, positive_example,
+        negative_example, governance_status, evidence_status, notes,
+        source_metadata
+      )
+      SELECT
+        $1::uuid,
+        COALESCE(max(revision_no), 0) + 1,
+        $2, $3, $4, $5, $6, $7, $8,
+        $9::jsonb
+      FROM taxonomy_concept_revisions
+      WHERE concept_id = $1::uuid
+      RETURNING id
+    `,
+    [
+      row.concept_id,
+      next.label,
+      next.definition,
+      next.positive_example,
+      next.negative_example,
+      next.governance_status,
+      next.evidence_status,
+      next.notes,
+      JSON.stringify({
+        ...row.source_metadata,
+        curatedFromRevisionId: row.revision_id,
+        curatedBy: 'TAX-11',
+      }),
+    ],
+  );
+
+  await client.query(
+    `UPDATE taxonomy_release_concepts
+     SET concept_revision_id = $2::uuid
+     WHERE id = $1::uuid`,
+    [releaseConceptId, inserted.rows[0]!.id],
+  );
+  return true;
+}
+
+async function applyInitialCuration(
+  client: PoolClient,
+  draftId: string,
+): Promise<Record<string, number>> {
+  const view = await loadReleaseView(pgRunner(client), draftId, {
+    includeRetired: true,
+  });
+  if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
+
+  const counts = {
+    dimensionsConfigured: 0,
+    groupsCreated: 0,
+    conceptsGrouped: 0,
+    labelsFixed: 0,
+    codesSuggested: 0,
+    labelClassificationDisabled: 0,
+  };
+
+  for (const dimension of view.dimensions) {
+    const defaults = legacyDimensionDefaults(dimension.code);
+    await client.query(
+      `
+        UPDATE taxonomy_release_dimensions
+        SET profile_visible = $3,
+            profile_order = $4,
+            help_text = $5,
+            detail_section = $6,
+            detail_order = $7,
+            uses_groups = $8,
+            official_code_type = $9
+        WHERE release_id = $1::uuid AND dimension_id = $2::uuid
+      `,
+      [
+        draftId,
+        dimension.id,
+        defaults.profileVisible,
+        defaults.profileOrder,
+        defaults.helpText,
+        defaults.detailSection,
+        defaults.detailOrder,
+        defaults.usesGroups,
+        defaults.officialCodeType,
+      ],
+    );
+    counts.dimensionsConfigured += 1;
+  }
+
+  await client.query(
+    `
+      UPDATE taxonomy_release_concepts rc
+      SET profile_visible = true,
+          classify_by_label = NOT (c.code = ANY($2::text[]))
+      FROM taxonomy_concepts c
+      WHERE rc.release_id = $1::uuid
+        AND c.id = rc.concept_id
+    `,
+    [draftId, [...GENERIC_LABEL_CODES]],
+  );
+  counts.labelClassificationDisabled = view.concepts.filter((concept) =>
+    GENERIC_LABEL_CODES.has(concept.code),
+  ).length;
+
+  const conceptByCode = new Map(
+    view.concepts.map((concept) => [concept.code, concept]),
+  );
+  const dimensionByCode = new Map(
+    view.dimensions.map((dimension) => [dimension.code, dimension]),
+  );
+
+  for (const [dimensionCode, seed] of Object.entries(DIMENSION_SEEDS)) {
+    const dimension = dimensionByCode.get(dimensionCode);
+    if (!dimension) continue;
+
+    for (const [groupIndex, group] of seed.groups.entries()) {
+      const inserted = await client.query<{ id: string }>(
+        `
+          INSERT INTO taxonomy_release_groups (
+            release_id, dimension_id, code, label, display_order,
+            detail_section, official_codes
+          ) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::text[])
+          RETURNING id
+        `,
+        [
+          draftId,
+          dimension.id,
+          group.code,
+          group.label,
+          groupIndex + 1,
+          group.detailSection ?? null,
+          group.officialCodes ?? [],
+        ],
+      );
+      const groupId = inserted.rows[0]!.id;
+      counts.groupsCreated += 1;
+
+      for (const [memberIndex, member] of group.members.entries()) {
+        const concept = conceptByCode.get(`${dimensionCode}.${member}`);
+        if (!concept) continue;
+        await client.query(
+          `UPDATE taxonomy_release_concepts
+           SET group_id = $2::uuid, display_order = $3, release_notes = $4
+           WHERE id = $1::uuid`,
+          [concept.releaseConceptId, groupId, memberIndex + 1, SEED_NOTE],
+        );
+        counts.conceptsGrouped += 1;
+      }
+
+      for (const segment of group.segments ?? []) {
+        const sector = conceptByCode.get(`sector.${segment}`);
+        if (!sector) continue;
+        await client.query(
+          `INSERT INTO taxonomy_release_group_segments (
+             release_id, group_id, segment_release_concept_id
+           ) VALUES ($1::uuid, $2::uuid, $3::uuid)
+           ON CONFLICT DO NOTHING`,
+          [draftId, groupId, sector.releaseConceptId],
+        );
+      }
+    }
+  }
+
+  for (const [dimensionCode, codes] of Object.entries(OFFICIAL_CODE_SEEDS)) {
+    for (const [suffix, values] of Object.entries(codes)) {
+      const concept = conceptByCode.get(`${dimensionCode}.${suffix}`);
+      if (!concept) continue;
+      await client.query(
+        `UPDATE taxonomy_release_concepts
+         SET official_codes = $2::text[], release_notes = $3
+         WHERE id = $1::uuid`,
+        [concept.releaseConceptId, values, SEED_NOTE],
+      );
+      counts.codesSuggested += 1;
+    }
+  }
+
+  for (const [suffix, fix] of Object.entries(DOCUMENT_LABEL_FIXES)) {
+    const concept = conceptByCode.get(`document.${suffix}`);
+    if (!concept) continue;
+    const changed = await insertConceptRevision(
+      client,
+      concept.releaseConceptId,
+      { label: fix.label },
+    );
+    if (changed) counts.labelsFixed += 1;
+    await client.query(
+      `UPDATE taxonomy_release_concepts
+       SET official_codes = $2::text[], release_notes = $3
+       WHERE id = $1::uuid`,
+      [concept.releaseConceptId, fix.codes, SEED_NOTE],
+    );
+  }
+
+  return counts;
+}
+
+export interface CreateDraftResult {
+  draft: ReleaseSummary;
+  sourceVersion: string;
+  initialCuration: Record<string, number> | null;
+}
+
+export async function createDraft(
+  client: PoolClient,
+  actor: CuratorActor,
+): Promise<CreateDraftResult> {
+  assertJustification(actor);
+  const run = pgRunner(client);
+
+  if (await findOpenDraft(run)) {
+    throw new CurationError('DRAFT_ALREADY_OPEN', 409);
+  }
+
+  const source = await findLatestPublishedRelease(run);
+  if (!source) throw new CurationError('NO_PUBLISHED_RELEASE', 409);
+
+  const sourceView = await loadReleaseView(run, source.id);
+  const sourceConfigured =
+    sourceView?.dimensions.some((dimension) => dimension.configured) ?? false;
+
+  const [major, minor, patch] = await nextVersion(client, source);
+  const inserted = await client.query<{ id: string }>(
+    `
+      INSERT INTO taxonomy_releases (
+        version_major, version_minor, version_patch,
+        status, previous_release_id, manifest, change_notes,
+        created_by_actor
+      ) VALUES (
+        $1, $2, $3, 'DRAFT', $4::uuid, $5::jsonb, NULL, $6
+      ) RETURNING id
+    `,
+    [
+      major,
+      minor,
+      patch,
+      source.id,
+      JSON.stringify({
+        kind: CURATED_RELEASE_KIND,
+        sourceReleaseId: source.id,
+        sourceVersion: source.version,
+      }),
+      `curator:${actor.userId}`,
+    ],
+  );
+  const draftId = inserted.rows[0]!.id;
+
+  await copyReleaseGraph(client, source.id, draftId);
+  const initialCuration = sourceConfigured
+    ? null
+    : await applyInitialCuration(client, draftId);
+
+  const draft = await findRelease(run, draftId);
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_DRAFT_CREATED', draftId, {
+    sourceReleaseId: source.id,
+    sourceVersion: source.version,
+    targetVersion: draft?.version,
+    initialCuration,
+  });
+
+  return {
+    draft: draft!,
+    sourceVersion: source.version,
+    initialCuration,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dimensions
+// ---------------------------------------------------------------------------
+
+export interface DimensionPatch {
+  name?: string | undefined;
+  description?: string | null | undefined;
+  profileVisible?: boolean | undefined;
+  profileOrder?: number | undefined;
+  helpText?: string | null | undefined;
+  detailSection?: string | null | undefined;
+  detailOrder?: number | undefined;
+  usesGroups?: boolean | undefined;
+  officialCodeType?: OfficialCodeType | null | undefined;
+}
+
+async function requireDimension(
+  client: PoolClient,
+  draftId: string,
+  code: string,
+): Promise<{
+  dimension_id: string;
+  revision_id: string;
+  name: string;
+  description: string | null;
+  governance_status: string;
+  constraints: Record<string, unknown>;
+}> {
+  const result = await client.query(
+    `
+      SELECT
+        d.id AS dimension_id, dr.id AS revision_id, dr.name,
+        dr.description, dr.governance_status, dr.constraints
+      FROM taxonomy_release_dimensions rd
+      JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
+      JOIN taxonomy_dimension_revisions dr ON dr.id = rd.dimension_revision_id
+      WHERE rd.release_id = $1::uuid AND d.code = $2
+    `,
+    [draftId, code],
+  );
+  const row = result.rows[0];
+  if (!row) throw new CurationError('DIMENSION_NOT_FOUND', 404);
+  return row;
+}
+
+export async function updateDimension(
+  client: PoolClient,
+  actor: CuratorActor,
+  code: string,
+  patch: DimensionPatch,
+): Promise<void> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  const current = await requireDimension(client, draft.id, code);
+
+  const name = patch.name !== undefined ? patch.name.trim() : current.name;
+  if (!name) throw new CurationError('DIMENSION_NAME_REQUIRED');
+  const description =
+    patch.description !== undefined
+      ? cleanText(patch.description)
+      : current.description;
+
+  if (name !== current.name || description !== current.description) {
+    const revision = await client.query<{ id: string }>(
+      `
+        INSERT INTO taxonomy_dimension_revisions (
+          dimension_id, revision_no, name, description,
+          governance_status, constraints
+        )
+        SELECT $1::uuid, COALESCE(max(revision_no), 0) + 1, $2, $3, $4, $5::jsonb
+        FROM taxonomy_dimension_revisions
+        WHERE dimension_id = $1::uuid
+        RETURNING id
+      `,
+      [
+        current.dimension_id,
+        name,
+        description,
+        current.governance_status,
+        JSON.stringify(current.constraints ?? {}),
+      ],
+    );
+    await client.query(
+      `UPDATE taxonomy_release_dimensions
+       SET dimension_revision_id = $3::uuid
+       WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
+      [draft.id, current.dimension_id, revision.rows[0]!.id],
+    );
+  }
+
+  if (
+    patch.officialCodeType !== undefined &&
+    patch.officialCodeType !== null &&
+    !OFFICIAL_CODE_TYPES.includes(patch.officialCodeType)
+  ) {
+    throw new CurationError('INVALID_OFFICIAL_CODE_TYPE');
+  }
+
+  const sets: string[] = [];
+  const params: unknown[] = [draft.id, current.dimension_id];
+  const push = (column: string, value: unknown) => {
+    params.push(value);
+    sets.push(`${column} = $${params.length}`);
+  };
+  if (patch.profileVisible !== undefined) push('profile_visible', patch.profileVisible);
+  if (patch.profileOrder !== undefined) push('profile_order', patch.profileOrder);
+  if (patch.helpText !== undefined) push('help_text', cleanText(patch.helpText));
+  if (patch.detailSection !== undefined) push('detail_section', cleanText(patch.detailSection));
+  if (patch.detailOrder !== undefined) push('detail_order', patch.detailOrder);
+  if (patch.usesGroups !== undefined) push('uses_groups', patch.usesGroups);
+  if (patch.officialCodeType !== undefined) push('official_code_type', patch.officialCodeType);
+
+  if (sets.length > 0) {
+    await client.query(
+      `UPDATE taxonomy_release_dimensions SET ${sets.join(', ')}
+       WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
+      params,
+    );
+  }
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_DIMENSION_UPDATED', draft.id, {
+    dimension: code,
+    patch,
+  });
+}
+
+async function dimensionCodeType(
+  client: PoolClient,
+  draftId: string,
+  dimensionId: string,
+): Promise<OfficialCodeType | null> {
+  const result = await client.query<{ official_code_type: OfficialCodeType | null }>(
+    `SELECT official_code_type FROM taxonomy_release_dimensions
+     WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
+    [draftId, dimensionId],
+  );
+  return result.rows[0]?.official_code_type ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Groups
+// ---------------------------------------------------------------------------
+
+export interface GroupInput {
+  label?: string | undefined;
+  code?: string | undefined;
+  displayOrder?: number | undefined;
+  helpText?: string | null | undefined;
+  detailSection?: string | null | undefined;
+  officialCodes?: string[] | undefined;
+  segmentCodes?: string[] | undefined;
+}
+
+async function setGroupSegments(
+  client: PoolClient,
+  draftId: string,
+  groupId: string,
+  segmentCodes: readonly string[],
+): Promise<void> {
+  await client.query(
+    `DELETE FROM taxonomy_release_group_segments WHERE group_id = $1::uuid`,
+    [groupId],
+  );
+  if (segmentCodes.length === 0) return;
+
+  const found = await client.query<{ id: string; code: string }>(
+    `
+      SELECT rc.id, c.code
+      FROM taxonomy_release_concepts rc
+      JOIN taxonomy_concepts c ON c.id = rc.concept_id
+      JOIN taxonomy_dimensions d ON d.id = c.dimension_id
+      WHERE rc.release_id = $1::uuid
+        AND d.code = 'sector'
+        AND c.code = ANY($2::text[])
+    `,
+    [draftId, [...new Set(segmentCodes)]],
+  );
+  const missing = segmentCodes.filter(
+    (code) => !found.rows.some((row) => row.code === code),
+  );
+  if (missing.length > 0) {
+    throw new CurationError(
+      'UNKNOWN_SEGMENT',
+      400,
+      `Segmento(s) inexistente(s): ${missing.join(', ')}`,
+    );
+  }
+  for (const row of found.rows) {
+    await client.query(
+      `INSERT INTO taxonomy_release_group_segments (
+         release_id, group_id, segment_release_concept_id
+       ) VALUES ($1::uuid, $2::uuid, $3::uuid)`,
+      [draftId, groupId, row.id],
+    );
+  }
+}
+
+export async function createGroup(
+  client: PoolClient,
+  actor: CuratorActor,
+  dimensionCode: string,
+  input: GroupInput,
+): Promise<string> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  const dimension = await requireDimension(client, draft.id, dimensionCode);
+  const label = input.label?.trim();
+  if (!label) throw new CurationError('GROUP_LABEL_REQUIRED');
+  const code = input.code?.trim() || slugify(label);
+  if (!code) throw new CurationError('GROUP_CODE_REQUIRED');
+  const type = await dimensionCodeType(client, draft.id, dimension.dimension_id);
+
+  const order =
+    input.displayOrder ??
+    (
+      await client.query<{ next: number }>(
+        `SELECT COALESCE(max(display_order), 0) + 1 AS next
+         FROM taxonomy_release_groups
+         WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
+        [draft.id, dimension.dimension_id],
+      )
+    ).rows[0]!.next;
+
+  let groupId: string;
+  try {
+    const inserted = await client.query<{ id: string }>(
+      `
+        INSERT INTO taxonomy_release_groups (
+          release_id, dimension_id, code, label, display_order,
+          help_text, detail_section, official_codes
+        ) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8::text[])
+        RETURNING id
+      `,
+      [
+        draft.id,
+        dimension.dimension_id,
+        code,
+        label,
+        order,
+        cleanText(input.helpText),
+        cleanText(input.detailSection),
+        normalizeCodes(type, input.officialCodes ?? []),
+      ],
+    );
+    groupId = inserted.rows[0]!.id;
+  } catch (error) {
+    if ((error as { code?: string }).code === '23505') {
+      throw new CurationError('GROUP_ALREADY_EXISTS', 409);
+    }
+    throw error;
+  }
+
+  if (input.segmentCodes) {
+    await setGroupSegments(client, draft.id, groupId, input.segmentCodes);
+  }
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_GROUP_CREATED', draft.id, {
+    dimension: dimensionCode,
+    groupId,
+    input,
+  });
+  return groupId;
+}
+
+async function requireGroup(
+  client: PoolClient,
+  draftId: string,
+  groupId: string,
+): Promise<{ id: string; dimension_id: string }> {
+  const result = await client.query<{ id: string; dimension_id: string }>(
+    `SELECT id, dimension_id FROM taxonomy_release_groups
+     WHERE id = $1::uuid AND release_id = $2::uuid`,
+    [groupId, draftId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new CurationError('GROUP_NOT_FOUND', 404);
+  return row;
+}
+
+export async function updateGroup(
+  client: PoolClient,
+  actor: CuratorActor,
+  groupId: string,
+  input: GroupInput,
+): Promise<void> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  const group = await requireGroup(client, draft.id, groupId);
+  const type = await dimensionCodeType(client, draft.id, group.dimension_id);
+
+  const sets: string[] = [];
+  const params: unknown[] = [groupId];
+  const push = (column: string, value: unknown, cast = '') => {
+    params.push(value);
+    sets.push(`${column} = $${params.length}${cast}`);
+  };
+  if (input.label !== undefined) {
+    const label = input.label.trim();
+    if (!label) throw new CurationError('GROUP_LABEL_REQUIRED');
+    push('label', label);
+  }
+  if (input.displayOrder !== undefined) push('display_order', input.displayOrder);
+  if (input.helpText !== undefined) push('help_text', cleanText(input.helpText));
+  if (input.detailSection !== undefined) push('detail_section', cleanText(input.detailSection));
+  if (input.officialCodes !== undefined) {
+    push('official_codes', normalizeCodes(type, input.officialCodes), '::text[]');
+  }
+  if (sets.length > 0) {
+    await client.query(
+      `UPDATE taxonomy_release_groups SET ${sets.join(', ')} WHERE id = $1::uuid`,
+      params,
+    );
+  }
+  if (input.segmentCodes !== undefined) {
+    await setGroupSegments(client, draft.id, groupId, input.segmentCodes);
+  }
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_GROUP_UPDATED', draft.id, {
+    groupId,
+    input,
+  });
+}
+
+export async function deleteGroup(
+  client: PoolClient,
+  actor: CuratorActor,
+  groupId: string,
+): Promise<void> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  await requireGroup(client, draft.id, groupId);
+  await client.query(
+    `UPDATE taxonomy_release_concepts SET group_id = NULL
+     WHERE release_id = $1::uuid AND group_id = $2::uuid`,
+    [draft.id, groupId],
+  );
+  await client.query(
+    `DELETE FROM taxonomy_release_groups WHERE id = $1::uuid`,
+    [groupId],
+  );
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_GROUP_DELETED', draft.id, {
+    groupId,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Concepts (items)
+// ---------------------------------------------------------------------------
+
+export interface ConceptAliasInput {
+  text: string;
+  aliasType: AliasType;
+}
+
+export interface ConceptInput {
+  label?: string | undefined;
+  definition?: string | undefined;
+  positiveExample?: string | null | undefined;
+  negativeExample?: string | null | undefined;
+  governanceStatus?: string | undefined;
+  evidenceStatus?: string | undefined;
+  notes?: string | null | undefined;
+  groupId?: string | null | undefined;
+  profileVisible?: boolean | undefined;
+  displayOrder?: number | null | undefined;
+  helpText?: string | null | undefined;
+  classifyByLabel?: boolean | undefined;
+  officialCodes?: string[] | undefined;
+  aliases?: ConceptAliasInput[] | undefined;
+  membershipStatus?: 'INCLUDED' | 'RETIRED' | undefined;
+}
+
+async function requireDraftConcept(
+  client: PoolClient,
+  draftId: string,
+  code: string,
+): Promise<{ id: string; dimension_id: string; concept_id: string }> {
+  const result = await client.query<{
+    id: string;
+    dimension_id: string;
+    concept_id: string;
+  }>(
+    `
+      SELECT rc.id, c.dimension_id, c.id AS concept_id
+      FROM taxonomy_release_concepts rc
+      JOIN taxonomy_concepts c ON c.id = rc.concept_id
+      WHERE rc.release_id = $1::uuid AND c.code = $2
+    `,
+    [draftId, code],
+  );
+  const row = result.rows[0];
+  if (!row) throw new CurationError('CONCEPT_NOT_FOUND', 404);
+  return row;
+}
+
+async function setConceptAliases(
+  client: PoolClient,
+  draftId: string,
+  releaseConceptId: string,
+  aliases: readonly ConceptAliasInput[],
+): Promise<void> {
+  await client.query(
+    `DELETE FROM taxonomy_release_alias_bindings
+     WHERE release_id = $1::uuid AND release_concept_id = $2::uuid`,
+    [draftId, releaseConceptId],
+  );
+
+  const seen = new Set<string>();
+  for (const alias of aliases) {
+    const text = alias.text.trim();
+    if (!text) continue;
+    if (!ALIAS_TYPES.includes(alias.aliasType)) {
+      throw new CurationError('INVALID_ALIAS_TYPE');
+    }
+    const normalized = normalizeAliasText(text);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const aliasRow = await client.query<{ id: string }>(
+      `
+        WITH inserted AS (
+          INSERT INTO taxonomy_aliases (text, normalized_text, language)
+          VALUES ($1, $2, 'pt-BR')
+          ON CONFLICT (normalized_text, language) DO NOTHING
+          RETURNING id
+        )
+        SELECT id FROM inserted
+        UNION ALL
+        SELECT id FROM taxonomy_aliases
+        WHERE normalized_text = $2 AND language = 'pt-BR'
+        LIMIT 1
+      `,
+      [text, normalized],
+    );
+
+    await client.query(
+      `
+        INSERT INTO taxonomy_release_alias_bindings (
+          release_id, alias_id, release_concept_id, alias_type,
+          decision_status, justification, evidence_status
+        ) VALUES (
+          $1::uuid, $2::uuid, $3::uuid, $4, 'APPROVED',
+          'Curadoria TAX-11', 'NOT_ASSESSED'
+        )
+      `,
+      [draftId, aliasRow.rows[0]!.id, releaseConceptId, alias.aliasType],
+    );
+  }
+}
+
+async function applyConceptSettings(
+  client: PoolClient,
+  draftId: string,
+  releaseConceptId: string,
+  dimensionId: string,
+  input: ConceptInput,
+): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [releaseConceptId];
+  const push = (column: string, value: unknown, cast = '') => {
+    params.push(value);
+    sets.push(`${column} = $${params.length}${cast}`);
+  };
+
+  if (input.groupId !== undefined) {
+    if (input.groupId !== null) {
+      const group = await requireGroup(client, draftId, input.groupId);
+      if (group.dimension_id !== dimensionId) {
+        throw new CurationError('GROUP_DIMENSION_MISMATCH');
+      }
+    }
+    push('group_id', input.groupId, '::uuid');
+  }
+  if (input.profileVisible !== undefined) push('profile_visible', input.profileVisible);
+  if (input.displayOrder !== undefined) push('display_order', input.displayOrder);
+  if (input.helpText !== undefined) push('help_text', cleanText(input.helpText));
+  if (input.classifyByLabel !== undefined) push('classify_by_label', input.classifyByLabel);
+  if (input.officialCodes !== undefined) {
+    const type = await dimensionCodeType(client, draftId, dimensionId);
+    push('official_codes', normalizeCodes(type, input.officialCodes), '::text[]');
+  }
+  if (input.membershipStatus !== undefined) {
+    if (!['INCLUDED', 'RETIRED'].includes(input.membershipStatus)) {
+      throw new CurationError('INVALID_MEMBERSHIP_STATUS');
+    }
+    push('membership_status', input.membershipStatus);
+  }
+  if (sets.length > 0) {
+    await client.query(
+      `UPDATE taxonomy_release_concepts SET ${sets.join(', ')} WHERE id = $1::uuid`,
+      params,
+    );
+  }
+  if (input.aliases !== undefined) {
+    await setConceptAliases(client, draftId, releaseConceptId, input.aliases);
+  }
+}
+
+function validateSemanticInput(input: ConceptInput): void {
+  if (
+    input.governanceStatus !== undefined &&
+    !(GOVERNANCE_STATUSES as readonly string[]).includes(input.governanceStatus)
+  ) {
+    throw new CurationError('INVALID_GOVERNANCE_STATUS');
+  }
+  if (
+    input.evidenceStatus !== undefined &&
+    !(EVIDENCE_STATUSES as readonly string[]).includes(input.evidenceStatus)
+  ) {
+    throw new CurationError('INVALID_EVIDENCE_STATUS');
+  }
+  if (input.label !== undefined && !input.label.trim()) {
+    throw new CurationError('LABEL_REQUIRED');
+  }
+  if (input.definition !== undefined && !input.definition.trim()) {
+    throw new CurationError('DEFINITION_REQUIRED');
+  }
+}
+
+export async function createConcept(
+  client: PoolClient,
+  actor: CuratorActor,
+  dimensionCode: string,
+  input: ConceptInput & { code?: string | undefined },
+): Promise<string> {
+  assertJustification(actor);
+  validateSemanticInput(input);
+  const draft = await requireOpenDraft(client);
+  const dimension = await requireDimension(client, draft.id, dimensionCode);
+  const label = input.label?.trim();
+  if (!label) throw new CurationError('LABEL_REQUIRED');
+
+  const suffix = input.code?.trim()
+    ? input.code.trim().replace(new RegExp(`^${dimensionCode}\\.`), '')
+    : slugify(label);
+  const code = `${dimensionCode}.${suffix}`;
+  if (!/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/.test(code)) {
+    throw new CurationError('INVALID_CONCEPT_CODE');
+  }
+
+  const existing = await client.query<{
+    id: string;
+    dimension_id: string;
+    in_draft: boolean;
+  }>(
+    `
+      SELECT c.id, c.dimension_id,
+        EXISTS (
+          SELECT 1 FROM taxonomy_release_concepts rc
+          WHERE rc.release_id = $2::uuid AND rc.concept_id = c.id
+        ) AS in_draft
+      FROM taxonomy_concepts c
+      WHERE c.code = $1
+    `,
+    [code, draft.id],
+  );
+
+  let conceptId: string;
+  const found = existing.rows[0];
+  if (found) {
+    if (found.in_draft) throw new CurationError('CONCEPT_ALREADY_EXISTS', 409);
+    if (found.dimension_id !== dimension.dimension_id) {
+      throw new CurationError('CONCEPT_CODE_TAKEN', 409);
+    }
+    conceptId = found.id;
+  } else {
+    const inserted = await client.query<{ id: string }>(
+      `INSERT INTO taxonomy_concepts (code, dimension_id, identity_status)
+       VALUES ($1, $2::uuid, 'CURRENT') RETURNING id`,
+      [code, dimension.dimension_id],
+    );
+    conceptId = inserted.rows[0]!.id;
+  }
+
+  const revision = await client.query<{ id: string }>(
+    `
+      INSERT INTO taxonomy_concept_revisions (
+        concept_id, revision_no, label, definition, positive_example,
+        negative_example, governance_status, evidence_status, notes,
+        source_metadata
+      )
+      SELECT $1::uuid, COALESCE(max(revision_no), 0) + 1, $2, $3, $4, $5,
+             $6, $7, $8, '{"createdBy":"TAX-11 curation"}'::jsonb
+      FROM taxonomy_concept_revisions WHERE concept_id = $1::uuid
+      RETURNING id
+    `,
+    [
+      conceptId,
+      label,
+      input.definition?.trim() || label,
+      cleanText(input.positiveExample),
+      cleanText(input.negativeExample),
+      input.governanceStatus ?? 'PROPOSED',
+      input.evidenceStatus ?? 'NOT_ASSESSED',
+      cleanText(input.notes),
+    ],
+  );
+
+  const releaseConcept = await client.query<{ id: string }>(
+    `
+      INSERT INTO taxonomy_release_concepts (
+        release_id, concept_id, concept_revision_id, membership_status,
+        profile_visible, classify_by_label
+      ) VALUES ($1::uuid, $2::uuid, $3::uuid, 'INCLUDED', true, true)
+      RETURNING id
+    `,
+    [draft.id, conceptId, revision.rows[0]!.id],
+  );
+  const releaseConceptId = releaseConcept.rows[0]!.id;
+
+  await applyConceptSettings(client, draft.id, releaseConceptId, dimension.dimension_id, {
+    ...input,
+    membershipStatus: undefined,
+  });
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_CONCEPT_CREATED', draft.id, {
+    code,
+    input,
+  });
+  return code;
+}
+
+export async function updateConcept(
+  client: PoolClient,
+  actor: CuratorActor,
+  code: string,
+  input: ConceptInput,
+): Promise<void> {
+  assertJustification(actor);
+  validateSemanticInput(input);
+  const draft = await requireOpenDraft(client);
+  const concept = await requireDraftConcept(client, draft.id, code);
+
+  await insertConceptRevision(client, concept.id, {
+    ...(input.label !== undefined ? { label: input.label.trim() } : {}),
+    ...(input.definition !== undefined ? { definition: input.definition.trim() } : {}),
+    ...(input.positiveExample !== undefined ? { positiveExample: cleanText(input.positiveExample) } : {}),
+    ...(input.negativeExample !== undefined ? { negativeExample: cleanText(input.negativeExample) } : {}),
+    ...(input.governanceStatus !== undefined ? { governanceStatus: input.governanceStatus } : {}),
+    ...(input.evidenceStatus !== undefined ? { evidenceStatus: input.evidenceStatus } : {}),
+    ...(input.notes !== undefined ? { notes: cleanText(input.notes) } : {}),
+  });
+
+  await applyConceptSettings(client, draft.id, concept.id, concept.dimension_id, input);
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_CONCEPT_UPDATED', draft.id, {
+    code,
+    input,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Spreadsheet import (one row per item)
+// ---------------------------------------------------------------------------
+
+export interface ImportRow {
+  line: number;
+  group: string | null;
+  item: string;
+  officialCodes: string[];
+  synonyms: string[];
+  profileVisible: boolean | null;
+  displayOrder: number | null;
+  code: string | null;
+}
+
+export interface ImportReport {
+  created: number;
+  updated: number;
+  groupsCreated: number;
+  errors: Array<{ line: number; message: string }>;
+}
+
+export async function importDimensionRows(
+  client: PoolClient,
+  actor: CuratorActor,
+  dimensionCode: string,
+  rows: readonly ImportRow[],
+): Promise<ImportReport> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  const view = await loadReleaseView(pgRunner(client), draft.id, {
+    includeRetired: true,
+  });
+  if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
+  await requireDimension(client, draft.id, dimensionCode);
+
+  const report: ImportReport = { created: 0, updated: 0, groupsCreated: 0, errors: [] };
+  const concepts = view.concepts.filter((c) => c.dimensionCode === dimensionCode);
+  const byCode = new Map(concepts.map((c) => [c.code, c]));
+  const byLabel = new Map(concepts.map((c) => [normalizeAliasText(c.label), c]));
+  const groupIds = new Map(
+    view.groups
+      .filter((group) => group.dimensionCode === dimensionCode)
+      .map((group) => [normalizeAliasText(group.label), group.id]),
+  );
+
+  for (const row of rows) {
+    await client.query('SAVEPOINT import_row');
+    try {
+      let groupId: string | null = null;
+      if (row.group) {
+        const key = normalizeAliasText(row.group);
+        groupId = groupIds.get(key) ?? null;
+        if (!groupId) {
+          groupId = await createGroup(client, actor, dimensionCode, {
+            label: row.group,
+          });
+          groupIds.set(key, groupId);
+          report.groupsCreated += 1;
+        }
+      }
+
+      const input: ConceptInput = {
+        label: row.item,
+        groupId,
+        officialCodes: row.officialCodes,
+        aliases: row.synonyms.map((text) => ({
+          text,
+          aliasType: 'EXACT_LEXICAL' as const,
+        })),
+        ...(row.profileVisible !== null ? { profileVisible: row.profileVisible } : {}),
+        ...(row.displayOrder !== null ? { displayOrder: row.displayOrder } : {}),
+      };
+
+      const existing =
+        (row.code ? byCode.get(row.code) : undefined) ??
+        byLabel.get(normalizeAliasText(row.item));
+
+      if (existing) {
+        const keepAliases = existing.aliases.filter(
+          (alias) =>
+            alias.aliasType !== 'EXACT_LEXICAL' &&
+            !row.synonyms.some(
+              (text) => normalizeAliasText(text) === normalizeAliasText(alias.text),
+            ),
+        ) as ConceptAliasInput[];
+        await updateConcept(client, actor, existing.code, {
+          ...input,
+          aliases: [...keepAliases, ...(input.aliases ?? [])],
+          membershipStatus: 'INCLUDED',
+        });
+        report.updated += 1;
+      } else {
+        const code = await createConcept(client, actor, dimensionCode, input);
+        byLabel.set(normalizeAliasText(row.item), {
+          code,
+          aliases: [],
+        } as unknown as ConceptView);
+        report.created += 1;
+      }
+      await client.query('RELEASE SAVEPOINT import_row');
+    } catch (error) {
+      await client.query('ROLLBACK TO SAVEPOINT import_row');
+      report.errors.push({
+        line: row.line,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+      });
+    }
+  }
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_IMPORT', draft.id, {
+    dimension: dimensionCode,
+    rows: rows.length,
+    created: report.created,
+    updated: report.updated,
+    errors: report.errors.length,
+  });
+  return report;
+}
+
+// ---------------------------------------------------------------------------
+// Diff, validation and publication
+// ---------------------------------------------------------------------------
+
+export interface DraftDiff {
+  sourceVersion: string | null;
+  targetVersion: string;
+  addedConcepts: string[];
+  removedConcepts: string[];
+  changedConcepts: Array<{ code: string; fields: string[] }>;
+  changedDimensions: Array<{ code: string; fields: string[] }>;
+  addedGroups: string[];
+  removedGroups: string[];
+  changedGroups: Array<{ key: string; fields: string[] }>;
+}
+
+const CONCEPT_DIFF_FIELDS: Array<keyof ConceptView> = [
+  'label',
+  'definition',
+  'positiveExample',
+  'negativeExample',
+  'governanceStatus',
+  'evidenceStatus',
+  'notes',
+  'groupCode',
+  'profileVisible',
+  'displayOrder',
+  'helpText',
+  'classifyByLabel',
+  'officialCodes',
+  'aliases',
+];
+
+const DIMENSION_DIFF_FIELDS: Array<keyof DimensionView> = [
+  'name',
+  'description',
+  'profileVisible',
+  'profileOrder',
+  'helpText',
+  'detailSection',
+  'detailOrder',
+  'usesGroups',
+  'officialCodeType',
+];
+
+const GROUP_DIFF_FIELDS: Array<keyof GroupView> = [
+  'label',
+  'displayOrder',
+  'helpText',
+  'detailSection',
+  'officialCodes',
+  'segmentCodes',
+];
+
+function differs(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) !== JSON.stringify(right);
+}
+
+export function diffReleaseViews(
+  source: ReleaseView | null,
+  target: ReleaseView,
+): DraftDiff {
+  const sourceConcepts = new Map(
+    (source?.concepts ?? []).map((concept) => [concept.code, concept]),
+  );
+  const targetConcepts = new Map(
+    target.concepts
+      .filter((concept) => concept.membershipStatus === 'INCLUDED')
+      .map((concept) => [concept.code, concept]),
+  );
+
+  const diff: DraftDiff = {
+    sourceVersion: source?.release.version ?? null,
+    targetVersion: target.release.version,
+    addedConcepts: [],
+    removedConcepts: [],
+    changedConcepts: [],
+    changedDimensions: [],
+    addedGroups: [],
+    removedGroups: [],
+    changedGroups: [],
+  };
+
+  for (const [code, concept] of targetConcepts) {
+    const before = sourceConcepts.get(code);
+    if (!before) {
+      diff.addedConcepts.push(code);
+      continue;
+    }
+    const fields = CONCEPT_DIFF_FIELDS.filter((field) =>
+      differs(before[field], concept[field]),
+    );
+    if (fields.length > 0) diff.changedConcepts.push({ code, fields });
+  }
+  for (const code of sourceConcepts.keys()) {
+    if (!targetConcepts.has(code)) diff.removedConcepts.push(code);
+  }
+
+  const sourceDimensions = new Map(
+    (source?.dimensions ?? []).map((dimension) => [dimension.code, dimension]),
+  );
+  for (const dimension of target.dimensions) {
+    const before = sourceDimensions.get(dimension.code);
+    if (!before) continue;
+    const fields = DIMENSION_DIFF_FIELDS.filter((field) =>
+      differs(before[field], dimension[field]),
+    );
+    if (fields.length > 0) diff.changedDimensions.push({ code: dimension.code, fields });
+  }
+
+  const groupKey = (group: GroupView) => `${group.dimensionCode}/${group.code}`;
+  const sourceGroups = new Map((source?.groups ?? []).map((g) => [groupKey(g), g]));
+  const targetGroups = new Map(target.groups.map((g) => [groupKey(g), g]));
+  for (const [key, group] of targetGroups) {
+    const before = sourceGroups.get(key);
+    if (!before) {
+      diff.addedGroups.push(key);
+      continue;
+    }
+    const fields = GROUP_DIFF_FIELDS.filter((field) =>
+      differs(before[field], group[field]),
+    );
+    if (fields.length > 0) diff.changedGroups.push({ key, fields });
+  }
+  for (const key of sourceGroups.keys()) {
+    if (!targetGroups.has(key)) diff.removedGroups.push(key);
+  }
+
+  return diff;
+}
+
+export interface ValidationIssue {
+  severity: 'BLOCKER' | 'WARNING';
+  code: string;
+  message: string;
+  subject?: string;
+}
+
+export async function validateReleaseView(
+  client: PoolClient | null,
+  view: ReleaseView,
+): Promise<ValidationIssue[]> {
+  const issues: ValidationIssue[] = [];
+  const included = view.concepts.filter((c) => c.membershipStatus === 'INCLUDED');
+  const dimensionByCode = new Map(view.dimensions.map((d) => [d.code, d]));
+
+  for (const dimension of view.dimensions) {
+    const concepts = included.filter((c) => c.dimensionCode === dimension.code);
+    if (dimension.profileVisible && !concepts.some((c) => c.profileVisible)) {
+      issues.push({
+        severity: 'WARNING',
+        code: 'PROFILE_DIMENSION_EMPTY',
+        message: `"${dimension.name}" aparece no Perfil Tributário sem nenhum item disponível.`,
+        subject: dimension.code,
+      });
+    }
+
+    const labels = new Map<string, string[]>();
+    for (const concept of concepts) {
+      const key = normalizeAliasText(concept.label);
+      labels.set(key, [...(labels.get(key) ?? []), concept.code]);
+    }
+    for (const codes of labels.values()) {
+      if (codes.length > 1) {
+        issues.push({
+          severity: 'WARNING',
+          code: 'DUPLICATE_LABEL',
+          message: `Itens com o mesmo nome em "${dimension.name}": ${codes.join(', ')}.`,
+          subject: dimension.code,
+        });
+      }
+    }
+  }
+
+  for (const concept of included) {
+    const dimension = dimensionByCode.get(concept.dimensionCode);
+    const type = dimension?.officialCodeType ?? null;
+    const invalid = concept.officialCodes.filter((code) => !isValidOfficialCode(type, code));
+    if (invalid.length > 0) {
+      issues.push({
+        severity: 'BLOCKER',
+        code: 'INVALID_OFFICIAL_CODE',
+        message: `${concept.label}: código(s) inválido(s) ${invalid.join(', ')}.`,
+        subject: concept.code,
+      });
+    }
+    if (/;\s*(\d+|—|modelo)/i.test(concept.label)) {
+      issues.push({
+        severity: 'WARNING',
+        code: 'LABEL_WITH_MODEL',
+        message: `${concept.label}: o nome ainda contém o modelo; use o campo Código oficial.`,
+        subject: concept.code,
+      });
+    }
+  }
+
+  const usedGroups = new Set(included.map((c) => c.groupId).filter(Boolean));
+  for (const group of view.groups) {
+    if (!usedGroups.has(group.id)) {
+      issues.push({
+        severity: 'WARNING',
+        code: 'EMPTY_GROUP',
+        message: `Grupo "${group.label}" está vazio.`,
+        subject: `${group.dimensionCode}/${group.code}`,
+      });
+    }
+  }
+
+  if (client) {
+    const catalogTypes: Array<[OfficialCodeType, string]> = [
+      ['NCM', 'NCM'],
+      ['CNAE', 'CNAE'],
+      ['CCLASSTRIB', 'CCLASSTRIB'],
+    ];
+    for (const [type, catalogCode] of catalogTypes) {
+      const codes = [
+        ...new Set([
+          ...included
+            .filter((c) => dimensionByCode.get(c.dimensionCode)?.officialCodeType === type)
+            .flatMap((c) => c.officialCodes),
+          ...view.groups
+            .filter((g) => dimensionByCode.get(g.dimensionCode)?.officialCodeType === type)
+            .flatMap((g) => g.officialCodes),
+        ]),
+      ];
+      if (codes.length === 0) continue;
+      const known = await client.query<{ code: string }>(
+        `
+          SELECT DISTINCT x.code
+          FROM unnest($2::text[]) AS x(code)
+          WHERE EXISTS (
+            SELECT 1
+            FROM official_catalog_entries e
+            JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
+            JOIN official_catalogs oc ON oc.id = ed.catalog_id
+            WHERE oc.code = $1 AND ed.status = 'CURRENT'
+              AND regexp_replace(e.official_code, '[^0-9A-Za-z]', '', 'g') LIKE x.code || '%'
+          )
+        `,
+        [catalogCode, codes],
+      );
+      const catalogLoaded = await client.query(
+        `SELECT 1 FROM official_catalog_editions ed
+         JOIN official_catalogs oc ON oc.id = ed.catalog_id
+         WHERE oc.code = $1 AND ed.status = 'CURRENT' LIMIT 1`,
+        [catalogCode],
+      );
+      if (catalogLoaded.rowCount === 0) {
+        issues.push({
+          severity: 'WARNING',
+          code: 'CATALOG_NOT_LOADED',
+          message: `Tabela oficial ${type} não carregada; os códigos ${type} não foram conferidos.`,
+        });
+        continue;
+      }
+      const knownSet = new Set(known.rows.map((row) => row.code));
+      const unknown = codes.filter((code) => !knownSet.has(code));
+      if (unknown.length > 0) {
+        issues.push({
+          severity: 'WARNING',
+          code: 'OFFICIAL_CODE_NOT_IN_CATALOG',
+          message: `${type}: ${unknown.length} código(s) não encontrado(s) na edição vigente: ${unknown.slice(0, 20).join(', ')}${unknown.length > 20 ? '…' : ''}.`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+export interface PublishResult {
+  release: ReleaseSummary;
+  snapshotSha256: string;
+  diff: DraftDiff;
+}
+
+export function releaseSnapshot(view: ReleaseView): Record<string, unknown> {
+  return {
+    version: view.release.version,
+    dimensions: view.dimensions.map((d) => ({
+      code: d.code,
+      name: d.name,
+      description: d.description,
+      profileVisible: d.profileVisible,
+      profileOrder: d.profileOrder,
+      helpText: d.helpText,
+      detailSection: d.detailSection,
+      detailOrder: d.detailOrder,
+      usesGroups: d.usesGroups,
+      officialCodeType: d.officialCodeType,
+    })),
+    groups: view.groups.map((g) => ({
+      dimension: g.dimensionCode,
+      code: g.code,
+      label: g.label,
+      displayOrder: g.displayOrder,
+      helpText: g.helpText,
+      detailSection: g.detailSection,
+      officialCodes: g.officialCodes,
+      segments: g.segmentCodes,
+    })),
+    concepts: view.concepts
+      .filter((c) => c.membershipStatus === 'INCLUDED')
+      .map((c) => ({
+        code: c.code,
+        label: c.label,
+        definition: c.definition,
+        positiveExample: c.positiveExample,
+        negativeExample: c.negativeExample,
+        governanceStatus: c.governanceStatus,
+        evidenceStatus: c.evidenceStatus,
+        group: c.groupCode,
+        profileVisible: c.profileVisible,
+        displayOrder: c.displayOrder,
+        helpText: c.helpText,
+        classifyByLabel: c.classifyByLabel,
+        officialCodes: c.officialCodes,
+        aliases: c.aliases,
+      })),
+  };
+}
+
+export async function publishDraft(
+  client: PoolClient,
+  actor: CuratorActor,
+  input: { changeNotes: string; gitSha?: string | null },
+): Promise<PublishResult> {
+  assertJustification(actor);
+  const notes = input.changeNotes.trim();
+  if (!notes) throw new CurationError('CHANGE_NOTES_REQUIRED');
+
+  const draft = await requireOpenDraft(client);
+  const run = pgRunner(client);
+  const view = await loadReleaseView(run, draft.id, { includeRetired: true });
+  if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
+
+  const issues = await validateReleaseView(client, view);
+  const blockers = issues.filter((issue) => issue.severity === 'BLOCKER');
+  if (blockers.length > 0) {
+    throw new CurationError(
+      'DRAFT_HAS_BLOCKERS',
+      409,
+      blockers.map((b) => b.message).join(' | '),
+    );
+  }
+
+  const latest = await findLatestPublishedRelease(run);
+  if (latest && latest.id !== draft.previousReleaseId) {
+    throw new CurationError('STALE_DRAFT_BASE', 409);
+  }
+  const sourceView = latest ? await loadReleaseView(run, latest.id) : null;
+  const diff = diffReleaseViews(sourceView, view);
+
+  const snapshot = releaseSnapshot(view);
+  const snapshotJson = canonicalJson(snapshot);
+  const snapshotSha256 = createHash('sha256').update(snapshotJson, 'utf8').digest('hex');
+  const gitSha =
+    input.gitSha && /^[a-f0-9]{40}$/.test(input.gitSha)
+      ? input.gitSha
+      : createHash('sha1').update(snapshotJson, 'utf8').digest('hex');
+
+  const manifest = {
+    kind: CURATED_RELEASE_KIND,
+    sourceReleaseId: draft.previousReleaseId,
+    sourceVersion: latest?.version ?? null,
+    snapshotSha256,
+    artifactGitShaSource: input.gitSha ? 'RAILWAY_GIT_COMMIT_SHA' : 'SNAPSHOT_SHA1',
+    publishedBy: `curator:${actor.userId}`,
+    counts: {
+      dimensions: view.dimensions.length,
+      groups: view.groups.length,
+      concepts: view.concepts.filter((c) => c.membershipStatus === 'INCLUDED').length,
+      added: diff.addedConcepts.length,
+      removed: diff.removedConcepts.length,
+      changed: diff.changedConcepts.length,
+    },
+    warnings: issues.length,
+  };
+
+  const updated = await client.query(
+    `
+      UPDATE taxonomy_releases
+      SET status = 'PUBLISHED',
+          approved_at = now(),
+          published_at = now(),
+          artifact_repository = 'fabiojuniort-cyber/radar-fiscal-backend',
+          artifact_path = $2,
+          artifact_git_sha = $3,
+          artifact_sha256 = $4,
+          manifest = $5::jsonb,
+          change_notes = $6
+      WHERE id = $1::uuid AND status = 'DRAFT'
+    `,
+    [
+      draft.id,
+      `taxonomy-curation/releases/${draft.version}.json`,
+      gitSha,
+      snapshotSha256,
+      JSON.stringify(manifest),
+      notes,
+    ],
+  );
+  if (updated.rowCount !== 1) throw new CurationError('PUBLISH_FAILED', 409);
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_PUBLISHED', draft.id, {
+    version: draft.version,
+    snapshotSha256,
+    counts: manifest.counts,
+  });
+
+  const release = await findRelease(run, draft.id);
+  return { release: release!, snapshotSha256, diff };
+}
+
+// ---------------------------------------------------------------------------
+// Runtime switches
+// ---------------------------------------------------------------------------
+
+export async function setRuntimeSetting(
+  client: PoolClient,
+  actor: CuratorActor,
+  key: 'classification_enabled' | 'classification_excluded_sources',
+  value: unknown,
+): Promise<void> {
+  assertJustification(actor);
+  if (key === 'classification_enabled' && typeof value !== 'boolean') {
+    throw new CurationError('INVALID_SETTING_VALUE');
+  }
+  if (
+    key === 'classification_excluded_sources' &&
+    (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))
+  ) {
+    throw new CurationError('INVALID_SETTING_VALUE');
+  }
+  const updated = await client.query(
+    `UPDATE taxonomy_runtime_settings
+     SET value = $2::jsonb, updated_at = now(), updated_by = $3
+     WHERE key = $1`,
+    [key, JSON.stringify(value), `curator:${actor.userId}`],
+  );
+  if (updated.rowCount !== 1) throw new CurationError('SETTING_NOT_FOUND', 404);
+  await writeAudit(client, actor, 'TAXONOMY_RUNTIME_SETTING_UPDATED', null, {
+    key,
+    value,
+  });
+}

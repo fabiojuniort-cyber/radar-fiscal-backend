@@ -3,6 +3,7 @@ import type {
   FastifyRequest,
 } from 'fastify';
 import type { Kysely } from 'kysely';
+import type { Pool } from 'pg';
 
 import type { DB } from '../infrastructure/database/database.types.js';
 
@@ -20,6 +21,7 @@ export interface AccessTokenPayload {
 declare module 'fastify' {
   interface FastifyInstance {
     db: Kysely<DB>;
+    curatorPool: Pool | null;
     authenticate: (
       request: FastifyRequest,
       reply: FastifyReply,

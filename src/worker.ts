@@ -12,6 +12,9 @@ import {
   processPublicationNcmEnrichmentBatch,
 } from './modules/taxonomy/ncm/publication-ncm.detector.js';
 import {
+  processPublicationTaxonomyBatch,
+} from './modules/taxonomy/classification/classification.worker.js';
+import {
   assertStandaloneDatabaseConnection,
   assertWorkerRuntimeConnection,
   createStandaloneDatabase,
@@ -22,6 +25,9 @@ let stopping = false;
 
 const NCM_IDLE_BATCH_SIZE = 10;
 const NCM_AFTER_COLLECTION_BATCH_SIZE = 5;
+// TAX-11: classification runs only while the curator keeps it enabled.
+const TAXONOMY_IDLE_BATCH_SIZE = 20;
+const TAXONOMY_AFTER_COLLECTION_BATCH_SIZE = 10;
 
 function requestShutdown(signal: string): void {
   stopping = true;
@@ -80,6 +86,41 @@ async function enrichPublicationNcms(
   }
 }
 
+async function classifyPublications(
+  db: ReturnType<typeof createStandaloneDatabase>,
+  limit: number,
+): Promise<void> {
+  try {
+    const result = await processPublicationTaxonomyBatch(db, {
+      limit,
+      codeGitSha: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
+    });
+
+    if (result.selected > 0) {
+      processLogger.info(
+        {
+          releaseId: result.releaseId,
+          selected: result.selected,
+          succeeded: result.succeeded,
+          failed: result.failed,
+          assertions: result.assertions,
+        },
+        'Publication taxonomy classification batch completed',
+      );
+    }
+  } catch (error) {
+    processLogger.warn(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown taxonomy classification error',
+      },
+      'Publication taxonomy classification batch failed',
+    );
+  }
+}
+
 async function run(): Promise<void> {
   const db = createStandaloneDatabase({
     connectionString: env.DATABASE_URL,
@@ -121,6 +162,9 @@ async function run(): Promise<void> {
         ncmIdleBatchSize: NCM_IDLE_BATCH_SIZE,
         ncmAfterCollectionBatchSize:
           NCM_AFTER_COLLECTION_BATCH_SIZE,
+        taxonomyIdleBatchSize: TAXONOMY_IDLE_BATCH_SIZE,
+        taxonomyAfterCollectionBatchSize:
+          TAXONOMY_AFTER_COLLECTION_BATCH_SIZE,
       },
       'Collection worker started',
     );
@@ -141,6 +185,10 @@ async function run(): Promise<void> {
           await enrichPublicationNcms(
             db,
             NCM_IDLE_BATCH_SIZE,
+          );
+          await classifyPublications(
+            db,
+            TAXONOMY_IDLE_BATCH_SIZE,
           );
           await sleep(
             env.COLLECTION_POLL_INTERVAL_MS,
@@ -167,6 +215,10 @@ async function run(): Promise<void> {
         await enrichPublicationNcms(
           db,
           NCM_AFTER_COLLECTION_BATCH_SIZE,
+        );
+        await classifyPublications(
+          db,
+          TAXONOMY_AFTER_COLLECTION_BATCH_SIZE,
         );
       } catch (error) {
         processLogger.error(
