@@ -1,3 +1,4 @@
+import { isIsoDate } from './doe-sp-legacy.parser.js';
 import { asciiUpper } from './doe-sp.parser.js';
 
 /*
@@ -7,9 +8,10 @@ import { asciiUpper } from './doe-sp.parser.js';
  *
  * One vocabulary drives both steps, so discovery is a superset of what is kept
  * (review DOE-SP-LEGACY-04, B1):
- * - every term is sent to the portal's keyword index (editions from 2003 on)
- *   as a separate query (the index matches words; a multi-word query behaves
- *   like AND, which only widens the hits); spelling variants that the index
+ * - every term is sent to the portal's keyword index (Executivo III, from
+ *   2003 on; Executivo I and II are read whole) as a separate query (the index
+ *   matches words; a multi-word query behaves like AND, which only widens
+ *   the hits); spelling variants that the index
  *   might treat as different words (without accents, without hyphen) are
  *   queried too;
  * - every downloaded page is kept only when its text contains one of these
@@ -45,8 +47,21 @@ export const DOE_SP_LEGACY_TAX_VOCABULARY: readonly string[] = [
   'taxa de fiscalização', 'taxas de fiscalização', 'taxa de polícia', 'taxas de polícia',
 ];
 
-/** Bumped whenever DOE_SP_LEGACY_TAX_VOCABULARY changes (restarts an unfinished listing). */
-export const DOE_SP_LEGACY_VOCABULARY_VERSION = 2;
+/** Bumped whenever the vocabulary or its rules change (restarts an unfinished listing). */
+export const DOE_SP_LEGACY_VOCABULARY_VERSION = 3;
+
+/**
+ * Acronyms that only name a tax from a given date (decision of the owner after
+ * the dry pilot P1, DOE-SP-LEGACY-09): CT-e from 2007, IBS from 2019, CBS from
+ * 2020. On an older page the acronym alone is another word ("Cte.", an
+ * unrelated body or company) and does not keep the page; any other term still
+ * does. Keys are the matched term without spaces/hyphens (ASCII upper).
+ */
+export const DOE_SP_LEGACY_TERM_SINCE: Readonly<Record<string, string>> = {
+  CTE: '2007-01-01',
+  IBS: '2019-01-01',
+  CBS: '2020-01-01',
+};
 
 function stripAccents(value: string): string {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -88,12 +103,20 @@ export const DOE_SP_LEGACY_TAX_PATTERN = new RegExp(
 
 const MAX_MATCHED_TERMS = 20;
 
-/** Distinct tax terms found in the page text (ASCII upper), in order of appearance. */
-export function doeSpLegacyTaxTerms(text: string): string[] {
+/**
+ * Distinct tax terms found in the text of a page of `date` (YYYY-MM-DD), ASCII
+ * upper, in order of appearance. Acronyms of DOE_SP_LEGACY_TERM_SINCE count
+ * only on pages from their date on.
+ */
+export function doeSpLegacyTaxTerms(text: string, date: string): string[] {
+  if (!isIsoDate(date)) throw new RangeError(`invalid page date ${date}`);
   const upper = asciiUpper(text);
   const found = new Set<string>();
   for (const match of upper.matchAll(new RegExp(DOE_SP_LEGACY_TAX_PATTERN))) {
-    found.add(match[0].replace(/\s+/g, ' '));
+    const term = match[0].replace(/\s+/g, ' ');
+    const since = DOE_SP_LEGACY_TERM_SINCE[term.replace(/[\s-]/g, '')];
+    if (since !== undefined && date < since) continue;
+    found.add(term);
     if (found.size >= MAX_MATCHED_TERMS) break;
   }
   return [...found];
