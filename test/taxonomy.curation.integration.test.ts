@@ -312,10 +312,10 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       payload: {
         justification: 'Planilha de produtos',
         csv: [
-          'Segmento;Grupo;Item;Código oficial;Sinônimos;No perfil',
-          'Agronegócio;Fertilizantes e corretivos;Cloreto de potássio;3104.20;"KCl, potassa";✓',
-          'Agronegócio;Defensivos e adjuvantes;Espalhante adesivo;;adjuvante;✓',
-          'Agronegócio;Grãos novos;Soja;;;não',
+          'Segmento;Grupo;Item;Código oficial;Sinônimos;No perfil;Código TriBusca',
+          'Agronegócio;Fertilizantes e corretivos;Cloreto de potássio;3104.20;"KCl, potassa";✓;',
+          'Agronegócio;Defensivos e adjuvantes;Espalhante adesivo;;adjuvante;✓;',
+          'Agronegócio;Grãos novos;Soja;;;não;product.soy',
         ].join('\n'),
       },
     });
@@ -333,7 +333,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       method: 'POST',
       url: '/api/v1/admin/taxonomy/drafts/current/dimensions/product/import',
       headers: curator.headers,
-      payload: { justification: 'Só perfil', csv: 'Item;No perfil\nUreia;✓' },
+      payload: { justification: 'Só perfil', csv: 'Item;No perfil;Código TriBusca\nUreia;✓;product.urea' },
     });
     assert.equal(partial.statusCode, 200, partial.body);
     const afterPartial = (
@@ -427,12 +427,27 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       headers: curator.headers,
       payload: {
         justification: 'Carga massiva',
-        csv: 'Grupo;Item;Classificar pelo nome;Código TriBusca\nFertilizantes e corretivos;Gesso;x;\nFertilizantes e corretivos;Termofosfato;x;',
+        csv: [
+          'Grupo;Item;Classificar pelo nome;Código TriBusca',
+          'Fertilizantes e corretivos;Termofosfato;x;',
+          'Fertilizantes e corretivos;Gesso;x;',
+          'Fertilizantes e corretivos;Gesso;;product.gesso',
+          'Fertilizantes e corretivos;Inexistente;;product.nao_existe',
+        ].join('\n'),
       },
     });
     assert.equal(blankCode.statusCode, 200, blankCode.body);
-    assert.equal(blankCode.json().updated, 1, 'same name updates the existing item');
-    assert.equal(blankCode.json().created, 1);
+    assert.equal(blankCode.json().created, 2, 'blank TriBusca code always creates');
+    assert.equal(blankCode.json().updated, 1, 'filled TriBusca code updates that item');
+    assert.equal(blankCode.json().errors.length, 1, 'unknown TriBusca code is refused');
+    assert.match(blankCode.json().errors[0].message, /não existe nesta tabela/);
+    assert.equal(blankCode.json().warnings.length, 1, 'same name as an existing item is flagged');
+    assert.match(blankCode.json().warnings[0].message, /já existia \(product\.gesso\)/);
+    const createdAfterBlank = (
+      await app.inject({ method: 'GET', url: `/api/v1/admin/taxonomy/releases/${draft.draft.id}`, headers: curator.headers })
+    ).json();
+    assert.ok(createdAfterBlank.concepts.some((c: { code: string }) => c.code === 'product.termofosfato'));
+    assert.ok(createdAfterBlank.concepts.some((c: { code: string }) => c.code === 'product.gesso_3'), 'next free code');
 
     const dimensionPatch = await app.inject({
       method: 'PATCH',

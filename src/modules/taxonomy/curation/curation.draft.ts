@@ -1472,6 +1472,7 @@ export interface ImportReport {
   updated: number;
   groupsCreated: number;
   errors: Array<{ line: number; message: string }>;
+  warnings: Array<{ line: number; message: string }>;
 }
 
 export async function importDimensionRows(
@@ -1488,7 +1489,7 @@ export async function importDimensionRows(
   if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
   await requireDimension(client, draft.id, dimensionCode);
 
-  const report: ImportReport = { created: 0, updated: 0, groupsCreated: 0, errors: [] };
+  const report: ImportReport = { created: 0, updated: 0, groupsCreated: 0, errors: [], warnings: [] };
   const concepts = view.concepts.filter((c) => c.dimensionCode === dimensionCode);
   const byCode = new Map(concepts.map((c) => [c.code, c]));
   const byLabel = new Map(concepts.map((c) => [normalizeAliasText(c.label), c]));
@@ -1533,9 +1534,15 @@ export async function importDimensionRows(
         aliasType: 'EXACT_LEXICAL' as const,
       }));
 
-      const existing =
-        (row.code ? byCode.get(row.code) : undefined) ??
-        byLabel.get(normalizeAliasText(row.item));
+      // "Código TriBusca" filled = update that item; blank = new item.
+      const existing = row.code ? byCode.get(row.code) : undefined;
+      if (row.code && !existing) {
+        throw new CurationError(
+          'CONCEPT_NOT_FOUND',
+          404,
+          `Código TriBusca “${row.code}” não existe nesta tabela (deixe em branco para criar um item novo)`,
+        );
+      }
 
       if (existing) {
         const aliasUpdate =
@@ -1571,10 +1578,17 @@ export async function importDimensionRows(
         });
         report.updated += 1;
       } else {
+        const sameName = byLabel.get(normalizeAliasText(row.item));
         const code = await createConcept(client, actor, dimensionCode, {
           ...input,
           ...(synonyms ? { aliases: synonyms } : {}),
         });
+        if (sameName) {
+          report.warnings.push({
+            line: row.line,
+            message: `“${row.item}” já existia (${sameName.code}); criado como item novo ${code}. Para atualizar o existente, preencha o Código TriBusca.`,
+          });
+        }
         byLabel.set(normalizeAliasText(row.item), {
           code,
           aliases: synonyms ?? [],
