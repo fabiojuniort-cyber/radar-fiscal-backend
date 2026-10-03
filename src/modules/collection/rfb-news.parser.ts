@@ -127,13 +127,27 @@ function parseBrazilDateTime(value: string): Date | undefined {
   const match = /(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2})h(\d{2}))?/.exec(value);
   if (!match) return undefined;
 
-  const [, day, month, year, hour = '00', minute = '00'] = match;
-  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00-03:00`);
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const hour = Number(match[4] ?? '00');
+  const minute = Number(match[5] ?? '00');
+  if (
+    month < 1 || month > 12 ||
+    day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate() ||
+    hour < 0 || hour > 23 || minute < 0 || minute > 59
+  ) return undefined;
+
+  const date = new Date(
+    `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-03:00`,
+  );
   return Number.isFinite(date.getTime()) ? date : undefined;
 }
 
-function parseIsoDate(value: string | undefined): Date | undefined {
+function parseSourceDate(value: string | undefined): Date | undefined {
   if (!value) return undefined;
+  const brazil = parseBrazilDateTime(value);
+  if (brazil) return brazil;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date : undefined;
 }
@@ -149,12 +163,21 @@ function metaValue(
   return undefined;
 }
 
+function visibleTimestamp(text: string, label: 'Publicado' | 'Atualizado'): Date | undefined {
+  const expression = new RegExp(
+    `${label} em\\s+(\\d{2}\\/\\d{2}\\/\\d{4}(?:\\s+\\d{2}h\\d{2})?)`,
+    'i',
+  );
+  return parseBrazilDateTime(expression.exec(text)?.[1] ?? '');
+}
+
 export function parseRfbNewsArticle(
   html: string,
   url: string,
 ): RfbNewsArticle {
   const meta = new Map<string, string>();
   const tags = new Set<string>();
+  const pageText: string[] = [];
   const mainText: string[] = [];
   const h1Text: string[] = [];
   let hiddenDepth = 0;
@@ -177,7 +200,12 @@ export function parseRfbNewsArticle(
       }
 
       if (tag === 'meta') {
-        const key = (attributes.property ?? attributes.name ?? '').trim().toLowerCase();
+        const key = (
+          attributes.property ??
+          attributes.name ??
+          attributes.itemprop ??
+          ''
+        ).trim().toLowerCase();
         const content = normalizeSpace(attributes.content ?? '');
         if (key && content && !meta.has(key)) meta.set(key, content);
       }
@@ -190,6 +218,7 @@ export function parseRfbNewsArticle(
     },
     ontext(text) {
       if (hiddenDepth > 0) return;
+      pageText.push(text);
       if (mainDepth > 0) mainText.push(text);
       if (h1Depth > 0) h1Text.push(text);
       if (tagAnchor) tagAnchorText += ` ${text}`;
@@ -214,6 +243,7 @@ export function parseRfbNewsArticle(
   parser.end();
 
   const visible = normalizeSpace(mainText.join(' '));
+  const pageVisible = normalizeSpace(pageText.join(' '));
   const title = normalizeSpace(
     metaValue(meta, 'og:title', 'twitter:title', 'dc.title') ?? h1Text.join(' '),
   );
@@ -224,12 +254,28 @@ export function parseRfbNewsArticle(
   ) || undefined;
 
   const publishedAt =
-    parseIsoDate(metaValue(meta, 'article:published_time', 'dc.date', 'dcterms.created')) ??
-    parseBrazilDateTime(/Publicado em\s+([^A]+?)(?:Atualizado|$)/i.exec(visible)?.[1] ?? '');
+    parseSourceDate(metaValue(
+      meta,
+      'article:published_time',
+      'dc.date',
+      'dc.date.created',
+      'dc.date.issued',
+      'dcterms.created',
+      'dcterms.issued',
+      'datepublished',
+    )) ??
+    visibleTimestamp(pageVisible, 'Publicado');
 
   const updatedAt =
-    parseIsoDate(metaValue(meta, 'article:modified_time', 'dcterms.modified')) ??
-    parseBrazilDateTime(/Atualizado em\s+(.+?)(?:\s{2,}|$)/i.exec(visible)?.[1] ?? '');
+    parseSourceDate(metaValue(
+      meta,
+      'article:modified_time',
+      'dcterms.modified',
+      'dc.date.modified',
+      'datemodified',
+      'modified',
+    )) ??
+    visibleTimestamp(pageVisible, 'Atualizado');
 
   const keywordMeta = metaValue(meta, 'keywords', 'news_keywords');
   if (keywordMeta) {

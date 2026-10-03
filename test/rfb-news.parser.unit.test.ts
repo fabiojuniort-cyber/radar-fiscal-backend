@@ -29,6 +29,25 @@ test('RFB news listing keeps only article links and deduplicates them', () => {
   ]);
 });
 
+test('RFB news listing accepts links across month and year rollovers', () => {
+  const html = `
+    <main>
+      <a href="/receitafederal/pt-br/assuntos/noticias/2026/setembro/ultima-setembro">Setembro</a>
+      <a href="/receitafederal/pt-br/assuntos/noticias/2026/outubro/primeira-outubro">Outubro</a>
+      <a href="/receitafederal/pt-br/assuntos/noticias/2027/janeiro/primeira-janeiro">Janeiro</a>
+    </main>
+  `;
+
+  assert.deepEqual(
+    parseRfbNewsListing(html).map((item) => item.url),
+    [
+      'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/ultima-setembro',
+      'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/primeira-outubro',
+      'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2027/janeiro/primeira-janeiro',
+    ],
+  );
+});
+
 test('RFB news article uses official metadata, image and visible main content', () => {
   const html = `
     <html><head>
@@ -62,6 +81,24 @@ test('RFB news article uses official metadata, image and visible main content', 
   assert.equal(article.imageUrl, 'https://www.gov.br/receitafederal/imagens/noticias/ibs-cbs.jpg');
   assert.ok(article.content?.includes('Reforma Tributária do Consumo'));
   assert.deepEqual(new Set(article.tags), new Set(['RTC', 'IBS', 'CBS', 'Documentos fiscais']));
+});
+
+test('RFB news article accepts alternate gov.br publication metadata at month rollover', () => {
+  const html = `
+    <head>
+      <meta property="og:title" content="Receita atualiza regras de IBS e CBS">
+      <meta name="dc.date.issued" content="02/10/2026 15h10">
+      <meta itemprop="dateModified" content="2026-10-02T16:00:00-03:00">
+    </head>
+    <main><h1>Receita atualiza regras de IBS e CBS</h1><p>Conteúdo tributário.</p></main>
+  `;
+  const article = parseRfbNewsArticle(
+    html,
+    'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/ibs-cbs',
+  );
+
+  assert.equal(article.publishedAt?.toISOString(), '2026-10-02T18:10:00.000Z');
+  assert.equal(article.updatedAt?.toISOString(), '2026-10-02T19:00:00.000Z');
 });
 
 test('RFB news article resolves a relative social image URL', () => {
@@ -112,4 +149,36 @@ test('RFB news article falls back to visible published timestamp', () => {
     'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/julho/exemplo',
   );
   assert.equal(article.publishedAt?.toISOString(), '2026-07-27T14:36:00.000Z');
+});
+
+test('RFB news article finds visible publication timestamp outside main', () => {
+  const html = `
+    <body>
+      <div class="documentByLine">Publicado em 02/10/2026 15h10</div>
+      <main>
+        <h1>Notícia da virada do mês</h1>
+        <p>IBS e CBS.</p>
+      </main>
+    </body>
+  `;
+  const article = parseRfbNewsArticle(
+    html,
+    'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/virada',
+  );
+  assert.equal(article.publishedAt?.toISOString(), '2026-10-02T18:10:00.000Z');
+  assert.equal(article.content, 'Notícia da virada do mês IBS e CBS.');
+});
+
+test('RFB news article rejects invalid Brazilian calendar dates instead of rolling them over', () => {
+  const html = `
+    <body>
+      <div>Publicado em 31/02/2026 10h00</div>
+      <main><h1>Data inválida</h1><p>Conteúdo.</p></main>
+    </body>
+  `;
+  const article = parseRfbNewsArticle(
+    html,
+    'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/fevereiro/data-invalida',
+  );
+  assert.equal(article.publishedAt, undefined);
 });

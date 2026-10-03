@@ -114,7 +114,7 @@ export async function newsRoutes(app: FastifyInstance): Promise<void> {
         FROM latest
         WHERE ${predicate}
         ORDER BY
-          latest.published_at DESC NULLS LAST,
+          COALESCE(latest.published_at, latest.collected_at) DESC,
           latest.collected_at DESC,
           latest.id DESC
         LIMIT ${limit}
