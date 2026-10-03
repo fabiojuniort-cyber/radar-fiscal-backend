@@ -43,6 +43,7 @@ import {
   deleteGroup,
   diffReleaseViews,
   importDimensionRows,
+  saveDimensionRows,
   publishDraft,
   assertCuratorSession,
   setRuntimeSetting,
@@ -206,6 +207,8 @@ export function parseImportCsv(text: string): ImportRow[] {
   const synonymsCol = col('sinonimos', 'sinonimo');
   const profileCol = col('no perfil', 'perfil');
   const orderCol = col('ordem');
+  const classifyCol = col('classificar pelo nome', 'classificar');
+  const definitionCol = col('definicao');
   const tribuscaCol = col('codigo tribusca');
 
   const CLEAR = /^(—|-|–)$/;
@@ -243,6 +246,8 @@ export function parseImportCsv(text: string): ImportRow[] {
         officialCodes: listCell(codesCol, row),
         synonyms: listCell(synonymsCol, row),
         profileVisible: profileCol >= 0 ? truthy(row[profileCol]) : null,
+        classifyByLabel: classifyCol >= 0 ? truthy(row[classifyCol]) : null,
+        definition: definitionCol >= 0 ? (row[definitionCol] ?? '').trim() || undefined : undefined,
         displayOrder: Number.isFinite(order) ? order : null,
         code: tribuscaCol >= 0 ? (row[tribuscaCol] ?? '').trim() || null : null,
       },
@@ -600,6 +605,51 @@ export async function taxonomyAdminRoutes(
     },
   );
 
+  typed.post(
+    '/api/v1/admin/taxonomy/drafts/current/dimensions/:code/rows',
+    {
+      preHandler: requireCurator,
+      bodyLimit: 5 * 1024 * 1024,
+      schema: {
+        params: dimensionParams,
+        body: z.object({
+          justification,
+          rows: z
+            .array(
+              z.object({
+                code: z.string().trim().min(1).max(200).nullable(),
+                group: z.string().trim().max(200).nullable().optional(),
+                label: z.string().max(300),
+                officialCodes: z.array(z.string().trim().min(1).max(40)).max(500),
+                aliases: z
+                  .array(
+                    z.object({
+                      text: z.string().trim().min(1).max(300),
+                      aliasType: z.enum(ALIAS_TYPES),
+                    }),
+                  )
+                  .max(200),
+                profileVisible: z.boolean(),
+                classifyByLabel: z.boolean(),
+                displayOrder: z.number().int().min(0).max(100000).nullable(),
+              }),
+            )
+            .max(5000),
+          retire: z.array(z.string().trim().min(1).max(200)).max(5000).default([]),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const result = await withCuratorTransaction(curatorPool(), (client) =>
+        saveDimensionRows(client, actorFrom(request, request.body.justification), request.params.code, {
+          rows: request.body.rows,
+          retire: request.body.retire,
+        }),
+      );
+      return reply.send(result);
+    },
+  );
+
   typed.get(
     '/api/v1/admin/taxonomy/releases/:releaseId/dimensions/:code/export.csv',
     {
@@ -643,9 +693,9 @@ export async function taxonomyAdminRoutes(
               .map((code) => formatOfficialCode(dimension.officialCodeType, code))
               .join(', '),
             concept.aliases.map((alias) => alias.text).join(', '),
-            concept.profileVisible ? '✓' : '',
+            concept.profileVisible ? 'x' : '',
             concept.displayOrder,
-            concept.classifyByLabel ? '✓' : '',
+            concept.classifyByLabel ? 'x' : '',
             concept.definition,
             concept.code,
           ]

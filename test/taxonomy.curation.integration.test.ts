@@ -348,6 +348,84 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.ok(urea.aliases.some((a: { text: string }) => a.text === 'carbamida'));
     assert.equal(urea.groupCode, 'fertilizantes');
 
+    // Spreadsheet-like editor: batch save, generated unique codes, retire.
+    const gridUrl = '/api/v1/admin/taxonomy/drafts/current/dimensions/product/rows';
+    const gridRow = (label: string, extra: Record<string, unknown> = {}) => ({
+      code: null,
+      group: 'Fertilizantes e corretivos',
+      label,
+      officialCodes: [],
+      aliases: [
+        { text: `${label} em pó`, aliasType: 'EXACT_LEXICAL' },
+        { text: `${label} agrícola`, aliasType: 'EXACT_LEXICAL' },
+      ],
+      profileVisible: true,
+      classifyByLabel: true,
+      displayOrder: null,
+      ...extra,
+    });
+    const gridSaved = await app.inject({
+      method: 'POST',
+      url: gridUrl,
+      headers: curator.headers,
+      payload: {
+        justification: 'Grade',
+        rows: [gridRow('Gesso'), gridRow('Gesso!')],
+        retire: [],
+      },
+    });
+    assert.equal(gridSaved.statusCode, 200, gridSaved.body);
+    assert.deepEqual(gridSaved.json().created, ['product.gesso', 'product.gesso_2']);
+
+    const gridAtomic = await app.inject({
+      method: 'POST',
+      url: gridUrl,
+      headers: curator.headers,
+      payload: {
+        justification: 'Grade',
+        rows: [gridRow('Calcário'), gridRow('Ureia', { code: 'product.urea', officialCodes: ['31021'] })],
+        retire: ['product.gesso_2'],
+      },
+    });
+    assert.equal(gridAtomic.statusCode, 400, gridAtomic.body);
+    assert.match(gridAtomic.json().message, /Linha 2/);
+    const afterGrid = (
+      await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/taxonomy/releases/${draft.draft.id}`,
+        headers: curator.headers,
+      })
+    ).json();
+    const gesso = afterGrid.concepts.find((c: { code: string }) => c.code === 'product.gesso');
+    assert.equal(gesso.aliases.length, 2, 'several synonyms per row');
+    assert.ok(
+      !afterGrid.concepts.some((c: { label: string }) => c.label === 'Calcário'),
+      'a failing row rolls back the whole save',
+    );
+
+    const gridRetire = await app.inject({
+      method: 'POST',
+      url: gridUrl,
+      headers: curator.headers,
+      payload: { justification: 'Grade', rows: [], retire: ['product.gesso_2'] },
+    });
+    assert.equal(gridRetire.statusCode, 200, gridRetire.body);
+    assert.equal(gridRetire.json().retired, 1);
+
+    // CSV rows without "Código TriBusca" get a code generated from the item.
+    const blankCode = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/dimensions/product/import',
+      headers: curator.headers,
+      payload: {
+        justification: 'Carga massiva',
+        csv: 'Grupo;Item;Classificar pelo nome;Código TriBusca\nFertilizantes e corretivos;Gesso;x;\nFertilizantes e corretivos;Termofosfato;x;',
+      },
+    });
+    assert.equal(blankCode.statusCode, 200, blankCode.body);
+    assert.equal(blankCode.json().updated, 1, 'same name updates the existing item');
+    assert.equal(blankCode.json().created, 1);
+
     const dimensionPatch = await app.inject({
       method: 'PATCH',
       url: '/api/v1/admin/taxonomy/drafts/current/dimensions/sector',
@@ -374,7 +452,8 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       headers: curator.headers,
     });
     assert.equal(exported.statusCode, 200);
-    assert.match(exported.body, /Cloreto de potássio;3104\.20;KCl, potassa;✓/);
+    assert.match(exported.body, /Cloreto de potássio;3104\.20;KCl, potassa;x/);
+    assert.ok(!exported.body.includes('✓'), 'export marks with x, easy to type back');
 
     const published = await app.inject({
       method: 'POST',
