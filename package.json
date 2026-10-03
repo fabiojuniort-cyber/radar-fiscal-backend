@@ -30,6 +30,7 @@
     "db:ensure-confaz-source": "node dist/infrastructure/database/ensure-confaz-source.js",
     "db:inspect-confaz": "node dist/infrastructure/database/inspect-confaz.js",
     "confaz:import-act": "node dist/infrastructure/database/import-confaz-act.js",
+    "taxonomy:load-products": "node dist/infrastructure/database/taxonomy-load-products.js",
     "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js",
     "db:ensure-nfe-encat-source": "node dist/infrastructure/database/ensure-nfe-encat-source.js",
     "db:trigger-nfe-encat-run": "node dist/infrastructure/database/trigger-nfe-encat-run.js",
