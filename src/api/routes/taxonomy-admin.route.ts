@@ -44,6 +44,7 @@ import {
   diffReleaseViews,
   importDimensionRows,
   publishDraft,
+  assertCuratorSession,
   setRuntimeSetting,
   updateConcept,
   updateDimension,
@@ -62,6 +63,7 @@ import {
   pgRunner,
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
+import { PROTECTED_EXCLUDED_SOURCES } from '../../modules/taxonomy/curation/curation.constants.js';
 import { importNcmCatalog } from '../../modules/taxonomy/ncm/ncm-catalog.importer.js';
 import {
   NCM_SOURCE_URL,
@@ -146,10 +148,12 @@ async function isTaxonomyCurator(
   return withUserContext(app.db, userId, async (trx) => {
     const result = await sql<{ ok: number }>`
       SELECT 1 AS ok
-      FROM platform_user_roles
-      WHERE user_id = ${userId}::uuid
-        AND role = 'TAXONOMY_CURATOR'
-        AND revoked_at IS NULL
+      FROM platform_user_roles r
+      JOIN app_users u ON u.id = r.user_id
+      WHERE r.user_id = ${userId}::uuid
+        AND r.role = 'TAXONOMY_CURATOR'
+        AND r.revoked_at IS NULL
+        AND u.status = 'ACTIVE'
       LIMIT 1
     `.execute(trx);
     return result.rows.length > 0;
@@ -194,11 +198,19 @@ export function parseImportCsv(text: string): ImportRow[] {
   const orderCol = col('ordem');
   const tribuscaCol = col('codigo tribusca');
 
-  const split = (value: string | undefined) =>
-    (value ?? '')
+  const CLEAR = /^(—|-|–)$/;
+  // undefined = keep current value (column absent or blank cell);
+  // [] / null = clear (cell with "—" or "-").
+  const listCell = (index: number, row: string[]): string[] | undefined => {
+    if (index < 0) return undefined;
+    const raw = (row[index] ?? '').trim();
+    if (!raw || /^a definir$/i.test(raw)) return undefined;
+    if (CLEAR.test(raw)) return [];
+    return raw
       .split(/[,;|\n]/)
       .map((part) => part.trim())
-      .filter((part) => part && part !== '—' && part !== '-' && !/^a definir$/i.test(part));
+      .filter((part) => part && !CLEAR.test(part));
+  };
 
   const truthy = (value: string | undefined): boolean | null => {
     const normalized = (value ?? '').trim().toLowerCase();
@@ -212,13 +224,14 @@ export function parseImportCsv(text: string): ImportRow[] {
     const item = (row[itemCol] ?? '').trim();
     if (!item) return [];
     const order = orderCol >= 0 ? Number.parseInt(row[orderCol] ?? '', 10) : Number.NaN;
+    const groupRaw = groupCol >= 0 ? (row[groupCol] ?? '').trim() : '';
     return [
       {
         line: headerIndex + offset + 2,
-        group: groupCol >= 0 ? (row[groupCol] ?? '').trim() || null : null,
+        group: !groupRaw ? undefined : CLEAR.test(groupRaw) ? null : groupRaw,
         item,
-        officialCodes: codesCol >= 0 ? split(row[codesCol]) : [],
-        synonyms: synonymsCol >= 0 ? split(row[synonymsCol]) : [],
+        officialCodes: listCell(codesCol, row),
+        synonyms: listCell(synonymsCol, row),
         profileVisible: profileCol >= 0 ? truthy(row[profileCol]) : null,
         displayOrder: Number.isFinite(order) ? order : null,
         code: tribuscaCol >= 0 ? (row[tribuscaCol] ?? '').trim() || null : null,
@@ -421,7 +434,7 @@ export async function taxonomyAdminRoutes(
         progress: await classificationProgress(
           app,
           published?.id ?? null,
-          settings.classificationExcludedSources,
+          [...new Set([...settings.classificationExcludedSources, ...PROTECTED_EXCLUDED_SOURCES])],
         ),
         catalogs,
         curatorDatabase: app.curatorPool !== null,
@@ -448,6 +461,7 @@ export async function taxonomyAdminRoutes(
       const pool = curatorPool();
       const client = await pool.connect();
       try {
+        await assertCuratorSession(client);
         await client.query('BEGIN READ ONLY');
         await client.query('SET LOCAL ROLE radar_taxonomy_curator');
         const run = pgRunner(client);
@@ -690,6 +704,15 @@ export async function taxonomyAdminRoutes(
       },
     },
     async (request, reply) => {
+      const missing = PROTECTED_EXCLUDED_SOURCES.filter(
+        (source) => !request.body.sources.includes(source),
+      );
+      if (missing.length > 0) {
+        return reply.status(409).send({
+          error: 'protected_excluded_source',
+          message: `A fonte ${missing.join(', ')} só pode voltar à classificação após o fechamento formal da reconstrução DOE-SP (operação própria).`,
+        });
+      }
       await withCuratorTransaction(curatorPool(), (client) =>
         setRuntimeSetting(
           client,
@@ -767,6 +790,7 @@ export async function taxonomyAdminRoutes(
       const pool = curatorPool();
       const client = await pool.connect();
       try {
+        await assertCuratorSession(client);
         await client.query('BEGIN READ ONLY');
         await client.query('SET LOCAL ROLE radar_taxonomy_curator');
         const diff = await diffAgainstCurrentEdition(client, catalog, sourceSha256, entries);
@@ -803,24 +827,28 @@ export async function taxonomyAdminRoutes(
         if (downloaded.sourceSha256 !== request.body.expectedSha256) {
           return reply.status(409).send({ error: 'source_changed_since_check' });
         }
+        // importNcmCatalog owns its transaction; release that connection
+        // before opening the audit transaction (pool max is small).
         const client = await curatorPool().connect();
+        let result: Awaited<ReturnType<typeof importNcmCatalog>>;
         try {
-          const result = await importNcmCatalog(client, {
+          await assertCuratorSession(client);
+          result = await importNcmCatalog(client, {
             sourceUrl: NCM_SOURCE_URL,
             sourceSha256: downloaded.sourceSha256,
             parsed: downloaded.parsed,
           });
-          await withCuratorTransaction(curatorPool(), async (tx) => {
-            await tx.query(
-              `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-               VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, $3::jsonb, gen_random_uuid())`,
-              [actor.userId, result.editionId, JSON.stringify({ catalog, ...result, justification: actor.justification })],
-            );
-          });
-          return reply.send({ catalog, ...result });
         } finally {
           client.release();
         }
+        await withCuratorTransaction(curatorPool(), async (tx) => {
+          await tx.query(
+            `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
+             VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, $3::jsonb, gen_random_uuid())`,
+            [actor.userId, result.editionId, JSON.stringify({ catalog, ...result, justification: actor.justification })],
+          );
+        });
+        return reply.send({ catalog, ...result });
       }
 
       let sourceSha256: string;
@@ -915,6 +943,9 @@ export async function taxonomyAdminRoutes(
         if (!releaseConceptId) throw new CurationError('CONCEPT_NOT_FOUND', 404);
 
         const action = request.body.action;
+        // The concept-level decision (ADD/REMOVE) is what survives new
+        // releases; the assertion review keeps the audit trail of the
+        // automatic tag that was judged.
         if (existing?.origin === 'AUTOMATIC' && existing.assertionId && action !== 'ADD') {
           await client.query(
             `INSERT INTO publication_taxonomy_reviews (
@@ -927,24 +958,24 @@ export async function taxonomyAdminRoutes(
               actor.justification,
             ],
           );
-        } else if (action === 'ADD' || action === 'REMOVE') {
-          await client.query(
-            `INSERT INTO publication_taxonomy_curator_tags (
-               publication_version_id, taxonomy_release_id, release_concept_id,
-               action, actor_id, rationale
-             ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)`,
-            [
-              view.publicationVersionId,
-              view.release!.id,
-              releaseConceptId,
-              action,
-              `curator:${actor.userId}`,
-              actor.justification,
-            ],
-          );
-        } else {
+        } else if (action === 'RESTORE') {
           throw new CurationError('NOTHING_TO_RESTORE', 409);
         }
+
+        await client.query(
+          `INSERT INTO publication_taxonomy_curator_tags (
+             publication_version_id, taxonomy_release_id, release_concept_id,
+             action, actor_id, rationale
+           ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)`,
+          [
+            view.publicationVersionId,
+            view.release!.id,
+            releaseConceptId,
+            action === 'REMOVE' ? 'REMOVE' : 'ADD',
+            `curator:${actor.userId}`,
+            actor.justification,
+          ],
+        );
 
         await client.query(
           `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)

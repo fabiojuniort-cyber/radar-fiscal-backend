@@ -78,12 +78,30 @@ const EVIDENCE_STATUSES = [
  * Runs `fn` in one transaction as radar_taxonomy_curator, serialized with
  * every other curation write through a transaction-scoped advisory lock.
  */
+const CURATOR_LOGIN = 'radar_taxonomy_curator_runtime';
+
+/**
+ * Refuses a curator connection that is not the dedicated NOINHERIT login
+ * (e.g. DATABASE_CURATOR_URL pointing at an admin/superuser URL).
+ */
+export async function assertCuratorSession(client: PoolClient): Promise<void> {
+  const result = await client.query<{ session_user: string; superuser: boolean }>(
+    `SELECT session_user::text AS session_user,
+            COALESCE((SELECT rolsuper FROM pg_roles WHERE rolname = session_user), true) AS superuser`,
+  );
+  const row = result.rows[0];
+  if (!row || row.session_user !== CURATOR_LOGIN || row.superuser) {
+    throw new CurationError('CURATOR_DATABASE_MISCONFIGURED', 503);
+  }
+}
+
 export async function withCuratorTransaction<T>(
   pool: Pool,
   fn: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
   const client = await pool.connect();
   try {
+    await assertCuratorSession(client);
     await client.query('BEGIN');
     await client.query('SET LOCAL ROLE radar_taxonomy_curator');
     await client.query(
@@ -1396,12 +1414,17 @@ export async function updateConcept(
 // Spreadsheet import (one row per item)
 // ---------------------------------------------------------------------------
 
+/**
+ * One spreadsheet row. For group/codes/synonyms, `undefined` means "keep the
+ * current value" (column absent or cell blank) and null/[] means "clear"
+ * (cell with "—" or "-"). Blank cells never erase curated data.
+ */
 export interface ImportRow {
   line: number;
-  group: string | null;
+  group: string | null | undefined;
   item: string;
-  officialCodes: string[];
-  synonyms: string[];
+  officialCodes: string[] | undefined;
+  synonyms: string[] | undefined;
   profileVisible: boolean | null;
   displayOrder: number | null;
   code: string | null;
@@ -1440,61 +1463,80 @@ export async function importDimensionRows(
 
   for (const row of rows) {
     await client.query('SAVEPOINT import_row');
+    const groupsCreatedInRow: string[] = [];
     try {
-      let groupId: string | null = null;
-      if (row.group) {
+      let groupId: string | null | undefined;
+      if (row.group === null) {
+        groupId = null;
+      } else if (row.group) {
         const key = normalizeAliasText(row.group);
-        groupId = groupIds.get(key) ?? null;
+        groupId = groupIds.get(key);
         if (!groupId) {
           groupId = await createGroup(client, actor, dimensionCode, {
             label: row.group,
           });
           groupIds.set(key, groupId);
-          report.groupsCreated += 1;
+          groupsCreatedInRow.push(key);
         }
       }
 
       const input: ConceptInput = {
         label: row.item,
-        groupId,
-        officialCodes: row.officialCodes,
-        aliases: row.synonyms.map((text) => ({
-          text,
-          aliasType: 'EXACT_LEXICAL' as const,
-        })),
+        ...(groupId !== undefined ? { groupId } : {}),
+        ...(row.officialCodes !== undefined ? { officialCodes: row.officialCodes } : {}),
         ...(row.profileVisible !== null ? { profileVisible: row.profileVisible } : {}),
         ...(row.displayOrder !== null ? { displayOrder: row.displayOrder } : {}),
       };
+      const synonyms = row.synonyms?.map((text) => ({
+        text,
+        aliasType: 'EXACT_LEXICAL' as const,
+      }));
 
       const existing =
         (row.code ? byCode.get(row.code) : undefined) ??
         byLabel.get(normalizeAliasText(row.item));
 
       if (existing) {
-        const keepAliases = existing.aliases.filter(
-          (alias) =>
-            alias.aliasType !== 'EXACT_LEXICAL' &&
-            !row.synonyms.some(
-              (text) => normalizeAliasText(text) === normalizeAliasText(alias.text),
-            ),
-        ) as ConceptAliasInput[];
+        const aliasUpdate =
+          synonyms === undefined
+            ? {}
+            : {
+                // Spreadsheet synonyms replace the "equivalente exato" list;
+                // other alias types (siglas, nomes antigos…) are kept.
+                aliases: [
+                  ...(existing.aliases.filter(
+                    (alias) =>
+                      alias.aliasType !== 'EXACT_LEXICAL' &&
+                      !synonyms.some(
+                        (item) => normalizeAliasText(item.text) === normalizeAliasText(alias.text),
+                      ),
+                  ) as ConceptAliasInput[]),
+                  ...synonyms,
+                ],
+              };
         await updateConcept(client, actor, existing.code, {
           ...input,
-          aliases: [...keepAliases, ...(input.aliases ?? [])],
+          ...aliasUpdate,
           membershipStatus: 'INCLUDED',
         });
         report.updated += 1;
       } else {
-        const code = await createConcept(client, actor, dimensionCode, input);
+        const code = await createConcept(client, actor, dimensionCode, {
+          ...input,
+          ...(synonyms ? { aliases: synonyms } : {}),
+        });
         byLabel.set(normalizeAliasText(row.item), {
           code,
-          aliases: [],
+          aliases: synonyms ?? [],
         } as unknown as ConceptView);
         report.created += 1;
       }
       await client.query('RELEASE SAVEPOINT import_row');
+      report.groupsCreated += groupsCreatedInRow.length;
     } catch (error) {
       await client.query('ROLLBACK TO SAVEPOINT import_row');
+      // The rollback also undid groups created by this row.
+      for (const key of groupsCreatedInRow) groupIds.delete(key);
       report.errors.push({
         line: row.line,
         message: error instanceof Error ? error.message : 'Erro desconhecido',

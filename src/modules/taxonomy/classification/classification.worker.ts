@@ -1,6 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
+import { PROTECTED_EXCLUDED_SOURCES } from '../curation/curation.constants.js';
 import {
   findLatestPublishedRelease,
   kyselyRunner,
@@ -28,6 +29,9 @@ import {
 
 export const MAX_CLASSIFICATION_ATTEMPTS = 3;
 const FAILED_RETRY_INTERVAL = '15 minutes';
+// After the quick retries, a failed seal is retried once a day so a systemic
+// failure fixed by a later deploy heals without manual intervention.
+const EXHAUSTED_RETRY_INTERVAL = '24 hours';
 const CONCEPT_CACHE_TTL_MS = 5 * 60_000;
 
 export interface PublicationTaxonomyBatchResult {
@@ -120,8 +124,13 @@ async function selectPending(
         s.id IS NULL
         OR (
           s.status = 'FAILED'
-          AND s.attempt_count < ${MAX_CLASSIFICATION_ATTEMPTS}
-          AND s.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
+          AND (
+            (
+              s.attempt_count < ${MAX_CLASSIFICATION_ATTEMPTS}
+              AND s.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
+            )
+            OR s.scanned_at <= now() - ${EXHAUSTED_RETRY_INTERVAL}::interval
+          )
         )
       )
       -- NCM detection runs first so NCM-based tags are not missed.
@@ -155,7 +164,9 @@ async function ncmCodesFor(
     SELECT DISTINCT ncm_code
     FROM publication_ncm_mentions
     WHERE publication_version_id = ${publicationVersionId}::uuid
-      AND verification_status <> 'REJECTED'
+      AND verification_status = 'CATALOG_MATCHED'
+      AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
+      AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
   `.execute(db);
   return result.rows.map((row) => row.ncm_code);
 }
@@ -346,7 +357,7 @@ export async function processPublicationTaxonomyBatch(
   const pending = await selectPending(
     db,
     release.id,
-    settings.classificationExcludedSources,
+    [...new Set([...settings.classificationExcludedSources, ...PROTECTED_EXCLUDED_SOURCES])],
     limit,
   );
   result.selected = pending.length;

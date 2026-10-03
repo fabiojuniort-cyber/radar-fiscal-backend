@@ -328,6 +328,26 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     const sectorDraft = draftView.dimensions.find((d: { code: string }) => d.code === 'sector');
     assert.equal(sectorDraft.name, 'Segmento', 'initial curation renames Setor');
 
+    // A sheet without the code/synonym columns must not erase curated data.
+    const partial = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/dimensions/product/import',
+      headers: curator.headers,
+      payload: { justification: 'Só perfil', csv: 'Item;No perfil\nUreia;✓' },
+    });
+    assert.equal(partial.statusCode, 200, partial.body);
+    const afterPartial = (
+      await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/taxonomy/releases/${draft.draft.id}`,
+        headers: curator.headers,
+      })
+    ).json();
+    const urea = afterPartial.concepts.find((c: { code: string }) => c.code === 'product.urea');
+    assert.deepEqual(urea.officialCodes, ['310210']);
+    assert.ok(urea.aliases.some((a: { text: string }) => a.text === 'carbamida'));
+    assert.equal(urea.groupCode, 'fertilizantes');
+
     const dimensionPatch = await app.inject({
       method: 'PATCH',
       url: '/api/v1/admin/taxonomy/drafts/current/dimensions/sector',
@@ -521,6 +541,65 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       payload: { justification: 'Revisto', conceptCode: 'theme.presumed_credit', action: 'RESTORE' },
     });
     assert.equal(restored.statusCode, 200, restored.body);
+
+    // DOE-SP cannot be put back into classification from the API.
+    const unprotect = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/taxonomy/settings/excluded-sources',
+      headers: curator.headers,
+      payload: { justification: 'Tentar incluir DOE-SP', sources: [] },
+    });
+    assert.equal(unprotect.statusCode, 409);
+
+    // Curator decisions survive a new release: remove the automatic tag,
+    // publish the next version and reclassify.
+    const removeAgain = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/taxonomy/publications/${publicationId}/tags`,
+      headers: curator.headers,
+      payload: { justification: 'Não é crédito presumido', conceptCode: 'theme.presumed_credit', action: 'REMOVE' },
+    });
+    assert.equal(removeAgain.statusCode, 200, removeAgain.body);
+    const nextDraft = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts',
+      headers: curator.headers,
+      payload: { justification: 'Segunda versão' },
+    });
+    assert.equal(nextDraft.statusCode, 201, nextDraft.body);
+    assert.equal(nextDraft.json().initialCuration, null, 'configured source is copied as is');
+    const nextPublish = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/publish',
+      headers: curator.headers,
+      payload: { justification: 'Revisado', changeNotes: 'Segunda versão curada' },
+    });
+    assert.equal(nextPublish.statusCode, 200, nextPublish.body);
+    resetClassificationConceptCache();
+    const rerun = await processPublicationTaxonomyBatch(worker, { limit: 50 });
+    assert.ok(rerun.succeeded >= 1, JSON.stringify(rerun));
+    const afterRelease = (
+      await app.inject({ method: 'GET', url: `/api/v1/publications/${publicationId}/taxonomy`, headers: customer.headers })
+    ).json();
+    assert.equal(afterRelease.release.version, `v${MAJOR}.2.0`);
+    const codesAfter = afterRelease.sections.flatMap((s: { tags: Array<{ conceptCode: string }> }) =>
+      s.tags.map((t) => t.conceptCode),
+    );
+    assert.ok(!codesAfter.includes('theme.presumed_credit'), 'removal survives the new release');
+    assert.ok(codesAfter.includes('product.soy'), 'manual tag survives the new release');
+    assert.ok(codesAfter.includes('product.urea'));
+    const archiveRemoved = await app.inject({
+      method: 'GET',
+      url: '/api/v2/archive?tag=theme.presumed_credit',
+      headers: customer.headers,
+    });
+    assert.ok(!archiveRemoved.json().items.some((item: { id: string }) => item.id === publicationId));
+    const archiveManual = await app.inject({
+      method: 'GET',
+      url: '/api/v2/archive?tag=product.soy',
+      headers: customer.headers,
+    });
+    assert.ok(archiveManual.json().items.some((item: { id: string }) => item.id === publicationId));
 
     const progress = (
       await app.inject({ method: 'GET', url: '/api/v1/admin/taxonomy/state', headers: curator.headers })

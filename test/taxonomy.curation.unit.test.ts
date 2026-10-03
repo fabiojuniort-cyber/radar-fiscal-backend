@@ -136,7 +136,7 @@ test('CNAE to segment: most specific prefix wins and primary CNAE pre-selects', 
   );
 });
 
-test('spreadsheet import accepts blanks, ✓ flags and comma separated synonyms', () => {
+test('spreadsheet import: blank keeps, "—" clears, ✓ flags and comma separated synonyms', () => {
   const rows = parseImportCsv(
     [
       'Segmento;Grupo;Item;Código oficial;Sinônimos;No perfil;Ordem',
@@ -144,10 +144,11 @@ test('spreadsheet import accepts blanks, ✓ flags and comma separated synonyms'
       'Agronegócio;Fertilizantes;Cloreto de potássio;3104.20;"KCl, potassa";✓;',
       'Agronegócio;Defensivos e adjuvantes;Espalhante adesivo;a definir;adjuvante;;',
       ';;;;;;',
-      'Combustíveis;;Diesel;;óleo diesel;não;',
+      'Combustíveis;—;Diesel;;óleo diesel;não;',
+      'Combustíveis;;Gasolina;-;;;',
     ].join('\n'),
   );
-  assert.equal(rows.length, 4);
+  assert.equal(rows.length, 5);
   assert.deepEqual(rows[0], {
     line: 2,
     group: 'Fertilizantes',
@@ -159,10 +160,19 @@ test('spreadsheet import accepts blanks, ✓ flags and comma separated synonyms'
     code: null,
   });
   assert.deepEqual(rows[1]!.synonyms, ['KCl', 'potassa']);
-  assert.deepEqual(rows[2]!.officialCodes, []);
+  assert.equal(rows[2]!.officialCodes, undefined, '"a definir" keeps the current code');
   assert.equal(rows[2]!.profileVisible, null);
-  assert.equal(rows[3]!.group, null);
+  assert.equal(rows[3]!.group, null, '"—" clears the group');
+  assert.equal(rows[3]!.officialCodes, undefined, 'blank keeps the current code');
   assert.equal(rows[3]!.profileVisible, false);
+  assert.equal(rows[4]!.group, undefined, 'blank keeps the current group');
+  assert.deepEqual(rows[4]!.officialCodes, [], '"-" clears the codes');
+  assert.equal(rows[4]!.synonyms, undefined);
+
+  const onlyProfile = parseImportCsv('Item;No perfil\nUreia;✓');
+  assert.equal(onlyProfile[0]!.group, undefined);
+  assert.equal(onlyProfile[0]!.officialCodes, undefined);
+  assert.equal(onlyProfile[0]!.synonyms, undefined);
 });
 
 test('official codes are normalized and validated by type', () => {

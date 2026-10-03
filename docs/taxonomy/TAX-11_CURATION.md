@@ -40,7 +40,9 @@ nome" desligado para nomes genéricos (ex.: "Lei", "Venda", "Federal").
 | item | `classify_by_label`, `official_codes`, sinônimos | classificação automática |
 
 Releases anteriores (colunas NULL) usam os padrões legados de
-`curation.constants.ts`, que reproduzem o comportamento antes da TAX-11.
+`curation.constants.ts`: as 8 dimensões que o site exibia no Perfil Tributário
+antes da TAX-11 (a API antiga também devolvia Tema/Tratamento/Sujeito, mas o
+site os filtrava e nunca salvou códigos dessas dimensões).
 
 ## Acesso
 
@@ -60,13 +62,16 @@ Releases anteriores (colunas NULL) usam os padrões legados de
   **nasce desligado**; o curador liga depois de revisar as tabelas.
 - `classification_excluded_sources` nasce com `["doe-sp"]`: o guard da
   reconstrução DOE-SP recusa histórico de classificação em publicações do
-  escopo. Remover a exclusão só após o fechamento formal do DOE-SP.
+  escopo. O DOE-SP também é excluído no código (`PROTECTED_EXCLUDED_SOURCES`)
+  e a API recusa removê-lo; voltar a classificá-lo exige mudança própria após
+  o fechamento formal do DOE-SP.
 - O Worker roda `processPublicationTaxonomyBatch` após a detecção de NCM
   (20 por ciclo ocioso, 10 após cada coleta), mais recentes primeiro.
 - Selo: `publication_taxonomy_scans` por versão × release × motor. Sem selo
   `SUCCESS` = pendente; publicar nova release ou mudar o motor reenfileira o
   acervo inteiro (legado incluso) sem apagar histórico. Falhas são retentadas
-  até 3 vezes (intervalo de 15 min).
+  até 3 vezes (intervalo de 15 min) e, depois, uma vez por dia — uma falha
+  sistêmica corrigida por deploy se recupera sozinha.
 - Sinais: nome do item (se `classify_by_label`), sinônimos
   `EXACT_LEXICAL`/`ABBREVIATION`, prefixo NCM contra menções NCM detectadas e
   cClassTrib citado no texto. Cada tag guarda o trecho/termo que a gerou.
@@ -77,9 +82,13 @@ Releases anteriores (colunas NULL) usam os padrões legados de
   tag, status (`CLASSIFIED`, `PENDING`, `DISABLED`, `EXCLUDED`, `FAILED`).
 - `GET /api/v2/archive?tag=<código>` — Acervo filtrado por tag efetiva.
 - Curador: `POST /api/v1/admin/taxonomy/publications/:id/tags`
-  (`ADD`/`REMOVE`/`RESTORE`). Remover tag automática grava `REJECT` em
-  `publication_taxonomy_reviews`; tags manuais usam
-  `publication_taxonomy_curator_tags` (append-only).
+  (`ADD`/`REMOVE`/`RESTORE`). Cada correção grava um evento por conceito em
+  `publication_taxonomy_curator_tags` (append-only); a decisão mais recente
+  por versão da legislação × conceito vale também nas releases seguintes.
+  Remover/restaurar tag automática grava ainda `REJECT`/`CONFIRM` em
+  `publication_taxonomy_reviews` (trilha da asserção julgada).
+- Planilha: coluna ausente ou célula vazia mantém o valor atual; "—" ou "-"
+  limpa o campo.
 
 ## Catálogos oficiais
 

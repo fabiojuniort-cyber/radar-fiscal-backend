@@ -4,6 +4,7 @@ import {
 } from '../classification/classification.curated.js';
 import {
   DEFAULT_SECTION_ORDER,
+  PROTECTED_EXCLUDED_SOURCES,
 } from './curation.constants.js';
 import {
   findLatestPublishedRelease,
@@ -75,7 +76,7 @@ interface AutomaticRow {
 }
 
 interface CuratorRow {
-  release_concept_id: string;
+  concept_code: string;
   action: 'ADD' | 'REMOVE';
   rationale: string;
 }
@@ -102,17 +103,20 @@ export async function loadPublicationTaxonomy(
           FROM publication_origins po
           JOIN sources s ON s.id = po.source_id
           WHERE po.publication_id = pv.publication_id
-            AND s.code = ANY(
-              SELECT jsonb_array_elements_text(value)
-              FROM taxonomy_runtime_settings
-              WHERE key = 'classification_excluded_sources'
+            AND (
+              s.code = ANY($2::text[])
+              OR s.code = ANY(
+                SELECT jsonb_array_elements_text(value)
+                FROM taxonomy_runtime_settings
+                WHERE key = 'classification_excluded_sources'
+              )
             )
         ) AS excluded
       FROM publication_versions pv
       WHERE pv.publication_id = $1::uuid AND pv.is_current = true
       LIMIT 1
     `,
-    [publicationId],
+    [publicationId, [...PROTECTED_EXCLUDED_SOURCES]],
   );
   const current = version[0];
   if (!current) return base;
@@ -169,17 +173,22 @@ export async function loadPublicationTaxonomy(
       )
     : [];
 
+  // Curator decisions are per legislation version x concept identity and
+  // survive new releases: the latest ADD/REMOVE for the concept code wins,
+  // whatever release it was recorded against.
   const curator = await run<CuratorRow>(
     `
-      SELECT DISTINCT ON (release_concept_id)
-        release_concept_id, action, rationale
-      FROM publication_taxonomy_curator_tags
-      WHERE publication_version_id = $1::uuid
-        AND taxonomy_release_id = $2::uuid
-      ORDER BY release_concept_id, created_at DESC, id DESC
+      SELECT DISTINCT ON (c.code)
+        c.code AS concept_code, ct.action, ct.rationale
+      FROM publication_taxonomy_curator_tags ct
+      JOIN taxonomy_release_concepts rc ON rc.id = ct.release_concept_id
+      JOIN taxonomy_concepts c ON c.id = rc.concept_id
+      WHERE ct.publication_version_id = $1::uuid
+      ORDER BY c.code, ct.created_at DESC, ct.id DESC
     `,
-    [current.id, release.id],
+    [current.id],
   );
+  const decisionByCode = new Map(curator.map((row) => [row.concept_code, row]));
 
   const settings = await loadRuntimeSettings(run);
   let status: PublicationTaxonomyStatus;
@@ -229,7 +238,10 @@ export async function loadPublicationTaxonomy(
   for (const row of automatic) {
     const concept = conceptById.get(row.release_concept_id);
     if (!concept) continue;
-    const removed = row.latest_review === 'REJECT';
+    const decision = decisionByCode.get(concept.code);
+    const removed = decision
+      ? decision.action === 'REMOVE'
+      : row.latest_review === 'REJECT';
     if (removed && !options.includeRemoved) continue;
     add(concept, {
       origin: 'AUTOMATIC',
@@ -243,15 +255,12 @@ export async function loadPublicationTaxonomy(
     });
   }
 
+  const conceptByCode = new Map(view.concepts.map((concept) => [concept.code, concept]));
   for (const row of curator) {
-    const concept = conceptById.get(row.release_concept_id);
+    if (row.action !== 'ADD') continue;
+    const concept = conceptByCode.get(row.concept_code);
     if (!concept) continue;
-    if (row.action === 'REMOVE') {
-      const existing = tags.get(row.release_concept_id);
-      if (existing?.tag.origin === 'CURATOR') tags.delete(row.release_concept_id);
-      continue;
-    }
-    if (tags.get(row.release_concept_id)?.tag.removed === false) continue;
+    if (tags.has(concept.releaseConceptId)) continue;
     add(concept, {
       origin: 'CURATOR',
       assertionId: null,
@@ -267,7 +276,7 @@ export async function loadPublicationTaxonomy(
     const mentions = await run<{ ncm_code: string }>(
       `SELECT DISTINCT ncm_code FROM publication_ncm_mentions
        WHERE publication_version_id = $1::uuid
-         AND verification_status <> 'REJECTED'`,
+         AND verification_status = 'CATALOG_MATCHED'`,
       [current.id],
     );
     const taggedGroups = new Set(
