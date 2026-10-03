@@ -57,6 +57,16 @@ site os filtrava e nunca salvou códigos dessas dimensões).
 - O motivo é opcional na interface; sem texto, o site envia “Curadoria da taxonomia”
   (a API continua exigindo um motivo para a auditoria).
 
+## Sinônimos: um tipo só (decisão do PO, 03/10/2026)
+
+- Para o curador existe um único tipo de sinônimo, e **todo sinônimo marca as
+  legislações em que aparece**. O classificador curado (`tribusca.taxonomy.curated`
+  **2.1.0**) usa todos os sinônimos, qualquer que seja o tipo gravado. A versão nova do
+  motor reclassifica pelo selo o que já tiver sido classificado.
+- Sinônimos que o dicionário TAX-02 marcou como `AMBIGUOUS` ou `SEARCH_RELATED`
+  (ex.: “IE”, “ST”, “Cashback”, “DRC”, “Abatedouro”) aparecem na revisão como aviso
+  `SYNONYM_WAS_NOT_AUTOMATIC`, para o PO decidir se ficam antes de publicar.
+
 ## Acesso
 
 - Papel de plataforma `TAXONOMY_CURATOR` em `platform_user_roles` (global, não

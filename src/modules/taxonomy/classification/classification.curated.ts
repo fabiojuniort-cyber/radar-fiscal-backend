@@ -9,7 +9,7 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-export const CURATED_ENGINE_VERSION = '2.0.0';
+export const CURATED_ENGINE_VERSION = '2.1.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
@@ -178,10 +178,9 @@ export function planCuratedClassification(
       }
     }
 
+    // One kind of synonym for the curator (PO decision): every synonym
+    // marks the legislação where it appears, whatever its stored type.
     for (const alias of concept.aliases) {
-      if (alias.aliasType !== 'EXACT_LEXICAL' && alias.aliasType !== 'ABBREVIATION') {
-        continue;
-      }
       const excerpt = findTerm(raw, normalized, alias.text);
       if (!excerpt) continue;
       keep({
@@ -230,7 +229,7 @@ export function planCuratedClassification(
     policyVersion: 2,
     engine: CURATED_ENGINE_KEY,
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
-    autoAliasTypes: ['EXACT_LEXICAL', 'ABBREVIATION'],
+    autoAliasTypes: 'ALL',
     officialCodes: ['NCM_PREFIX_ON_DETECTED_MENTIONS', 'CCLASSTRIB_CITED'],
     normalization: 'NFD_LOWER_ALNUM_TOKENS',
     conceptConfigSha256: sha256Hex(

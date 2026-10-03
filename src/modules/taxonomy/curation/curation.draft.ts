@@ -1916,6 +1916,21 @@ export async function validateReleaseView(
         subject: concept.code,
       });
     }
+    // Every synonym now marks legislações; the ones the dictionary had
+    // flagged as ambiguous or search-only deserve a second look.
+    const risky = concept.aliases.filter(
+      (alias) => alias.aliasType === 'AMBIGUOUS' || alias.aliasType === 'SEARCH_RELATED',
+    );
+    if (risky.length > 0) {
+      issues.push({
+        severity: 'WARNING',
+        code: 'SYNONYM_WAS_NOT_AUTOMATIC',
+        message: `${concept.label}: o(s) sinônimo(s) ${risky
+          .map((alias) => `“${alias.text}” (${alias.aliasType === 'AMBIGUOUS' ? 'ambíguo' : 'só busca'} no dicionário)`)
+          .join(', ')} agora marcam legislações automaticamente. Confira se devem ficar.`,
+        subject: concept.code,
+      });
+    }
     if (/;\s*(\d+|—|modelo)/i.test(concept.label)) {
       issues.push({
         severity: 'WARNING',
