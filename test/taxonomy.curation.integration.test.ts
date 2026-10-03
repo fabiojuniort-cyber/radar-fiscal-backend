@@ -422,6 +422,10 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.ok(productCodes.includes('product.cloreto_de_potassio'));
     assert.ok(!productCodes.includes('product.soy'), 'hidden item is not offered');
     assert.ok(body.conceptCodes.includes('product.soy'), 'hidden item stays saveable');
+    assert.ok(
+      body.conceptIndex.some((c: { code: string; label: string }) => c.code === 'product.soy' && c.label === 'Soja'),
+      'hidden item keeps its label for legacy profile fields',
+    );
     assert.equal(body.dimensions[2].concepts[0].label, 'NF-e');
 
     // Classification is disabled by default: the Worker does nothing.

@@ -192,7 +192,17 @@ export function parseImportCsv(text: string): ImportRow[] {
   const col = (...names: string[]) => headers.findIndex((h) => names.includes(h));
   const groupCol = col('grupo');
   const itemCol = col('item', 'produto');
-  const codesCol = col('codigo oficial', 'ncm', 'cnae', 'codigo');
+  const codesCol = col(
+    'codigo oficial',
+    'ncm',
+    'cnae',
+    'cfop',
+    'nbs',
+    'modelo',
+    'cclasstrib',
+    'item lc 116',
+    'codigo',
+  );
   const synonymsCol = col('sinonimos', 'sinonimo');
   const profileCol = col('no perfil', 'perfil');
   const orderCol = col('ordem');

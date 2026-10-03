@@ -1776,6 +1776,7 @@ export async function productRoutes(
                 release: null,
                 dimensions: [],
                 conceptCodes: [],
+                conceptIndex: [],
               };
             }
 
@@ -1783,7 +1784,7 @@ export async function productRoutes(
             // (legacy defaults for releases published before curation).
             const view = await loadReleaseView(kyselyRunner(trx), release.id);
             if (!view) {
-              return { release: null, dimensions: [], conceptCodes: [] };
+              return { release: null, dimensions: [], conceptCodes: [], conceptIndex: [] };
             }
 
             return {
@@ -1797,6 +1798,13 @@ export async function productRoutes(
               // Every INCLUDED code of the release, visible or not: the profile
               // keeps hidden selections and drops only codes no longer offered.
               conceptCodes: view.concepts.map((concept) => concept.code),
+              // Labels of every included concept, so saving a profile keeps the
+              // legacy label fields complete for hidden selections too.
+              conceptIndex: view.concepts.map((concept) => ({
+                code: concept.code,
+                label: concept.label,
+                dimensionCode: concept.dimensionCode,
+              })),
               dimensions: view.dimensions
                 .filter((dimension) => dimension.profileVisible)
                 .map((dimension) => {
