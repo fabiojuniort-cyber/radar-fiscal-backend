@@ -12,6 +12,10 @@ import {
   TenantAccessDeniedError,
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
+import {
+  DISPLAY_TITLE_CONTENT_CHARS,
+  publicationDisplayTitle,
+} from '../../modules/catalog/display-title.js';
 import { buildSearchTsquery } from '../../modules/catalog/search-query.js';
 import {
   CURATED_ENGINE_KEY,
@@ -417,6 +421,7 @@ interface ArchiveRow {
   published_on: Date | string | null;
   effective_on: Date | string | null;
   relevant_excerpt: string | null;
+  content_head: string | null;
   official_url: string | null;
   source_code: string | null;
   source_name: string | null;
@@ -937,6 +942,7 @@ export async function catalogMonitoringRoutes(
           p.published_on,
           p.effective_on,
           cv.relevant_excerpt,
+          left(cv.content_text, ${DISPLAY_TITLE_CONTENT_CHARS}) AS content_head,
           COALESCE(
             p.primary_official_url,
             first_origin.official_url
@@ -989,7 +995,7 @@ export async function catalogMonitoringRoutes(
         hasMore,
         items: items.map((row) => ({
           id: row.id,
-          title: row.title,
+          title: publicationDisplayTitle(row.title, row.content_head),
           actType: row.act_type,
           actNumber: row.act_number,
           agency: row.agency,
