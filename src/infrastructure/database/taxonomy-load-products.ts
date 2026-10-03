@@ -10,7 +10,7 @@ import {
   parseProductSheet,
   type ProductLoadSummary,
 } from '../../modules/taxonomy/curation/curation.product-load.js';
-import { resolveCuratorDatabaseUrl } from './curator-client.js';
+import { resolveCuratorDatabaseUrl } from './curator-url.js';
 
 /**
  * Loads a product classification sheet (Segmento;Grupo;Item) into the open
