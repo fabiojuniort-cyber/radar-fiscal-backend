@@ -41,6 +41,15 @@ const envSchema = z.object({
 
   DATABASE_ADMIN_URL: databaseUrlSchema.optional(),
 
+  // TAX-11: dedicated login used only by the taxonomy curation routes.
+  // When unset, curation routes answer 503 and the rest of the API works.
+  DATABASE_CURATOR_URL: databaseUrlSchema.optional(),
+
+  DB_CURATOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
+
+  // Commit deployed by Railway; recorded on curated taxonomy releases.
+  RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
+
   JWT_ACCESS_SECRET: z.string().min(32),
 
   AUTH_REFRESH_COOKIE_NAME: z

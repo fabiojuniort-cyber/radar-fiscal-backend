@@ -15,7 +15,10 @@ import { newsRoutes } from './api/routes/news.route.js';
 import { productNcmRoutes } from './api/routes/product-ncm.route.js';
 import { publicRoutes } from './api/routes/public.route.js';
 import { productRoutes } from './api/routes/product.route.js';
+import { taxonomyAdminRoutes } from './api/routes/taxonomy-admin.route.js';
+import { publicationTaxonomyRoutes } from './api/routes/publication-taxonomy.route.js';
 import { createDatabase } from './infrastructure/database/client.js';
+import { createCuratorPool } from './infrastructure/database/curator-client.js';
 import { loggerOptions } from './infrastructure/logging/logger.js';
 import { registerAuthSupport } from './modules/auth/auth.plugin.js';
 
@@ -31,8 +34,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.decorate('db', db);
 
+  const curatorPool = createCuratorPool(app.log);
+  app.decorate('curatorPool', curatorPool);
+
   app.addHook('onClose', async () => {
     await db.destroy();
+    await curatorPool?.end();
   });
 
   await registerAuthSupport(app);
@@ -46,6 +53,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(catalogMonitoringRoutes);
   await app.register(companyManualRoutes);
   await app.register(establishmentManualRoutes);
+  await app.register(taxonomyAdminRoutes);
+  await app.register(publicationTaxonomyRoutes);
 
   return app;
 }

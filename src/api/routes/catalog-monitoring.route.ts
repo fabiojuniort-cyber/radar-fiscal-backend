@@ -13,6 +13,10 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { buildSearchTsquery } from '../../modules/catalog/search-query.js';
+import {
+  CURATED_ENGINE_KEY,
+  CURATED_ENGINE_VERSION,
+} from '../../modules/taxonomy/classification/classification.curated.js';
 import { derivePublicSourceStatus } from './public.route.js';
 
 const SAO_PAULO_TZ = 'America/Sao_Paulo';
@@ -81,6 +85,12 @@ const archiveQuerySchema = z
           : value,
       z.string().regex(/^\d{8}$/).optional(),
     ),
+    // TAX-11: taxonomy tag (concept code) of the latest published release.
+    tag: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/)
+      .optional(),
     page: z.coerce.number().int().min(1).max(100000).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(25),
   })
@@ -248,10 +258,96 @@ function buildArchivePlan(
     `);
   }
 
+  // TAX-11: effective tags on the current version for the latest PUBLISHED
+  // release. The curator's latest decision for (version, concept identity)
+  // wins across releases: REMOVE hides an automatic tag, ADD shows the tag
+  // even without an automatic assertion. Without a decision, an automatic
+  // assertion counts unless its latest review is REJECT.
+  const tagIds = input.tag
+    ? sql`
+        SELECT tag_pv.publication_id
+        FROM taxonomy_release_concepts tag_rc
+        JOIN taxonomy_concepts tag_c ON tag_c.id = tag_rc.concept_id
+        JOIN publication_taxonomy_assertions tag_a
+          ON tag_a.release_concept_id = tag_rc.id
+         AND tag_a.taxonomy_release_id = tag_rc.release_id
+        JOIN publication_taxonomy_scans tag_s
+          ON tag_s.run_id = tag_a.run_id
+         AND tag_s.status = 'SUCCESS'
+         AND tag_s.engine_key = ${CURATED_ENGINE_KEY}
+         AND tag_s.engine_version = ${CURATED_ENGINE_VERSION}
+        JOIN publication_versions tag_pv
+          ON tag_pv.id = tag_s.publication_version_id
+         AND tag_pv.is_current = true
+        LEFT JOIN LATERAL (
+          SELECT ct.action
+          FROM publication_taxonomy_curator_tags ct
+          JOIN taxonomy_release_concepts ct_rc ON ct_rc.id = ct.release_concept_id
+          WHERE ct.publication_version_id = tag_pv.id
+            AND ct_rc.concept_id = tag_c.id
+          ORDER BY ct.created_at DESC, ct.id DESC
+          LIMIT 1
+        ) tag_decision ON true
+        WHERE tag_c.code = ${input.tag}
+          AND tag_rc.release_id = (
+            SELECT id FROM taxonomy_releases
+            WHERE status = 'PUBLISHED'
+            ORDER BY version_major DESC, version_minor DESC, version_patch DESC
+            LIMIT 1
+          )
+          AND (
+            tag_decision.action = 'ADD'
+            OR (
+              tag_decision.action IS NULL
+              AND COALESCE((
+                SELECT r.decision
+                FROM publication_taxonomy_reviews r
+                WHERE r.assertion_id = tag_a.id
+                ORDER BY r.created_at DESC, r.id DESC
+                LIMIT 1
+              ), 'CONFIRM') <> 'REJECT'
+            )
+          )
+        UNION
+        SELECT tag_pv.publication_id
+        FROM (
+          SELECT DISTINCT ON (ct.publication_version_id)
+            ct.publication_version_id, ct.action, ct_rc.concept_id
+          FROM publication_taxonomy_curator_tags ct
+          JOIN taxonomy_release_concepts ct_rc ON ct_rc.id = ct.release_concept_id
+          JOIN taxonomy_concepts ct_c ON ct_c.id = ct_rc.concept_id
+          WHERE ct_c.code = ${input.tag}
+          ORDER BY ct.publication_version_id, ct.created_at DESC, ct.id DESC
+        ) latest_ct
+        JOIN publication_versions tag_pv
+          ON tag_pv.id = latest_ct.publication_version_id
+         AND tag_pv.is_current = true
+        WHERE latest_ct.action = 'ADD'
+          AND EXISTS (
+            SELECT 1
+            FROM taxonomy_release_concepts cur_rc
+            WHERE cur_rc.concept_id = latest_ct.concept_id
+              AND cur_rc.membership_status = 'INCLUDED'
+              AND cur_rc.release_id = (
+                SELECT id FROM taxonomy_releases
+                WHERE status = 'PUBLISHED'
+                ORDER BY version_major DESC, version_minor DESC, version_patch DESC
+                LIMIT 1
+              )
+          )
+      `
+    : null;
+
+  if (tagIds) {
+    conditions.push(sql<boolean>`p.id IN (${tagIds})`);
+  }
+
   const filters = sql.join(conditions, sql` AND `) as RawBuilder<boolean>;
   // Without a text search, an NCM filter is the selective condition: fetch
   // its publications through the mention code index first.
-  let searchIds: RawBuilder<unknown> | null = input.ncm
+  let searchIds: RawBuilder<unknown> | null = tagIds && !input.ncm
+    ? tagIds
+    : input.ncm
     ? sql`
         SELECT DISTINCT ncm_pv.publication_id
         FROM publication_ncm_mentions pnm
@@ -763,6 +859,7 @@ export async function catalogMonitoringRoutes(
       if (
         !input.q &&
         !input.ncm &&
+        !input.tag &&
         !input.uf &&
         !input.jurisdiction &&
         !input.actType &&

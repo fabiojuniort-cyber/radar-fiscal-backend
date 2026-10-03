@@ -33,6 +33,7 @@ jobs:
       DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
       DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
       DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
       JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
       AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
       PUBLIC_API_ALLOWED_ORIGINS: https://public.example
@@ -145,6 +146,10 @@ jobs:
         run: |
           set -o pipefail
           npx tsx --test test/product-ncm.integration.test.ts 2>&1 | tee product-ncm-integration.log
+
+      # TAX-11 commits a high-numbered curated release; keep it the last gate.
+      - name: TAX-11 curation end-to-end integration
+        run: npx tsx --test test/taxonomy.curation.integration.test.ts
 
       - name: Upload Product/NCM integration diagnostics
         if: always()

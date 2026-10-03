@@ -154,6 +154,69 @@ async function run(): Promise<void> {
       );
     }
 
+    // TAX-11: optional dedicated curator login. When provisioned it must be a
+    // NOINHERIT login whose only membership is radar_taxonomy_curator, and the
+    // app/worker runtimes must never be able to assume it.
+    const curatorLogin = await pool.query<{
+      rolcanlogin: boolean;
+      rolinherit: boolean;
+      rolsuper: boolean;
+      rolcreatedb: boolean;
+      rolcreaterole: boolean;
+      rolreplication: boolean;
+      rolbypassrls: boolean;
+      curator_member: boolean;
+      app_member: boolean;
+      worker_member: boolean;
+      app_runtime_can_assume: boolean;
+      worker_runtime_can_assume: boolean;
+    }>(`
+      SELECT
+        r.rolcanlogin,
+        r.rolinherit,
+        r.rolsuper,
+        r.rolcreatedb,
+        r.rolcreaterole,
+        r.rolreplication,
+        r.rolbypassrls,
+        pg_has_role(r.oid, 'radar_taxonomy_curator', 'MEMBER') AS curator_member,
+        pg_has_role(r.oid, 'radar_app', 'MEMBER') AS app_member,
+        pg_has_role(r.oid, 'radar_worker', 'MEMBER') AS worker_member,
+        COALESCE((
+          SELECT pg_has_role(a.oid, r.oid, 'MEMBER')
+          FROM pg_roles a WHERE a.rolname = 'radar_app_runtime'
+        ), false) AS app_runtime_can_assume,
+        COALESCE((
+          SELECT pg_has_role(w.oid, r.oid, 'MEMBER')
+          FROM pg_roles w WHERE w.rolname = 'radar_worker_runtime'
+        ), false) AS worker_runtime_can_assume
+      FROM pg_roles r
+      WHERE r.rolname = 'radar_taxonomy_curator_runtime'
+    `);
+
+    const login = curatorLogin.rows[0];
+    if (
+      login &&
+      (
+        !login.rolcanlogin ||
+        login.rolinherit ||
+        login.rolsuper ||
+        login.rolcreatedb ||
+        login.rolcreaterole ||
+        login.rolreplication ||
+        login.rolbypassrls ||
+        !login.curator_member ||
+        login.app_member ||
+        login.worker_member ||
+        login.app_runtime_can_assume ||
+        login.worker_runtime_can_assume
+      )
+    ) {
+      throw new Error(
+        'Taxonomy curator runtime login does not match least-privilege policy.',
+      );
+    }
+
     const identities = await readPrivileges(pool, IDENTITY_TABLES);
 
     if (

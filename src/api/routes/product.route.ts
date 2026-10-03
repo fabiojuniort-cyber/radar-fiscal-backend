@@ -13,6 +13,11 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import {
+  kyselyRunner,
+  loadReleaseView,
+} from '../../modules/taxonomy/curation/curation.read.js';
+import { suggestSegmentsForCompany } from '../../modules/taxonomy/curation/curation.suggestions.js';
 import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import {
   CnpjRegistryError,
@@ -1770,76 +1775,17 @@ export async function productRoutes(
               return {
                 release: null,
                 dimensions: [],
+                conceptCodes: [],
+                conceptIndex: [],
               };
             }
 
-            const allowedDimensions = [
-              'tax',
-              'theme',
-              'treatment',
-              'regime',
-              'operation',
-              'operation_purpose',
-              'document',
-              'obligation',
-              'sector',
-              'product',
-              'subject',
-            ];
-
-            const dimensions = await trx
-              .selectFrom('taxonomy_release_dimensions as rd')
-              .innerJoin(
-                'taxonomy_dimensions as d',
-                'd.id',
-                'rd.dimension_id',
-              )
-              .innerJoin(
-                'taxonomy_dimension_revisions as dr',
-                'dr.id',
-                'rd.dimension_revision_id',
-              )
-              .select([
-                'd.id',
-                'd.code',
-                'dr.name',
-                'dr.description',
-              ])
-              .where('rd.release_id', '=', release.id)
-              .where('rd.membership_status', '=', 'INCLUDED')
-              .where('d.code', 'in', allowedDimensions)
-              .orderBy('dr.name')
-              .execute();
-
-            const concepts = await trx
-              .selectFrom('taxonomy_release_concepts as rc')
-              .innerJoin(
-                'taxonomy_concepts as c',
-                'c.id',
-                'rc.concept_id',
-              )
-              .innerJoin(
-                'taxonomy_concept_revisions as cr',
-                'cr.id',
-                'rc.concept_revision_id',
-              )
-              .innerJoin(
-                'taxonomy_dimensions as d',
-                'd.id',
-                'c.dimension_id',
-              )
-              .select([
-                'd.code as dimension_code',
-                'c.code',
-                'cr.label',
-                'cr.definition',
-              ])
-              .where('rc.release_id', '=', release.id)
-              .where('rc.membership_status', '=', 'INCLUDED')
-              .where('d.code', 'in', allowedDimensions)
-              .orderBy('d.code')
-              .orderBy('cr.label')
-              .execute();
+            // TAX-11: presentation comes from the curated release settings
+            // (legacy defaults for releases published before curation).
+            const view = await loadReleaseView(kyselyRunner(trx), release.id);
+            if (!view) {
+              return { release: null, dimensions: [], conceptCodes: [], conceptIndex: [] };
+            }
 
             return {
               release: {
@@ -1849,26 +1795,137 @@ export async function productRoutes(
                   ? new Date(release.published_at).toISOString()
                   : null,
               },
-              dimensions: dimensions.map((dimension) => ({
-                code: dimension.code,
-                name: dimension.name,
-                description: dimension.description,
-                concepts: concepts
-                  .filter(
-                    (concept) =>
-                      concept.dimension_code === dimension.code,
-                  )
-                  .map((concept) => ({
-                    code: concept.code,
-                    label: concept.label,
-                    definition: concept.definition,
-                  })),
+              // Every INCLUDED code of the release, visible or not: the profile
+              // keeps hidden selections and drops only codes no longer offered.
+              conceptCodes: view.concepts.map((concept) => concept.code),
+              // Labels of every included concept, so saving a profile keeps the
+              // legacy label fields complete for hidden selections too.
+              conceptIndex: view.concepts.map((concept) => ({
+                code: concept.code,
+                label: concept.label,
+                dimensionCode: concept.dimensionCode,
               })),
+              dimensions: view.dimensions
+                .filter((dimension) => dimension.profileVisible)
+                .map((dimension) => {
+                  const groups = view.groups
+                    .filter((group) => group.dimensionCode === dimension.code)
+                    .sort(
+                      (left, right) =>
+                        left.displayOrder - right.displayOrder ||
+                        left.label.localeCompare(right.label, 'pt-BR'),
+                    );
+                  const groupCode = new Map(
+                    groups.map((group) => [group.id, group.code]),
+                  );
+                  return {
+                    code: dimension.code,
+                    name: dimension.name,
+                    description: dimension.description,
+                    helpText: dimension.helpText,
+                    profileOrder: dimension.profileOrder,
+                    usesGroups: dimension.usesGroups,
+                    officialCodeType: dimension.officialCodeType,
+                    groups: dimension.usesGroups
+                      ? groups.map((group) => ({
+                          code: group.code,
+                          label: group.label,
+                          helpText: group.helpText,
+                          segmentCodes: group.segmentCodes,
+                        }))
+                      : [],
+                    concepts: view.concepts
+                      .filter(
+                        (concept) =>
+                          concept.dimensionCode === dimension.code &&
+                          concept.profileVisible,
+                      )
+                      .sort(
+                        (left, right) =>
+                          (left.displayOrder ?? 100000) -
+                            (right.displayOrder ?? 100000) ||
+                          left.label.localeCompare(right.label, 'pt-BR'),
+                      )
+                      .map((concept) => ({
+                        code: concept.code,
+                        label: concept.label,
+                        definition: concept.definition,
+                        helpText: concept.helpText,
+                        groupCode: dimension.usesGroups && concept.groupId
+                          ? groupCode.get(concept.groupId) ?? null
+                          : null,
+                        officialCodes: concept.officialCodes,
+                      })),
+                  };
+                }),
             };
           },
         );
 
         return reply.status(200).send(result);
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
+    '/api/v1/companies/:companyId/taxonomy-suggestions',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyIdParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const tenantId = tenantIdFromRequest(request);
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const suggestions = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            const company = await trx
+              .selectFrom('companies')
+              .select('id')
+              .where('id', '=', request.params.companyId)
+              .where('tenant_id', '=', tenantId)
+              .executeTakeFirst();
+            if (!company) return null;
+
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select('id')
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+            if (!release) return [];
+
+            return suggestSegmentsForCompany(
+              kyselyRunner(trx),
+              release.id,
+              request.params.companyId,
+            );
+          },
+        );
+
+        if (suggestions === null) {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+        return reply.status(200).send({ segments: suggestions });
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
