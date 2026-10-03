@@ -34,11 +34,13 @@ import type { DB } from './database.types.js';
  * attempt, never visible to the workers' queue), so persistence, versioning,
  * origins and audit follow exactly the normal CONFAZ path.
  *
- * --refresh-presentation (with --confirm): the display HTML is not part of
- * the version hash, so improving how a page is read does not create a new
- * version. This flag rewrites the stored presentation of the act's latest
+ * --refresh-presentation (with --confirm): the display HTML and the validity
+ * end date are not part of the version hash, so improving how a page is read
+ * does not create a new version. This flag rewrites them on the act's latest
  * version — only when its content hash equals the page's — and audits it.
  */
+
+const EFFECTIVE_UNTIL_KEYS = ['effectiveUntil', 'effectiveUntilBasis', 'effectiveUntilText', 'effectiveUntilAmendedBy'];
 
 function arg(name: string): string | undefined {
   const raw = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -220,18 +222,25 @@ try {
         console.log('CONFAZ_PRESENTATION_REFRESH=' + JSON.stringify({ refreshed: false, reason: !presentation ? 'NO_PRESENTATION' : 'CONTENT_HASH_DIFFERS', versionId: latest.id }));
       } else {
         await db.transaction().execute(async (trx) => {
+          // Display-only fields derived from the page (not in the hash):
+          // the presentation HTML and the validity end date.
+          const derived = Object.fromEntries(
+            ['presentation', ...EFFECTIVE_UNTIL_KEYS]
+              .filter((key) => normalized.metadata[key] !== undefined)
+              .map((key) => [key, normalized.metadata[key]]),
+          );
           await sql`
             UPDATE publication_versions
-            SET source_metadata = jsonb_set(source_metadata, '{presentation}', ${JSON.stringify(presentation)}::jsonb, true)
+            SET source_metadata = (source_metadata - ${sql.raw(`ARRAY[${EFFECTIVE_UNTIL_KEYS.map((key) => `'${key}'`).join(',')}]`)}::text[]) || ${JSON.stringify(derived)}::jsonb
             WHERE id = ${latest.id}::uuid AND content_hash = ${normalized.contentHash}
           `.execute(trx);
           await sql`
             INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
             VALUES (NULL, 'SYSTEM', 'ops:import-confaz-act', 'PUBLICATION_PRESENTATION_REFRESHED', 'publication_version', ${latest.id}::uuid,
-                    ${JSON.stringify({ officialUrl, savedPageSha256: fileSha256, htmlChars: (presentation as { html?: string }).html?.length ?? 0 })}::jsonb, gen_random_uuid())
+                    ${JSON.stringify({ officialUrl, savedPageSha256: fileSha256, htmlChars: (presentation as { html?: string }).html?.length ?? 0, effectiveUntil: normalized.metadata.effectiveUntil ?? null })}::jsonb, gen_random_uuid())
           `.execute(trx);
         });
-        console.log('CONFAZ_PRESENTATION_REFRESH=' + JSON.stringify({ refreshed: true, versionId: latest.id, versionNo: latest.version_no }));
+        console.log('CONFAZ_PRESENTATION_REFRESH=' + JSON.stringify({ refreshed: true, versionId: latest.id, versionNo: latest.version_no, effectiveUntil: normalized.metadata.effectiveUntil ?? null }));
       }
     }
   }

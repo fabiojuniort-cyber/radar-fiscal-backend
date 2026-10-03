@@ -307,3 +307,15 @@ Apresentação fiel ao portal:
   13,7 px, preto, entrelinha 1,8, links #2c67cd sem sublinhado), quando a origem é `confaz`.
 
 Primeiro uso: Convênio ICMS 100/97 (`ops/confaz/acts/CV100_97.html`), pedido pelo PO em 03/10/2026.
+
+## Vigência final (até quando o ato vale)
+
+`effectiveOn` continua sendo o **início** da vigência. O fim é lido da **redação atual** do ato e gravado nos metadados da versão (`effectiveUntil`, `effectiveUntilBasis`, `effectiveUntilText`, `effectiveUntilAmendedBy`). Esses campos ficam fora do hash, então melhorar a leitura não cria uma nova versão.
+
+- **Cláusula de vigência:** "Este convênio … vigendo até 31 de dezembro de 2027" (`CURRENT_VALIDITY_CLAUSE`). Quando a nota anterior diz "Nova redação dada … pelo Conv. ICMS 79/25", o ato que alterou é registrado.
+- **Notas de prorrogação do ato inteiro:** "Prorrogado, até 31.12.27, pelo Conv. ICMS 79/25." (`EXTENSION_NOTE`). Notas sobre um inciso ou cláusula específica são ignoradas.
+- **Redações anteriores são ignoradas.** Com classes, valem `RedaoAnt`, `A8-3RedacaoAnt`, `RemissoAnt` e `A8-2RemissaoAnt`. Sem classes, vale o parágrafo que segue "Redação original/anterior".
+- **Vale a data mais recente.** Se houver empate, a cláusula prevalece.
+- **API:** o detalhe da publicação expõe `publication.effectiveUntil = { date, basis, amendedBy }`.
+- **Atos já gravados:** `confaz:import-act … --confirm --refresh-presentation` também atualiza esses campos.
+- **Pendência:** a revogação total ("Revogado pelo Conv. …") ainda não encerra a vigência automaticamente.

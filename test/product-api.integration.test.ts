@@ -464,6 +464,9 @@ test(
           ].join('\n'),
           'Crédito presumido para fertilizantes.',
           JSON.stringify({
+            effectiveUntil: '2027-12-31',
+            effectiveUntilBasis: 'CURRENT_VALIDITY_CLAUSE',
+            effectiveUntilAmendedBy: 'Conv. ICMS 79/25',
             presentation: {
               version: 1,
               format: 'SANITIZED_HTML',
@@ -549,6 +552,11 @@ test(
           publication: {
             id: string;
             officialUrl: string | null;
+            effectiveUntil: {
+              date: string;
+              basis: string;
+              amendedBy: string | null;
+            } | null;
           };
           version: {
             contentText: string | null;
@@ -567,6 +575,14 @@ test(
       assert.equal(
         detailBody.publication.officialUrl,
         'https://example.test/ato-oficial',
+      );
+      assert.deepEqual(
+        detailBody.publication.effectiveUntil,
+        {
+          date: '2027-12-31',
+          basis: 'CURRENT_VALIDITY_CLAUSE',
+          amendedBy: 'Conv. ICMS 79/25',
+        },
       );
       assert.match(
         detailBody.version?.contentText ?? '',

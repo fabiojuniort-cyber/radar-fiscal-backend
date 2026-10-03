@@ -226,6 +226,22 @@ function recordValue(
     : undefined;
 }
 
+/** Last day in force read from the act's current wording (CONFAZ). */
+function publicationEffectiveUntil(
+  sourceMetadata: unknown,
+): { date: string; basis: string; amendedBy: string | null } | null {
+  const metadata = recordValue(sourceMetadata);
+  const date = metadata?.effectiveUntil;
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return null;
+  }
+  return {
+    date,
+    basis: typeof metadata?.effectiveUntilBasis === 'string' ? metadata.effectiveUntilBasis : 'UNKNOWN',
+    amendedBy: typeof metadata?.effectiveUntilAmendedBy === 'string' ? metadata.effectiveUntilAmendedBy : null,
+  };
+}
+
 function publicationPresentation(
   sourceMetadata: unknown,
 ): {
@@ -2267,6 +2283,7 @@ export async function productRoutes(
           effectiveOn: row.effective_on
             ? new Date(row.effective_on).toISOString().slice(0, 10)
             : null,
+          effectiveUntil: publicationEffectiveUntil(row.source_metadata),
           officialUrl,
           firstCollectedAt: new Date(row.first_collected_at).toISOString(),
           lastSeenAt: new Date(row.last_seen_at).toISOString(),
