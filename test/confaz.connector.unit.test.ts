@@ -556,3 +556,23 @@ test('older acts: two-digit 19xx years, portal title before the act heading and 
   assert.equal(recent.actNumber, '88/2026');
   assert.equal(recent.publishedAt?.toISOString().slice(0, 10), '2026-11-06');
 });
+
+test('presentation keeps only the act text block, without the portal footer', () => {
+  const html = `<html><body><h1 class="documentFirstHeading">CONVÊNIO ICMS 100/97</h1>
+    <div id="content-core">
+      <div id="parent-fieldname-text"><p class="TituloAcordo">CONVÊNIO ICMS 100/97</p>
+        <p class="DataPublicao">Publicado no DOU de 06.11.97.</p>
+        <div class="nested"><p>Cláusula primeira Fica reduzida a base de cálculo do ICMS.</p></div>
+      </div>
+      <div><a href="#wrapper">Voltar para o topo</a></div>
+      <div><p>Desenvolvido com o CMS de código aberto <a href="http://plone.org/">Plone</a></p></div>
+    </div></body></html>`;
+  const parsed = parseConfazPublicationHtml(
+    html,
+    'https://www.confaz.fazenda.gov.br/legislacao/convenios/1997/CV100_97',
+    'convenios',
+  );
+  assert.match(parsed.presentationHtml ?? '', /Cláusula primeira/);
+  assert.match(parsed.presentationHtml ?? '', /class="nested"/, 'nested blocks stay inside the act text');
+  assert.doesNotMatch(parsed.presentationHtml ?? '', /Voltar para o topo|Plone/);
+});

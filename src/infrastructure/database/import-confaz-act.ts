@@ -16,6 +16,7 @@ import {
 } from '../../modules/collection/confaz.connector.js';
 import type { CollectionConnector } from '../../modules/collection/connector.contract.js';
 import { ConnectorRegistry } from '../../modules/collection/connector.registry.js';
+import { normalizePublication } from '../../modules/collection/publication.normalizer.js';
 import type { DB } from './database.types.js';
 
 /**
@@ -26,12 +27,17 @@ import type { DB } from './database.types.js';
  *   node dist/infrastructure/database/import-confaz-act.js \
  *     --file=ops/confaz/acts/CV100_97.html \
  *     --url=https://www.confaz.fazenda.gov.br/legislacao/convenios/1997/CV100_97 \
- *     [--confirm]
+ *     [--confirm] [--refresh-presentation]
  *
  * Without --confirm it only parses and checks (read-only). With --confirm it
  * runs the real collection engine once (MANUAL run owned by this process, one
  * attempt, never visible to the workers' queue), so persistence, versioning,
  * origins and audit follow exactly the normal CONFAZ path.
+ *
+ * --refresh-presentation (with --confirm): the display HTML is not part of
+ * the version hash, so improving how a page is read does not create a new
+ * version. This flag rewrites the stored presentation of the act's latest
+ * version — only when its content hash equals the page's — and audits it.
  */
 
 function arg(name: string): string | undefined {
@@ -42,6 +48,7 @@ function arg(name: string): string | undefined {
 const file = arg('file');
 const officialUrl = arg('url');
 const confirm = process.argv.includes('--confirm');
+const refreshPresentation = process.argv.includes('--refresh-presentation');
 
 if (!file || !officialUrl) {
   console.error('Usage: import-confaz-act --file=<saved official page> --url=<official CONFAZ URL> [--confirm]');
@@ -199,6 +206,34 @@ try {
         }),
     );
     if (run.status !== 'SUCCESS') process.exitCode = 2;
+
+    if (refreshPresentation && run.status === 'SUCCESS' && after?.publication_id) {
+      const normalized = normalizePublication({ sourceId: acquired.sourceId, publication });
+      const presentation = normalized.metadata.presentation;
+      const latest = await db
+        .selectFrom('publication_versions')
+        .select(['id', 'version_no', 'content_hash'])
+        .where('publication_id', '=', after.publication_id)
+        .orderBy('version_no', 'desc')
+        .executeTakeFirstOrThrow();
+      if (!presentation || latest.content_hash !== normalized.contentHash) {
+        console.log('CONFAZ_PRESENTATION_REFRESH=' + JSON.stringify({ refreshed: false, reason: !presentation ? 'NO_PRESENTATION' : 'CONTENT_HASH_DIFFERS', versionId: latest.id }));
+      } else {
+        await db.transaction().execute(async (trx) => {
+          await sql`
+            UPDATE publication_versions
+            SET source_metadata = jsonb_set(source_metadata, '{presentation}', ${JSON.stringify(presentation)}::jsonb, true)
+            WHERE id = ${latest.id}::uuid AND content_hash = ${normalized.contentHash}
+          `.execute(trx);
+          await sql`
+            INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
+            VALUES (NULL, 'SYSTEM', 'ops:import-confaz-act', 'PUBLICATION_PRESENTATION_REFRESHED', 'publication_version', ${latest.id}::uuid,
+                    ${JSON.stringify({ officialUrl, savedPageSha256: fileSha256, htmlChars: (presentation as { html?: string }).html?.length ?? 0 })}::jsonb, gen_random_uuid())
+          `.execute(trx);
+        });
+        console.log('CONFAZ_PRESENTATION_REFRESH=' + JSON.stringify({ refreshed: true, versionId: latest.id, versionNo: latest.version_no }));
+      }
+    }
   }
 } finally {
   await db.destroy();
