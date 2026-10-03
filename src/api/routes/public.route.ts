@@ -10,6 +10,10 @@ import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { aggregateCacheOptions } from '../../infrastructure/cache/aggregate-cache.js';
 import { TtlCache } from '../../infrastructure/cache/ttl-cache.js';
+import {
+  DISPLAY_TITLE_CONTENT_CHARS,
+  publicationDisplayTitle,
+} from '../../modules/catalog/display-title.js';
 
 const CACHE_CONTROL_VALUE = 'public, max-age=300';
 const SAO_PAULO_TZ = 'America/Sao_Paulo';
@@ -401,6 +405,17 @@ export async function publicRoutes(
                 )
               )
             `.as('official_url'),
+          )
+          .select(
+            sql<string | null>`
+              (
+                SELECT left(pv.content_text, ${DISPLAY_TITLE_CONTENT_CHARS})
+                FROM publication_versions pv
+                WHERE pv.publication_id = p.id
+                  AND pv.is_current = true
+                LIMIT 1
+              )
+            `.as('content_head'),
           );
 
         if (request.query.uf) {
@@ -462,7 +477,7 @@ export async function publicRoutes(
         return {
           items: rows.map((row) => ({
             id: row.id,
-            title: row.title,
+            title: publicationDisplayTitle(row.title, row.content_head),
             actType: row.act_type,
             actNumber: row.act_number,
             agency: row.agency,

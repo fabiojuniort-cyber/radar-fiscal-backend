@@ -4,7 +4,7 @@ import type {
   FastifyRequest,
 } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { z } from 'zod';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
@@ -13,6 +13,10 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import {
+  DISPLAY_TITLE_CONTENT_CHARS,
+  publicationDisplayTitle,
+} from '../../modules/catalog/display-title.js';
 import {
   kyselyRunner,
   loadReleaseView,
@@ -2271,7 +2275,7 @@ export async function productRoutes(
       return reply.status(200).send({
         publication: {
           id: row.id,
-          title: row.title,
+          title: publicationDisplayTitle(row.title, row.content_text),
           actType: row.act_type,
           actNumber: row.act_number,
           agency: row.agency,
@@ -2350,7 +2354,10 @@ export async function productRoutes(
           'p.effective_on',
           'p.primary_official_url',
           'pv.relevant_excerpt',
-        ]);
+        ])
+        .select(
+          sql<string | null>`left(pv.content_text, ${DISPLAY_TITLE_CONTENT_CHARS})`.as('content_head'),
+        );
 
       if (request.query.uf) {
         query = query.where('p.uf', '=', request.query.uf);
@@ -2431,7 +2438,7 @@ export async function productRoutes(
 
         items.push({
           id: row.id,
-          title: row.title,
+          title: publicationDisplayTitle(row.title, row.content_head),
           actType: row.act_type,
           actNumber: row.act_number,
           agency: row.agency,
