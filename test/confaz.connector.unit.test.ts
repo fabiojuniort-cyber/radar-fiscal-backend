@@ -520,3 +520,39 @@ test('DOU (PRIMARY) and portal (ENRICHMENT) parses of the same act share one glo
   const normalizedCorrection = normalizePublication({ sourceId: SOURCE_ID, publication: correction });
   assert.notEqual(normalizedCorrection.identityHash, portal.identityHash);
 });
+
+test('older acts: two-digit 19xx years, portal title before the act heading and amendment notes before the ementa', () => {
+  const html = `<!DOCTYPE html><html><head>
+    <meta property="og:description" content="Reduz a base de cálculo do ICMS nas saídas dos insumos agropecuários que especifica, e dá outras providências.">
+  </head><body>
+    <h1 id="portal-title">CONFAZ</h1>
+    <div id="content"><h1 class="documentFirstHeading">CONVÊNIO ICMS 100/97</h1>
+    <div id="content-core">
+      <p>Publicado no DOU de 06.11.97.</p>
+      <p>Ratificação Nacional DOU de 21.11.97 pelo Ato COTEPE-ICMS 17/97.</p>
+      <p>Alterado pelos Convs. ICMS 40/98, 97/99, 08/00.</p>
+      <p>Cláusula primeira Fica reduzida em 60% a base de cálculo do ICMS nas saídas interestaduais dos insumos agropecuários.</p>
+      <p>Cláusula sétima Este convênio entra em vigor na data da publicação.</p>
+    </div></div><footer>rodapé</footer>
+  </body></html>`;
+  const parsed = parseConfazPublicationHtml(
+    html,
+    'https://www.confaz.fazenda.gov.br/legislacao/convenios/1997/CV100_97',
+    'convenios',
+  );
+  assert.equal(parsed.actNumber, '100/1997');
+  assert.equal(parsed.metadata?.year, 1997);
+  assert.equal(parsed.publishedAt?.toISOString().slice(0, 10), '1997-11-06');
+  assert.equal(
+    parsed.title,
+    'Reduz a base de cálculo do ICMS nas saídas dos insumos agropecuários que especifica, e dá outras providências.',
+  );
+  // Recent acts keep the 20xx reading.
+  const recent = parseConfazPublicationHtml(
+    html.replaceAll('100/97', '88/26').replaceAll('.97', '.26'),
+    'https://www.confaz.fazenda.gov.br/legislacao/convenios/2026/CV088_26',
+    'convenios',
+  );
+  assert.equal(recent.actNumber, '88/2026');
+  assert.equal(recent.publishedAt?.toISOString().slice(0, 10), '2026-11-06');
+});

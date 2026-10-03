@@ -284,6 +284,12 @@ function extractH1(html: string): string | undefined {
   return match?.[1] ? textFromHtml(match[1]) : undefined;
 }
 
+function extractH1s(html: string): string[] {
+  return [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)]
+    .map((match) => (match[1] ? textFromHtml(match[1]) : ''))
+    .filter(Boolean);
+}
+
 function extractAnchors(html: string, baseUrl: string): Anchor[] {
   const anchors: Anchor[] = [];
   const pattern = /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi;
@@ -312,6 +318,16 @@ function extractAnchors(html: string, baseUrl: string): Anchor[] {
   return anchors;
 }
 
+/**
+ * The portal writes years with two digits ("100/97", "DOU de 29.07.26").
+ * CONFAZ acts exist since the 1970s, so 70–99 are 19xx and 00–69 are 20xx
+ * (same pivot as the DOE-SP rules).
+ */
+function expandTwoDigitYear(rawYear: number): number {
+  if (rawYear >= 100) return rawYear;
+  return rawYear >= 70 ? 1900 + rawYear : 2000 + rawYear;
+}
+
 function parseActReference(
   value: string,
 ): { number: number; year: number } | undefined {
@@ -322,7 +338,7 @@ function parseActReference(
 
   const number = Number.parseInt(match[1], 10);
   const rawYear = Number.parseInt(match[2], 10);
-  const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+  const year = expandTwoDigitYear(rawYear);
 
   if (!Number.isSafeInteger(number) || number < 1 || year < 1900 || year > 2200) {
     return undefined;
@@ -418,7 +434,7 @@ function parseDotDate(value: string): Date | undefined {
   const day = Number.parseInt(match[1], 10);
   const month = Number.parseInt(match[2], 10) - 1;
   const rawYear = Number.parseInt(match[3], 10);
-  const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+  const year = expandTwoDigitYear(rawYear);
   const date = new Date(Date.UTC(year, month, day));
 
   if (
@@ -555,7 +571,47 @@ function extractEffectiveDate(
   return {};
 }
 
-function extractEmenta(mainHtml: string, text: string, heading: string): string {
+// Amendment history notes that older acts list before the ementa.
+const AMENDMENT_NOTE = /^(Alterad[oa]s?|Revogad[oa]s?|Prorrogad[oa]s?|Acrescentad[oa]s?|Retifica[çc][ãa]o|Republica[çc][ãa]o|Vide|Nova\s+reda[çc][ãa]o|Reda[çc][ãa]o\s+dada)\b/i;
+
+/** The portal's own description of the act (meta og:description / documentDescription). */
+function extractOfficialDescription(html: string): string | undefined {
+  const patterns = [
+    /<meta\b[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i,
+    /<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i,
+    /<[a-z]+\b[^>]*class=["'][^"']*\bdocumentDescription\b[^"']*["'][^>]*>([\s\S]*?)<\/[a-z]+>/i,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(html);
+    const value = match?.[1] ? normalizeSpaces(textFromHtml(decodeHtmlEntities(match[1]))) : '';
+    if (value.length >= 20) return value;
+  }
+  return undefined;
+}
+
+function extractEmenta(mainHtml: string, text: string, heading: string, fullHtml?: string): string {
+  const ementa = extractEmentaCandidate(mainHtml, text, heading);
+  if (!AMENDMENT_NOTE.test(ementa)) return ementa;
+  // Older acts open with "Alterado pelos Convs. …": use the next real
+  // paragraph, or the portal's own description of the act.
+  const paragraphs = [...mainHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((match) => textFromHtml(match[1] ?? ''))
+    .filter(Boolean);
+  const official = fullHtml ? extractOfficialDescription(fullHtml) : undefined;
+  if (official && !AMENDMENT_NOTE.test(official)) return official;
+  return (
+    paragraphs.find(
+      (paragraph) =>
+        paragraph.length >= 20 &&
+        !AMENDMENT_NOTE.test(paragraph) &&
+        !/^Publicado\s+no\s+DOU/i.test(paragraph) &&
+        !/^Ratifica/i.test(paragraph) &&
+        !paragraph.toUpperCase().startsWith(heading.toUpperCase()),
+    ) ?? ementa
+  );
+}
+
+function extractEmentaCandidate(mainHtml: string, text: string, heading: string): string {
   const paragraphs = [...mainHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
     .map((match) => textFromHtml(match[1] ?? ''))
     .filter(Boolean);
@@ -738,7 +794,12 @@ export function parseConfazPublicationHtml(
 ): ConnectorPublication {
   const family = familyForKey(familyKey);
   const mainHtml = extractMainHtml(html);
-  const heading = extractH1(html) ?? extractH1(mainHtml);
+  // Prefer the act heading (documentFirstHeading); some page versions also
+  // render the portal title ("CONFAZ") as an earlier <h1>.
+  const heading =
+    extractH1s(html).find((text) => family.labelPattern.test(text)) ??
+    extractH1(html) ??
+    extractH1(mainHtml);
 
   if (!heading || !family.labelPattern.test(heading)) {
     throw new ConnectorError(
@@ -766,7 +827,7 @@ export function parseConfazPublicationHtml(
   }
 
   const content = extractContentText(mainHtml, heading);
-  const ementa = extractEmenta(mainHtml, content, heading);
+  const ementa = extractEmenta(mainHtml, content, heading, html);
   const publishedAt = extractPublishedAt(content);
   const actDate = extractActDate(content, reference);
   const ratification = extractRatification(content);
