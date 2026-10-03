@@ -383,3 +383,74 @@ export async function processPublicationTaxonomyBatch(
 
   return result;
 }
+
+export interface SinglePublicationClassification {
+  publicationVersionId: string;
+  releaseId: string;
+  ncmScanned: boolean;
+  persisted: boolean;
+  tags: Array<{
+    conceptCode: string;
+    label: string;
+    reasonCode: string;
+    matchedTerm: string;
+    confidence: number;
+  }>;
+}
+
+/**
+ * Classifies ONE publication (its current version) against a given release,
+ * on demand and independently of the global switch: the curator can see the
+ * result of a release on a chosen act before enabling classification for
+ * the archive. With `persist` the seal is written exactly like the worker's.
+ */
+export async function classifySinglePublication(
+  db: Kysely<DB>,
+  input: { publicationId: string; releaseId: string; persist: boolean; codeGitSha?: string | null },
+): Promise<SinglePublicationClassification> {
+  const current = await sql<PendingVersion>`
+    SELECT pv.id AS publication_version_id, p.title, pv.content_text, pv.relevant_excerpt
+    FROM publications p
+    JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
+    WHERE p.id = ${input.publicationId}::uuid
+  `.execute(db);
+  const row = current.rows[0];
+  if (!row) throw new Error('PUBLICATION_NOT_FOUND');
+
+  const ncmScan = await sql<{ found: number }>`
+    SELECT 1 AS found FROM publication_ncm_scans
+    WHERE publication_version_id = ${row.publication_version_id}::uuid
+      AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
+      AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
+    LIMIT 1
+  `.execute(db);
+
+  const concepts = await loadClassificationConcepts(db, input.releaseId);
+  const plan = planCuratedClassification({
+    publicationVersionId: row.publication_version_id,
+    taxonomyReleaseId: input.releaseId,
+    title: row.title,
+    contentText: row.content_text ?? row.relevant_excerpt,
+    ncmCodes: await ncmCodesFor(db, row.publication_version_id),
+    concepts,
+    codeGitSha: input.codeGitSha ?? null,
+  });
+  if (input.persist) await persistSuccess(db, plan);
+
+  const labelById = new Map(concepts.map((concept) => [concept.releaseConceptId, concept.label]));
+  return {
+    publicationVersionId: row.publication_version_id,
+    releaseId: input.releaseId,
+    ncmScanned: ncmScan.rows.length > 0,
+    persisted: input.persist,
+    tags: plan.assertions
+      .map((assertion) => ({
+        conceptCode: assertion.conceptCode,
+        label: labelById.get(assertion.releaseConceptId) ?? assertion.conceptCode,
+        reasonCode: assertion.reasonCode,
+        matchedTerm: assertion.matchedTerm,
+        confidence: assertion.confidence,
+      }))
+      .sort((a, b) => a.conceptCode.localeCompare(b.conceptCode)),
+  };
+}
