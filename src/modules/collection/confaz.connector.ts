@@ -592,6 +592,97 @@ function extractEffectiveDate(
   return {};
 }
 
+type EffectiveUntil = {
+  date: Date;
+  basis: 'CURRENT_VALIDITY_CLAUSE' | 'EXTENSION_NOTE';
+  text: string;
+  amendedBy?: string;
+};
+
+// Previous wordings ("Redação anterior/original") the portal keeps below the
+// current text; their dates no longer apply.
+const PREVIOUS_WORDING_CLASS = /\b(?:RedaoAnt|A8-3RedacaoAnt|RemissoAnt|A8-2RemissaoAnt)\b/;
+const PREVIOUS_WORDING_NOTE = /^Reda[çc][ãa]o\s+(?:original|anterior)\b/i;
+const DATE_TEXT = String.raw`(\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{1,2}º?\s+de\s+[A-Za-zçÇ]+\s+de\s+\d{4})`;
+// "Este convênio entra em vigor …, vigendo até 31 de dezembro de 2027."
+const VALIDITY_CLAUSE = new RegExp(
+  String.raw`\bEst[ea]\s+(?:conv[eê]nio|ajuste|protocolo|ato)\b[\s\S]{0,400}?\b(?:vigendo|vigorando|vigorar[aá]|vigora|produzir[aá]\s+efeitos|produzindo\s+efeitos)\s+at[eé]\s+(?:o\s+dia\s+)?` + DATE_TEXT,
+  'i',
+);
+// Whole-act extension notes: "Prorrogado, até 31.12.27, pelo Conv. ICMS 79/25."
+const EXTENSION_NOTE = new RegExp(
+  String.raw`^Prorrogad[oa]s?\s*,?\s+at[eé]\s+` + DATE_TEXT + String.raw`\s*,?\s+pel[oa]\s+(.+?)\.?$`,
+  'i',
+);
+const AMENDED_BY = /\bpel[oa]\s+((?:Conv(?:[eê]nio|\.)|Ajuste|Protocolo)\s*(?:ICMS|SINIEF|ECF)?\s*n?º?\s*\d{1,3}\/\d{2,4})/i;
+
+function parseAnyDate(value: string): Date | undefined {
+  return /^\d{1,2}[./]/.test(value.trim()) ? parseDotDate(value) : parseLongDate(value);
+}
+
+/**
+ * Last day the act is in force, read from its CURRENT wording: the validity
+ * clause ("vigendo até …") and the whole-act extension notes ("Prorrogado,
+ * até …"). Previous wordings are ignored; the latest date wins.
+ */
+export function extractEffectiveUntil(bodyHtml: string): EffectiveUntil | undefined {
+  const paragraphs = [...bodyHtml.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p>/gi)].map((match) => ({
+    className: /\bclass=["']([^"']*)["']/i.exec(match[1] ?? '')?.[1] ?? '',
+    text: textFromHtml(match[2] ?? ''),
+  }));
+  const hasClasses = paragraphs.some((paragraph) => paragraph.className !== '');
+  const candidates: EffectiveUntil[] = [];
+  let previousNote = '';
+  let afterPreviousWordingNote = false;
+
+  for (const paragraph of paragraphs) {
+    if (!paragraph.text) continue;
+    const isPreviousWording = hasClasses
+      ? PREVIOUS_WORDING_CLASS.test(paragraph.className)
+      : afterPreviousWordingNote || PREVIOUS_WORDING_NOTE.test(paragraph.text);
+    afterPreviousWordingNote = !hasClasses && PREVIOUS_WORDING_NOTE.test(paragraph.text);
+    if (isPreviousWording) continue;
+
+    const extension = EXTENSION_NOTE.exec(paragraph.text);
+    const extensionDate = extension?.[1] ? parseAnyDate(extension[1]) : undefined;
+    if (extension && extensionDate) {
+      const amendedBy = AMENDED_BY.exec(paragraph.text)?.[1];
+      candidates.push({
+        date: extensionDate,
+        basis: 'EXTENSION_NOTE',
+        text: paragraph.text,
+        ...(amendedBy ? { amendedBy: normalizeSpaces(amendedBy) } : {}),
+      });
+    }
+
+    const clause = VALIDITY_CLAUSE.exec(paragraph.text);
+    const clauseDate = clause?.[1] ? parseAnyDate(clause[1]) : undefined;
+    if (clause && clauseDate) {
+      const amendedBy = /^Nova\s+reda[çc][ãa]o\b/i.test(previousNote)
+        ? AMENDED_BY.exec(previousNote)?.[1]
+        : undefined;
+      candidates.push({
+        date: clauseDate,
+        basis: 'CURRENT_VALIDITY_CLAUSE',
+        text: normalizeSpaces(clause[0]),
+        ...(amendedBy ? { amendedBy: normalizeSpaces(amendedBy) } : {}),
+      });
+    }
+    previousNote = paragraph.text;
+  }
+
+  // Latest date wins; on a tie the clause itself is the stronger basis.
+  let best: EffectiveUntil | undefined;
+  for (const candidate of candidates) {
+    const diff = best ? candidate.date.getTime() - best.date.getTime() : 1;
+    if (diff > 0 || (diff === 0 && candidate.basis === 'CURRENT_VALIDITY_CLAUSE')) {
+      const amendedBy = candidate.amendedBy ?? (diff === 0 ? best?.amendedBy : undefined);
+      best = { ...candidate, ...(amendedBy ? { amendedBy } : {}) };
+    }
+  }
+  return best;
+}
+
 // Amendment history notes that older acts list before the ementa.
 const AMENDMENT_NOTE = /^(Alterad[oa]s?|Revogad[oa]s?|Prorrogad[oa]s?|Acrescentad[oa]s?|Retifica[çc][ãa]o|Republica[çc][ãa]o|Vide|Nova\s+reda[çc][ãa]o|Reda[çc][ãa]o\s+dada)\b/i;
 
@@ -853,6 +944,8 @@ export function parseConfazPublicationHtml(
   const actDate = extractActDate(content, reference);
   const ratification = extractRatification(content);
   const effective = extractEffectiveDate(content, publishedAt, ratification);
+  const bodyHtml = extractActBodyHtml(html) ?? mainHtml;
+  const effectiveUntil = extractEffectiveUntil(bodyHtml);
   const variant = inferVariantFromPage(heading, indexVariant);
   const files = extractFileLinks(mainHtml, officialUrl);
   const relatedLinks = extractRelatedLinks(mainHtml, officialUrl);
@@ -902,6 +995,14 @@ export function parseConfazPublicationHtml(
           effectiveText: effective.text,
         }
       : {}),
+    ...(effectiveUntil
+      ? {
+          effectiveUntil: metadataDate(effectiveUntil.date),
+          effectiveUntilBasis: effectiveUntil.basis,
+          effectiveUntilText: effectiveUntil.text,
+          ...(effectiveUntil.amendedBy ? { effectiveUntilAmendedBy: effectiveUntil.amendedBy } : {}),
+        }
+      : {}),
     ...(ufMentions.length > 0
       ? { explicitUfMentions: ufMentions, explicitUfMentionsSource: 'NORMATIVE_TEXT_MENTIONS' }
       : {}),
@@ -917,7 +1018,7 @@ export function parseConfazPublicationHtml(
     ...(publishedAt ? { publishedAt } : {}),
     ...(effective.date ? { effectiveAt: effective.date } : {}),
     content,
-    presentationHtml: extractActBodyHtml(html) ?? mainHtml,
+    presentationHtml: bodyHtml,
     officialUrl,
     externalId: sourcePath,
     ...(files.length > 0 ? { files } : {}),

@@ -12,6 +12,10 @@ import {
   resetClassificationConceptCache,
 } from '../src/modules/taxonomy/classification/classification.worker.js';
 import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
+import {
+  loadProductSheet,
+  parseProductSheet,
+} from '../src/modules/taxonomy/curation/curation.product-load.js';
 
 /**
  * TAX-11 end-to-end gate. Runs as a dedicated, final CI step: it commits a
@@ -534,6 +538,54 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         }))
         .sort((x, y) => String(x.code).localeCompare(String(y.code)));
     assert.deepEqual(pick(afterRoundTrip), pick(beforeRoundTrip));
+
+    // Bulk load of the PO's product sheet: the sheet is the latest truth
+    // (rolled back here so the rest of the gate keeps its fixture).
+    {
+      const client = await app.curatorPool!.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+        const load = await loadProductSheet(
+          client,
+          { userId: 'ops:test', justification: 'Carga da planilha' },
+          parseProductSheet(
+            [
+              '\uFEFFSegmento;Grupo;Item',
+              'Agronegocio;Fertilizantes, corretivos e substratos;ureias',
+              'Agronegocio;Fertilizantes, corretivos e substratos;MAP (mono-amônio fosfato)',
+              'Agronegocio;Grãos e Cereais;arroz',
+              'Agronegocio;Grãos e Cereais;Arroz',
+            ].join('\r\n'),
+          ),
+        );
+        assert.deepEqual(load.errors, []);
+        assert.equal(load.sheetRows, 4);
+        assert.deepEqual(load.sheetDuplicates, [{ line: 4, item: 'arroz', replacedByLine: 5 }]);
+        assert.deepEqual(
+          load.matched.map((m) => [m.code, m.item]).sort(),
+          [['product.rice', 'Arroz'], ['product.urea', 'Ureias']],
+        );
+        assert.equal(load.updated, 2);
+        assert.equal(load.created, 1);
+        assert.equal(load.groupsCreated, 2);
+        assert.equal(load.groupsLinkedToSegment.length, 2);
+
+        const { findOpenDraft, loadReleaseView, pgRunner } = await import('../src/modules/taxonomy/curation/curation.read.js');
+        const open = await findOpenDraft(pgRunner(client));
+        const view = await loadReleaseView(pgRunner(client), open!.id);
+        const urea = view!.concepts.find((c) => c.code === 'product.urea')!;
+        const fertGroup = view!.groups.find((g) => g.label === 'Fertilizantes, corretivos e substratos')!;
+        assert.equal(urea.label, 'Ureias');
+        assert.equal(urea.groupId, fertGroup.id);
+        assert.ok(urea.aliases.some((a) => a.text === 'Ureia'), 'previous name kept as synonym');
+        assert.deepEqual(fertGroup.segmentCodes, ['sector.agribusiness']);
+        assert.ok(view!.concepts.some((c) => c.label === 'MAP (mono-amônio fosfato)' && c.groupId === fertGroup.id));
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    }
 
     const published = await app.inject({
       method: 'POST',

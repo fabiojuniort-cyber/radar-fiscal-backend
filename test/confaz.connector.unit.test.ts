@@ -5,6 +5,7 @@ import {
   ConfazConnector,
   classifyConfazNetworkFailure,
   extractConfazIndexLinks,
+  extractEffectiveUntil,
   parseConfazPublicationHtml,
 } from '../src/modules/collection/confaz.connector.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
@@ -575,4 +576,40 @@ test('presentation keeps only the act text block, without the portal footer', ()
   assert.match(parsed.presentationHtml ?? '', /Cláusula primeira/);
   assert.match(parsed.presentationHtml ?? '', /class="nested"/, 'nested blocks stay inside the act text');
   assert.doesNotMatch(parsed.presentationHtml ?? '', /Voltar para o topo|Plone/);
+});
+
+test('validity end comes from the current wording of the validity clause, not from previous wordings', () => {
+  const until = extractEffectiveUntil(`
+    <p class="DataPublicao">Prorrogado, até 31.12.25, pelo Conv. ICMS 26/21.</p>
+    <p class="DataPublicao">Prorrogado, até 31.12.27, pelo Conv. ICMS 79/25.</p>
+    <p class="A8-1Remissao">Nova redação dada à cláusula sétima pelo Conv. ICMS 79/25, efeitos a partir de 25.07.25.</p>
+    <p class="A5-1TextoAcordo"><b>Cláusula sétima</b>&nbsp;Este convênio entra em vigor na data da publicação de sua ratificação nacional, vigendo até 31 de dezembro de 2027.</p>
+    <p class="A8-2RemissaoAnt">Redação original, efeitos até 24.07.25.</p>
+    <p class="A8-3RedacaoAnt">Cláusula sétima Este convênio entra em vigor na data da publicação, vigendo até 30 de abril de 2099.</p>`);
+
+  assert.equal(until?.date.toISOString().slice(0, 10), '2027-12-31');
+  assert.equal(until?.basis, 'CURRENT_VALIDITY_CLAUSE');
+  assert.equal(until?.amendedBy, 'Conv. ICMS 79/25');
+});
+
+test('validity end follows whole-act extension notes when the clause was not rewritten', () => {
+  const until = extractEffectiveUntil(`
+    <p class="DataPublicao">Prorrogado, até 30.04.01, pelo Conv. ICMS 05/99.</p>
+    <p class="DataPublicao">Prorrogado até 31.03.21, pelo Conv. ICMS 133/20.</p>
+    <p class="DataPublicao">Prorrogado o prazo do inciso II até 31.12.30, pelo Conv. ICMS 1/20.</p>
+    <p class="TextoAcordo">Cláusula sétima Este convênio entra em vigor na data da publicação, vigendo até 30 de abril de 1999.</p>`);
+
+  assert.equal(until?.date.toISOString().slice(0, 10), '2021-03-31');
+  assert.equal(until?.basis, 'EXTENSION_NOTE');
+  assert.equal(until?.amendedBy, 'Conv. ICMS 133/20');
+});
+
+test('validity end skips previous wordings on pages without paragraph classes', () => {
+  const until = extractEffectiveUntil(`
+    <p>Cláusula terceira Este convênio entra em vigor na data da publicação, vigendo até 31.12.26.</p>
+    <p>Redação anterior dada pelo Conv. ICMS 10/20, efeitos até 30.06.24.</p>
+    <p>Cláusula terceira Este convênio entra em vigor na data da publicação, vigendo até 31.12.40.</p>`);
+
+  assert.equal(until?.date.toISOString().slice(0, 10), '2026-12-31');
+  assert.equal(extractEffectiveUntil('<p>Este convênio entra em vigor na data de sua publicação.</p>'), undefined);
 });

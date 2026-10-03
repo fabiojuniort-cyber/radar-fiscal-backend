@@ -132,3 +132,13 @@ ordem configurada, com grupos e ajuda, e `conceptCodes` com todos os itens da
 release (itens ocultos continuam salváveis). `/api/v1/companies/:id/taxonomy-suggestions`
 sugere segmentos pelo CNAE (prefixo mais específico vence; CNAE principal
 pré-marca, secundários sugerem).
+
+## Carga da planilha de produtos (Segmento;Grupo;Item)
+
+`npm run taxonomy:load-products -- --file=ops/taxonomy/loads/<planilha>.csv [--confirm]` carrega a planilha do PO na tabela de Produtos do rascunho aberto. A lógica fica em `curation.product-load.ts`. A planilha é tratada como a fonte mais atualizada:
+
+- **Item que já existe:** é atualizado. Conta como existente o mesmo nome (ignorando maiúsculas, acentos e singular/plural) ou um de seus sinônimos. O item recebe o nome e o grupo da planilha, e o nome anterior vira sinônimo.
+- **Item novo:** é criado no grupo da planilha. O grupo é criado se não existir.
+- **Segmento:** os grupos da planilha são vinculados ao segmento informado (item do Setor com o mesmo nome).
+- **Item repetido na planilha:** vale a última linha.
+- **Sem `--confirm`:** tudo é executado e desfeito (simulação). Se houver erro, nada é gravado. Nada é publicado: o curador revisa o rascunho antes.
