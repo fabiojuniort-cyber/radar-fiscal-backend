@@ -457,6 +457,20 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     });
     assert.equal(dimensionPatch.statusCode, 204, dimensionPatch.body);
 
+    const searchOnly = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/admin/taxonomy/drafts/current/concepts/product.urea',
+      headers: curator.headers,
+      payload: {
+        justification: 'Sinônimo legado',
+        aliases: [
+          { text: 'carbamida', aliasType: 'EXACT_LEXICAL' },
+          { text: 'adubo nitrogenado', aliasType: 'SEARCH_RELATED' },
+        ],
+      },
+    });
+    assert.equal(searchOnly.statusCode, 204, searchOnly.body);
+
     const review = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/taxonomy/drafts/current/review',
@@ -468,6 +482,14 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.ok(diff.changedConcepts.some((c: { code: string }) => c.code === 'document.nfe'));
     assert.ok(diff.changedDimensions.some((d: { code: string }) => d.code === 'sector'));
     assert.ok(!review.json().issues.some((i: { severity: string }) => i.severity === 'BLOCKER'));
+    const synonymWarnings = review
+      .json()
+      .issues.filter((i: { code: string }) => i.code === 'SYNONYM_WAS_NOT_AUTOMATIC');
+    assert.ok(
+      synonymWarnings.some((i: { message: string }) => /“adubo nitrogenado” \(só busca no dicionário\)/.test(i.message)),
+      JSON.stringify(synonymWarnings.slice(0, 3)),
+    );
+    assert.ok(synonymWarnings.every((i: { severity: string }) => i.severity === 'WARNING'), 'warning, not a blocker');
 
     const exported = await app.inject({
       method: 'GET',
