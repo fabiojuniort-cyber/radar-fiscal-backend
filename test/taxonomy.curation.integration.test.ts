@@ -8,6 +8,7 @@ import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
 import {
+  classifySinglePublication,
   processPublicationTaxonomyBatch,
   resetClassificationConceptCache,
 } from '../src/modules/taxonomy/classification/classification.worker.js';
@@ -656,6 +657,41 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       headers: customer.headers,
     });
     assert.equal(pendingView.json().status, 'DISABLED');
+
+    // On-demand classification of ONE act works with the switch off:
+    // a preview saves nothing; with persist the act shows its tags.
+    {
+      const releaseId = (await admin.query<{ id: string }>(
+        `SELECT id FROM taxonomy_releases WHERE status = 'PUBLISHED' ORDER BY published_at DESC LIMIT 1`,
+      )).rows[0]!.id;
+      resetClassificationConceptCache();
+      const preview = await classifySinglePublication(worker, { publicationId, releaseId, persist: false });
+      assert.equal(preview.persisted, false);
+      assert.ok(preview.ncmScanned);
+      assert.ok(preview.tags.some((tag) => tag.conceptCode === 'product.urea'), JSON.stringify(preview.tags));
+      const stillDisabled = await app.inject({
+        method: 'GET',
+        url: `/api/v1/publications/${publicationId}/taxonomy`,
+        headers: customer.headers,
+      });
+      assert.equal(stillDisabled.json().status, 'DISABLED', 'a preview writes nothing');
+
+      const other = await createPublication(admin, 'Convênio sobre ureia', 'Reduz a base de cálculo nas saídas de ureia.');
+      await processPublicationNcmEnrichmentBatch(worker, { limit: 50 });
+      const saved = await classifySinglePublication(worker, {
+        publicationId: other.publicationId,
+        releaseId,
+        persist: true,
+      });
+      assert.equal(saved.persisted, true);
+      assert.ok(saved.tags.some((tag) => tag.conceptCode === 'product.urea'), JSON.stringify(saved.tags));
+      const classifiedOne = await app.inject({
+        method: 'GET',
+        url: `/api/v1/publications/${other.publicationId}/taxonomy`,
+        headers: customer.headers,
+      });
+      assert.equal(classifiedOne.json().status, 'CLASSIFIED');
+    }
 
     const enable = await app.inject({
       method: 'PUT',
