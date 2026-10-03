@@ -8,7 +8,7 @@ import { buildApp } from '../src/app.js';
 
 const PASSWORD = 'News-Test-2026!Safe';
 
-test('news API requires auth and returns latest official news with search and image', async () => {
+test('news API requires auth and returns latest official news with search, image and fresh-date fallback', async () => {
   const adminUrl = process.env.DATABASE_ADMIN_URL;
   assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required for news API integration tests.');
 
@@ -18,6 +18,7 @@ test('news API requires auth and returns latest official news with search and im
   const email = `news-${suffix}@example.test`;
   const sourceId = randomUUID();
   const newsId = randomUUID();
+  const undatedNewsId = randomUUID();
   const imageUrl = 'https://www.gov.br/receitafederal/imagens/noticias/ibs-cbs.jpg';
 
   try {
@@ -64,20 +65,27 @@ test('news API requires auth and returns latest official news with search and im
     await admin.query(
       `INSERT INTO news_items (
          id, source_id, identity_hash, agency, official_url
-       ) VALUES ($1, $2, $3, 'Receita Federal', $4)`,
+       ) VALUES
+         ($1, $2, $3, 'Receita Federal', $4),
+         ($5, $2, $6, 'Receita Federal', $7)`,
       [
         newsId,
         sourceId,
         'a'.repeat(64),
         'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/ibs-cbs-test',
+        undatedNewsId,
+        'c'.repeat(64),
+        'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/simples-test',
       ],
     );
 
     await admin.query(
       `INSERT INTO news_item_versions (
          news_item_id, version_no, content_hash, title, summary, category,
-         published_at, official_url, tags, source_metadata
-       ) VALUES ($1, 1, $2, $3, $4, 'Tributação', $5, $6, $7, $8::jsonb)`,
+         published_at, official_url, tags, source_metadata, collected_at
+       ) VALUES
+         ($1, 1, $2, $3, $4, 'Tributação', $5, $6, $7, $8::jsonb, $9),
+         ($10, 1, $11, $12, $13, 'Tributação', NULL, $14, $15, '{}'::jsonb, $16)`,
       [
         newsId,
         'b'.repeat(64),
@@ -87,6 +95,14 @@ test('news API requires auth and returns latest official news with search and im
         'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/ibs-cbs-test',
         ['IBS', 'CBS', 'RTC'],
         JSON.stringify({ imageUrl }),
+        new Date('2026-09-20T13:05:00Z'),
+        undatedNewsId,
+        'd'.repeat(64),
+        'Receita divulga atualização de outubro sobre Simples Nacional',
+        'Notícia coletada na virada do mês sem timestamp oficial parseado.',
+        'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/simples-test',
+        ['Simples Nacional'],
+        new Date('2026-10-02T18:10:00Z'),
       ],
     );
 
@@ -103,6 +119,7 @@ test('news API requires auth and returns latest official news with search and im
         sourceName: string;
         title: string;
         category: string | null;
+        publishedAt: string | null;
         officialUrl: string;
         imageUrl: string | null;
         tags: string[];
@@ -111,14 +128,16 @@ test('news API requires auth and returns latest official news with search and im
       totalPages: number;
     }>();
 
-    assert.equal(body.totalItems, 1);
+    assert.equal(body.totalItems, 2);
     assert.equal(body.totalPages, 1);
-    assert.equal(body.items[0]?.id, newsId);
-    assert.equal(body.items[0]?.sourceName, 'Receita Federal — Notícias');
-    assert.equal(body.items[0]?.category, 'Tributação');
-    assert.equal(body.items[0]?.imageUrl, imageUrl);
-    assert.deepEqual(body.items[0]?.tags, ['IBS', 'CBS', 'RTC']);
-    assert.match(body.items[0]?.officialUrl ?? '', /gov\.br\/receitafederal/);
+    assert.equal(body.items[0]?.id, undatedNewsId);
+    assert.equal(body.items[0]?.publishedAt, null);
+    assert.equal(body.items[1]?.id, newsId);
+    assert.equal(body.items[1]?.sourceName, 'Receita Federal — Notícias');
+    assert.equal(body.items[1]?.category, 'Tributação');
+    assert.equal(body.items[1]?.imageUrl, imageUrl);
+    assert.deepEqual(body.items[1]?.tags, ['IBS', 'CBS', 'RTC']);
+    assert.match(body.items[1]?.officialUrl ?? '', /gov\.br\/receitafederal/);
 
     const search = await app.inject({
       method: 'GET',
@@ -136,8 +155,14 @@ test('news API requires auth and returns latest official news with search and im
     assert.equal(noMatch.statusCode, 200);
     assert.deepEqual(noMatch.json<{ items: unknown[] }>().items, []);
   } finally {
-    await admin.query('DELETE FROM news_item_versions WHERE news_item_id = $1', [newsId]);
-    await admin.query('DELETE FROM news_items WHERE id = $1', [newsId]);
+    await admin.query(
+      'DELETE FROM news_item_versions WHERE news_item_id = ANY($1::uuid[])',
+      [[newsId, undatedNewsId]],
+    );
+    await admin.query(
+      'DELETE FROM news_items WHERE id = ANY($1::uuid[])',
+      [[newsId, undatedNewsId]],
+    );
     await admin.query('DELETE FROM sources WHERE id = $1', [sourceId]);
     await app.close();
     await admin.end();
