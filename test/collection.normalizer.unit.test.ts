@@ -431,3 +431,23 @@ test('sanitizes source presentation HTML while preserving legal structure', () =
     /href="https:\/\/example\.gov\/ato"/,
   );
 });
+
+test('keeps only the official legal paragraph classes in presentation HTML', () => {
+  const sanitized = sanitizeLegalPresentationHtml(
+    [
+      '<p class="DataPublicao">Publicado no DOU de 06.11.97.</p>',
+      '<p class="Remisso evil-overlay">Nova redação dada ao caput.</p>',
+      '<p class="RedaoAnt">Redação anterior.</p>',
+      '<p class="hidden">Texto.</p>',
+      '<p class="x&quot; onclick=&quot;evil()">Outro.</p>',
+    ].join(''),
+  );
+
+  assert.ok(sanitized);
+  assert.match(sanitized, /<p class="DataPublicao">Publicado/);
+  assert.match(sanitized, /<p class="Remisso">Nova redação/);
+  assert.match(sanitized, /<p class="RedaoAnt">Redação anterior/);
+  assert.match(sanitized, /<p>Texto\.<\/p>/);
+  assert.match(sanitized, /<p>Outro\.<\/p>/);
+  assert.doesNotMatch(sanitized, /evil|hidden|onclick/);
+});

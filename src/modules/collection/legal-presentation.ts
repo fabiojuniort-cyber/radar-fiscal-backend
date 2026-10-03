@@ -96,11 +96,45 @@ function safeHref(
   return undefined;
 }
 
+/**
+ * Paragraph styles of official legal portals (CONFAZ "estilos das leis").
+ * Only these class names survive sanitization; the site styles them per
+ * source so the text keeps the official visual identity.
+ */
+export const LEGAL_PRESENTATION_CLASSES = new Set([
+  'TituloAcordo',
+  'AcordoTipo',
+  'Ementa',
+  'DataPublicao',
+  'A2DataPublicacao',
+  'TextoAcordo',
+  'A5-1TextoAcordo',
+  'RedaoAnt',
+  'A8-3RedacaoAnt',
+  'Remisso',
+  'A8-1Remissao',
+  'RemissoAnt',
+  'A8-2RemissaoAnt',
+]);
+
+function allowedClasses(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const kept = raw
+    .split(/\s+/)
+    .filter((token) => LEGAL_PRESENTATION_CLASSES.has(token));
+  return kept.length ? [...new Set(kept)].join(' ') : undefined;
+}
+
 function allowedAttributes(
   name: string,
   attributes: Record<string, string>,
 ): string {
   const output: string[] = [];
+
+  const classes = allowedClasses(attributes.class);
+  if (classes) {
+    output.push(`class="${escapeAttribute(classes)}"`);
+  }
 
   if (name === 'a') {
     const href = safeHref(
