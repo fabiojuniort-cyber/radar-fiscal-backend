@@ -156,6 +156,8 @@ test('spreadsheet import: blank keeps, "—" clears, ✓ flags and comma separat
     officialCodes: ['3102.10'],
     synonyms: [],
     profileVisible: true,
+    classifyByLabel: null,
+    definition: undefined,
     displayOrder: 1,
     code: null,
   });
@@ -168,6 +170,16 @@ test('spreadsheet import: blank keeps, "—" clears, ✓ flags and comma separat
   assert.equal(rows[4]!.group, undefined, 'blank keeps the current group');
   assert.deepEqual(rows[4]!.officialCodes, [], '"-" clears the codes');
   assert.equal(rows[4]!.synonyms, undefined);
+
+  const marked = parseImportCsv(
+    'Item;No perfil;Classificar pelo nome;Definição;Código TriBusca\nUreia;x;X;Fertilizante nitrogenado;\nGesso;;não;;',
+  );
+  assert.equal(marked[0]!.profileVisible, true, 'x marks like the export');
+  assert.equal(marked[0]!.classifyByLabel, true);
+  assert.equal(marked[0]!.definition, 'Fertilizante nitrogenado');
+  assert.equal(marked[0]!.code, null, 'blank TriBusca code is generated from the item');
+  assert.equal(marked[1]!.profileVisible, null);
+  assert.equal(marked[1]!.classifyByLabel, false);
 
   const onlyProfile = parseImportCsv('Item;No perfil\nUreia;✓');
   assert.equal(onlyProfile[0]!.group, undefined);

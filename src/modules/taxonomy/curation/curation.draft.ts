@@ -1278,6 +1278,37 @@ function validateSemanticInput(input: ConceptInput): void {
   }
 }
 
+/**
+ * Code generated from the item name (dimension.slug). When another item
+ * already uses it, a numeric suffix keeps it unique; a historical concept of
+ * the same dimension outside the draft is reused (same identity).
+ */
+async function availableConceptCode(
+  client: PoolClient,
+  draftId: string,
+  dimensionId: string,
+  base: string,
+): Promise<string> {
+  for (let attempt = 1; attempt < 1000; attempt += 1) {
+    const candidate = attempt === 1 ? base : `${base}_${attempt}`;
+    const found = await client.query<{ dimension_id: string; in_draft: boolean }>(
+      `
+        SELECT c.dimension_id,
+          EXISTS (
+            SELECT 1 FROM taxonomy_release_concepts rc
+            WHERE rc.release_id = $2::uuid AND rc.concept_id = c.id
+          ) AS in_draft
+        FROM taxonomy_concepts c
+        WHERE c.code = $1
+      `,
+      [candidate, draftId],
+    );
+    const row = found.rows[0];
+    if (!row || (!row.in_draft && row.dimension_id === dimensionId)) return candidate;
+  }
+  throw new CurationError('CONCEPT_CODE_EXHAUSTED', 409);
+}
+
 export async function createConcept(
   client: PoolClient,
   actor: CuratorActor,
@@ -1291,12 +1322,16 @@ export async function createConcept(
   const label = input.label?.trim();
   if (!label) throw new CurationError('LABEL_REQUIRED');
 
-  const suffix = input.code?.trim()
-    ? input.code.trim().replace(new RegExp(`^${dimensionCode}\\.`), '')
-    : slugify(label);
-  const code = `${dimensionCode}.${suffix}`;
+  const explicitCode = input.code?.trim();
+  const suffix = explicitCode
+    ? explicitCode.replace(new RegExp(`^${dimensionCode}\\.`), '')
+    : slugify(label) || 'item';
+  let code = `${dimensionCode}.${suffix}`;
   if (!/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/.test(code)) {
     throw new CurationError('INVALID_CONCEPT_CODE');
+  }
+  if (!explicitCode) {
+    code = await availableConceptCode(client, draft.id, dimension.dimension_id, code);
   }
 
   const existing = await client.query<{
@@ -1426,6 +1461,8 @@ export interface ImportRow {
   officialCodes: string[] | undefined;
   synonyms: string[] | undefined;
   profileVisible: boolean | null;
+  classifyByLabel?: boolean | null | undefined;
+  definition?: string | undefined;
   displayOrder: number | null;
   code: string | null;
 }
@@ -1435,6 +1472,7 @@ export interface ImportReport {
   updated: number;
   groupsCreated: number;
   errors: Array<{ line: number; message: string }>;
+  warnings: Array<{ line: number; message: string }>;
 }
 
 export async function importDimensionRows(
@@ -1451,7 +1489,7 @@ export async function importDimensionRows(
   if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
   await requireDimension(client, draft.id, dimensionCode);
 
-  const report: ImportReport = { created: 0, updated: 0, groupsCreated: 0, errors: [] };
+  const report: ImportReport = { created: 0, updated: 0, groupsCreated: 0, errors: [], warnings: [] };
   const concepts = view.concepts.filter((c) => c.dimensionCode === dimensionCode);
   const byCode = new Map(concepts.map((c) => [c.code, c]));
   const byLabel = new Map(concepts.map((c) => [normalizeAliasText(c.label), c]));
@@ -1485,6 +1523,10 @@ export async function importDimensionRows(
         ...(groupId !== undefined ? { groupId } : {}),
         ...(row.officialCodes !== undefined ? { officialCodes: row.officialCodes } : {}),
         ...(row.profileVisible !== null ? { profileVisible: row.profileVisible } : {}),
+        ...(row.classifyByLabel !== null && row.classifyByLabel !== undefined
+          ? { classifyByLabel: row.classifyByLabel }
+          : {}),
+        ...(row.definition ? { definition: row.definition } : {}),
         ...(row.displayOrder !== null ? { displayOrder: row.displayOrder } : {}),
       };
       const synonyms = row.synonyms?.map((text) => ({
@@ -1492,9 +1534,15 @@ export async function importDimensionRows(
         aliasType: 'EXACT_LEXICAL' as const,
       }));
 
-      const existing =
-        (row.code ? byCode.get(row.code) : undefined) ??
-        byLabel.get(normalizeAliasText(row.item));
+      // "Código TriBusca" filled = update that item; blank = new item.
+      const existing = row.code ? byCode.get(row.code) : undefined;
+      if (row.code && !existing) {
+        throw new CurationError(
+          'CONCEPT_NOT_FOUND',
+          404,
+          `Código TriBusca “${row.code}” não existe nesta tabela (deixe em branco para criar um item novo)`,
+        );
+      }
 
       if (existing) {
         const aliasUpdate =
@@ -1502,17 +1550,26 @@ export async function importDimensionRows(
             ? {}
             : {
                 // Spreadsheet synonyms replace the "equivalente exato" list;
-                // other alias types (siglas, nomes antigos…) are kept.
-                aliases: [
-                  ...(existing.aliases.filter(
-                    (alias) =>
-                      alias.aliasType !== 'EXACT_LEXICAL' &&
-                      !synonyms.some(
-                        (item) => normalizeAliasText(item.text) === normalizeAliasText(alias.text),
-                      ),
-                  ) as ConceptAliasInput[]),
-                  ...synonyms,
-                ],
+                // other alias types (siglas, nomes antigos…) are kept, and a
+                // synonym already known keeps its type, so exporting and
+                // importing the same sheet changes nothing.
+                aliases: (() => {
+                  const known = new Map(
+                    (existing.aliases as ConceptAliasInput[]).map((alias) => [
+                      normalizeAliasText(alias.text),
+                      alias,
+                    ]),
+                  );
+                  const inSheet = new Set(synonyms.map((item) => normalizeAliasText(item.text)));
+                  return [
+                    ...(existing.aliases as ConceptAliasInput[]).filter(
+                      (alias) =>
+                        alias.aliasType !== 'EXACT_LEXICAL' &&
+                        !inSheet.has(normalizeAliasText(alias.text)),
+                    ),
+                    ...synonyms.map((item) => known.get(normalizeAliasText(item.text)) ?? item),
+                  ];
+                })(),
               };
         await updateConcept(client, actor, existing.code, {
           ...input,
@@ -1521,10 +1578,17 @@ export async function importDimensionRows(
         });
         report.updated += 1;
       } else {
+        const sameName = byLabel.get(normalizeAliasText(row.item));
         const code = await createConcept(client, actor, dimensionCode, {
           ...input,
           ...(synonyms ? { aliases: synonyms } : {}),
         });
+        if (sameName) {
+          report.warnings.push({
+            line: row.line,
+            message: `“${row.item}” já existia (${sameName.code}); criado como item novo ${code}. Para atualizar o existente, preencha o Código TriBusca.`,
+          });
+        }
         byLabel.set(normalizeAliasText(row.item), {
           code,
           aliases: synonyms ?? [],
@@ -1552,6 +1616,118 @@ export async function importDimensionRows(
     errors: report.errors.length,
   });
   return report;
+}
+
+/**
+ * One row of the spreadsheet-like editor. `code` null = new row (code is
+ * generated from the label). `group` undefined keeps the current group,
+ * null clears it, a label links (or creates) the group.
+ */
+export interface GridRowInput {
+  code: string | null;
+  group?: string | null | undefined;
+  label: string;
+  officialCodes: string[];
+  aliases: ConceptAliasInput[];
+  profileVisible: boolean;
+  classifyByLabel: boolean;
+  displayOrder: number | null;
+}
+
+export interface GridSaveResult {
+  created: string[];
+  updated: number;
+  retired: number;
+  groupsCreated: number;
+}
+
+/**
+ * Saves every pending change of the editor at once. All-or-nothing: the
+ * first invalid row aborts the whole save (the caller's transaction rolls
+ * back) and the error names the row.
+ */
+export async function saveDimensionRows(
+  client: PoolClient,
+  actor: CuratorActor,
+  dimensionCode: string,
+  input: { rows: readonly GridRowInput[]; retire: readonly string[] },
+): Promise<GridSaveResult> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  const view = await loadReleaseView(pgRunner(client), draft.id, { includeRetired: true });
+  if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
+  await requireDimension(client, draft.id, dimensionCode);
+
+  const concepts = new Map(
+    view.concepts.filter((c) => c.dimensionCode === dimensionCode).map((c) => [c.code, c]),
+  );
+  const groupIds = new Map(
+    view.groups
+      .filter((group) => group.dimensionCode === dimensionCode)
+      .map((group) => [normalizeAliasText(group.label), group.id]),
+  );
+  const result: GridSaveResult = { created: [], updated: 0, retired: 0, groupsCreated: 0 };
+
+  for (const [index, row] of input.rows.entries()) {
+    const label = row.label.trim();
+    const where = `Linha ${index + 1}${label ? ` (“${label}”)` : ''}`;
+    try {
+      if (!label) throw new CurationError('LABEL_REQUIRED', 400, 'o nome do item é obrigatório');
+      let groupId: string | null | undefined;
+      if (row.group === null || row.group?.trim() === '') {
+        groupId = row.group === undefined ? undefined : null;
+      } else if (row.group) {
+        const key = normalizeAliasText(row.group);
+        groupId = groupIds.get(key);
+        if (!groupId) {
+          groupId = await createGroup(client, actor, dimensionCode, { label: row.group.trim() });
+          groupIds.set(key, groupId);
+          result.groupsCreated += 1;
+        }
+      }
+      const fields: ConceptInput = {
+        label,
+        ...(groupId !== undefined ? { groupId } : {}),
+        officialCodes: row.officialCodes,
+        aliases: row.aliases,
+        profileVisible: row.profileVisible,
+        classifyByLabel: row.classifyByLabel,
+        displayOrder: row.displayOrder,
+      };
+      if (row.code) {
+        if (!concepts.has(row.code)) throw new CurationError('CONCEPT_NOT_FOUND', 404);
+        await updateConcept(client, actor, row.code, fields);
+        result.updated += 1;
+      } else {
+        result.created.push(await createConcept(client, actor, dimensionCode, fields));
+      }
+    } catch (error) {
+      const message =
+        error instanceof CurationError
+          ? error.message !== error.code
+            ? error.message
+            : error.code
+          : error instanceof Error
+            ? error.message
+            : 'erro desconhecido';
+      throw new CurationError('ROW_INVALID', 400, `${where}: ${message}`);
+    }
+  }
+
+  for (const code of input.retire) {
+    if (!concepts.has(code)) throw new CurationError('CONCEPT_NOT_FOUND', 404, `Item ${code} não encontrado`);
+    await updateConcept(client, actor, code, { membershipStatus: 'RETIRED' });
+    result.retired += 1;
+  }
+
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_GRID_SAVE', draft.id, {
+    dimension: dimensionCode,
+    created: result.created.length,
+    updated: result.updated,
+    retired: result.retired,
+    groupsCreated: result.groupsCreated,
+  });
+  return result;
 }
 
 // ---------------------------------------------------------------------------

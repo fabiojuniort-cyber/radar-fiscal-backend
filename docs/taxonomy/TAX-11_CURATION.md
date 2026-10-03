@@ -44,6 +44,19 @@ Releases anteriores (colunas NULL) usam os padrões legados de
 antes da TAX-11 (a API antiga também devolvia Tema/Tratamento/Sujeito, mas o
 site os filtrava e nunca salvou códigos dessas dimensões).
 
+## Edição em grade e carga massiva (TAX-11b)
+
+- `POST /api/v1/admin/taxonomy/drafts/current/dimensions/:code/rows` salva de uma vez
+  as linhas da grade (novas, alteradas) e a lista `retire`. É tudo ou nada: a primeira
+  linha inválida aborta a transação e a mensagem cita “Linha N (“nome”)”.
+- Linha nova sem código: o código é `dimensão.slug(nome)`; se já existir, recebe sufixo
+  `_2`, `_3`… Um conceito histórico da mesma dimensão fora do rascunho é reaproveitado.
+- Planilha: exporta “No perfil” e “Classificar pelo nome” com `x`; a importação aceita
+  `x`, `✓`, `sim`, `1`. “Código TriBusca” vazio gera o código pelo nome (mesmo nome
+  atualiza o item existente). A importação também lê “Classificar pelo nome” e “Definição”.
+- O motivo é opcional na interface; sem texto, o site envia “Curadoria da taxonomia”
+  (a API continua exigindo um motivo para a auditoria).
+
 ## Acesso
 
 - Papel de plataforma `TAXONOMY_CURATOR` em `platform_user_roles` (global, não
