@@ -68,6 +68,9 @@ jobs:
         run: npm run test:taxonomy-baseline-unit
 
       - name: Upload generated TAX-06 manifest
+        # Diagnostic copy only: the byte-identity check below is the gate.
+        # A full artifact quota must not fail the build.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: tax-06-baseline-manifest
@@ -153,6 +156,7 @@ jobs:
 
       - name: Upload Product/NCM integration diagnostics
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: product-ncm-integration-diagnostics
