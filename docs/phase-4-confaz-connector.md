@@ -271,3 +271,30 @@ Além de fonte, runs, publicações e versões do portal, o comando agora mostra
 - `summary.douLastRunStatus` e `summary.confazActsViaDou`;
 - `summary.publications_with_portal_and_dou_origins` (sobreposição sem duplicidade);
 - `dou.confazCoverageByActType`, `dou.latestConfazActs` e `dou.runs`.
+
+## Importação de ato único a partir da página oficial salva (CONFAZ-ACT-IMPORT)
+
+Para atos fora do alcance da coleta incremental (anos anteriores) ou enquanto o portal
+estiver inacessível a partir da produção:
+
+1. O operador abre a página oficial do ato no portal do CONFAZ e salva com o navegador
+   ("Página da Web, somente HTML"). O arquivo vai para `ops/confaz/acts/` no repositório.
+2. Teste sem gravar (somente leitura):
+   `node dist/infrastructure/database/import-confaz-act.js --file=ops/confaz/acts/<ARQ>.html --url=<URL oficial>`
+3. Importação: o mesmo comando com `--confirm`. O comando cria uma execução `MANUAL`
+   própria (uma tentativa, invisível para a fila dos workers) e grava pelo motor normal da
+   coleta: normalização, identidade, versões, origens e auditoria.
+
+Proteções:
+- O arquivo precisa ter sido salvo da URL informada (`saved from url` ou `og:url`).
+- O ano do ato precisa coincidir com o ano da URL.
+- Reexecutar é idempotente: a mesma publicação é reconhecida, sem nova versão se o
+  conteúdo não mudou.
+- Metadados `ingestionChannel=CONFAZ_PORTAL_SAVED_PAGE` e `savedPage.sha256` registram a procedência.
+
+Correções do parser junto com este comando:
+- Anos de dois dígitos de 70 a 99 viram 19xx ("100/97" → 1997).
+- O título do ato é o `<h1>` que corresponde à família, mesmo com o título do portal antes.
+- A ementa ignora notas de alteração ("Alterado pelos Convs. …") e usa a descrição oficial do portal quando necessário.
+
+Primeiro uso: Convênio ICMS 100/97 (`ops/confaz/acts/CV100_97.html`), pedido pelo PO em 03/10/2026.
