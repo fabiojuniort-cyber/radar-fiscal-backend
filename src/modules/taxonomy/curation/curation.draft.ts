@@ -1543,17 +1543,26 @@ export async function importDimensionRows(
             ? {}
             : {
                 // Spreadsheet synonyms replace the "equivalente exato" list;
-                // other alias types (siglas, nomes antigos…) are kept.
-                aliases: [
-                  ...(existing.aliases.filter(
-                    (alias) =>
-                      alias.aliasType !== 'EXACT_LEXICAL' &&
-                      !synonyms.some(
-                        (item) => normalizeAliasText(item.text) === normalizeAliasText(alias.text),
-                      ),
-                  ) as ConceptAliasInput[]),
-                  ...synonyms,
-                ],
+                // other alias types (siglas, nomes antigos…) are kept, and a
+                // synonym already known keeps its type, so exporting and
+                // importing the same sheet changes nothing.
+                aliases: (() => {
+                  const known = new Map(
+                    (existing.aliases as ConceptAliasInput[]).map((alias) => [
+                      normalizeAliasText(alias.text),
+                      alias,
+                    ]),
+                  );
+                  const inSheet = new Set(synonyms.map((item) => normalizeAliasText(item.text)));
+                  return [
+                    ...(existing.aliases as ConceptAliasInput[]).filter(
+                      (alias) =>
+                        alias.aliasType !== 'EXACT_LEXICAL' &&
+                        !inSheet.has(normalizeAliasText(alias.text)),
+                    ),
+                    ...synonyms.map((item) => known.get(normalizeAliasText(item.text)) ?? item),
+                  ];
+                })(),
               };
         await updateConcept(client, actor, existing.code, {
           ...input,

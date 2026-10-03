@@ -370,7 +370,15 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       headers: curator.headers,
       payload: {
         justification: 'Grade',
-        rows: [gridRow('Gesso'), gridRow('Gesso!')],
+        rows: [
+          gridRow('Gesso', {
+            aliases: [
+              { text: 'Gesso em pó', aliasType: 'EXACT_LEXICAL' },
+              { text: 'CaSO4', aliasType: 'ABBREVIATION' },
+            ],
+          }),
+          gridRow('Gesso!'),
+        ],
         retire: [],
       },
     });
@@ -454,6 +462,41 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.equal(exported.statusCode, 200);
     assert.match(exported.body, /Cloreto de potássio;3104\.20;KCl, potassa;x/);
     assert.ok(!exported.body.includes('✓'), 'export marks with x, easy to type back');
+
+    // Exporting and importing the same sheet back changes nothing: same
+    // items (matched by TriBusca code), same synonym types, no duplicates.
+    const beforeRoundTrip = (
+      await app.inject({ method: 'GET', url: `/api/v1/admin/taxonomy/releases/${draft.draft.id}`, headers: curator.headers })
+    ).json();
+    const roundTrip = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/dimensions/product/import',
+      headers: curator.headers,
+      payload: { justification: 'Ida e volta', csv: exported.body },
+    });
+    assert.equal(roundTrip.statusCode, 200, roundTrip.body);
+    assert.equal(roundTrip.json().created, 0, 'no duplicates on round trip');
+    assert.deepEqual(roundTrip.json().errors, []);
+    const afterRoundTrip = (
+      await app.inject({ method: 'GET', url: `/api/v1/admin/taxonomy/releases/${draft.draft.id}`, headers: curator.headers })
+    ).json();
+    const pick = (view: { concepts: Array<Record<string, unknown>> }) =>
+      view.concepts
+        .filter((c) => c.dimensionCode === 'product')
+        .map((c) => ({
+          code: c.code,
+          label: c.label,
+          groupCode: c.groupCode,
+          officialCodes: c.officialCodes,
+          profileVisible: c.profileVisible,
+          classifyByLabel: c.classifyByLabel,
+          displayOrder: c.displayOrder,
+          aliases: [...(c.aliases as Array<{ text: string; aliasType: string }>)].sort((x, y) =>
+            x.text.localeCompare(y.text),
+          ),
+        }))
+        .sort((x, y) => String(x.code).localeCompare(String(y.code)));
+    assert.deepEqual(pick(afterRoundTrip), pick(beforeRoundTrip));
 
     const published = await app.inject({
       method: 'POST',
