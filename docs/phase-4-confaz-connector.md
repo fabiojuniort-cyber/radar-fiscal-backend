@@ -297,4 +297,13 @@ Correções do parser junto com este comando:
 - O título do ato é o `<h1>` que corresponde à família, mesmo com o título do portal antes.
 - A ementa ignora notas de alteração ("Alterado pelos Convs. …") e usa a descrição oficial do portal quando necessário.
 
+Apresentação fiel ao portal:
+- A apresentação guardada é só o bloco do texto do ato (`#parent-fieldname-text`), sem o
+  rodapé do portal ("Voltar para o topo", "Desenvolvido com o CMS…").
+- A apresentação não entra no hash da versão. Para atualizar um ato já importado, use
+  `--confirm --refresh-presentation`: reescreve a apresentação da última versão, somente se
+  o hash do conteúdo for igual, e registra `PUBLICATION_PRESENTATION_REFRESHED` na auditoria.
+- O site aplica o estilo do portal do CONFAZ, medido na folha de estilos oficial (Open Sans
+  13,7 px, preto, entrelinha 1,8, links #2c67cd sem sublinhado), quando a origem é `confaz`.
+
 Primeiro uso: Convênio ICMS 100/97 (`ops/confaz/acts/CV100_97.html`), pedido pelo PO em 03/10/2026.

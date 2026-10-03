@@ -279,6 +279,27 @@ function extractMainHtml(html: string): string {
   return html;
 }
 
+/**
+ * The act text block (Plone field "text"), without the portal's footer,
+ * "Voltar para o topo" or "Desenvolvido com o CMS" links. Undefined when the
+ * page has no such block, so callers keep the previous behavior.
+ */
+export function extractActBodyHtml(html: string): string | undefined {
+  const start = /<div\b[^>]*\bid=["']parent-fieldname-text["'][^>]*>/i.exec(html);
+  if (!start || start.index === undefined) return undefined;
+  const tag = /<(\/?)div\b[^>]*>/gi;
+  tag.lastIndex = start.index + start[0].length;
+  let depth = 1;
+  for (let match = tag.exec(html); match; match = tag.exec(html)) {
+    depth += match[1] ? -1 : 1;
+    if (depth === 0) {
+      const body = html.slice(start.index + start[0].length, match.index).trim();
+      return body || undefined;
+    }
+  }
+  return undefined;
+}
+
 function extractH1(html: string): string | undefined {
   const match = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
   return match?.[1] ? textFromHtml(match[1]) : undefined;
@@ -896,7 +917,7 @@ export function parseConfazPublicationHtml(
     ...(publishedAt ? { publishedAt } : {}),
     ...(effective.date ? { effectiveAt: effective.date } : {}),
     content,
-    presentationHtml: mainHtml,
+    presentationHtml: extractActBodyHtml(html) ?? mainHtml,
     officialUrl,
     externalId: sourcePath,
     ...(files.length > 0 ? { files } : {}),
