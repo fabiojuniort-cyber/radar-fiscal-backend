@@ -324,7 +324,7 @@ test('release diff reports added, removed and changed concepts and groups', () =
   assert.deepEqual(diff.addedGroups, ['document/mercadorias']);
 });
 
-test('engine 2.2.0: Roman-numeral acronyms ignore item numbering; acronyms are case-sensitive', () => {
+test('engine 2.2.0: Roman-numeral terms ignore item numbering; matching ignores case and accents', () => {
   const concepts = [
     { releaseConceptId: 'rc-ii', code: 'tax.ii', label: 'II', classifyByLabel: true, aliases: [], ncmPrefixes: [], cclasstribCodes: [] },
     { releaseConceptId: 'rc-ipi', code: 'tax.ipi', label: 'IPI', classifyByLabel: true, aliases: [], ncmPrefixes: [], cclasstribCodes: [] },
@@ -348,9 +348,11 @@ test('engine 2.2.0: Roman-numeral acronyms ignore item numbering; acronyms are c
     ),
     [],
   );
-  // The tax itself still classifies, and "ipi" in lowercase is not IPI.
+  // The tax itself still classifies, whatever the case.
   assert.deepEqual(plan('Reduz o II e o IPI na importação de máquinas.'), ['tax.ii', 'tax.ipi']);
+  assert.deepEqual(plan('reduz o ii e o ipi'), ['tax.ii', 'tax.ipi']);
   assert.deepEqual(plan('Imposto de Importação (II) incide sobre bens.'), ['tax.ii']);
-  assert.deepEqual(plan('o tipi foi alterado; ipi-like'), []);
   assert.deepEqual(plan('Inciso II - texto. Também se aplica ao II.'), ['tax.ii']);
+  // Lowercase item numbering is still numbering.
+  assert.deepEqual(plan('nos incisos i e ii do artigo; ii - às saídas'), []);
 });

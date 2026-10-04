@@ -67,12 +67,11 @@ site os filtrava e nunca salvou códigos dessas dimensões).
   (ex.: “IE”, “ST”, “Cashback”, “DRC”, “Abatedouro”) aparecem na revisão como aviso
   `SYNONYM_WAS_NOT_AUTOMATIC`, para o PO decidir se ficam antes de publicar.
 
-## Siglas e algarismos romanos (motor 2.2.0)
+## Algarismos romanos (motor 2.2.0)
 
-- Siglas (nome ou sinônimo só com maiúsculas, de 2 a 6 letras: “II”, “IPI”, “ICMS”)
-  são procuradas respeitando maiúsculas: “ii” ou “ipi” dentro de outro texto não contam.
-- Sigla que também é algarismo romano (“II” = Imposto de Importação) não conta quando
-  é numeração do ato: começo de parágrafo (“II - às saídas”), seguida de “-”/“)”, em
+- A comparação ignora maiúsculas, minúsculas e acentos (decisão do PO, 04/10/2026).
+- Termo que também é algarismo romano (“II” = Imposto de Importação) não conta quando
+  é numeração do ato: começo de parágrafo (“II - às saídas”), seguido de “-”/“)”, em
   listas (“incisos I e II”, “II a IV”, “I, II”) ou depois de inciso/alínea/item/anexo/
   capítulo/título/seção/art./nº. “(II)” e “do II e do IPI” continuam contando.
 - No Conv. ICMS 100/97 as 21 ocorrências de “II” são incisos: nenhuma marca mais o tributo.

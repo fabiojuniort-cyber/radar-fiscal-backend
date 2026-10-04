@@ -114,15 +114,13 @@ function excerptAround(raw: string, start: number, end: number): string {
   return prefix + raw.slice(from, to).replace(/\s+/g, ' ').trim() + suffix;
 }
 
-// Acronyms ("II", "IPI", "ICMS") are matched case-sensitively: "ii" in a
-// word is not the tax. A Roman-numeral acronym ("II" = Imposto de
-// Importação) is also how acts number items ("II - às saídas", "incisos I
-// e II", "Anexo II"); those enumerations never count as the term.
-const ACRONYM = /^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,6}$/;
-const ROMAN = /^[IVXLCDM]+$/;
+// Matching ignores case and accents. A term that is also a Roman numeral
+// ("II" = Imposto de Importação) is how acts number their items ("II - às
+// saídas", "incisos I e II", "Anexo II"); those enumerations never count.
+const ROMAN = /^[ivxlcdm]+$/;
 const ENUMERATION_BEFORE =
-  /(?:\b(?:incisos?|al[íi]neas?|itens?|anexos?|cap[íi]tulos?|t[íi]tulos?|se[çc][õo]es|se[çc][ãa]o|partes?|livros?|art(?:igo)?s?\.?|n[ºo°]\.?)|\b[IVXLCDM]+\s*(?:,|e|a|ou|-|–|—))\s*$/i;
-const ENUMERATION_AFTER = /^\s*(?:[-–—)]|,\s*[IVXLCDM]+\b|(?:e|a|ou)\s+[IVXLCDM]+\b)/;
+  /(?:\b(?:incisos?|al[íi]neas?|itens?|anexos?|cap[íi]tulos?|t[íi]tulos?|se[çc][õo]es|se[çc][ãa]o|partes?|livros?|art(?:igo)?s?\.?|n[ºo°]\.?)|\b[ivxlcdm]+\s*(?:,|e|a|ou|-|–|—))\s*$/i;
+const ENUMERATION_AFTER = /^\s*(?:[-–—)]|,\s*[ivxlcdm]+\b|(?:e|a|ou)\s+[ivxlcdm]+\b)/i;
 
 function isEnumeration(raw: string, start: number, end: number): boolean {
   const before = raw.slice(Math.max(0, start - 30), start);
@@ -142,7 +140,7 @@ function findTerm(
   const needle = normalizeTerm(term);
   if (!needle) return null;
   const haystack = ' ' + normalized.text + ' ';
-  const acronym = ACRONYM.test(term.trim()) ? term.trim() : null;
+  const roman = ROMAN.test(needle);
 
   for (
     let position = haystack.indexOf(' ' + needle + ' ');
@@ -152,10 +150,7 @@ function findTerm(
     const start = normalized.rawIndex[position] ?? 0;
     const lastIndex = position + needle.length - 1;
     const end = (normalized.rawIndex[lastIndex] ?? start) + 1;
-    if (acronym) {
-      if (raw.slice(start, end) !== acronym) continue;
-      if (ROMAN.test(acronym) && isEnumeration(raw, start, end)) continue;
-    }
+    if (roman && isEnumeration(raw, start, end)) continue;
     return excerptAround(raw, start, end);
   }
   return null;
