@@ -86,7 +86,7 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.equal(byCode.get('product.rice')!.matchedTerm, '10063011');
   assert.equal(byCode.get('treatment.rate_reduction')!.reasonCode, 'OFFICIAL_CODE_CCLASSTRIB');
   assert.equal(byCode.get('treatment.rate_reduction')!.matchedTerm, '200034');
-  assert.equal(plan.engineVersion, '2.1.0');
+  assert.equal(plan.engineVersion, '2.2.0');
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
 });
 
@@ -322,4 +322,35 @@ test('release diff reports added, removed and changed concepts and groups', () =
     { code: 'document.nfe', fields: ['label', 'groupCode'] },
   ]);
   assert.deepEqual(diff.addedGroups, ['document/mercadorias']);
+});
+
+test('engine 2.2.0: Roman-numeral acronyms ignore item numbering; acronyms are case-sensitive', () => {
+  const concepts = [
+    { releaseConceptId: 'rc-ii', code: 'tax.ii', label: 'II', classifyByLabel: true, aliases: [], ncmPrefixes: [], cclasstribCodes: [] },
+    { releaseConceptId: 'rc-ipi', code: 'tax.ipi', label: 'IPI', classifyByLabel: true, aliases: [], ncmPrefixes: [], cclasstribCodes: [] },
+  ];
+  const plan = (contentText: string) =>
+    planCuratedClassification({
+      publicationVersionId: 'v',
+      taxonomyReleaseId: 'r',
+      title: 'Ato',
+      contentText,
+      ncmCodes: [],
+      concepts,
+      codeGitSha: null,
+    }).assertions.map((a) => a.conceptCode).sort();
+
+  // Conv. ICMS 100/97: items and lists of items are not the tax.
+  assert.deepEqual(
+    plan(
+      'Cláusula terceira Ficam isentas:\nI - as saídas internas;\nII - às saídas, a título de retorno;\n' +
+        'nos incisos I e II do artigo 21, conforme Anexo II, itens II a IV, inciso II do caput.',
+    ),
+    [],
+  );
+  // The tax itself still classifies, and "ipi" in lowercase is not IPI.
+  assert.deepEqual(plan('Reduz o II e o IPI na importação de máquinas.'), ['tax.ii', 'tax.ipi']);
+  assert.deepEqual(plan('Imposto de Importação (II) incide sobre bens.'), ['tax.ii']);
+  assert.deepEqual(plan('o tipi foi alterado; ipi-like'), []);
+  assert.deepEqual(plan('Inciso II - texto. Também se aplica ao II.'), ['tax.ii']);
 });
