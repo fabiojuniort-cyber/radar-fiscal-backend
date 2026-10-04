@@ -9,7 +9,7 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-export const CURATED_ENGINE_VERSION = '2.1.0';
+export const CURATED_ENGINE_VERSION = '2.2.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
@@ -114,6 +114,24 @@ function excerptAround(raw: string, start: number, end: number): string {
   return prefix + raw.slice(from, to).replace(/\s+/g, ' ').trim() + suffix;
 }
 
+// Matching ignores case and accents. A term that is also a Roman numeral
+// ("II" = Imposto de Importação) is how acts number their items ("II - às
+// saídas", "incisos I e II", "Anexo II"); those enumerations never count.
+const ROMAN = /^[ivxlcdm]+$/;
+const ENUMERATION_BEFORE =
+  /(?:\b(?:incisos?|al[íi]neas?|itens?|anexos?|cap[íi]tulos?|t[íi]tulos?|se[çc][õo]es|se[çc][ãa]o|partes?|livros?|art(?:igo)?s?\.?|n[ºo°]\.?)|\b[ivxlcdm]+\s*(?:,|e|a|ou|-|–|—))\s*$/i;
+const ENUMERATION_AFTER = /^\s*(?:[-–—)]|,\s*[ivxlcdm]+\b|(?:e|a|ou)\s+[ivxlcdm]+\b)/i;
+
+function isEnumeration(raw: string, start: number, end: number): boolean {
+  const before = raw.slice(Math.max(0, start - 30), start);
+  const after = raw.slice(end, end + 12);
+  // "(II)" is the acronym in parentheses, not an item "II)".
+  if (/\(\s*$/.test(before)) return false;
+  // A numeral opening a line/paragraph is an item marker.
+  if (/(?:^|\n)\s*$/.test(before)) return true;
+  return ENUMERATION_BEFORE.test(before) || ENUMERATION_AFTER.test(after);
+}
+
 function findTerm(
   raw: string,
   normalized: NormalizedText,
@@ -122,13 +140,20 @@ function findTerm(
   const needle = normalizeTerm(term);
   if (!needle) return null;
   const haystack = ' ' + normalized.text + ' ';
-  const position = haystack.indexOf(' ' + needle + ' ');
-  if (position < 0) return null;
+  const roman = ROMAN.test(needle);
 
-  const start = normalized.rawIndex[position] ?? 0;
-  const lastIndex = position + needle.length - 1;
-  const end = (normalized.rawIndex[lastIndex] ?? start) + 1;
-  return excerptAround(raw, start, end);
+  for (
+    let position = haystack.indexOf(' ' + needle + ' ');
+    position >= 0;
+    position = haystack.indexOf(' ' + needle + ' ', position + 1)
+  ) {
+    const start = normalized.rawIndex[position] ?? 0;
+    const lastIndex = position + needle.length - 1;
+    const end = (normalized.rawIndex[lastIndex] ?? start) + 1;
+    if (roman && isEnumeration(raw, start, end)) continue;
+    return excerptAround(raw, start, end);
+  }
+  return null;
 }
 
 const CCLASSTRIB_RE =

@@ -61,11 +61,20 @@ site os filtrava e nunca salvou códigos dessas dimensões).
 
 - Para o curador existe um único tipo de sinônimo, e **todo sinônimo marca as
   legislações em que aparece**. O classificador curado (`tribusca.taxonomy.curated`
-  **2.1.0**) usa todos os sinônimos, qualquer que seja o tipo gravado. A versão nova do
+  **2.1.0** em diante) usa todos os sinônimos, qualquer que seja o tipo gravado. A versão nova do
   motor reclassifica pelo selo o que já tiver sido classificado.
 - Sinônimos que o dicionário TAX-02 marcou como `AMBIGUOUS` ou `SEARCH_RELATED`
   (ex.: “IE”, “ST”, “Cashback”, “DRC”, “Abatedouro”) aparecem na revisão como aviso
   `SYNONYM_WAS_NOT_AUTOMATIC`, para o PO decidir se ficam antes de publicar.
+
+## Algarismos romanos (motor 2.2.0)
+
+- A comparação ignora maiúsculas, minúsculas e acentos (decisão do PO, 04/10/2026).
+- Termo que também é algarismo romano (“II” = Imposto de Importação) não conta quando
+  é numeração do ato: começo de parágrafo (“II - às saídas”), seguido de “-”/“)”, em
+  listas (“incisos I e II”, “II a IV”, “I, II”) ou depois de inciso/alínea/item/anexo/
+  capítulo/título/seção/art./nº. “(II)” e “do II e do IPI” continuam contando.
+- No Conv. ICMS 100/97 as 21 ocorrências de “II” são incisos: nenhuma marca mais o tributo.
 
 ## Acesso
 
