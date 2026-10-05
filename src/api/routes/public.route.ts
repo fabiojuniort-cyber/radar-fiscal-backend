@@ -17,7 +17,6 @@ import {
 
 const CACHE_CONTROL_VALUE =
   'public, max-age=0, no-cache, must-revalidate';
-const SAO_PAULO_TZ = 'America/Sao_Paulo';
 
 const publicationsQuerySchema = z.object({
   uf: z
@@ -306,25 +305,7 @@ export async function publicRoutes(
               vsm.last_success_at,
               vsm.last_attempt_at,
               (
-                SELECT count(*)::int
-                FROM collection_runs cr
-                JOIN collection_run_publications crp
-                  ON crp.collection_run_id = cr.id
-                WHERE cr.source_id = s.id
-                  AND public.publication_scope_is_in_scope(
-                    crp.publication_id
-                  )
-                  AND crp.disposition IN (
-                    'NEW_PUBLICATION',
-                    'NEW_VERSION'
-                  )
-                  AND (
-                    crp.detected_at
-                    AT TIME ZONE ${SAO_PAULO_TZ}
-                  )::date = (
-                    now()
-                    AT TIME ZONE ${SAO_PAULO_TZ}
-                  )::date
+                SELECT public.publication_scope_imported_today(s.id)
               ) AS imported_today,
               (
                 SELECT count(DISTINCT po.publication_id)::int
@@ -560,25 +541,7 @@ export async function publicRoutes(
                 )::int
                 FROM (
                   SELECT (
-                    SELECT count(*)::int
-                    FROM collection_runs cr
-                    JOIN collection_run_publications crp
-                      ON crp.collection_run_id = cr.id
-                    WHERE cr.source_id = s.id
-                      AND public.publication_scope_is_in_scope(
-                        crp.publication_id
-                      )
-                      AND crp.disposition IN (
-                        'NEW_PUBLICATION',
-                        'NEW_VERSION'
-                      )
-                      AND (
-                        crp.detected_at
-                        AT TIME ZONE ${SAO_PAULO_TZ}
-                      )::date = (
-                        now()
-                        AT TIME ZONE ${SAO_PAULO_TZ}
-                      )::date
+                    SELECT public.publication_scope_imported_today(s.id)
                   ) AS source_imports
                   FROM sources s
                 ) per_source

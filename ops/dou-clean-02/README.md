@@ -33,6 +33,8 @@ Validar em produção que `OUT_OF_SCOPE`:
 
 Esta etapa ocorre com o PR ainda **não mergeado** e antes de qualquer deploy capaz de executar as migrations 033/034/035.
 
+**Dumps, backups e restauração de teste permanecem dentro da Railway.** Executar as ferramentas abaixo em um runner na Railway e restaurar em PostgreSQL temporário isolado na Railway; não baixar o dump nem usar PostgreSQL local. Registrar apenas hashes, contagens, timestamps e resultados sanitizados.
+
 ### 1.1 Snapshot somente leitura do banco atual
 
 Executar com credencial administrativa e registrar o resultado:
@@ -125,6 +127,8 @@ Esperado:
 - `worker_can_transition = false`.
 
 Também validar que o histórico de coleta continua legível pelo runtime sem reexpor conteúdo canônico:
+
+A migration 035 limita essa leitura às colunas `collection_run_id` e `disposition`. A função `publication_scope_imported_today(uuid)` permite à API pública ler somente a contagem diária em escopo por fonte, sem acesso direto aos identificadores ou timestamps do histórico; suas contagens caem no SUPPRESS e voltam no RESTORE, enquanto `importedDocuments` histórico permanece estável.
 
 ```sql
 BEGIN;

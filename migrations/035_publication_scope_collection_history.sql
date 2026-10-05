@@ -28,3 +28,28 @@ REVOKE SELECT ON public.collection_run_publications FROM radar_app;
 GRANT SELECT (collection_run_id, disposition)
 ON public.collection_run_publications
 TO radar_app;
+
+-- Public coverage needs today's visible import count, not identifiers or raw
+-- audit rows. Keep those columns private and expose only this narrow aggregate.
+CREATE FUNCTION public.publication_scope_imported_today(p_source_id UUID)
+RETURNS INTEGER
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+    SELECT count(*)::int
+    FROM public.collection_runs cr
+    JOIN public.collection_run_publications crp
+      ON crp.collection_run_id = cr.id
+    WHERE cr.source_id = p_source_id
+      AND public.publication_scope_is_in_scope(crp.publication_id)
+      AND crp.disposition IN ('NEW_PUBLICATION', 'NEW_VERSION')
+      AND (crp.detected_at AT TIME ZONE 'America/Sao_Paulo')::date =
+          (now() AT TIME ZONE 'America/Sao_Paulo')::date;
+$$;
+
+REVOKE ALL ON FUNCTION public.publication_scope_imported_today(UUID)
+FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.publication_scope_imported_today(UUID)
+TO radar_app;

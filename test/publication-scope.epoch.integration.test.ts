@@ -195,9 +195,9 @@ test(
           SELECT count(*)::int AS n
           FROM collection_run_publications
           WHERE collection_run_id = $1
-            AND publication_id = $2
+            AND disposition IN ('NEW_PUBLICATION', 'NEW_VERSION')
         `,
-        [runId, publicationId],
+        [runId],
       );
       assert.equal(
         history.rows[0]?.n,

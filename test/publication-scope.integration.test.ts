@@ -238,6 +238,11 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       [runId],
     );
     assert.equal(historyBefore.rows[0]?.n, 1);
+    const importsBefore = await client.query<{ n: number }>(
+      'SELECT public.publication_scope_imported_today($1::uuid) AS n',
+      [sourceId],
+    );
+    assert.equal(importsBefore.rows[0]?.n, 1);
 
     await client.query('SAVEPOINT history_identifier_guard');
     await assert.rejects(
@@ -350,6 +355,11 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       1,
       'SUPPRESS must not rewrite or hide the historical importedDocuments count',
     );
+    const importsSuppressed = await client.query<{ n: number }>(
+      'SELECT public.publication_scope_imported_today($1::uuid) AS n',
+      [sourceId],
+    );
+    assert.equal(importsSuppressed.rows[0]?.n, 0);
     await resetRole(client);
 
     await setRole(client, 'radar_worker_runtime');
@@ -447,6 +457,11 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       [publicationId],
     );
     assert.equal(appRestored.rows[0]?.n, 1);
+    const importsRestored = await client.query<{ n: number }>(
+      'SELECT public.publication_scope_imported_today($1::uuid) AS n',
+      [sourceId],
+    );
+    assert.equal(importsRestored.rows[0]?.n, 1);
     await resetRole(client);
 
     // Suppress once more, then prove a material canonical mutation produces a
