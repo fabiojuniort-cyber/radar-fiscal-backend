@@ -101,6 +101,12 @@ O arquivo de backup não deve ser commitado no repositório.
 
 **Sem `backup + restore PASS`, o merge/deploy permanece bloqueado.**
 
+### 1.4 Runner versionado na Railway
+
+`runner/Dockerfile` e `runner/backup-restore.sh` automatizam este gate. Criar serviço temporário exclusivo desta frente, sem domínio público, com volume privado em `/data`, restart policy `NEVER`, sem pre-deploy/migration e fonte fixada no SHA revisado. Usar referência Railway à credencial administrativa em `PROD_DATABASE_ADMIN_URL`, sem copiar valores para logs; `CANDIDATE_SHA` registra o SHA candidato. `MODE=preflight` é o padrão e faz somente leitura de versão, tamanho e ausência dos objetos de scope. Só alterar para `MODE=backup-restore` após a revisão independente do runner.
+
+O runner impõe PostgreSQL major 18, sessões produtivas read-only e espaço livre conservador, compartilha snapshot entre dump e contagens de **todas** as tabelas públicas, e restaura em cluster novo dentro do container Railway, sem listener TCP, por Unix socket exclusivo. Roles referenciadas são criadas como `NOLOGIN`, sem copiar senhas. `createdb`/`pg_restore` recebem somente o endereço local desse cluster isolado. Qualquer divergência de contagem impede `SCOPE_BACKUP_RESTORE_PASS`. Dump, cluster restaurado e logs privados permanecem no volume; somente evidência sanitizada é impressa. Não remover esse volume antes do encerramento R3 e da decisão de retenção do backup.
+
 ## 2. Deploy/migration e preflight pós-migration
 
 Somente após a evidência da seção 1 estar registrada e o gate R3 autorizar o merge/deploy.
