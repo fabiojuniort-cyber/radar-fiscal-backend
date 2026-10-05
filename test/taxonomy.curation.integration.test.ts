@@ -694,6 +694,16 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       'hidden item keeps its label for legacy profile fields',
     );
     assert.equal(body.dimensions[2].concepts[0].label, 'NF-e');
+    // Segmento table and Produtos table for the CNAE / product pickers.
+    assert.ok(body.segments.some((item: { code: string }) => item.code === 'sector.agribusiness'));
+    const ureaOption = body.products.find((item: { code: string }) => item.code === 'product.urea');
+    assert.equal(ureaOption.groupLabel, 'Fertilizantes e corretivos');
+    assert.deepEqual(ureaOption.officialCodes, ['310210']);
+    assert.ok(ureaOption.segmentCodes.includes('sector.agribusiness'));
+    assert.ok(
+      !body.products.some((item: { code: string }) => item.code === 'product.soy'),
+      'hidden item is not offered to companies',
+    );
 
     // Classification is disabled by default: the Worker does nothing.
     const { publicationId } = await createPublication(

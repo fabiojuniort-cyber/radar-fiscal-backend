@@ -1816,6 +1816,8 @@ export async function productRoutes(
                 dimensions: [],
                 conceptCodes: [],
                 conceptIndex: [],
+                segments: [],
+                products: [],
               };
             }
 
@@ -1823,10 +1825,34 @@ export async function productRoutes(
             // (legacy defaults for releases published before curation).
             const view = await loadReleaseView(kyselyRunner(trx), release.id);
             if (!view) {
-              return { release: null, dimensions: [], conceptCodes: [], conceptIndex: [] };
+              return { release: null, dimensions: [], conceptCodes: [], conceptIndex: [], segments: [], products: [] };
             }
 
+            const sectorDimension = view.dimensions.find((dimension) => dimension.officialCodeType === 'CNAE');
+            const groupById = new Map(view.groups.map((group) => [group.id, group]));
             return {
+              // Segmento table (not CNAE activities): segment per CNAE.
+              segments: view.concepts
+                .filter(
+                  (concept) =>
+                    concept.dimensionCode === sectorDimension?.code && !isCnaeActivity(concept.officialCodes),
+                )
+                .map((concept) => ({ code: concept.code, label: concept.label }))
+                .sort((left, right) => left.label.localeCompare(right.label, 'pt-BR')),
+              // Produtos table: what a company can parametrize per CNAE.
+              products: view.concepts
+                .filter((concept) => concept.dimensionCode === 'product' && concept.profileVisible)
+                .map((concept) => {
+                  const group = concept.groupId ? groupById.get(concept.groupId) : undefined;
+                  return {
+                    code: concept.code,
+                    label: concept.label,
+                    groupLabel: group?.label ?? null,
+                    segmentCodes: group?.segmentCodes ?? [],
+                    officialCodes: concept.officialCodes,
+                  };
+                })
+                .sort((left, right) => left.label.localeCompare(right.label, 'pt-BR')),
               release: {
                 id: release.id,
                 version: release.version,
