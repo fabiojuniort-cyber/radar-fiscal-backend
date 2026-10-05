@@ -160,7 +160,10 @@ function provenance(metadata: Metadata): DouProvenance | undefined {
   if (!Array.isArray(dou.parts) || !dou.parts.length) return undefined;
   const partNumbers = new Set<number>();
   const pageKeys = new Set<string>();
-  const partFingerprints: Array<{ filename: string; rawSha256: string }> = [];
+  // A byte hash claim cannot excuse contradictory extracted attributes for
+  // the same XML. Bind the complete supplied part record, including page
+  // number/reference, rather than filename/rawSha256 alone.
+  const partFingerprints: Array<{ filename: string; evidence: Metadata }> = [];
   let journal: string | undefined;
   const brazilianDate = `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;
   for (const raw of dou.parts) {
@@ -175,7 +178,7 @@ function provenance(metadata: Metadata): DouProvenance | undefined {
     const partNumber = Number(filename[4] ?? '1');
     if (!Number.isSafeInteger(partNumber) || partNumber < 1 || partNumbers.has(partNumber)) return undefined;
     partNumbers.add(partNumber);
-    partFingerprints.push({ filename: part.filename, rawSha256: part.rawSha256 });
+    partFingerprints.push({ filename: part.filename, evidence: part });
     if (part.sizeBytes !== undefined && (typeof part.sizeBytes !== 'number' || !Number.isSafeInteger(part.sizeBytes) || part.sizeBytes <= 0)) return undefined;
     if (attributes.pdfPage !== undefined) {
       const key = certifiedPageKey(attributes.pdfPage);
@@ -207,6 +210,17 @@ function hasRoutineEvidenceEnvelope(dou: Metadata): boolean {
       return typeof item?.rawSha256 === 'string' && SHA256.test(item.rawSha256) &&
         attributes?.artType === 'EXTRATO DE CONTRATO';
     });
+}
+
+function hasUnexaminedPresentation(metadata: Metadata): boolean {
+  if (metadata.presentation === undefined) return false;
+  const presentation = record(metadata.presentation);
+  // Only this exact descriptor is known to point back to content_text without
+  // carrying an additional representation. HTML/unknown fields need separate
+  // inspection; even SANITIZED_HTML can contain material absent from the body.
+  return !presentation || presentation.version !== 1 || presentation.format !== 'PRESERVED_TEXT' ||
+    presentation.preservesWhitespace !== true ||
+    Object.keys(presentation).some(key => !['version', 'format', 'preservesWhitespace'].includes(key));
 }
 
 function decide(publication: CleanupPublication, sourceId: string): DouCleanupCandidateDecision {
@@ -265,6 +279,7 @@ function decide(publication: CleanupPublication, sourceId: string): DouCleanupCa
     ...classifications.flatMap(value => value?.decision === 'KEEP' ? [value.category, ...value.reasonCodes] : []));
   if (classifications.every(value => value === null)) return result('KEEP', 'not_contract_excerpt');
   if (storedScopes.some(value => value?.decision !== 'IGNORE')) return result('REVIEW', 'persisted_review_or_invalid_scope');
+  if (metadata.some(hasUnexaminedPresentation)) return result('REVIEW', 'unexamined_presentation_material');
   // Extra attachments are outside the body/supplementary proof. Even a file
   // labelled PROVENANCE is not silently assumed to contain no material text.
   const fileInventories = [...metadata.map(meta => meta.files),
