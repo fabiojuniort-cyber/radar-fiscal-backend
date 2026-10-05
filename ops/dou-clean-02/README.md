@@ -164,7 +164,7 @@ Para alinhar o Worker sem iniciar esse rescan:
 
 1. definir `PUBLICATION_NCM_ENRICHMENT_ENABLED=false` **somente no serviço Worker** antes do deploy;
 2. deployar o SHA revisado e confirmar no log de startup `ncmEnrichmentEnabled=false`;
-3. manter coleta e classificação normais; a flag não altera detector, ledger nem dados persistidos;
+3. manter a coleta normal e o loop de classificação ativo; versões que ainda não tenham scan NCM SUCCESS 1.1 ficam corretamente aguardando esse pré-requisito até a reativação do scanner; a flag não altera detector, ledger nem dados persistidos;
 4. alinhar o Scheduler ao mesmo SHA sem mudar cron, backfill ou variáveis;
 5. executar o smoke SUPPRESS/RESTORE somente depois de confirmar os runtimes saudáveis.
 
