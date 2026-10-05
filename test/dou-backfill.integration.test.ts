@@ -7,11 +7,13 @@ import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { acquireNextCollectionRun, createCollectionRun } from '../src/modules/collection/collection-run.repository.js';
+import { isCronDue } from '../src/modules/collection/cron.js';
 import {
   DouBackfillBlockedError,
   planDouBackfillDates,
   readDouBackfillCoverage,
   runDouBackfillBatch,
+  runDouBackfillTick,
 } from '../src/modules/collection/dou-backfill.js';
 import { readDouSourceState } from '../src/modules/collection/dou-source-state.repository.js';
 import { fixtureFetch } from './dou.fixtures.js';
@@ -27,7 +29,8 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
   const base = { sourceId, credentials, fetch, now, timeoutMs: 10_000, sleep: async () => undefined };
   try {
     await db.insertInto('sources').values({
-      id: sourceId, code: `dou-backfill-${sourceId}`, name: 'DOU backfill', jurisdiction_level: 'FEDERAL',
+      // The hourly tick resolves the source by its production code.
+      id: sourceId, code: 'dou', name: 'DOU backfill', jurisdiction_level: 'FEDERAL',
       base_url: 'https://inlabs.in.gov.br', connector_key: 'dou', max_attempts: 1,
     }).execute();
 
@@ -87,6 +90,44 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
       };
       await runDouBackfillBatch(db, { ...base, fetch: slowFetch, dates: ['2026-09-17'], workerId: 'backfill-test' });
       assert.equal(acquiredByWorker, undefined);
+    });
+
+    await t.test('hourly tick: one date per run, throttled to one run per interval, complete when nothing is missing', async () => {
+      const tick = (overrides: Record<string, unknown> = {}) => runDouBackfillTick(db, {
+        from: '2026-09-15', workerId: 'tick-worker', credentials, fetch, now, timeoutMs: 10_000, isCronDue, ...overrides,
+      });
+      // Covered so far: 13, 17, 18, 19, 20 (plus the monitoring window). Missing: 01/10 .. 21/09, 16, 15.
+      // Earlier subtests just ran backfills: the first tick ignores the interval.
+      const first = await tick({ minIntervalMs: 1 });
+      assert.equal(first.state, 'RAN');
+      assert.deepEqual(first.state === 'RAN' && first.batch.dates, ['2026-10-01'], 'walks back one day per query');
+      assert.equal(first.state === 'RAN' && first.batch.result.status, 'SUCCESS_NO_RESULTS');
+
+      const throttled = await tick(); // default: one run per hour
+      assert.deepEqual(throttled, { state: 'SKIPPED', reason: 'THROTTLED' });
+
+      const rest = await tick({ minIntervalMs: 1, datesPerRun: 4 });
+      assert.equal(rest.state === 'RAN' && rest.batch.dates.length, 4);
+      assert.equal(rest.state === 'RAN' && rest.batch.dates[0], '2026-09-30');
+
+      const complete = await runDouBackfillTick(db, {
+        from: '2026-09-17', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1,
+        // Everything from 17/09 is covered once the remaining dates are consulted.
+      });
+      assert.notEqual(complete.state, 'SKIPPED');
+      let state = complete.state;
+      for (let guard = 0; state === 'RAN' && guard < 10; guard += 1) {
+        state = (await runDouBackfillTick(db, { from: '2026-09-17', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1, datesPerRun: 4 })).state;
+      }
+      assert.equal(state, 'COMPLETE');
+    });
+
+    await t.test('hourly tick never starts close to a scheduled DOU cycle', async () => {
+      await db.updateTable('sources').set({ schedule_cron: '10 12 * * *', schedule_timezone: 'America/Sao_Paulo' }).where('id', '=', sourceId).execute();
+      // now() is 12:00 in São Paulo: the 12:10 cycle is within the 20-minute guard.
+      const skipped = await runDouBackfillTick(db, { from: '2026-09-15', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1 });
+      assert.deepEqual(skipped, { state: 'SKIPPED', reason: 'SCHEDULED_CYCLE_DUE' });
+      await db.updateTable('sources').set({ schedule_cron: null }).where('id', '=', sourceId).execute();
     });
 
     await t.test('dates inside the monitoring window are refused', async () => {

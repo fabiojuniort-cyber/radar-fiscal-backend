@@ -182,4 +182,10 @@ Governança: tribusca-control Issue #35. Fecha a pendência "interface de execu�
 - **Checkpoint:** runs BACKFILL não alimentam o checkpoint do monitoramento (`readDouSourceState` as ignora).
 - **Data das publicações:** recebem `published_on` = data oficial do DOU, não a data da coleta.
 
+**Modo horário no Worker (D-056).** Com `DOU_BACKFILL_FROM=AAAA-MM-DD` no Worker, a mesma lógica roda sozinha. A cada intervalo (`DOU_BACKFILL_INTERVAL_MS`, padrão 1 h), uma run BACKFILL busca a próxima data faltante, recuando `DOU_BACKFILL_DATES_PER_RUN` dia(s) por consulta (padrão 1, máximo 4).
+- Só roda com o Worker ocioso, sem run aberta do DOU e fora dos 20 min anteriores a um ciclo.
+- O intervalo é verificado no banco, sob o lock da tabela, então várias réplicas do Worker não duplicam a consulta.
+- Quando não resta data faltante em `[DOU_BACKFILL_FROM, hoje − 3]`, o Worker registra `DOU backfill complete; DOU_BACKFILL_FROM can be removed` e para de consultar. Basta então remover a variável.
+- Logs: `DOU backfill batch completed` (runId, datas, status, métricas, `remainingDates`) e `DOU backfill tick failed`.
+
 **Operação (R3).** Primeiro o dry-run, depois `--apply` logo após um ciclo do DOU (ex.: 06h20, 10h20 de Brasília), registrando as saídas na Issue. Para recuar além do mês anterior, `--from` explícito e decisão do responsável sobre o alcance (D-056: acervo oficial disponível).

@@ -8,6 +8,8 @@ import {
 import {
   buildConnectorRegistry,
 } from './modules/collection/connector-registry.factory.js';
+import { isCronDue } from './modules/collection/cron.js';
+import { runDouBackfillTick } from './modules/collection/dou-backfill.js';
 import {
   processPublicationNcmEnrichmentBatch,
 } from './modules/taxonomy/ncm/publication-ncm.detector.js';
@@ -29,6 +31,13 @@ const NCM_AFTER_COLLECTION_BATCH_SIZE = 5;
 const TAXONOMY_IDLE_BATCH_SIZE = 20;
 const TAXONOMY_AFTER_COLLECTION_BATCH_SIZE = 10;
 
+// DOU administrative backfill (D-056): evaluated while idle, at most every
+// few minutes; the database throttle keeps it to one run per interval across
+// all Worker replicas.
+const DOU_BACKFILL_CHECK_MS = 5 * 60_000;
+let douBackfillComplete = false;
+let douBackfillNextCheckAt = 0;
+
 function requestShutdown(signal: string): void {
   stopping = true;
 
@@ -49,6 +58,70 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) =>
     setTimeout(resolve, ms),
   );
+}
+
+async function backfillDou(
+  db: ReturnType<typeof createStandaloneDatabase>,
+): Promise<void> {
+  if (!env.DOU_BACKFILL_FROM || douBackfillComplete) return;
+  if (
+    process.env.DOU_CONNECTOR_ENABLED !== 'true' ||
+    !process.env.INLABS_EMAIL ||
+    !process.env.INLABS_PASSWORD
+  ) return;
+  if (Date.now() < douBackfillNextCheckAt) return;
+  douBackfillNextCheckAt = Date.now() + DOU_BACKFILL_CHECK_MS;
+
+  try {
+    const result = await runDouBackfillTick(db, {
+      from: env.DOU_BACKFILL_FROM,
+      datesPerRun: env.DOU_BACKFILL_DATES_PER_RUN,
+      minIntervalMs: env.DOU_BACKFILL_INTERVAL_MS,
+      workerId: env.COLLECTION_WORKER_ID,
+      credentials: () => ({
+        email: process.env.INLABS_EMAIL!,
+        password: process.env.INLABS_PASSWORD!,
+      }),
+      timeoutMs: env.COLLECTION_TIMEOUT_MS,
+      ...(env.COLLECTION_BUDGET_GRACE_MS !== undefined
+        ? { budgetGraceMs: env.COLLECTION_BUDGET_GRACE_MS }
+        : {}),
+      heartbeatIntervalMs: env.COLLECTION_HEARTBEAT_INTERVAL_MS,
+      logger: processLogger,
+      isCronDue,
+    });
+    if (result.state === 'COMPLETE') {
+      douBackfillComplete = true;
+      processLogger.info(
+        { from: env.DOU_BACKFILL_FROM },
+        'DOU backfill complete; DOU_BACKFILL_FROM can be removed',
+      );
+    } else if (result.state === 'RAN') {
+      processLogger.info(
+        {
+          runId: result.batch.runId,
+          dates: result.batch.dates,
+          attempts: result.batch.attempts,
+          status: result.batch.retryLimitReached
+            ? 'SOURCE_UNAVAILABLE'
+            : result.batch.result.status,
+          metrics: result.batch.result.metrics,
+          remainingDates: result.remainingDates,
+        },
+        'DOU backfill batch completed',
+      );
+    }
+  } catch (error) {
+    processLogger.warn(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown DOU backfill error',
+      },
+      'DOU backfill tick failed',
+    );
+  }
 }
 
 async function enrichPublicationNcms(
@@ -182,6 +255,7 @@ async function run(): Promise<void> {
           );
 
         if (!acquired) {
+          await backfillDou(db);
           await enrichPublicationNcms(
             db,
             NCM_IDLE_BATCH_SIZE,

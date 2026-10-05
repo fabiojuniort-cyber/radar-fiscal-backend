@@ -155,12 +155,20 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
 
 export class DouBackfillBlockedError extends Error {}
 
+/** A backfill run was created less than `minIntervalMs` ago (D-056: one query per hour). */
+export class DouBackfillThrottledError extends DouBackfillBlockedError {}
+
 /**
  * Creates the BACKFILL run already owned by `workerId`, in one transaction,
  * so the regular worker can never acquire it. Refuses when the source has an
  * open run (monitoring keeps priority; one active run per source).
  */
-async function createOwnedBackfillRun(db: Kysely<DB>, sourceId: string, workerId: string): Promise<AcquiredCollectionRun> {
+async function createOwnedBackfillRun(
+  db: Kysely<DB>,
+  sourceId: string,
+  workerId: string,
+  minIntervalMs = 0,
+): Promise<AcquiredCollectionRun> {
   return db.transaction().execute(async (trx) => {
     // Same serialization as the operator pause: a Scheduler insert in flight
     // commits first (and is seen below) or waits for this transaction.
@@ -179,6 +187,19 @@ async function createOwnedBackfillRun(db: Kysely<DB>, sourceId: string, workerId
       .executeTakeFirst();
     if (open) {
       throw new DouBackfillBlockedError(`DOU has an open ${open.trigger_type} run ${open.id} (${open.status}).`);
+    }
+    if (minIntervalMs > 0) {
+      // Checked under the table lock, so concurrent worker replicas cannot
+      // both start a backfill in the same interval.
+      const last = await trx.selectFrom('collection_runs')
+        .select('created_at')
+        .where('source_id', '=', sourceId)
+        .where('trigger_type', '=', 'BACKFILL')
+        .orderBy('created_at', 'desc')
+        .executeTakeFirst();
+      if (last && Date.now() - new Date(last.created_at).getTime() < minIntervalMs) {
+        throw new DouBackfillThrottledError('A DOU backfill run already started in this interval.');
+      }
     }
     const now = new Date();
     const run = await trx.insertInto('collection_runs')
@@ -231,6 +252,10 @@ export interface DouBackfillBatchOptions {
   logger?: CollectionEngineLogger;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
+  budgetGraceMs?: number;
+  heartbeatIntervalMs?: number;
+  /** Refuse to start when the previous BACKFILL run is more recent than this. */
+  minIntervalMs?: number;
 }
 
 export interface DouBackfillBatchResult {
@@ -265,12 +290,14 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
     ...(options.fetch ? { fetch: options.fetch } : {}),
   }));
 
-  const run = await createOwnedBackfillRun(db, options.sourceId, options.workerId);
+  const run = await createOwnedBackfillRun(db, options.sourceId, options.workerId, options.minIntervalMs);
   let attempts = 0;
   while (true) {
     attempts += 1;
     const result = await processAcquiredCollectionRun(db, registry, run, {
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.budgetGraceMs !== undefined ? { budgetGraceMs: options.budgetGraceMs } : {}),
+      ...(options.heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs: options.heartbeatIntervalMs } : {}),
       ...(options.logger ? { logger: options.logger } : {}),
     });
     if (result.state === 'TERMINAL') return { runId: run.id, dates: options.dates, attempts, result };
@@ -289,5 +316,85 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
     }
     const waitMs = Math.max(0, (result.nextAttemptAt?.getTime() ?? Date.now()) - Date.now());
     await sleep(waitMs);
+  }
+}
+
+export interface DouBackfillTickOptions {
+  /** Oldest date to backfill (YYYY-MM-DD). */
+  from: string;
+  /** Dates per hourly run; D-056 default is one day per query. */
+  datesPerRun?: number;
+  /** Minimum interval between backfill runs; D-056 default one hour. */
+  minIntervalMs?: number;
+  /** Never start when a scheduled DOU cycle is due within this many minutes. */
+  guardMinutes?: number;
+  workerId: string;
+  credentials: () => InlabsCredentials | undefined;
+  timeoutMs?: number;
+  budgetGraceMs?: number;
+  heartbeatIntervalMs?: number;
+  logger?: CollectionEngineLogger;
+  now?: () => Date;
+  fetch?: typeof fetch;
+  /** Whether `cron` is due at `instant` in `timezone` (injected to keep this module free of the cron parser). */
+  isCronDue: (cron: string, instant: Date, timezone: string) => boolean;
+}
+
+export type DouBackfillTickResult =
+  | { state: 'COMPLETE' }
+  | { state: 'SKIPPED'; reason: 'SOURCE_INACTIVE' | 'THROTTLED' | 'SOURCE_BUSY' | 'SCHEDULED_CYCLE_DUE' }
+  | { state: 'RAN'; batch: DouBackfillBatchResult; remainingDates: number };
+
+/**
+ * Hourly backfill step (D-056: one query per hour, walking back one day per
+ * query). Runs at most one batch, never inside the monitoring window, never
+ * concurrently with a DOU run and never close to a scheduled cycle. Reports
+ * COMPLETE once no date in [from, today-3] is missing, which is the signal to
+ * switch it off.
+ */
+export async function runDouBackfillTick(db: Kysely<DB>, options: DouBackfillTickOptions): Promise<DouBackfillTickResult> {
+  const now = options.now?.() ?? new Date();
+  const source = await db.selectFrom('sources')
+    .select(['id', 'is_active', 'connector_key', 'schedule_cron', 'schedule_timezone'])
+    .where('code', '=', 'dou')
+    .executeTakeFirst();
+  if (!source || !source.is_active || source.connector_key !== 'dou') return { state: 'SKIPPED', reason: 'SOURCE_INACTIVE' };
+
+  const guardMinutes = options.guardMinutes ?? 20;
+  if (source.schedule_cron) {
+    const start = Math.floor(now.getTime() / 60_000) * 60_000;
+    for (let minute = 0; minute <= guardMinutes; minute += 1) {
+      if (options.isCronDue(source.schedule_cron, new Date(start + minute * 60_000), source.schedule_timezone)) {
+        return { state: 'SKIPPED', reason: 'SCHEDULED_CYCLE_DUE' };
+      }
+    }
+  }
+
+  const coverage = await readDouBackfillCoverage(db, source.id);
+  const today = saoPauloDate(now);
+  const dates = planDouBackfillDates({ from: options.from, to: addDays(today, -3), today, covered: coverage.covered });
+  if (!dates.length) return { state: 'COMPLETE' };
+
+  const batch = dates.slice(0, options.datesPerRun ?? 1);
+  try {
+    const result = await runDouBackfillBatch(db, {
+      sourceId: source.id,
+      dates: batch,
+      workerId: options.workerId,
+      credentials: options.credentials,
+      receipts: coverage.receipts,
+      minIntervalMs: options.minIntervalMs ?? 3_600_000,
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.budgetGraceMs !== undefined ? { budgetGraceMs: options.budgetGraceMs } : {}),
+      ...(options.heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs: options.heartbeatIntervalMs } : {}),
+      ...(options.logger ? { logger: options.logger } : {}),
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+      ...(options.now ? { now: options.now } : {}),
+    });
+    return { state: 'RAN', batch: result, remainingDates: dates.length - batch.length };
+  } catch (error) {
+    if (error instanceof DouBackfillThrottledError) return { state: 'SKIPPED', reason: 'THROTTLED' };
+    if (error instanceof DouBackfillBlockedError) return { state: 'SKIPPED', reason: 'SOURCE_BUSY' };
+    throw error;
   }
 }
