@@ -65,6 +65,18 @@ async function backfillDou(
 ): Promise<void> {
   if (!env.DOU_BACKFILL_FROM || douBackfillComplete) return;
   if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(env.DOU_BACKFILL_FROM) ||
+    Number.isNaN(Date.parse(`${env.DOU_BACKFILL_FROM}T00:00:00Z`)) ||
+    new Date(`${env.DOU_BACKFILL_FROM}T00:00:00Z`).toISOString().slice(0, 10) !== env.DOU_BACKFILL_FROM
+  ) {
+    douBackfillComplete = true;
+    processLogger.error(
+      { from: env.DOU_BACKFILL_FROM },
+      'DOU backfill disabled: DOU_BACKFILL_FROM must be a valid YYYY-MM-DD date',
+    );
+    return;
+  }
+  if (
     process.env.DOU_CONNECTOR_ENABLED !== 'true' ||
     !process.env.INLABS_EMAIL ||
     !process.env.INLABS_PASSWORD
@@ -95,6 +107,16 @@ async function backfillDou(
       processLogger.info(
         { from: env.DOU_BACKFILL_FROM },
         'DOU backfill complete; DOU_BACKFILL_FROM can be removed',
+      );
+    } else if (result.state === 'STALLED') {
+      douBackfillComplete = true;
+      processLogger.error(
+        {
+          from: env.DOU_BACKFILL_FROM,
+          consecutiveFailures: result.consecutiveFailures,
+          remainingDates: result.remainingDates,
+        },
+        'DOU backfill stalled; operator action required',
       );
     } else if (result.state === 'RAN') {
       processLogger.info(

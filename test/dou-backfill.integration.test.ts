@@ -122,6 +122,33 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
       assert.equal(state, 'COMPLETE');
     });
 
+    await t.test('a date that keeps failing does not block older dates; repeated failures stall the backfill', async () => {
+      const tickArgs = { from: '2026-09-01', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1 };
+      let sequence = 0;
+      const failedRun = async () => {
+        // Distinct scheduled_for: (source, scheduled_for, trigger) is unique.
+        const at = new Date(Date.now() + (sequence += 1));
+        await db.insertInto('collection_runs').values({
+          source_id: sourceId, scheduled_for: at, started_at: at, finished_at: at,
+          status: 'SOURCE_UNAVAILABLE', trigger_type: 'BACKFILL', error_summary: 'DOU_BACKFILL_RETRY_LIMIT: 8 attempts',
+        }).execute();
+      };
+      const coverage = await readDouBackfillCoverage(db, sourceId);
+      const missing = planDouBackfillDates({ from: '2026-09-01', to: '2026-10-01', today: '2026-10-04', covered: coverage.covered });
+      assert.ok(missing.length >= 2);
+
+      await failedRun();
+      const rotated = await runDouBackfillTick(db, tickArgs);
+      assert.deepEqual(rotated.state === 'RAN' && rotated.batch.dates, [missing[1]], 'after one failure the next date is tried');
+
+      const remaining = planDouBackfillDates({ from: '2026-09-01', to: '2026-10-01', today: '2026-10-04', covered: (await readDouBackfillCoverage(db, sourceId)).covered });
+      for (let i = 0; i < 2 * remaining.length; i += 1) await failedRun();
+      const stalled = await runDouBackfillTick(db, tickArgs);
+      assert.equal(stalled.state, 'STALLED');
+      assert.deepEqual(stalled.state === 'STALLED' && stalled.remainingDates, remaining);
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).where('status', '=', 'SOURCE_UNAVAILABLE').execute();
+    });
+
     await t.test('hourly tick never starts close to a scheduled DOU cycle', async () => {
       await db.updateTable('sources').set({ schedule_cron: '10 12 * * *', schedule_timezone: 'America/Sao_Paulo' }).where('id', '=', sourceId).execute();
       // now() is 12:00 in São Paulo: the 12:10 cycle is within the 20-minute guard.

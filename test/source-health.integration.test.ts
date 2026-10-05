@@ -37,14 +37,20 @@ test('source health reads real run history and flags stuck, stale and persistent
     return row.id;
   }
 
-  async function finishedRun(sourceId: string, status: string, finishedHoursAgo: number, error: string | null = null) {
+  async function finishedRun(
+    sourceId: string,
+    status: string,
+    finishedHoursAgo: number,
+    error: string | null = null,
+    triggerType: 'SCHEDULED' | 'BACKFILL' = 'SCHEDULED',
+  ) {
     await db.insertInto('collection_runs').values({
       source_id: sourceId,
       scheduled_for: hoursAgo(finishedHoursAgo + 0.1),
       started_at: hoursAgo(finishedHoursAgo + 0.05),
       finished_at: hoursAgo(finishedHoursAgo),
       status,
-      trigger_type: 'SCHEDULED',
+      trigger_type: triggerType,
       error_summary: error,
     }).execute();
   }
@@ -74,7 +80,14 @@ test('source health reads real run history and flags stuck, stale and persistent
     const partial = await source('partial');
     for (let i = 1; i <= 6; i += 1) {
       await finishedRun(partial, 'PARTIAL_SUCCESS', i, 'Partial processing: 1 item errors');
+      // Administrative backfill runs in between must not mask the pattern.
+      await finishedRun(partial, 'SUCCESS', i - 0.5, null, 'BACKFILL');
     }
+
+    // A source consulted only by backfill runs is still stale for monitoring.
+    const backfillOnly = await source('backfill-only');
+    await finishedRun(backfillOnly, 'SUCCESS_NO_RESULTS', 30);
+    await finishedRun(backfillOnly, 'SUCCESS', 0.5, null, 'BACKFILL');
 
     const inactive = await source('inactive', false);
     await finishedRun(inactive, 'SOURCE_UNAVAILABLE', 200);
@@ -84,7 +97,7 @@ test('source health reads real run history and flags stuck, stale and persistent
     const rows = (await readSourceHealthRows(db)).filter((row) => row.sourceCode.endsWith(suffix));
     assert.deepEqual(
       rows.map((row) => row.sourceCode).sort(),
-      [`healthy-${suffix}`, `partial-${suffix}`, `stuck-${suffix}`],
+      [`backfill-only-${suffix}`, `healthy-${suffix}`, `partial-${suffix}`, `stuck-${suffix}`],
     );
 
     const stuckRow = rows.find((row) => row.sourceCode === `stuck-${suffix}`)!;
@@ -99,7 +112,12 @@ test('source health reads real run history and flags stuck, stale and persistent
     const alerts = evaluateSourceHealth(rows, now).alerts
       .map((alert) => `${alert.sourceCode.replace(`-${suffix}`, '')}:${alert.kind}`)
       .sort();
-    assert.deepEqual(alerts, ['partial:PERSISTENT_PARTIAL', 'stuck:STALE_SOURCE', 'stuck:STUCK_RUN']);
+    assert.deepEqual(alerts, [
+      'backfill-only:STALE_SOURCE',
+      'partial:PERSISTENT_PARTIAL',
+      'stuck:STALE_SOURCE',
+      'stuck:STUCK_RUN',
+    ]);
   } finally {
     if (created.length) {
       await db.deleteFrom('collection_runs').where('source_id', 'in', created).execute();

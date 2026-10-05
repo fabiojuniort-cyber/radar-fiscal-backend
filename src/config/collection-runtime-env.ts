@@ -137,9 +137,11 @@ const schema = z.object({
   // hour, one day back per query). Unset = off. Set to the oldest date to
   // fill (YYYY-MM-DD); the Worker logs "DOU backfill complete" once nothing
   // is missing, after which the variable can be removed.
+  // Validated where it is used: an invalid value disables the backfill
+  // (logged) instead of stopping the Worker at startup.
   DOU_BACKFILL_FROM: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .trim()
     .optional(),
 
   DOU_BACKFILL_DATES_PER_RUN: z.coerce

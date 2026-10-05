@@ -93,9 +93,11 @@ export interface DouBackfillCoverage {
 /**
  * Coverage = dates with any archive receipt in the latest successful
  * monitoring checkpoint, plus dates whose six packages were all consulted
- * (parsed, unchanged or not available) by a successful backfill run. Dates
- * without an edition therefore become covered once a backfill has checked
- * them and are not consulted again.
+ * (parsed, partially parsed, unchanged or not available) by a finished
+ * backfill run. Dates without an edition therefore become covered once a
+ * backfill has checked them. A package with individually broken matters
+ * (PARTIAL) is consulted: retrying would not repair those matters, and the
+ * run stays PARTIAL_SUCCESS in the history for audit.
  */
 export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string): Promise<DouBackfillCoverage> {
   const receipts: Record<string, string> = {};
@@ -124,7 +126,7 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
     .select([sql<unknown>`ca.metadata -> 'dou' -> 'archives'`.as('archives')])
     .where('cr.source_id', '=', sourceId)
     .where('cr.trigger_type', '=', 'BACKFILL')
-    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS'])
+    .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS'])
     .where('ca.status', '=', 'SUCCESS')
     .execute();
   const consulted = new Map<string, Set<string>>();
@@ -136,7 +138,7 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
       const section = archive?.section;
       const state = archive?.state;
       if (typeof date !== 'string' || !validDate(date) || typeof section !== 'string') continue;
-      if (state !== 'PARSED' && state !== 'UNCHANGED' && state !== 'NOT_AVAILABLE') continue;
+      if (state !== 'PARSED' && state !== 'UNCHANGED' && state !== 'NOT_AVAILABLE' && state !== 'PARTIAL') continue;
       const sections = consulted.get(date) ?? new Set<string>();
       sections.add(section);
       consulted.set(date, sections);
@@ -342,8 +344,27 @@ export interface DouBackfillTickOptions {
 
 export type DouBackfillTickResult =
   | { state: 'COMPLETE' }
+  | { state: 'STALLED'; consecutiveFailures: number; remainingDates: string[] }
   | { state: 'SKIPPED'; reason: 'SOURCE_INACTIVE' | 'THROTTLED' | 'SOURCE_BUSY' | 'SCHEDULED_CYCLE_DUE' }
   | { state: 'RAN'; batch: DouBackfillBatchResult; remainingDates: number };
+
+/** BACKFILL runs that ended without consulting the source, since the last finished one. */
+async function consecutiveBackfillFailures(db: Kysely<DB>, sourceId: string): Promise<number> {
+  const recent = await db.selectFrom('collection_runs')
+    .select('status')
+    .where('source_id', '=', sourceId)
+    .where('trigger_type', '=', 'BACKFILL')
+    .where('finished_at', 'is not', null)
+    .orderBy('finished_at', 'desc')
+    .limit(500)
+    .execute();
+  let failures = 0;
+  for (const run of recent) {
+    if (run.status === 'SUCCESS' || run.status === 'SUCCESS_NO_RESULTS' || run.status === 'PARTIAL_SUCCESS') break;
+    failures += 1;
+  }
+  return failures;
+}
 
 /**
  * Hourly backfill step (D-056: one query per hour, walking back one day per
@@ -375,7 +396,18 @@ export async function runDouBackfillTick(db: Kysely<DB>, options: DouBackfillTic
   const dates = planDouBackfillDates({ from: options.from, to: addDays(today, -3), today, covered: coverage.covered });
   if (!dates.length) return { state: 'COMPLETE' };
 
-  const batch = dates.slice(0, options.datesPerRun ?? 1);
+  // A date that keeps failing (e.g. a package INLABS lists but never serves)
+  // must not block the older ones: after K consecutive unsuccessful backfill
+  // runs the plan starts K dates further. Any finished run resets K, so a
+  // transient INLABS outage only delays the order. When every remaining date
+  // failed twice in a row, the backfill stops and asks for an operator.
+  const failures = await consecutiveBackfillFailures(db, source.id);
+  if (failures >= 2 * dates.length) {
+    return { state: 'STALLED', consecutiveFailures: failures, remainingDates: dates };
+  }
+  const offset = failures % dates.length;
+  const ordered = [...dates.slice(offset), ...dates.slice(0, offset)];
+  const batch = ordered.slice(0, options.datesPerRun ?? 1);
   try {
     const result = await runDouBackfillBatch(db, {
       sourceId: source.id,
