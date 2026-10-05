@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import type { FastifyInstance } from 'fastify';
@@ -539,6 +540,48 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         }))
         .sort((x, y) => String(x.code).localeCompare(String(y.code)));
     assert.deepEqual(pick(afterRoundTrip), pick(beforeRoundTrip));
+
+    // CNAE segment import uses the actual curator role; repeat updates instead
+    // of duplicating and the dry-run rolls back every hierarchy and alias write.
+    {
+      const { parseSegmentPackage } = await import('../src/modules/taxonomy/curation/curation.segment-package.js');
+      const { loadSegmentPackage, verifySegmentPackage } = await import('../src/modules/taxonomy/curation/curation.segment-load.js');
+      const { loadReleaseView, pgRunner } = await import('../src/modules/taxonomy/curation/curation.read.js');
+      const full = parseSegmentPackage(readFileSync('ops/taxonomy/loads/trifaros-cnae-2.3.json', 'utf8'));
+      const rows = full.rows.slice(0, 4);
+      const data = { ...full, rows,
+        subsegments: full.subsegments.filter(sub => rows.some(row => row.subsegmentId === sub.id)),
+        segments: full.segments.filter(seg => rows.some(row => row.segmentId === seg.id)),
+      };
+      const client = await app.curatorPool!.connect();
+      let before: Awaited<ReturnType<typeof loadReleaseView>> = null;
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+        before = await loadReleaseView(pgRunner(client), draft.draft.id, { includeRetired: true });
+        const actor = { userId: 'ops:test-segments', justification: 'CNAE load dry-run' };
+        const first = await loadSegmentPackage(client, actor, before!, data);
+        assert.equal(first.created, 4);
+        assert.equal(first.updated, 0);
+        const after = await loadReleaseView(pgRunner(client), draft.draft.id, { includeRetired: true });
+        verifySegmentPackage(after!, data);
+        const repeat = await loadSegmentPackage(client, actor, after!, data);
+        assert.equal(repeat.created, 0);
+        assert.equal(repeat.updated, 4);
+        const checked = await loadReleaseView(pgRunner(client), draft.draft.id, { includeRetired: true });
+        assert.equal(checked!.concepts.length, after!.concepts.length);
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+      const persisted = await app.curatorPool!.connect();
+      try {
+        await persisted.query('BEGIN READ ONLY');
+        await persisted.query('SET LOCAL ROLE radar_taxonomy_curator');
+        const afterRollback = await loadReleaseView(pgRunner(persisted), draft.draft.id, { includeRetired: true });
+        assert.deepEqual(afterRollback, before);
+      } finally { await persisted.query('ROLLBACK'); persisted.release(); }
+    }
 
     // Bulk load of the PO's product sheet: the sheet is the latest truth
     // (rolled back here so the rest of the gate keeps its fixture).
