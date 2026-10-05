@@ -121,6 +121,22 @@ site os filtrava e nunca salvou códigos dessas dimensões).
   `publication_taxonomy_reviews` (trilha da asserção julgada).
 - Planilha: coluna ausente ou célula vazia mantém o valor atual; "—" ou "-"
   limpa o campo.
+- Segmento pelos produtos: cada produto marcado leva aos segmentos do seu
+  grupo (`taxonomy_release_group_segments`); o segmento entra como tag
+  automática com motivo `PRODUCTS` ("Pelos produtos citados: …"), a menos que
+  já tenha sido marcado pelo texto. O curador remove/restaura como qualquer tag.
+
+### Afinidade com a empresa
+
+`GET /api/v1/companies/:companyId/publications/:id/affinity` (cabeçalho
+`X-Tenant-Id`) cruza as tags da legislação com o Perfil Tributário vigente da
+empresa. Pesos por tipo: produto e segmento 3; tributo, regime, operação,
+finalidade e tratamento 2; espécie tributária, documento, obrigação e tema 1;
+demais (ex.: tipo de ato) 0. Um produto do perfil também casa com a tag de
+grupo da lei. Nível: **Alta** com pontuação ≥ 5 e pelo menos um produto ou
+segmento em comum; **Média** ≥ 3; **Baixa** > 0; senão **Sem afinidade**.
+`status` é `NO_PROFILE` sem perfil preenchido e `NOT_CLASSIFIED` enquanto a lei
+não foi classificada.
 
 ## Catálogos oficiais
 

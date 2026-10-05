@@ -25,7 +25,7 @@ export type PublicationTaxonomyStatus =
   | 'NOT_FOUND';
 
 export interface TagReason {
-  type: 'TEXT' | 'SYNONYM' | 'NCM' | 'CCLASSTRIB' | 'CURATOR';
+  type: 'TEXT' | 'SYNONYM' | 'NCM' | 'CCLASSTRIB' | 'CURATOR' | 'PRODUCTS';
   term: string | null;
   excerpt: string | null;
 }
@@ -307,6 +307,50 @@ export async function loadPublicationTaxonomy(
             type: 'NCM',
             term: hit.ncm_code,
             excerpt: `NCM ${hit.ncm_code} citado na legislação`,
+          },
+        },
+      });
+    }
+  }
+
+  // Segments served by the act, seen from its products: each tagged product
+  // (or product group) brings the segments its group is linked to.
+  if (productType) {
+    const groupByCode = new Map(view.groups.map((group) => [group.code, group]));
+    const productsBySegment = new Map<string, string[]>();
+    for (const { tag } of tags.values()) {
+      if (tag.removed || tag.dimensionCode !== productType.code || !tag.groupCode) continue;
+      const group = groupByCode.get(tag.groupCode);
+      for (const segmentCode of group?.segmentCodes ?? []) {
+        const products = productsBySegment.get(segmentCode) ?? [];
+        products.push(tag.label);
+        productsBySegment.set(segmentCode, products);
+      }
+    }
+    for (const [segmentCode, products] of productsBySegment) {
+      const segment = conceptByCode.get(segmentCode);
+      if (!segment || tags.has(segment.releaseConceptId)) continue;
+      // A curator who removed the segment from this act has the last word.
+      const removed = decisionByCode.get(segment.code)?.action === 'REMOVE';
+      if (removed && !options.includeRemoved) continue;
+      const names = [...new Set(products)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      const shown = names.slice(0, 5).join(', ') + (names.length > 5 ? ` e mais ${names.length - 5}` : '');
+      tags.set(segment.releaseConceptId, {
+        section: sectionOf(segment) ?? 'Segmentos',
+        tag: {
+          kind: 'CONCEPT',
+          conceptCode: segment.code,
+          groupCode: null,
+          label: segment.label,
+          dimensionCode: segment.dimensionCode,
+          groupLabel: null,
+          origin: 'AUTOMATIC',
+          assertionId: null,
+          removed,
+          reason: {
+            type: 'PRODUCTS',
+            term: names.join(', '),
+            excerpt: `Pelos produtos citados: ${shown}`,
           },
         },
       });
