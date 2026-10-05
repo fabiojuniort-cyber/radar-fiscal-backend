@@ -724,6 +724,42 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.equal(find('product.rice').reason.term, '10063011');
     assert.equal(find('product.espalhante_adesivo').reason.type, 'SYNONYM');
     assert.equal(find('act_type.law'), undefined, 'generic label does not tag');
+    // Segment served by the act, seen from its products (group → segment).
+    assert.equal(find('sector.agribusiness').reason.type, 'PRODUCTS');
+    assert.match(find('sector.agribusiness').reason.excerpt, /Ureia|Uréia/);
+
+    // Affinity with the customer's company tax profile.
+    {
+      const company = await admin.query<{ id: string }>(
+        `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
+         VALUES ($1::uuid, 'Agro Teste S.A.', $2) RETURNING id`,
+        [customer.tenantId, String(Date.now()).padStart(14, '0').slice(-14)],
+      );
+      const companyId = company.rows[0]!.id;
+      const affinityUrl = `/api/v1/companies/${companyId}/publications/${publicationId}/affinity`;
+      const noProfile = await app.inject({ method: 'GET', url: affinityUrl, headers: customer.headers });
+      assert.equal(noProfile.statusCode, 200, noProfile.body);
+      assert.equal(noProfile.json().status, 'NO_PROFILE');
+
+      await admin.query(
+        `INSERT INTO company_tax_profiles (company_id, version_no, tax_regime, personalization, is_current)
+         VALUES ($1::uuid, 1, 'LUCRO_REAL', $2::jsonb, true)`,
+        [
+          companyId,
+          JSON.stringify({ taxonomy: { releaseId: tagView.release.id, releaseVersion: tagView.release.version, conceptCodes: ['sector.agribusiness', 'product.urea'] } }),
+        ],
+      );
+      const affinity = await app.inject({ method: 'GET', url: affinityUrl, headers: customer.headers });
+      assert.equal(affinity.statusCode, 200, affinity.body);
+      const body = affinity.json();
+      assert.equal(body.company.name, 'Agro Teste S.A.');
+      assert.equal(body.level, 'HIGH');
+      assert.deepEqual(body.matches.map((m: { code: string }) => m.code).sort(), ['product.urea', 'sector.agribusiness']);
+
+      // Another tenant cannot read this company's affinity.
+      const other = await app.inject({ method: 'GET', url: affinityUrl, headers: curator.headers });
+      assert.equal(other.statusCode, 404, other.body);
+    }
 
     // Seal: a second batch does not reclassify the same version.
     const again = await processPublicationTaxonomyBatch(worker, { limit: 50 });
