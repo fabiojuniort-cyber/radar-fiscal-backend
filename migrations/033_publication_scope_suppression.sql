@@ -35,6 +35,8 @@ CREATE TABLE public.publication_scope_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_publication_scope_operation
         UNIQUE (operation_id, publication_id),
+    CONSTRAINT uq_publication_scope_event_publication
+        UNIQUE (id, publication_id),
     CONSTRAINT chk_publication_scope_event_transition
         CHECK (
             (action = 'SUPPRESS'
@@ -56,14 +58,16 @@ CREATE TABLE public.publication_scope_state (
         ON DELETE RESTRICT,
     scope TEXT NOT NULL
         CHECK (scope IN ('IN_SCOPE', 'OUT_OF_SCOPE')),
-    current_event_id UUID NOT NULL
-        REFERENCES public.publication_scope_events(id)
-        ON DELETE RESTRICT,
+    current_event_id UUID NOT NULL,
     policy_key TEXT NOT NULL
         CHECK (btrim(policy_key) <> ''),
     evidence_sha256 CHAR(64) NOT NULL
         CHECK (evidence_sha256 ~ '^[a-f0-9]{64}$'),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_publication_scope_state_current_event
+        FOREIGN KEY (current_event_id, publication_id)
+        REFERENCES public.publication_scope_events(id, publication_id)
+        ON DELETE RESTRICT
 );
 
 CREATE INDEX ix_publication_scope_state_out
@@ -100,6 +104,27 @@ AS $$
         FROM public.publication_scope_state s
         WHERE s.publication_id = p_publication_id
           AND s.scope = 'OUT_OF_SCOPE'
+    );
+$$;
+
+-- Tenant match visibility needs a scope check from company_publication_id
+-- without granting ordinary runtime direct access to the scope ledger.
+CREATE FUNCTION public.publication_scope_company_publication_is_in_scope(
+    p_company_publication_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+    SELECT COALESCE(
+        (
+            SELECT public.publication_scope_is_in_scope(cp.publication_id)
+            FROM public.company_publications cp
+            WHERE cp.id = p_company_publication_id
+        ),
+        false
     );
 $$;
 
@@ -409,24 +434,26 @@ SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        IF NEW.is_current THEN
-            PERFORM public.restore_publication_scope_on_material_change(
-                NEW.publication_id,
-                'PUBLICATION_CURRENT_VERSION_ADDED'
-            );
-        END IF;
-    ELSIF NEW.is_current AND (
-        OLD.publication_id IS DISTINCT FROM NEW.publication_id
-        OR OLD.content_hash IS DISTINCT FROM NEW.content_hash
-        OR OLD.content_text IS DISTINCT FROM NEW.content_text
-        OR OLD.relevant_excerpt IS DISTINCT FROM NEW.relevant_excerpt
-        OR OLD.source_metadata IS DISTINCT FROM NEW.source_metadata
-        OR OLD.is_current IS DISTINCT FROM NEW.is_current
-    ) THEN
         PERFORM public.restore_publication_scope_on_material_change(
             NEW.publication_id,
-            'PUBLICATION_CURRENT_VERSION_CHANGED'
+            'PUBLICATION_VERSION_ADDED'
         );
+    ELSIF OLD.publication_id IS DISTINCT FROM NEW.publication_id
+       OR OLD.content_hash IS DISTINCT FROM NEW.content_hash
+       OR OLD.content_text IS DISTINCT FROM NEW.content_text
+       OR OLD.relevant_excerpt IS DISTINCT FROM NEW.relevant_excerpt
+       OR OLD.source_metadata IS DISTINCT FROM NEW.source_metadata
+       OR OLD.is_current IS DISTINCT FROM NEW.is_current THEN
+        PERFORM public.restore_publication_scope_on_material_change(
+            NEW.publication_id,
+            'PUBLICATION_VERSION_CHANGED'
+        );
+        IF OLD.publication_id IS DISTINCT FROM NEW.publication_id THEN
+            PERFORM public.restore_publication_scope_on_material_change(
+                OLD.publication_id,
+                'PUBLICATION_VERSION_MOVED'
+            );
+        END IF;
     END IF;
     RETURN NEW;
 END;
@@ -476,7 +503,7 @@ SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     PERFORM public.refresh_publication_source_feed(
-        ARRAY[COALESCE(NEW.publication_id, OLD.publication_id)]
+        ARRAY[NEW.publication_id]
     );
     RETURN NULL;
 END;
@@ -568,18 +595,48 @@ WITH CHECK (true);
 -- constrained by publication scope. RESTRICTIVE composes with existing tenant
 -- policies instead of widening them.
 CREATE POLICY company_publications_app_scope
-AS RESTRICTIVE
 ON public.company_publications
+AS RESTRICTIVE
 FOR ALL TO radar_app
 USING (public.publication_scope_is_in_scope(publication_id))
 WITH CHECK (public.publication_scope_is_in_scope(publication_id));
 
 CREATE POLICY company_publications_worker_scope
-AS RESTRICTIVE
 ON public.company_publications
+AS RESTRICTIVE
 FOR ALL TO radar_worker
 USING (public.publication_scope_is_in_scope(publication_id))
 WITH CHECK (public.publication_scope_is_in_scope(publication_id));
+
+CREATE POLICY publication_matches_app_scope
+ON public.publication_matches
+AS RESTRICTIVE
+FOR ALL TO radar_app
+USING (
+    public.publication_scope_company_publication_is_in_scope(
+        company_publication_id
+    )
+)
+WITH CHECK (
+    public.publication_scope_company_publication_is_in_scope(
+        company_publication_id
+    )
+);
+
+CREATE POLICY publication_matches_worker_scope
+ON public.publication_matches
+AS RESTRICTIVE
+FOR ALL TO radar_worker
+USING (
+    public.publication_scope_company_publication_is_in_scope(
+        company_publication_id
+    )
+)
+WITH CHECK (
+    public.publication_scope_company_publication_is_in_scope(
+        company_publication_id
+    )
+);
 
 -- Ordinary runtime receives no raw ledger access and no transition privilege.
 REVOKE ALL ON public.publication_scope_events,
@@ -588,6 +645,7 @@ FROM PUBLIC, radar_app, radar_worker;
 
 REVOKE ALL ON FUNCTION public.publication_scope_event_append_only() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.publication_scope_is_in_scope(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.publication_scope_company_publication_is_in_scope(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.apply_publication_scope_transition(
     UUID, TEXT, UUID, UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT
 ) FROM PUBLIC, radar_app, radar_worker;
@@ -598,4 +656,7 @@ REVOKE ALL ON FUNCTION public.trg_publication_scope_version_material() FROM PUBL
 REVOKE ALL ON FUNCTION public.trg_publication_scope_refresh_feed() FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.publication_scope_is_in_scope(UUID)
+TO radar_app, radar_worker;
+
+GRANT EXECUTE ON FUNCTION public.publication_scope_company_publication_is_in_scope(UUID)
 TO radar_app, radar_worker;
