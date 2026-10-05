@@ -492,7 +492,7 @@ function isoDate(date: Date | undefined): string | undefined {
 }
 
 function extractPublishedAt(text: string): Date | undefined {
-  const match = /Publica(?:do|ç(?:ã|a)o)\s+no\s+DOU\s+de\s+((?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4})|(?:\d{1,2}(?:º|°)?\s+de\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+de\s+\d{4}))/i.exec(text);
+  const match = /Publica(?:do|ç(?:ã|a)o)(?:\s+no)?\s+DOU\s+de\s+((?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4})|(?:\d{1,2}(?:º|°)?\s+de\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]+\s+de\s+\d{4}))/i.exec(text);
   if (!match?.[1]) {
     return undefined;
   }
@@ -683,6 +683,8 @@ export function extractEffectiveUntil(bodyHtml: string): EffectiveUntil | undefi
   return best;
 }
 
+// "Publicado no DOU de …" and, on older acts, "Publicação DOU de …".
+const PUBLICATION_NOTE = /^Publica(?:do|ç[ãa]o)(?:\s+no)?\s+DOU\b/i;
 // Amendment history notes that older acts list before the ementa.
 const AMENDMENT_NOTE = /^(Alterad[oa]s?|Revogad[oa]s?|Prorrogad[oa]s?|Acrescentad[oa]s?|Retifica[çc][ãa]o|Republica[çc][ãa]o|Vide|Nova\s+reda[çc][ãa]o|Reda[çc][ãa]o\s+dada)\b/i;
 
@@ -716,7 +718,7 @@ function extractEmenta(mainHtml: string, text: string, heading: string, fullHtml
       (paragraph) =>
         paragraph.length >= 20 &&
         !AMENDMENT_NOTE.test(paragraph) &&
-        !/^Publicado\s+no\s+DOU/i.test(paragraph) &&
+        !PUBLICATION_NOTE.test(paragraph) &&
         !/^Ratifica/i.test(paragraph) &&
         !paragraph.toUpperCase().startsWith(heading.toUpperCase()),
     ) ?? ementa
@@ -731,7 +733,7 @@ function extractEmentaCandidate(mainHtml: string, text: string, heading: string)
   for (const paragraph of paragraphs) {
     if (
       paragraph.length >= 20 &&
-      !/^Publicado\s+no\s+DOU/i.test(paragraph) &&
+      !PUBLICATION_NOTE.test(paragraph) &&
       !/^Ratifica/i.test(paragraph) &&
       !/^Imprimir$/i.test(paragraph) &&
       !paragraph.toUpperCase().startsWith(heading.toUpperCase())
@@ -747,7 +749,7 @@ function extractEmentaCandidate(mainHtml: string, text: string, heading: string)
     const normalized = normalizeSpaces(line);
     if (
       normalized.length >= 20 &&
-      !/^Publicado\s+no\s+DOU/i.test(normalized) &&
+      !PUBLICATION_NOTE.test(normalized) &&
       !/^Ratifica/i.test(normalized) &&
       !/^Imprimir$/i.test(normalized) &&
       !/^(CONV[ÊE]NIO|AJUSTE|ATO|PROTOCOLO)\b/i.test(normalized)
