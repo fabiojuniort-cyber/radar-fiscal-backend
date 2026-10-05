@@ -96,3 +96,49 @@ test('no profile and not yet classified are reported as such', () => {
     'NOT_CLASSIFIED',
   );
 });
+
+test('NCMs of the company mentioned in the act count like a product, even before classification', () => {
+  const pending = view([], 'PENDING');
+  const ncmOnly = computePublicationAffinity({
+    view: pending,
+    profileCodes: [],
+    profileProductGroups: new Map(),
+    profileNcms: ['31021010'],
+    publicationNcms: [
+      { code: '31021010', description: 'Ureia com teor de nitrogênio superior a 45 %' },
+      { code: '10063011', description: 'Arroz' },
+    ],
+  });
+  assert.equal(ncmOnly.status, 'OK');
+  assert.equal(ncmOnly.level, 'MEDIUM');
+  assert.deepEqual(ncmOnly.matches, [
+    {
+      code: '31021010',
+      label: '3102.10.10 · Ureia com teor de nitrogênio superior a 45 %',
+      dimensionCode: 'ncm',
+      weight: 3,
+      via: 'SAME_ITEM',
+    },
+  ]);
+
+  // NCM + tax tags of a classified act: strong (NCM) and above 5 = HIGH.
+  const both = computePublicationAffinity({
+    view: CV100,
+    profileCodes: ['tax.icms'],
+    profileProductGroups: new Map(),
+    profileNcms: ['31021010'],
+    publicationNcms: [{ code: '31021010', description: null }],
+  });
+  assert.equal(both.level, 'HIGH');
+  assert.deepEqual(both.matches.map((m) => m.code), ['31021010', 'tax.icms']);
+
+  // No NCM in common and not classified: still pending classification.
+  const none = computePublicationAffinity({
+    view: pending,
+    profileCodes: [],
+    profileProductGroups: new Map(),
+    profileNcms: ['31021010'],
+    publicationNcms: [],
+  });
+  assert.equal(none.status, 'NOT_CLASSIFIED');
+});

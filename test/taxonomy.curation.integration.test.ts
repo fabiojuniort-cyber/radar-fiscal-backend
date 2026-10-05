@@ -920,6 +920,21 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         payload: profileBody([{ cnaeCode: '0111301', segmentCode: 'sector.agribusiness' }]),
       });
       assert.ok(savedProfile.statusCode < 300, savedProfile.body);
+      // The user may also remove the CNAE's segment (null).
+      const noSegment = await app.inject({
+        method: 'PUT',
+        url: profileUrl,
+        headers: customer.headers,
+        payload: profileBody([{ cnaeCode: '0111301', segmentCode: null as unknown as string }]),
+      });
+      assert.ok(noSegment.statusCode < 300, noSegment.body);
+      const restored = await app.inject({
+        method: 'PUT',
+        url: profileUrl,
+        headers: customer.headers,
+        payload: profileBody([{ cnaeCode: '0111301', segmentCode: 'sector.agribusiness' }]),
+      });
+      assert.ok(restored.statusCode < 300, restored.body);
 
       // Product parametrized per CNAE, linked to the Produtos table.
       const badProduct = await app.inject({
