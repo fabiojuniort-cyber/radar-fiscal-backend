@@ -102,7 +102,9 @@ export interface DouBackfillCoverage {
  * monitoring/backfill evidence. Receipts are kept separately as hash hints. Dates without an edition therefore become covered once a
  * backfill has checked them. A package with individually broken matters
  * (PARTIAL) is consulted: retrying would not repair those matters, and the
- * run stays PARTIAL_SUCCESS in the history for audit.
+ * run stays PARTIAL_SUCCESS in the history for audit. Publication persistence
+ * failures are different: their run cannot prove coverage or supply hashes
+ * that would skip replaying the failed publications.
  */
 export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string): Promise<DouBackfillCoverage> {
   const receipts: Record<string, string> = {};
@@ -165,6 +167,16 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
     .where('cr.trigger_type', '=', 'BACKFILL')
     .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS'])
     .where('ca.status', '=', 'SUCCESS')
+    // PARTIAL_SUCCESS can mean either parser-level omissions or publication
+    // persistence failures. Only the latter create FAILED collection_items.
+    // Reject the whole run conservatively: archive metadata is written before
+    // persistence and cannot prove which package's publications all committed.
+    .where(({ not, exists, selectFrom }) => not(exists(
+      selectFrom('collection_items as ci')
+        .select('ci.id')
+        .whereRef('ci.collection_run_id', '=', 'cr.id')
+        .where('ci.status', '=', 'FAILED'),
+    )))
     .execute();
   for (const row of backfills) ingestArchives(row.archives);
 
@@ -178,6 +190,39 @@ export class DouBackfillBlockedError extends Error {}
 
 /** A backfill run was created less than `minIntervalMs` ago (D-056: one query per hour). */
 export class DouBackfillThrottledError extends DouBackfillBlockedError {}
+
+/**
+ * Cheap eligibility checks before loading archive history. Outside the run
+ * creation transaction these are only hints: the same checks must run again
+ * under its table lock before a BACKFILL run can be created.
+ */
+export async function assertDouBackfillAvailable(
+  db: Kysely<DB>,
+  sourceId: string,
+  minIntervalMs = 0,
+): Promise<void> {
+  const open = await db.selectFrom('collection_runs')
+    .select(['id', 'status', 'trigger_type'])
+    .where('source_id', '=', sourceId)
+    .where('status', 'in', ['PENDING', 'RUNNING'])
+    .limit(1)
+    .executeTakeFirst();
+  if (open) {
+    throw new DouBackfillBlockedError(`DOU has an open ${open.trigger_type} run ${open.id} (${open.status}).`);
+  }
+  if (minIntervalMs > 0) {
+    const last = await db.selectFrom('collection_runs')
+      .select('created_at')
+      .where('source_id', '=', sourceId)
+      .where('trigger_type', '=', 'BACKFILL')
+      .orderBy('created_at', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    if (last && Date.now() - new Date(last.created_at).getTime() < minIntervalMs) {
+      throw new DouBackfillThrottledError('A DOU backfill run already started in this interval.');
+    }
+  }
+}
 
 /**
  * Creates the BACKFILL run already owned by `workerId`, in one transaction,
@@ -201,27 +246,9 @@ async function createOwnedBackfillRun(
     if (!source || source.connector_key !== 'dou' || !source.is_active) {
       throw new DouBackfillBlockedError('DOU source is not active with connector key dou.');
     }
-    const open = await trx.selectFrom('collection_runs')
-      .select(['id', 'status', 'trigger_type'])
-      .where('source_id', '=', sourceId)
-      .where('status', 'in', ['PENDING', 'RUNNING'])
-      .executeTakeFirst();
-    if (open) {
-      throw new DouBackfillBlockedError(`DOU has an open ${open.trigger_type} run ${open.id} (${open.status}).`);
-    }
-    if (minIntervalMs > 0) {
-      // Checked under the table lock, so concurrent worker replicas cannot
-      // both start a backfill in the same interval.
-      const last = await trx.selectFrom('collection_runs')
-        .select('created_at')
-        .where('source_id', '=', sourceId)
-        .where('trigger_type', '=', 'BACKFILL')
-        .orderBy('created_at', 'desc')
-        .executeTakeFirst();
-      if (last && Date.now() - new Date(last.created_at).getTime() < minIntervalMs) {
-        throw new DouBackfillThrottledError('A DOU backfill run already started in this interval.');
-      }
-    }
+    // Authoritative recheck under the lock: another replica or Scheduler may
+    // have created a run since an earlier read-only eligibility precheck.
+    await assertDouBackfillAvailable(trx, sourceId, minIntervalMs);
     const now = new Date();
     const run = await trx.insertInto('collection_runs')
       .values({
@@ -417,6 +444,15 @@ export async function runDouBackfillTick(db: Kysely<DB>, options: DouBackfillTic
     }
   }
 
+  const minIntervalMs = options.minIntervalMs ?? 3_600_000;
+  try {
+    await assertDouBackfillAvailable(db, source.id, minIntervalMs);
+  } catch (error) {
+    if (error instanceof DouBackfillThrottledError) return { state: 'SKIPPED', reason: 'THROTTLED' };
+    if (error instanceof DouBackfillBlockedError) return { state: 'SKIPPED', reason: 'SOURCE_BUSY' };
+    throw error;
+  }
+
   const coverage = await readDouBackfillCoverage(db, source.id);
   const today = saoPauloDate(now);
   const dates = planDouBackfillDates({ from: options.from, to: addDays(today, -3), today, covered: coverage.covered });
@@ -441,7 +477,7 @@ export async function runDouBackfillTick(db: Kysely<DB>, options: DouBackfillTic
       workerId: options.workerId,
       credentials: options.credentials,
       receipts: coverage.receipts,
-      minIntervalMs: options.minIntervalMs ?? 3_600_000,
+      minIntervalMs,
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.budgetGraceMs !== undefined ? { budgetGraceMs: options.budgetGraceMs } : {}),
       ...(options.heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs: options.heartbeatIntervalMs } : {}),

@@ -14,7 +14,12 @@ import {
 import type {
   ConnectorNewsItem,
   ConnectorPublication,
+  ConnectorResult,
 } from './connector.contract.js';
+import { connectorPublicationCount } from './connector.contract.js';
+import { ConnectorError } from './connector.error.js';
+import { createCollectionMemoryProbe } from './collection.memory.js';
+import { disposePublicationSpool } from './publication-spool.js';
 import {
   executeConnector,
   type ConnectorExecutionFailure,
@@ -192,7 +197,7 @@ function newsSourceItemKey(
 function resultItemCount(
   outcome: Extract<ConnectorExecutionOutcome, { ok: true }>,
 ): number {
-  return outcome.result.publications.length +
+  return connectorPublicationCount(outcome.result) +
     (outcome.result.newsItems?.length ?? 0);
 }
 
@@ -303,6 +308,12 @@ export async function processAcquiredCollectionRun(
   );
 
   let heartbeatTimer: NodeJS.Timeout | undefined;
+  let collectedResult: ConnectorResult | undefined;
+  const memory = run.connectorKey === 'dou'
+    ? createCollectionMemoryProbe(sample => logger.info({
+        sourceId: run.sourceId, runId: run.id, attemptId: attempt.id, ...sample,
+      }, 'Collection memory sample'))
+    : undefined;
 
   if (heartbeatIntervalMs > 0) {
     heartbeatTimer = setInterval(() => {
@@ -345,17 +356,28 @@ export async function processAcquiredCollectionRun(
             runId: run.id,
             attemptId: attempt.id,
             timeoutMs,
+            ...(memory ? { memory } : {}),
             ...(options.budgetGraceMs !== undefined ? { budgetGraceMs: options.budgetGraceMs } : {}),
           })
         : missingConnectorOutcome(run.connectorKey);
 
-    await finishCollectionAttempt(db, {
+    if (outcome.ok) collectedResult = outcome.result;
+
+    const finishedAttempt = await finishCollectionAttempt(db, {
       attemptId: attempt.id,
       outcome,
       runId: run.id,
+      workerId: run.workerId,
       sourceId: run.sourceId,
       connectorKey: run.connectorKey,
     });
+    if (!finishedAttempt) {
+      // The recovering owner decides this run's status. Do not replay a
+      // stale spool/array, publish checkpoints, schedule retries or finish it.
+      throw new ConnectorError('Collection run ownership was lost before persistence.', {
+        code: 'COLLECTION_RUN_OWNERSHIP_LOST', kind: 'CANCELLED', retryable: false,
+      });
+    }
 
     if (!outcome.ok) {
       const persistentDouRetry =
@@ -465,17 +487,17 @@ export async function processAcquiredCollectionRun(
     }
 
     const newsItems = outcome.result.newsItems ?? [];
-    metrics.found = outcome.result.publications.length + newsItems.length;
+    metrics.found = connectorPublicationCount(outcome.result) + newsItems.length;
     metrics.connectorPartialFailures =
       outcome.result.partialFailures?.length ?? 0;
 
-    for (
-      let index = 0;
-      index < outcome.result.publications.length;
-      index += 1
-    ) {
-      const publication =
-        outcome.result.publications[index]!;
+    memory?.('persist_start', { publications: metrics.found, spoolBytes: outcome.result.publicationStream?.bytes ?? 0 });
+    // The executor only returns a sealed spool after collect succeeds. Replay
+    // is sequential and awaited, retaining one complete publication at a time.
+    const publicationInput = outcome.result.publicationStream ?? outcome.result.publications;
+    let index = -1;
+    for await (const publication of publicationInput) {
+      index += 1;
 
       try {
         const normalized = normalizePublication({
@@ -542,6 +564,7 @@ export async function processAcquiredCollectionRun(
           'Publication processing failed',
         );
       }
+      if ((index + 1) % 100 === 0) memory?.('persist_progress', { publications: index + 1 });
     }
 
     for (let index = 0; index < newsItems.length; index += 1) {
@@ -600,6 +623,10 @@ export async function processAcquiredCollectionRun(
       outcome,
       metrics,
     );
+    memory?.('persist_complete', { publications: metrics.processed });
+    // Cleanup is part of successful replay, before terminal status can make
+    // receipts eligible. The finally path still handles every earlier exit.
+    await disposePublicationSpool(outcome.result.publicationStream);
 
     await finishCollectionRun(db, {
       runId: run.id,
@@ -637,7 +664,21 @@ export async function processAcquiredCollectionRun(
       status,
       metrics,
     };
+  } catch (error) {
+    if (!(error instanceof ConnectorError) || !error.code.startsWith('PUBLICATION_SPOOL_')) throw error;
+    // A corrupt/unreadable spool must never promote the attempt's receipts.
+    await finishCollectionRun(db, {
+      runId: run.id, workerId: run.workerId, status: 'PROCESSING_FAILED',
+      errorSummary: error.code,
+    });
+    logger.error({ runId: run.id, attemptId: attempt.id, errorCode: error.code }, 'Collection spool replay failed');
+    return { runId: run.id, attemptNo: attempt.attemptNo, state: 'TERMINAL', status: 'PROCESSING_FAILED', metrics };
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
+    try { await disposePublicationSpool(collectedResult?.publicationStream); }
+    catch {
+      logger.error({ runId: run.id, attemptId: attempt.id, errorCode: 'PUBLICATION_SPOOL_CLEANUP_FAILED' }, 'Collection spool cleanup failed');
+    }
+    memory?.('cleanup');
   }
 }

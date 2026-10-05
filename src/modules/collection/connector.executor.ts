@@ -5,8 +5,11 @@ import type {
 } from './connector.contract.js';
 import {
   isConnectorError,
+  ConnectorError,
   type ConnectorErrorKind,
 } from './connector.error.js';
+import type { CollectionMemoryProbe } from './collection.memory.js';
+import { PublicationSpool, disposePublicationSpool } from './publication-spool.js';
 
 export type ConnectorAttemptStatus =
   | 'SUCCESS'
@@ -50,6 +53,7 @@ export interface ExecuteConnectorInput {
    */
   budgetGraceMs?: number;
   now?: () => number;
+  memory?: CollectionMemoryProbe;
 }
 
 export const DEFAULT_MIN_BUDGET_GRACE_MS = 120_000;
@@ -94,25 +98,6 @@ class ConnectorCancelledError extends Error {
   }
 }
 
-function createCancellationPromise(
-  signal: AbortSignal,
-): Promise<never> {
-  return new Promise((_, reject) => {
-    if (signal.aborted) {
-      reject(new ConnectorCancelledError());
-      return;
-    }
-
-    signal.addEventListener(
-      'abort',
-      () => {
-        reject(new ConnectorCancelledError());
-      },
-      { once: true },
-    );
-  });
-}
-
 export async function executeConnector(
   input: ExecuteConnectorInput,
 ): Promise<ConnectorExecutionOutcome> {
@@ -138,6 +123,8 @@ export async function executeConnector(
     : timeoutController.signal;
 
   let timeoutHandle: NodeJS.Timeout | undefined;
+  let spool: PublicationSpool | undefined;
+  let cancel: (() => void) | undefined;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutHandle = setTimeout(() => {
@@ -148,21 +135,51 @@ export async function executeConnector(
     timeoutHandle.unref();
   });
 
-  const executions: Array<
-    Promise<ConnectorResult>
-  > = [
-    input.connector.collect({
+  const collection = async (): Promise<ConnectorResult> => {
+    const context = {
       sourceId: input.sourceId,
       runId: input.runId,
       attemptId: input.attemptId,
       signal: connectorSignal,
       budget,
-    }),
+      ...(input.memory ? { memory: input.memory } : {}),
+    };
+    connectorSignal.throwIfAborted();
+    input.memory?.('collect_start');
+    if (!input.connector.collectIncremental) return input.connector.collect(context);
+    try {
+      spool = await PublicationSpool.create(connectorSignal);
+      connectorSignal.throwIfAborted();
+      const result = await input.connector.collectIncremental(context, publication => spool!.append(publication));
+      connectorSignal.throwIfAborted();
+      if (result.publications.length || result.publicationStream) {
+        throw new ConnectorError('INCREMENTAL_CONNECTOR_INVALID_RESULT', {
+          code: 'INCREMENTAL_CONNECTOR_INVALID_RESULT', kind: 'PROCESSING_ERROR', retryable: false,
+        });
+      }
+      await spool.seal();
+      connectorSignal.throwIfAborted();
+      input.memory?.('collect_complete', { publications: spool.count, spoolBytes: spool.bytes });
+      return { ...result, publicationStream: spool };
+    } catch (error) {
+      await disposePublicationSpool(spool);
+      throw error;
+    }
+  };
+
+  const executions: Array<
+    Promise<ConnectorResult>
+  > = [
+    collection(),
     timeoutPromise,
   ];
 
   if (input.signal) {
-    executions.push(createCancellationPromise(input.signal));
+    executions.push(new Promise<never>((_, reject) => {
+      cancel = () => reject(new ConnectorCancelledError());
+      if (input.signal!.aborted) cancel();
+      else input.signal!.addEventListener('abort', cancel, { once: true });
+    }));
   }
 
   try {
@@ -175,6 +192,10 @@ export async function executeConnector(
       result,
     };
   } catch (error) {
+    timeoutController.abort();
+    let cleanupFailed = false;
+    try { await disposePublicationSpool(spool); }
+    catch (cleanupError) { error = cleanupError; cleanupFailed = true; }
     const durationMs = Date.now() - startedAt;
 
     if (error instanceof ConnectorTimeoutError) {
@@ -188,13 +209,13 @@ export async function executeConnector(
       };
     }
 
-    if (error instanceof ConnectorCancelledError) {
+    if (!cleanupFailed && (error instanceof ConnectorCancelledError || input.signal?.aborted)) {
       return {
         ok: false,
         status: 'CANCELLED',
         durationMs,
         code: 'CONNECTOR_CANCELLED',
-        message: error.message,
+        message: 'Connector execution cancelled',
         retryable: false,
       };
     }
@@ -239,5 +260,6 @@ export async function executeConnector(
     if (timeoutHandle) {
       clearTimeout(timeoutHandle);
     }
+    if (cancel) input.signal?.removeEventListener('abort', cancel);
   }
 }

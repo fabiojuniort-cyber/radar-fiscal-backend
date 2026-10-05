@@ -1,7 +1,7 @@
 import type { CollectionConnector, ConnectorExecutionContext, ConnectorPartialFailure, ConnectorPublication, ConnectorResult } from './connector.contract.js';
 import { ConnectorError } from './connector.error.js';
 import { InlabsClient, type InlabsCredentials, type InlabsXmlSection } from './inlabs.client.js';
-import { readDouZip, parseDouEntries, type DouArchiveContext } from './dou.parser.js';
+import { parseDouZip, type DouArchiveContext } from './dou.parser.js';
 import { classifyDouContractExcerpt, DOU_SCOPE_RULE_VERSION } from './dou-scope.rules.js';
 
 export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO3', 'DO3E'];
@@ -43,11 +43,20 @@ export function douCollectionDates(now: Date): string[] {
 
 export class DouConnector implements CollectionConnector {
   readonly key = 'dou';
-  readonly version = '0.5.0';
+  readonly version = '0.6.0';
   readonly #options: DouOptions;
   constructor(options: DouOptions) { this.#options = options; }
 
   async collect(context: ConnectorExecutionContext): Promise<ConnectorResult> {
+    const publications: ConnectorPublication[] = [];
+    const result = await this.collectIncremental(context, async publication => { publications.push(publication); });
+    return { ...result, publications };
+  }
+
+  async collectIncremental(
+    context: ConnectorExecutionContext,
+    emit: (publication: ConnectorPublication) => Promise<void>,
+  ): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
     const dates = this.#options.dates ?? douCollectionDates(now);
     if (!dates.length || dates.length > 4 || new Set(dates).size !== dates.length || dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d) || !Number.isFinite(Date.parse(d)) || new Date(d).toISOString().slice(0, 10) !== d)) throw failure('DOU_INVALID_DATE_BATCH');
@@ -55,10 +64,11 @@ export class DouConnector implements CollectionConnector {
     // Do not silently discard a gap that exceeds the bounded reconciliation window.
     if (!this.#options.dates && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
     const client = new InlabsClient({ credentials: this.#options.credentials, ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}) });
-    const publications: ConnectorPublication[] = []; const partialFailures: ConnectorPartialFailure[] = [];
+    const partialFailures: ConnectorPartialFailure[] = [];
     const receipts: Record<string, string> = { ...state.archives };
     const archives: Array<Record<string, unknown>> = []; let available = 0; let xmlCount = 0; let mediaCount = 0;
     let assembledMatterCount = 0; let scopeIgnoredCount = 0;
+    let publicationCount = 0; let embeddedActCount = 0; let confazMatterCount = 0;
     const scopeIgnoredByCategory: Record<string, number> = {};
     const scopeIgnoredReferences: Array<Record<string, unknown>> = [];
     const editions = new Set<string>();
@@ -91,22 +101,18 @@ export class DouConnector implements CollectionConnector {
             continue;
           }
           available++;
+          context.memory?.('archive_downloaded', { archives: available, archiveBytes: download.bytes.byteLength, publications: publicationCount });
           if (state.archives[filename] === download.rawSha256) {
             archives.push({ filename, state: 'UNCHANGED', date, section, rawSha256: download.rawSha256 });
             continue;
           }
           const archive: DouArchiveContext = { filename, date, section, officialUrl: download.officialUrl, rawSha256: download.rawSha256 };
-          const extracted = await readDouZip(download.bytes, context.signal);
-          if (!extracted.entries.length) throw failure('DOU_ARCHIVE_HAS_NO_XML', true);
-          const parsed = parseDouEntries(extracted.entries, archive);
-          const parsedEmbeddedActCount = parsed.publications.filter(
-            p => (p.metadata?.dou as { embeddedAct?: boolean } | undefined)?.embeddedAct === true,
-          ).length;
-          const sourceMatterCount = parsed.publications.length - parsedEmbeddedActCount;
-          assembledMatterCount += sourceMatterCount;
-          const accepted: ConnectorPublication[] = [];
+          let sourceMatterCount = 0; let archivePublicationCount = 0; let archiveEmbeddedActCount = 0;
           let archiveIgnoredCount = 0;
-          for (const publication of parsed.publications) {
+          const parsed = await parseDouZip(download.bytes, archive, context.signal, async publication => {
+            const data = publication.metadata?.dou as { edition: string; embeddedAct?: boolean };
+            editions.add(`${date}:${data.edition}`);
+            if (data.embeddedAct !== true) sourceMatterCount++;
             const classification = classifyDouContractExcerpt(publication);
             if (classification?.decision === 'IGNORE') {
               scopeIgnoredCount += 1;
@@ -121,32 +127,33 @@ export class DouConnector implements CollectionConnector {
                   reasonCodes: classification.reasonCodes,
                 });
               }
-              continue;
+              return;
             }
-            accepted.push(classification ? {
+            // The sink controls backpressure. No whole-run publications array
+            // exists in the engine path, and multipart matters are already whole.
+            await emit(classification ? {
               ...publication,
               metadata: { ...publication.metadata, douScope: classification },
             } : publication);
-          }
-          const embeddedActCount = accepted.filter(
-            p => (p.metadata?.dou as { embeddedAct?: boolean } | undefined)?.embeddedAct === true,
-          ).length;
-          xmlCount += extracted.entries.length; mediaCount += extracted.mediaCount;
-          publications.push(...accepted); partialFailures.push(...parsed.partialFailures);
-          for (const p of parsed.publications) {
-            const data = p.metadata?.dou as { edition: string };
-            editions.add(`${date}:${data.edition}`);
-          }
+            publicationCount++; archivePublicationCount++;
+            if (data.embeddedAct === true) { embeddedActCount++; archiveEmbeddedActCount++; }
+            if (publication.agency === 'CONFAZ') confazMatterCount++;
+          });
+          if (!parsed.xmlCount) throw failure('DOU_ARCHIVE_HAS_NO_XML', true);
+          assembledMatterCount += sourceMatterCount;
+          xmlCount += parsed.xmlCount; mediaCount += parsed.mediaCount;
+          partialFailures.push(...parsed.partialFailures);
+          context.memory?.('archive_parsed', { archives: available, xmlEntries: xmlCount, publications: publicationCount });
           if (!parsed.partialFailures.length) receipts[filename] = download.rawSha256;
           archives.push({
             ...archive,
             state: parsed.partialFailures.length ? 'PARTIAL' : 'PARSED',
-            xmlCount: extracted.entries.length,
+            xmlCount: parsed.xmlCount,
             matterCount: sourceMatterCount,
-            publicationCount: accepted.length,
-            embeddedActCount,
+            publicationCount: archivePublicationCount,
+            embeddedActCount: archiveEmbeddedActCount,
             scopeIgnoredCount: archiveIgnoredCount,
-            mediaCount: extracted.mediaCount,
+            mediaCount: parsed.mediaCount,
           });
         }
       }
@@ -155,20 +162,17 @@ export class DouConnector implements CollectionConnector {
       // eligible as a checkpoint; attempt success alone precedes publication persistence.
       const cutoff = new Date(now); cutoff.setUTCDate(cutoff.getUTCDate() - 65);
       for (const name of Object.keys(receipts)) if (name.slice(0, 10) < cutoff.toISOString().slice(0, 10)) delete receipts[name];
-      const embeddedActCount = publications.filter(
-        p => (p.metadata?.dou as { embeddedAct?: boolean } | undefined)?.embeddedAct === true,
-      ).length;
-      return { publications, partialFailures, metadata: {
+      return { publications: [], partialFailures, metadata: {
         dou: {
           archives,
           xmlCount,
           mediaCount,
           assembledMatterCount,
-          publicationCount: publications.length,
+          publicationCount,
           embeddedActCount,
           editions: [...editions],
           partialFailures,
-          confazMatterCount: publications.filter(p => p.agency === 'CONFAZ').length,
+          confazMatterCount,
           scope: {
             ruleVersion: DOU_SCOPE_RULE_VERSION,
             ignoredCount: scopeIgnoredCount,

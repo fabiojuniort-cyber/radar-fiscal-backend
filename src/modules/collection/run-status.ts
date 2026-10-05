@@ -1,4 +1,5 @@
 import type { ConnectorExecutionOutcome } from './connector.executor.js';
+import { connectorPublicationCount } from './connector.contract.js';
 
 export type CollectionRunTerminalStatus =
   | 'SUCCESS'
@@ -22,7 +23,7 @@ export function resolveCollectionRunStatus(
       return 'PARTIAL_SUCCESS';
     }
 
-    return outcome.result.publications.length > 0
+    return connectorPublicationCount(outcome.result) > 0
       ? 'SUCCESS'
       : 'SUCCESS_NO_RESULTS';
   }
