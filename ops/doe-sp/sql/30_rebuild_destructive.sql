@@ -23,6 +23,8 @@
 --   DELETE   publication_origins of source doe-sp
 --   ABORT    if any publication_ncm_mentions row references a scope version
 --            (derived tax evidence must be preserved or recomputed explicitly)
+--   ABORT    if any publication scope event/state references a DOE-SP
+--            publication (SUPPRESS/RESTORE audit must remain append-only)
 --   ABORT    if any norma_clara_translations row references a scope version
 --            (prototype AI cache, FK ON DELETE CASCADE): deleting it would
 --            lose data whose preservation is not designed yet
@@ -54,7 +56,8 @@ SET LOCAL lock_timeout = '10s';
 LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE collection_items IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE publications, publication_origins, publication_versions, publication_files,
-  collection_run_publications, collection_checkpoints IN SHARE ROW EXCLUSIVE MODE;
+  collection_run_publications, collection_checkpoints,
+  publication_scope_events, publication_scope_state IN SHARE ROW EXCLUSIVE MODE;
 \if :has_translations
 LOCK TABLE norma_clara_translations IN SHARE ROW EXCLUSIVE MODE;
 \endif
@@ -119,6 +122,16 @@ BEGIN
   JOIN collection_runs cr ON cr.id = ci.collection_run_id JOIN sources s ON s.id = cr.source_id WHERE s.code <> 'doe-sp';
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % collection_items of other sources reference the scope', v_n; END IF;
 
+  SELECT count(*) INTO v_n
+  FROM publication_scope_events pse
+  JOIN doe_sp_rebuild_scope d ON d.id = pse.publication_id;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % publication scope events reference DOE-SP publications (preserve SUPPRESS/RESTORE audit; do not rebuild destructively)', v_n; END IF;
+
+  SELECT count(*) INTO v_n
+  FROM publication_scope_state pss
+  JOIN doe_sp_rebuild_scope d ON d.id = pss.publication_id;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % publication scope state rows reference DOE-SP publications (restore/govern scope first)', v_n; END IF;
+
   IF to_regclass('public.publication_taxonomy_runs') IS NOT NULL THEN
     EXECUTE 'SELECT count(*) FROM publication_taxonomy_runs ptr JOIN publication_versions pv ON pv.id = ptr.publication_version_id
              JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
@@ -146,7 +159,9 @@ BEGIN
       'company_publications_publication_id_fkey', 'publication_taxonomy_runs_publication_version_id_fkey',
       'publication_ncm_mentions_publication_version_id_fkey',
       'publication_ncm_scans_publication_version_id_fkey',
-      'norma_clara_translations_publication_version_id_fkey');
+      'norma_clara_translations_publication_version_id_fkey',
+      'publication_scope_events_publication_id_fkey',
+      'publication_scope_state_publication_id_fkey');
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % unknown foreign keys reference publications/versions (schema drift)', v_n; END IF;
 END
 $$;

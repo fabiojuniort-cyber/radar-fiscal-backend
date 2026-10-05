@@ -2,6 +2,10 @@ import { sql, type Kysely, type RawBuilder, type Transaction } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
 import { currentWordingText } from '../../collection/legal-presentation.js';
+import {
+  isPublicationOutOfScopeError,
+  lockPublicationVersionInScope,
+} from '../../publication-scope/publication-scope.guard.js';
 
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
 // 1.1.0: reads only the wording in force (previous wordings of CONFAZ acts
@@ -189,11 +193,15 @@ export async function persistSuccessfulScan(
   candidates: NcmCandidate[],
   currentWordingOnly = false,
 ): Promise<number> {
+  await lockPublicationVersionInScope(
+    trx,
+    row.publication_version_id,
+  );
+
   const matches = await catalogMatches(
     trx,
     candidates.map((candidate) => candidate.code),
   );
-
 
   let insertedMatches = 0;
 
@@ -297,41 +305,48 @@ async function markFailedScan(
     ? error.message.slice(0, 2_000)
     : 'Unknown NCM enrichment error';
 
-  await sql`
-    INSERT INTO publication_ncm_scans (
-      publication_version_id,
-      detector_key,
-      detector_version,
-      status,
-      source_field,
-      candidate_count,
-      match_count,
-      error_message,
-      scanned_at
-    ) VALUES (
-      ${row.publication_version_id}::uuid,
-      ${PUBLICATION_NCM_DETECTOR_KEY},
-      ${PUBLICATION_NCM_DETECTOR_VERSION},
-      'FAILED',
-      ${sourceField},
-      ${candidateCount},
-      0,
-      ${message},
-      now()
-    )
-    ON CONFLICT (
-      publication_version_id,
-      detector_key,
-      detector_version
-    ) DO UPDATE SET
-      status = 'FAILED',
-      source_field = EXCLUDED.source_field,
-      candidate_count = EXCLUDED.candidate_count,
-      match_count = 0,
-      error_message = EXCLUDED.error_message,
-      scanned_at = now()
-    WHERE publication_ncm_scans.status <> 'SUCCESS'
-  `.execute(db);
+  await db.transaction().execute(async (trx) => {
+    await lockPublicationVersionInScope(
+      trx,
+      row.publication_version_id,
+    );
+
+    await sql`
+      INSERT INTO publication_ncm_scans (
+        publication_version_id,
+        detector_key,
+        detector_version,
+        status,
+        source_field,
+        candidate_count,
+        match_count,
+        error_message,
+        scanned_at
+      ) VALUES (
+        ${row.publication_version_id}::uuid,
+        ${PUBLICATION_NCM_DETECTOR_KEY},
+        ${PUBLICATION_NCM_DETECTOR_VERSION},
+        'FAILED',
+        ${sourceField},
+        ${candidateCount},
+        0,
+        ${message},
+        now()
+      )
+      ON CONFLICT (
+        publication_version_id,
+        detector_key,
+        detector_version
+      ) DO UPDATE SET
+        status = 'FAILED',
+        source_field = EXCLUDED.source_field,
+        candidate_count = EXCLUDED.candidate_count,
+        match_count = 0,
+        error_message = EXCLUDED.error_message,
+        scanned_at = now()
+      WHERE publication_ncm_scans.status <> 'SUCCESS'
+    `.execute(trx);
+  });
 }
 
 async function selectBatch(
@@ -352,11 +367,13 @@ async function selectBatch(
       ON pns.publication_version_id = pv.id
      AND pns.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
      AND pns.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
-    WHERE
-      pns.id IS NULL
-      OR (
-        pns.status = 'FAILED'
-        AND pns.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
+    WHERE public.publication_scope_is_in_scope(p.id)
+      AND (
+        pns.id IS NULL
+        OR (
+          pns.status = 'FAILED'
+          AND pns.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
+        )
       )
     ORDER BY
       p.published_on DESC NULLS LAST,
@@ -403,14 +420,25 @@ export async function processPublicationNcmEnrichmentBatch(
       result.succeeded += 1;
       result.matches += insertedMatches;
     } catch (error) {
-      result.failed += 1;
-      await markFailedScan(
-        db,
-        row,
-        sourceField,
-        candidates.length,
-        error,
-      );
+      if (isPublicationOutOfScopeError(error)) {
+        continue;
+      }
+
+      try {
+        await markFailedScan(
+          db,
+          row,
+          sourceField,
+          candidates.length,
+          error,
+        );
+        result.failed += 1;
+      } catch (markError) {
+        if (isPublicationOutOfScopeError(markError)) {
+          continue;
+        }
+        throw markError;
+      }
     }
   }
 

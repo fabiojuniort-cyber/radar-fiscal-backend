@@ -46,6 +46,8 @@ SELECT
            SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id
            WHERE s.code = ''doe-sp'' AND s.connector_key = ''doe-sp''))',
       false, true, '')))[1]::text::bigint END AS blocker_ncm_mentions,
+  (SELECT count(*) FROM publication_scope_events pse JOIN doe_pub d ON d.id = pse.publication_id) AS blocker_scope_events,
+  (SELECT count(*) FROM publication_scope_state pss JOIN doe_pub d ON d.id = pss.publication_id) AS blocker_scope_state,
   (SELECT count(*) FROM pg_constraint WHERE contype = 'f'
      AND confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
      AND conname NOT IN (
@@ -59,7 +61,9 @@ SELECT
        'publication_taxonomy_runs_publication_version_id_fkey',
        'publication_ncm_mentions_publication_version_id_fkey',
        'publication_ncm_scans_publication_version_id_fkey',
-       'norma_clara_translations_publication_version_id_fkey')) AS blocker_unknown_foreign_keys,
+       'norma_clara_translations_publication_version_id_fkey',
+       'publication_scope_events_publication_id_fkey',
+       'publication_scope_state_publication_id_fkey')) AS blocker_unknown_foreign_keys,
   -- global totals before (30 asserts totals after = before - deleted)
   (SELECT count(*) FROM publications) AS global_publications,
   (SELECT count(*) FROM publication_versions) AS global_versions,
@@ -90,6 +94,8 @@ SELECT 'DOE_SP_DRY_RUN=' || jsonb_build_object(
     'source_active', :blocker_source_active,
     'classification_runs', :blocker_classification_runs,
     'ncm_mentions', :blocker_ncm_mentions,
+    'scope_events', :blocker_scope_events,
+    'scope_state', :blocker_scope_state,
     'unknown_foreign_keys', :blocker_unknown_foreign_keys,
     -- 30 aborts: deleting old AI translations has no preservation design yet.
     'scope_translations', :expected_translations_deleted),

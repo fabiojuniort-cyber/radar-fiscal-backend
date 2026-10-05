@@ -129,14 +129,47 @@ test('values past the stale window are reloaded synchronously', async () => {
   assert.equal(await cache.get('k', async () => 2), 2);
 });
 
-test('ttl of zero disables caching', async () => {
-  const cache = new TtlCache<number>({ ttlMs: 0 });
+test('key version invalidates fresh and stale entries immediately', async () => {
+  let version = 10;
+  let calls = 0;
+  const cache = new TtlCache<number>({
+    ttlMs: 10_000,
+    staleMs: 10_000,
+    keyVersion: async () => version,
+  });
+  const loader = async () => ++calls;
+
+  assert.equal(await cache.get('aggregate', loader), 1);
+  assert.equal(await cache.get('aggregate', loader), 1);
+  assert.equal(calls, 1);
+
+  version += 1;
+
+  assert.equal(
+    await cache.get('aggregate', loader),
+    2,
+    'a version advance must bypass an otherwise fresh cached value',
+  );
+  assert.equal(await cache.get('aggregate', loader), 2);
+  assert.equal(calls, 2);
+});
+
+test('ttl of zero disables caching without resolving a key version', async () => {
+  let versionCalls = 0;
+  const cache = new TtlCache<number>({
+    ttlMs: 0,
+    keyVersion: async () => {
+      versionCalls += 1;
+      return 1;
+    },
+  });
   let calls = 0;
   const loader = async () => ++calls;
 
   await cache.get('k', loader);
   await cache.get('k', loader);
   assert.equal(calls, 2);
+  assert.equal(versionCalls, 0);
 });
 
 test('evicts the oldest keys beyond maxEntries', async () => {

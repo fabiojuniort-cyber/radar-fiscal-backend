@@ -15,8 +15,8 @@ import {
   publicationDisplayTitle,
 } from '../../modules/catalog/display-title.js';
 
-const CACHE_CONTROL_VALUE = 'public, max-age=300';
-const SAO_PAULO_TZ = 'America/Sao_Paulo';
+const CACHE_CONTROL_VALUE =
+  'public, max-age=0, no-cache, must-revalidate';
 
 const publicationsQuerySchema = z.object({
   uf: z
@@ -143,6 +143,16 @@ function allowedOrigins(): Set<string> {
   );
 }
 
+async function publicationScopeEpoch(
+  app: FastifyInstance,
+): Promise<string> {
+  const result = await sql<{ epoch: string }>`
+    SELECT public.publication_scope_epoch()::text AS epoch
+  `.execute(app.db);
+
+  return result.rows[0]?.epoch ?? '0';
+}
+
 export function withOriginVary(
   current: string | number | string[] | undefined,
 ): string {
@@ -223,8 +233,9 @@ export async function publicRoutes(
   const typed =
     app.withTypeProvider<ZodTypeProvider>();
 
-  // Public payloads are global and already advertised as cacheable for
-  // 300 s; keep a short server-side copy so bursts do not reach PostgreSQL.
+  // Public payloads are cached server-side, but scope transitions advance a
+  // database epoch that becomes part of every cache key. HTTP consumers must
+  // revalidate so a suppressed act is not retained for the previous 300 s.
   const cacheOptions = aggregateCacheOptions(app);
   const sourcesCache = new TtlCache<object>(cacheOptions);
   const publicationsCache = new TtlCache<object>({
@@ -275,88 +286,82 @@ export async function publicRoutes(
   typed.get(
     '/public/v1/sources',
     async (_request, reply) => {
-      const payload = await sourcesCache.get('sources', async () => {
-        const generatedAt = new Date();
+      const scopeEpoch = await publicationScopeEpoch(app);
+      reply.header('X-Publication-Scope-Epoch', scopeEpoch);
 
-        const result = await sql<SourceRow>`
-          SELECT
-            s.code,
-            s.name,
-            s.jurisdiction_level,
-            s.uf,
-            s.is_active,
-            vsm.last_run_status,
-            vsm.last_success_at,
-            vsm.last_attempt_at,
-            (
-              SELECT count(*)::int
-              FROM collection_runs cr
-              JOIN collection_run_publications crp
-                ON crp.collection_run_id = cr.id
-              WHERE cr.source_id = s.id
-                AND crp.disposition IN (
-                  'NEW_PUBLICATION',
-                  'NEW_VERSION'
-                )
-                AND (
-                  crp.detected_at
-                  AT TIME ZONE ${SAO_PAULO_TZ}
-                )::date = (
-                  now()
-                  AT TIME ZONE ${SAO_PAULO_TZ}
-                )::date
-            ) AS imported_today,
-            (
-              SELECT count(DISTINCT po.publication_id)::int
-              FROM publication_origins po
-              WHERE po.source_id = s.id
-            ) AS total_publications
-          FROM sources s
-          LEFT JOIN v_source_monitoring vsm
-            ON vsm.source_id = s.id
-          ORDER BY
-            CASE
-              WHEN s.jurisdiction_level = 'FEDERAL'
-                THEN 0
-              ELSE 1
-            END,
-            s.uf NULLS FIRST,
-            s.name
-        `.execute(app.db);
+      const payload = await sourcesCache.get(
+        `sources:${scopeEpoch}`,
+        async () => {
+          const generatedAt = new Date();
 
-        return {
-          generatedAt:
-            generatedAt.toISOString(),
-          items: result.rows.map((row) => ({
-            code: row.code,
-            name: row.name,
-            jurisdictionLevel:
-              row.jurisdiction_level,
-            uf: row.uf,
-            isActive: row.is_active,
-            status: derivePublicSourceStatus({
+          const result = await sql<SourceRow>`
+            SELECT
+              s.code,
+              s.name,
+              s.jurisdiction_level,
+              s.uf,
+              s.is_active,
+              vsm.last_run_status,
+              vsm.last_success_at,
+              vsm.last_attempt_at,
+              (
+                SELECT public.publication_scope_imported_today(s.id)
+              ) AS imported_today,
+              (
+                SELECT count(DISTINCT po.publication_id)::int
+                FROM publication_origins po
+                WHERE po.source_id = s.id
+                  AND public.publication_scope_is_in_scope(
+                    po.publication_id
+                  )
+              ) AS total_publications
+            FROM sources s
+            LEFT JOIN v_source_monitoring vsm
+              ON vsm.source_id = s.id
+            ORDER BY
+              CASE
+                WHEN s.jurisdiction_level = 'FEDERAL'
+                  THEN 0
+                ELSE 1
+              END,
+              s.uf NULLS FIRST,
+              s.name
+          `.execute(app.db);
+
+          return {
+            generatedAt:
+              generatedAt.toISOString(),
+            items: result.rows.map((row) => ({
+              code: row.code,
+              name: row.name,
+              jurisdictionLevel:
+                row.jurisdiction_level,
+              uf: row.uf,
               isActive: row.is_active,
+              status: derivePublicSourceStatus({
+                isActive: row.is_active,
+                lastRunStatus:
+                  row.last_run_status,
+                lastSuccessAt:
+                  row.last_success_at,
+                now: generatedAt,
+              }),
               lastRunStatus:
                 row.last_run_status,
-              lastSuccessAt:
+              lastSuccessAt: toIsoTimestamp(
                 row.last_success_at,
-              now: generatedAt,
-            }),
-            lastRunStatus:
-              row.last_run_status,
-            lastSuccessAt: toIsoTimestamp(
-              row.last_success_at,
-            ),
-            lastAttemptAt: toIsoTimestamp(
-              row.last_attempt_at,
-            ),
-            importedToday:
-              row.imported_today,
-            totalPublications:
-              row.total_publications,
-          })),
-        };
-      });
+              ),
+              lastAttemptAt: toIsoTimestamp(
+                row.last_attempt_at,
+              ),
+              importedToday:
+                row.imported_today,
+              totalPublications:
+                row.total_publications,
+            })),
+          };
+        },
+      );
 
       return reply.status(200).send(payload);
     },
@@ -371,7 +376,11 @@ export async function publicRoutes(
       },
     },
     async (request, reply) => {
+      const scopeEpoch = await publicationScopeEpoch(app);
+      reply.header('X-Publication-Scope-Epoch', scopeEpoch);
+
       const cacheKey = JSON.stringify([
+        scopeEpoch,
         request.query.uf ?? null,
         request.query.jurisdiction ?? null,
         request.query.source ?? null,
@@ -416,6 +425,9 @@ export async function publicRoutes(
                 LIMIT 1
               )
             `.as('content_head'),
+          )
+          .where(
+            sql<boolean>`public.publication_scope_is_in_scope(p.id)`,
           );
 
         if (request.query.uf) {
@@ -500,66 +512,58 @@ export async function publicRoutes(
   typed.get(
     '/public/v1/stats',
     async (_request, reply) => {
-      const payload = await statsCache.get('stats', async () => {
-        const result = await sql<StatsRow>`
-          SELECT
-            (
-              SELECT count(*)::int
-              FROM publications
-            ) AS total_publications,
-            (
-              SELECT count(*)::int
-              FROM sources
-            ) AS total_sources,
-            (
-              SELECT count(*)::int
-              FROM sources
-              WHERE is_active = true
-            ) AS active_sources,
-            (
-              SELECT COALESCE(
-                sum(source_imports),
-                0
-              )::int
-              FROM (
-                SELECT (
-                  SELECT count(*)::int
-                  FROM collection_runs cr
-                  JOIN collection_run_publications crp
-                    ON crp.collection_run_id = cr.id
-                  WHERE cr.source_id = s.id
-                    AND crp.disposition IN (
-                      'NEW_PUBLICATION',
-                      'NEW_VERSION'
-                    )
-                    AND (
-                      crp.detected_at
-                      AT TIME ZONE ${SAO_PAULO_TZ}
-                    )::date = (
-                      now()
-                      AT TIME ZONE ${SAO_PAULO_TZ}
-                    )::date
-                ) AS source_imports
-                FROM sources s
-              ) per_source
-            ) AS imported_today
-        `.execute(app.db);
+      const scopeEpoch = await publicationScopeEpoch(app);
+      reply.header('X-Publication-Scope-Epoch', scopeEpoch);
 
-        const row = result.rows[0];
+      const payload = await statsCache.get(
+        `stats:${scopeEpoch}`,
+        async () => {
+          const result = await sql<StatsRow>`
+            SELECT
+              (
+                SELECT count(*)::int
+                FROM publications p
+                WHERE public.publication_scope_is_in_scope(p.id)
+              ) AS total_publications,
+              (
+                SELECT count(*)::int
+                FROM sources
+              ) AS total_sources,
+              (
+                SELECT count(*)::int
+                FROM sources
+                WHERE is_active = true
+              ) AS active_sources,
+              (
+                SELECT COALESCE(
+                  sum(source_imports),
+                  0
+                )::int
+                FROM (
+                  SELECT (
+                    SELECT public.publication_scope_imported_today(s.id)
+                  ) AS source_imports
+                  FROM sources s
+                ) per_source
+              ) AS imported_today
+          `.execute(app.db);
 
-        return {
-          totalPublications:
-            row?.total_publications ?? 0,
-          totalSources:
-            row?.total_sources ?? 0,
-          activeSources:
-            row?.active_sources ?? 0,
-          importedToday:
-            row?.imported_today ?? 0,
-          generatedAt:
-            new Date().toISOString(),
-        };
-      });
+          const row = result.rows[0];
+
+          return {
+            totalPublications:
+              row?.total_publications ?? 0,
+            totalSources:
+              row?.total_sources ?? 0,
+            activeSources:
+              row?.active_sources ?? 0,
+            importedToday:
+              row?.imported_today ?? 0,
+            generatedAt:
+              new Date().toISOString(),
+          };
+        },
+      );
 
       return reply.status(200).send(payload);
     },

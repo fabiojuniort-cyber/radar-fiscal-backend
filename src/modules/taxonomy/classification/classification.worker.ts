@@ -1,6 +1,11 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
+import { currentWordingText } from '../../collection/legal-presentation.js';
+import {
+  isPublicationOutOfScopeError,
+  lockPublicationVersionInScope,
+} from '../../publication-scope/publication-scope.guard.js';
 import { PROTECTED_EXCLUDED_SOURCES } from '../curation/curation.constants.js';
 import {
   findLatestPublishedRelease,
@@ -8,7 +13,6 @@ import {
   loadReleaseView,
   loadRuntimeSettings,
 } from '../curation/curation.read.js';
-import { currentWordingText } from '../../collection/legal-presentation.js';
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
@@ -142,6 +146,7 @@ async function selectPending(
           )
         )
       )
+      AND public.publication_scope_is_in_scope(p.id)
       -- NCM detection runs first so NCM-based tags are not missed.
       AND EXISTS (
         SELECT 1 FROM publication_ncm_scans n
@@ -186,6 +191,11 @@ async function persistSuccess(
   plan: ReturnType<typeof planCuratedClassification>,
 ): Promise<number> {
   return db.transaction().execute(async (trx) => {
+    await lockPublicationVersionInScope(
+      trx,
+      plan.publicationVersionId,
+    );
+
     const inserted = await sql<{ id: string }>`
       INSERT INTO publication_taxonomy_runs (
         publication_version_id, taxonomy_release_id, method_type,
@@ -309,34 +319,41 @@ async function markFailed(
       ? error.message.slice(0, 2_000)
       : 'Unknown taxonomy classification error';
 
-  await sql`
-    INSERT INTO publication_taxonomy_scans (
-      publication_version_id, taxonomy_release_id, engine_key,
-      engine_version, status, run_id, assertion_count, attempt_count,
-      error_message, scanned_at
-    ) VALUES (
-      ${publicationVersionId}::uuid,
-      ${releaseId}::uuid,
-      ${CURATED_ENGINE_KEY},
-      ${CURATED_ENGINE_VERSION},
-      'FAILED',
-      NULL,
-      0,
-      1,
-      ${message},
-      now()
-    )
-    ON CONFLICT (
-      publication_version_id, taxonomy_release_id, engine_key, engine_version
-    ) DO UPDATE SET
-      status = 'FAILED',
-      run_id = NULL,
-      assertion_count = 0,
-      attempt_count = publication_taxonomy_scans.attempt_count + 1,
-      error_message = EXCLUDED.error_message,
-      scanned_at = now()
-    WHERE publication_taxonomy_scans.status <> 'SUCCESS'
-  `.execute(db);
+  await db.transaction().execute(async (trx) => {
+    await lockPublicationVersionInScope(
+      trx,
+      publicationVersionId,
+    );
+
+    await sql`
+      INSERT INTO publication_taxonomy_scans (
+        publication_version_id, taxonomy_release_id, engine_key,
+        engine_version, status, run_id, assertion_count, attempt_count,
+        error_message, scanned_at
+      ) VALUES (
+        ${publicationVersionId}::uuid,
+        ${releaseId}::uuid,
+        ${CURATED_ENGINE_KEY},
+        ${CURATED_ENGINE_VERSION},
+        'FAILED',
+        NULL,
+        0,
+        1,
+        ${message},
+        now()
+      )
+      ON CONFLICT (
+        publication_version_id, taxonomy_release_id, engine_key, engine_version
+      ) DO UPDATE SET
+        status = 'FAILED',
+        run_id = NULL,
+        assertion_count = 0,
+        attempt_count = publication_taxonomy_scans.attempt_count + 1,
+        error_message = EXCLUDED.error_message,
+        scanned_at = now()
+      WHERE publication_taxonomy_scans.status <> 'SUCCESS'
+    `.execute(trx);
+  });
 }
 
 export async function processPublicationTaxonomyBatch(
@@ -386,8 +403,19 @@ export async function processPublicationTaxonomyBatch(
       result.assertions += await persistSuccess(db, plan);
       result.succeeded += 1;
     } catch (error) {
-      result.failed += 1;
-      await markFailed(db, row.publication_version_id, release.id, error);
+      if (isPublicationOutOfScopeError(error)) {
+        continue;
+      }
+
+      try {
+        await markFailed(db, row.publication_version_id, release.id, error);
+        result.failed += 1;
+      } catch (markError) {
+        if (isPublicationOutOfScopeError(markError)) {
+          continue;
+        }
+        throw markError;
+      }
     }
   }
 
@@ -424,6 +452,7 @@ export async function classifySinglePublication(
     FROM publications p
     JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
     WHERE p.id = ${input.publicationId}::uuid
+      AND public.publication_scope_is_in_scope(p.id)
   `.execute(db);
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');

@@ -22,6 +22,7 @@ export type TaxonomyMatchDisposition =
   | 'NO_MATCH'
   | 'SKIPPED_PROFILE_INACTIVE'
   | 'SKIPPED_NO_TAXONOMY_CRITERIA'
+  | 'SKIPPED_PUBLICATION_OUT_OF_SCOPE'
   | 'NO_PUBLISHED_RELEASE';
 
 export interface TaxonomyMatchResult {
@@ -228,6 +229,51 @@ export async function matchPublicationByTaxonomy(
       };
     }
 
+    // Concurrency boundary with SUPPRESS/RESTORE. Use two statements so the
+    // scope check receives a fresh READ COMMITTED snapshot after waiting for
+    // a competing publication row lock.
+    const publication =
+      await client.query<{
+        publication_id: string;
+      }>(
+        [
+          'SELECT p.id AS publication_id',
+          'FROM publication_versions pv',
+          'JOIN publications p ON p.id = pv.publication_id',
+          'WHERE pv.id = $1',
+          'FOR SHARE OF p',
+        ].join(' '),
+        [input.publicationVersionId],
+      );
+
+    const publicationId =
+      publication.rows[0]
+        ?.publication_id;
+
+    if (!publicationId) {
+      throw new Error(
+        'PUBLICATION_VERSION_NOT_FOUND',
+      );
+    }
+
+    const scope = await client.query<{
+      in_scope: boolean;
+    }>(
+      'SELECT public.publication_scope_is_in_scope($1::uuid) AS in_scope',
+      [publicationId],
+    );
+
+    if (scope.rows[0]?.in_scope !== true) {
+      await client.query('ROLLBACK');
+      return {
+        disposition:
+          'SKIPPED_PUBLICATION_OUT_OF_SCOPE',
+        matchedCriteriaCodes: [],
+        matchedAssertionCodes: [],
+        classificationRunIds: [],
+      };
+    }
+
     const release =
       await client.query<{
         id: string;
@@ -367,28 +413,6 @@ export async function matchPublicationByTaxonomy(
             .matchedAssertionCodes,
         classificationRunIds,
       };
-    }
-
-    const publication =
-      await client.query<{
-        publication_id: string;
-      }>(
-        [
-          'SELECT publication_id',
-          'FROM publication_versions',
-          'WHERE id = $1',
-        ].join(' '),
-        [input.publicationVersionId],
-      );
-
-    const publicationId =
-      publication.rows[0]
-        ?.publication_id;
-
-    if (!publicationId) {
-      throw new Error(
-        'PUBLICATION_VERSION_NOT_FOUND',
-      );
     }
 
     const companyPublication =

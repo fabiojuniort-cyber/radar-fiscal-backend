@@ -114,8 +114,10 @@ The value is a comma-separated allowlist. The exact Railway prototype and final-
 Responses use:
 
 ```text
-Cache-Control: public, max-age=300
+Cache-Control: public, max-age=0, no-cache, must-revalidate
 ```
+
+Public clients and intermediaries must revalidate successful GET responses so publication scope changes such as `SUPPRESS`/`RESTORE` are not hidden behind a stale five-minute browser/CDN response.
 
 The backend currently has no rate-limit plugin, so per-IP rate limiting remains an API-01 follow-up before high-volume public exposure.
 
