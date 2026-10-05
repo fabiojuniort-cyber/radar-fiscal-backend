@@ -289,7 +289,9 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       publications: 0,
       origins: 0,
       versions: 0,
-      run_links: 0,
+      // collection_run_publications is immutable collection audit/history;
+      // SUPPRESS must not rewrite the historical fact that the run imported it.
+      run_links: 1,
       in_scope: false,
     });
     await resetRole(client);
