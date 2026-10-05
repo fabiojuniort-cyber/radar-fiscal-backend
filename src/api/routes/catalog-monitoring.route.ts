@@ -21,6 +21,7 @@ import {
   CURATED_ENGINE_KEY,
   CURATED_ENGINE_VERSION,
 } from '../../modules/taxonomy/classification/classification.curated.js';
+import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
 import { derivePublicSourceStatus } from './public.route.js';
 
 const SAO_PAULO_TZ = 'America/Sao_Paulo';
@@ -314,6 +315,7 @@ function buildArchivePlan(
           AND ncm_pv.is_current = true
           AND pnm_filter.verification_status = 'CATALOG_MATCHED'
           AND pnm_filter.ncm_code = ${input.ncm}
+          AND ${notSupersededNcmMention('pnm_filter')}
       )
     `);
   }
@@ -416,6 +418,7 @@ function buildArchivePlan(
         WHERE pnm.ncm_code = ${input.ncm}
           AND pnm.verification_status = 'CATALOG_MATCHED'
           AND ncm_pv.is_current = true
+          AND ${notSupersededNcmMention('pnm')}
       `
     : null;
 
