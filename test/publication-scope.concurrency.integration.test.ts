@@ -41,6 +41,7 @@ test('SUPPRESS races real NCM, classification, matching and curator commit paths
   const classifyDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: pools[1]! }) });
   let suppressor: PoolClient | undefined;
   let pending: Promise<unknown>[] = [];
+  let releaseWriter = () => {};
   const row = { publication_version_id: ver, content_text: 'controlled race', relevant_excerpt: null, presentation_html: null };
   try {
     await admin.query(`INSERT INTO publications(id,identity_hash,identity_strength,identity_basis,jurisdiction_level,title)
@@ -102,13 +103,14 @@ test('SUPPRESS races real NCM, classification, matching and curator commit paths
     let unlock!: () => void;
     let locked!: () => void;
     const barrier = new Promise<void>(resolve => { unlock = resolve; });
+    releaseWriter = unlock;
     const ready = new Promise<void>(resolve => { locked = resolve; });
     const writer = ncmDb.transaction().execute(async trx => {
       await persistSuccessfulScan(trx, row, 'CONTENT_TEXT', []);
       locked();
       await barrier;
     });
-    await ready;
+    await Promise.race([ready, writer]);
     await suppressor.query('BEGIN');
     await suppressor.query(`SET LOCAL application_name = 'scope-suppress-${suffix}'`);
     const racing = suppressor.query(transition, [pub, 'SUPPRESS', randomUUID(), restored.rows[0].event_id, hash(pub)]);
@@ -121,6 +123,7 @@ test('SUPPRESS races real NCM, classification, matching and curator commit paths
     await assert.rejects(ncmDb.transaction().execute(trx => persistSuccessfulScan(trx, row, 'CONTENT_TEXT', [])), /PUBLICATION_OUT_OF_SCOPE/);
     await admin.query(transition, [pub, 'RESTORE', randomUUID(), final.rows[0].event_id, hash(pub)]);
   } finally {
+    releaseWriter();
     if (suppressor) { await suppressor.query('ROLLBACK').catch(() => undefined); suppressor.release(); }
     await Promise.allSettled(pending);
     await ncmDb.destroy(); await classifyDb.destroy();
