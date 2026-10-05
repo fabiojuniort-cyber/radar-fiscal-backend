@@ -111,3 +111,105 @@ test(
     }
   },
 );
+
+test(
+  'radar_app preserves collection-run audit after SUPPRESS while canonical content stays hidden',
+  async () => {
+    const adminUrl = process.env.DATABASE_ADMIN_URL;
+    assert.ok(adminUrl, 'DATABASE_ADMIN_URL is required');
+
+    const pool = new Pool({ connectionString: adminUrl, max: 1 });
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const publicationId = randomUUID();
+      const sourceId = randomUUID();
+      const runId = randomUUID();
+      const suffix = randomUUID();
+
+      await client.query(
+        `
+          INSERT INTO sources (
+            id, code, name, jurisdiction_level, base_url, connector_key
+          ) VALUES ($1, $2, $3, 'FEDERAL', 'https://example.invalid', $4)
+        `,
+        [sourceId, `scope-history-${suffix}`, 'Scope history fixture', `scope-history-${suffix}`],
+      );
+
+      await client.query(
+        `
+          INSERT INTO publications (
+            id, identity_hash, identity_strength, identity_basis,
+            jurisdiction_level, title
+          ) VALUES ($1, $2, 'STRONG', '{}'::jsonb, 'FEDERAL', $3)
+        `,
+        [publicationId, 'c'.repeat(64), 'Scope history publication'],
+      );
+
+      await client.query(
+        `
+          INSERT INTO collection_runs (
+            id, source_id, scheduled_for, trigger_type, status
+          ) VALUES ($1, $2, now(), 'MANUAL', 'SUCCESS')
+        `,
+        [runId, sourceId],
+      );
+
+      await client.query(
+        `
+          INSERT INTO collection_run_publications (
+            collection_run_id, publication_id, disposition
+          ) VALUES ($1, $2, 'NEW_PUBLICATION')
+        `,
+        [runId, publicationId],
+      );
+
+      await client.query(
+        `
+          SELECT event_id
+          FROM public.apply_publication_scope_transition(
+            $1::uuid, 'SUPPRESS', $2::uuid, NULL,
+            'TEST_SCOPE_POLICY', 'TEST_HISTORY_SUPPRESS', 'test-v1',
+            $3, NULL, 'INTEGRATION_TEST'
+          )
+        `,
+        [publicationId, randomUUID(), HASH_B],
+      );
+
+      await client.query('SET LOCAL ROLE radar_app');
+
+      const canonical = await client.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM publications WHERE id = $1',
+        [publicationId],
+      );
+      assert.equal(
+        canonical.rows[0]?.n,
+        0,
+        'suppressed canonical publication must stay hidden from radar_app',
+      );
+
+      const history = await client.query<{ n: number }>(
+        `
+          SELECT count(*)::int AS n
+          FROM collection_run_publications
+          WHERE collection_run_id = $1
+            AND publication_id = $2
+        `,
+        [runId, publicationId],
+      );
+      assert.equal(
+        history.rows[0]?.n,
+        1,
+        'collection audit must retain the historical imported-document row',
+      );
+
+      await client.query('RESET ROLE');
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+      await pool.end();
+    }
+  },
+);

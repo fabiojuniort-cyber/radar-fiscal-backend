@@ -13,6 +13,7 @@ Validar em produção que `OUT_OF_SCOPE`:
 - deixa de iniciar NCM, classificação taxonômica e matching;
 - não permite que trabalho concorrente confirme derivados depois do SUPPRESS;
 - preserva integralmente publicação, versões, origens, arquivos e evidências derivadas já existentes;
+- preserva também o fato histórico de que um `collection_run` importou o documento;
 - volta a aparecer após `RESTORE`;
 - mantém eventos `SUPPRESS`/`RESTORE` append-only;
 - é automaticamente restaurado quando material canônico relevante muda.
@@ -23,13 +24,77 @@ Validar em produção que `OUT_OF_SCOPE`:
 2. PR da implementação com CI completo verde.
 3. revisão independente do SHA material candidato.
 4. nenhum batch de limpeza histórica ativo.
-5. acesso administrativo ao PostgreSQL para migration/smoke; não usar credencial de runtime.
+5. acesso administrativo ao PostgreSQL para backup/migration/smoke; não usar credencial de runtime.
 6. não utilizar Railway AI Agent.
 7. registrar SHA do backend e estado de Backend/Worker/Scheduler antes do deploy.
+8. **backup lógico + restore validado devem estar concluídos antes de autorizar o merge/deploy**. Em produção, o backend acompanha `main` e o Railway executa `npm run db:prepare` no `preDeployCommand`; portanto, merge pode aplicar migrations antes de a nova aplicação iniciar.
 
-## 1. Preflight somente leitura
+## 1. Gate pré-deploy: snapshot + backup/restore
 
-Executar com credencial administrativa:
+Esta etapa ocorre com o PR ainda **não mergeado** e antes de qualquer deploy capaz de executar as migrations 033/034/035.
+
+### 1.1 Snapshot somente leitura do banco atual
+
+Executar com credencial administrativa e registrar o resultado:
+
+```sql
+SELECT count(*) AS publications FROM publications;
+SELECT count(*) AS publication_versions FROM publication_versions;
+SELECT count(*) AS publication_origins FROM publication_origins;
+SELECT count(*) AS collection_run_publications FROM collection_run_publications;
+
+SELECT to_regclass('public.publication_scope_events') AS events_before,
+       to_regclass('public.publication_scope_state') AS state_before,
+       to_regclass('public.publication_scope_epoch_state') AS epoch_before;
+```
+
+Na primeira implantação de DOU-CLEAN-02, os três objetos de scope devem ser `NULL`. Se já existirem por uma tentativa anterior, **não assumir estado limpo**: registrar o estado, interromper a implantação e reconciliar com a Issue #84 antes de prosseguir.
+
+### 1.2 Backup lógico consistente
+
+Criar backup lógico consistente da produção com a ferramenta padrão de PostgreSQL/Railway, sem registrar segredo em log:
+
+```bash
+pg_dump "$DATABASE_ADMIN_URL" --format=custom --file scope-pre-deploy.dump
+```
+
+Registrar timestamp, SHA candidato da aplicação e SHA-256/tamanho do dump.
+
+### 1.3 Restore obrigatório em banco temporário isolado
+
+Restaurar o dump em **banco temporário isolado**, nunca sobre produção:
+
+```bash
+createdb "$RESTORE_DATABASE_URL"
+pg_restore --exit-on-error --no-owner --dbname="$RESTORE_DATABASE_URL" scope-pre-deploy.dump
+```
+
+Validar no restaurado:
+
+```sql
+SELECT count(*) FROM publications;
+SELECT count(*) FROM publication_versions;
+SELECT count(*) FROM publication_origins;
+SELECT count(*) FROM collection_run_publications;
+```
+
+As contagens devem reconciliar com o snapshot pré-deploy. Registrar como evidência:
+
+- timestamp;
+- SHA candidato da aplicação;
+- tamanho/SHA-256 do dump;
+- resultado do `pg_restore`;
+- contagens do banco original e do restaurado.
+
+O arquivo de backup não deve ser commitado no repositório.
+
+**Sem `backup + restore PASS`, o merge/deploy permanece bloqueado.**
+
+## 2. Deploy/migration e preflight pós-migration
+
+Somente após a evidência da seção 1 estar registrada e o gate R3 autorizar o merge/deploy.
+
+O backend de produção executa `npm run db:prepare` no `preDeployCommand`; isso aplica as migrations antes de iniciar a nova versão. Após o deploy, mas **antes do primeiro SUPPRESS/RESTORE produtivo**, executar:
 
 ```sql
 SELECT to_regclass('public.publication_scope_events') IS NOT NULL AS events_exists,
@@ -54,45 +119,21 @@ SELECT
 
 Esperado:
 
-- objetos existem depois da migration;
+- objetos existem;
+- `out_of_scope = 0` antes do smoke inicial;
 - `app_can_transition = false`;
 - `worker_can_transition = false`.
 
-## 2. Backup + restore obrigatório antes do primeiro write produtivo
-
-Criar backup lógico consistente da produção com a ferramenta padrão de PostgreSQL/Railway. Exemplo operacional, sem registrar segredo em log:
-
-```bash
-pg_dump "$DATABASE_ADMIN_URL" --format=custom --file scope-pre-smoke.dump
-```
-
-Restaurar o dump em **banco temporário isolado**, nunca sobre produção:
-
-```bash
-createdb "$RESTORE_DATABASE_URL"
-pg_restore --exit-on-error --no-owner --dbname="$RESTORE_DATABASE_URL" scope-pre-smoke.dump
-```
-
-Validar no restaurado:
+Também validar que o histórico de coleta continua legível pelo runtime sem reexpor conteúdo canônico:
 
 ```sql
-SELECT count(*) FROM publications;
-SELECT count(*) FROM publication_versions;
-SELECT count(*) FROM publication_origins;
-SELECT count(*) FROM publication_scope_events;
-SELECT count(*) FROM publication_scope_state;
-SELECT public.publication_scope_epoch();
+BEGIN;
+SET LOCAL ROLE radar_app;
+SELECT count(*) FROM collection_run_publications;
+ROLLBACK;
 ```
 
-Registrar como evidência:
-
-- timestamp;
-- SHA da aplicação;
-- tamanho/SHA-256 do dump;
-- resultado do `pg_restore`;
-- contagens acima.
-
-O arquivo de backup não deve ser commitado no repositório.
+Falha de migration, privilege check ou reconciliação bloqueia o smoke.
 
 ## 3. Escolha do registro de smoke
 
@@ -128,7 +169,7 @@ FROM (
 ) x;
 ```
 
-Também registrar contagens de `publication_files`, NCM, taxonomia, `company_publications`, `publication_matches` e `publication_source_feed` para esse publication_id.
+Também registrar contagens de `publication_files`, NCM, taxonomia, `company_publications`, `publication_matches`, `publication_source_feed` e `collection_run_publications` para esse publication_id.
 
 ## 4. SUPPRESS controlado
 
@@ -163,11 +204,13 @@ Antes de restaurar, provar:
 3. endpoint público/listas/Acervo normal não devolvem o ato;
 4. acesso direto normal ao publication_id não devolve conteúdo ao usuário comum;
 5. `X-Publication-Scope-Epoch` avançou e resposta pública usa revalidação HTTP;
-6. batch NCM não seleciona a versão;
-7. batch de classificação não seleciona a versão;
-8. matching não cria novo vínculo para a publicação;
-9. contagens de publicação/versões/origens/arquivos/evidências permanecem iguais;
-10. runtime `radar_app`/`radar_worker` continua sem EXECUTE na função de transição.
+6. totais, facets e navegação do Acervo refletem o novo epoch sem aguardar TTL/stale TTL;
+7. batch NCM não seleciona a versão;
+8. batch de classificação não seleciona a versão;
+9. matching não cria novo vínculo para a publicação;
+10. contagens de publicação/versões/origens/arquivos/evidências permanecem iguais;
+11. `collection_run_publications` e `importedDocuments` históricos do run permanecem iguais ao pré-smoke;
+12. runtime `radar_app`/`radar_worker` continua sem EXECUTE na função de transição.
 
 Se qualquer item falhar, **não prosseguir para batch histórico**. Restaurar o registro de smoke e abrir incidente/Issue.
 
@@ -198,6 +241,7 @@ Validar:
 - API/Acervo normal volta a exibir;
 - epoch avança novamente;
 - fingerprints de versões/origens e contagens de evidência permanecem iguais aos do pré-smoke;
+- histórico de `collection_run_publications` permanece idêntico;
 - evento SUPPRESS continua existente e imutável;
 - novo evento RESTORE existe.
 
@@ -243,10 +287,12 @@ Registrar em `tribusca-control#84`:
 - SHA mergeado e SHA deployado;
 - CI completo;
 - parecer independente;
-- backup + restore PASS;
+- backup + restore **pré-deploy** PASS;
 - contagens/fingerprints pré e pós smoke;
 - event_ids SUPPRESS e RESTORE do fixture;
 - epoch antes/SUPPRESS/RESTORE;
+- prova de invalidação imediata de cache v1/v2/Acervo;
+- prova de preservação de `collection_run_publications`/`importedDocuments` histórico;
 - estado Backend/Worker/Scheduler;
 - ausência de publicações deixadas OUT_OF_SCOPE pelo smoke.
 
