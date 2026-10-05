@@ -6,7 +6,7 @@ import {
   type CollectionEngineLogger,
   type CollectionEngineResult,
 } from './collection.engine.js';
-import { finishCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
+import { finishCollectionRun, heartbeatCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
 import { ConnectorRegistry } from './connector.registry.js';
 import { DOU_XML_SECTIONS, DouConnector } from './dou.connector.js';
 import type { InlabsCredentials } from './inlabs.client.js';
@@ -251,7 +251,9 @@ async function createOwnedBackfillRun(
 async function reclaimRun(db: Kysely<DB>, runId: string, workerId: string): Promise<void> {
   const now = new Date();
   const updated = await db.updateTable('collection_runs')
-    .set({ worker_id: workerId, locked_at: now, heartbeat_at: now, next_attempt_at: null, updated_at: now })
+    // Keep the scheduled retry deadline while this owner sleeps. Stale
+    // recovery must not mistake a live retry wait for an abandoned run.
+    .set({ worker_id: workerId, locked_at: now, heartbeat_at: now, updated_at: now })
     .where('id', '=', runId)
     .where('status', '=', 'RUNNING')
     .where('worker_id', 'is', null)
@@ -337,6 +339,11 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
     }
     const waitMs = Math.max(0, (result.nextAttemptAt?.getTime() ?? Date.now()) - Date.now());
     await sleep(waitMs);
+    // Renew immediately on waking, before opening the next attempt and its
+    // periodic heartbeat. If recovery already won the row, stop this owner.
+    if (!await heartbeatCollectionRun(db, run.id, run.workerId)) {
+      throw new DouBackfillBlockedError(`Backfill run ${run.id} lost ownership while waiting to retry.`);
+    }
   }
 }
 

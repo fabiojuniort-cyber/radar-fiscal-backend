@@ -37,6 +37,12 @@ test(
     const db = new Kysely<DB>({
       dialect: new PostgresDialect({ pool }),
     });
+    // Independent connections, as used by two worker replicas.
+    const replicaDb = new Kysely<DB>({
+      dialect: new PostgresDialect({
+        pool: new Pool({ connectionString: adminUrl, max: 2, statement_timeout: 5_000 }),
+      }),
+    });
 
     const sourceId = randomUUID();
     const scheduledFor = new Date(
@@ -87,9 +93,31 @@ test(
 
       assert.equal(Number(runCount.count), 1);
 
+      // Hold the candidate row explicitly: both replicas must skip it, not
+      // wait for its owner or change it. The lock is released by this callback.
+      await db.transaction().execute(async (trx) => {
+        await trx.selectFrom('collection_runs').select('id')
+          .where('id', '=', runId!).forUpdate().executeTakeFirstOrThrow();
+        const skipped = await Promise.all([
+          acquireNextCollectionRun(db, 'worker-a'),
+          acquireNextCollectionRun(replicaDb, 'worker-b'),
+        ]);
+        assert.deepEqual(skipped, [null, null]);
+      });
+
+      let arrived = 0;
+      let release!: () => void;
+      const ready = new Promise<void>((resolve) => { release = resolve; });
+      const claim = (database: Kysely<DB>, workerId: string) =>
+        database.connection().execute(async (connection) => {
+          // Both pools have a checked-out connection before either claim starts.
+          if (++arrived === 2) release();
+          await ready;
+          return acquireNextCollectionRun(connection, workerId);
+        });
       const [workerA, workerB] = await Promise.all([
-        acquireNextCollectionRun(db, 'worker-a'),
-        acquireNextCollectionRun(db, 'worker-b'),
+        claim(db, 'worker-a'),
+        claim(replicaDb, 'worker-b'),
       ]);
 
       const acquisitions = [workerA, workerB].filter(
@@ -299,7 +327,7 @@ test(
         .where('id', '=', sourceId)
         .execute();
 
-      await db.destroy();
+      await Promise.all([db.destroy(), replicaDb.destroy()]);
     }
   },
 );
