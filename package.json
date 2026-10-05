@@ -32,6 +32,7 @@
     "confaz:import-act": "node dist/infrastructure/database/import-confaz-act.js",
     "taxonomy:load-products": "node dist/infrastructure/database/taxonomy-load-products.js",
     "taxonomy:classify-one": "node dist/infrastructure/database/taxonomy-classify-one.js",
+    "taxonomy:retire-legacy-segments": "node dist/infrastructure/database/taxonomy-retire-legacy-segments.js",
     "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js",
     "db:dou-backfill": "node dist/infrastructure/database/dou-backfill.js",
     "db:ensure-nfe-encat-source": "node dist/infrastructure/database/ensure-nfe-encat-source.js",

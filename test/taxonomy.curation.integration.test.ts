@@ -643,6 +643,46 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       }
     }
 
+    // Old baseline segments retire once their groups move to the TriFaros
+    // Segmento table (rolled back here too).
+    {
+      const client = await app.curatorPool!.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+        const actor = { userId: 'ops:test', justification: 'Segmentos antigos' };
+        const { createConcept } = await import('../src/modules/taxonomy/curation/curation.draft.js');
+        const { retireLegacySegments, LEGACY_SEGMENT_TARGETS } = await import(
+          '../src/modules/taxonomy/curation/curation.legacy-segments.js'
+        );
+        const blocked = await retireLegacySegments(client, actor);
+        assert.ok(blocked.missingTargets.includes('sector.trifaros_agro'), 'nothing moves without the new segments');
+        for (const id of new Set(Object.values(LEGACY_SEGMENT_TARGETS))) {
+          await createConcept(client, actor, 'sector', {
+            code: `sector.trifaros_${id}`,
+            label: `TriFaros ${id}`,
+            definition: `Segmento ${id}`,
+            officialCodes: [],
+            aliases: [],
+            classifyByLabel: false,
+          });
+        }
+        const done = await retireLegacySegments(client, actor);
+        assert.deepEqual(done.missingTargets, []);
+        assert.ok(done.retire.includes('sector.agribusiness'));
+        const { findOpenDraft, loadReleaseView, pgRunner } = await import('../src/modules/taxonomy/curation/curation.read.js');
+        const open = await findOpenDraft(pgRunner(client));
+        const view = await loadReleaseView(pgRunner(client), open!.id);
+        assert.ok(!view!.concepts.some((c) => c.code === 'sector.agribusiness'), 'old item retired');
+        const fert = view!.groups.find((g) => g.code === 'fertilizantes')!;
+        assert.ok(fert.segmentCodes.includes('sector.trifaros_agro'));
+        assert.ok(view!.groups.every((g) => g.segmentCodes.every((code) => !code.startsWith('sector.') || code.startsWith('sector.trifaros_'))));
+      } finally {
+        await client.query('ROLLBACK');
+        client.release();
+      }
+    }
+
     const published = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/taxonomy/drafts/current/publish',
