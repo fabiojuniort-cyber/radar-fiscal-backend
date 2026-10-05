@@ -1,9 +1,326 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { parseDouEntries, readDouZip, classifyDouAct, extractEmbeddedConfazPublications, douHtmlText } from '../src/modules/collection/dou.parser.js';
+import { setImmediate } from 'node:timers/promises';
+import sax from 'sax';
+import { parseDouEntries, parseDouZip, readDouZip, classifyDouAct, extractEmbeddedConfazPublications, douHtmlText } from '../src/modules/collection/dou.parser.js';
+import type { DouXmlEntry, DouArchiveContext } from '../src/modules/collection/dou.parser.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { classifyDouContractExcerpt } from '../src/modules/collection/dou-scope.rules.js';
 import { fixtureEntries, makeZip, archiveContext } from './dou.fixtures.js';
+
+async function assertZipParity(entries: DouXmlEntry[], context: DouArchiveContext) {
+  const expected = parseDouEntries(entries, context);
+  const publications: typeof expected.publications = [];
+  const result = await parseDouZip(await makeZip([
+    ...entries,
+    { name: 'illustration.jpg', bytes: Buffer.from('media fixture') },
+  ]), context, new AbortController().signal, async publication => {
+    publications.push(publication);
+  });
+  assert.deepEqual(result, {
+    partialFailures: expected.partialFailures,
+    xmlCount: entries.length,
+    mediaCount: 1,
+  }, 'the streaming result contains counters and failures, never a publication buffer');
+  assert.deepEqual(publications, expected.publications);
+  assert.deepEqual(
+    publications.map(publication => normalizePublication({ sourceId: 'dou', publication })),
+    expected.publications.map(publication => normalizePublication({ sourceId: 'dou', publication })),
+  );
+  for (const publication of publications) {
+    for (const part of (publication.metadata!.dou as any).parts ?? []) {
+      const entry = entries.find(entry => entry.name === part.filename)!;
+      assert.equal(part.rawSha256, createHash('sha256').update(entry.bytes).digest('hex'));
+      assert.equal(part.sizeBytes, entry.bytes.byteLength);
+    }
+  }
+  return publications;
+}
+
+function syntheticZipEntry(options: {
+  matter: string; section?: string; part?: number; title?: string; abstract?: string; text?: string;
+}): DouXmlEntry {
+  const { matter, section = 'DO1', part, title = 'DESPACHO Nº 28, DE 17 DE SETEMBRO DE 2026',
+    abstract = '', text = '<p>Conteúdo oficial de teste.</p>' } = options;
+  const journal = section === 'DO3' ? '530' : '515';
+  return {
+    name: `${journal}_20260918_${matter}${part ? `-${part}` : ''}.xml`,
+    bytes: Buffer.from(`<xml><article id="${matter}${part ?? 1}" idMateria="${matter}" pubDate="18/09/2026" pubName="${section}" editionNumber="180" artCategory="Ministério da Fazenda/Conselho Nacional de Política Fazendária" artType="${section === 'DO3' ? 'EXTRATO DE CONTRATO' : 'DESPACHO'}" highlightImage="data:image/png;base64,aW1hZ2U=" numberPage="${part ?? 1}" pdfPage="https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&amp;jornal=${journal}&amp;pagina=${part ?? 1}"><body><Identifica><![CDATA[${title}]]></Identifica><Ementa><![CDATA[${abstract}]]></Ementa><Texto><![CDATA[${text}]]></Texto></body></article></xml>`),
+  };
+}
+
+function embeddedZipEntry(): DouXmlEntry {
+  return syntheticZipEntry({
+    matter: '12345678',
+    text: [
+      '<p>Publica os Convênios ICMS.</p>',
+      '<p>CONVÊNIO ICMS Nº 63, DE 17 DE SETEMBRO DE 2026</p>',
+      '<p>Altera o Convênio ICMS nº 87, de 9 de julho de 2010.</p>',
+      '<p>CONVÊNIO ICMS Nº 64, DE 17 DE SETEMBRO DE 2026</p>',
+      '<p>Autoriza as unidades federadas nas condições que especifica.</p>',
+    ].join(''),
+  });
+}
+
+test('streaming ZIP parser exactly preserves real fixture publications and arbitrary multipart order', async () => {
+  await assertZipParity(await fixtureEntries('DO1'), archiveContext('DO1'));
+  const entries = await fixtureEntries('DO1E');
+  for (const order of [entries, [...entries].reverse(), [entries[5]!, entries[0]!, entries[3]!, entries[6]!, entries[4]!, entries[1]!, entries[7]!, entries[2]!]]) {
+    await assertZipParity(order, archiveContext('DO1E'));
+  }
+  await assertZipParity([
+    syntheticZipEntry({ matter: '12345678', part: 2 }),
+    syntheticZipEntry({ matter: '12345679', part: 1 }),
+    syntheticZipEntry({ matter: '12345678', part: 1 }),
+    syntheticZipEntry({ matter: '12345679', part: 2 }),
+  ], archiveContext('DO1'));
+});
+
+test('streaming ZIP parser preserves continuation scope signals, HTML presentation and embedded CONFAZ acts', async () => {
+  const publications = await assertZipParity([
+    syntheticZipEntry({ matter: '12345679', section: 'DO3', part: 2, title: 'ANEXO - CONTINUAÇÃO', abstract: 'Concede isenção do ICMS.', text: '<blockquote>Informações complementares.</blockquote>' }),
+    syntheticZipEntry({ matter: '12345679', section: 'DO3', part: 1, title: 'EXTRATO DE CONTRATO Nº 7/2026', text: '<p>Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.</p>' }),
+  ], archiveContext('DO3'));
+  const publication = publications[0]!;
+  const metadata = publication.metadata!.dou as any;
+  assert.deepEqual(metadata.continuationTitles, ['ANEXO - CONTINUAÇÃO']);
+  assert.deepEqual(metadata.continuationAbstracts, ['Concede isenção do ICMS.']);
+  assert.equal(metadata.scopeStructureIncomplete, true);
+  assert.equal(classifyDouContractExcerpt(publication)?.decision, 'KEEP');
+  assert.equal(classifyDouContractExcerpt(publication)?.category, 'TRIBUTARIO_FISCAL');
+  assert.match(publication.presentationHtml!, /<\/section><hr><section>/);
+  assert.equal(metadata.parts[0].hasHighlightImage, true);
+  assert.equal(metadata.parts[0].attributes.highlightImage, undefined);
+
+  const embedded = await assertZipParity([embeddedZipEntry()], archiveContext('DO1'));
+  assert.deepEqual(embedded.map(item => item.actNumber), ['28/2026', '63/2026', '64/2026']);
+  assert.equal((embedded[1]!.metadata!.dou as any).parentMatterExternalId, embedded[0]!.externalId);
+});
+
+test('image-heavy XML detaches each completed retained value once without copying its image or changing publication semantics', async t => {
+  const title = 'PORTARIA Nº 7, DE 17 DE SETEMBRO DE 2026 🧾';
+  const agency = 'Órgão público/Coordenação – São Paulo 🧮';
+  const abstract = 'Isenção para ação fiscal 🚀 & controle.';
+  const firstHtml = '<p>Ação fiscal 🚀 — café e coração.</p>';
+  const secondHtml = '<p>Entidade &amp; obrigação.</p>';
+  const html = firstHtml + secondHtml;
+  const smallImage = 'data:image/png;base64,aW1hZ2U=';
+  const largeImage = 'data:image/png;base64,' + 'QUJD'.repeat(12 * 1024);
+  const entry = syntheticZipEntry({ matter: '12345678', title, abstract, text: html });
+  const xml = Buffer.from(entry.bytes).toString('utf8')
+    .replace('Ministério da Fazenda/Conselho Nacional de Política Fazendária', agency)
+    .replace(`<Texto><![CDATA[${html}]]></Texto>`, `<Texto><![CDATA[${firstHtml}]]><![CDATA[${secondHtml}]]></Texto>`);
+  const small = { ...entry, bytes: Buffer.from(xml) };
+  const large = { ...entry, bytes: Buffer.from(xml.replace(smallImage, largeImage)) };
+  const context = archiveContext('DO1');
+  const baseline = parseDouEntries([small], context);
+  assert.deepEqual(baseline.partialFailures, []);
+  assert.equal(baseline.publications.length, 1);
+  const original = baseline.publications[0]!;
+  const dou = original.metadata!.dou as any;
+  const expected = {
+    ...original,
+    metadata: { ...original.metadata, dou: {
+      ...dou,
+      parts: [{ ...dou.parts[0],
+        rawSha256: createHash('sha256').update(large.bytes).digest('hex'),
+        sizeBytes: large.bytes.byteLength,
+      }],
+    } },
+  };
+  const expectedCopies = [...Object.values(dou.parts[0].attributes), title, abstract, html].sort();
+  const originalFrom = Buffer.from;
+  const copied: string[] = [];
+  t.mock.method(Buffer, 'from', (...args: Parameters<typeof Buffer.from>) => {
+    if (typeof args[0] === 'string' && args[1] === 'utf16le') copied.push(args[0]);
+    return Reflect.apply(originalFrom, Buffer, args);
+  });
+  const zipped = await makeZip([large]);
+
+  for (const mode of ['legacy', 'streaming']) {
+    copied.length = 0;
+    let publications: typeof baseline.publications;
+    if (mode === 'legacy') {
+      const result = parseDouEntries([large], context);
+      assert.deepEqual(result.partialFailures, []);
+      publications = result.publications;
+    } else {
+      publications = [];
+      const result = await parseDouZip(zipped, context, new AbortController().signal, async value => { publications.push(value); });
+      assert.deepEqual(result, { partialFailures: [], xmlCount: 1, mediaCount: 0 });
+    }
+    assert.deepEqual([...copied].sort(), expectedCopies, `${mode}: detach complete attrs/fields exactly once, not SAX fragments`);
+    assert.equal(copied.includes(largeImage), false, `${mode}: the discarded base64 image is never copied`);
+    assert.deepEqual(publications, [expected], `${mode}: only original-byte provenance changes with the image`);
+    const publication = publications[0]!;
+    assert.equal(publication.title, title);
+    assert.equal(publication.presentationHtml, `<section>${html}</section>`);
+    assert.equal(publication.content, 'Ação fiscal 🚀 — café e coração.\nEntidade & obrigação.');
+    assert.equal((publication.metadata!.dou as any).parts[0].attributes.artCategory, agency);
+    const before = normalizePublication({ sourceId: 'dou', publication: original });
+    const after = normalizePublication({ sourceId: 'dou', publication });
+    assert.equal(after.identityHash, before.identityHash);
+    assert.equal(after.contentHash, before.contentHash);
+  }
+});
+
+test('completed-field detachment preserves an emoji split across real SAX CDATA callbacks', t => {
+  const html = '<p>Ação fiscal 🚀 — obrigação íntegra.</p>';
+  const entry = syntheticZipEntry({ matter: '12345678', text: html });
+  const expected = parseDouEntries([entry], archiveContext('DO1'));
+  const originalParser = sax.parser;
+  const fragments: string[] = [];
+  t.mock.method(sax, 'parser', (...args: Parameters<typeof sax.parser>) => {
+    const parser = originalParser(...args);
+    const write = parser.write;
+    parser.write = function (xml) {
+      if (typeof xml !== 'string') return write.call(this, xml);
+      const split = xml.indexOf('🚀', xml.indexOf('<Texto>')) + 1;
+      assert.ok(split > 0);
+      const onCdata = this.oncdata;
+      this.oncdata = fragment => { fragments.push(fragment); onCdata?.(fragment); };
+      // Valid UTF-8 input has already been decoded. SAX may flush a JS string
+      // between its UTF-16 surrogate units; the complete field must join them.
+      write.call(this, xml.slice(0, split));
+      this.flush();
+      return write.call(this, xml.slice(split));
+    };
+    return parser;
+  });
+
+  const actual = parseDouEntries([entry], archiveContext('DO1'));
+  assert.ok(fragments.some(fragment => fragment.endsWith('\ud83d')));
+  assert.ok(fragments.some(fragment => fragment.startsWith('\ude80')));
+  assert.deepEqual(actual, expected);
+  assert.equal(actual.publications[0]!.presentationHtml, `<section>${html}</section>`);
+  assert.equal(actual.publications[0]!.content, 'Ação fiscal 🚀 — obrigação íntegra.');
+});
+
+test('streaming ZIP parser awaits every publication sink, including embedded children', { timeout: 5000 }, async () => {
+  const zip = await makeZip([embeddedZipEntry(), syntheticZipEntry({ matter: '12345679' })]);
+  let release!: () => void;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  let entered!: () => void;
+  const firstEntered = new Promise<void>(resolve => { entered = resolve; });
+  let calls = 0; let active = 0; let maximumActive = 0; let settled = false;
+  const pending = parseDouZip(zip, archiveContext('DO1'), new AbortController().signal, async () => {
+    calls++; active++; maximumActive = Math.max(maximumActive, active);
+    if (calls === 1) { entered(); await blocked; }
+    await setImmediate();
+    active--;
+  });
+  void pending.then(() => { settled = true; }, () => { settled = true; });
+  try {
+    await firstEntered;
+    await setImmediate();
+    assert.equal(calls, 1, 'no parent or child is emitted while the preceding sink is pending');
+    assert.equal(settled, false);
+  } finally { release(); }
+  await pending;
+  assert.equal(calls, 4);
+  assert.equal(maximumActive, 1);
+  assert.equal(active, 0);
+});
+
+test('streaming ZIP parser propagates synchronous and asynchronous sink failures without emitting more items', async () => {
+  const zip = await makeZip([embeddedZipEntry(), syntheticZipEntry({ matter: '12345679' })]);
+  for (const failAt of [1, 2]) {
+    for (const asynchronous of [false, true]) {
+      const failure = new Error('publication persistence failed');
+      let calls = 0;
+      await assert.rejects(parseDouZip(zip, archiveContext('DO1'), new AbortController().signal, () => {
+        if (++calls !== failAt) return Promise.resolve();
+        if (asynchronous) return Promise.reject(failure);
+        throw failure;
+      }), reason => reason === failure);
+      assert.equal(calls, failAt, 'a sink failure is fatal, not a partial XML failure');
+    }
+  }
+});
+
+test('streaming ZIP parser honors cancellation before parsing and between parent or child sink calls', async () => {
+  const zip = await makeZip([embeddedZipEntry(), syntheticZipEntry({ matter: '12345679' })]);
+  for (const abortAt of [0, 1, 2]) {
+    const controller = new AbortController();
+    const reason = new Error('collection cancelled');
+    let calls = 0;
+    if (abortAt === 0) controller.abort(reason);
+    await assert.rejects(parseDouZip(zip, archiveContext('DO1'), controller.signal, async () => {
+      if (++calls === abortAt) controller.abort(reason);
+      await setImmediate();
+    }), error => error === reason);
+    assert.equal(calls, abortAt, 'no later parent or embedded act reaches the sink after cancellation');
+  }
+});
+
+test('streaming ZIP parser cancels an active large-entry read without emitting a partial publication', async () => {
+  const zip = await makeZip([syntheticZipEntry({ matter: '12345678', text: 'x'.repeat(4 * 1024 * 1024) })]);
+  const controller = new AbortController();
+  const reason = new Error('cancel active ZIP read');
+  let calls = 0;
+  const pending = parseDouZip(zip, archiveContext('DO1'), controller.signal, async () => { calls++; });
+  // Yield into ZIP I/O, then abort while the multi-chunk XML entry is being read.
+  await setImmediate();
+  controller.abort(reason);
+  await assert.rejects(pending, error => error === reason);
+  assert.equal(calls, 0);
+});
+
+test('streaming ZIP parser enforces CRC, unsafe path and duplicate-entry checks before any sink call', async () => {
+  const entry = syntheticZipEntry({ matter: '12345678' });
+  const validZip = await makeZip([entry, syntheticZipEntry({ matter: '12345679' })]);
+  const corrupt = Buffer.from(validZip);
+  const centralHeader = Buffer.from([0x50, 0x4b, 1, 2]);
+  const first = corrupt.indexOf(centralHeader);
+  const second = corrupt.indexOf(centralHeader, first + 4);
+  assert.ok(second > first);
+  corrupt.writeUInt32LE(0, second + 16);
+  const cases: Array<[Uint8Array, RegExp]> = [
+    [corrupt, /DOU_ZIP_CRC_MISMATCH/],
+    [await makeZip([{ name: 'nested/file.xml', bytes: entry.bytes }]), /DOU_UNSAFE_ZIP_PATH/],
+    [await makeZip([entry, entry]), /DOU_UNSAFE_ZIP/],
+    [Buffer.from('not zip'), /DOU_INVALID_ZIP/],
+  ];
+  for (const [bytes, pattern] of cases) {
+    let calls = 0;
+    await assert.rejects(parseDouZip(bytes, archiveContext('DO1'), new AbortController().signal, async () => { calls++; }), pattern);
+    assert.equal(calls, 0);
+  }
+  const empty = await parseDouZip(await makeZip([]), archiveContext('DO1'), new AbortController().signal, async () => { assert.fail('empty ZIP emitted a publication'); });
+  assert.deepEqual(empty, { partialFailures: [], xmlCount: 0, mediaCount: 0 });
+});
+
+test('streaming ZIP parser preserves conservative DTD, context, certified-reference and broken-continuation failures', async () => {
+  const original = syntheticZipEntry({ matter: '12345678' });
+  const xml = Buffer.from(original.bytes).toString('utf8');
+  for (const [text, code] of [
+    ['<!DOCTYPE xml SYSTEM "https://example.invalid">' + xml, 'DOU_XML_DTD_FORBIDDEN'],
+    [xml.replaceAll('pesquisa.in.gov.br', 'example.invalid'), 'DOU_INVALID_CERTIFIED_REFERENCE'],
+  ]) {
+    const entries = [{ ...original, bytes: Buffer.from(text!) }];
+    assert.equal(parseDouEntries(entries, archiveContext('DO1')).partialFailures[0]?.code, code);
+    await assertZipParity(entries, archiveContext('DO1'));
+  }
+  await assertZipParity([original], { ...archiveContext('DO1'), date: '2026-09-17' });
+  const entries = await fixtureEntries('DO1E');
+  await assertZipParity(entries.filter(entry => !entry.name.endsWith('24378456-2.xml')), archiveContext('DO1E'));
+  await assertZipParity(entries.map(entry => entry.name.endsWith('24378456-2.xml') ? { ...entry, bytes: Buffer.from('<xml>broken') } : entry).reverse(), archiveContext('DO1E'));
+});
+
+test('streaming ZIP parser honors a Uint8Array view offset and length without consuming surrounding bytes', async () => {
+  const entries = await fixtureEntries('DO1');
+  const zip = await makeZip(entries);
+  const backing = new Uint8Array(zip.length + 257);
+  backing.fill(0xff);
+  backing.set(zip, 127);
+  const view = backing.subarray(127, 127 + zip.length);
+  const publications: ReturnType<typeof parseDouEntries>['publications'] = [];
+  const result = await parseDouZip(view, archiveContext('DO1'), new AbortController().signal, async publication => { publications.push(publication); });
+  const expected = parseDouEntries(entries, archiveContext('DO1'));
+  assert.deepEqual(publications, expected.publications);
+  assert.deepEqual(result, { partialFailures: expected.partialFailures, xmlCount: entries.length, mediaCount: 0 });
+});
 
 test('real XML preserves date, category, numbering, content and certified page without inventing HTML links', async () => {
   const entries = await fixtureEntries('DO1'); const result = parseDouEntries(entries, archiveContext('DO1'));

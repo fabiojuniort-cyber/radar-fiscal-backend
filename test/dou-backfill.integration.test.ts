@@ -260,6 +260,59 @@ test('monitoring coverage remains monotonic when a later run moves its archive w
   }
 });
 
+test('backfill coverage rejects publication persistence failures but keeps parser-only partial consultation', async () => {
+  assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
+  const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 2 }) }) });
+  const sourceId = randomUUID();
+  const failedDate = '2026-09-18';
+  const parserPartialDate = '2026-09-19';
+  const insertBackfill = async (date: string, parserPartial: boolean) => {
+    const at = new Date(`${date}T18:00:00Z`);
+    const run = await db.insertInto('collection_runs').values({
+      source_id: sourceId, scheduled_for: at, started_at: at, finished_at: at,
+      status: 'PARTIAL_SUCCESS', trigger_type: 'BACKFILL',
+    }).returning('id').executeTakeFirstOrThrow();
+    const attempt = await db.insertInto('collection_attempts').values({
+      collection_run_id: run.id, attempt_no: 1, status: 'SUCCESS',
+      metadata: {
+        // Archive consultation metadata is written before publication
+        // persistence; PARSED alone must not make a failed item disappear.
+        dou: { archives: DOU_BACKFILL_SECTIONS.map(section => ({
+          date, section, filename: `${date}-${section}.zip`, rawSha256: 'a'.repeat(64),
+          state: parserPartial && section === 'DO1' ? 'PARTIAL' : 'PARSED',
+        })) },
+      },
+    }).returning('id').executeTakeFirstOrThrow();
+    return { runId: run.id, attemptId: attempt.id };
+  };
+  try {
+    await db.insertInto('sources').values({
+      id: sourceId, code: `dou-failed-coverage-${sourceId}`, name: 'DOU failed publication coverage',
+      jurisdiction_level: 'FEDERAL', base_url: 'https://inlabs.in.gov.br', connector_key: 'dou',
+    }).execute();
+    const failed = await insertBackfill(failedDate, false);
+    await db.insertInto('collection_items').values({
+      collection_run_id: failed.runId, first_attempt_id: failed.attemptId,
+      source_item_key: 'fixture-failed-publication', status: 'FAILED',
+      error_code: 'PUBLICATION_PROCESSING_ERROR', error_message: 'Fixture publication persistence failure.',
+    }).execute();
+    await insertBackfill(parserPartialDate, true);
+
+    const coverage = await readDouBackfillCoverage(db, sourceId);
+    assert.deepEqual(coverage.covered, new Set([parserPartialDate]), 'a failed item only excludes its own run; parser omissions remain consulted');
+    for (const section of DOU_BACKFILL_SECTIONS) {
+      assert.equal(coverage.receipts[`${failedDate}-${section}.zip`], undefined, 'the failed run cannot supply hashes that skip retrying its publications');
+    }
+    assert.equal(coverage.receipts[`${parserPartialDate}-DO1.zip`], undefined, 'a partial archive is not an unchanged-package receipt');
+    assert.equal(coverage.receipts[`${parserPartialDate}-DO3.zip`], 'a'.repeat(64));
+    assert.deepEqual(planDouBackfillDates({ from: failedDate, to: parserPartialDate, today: '2026-10-04', covered: coverage.covered }), [failedDate]);
+  } finally {
+    await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+    await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+    await db.destroy();
+  }
+});
+
 test('administrative DOU backfill runs explicit past dates through the engine without touching monitoring', async (t) => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
   const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 4 }) }) });

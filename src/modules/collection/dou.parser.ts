@@ -9,7 +9,14 @@ import { parseCanonicalRfbFormalAct } from './rfb-normas.identity.js';
 
 export interface DouXmlEntry { name: string; bytes: Uint8Array }
 export interface DouArchiveContext { date: string; section: string; filename: string; officialUrl: string; rawSha256: string }
-interface Part { attrs: Record<string, string>; fields: Record<string, string>; entry: DouXmlEntry; part: number; journal: string }
+interface Part {
+  attrs: Record<string, string>;
+  fields: Record<string, string>;
+  entry: { name: string; rawSha256: string; sizeBytes: number };
+  part: number;
+  journal: string;
+  hasHighlightImage: boolean;
+}
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const error = (code: string) => new ConnectorError(code, { code, kind: 'PROCESSING_ERROR', retryable: false });
 
@@ -34,6 +41,15 @@ function hasUnpreservedScopeBlocks(html: string): boolean {
   }, { decodeEntities: true });
   parser.end(html);
   return found;
+}
+
+function detachXmlStrings(values: Record<string, string>): void {
+  // SAX can return slices/ropes backed by the full decoded XML. Copy completed
+  // values through independent bytes so small fields cannot pin large images.
+  // UTF-16 preserves every code unit, including any lone surrogate SAX accepts.
+  for (const key of Object.keys(values)) {
+    values[key] = Buffer.from(values[key]!, 'utf16le').toString('utf16le');
+  }
 }
 
 function parsePart(entry: DouXmlEntry): Part {
@@ -68,7 +84,19 @@ function parsePart(entry: DouXmlEntry): Part {
   const date = brazilDate(attrs.pubDate ?? '');
   if (date.replaceAll('-', '') !== match[2]) throw error('DOU_FILENAME_DATE_MISMATCH');
   if (!/^\d+$/.test(attrs.id ?? '') || !attrs.editionNumber || !attrs.artCategory || !attrs.pubName) throw error('DOU_MISSING_METADATA');
-  return { attrs, fields, entry, part: Number(match[4] ?? 1), journal: match[1]! };
+  // Multipart grouping needs parsed fields, not the original XML buffers (or
+  // embedded base64 images). Keep only the original byte hash/size for provenance.
+  const hasHighlightImage = Boolean(attrs.highlightImage);
+  delete attrs.highlightImage;
+  // Detach only after all SAX callbacks/concatenation have finished, and never
+  // copy highlightImage: it is intentionally absent from retained provenance.
+  detachXmlStrings(attrs);
+  detachXmlStrings(fields);
+  return {
+    attrs, fields,
+    entry: { name: entry.name, rawSha256: hash(entry.bytes), sizeBytes: entry.bytes.byteLength },
+    part: Number(match[4] ?? 1), journal: match[1]!, hasHighlightImage,
+  };
 }
 
 function brazilDate(input: string): string {
@@ -360,59 +388,94 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
         ...(titleFallback ? { titleFallback: 'ART_TYPE_AND_UNIT' } : {}),
         certifiedPageUrls: [...new Set(pages)], officialHtmlUrl: null,
         archive: context,
-        parts: parts.map(p => ({ filename: p.entry.name, rawSha256: hash(p.entry.bytes), sizeBytes: p.entry.bytes.byteLength,
+        parts: parts.map(p => ({ filename: p.entry.name, rawSha256: p.entry.rawSha256, sizeBytes: p.entry.sizeBytes,
           // The dictionary permits base64 images here; do not persist image bytes in PostgreSQL.
           attributes: Object.fromEntries(Object.entries(p.attrs).filter(([key]) => key !== 'highlightImage')),
-          hasHighlightImage: Boolean(p.attrs.highlightImage),
+          hasHighlightImage: p.hasHighlightImage,
         })),
       },
     },
   };
 }
 
+interface DouGroups {
+  groups: Map<string, Part[]>;
+  invalid: Set<string>;
+  partialFailures: ConnectorPartialFailure[];
+}
+
+function addDouEntry({ groups, invalid, partialFailures }: DouGroups, entry: DouXmlEntry): void {
+  // Infer a group only from the validated filename pattern so a broken continuation
+  // prevents a truncated publication from being persisted as a new complete version.
+  const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/.exec(entry.name);
+  const key = filenameGroup ? `${filenameGroup[1]}:${filenameGroup[2]}` : entry.name;
+  try {
+    const p = parsePart(entry);
+    if (invalid.has(key)) return;
+    const group = groups.get(key) ?? [];
+    group.push(p);
+    groups.set(key, group);
+  } catch (e) {
+    invalid.add(key);
+    groups.delete(key);
+    partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_XML', message: 'XML could not be processed', itemReference: entry.name });
+  }
+}
+
+function* assembledPublications({ groups, partialFailures }: DouGroups, context: DouArchiveContext): Generator<ConnectorPublication> {
+  for (const [key, parts] of groups) {
+    groups.delete(key);
+    let publications: ConnectorPublication[];
+    try {
+      const parent = publication(parts, context);
+      publications = [parent, ...extractEmbeddedConfazPublications(parent)];
+    } catch (e) {
+      partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_MATTER', message: 'Matter could not be assembled', itemReference: parts[0]!.entry.name });
+      continue;
+    } finally {
+      // Do not retain parsed HTML/attributes while the consumer persists this group.
+      parts.length = 0;
+    }
+    yield* publications;
+  }
+}
+
 export function parseDouEntries(entries: DouXmlEntry[], context: DouArchiveContext): {
   publications: ConnectorPublication[]; partialFailures: ConnectorPartialFailure[];
 } {
-  const groups = new Map<string, Part[]>(); const invalid = new Set<string>();
-  const partialFailures: ConnectorPartialFailure[] = [];
-  for (const entry of entries) {
-    // Infer a group only from the validated filename pattern so a broken continuation
-    // prevents a truncated publication from being persisted as a new complete version.
-    const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/.exec(entry.name);
-    const key = filenameGroup ? `${filenameGroup[1]}:${filenameGroup[2]}` : entry.name;
-    try { const p = parsePart(entry); const group = groups.get(key) ?? []; group.push(p); groups.set(key, group); }
-    catch (e) { invalid.add(key); partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_XML', message: 'XML could not be processed', itemReference: entry.name }); }
-  }
-  const publications: ConnectorPublication[] = [];
-  for (const [key, parts] of groups) {
-    if (invalid.has(key)) continue;
-    try {
-      const parent = publication(parts, context);
-      publications.push(
-        parent,
-        ...extractEmbeddedConfazPublications(parent),
-      );
-    }
-    catch (e) { partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_MATTER', message: 'Matter could not be assembled', itemReference: parts[0]!.entry.name }); }
-  }
-  return { publications, partialFailures };
+  const state: DouGroups = { groups: new Map(), invalid: new Set(), partialFailures: [] };
+  for (const entry of entries) addDouEntry(state, entry);
+  return { publications: [...assembledPublications(state, context)], partialFailures: state.partialFailures };
 }
 
-/** Read entries sequentially into bounded memory, without extracting paths to disk. */
-export async function readDouZip(bytes: Uint8Array, signal: AbortSignal): Promise<{ entries: DouXmlEntry[]; mediaCount: number }> {
+/** Read one XML entry at a time without copying the compressed archive. */
+async function visitDouZip(
+  bytes: Uint8Array,
+  signal: AbortSignal,
+  onEntry: (entry: DouXmlEntry) => void,
+): Promise<{ xmlCount: number; mediaCount: number }> {
   if (bytes.byteLength > 64 * 1024 * 1024) throw error('DOU_ARCHIVE_TOO_LARGE');
   signal.throwIfAborted();
-  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.fromBuffer(Buffer.from(bytes),
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.fromBuffer(buffer,
     { lazyEntries: true, validateEntrySizes: true, strictFileNames: true }, (err, file) => err ? reject(error('DOU_INVALID_ZIP')) : resolve(file)));
   return new Promise((resolve, reject) => {
-    const entries: DouXmlEntry[] = []; const names = new Set<string>(); let total = 0; let mediaCount = 0; let done = false;
+    const names = new Set<string>(); let total = 0; let xmlCount = 0; let mediaCount = 0; let done = false;
     let stream: NodeJS.ReadableStream & { destroy(): void } | undefined;
-    const cleanup = () => { signal.removeEventListener('abort', abort); zip.close(); };
-    const fail = (e: unknown) => { if (done) return; done = true; stream?.destroy(); cleanup(); reject(e); };
+    let entryBytes: Buffer | undefined;
+    const cleanup = () => {
+      signal.removeEventListener('abort', abort);
+      stream?.destroy();
+      stream = undefined;
+      entryBytes = undefined;
+      names.clear();
+      zip.close();
+    };
+    const fail = (e: unknown) => { if (done) return; done = true; cleanup(); reject(e); };
     const abort = () => fail(signal.reason ?? error('DOU_CANCELLED'));
     signal.addEventListener('abort', abort, { once: true });
     zip.on('error', () => fail(error('DOU_INVALID_ZIP')));
-    zip.on('end', () => { if (done) return; done = true; cleanup(); resolve({ entries, mediaCount }); });
+    zip.on('end', () => { if (done) return; done = true; cleanup(); resolve({ xmlCount, mediaCount }); });
     zip.on('entry', (entry: yauzl.Entry) => {
       if (done) return;
       if (signal.aborted) { abort(); return; }
@@ -428,21 +491,64 @@ export async function readDouZip(bytes: Uint8Array, signal: AbortSignal): Promis
       zip.openReadStream(entry, (err, input) => {
         if (err || !input) { fail(error('DOU_INVALID_ZIP_ENTRY')); return; }
         if (done) { input.destroy(); return; }
-        stream = input; const chunks: Buffer[] = []; let size = 0;
+        // The advertised size is bounded above before allocation. An exact-sized
+        // entry buffer avoids retaining all inflate chunks plus a concatenated copy.
+        stream = input; entryBytes = Buffer.allocUnsafe(entry.uncompressedSize); let size = 0;
         input.on('data', (chunk: Buffer) => {
+          if (done) return;
+          if (size + chunk.length > entry.uncompressedSize || size + chunk.length > 8 * 1024 * 1024) { fail(error('DOU_ZIP_SIZE_MISMATCH')); return; }
+          chunk.copy(entryBytes!, size);
           size += chunk.length;
-          if (size > entry.uncompressedSize || size > 8 * 1024 * 1024) { fail(error('DOU_ZIP_SIZE_MISMATCH')); return; }
-          chunks.push(chunk);
         });
         input.on('error', () => fail(error('DOU_INVALID_ZIP_ENTRY')));
         input.on('end', () => {
           if (done) return;
-          const data = Buffer.concat(chunks);
-          if (data.length !== entry.uncompressedSize || crc32(data) !== entry.crc32) { fail(error('DOU_ZIP_CRC_MISMATCH')); return; }
-          entries.push({ name: entry.fileName, bytes: data }); stream = undefined; zip.readEntry();
+          if (size !== entry.uncompressedSize || crc32(entryBytes!) !== entry.crc32) { fail(error('DOU_ZIP_CRC_MISMATCH')); return; }
+          try {
+            onEntry({ name: entry.fileName, bytes: entryBytes! });
+            xmlCount++;
+          } catch (e) { fail(e); return; }
+          entryBytes = undefined;
+          stream = undefined;
+          if (signal.aborted) abort(); else zip.readEntry();
         });
       });
     });
     if (signal.aborted) abort(); else zip.readEntry();
   });
+}
+
+/** Compatibility API for callers that explicitly need the original XML entries. */
+export async function readDouZip(bytes: Uint8Array, signal: AbortSignal): Promise<{ entries: DouXmlEntry[]; mediaCount: number }> {
+  const entries: DouXmlEntry[] = [];
+  const { mediaCount } = await visitDouZip(bytes, signal, entry => { entries.push(entry); });
+  return { entries, mediaCount };
+}
+
+/**
+ * Parse one archive with bounded XML-buffer residency, then await the consumer for
+ * each complete publication. Unordered/malformed continuations require retaining
+ * parsed groups until the entire ZIP is verified; no publication batch or raw XML
+ * entry array is retained. Groups are released as the consumer progresses.
+ */
+export async function parseDouZip(
+  bytes: Uint8Array,
+  context: DouArchiveContext,
+  signal: AbortSignal,
+  onPublication: (publication: ConnectorPublication) => void | Promise<void>,
+): Promise<{ partialFailures: ConnectorPartialFailure[]; xmlCount: number; mediaCount: number }> {
+  const state: DouGroups = { groups: new Map(), invalid: new Set(), partialFailures: [] };
+  try {
+    const counts = await visitDouZip(bytes, signal, entry => addDouEntry(state, entry));
+    for (const publication of assembledPublications(state, context)) {
+      signal.throwIfAborted();
+      await onPublication(publication);
+      signal.throwIfAborted();
+    }
+    signal.throwIfAborted();
+    return { partialFailures: state.partialFailures, ...counts };
+  } finally {
+    state.groups.clear();
+    state.invalid.clear();
+  }
 }

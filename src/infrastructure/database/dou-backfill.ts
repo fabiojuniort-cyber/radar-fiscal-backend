@@ -9,6 +9,7 @@ import { isCronDue } from '../../modules/collection/cron.js';
 import {
   DouBackfillBlockedError,
   addDays,
+  assertDouBackfillAvailable,
   douBackfillBatches,
   planDouBackfillDates,
   readDouBackfillCoverage,
@@ -90,6 +91,10 @@ try {
   if (!source || source.connector_key !== 'dou' || !source.is_active) {
     throw new DouBackfillBlockedError('DOU source is not provisioned and active.');
   }
+
+  // Applying cannot proceed while the source is busy; reject before loading
+  // its archive history. Dry runs still show the plan even during a live run.
+  if (apply) await assertDouBackfillAvailable(db, source.id);
 
   const coverage = await readDouBackfillCoverage(db, source.id);
   const dates = planDouBackfillDates({ from, to, today, covered: coverage.covered });

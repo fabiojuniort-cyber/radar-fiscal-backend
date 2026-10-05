@@ -1,3 +1,5 @@
+import type { CollectionMemoryProbe } from './collection.memory.js';
+
 export type ConnectorSphere = 'FEDERAL' | 'STATE';
 
 export type ConnectorFileVersionRole =
@@ -149,6 +151,14 @@ export interface ConnectorCheckpoint {
 export interface ConnectorResult {
   publications: ConnectorPublication[];
 
+  /** Runtime-only sealed collection spool; never serialized into attempt history.
+   * Its owner must dispose it after consumption, including persistence failures. */
+  publicationStream?: AsyncIterable<ConnectorPublication> & {
+    readonly count: number;
+    readonly bytes: number;
+    dispose(): Promise<void>;
+  };
+
   /** Notícias oficiais coletadas pela mesma infraestrutura de runs/attempts. */
   newsItems?: ConnectorNewsItem[];
 
@@ -188,6 +198,8 @@ export interface ConnectorExecutionContext {
   signal: AbortSignal;
   /** Always provided by the executor; optional for direct/test invocations. */
   budget?: ConnectorTimeBudget;
+  /** Fixed-cardinality process counters only; no source content. */
+  memory?: CollectionMemoryProbe;
 }
 
 export interface CollectionConnector {
@@ -201,4 +213,16 @@ export interface CollectionConnector {
   readonly version?: string;
 
   collect(context: ConnectorExecutionContext): Promise<ConnectorResult>;
+
+  /** Opt-in bounded-memory collection. Await every sink write. The executor
+   * stages complete publications off-heap and seals only after full success;
+   * the engine still starts persistence strictly after that collect barrier. */
+  collectIncremental?(
+    context: ConnectorExecutionContext,
+    emit: (publication: ConnectorPublication) => Promise<void>,
+  ): Promise<ConnectorResult>;
+}
+
+export function connectorPublicationCount(result: ConnectorResult): number {
+  return result.publications.length + (result.publicationStream?.count ?? 0);
 }

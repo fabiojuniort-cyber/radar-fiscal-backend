@@ -1,5 +1,3 @@
-import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
-
 import { ConnectorError } from './connector.error.js';
 
 /*
@@ -16,7 +14,22 @@ import { ConnectorError } from './connector.error.js';
 /** A raster at least this large (pixels) covers a whole scanned page. */
 const SCANNED_PAGE_MIN_PIXELS = 2_000_000;
 
-const IMAGE_OPS = new Set<number>([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject]);
+type PdfJs = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
+let pdfJsPromise: Promise<{ getDocument: PdfJs['getDocument']; imageOps: Set<number> }> | undefined;
+
+function loadPdfJs() {
+  // Cache the in-flight promise as well as the resolved module: concurrent
+  // first extractions share one initialization, and non-PDF processes pay none.
+  return pdfJsPromise ??= import('pdfjs-dist/legacy/build/pdf.mjs').then(({ getDocument, OPS }) => ({
+    getDocument,
+    imageOps: new Set<number>([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject]),
+  })).catch(error => {
+    // Coalesce a failed first wave, but let a later call retry a transient
+    // resolver/loader failure instead of caching its rejection permanently.
+    pdfJsPromise = undefined;
+    throw error;
+  });
+}
 
 /** Prodesp certification stamp of the certified download (not part of the page). */
 const CERTIFICATION_STAMP = /P[áa]gina do Di[áa]rio Oficial certificada[\s\S]*$/i;
@@ -42,6 +55,7 @@ function normalize(text: string): string {
 }
 
 export async function extractDoeSpLegacyPdfText(bytes: Uint8Array): Promise<DoeSpLegacyPageText> {
+  const { getDocument, imageOps } = await loadPdfJs();
   // pdf.js transfers (detaches) the buffer it receives.
   const task = getDocument({
     data: new Uint8Array(bytes),
@@ -70,7 +84,7 @@ export async function extractDoeSpLegacyPdfText(bytes: Uint8Array): Promise<DoeS
       parts.push(content.items.map((item) => ('str' in item ? item.str + (item.hasEOL ? '\n' : '') : '')).join(''));
       const operators = await page.getOperatorList();
       operators.fnArray.forEach((fn, index) => {
-        if (!IMAGE_OPS.has(fn)) return;
+        if (!imageOps.has(fn)) return;
         const args = operators.argsArray[index] as unknown[] | undefined;
         const width = typeof args?.[1] === 'number' ? args[1] : 0;
         const height = typeof args?.[2] === 'number' ? args[2] : 0;

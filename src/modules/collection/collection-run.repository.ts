@@ -12,6 +12,7 @@ import type {
   ConnectorExecutionOutcome,
 } from './connector.executor.js';
 import { writeCheckpoint } from './checkpoint.repository.js';
+import { connectorPublicationCount } from './connector.contract.js';
 import type { CollectionRunTerminalStatus } from './run-status.js';
 
 export interface AcquiredCollectionRun {
@@ -58,6 +59,8 @@ export interface FinishAttemptInput {
   outcome: ConnectorExecutionOutcome;
   /** Required when the outcome carries a checkpoint. */
   runId?: string;
+  /** When supplied, runId is required and run ownership is checked atomically. */
+  workerId?: string;
   sourceId?: string;
   connectorKey?: string;
 }
@@ -551,32 +554,48 @@ function failureMetadata(
 export async function finishCollectionAttempt(
   db: Kysely<DB>,
   input: FinishAttemptInput,
-): Promise<void> {
+): Promise<boolean> {
   const finishedAt = new Date();
+  if (input.workerId !== undefined && !input.runId) {
+    throw new Error('runId is required to verify collection run ownership');
+  }
+  if (input.outcome.ok && input.outcome.result.checkpoint && (!input.runId || !input.sourceId || !input.connectorKey)) {
+    throw new Error('runId, sourceId and connectorKey are required to persist a checkpoint');
+  }
 
-  if (input.outcome.ok) {
-    const outcome = input.outcome;
-    const checkpoint = outcome.result.checkpoint;
-    const safeDoeSpHttpDiagnostics =
-      doeSpHttpDiagnostics(
-        input.connectorKey,
-        outcome.result.partialFailures,
-      );
-    if (checkpoint && (!input.runId || !input.sourceId || !input.connectorKey)) {
-      throw new Error('runId, sourceId and connectorKey are required to persist a checkpoint');
-    }
-
-    await db.transaction().execute(async (trx) => {
-      // Only the attempt that still owns its RUNNING row may finish it and
-      // publish a checkpoint (a recovered/stale attempt must not).
-      const owned = await trx
-        .selectFrom('collection_attempts')
+  return db.transaction().execute(async (trx) => {
+    // Recovery locks the run before cancelling its attempt. Use the same lock
+    // order and do not let a recovered worker finish or publish a checkpoint.
+    if (input.workerId !== undefined) {
+      const ownedRun = await trx
+        .selectFrom('collection_runs')
         .select('id')
-        .where('id', '=', input.attemptId)
+        .where('id', '=', input.runId!)
         .where('status', '=', 'RUNNING')
+        .where('worker_id', '=', input.workerId)
         .forUpdate()
         .executeTakeFirst();
-      if (!owned) return;
+      if (!ownedRun) return false;
+    }
+
+    const owned = await trx
+      .selectFrom('collection_attempts')
+      .select('id')
+      .where('id', '=', input.attemptId)
+      .where('status', '=', 'RUNNING')
+      .$if(input.runId !== undefined, query => query.where('collection_run_id', '=', input.runId!))
+      .forUpdate()
+      .executeTakeFirst();
+    if (!owned) return false;
+
+    if (input.outcome.ok) {
+      const outcome = input.outcome;
+      const checkpoint = outcome.result.checkpoint;
+      const safeDoeSpHttpDiagnostics =
+        doeSpHttpDiagnostics(
+          input.connectorKey,
+          outcome.result.partialFailures,
+        );
 
       const checkpointRef = checkpoint
         ? await writeCheckpoint(trx, {
@@ -588,7 +607,7 @@ export async function finishCollectionAttempt(
           })
         : undefined;
 
-      await trx
+      const updated = await trx
         .updateTable('collection_attempts')
         .set({
           status: 'SUCCESS',
@@ -605,37 +624,39 @@ export async function finishCollectionAttempt(
                     safeDoeSpHttpDiagnostics,
                 }
               : {}),
-            publicationCount: outcome.result.publications.length,
+            publicationCount: connectorPublicationCount(outcome.result),
             ...(outcome.result.completion ? { completion: outcome.result.completion } : {}),
             ...(checkpointRef ? { checkpointRef } : {}),
           }),
         })
         .where('id', '=', input.attemptId)
         .where('status', '=', 'RUNNING')
-        .execute();
-    });
+        .returning('id')
+        .executeTakeFirst();
+      return updated !== undefined;
+    }
 
-    return;
-  }
-
-  await db
-    .updateTable('collection_attempts')
-    .set({
-      status: input.outcome.status,
-      finished_at: finishedAt,
-      response_time_ms: input.outcome.durationMs,
-      http_status:
-        input.outcome.httpStatus ?? null,
-      error_code: input.outcome.code,
-      error_message: input.outcome.message,
-      retryable: input.outcome.retryable,
-      retry_after_seconds:
-        input.outcome.retryAfterSeconds ?? null,
-      metadata: failureMetadata(input.outcome),
-    })
-    .where('id', '=', input.attemptId)
-    .where('status', '=', 'RUNNING')
-    .execute();
+    const updated = await trx
+      .updateTable('collection_attempts')
+      .set({
+        status: input.outcome.status,
+        finished_at: finishedAt,
+        response_time_ms: input.outcome.durationMs,
+        http_status:
+          input.outcome.httpStatus ?? null,
+        error_code: input.outcome.code,
+        error_message: input.outcome.message,
+        retryable: input.outcome.retryable,
+        retry_after_seconds:
+          input.outcome.retryAfterSeconds ?? null,
+        metadata: failureMetadata(input.outcome),
+      })
+      .where('id', '=', input.attemptId)
+      .where('status', '=', 'RUNNING')
+      .returning('id')
+      .executeTakeFirst();
+    return updated !== undefined;
+  });
 }
 
 export async function heartbeatCollectionRun(
