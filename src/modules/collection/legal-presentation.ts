@@ -117,11 +117,28 @@ export const LEGAL_PRESENTATION_CLASSES = new Set([
   'A8-2RemissaoAnt',
 ]);
 
+/**
+ * CONFAZ prints previous wordings (and the notes about them) in its "Ant"
+ * paragraph styles and, inside annex tables, in the green ("verde") table
+ * styles. They stay on the page as history but are not the act in force.
+ */
+const PREVIOUS_WORDING_CLASSES = new Set([
+  'RedaoAnt',
+  'A8-3RedacaoAnt',
+  'RemissoAnt',
+  'A8-2RemissaoAnt',
+]);
+const PREVIOUS_WORDING_TABLE_CLASS = /^(?:A\d+-\d+)?Tabela[A-Za-z]*verde$/;
+
+export function isPreviousWordingClass(token: string): boolean {
+  return PREVIOUS_WORDING_CLASSES.has(token) || PREVIOUS_WORDING_TABLE_CLASS.test(token);
+}
+
 function allowedClasses(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const kept = raw
     .split(/\s+/)
-    .filter((token) => LEGAL_PRESENTATION_CLASSES.has(token));
+    .filter((token) => LEGAL_PRESENTATION_CLASSES.has(token) || PREVIOUS_WORDING_TABLE_CLASS.test(token));
   return kept.length ? [...new Set(kept)].join(' ') : undefined;
 }
 
@@ -312,4 +329,70 @@ export function sanitizeLegalPresentationHtml(
   const trimmed = output.trim();
 
   return trimmed || undefined;
+}
+
+const BLOCK_TAGS = new Set(['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'section']);
+
+/**
+ * Text of the wording IN FORCE of a sanitized presentation: paragraphs in a
+ * previous-wording style are dropped and, in tables, the whole row that
+ * holds one (an annex item in its old wording). Returns undefined when the
+ * page marks no previous wording, so callers keep the stored content text.
+ */
+export function currentWordingText(html: string | null | undefined): string | undefined {
+  if (!html) return undefined;
+
+  type Frame = { tag: string; text: string; previous: boolean };
+  const frames: Frame[] = [];
+  let output = '';
+  let marked = false;
+
+  const append = (text: string) => {
+    const top = frames[frames.length - 1];
+    if (top) top.text += text;
+    else output += text;
+  };
+
+  const parser = new Parser(
+    {
+      onopentag(name, attributes) {
+        const tag = name.toLowerCase();
+        const previous = (attributes.class ?? '').split(/\s+/).some(isPreviousWordingClass);
+        if (previous) marked = true;
+        const row = [...frames].reverse().find((frame) => frame.tag === 'tr');
+        if (previous && row) row.previous = true;
+        if (tag === 'tr' || tag === 'p' || previous) {
+          frames.push({ tag, text: '', previous: previous && !row });
+        }
+        if (tag === 'br') append('\n');
+      },
+      ontext(text) {
+        append(text);
+      },
+      onclosetag(name) {
+        const tag = name.toLowerCase();
+        const separator = BLOCK_TAGS.has(tag) ? '\n' : tag === 'td' || tag === 'th' ? ' ' : '';
+        const index = frames.map((frame) => frame.tag).lastIndexOf(tag);
+        if (index < 0 || index !== frames.length - 1) {
+          if (separator && tag !== 'br') append(separator);
+          return;
+        }
+        const frame = frames.pop()!;
+        if (!frame.previous) append(frame.text + separator);
+      },
+    },
+    { decodeEntities: true, lowerCaseTags: true, lowerCaseAttributeNames: true, recognizeSelfClosing: true },
+  );
+  parser.end(html);
+  while (frames.length > 0) {
+    const frame = frames.pop()!;
+    if (!frame.previous) append(frame.text);
+  }
+
+  if (!marked) return undefined;
+  return output
+    .split('\n')
+    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
 }

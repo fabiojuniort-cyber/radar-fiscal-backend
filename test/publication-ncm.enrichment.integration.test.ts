@@ -9,6 +9,7 @@ import { createStandaloneDatabase } from '../src/infrastructure/database/standal
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
+  NOT_SUPERSEDED_NCM_MENTION_SQL,
   processPublicationNcmEnrichmentBatch,
 } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
 
@@ -236,6 +237,29 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
       [matched.versionId],
     );
     assert.equal(duplicateCount.rows[0]?.count, 2);
+
+    // What an older detector version found (e.g. in a previous wording) stays
+    // as evidence, but readers skip it once the newer version scanned.
+    const legacyCatalog = await admin.query<{ id: string }>(
+      `SELECT e.id FROM official_catalog_entries e
+       JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
+       JOIN official_catalogs c ON c.id = ed.catalog_id
+       WHERE c.code = 'NCM' AND ed.status = 'CURRENT'
+         AND regexp_replace(e.official_code, '[^0-9]', '', 'g') = '10063011'`,
+    );
+    await admin.query(
+      `INSERT INTO publication_ncm_mentions (
+         publication_version_id, ncm_code, official_catalog_entry_id,
+         verification_status, method_type, detector_key, detector_version, excerpt
+       ) VALUES ($1::uuid, '10063011', $2::uuid, 'CATALOG_MATCHED', 'EXTRACTOR', $3, '1.0.0', 'redação anterior')`,
+      [zeroMatch.versionId, legacyCatalog.rows[0]!.id, PUBLICATION_NCM_DETECTOR_KEY],
+    );
+    const visible = await admin.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM publication_ncm_mentions pnm
+       WHERE pnm.publication_version_id = $1::uuid AND ${NOT_SUPERSEDED_NCM_MENTION_SQL('pnm')}`,
+      [zeroMatch.versionId],
+    );
+    assert.equal(visible.rows[0]?.count, 0);
   } finally {
     await db.destroy();
 

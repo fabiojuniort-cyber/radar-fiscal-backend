@@ -25,6 +25,7 @@ import {
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { isCnaeActivity } from '../../modules/taxonomy/curation/curation.constants.js';
 import { suggestSegmentsForCompany } from '../../modules/taxonomy/curation/curation.suggestions.js';
+import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
 import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import {
   CnpjRegistryError,
@@ -2192,6 +2193,7 @@ export async function productRoutes(
                   AND pv.is_current = TRUE
                   AND pnm.verification_status <> 'REJECTED'
                   AND pnm.ncm_code = ANY(${profileNcms}::text[])
+                  AND ${notSupersededNcmMention('pnm')}
                 ORDER BY pnm.ncm_code, (pnm.verification_status = 'CATALOG_MATCHED') DESC
               `.execute(app.db)
             ).rows

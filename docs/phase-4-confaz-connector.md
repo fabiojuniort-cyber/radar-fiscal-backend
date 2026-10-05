@@ -296,6 +296,19 @@ Correções do parser junto com este comando:
 - Anos de dois dígitos de 70 a 99 viram 19xx ("100/97" → 1997).
 - O título do ato é o `<h1>` que corresponde à família, mesmo com o título do portal antes.
 - A ementa ignora notas de alteração ("Alterado pelos Convs. …") e usa a descrição oficial do portal quando necessário.
+- A nota "Publicação DOU de …" dos atos antigos (sem "no") também vale como data de publicação.
+
+Redação vigente (NCM e taxonomia):
+- O portal mantém as redações anteriores na página (parágrafos "Ant" e, nos anexos, linhas
+  em verde, estilos `Tabela…verde`). A apresentação guarda esses estilos e o detector de NCM
+  (1.1.0) e a classificação leem só a redação vigente: a linha da tabela em redação anterior
+  é ignorada inteira.
+- O detector também aceita o código digitado como "8417.8020" nos anexos oficiais.
+- Menções de NCM continuam append-only: as de uma versão anterior do detector deixam de valer
+  quando a versão nova reprocessa o ato.
+- `npm run taxonomy:ncm-rescan-one -- --publication=<uuid> [--confirm]` reprocessa um ato e
+  lista as NCMs da redação vigente encontradas no catálogo, as que não estão no catálogo vigente
+  e as que só aparecem em redações anteriores.
 
 Apresentação fiel ao portal:
 - A apresentação guardada é só o bloco do texto do ato (`#parent-fieldname-text`), sem o
