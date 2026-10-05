@@ -29,27 +29,31 @@ export async function publicationIsInScope(
 /**
  * Serializes an enrichment commit with SUPPRESS/RESTORE for the publication.
  *
- * - If this SHARE lock wins first, suppression waits until this transaction
- *   commits; therefore derived evidence cannot commit after the suppression.
- * - If suppression wins first, this query resumes after it commits, observes
- *   OUT_OF_SCOPE and fails closed.
+ * The scope check is deliberately a second SQL statement. Under READ COMMITTED
+ * a statement snapshot can be taken before waiting for a conflicting row lock;
+ * checking only in the locking SELECT could therefore observe stale IN_SCOPE.
+ * After the SHARE lock is acquired, the second statement gets a fresh snapshot
+ * and sees the committed scope transition that won the race.
  */
 export async function lockPublicationVersionInScope(
   trx: Transaction<DB>,
   publicationVersionId: string,
 ): Promise<string> {
-  const result = await sql<{ publication_id: string }>`
+  const locked = await sql<{ publication_id: string }>`
     SELECT p.id AS publication_id
     FROM public.publication_versions pv
     JOIN public.publications p
       ON p.id = pv.publication_id
     WHERE pv.id = ${publicationVersionId}::uuid
-      AND public.publication_scope_is_in_scope(p.id)
     FOR SHARE OF p
   `.execute(trx);
 
-  const publicationId = result.rows[0]?.publication_id;
+  const publicationId = locked.rows[0]?.publication_id;
   if (!publicationId) {
+    throw new Error('PUBLICATION_VERSION_NOT_FOUND');
+  }
+
+  if (!await publicationIsInScope(trx, publicationId)) {
     throw new PublicationOutOfScopeError();
   }
 
