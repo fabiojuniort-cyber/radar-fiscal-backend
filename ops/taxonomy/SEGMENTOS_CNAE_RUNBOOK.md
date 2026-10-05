@@ -6,7 +6,8 @@ pelo Railway. Carga curatorial aditiva R1 no DRAFT v1.3.0, usando as funções
 TAX-11 existentes. Não é repair, migration, publicação ou classificação de atos.
 
 Pacote público `ops/taxonomy/loads/trifaros-cnae-2.3.json`: SHA-256
-`9bd8e47e5a9d1975b27f6841c498d2867cc687b64a92f77bf4057dc3db30434d`.
+`c6d2b14bdd6e7f023ca56e6a67c3749434d357a68035b5bb4ae7f178da8b5298`
+(bytes Git/LF; a entrada CRLF do Windows é normalizada somente nas quebras de linha).
 1.332 CNAEs, 32 segmentos, 137 subsegmentos, 17.671 sinônimos. Derivado de
 `TriFaros_Segmentos_CNAE_Empresas_Brasil.xlsx`; descritores positivos IBGE.
 As quatro subclasses com mais de 200 descritores ficam no limite do contrato,
