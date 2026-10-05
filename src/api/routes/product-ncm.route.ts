@@ -12,6 +12,7 @@ import {
   TenantAccessDeniedError,
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
+import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
 
 const companyParamsSchema = z.object({ companyId: z.string().uuid() });
 const productParamsSchema = z.object({
@@ -797,6 +798,7 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
         WHERE pv.publication_id = ${request.params.publicationId}::uuid
           AND pv.is_current = TRUE
           AND pnm.verification_status <> 'REJECTED'
+          AND ${notSupersededNcmMention('pnm')}
         ORDER BY
           pnm.ncm_code,
           (pnm.verification_status = 'CATALOG_MATCHED') DESC,

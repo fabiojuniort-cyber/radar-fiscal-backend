@@ -1,14 +1,37 @@
-import { sql, type Kysely, type Transaction } from 'kysely';
+import { sql, type Kysely, type RawBuilder, type Transaction } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
+import { currentWordingText } from '../../collection/legal-presentation.js';
 
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
-export const PUBLICATION_NCM_DETECTOR_VERSION = '1.0.0';
+// 1.1.0: reads only the wording in force (previous wordings of CONFAZ acts
+// are skipped) and accepts the "8417.8020" typing found in official annexes.
+export const PUBLICATION_NCM_DETECTOR_VERSION = '1.1.0';
 
 export type PublicationNcmSourceField =
   | 'CONTENT_TEXT'
   | 'RELEVANT_EXCERPT'
   | 'NONE';
+
+/**
+ * Mentions stay append-only evidence. When a newer version of the same
+ * detector has scanned a publication version, only its findings count:
+ * this condition hides the older ones (e.g. NCMs of previous wordings that
+ * detector 1.0.0 still read). Mentions without scans are kept.
+ */
+export function NOT_SUPERSEDED_NCM_MENTION_SQL(alias: string): string {
+  return `NOT EXISTS (
+    SELECT 1 FROM publication_ncm_scans newer_scan
+    WHERE newer_scan.publication_version_id = ${alias}.publication_version_id
+      AND newer_scan.detector_key = ${alias}.detector_key
+      AND newer_scan.status = 'SUCCESS'
+      AND newer_scan.detector_version > ${alias}.detector_version
+  )`;
+}
+
+export function notSupersededNcmMention(alias: string): RawBuilder<boolean> {
+  return sql<boolean>`${sql.raw(NOT_SUPERSEDED_NCM_MENTION_SQL(alias))}`;
+}
 
 export interface NcmCandidate {
   code: string;
@@ -30,6 +53,7 @@ interface VersionForNcmScan {
   publication_version_id: string;
   content_text: string | null;
   relevant_excerpt: string | null;
+  presentation_html: string | null;
 }
 
 interface CatalogMatch {
@@ -37,7 +61,7 @@ interface CatalogMatch {
   code: string;
 }
 
-const CANDIDATE_RE = /(?<!\d)(\d{8}|\d{4}\.\d{2}\.\d{2})(?!\d)/g;
+const CANDIDATE_RE = /(?<![\d.])(\d{8}|\d{4}\.\d{2}\.\d{2}|\d{4}\.\d{4})(?![\d]|\.\d)/g;
 const EXCERPT_RADIUS = 120;
 const FAILED_RETRY_INTERVAL = '15 minutes';
 
@@ -84,13 +108,18 @@ export function extractNcmCandidates(text: string): NcmCandidate[] {
   return [...byCode.values()];
 }
 
-function selectText(row: VersionForNcmScan): {
+export function selectText(row: VersionForNcmScan): {
   text: string;
   sourceField: PublicationNcmSourceField;
+  currentWordingOnly: boolean;
 } {
   const content = row.content_text?.trim();
   if (content) {
-    return { text: row.content_text!, sourceField: 'CONTENT_TEXT' };
+    // Acts that keep previous wordings on the page (CONFAZ annexes in green,
+    // "Redação anterior"): only the wording in force counts.
+    const current = currentWordingText(row.presentation_html);
+    if (current) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
+    return { text: row.content_text!, sourceField: 'CONTENT_TEXT', currentWordingOnly: false };
   }
 
   const excerpt = row.relevant_excerpt?.trim();
@@ -98,13 +127,14 @@ function selectText(row: VersionForNcmScan): {
     return {
       text: row.relevant_excerpt!,
       sourceField: 'RELEVANT_EXCERPT',
+      currentWordingOnly: false,
     };
   }
 
-  return { text: '', sourceField: 'NONE' };
+  return { text: '', sourceField: 'NONE', currentWordingOnly: false };
 }
 
-async function assertCurrentNcmCatalog(
+export async function assertCurrentNcmCatalog(
   db: Kysely<DB>,
 ): Promise<void> {
   const result = await sql<{ id: string }>`
@@ -122,7 +152,7 @@ async function assertCurrentNcmCatalog(
   }
 }
 
-async function catalogMatches(
+export async function catalogMatches(
   trx: Transaction<DB>,
   codes: string[],
 ): Promise<Map<string, CatalogMatch>> {
@@ -152,16 +182,18 @@ async function catalogMatches(
   );
 }
 
-async function persistSuccessfulScan(
+export async function persistSuccessfulScan(
   trx: Transaction<DB>,
   row: VersionForNcmScan,
   sourceField: PublicationNcmSourceField,
   candidates: NcmCandidate[],
+  currentWordingOnly = false,
 ): Promise<number> {
   const matches = await catalogMatches(
     trx,
     candidates.map((candidate) => candidate.code),
   );
+
 
   let insertedMatches = 0;
 
@@ -172,6 +204,7 @@ async function persistSuccessfulScan(
     const metadata = JSON.stringify({
       occurrenceCount: candidate.occurrenceCount,
       sourceField,
+      currentWordingOnly,
       interpretation: 'CATALOG_CODE_MENTION_ONLY',
     });
 
@@ -309,7 +342,8 @@ async function selectBatch(
     SELECT
       pv.id AS publication_version_id,
       pv.content_text,
-      pv.relevant_excerpt
+      pv.relevant_excerpt,
+      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
     FROM publications p
     JOIN publication_versions pv
       ON pv.publication_id = p.id
@@ -351,7 +385,7 @@ export async function processPublicationNcmEnrichmentBatch(
   };
 
   for (const row of rows) {
-    const { text, sourceField } = selectText(row);
+    const { text, sourceField, currentWordingOnly } = selectText(row);
     const candidates = extractNcmCandidates(text);
     result.candidates += candidates.length;
 
@@ -362,6 +396,7 @@ export async function processPublicationNcmEnrichmentBatch(
           row,
           sourceField,
           candidates,
+          currentWordingOnly,
         ),
       );
 

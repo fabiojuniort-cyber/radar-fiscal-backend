@@ -8,6 +8,7 @@ import {
   loadReleaseView,
   loadRuntimeSettings,
 } from '../curation/curation.read.js';
+import { currentWordingText } from '../../collection/legal-presentation.js';
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
@@ -48,6 +49,7 @@ interface PendingVersion {
   title: string;
   content_text: string | null;
   relevant_excerpt: string | null;
+  presentation_html: string | null;
 }
 
 let conceptCache: {
@@ -99,6 +101,12 @@ export async function loadClassificationConcepts(
   return concepts;
 }
 
+/** The wording in force: previous wordings kept on the page do not classify the act. */
+function classificationText(row: PendingVersion): string | null {
+  if (row.content_text?.trim()) return currentWordingText(row.presentation_html) ?? row.content_text;
+  return row.relevant_excerpt;
+}
+
 async function selectPending(
   db: Kysely<DB>,
   releaseId: string,
@@ -110,7 +118,8 @@ async function selectPending(
       pv.id AS publication_version_id,
       p.title,
       pv.content_text,
-      pv.relevant_excerpt
+      pv.relevant_excerpt,
+      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
     FROM publications p
     JOIN publication_versions pv
       ON pv.publication_id = p.id
@@ -369,7 +378,7 @@ export async function processPublicationTaxonomyBatch(
         publicationVersionId: row.publication_version_id,
         taxonomyReleaseId: release.id,
         title: row.title,
-        contentText: row.content_text ?? row.relevant_excerpt,
+        contentText: classificationText(row),
         ncmCodes: await ncmCodesFor(db, row.publication_version_id),
         concepts,
         codeGitSha: options.codeGitSha ?? null,
@@ -410,7 +419,8 @@ export async function classifySinglePublication(
   input: { publicationId: string; releaseId: string; persist: boolean; codeGitSha?: string | null },
 ): Promise<SinglePublicationClassification> {
   const current = await sql<PendingVersion>`
-    SELECT pv.id AS publication_version_id, p.title, pv.content_text, pv.relevant_excerpt
+    SELECT pv.id AS publication_version_id, p.title, pv.content_text, pv.relevant_excerpt,
+      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
     FROM publications p
     JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
     WHERE p.id = ${input.publicationId}::uuid
@@ -433,7 +443,7 @@ export async function classifySinglePublication(
     publicationVersionId: row.publication_version_id,
     taxonomyReleaseId: input.releaseId,
     title: row.title,
-    contentText: row.content_text ?? row.relevant_excerpt,
+    contentText: classificationText(row),
     ncmCodes: await ncmCodesFor(db, row.publication_version_id),
     concepts,
     codeGitSha: input.codeGitSha ?? null,
