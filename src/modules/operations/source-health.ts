@@ -157,7 +157,10 @@ function toDate(value: unknown): Date | null {
 
 /**
  * Reads the minimal run history needed by the watchdog for every active,
- * scheduled source. Read-only; bounded per source.
+ * scheduled source. Read-only; bounded per source. Administrative BACKFILL
+ * runs are left out of freshness and partial-run history (they must not mask
+ * a monitoring problem), but an open BACKFILL run still counts as an open
+ * run, so a stuck backfill is reported.
  */
 export async function readSourceHealthRows(
   db: Kysely<DB>,
@@ -184,6 +187,7 @@ export async function readSourceHealthRows(
         SELECT MAX(cr.finished_at)
         FROM collection_runs cr
         WHERE cr.source_id = s.id
+          AND cr.trigger_type <> 'BACKFILL'
           AND cr.status IN ('SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS')
       ) AS last_consulted_at,
       last_finished.status AS last_finished_status,
@@ -202,6 +206,7 @@ export async function readSourceHealthRows(
           SELECT cr.status, cr.finished_at
           FROM collection_runs cr
           WHERE cr.source_id = s.id
+            AND cr.trigger_type <> 'BACKFILL'
             AND cr.finished_at IS NOT NULL
           ORDER BY cr.finished_at DESC
           LIMIT ${recentRuns}
@@ -212,6 +217,7 @@ export async function readSourceHealthRows(
       SELECT cr.status, cr.error_summary
       FROM collection_runs cr
       WHERE cr.source_id = s.id
+        AND cr.trigger_type <> 'BACKFILL'
         AND cr.finished_at IS NOT NULL
       ORDER BY cr.finished_at DESC
       LIMIT 1

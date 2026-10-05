@@ -133,6 +133,30 @@ const schema = z.object({
     .min(60_000)
     .default(6 * 3_600_000),
 
+  // DOU administrative backfill inside the Worker (D-056: one query per
+  // hour, one day back per query). Unset = off. Set to the oldest date to
+  // fill (YYYY-MM-DD); the Worker logs "DOU backfill complete" once nothing
+  // is missing, after which the variable can be removed.
+  // Validated where it is used: an invalid value disables the backfill
+  // (logged) instead of stopping the Worker at startup.
+  DOU_BACKFILL_FROM: z
+    .string()
+    .trim()
+    .optional(),
+
+  DOU_BACKFILL_DATES_PER_RUN: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(4)
+    .default(1),
+
+  DOU_BACKFILL_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(600_000)
+    .default(3_600_000),
+
   COLLECTION_ENABLE_SIMULATED_CONNECTORS: z
     .enum(['true', 'false'])
     .default('false')

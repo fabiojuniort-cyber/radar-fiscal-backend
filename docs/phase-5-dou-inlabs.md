@@ -158,3 +158,34 @@ Ausência nunca gera receipt: a próxima run pergunta de novo, então uma classi
 **Matéria sem título.** Uma matéria oficial com `<Identifica>` vazio era descartada (`DOU_MISSING_TITLE`). Agora recebe título descritivo formado pelos próprios atributos oficiais (`artType - unidade`), com `metadata.dou.titleFallback = 'ART_TYPE_AND_UNIT'`. O título de reserva não entra na classificação: nenhum número de ato ou identidade normativa é inferido; a identidade permanece a da matéria oficial (`SOURCE_SCOPED`).
 
 **Agenda.** Pela D-056 a fonte `dou` passa a `0 6,10,14,18 * * *` (`America/Sao_Paulo`); ver `docs/collection-schedules.md`.
+
+## Backfill administrativo (2026-10-05)
+
+Governança: tribusca-control Issue #35. Fecha a pendência "interface de execução administrativa por run" (seção *Integração, incremental e recuperação*).
+
+**Motivo.** O monitoramento consulta hoje, os dois dias anteriores e **uma** data antiga rotativa por run. Datas anteriores à ativação da fonte (~18/09/2026), e as perdidas enquanto a fonte ficou bloqueada antes da PR #80, só entravam quando a rotação as sorteava: milhares de atos de setembro chegando "hoje", em dias sem DOU.
+
+**Execução.** `npm run db:dou-backfill -- [--from=AAAA-MM-DD] [--to=AAAA-MM-DD] [--apply]`
+- Sem `--apply`: só imprime `DOU_BACKFILL_PLAN=` com as datas faltantes, da mais recente para a mais antiga, e os lotes.
+- Padrão: do primeiro dia do mês anterior até hoje − 3 (horário de Brasília). Datas da janela de monitoramento (hoje, −1 e −2) nunca entram.
+- **Datas faltantes**: as sem receipt no checkpoint do monitoramento e não consultadas por inteiro (6 pacotes) por um backfill bem-sucedido. Uma data sem edição fica coberta depois de checada uma vez.
+- Com `--apply`: cada lote de até 4 datas é uma run `trigger_type = BACKFILL`, executada pelo **motor normal**, com a mesma persistência, `publication_origins` e regras de identidade. Logs `DOU_BACKFILL_RUN=` por lote e `DOU_BACKFILL_SUMMARY=` no fim.
+
+**Garantias.**
+- **Prioridade do monitoramento:**
+  - não inicia lote se a fonte tem run aberta;
+  - não inicia lote se um ciclo agendado do DOU cai nos próximos `--guard-minutes` (padrão 20). Nesse caso imprime `DOU_BACKFILL_PAUSED` e encerra; basta rodar de novo depois.
+  - A criação da run usa o mesmo `LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE` da pausa operacional, contra corrida com o Scheduler.
+- **Posse da run:** a run nasce `RUNNING` e pertence ao script. Entre tentativas o script a retoma antes que o worker possa adquiri-la. Se o worker pegasse uma run BACKFILL, ela falharia fechada (`DOU_BACKFILL_DATE_BATCH_REQUIRED`).
+- **Retries limitados:** falhas transitórias do INLABS são repetidas pelo motor, até 8 tentativas por lote. Atingido o limite, a run fecha como `SOURCE_UNAVAILABLE` (`DOU_BACKFILL_RETRY_LIMIT`) e o script para.
+- **Lote sem edição:** um lote só de datas sem edição termina `SUCCESS_NO_RESULTS`. Isso vale só no backfill (`allowEmptyBatch`); o monitoramento continua tratando ausência total como disponibilidade pendente.
+- **Checkpoint:** runs BACKFILL não alimentam o checkpoint do monitoramento (`readDouSourceState` as ignora).
+- **Data das publicações:** recebem `published_on` = data oficial do DOU, não a data da coleta.
+
+**Modo horário no Worker (D-056).** Com `DOU_BACKFILL_FROM=AAAA-MM-DD` no Worker, a mesma lógica roda sozinha. A cada intervalo (`DOU_BACKFILL_INTERVAL_MS`, padrão 1 h), uma run BACKFILL busca a próxima data faltante, recuando `DOU_BACKFILL_DATES_PER_RUN` dia(s) por consulta (padrão 1, máximo 4).
+- Só roda com o Worker ocioso, sem run aberta do DOU e fora dos 20 min anteriores a um ciclo.
+- O intervalo é verificado no banco, sob o lock da tabela, então várias réplicas do Worker não duplicam a consulta.
+- Quando não resta data faltante em `[DOU_BACKFILL_FROM, hoje − 3]`, o Worker registra `DOU backfill complete; DOU_BACKFILL_FROM can be removed` e para de consultar. Basta então remover a variável.
+- Logs: `DOU backfill batch completed` (runId, datas, status, métricas, `remainingDates`) e `DOU backfill tick failed`.
+
+**Operação (R3).** Primeiro o dry-run, depois `--apply` logo após um ciclo do DOU (ex.: 06h20, 10h20 de Brasília), registrando as saídas na Issue. Para recuar além do mês anterior, `--from` explícito e decisão do responsável sobre o alcance (D-056: acervo oficial disponível).
