@@ -13,6 +13,8 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { computePublicationAffinity } from '../../modules/taxonomy/affinity/publication-affinity.js';
+import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import {
   DISPLAY_TITLE_CONTENT_CHARS,
   publicationDisplayTitle,
@@ -293,6 +295,11 @@ const establishmentIdParamsSchema = z.object({
 });
 
 const publicationIdParamsSchema = z.object({
+  publicationId: z.string().uuid(),
+});
+
+const companyPublicationParamsSchema = z.object({
+  companyId: z.string().uuid(),
   publicationId: z.string().uuid(),
 });
 
@@ -2013,6 +2020,99 @@ export async function productRoutes(
                 createdAt: new Date(profile.created_at).toISOString(),
               }
             : null,
+        });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  // Affinity between a legislation and the company's tax profile: the act's
+  // taxonomy tags against the canonical codes chosen in the profile.
+  typed.get(
+    '/api/v1/companies/:companyId/publications/:publicationId/affinity',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: companyPublicationParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const company = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            const row = await trx
+              .selectFrom('companies')
+              .select(['id', 'legal_name', 'trade_name'])
+              .where('id', '=', request.params.companyId)
+              .where('is_active', '=', true)
+              .executeTakeFirst();
+            if (!row) return null;
+            const profile = await trx
+              .selectFrom('company_tax_profiles')
+              .select(['personalization'])
+              .where('company_id', '=', row.id)
+              .where('is_current', '=', true)
+              .executeTakeFirst();
+            return { ...row, profile };
+          },
+        );
+        if (!company) {
+          return reply.status(404).send({ error: 'company_not_found' });
+        }
+
+        const taxonomy = recordValue(recordValue(company.profile?.personalization)?.taxonomy);
+        const profileCodes = Array.isArray(taxonomy?.conceptCodes)
+          ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
+          : [];
+
+        const view = await loadPublicationTaxonomy(
+          kyselyRunner(app.db),
+          request.params.publicationId,
+        );
+        if (view.status === 'NOT_FOUND') {
+          return reply.status(404).send({ error: 'publication_not_found' });
+        }
+
+        const profileProductGroups = new Map<string, string>();
+        if (view.release && profileCodes.length > 0) {
+          const rows = await sql<{ concept_code: string; group_code: string }>`
+            SELECT c.code AS concept_code, g.code AS group_code
+            FROM taxonomy_release_concepts rc
+            JOIN taxonomy_concepts c ON c.id = rc.concept_id
+            JOIN taxonomy_release_groups g ON g.id = rc.group_id
+            WHERE rc.release_id = ${view.release.id}::uuid
+              AND c.code = ANY(${profileCodes}::text[])
+          `.execute(app.db);
+          for (const item of rows.rows) {
+            profileProductGroups.set(item.concept_code, item.group_code);
+          }
+        }
+
+        const affinity = computePublicationAffinity({
+          view,
+          profileCodes,
+          profileProductGroups,
+        });
+        return reply.status(200).send({
+          company: {
+            id: company.id,
+            name: company.trade_name || company.legal_name,
+          },
+          ...affinity,
         });
       } catch (error) {
         const handled = handleTenantError(error, reply);
