@@ -176,7 +176,7 @@ The implementation uses existing structures/indexes:
 
 It does not scan `publication_versions`.
 
-The application runtime role already has SELECT grants on the global source/publication/collection tables and `v_source_monitoring` in migration 009.
+The application runtime role has SELECT grants on the global source/publication tables and `v_source_monitoring`. DOU-CLEAN-02 migration 035 limits direct collection audit reads to `collection_run_id` and `disposition`; `publication_scope_imported_today(uuid)` supplies the scope-filtered daily import count without exposing publication identifiers or timestamps. Historical monitoring counts remain stable through SUPPRESS/RESTORE.
 
 ## Production-schema verification limitation
 

@@ -40,6 +40,9 @@ Esta etapa ocorre com o PR ainda **não mergeado** e antes de qualquer deploy ca
 Executar com credencial administrativa e registrar o resultado:
 
 ```sql
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT pg_export_snapshot() AS backup_snapshot;
+
 SELECT count(*) AS publications FROM publications;
 SELECT count(*) AS publication_versions FROM publication_versions;
 SELECT count(*) AS publication_origins FROM publication_origins;
@@ -52,13 +55,17 @@ SELECT to_regclass('public.publication_scope_events') AS events_before,
 
 Na primeira implantação de DOU-CLEAN-02, os três objetos de scope devem ser `NULL`. Se já existirem por uma tentativa anterior, **não assumir estado limpo**: registrar o estado, interromper a implantação e reconciliar com a Issue #84 antes de prosseguir.
 
+Manter essa sessão/transação aberta até o término do `pg_dump`. Usar o valor retornado como `SCOPE_BACKUP_SNAPSHOT` no runner; assim o dump e as contagens compartilham o mesmo snapshot mesmo durante coletas concorrentes. Em caso de interrupção da sessão, repetir o snapshot e o dump; não reconciliar contagens obtidas em momentos distintos.
+
 ### 1.2 Backup lógico consistente
 
 Criar backup lógico consistente da produção com a ferramenta padrão de PostgreSQL/Railway, sem registrar segredo em log:
 
 ```bash
-pg_dump "$DATABASE_ADMIN_URL" --format=custom --file scope-pre-deploy.dump
+pg_dump "$DATABASE_ADMIN_URL" --snapshot="$SCOPE_BACKUP_SNAPSHOT" --format=custom --file scope-pre-deploy.dump
 ```
+
+Após o dump concluir com sucesso, executar `COMMIT` na sessão de snapshot.
 
 Registrar timestamp, SHA candidato da aplicação e SHA-256/tamanho do dump.
 
@@ -66,8 +73,10 @@ Registrar timestamp, SHA candidato da aplicação e SHA-256/tamanho do dump.
 
 Restaurar o dump em **banco temporário isolado**, nunca sobre produção:
 
+Provisionar um servidor PostgreSQL temporário na Railway com versão compatível com produção e com as roles referenciadas pelas policies/grants do dump, sem reutilizar senhas produtivas. Confirmar que `RESTORE_MAINTENANCE_URL` aponta para esse servidor isolado. `RESTORE_DATABASE_URL` deve apontar para `scope_restore_test` nesse mesmo servidor; não usar a URL produtiva em nenhum comando de criação/restore. A connection string vai em `--maintenance-db`; o argumento posicional de `createdb` é o nome do banco ([PostgreSQL createdb](https://www.postgresql.org/docs/current/app-createdb.html)).
+
 ```bash
-createdb "$RESTORE_DATABASE_URL"
+createdb --maintenance-db="$RESTORE_MAINTENANCE_URL" --template=template0 scope_restore_test
 pg_restore --exit-on-error --no-owner --dbname="$RESTORE_DATABASE_URL" scope-pre-deploy.dump
 ```
 
