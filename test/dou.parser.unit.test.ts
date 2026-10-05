@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseDouEntries, readDouZip, classifyDouAct, extractEmbeddedConfazPublications } from '../src/modules/collection/dou.parser.js';
+import { parseDouEntries, readDouZip, classifyDouAct, extractEmbeddedConfazPublications, douHtmlText } from '../src/modules/collection/dou.parser.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { classifyDouContractExcerpt } from '../src/modules/collection/dou-scope.rules.js';
 import { fixtureEntries, makeZip, archiveContext } from './dou.fixtures.js';
@@ -82,6 +82,36 @@ test('every continuation Ementa reaches scope classification without changing co
   const after = normalizePublication({ sourceId: 'dou', publication });
   assert.equal(after.identityHash, before.identityHash);
   assert.equal(after.contentHash, before.contentHash);
+});
+
+test('unpreserved HTML block boundaries veto IGNORE through metadata without changing canonical text or hashes', () => {
+  const title = 'EXTRATO DE CONTRATO Nº 7/2026';
+  const routine = 'Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.';
+  for (const tag of ['section', 'article', 'blockquote', 'hr', 'dl', 'dt', 'dd']) {
+    const structuralText = tag === 'hr'
+      ? 'Contratante: UNIÃO<hr>Determina a retenção de IRRF.'
+      : `<${tag}>Contratante: UNIÃO</${tag}><${tag}>Determina a retenção de IRRF.</${tag}>`;
+    for (const field of ['Texto', 'Ementa', 'Identifica']) {
+      const html = field === 'Texto' ? routine.replace('Contratante: União.', structuralText) : routine;
+      const abstract = field === 'Ementa' ? structuralText : '';
+      const heading = field === 'Identifica' ? (tag === 'hr' ? `${title}<hr>` : `<${tag}>${title}</${tag}>`) : title;
+      const bytes = Buffer.from(`<xml><article id="1" idMateria="12345678" pubDate="18/09/2026" pubName="DO3" editionNumber="180" artCategory="Órgão público federal" artType="EXTRATO DE CONTRATO" numberPage="1" pdfPage="https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&amp;jornal=530&amp;pagina=1"><body><Identifica><![CDATA[${heading}]]></Identifica><Ementa><![CDATA[${abstract}]]></Ementa><Texto><![CDATA[${html}]]></Texto></body></article></xml>`);
+      const result = parseDouEntries([{ name: '530_20260918_12345678.xml', bytes }], archiveContext('DO3'));
+      assert.deepEqual(result.partialFailures, []);
+      const publication = result.publications[0]!;
+      const dou = publication.metadata!.dou as Record<string, unknown>;
+      assert.equal(dou.scopeStructureIncomplete, true, `${tag}/${field}`);
+      assert.equal(publication.content, douHtmlText(html), 'canonical text extraction is unchanged');
+      assert.deepEqual(classifyDouContractExcerpt(publication)?.reasonCodes, ['incomplete_text_structure']);
+      assert.equal(classifyDouContractExcerpt(publication)?.decision, 'REVIEW');
+      const { scopeStructureIncomplete: _flag, ...legacyDou } = dou;
+      const legacy = { ...publication, metadata: { ...publication.metadata, dou: legacyDou } };
+      const before = normalizePublication({ sourceId: 'dou', publication: legacy });
+      const after = normalizePublication({ sourceId: 'dou', publication });
+      assert.equal(after.identityHash, before.identityHash);
+      assert.equal(after.contentHash, before.contentHash);
+    }
+  }
 });
 
 test('a matter with an empty official title is kept with a flagged descriptive title, never an inferred act', async () => {

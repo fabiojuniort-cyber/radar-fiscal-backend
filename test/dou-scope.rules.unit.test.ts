@@ -14,7 +14,7 @@ function excerpt(object: string, overrides: Partial<DouScopePublication> = {}, a
     actType: 'EXTRATO DE CONTRATO',
     agency: 'Órgão público federal',
     content: [
-      'Contratante: UNIÃO.', 'Contratada: Fornecedora Privada Ltda.', 'CNPJ: 12.345.678/0001-90.',
+      'Contratante: UNIÃO.', 'Contratada: Alfa Ltda.', 'CNPJ: 12.345.678/0001-90.',
       'Pregão Eletrônico nº 7/2026.', `Objeto: ${object}.`, 'Valor Global: R$ 100.000,00.',
       'Vigência: 01/10/2026 a 30/09/2027.', 'Fundamento Legal: Lei nº 14.133/2021.', additionalContent,
     ].filter(Boolean).join(' '),
@@ -122,6 +122,66 @@ test('unrecognized clauses fail safe even without a known relevance keyword', ()
   equal(body.decision, 'REVIEW'); deepEqual(body.reasonCodes, ['unrecognized_administrative_content']);
   const metadata = classified(excerpt('Aquisição de papel A4', { metadata: { dou: { abstract: 'Determina efeito econômico ainda não classificado.' } } }));
   equal(metadata.decision, 'REVIEW'); deepEqual(metadata.reasonCodes, ['unrecognized_supplementary_text']);
+});
+test('unpunctuated newlines never let a party field absorb the following material clause', () => {
+  for (const lineBreak of ['\n', '\r\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029']) {
+    for (const signal of [
+      'Determina a retenção de IRRF.',
+      'Autoriza serviços de telecomunicações pela contratada.',
+      'Estabelece obrigações no eSocial.',
+    ]) {
+      const text = `Contratante: UNIÃO${lineBreak}${signal}`;
+      const baseline = excerpt('Aquisição de papel A4');
+      for (const publication of [
+        excerpt('Aquisição de papel A4', {}, text),
+        { ...baseline, content: baseline.content!.replace('Contratante: UNIÃO.', text) },
+        excerpt('Aquisição de papel A4', { metadata: { dou: { abstract: text } } }),
+        excerpt('Aquisição de papel A4', { metadata: { dou: { continuationTitles: [text] } } }),
+        excerpt('Aquisição de papel A4', { metadata: { dou: { continuationAbstracts: [text] } } }),
+      ]) {
+        const c = classified(publication);
+        equal(c.decision, 'REVIEW', JSON.stringify({ lineBreak, signal, publication }));
+        ok(c.reasonCodes.some(reason => reason.startsWith('unrecognized_') || reason === 'missing_or_duplicate_party_field'));
+      }
+    }
+  }
+});
+test('line-delimited administrative fields remain eligible for IGNORE without changing object matching', () => {
+  const baseline = excerpt('Aquisição de papel A4');
+  for (const lineBreak of ['\n', '\r\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029']) {
+    const c = classified({
+      ...baseline,
+      content: baseline.content!.replace(/\.\s+/g, lineBreak),
+      metadata: { dou: { abstract: `Comprovação de regularidade fiscal${lineBreak}Pagamento mediante nota fiscal.` } },
+    });
+    equal(c.decision, 'IGNORE', JSON.stringify(lineBreak));
+  }
+});
+test('party proof rejects prose, separators, duplicates and missing structured CNPJ', () => {
+  const baseline = excerpt('Aquisição de papel A4');
+  const signal = 'Determina a retenção de IRRF';
+  const alteredBodies = [
+    ...[' - ', ' / ', ' e '].map(separator => baseline.content!.replace('Contratante: UNIÃO.', `Contratante: União${separator}${signal}.`)),
+    baseline.content!.replace('Contratante: UNIÃO.', `Contratante: União (${signal}).`),
+    baseline.content!.replace('Contratada: Alfa Ltda.', 'Contratada: Alfa foi adquirida pela Beta Ltda.'),
+    baseline.content!.replace('Contratada: Alfa Ltda.', 'Contratada: Alfa / Beta Ltda.'),
+    baseline.content!.replace('Contratada: Alfa Ltda.', 'Contratada: Alfa - Beta Ltda.'),
+    baseline.content!.replace('Contratada: Alfa Ltda.', 'Contratada: Alfa (Beta) Ltda.'),
+    baseline.content!.replace('Contratada: Alfa Ltda.', 'Contratada: Alfa e Beta Ltda.'),
+    baseline.content!.replace('Contratada: Alfa Ltda.', 'Contratada: Fornecedora Privada Ltda.'),
+    `${baseline.content} Contratante: União.`,
+    `${baseline.content} Contratada: Beta Ltda.`,
+    `${baseline.content} CNPJ: 12.345.678/0001-90.`,
+    baseline.content!.replace('CNPJ: 12.345.678/0001-90. ', ''),
+    baseline.content!.replace('CNPJ: 12.345.678/0001-90.', 'CNPJ: 12345678000190.'),
+  ];
+  for (const content of alteredBodies) equal(classified({ ...baseline, content }).decision, 'REVIEW', content);
+  equal(classified(excerpt('Aquisição de papel A4', { metadata: { dou: { abstract: 'Contratante: União.' } } })).decision, 'REVIEW');
+  equal(classified({ ...baseline, content: baseline.content!.replace('Contratante: UNIÃO.', 'Contratante: União Federal.') }).decision, 'IGNORE');
+});
+test('structurally incomplete text cannot authorize IGNORE even when its flattened clauses look routine', () => {
+  const c = classified(excerpt('Aquisição de papel A4', { metadata: { dou: { scopeStructureIncomplete: true } } }));
+  equal(c.decision, 'REVIEW'); deepEqual(c.reasonCodes, ['incomplete_text_structure']);
 });
 test('neutral fiscal phrases cannot erase normative qualifiers in the same or next clause', () => {
   for (const signal of [

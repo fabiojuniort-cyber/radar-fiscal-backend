@@ -1,4 +1,4 @@
-export const DOU_SCOPE_RULE_VERSION = 'dou-scope-v3' as const;
+export const DOU_SCOPE_RULE_VERSION = 'dou-scope-v4' as const;
 
 export type DouScopeCategory =
   | 'CONTRATACAO_ADMINISTRATIVA_ROTINEIRA'
@@ -70,8 +70,10 @@ const ROUTINE_OBJECT_RULES: readonly RoutineObjectRule[] = [
 // subject. Unknown clauses (including in metadata) stay REVIEW. In particular,
 // free text following an accepted object or field must not inherit its status.
 const ROUTINE_ADMINISTRATIVE_CLAUSES: readonly RegExp[] = [
-  /^contratante\s*:\s*[a-z0-9][a-z0-9 &'()/\-]{0,180}$/,
-  /^contratad[ao]\s*:\s*[a-z0-9][a-z0-9 &'()/\-]{0,180}\s+(?:ltda|s\.?\s*a|s\/a|eireli)$/,
+  /^contratante\s*:\s*uniao(?: federal)?$/,
+  // Deliberately high precision: one name token plus a legal suffix. More
+  // complex legal names remain REVIEW; an open name regex can swallow prose.
+  /^contratad[ao]\s*:\s*[a-z][a-z0-9]{1,39}\s+(?:ltda|s\.?\s*a|eireli)$/,
   /^cnpj\s*:\s*\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/,
   /^(?:pregao(?: eletronico| presencial)?|dispensa de licitacao|inexigibilidade de licitacao|concorrencia(?: eletronica)?)\s+(?:n[º°o.]?\s*)?\d+(?:\/\d{4})?$/,
   /^valor(?: global| total)?\s*:\s*(?:r\$\s*)?\d[\d.,]*$/,
@@ -107,8 +109,16 @@ function isRoutineAdministrativeText(text: string): boolean {
   });
 }
 
+function normalizeClauses(value: string | null | undefined): string {
+  // A line break is an evidence boundary even when the source omits a period.
+  // Collapsing it would let a free-text party field swallow the next clause.
+  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\r\n?|[\v\f\u0085\u2028\u2029]/g, '\n').toLowerCase().replace(/[^\S\n]+/g, ' ').trim();
+}
 function normalize(value: string | null | undefined): string {
-  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u00a0/g, ' ').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Matching/extraction retains its whitespace-insensitive representation;
+  // positive clause proof must always use normalizeClauses instead.
+  return normalizeClauses(value).replace(/\s+/g, ' ').trim();
 }
 function result(category: DouScopeCategory, decision: DouScopeDecision, reasonCodes: string[]): DouScopeClassification {
   return { ruleVersion: DOU_SCOPE_RULE_VERSION, category, decision, reasonCodes };
@@ -127,7 +137,7 @@ function supplementaryTexts(publication: DouScopePublication): string[] {
   // content. They can veto IGNORE, never supply the positive routine evidence.
   return [typeof dou?.abstract === 'string' ? dou.abstract : '',
     ...strings(dou?.continuationTitles), ...strings(dou?.continuationAbstracts)]
-    .map(normalize).filter(Boolean);
+    .map(normalizeClauses).filter(Boolean);
 }
 function withoutNeutralFiscalBoilerplate(text: string): string {
   // Never erase a keyword within a longer clause. A normative qualifier after
@@ -162,16 +172,18 @@ export function classifyDouContractExcerpt(publication: DouScopePublication): Do
   const title = normalize(publication.title);
   if (!/^extrato de contrato\b/.test(title)) return null;
   const content = normalize(publication.content);
+  const clauseContent = normalizeClauses(publication.content);
   const supplementary = supplementaryTexts(publication);
-  const fullText = [title, content, ...supplementary].join('\n');
+  const fullText = [title, content, ...supplementary.map(normalize)].join('\n');
 
   const relevanceMatches = RELEVANCE_RULES.filter((rule) => rule.pattern.test(fullText));
   const first = relevanceMatches[0];
   if (first) return result(first.category, 'KEEP', relevanceMatches.map((rule) => rule.code));
 
-  const ambiguousText = withoutNeutralFiscalBoilerplate(fullText);
+  const ambiguousText = withoutNeutralFiscalBoilerplate([title, clauseContent, ...supplementary].join('\n'));
   const ambiguousMatches = AMBIGUOUS_RELEVANCE_RULES.filter((rule) => rule.pattern.test(ambiguousText));
   if (ambiguousMatches.length) return result('AMBIGUO', 'REVIEW', ambiguousMatches.map((rule) => rule.code));
+  if (record(publication.metadata?.dou)?.scopeStructureIncomplete === true) return review('incomplete_text_structure');
 
   if (!content) return review('missing_content');
   const object = extractSingleObject(content);
@@ -179,8 +191,12 @@ export function classifyDouContractExcerpt(publication: DouScopePublication): Do
   const routine = ROUTINE_OBJECT_RULES.find((rule) => rule.pattern.test(object.text));
   if (!routine) return review('ordinary_procurement_object_not_confirmed');
   if (!hasProcurementStructure(content)) return review('missing_procurement_structure');
+  // A structured CNPJ only strengthens the proof; it never authorizes IGNORE
+  // alone. Duplicate party fields anywhere, including supplements, are unsafe.
+  if (['contratante', 'contratad[ao]', 'cnpj'].some(field =>
+    [...fullText.matchAll(new RegExp(`\\b${field}\\s*:`, 'g'))].length !== 1)) return review('missing_or_duplicate_party_field');
   if (!/^extrato de contrato(?:\s+n[º°o.]?\s*\d+(?:\/\d{4})?)?$/.test(title)) return review('unrecognized_contract_title');
-  if (!isRoutineAdministrativeText(content)) return review('unrecognized_administrative_content');
+  if (!isRoutineAdministrativeText(clauseContent)) return review('unrecognized_administrative_content');
   if (supplementary.some(text => text !== title && !isRoutineAdministrativeText(text) &&
     !ROUTINE_OBJECT_RULES.some(rule => rule.pattern.test(text)))) return review('unrecognized_supplementary_text');
   return result('CONTRATACAO_ADMINISTRATIVA_ROTINEIRA', 'IGNORE', ['procurement_structure_confirmed', routine.code]);
