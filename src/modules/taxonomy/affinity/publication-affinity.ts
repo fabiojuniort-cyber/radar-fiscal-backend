@@ -47,7 +47,10 @@ export const DIMENSION_WEIGHTS: Record<string, number> = {
   theme: 1,
 };
 
-const STRONG_DIMENSIONS = new Set(['product', 'sector']);
+/** An NCM of the company mentioned in the act is as specific as a product. */
+export const NCM_WEIGHT = 3;
+
+const STRONG_DIMENSIONS = new Set(['product', 'sector', 'ncm']);
 
 export function affinityLevel(score: number, strong: boolean): AffinityLevel {
   if (score >= 5 && strong) return 'HIGH';
@@ -61,18 +64,36 @@ export function computePublicationAffinity(input: {
   profileCodes: readonly string[];
   /** Product concept code -> its group code, for the profile's products. */
   profileProductGroups: ReadonlyMap<string, string>;
+  /** NCMs of the company (8 digits): profile, CNAEs and products. */
+  profileNcms?: readonly string[];
+  /** NCMs mentioned in the act, with their catalog description. */
+  publicationNcms?: ReadonlyArray<{ code: string; description: string | null }>;
 }): PublicationAffinity {
   const profile = new Set(input.profileCodes);
-  if (profile.size === 0) {
+  const companyNcms = new Set(input.profileNcms ?? []);
+  if (profile.size === 0 && companyNcms.size === 0) {
     return { status: 'NO_PROFILE', level: null, score: 0, matches: [] };
   }
-  if (input.view.status !== 'CLASSIFIED') {
+
+  const matches = new Map<string, AffinityMatch>();
+  // NCMs do not depend on the taxonomy classification of the act.
+  for (const ncm of input.publicationNcms ?? []) {
+    if (!companyNcms.has(ncm.code) || matches.has(`ncm:${ncm.code}`)) continue;
+    const formatted = `${ncm.code.slice(0, 4)}.${ncm.code.slice(4, 6)}.${ncm.code.slice(6)}`;
+    matches.set(`ncm:${ncm.code}`, {
+      code: ncm.code,
+      label: ncm.description ? `${formatted} · ${ncm.description}` : formatted,
+      dimensionCode: 'ncm',
+      weight: NCM_WEIGHT,
+      via: 'SAME_ITEM',
+    });
+  }
+  if (input.view.status !== 'CLASSIFIED' && matches.size === 0) {
     return { status: 'NOT_CLASSIFIED', level: null, score: 0, matches: [] };
   }
 
   const profileGroups = new Set(input.profileProductGroups.values());
-  const matches = new Map<string, AffinityMatch>();
-  for (const section of input.view.sections) {
+  for (const section of input.view.status === 'CLASSIFIED' ? input.view.sections : []) {
     for (const tag of section.tags) {
       if (tag.removed) continue;
       const weight = DIMENSION_WEIGHTS[tag.dimensionCode] ?? 0;

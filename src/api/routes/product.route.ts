@@ -205,6 +205,12 @@ const taxProfileBodySchema = z.object({
     documents: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
     obligations: z.array(z.string().trim().min(1).max(120)).max(60).default([]),
     keywords: z.array(z.string().trim().min(1).max(120)).max(100).default([]),
+    // NCMs the company works with (card NCM), compared with the NCMs that
+    // legislation mentions.
+    ncmCodes: z
+      .array(z.string().trim().transform((value) => value.replace(/\D/g, '')).refine((value) => /^\d{8}$/.test(value)))
+      .max(500)
+      .default([]),
     taxonomy: z
       .object({
         releaseId: z.string().uuid(),
@@ -223,7 +229,8 @@ const taxProfileBodySchema = z.object({
           .array(
             z.object({
               cnaeCode: z.string().trim().regex(/^\d{7}$/),
-              segmentCode: z.string().trim().regex(/^sector\.[a-z0-9_]+$/),
+              // null: the user removed the CNAE's segment.
+              segmentCode: z.string().trim().regex(/^sector\.[a-z0-9_]+$/).nullable(),
             }),
           )
           .max(200)
@@ -2115,7 +2122,25 @@ export async function productRoutes(
               WHERE cpp.company_id = ${row.id}::uuid
                 AND cpp.is_active = TRUE
             `.execute(trx);
-            return { ...row, profile, productCodes: products.rows.map((item) => item.code) };
+            // NCMs of the company: card NCM, CNAE NCMs and product NCMs.
+            const cnaeNcms = await sql<{ code: string }>`
+              SELECT DISTINCT regexp_replace(e.official_code, '[^0-9]', '', 'g') AS code
+              FROM official_catalog_entries e
+              WHERE e.id IN (
+                SELECT ccn.official_catalog_entry_id FROM company_cnae_ncms ccn WHERE ccn.company_id = ${row.id}::uuid
+                UNION
+                SELECT cpn.official_catalog_entry_id
+                FROM company_product_ncms cpn
+                JOIN company_product_profiles cpp ON cpp.id = cpn.company_product_profile_id
+                WHERE cpp.company_id = ${row.id}::uuid AND cpp.is_active = TRUE
+              )
+            `.execute(trx);
+            return {
+              ...row,
+              profile,
+              productCodes: products.rows.map((item) => item.code),
+              ncmCodes: cnaeNcms.rows.map((item) => item.code),
+            };
           },
         );
         if (!company) {
@@ -2147,6 +2172,31 @@ export async function productRoutes(
           return reply.status(404).send({ error: 'publication_not_found' });
         }
 
+        const personalization = recordValue(company.profile?.personalization);
+        const profileNcms = [
+          ...new Set([
+            ...(Array.isArray(personalization?.ncmCodes)
+              ? personalization.ncmCodes.filter((code): code is string => typeof code === 'string')
+              : []),
+            ...company.ncmCodes,
+          ]),
+        ];
+        const publicationNcms = profileNcms.length
+          ? (
+              await sql<{ code: string; description: string | null }>`
+                SELECT DISTINCT ON (pnm.ncm_code) pnm.ncm_code AS code, e.description
+                FROM publication_versions pv
+                JOIN publication_ncm_mentions pnm ON pnm.publication_version_id = pv.id
+                LEFT JOIN official_catalog_entries e ON e.id = pnm.official_catalog_entry_id
+                WHERE pv.publication_id = ${request.params.publicationId}::uuid
+                  AND pv.is_current = TRUE
+                  AND pnm.verification_status <> 'REJECTED'
+                  AND pnm.ncm_code = ANY(${profileNcms}::text[])
+                ORDER BY pnm.ncm_code, (pnm.verification_status = 'CATALOG_MATCHED') DESC
+              `.execute(app.db)
+            ).rows
+          : [];
+
         const profileProductGroups = new Map<string, string>();
         if (view.release && profileCodes.length > 0) {
           const rows = await sql<{ concept_code: string; group_code: string }>`
@@ -2166,6 +2216,8 @@ export async function productRoutes(
           view,
           profileCodes,
           profileProductGroups,
+          profileNcms,
+          publicationNcms,
         });
         return reply.status(200).send({
           company: {
@@ -2271,7 +2323,11 @@ export async function productRoutes(
                 }
               }
 
-              const segmentCodes = [...new Set(taxonomy.cnaeSegments.map((item) => item.segmentCode))];
+              const segmentCodes = [
+                ...new Set(
+                  taxonomy.cnaeSegments.flatMap((item) => (item.segmentCode ? [item.segmentCode] : [])),
+                ),
+              ];
               if (segmentCodes.length > 0) {
                 const segments = await sql<{ code: string; official_codes: string[] | null }>`
                   SELECT c.code, rc.official_codes
@@ -2292,6 +2348,22 @@ export async function productRoutes(
                   return 'INVALID_TAXONOMY_SELECTION' as const;
                 }
               }
+            }
+
+            // NCMs of the card NCM: assignable entries of the current catalog.
+            const ncmCodes = [...new Set(request.body.personalization.ncmCodes)];
+            if (ncmCodes.length > 0) {
+              const found = await sql<{ code: string }>`
+                SELECT DISTINCT regexp_replace(e.official_code, '[^0-9]', '', 'g') AS code
+                FROM official_catalog_entries e
+                JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
+                JOIN official_catalogs c ON c.id = ed.catalog_id
+                WHERE c.code = 'NCM'
+                  AND ed.status = 'CURRENT'
+                  AND COALESCE((e.metadata ->> 'assignable')::boolean, FALSE) = TRUE
+                  AND regexp_replace(e.official_code, '[^0-9]', '', 'g') = ANY(${ncmCodes}::text[])
+              `.execute(trx);
+              if (found.rows.length !== ncmCodes.length) return 'INVALID_NCM_CODES' as const;
             }
 
             const current = await trx
@@ -2355,6 +2427,10 @@ export async function productRoutes(
 
         if (profile === 'INVALID_TAXONOMY_SELECTION') {
           return reply.status(400).send({ error: 'invalid_taxonomy_selection' });
+        }
+
+        if (profile === 'INVALID_NCM_CODES') {
+          return reply.status(400).send({ error: 'invalid_ncm_codes' });
         }
 
         return reply.status(200).send({

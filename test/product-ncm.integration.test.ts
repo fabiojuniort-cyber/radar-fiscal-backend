@@ -363,6 +363,38 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       'Arroz semibranqueado ou branqueado.',
     );
 
+    // Card NCM of the tax profile: only catalog NCMs; matches the act's NCMs.
+    const profileBody = (ncmCodes: string[]) => ({
+      taxRegime: 'LUCRO_REAL',
+      segments: [],
+      activities: [],
+      personalization: { ncmCodes, taxonomy: null },
+    });
+    const invalidProfileNcm = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/companies/${companyId}/tax-profile`,
+      headers: firstHeaders,
+      payload: profileBody(['99999999']),
+    });
+    assert.equal(invalidProfileNcm.statusCode, 400, invalidProfileNcm.body);
+    assert.equal(invalidProfileNcm.json<{ error: string }>().error, 'invalid_ncm_codes');
+    const savedProfileNcm = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/companies/${companyId}/tax-profile`,
+      headers: firstHeaders,
+      payload: profileBody(['1006.30.11']),
+    });
+    assert.equal(savedProfileNcm.statusCode, 200, savedProfileNcm.body);
+    const affinity = await app.inject({
+      method: 'GET',
+      url: `/api/v1/companies/${companyId}/publications/${publicationId}/affinity`,
+      headers: firstHeaders,
+    });
+    assert.equal(affinity.statusCode, 200, affinity.body);
+    const affinityBody = affinity.json<{ status: string; matches: Array<{ code: string; dimensionCode: string }> }>();
+    assert.equal(affinityBody.status, 'OK');
+    assert.deepEqual(affinityBody.matches.map((m) => [m.dimensionCode, m.code]), [['ncm', '10063011']]);
+
     const remove = await app.inject({
       method: 'DELETE',
       url: `/api/v1/companies/${companyId}/product-profiles/${profile.id}`,
