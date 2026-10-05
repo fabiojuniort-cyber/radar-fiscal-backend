@@ -16,7 +16,7 @@ const server = (overrides = {}) => ({
   in_recovery: false, all_stats_visible: true, statements_installed: false,
   statements_public: false, database_bytes: '123', server_started_epoch: '1234.5', ...overrides,
 });
-function fakeClient({ failId, serverRow = server(), optionalError = false, connectError = false } = {}) {
+function fakeClient({ failId, serverRow = server(), optionalError = false, optionalCode = '42501', optionalRows = [], connectError = false } = {}) {
   const calls = [];
   return {
     calls,
@@ -26,7 +26,8 @@ function fakeClient({ failId, serverRow = server(), optionalError = false, conne
       calls.push(sql);
       if (sql === QUERIES[0].sql) return { rows: [serverRow] };
       if (sql === QUERIES.find((q) => q.id === failId)?.sql) throw Object.assign(new Error('URL secret'), { code: '57014' });
-      if (sql === STATEMENTS.sql && optionalError) throw Object.assign(new Error('URL secret'), { code: '42501' });
+      if (sql === STATEMENTS.sql && optionalError) throw Object.assign(new Error('URL secret'), { code: optionalCode });
+      if (sql === STATEMENTS.sql) return { rows: optionalRows };
       return { rows: [] };
     },
   };
@@ -114,6 +115,46 @@ test('optional extension privilege failure remains NOT_PROVEN with SQLSTATE only
   const records = []; await snapshot(c, (r) => records.push(r), 1);
   assert.deepEqual(records.at(-1), { sample: 1, section: 'statements_aggregate', status: 'NOT_PROVEN', code: '42501' });
   assert.equal(c.calls.at(-1), 'ROLLBACK');
+});
+test('optional result sanitization failure aborts without NOT_PROVEN or COMPLETE', async () => {
+  for (const rows of [[{ calls: 'SENSITIVE_INVALID_OUTPUT' }], [{}, {}]]) {
+    const c = fakeClient({ serverRow: server({ statements_public: true }), optionalRows: rows });
+    const records = [];
+    await assert.rejects(run(c, (r) => records.push(r), async () => {}), /OUTPUT_TYPE|ROW_LIMIT/);
+    assert.equal(c.calls.at(-2), 'ROLLBACK'); assert.equal(c.calls.at(-1), 'END');
+    assert.ok(!records.some((r) => r.section === 'statements_aggregate' || r.section === 'complete'));
+    assert.doesNotMatch(JSON.stringify(records), /SENSITIVE_INVALID_OUTPUT/);
+  }
+});
+test('optional transport/query-timeout errors are not tolerated as unavailable statistics', async () => {
+  for (const code of ['08006', '57014', 'ECONNRESET']) {
+    const c = fakeClient({ serverRow: server({ statements_public: true }), optionalError: true, optionalCode: code });
+    const records = [];
+    await assert.rejects(run(c, (r) => records.push(r), async () => {}));
+    assert.ok(!records.some((r) => r.section === 'statements_aggregate' || r.section === 'complete'));
+    assert.equal(c.calls.at(-1), 'END');
+  }
+});
+test('client.end rejection prevents the success marker', async () => {
+  const c = fakeClient(); const records = [];
+  c.end = async () => { c.calls.push('END_FAILED'); throw new Error('private close failure'); };
+  await assert.rejects(run(c, (r) => records.push(r), async () => {}), /private close failure/);
+  assert.equal(c.calls.at(-1), 'END_FAILED');
+  assert.ok(!records.some((r) => r.section === 'complete'));
+  assert.doesNotMatch(JSON.stringify(records), /private close failure/);
+});
+test('success marker waits for client.end to resolve', async () => {
+  const c = fakeClient(); const records = [];
+  let enteredEnd; let releaseEnd;
+  const entered = new Promise((resolve) => { enteredEnd = resolve; });
+  const released = new Promise((resolve) => { releaseEnd = resolve; });
+  c.end = async () => { enteredEnd(); await released; c.calls.push('END_RESOLVED'); };
+  const pending = run(c, (r) => records.push(r), async () => {});
+  await entered;
+  assert.ok(!records.some((r) => r.section === 'complete'));
+  releaseEnd(); await pending;
+  assert.equal(c.calls.at(-1), 'END_RESOLVED');
+  assert.equal(records.at(-1).status, 'READ_ONLY_COMPLETED');
 });
 test('two fresh snapshots use one connection and wait only after ROLLBACK', async () => {
   const c = fakeClient(); let pauses = 0;
