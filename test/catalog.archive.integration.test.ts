@@ -508,6 +508,59 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
       assert.deepEqual(ids(await archive(q(`Portaria de 1216 ${marker}`))), [portaria1216]);
     });
 
+    await t.test('navigation groups the selected branch with exact counts', async () => {
+      const navigationCode = `${marker}nav`;
+      const navigationSourceId = await createSource(navigationCode);
+      await addOrigin(contentOnly, navigationSourceId);
+
+      const dateRow = await admin.query<{ year: number; month: number }>(
+        `SELECT extract(year from published_on)::int AS year,
+                extract(month from published_on)::int AS month
+         FROM publications WHERE id = $1`,
+        [contentOnly],
+      );
+      const expectedYear = String(dateRow.rows[0]!.year);
+      const expectedMonth = String(dateRow.rows[0]!.month);
+
+      async function navigation(query: string) {
+        const response = await app.inject({
+          method: 'GET',
+          url: `/api/v2/archive/navigation?${query}`,
+          headers,
+        });
+        assert.equal(response.statusCode, 200, response.body);
+        return response.json<{
+          groupBy: string;
+          items: Array<{ value: string; label: string; count: number }>;
+        }>();
+      }
+
+      const types = await navigation(
+        `groupBy=actType&source=${encodeURIComponent(navigationCode)}`,
+      );
+      assert.deepEqual(types.items, [{ value: 'Ato', label: 'Ato', count: 1 }]);
+
+      const years = await navigation(
+        `groupBy=year&source=${encodeURIComponent(navigationCode)}&actType=Ato`,
+      );
+      assert.deepEqual(years.items, [
+        { value: expectedYear, label: expectedYear, count: 1 },
+      ]);
+
+      const months = await navigation(
+        `groupBy=month&source=${encodeURIComponent(navigationCode)}&actType=Ato&year=${expectedYear}`,
+      );
+      assert.deepEqual(months.items, [
+        { value: expectedMonth, label: expectedMonth, count: 1 },
+      ]);
+
+      const sources = await navigation('groupBy=source&actType=Ato');
+      assert.deepEqual(
+        sources.items.find((item) => item.value === navigationCode),
+        { value: navigationCode, label: navigationCode, count: 1 },
+      );
+    });
+
     await t.test('facets list sources present in the feed', async () => {
       const response = await app.inject({
         method: 'GET',
