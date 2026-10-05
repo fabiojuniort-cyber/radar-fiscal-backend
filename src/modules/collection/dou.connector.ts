@@ -2,8 +2,9 @@ import type { CollectionConnector, ConnectorExecutionContext, ConnectorPartialFa
 import { ConnectorError } from './connector.error.js';
 import { InlabsClient, type InlabsCredentials, type InlabsXmlSection } from './inlabs.client.js';
 import { readDouZip, parseDouEntries, type DouArchiveContext } from './dou.parser.js';
+import { classifyDouContractExcerpt, DOU_SCOPE_RULE_VERSION } from './dou-scope.rules.js';
 
-export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO2', 'DO2E', 'DO3', 'DO3E'];
+export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO3', 'DO3E'];
 
 export interface DouState {
   archives: Record<string, string>;
@@ -42,7 +43,7 @@ export function douCollectionDates(now: Date): string[] {
 
 export class DouConnector implements CollectionConnector {
   readonly key = 'dou';
-  readonly version = '0.4.0';
+  readonly version = '0.5.0';
   readonly #options: DouOptions;
   constructor(options: DouOptions) { this.#options = options; }
 
@@ -57,6 +58,9 @@ export class DouConnector implements CollectionConnector {
     const publications: ConnectorPublication[] = []; const partialFailures: ConnectorPartialFailure[] = [];
     const receipts: Record<string, string> = { ...state.archives };
     const archives: Array<Record<string, unknown>> = []; let available = 0; let xmlCount = 0; let mediaCount = 0;
+    let assembledMatterCount = 0; let scopeIgnoredCount = 0;
+    const scopeIgnoredByCategory: Record<string, number> = {};
+    const scopeIgnoredReferences: Array<Record<string, unknown>> = [];
     const editions = new Set<string>();
     try {
       await client.login(context.signal);
@@ -95,12 +99,40 @@ export class DouConnector implements CollectionConnector {
           const extracted = await readDouZip(download.bytes, context.signal);
           if (!extracted.entries.length) throw failure('DOU_ARCHIVE_HAS_NO_XML', true);
           const parsed = parseDouEntries(extracted.entries, archive);
-          const embeddedActCount = parsed.publications.filter(
+          const parsedEmbeddedActCount = parsed.publications.filter(
             p => (p.metadata?.dou as { embeddedAct?: boolean } | undefined)?.embeddedAct === true,
           ).length;
-          const sourceMatterCount = parsed.publications.length - embeddedActCount;
+          const sourceMatterCount = parsed.publications.length - parsedEmbeddedActCount;
+          assembledMatterCount += sourceMatterCount;
+          const accepted: ConnectorPublication[] = [];
+          let archiveIgnoredCount = 0;
+          for (const publication of parsed.publications) {
+            const classification = classifyDouContractExcerpt(publication);
+            if (classification?.decision === 'IGNORE') {
+              scopeIgnoredCount += 1;
+              archiveIgnoredCount += 1;
+              scopeIgnoredByCategory[classification.category] = (scopeIgnoredByCategory[classification.category] ?? 0) + 1;
+              if (scopeIgnoredReferences.length < 100) {
+                scopeIgnoredReferences.push({
+                  externalId: publication.externalId ?? null,
+                  officialUrl: publication.officialUrl,
+                  actType: publication.actType ?? null,
+                  category: classification.category,
+                  reasonCodes: classification.reasonCodes,
+                });
+              }
+              continue;
+            }
+            accepted.push(classification ? {
+              ...publication,
+              metadata: { ...publication.metadata, douScope: classification },
+            } : publication);
+          }
+          const embeddedActCount = accepted.filter(
+            p => (p.metadata?.dou as { embeddedAct?: boolean } | undefined)?.embeddedAct === true,
+          ).length;
           xmlCount += extracted.entries.length; mediaCount += extracted.mediaCount;
-          publications.push(...parsed.publications); partialFailures.push(...parsed.partialFailures);
+          publications.push(...accepted); partialFailures.push(...parsed.partialFailures);
           for (const p of parsed.publications) {
             const data = p.metadata?.dou as { edition: string };
             editions.add(`${date}:${data.edition}`);
@@ -111,8 +143,9 @@ export class DouConnector implements CollectionConnector {
             state: parsed.partialFailures.length ? 'PARTIAL' : 'PARSED',
             xmlCount: extracted.entries.length,
             matterCount: sourceMatterCount,
-            publicationCount: parsed.publications.length,
+            publicationCount: accepted.length,
             embeddedActCount,
+            scopeIgnoredCount: archiveIgnoredCount,
             mediaCount: extracted.mediaCount,
           });
         }
@@ -125,19 +158,25 @@ export class DouConnector implements CollectionConnector {
       const embeddedActCount = publications.filter(
         p => (p.metadata?.dou as { embeddedAct?: boolean } | undefined)?.embeddedAct === true,
       ).length;
-      const sourceMatterCount = publications.length - embeddedActCount;
       return { publications, partialFailures, metadata: {
         dou: {
           archives,
           xmlCount,
           mediaCount,
-          assembledMatterCount: sourceMatterCount,
+          assembledMatterCount,
           publicationCount: publications.length,
           embeddedActCount,
           editions: [...editions],
           partialFailures,
           confazMatterCount: publications.filter(p => p.agency === 'CONFAZ').length,
-          coverage: 'DOU_SECTIONS_1_2_3_NORMAL_AND_EXTRA', sections: [...DOU_XML_SECTIONS], supplementsVerified: false,
+          scope: {
+            ruleVersion: DOU_SCOPE_RULE_VERSION,
+            ignoredCount: scopeIgnoredCount,
+            ignoredByCategory: scopeIgnoredByCategory,
+            ignoredReferences: scopeIgnoredReferences,
+            ignoredReferenceLimit: 100,
+          },
+          coverage: 'DOU_SECTIONS_1_3_NORMAL_AND_EXTRA', sections: [...DOU_XML_SECTIONS], supplementsVerified: false,
           archivalStorage: 'NOT_CONFIGURED', xmlTimelinessGuaranteed: false },
         douArchives: receipts,
       } };

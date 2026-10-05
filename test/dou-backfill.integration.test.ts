@@ -9,6 +9,7 @@ import type { DB } from '../src/infrastructure/database/database.types.js';
 import { acquireNextCollectionRun, createCollectionRun } from '../src/modules/collection/collection-run.repository.js';
 import { isCronDue } from '../src/modules/collection/cron.js';
 import {
+  DOU_BACKFILL_SECTIONS,
   DouBackfillBlockedError,
   DouBackfillThrottledError,
   planDouBackfillDates,
@@ -203,6 +204,59 @@ test('backfill retries keep ownership through the deadline grace and abandoned o
     await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
     await db.deleteFrom('sources').where('id', '=', sourceId).execute();
     await Promise.all(databases.map((database) => database.destroy()));
+  }
+});
+
+test('monitoring coverage remains monotonic when a later run moves its archive window', async () => {
+  assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
+  const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 4 }) }) });
+  const sourceId = randomUUID();
+  const firstDate = '2026-09-18';
+  const secondDate = '2026-09-19';
+  const legacyReceipt = '2026-09-17-DO2.zip';
+  const receiptOnly = '2026-09-16-DO3.zip';
+  const insertMonitoring = async (date: string, status: 'SUCCESS' | 'SUCCESS_NO_RESULTS', hash: string) => {
+    const at = new Date(`${date}T18:00:00Z`);
+    const run = await db.insertInto('collection_runs').values({
+      source_id: sourceId, scheduled_for: at, started_at: at, finished_at: at,
+      status, trigger_type: 'SCHEDULED',
+    }).returning('id').executeTakeFirstOrThrow();
+    await db.insertInto('collection_attempts').values({
+      collection_run_id: run.id, attempt_no: 1, status: 'SUCCESS',
+      metadata: {
+        douArchives: { [`${date}-DO1.zip`]: hash, [legacyReceipt]: hash, [receiptOnly]: hash },
+        dou: { archives: DOU_BACKFILL_SECTIONS.map((section) => ({
+          date, section, filename: `${date}-${section}.zip`,
+          state: section === 'DO1' ? (status === 'SUCCESS' ? 'PARSED' : 'UNCHANGED') : 'NOT_AVAILABLE',
+          ...(section === 'DO1' ? { rawSha256: hash } : {}),
+        })) },
+      },
+    }).execute();
+  };
+  try {
+    await db.insertInto('sources').values({
+      id: sourceId, code: `dou-coverage-${sourceId}`, name: 'DOU coverage history',
+      jurisdiction_level: 'FEDERAL', base_url: 'https://inlabs.in.gov.br', connector_key: 'dou',
+    }).execute();
+    await insertMonitoring(firstDate, 'SUCCESS', 'a'.repeat(64));
+    assert.deepEqual((await readDouBackfillCoverage(db, sourceId)).covered, new Set([firstDate]));
+
+    await insertMonitoring(secondDate, 'SUCCESS_NO_RESULTS', 'b'.repeat(64));
+    for (let pass = 0; pass < 3; pass += 1) {
+      const coverage = await readDouBackfillCoverage(db, sourceId);
+      assert.deepEqual(coverage.covered, new Set([firstDate, secondDate]), 'the previous archive window remains covered');
+      assert.deepEqual(planDouBackfillDates({ from: firstDate, to: secondDate, today: '2026-10-04', covered: coverage.covered }), []);
+      assert.equal(coverage.receipts[`${firstDate}-DO1.zip`], 'a'.repeat(64), 'older parsed archive receipts remain usable');
+      assert.equal(coverage.receipts[`${secondDate}-DO1.zip`], 'b'.repeat(64), 'unchanged archive receipts remain usable');
+      assert.equal(coverage.receipts[legacyReceipt], 'b'.repeat(64), 'the newest valid historical receipt wins');
+      assert.equal(coverage.receipts[receiptOnly], 'b'.repeat(64));
+      assert.equal(coverage.covered.has('2026-09-17'), false, 'excluded DO2 receipts cannot prove coverage');
+      assert.equal(coverage.covered.has('2026-09-16'), false, 'an enabled-section receipt alone cannot prove coverage');
+    }
+  } finally {
+    await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+    await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+    await db.destroy();
   }
 });
 

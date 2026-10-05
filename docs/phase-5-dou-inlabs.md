@@ -189,3 +189,32 @@ Governança: tribusca-control Issue #35. Fecha a pendência "interface de execu�
 - Logs: `DOU backfill batch completed` (runId, datas, status, métricas, `remainingDates`) e `DOU backfill tick failed`.
 
 **Operação (R3).** Primeiro o dry-run, depois `--apply` logo após um ciclo do DOU (ex.: 06h20, 10h20 de Brasília), registrando as saídas na Issue. Para recuar além do mês anterior, `--from` explícito e decisão do responsável sobre o alcance (D-056: acervo oficial disponível).
+
+
+## Correção 2026-10-05 — escopo DOU 1/3, cobertura e triagem de contratos
+
+Governança: tribusca-control Issue #72.
+
+Por decisão de produto, a política operacional do DOU passa a coletar somente `DO1`, `DO1E`, `DO3` e `DO3E`. `DO2` e `DO2E` permanecem apenas como evidência histórica em runs/receipts antigos; não são baixados, não são seções esperadas e não podem produzir falha, retry ou pendência nova.
+
+A mesma constante `DOU_XML_SECTIONS` define download e cobertura do backfill. Receipt é apenas evidência de hash para evitar reparse; cobertura de data exige prova de consulta das quatro seções habilitadas em estado terminal `PARSED`, `UNCHANGED`, `NOT_AVAILABLE` ou `PARTIAL`. Um receipt isolado não torna a data completa. Metadados históricos com as seis seções continuam válidos quando as quatro atuais estão comprovadas; legado sem `dou.archives` suficiente é reconsultado conservadoramente, reaproveitando hashes existentes.
+
+O teto operacional de um lote de quatro datas cai de 24 para 16 downloads de ZIP por tentativa. A string de cobertura passa a `DOU_SECTIONS_1_3_NORMAL_AND_EXTRA`.
+
+`EXTRATO DE CONTRATO` não é descartado por rótulo. A regra determinística `dou-scope-v4` classifica a matéria completa após o parser. Sinais tributários, regulatórios/concessão ou eventos empresariais relevantes têm precedência; caso ambíguo permanece no acervo. Somente contratação administrativa rotineira comprovada por estrutura de contratação e allowlist estreita do objeto recebe `IGNORE`. CNPJ isolado, referência à Lei 14.133, órgão emissor ou boilerplate como “fiscal do contrato” não autorizam exclusão por si sós.
+
+A v3 exige prova positiva de todo o texto, não apenas ausência de palavras-chave: cada cláusula do corpo e de seus textos complementares deve ser reconhecida como campo administrativo de formato restrito ou boilerplate permitido. Cláusulas, valores, títulos ou qualificadores não reconhecidos resultam em `REVIEW`, mesmo sem sinal material conhecido. Essa escolha pode preservar mais contratos para revisão; evita que uma allowlist do objeto torne rotineira uma obrigação material desconhecida.
+
+A v4 preserva quebras de linha na normalização usada para essa prova positiva, inclusive no corpo e nos metadados complementares. LF, CRLF, CR, VT, FF, NEL e separadores Unicode de linha/parágrafo mantêm o limite entre um campo administrativo e uma cláusula posterior, ainda que não haja ponto final. A normalização sem distinção de espaços permanece apenas para matching e extração do objeto; ela nunca serve como prova de que todo o residual é administrativo.
+
+A prova das partes também é deliberadamente estreita: exatamente um `Contratante` com valor `União` ou `União Federal`, exatamente uma `Contratada` com um único token alfanumérico de nome e sufixo legal (`Ltda`, `S.A.` ou `Eireli`), e exatamente um `CNPJ` no formato estruturado. Campos repetidos, nomes compostos, separadores ou prosa nas partes recebem `REVIEW`; a contagem inclui os textos complementares. O CNPJ é somente requisito adicional de confiança e nunca autoriza exclusão isoladamente. Essa política de alta precisão aceita preservar contratos genuinamente rotineiros quando sua estrutura excede a prova implementada.
+
+Quando `Identifica`, `Ementa` ou `Texto` contiver blocos `section`, `article`, `blockquote`, `hr`, `dl`, `dt` ou `dd` cujos limites a extração canônica legada não preserva, o parser registra `metadata.dou.scopeStructureIncomplete=true`. Na ausência de um sinal conclusivo `KEEP`, essa flag força `REVIEW`. Não se altera `douHtmlText`, o texto canônico nem a política de hashes para resolver esse caso; testes cobrem as sete tags nos três campos e confirmam os mesmos hashes de identidade/conteúdo com ou sem a flag.
+
+Incorporação da contratada (incluindo formas verbais inequívocas), sucessão em direitos e obrigações, isenção de ICMS e obrigação explícita de emissão de notas fiscais eletrônicas recebem `KEEP`. Morfologias corporativas ou outros termos materiais insuficientes para categoria conclusiva recebem `REVIEW`. Boilerplate de faturamento/regularidade só é neutro como cláusula completa de formato permitido; nunca se apagam substrings como “nota fiscal” ou “regularidade fiscal” de uma obrigação/regime maior.
+
+A análise preserva os limites entre título, corpo, `metadata.dou.abstract`, todos os `continuationTitles` e todos os `continuationAbstracts` (Ementas das partes posteriores, mesmo com título idêntico). O parser conserva essas Ementas apenas em metadata; não muda `content`, `presentationHtml`, identidade ou política de `contentHash`. Os metadados podem vetar exclusão, nunca suprir a prova positiva do objeto/estrutura rotineiros. Regressão multipart prova que isenção do ICMS somente na segunda Ementa é preservada com os mesmos hashes de identidade/conteúdo.
+
+A cobertura de monitoramento agrega `dou.archives` de todo o histórico elegível (`SUCCESS`/`SUCCESS_NO_RESULTS`, tentativa `SUCCESS`, não `BACKFILL`), mantendo as quatro seções atuais como requisito. A janela móvel de um monitoramento novo não apaga a prova de datas consultadas anteriormente. Receipts do histórico de monitoramento são lidos em ordem temporal estável, prevalecendo o hash válido mais recente; receipts isolados continuam sem provar cobertura. Essa leitura histórica pode crescer com o acervo; otimização de custo fica na frente própria, sem trocar correção por presunção de cobertura.
+
+Ignorados não persistem conteúdo integral. A tentativa registra versão da regra, contagem por categoria e até 100 referências mínimas (externalId/URL/tipo/motivos) para auditoria. Mudanças futuras da regra exigem nova versão e estratégia explícita de replay; receipt `UNCHANGED` comprova bytes, não que uma nova política tenha sido aplicada.

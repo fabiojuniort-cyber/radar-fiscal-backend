@@ -25,6 +25,17 @@ export function douHtmlText(html: string): string {
   return out.replace(/[\t \u00a0]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n+/g, '\n').trim();
 }
 
+function hasUnpreservedScopeBlocks(html: string): boolean {
+  // Keep the legacy canonical text/hash policy unchanged. The scope filter
+  // instead receives a conservative veto when block boundaries were lost.
+  let found = false;
+  const parser = new HtmlParser({
+    onopentag(name) { if (/^(?:section|article|blockquote|hr|dl|dt|dd)$/.test(name)) found = true; },
+  }, { decodeEntities: true });
+  parser.end(html);
+  return found;
+}
+
 function parsePart(entry: DouXmlEntry): Part {
   const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/.exec(entry.name);
   if (!match) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
@@ -297,6 +308,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
   if (date !== context.date || a.pubName !== context.section) throw error('DOU_ARCHIVE_CONTEXT_MISMATCH');
   const pages: string[] = [];
   const continuationTitles = new Set<string>();
+  const continuationAbstracts = new Set<string>();
   for (const p of parts) {
     for (const key of ['idMateria', 'pubDate', 'pubName', 'editionNumber', 'artCategory', 'artType']) {
       if (p.attrs[key] !== a[key]) throw error('DOU_INCONSISTENT_PARTS');
@@ -306,6 +318,8 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
       if (continuationTitle && continuationTitle !== officialTitle) {
         continuationTitles.add(continuationTitle);
       }
+      const continuationAbstract = douHtmlText(p.fields.Ementa ?? '');
+      if (continuationAbstract) continuationAbstracts.add(continuationAbstract);
     }
     let url: URL;
     try { url = new URL(p.attrs.pdfPage!); } catch { throw error('DOU_MISSING_CERTIFIED_REFERENCE'); }
@@ -315,6 +329,8 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
     pages.push(p.attrs.pdfPage!);
   }
   const structural = classifyDouAct(officialTitle, a.artCategory!, a.artType ?? '');
+  const scopeStructureIncomplete = parts.some(p =>
+    ['Identifica', 'Ementa', 'Texto'].some(field => hasUnpreservedScopeBlocks(p.fields[field] ?? '')));
   const text = parts.map(p => douHtmlText(p.fields.Texto ?? '')).join('\n');
   const presentationHtml = parts
     .map(p => p.fields.Texto ?? '')
@@ -339,6 +355,8 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
         actDate: structural.actDate ?? null, actYear: structural.actDate?.slice(0, 4) ?? null,
         structuralFamily: structural.family ?? null, abstract: douHtmlText(first.fields.Ementa ?? ''),
         continuationTitles: [...continuationTitles],
+        continuationAbstracts: [...continuationAbstracts],
+        ...(scopeStructureIncomplete ? { scopeStructureIncomplete: true } : {}),
         ...(titleFallback ? { titleFallback: 'ART_TYPE_AND_UNIT' } : {}),
         certifiedPageUrls: [...new Set(pages)], officialHtmlUrl: null,
         archive: context,
