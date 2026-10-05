@@ -189,3 +189,18 @@ Governança: tribusca-control Issue #35. Fecha a pendência "interface de execu�
 - Logs: `DOU backfill batch completed` (runId, datas, status, métricas, `remainingDates`) e `DOU backfill tick failed`.
 
 **Operação (R3).** Primeiro o dry-run, depois `--apply` logo após um ciclo do DOU (ex.: 06h20, 10h20 de Brasília), registrando as saídas na Issue. Para recuar além do mês anterior, `--from` explícito e decisão do responsável sobre o alcance (D-056: acervo oficial disponível).
+
+
+## Correção 2026-10-05 — escopo DOU 1/3, cobertura e triagem de contratos
+
+Governança: tribusca-control Issue #72.
+
+Por decisão de produto, a política operacional do DOU passa a coletar somente `DO1`, `DO1E`, `DO3` e `DO3E`. `DO2` e `DO2E` permanecem apenas como evidência histórica em runs/receipts antigos; não são baixados, não são seções esperadas e não podem produzir falha, retry ou pendência nova.
+
+A mesma constante `DOU_XML_SECTIONS` define download e cobertura do backfill. Receipt é apenas evidência de hash para evitar reparse; cobertura de data exige prova de consulta das quatro seções habilitadas em estado terminal `PARSED`, `UNCHANGED`, `NOT_AVAILABLE` ou `PARTIAL`. Um receipt isolado não torna a data completa. Metadados históricos com as seis seções continuam válidos quando as quatro atuais estão comprovadas; legado sem `dou.archives` suficiente é reconsultado conservadoramente, reaproveitando hashes existentes.
+
+O teto operacional de um lote de quatro datas cai de 24 para 16 downloads de ZIP por tentativa. A string de cobertura passa a `DOU_SECTIONS_1_3_NORMAL_AND_EXTRA`.
+
+`EXTRATO DE CONTRATO` não é descartado por rótulo. A regra determinística `dou-scope-v1` classifica a matéria completa após o parser. Sinais tributários, regulatórios/concessão ou eventos empresariais relevantes têm precedência; caso ambíguo permanece no acervo. Somente contratação administrativa rotineira comprovada por estrutura de contratação e allowlist estreita do objeto recebe `IGNORE`. CNPJ isolado, referência à Lei 14.133, órgão emissor ou boilerplate como “fiscal do contrato” não autorizam exclusão por si sós.
+
+Ignorados não persistem conteúdo integral. A tentativa registra versão da regra, contagem por categoria e até 100 referências mínimas (externalId/URL/tipo/motivos) para auditoria. Mudanças futuras da regra exigem nova versão e estratégia explícita de replay; receipt `UNCHANGED` comprova bytes, não que uma nova política tenha sido aplicada.

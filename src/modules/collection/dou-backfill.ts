@@ -8,7 +8,7 @@ import {
 } from './collection.engine.js';
 import { finishCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
 import { ConnectorRegistry } from './connector.registry.js';
-import { DouConnector } from './dou.connector.js';
+import { DOU_XML_SECTIONS, DouConnector } from './dou.connector.js';
 import type { InlabsCredentials } from './inlabs.client.js';
 
 /**
@@ -24,10 +24,16 @@ import type { InlabsCredentials } from './inlabs.client.js';
  */
 
 export const DOU_BACKFILL_MAX_DATES_PER_RUN = 4;
-export const DOU_BACKFILL_SECTIONS = ['DO1', 'DO2', 'DO3', 'DO1E', 'DO2E', 'DO3E'] as const;
+export const DOU_BACKFILL_SECTIONS = DOU_XML_SECTIONS;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
+const DOU_CONSULTED_STATES = new Set(['PARSED', 'UNCHANGED', 'NOT_AVAILABLE', 'PARTIAL']);
+const DOU_ENABLED_SECTIONS = new Set<string>(DOU_BACKFILL_SECTIONS);
+
+export function isDouBackfillCoverageComplete(sections: ReadonlySet<string>): boolean {
+  return DOU_BACKFILL_SECTIONS.every((section) => sections.has(section));
+}
 
 function validDate(value: string): boolean {
   return DATE.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
@@ -91,10 +97,9 @@ export interface DouBackfillCoverage {
 }
 
 /**
- * Coverage = dates with any archive receipt in the latest successful
- * monitoring checkpoint, plus dates whose six packages were all consulted
- * (parsed, partially parsed, unchanged or not available) by a finished
- * backfill run. Dates without an edition therefore become covered once a
+ * Coverage = dates whose currently enabled DOU packages were all consulted
+ * (parsed, partially parsed, unchanged or not available) by eligible
+ * monitoring/backfill evidence. Receipts are kept separately as hash hints. Dates without an edition therefore become covered once a
  * backfill has checked them. A package with individually broken matters
  * (PARTIAL) is consulted: retrying would not repair those matters, and the
  * run stays PARTIAL_SUCCESS in the history for audit.
@@ -102,6 +107,29 @@ export interface DouBackfillCoverage {
 export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string): Promise<DouBackfillCoverage> {
   const receipts: Record<string, string> = {};
   const covered = new Set<string>();
+  const consulted = new Map<string, Set<string>>();
+
+  const ingestArchives = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    for (const raw of value) {
+      const archive = record(raw);
+      const date = archive?.date;
+      const section = archive?.section;
+      const state = archive?.state;
+      if (typeof date !== 'string' || !validDate(date) || typeof section !== 'string' || typeof state !== 'string') continue;
+
+      if ((state === 'PARSED' || state === 'UNCHANGED') &&
+          typeof archive?.rawSha256 === 'string' && typeof archive.filename === 'string' &&
+          /^[a-f0-9]{64}$/.test(archive.rawSha256)) {
+        receipts[archive.filename] = archive.rawSha256;
+      }
+
+      if (!DOU_ENABLED_SECTIONS.has(section) || !DOU_CONSULTED_STATES.has(state)) continue;
+      const sections = consulted.get(date) ?? new Set<string>();
+      sections.add(section);
+      consulted.set(date, sections);
+    }
+  };
 
   const monitoring = await db.selectFrom('collection_attempts as ca')
     .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
@@ -113,13 +141,16 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
     .orderBy('cr.finished_at', 'desc')
     .orderBy('ca.attempt_no', 'desc')
     .executeTakeFirst();
-  const rawReceipts = record(record(monitoring?.metadata)?.douArchives);
+  const monitoringMetadata = record(monitoring?.metadata);
+  const rawReceipts = record(monitoringMetadata?.douArchives);
   for (const [name, value] of Object.entries(rawReceipts ?? {})) {
     if (/^\d{4}-\d{2}-\d{2}-DO[123]E?\.zip$/.test(name) && typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) {
+      // Historical DO2/DO2E receipts remain harmless evidence for unchanged
+      // packages. They never participate in coverage or generate downloads.
       receipts[name] = value;
-      covered.add(name.slice(0, 10));
     }
   }
+  ingestArchives(record(monitoringMetadata?.dou)?.archives);
 
   const backfills = await db.selectFrom('collection_attempts as ca')
     .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
@@ -129,32 +160,14 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
     .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS'])
     .where('ca.status', '=', 'SUCCESS')
     .execute();
-  const consulted = new Map<string, Set<string>>();
-  for (const row of backfills) {
-    if (!Array.isArray(row.archives)) continue;
-    for (const raw of row.archives) {
-      const archive = record(raw);
-      const date = archive?.date;
-      const section = archive?.section;
-      const state = archive?.state;
-      if (typeof date !== 'string' || !validDate(date) || typeof section !== 'string') continue;
-      if (state !== 'PARSED' && state !== 'UNCHANGED' && state !== 'NOT_AVAILABLE' && state !== 'PARTIAL') continue;
-      const sections = consulted.get(date) ?? new Set<string>();
-      sections.add(section);
-      consulted.set(date, sections);
-      if ((state === 'PARSED' || state === 'UNCHANGED') && typeof archive?.rawSha256 === 'string' &&
-          typeof archive.filename === 'string' && /^[a-f0-9]{64}$/.test(archive.rawSha256)) {
-        receipts[archive.filename] = archive.rawSha256;
-      }
-    }
-  }
+  for (const row of backfills) ingestArchives(row.archives);
+
   for (const [date, sections] of consulted) {
-    if (DOU_BACKFILL_SECTIONS.every((section) => sections.has(section))) covered.add(date);
+    if (isDouBackfillCoverageComplete(sections)) covered.add(date);
   }
 
   return { receipts, covered };
 }
-
 export class DouBackfillBlockedError extends Error {}
 
 /** A backfill run was created less than `minIntervalMs` ago (D-056: one query per hour). */

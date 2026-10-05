@@ -18,12 +18,36 @@ test('official XML fixtures pass through the connector and stable receipt skips 
   assert.equal((first.metadata!.dou as any).xmlCount,12);
   assert.equal((first.metadata!.dou as any).confazMatterCount,0);
   assert.deepEqual((first.metadata!.dou as any).sections, DOU_XML_SECTIONS);
-  assert.equal((first.metadata!.dou as any).coverage,'DOU_SECTIONS_1_2_3_NORMAL_AND_EXTRA');
+  assert.equal((first.metadata!.dou as any).coverage,'DOU_SECTIONS_1_3_NORMAL_AND_EXTRA');
   const second = await new DouConnector({credentials,now:()=>new Date("2026-09-21T12:00:00Z"),fetch,dates:['2026-09-18'],readState:async()=>({archives:first.metadata!.douArchives as Record<string,string>})}).collect(context());
   assert.equal(second.publications.length,0);
   const states = Object.fromEntries((second.metadata!.dou as any).archives.map((a:any)=>[a.section,a.state]));
   assert.equal(states.DO1,'UNCHANGED'); assert.equal(states.DO1E,'UNCHANGED');
-  for (const section of ['DO2','DO2E','DO3','DO3E']) assert.equal(states[section],'NOT_AVAILABLE');
+  for (const section of ['DO3','DO3E']) assert.equal(states[section],'NOT_AVAILABLE');
+  assert.equal(states.DO2, undefined); assert.equal(states.DO2E, undefined);
+});
+
+test('collector never requests DO2/DO2E and exposes the four-section policy literally', async () => {
+  const base = await fixtureFetch();
+  const downloads: string[] = [];
+  const fetch = (async (input, init) => {
+    const url = new URL(String(input));
+    const dl = url.searchParams.get('dl');
+    if (dl) downloads.push(dl);
+    return base(input, init);
+  }) as typeof globalThis.fetch;
+
+  const result = await new DouConnector({ credentials, now: () => new Date('2026-09-21T12:00:00Z'), fetch, dates: ['2026-09-18'] }).collect(context());
+
+  assert.deepEqual(DOU_XML_SECTIONS, ['DO1', 'DO1E', 'DO3', 'DO3E']);
+  assert.deepEqual(downloads, [
+    '2026-09-18-DO1.zip',
+    '2026-09-18-DO1E.zip',
+    '2026-09-18-DO3.zip',
+    '2026-09-18-DO3E.zip',
+  ]);
+  assert.equal(downloads.some((name) => name.includes('DO2')), false);
+  assert.deepEqual((result.metadata!.dou as any).sections, ['DO1', 'DO1E', 'DO3', 'DO3E']);
 });
 
 test('changed package is parsed again without treating whole archive hash as publication content',async()=>{
