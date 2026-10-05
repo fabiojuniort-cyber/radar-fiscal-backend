@@ -6,7 +6,7 @@ import {
   type CollectionEngineLogger,
   type CollectionEngineResult,
 } from './collection.engine.js';
-import { finishCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
+import { finishCollectionRun, heartbeatCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
 import { ConnectorRegistry } from './connector.registry.js';
 import { DouConnector } from './dou.connector.js';
 import type { InlabsCredentials } from './inlabs.client.js';
@@ -320,6 +320,11 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
     }
     const waitMs = Math.max(0, (result.nextAttemptAt?.getTime() ?? Date.now()) - Date.now());
     await sleep(waitMs);
+    // Renew immediately on waking, before opening the next attempt and its
+    // periodic heartbeat. If recovery already won the row, stop this owner.
+    if (!await heartbeatCollectionRun(db, run.id, run.workerId)) {
+      throw new DouBackfillBlockedError(`Backfill run ${run.id} lost ownership while waiting to retry.`);
+    }
   }
 }
 

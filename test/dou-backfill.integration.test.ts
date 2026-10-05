@@ -89,7 +89,7 @@ test('two independent pools serialize DOU backfill creation and enforce the inte
   }
 });
 
-test('a backfill retry deadline prevents early stale takeover and permits recovery after it is due', async () => {
+test('backfill retries keep ownership through the deadline grace and abandoned owners remain recoverable', async (t) => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
   const databases = [0, 1].map(() => new Kysely<DB>({
     dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 2 }) }),
@@ -100,8 +100,18 @@ test('a backfill retry deadline prevents early stale takeover and permits recove
   let requests = 0;
   let sleeps = 0;
   let runId: string | undefined;
+  let staleHeartbeatMs = 0;
+  let observedRenewal = false;
   const transientFetch: typeof fetch = async (input, init) => {
     if (++requests === 1) return new Response(null, { status: 503 });
+    if (requests === 2) {
+      const resumed = await db.selectFrom('collection_runs').select(['worker_id', 'heartbeat_at'])
+        .where('id', '=', runId!).executeTakeFirstOrThrow();
+      assert.equal(resumed.worker_id, 'backfill-retry-owner');
+      assert.ok(resumed.heartbeat_at && new Date(resumed.heartbeat_at).getTime() > staleHeartbeatMs,
+        'the owner renews immediately after sleep, before attempting another request');
+      observedRenewal = true;
+    }
     return fetch(input, init);
   };
   try {
@@ -112,7 +122,9 @@ test('a backfill retry deadline prevents early stale takeover and permits recove
 
     const result = await runDouBackfillBatch(db, {
       sourceId, credentials, fetch: transientFetch, now, dates: ['2026-09-20'], workerId: 'backfill-retry-owner', maxAttempts: 2,
-      heartbeatIntervalMs: 100,
+      // Disable periodic heartbeats only in this fixture: they must not mask
+      // a missing synchronous renewal between sleep and the next attempt.
+      heartbeatIntervalMs: 0,
       sleep: async (waitMs) => {
         sleeps += 1;
         const staleAfterMs = 1_000;
@@ -128,7 +140,8 @@ test('a backfill retry deadline prevents early stale takeover and permits recove
         // Model five seconds inside the twenty-second retry without a real
         // sleep or changing the global clock. There is no heartbeat between
         // attempts, so this is the persisted state of a live waiting owner.
-        await db.updateTable('collection_runs').set({ heartbeat_at: new Date(Date.now() - 5_000) })
+        staleHeartbeatMs = Date.now() - 5_000;
+        await db.updateTable('collection_runs').set({ heartbeat_at: new Date(staleHeartbeatMs) })
           .where('id', '=', run.id).execute();
         assert.equal(await acquireNextCollectionRun(replicaDb, 'default-stale-worker'), null,
           'the default 120-second threshold does not expose this retry gap');
@@ -137,14 +150,24 @@ test('a backfill retry deadline prevents early stale takeover and permits recove
         const owner = await db.selectFrom('collection_runs').select('worker_id')
           .where('id', '=', run.id).executeTakeFirstOrThrow();
         assert.equal(owner.worker_id, 'backfill-retry-owner');
-        // Advance the persisted deadline to model completion of the injected
-        // sleep without a wall-clock wait. The original owner can now retry.
-        await db.updateTable('collection_runs').set({ next_attempt_at: new Date(Date.now() - 1_000) })
-          .where('id', '=', run.id).execute();
+        // Fix only the stale cutoff's JS clock. PostgreSQL now() and the
+        // owner's new Date() heartbeat still use real time. This makes the
+        // post-deadline boundary independent of runner/query latency.
+        const afterDeadline = Date.now();
+        const clock = t.mock.method(Date, 'now', () => afterDeadline);
+        try {
+          await db.updateTable('collection_runs').set({ next_attempt_at: new Date(afterDeadline - 100) })
+            .where('id', '=', run.id).execute();
+          assert.equal(await acquireNextCollectionRun(replicaDb, 'within-deadline-grace', { staleAfterMs }), null,
+            '100ms after the deadline is still inside the 1s stale grace, despite the old heartbeat');
+        } finally {
+          clock.mock.restore();
+        }
       },
     });
     assert.equal(sleeps, 1);
     assert.ok(requests > 1, 'the original owner makes the second attempt');
+    assert.equal(observedRenewal, true);
     assert.equal(result.attempts, 2);
     assert.equal(result.result.state, 'TERMINAL');
     assert.equal(result.result.status, 'SUCCESS_NO_RESULTS');
@@ -155,18 +178,27 @@ test('a backfill retry deadline prevents early stale takeover and permits recove
       { attempt_no: 2, status: 'SUCCESS', error_code: null },
     ]);
 
-    // The deadline is not permanent ownership: an abandoned owner whose
-    // retry is due must remain recoverable through the existing stale path.
+    // The grace is not permanent ownership: both the abandoned heartbeat
+    // and retry deadline must be older than the full stale window.
     const abandoned = await createCollectionRun(db, {
       sourceId, scheduledFor: new Date(Date.now() - 60_000), triggerType: 'BACKFILL',
     });
-    await db.updateTable('collection_runs').set({
-      status: 'RUNNING', worker_id: 'abandoned-backfill-owner',
-      heartbeat_at: new Date(Date.now() - 5_000), next_attempt_at: new Date(Date.now() - 1_000),
-    }).where('id', '=', abandoned).execute();
-    const recovered = await acquireNextCollectionRun(replicaDb, 'due-retry-recovery', { staleAfterMs: 1_000 });
-    assert.equal(recovered?.id, abandoned);
-    assert.equal(recovered?.workerId, 'due-retry-recovery');
+    const abandonedNow = Date.now();
+    const clock = t.mock.method(Date, 'now', () => abandonedNow);
+    try {
+      await db.updateTable('collection_runs').set({
+        status: 'RUNNING', worker_id: 'abandoned-backfill-owner',
+        heartbeat_at: new Date(abandonedNow - 5_000), next_attempt_at: new Date(abandonedNow - 100),
+      }).where('id', '=', abandoned).execute();
+      assert.equal(await acquireNextCollectionRun(replicaDb, 'abandoned-within-grace', { staleAfterMs: 1_000 }), null);
+      await db.updateTable('collection_runs').set({ next_attempt_at: new Date(abandonedNow - 2_000) })
+        .where('id', '=', abandoned).execute();
+      const recovered = await acquireNextCollectionRun(replicaDb, 'due-retry-recovery', { staleAfterMs: 1_000 });
+      assert.equal(recovered?.id, abandoned);
+      assert.equal(recovered?.workerId, 'due-retry-recovery');
+    } finally {
+      clock.mock.restore();
+    }
   } finally {
     await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
     await db.deleteFrom('sources').where('id', '=', sourceId).execute();
