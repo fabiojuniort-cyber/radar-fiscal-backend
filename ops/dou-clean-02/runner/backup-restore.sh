@@ -28,7 +28,7 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
-trap 'echo "SCOPE_BACKUP_FAIL=line_$LINENO"' ERR
+trap 'echo "SCOPE_BACKUP_FAIL=line_$LINENO" >&2' ERR
 prod() { psql "$PROD" -X -qAt -v ON_ERROR_STOP=1 "$@" 2>>"$WORK/private.log"; }
 [[ "$(prod -c 'SHOW default_transaction_read_only')" == on ]]
 prod -c "SELECT json_build_object('serverMajor', current_setting('server_version_num')::int / 10000, 'databaseBytes', pg_database_size(current_database()), 'scopeAbsent', to_regclass('public.publication_scope_events') IS NULL AND to_regclass('public.publication_scope_state') IS NULL AND to_regclass('public.publication_scope_epoch_state') IS NULL);" > "$WORK/preflight.json"
@@ -53,7 +53,7 @@ read -r -t 30 SNAPSHOT <&"$SNAP_OUT"
 # Role passwords, login attributes and memberships are never exported.
 cat > "$WORK/counts.sql" <<'SQL'
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
-SELECT format('SET TRANSACTION SNAPSHOT %L', :'snapshot') \gexec
+SET TRANSACTION SNAPSHOT :'snapshot';
 SELECT format('SELECT %L || ''='' || count(*)::text FROM %I.%I;', tablename, schemaname, tablename)
 FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename \gexec
 COMMIT;
@@ -61,16 +61,18 @@ SQL
 prod -v snapshot="$SNAPSHOT" -f "$WORK/counts.sql" > "$WORK/counts.original.txt"
 cat > "$WORK/roles.sql" <<'SQL'
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
-SELECT format('SET TRANSACTION SNAPSHOT %L', :'snapshot') \gexec
+SET TRANSACTION SNAPSHOT :'snapshot';
 SELECT format('CREATE ROLE %I NOLOGIN;', rolname)
 FROM pg_roles WHERE rolname !~ '^pg_' AND rolname <> 'postgres' ORDER BY rolname;
 COMMIT;
 SQL
 prod -v snapshot="$SNAPSHOT" -f "$WORK/roles.sql" > "$WORK/roles.private.sql"
+echo 'SCOPE_BACKUP_STAGE=snapshot_counts_and_roles_captured'
 DUMP="$WORK/scope-pre-deploy.dump"
 pg_dump "$PROD" --snapshot="$SNAPSHOT" --format=custom --compress=6 --no-password --file="$DUMP" 2>>"$WORK/private.log"
 pg_restore --list "$DUMP" > "$WORK/dump.private.toc" 2>>"$WORK/private.log"
 sha256sum "$DUMP" > "$DUMP.sha256"
+echo 'SCOPE_BACKUP_STAGE=dump_and_toc_complete'
 printf '%s\n' 'COMMIT;' >&"$SNAP_IN"
 exec {SNAP_IN}>&-
 wait "$SNAPSHOT_PID"
@@ -88,6 +90,7 @@ LOCAL_RESTORE="host=$SOCKET port=5439 user=postgres dbname=scope_restore_test"
 psql "$LOCAL_ADMIN" -X -q -v ON_ERROR_STOP=1 -f "$WORK/roles.private.sql" >>"$WORK/private.log" 2>&1
 createdb --maintenance-db="$LOCAL_ADMIN" --template=template0 scope_restore_test >>"$WORK/private.log" 2>&1
 pg_restore --exit-on-error --no-owner --jobs=2 --dbname="$LOCAL_RESTORE" "$DUMP" >>"$WORK/private.log" 2>&1
+echo 'SCOPE_BACKUP_STAGE=isolated_restore_complete'
 # All public table counts must match, including the four mandatory tables.
 sed '/SET TRANSACTION SNAPSHOT/d' "$WORK/counts.sql" > "$WORK/counts.restored.sql"
 PGOPTIONS='-c default_transaction_read_only=on' psql "$LOCAL_RESTORE" -X -qAt -v ON_ERROR_STOP=1 -f "$WORK/counts.restored.sql" > "$WORK/counts.restored.txt" 2>>"$WORK/private.log"
