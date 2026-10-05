@@ -146,14 +146,18 @@ The actual prototype/final origins are deployment configuration and must be conf
 Successful GET responses send:
 
 ```text
-Cache-Control: public, max-age=300
+Cache-Control: public, max-age=0, no-cache, must-revalidate
 ```
+
+Public clients and intermediaries must revalidate successful GET responses. This prevents a response containing a publication that has just transitioned to `OUT_OF_SCOPE` from remaining usable for the former five-minute client/CDN TTL.
 
 Since PERF-01, the server also keeps an in-process copy of the global
 aggregates (`/public/v1/sources`, `/public/v1/stats`, `/public/v1/publications`,
 `/public/v2/stats`, `/public/v2/sources` and the authenticated
-`/api/v2/archive/facets` and archive totals). See
-[catalog-performance.md](catalog-performance.md).
+`/api/v2/archive/facets` and archive totals). Publication-scope transitions
+advance a monotonic cache epoch used to version the affected server-side cache
+keys, so `SUPPRESS`/`RESTORE` invalidates those cached representations without
+requiring a process restart. See [catalog-performance.md](catalog-performance.md).
 
 ## Rate limit
 
