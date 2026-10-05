@@ -210,12 +210,16 @@ export async function snapshot(client, emit, sample) {
       emit({ sample, section: spec.id, rows: safe });
     }
     if (server.statements_public) {
+      let result;
       try {
-        const { rows } = await client.query(STATEMENTS.sql);
-        emit({ sample, section: STATEMENTS.id, rows: sanitizeRows(STATEMENTS, rows) });
+        result = await client.query(STATEMENTS.sql);
       } catch (error) {
+        // Only expected PostgreSQL availability/privilege failures are optional.
+        // Sanitization/output failures and transport/timeouts must fail closed.
+        if (!['42501', '42883', '42P01', '42703', '55000'].includes(error?.code)) throw error;
         emit({ sample, section: STATEMENTS.id, status: 'NOT_PROVEN', code: safeErrorCode(error) });
       }
+      if (result) emit({ sample, section: STATEMENTS.id, rows: sanitizeRows(STATEMENTS, result.rows) });
     } else {
       emit({ sample, section: STATEMENTS.id, status: 'NOT_PROVEN', reason: 'NOT_INSTALLED_IN_PUBLIC' });
     }
@@ -232,10 +236,10 @@ export async function run(client, emit, pause = (ms) => new Promise((resolve) =>
       await snapshot(client, emit, sample);
       if (sample === 1) await pause(15000); // Outside the transaction; fresh statistics next time.
     }
-    emit({ section: 'complete', status: 'READ_ONLY_COMPLETED', samples: 2 });
   } finally {
     await client.end();
   }
+  emit({ section: 'complete', status: 'READ_ONLY_COMPLETED', samples: 2 });
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env, write = (line) => process.stdout.write(line)) {
