@@ -222,6 +222,7 @@ test('supplied archive and certified page URLs must corroborate the same date/fi
   archive.officialUrl = 'https://inlabs.in.gov.br/index.php?p=2026-10-05&dl=2026-10-05-DO2.zip';
   attributes(meta).numberPage = '1';
   attributes(meta).pdfPage = 'https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=05/10/2026&jornal=530&pagina=1';
+  row.versions[0]!.source_metadata = structuredClone(meta);
   equal(decision(row).disposition, 'CANDIDATE');
   for (const url of [
     'https://inlabs.in.gov.br/index.php?p=2026-10-04&dl=2026-10-05-DO2.zip',
@@ -283,6 +284,80 @@ test('unexamined files cannot authorize a routine contract candidate, regardless
   equal(decision(row).disposition, 'CANDIDATE');
   row.origins[0]!.metadata.files = null;
   equal(decision(row).disposition, 'REVIEW');
+});
+
+test('material presentation HTML in either origin or version never inherits routine body proof', () => {
+  for (const target of ['origin', 'version']) {
+    const cases: unknown[] = [
+      { version: 1, format: 'SANITIZED_HTML', html: '<p>Transação tributária de débitos inscritos.</p>', preservesWhitespace: true },
+      { version: 1, format: 'SANITIZED_HTML', html: '<p>' + routine + '</p>', preservesWhitespace: true },
+      { version: 1, format: 'PRESERVED_TEXT', html: 'Transação tributária de débitos inscritos.', preservesWhitespace: true },
+      { version: 1, format: 'PRESERVED_TEXT', text: 'Conteúdo adicional.', preservesWhitespace: true },
+      { version: 1, format: 'PRESERVED_TEXT', blocks: [], preservesWhitespace: true },
+      { version: 1, format: 'UNKNOWN', preservesWhitespace: true },
+      null, [], 'Transação tributária de débitos inscritos.',
+    ];
+    for (const presentation of cases) {
+      const row = publication();
+      const holder = target === 'origin' ? row.origins[0]!.metadata : row.versions[0]!.source_metadata;
+      holder.presentation = presentation;
+      equal(decision(row).disposition, 'REVIEW');
+      ok(decision(row).reasonCodes.includes('unexamined_presentation_material'));
+      equal(planDouHistoricalCleanup(snapshot(row)).executionAllowed, false);
+    }
+  }
+});
+
+test('a content-free PRESERVED_TEXT descriptor is allowed; presentation cannot promote KEEP or REVIEW', () => {
+  const row = publication();
+  for (const meta of [row.origins[0]!.metadata, row.versions[0]!.source_metadata]) {
+    meta.presentation = { version: 1, format: 'PRESERVED_TEXT', preservesWhitespace: true };
+  }
+  equal(decision(row).disposition, 'CANDIDATE');
+  for (const [text, expected] of [['Transação tributária de débitos inscritos.', 'KEEP'], ['Cláusula desconhecida.', 'REVIEW']]) {
+    const changed = structuredClone(row); changed.versions[0]!.content_text = text!;
+    changed.versions[0]!.source_metadata.presentation = { version: 1, format: 'SANITIZED_HTML', html: '<p>' + routine + '</p>' };
+    equal(decision(changed).disposition, expected);
+  }
+});
+
+test('equal XML filename/hash cannot conceal internally valid but contradictory page attributes', () => {
+  for (const section of ['DO2', 'DO3']) {
+    const row = publication(section);
+    const page = (number: string) => `https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=05/10/2026&jornal=530&pagina=${number}`;
+    for (const meta of [row.origins[0]!.metadata, row.versions[0]!.source_metadata]) {
+      attributes(meta).numberPage = '1'; attributes(meta).pdfPage = page('1'); dou(meta).certifiedPageUrls = [page('1')];
+    }
+    equal(decision(row).disposition, 'CANDIDATE');
+    for (const target of ['origin', 'version']) {
+      const changed = structuredClone(row);
+      const meta = target === 'origin' ? changed.origins[0]!.metadata : changed.versions[0]!.source_metadata;
+      attributes(meta).numberPage = '2'; attributes(meta).pdfPage = page('2'); dou(meta).certifiedPageUrls = [page('2')];
+      equal(parts(changed.origins[0]!.metadata)[0]!.filename, parts(changed.versions[0]!.source_metadata)[0]!.filename);
+      equal(parts(changed.origins[0]!.metadata)[0]!.rawSha256, parts(changed.versions[0]!.source_metadata)[0]!.rawSha256);
+      equal(decision(changed).disposition, 'REVIEW');
+      ok(decision(changed).reasonCodes.includes('version_and_origin_part_inventory_disagree'));
+      equal(planDouHistoricalCleanup(snapshot(changed)).executionAllowed, false);
+    }
+  }
+});
+
+test('one body version may be legitimately reused by an additional origin with different matter provenance', () => {
+  for (const section of ['DO2', 'DO3']) {
+    const row = publication(section); const additional = structuredClone(row.origins[0]!);
+    additional.id = uuid(88); additional.external_id = `2026-10-05:${section}:180:87654321`;
+    dou(additional.metadata).officialMatterId = '87654321';
+    attributes(additional.metadata).idMateria = '87654321';
+    parts(additional.metadata)[0]!.filename = '530_20261005_87654321.xml';
+    parts(additional.metadata)[0]!.rawSha256 = 'c'.repeat(64);
+    row.origins.push(additional);
+    equal(row.versions.length, 1);
+    equal(decision(row).disposition, 'CANDIDATE');
+    equal(planDouHistoricalCleanup(snapshot(row)).executionAllowed, false);
+    // Every origin's supplementary/presentation material is still examined.
+    additional.metadata.presentation = { format: 'SANITIZED_HTML', html: 'Transação tributária de débitos inscritos.' };
+    if (section === 'DO3') equal(decision(row).disposition, 'REVIEW');
+  }
 });
 
 test('old KEEP version is preserved and routine multiversion lacks title proof', () => {
