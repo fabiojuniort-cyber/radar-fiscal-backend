@@ -10,6 +10,7 @@ import {
   isValidOfficialCode,
   normalizeOfficialCode,
   type OfficialCodeType,
+  isCnaeActivity,
 } from './curation.constants.js';
 import {
   CURATED_RELEASE_KIND,
@@ -924,9 +925,14 @@ async function setGroupSegments(
   );
   if (segmentCodes.length === 0) return;
 
-  const found = await client.query<{ id: string; code: string }>(
+  const found = await client.query<{
+    id: string;
+    code: string;
+    membership_status: string;
+    official_codes: string[] | null;
+  }>(
     `
-      SELECT rc.id, c.code
+      SELECT rc.id, c.code, rc.membership_status, rc.official_codes
       FROM taxonomy_release_concepts rc
       JOIN taxonomy_concepts c ON c.id = rc.concept_id
       JOIN taxonomy_dimensions d ON d.id = c.dimension_id
@@ -936,14 +942,25 @@ async function setGroupSegments(
     `,
     [draftId, [...new Set(segmentCodes)]],
   );
+  // Only items of the Segmento table qualify: included, and not a CNAE
+  // activity (7-digit code), which belongs to a subsegment instead.
   const missing = segmentCodes.filter(
-    (code) => !found.rows.some((row) => row.code === code),
+    (code) =>
+      !found.rows.some((row) => row.code === code && row.membership_status === 'INCLUDED'),
   );
   if (missing.length > 0) {
     throw new CurationError(
       'UNKNOWN_SEGMENT',
       400,
-      `Segmento(s) inexistente(s): ${missing.join(', ')}`,
+      `Segmento(s) inexistente(s) na tabela Segmento: ${missing.join(', ')}`,
+    );
+  }
+  const activities = found.rows.filter((row) => isCnaeActivity(row.official_codes ?? []));
+  if (activities.length > 0) {
+    throw new CurationError(
+      'NOT_A_SEGMENT',
+      400,
+      `Atividade CNAE não é segmento: ${activities.map((row) => row.code).join(', ')}`,
     );
   }
   for (const row of found.rows) {
@@ -1639,6 +1656,7 @@ export interface GridSaveResult {
   updated: number;
   retired: number;
   groupsCreated: number;
+  groupsUpdated: number;
 }
 
 /**
@@ -1650,7 +1668,12 @@ export async function saveDimensionRows(
   client: PoolClient,
   actor: CuratorActor,
   dimensionCode: string,
-  input: { rows: readonly GridRowInput[]; retire: readonly string[] },
+  input: {
+    rows: readonly GridRowInput[];
+    retire: readonly string[];
+    /** Segment of each group, edited in the grid's Segmento column. */
+    groupSegments?: ReadonlyArray<{ group: string; segmentCodes: string[] }> | undefined;
+  },
 ): Promise<GridSaveResult> {
   assertJustification(actor);
   const draft = await requireOpenDraft(client);
@@ -1666,7 +1689,7 @@ export async function saveDimensionRows(
       .filter((group) => group.dimensionCode === dimensionCode)
       .map((group) => [normalizeAliasText(group.label), group.id]),
   );
-  const result: GridSaveResult = { created: [], updated: 0, retired: 0, groupsCreated: 0 };
+  const result: GridSaveResult = { created: [], updated: 0, retired: 0, groupsCreated: 0, groupsUpdated: 0 };
 
   for (const [index, row] of input.rows.entries()) {
     const label = row.label.trim();
@@ -1714,6 +1737,18 @@ export async function saveDimensionRows(
     }
   }
 
+  for (const { group, segmentCodes } of input.groupSegments ?? []) {
+    const groupId = groupIds.get(normalizeAliasText(group));
+    if (!groupId) throw new CurationError('GROUP_NOT_FOUND', 404, `Grupo “${group}” não encontrado`);
+    try {
+      await updateGroup(client, actor, groupId, { segmentCodes });
+    } catch (error) {
+      const message = error instanceof CurationError && error.message !== error.code ? error.message : 'segmento inválido';
+      throw new CurationError('ROW_INVALID', 400, `Grupo “${group}”: ${message}`);
+    }
+    result.groupsUpdated += 1;
+  }
+
   for (const code of input.retire) {
     if (!concepts.has(code)) throw new CurationError('CONCEPT_NOT_FOUND', 404, `Item ${code} não encontrado`);
     await updateConcept(client, actor, code, { membershipStatus: 'RETIRED' });
@@ -1726,6 +1761,7 @@ export async function saveDimensionRows(
     updated: result.updated,
     retired: result.retired,
     groupsCreated: result.groupsCreated,
+    groupsUpdated: result.groupsUpdated,
   });
   return result;
 }

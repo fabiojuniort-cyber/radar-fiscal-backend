@@ -20,7 +20,7 @@ import {
   normalizeCodes,
 } from '../src/modules/taxonomy/curation/curation.draft.js';
 import type { ReleaseView } from '../src/modules/taxonomy/curation/curation.read.js';
-import { matchSegmentsByCnae } from '../src/modules/taxonomy/curation/curation.suggestions.js';
+import { matchSegmentsByCnae, segmentsForCnaes } from '../src/modules/taxonomy/curation/curation.suggestions.js';
 
 function concept(
   code: string,
@@ -137,6 +137,41 @@ test('CNAE to segment: most specific prefix wins and primary CNAE pre-selects', 
       ['sector.health_plans', 'SECONDARY'],
     ],
   );
+});
+
+test('CNAE to segment: a CNAE activity answers with the segment of its subsegment', () => {
+  const concept = (code: string, label: string, officialCodes: string[], groupId: string | null = null) => ({
+    code,
+    label,
+    dimensionCode: 'sector',
+    officialCodes,
+    groupId,
+  });
+  const view = {
+    concepts: [
+      concept('sector.trifaros_agro', 'Agropecuária, pesca e insumos agrícolas', []),
+      concept('sector.cultivo_de_arroz', 'Cultivo de arroz', ['0111301'], 'g-agro-prod'),
+      concept('sector.agribusiness', 'Agronegócio', ['01']),
+      concept('sector.trifaros_com', 'Comércio multissetorial', []),
+    ],
+    groups: [{ id: 'g-agro-prod', segmentCodes: ['sector.trifaros_agro'] }],
+  } as unknown as Parameters<typeof segmentsForCnaes>[1];
+
+  const [rice, other] = segmentsForCnaes(
+    [
+      { code: '0111-3/01', isPrimary: true },
+      { code: '0113000', isPrimary: false },
+    ],
+    view,
+    'sector',
+  );
+  assert.deepEqual(rice, {
+    cnaeCode: '0111301',
+    isPrimary: true,
+    segments: [{ code: 'sector.trifaros_agro', label: 'Agropecuária, pesca e insumos agrícolas' }],
+  });
+  // No activity for this CNAE: the prefix item is the segment itself.
+  assert.deepEqual(other!.segments, [{ code: 'sector.agribusiness', label: 'Agronegócio' }]);
 });
 
 test('spreadsheet import: blank keeps, "—" clears, ✓ flags and comma separated synonyms', () => {

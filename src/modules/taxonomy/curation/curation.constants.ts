@@ -205,3 +205,8 @@ export function formatOfficialCode(
   }
   return code;
 }
+
+/** A Segmento-table item carrying a full CNAE subclass is an activity. */
+export function isCnaeActivity(officialCodes: readonly string[]): boolean {
+  return officialCodes.some((code) => /^\d{7}$/.test(code.replace(/\D/g, '')));
+}

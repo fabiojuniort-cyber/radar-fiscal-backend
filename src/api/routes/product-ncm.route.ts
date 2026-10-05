@@ -21,7 +21,15 @@ const productParamsSchema = z.object({
 const publicationParamsSchema = z.object({ publicationId: z.string().uuid() });
 const ncmQuerySchema = z.object({
   q: z.string().trim().max(160).default(''),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
+  // NCM codes of a product of the taxonomy (any level): lists the assignable
+  // NCMs under them, so the profile only offers the product's own NCMs.
+  prefixes: z
+    .string()
+    .trim()
+    .max(2000)
+    .default('')
+    .transform((value) => [...new Set(value.split(',').map((item) => item.replace(/\D/g, '')).filter((item) => item.length >= 2))].slice(0, 100)),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
 });
 
 const cnaeSchema = z
@@ -40,6 +48,13 @@ const productProfileBodySchema = z
   .object({
     cnaeCode: cnaeSchema.nullable().default(null),
     productLabel: z.string().trim().min(1).max(160),
+    // Item of the taxonomy Produtos table (published release).
+    productConceptCode: z
+      .string()
+      .trim()
+      .regex(/^product\.[a-z0-9_]+$/)
+      .nullable()
+      .default(null),
     ncmCodes: z.array(ncmCodeSchema).max(100).default([]),
   })
   .superRefine((value, ctx) => {
@@ -56,6 +71,7 @@ interface ProfileRow {
   taxonomy_release_id: string | null;
   sector_release_concept_id: string | null;
   product_release_concept_id: string | null;
+  product_concept_code: string | null;
   product_label: string;
   created_at: Date | string;
   updated_at: Date | string;
@@ -151,6 +167,7 @@ function profileResponse(row: ProfileRow) {
       sectorConceptId: row.sector_release_concept_id,
       productConceptId: row.product_release_concept_id,
     },
+    productConceptCode: row.product_concept_code,
     ncms: normalizeNcms(row.ncms),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
@@ -235,6 +252,7 @@ async function readProfiles(
         cpp.taxonomy_release_id,
         cpp.sector_release_concept_id,
         cpp.product_release_concept_id,
+        pc.code AS product_concept_code,
         cpp.product_label,
         cpp.created_at,
         cpp.updated_at,
@@ -254,6 +272,8 @@ async function readProfiles(
         ) AS ncms
       FROM company_product_profiles cpp
       LEFT JOIN cnaes c ON c.code = cpp.cnae_code
+      LEFT JOIN taxonomy_release_concepts prc ON prc.id = cpp.product_release_concept_id
+      LEFT JOIN taxonomy_concepts pc ON pc.id = prc.concept_id
       LEFT JOIN company_product_ncms cpn ON cpn.company_product_profile_id = cpp.id
       LEFT JOIN official_catalog_entries e ON e.id = cpn.official_catalog_entry_id
       WHERE cpp.company_id = ${companyId}::uuid
@@ -266,12 +286,38 @@ async function readProfiles(
         cpp.taxonomy_release_id,
         cpp.sector_release_concept_id,
         cpp.product_release_concept_id,
+        pc.code,
         cpp.product_label,
         cpp.created_at,
         cpp.updated_at
       ORDER BY cpp.cnae_code NULLS LAST, lower(cpp.product_label), cpp.id
     `.execute(trx)
   ).rows;
+}
+
+/** Product of the current published taxonomy release, by canonical code. */
+async function resolveProductConcept(
+  trx: Transaction<DB>,
+  code: string | null,
+): Promise<{ releaseId: string; releaseConceptId: string } | null | 'invalid'> {
+  if (!code) return null;
+  const result = await sql<{ release_id: string; id: string }>`
+    SELECT rc.release_id, rc.id
+    FROM taxonomy_release_concepts rc
+    JOIN taxonomy_concepts c ON c.id = rc.concept_id
+    JOIN taxonomy_dimensions d ON d.id = c.dimension_id
+    WHERE rc.release_id = (
+        SELECT id FROM taxonomy_releases
+        WHERE status = 'PUBLISHED'
+        ORDER BY version_major DESC, version_minor DESC, version_patch DESC
+        LIMIT 1
+      )
+      AND rc.membership_status = 'INCLUDED'
+      AND d.code = 'product'
+      AND c.code = ${code}
+  `.execute(trx);
+  const row = result.rows[0];
+  return row ? { releaseId: row.release_id, releaseConceptId: row.id } : 'invalid';
 }
 
 async function replaceNcms(
@@ -308,6 +354,8 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
       if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
       const q = request.query.q.trim();
       const digits = q.replace(/\D/g, '');
+      const prefixes = request.query.prefixes;
+      const prefixPatterns = prefixes.map((prefix) => `${prefix}%`);
       const result = await sql<NcmEntryRow>`
         SELECT
           e.id,
@@ -322,6 +370,10 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
         WHERE c.code = 'NCM'
           AND ed.status = 'CURRENT'
           AND COALESCE((e.metadata ->> 'assignable')::boolean, FALSE) = TRUE
+          AND (
+            ${prefixes.length === 0}
+            OR regexp_replace(e.official_code, '[^0-9]', '', 'g') LIKE ANY(${prefixPatterns}::text[])
+          )
           AND (
             ${q.length === 0}
             OR e.description ILIKE ${`%${q}%`}
@@ -400,6 +452,8 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
             if (!(await assertCompanyCnae(trx, request.params.companyId, request.body.cnaeCode))) {
               return { kind: 'cnae_not_linked' as const };
             }
+            const product = await resolveProductConcept(trx, request.body.productConceptCode);
+            if (product === 'invalid') return { kind: 'invalid_product' as const };
             const entries = await resolveNcmEntries(trx, request.body.ncmCodes);
             const resolved = new Set(entries.map((entry) => entry.code));
             const invalidCodes = request.body.ncmCodes.filter((code) => !resolved.has(code));
@@ -407,11 +461,15 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
               return { kind: 'invalid_ncm_codes' as const, invalidCodes };
             }
             const inserted = await sql<{ id: string }>`
-              INSERT INTO company_product_profiles (company_id, cnae_code, product_label)
+              INSERT INTO company_product_profiles (
+                company_id, cnae_code, product_label, taxonomy_release_id, product_release_concept_id
+              )
               VALUES (
                 ${request.params.companyId}::uuid,
                 ${request.body.cnaeCode},
-                ${request.body.productLabel}
+                ${request.body.productLabel},
+                ${product?.releaseId ?? null}::uuid,
+                ${product?.releaseConceptId ?? null}::uuid
               )
               RETURNING id
             `.execute(trx);
@@ -427,7 +485,7 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
         if (created.kind === 'company_not_found') {
           return reply.status(404).send({ error: created.kind });
         }
-        if (created.kind === 'cnae_not_linked') {
+        if (created.kind === 'cnae_not_linked' || created.kind === 'invalid_product') {
           return reply.status(400).send({ error: created.kind });
         }
         if (created.kind === 'invalid_ncm_codes') {
@@ -476,6 +534,8 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
               FOR UPDATE
             `.execute(trx);
             if (!existing.rows[0]) return { kind: 'profile_not_found' as const };
+            const product = await resolveProductConcept(trx, request.body.productConceptCode);
+            if (product === 'invalid') return { kind: 'invalid_product' as const };
             const entries = await resolveNcmEntries(trx, request.body.ncmCodes);
             const resolved = new Set(entries.map((entry) => entry.code));
             const invalidCodes = request.body.ncmCodes.filter((code) => !resolved.has(code));
@@ -487,6 +547,8 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
               SET
                 cnae_code = ${request.body.cnaeCode},
                 product_label = ${request.body.productLabel},
+                taxonomy_release_id = ${product?.releaseId ?? null}::uuid,
+                product_release_concept_id = ${product?.releaseConceptId ?? null}::uuid,
                 updated_at = now()
               WHERE id = ${request.params.profileId}::uuid
             `.execute(trx);
@@ -500,7 +562,7 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
         if (updated.kind === 'company_not_found' || updated.kind === 'profile_not_found') {
           return reply.status(404).send({ error: updated.kind });
         }
-        if (updated.kind === 'cnae_not_linked') {
+        if (updated.kind === 'cnae_not_linked' || updated.kind === 'invalid_product') {
           return reply.status(400).send({ error: updated.kind });
         }
         if (updated.kind === 'invalid_ncm_codes') {

@@ -23,6 +23,7 @@ import {
   kyselyRunner,
   loadReleaseView,
 } from '../../modules/taxonomy/curation/curation.read.js';
+import { isCnaeActivity } from '../../modules/taxonomy/curation/curation.constants.js';
 import { suggestSegmentsForCompany } from '../../modules/taxonomy/curation/curation.suggestions.js';
 import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import {
@@ -216,6 +217,17 @@ const taxProfileBodySchema = z.object({
               .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/),
           )
           .max(500),
+        // Segment of each company CNAE: suggested from the Segmento table,
+        // changeable by the user (TAX-11).
+        cnaeSegments: z
+          .array(
+            z.object({
+              cnaeCode: z.string().trim().regex(/^\d{7}$/),
+              segmentCode: z.string().trim().regex(/^sector\.[a-z0-9_]+$/),
+            }),
+          )
+          .max(200)
+          .default([]),
       })
       .nullable()
       .default(null),
@@ -1939,7 +1951,7 @@ export async function productRoutes(
               .orderBy('version_minor', 'desc')
               .orderBy('version_patch', 'desc')
               .executeTakeFirst();
-            if (!release) return [];
+            if (!release) return { segments: [], cnaes: [] };
 
             return suggestSegmentsForCompany(
               kyselyRunner(trx),
@@ -1952,7 +1964,7 @@ export async function productRoutes(
         if (suggestions === null) {
           return reply.status(404).send({ error: 'company_not_found' });
         }
-        return reply.status(200).send({ segments: suggestions });
+        return reply.status(200).send(suggestions);
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
@@ -2067,7 +2079,17 @@ export async function productRoutes(
               .where('company_id', '=', row.id)
               .where('is_current', '=', true)
               .executeTakeFirst();
-            return { ...row, profile };
+            // Products the company parametrized per CNAE, linked to the
+            // taxonomy Produtos table, also describe its profile.
+            const products = await sql<{ code: string }>`
+              SELECT DISTINCT pc.code
+              FROM company_product_profiles cpp
+              JOIN taxonomy_release_concepts prc ON prc.id = cpp.product_release_concept_id
+              JOIN taxonomy_concepts pc ON pc.id = prc.concept_id
+              WHERE cpp.company_id = ${row.id}::uuid
+                AND cpp.is_active = TRUE
+            `.execute(trx);
+            return { ...row, profile, productCodes: products.rows.map((item) => item.code) };
           },
         );
         if (!company) {
@@ -2075,9 +2097,21 @@ export async function productRoutes(
         }
 
         const taxonomy = recordValue(recordValue(company.profile?.personalization)?.taxonomy);
-        const profileCodes = Array.isArray(taxonomy?.conceptCodes)
-          ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
+        const cnaeSegmentCodes = Array.isArray(taxonomy?.cnaeSegments)
+          ? taxonomy.cnaeSegments.flatMap((item) => {
+              const code = recordValue(item)?.segmentCode;
+              return typeof code === 'string' ? [code] : [];
+            })
           : [];
+        const profileCodes = [
+          ...new Set([
+            ...(Array.isArray(taxonomy?.conceptCodes)
+              ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
+              : []),
+            ...cnaeSegmentCodes,
+            ...company.productCodes,
+          ]),
+        ];
 
         const view = await loadPublicationTaxonomy(
           kyselyRunner(app.db),
@@ -2207,6 +2241,28 @@ export async function productRoutes(
                   new Set(concepts.map((concept) => concept.code)).size !==
                   new Set(taxonomy.conceptCodes).size
                 ) {
+                  return 'INVALID_TAXONOMY_SELECTION' as const;
+                }
+              }
+
+              const segmentCodes = [...new Set(taxonomy.cnaeSegments.map((item) => item.segmentCode))];
+              if (segmentCodes.length > 0) {
+                const segments = await sql<{ code: string; official_codes: string[] | null }>`
+                  SELECT c.code, rc.official_codes
+                  FROM taxonomy_release_concepts rc
+                  JOIN taxonomy_concepts c ON c.id = rc.concept_id
+                  JOIN taxonomy_dimensions d ON d.id = c.dimension_id
+                  WHERE rc.release_id = ${taxonomy.releaseId}::uuid
+                    AND rc.membership_status = 'INCLUDED'
+                    AND d.code = 'sector'
+                    AND c.code = ANY(${segmentCodes}::text[])
+                `.execute(trx);
+                const valid = new Set(
+                  segments.rows
+                    .filter((segment) => !isCnaeActivity(segment.official_codes ?? []))
+                    .map((segment) => segment.code),
+                );
+                if (segmentCodes.some((code) => !valid.has(code))) {
                   return 'INVALID_TAXONOMY_SELECTION' as const;
                 }
               }
