@@ -286,7 +286,7 @@ test(
             response.headers[
               'cache-control'
             ],
-            'public, max-age=300',
+            'public, max-age=0, no-cache, must-revalidate',
           );
 
           const body = response.json<{
@@ -503,7 +503,7 @@ test(
             );
             assert.equal(
               response.headers['cache-control'],
-              'public, max-age=300',
+              'public, max-age=0, no-cache, must-revalidate',
             );
           }
 
