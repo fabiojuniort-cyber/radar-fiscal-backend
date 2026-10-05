@@ -253,7 +253,7 @@ async function persistSuccessfulScan(
   return insertedMatches;
 }
 
-export async function markFailedScan(
+async function markFailedScan(
   db: Kysely<DB>,
   row: VersionForNcmScan,
   sourceField: PublicationNcmSourceField,
