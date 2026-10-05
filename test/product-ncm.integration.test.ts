@@ -224,6 +224,55 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
     });
     assert.equal(crossTenant.statusCode, 404);
 
+    // NCMs of a CNAE, independent of products.
+    const cnaeNcmsUrl = `/api/v1/companies/${companyId}/cnae-ncms`;
+    const addCnaeNcm = await app.inject({
+      method: 'POST',
+      url: cnaeNcmsUrl,
+      headers: firstHeaders,
+      payload: { cnaeCode: '0111301', ncmCodes: ['1006.30.11', '10063011'] },
+    });
+    assert.equal(addCnaeNcm.statusCode, 201, addCnaeNcm.body);
+    const cnaeNcms = addCnaeNcm.json<{ items: Array<{ id: string; cnaeCode: string; code: string }> }>().items;
+    assert.deepEqual(cnaeNcms.map((item) => [item.cnaeCode, item.code]), [['0111301', '10063011']]);
+    const again = await app.inject({
+      method: 'POST',
+      url: cnaeNcmsUrl,
+      headers: firstHeaders,
+      payload: { cnaeCode: '0111301', ncmCodes: ['10063011'] },
+    });
+    assert.equal(again.json<{ items: unknown[] }>().items.length, 1, 'adding twice keeps one');
+    const invalidCnaeNcm = await app.inject({
+      method: 'POST',
+      url: cnaeNcmsUrl,
+      headers: firstHeaders,
+      payload: { cnaeCode: '0111301', ncmCodes: ['99999999'] },
+    });
+    assert.equal(invalidCnaeNcm.statusCode, 400);
+    const otherCnae = await app.inject({
+      method: 'POST',
+      url: cnaeNcmsUrl,
+      headers: firstHeaders,
+      payload: { cnaeCode: '4930202', ncmCodes: ['10063011'] },
+    });
+    assert.equal(otherCnae.statusCode, 400, 'CNAE must belong to the company');
+    const crossTenantNcms = await app.inject({ method: 'GET', url: cnaeNcmsUrl, headers: secondHeaders });
+    assert.equal(crossTenantNcms.statusCode, 404);
+    const crossTenantDelete = await app.inject({
+      method: 'DELETE',
+      url: `${cnaeNcmsUrl}/${cnaeNcms[0]!.id}`,
+      headers: secondHeaders,
+    });
+    assert.equal(crossTenantDelete.statusCode, 404);
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `${cnaeNcmsUrl}/${cnaeNcms[0]!.id}`,
+      headers: firstHeaders,
+    });
+    assert.equal(removed.statusCode, 204);
+    const afterRemove = await app.inject({ method: 'GET', url: cnaeNcmsUrl, headers: firstHeaders });
+    assert.deepEqual(afterRemove.json<{ items: unknown[] }>().items, []);
+
     const update = await app.inject({
       method: 'PUT',
       url: `/api/v1/companies/${companyId}/product-profiles/${profile.id}`,
