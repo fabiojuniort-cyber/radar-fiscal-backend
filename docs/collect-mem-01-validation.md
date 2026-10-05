@@ -99,11 +99,12 @@ tests and new spool/filesystem/executor/engine lifecycle tests. Filesystem
 coverage includes memory filesystems, overlay/unknown, unavailable diagnostics,
 bounded/stalled mount discovery, path matching, telemetry privacy and a failed
 telemetry sink. All added unit test files are registered in `npm test` too.
-The final local dedicated run passed **182/182 tests**, including
-the original DOE-SP legacy suite (31) and the new real-PDF regression suite (5).
+The final local dedicated run passed **192/192 tests**, including
+the original DOE-SP legacy suite (31), real-PDF regression suite (6), and
+the bounded per-package benchmark trend suite (9).
 `npm run typecheck` and `npm run build` also passed.
-Final local validation passed 146/146 tests, standalone backfill 16/16 and
-parser 22/22, plus typecheck and build. The image-retention regression uses
+Earlier standalone focused runs passed backfill 16/16 and parser 22/22;
+the consolidated count above supersedes previous partial-suite totals. The image-retention regression uses
 deterministic copy/Unicode/hash assertions, without forced GC or heap thresholds.
 Use `--test-isolation=none`
 here: this sandbox blocks Node child processes; ordinary test-isolation could
@@ -155,6 +156,78 @@ and (for spool mode) the filesystem observation, because heap alone does not
 represent process residency. These are
 single-run synthetic observations, not production capacity guarantees. V8 GC,
 fixture compression and baseline external-memory reclamation affect peaks.
+
+## Per-package memory trace and growth trend (review completion)
+
+The harness now captures one `afterPackages` record for every `archive_parsed`
+event, after ZIP parsing/multipart validation and the awaited publication sink
+have completed. Each record has `packageIndex`, elapsed milliseconds, cumulative
+publication/XML counts and `rss`, `heapUsed`, `heapTotal`, `external`,
+`arrayBuffers` in bytes. The currently downloaded ZIP may still be in scope:
+these are **post-parser/sink process snapshots, not post-GC retained-memory
+measurements**. No GC is forced during collection.
+
+Only `scripts/dou-memory-trend.ts` retains samples: **at most 16 per workload**.
+The production memory probe remains stateless. Timer/other-phase events do not
+enter the history; invalid/duplicate/out-of-order, excess or missing package
+samples make the benchmark fail rather than silently truncate the evidence.
+Workloads are explicitly restricted to 1/4/8/16; expected fixture counts are
+checked after every package as well as against the final digest.
+
+For each of the five memory metrics, `packageMemoryTrend.metrics` reports:
+
+- `firstBytes` / `lastBytes`: samples after packages 1 and N.
+- `deltaBytes = lastBytes - firstBytes`.
+- `meanDeltaBytesPerPackage = deltaBytes / (N - 1)`.
+- `leastSquaresSlopeBytesPerPackage`: ordinary least-squares slope of all N
+  samples against package index, i.e. covariance numerator divided by the
+  sum of squared centered package indices; unit **bytes/package**.
+
+For N=1, both mean delta/package and OLS slope are `null` because there is no
+observed interval; a zero delta for one sample is not evidence of flat growth.
+Nine helper tests cover increasing/constant/decreasing and non-linear trends,
+single-sample semantics, the 16-sample bound, invalid/incomplete sequences,
+finite counters, overflow resistance and scalar-only independent snapshots.
+
+### Final local matrix
+
+One fresh process per mode/workload, with the default 64 publications/package,
+32768 characters/publication and 1ms slow sink. All four digest pairs and all
+58 per-package count snapshots matched between modes. Full ordered snapshots,
+trends, peaks, duration, filesystem and hashes of the measured script/helper/
+parser/connector are stored in
+[`dou-memory-after-packages-20261005.json`](./dou-memory-after-packages-20261005.json).
+
+| Packages | Publications | Array peak heap (bytes) | Spool peak heap (bytes) | Array peak RSS (bytes) | Spool peak RSS (bytes) | Array ms | Spool ms |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 64 | 32881992 | 24097184 | 127053824 | 85200896 | 345 | 365 |
+| 4 | 256 | 66420576 | 31012192 | 172130304 | 110776320 | 1039 | 1222 |
+| 8 | 512 | 118033528 | 46135128 | 279257088 | 157671424 | 1833 | 2254 |
+| 16 | 1024 | 159987520 | 72355760 | 361623552 | 223522816 | 3600 | 4266 |
+
+OLS slopes below are displayed as **MiB/package** (raw JSON remains bytes/package).
+`—` means null, not zero. This describes observed growth during each finite run;
+it is neither a leak detector nor a production capacity/plateau assertion.
+
+| Packages | Mode | RSS | heapUsed | heapTotal | external | arrayBuffers |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | array | — | — | — | — | — |
+| 1 | spool | — | — | — | — | — |
+| 4 | array | 18.552 | 5.647 | 17.550 | 0.145 | 0.145 |
+| 4 | spool | 4.368 | -0.827 | 5.100 | -0.968 | -0.968 |
+| 8 | array | 16.128 | 5.805 | 20.330 | 0.667 | 0.061 |
+| 8 | spool | 6.343 | 1.800 | 6.595 | -0.294 | -0.294 |
+| 16 | array | 11.146 | 5.621 | 9.483 | 3.187 | 2.902 |
+| 16 | spool | 3.321 | 0.174 | 4.488 | 0.122 | 0.107 |
+
+At 16 packages, first-to-last RSS delta was 180.828 MiB (array)
+versus 62.895 MiB (spool); heap delta was
+84.198 versus 26.737 MiB. The spool substantially reduced
+growth in this run, **but RSS still grew and no flat-memory guarantee is made**.
+Natural V8 collections make the samples saw-toothed, so the endpoint mean and
+OLS can differ materially; a negative slope in a short run is not proof of
+negative long-term retention. The spool filesystem was `overlay / unknown` for
+all runs: filesystem page cache/cgroup memory is not captured by Node RSS alone.
 
 ## Remaining scope and known risks
 

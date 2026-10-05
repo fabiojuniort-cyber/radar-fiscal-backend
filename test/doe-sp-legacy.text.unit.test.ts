@@ -76,3 +76,36 @@ test('fresh wrapper bootstrap does not import pdf.js; concurrent and subsequent 
     hooks.deregister();
   }
 });
+
+test('concurrent first-use import failures share one rejection and a later call retries successfully', async () => {
+  const source = new URL('../src/modules/collection/doe-sp-legacy.text.ts', import.meta.url);
+  source.searchParams.set('retry-import-test', String(performance.now()));
+  const failure = new Error('Injected one-shot module resolution failure');
+  let imports = 0;
+  const hooks = registerHooks({ resolve(specifier, context, nextResolve) {
+    if (specifier === 'pdfjs-dist/legacy/build/pdf.mjs' && context.parentURL === source.href) {
+      imports += 1;
+      if (imports === 1) throw failure;
+    }
+    return nextResolve(specifier, context);
+  } });
+  try {
+    const { extractDoeSpLegacyPdfText: extractFresh } = await import(source.href) as typeof import('../src/modules/collection/doe-sp-legacy.text.js');
+    const bytes = legacyPdfFixture({ text: 'Successful import retry' });
+    const before = new Uint8Array(bytes);
+    const firstWave = await Promise.allSettled(Array.from({ length: 8 }, () => extractFresh(bytes)));
+    assert.equal(imports, 1, 'The failed first wave must still coalesce into one import');
+    for (const result of firstWave) {
+      assert.equal(result.status, 'rejected');
+      if (result.status === 'rejected') assert.equal(result.reason, failure);
+    }
+    const retryWave = await Promise.all(Array.from({ length: 8 }, () => extractFresh(bytes)));
+    assert.equal(imports, 2, 'Only the rejected promise should be cleared for one shared retry');
+    for (const result of retryWave) assert.equal(result.text, 'Successful import retry');
+    assert.equal((await extractFresh(bytes)).text, 'Successful import retry');
+    assert.equal(imports, 2, 'The successful retry stays cached');
+    assert.deepEqual(bytes, before);
+  } finally {
+    hooks.deregister();
+  }
+});

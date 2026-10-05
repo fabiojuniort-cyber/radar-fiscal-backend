@@ -23,7 +23,12 @@ function loadPdfJs() {
   return pdfJsPromise ??= import('pdfjs-dist/legacy/build/pdf.mjs').then(({ getDocument, OPS }) => ({
     getDocument,
     imageOps: new Set<number>([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject]),
-  }));
+  })).catch(error => {
+    // Coalesce a failed first wave, but let a later call retry a transient
+    // resolver/loader failure instead of caching its rejection permanently.
+    pdfJsPromise = undefined;
+    throw error;
+  });
 }
 
 /** Prodesp certification stamp of the certified download (not part of the page). */

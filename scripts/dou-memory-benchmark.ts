@@ -11,6 +11,7 @@ import type { ConnectorPublication } from '../src/modules/collection/connector.c
 import type { PublicationSpoolFilesystem } from '../src/modules/collection/publication-spool.filesystem.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { makeZip } from '../test/dou.fixtures.js';
+import { createPackageMemoryRecorder } from './dou-memory-trend.js';
 
 const child = process.argv.includes('--child');
 if (!child) {
@@ -25,13 +26,25 @@ if (!child) {
     }
   }
   for (let i = 0; i < results.length; i += 2) {
-    const array = results[i] as { digest: string; publications: number };
+    const array = results[i] as {
+      digest: string; publications: number;
+      afterPackages: Array<{ packageIndex: number; publications: number; xmlEntries: number }>;
+    };
     const spool = results[i + 1] as typeof array;
     if (array.digest !== spool.digest || array.publications !== spool.publications) throw new Error('benchmark semantic mismatch');
+    if (array.afterPackages.length !== spool.afterPackages.length || array.afterPackages.some((sample, index) => {
+      const other = spool.afterPackages[index]!;
+      return sample.packageIndex !== other.packageIndex || sample.publications !== other.publications || sample.xmlEntries !== other.xmlEntries;
+    })) throw new Error('benchmark per-package semantic mismatch');
   }
 } else {
   const mode = process.argv[process.argv.indexOf('--child') + 1]!;
   const packageCount = Number(process.argv[process.argv.indexOf('--child') + 2]);
+  if (mode !== 'array' && mode !== 'spool') throw new Error('benchmark mode must be array or spool');
+  if (![1, 4, 8, 16].includes(packageCount)) throw new Error('benchmark packages must be 1, 4, 8 or 16');
+  // The harness alone retains this bounded history. The production probe stays
+  // stateless; timer and non-package samples are never added to this recorder.
+  const packageMemory = createPackageMemoryRecorder(packageCount);
   const publicationsPerPackage = Number(process.env.BENCH_PUBLICATIONS ?? 64);
   const textCharacters = Number(process.env.BENCH_TEXT_CHARACTERS ?? 32768);
   const slowSinkMs = Number(process.env.BENCH_SINK_DELAY_MS ?? 1);
@@ -63,6 +76,7 @@ if (!child) {
   let spoolFilesystem: PublicationSpoolFilesystem | undefined;
   const memory = createCollectionMemoryProbe(sample => {
     sampleCount++;
+    packageMemory.record(sample, performance.now() - startedAt);
     if (sample.phase === 'spool_ready' && sample.spoolFilesystem && sample.spoolStorage && sample.spoolFilesystemProbe) {
       spoolFilesystem = {
         spoolFilesystem: sample.spoolFilesystem, spoolStorage: sample.spoolStorage,
@@ -99,8 +113,15 @@ if (!child) {
       finally { await stream.dispose(); }
     }
     memory('cleanup');
+    const packageTrace = packageMemory.summarize();
+    if (publications !== packageCount * publicationsPerPackage || packageTrace.afterPackages.some(sample =>
+      sample.publications !== sample.packageIndex * publicationsPerPackage
+      || sample.xmlEntries !== sample.packageIndex * publicationsPerPackage)) {
+      throw new Error('benchmark did not observe every expected synthetic publication after each package');
+    }
     process.stdout.write(JSON.stringify({ mode, packages: packageCount, publicationsPerPackage, textCharacters, slowSinkMs, publications, spoolBytes,
       durationMs: Math.round(performance.now() - startedAt), start, peak, sampleCount, spoolFilesystem,
+      ...packageTrace,
       digest: digest.digest('hex') }) + '\n');
   } finally { clearInterval(timer); }
 }
