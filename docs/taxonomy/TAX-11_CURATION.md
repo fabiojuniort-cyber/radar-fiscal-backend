@@ -173,6 +173,10 @@ pré-marca, secundários sugerem).
   os códigos do produto.
 - A afinidade soma os marcadores do perfil, os segmentos por CNAE e os
   produtos parametrizados.
+- NCMs por CNAE independem dos produtos: `GET/POST /api/v1/companies/:id/cnae-ncms`
+  e `DELETE …/cnae-ncms/:ncmId` (tabela `company_cnae_ncms`, migration 032,
+  isolada por conta como `company_product_profiles`). NCM de um produto
+  continua em `company_product_ncms`.
 ## Carga da planilha de produtos (Segmento;Grupo;Item)
 
 `npm run taxonomy:load-products -- --file=ops/taxonomy/loads/<planilha>.csv [--confirm]` carrega a planilha do PO na tabela de Produtos do rascunho aberto. A lógica fica em `curation.product-load.ts`. A planilha é tratada como a fonte mais atualizada:

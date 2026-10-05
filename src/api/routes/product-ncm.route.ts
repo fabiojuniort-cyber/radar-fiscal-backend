@@ -63,6 +63,24 @@ const productProfileBodySchema = z
     }
   });
 
+// NCMs a company declares for one of its CNAEs, independent of products.
+const cnaeNcmBodySchema = z.object({
+  cnaeCode: cnaeSchema,
+  ncmCodes: z.array(ncmCodeSchema).min(1).max(100),
+});
+const cnaeNcmParamsSchema = z.object({
+  companyId: z.string().uuid(),
+  ncmId: z.string().uuid(),
+});
+
+interface CnaeNcmRow {
+  id: string;
+  cnae_code: string;
+  entry_id: string;
+  official_code: string;
+  description: string;
+}
+
 interface ProfileRow {
   id: string;
   company_id: string;
@@ -318,6 +336,37 @@ async function resolveProductConcept(
   `.execute(trx);
   const row = result.rows[0];
   return row ? { releaseId: row.release_id, releaseConceptId: row.id } : 'invalid';
+}
+
+async function readCnaeNcms(
+  trx: Transaction<DB>,
+  companyId: string,
+): Promise<CnaeNcmRow[]> {
+  return (
+    await sql<CnaeNcmRow>`
+      SELECT
+        ccn.id,
+        ccn.cnae_code::text AS cnae_code,
+        e.id AS entry_id,
+        e.official_code,
+        e.description
+      FROM company_cnae_ncms ccn
+      JOIN official_catalog_entries e ON e.id = ccn.official_catalog_entry_id
+      WHERE ccn.company_id = ${companyId}::uuid
+      ORDER BY ccn.cnae_code, e.official_code
+    `.execute(trx)
+  ).rows;
+}
+
+function cnaeNcmResponse(row: CnaeNcmRow) {
+  return {
+    id: row.id,
+    cnaeCode: row.cnae_code,
+    entryId: row.entry_id,
+    code: row.official_code.replace(/\D/g, ''),
+    officialCode: row.official_code,
+    description: row.description,
+  };
 }
 
 async function replaceNcms(
@@ -611,6 +660,107 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
               : 'profile_not_found' as const;
           },
         );
+        if (outcome !== 'ok') return reply.status(404).send({ error: outcome });
+        return reply.status(204).send();
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
+    '/api/v1/companies/:companyId/cnae-ncms',
+    {
+      preHandler: app.authenticate,
+      schema: { params: companyParamsSchema },
+    },
+    async (request, reply) => {
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
+      try {
+        const rows = await withTenantContext(app.db, request.auth.userId, tenantId, async (trx) => {
+          if (!(await assertCompany(trx, request.params.companyId, tenantId))) return null;
+          return readCnaeNcms(trx, request.params.companyId);
+        });
+        if (rows === null) return reply.status(404).send({ error: 'company_not_found' });
+        return reply.status(200).send({ items: rows.map(cnaeNcmResponse) });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.post(
+    '/api/v1/companies/:companyId/cnae-ncms',
+    {
+      preHandler: app.authenticate,
+      schema: { params: companyParamsSchema, body: cnaeNcmBodySchema },
+    },
+    async (request, reply) => {
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
+      try {
+        const outcome = await withTenantContext(app.db, request.auth.userId, tenantId, async (trx) => {
+          if (!(await assertCompany(trx, request.params.companyId, tenantId))) {
+            return { kind: 'company_not_found' as const };
+          }
+          if (!(await assertCompanyCnae(trx, request.params.companyId, request.body.cnaeCode))) {
+            return { kind: 'cnae_not_linked' as const };
+          }
+          const codes = [...new Set(request.body.ncmCodes)];
+          const entries = await resolveNcmEntries(trx, codes);
+          const resolved = new Set(entries.map((entry) => entry.code));
+          const invalidCodes = codes.filter((code) => !resolved.has(code));
+          if (invalidCodes.length > 0) return { kind: 'invalid_ncm_codes' as const, invalidCodes };
+          for (const entry of entries) {
+            await sql`
+              INSERT INTO company_cnae_ncms (company_id, cnae_code, official_catalog_entry_id)
+              VALUES (${request.params.companyId}::uuid, ${request.body.cnaeCode}, ${entry.id}::uuid)
+              ON CONFLICT ON CONSTRAINT uq_company_cnae_ncm DO NOTHING
+            `.execute(trx);
+          }
+          return { kind: 'ok' as const, rows: await readCnaeNcms(trx, request.params.companyId) };
+        });
+        if (outcome.kind === 'company_not_found') return reply.status(404).send({ error: outcome.kind });
+        if (outcome.kind === 'cnae_not_linked') return reply.status(400).send({ error: outcome.kind });
+        if (outcome.kind === 'invalid_ncm_codes') {
+          return reply.status(400).send({ error: outcome.kind, invalidCodes: outcome.invalidCodes });
+        }
+        return reply.status(201).send({ items: outcome.rows.map(cnaeNcmResponse) });
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  typed.delete(
+    '/api/v1/companies/:companyId/cnae-ncms/:ncmId',
+    {
+      preHandler: app.authenticate,
+      schema: { params: cnaeNcmParamsSchema },
+    },
+    async (request, reply) => {
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
+      try {
+        const outcome = await withTenantContext(app.db, request.auth.userId, tenantId, async (trx) => {
+          if (!(await assertCompany(trx, request.params.companyId, tenantId))) return 'company_not_found' as const;
+          const result = await sql`
+            DELETE FROM company_cnae_ncms
+            WHERE id = ${request.params.ncmId}::uuid
+              AND company_id = ${request.params.companyId}::uuid
+          `.execute(trx);
+          return (result.numAffectedRows ?? 0n) > 0n ? ('ok' as const) : ('ncm_not_found' as const);
+        });
         if (outcome !== 'ok') return reply.status(404).send({ error: outcome });
         return reply.status(204).send();
       } catch (error) {
