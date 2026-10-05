@@ -61,6 +61,84 @@ test('routine object cannot hide incorporation of the contractor or corporate su
     equal(c.category, 'EMPRESARIAL_RELEVANTE'); equal(c.decision, 'KEEP');
   }
 });
+test('explicit corporate passive and active verb forms are KEEP', () => {
+  for (const clause of [
+    'A contratada foi incorporada pela empresa Beta S.A.',
+    'A contratada será incorporada pela empresa Beta S.A.',
+    'A empresa incorpora a contratada.',
+    'A empresa Beta deverá incorporar a contratada.',
+  ]) {
+    const c = classified(excerpt('Aquisição de papel A4', {}, clause));
+    equal(c.category, 'EMPRESARIAL_RELEVANTE'); equal(c.decision, 'KEEP');
+  }
+});
+test('corporate morphology without an unequivocal relation remains REVIEW, not routine or corporate KEEP', () => {
+  for (const clause of [
+    'A sociedade Alfa foi cindida parcialmente.',
+    'A contratada fundiu-se com a empresa Beta S.A.',
+    'A parte sucedida ainda será identificada.',
+    'Os bens serão incorporados ao patrimônio da contratante.',
+    'A parte informou que incorporará bens e que os incorporaria novamente.',
+  ]) {
+    const c = classified(excerpt('Aquisição de papel A4', {}, clause));
+    equal(c.decision, 'REVIEW'); equal(c.category, 'AMBIGUO');
+  }
+});
+test('instituting electronic invoice issuance is tax relevance, not billing boilerplate', () => {
+  const c = classified(excerpt('Aquisição de papel A4', {}, 'Fica instituída a obrigatoriedade de emissão de notas fiscais eletrônicas.'));
+  equal(c.decision, 'KEEP'); equal(c.category, 'TRIBUTARIO_FISCAL');
+  ok(c.reasonCodes.includes('electronic_invoice_obligation'));
+});
+test('unknown material clauses never inherit routine status from the object in any available text', () => {
+  const signals = [
+    'A contratada foi incorporada pela empresa Beta S.A.',
+    'A contratada será incorporada pela empresa Beta S.A.',
+    'A empresa incorpora a contratada.',
+    'A contratada será sucedida pela empresa Beta S.A.',
+    'Fica determinada a retenção do INSS.',
+    'Dispõe sobre contribuição previdenciária sobre receita bruta.',
+    'Institui obrigações acessórias no eSocial e na EFD-Reinf.',
+    'Altera a emissão de NF-e e a DCTFWeb.',
+    'Determina a retenção do IRRF.',
+    'Fica instituída a obrigatoriedade de emissão de notas fiscais eletrônicas.',
+    'Altera os requisitos de regularidade fiscal.',
+    'Autoriza serviços de telecomunicações pela contratada.',
+    'Cláusula adicional: efeito econômico ainda não classificado.',
+  ];
+  for (const signal of signals) {
+    for (const publication of [
+      excerpt('Aquisição de papel A4', {}, signal),
+      excerpt('Aquisição de papel A4', { metadata: { dou: { abstract: signal } } }),
+      excerpt('Aquisição de papel A4', { metadata: { dou: { continuationTitles: [signal] } } }),
+      excerpt('Aquisição de papel A4', { metadata: { dou: { continuationAbstracts: [signal] } } }),
+    ]) {
+      const c = classified(publication);
+      ok(c.decision !== 'IGNORE', `${signal}: ${JSON.stringify(publication)}`);
+    }
+  }
+});
+test('unrecognized clauses fail safe even without a known relevance keyword', () => {
+  const body = classified(excerpt('Aquisição de papel A4', {}, 'Cláusula adicional: efeito econômico ainda não classificado.'));
+  equal(body.decision, 'REVIEW'); deepEqual(body.reasonCodes, ['unrecognized_administrative_content']);
+  const metadata = classified(excerpt('Aquisição de papel A4', { metadata: { dou: { abstract: 'Determina efeito econômico ainda não classificado.' } } }));
+  equal(metadata.decision, 'REVIEW'); deepEqual(metadata.reasonCodes, ['unrecognized_supplementary_text']);
+});
+test('neutral fiscal phrases cannot erase normative qualifiers in the same or next clause', () => {
+  for (const signal of [
+    'Pagamento mediante nota fiscal eletrônica cuja emissão passa a ser obrigatória.',
+    'Pagamento mediante nota fiscal. Fica instituída a obrigatoriedade de emissão de notas fiscais eletrônicas.',
+    'Conferência de notas fiscais referentes à obrigatoriedade de emissão eletrônica.',
+    'Fica instituído novo regime de regularidade fiscal.',
+  ]) {
+    const c = classified(excerpt('Aquisição de papel A4', {}, signal));
+    ok(c.decision !== 'IGNORE', signal);
+  }
+  for (const boilerplate of [
+    'Pagamento mediante nota fiscal eletrônica.',
+    'O pagamento será realizado após a apresentação da nota fiscal.',
+    'Conferência de notas fiscais. Comprovação de regularidade fiscal.',
+  ]) equal(classified(excerpt('Aquisição de papel A4', {}, boilerplate)).decision, 'IGNORE', boilerplate);
+});
 test('routine object cannot hide an exemption of a named tax anywhere in the body', () => {
   for (const tax of ['ICMS', 'ISS', 'ISSQN', 'IPI', 'PIS/Pasep', 'Cofins', 'IBS', 'CBS']) {
     const c = classified(excerpt('Aquisição de papel A4', {}, `A cláusula concede isenção do ${tax}.`));

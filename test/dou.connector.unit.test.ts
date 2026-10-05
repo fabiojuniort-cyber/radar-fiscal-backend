@@ -67,6 +67,8 @@ test('assembled contract excerpts preserve relevant body, abstract and continuat
     entry('116', routine, 'Tratamento do ICMS pendente de confirmação.'),
     entry('117', routine, 'Pagamento mediante nota fiscal e regularidade fiscal.', title, 1),
     entry('117', 'Informações complementares.', '', 'Designação do fiscal do contrato.', 2),
+    entry('118', routine, '', title, 1),
+    entry('118', 'Informações complementares.', 'Concede isenção do ICMS.', title, 2),
   ]);
   const fetch = (async (input) => {
     const url = new URL(String(input));
@@ -84,11 +86,12 @@ test('assembled contract excerpts preserve relevant body, abstract and continuat
     ['114', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
     ['115', 'EMPRESARIAL_RELEVANTE', 'KEEP', ['corporate_reorganization']],
     ['116', 'AMBIGUO', 'REVIEW', ['possible_tax_relevance']],
-  ].map(([id, category, decision, reasonCodes]) => [`2026-09-18:DO3:180:${id}`, { ruleVersion: 'dou-scope-v2', category, decision, reasonCodes }]));
+    ['118', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
+  ].map(([id, category, decision, reasonCodes]) => [`2026-09-18:DO3:180:${id}`, { ruleVersion: 'dou-scope-v3', category, decision, reasonCodes }]));
   assert.ok(result.publications.every(publication => publication.title === title && publication.actType === 'EXTRATO DE CONTRATO'));
   const metadata = result.metadata!.dou as any;
-  assert.equal(metadata.assembledMatterCount, 7);
-  assert.equal(metadata.publicationCount, 5);
+  assert.equal(metadata.assembledMatterCount, 8);
+  assert.equal(metadata.publicationCount, 6);
   assert.equal(metadata.scope.ignoredCount, 2);
   assert.equal(metadata.scope.ignoredByCategory.CONTRATACAO_ADMINISTRATIVA_ROTINEIRA, 2);
 });
