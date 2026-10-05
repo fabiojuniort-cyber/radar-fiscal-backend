@@ -154,6 +154,22 @@ ROLLBACK;
 
 Falha de migration, privilege check ou reconciliação bloqueia o smoke.
 
+### 2.1 Alinhamento de Worker/Scheduler após a migration
+
+Antes do smoke, Backend, Worker e Scheduler devem usar release compatível com DOU-CLEAN-02. Não executar SUPPRESS enquanto o Worker estiver em código anterior aos guards de scope.
+
+A primeira ativação do Worker que contém o detector NCM `1.1.0` pode tornar versões antigas elegíveis para nova varredura. Isso é uma operação separada do smoke desta frente e não deve ocorrer implicitamente durante o gate R3.
+
+Para alinhar o Worker sem iniciar esse rescan:
+
+1. definir `PUBLICATION_NCM_ENRICHMENT_ENABLED=false` **somente no serviço Worker** antes do deploy;
+2. deployar o SHA revisado e confirmar no log de startup `ncmEnrichmentEnabled=false`;
+3. manter coleta e classificação normais; a flag não altera detector, ledger nem dados persistidos;
+4. alinhar o Scheduler ao mesmo SHA sem mudar cron, backfill ou variáveis;
+5. executar o smoke SUPPRESS/RESTORE somente depois de confirmar os runtimes saudáveis.
+
+O padrão da flag é `true`, preservando o comportamento normal fora desta janela. Reativar o scanner NCM 1.1 e executar eventual rescan histórico exige plano operacional explícito e monitoramento próprios; não faz parte do smoke DOU-CLEAN-02.
+
 ## 3. Escolha do registro de smoke
 
 Usar somente publicação controlada que:
