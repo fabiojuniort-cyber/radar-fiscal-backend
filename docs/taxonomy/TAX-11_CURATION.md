@@ -158,6 +158,21 @@ release (itens ocultos continuam salváveis). `/api/v1/companies/:id/taxonomy-su
 sugere segmentos pelo CNAE (prefixo mais específico vence; CNAE principal
 pré-marca, secundários sugerem).
 
+
+### Segmento por CNAE e produtos da empresa
+
+- Segmento é item da tabela Segmento que não é atividade CNAE (código de 7
+  dígitos). O segmento de um grupo (coluna Segmento da grade, `groupSegments`
+  no salvamento) só aceita esses itens, incluídos no rascunho.
+- `taxonomy-suggestions` devolve `cnaes`: para cada CNAE da empresa (cadastro e
+  estabelecimentos), o item mais específico da tabela Segmento; atividade CNAE
+  responde com o segmento do seu subsegmento. O usuário pode trocar o
+  segmento de cada CNAE; a escolha fica em `personalization.taxonomy.cnaeSegments`.
+- Produto parametrizado por CNAE leva `productConceptCode` (item publicado da
+  tabela Produtos). `GET /api/v1/ncm?prefixes=…` lista os NCMs atribuíveis sob
+  os códigos do produto.
+- A afinidade soma os marcadores do perfil, os segmentos por CNAE e os
+  produtos parametrizados.
 ## Carga da planilha de produtos (Segmento;Grupo;Item)
 
 `npm run taxonomy:load-products -- --file=ops/taxonomy/loads/<planilha>.csv [--confirm]` carrega a planilha do PO na tabela de Produtos do rascunho aberto. A lógica fica em `curation.product-load.ts`. A planilha é tratada como a fonte mais atualizada:

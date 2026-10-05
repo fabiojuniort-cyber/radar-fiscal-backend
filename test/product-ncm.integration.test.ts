@@ -150,6 +150,17 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       '10063011',
     );
 
+    // Only the NCMs under a product's codes (Produtos table).
+    const byPrefix = await app.inject({
+      method: 'GET',
+      url: '/api/v1/ncm?prefixes=1006.30,9999&limit=200',
+      headers: firstHeaders,
+    });
+    assert.equal(byPrefix.statusCode, 200, byPrefix.body);
+    const prefixed = byPrefix.json<{ items: Array<{ code: string }> }>().items;
+    assert.ok(prefixed.some((item) => item.code === '10063011'));
+    assert.ok(prefixed.every((item) => item.code.startsWith('100630') || item.code.startsWith('9999')));
+
     const invalidCnae = await app.inject({
       method: 'POST',
       url: `/api/v1/companies/${companyId}/product-profiles`,

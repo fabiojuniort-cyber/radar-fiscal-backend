@@ -409,6 +409,61 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         headers: curator.headers,
       })
     ).json();
+    // Segmento column of the grid: a group's segment must be an item of the
+    // Segmento table, never a CNAE activity (7-digit) nor a retired item.
+    {
+      const activity = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/taxonomy/drafts/current/dimensions/sector/rows',
+        headers: curator.headers,
+        payload: {
+          justification: 'Atividade CNAE',
+          rows: [
+            {
+              code: null,
+              group: null,
+              label: 'Cultivo de arroz (teste)',
+              officialCodes: ['0111301'],
+              aliases: [],
+              profileVisible: false,
+              classifyByLabel: false,
+              displayOrder: null,
+            },
+          ],
+          retire: [],
+        },
+      });
+      assert.equal(activity.statusCode, 200, activity.body);
+      const activityCode = activity.json().created[0] as string;
+      const segmentSave = (segmentCodes: string[]) =>
+        app.inject({
+          method: 'POST',
+          url: gridUrl,
+          headers: curator.headers,
+          payload: {
+            justification: 'Segmento do grupo',
+            rows: [],
+            retire: [],
+            groupSegments: [{ group: 'fertilizantes e corretivos', segmentCodes }],
+          },
+        });
+      const notSegment = await segmentSave([activityCode]);
+      assert.equal(notSegment.statusCode, 400, notSegment.body);
+      assert.match(notSegment.json().message, /não é segmento/);
+      const unknown = await segmentSave(['sector.nao_existe']);
+      assert.equal(unknown.statusCode, 400, unknown.body);
+      assert.match(unknown.json().message, /tabela Segmento/);
+      const linked = await segmentSave(['sector.agribusiness']);
+      assert.equal(linked.statusCode, 200, linked.body);
+      assert.equal(linked.json().groupsUpdated, 1);
+      const retired = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/taxonomy/drafts/current/dimensions/sector/rows',
+        headers: curator.headers,
+        payload: { justification: 'Remove atividade de teste', rows: [], retire: [activityCode] },
+      });
+      assert.equal(retired.statusCode, 200, retired.body);
+    }
     const gesso = afterGrid.concepts.find((c: { code: string }) => c.code === 'product.gesso');
     assert.equal(gesso.aliases.length, 2, 'several synonyms per row');
     assert.ok(
@@ -639,6 +694,16 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       'hidden item keeps its label for legacy profile fields',
     );
     assert.equal(body.dimensions[2].concepts[0].label, 'NF-e');
+    // Segmento table and Produtos table for the CNAE / product pickers.
+    assert.ok(body.segments.some((item: { code: string }) => item.code === 'sector.agribusiness'));
+    const ureaOption = body.products.find((item: { code: string }) => item.code === 'product.urea');
+    assert.equal(ureaOption.groupLabel, 'Fertilizantes e corretivos');
+    assert.deepEqual(ureaOption.officialCodes, ['310210']);
+    assert.ok(ureaOption.segmentCodes.includes('sector.agribusiness'));
+    assert.ok(
+      !body.products.some((item: { code: string }) => item.code === 'product.soy'),
+      'hidden item is not offered to companies',
+    );
 
     // Classification is disabled by default: the Worker does nothing.
     const { publicationId } = await createPublication(
@@ -759,6 +824,82 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       // Another tenant cannot read this company's affinity.
       const other = await app.inject({ method: 'GET', url: affinityUrl, headers: curator.headers });
       assert.equal(other.statusCode, 404, other.body);
+      // Segment of each company CNAE, from the Segmento table.
+      await admin.query(
+        `INSERT INTO cnaes (code, description, is_active) VALUES ('0111301', 'Cultivo de arroz', TRUE)
+         ON CONFLICT (code) DO NOTHING`,
+      );
+      await admin.query(
+        `INSERT INTO company_cnaes (company_id, cnae_code, is_primary) VALUES ($1::uuid, '0111301', TRUE)`,
+        [companyId],
+      );
+      const suggestions = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${companyId}/taxonomy-suggestions`,
+        headers: customer.headers,
+      });
+      assert.equal(suggestions.statusCode, 200, suggestions.body);
+      const [cnaeRow] = suggestions.json().cnaes;
+      assert.equal(cnaeRow.cnaeCode, '0111301');
+      assert.ok(cnaeRow.segments.some((segment: { code: string }) => segment.code === 'sector.agribusiness'));
+
+      // Profile keeps the user's segment per CNAE; a CNAE activity or an
+      // unknown item is refused.
+      const profileUrl = `/api/v1/companies/${companyId}/tax-profile`;
+      const profileBody = (cnaeSegments: Array<{ cnaeCode: string; segmentCode: string }>) => ({
+        taxRegime: 'LUCRO_REAL',
+        segments: [],
+        activities: [],
+        personalization: {
+          taxonomy: {
+            releaseId: tagView.release.id,
+            releaseVersion: tagView.release.version,
+            conceptCodes: [],
+            cnaeSegments,
+          },
+        },
+      });
+      const badSegment = await app.inject({
+        method: 'PUT',
+        url: profileUrl,
+        headers: customer.headers,
+        payload: profileBody([{ cnaeCode: '0111301', segmentCode: 'sector.nao_existe' }]),
+      });
+      assert.equal(badSegment.statusCode, 400, badSegment.body);
+      const savedProfile = await app.inject({
+        method: 'PUT',
+        url: profileUrl,
+        headers: customer.headers,
+        payload: profileBody([{ cnaeCode: '0111301', segmentCode: 'sector.agribusiness' }]),
+      });
+      assert.ok(savedProfile.statusCode < 300, savedProfile.body);
+
+      // Product parametrized per CNAE, linked to the Produtos table.
+      const badProduct = await app.inject({
+        method: 'POST',
+        url: `/api/v1/companies/${companyId}/product-profiles`,
+        headers: customer.headers,
+        payload: { cnaeCode: '0111301', productLabel: 'Inexistente', productConceptCode: 'product.nao_existe', ncmCodes: [] },
+      });
+      assert.equal(badProduct.statusCode, 400, badProduct.body);
+      assert.equal(badProduct.json().error, 'invalid_product');
+      const productProfile = await app.inject({
+        method: 'POST',
+        url: `/api/v1/companies/${companyId}/product-profiles`,
+        headers: customer.headers,
+        payload: { cnaeCode: '0111301', productLabel: 'Ureia', productConceptCode: 'product.urea', ncmCodes: [] },
+      });
+      assert.equal(productProfile.statusCode, 201, productProfile.body);
+      assert.equal(productProfile.json().productConceptCode, 'product.urea');
+
+      // Affinity now reads the CNAE segment and the parametrized product.
+      const fromProfile = await app.inject({ method: 'GET', url: affinityUrl, headers: customer.headers });
+      assert.equal(fromProfile.statusCode, 200, fromProfile.body);
+      assert.equal(fromProfile.json().level, 'HIGH');
+      assert.deepEqual(
+        fromProfile.json().matches.map((m: { code: string }) => m.code).sort(),
+        ['product.urea', 'sector.agribusiness'],
+      );
     }
 
     // Seal: a second batch does not reclassify the same version.

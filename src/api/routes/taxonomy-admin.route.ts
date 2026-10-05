@@ -636,6 +636,15 @@ export async function taxonomyAdminRoutes(
             )
             .max(5000),
           retire: z.array(z.string().trim().min(1).max(200)).max(5000).default([]),
+          groupSegments: z
+            .array(
+              z.object({
+                group: z.string().trim().min(1).max(200),
+                segmentCodes: z.array(z.string().regex(/^sector\.[a-z0-9_]+$/)).max(100),
+              }),
+            )
+            .max(2000)
+            .default([]),
         }),
       },
     },
@@ -644,6 +653,7 @@ export async function taxonomyAdminRoutes(
         saveDimensionRows(client, actorFrom(request, request.body.justification), request.params.code, {
           rows: request.body.rows,
           retire: request.body.retire,
+          groupSegments: request.body.groupSegments,
         }),
       );
       return reply.send(result);
