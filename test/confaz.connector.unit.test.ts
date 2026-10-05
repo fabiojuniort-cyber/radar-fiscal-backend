@@ -558,6 +558,32 @@ test('older acts: two-digit 19xx years, portal title before the act heading and 
   assert.equal(recent.publishedAt?.toISOString().slice(0, 10), '2026-11-06');
 });
 
+test('older acts written "Publicação DOU de …" keep the DOU date and the official ementa', () => {
+  const html = `<!DOCTYPE html><html><head>
+    <meta property="og:description" content="Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas.">
+  </head><body>
+    <div id="content"><h1 class="documentFirstHeading">CONVÊNIO ICMS 52/91</h1>
+    <div id="content-core">
+      <p class="DataPublicao">Publicação DOU de 30.09.91.</p>
+      <p class="DataPublicao">Retificação DOU de 11.10.91 e 04.12.91.</p>
+      <p class="DataPublicao">Ratificação Nacional DOU de 17.10.91, pelo Ato COTEPE/ICMS 08/91.</p>
+      <p class="Ementa">Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas.</p>
+      <p>Cláusula primeira Fica reduzida a base de cálculo do ICMS nas operações com máquinas e implementos agrícolas.</p>
+    </div></div>
+  </body></html>`;
+  const parsed = parseConfazPublicationHtml(
+    html,
+    'https://www.confaz.fazenda.gov.br/legislacao/convenios/1991/CV052_91',
+    'convenios',
+  );
+  assert.equal(parsed.actNumber, '52/1991');
+  assert.equal(parsed.publishedAt?.toISOString().slice(0, 10), '1991-09-30');
+  assert.equal(
+    parsed.title,
+    'Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas.',
+  );
+});
+
 test('presentation keeps only the act text block, without the portal footer', () => {
   const html = `<html><body><h1 class="documentFirstHeading">CONVÊNIO ICMS 100/97</h1>
     <div id="content-core">
