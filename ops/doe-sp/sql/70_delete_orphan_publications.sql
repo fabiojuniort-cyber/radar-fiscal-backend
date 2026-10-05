@@ -10,6 +10,8 @@
 --   collection_items.publication_id  (FK NO ACTION)   -> set to NULL, rows kept
 --   collection_run_publications      (FK CASCADE)     -> deleted with the row
 --   company_publications             (FK CASCADE)     -> must be 0 (guard)
+--   publication_scope_events/state   (FK RESTRICT)    -> must be 0 (guard;
+--     SUPPRESS/RESTORE audit is never deleted by this repair)
 --
 -- Usage:
 --   dry execution (default): every statement runs, counts are printed as
@@ -42,10 +44,14 @@ BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '60s';
 SET LOCAL lock_timeout = '10s';
 
--- Locks before the first query (see 30_rebuild_destructive.sql).
+-- Locks before the first query (see 30_rebuild_destructive.sql). The scope
+-- ledger is locked too so a concurrent SUPPRESS/RESTORE cannot appear after
+-- the guard and before the orphan deletion.
 LOCK TABLE collection_items IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE publications, publication_origins, publication_versions,
-  collection_run_publications, company_publications IN SHARE ROW EXCLUSIVE MODE;
+  collection_run_publications, company_publications,
+  publication_scope_events, publication_scope_state
+  IN SHARE ROW EXCLUSIVE MODE;
 
 CREATE TEMP TABLE doe_sp_orphans ON COMMIT DROP AS
 SELECT id::uuid FROM (VALUES
@@ -86,6 +92,18 @@ BEGIN
   SELECT count(*) INTO v_n FROM company_publications cp JOIN doe_sp_orphans o ON o.id = cp.publication_id;
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % company_publications reference the orphans', v_n; END IF;
 
+  -- SUPPRESS/RESTORE history is append-only evidence. A publication that has
+  -- entered scope governance is no longer eligible for this legacy hard delete.
+  SELECT count(*) INTO v_n
+  FROM publication_scope_events pse
+  JOIN doe_sp_orphans o ON o.id = pse.publication_id;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % publication scope events reference the orphans (preserve SUPPRESS/RESTORE audit; do not delete)', v_n; END IF;
+
+  SELECT count(*) INTO v_n
+  FROM publication_scope_state pss
+  JOIN doe_sp_orphans o ON o.id = pss.publication_id;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % publication scope state rows reference the orphans (restore/govern scope first)', v_n; END IF;
+
   -- Only DOE-SP run history may point at them.
   SELECT count(*) INTO v_n FROM collection_items ci JOIN doe_sp_orphans o ON o.id = ci.publication_id
   JOIN collection_runs cr ON cr.id = ci.collection_run_id JOIN sources s ON s.id = cr.source_id
@@ -102,7 +120,9 @@ BEGIN
     AND conname NOT IN (
       'publication_origins_publication_id_fkey', 'publication_versions_publication_id_fkey',
       'collection_run_publications_publication_id_fkey', 'fk_collection_item_publication',
-      'company_publications_publication_id_fkey');
+      'company_publications_publication_id_fkey',
+      'publication_scope_events_publication_id_fkey',
+      'publication_scope_state_publication_id_fkey');
   IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % unknown foreign keys reference publications (schema drift)', v_n; END IF;
 END
 $$;
