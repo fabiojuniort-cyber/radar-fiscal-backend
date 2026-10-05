@@ -186,3 +186,14 @@ pré-marca, secundários sugerem).
 - **Segmento:** os grupos da planilha são vinculados ao segmento informado (item do Setor com o mesmo nome).
 - **Item repetido na planilha:** vale a última linha.
 - **Sem `--confirm`:** tudo é executado e desfeito (simulação). Se houver erro, nada é gravado. Nada é publicado: o curador revisa o rascunho antes.
+
+## Segmentos antigos (baseline) → tabela Segmento TriFaros
+
+Os 45 itens de Setor da baseline TAX-10 ("Agronegócio", "Atacado"...) foram
+substituídos pelos 32 segmentos TriFaros. `npm run taxonomy:retire-legacy-segments
+[-- --confirm]` (sem `--confirm` é simulação) trabalha no rascunho aberto (cria um
+se não houver): move cada grupo ligado a um item antigo para o segmento TriFaros
+correspondente (`LEGACY_SEGMENT_TARGETS` em `curation.legacy-segments.ts`) e
+retira os itens antigos. Se faltar um segmento TriFaros no rascunho, nada muda.
+Não publica: o curador revisa e publica.
+

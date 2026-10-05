@@ -20,6 +20,10 @@ import {
   normalizeCodes,
 } from '../src/modules/taxonomy/curation/curation.draft.js';
 import type { ReleaseView } from '../src/modules/taxonomy/curation/curation.read.js';
+import {
+  LEGACY_SEGMENT_TARGETS,
+  planLegacySegmentRetirement,
+} from '../src/modules/taxonomy/curation/curation.legacy-segments.js';
 import { matchSegmentsByCnae, segmentsForCnaes } from '../src/modules/taxonomy/curation/curation.suggestions.js';
 
 function concept(
@@ -390,4 +394,43 @@ test('engine 2.2.0: Roman-numeral terms ignore item numbering; matching ignores 
   assert.deepEqual(plan('Inciso II - texto. Também se aplica ao II.'), ['tax.ii']);
   // Lowercase item numbering is still numbering.
   assert.deepEqual(plan('nos incisos i e ii do artigo; ii - às saídas'), []);
+});
+
+test('legacy segments: every old baseline item maps to a TriFaros segment', () => {
+  assert.equal(Object.keys(LEGACY_SEGMENT_TARGETS).length, 45);
+  const trifaros = new Set(['inst', 'agro', 'amb', 'ali', 'aut', 'bel', 'cas', 'com', 'con', 'cons', 'edu', 'ene', 'fin', 'imo', 'ind', 'jur', 'loc', 'mkt', 'cul', 'min', 'mod', 'pap', 'qui', 'res', 'apo', 'sau', 'seg', 'pes', 'tec', 'log', 'tur', 'pet']);
+  for (const [legacy, target] of Object.entries(LEGACY_SEGMENT_TARGETS)) {
+    assert.ok(trifaros.has(target), `${legacy} -> ${target}`);
+  }
+});
+
+test('legacy segments: groups move to the TriFaros segment before old items retire', () => {
+  const concept = (code: string) => ({ code, membershipStatus: 'INCLUDED' });
+  const view = {
+    concepts: [
+      concept('sector.agribusiness'),
+      concept('sector.rural_production'),
+      concept('sector.chemical_industry'),
+      concept('sector.trifaros_agro'),
+      concept('sector.trifaros_qui'),
+      concept('sector.trifaros_com'),
+    ],
+    groups: [
+      { id: 'g1', label: 'Fertilizantes', segmentCodes: ['sector.agribusiness', 'sector.chemical_industry'] },
+      { id: 'g2', label: 'Grãos', segmentCodes: ['sector.agribusiness', 'sector.rural_production'] },
+      { id: 'g3', label: 'Agro / Produção', segmentCodes: ['sector.trifaros_agro'] },
+    ],
+  } as unknown as Parameters<typeof planLegacySegmentRetirement>[0];
+
+  const plan = planLegacySegmentRetirement(view);
+  assert.deepEqual(plan.groupUpdates.map((item) => [item.group, item.to]), [
+    ['Fertilizantes', ['sector.trifaros_agro', 'sector.trifaros_qui']],
+    ['Grãos', ['sector.trifaros_agro']],
+  ]);
+  assert.deepEqual(plan.retire, ['sector.agribusiness', 'sector.chemical_industry', 'sector.rural_production']);
+  assert.deepEqual(plan.missingTargets, []);
+
+  // A link to a TriFaros segment missing from the draft stops the change.
+  const withoutQui = { ...view, concepts: view.concepts.filter((item) => item.code !== 'sector.trifaros_qui') };
+  assert.deepEqual(planLegacySegmentRetirement(withoutQui).missingTargets, ['sector.trifaros_qui']);
 });
