@@ -431,6 +431,85 @@ test('unpreserved HTML block boundaries veto IGNORE through metadata without cha
   }
 });
 
+test('nested XML in scope fields vetoes IGNORE without changing canonical text, HTML or hashes', async () => {
+  const title = 'EXTRATO DE CONTRATO Nº 7/2026';
+  const routine = '<p>Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.</p>';
+  const entry = syntheticZipEntry({ matter: '12345678', section: 'DO3', title, text: routine });
+  const context = archiveContext('DO3');
+  const baseline = parseDouEntries([entry], context).publications[0]!;
+  assert.equal(classifyDouContractExcerpt(baseline)?.decision, 'IGNORE');
+  for (const nested of [
+    '<p>Concede isenção do ICMS.</p>',
+    '<p>Autoriza a concessão de serviços públicos.</p>',
+    '<span>Condições adicionais não identificadas.</span>',
+    '<div><p><![CDATA[Concede isenção do ICMS.]]></p></div>',
+    '<br/>',
+  ]) {
+    for (const field of ['Texto', 'Ementa', 'Identifica']) {
+      const changed = { ...entry, bytes: Buffer.from(Buffer.from(entry.bytes).toString('utf8')
+        .replace(`</${field}>`, `${nested}</${field}>`)) };
+      const publications = await assertZipParity([changed], context);
+      assert.equal(publications.length, 1);
+      const publication = publications[0]!;
+      const dou = publication.metadata!.dou as any;
+      assert.equal(dou.scopeStructureIncomplete, true, `${field}: ${nested}`);
+      assert.equal(classifyDouContractExcerpt(publication)?.decision, 'REVIEW');
+      assert.deepEqual(classifyDouContractExcerpt(publication)?.reasonCodes, ['incomplete_text_structure']);
+      // Deliberately preserve legacy extraction: discarded XML is represented
+      // by a conservative veto, never silently interpreted as routine-only.
+      assert.equal(publication.title, baseline.title);
+      assert.equal(publication.content, baseline.content);
+      assert.equal(publication.presentationHtml, baseline.presentationHtml);
+      assert.equal(dou.abstract, (baseline.metadata!.dou as any).abstract);
+      const before = normalizePublication({ sourceId: 'dou', publication: baseline });
+      const after = normalizePublication({ sourceId: 'dou', publication });
+      assert.equal(after.identityHash, before.identityHash);
+      assert.equal(after.contentHash, before.contentHash);
+    }
+  }
+});
+
+test('nested XML in any continuation scope field vetoes IGNORE in arbitrary multipart order', async () => {
+  const title = 'EXTRATO DE CONTRATO Nº 7/2026';
+  const first = syntheticZipEntry({ matter: '12345678', section: 'DO3', part: 1, title,
+    text: 'Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.' });
+  const second = syntheticZipEntry({ matter: '12345678', section: 'DO3', part: 2, title, text: 'Informações complementares.' });
+  const context = archiveContext('DO3');
+  assert.equal(classifyDouContractExcerpt(parseDouEntries([first, second], context).publications[0]!)?.decision, 'IGNORE');
+  for (const field of ['Texto', 'Ementa', 'Identifica']) {
+    const changed = { ...second, bytes: Buffer.from(Buffer.from(second.bytes).toString('utf8')
+      .replace(`</${field}>`, `<p>Concede isenção do ICMS.</p></${field}>`)) };
+    for (const entries of [[first, changed], [changed, first]]) {
+      const publications = await assertZipParity(entries, context);
+      assert.equal(publications.length, 1);
+      assert.equal((publications[0]!.metadata!.dou as any).scopeStructureIncomplete, true);
+      assert.equal(classifyDouContractExcerpt(publications[0]!)?.decision, 'REVIEW');
+      assert.deepEqual(classifyDouContractExcerpt(publications[0]!)?.reasonCodes, ['incomplete_text_structure']);
+    }
+  }
+});
+
+test('ordinary XML text, CDATA HTML and escaped HTML remain eligible for routine IGNORE', async () => {
+  const title = 'EXTRATO DE CONTRATO Nº 7/2026';
+  const routine = 'Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.';
+  const entry = syntheticZipEntry({ matter: '12345678', section: 'DO3', title, text: routine });
+  for (const [xmlText, html] of [
+    [routine, routine],
+    [`<![CDATA[<p>${routine}</p>]]>`, `<p>${routine}</p>`],
+    [`&lt;p&gt;${routine}&lt;/p&gt;`, `<p>${routine}</p>`],
+  ]) {
+    const changed = { ...entry, bytes: Buffer.from(Buffer.from(entry.bytes).toString('utf8')
+      .replace(`<Texto><![CDATA[${routine}]]></Texto>`, `<Texto>${xmlText}</Texto>`)) };
+    const publications = await assertZipParity([changed], archiveContext('DO3'));
+    assert.equal(publications.length, 1);
+    const publication = publications[0]!;
+    assert.equal((publication.metadata!.dou as any).scopeStructureIncomplete, undefined);
+    assert.equal(classifyDouContractExcerpt(publication)?.decision, 'IGNORE');
+    assert.equal(publication.content, routine);
+    assert.equal(publication.presentationHtml, `<section>${html}</section>`);
+  }
+});
+
 test('a matter with an empty official title is kept with a flagged descriptive title, never an inferred act', async () => {
   const entries = await fixtureEntries('DO1');
   const original = parseDouEntries(entries, archiveContext('DO1')).publications.find(p => p.actNumber === '119/2026')!;
