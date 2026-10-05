@@ -17,6 +17,12 @@ export interface DouOptions {
   // A bounded, explicit date range for controlled validation/backfill. Runtime registry
   // never supplies these dates and does not mutate shared source configuration.
   dates?: string[];
+  /**
+   * Backfill of past dates only: a batch where every package is absent is a
+   * consulted batch without editions (weekends, holidays), not a pending
+   * availability to retry. Monitoring never sets it.
+   */
+  allowEmptyBatch?: boolean;
 }
 function failure(code: string, retryable = false) {
   return new ConnectorError(code, { code, kind: 'FETCH_ERROR', retryable });
@@ -111,7 +117,7 @@ export class DouConnector implements CollectionConnector {
           });
         }
       }
-      if (!available) throw failure('INLABS_EDITIONS_NOT_AVAILABLE', true);
+      if (!available && !this.#options.allowEmptyBatch) throw failure('INLABS_EDITIONS_NOT_AVAILABLE', true);
       // Bound receipt history. Only a terminal successful RUN makes these receipts
       // eligible as a checkpoint; attempt success alone precedes publication persistence.
       const cutoff = new Date(now); cutoff.setUTCDate(cutoff.getUTCDate() - 65);
