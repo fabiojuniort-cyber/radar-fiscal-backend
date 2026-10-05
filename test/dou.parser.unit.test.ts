@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { setImmediate } from 'node:timers/promises';
+import sax from 'sax';
 import { parseDouEntries, parseDouZip, readDouZip, classifyDouAct, extractEmbeddedConfazPublications, douHtmlText } from '../src/modules/collection/dou.parser.js';
 import type { DouXmlEntry, DouArchiveContext } from '../src/modules/collection/dou.parser.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
@@ -95,6 +96,105 @@ test('streaming ZIP parser preserves continuation scope signals, HTML presentati
   const embedded = await assertZipParity([embeddedZipEntry()], archiveContext('DO1'));
   assert.deepEqual(embedded.map(item => item.actNumber), ['28/2026', '63/2026', '64/2026']);
   assert.equal((embedded[1]!.metadata!.dou as any).parentMatterExternalId, embedded[0]!.externalId);
+});
+
+test('image-heavy XML detaches each completed retained value once without copying its image or changing publication semantics', async t => {
+  const title = 'PORTARIA Nº 7, DE 17 DE SETEMBRO DE 2026 🧾';
+  const agency = 'Órgão público/Coordenação – São Paulo 🧮';
+  const abstract = 'Isenção para ação fiscal 🚀 & controle.';
+  const firstHtml = '<p>Ação fiscal 🚀 — café e coração.</p>';
+  const secondHtml = '<p>Entidade &amp; obrigação.</p>';
+  const html = firstHtml + secondHtml;
+  const smallImage = 'data:image/png;base64,aW1hZ2U=';
+  const largeImage = 'data:image/png;base64,' + 'QUJD'.repeat(12 * 1024);
+  const entry = syntheticZipEntry({ matter: '12345678', title, abstract, text: html });
+  const xml = Buffer.from(entry.bytes).toString('utf8')
+    .replace('Ministério da Fazenda/Conselho Nacional de Política Fazendária', agency)
+    .replace(`<Texto><![CDATA[${html}]]></Texto>`, `<Texto><![CDATA[${firstHtml}]]><![CDATA[${secondHtml}]]></Texto>`);
+  const small = { ...entry, bytes: Buffer.from(xml) };
+  const large = { ...entry, bytes: Buffer.from(xml.replace(smallImage, largeImage)) };
+  const context = archiveContext('DO1');
+  const baseline = parseDouEntries([small], context);
+  assert.deepEqual(baseline.partialFailures, []);
+  assert.equal(baseline.publications.length, 1);
+  const original = baseline.publications[0]!;
+  const dou = original.metadata!.dou as any;
+  const expected = {
+    ...original,
+    metadata: { ...original.metadata, dou: {
+      ...dou,
+      parts: [{ ...dou.parts[0],
+        rawSha256: createHash('sha256').update(large.bytes).digest('hex'),
+        sizeBytes: large.bytes.byteLength,
+      }],
+    } },
+  };
+  const expectedCopies = [...Object.values(dou.parts[0].attributes), title, abstract, html].sort();
+  const originalFrom = Buffer.from;
+  const copied: string[] = [];
+  t.mock.method(Buffer, 'from', (...args: Parameters<typeof Buffer.from>) => {
+    if (typeof args[0] === 'string' && args[1] === 'utf16le') copied.push(args[0]);
+    return Reflect.apply(originalFrom, Buffer, args);
+  });
+  const zipped = await makeZip([large]);
+
+  for (const mode of ['legacy', 'streaming']) {
+    copied.length = 0;
+    let publications: typeof baseline.publications;
+    if (mode === 'legacy') {
+      const result = parseDouEntries([large], context);
+      assert.deepEqual(result.partialFailures, []);
+      publications = result.publications;
+    } else {
+      publications = [];
+      const result = await parseDouZip(zipped, context, new AbortController().signal, async value => { publications.push(value); });
+      assert.deepEqual(result, { partialFailures: [], xmlCount: 1, mediaCount: 0 });
+    }
+    assert.deepEqual([...copied].sort(), expectedCopies, `${mode}: detach complete attrs/fields exactly once, not SAX fragments`);
+    assert.equal(copied.includes(largeImage), false, `${mode}: the discarded base64 image is never copied`);
+    assert.deepEqual(publications, [expected], `${mode}: only original-byte provenance changes with the image`);
+    const publication = publications[0]!;
+    assert.equal(publication.title, title);
+    assert.equal(publication.presentationHtml, `<section>${html}</section>`);
+    assert.equal(publication.content, 'Ação fiscal 🚀 — café e coração.\nEntidade & obrigação.');
+    assert.equal((publication.metadata!.dou as any).parts[0].attributes.artCategory, agency);
+    const before = normalizePublication({ sourceId: 'dou', publication: original });
+    const after = normalizePublication({ sourceId: 'dou', publication });
+    assert.equal(after.identityHash, before.identityHash);
+    assert.equal(after.contentHash, before.contentHash);
+  }
+});
+
+test('completed-field detachment preserves an emoji split across real SAX CDATA callbacks', t => {
+  const html = '<p>Ação fiscal 🚀 — obrigação íntegra.</p>';
+  const entry = syntheticZipEntry({ matter: '12345678', text: html });
+  const expected = parseDouEntries([entry], archiveContext('DO1'));
+  const originalParser = sax.parser;
+  const fragments: string[] = [];
+  t.mock.method(sax, 'parser', (...args: Parameters<typeof sax.parser>) => {
+    const parser = originalParser(...args);
+    const write = parser.write;
+    parser.write = function (xml) {
+      if (typeof xml !== 'string') return write.call(this, xml);
+      const split = xml.indexOf('🚀', xml.indexOf('<Texto>')) + 1;
+      assert.ok(split > 0);
+      const onCdata = this.oncdata;
+      this.oncdata = fragment => { fragments.push(fragment); onCdata?.(fragment); };
+      // Valid UTF-8 input has already been decoded. SAX may flush a JS string
+      // between its UTF-16 surrogate units; the complete field must join them.
+      write.call(this, xml.slice(0, split));
+      this.flush();
+      return write.call(this, xml.slice(split));
+    };
+    return parser;
+  });
+
+  const actual = parseDouEntries([entry], archiveContext('DO1'));
+  assert.ok(fragments.some(fragment => fragment.endsWith('\ud83d')));
+  assert.ok(fragments.some(fragment => fragment.startsWith('\ude80')));
+  assert.deepEqual(actual, expected);
+  assert.equal(actual.publications[0]!.presentationHtml, `<section>${html}</section>`);
+  assert.equal(actual.publications[0]!.content, 'Ação fiscal 🚀 — obrigação íntegra.');
 });
 
 test('streaming ZIP parser awaits every publication sink, including embedded children', { timeout: 5000 }, async () => {

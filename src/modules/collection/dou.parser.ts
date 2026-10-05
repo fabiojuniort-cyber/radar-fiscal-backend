@@ -43,6 +43,15 @@ function hasUnpreservedScopeBlocks(html: string): boolean {
   return found;
 }
 
+function detachXmlStrings(values: Record<string, string>): void {
+  // SAX can return slices/ropes backed by the full decoded XML. Copy completed
+  // values through independent bytes so small fields cannot pin large images.
+  // UTF-16 preserves every code unit, including any lone surrogate SAX accepts.
+  for (const key of Object.keys(values)) {
+    values[key] = Buffer.from(values[key]!, 'utf16le').toString('utf16le');
+  }
+}
+
 function parsePart(entry: DouXmlEntry): Part {
   const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/.exec(entry.name);
   if (!match) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
@@ -79,6 +88,10 @@ function parsePart(entry: DouXmlEntry): Part {
   // embedded base64 images). Keep only the original byte hash/size for provenance.
   const hasHighlightImage = Boolean(attrs.highlightImage);
   delete attrs.highlightImage;
+  // Detach only after all SAX callbacks/concatenation have finished, and never
+  // copy highlightImage: it is intentionally absent from retained provenance.
+  detachXmlStrings(attrs);
+  detachXmlStrings(fields);
   return {
     attrs, fields,
     entry: { name: entry.name, rawSha256: hash(entry.bytes), sizeBytes: entry.bytes.byteLength },

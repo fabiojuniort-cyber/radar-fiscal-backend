@@ -401,10 +401,16 @@ export type DouBackfillTickResult =
   | { state: 'SKIPPED'; reason: 'SOURCE_INACTIVE' | 'THROTTLED' | 'SOURCE_BUSY' | 'SCHEDULED_CYCLE_DUE' }
   | { state: 'RAN'; batch: DouBackfillBatchResult; remainingDates: number };
 
-/** BACKFILL runs that ended without consulting the source, since the last finished one. */
+/** Unsuccessful BACKFILL runs since the last coverage-eligible consultation. */
 async function consecutiveBackfillFailures(db: Kysely<DB>, sourceId: string): Promise<number> {
   const recent = await db.selectFrom('collection_runs')
     .select('status')
+    .select(({ exists, selectFrom }) => exists(
+      selectFrom('collection_items as ci')
+        .select('ci.id')
+        .whereRef('ci.collection_run_id', '=', 'collection_runs.id')
+        .where('ci.status', '=', 'FAILED'),
+    ).as('has_failed_items'))
     .where('source_id', '=', sourceId)
     .where('trigger_type', '=', 'BACKFILL')
     .where('finished_at', 'is not', null)
@@ -413,7 +419,11 @@ async function consecutiveBackfillFailures(db: Kysely<DB>, sourceId: string): Pr
     .execute();
   let failures = 0;
   for (const run of recent) {
-    if (run.status === 'SUCCESS' || run.status === 'SUCCESS_NO_RESULTS' || run.status === 'PARTIAL_SUCCESS') break;
+    // Match coverage eligibility: parser-only PARTIAL_SUCCESS is consulted,
+    // but a failed publication must rotate/stall instead of retrying the same
+    // uncovered date forever while repeatedly resetting this counter.
+    if (!run.has_failed_items &&
+        (run.status === 'SUCCESS' || run.status === 'SUCCESS_NO_RESULTS' || run.status === 'PARTIAL_SUCCESS')) break;
     failures += 1;
   }
   return failures;
@@ -460,7 +470,7 @@ export async function runDouBackfillTick(db: Kysely<DB>, options: DouBackfillTic
 
   // A date that keeps failing (e.g. a package INLABS lists but never serves)
   // must not block the older ones: after K consecutive unsuccessful backfill
-  // runs the plan starts K dates further. Any finished run resets K, so a
+  // runs the plan starts K dates further. A coverage-eligible run resets K, so a
   // transient INLABS outage only delays the order. When every remaining date
   // failed twice in a row, the backfill stops and asks for an operator.
   const failures = await consecutiveBackfillFailures(db, source.id);

@@ -1,10 +1,12 @@
+import type { PublicationSpoolFilesystem } from './publication-spool.filesystem.js';
+
 /** Shape-only, fixed-cardinality telemetry: never collect source bodies or filenames. */
 export type CollectionMemoryPhase =
   | 'collect_start' | 'archive_downloaded' | 'archive_parsed'
-  | 'collect_complete' | 'persist_start' | 'persist_progress'
+  | 'spool_ready' | 'collect_complete' | 'persist_start' | 'persist_progress'
   | 'persist_complete' | 'cleanup';
 
-export interface CollectionMemoryCounters {
+export interface CollectionMemoryCounters extends Partial<PublicationSpoolFilesystem> {
   archives?: number;
   publications?: number;
   xmlEntries?: number;
@@ -39,6 +41,10 @@ export function createCollectionMemoryProbe(
       ...(counters.xmlEntries !== undefined ? { xmlEntries: counters.xmlEntries } : {}),
       ...(counters.archiveBytes !== undefined ? { archiveBytes: counters.archiveBytes } : {}),
       ...(counters.spoolBytes !== undefined ? { spoolBytes: counters.spoolBytes } : {}),
+      ...(counters.spoolFilesystem !== undefined ? { spoolFilesystem: counters.spoolFilesystem } : {}),
+      ...(counters.spoolStorage !== undefined ? { spoolStorage: counters.spoolStorage } : {}),
+      ...(counters.spoolFilesystemProbe !== undefined ? { spoolFilesystemProbe: counters.spoolFilesystemProbe } : {}),
+      ...(counters.spoolFreeBytes !== undefined ? { spoolFreeBytes: counters.spoolFreeBytes } : {}),
     });
   };
 }

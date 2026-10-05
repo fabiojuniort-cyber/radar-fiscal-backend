@@ -150,6 +150,8 @@ export async function executeConnector(
     try {
       spool = await PublicationSpool.create(connectorSignal);
       connectorSignal.throwIfAborted();
+      // Filesystem diagnostics are advisory, including the telemetry consumer.
+      try { input.memory?.('spool_ready', spool.filesystem); } catch { /* observation must not fail collection */ }
       const result = await input.connector.collectIncremental(context, publication => spool!.append(publication));
       connectorSignal.throwIfAborted();
       if (result.publications.length || result.publicationStream) {

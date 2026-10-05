@@ -5,7 +5,7 @@ import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQue
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { DOU_BACKFILL_SECTIONS, assertDouBackfillAvailable, douBackfillBatches, isDouBackfillCoverageComplete, planDouBackfillDates, readDouBackfillCoverage, runDouBackfillTick } from '../src/modules/collection/dou-backfill.js';
-import { DOU_XML_SECTIONS } from '../src/modules/collection/dou.connector.js';
+import { DOU_XML_SECTIONS, DouConnector } from '../src/modules/collection/dou.connector.js';
 
 test('plan walks back one day at a time, skipping covered dates and the monitoring window', () => {
   const dates = planDouBackfillDates({
@@ -93,6 +93,7 @@ const sourceQuery = /from "sources"/;
 const openRunQuery = /select "id", "status", "trigger_type" from "collection_runs".*limit \$\d+$/;
 const lastRunQuery = /select "created_at" from "collection_runs".*order by "created_at" desc limit \$\d+$/;
 const coverageQuery = /from "collection_attempts" as "ca"/;
+const recentBackfillQuery = /select "status", .*as "has_failed_items" from "collection_runs".*"finished_at" is not null/;
 
 test('busy backfill ticks skip archive history for either open status', async () => {
   for (const status of ['PENDING', 'RUNNING']) {
@@ -180,7 +181,7 @@ test('passing read-only prechecks cannot bypass the locked open-run or interval 
       { sql: lastRunQuery, rows: [] },
       { sql: coverageQuery, rows: [] },
       { sql: coverageQuery, rows: [] },
-      { sql: /select "status" from "collection_runs".*"finished_at" is not null/, rows: [] },
+      { sql: recentBackfillQuery, rows: [] },
       { sql: /^LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE$/, rows: [] },
       { sql: sourceQuery, rows: [tickSource] },
       { sql: openRunQuery, rows: busy ? [{ id: 'concurrent-run', status: 'RUNNING', trigger_type: 'BACKFILL' }] : [] },
@@ -233,6 +234,99 @@ test('parser-partial backfills without failed publication items still cover cons
     assert.equal(coverage.receipts[`${date}-DO1.zip`], undefined, 'partial archive hashes still do not skip a replay');
     assert.equal(coverage.receipts[`${date}-DO3.zip`], hash);
     assert.deepEqual(planDouBackfillDates({ from: date, to: date, today: '2026-10-04', covered: coverage.covered }), []);
+    assertDone();
+  } finally {
+    await db.destroy();
+  }
+});
+
+type RecentBackfillRun = { status: string; has_failed_items: boolean };
+
+function tickPlanningSteps(recentRuns: RecentBackfillRun[]): QueryStep[] {
+  return [
+    { sql: sourceQuery, rows: [tickSource] },
+    { sql: openRunQuery, rows: [] },
+    { sql: coverageQuery, rows: [] },
+    { sql: coverageQuery, rows: [] },
+    { sql: recentBackfillQuery, rows: recentRuns },
+  ];
+}
+
+function successfulEmptyTickSteps(recentRuns: RecentBackfillRun[]): QueryStep[] {
+  return [
+    ...tickPlanningSteps(recentRuns),
+    { sql: /^LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE$/, rows: [] },
+    { sql: sourceQuery, rows: [tickSource] },
+    { sql: openRunQuery, rows: [] },
+    { sql: /^insert into "collection_runs"/, rows: [{ id: 'tick-run', source_id: tickSource.id, correlation_id: 'tick-correlation' }] },
+    { sql: /^select .* from "collection_runs" .*for update$/, rows: [{ id: 'tick-run', status: 'RUNNING', worker_id: tickOptions.workerId }] },
+    { sql: /^select "attempt_no" from "collection_attempts"/, rows: [] },
+    { sql: /^insert into "collection_attempts"/, rows: [{ id: 'tick-attempt', collection_run_id: 'tick-run', attempt_no: 1 }] },
+    { sql: /^select "id" from "collection_runs" .*for update$/, rows: [{ id: 'tick-run' }] },
+    { sql: /^select "id" from "collection_attempts" .*for update$/, rows: [{ id: 'tick-attempt' }] },
+    { sql: /^update "collection_attempts" set /, rows: [{ id: 'tick-attempt' }] },
+    { sql: /^update "collection_runs" set /, rows: [{ id: 'tick-run' }] },
+  ];
+}
+
+test('partial backfills with failed publications count toward the stall threshold instead of resetting it', async () => {
+  const { db, queries, assertDone } = scriptedDatabase(tickPlanningSteps([
+    { status: 'PARTIAL_SUCCESS', has_failed_items: true },
+    { status: 'PARTIAL_SUCCESS', has_failed_items: true },
+    { status: 'SUCCESS_NO_RESULTS', has_failed_items: false },
+  ]));
+  try {
+    assert.deepEqual(await runDouBackfillTick(db, { ...tickOptions, minIntervalMs: 0 }), {
+      state: 'STALLED', consecutiveFailures: 2, remainingDates: ['2026-10-01'],
+    });
+    const recent = queries.at(-1)!;
+    assert.match(recent.sql, /exists \(select .* from "collection_items"/);
+    assert.match(recent.sql, /"collection_run_id" = "collection_runs"\."id"/);
+    assert.ok(recent.parameters.includes('FAILED'), 'failure evidence comes from persisted item status');
+    assert.equal(queries.some(query => /insert into/.test(query.sql)), false, 'stalled ticks cannot create another run');
+    assertDone();
+  } finally {
+    await db.destroy();
+  }
+});
+
+test('one partial persistence failure rotates the next tick to the older missing date', async t => {
+  const collector = t.mock.method(DouConnector.prototype, 'collectIncremental', async () => ({ publications: [] }));
+  const { db, assertDone } = scriptedDatabase(successfulEmptyTickSteps([
+    { status: 'PARTIAL_SUCCESS', has_failed_items: true },
+    { status: 'SUCCESS_NO_RESULTS', has_failed_items: false },
+  ]));
+  try {
+    const result = await runDouBackfillTick(db, {
+      ...tickOptions, from: '2026-09-30', minIntervalMs: 0, heartbeatIntervalMs: 0,
+    });
+    assert.equal(result.state, 'RAN');
+    assert.ok(result.state === 'RAN');
+    assert.deepEqual(result.batch.dates, ['2026-09-30'], 'the failing newest date must not hold older dates hostage');
+    assert.equal(result.remainingDates, 1);
+    assert.equal(result.batch.result.status, 'SUCCESS_NO_RESULTS');
+    assert.equal(collector.mock.callCount(), 1);
+    assertDone();
+  } finally {
+    await db.destroy();
+  }
+});
+
+test('parser-only partial success resets the streak despite older failures and keeps newest-first planning', async t => {
+  const collector = t.mock.method(DouConnector.prototype, 'collectIncremental', async () => ({ publications: [] }));
+  const { db, assertDone } = scriptedDatabase(successfulEmptyTickSteps([
+    { status: 'PARTIAL_SUCCESS', has_failed_items: false },
+    ...Array.from({ length: 4 }, () => ({ status: 'PARTIAL_SUCCESS', has_failed_items: true })),
+  ]));
+  try {
+    const result = await runDouBackfillTick(db, {
+      ...tickOptions, from: '2026-09-30', minIntervalMs: 0, heartbeatIntervalMs: 0,
+    });
+    assert.equal(result.state, 'RAN', 'the four older failed runs must not cause STALLED after a parser-only partial success');
+    assert.ok(result.state === 'RAN');
+    assert.deepEqual(result.batch.dates, ['2026-10-01'], 'a safe partial consultation resets rotation to the newest missing date');
+    assert.equal(result.batch.result.status, 'SUCCESS_NO_RESULTS');
+    assert.equal(collector.mock.callCount(), 1);
     assertDone();
   } finally {
     await db.destroy();

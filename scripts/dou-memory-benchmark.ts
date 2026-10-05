@@ -8,6 +8,7 @@ import { DouConnector, DOU_XML_SECTIONS } from '../src/modules/collection/dou.co
 import { executeConnector } from '../src/modules/collection/connector.executor.js';
 import { createCollectionMemoryProbe } from '../src/modules/collection/collection.memory.js';
 import type { ConnectorPublication } from '../src/modules/collection/connector.contract.js';
+import type { PublicationSpoolFilesystem } from '../src/modules/collection/publication-spool.filesystem.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { makeZip } from '../test/dou.fixtures.js';
 
@@ -59,8 +60,16 @@ if (!child) {
   const start = process.memoryUsage();
   const peak = { ...start };
   let sampleCount = 0;
+  let spoolFilesystem: PublicationSpoolFilesystem | undefined;
   const memory = createCollectionMemoryProbe(sample => {
     sampleCount++;
+    if (sample.phase === 'spool_ready' && sample.spoolFilesystem && sample.spoolStorage && sample.spoolFilesystemProbe) {
+      spoolFilesystem = {
+        spoolFilesystem: sample.spoolFilesystem, spoolStorage: sample.spoolStorage,
+        spoolFilesystemProbe: sample.spoolFilesystemProbe,
+        ...(sample.spoolFreeBytes !== undefined ? { spoolFreeBytes: sample.spoolFreeBytes } : {}),
+      };
+    }
     for (const key of ['rss', 'heapUsed', 'heapTotal', 'external', 'arrayBuffers'] as const) peak[key] = Math.max(peak[key], sample[key]);
   });
   const timer = setInterval(() => memory('persist_progress'), 10);
@@ -91,6 +100,7 @@ if (!child) {
     }
     memory('cleanup');
     process.stdout.write(JSON.stringify({ mode, packages: packageCount, publicationsPerPackage, textCharacters, slowSinkMs, publications, spoolBytes,
-      durationMs: Math.round(performance.now() - startedAt), start, peak, sampleCount, digest: digest.digest('hex') }) + '\n');
+      durationMs: Math.round(performance.now() - startedAt), start, peak, sampleCount, spoolFilesystem,
+      digest: digest.digest('hex') }) + '\n');
   } finally { clearInterval(timer); }
 }

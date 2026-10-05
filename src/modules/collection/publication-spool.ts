@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import type { ConnectorPublication } from './connector.contract.js';
 import { ConnectorError } from './connector.error.js';
+import { inspectPublicationSpoolFilesystem, type PublicationSpoolFilesystem } from './publication-spool.filesystem.js';
 
 // Larger than the existing 16 x 128 MiB DOU XML ceiling, including JSON
 // escaping, framing and metadata. These are disk ceilings, not allocations.
@@ -168,6 +169,7 @@ export class PublicationSpool implements AsyncIterable<ConnectorPublication> {
     private readonly directory: string,
     private readonly handle: FileHandle,
     private readonly signal: AbortSignal | undefined,
+    readonly filesystem: Readonly<PublicationSpoolFilesystem>,
   ) {}
 
   static async create(signal?: AbortSignal): Promise<PublicationSpool> {
@@ -181,7 +183,9 @@ export class PublicationSpool implements AsyncIterable<ConnectorPublication> {
       checkSignal(signal);
       handle = await fs.open(join(directory, 'publications.bin'), 'wx+', 0o600);
       checkSignal(signal);
-      const spool = new PublicationSpool(directory, handle, signal);
+      const filesystem = await inspectPublicationSpoolFilesystem(directory);
+      checkSignal(signal);
+      const spool = new PublicationSpool(directory, handle, signal, filesystem);
       signal?.addEventListener('abort', spool.onAbort, { once: true });
       return spool;
     } catch (error) {
