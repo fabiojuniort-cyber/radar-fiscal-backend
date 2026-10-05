@@ -89,7 +89,7 @@ test('two independent pools serialize DOU backfill creation and enforce the inte
   }
 });
 
-test('a backfill retry longer than the stale threshold reproduces takeover by a second pool', async () => {
+test('a backfill retry deadline prevents early stale takeover and permits recovery after it is due', async () => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
   const databases = [0, 1].map(() => new Kysely<DB>({
     dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 2 }) }),
@@ -110,7 +110,7 @@ test('a backfill retry longer than the stale threshold reproduces takeover by a 
       base_url: 'https://inlabs.in.gov.br', connector_key: 'dou', max_attempts: 1,
     }).execute();
 
-    await assert.rejects(runDouBackfillBatch(db, {
+    const result = await runDouBackfillBatch(db, {
       sourceId, credentials, fetch: transientFetch, now, dates: ['2026-09-20'], workerId: 'backfill-retry-owner', maxAttempts: 2,
       heartbeatIntervalMs: 100,
       sleep: async (waitMs) => {
@@ -122,7 +122,8 @@ test('a backfill retry longer than the stale threshold reproduces takeover by a 
         runId = run.id;
         assert.equal(run.status, 'RUNNING');
         assert.equal(run.worker_id, 'backfill-retry-owner');
-        assert.equal(run.next_attempt_at, null, 'reclaim currently discards the not-yet-due retry timestamp');
+        assert.ok(run.next_attempt_at && new Date(run.next_attempt_at).getTime() > Date.now(),
+          'reclaim preserves the not-yet-due retry timestamp');
 
         // Model five seconds inside the twenty-second retry without a real
         // sleep or changing the global clock. There is no heartbeat between
@@ -131,16 +132,41 @@ test('a backfill retry longer than the stale threshold reproduces takeover by a 
           .where('id', '=', run.id).execute();
         assert.equal(await acquireNextCollectionRun(replicaDb, 'default-stale-worker'), null,
           'the default 120-second threshold does not expose this retry gap');
-        const recovered = await acquireNextCollectionRun(replicaDb, 'short-stale-worker', { staleAfterMs });
-        assert.equal(recovered?.id, run.id);
-        assert.equal(recovered?.workerId, 'short-stale-worker');
+        assert.equal(await acquireNextCollectionRun(replicaDb, 'short-stale-worker', { staleAfterMs }), null,
+          'even a one-second stale threshold cannot steal a live retry wait');
+        const owner = await db.selectFrom('collection_runs').select('worker_id')
+          .where('id', '=', run.id).executeTakeFirstOrThrow();
+        assert.equal(owner.worker_id, 'backfill-retry-owner');
+        // Advance the persisted deadline to model completion of the injected
+        // sleep without a wall-clock wait. The original owner can now retry.
+        await db.updateTable('collection_runs').set({ next_attempt_at: new Date(Date.now() - 1_000) })
+          .where('id', '=', run.id).execute();
       },
-    }), /not owned by this worker/);
+    });
     assert.equal(sleeps, 1);
-    assert.equal(requests, 1, 'the original owner loses its run before it can make the second attempt');
+    assert.ok(requests > 1, 'the original owner makes the second attempt');
+    assert.equal(result.attempts, 2);
+    assert.equal(result.result.state, 'TERMINAL');
+    assert.equal(result.result.status, 'SUCCESS_NO_RESULTS');
     const attempts = await db.selectFrom('collection_attempts').select(['attempt_no', 'status', 'error_code'])
-      .where('collection_run_id', '=', runId!).execute();
-    assert.deepEqual(attempts, [{ attempt_no: 1, status: 'SOURCE_UNAVAILABLE', error_code: 'INLABS_UNAVAILABLE' }]);
+      .where('collection_run_id', '=', runId!).orderBy('attempt_no').execute();
+    assert.deepEqual(attempts, [
+      { attempt_no: 1, status: 'SOURCE_UNAVAILABLE', error_code: 'INLABS_UNAVAILABLE' },
+      { attempt_no: 2, status: 'SUCCESS_NO_RESULTS', error_code: null },
+    ]);
+
+    // The deadline is not permanent ownership: an abandoned owner whose
+    // retry is due must remain recoverable through the existing stale path.
+    const abandoned = await createCollectionRun(db, {
+      sourceId, scheduledFor: new Date(Date.now() - 60_000), triggerType: 'BACKFILL',
+    });
+    await db.updateTable('collection_runs').set({
+      status: 'RUNNING', worker_id: 'abandoned-backfill-owner',
+      heartbeat_at: new Date(Date.now() - 5_000), next_attempt_at: new Date(Date.now() - 1_000),
+    }).where('id', '=', abandoned).execute();
+    const recovered = await acquireNextCollectionRun(replicaDb, 'due-retry-recovery', { staleAfterMs: 1_000 });
+    assert.equal(recovered?.id, abandoned);
+    assert.equal(recovered?.workerId, 'due-retry-recovery');
   } finally {
     await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
     await db.deleteFrom('sources').where('id', '=', sourceId).execute();

@@ -232,7 +232,9 @@ async function createOwnedBackfillRun(
 async function reclaimRun(db: Kysely<DB>, runId: string, workerId: string): Promise<void> {
   const now = new Date();
   const updated = await db.updateTable('collection_runs')
-    .set({ worker_id: workerId, locked_at: now, heartbeat_at: now, next_attempt_at: null, updated_at: now })
+    // Keep the scheduled retry deadline while this owner sleeps. Stale
+    // recovery must not mistake a live retry wait for an abandoned run.
+    .set({ worker_id: workerId, locked_at: now, heartbeat_at: now, updated_at: now })
     .where('id', '=', runId)
     .where('status', '=', 'RUNNING')
     .where('worker_id', 'is', null)

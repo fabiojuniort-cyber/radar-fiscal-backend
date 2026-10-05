@@ -205,6 +205,9 @@ export async function acquireNextCollectionRun(
           OR (
             cr.status = 'RUNNING'
             AND cr.worker_id IS NOT NULL
+            -- An owned backfill may be waiting between attempts without a
+            -- heartbeat. Honor its retry deadline before stale recovery.
+            AND (cr.next_attempt_at IS NULL OR cr.next_attempt_at <= now())
             AND coalesce(
               cr.heartbeat_at,
               cr.locked_at,
