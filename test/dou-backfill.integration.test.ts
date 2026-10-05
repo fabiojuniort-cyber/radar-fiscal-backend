@@ -152,7 +152,7 @@ test('a backfill retry deadline prevents early stale takeover and permits recove
       .where('collection_run_id', '=', runId!).orderBy('attempt_no').execute();
     assert.deepEqual(attempts, [
       { attempt_no: 1, status: 'SOURCE_UNAVAILABLE', error_code: 'INLABS_UNAVAILABLE' },
-      { attempt_no: 2, status: 'SUCCESS_NO_RESULTS', error_code: null },
+      { attempt_no: 2, status: 'SUCCESS', error_code: null },
     ]);
 
     // The deadline is not permanent ownership: an abandoned owner whose
