@@ -660,3 +660,33 @@ TO radar_app, radar_worker;
 
 GRANT EXECUTE ON FUNCTION public.publication_scope_company_publication_is_in_scope(UUID)
 TO radar_app, radar_worker;
+
+-- The curator has no raw canonical privileges. This narrow boundary locks
+-- the publication before a manual derived write and rechecks scope using a
+-- fresh READ COMMITTED statement snapshot after any conflicting transition.
+CREATE FUNCTION public.publication_scope_lock_curator_version(p_version_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+DECLARE
+    publication_id UUID;
+BEGIN
+    SELECT p.id INTO publication_id
+    FROM public.publication_versions pv
+    JOIN public.publications p ON p.id = pv.publication_id
+    WHERE pv.id = p_version_id AND pv.is_current
+    FOR SHARE OF p;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'PUBLICATION_VERSION_NOT_FOUND';
+    END IF;
+    IF NOT public.publication_scope_is_in_scope(publication_id) THEN
+        RAISE EXCEPTION 'PUBLICATION_OUT_OF_SCOPE';
+    END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.publication_scope_lock_curator_version(UUID)
+FROM PUBLIC, radar_app, radar_worker;
+GRANT EXECUTE ON FUNCTION public.publication_scope_lock_curator_version(UUID)
+TO radar_taxonomy_curator;

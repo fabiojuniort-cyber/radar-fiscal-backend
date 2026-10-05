@@ -266,7 +266,11 @@ Validar:
 
 ## 7. Rollback de aplicação
 
-### Antes de qualquer rollback para código anterior ao DOU-CLEAN-02
+### Compatibilidade obrigatória da aplicação
+
+**Não fazer rollback para código anterior ao DOU-CLEAN-02, mesmo com zero OUT_OF_SCOPE.** A migration 035 restringe as colunas do histórico de coleta: a API v1 anterior consulta `publication_id`/`detected_at` diretamente e falharia por falta de privilégio. Além disso, código anterior não contém os guards/epoch necessários. RESTORE não desfaz mudanças de contrato ou grants.
+
+Uma release de rollback deve ter compatibilidade comprovada com **todas** as migrations/grants já aplicadas, manter a função agregada de histórico e os guards/epoch de scope, e ter CI e revisão independente no SHA exato. Na ausência de release compatível, manter a infraestrutura e corrigir a aplicação por mudança forward revisada.
 
 É obrigatório:
 
@@ -283,7 +287,7 @@ Se houver qualquer `OUT_OF_SCOPE`:
 1. parar novas operações de scope;
 2. restaurar cada registro de forma governada, preservando eventos;
 3. verificar feed/API;
-4. somente depois considerar rollback da aplicação.
+4. somente depois considerar uma release de aplicação comprovadamente compatível.
 
 Motivo: código anterior não conhece os guards de scope dos workers e não oferece as mesmas garantias de invisibilidade/concorrência.
 
@@ -296,7 +300,7 @@ Rollback operacional é:
 1. RESTORE dos registros afetados;
 2. confirmar zero `OUT_OF_SCOPE`;
 3. manter ledger preservado;
-4. reverter somente a aplicação para SHA anterior, se necessário;
+4. redeployar somente uma release compatível revisada, se disponível, ou corrigir forward;
 5. abrir migration compensatória revisada em PR próprio caso seja necessário retirar a infraestrutura depois.
 
 ## 8. Pós-deploy
