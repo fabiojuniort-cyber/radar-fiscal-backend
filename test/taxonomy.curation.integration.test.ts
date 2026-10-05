@@ -12,7 +12,12 @@ import {
   processPublicationTaxonomyBatch,
   resetClassificationConceptCache,
 } from '../src/modules/taxonomy/classification/classification.worker.js';
-import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
+import {
+  markFailedScan,
+  processPublicationNcmEnrichmentBatch,
+  PUBLICATION_NCM_DETECTOR_KEY,
+  PUBLICATION_NCM_DETECTOR_VERSION,
+} from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
 import {
   loadProductSheet,
   parseProductSheet,
@@ -769,6 +774,64 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     const batch = await processPublicationTaxonomyBatch(worker, { limit: 50 });
     assert.equal(batch.skipped, null);
     assert.ok(batch.succeeded >= 1, JSON.stringify(batch));
+
+    // WORKER-CONC-01: a FAILED NCM seal is not enough for definitive
+    // classification, and a late failure must never downgrade SUCCESS.
+    {
+      const releaseId = (await admin.query<{ id: string }>(
+        `SELECT id FROM taxonomy_releases WHERE status = 'PUBLISHED' ORDER BY published_at DESC LIMIT 1`,
+      )).rows[0]!.id;
+      const blocked = await createPublication(admin, 'Ato aguardando NCM', 'Operação com NCM 1006.30.11');
+      await admin.query(
+        `INSERT INTO publication_ncm_scans (
+           publication_version_id, detector_key, detector_version, status,
+           source_field, candidate_count, match_count, error_message, scanned_at
+         ) VALUES ($1::uuid, $2, $3, 'FAILED', 'CONTENT_TEXT', 1, 0, 'fixture', now())`,
+        [blocked.versionId, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION],
+      );
+
+      const preview = await classifySinglePublication(worker, {
+        publicationId: blocked.publicationId, releaseId, persist: false,
+      });
+      assert.equal(preview.ncmScanned, false);
+      await assert.rejects(
+        classifySinglePublication(worker, { publicationId: blocked.publicationId, releaseId, persist: true }),
+        /NCM_SCAN_NOT_SUCCESS/,
+      );
+
+      await processPublicationTaxonomyBatch(worker, { limit: 200 });
+      let blockedSeal = await admin.query(
+        `SELECT status FROM publication_taxonomy_scans
+         WHERE publication_version_id = $1::uuid AND taxonomy_release_id = $2::uuid`,
+        [blocked.versionId, releaseId],
+      );
+      assert.equal(blockedSeal.rowCount, 0, 'FAILED NCM must not be classified definitively');
+
+      await admin.query(
+        `UPDATE publication_ncm_scans SET status='SUCCESS', error_message=NULL, scanned_at=now()
+         WHERE publication_version_id=$1::uuid AND detector_key=$2 AND detector_version=$3`,
+        [blocked.versionId, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION],
+      );
+      await markFailedScan(worker, {
+        publication_version_id: blocked.versionId,
+        content_text: 'Operação com NCM 1006.30.11',
+        relevant_excerpt: null,
+      }, 'CONTENT_TEXT', 1, new Error('late competing failure'));
+      const ncmSeal = await admin.query<{ status: string; error_message: string | null }>(
+        `SELECT status, error_message FROM publication_ncm_scans
+         WHERE publication_version_id=$1::uuid AND detector_key=$2 AND detector_version=$3`,
+        [blocked.versionId, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION],
+      );
+      assert.deepEqual(ncmSeal.rows[0], { status: 'SUCCESS', error_message: null });
+
+      await processPublicationTaxonomyBatch(worker, { limit: 200 });
+      blockedSeal = await admin.query(
+        `SELECT status FROM publication_taxonomy_scans
+         WHERE publication_version_id = $1::uuid AND taxonomy_release_id = $2::uuid`,
+        [blocked.versionId, releaseId],
+      );
+      assert.equal(blockedSeal.rows[0]?.status, 'SUCCESS', 'classification resumes after NCM SUCCESS');
+    }
 
     const tags = await app.inject({
       method: 'GET',
