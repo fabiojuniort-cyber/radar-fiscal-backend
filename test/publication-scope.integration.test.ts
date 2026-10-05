@@ -164,6 +164,10 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       worker_state_read: boolean;
       app_transition: boolean;
       worker_transition: boolean;
+      app_history_table_read: boolean;
+      app_history_run_id_read: boolean;
+      app_history_disposition_read: boolean;
+      app_history_publication_id_read: boolean;
     }>(
       `
         SELECT
@@ -178,7 +182,22 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
           ) AS app_transition,
           has_function_privilege(
             'radar_worker', $1, 'EXECUTE'
-          ) AS worker_transition
+          ) AS worker_transition,
+          has_table_privilege(
+            'radar_app', 'public.collection_run_publications', 'SELECT'
+          ) AS app_history_table_read,
+          has_column_privilege(
+            'radar_app', 'public.collection_run_publications',
+            'collection_run_id', 'SELECT'
+          ) AS app_history_run_id_read,
+          has_column_privilege(
+            'radar_app', 'public.collection_run_publications',
+            'disposition', 'SELECT'
+          ) AS app_history_disposition_read,
+          has_column_privilege(
+            'radar_app', 'public.collection_run_publications',
+            'publication_id', 'SELECT'
+          ) AS app_history_publication_id_read
       `,
       [TRANSITION_SIGNATURE],
     );
@@ -187,6 +206,10 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       worker_state_read: false,
       app_transition: false,
       worker_transition: false,
+      app_history_table_read: false,
+      app_history_run_id_read: true,
+      app_history_disposition_read: true,
+      app_history_publication_id_read: false,
     });
 
     await setRole(client, 'radar_app_runtime');
@@ -195,8 +218,7 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
         SELECT
           (SELECT count(*)::int FROM publications WHERE id = $1::uuid) AS publications,
           (SELECT count(*)::int FROM publication_origins WHERE publication_id = $1::uuid) AS origins,
-          (SELECT count(*)::int FROM publication_versions WHERE publication_id = $1::uuid) AS versions,
-          (SELECT count(*)::int FROM collection_run_publications WHERE publication_id = $1::uuid) AS run_links
+          (SELECT count(*)::int FROM publication_versions WHERE publication_id = $1::uuid) AS versions
       `,
       [publicationId],
     );
@@ -204,8 +226,31 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       publications: 1,
       origins: 1,
       versions: 1,
-      run_links: 1,
     });
+
+    const historyBefore = await client.query<{ n: number }>(
+      `
+        SELECT count(*)::int AS n
+        FROM collection_run_publications
+        WHERE collection_run_id = $1::uuid
+          AND disposition IN ('NEW_PUBLICATION', 'NEW_VERSION')
+      `,
+      [runId],
+    );
+    assert.equal(historyBefore.rows[0]?.n, 1);
+
+    await client.query('SAVEPOINT history_identifier_guard');
+    await assert.rejects(
+      client.query(
+        `SELECT publication_id
+         FROM collection_run_publications
+         WHERE collection_run_id = $1::uuid`,
+        [runId],
+      ),
+      /permission denied/i,
+    );
+    await client.query('ROLLBACK TO SAVEPOINT history_identifier_guard');
+    await client.query('RELEASE SAVEPOINT history_identifier_guard');
     await resetRole(client);
 
     const suppressOperation = randomUUID();
@@ -280,7 +325,6 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
           (SELECT count(*)::int FROM publications WHERE id = $1::uuid) AS publications,
           (SELECT count(*)::int FROM publication_origins WHERE publication_id = $1::uuid) AS origins,
           (SELECT count(*)::int FROM publication_versions WHERE publication_id = $1::uuid) AS versions,
-          (SELECT count(*)::int FROM collection_run_publications WHERE publication_id = $1::uuid) AS run_links,
           public.publication_scope_is_in_scope($1::uuid) AS in_scope
       `,
       [publicationId],
@@ -289,11 +333,23 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       publications: 0,
       origins: 0,
       versions: 0,
-      // collection_run_publications is immutable collection audit/history;
-      // SUPPRESS must not rewrite the historical fact that the run imported it.
-      run_links: 1,
       in_scope: false,
     });
+
+    const historySuppressed = await client.query<{ n: number }>(
+      `
+        SELECT count(*)::int AS n
+        FROM collection_run_publications
+        WHERE collection_run_id = $1::uuid
+          AND disposition IN ('NEW_PUBLICATION', 'NEW_VERSION')
+      `,
+      [runId],
+    );
+    assert.equal(
+      historySuppressed.rows[0]?.n,
+      1,
+      'SUPPRESS must not rewrite or hide the historical importedDocuments count',
+    );
     await resetRole(client);
 
     await setRole(client, 'radar_worker_runtime');
