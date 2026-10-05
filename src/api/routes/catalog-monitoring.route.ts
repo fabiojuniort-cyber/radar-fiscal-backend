@@ -137,6 +137,62 @@ const archiveQuerySchema = z
 
 type ArchiveQuery = z.infer<typeof archiveQuerySchema>;
 
+const archiveNavigationQuerySchema = z.object({
+  groupBy: z.enum(['jurisdiction', 'uf', 'source', 'actType', 'year', 'month']),
+  jurisdiction: z.enum(['FEDERAL', 'STATE']).optional(),
+  uf: z.string().trim().regex(/^[A-Za-z]{2}$/).transform((value) => value.toUpperCase()).optional(),
+  source: z.string().trim().min(1).max(100).optional(),
+  actType: z.string().trim().min(1).max(200).optional(),
+  year: z.coerce.number().int().min(1900).max(2100).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+}).superRefine((value, ctx) => {
+  if (value.month && !value.year) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'month_requires_year',
+      path: ['month'],
+    });
+  }
+});
+
+type ArchiveNavigationQuery = z.infer<typeof archiveNavigationQuerySchema>;
+
+function buildArchiveNavigationWhere(
+  input: ArchiveNavigationQuery,
+): RawBuilder<boolean> {
+  const conditions: RawBuilder<boolean>[] = [sql<boolean>`NOT p.is_hidden`];
+
+  if (input.jurisdiction) {
+    conditions.push(sql<boolean>`p.jurisdiction_level = ${input.jurisdiction}`);
+  }
+  if (input.uf) {
+    conditions.push(sql<boolean>`p.uf = ${input.uf}`);
+  }
+  if (input.source) {
+    const sourceCode = input.source.toLowerCase();
+    conditions.push(sql<boolean>`
+      EXISTS (
+        SELECT 1
+        FROM publication_source_feed sf
+        WHERE sf.source_code = ${sourceCode}
+          AND sf.publication_id = p.id
+          AND NOT sf.is_hidden
+      )
+    `);
+  }
+  if (input.actType) {
+    conditions.push(sql<boolean>`p.act_type = ${input.actType}`);
+  }
+  if (input.year) {
+    conditions.push(sql<boolean>`extract(year from p.published_on)::int = ${input.year}`);
+  }
+  if (input.month) {
+    conditions.push(sql<boolean>`extract(month from p.published_on)::int = ${input.month}`);
+  }
+
+  return sql.join(conditions, sql` AND `) as RawBuilder<boolean>;
+}
+
 function tenantIdFromRequest(
   request: FastifyRequest,
 ): string | null {
@@ -433,6 +489,11 @@ interface ArchiveFacets {
   actTypes: string[];
 }
 
+interface ArchiveNavigationResponse {
+  groupBy: ArchiveNavigationQuery['groupBy'];
+  items: Array<{ value: string; label: string; count: number }>;
+}
+
 interface PublicStatsV2 {
   totalPublications: number;
   totalSources: number;
@@ -502,6 +563,10 @@ export async function catalogMonitoringRoutes(
     maxEntries: 500,
   });
   const facetsCache = new TtlCache<ArchiveFacets>(cacheOptions);
+  const navigationCache = new TtlCache<ArchiveNavigationResponse>({
+    ...cacheOptions,
+    maxEntries: 1000,
+  });
   const statsCache = new TtlCache<PublicStatsV2>(cacheOptions);
   const sourcesCache = new TtlCache<PublicSourcesV2>(cacheOptions);
   const sourceCountsCache = new TtlCache<Map<string, number>>(cacheOptions);
@@ -692,6 +757,97 @@ export async function catalogMonitoringRoutes(
       sources: sources.rows,
       actTypes: actTypes.rows.map((row) => row.act_type),
     };
+  }
+
+  async function loadArchiveNavigation(
+    input: ArchiveNavigationQuery,
+  ): Promise<ArchiveNavigationResponse> {
+    const where = buildArchiveNavigationWhere(input);
+    type NavigationRow = { value: string; label: string; count: number };
+    let result;
+
+    switch (input.groupBy) {
+      case 'jurisdiction':
+        result = await sql<NavigationRow>`
+          SELECT
+            p.jurisdiction_level::text AS value,
+            CASE p.jurisdiction_level
+              WHEN 'FEDERAL' THEN 'Federal'
+              WHEN 'STATE' THEN 'Estadual'
+              ELSE p.jurisdiction_level::text
+            END AS label,
+            count(*)::int AS count
+          FROM publications p
+          WHERE ${where}
+            AND p.jurisdiction_level IN ('FEDERAL', 'STATE')
+          GROUP BY p.jurisdiction_level
+          ORDER BY CASE p.jurisdiction_level WHEN 'FEDERAL' THEN 0 ELSE 1 END
+        `.execute(app.db);
+        break;
+      case 'uf':
+        result = await sql<NavigationRow>`
+          SELECT p.uf::text AS value, p.uf::text AS label, count(*)::int AS count
+          FROM publications p
+          WHERE ${where} AND p.uf IS NOT NULL
+          GROUP BY p.uf
+          ORDER BY p.uf
+        `.execute(app.db);
+        break;
+      case 'source':
+        result = await sql<NavigationRow>`
+          SELECT
+            f.source_code AS value,
+            CASE
+              WHEN f.source_code = 'confaz' THEN 'CONFAZ'
+              ELSE COALESCE(
+                (SELECT min(s.name) FROM sources s WHERE lower(s.code) = f.source_code),
+                upper(f.source_code)
+              )
+            END AS label,
+            count(*)::int AS count
+          FROM publication_source_feed f
+          JOIN publications p ON p.id = f.publication_id
+          WHERE ${where} AND NOT f.is_hidden
+          GROUP BY f.source_code
+          ORDER BY label
+        `.execute(app.db);
+        break;
+      case 'actType':
+        result = await sql<NavigationRow>`
+          SELECT p.act_type AS value, p.act_type AS label, count(*)::int AS count
+          FROM publications p
+          WHERE ${where} AND p.act_type IS NOT NULL AND btrim(p.act_type) <> ''
+          GROUP BY p.act_type
+          ORDER BY p.act_type
+        `.execute(app.db);
+        break;
+      case 'year':
+        result = await sql<NavigationRow>`
+          SELECT
+            extract(year from p.published_on)::int::text AS value,
+            extract(year from p.published_on)::int::text AS label,
+            count(*)::int AS count
+          FROM publications p
+          WHERE ${where} AND p.published_on IS NOT NULL
+          GROUP BY extract(year from p.published_on)::int
+          ORDER BY extract(year from p.published_on)::int DESC
+        `.execute(app.db);
+        break;
+      case 'month':
+        result = await sql<NavigationRow>`
+          SELECT
+            extract(month from p.published_on)::int::text AS value,
+            extract(month from p.published_on)::int::text AS label,
+            count(*)::int AS count
+          FROM publications p
+          WHERE ${where} AND p.published_on IS NOT NULL
+          GROUP BY extract(month from p.published_on)::int
+          ORDER BY extract(month from p.published_on)::int DESC
+        `.execute(app.db);
+        break;
+    }
+
+    return { groupBy: input.groupBy, items: result.rows };
   }
 
   /** Counts up to ARCHIVE_COUNT_CAP + 1 matches. */
@@ -1009,6 +1165,37 @@ export async function catalogMonitoringRoutes(
           excerpt: row.relevant_excerpt,
         })),
       });
+    },
+  );
+
+  typed.get(
+    '/api/v2/archive/navigation',
+    {
+      preHandler: app.authenticate,
+      schema: { querystring: archiveNavigationQuerySchema },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+
+      const input = request.query;
+      const cacheKey = JSON.stringify([
+        input.groupBy,
+        input.jurisdiction ?? null,
+        input.uf ?? null,
+        input.source?.toLowerCase() ?? null,
+        input.actType ?? null,
+        input.year ?? null,
+        input.month ?? null,
+      ]);
+
+      return reply.status(200).send(
+        await navigationCache.get(
+          cacheKey,
+          () => loadArchiveNavigation(input),
+        ),
+      );
     },
   );
 
