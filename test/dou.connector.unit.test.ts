@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DOU_XML_SECTIONS, DouConnector, douCollectionDates } from '../src/modules/collection/dou.connector.js';
-import { fixtureFetch } from './dou.fixtures.js';
+import { fixtureFetch, makeZip } from './dou.fixtures.js';
 import { buildConnectorRegistry } from '../src/modules/collection/connector-registry.factory.js';
 const context = () => ({ sourceId:'dou',runId:'run',attemptId:'attempt',signal:new AbortController().signal });
 const credentials = () => ({ email:'test@example.invalid',password:'fixture' });
@@ -48,6 +48,49 @@ test('collector never requests DO2/DO2E and exposes the four-section policy lite
   ]);
   assert.equal(downloads.some((name) => name.includes('DO2')), false);
   assert.deepEqual((result.metadata!.dou as any).sections, ['DO1', 'DO1E', 'DO3', 'DO3E']);
+});
+
+test('assembled contract excerpts preserve relevant body, abstract and continuation signals before filtering', async () => {
+  const routine = 'Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.';
+  const title = 'EXTRATO DE CONTRATO Nº 7/2026';
+  const entry = (id: string, content: string, abstract = '', heading = title, part?: number) => ({
+    name: `530_20260918_${id}${part ? `-${part}` : ''}.xml`,
+    bytes: Buffer.from(`<xml><article id="${id}" idMateria="${id}" pubDate="18/09/2026" pubName="DO3" editionNumber="180" artCategory="Órgão público federal" artType="EXTRATO DE CONTRATO" numberPage="1" pdfPage="https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&amp;jornal=530&amp;pagina=1"><body><Identifica><![CDATA[${heading}]]></Identifica><Ementa><![CDATA[${abstract}]]></Ementa><Texto><![CDATA[${content}]]></Texto></body></article></xml>`),
+  });
+  const bytes = await makeZip([
+    entry('111', routine),
+    entry('112', `${routine} Incorporação da contratada pela empresa Beta S.A., sucessora em todos os direitos e obrigações.`),
+    entry('113', `${routine} A cláusula concede isenção do ICMS.`),
+    entry('114', routine, 'Concede isenção do ICMS.'),
+    entry('115', routine, '', title, 1),
+    entry('115', 'Informações complementares.', '', 'Incorporação da contratada pela empresa Beta S.A.', 2),
+    entry('116', routine, 'Tratamento do ICMS pendente de confirmação.'),
+    entry('117', routine, 'Pagamento mediante nota fiscal e regularidade fiscal.', title, 1),
+    entry('117', 'Informações complementares.', '', 'Designação do fiscal do contrato.', 2),
+  ]);
+  const fetch = (async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname === '/logar.php') return new Response(null, { status: 302, headers: { location: 'index.php', 'set-cookie': 'inlabs_session_cookie=test' } });
+    const dl = url.searchParams.get('dl');
+    if (!dl) return new Response('<html>Index</html>');
+    return dl === '2026-09-18-DO3.zip' ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
+  }) as typeof globalThis.fetch;
+  const result = await new DouConnector({ credentials, now: () => new Date('2026-09-21T12:00:00Z'), fetch, dates: ['2026-09-18'] }).collect(context());
+
+  assert.deepEqual(result.partialFailures, []);
+  assert.deepEqual(result.publications.map(publication => [publication.externalId, publication.metadata?.douScope]), [
+    ['112', 'EMPRESARIAL_RELEVANTE', 'KEEP', ['corporate_reorganization', 'corporate_succession']],
+    ['113', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
+    ['114', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
+    ['115', 'EMPRESARIAL_RELEVANTE', 'KEEP', ['corporate_reorganization']],
+    ['116', 'AMBIGUO', 'REVIEW', ['possible_tax_relevance']],
+  ].map(([id, category, decision, reasonCodes]) => [`2026-09-18:DO3:180:${id}`, { ruleVersion: 'dou-scope-v2', category, decision, reasonCodes }]));
+  assert.ok(result.publications.every(publication => publication.title === title && publication.actType === 'EXTRATO DE CONTRATO'));
+  const metadata = result.metadata!.dou as any;
+  assert.equal(metadata.assembledMatterCount, 7);
+  assert.equal(metadata.publicationCount, 5);
+  assert.equal(metadata.scope.ignoredCount, 2);
+  assert.equal(metadata.scope.ignoredByCategory.CONTRATACAO_ADMINISTRATIVA_ROTINEIRA, 2);
 });
 
 test('changed package is parsed again without treating whole archive hash as publication content',async()=>{

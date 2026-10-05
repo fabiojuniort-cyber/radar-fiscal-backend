@@ -52,6 +52,59 @@ test('keeps an explicit material corporate event', () => {
   const c = classified(excerpt('Transferência de controle societário da empresa Alfa S.A.'));
   equal(c.category, 'EMPRESARIAL_RELEVANTE'); equal(c.decision, 'KEEP');
 });
+test('routine object cannot hide incorporation of the contractor or corporate succession', () => {
+  for (const clause of [
+    'O contrato formaliza a incorporação da contratada pela empresa Beta S.A., sucessora em todos os direitos e obrigações.',
+    'A empresa Beta S.A. é sucessora em todos os direitos e obrigações.',
+  ]) {
+    const c = classified(excerpt('Aquisição de papel A4', {}, clause));
+    equal(c.category, 'EMPRESARIAL_RELEVANTE'); equal(c.decision, 'KEEP');
+  }
+});
+test('routine object cannot hide an exemption of a named tax anywhere in the body', () => {
+  for (const tax of ['ICMS', 'ISS', 'ISSQN', 'IPI', 'PIS/Pasep', 'Cofins', 'IBS', 'CBS']) {
+    const c = classified(excerpt('Aquisição de papel A4', {}, `A cláusula concede isenção do ${tax}.`));
+    equal(c.category, 'TRIBUTARIO_FISCAL'); equal(c.decision, 'KEEP');
+    ok(c.reasonCodes.includes('tax_exemption_reduction_or_suspension'));
+  }
+});
+test('abstract and every continuation heading can veto routine exclusion', () => {
+  const cases: Array<[Record<string, unknown>, string]> = [
+    [{ abstract: 'Concede isenção do ICMS.' }, 'TRIBUTARIO_FISCAL'],
+    [{ continuationTitles: ['Continuação', 'Incorporação da contratada pela empresa Beta S.A.'] }, 'EMPRESARIAL_RELEVANTE'],
+    [{ abstract: 'Contrato de concessão de serviço público.' }, 'REGULATORIO_CONCESSAO'],
+  ];
+  for (const [dou, category] of cases) {
+    const c = classified(excerpt('Aquisição de papel A4', { metadata: { dou } }));
+    equal(c.category, category); equal(c.decision, 'KEEP');
+  }
+});
+test('unproven but material signals fail safe in body, abstract and continuation headings', () => {
+  for (const signal of ['Tratamento do ICMS ainda pendente.', 'Incorporação sujeita a confirmação.', 'Outorga pendente de análise.']) {
+    for (const publication of [
+      excerpt('Aquisição de papel A4', {}, signal),
+      excerpt('Aquisição de papel A4', { metadata: { dou: { abstract: signal } } }),
+      excerpt('Aquisição de papel A4', { metadata: { dou: { continuationTitles: ['Continuação', signal] } } }),
+    ]) {
+      const c = classified(publication);
+      equal(c.category, 'AMBIGUO'); equal(c.decision, 'REVIEW');
+      ok(c.reasonCodes.some(reason => reason.startsWith('possible_')));
+    }
+  }
+});
+test('neutral fiscal boilerplate in metadata does not create material relevance', () => {
+  const c = classified(excerpt('Aquisição de papel A4', { metadata: { dou: {
+    abstract: 'Pagamento mediante nota fiscal e regularidade fiscal.',
+    continuationTitles: ['Designação do fiscal do contrato.', 'Conferência de notas fiscais.'],
+  } } }));
+  equal(c.decision, 'IGNORE');
+});
+test('metadata never supplies the positive routine procurement evidence', () => {
+  const c = classified(excerpt('Aquisição de papel A4', {
+    content: '', metadata: { dou: { abstract: excerpt('Aquisição de papel A4').content } },
+  }));
+  equal(c.decision, 'REVIEW'); deepEqual(c.reasonCodes, ['missing_content']);
+});
 test('relevance vetoes exclusion with deterministic tax-first precedence', () => {
   const c = classified(excerpt('Aquisição de papel A4', {}, 'O ajuste também formaliza transação tributária e integra contrato de concessão de serviço público.'));
   equal(c.category, 'TRIBUTARIO_FISCAL'); equal(c.decision, 'KEEP');

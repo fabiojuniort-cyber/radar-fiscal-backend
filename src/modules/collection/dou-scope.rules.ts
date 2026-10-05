@@ -1,4 +1,4 @@
-export const DOU_SCOPE_RULE_VERSION = 'dou-scope-v1' as const;
+export const DOU_SCOPE_RULE_VERSION = 'dou-scope-v2' as const;
 
 export type DouScopeCategory =
   | 'CONTRATACAO_ADMINISTRATIVA_ROTINEIRA'
@@ -13,6 +13,7 @@ export interface DouScopePublication {
   actType?: string | null;
   agency?: string | null;
   content?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 export interface DouScopeClassification {
   ruleVersion: typeof DOU_SCOPE_RULE_VERSION;
@@ -30,7 +31,7 @@ const RELEVANCE_RULES: readonly RelevanceRule[] = [
   { category: 'TRIBUTARIO_FISCAL', code: 'tax_credit_or_debt', pattern: /\b(?:creditos?|debitos?)\s+tributari[oa]s?\b/ },
   { category: 'TRIBUTARIO_FISCAL', code: 'tax_benefit_or_special_regime', pattern: /\b(?:beneficio|incentivo|regime especial)\s+(?:fiscal|tributario|aduaneiro)\b/ },
   { category: 'TRIBUTARIO_FISCAL', code: 'tax_or_customs_enforcement', pattern: /\b(?:fiscalizacao|arrecadacao|cobranca)\s+(?:tributaria|aduaneira)\b/ },
-  { category: 'TRIBUTARIO_FISCAL', code: 'tax_exemption_reduction_or_suspension', pattern: /\b(?:isencao|reducao|suspensao)\s+(?:de|do|da|dos|das)\s+(?:tributos?|impostos?|contribuicoes tributarias)\b/ },
+  { category: 'TRIBUTARIO_FISCAL', code: 'tax_exemption_reduction_or_suspension', pattern: /\b(?:isencao|reducao|suspensao)\s+(?:de|do|da|dos|das)\s+(?:(?:pagamento|aliquota|base de calculo)\s+(?:de|do|da)\s+)?(?:tributos?|impostos?|contribuicoes tributarias|icms|iss(?:qn)?|ipi|pis(?:\/pasep)?|cofins|irpj|irpf|csll|iof|itr|iptu|itbi|itcmd|ibs|cbs)\b/ },
   { category: 'TRIBUTARIO_FISCAL', code: 'tax_refund', pattern: /\b(?:restituicao|ressarcimento)\s+de\s+(?:tributos?|impostos?|creditos? tributarios?)\b/ },
   { category: 'REGULATORIO_CONCESSAO', code: 'concession_or_public_service_delegation', pattern: /\b(?:contrato de (?:sub)?concessao|subconcessao|concessao de servicos? publicos?|delegacao de servicos? publicos?)\b/ },
   { category: 'REGULATORIO_CONCESSAO', code: 'regulated_infrastructure_grant', pattern: /\b(?:concessao|permissao|outorga|autorizacao)\b.{0,180}\b(?:rodovias?|ferrovias?|infraestrutura rodoviaria|infraestrutura ferroviaria|servicos? publicos?|instalacao portuaria|terminal de uso privado|geracao de energia|distribuicao de energia|transmissao de energia|lavra mineral)\b/ },
@@ -39,9 +40,18 @@ const RELEVANCE_RULES: readonly RelevanceRule[] = [
   { category: 'REGULATORIO_CONCESSAO', code: 'tariff_revision', pattern: /\b(?:revisao|reajuste)\s+tarifari[oa]\b/ },
   { category: 'REGULATORIO_CONCESSAO', code: 'mineral_rights_transfer', pattern: /\b(?:cessao|transferencia)\s+de\s+direitos?\s+minerari[oa]s?\b/ },
   { category: 'EMPRESARIAL_RELEVANTE', code: 'corporate_control_change', pattern: /\b(?:alteracao|transferencia|aquisicao|alienacao)\s+(?:de|do)\s+controle\s+(?:societario|acionario)\b/ },
-  { category: 'EMPRESARIAL_RELEVANTE', code: 'corporate_reorganization', pattern: /\b(?:fusao|cisao|incorporacao)\s+(?:societaria|empresarial|de (?:empresas|sociedades)|da (?:empresa|sociedade|companhia))\b/ },
+  { category: 'EMPRESARIAL_RELEVANTE', code: 'corporate_reorganization', pattern: /\b(?:fusao|cisao|incorporacao)\s+(?:societaria|empresarial|(?:de|da|do|das|dos) (?:empresas?|sociedades?|companhias?|contratad[ao]s?))\b/ },
+  { category: 'EMPRESARIAL_RELEVANTE', code: 'corporate_succession', pattern: /\bsucessor(?:a|es|as)?\s+(?:em todos os|nos|em seus)\s+direitos e obrigacoes\b/ },
   { category: 'EMPRESARIAL_RELEVANTE', code: 'corporate_restructuring_or_intervention', pattern: /\b(?:recuperacao judicial|liquidacao extrajudicial|intervencao societaria)\b/ },
   { category: 'EMPRESARIAL_RELEVANTE', code: 'leniency_agreement', pattern: /\bacordo de leniencia\b/ },
+];
+
+// These signals are too broad to prove KEEP, but are incompatible with a
+// confident routine-only decision. Unknown material context must fail safe.
+const AMBIGUOUS_RELEVANCE_RULES: readonly RoutineObjectRule[] = [
+  { code: 'possible_tax_relevance', pattern: /\b(?:tributari[oa]s?|aduaneir[oa]s?|tributos?|impostos?|icms|iss|issqn|ipi|pis|pasep|cofins|irpj|irpf|csll|iof|itr|iptu|itbi|itcmd|ibs|cbs|isencao|isencoes|remissao|anistia|compensacao|fisca(?:l|is))\b/ },
+  { code: 'possible_regulatory_relevance', pattern: /\b(?:concessao|concessoes|subconcessao|outorga|outorgas|tarifari[oa]s?|minerari[oa]s?|regulatori[oa]s?)\b/ },
+  { code: 'possible_corporate_relevance', pattern: /\b(?:fusao|fusoes|cisao|cisoes|incorporacao|incorporacoes|societari[oa]s?|acionari[oa]s?|sucessao|sucessor(?:a|es|as)?|recuperacao judicial|falencia|liquidacao extrajudicial|leniencia)\b/ },
 ];
 
 const ROUTINE_OBJECT_RULES: readonly RoutineObjectRule[] = [
@@ -60,6 +70,27 @@ function result(category: DouScopeCategory, decision: DouScopeDecision, reasonCo
   return { ruleVersion: DOU_SCOPE_RULE_VERSION, category, decision, reasonCodes };
 }
 function review(reasonCode: string): DouScopeClassification { return result('AMBIGUO', 'REVIEW', [reasonCode]); }
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : undefined;
+}
+function relevanceText(publication: DouScopePublication): string {
+  const dou = record(publication.metadata?.dou);
+  const continuationTitles = Array.isArray(dou?.continuationTitles)
+    ? dou.continuationTitles.filter((value): value is string => typeof value === 'string') : [];
+  // The parser deliberately keeps Ementa and continuation headings out of
+  // content. They can veto IGNORE, never supply the positive routine evidence.
+  return [publication.title, publication.content,
+    typeof dou?.abstract === 'string' ? dou.abstract : '', ...continuationTitles]
+    .map(normalize).filter(Boolean).join(' ');
+}
+function withoutNeutralFiscalBoilerplate(text: string): string {
+  return text
+    .replace(/\bnotas? fisca(?:l|is)\b/g, ' ')
+    .replace(/\b(?:fisca(?:l|is)|fiscalizacao) d[oa]s? contratos?\b/g, ' ')
+    .replace(/\bregularidade fisca(?:l|is)\b/g, ' ');
+}
 
 function extractSingleObject(content: string): ObjectExtraction {
   const objectLabel = /\bobjeto(?: do contrato)?\s*:/g;
@@ -88,11 +119,15 @@ export function classifyDouContractExcerpt(publication: DouScopePublication): Do
   const title = normalize(publication.title);
   if (!/^extrato de contrato\b/.test(title)) return null;
   const content = normalize(publication.content);
-  const fullText = `${title} ${content}`.trim();
+  const fullText = relevanceText(publication);
 
   const relevanceMatches = RELEVANCE_RULES.filter((rule) => rule.pattern.test(fullText));
   const first = relevanceMatches[0];
   if (first) return result(first.category, 'KEEP', relevanceMatches.map((rule) => rule.code));
+
+  const ambiguousText = withoutNeutralFiscalBoilerplate(fullText);
+  const ambiguousMatches = AMBIGUOUS_RELEVANCE_RULES.filter((rule) => rule.pattern.test(ambiguousText));
+  if (ambiguousMatches.length) return result('AMBIGUO', 'REVIEW', ambiguousMatches.map((rule) => rule.code));
 
   if (!content) return review('missing_content');
   const object = extractSingleObject(content);

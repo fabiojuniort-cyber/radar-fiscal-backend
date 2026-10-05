@@ -92,7 +92,7 @@ function record(value: unknown): Record<string, unknown> | undefined {
 export interface DouBackfillCoverage {
   /** Archive receipts (filename -> SHA-256) usable to skip unchanged packages. */
   receipts: Record<string, string>;
-  /** Dates already collected (receipt) or fully consulted by a successful backfill. */
+  /** Dates fully consulted by eligible monitoring/backfill archive evidence. */
   covered: Set<string>;
 }
 
@@ -138,19 +138,25 @@ export async function readDouBackfillCoverage(db: Kysely<DB>, sourceId: string):
     .where('cr.status', 'in', ['SUCCESS', 'SUCCESS_NO_RESULTS'])
     .where('ca.status', '=', 'SUCCESS')
     .where('cr.trigger_type', '!=', 'BACKFILL')
-    .orderBy('cr.finished_at', 'desc')
-    .orderBy('ca.attempt_no', 'desc')
-    .executeTakeFirst();
-  const monitoringMetadata = record(monitoring?.metadata);
-  const rawReceipts = record(monitoringMetadata?.douArchives);
-  for (const [name, value] of Object.entries(rawReceipts ?? {})) {
-    if (/^\d{4}-\d{2}-\d{2}-DO[123]E?\.zip$/.test(name) && typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) {
-      // Historical DO2/DO2E receipts remain harmless evidence for unchanged
-      // packages. They never participate in coverage or generate downloads.
-      receipts[name] = value;
+    // Monitoring archives describe a moving window, not cumulative coverage.
+    // Read all eligible history oldest first so coverage never forgets a date
+    // and a newer valid receipt supersedes an older hash for the same package.
+    .orderBy('cr.finished_at', 'asc')
+    .orderBy('ca.attempt_no', 'asc')
+    .orderBy('ca.id', 'asc')
+    .execute();
+  for (const row of monitoring) {
+    const monitoringMetadata = record(row.metadata);
+    const rawReceipts = record(monitoringMetadata?.douArchives);
+    for (const [name, value] of Object.entries(rawReceipts ?? {})) {
+      if (/^\d{4}-\d{2}-\d{2}-DO[123]E?\.zip$/.test(name) && typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) {
+        // Historical DO2/DO2E receipts remain harmless evidence for unchanged
+        // packages. They never participate in coverage or generate downloads.
+        receipts[name] = value;
+      }
     }
+    ingestArchives(record(monitoringMetadata?.dou)?.archives);
   }
-  ingestArchives(record(monitoringMetadata?.dou)?.archives);
 
   const backfills = await db.selectFrom('collection_attempts as ca')
     .innerJoin('collection_runs as cr', 'cr.id', 'ca.collection_run_id')
