@@ -13,6 +13,7 @@ import {
   resetClassificationConceptCache,
 } from '../src/modules/taxonomy/classification/classification.worker.js';
 import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
+import { checkWorkerConcurrency } from './worker-concurrency.checks.js';
 import {
   loadProductSheet,
   parseProductSheet,
@@ -190,7 +191,7 @@ async function createPublication(admin: Pool, title: string, text: string) {
   return { publicationId, versionId: version.rows[0]!.id };
 }
 
-test('TAX-11 curation: draft, tables, publication, profile, classification and tags', async () => {
+test('TAX-11 curation: draft, tables, publication, profile, classification and tags', async (t) => {
   const admin = new Pool({ connectionString: adminUrl, max: 2 });
   const worker = createStandaloneDatabase({
     connectionString: workerUrl(),
@@ -809,6 +810,12 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     const batch = await processPublicationTaxonomyBatch(worker, { limit: 50 });
     assert.equal(batch.skipped, null);
     assert.ok(batch.succeeded >= 1, JSON.stringify(batch));
+
+    const concurrencyRelease = (await admin.query<{ id: string }>(
+      `SELECT id FROM taxonomy_releases WHERE status = 'PUBLISHED'
+       ORDER BY version_major DESC, version_minor DESC, version_patch DESC LIMIT 1`,
+    )).rows[0]!.id;
+    await checkWorkerConcurrency(t, admin, workerUrl(), concurrencyRelease);
 
     const tags = await app.inject({
       method: 'GET',

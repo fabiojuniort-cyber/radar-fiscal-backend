@@ -297,6 +297,7 @@ async function markFailedScan(
       match_count = 0,
       error_message = EXCLUDED.error_message,
       scanned_at = now()
+    WHERE publication_ncm_scans.status <> 'SUCCESS'
   `.execute(db);
 }
 

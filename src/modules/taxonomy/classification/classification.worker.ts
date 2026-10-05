@@ -139,6 +139,7 @@ async function selectPending(
         WHERE n.publication_version_id = pv.id
           AND n.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
           AND n.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
+          AND n.status = 'SUCCESS'
       )
       AND NOT EXISTS (
         SELECT 1
@@ -417,13 +418,15 @@ export async function classifySinglePublication(
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
-  const ncmScan = await sql<{ found: number }>`
-    SELECT 1 AS found FROM publication_ncm_scans
+  const ncmScan = await sql<{ status: string }>`
+    SELECT status FROM publication_ncm_scans
     WHERE publication_version_id = ${row.publication_version_id}::uuid
       AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
       AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
     LIMIT 1
   `.execute(db);
+  const ncmScanned = ncmScan.rows[0]?.status === 'SUCCESS';
+  if (input.persist && !ncmScanned) throw new Error('NCM_SCAN_NOT_SUCCESS');
 
   const concepts = await loadClassificationConcepts(db, input.releaseId);
   const plan = planCuratedClassification({
@@ -441,7 +444,7 @@ export async function classifySinglePublication(
   return {
     publicationVersionId: row.publication_version_id,
     releaseId: input.releaseId,
-    ncmScanned: ncmScan.rows.length > 0,
+    ncmScanned,
     persisted: input.persist,
     tags: plan.assertions
       .map((assertion) => ({

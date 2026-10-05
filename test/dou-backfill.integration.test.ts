@@ -10,6 +10,7 @@ import { acquireNextCollectionRun, createCollectionRun } from '../src/modules/co
 import { isCronDue } from '../src/modules/collection/cron.js';
 import {
   DouBackfillBlockedError,
+  DouBackfillThrottledError,
   planDouBackfillDates,
   readDouBackfillCoverage,
   runDouBackfillBatch,
@@ -20,6 +21,190 @@ import { fixtureFetch } from './dou.fixtures.js';
 
 const credentials = () => ({ email: 'test@example.invalid', password: 'fixture' });
 const now = () => new Date('2026-10-04T15:00:00Z');
+
+test('two independent pools serialize DOU backfill creation and enforce the interval after completion', { timeout: 15_000 }, async () => {
+  assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
+  const databases = [0, 1].map(() => new Kysely<DB>({
+    dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 2, statement_timeout: 5_000 }) }),
+  }));
+  const [db, replicaDb] = databases as [Kysely<DB>, Kysely<DB>];
+  const sourceId = randomUUID();
+  const fetch = await fixtureFetch();
+  let releaseFetch!: () => void;
+  const fetchGate = new Promise<void>((resolve) => { releaseFetch = resolve; });
+  // A safety deadline makes a broken serialization fail assertions instead
+  // of leaving the winning batch and its cleanup waiting indefinitely.
+  const deadline = setTimeout(releaseFetch, 5_000);
+  const gatedFetch: typeof fetch = async (input, init) => {
+    await fetchGate;
+    return fetch(input, init);
+  };
+  const options = { sourceId, credentials, fetch: gatedFetch, now, dates: ['2026-09-20'], timeoutMs: 10_000, minIntervalMs: 3_600_000 };
+  try {
+    await db.insertInto('sources').values({
+      id: sourceId, code: `dou-concurrency-${sourceId}`, name: 'DOU concurrent backfill', jurisdiction_level: 'FEDERAL',
+      base_url: 'https://inlabs.in.gov.br', connector_key: 'dou', max_attempts: 1,
+    }).execute();
+
+    let arrived = 0;
+    let releaseStart!: () => void;
+    const startGate = new Promise<void>((resolve) => { releaseStart = resolve; });
+    const launch = (database: Kysely<DB>, workerId: string) => database.connection().execute(async (connection) => {
+      if (++arrived === 2) releaseStart();
+      await startGate;
+      try {
+        return await runDouBackfillBatch(connection, { ...options, workerId });
+      } catch (error) {
+        // The winner remains RUNNING in fetch until its competitor has
+        // observed the committed open run and refused to create another.
+        releaseFetch();
+        throw error;
+      }
+    });
+    const outcomes = await Promise.allSettled([
+      launch(db, 'backfill-replica-a'),
+      launch(replicaDb, 'backfill-replica-b'),
+    ]);
+    const successes = outcomes.filter((outcome) => outcome.status === 'fulfilled');
+    const failures = outcomes.filter((outcome) => outcome.status === 'rejected');
+    assert.equal(successes.length, 1);
+    assert.equal(failures.length, 1);
+    assert.ok(failures[0]!.reason instanceof DouBackfillBlockedError);
+    assert.ok(!(failures[0]!.reason instanceof DouBackfillThrottledError), 'the competing batch must see an open run');
+    assert.equal(successes[0]!.value.result.status, 'SUCCESS_NO_RESULTS');
+
+    await assert.rejects(
+      runDouBackfillBatch(replicaDb, { ...options, fetch, workerId: 'backfill-after-completion' }),
+      DouBackfillThrottledError,
+    );
+    const runs = await db.selectFrom('collection_runs').select(['id', 'status', 'worker_id'])
+      .where('source_id', '=', sourceId).execute();
+    assert.deepEqual(runs, [{ id: successes[0]!.value.runId, status: 'SUCCESS_NO_RESULTS', worker_id: null }]);
+  } finally {
+    clearTimeout(deadline);
+    releaseFetch();
+    await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+    await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+    await Promise.all(databases.map((database) => database.destroy()));
+  }
+});
+
+test('backfill retries keep ownership through the deadline grace and abandoned owners remain recoverable', async (t) => {
+  assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
+  const databases = [0, 1].map(() => new Kysely<DB>({
+    dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 2 }) }),
+  }));
+  const [db, replicaDb] = databases as [Kysely<DB>, Kysely<DB>];
+  const sourceId = randomUUID();
+  const fetch = await fixtureFetch();
+  let requests = 0;
+  let sleeps = 0;
+  let runId: string | undefined;
+  let staleHeartbeatMs = 0;
+  let observedRenewal = false;
+  const transientFetch: typeof fetch = async (input, init) => {
+    if (++requests === 1) return new Response(null, { status: 503 });
+    if (requests === 2) {
+      const resumed = await db.selectFrom('collection_runs').select(['worker_id', 'heartbeat_at'])
+        .where('id', '=', runId!).executeTakeFirstOrThrow();
+      assert.equal(resumed.worker_id, 'backfill-retry-owner');
+      assert.ok(resumed.heartbeat_at && new Date(resumed.heartbeat_at).getTime() > staleHeartbeatMs,
+        'the owner renews immediately after sleep, before attempting another request');
+      observedRenewal = true;
+    }
+    return fetch(input, init);
+  };
+  try {
+    await db.insertInto('sources').values({
+      id: sourceId, code: `dou-retry-stale-${sourceId}`, name: 'DOU backfill retry stale boundary', jurisdiction_level: 'FEDERAL',
+      base_url: 'https://inlabs.in.gov.br', connector_key: 'dou', max_attempts: 1,
+    }).execute();
+
+    const result = await runDouBackfillBatch(db, {
+      sourceId, credentials, fetch: transientFetch, now, dates: ['2026-09-20'], workerId: 'backfill-retry-owner', maxAttempts: 2,
+      // Disable periodic heartbeats only in this fixture: they must not mask
+      // a missing synchronous renewal between sleep and the next attempt.
+      heartbeatIntervalMs: 0,
+      sleep: async (waitMs) => {
+        sleeps += 1;
+        const staleAfterMs = 1_000;
+        assert.ok(waitMs > 5_000 && waitMs <= 20_000, 'the actual INLABS retry exceeds the configured stale threshold');
+        const run = await db.selectFrom('collection_runs').select(['id', 'status', 'worker_id', 'next_attempt_at'])
+          .where('source_id', '=', sourceId).executeTakeFirstOrThrow();
+        runId = run.id;
+        assert.equal(run.status, 'RUNNING');
+        assert.equal(run.worker_id, 'backfill-retry-owner');
+        assert.ok(run.next_attempt_at && new Date(run.next_attempt_at).getTime() > Date.now(),
+          'reclaim preserves the not-yet-due retry timestamp');
+
+        // Model five seconds inside the twenty-second retry without a real
+        // sleep or changing the global clock. There is no heartbeat between
+        // attempts, so this is the persisted state of a live waiting owner.
+        staleHeartbeatMs = Date.now() - 5_000;
+        await db.updateTable('collection_runs').set({ heartbeat_at: new Date(staleHeartbeatMs) })
+          .where('id', '=', run.id).execute();
+        assert.equal(await acquireNextCollectionRun(replicaDb, 'default-stale-worker'), null,
+          'the default 120-second threshold does not expose this retry gap');
+        assert.equal(await acquireNextCollectionRun(replicaDb, 'short-stale-worker', { staleAfterMs }), null,
+          'even a one-second stale threshold cannot steal a live retry wait');
+        const owner = await db.selectFrom('collection_runs').select('worker_id')
+          .where('id', '=', run.id).executeTakeFirstOrThrow();
+        assert.equal(owner.worker_id, 'backfill-retry-owner');
+        // Fix only the stale cutoff's JS clock. PostgreSQL now() and the
+        // owner's new Date() heartbeat still use real time. This makes the
+        // post-deadline boundary independent of runner/query latency.
+        const afterDeadline = Date.now();
+        const clock = t.mock.method(Date, 'now', () => afterDeadline);
+        try {
+          await db.updateTable('collection_runs').set({ next_attempt_at: new Date(afterDeadline - 100) })
+            .where('id', '=', run.id).execute();
+          assert.equal(await acquireNextCollectionRun(replicaDb, 'within-deadline-grace', { staleAfterMs }), null,
+            '100ms after the deadline is still inside the 1s stale grace, despite the old heartbeat');
+        } finally {
+          clock.mock.restore();
+        }
+      },
+    });
+    assert.equal(sleeps, 1);
+    assert.ok(requests > 1, 'the original owner makes the second attempt');
+    assert.equal(observedRenewal, true);
+    assert.equal(result.attempts, 2);
+    assert.equal(result.result.state, 'TERMINAL');
+    assert.equal(result.result.status, 'SUCCESS_NO_RESULTS');
+    const attempts = await db.selectFrom('collection_attempts').select(['attempt_no', 'status', 'error_code'])
+      .where('collection_run_id', '=', runId!).orderBy('attempt_no').execute();
+    assert.deepEqual(attempts, [
+      { attempt_no: 1, status: 'SOURCE_UNAVAILABLE', error_code: 'INLABS_UNAVAILABLE' },
+      { attempt_no: 2, status: 'SUCCESS', error_code: null },
+    ]);
+
+    // The grace is not permanent ownership: both the abandoned heartbeat
+    // and retry deadline must be older than the full stale window.
+    const abandoned = await createCollectionRun(db, {
+      sourceId, scheduledFor: new Date(Date.now() - 60_000), triggerType: 'BACKFILL',
+    });
+    const abandonedNow = Date.now();
+    const clock = t.mock.method(Date, 'now', () => abandonedNow);
+    try {
+      await db.updateTable('collection_runs').set({
+        status: 'RUNNING', worker_id: 'abandoned-backfill-owner',
+        heartbeat_at: new Date(abandonedNow - 5_000), next_attempt_at: new Date(abandonedNow - 100),
+      }).where('id', '=', abandoned).execute();
+      assert.equal(await acquireNextCollectionRun(replicaDb, 'abandoned-within-grace', { staleAfterMs: 1_000 }), null);
+      await db.updateTable('collection_runs').set({ next_attempt_at: new Date(abandonedNow - 2_000) })
+        .where('id', '=', abandoned).execute();
+      const recovered = await acquireNextCollectionRun(replicaDb, 'due-retry-recovery', { staleAfterMs: 1_000 });
+      assert.equal(recovered?.id, abandoned);
+      assert.equal(recovered?.workerId, 'due-retry-recovery');
+    } finally {
+      clock.mock.restore();
+    }
+  } finally {
+    await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).execute();
+    await db.deleteFrom('sources').where('id', '=', sourceId).execute();
+    await Promise.all(databases.map((database) => database.destroy()));
+  }
+});
 
 test('administrative DOU backfill runs explicit past dates through the engine without touching monitoring', async (t) => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
