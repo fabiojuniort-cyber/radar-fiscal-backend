@@ -319,6 +319,7 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       'suppression must not mutate canonical/origin/version evidence',
     );
 
+    await client.query('SAVEPOINT scope_event_guard');
     await assert.rejects(
       client.query(
         `UPDATE publication_scope_events
@@ -328,7 +329,8 @@ test('publication scope SUPPRESS/RESTORE is reversible, audited and fail-closed'
       ),
       /PUBLICATION_SCOPE_EVENT_APPEND_ONLY/,
     );
-    await client.query('ROLLBACK TO SAVEPOINT scope_event_guard').catch(() => undefined);
+    await client.query('ROLLBACK TO SAVEPOINT scope_event_guard');
+    await client.query('RELEASE SAVEPOINT scope_event_guard');
 
     // The expected-current-event token is mandatory for a valid RESTORE.
     await client.query('SAVEPOINT stale_restore');
