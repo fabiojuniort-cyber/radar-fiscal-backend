@@ -3,8 +3,11 @@
 Status: **offline candidate planner only; destructive R3 is NOT implemented or approved.**
 Nothing in this package connects to a database, changes rows, deletes objects,
 pauses services, obtains a LOCK, or proves a deploy/backup/restore occurred.
-The local snapshot does not include `migrations/`; generated TypeScript types
-cannot establish live FK actions, triggers, RLS, views, or dependency closure.
+Schema source was subsequently audited through GitHub migrations 001–032 at
+`68a2b2ab01560db2df846bf8d1e634e08ab82ccd`. Relevant findings appear below.
+This proves repository DDL, **not** installed production migrations, drift,
+runtime permissions, or live dependency closure. The local execution snapshot
+still does not contain those migrations or a database restoration.
 
 ## Binding policy
 
@@ -24,6 +27,16 @@ cannot establish live FK actions, triggers, RLS, views, or dependency closure.
 - In enabled sections, persisted KEEP/REVIEW annotations are safety vetoes;
   persisted IGNORE is never sufficient evidence. Contradictory canonical act
   types and supplied archive filename/section/date evidence fail closed.
+- Planner `dou-cleanup-candidates-v2` requires mutually consistent source date,
+  section, edition and official matter ID; ZIP date/name/hash; every XML part's
+  date, matter ID, edition, type, section, filename and hash; and the exact origin
+  `external_id`. Parts must be unique and contiguous. A historical version must
+  map to a supplied origin identity with the same filename/hash part inventory.
+  Missing or contradictory proof is REVIEW,
+  even when a coarse `dou.section` alone says DO2. Supplied download/certified
+  URLs, row-level official URLs and the certified-page inventory are cross-checked
+  against the XML part pages too. No undocumented journal-number-to-section map is
+  invented; a real DO1E/603 fixture exercises the source's edition semantics.
 
 ## Safe local use
 
@@ -83,6 +96,11 @@ its independent verification are future work. Even a provisional candidate
 still requires title/capture authenticity and completeness verification before
 any future executor may act.
 
+Additional file inventories in metadata or supplied publication/version rows
+block routine candidacy until their material content is examined. A PROVENANCE
+label alone does not waive this check. Those attachments do not change the
+separate DO2/DO2E section-exclusion policy.
+
 DO2/DO2E candidates do not need a routine-text proof, but provenance conflicts
 still block them. All other enabled act families are retained.
 
@@ -124,7 +142,37 @@ still block them. All other enabled act families are retained.
 Do not conflate this offline report with step 6, a production dry-run, a restore
 test, an approval, or completion of R3.
 
-## Dependency inventory to verify against real DDL
+## DDL audit and consequences for physical deletion
+
+Repository:
+[radar-fiscal-backend at 68a2b2a](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/tree/68a2b2ab01560db2df846bf8d1e634e08ab82ccd/migrations).
+The complete relevant definitions were inspected, including 004, 005, 006,
+009, 020, 021, 026, 028, 029, 030 and 031. Later migrations through 032 do not
+remove the identified retention barriers.
+
+| Migration | Verified behavior relevant to cleanup |
+| --- | --- |
+| `004_publications.sql` | Publications cascade to origins/versions and run-publication links; versions cascade to files. `collection_items.publication_id` and run-link `publication_version_id` use default NO ACTION, not explicit RESTRICT. |
+| `005_monitoring_and_matching.sql` | Publications cascade to company-publication records, which cascade to matches. Deleting the root can erase tenant review/matching history. |
+| `006_audit.sql`, `009_rls_policies.sql` | Audit entity IDs/JSON are logical references, not publication FKs. Runtime audit access is SELECT/INSERT; publication workers have table-level UPDATE, which matters when introducing a mutable scope field. |
+| `020_taxonomy_classification.sql` | Taxonomy runs reference versions with RESTRICT. Assertions, spans and reviews have RESTRICT dependencies and BEFORE UPDATE/DELETE append-only guards. Run material identity cannot be rewritten. |
+| `021_taxonomy_candidates.sql` | Unmapped occurrences reference runs with RESTRICT and are append-only. Candidate-occurrence links have RESTRICT references and a guard rejecting DELETE. |
+| `026_company_product_ncm.sql` | NCM mentions reference versions with RESTRICT. Worker grants are SELECT/INSERT; this migration does not give mentions an append-only trigger. |
+| `028_publication_ncm_scans.sql` | Derived NCM scans have a version FK with CASCADE. Do not confuse these with the separate taxonomy scan table. |
+| `029_catalog_scale.sql` | `is_hidden` is GENERATED ALWAYS from title/type. Feed is a real table without publication FK, maintained by expected/refresh functions and origin/publication/source triggers; publication DELETE removes feed rows. |
+| `030_archive_act_type_scale.sql` | The act-type catalog is append-only derived vocabulary; facets validate live visibility. It is not a deletion ledger or archive of publication evidence. |
+| `031_taxonomy_curation.sql` | Taxonomy scans have no version FK but have a run FK (default NO ACTION). Curator tags have no version FK and do have an append-only UPDATE/DELETE guard. |
+
+**Conclusion:** a blanket physical `DELETE publications` is not compatible with
+preserving this audit/evidence graph. Some rows block deletion; other branches
+cascade away and destroy collection or tenant history; FK-free references may
+remain dangling. Copy-then-delete and child-first deletion do not avoid
+append-only guards. Do not disable triggers, weaken RESTRICT/NO ACTION to
+CASCADE, truncate evidence tables, or null out relationships as a cleanup trick.
+An isolated record without these dependencies may have different mechanics, but
+that does not authorize a general purge or prove evidence retention.
+
+The previous logical dependency inventory remains a minimum export checklist:
 
 | Root | Known logical dependencies in the local generated types |
 | --- | --- |
@@ -135,9 +183,9 @@ test, an approval, or completion of R3.
 | `publication_taxonomy_assertions` | `publication_taxonomy_spans`, `publication_taxonomy_reviews`, superseding assertions |
 | `taxonomy_unmapped_occurrences` | `taxonomy_candidate_occurrence_links` and shared candidate relationships |
 
-Never infer a cascade policy from this table. Candidates, taxonomy/curation and
-company matches can be shared/user-relevant and require explicit retention or
-review. `publication_source_feed` may be table/view/trigger-maintained; verify.
+Never infer a live cascade policy from generated types or this checklist.
+Candidates, taxonomy/curation and company matches can be shared/user-relevant
+and require explicit retention or review. Verify installed feed triggers/DDL.
 Inventory audit-log entity/JSON references and external object
 provider/bucket/key/hash references as well. Do not delete audit evidence.
 
@@ -147,3 +195,88 @@ historical metadata is required, design a separate, explicit reviewed action;
 do not remove mixed-section runs or pretend telemetry is covered by publication
 counts. Coverage policy must ignore excluded sections independently of whether
 old receipt hints remain stored.
+
+## Proposed next step — reversible scope suppression, subject to approval
+
+This is a **proposal**, not a migration or executor implemented by this PR.
+It removes records from active product use while retaining all historical bytes
+and identities. It does **not** satisfy a literal requirement to erase stored
+history or release its disk space. Product/governance must explicitly choose
+this retention contract, or authorize a separate physical-archive design.
+
+### Migration A: independent scope state and immutable decision events
+
+- Create `publication_scope_events`: immutable event ID, publication FK with
+  RESTRICT, SUPPRESS/RESTORE action, prior/new scope, reason, rule/code versions,
+  manifest/evidence hashes, operator/approval references, operation ID and time.
+  Enforce unique `(operation_id, publication_id)`, valid transitions, and
+  append-only guards. A restore adds an event, never removes the original.
+- Create `publication_scope_state`: one row per decided publication, publication
+  PK/FK with RESTRICT, `IN_SCOPE`/`OUT_OF_SCOPE`, current event FK, policy key,
+  evidence hash and update time. Missing state means IN_SCOPE. KEEP and REVIEW
+  are planner decisions and never authorize OUT_OF_SCOPE.
+- Permit state/event writes only through a reviewed restricted procedure/role
+  that verifies the expected current event and row hashes and writes both
+  atomically under the publication's lock. Pin SECURITY DEFINER search paths,
+  schema-qualify relations, revoke PUBLIC execute, and expose explicit admin
+  evidence reads. Collector/app/ordinary worker must not receive generic
+  suppression privileges. A separate state table avoids silently extending
+  the worker's existing table-level UPDATE grant on `publications` to scope.
+- If a denormalized `publications.catalog_scope_status` is chosen instead for
+  measured performance, it needs the same event linkage plus narrowed table/
+  column grants and a guarded projection update. Never reuse generated
+  `is_hidden`, rewrite title/type to force it, or overwrite company review state.
+
+### Migration B and application deployment: all consumers and derived state
+
+- Define one shared in-scope predicate/repository contract, independent of the
+  existing hidden-family predicate. Extend feed expected/refresh logic to omit
+  OUT_OF_SCOPE and refresh on scope-state changes. Manual feed DELETE alone is
+  temporary because its triggers reconstruct it from authoritative state.
+- Update every product read: catalog, public lists/stats, facets/counts/caches,
+  detail/direct-ID routes, company dashboards/matches, archive endpoints and
+  taxonomy/curator-tag views. Audit/evidence administration has explicit access
+  to suppressed records; operational history continues to report what actually
+  happened and separates historical collected totals from currently visible ones.
+- Update taxonomy, NCM and matching worker selections AND single-item execution/
+  commit guards. A writer that selected work before suppression must recheck
+  scope under the agreed lock before committing derived output. Do not mutate
+  existing assertions/tags/matches to simulate suppression.
+- Invalidate material evidence-bound contract decisions when title, type, body,
+  version or origin/supplementary metadata changes. Revalidate under lock; a new
+  KEEP/REVIEW must not inherit an old suppression. If revalidation cannot happen
+  synchronously, reject that material write or append an audited RESTORE to
+  IN_SCOPE pending review; do not leave new potentially relevant content hidden.
+  Pure last-seen/operational timestamp updates need not invalidate scope proof.
+  DO2 anti-reentry remains a collector policy, not a stale content verdict.
+- Add indexes/updated types/permission verifiers and backfill only derived scope
+  projections. Default all existing publications to IN_SCOPE. Deploy and verify
+  every consumer/writer before enabling the administrative executor.
+
+### Future executor: SUPPRESS/RESTORE only
+
+After the already-required LOCK, verified deploy, backup and tested temporary
+restore, a separately reviewed executor may recheck an approved manifest under
+writer exclusion and transaction locks, then append events and update scope/feed
+only. Its dry-run performs those exact operations in the restored environment
+and ROLLBACKs; execution requires an explicit new approval and identical hashes.
+It must not change originals, versions, files, taxonomy, tenant reviews, scan
+evidence or operational telemetry. Postconditions compare their full hashes and
+IDs, not just row counts. Test direct-ID/cache leaks, in-flight workers, stale
+evidence, replay idempotence, mixed-source records, and RESTORE round trips.
+
+RESTORE is the logical rollback, represented by a compensating event and rebuilt
+feed. A code rollback to readers unaware of scope would re-expose suppressed
+records; include compatible rollback builds in deployment governance.
+
+### If physical history removal is still mandatory
+
+Open a separate, approved evidence-retention/archive design before an executor.
+It must define which complete connected graphs and blobs are copied, immutable
+checksummed archive manifests and restore/read access, durable identity/tombstone
+anchors for remaining references, and explicit migrations adapting every FK,
+append-only evidence contract, non-FK reference and reader. Shared taxonomy/
+company evidence cannot be moved as if it belongs solely to one publication.
+Changing immutable relationships is a governance migration, not an admin flag.
+Until that design is approved and restored successfully in isolation, physical
+purge remains blocked. Logical suppression offers no claim of storage savings.
