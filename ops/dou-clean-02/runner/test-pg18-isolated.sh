@@ -96,6 +96,13 @@ psql_fixture fixture_template fixture-bootstrap '-c statement_timeout=12000 -c l
 query fixture_template 'CREATE DATABASE fixture_admin TEMPLATE template0;' >/dev/null
 sql_file fixture_template privileges.sql >"$TEMP_DIR/privileges-safe.out"
 printf '%s\n' 'PASS safe privilege baseline'
+psql_fixture fixture_template fixture-read-only-preflight '-c default_transaction_read_only=on -c statement_timeout=12000' \
+  --set=suppress_operation_id= --set=restore_operation_id= \
+  <"$ROOT_DIR/sql/state.sql" >"$TEMP_DIR/preflight-empty-operations.json"
+jq -e '.canonical_exists and .in_scope and .suppress_event==null and .restore_event==null' \
+  "$TEMP_DIR/preflight-empty-operations.json" >/dev/null
+[[ $(query fixture_template 'SELECT count(*) FROM public.publication_scope_events;') == 0 ]] || fail 'read-only preflight wrote events'
+printf '%s\n' 'PASS actual read-only state snapshot accepts empty operation IDs and writes no events'
 
 new_database fixture_nominal
 sql_file fixture_nominal suppress.sql >"$TEMP_DIR/nominal-suppress.out"

@@ -23,6 +23,8 @@ GRANT radar_taxonomy_curator TO radar_taxonomy_curator_runtime;
 GRANT radar_worker TO fixture_runtime_noinherit WITH INHERIT FALSE, SET TRUE;
 
 CREATE TABLE public.publications(id uuid PRIMARY KEY, is_hidden boolean NOT NULL DEFAULT false);
+ALTER TABLE public.publications ADD COLUMN published_on date DEFAULT '2026-01-01';
+ALTER TABLE public.publications ADD COLUMN first_collected_at timestamptz DEFAULT '2026-01-01T00:00:00Z';
 CREATE TABLE public.publication_versions(publication_id uuid, is_current boolean);
 CREATE TABLE public.publication_origins(publication_id uuid);
 CREATE TABLE public.publication_source_feed(publication_id uuid, is_hidden boolean);
@@ -135,3 +137,12 @@ GRANT EXECUTE ON FUNCTION public.publication_scope_imported_today(uuid) TO radar
 GRANT EXECUTE ON FUNCTION public.publication_scope_lock_curator_version(uuid) TO radar_taxonomy_curator;
 -- The synthetic transition owner calls epoch(); production owner is postgres.
 GRANT EXECUTE ON FUNCTION public.publication_scope_epoch() TO fixture_scope_owner;
+-- Fields used only by the actual read-only aggregate snapshot SQL.
+CREATE TABLE public.sources(id uuid PRIMARY KEY, code text, is_active boolean);
+ALTER TABLE public.publication_source_feed ADD COLUMN source_code text DEFAULT 'dou';
+ALTER TABLE public.publication_source_feed ADD COLUMN published_on date DEFAULT '2026-01-01';
+ALTER TABLE public.publication_source_feed ADD COLUMN first_collected_at timestamptz DEFAULT '2026-01-01T00:00:00Z';
+CREATE FUNCTION public.publication_source_feed_expected(ids uuid[])
+RETURNS TABLE(source_code text,publication_id uuid,published_on date,first_collected_at timestamptz,is_hidden boolean)
+LANGUAGE sql AS $$ SELECT f.source_code,f.publication_id,f.published_on,f.first_collected_at,f.is_hidden
+  FROM public.publication_source_feed f WHERE f.publication_id=ANY(ids) $$;

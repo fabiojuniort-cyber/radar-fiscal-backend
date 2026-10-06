@@ -19,9 +19,9 @@ SELECT jsonb_build_object(
     FROM (SELECT source_code,publication_id,published_on,first_collected_at,is_hidden FROM public.publication_source_feed
       WHERE publication_id=:'publication_id'::uuid) x),
   'suppress_event',(SELECT jsonb_build_object('id',e.id,'sha256',encode(sha256(convert_to(to_jsonb(e)::text,'UTF8')),'hex'))
-    FROM public.publication_scope_events e WHERE publication_id=:'publication_id'::uuid AND operation_id=:'suppress_operation_id'::uuid),
+    FROM public.publication_scope_events e WHERE publication_id=:'publication_id'::uuid AND operation_id=nullif(:'suppress_operation_id','')::uuid),
   'restore_event',(SELECT jsonb_build_object('id',e.id,'sha256',encode(sha256(convert_to(to_jsonb(e)::text,'UTF8')),'hex'))
-    FROM public.publication_scope_events e WHERE publication_id=:'publication_id'::uuid AND operation_id=:'restore_operation_id'::uuid),
+    FROM public.publication_scope_events e WHERE publication_id=:'publication_id'::uuid AND operation_id=nullif(:'restore_operation_id','')::uuid),
   'v1',jsonb_build_object(
     'totalPublications',(SELECT count(*) FROM public.publications p WHERE public.publication_scope_is_in_scope(p.id)),
     'totalSources',(SELECT count(*) FROM public.sources),'activeSources',(SELECT count(*) FROM public.sources WHERE is_active),
