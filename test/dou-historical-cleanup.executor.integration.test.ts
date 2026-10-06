@@ -1,5 +1,5 @@
 import { deepEqual, equal, match, ok, rejects } from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 
 import { Client } from 'pg';
@@ -35,17 +35,20 @@ test('executor refuses drift, suppresses idempotently, verifies and restores onl
   const admin = new Client({ connectionString: adminUrl });
   await admin.connect();
   try {
-    let sourceId = (await admin.query<{ id: string }>(`SELECT id FROM sources WHERE code = 'dou'`)).rows[0]?.id;
-    if (!sourceId) {
-      sourceId = randomUUID();
-      await admin.query(`INSERT INTO sources (id, code, name, jurisdiction_level, base_url, connector_key, is_active)
-        VALUES ($1, 'dou', 'DOU executor fixture', 'FEDERAL', 'https://example.invalid', 'dou', false)`, [sourceId]);
-    }
+    // Same upsert as db:ensure-dou-source: earlier suites may leave a `dou`
+    // code under a placeholder connector key, and the planner requires both.
+    const sourceId = (await admin.query<{ id: string }>(
+      `INSERT INTO sources (code, name, jurisdiction_level, base_url, connector_key, is_active)
+       VALUES ('dou', 'DOU executor fixture', 'FEDERAL', 'https://example.invalid', 'dou', false)
+       ON CONFLICT (code) DO UPDATE SET connector_key = EXCLUDED.connector_key
+       RETURNING id`)).rows[0]!.id;
     const seeded: string[] = [];
+    // Fixtures are append-only, so matter ids are unique per run.
+    const matterBase = 81_000_000 + randomInt(0, 900_000) * 10;
     for (const [index, section] of ['DO2', 'DO2', 'DO2E'].entries()) {
       const id = randomUUID();
-      const matter = `8100000${index}`;
-      const page = String(70 + index);
+      const matter = String(matterBase + index);
+      const page = String(matterBase + index);
       const meta = douMetadata(section, matter, page);
       await admin.query(`INSERT INTO publications (id, identity_hash, identity_strength, identity_basis, jurisdiction_level, title, act_type, agency)
         VALUES ($1::uuid, encode(sha256(convert_to($2::text, 'UTF8')), 'hex'), 'STRONG', '{}', 'FEDERAL', 'PORTARIA Nº ' || $3, 'PORTARIA', 'União')`,
