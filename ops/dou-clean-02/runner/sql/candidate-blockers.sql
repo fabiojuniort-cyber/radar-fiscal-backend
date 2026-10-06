@@ -40,7 +40,7 @@ SELECT jsonb_build_object(
   'has_history',(SELECT count(*) FILTER (WHERE has_history) FROM checks),
   'no_company_links',(SELECT count(*) FILTER (WHERE no_company_links) FROM checks),
   'no_scope_ledger',(SELECT count(*) FILTER (WHERE no_scope_ledger) FROM checks),
-  'all_filters',(SELECT count(*) FILTER (WHERE not_hidden AND one_current_version AND visible_feed AND has_files
+  'all_filters',(SELECT count(*) FILTER (WHERE not_hidden AND one_current_version AND visible_feed
     AND has_history AND no_company_links AND no_scope_ledger) FROM checks),
   'all_but_files',(SELECT count(*) FILTER (WHERE not_hidden AND one_current_version AND visible_feed
     AND has_history AND no_company_links AND no_scope_ledger) FROM checks),

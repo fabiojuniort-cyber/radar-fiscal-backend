@@ -462,7 +462,7 @@ main() {
   jq -e --slurpfile f "$WORK/baseline-fingerprints.json" '
     .publications==$f[0].publications.count and .versions==$f[0].publication_versions.count and
     .origins==$f[0].publication_origins.count and .files==$f[0].publication_files.count and
-    (.files|tonumber)>0 and ($f[0].collection_run_publications.count|tonumber)>0
+    ($f[0].collection_run_publications.count|tonumber)>0
   ' "$WORK/baseline-rls.json" >/dev/null
   api_phase baseline true "$SMOKE_BASELINE_EPOCH"
   same_json "$WORK/baseline-state.json" "$WORK/baseline-api-after.json"
@@ -544,5 +544,8 @@ main() {
   cat "$WORK/sanitized-summary.json"
   log 'DOU_CLEAN_02_PUBLIC_SCOPE_SMOKE_PASS; FINAL_IN_SCOPE_CONFIRMED'
   log 'AUTHENTICATED_ARCHIVE_DETAIL_FACETS_NAVIGATION_NOT_PROVEN; WORKER_INFLIGHT_RACE_NOT_PROVEN'
+  if jq -e '.files=="0"' "$WORK/baseline-rls.json" >/dev/null; then
+    log 'FILE_RLS_VACUOUS_NOT_PROVEN; CANDIDATE_HAS_NO_PUBLICATION_FILES'
+  fi
 }
 main "$@"

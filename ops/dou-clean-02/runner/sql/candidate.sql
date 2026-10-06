@@ -16,8 +16,10 @@ WITH ranked AS (
       encode(sha256(convert_to(p.id::text,'UTF8')),'hex')=:'controlled_publication_sha256')
     AND (SELECT count(*) FROM public.publication_versions v WHERE v.publication_id=p.id AND v.is_current)=1
     AND EXISTS (SELECT 1 FROM public.publication_source_feed f WHERE f.publication_id=p.id AND NOT f.is_hidden)
-    -- Require non-vacuous file-RLS and historical-import preservation proofs.
-    AND EXISTS (SELECT 1 FROM public.publication_files f JOIN public.publication_versions v ON v.id=f.publication_version_id WHERE v.publication_id=p.id)
+    -- Require a non-vacuous historical-import preservation proof. Files are NOT
+    -- required: no ingestion path writes publication_files, and production
+    -- showed has_files=0 for every row of the window (deployment 7f5c29ed).
+    -- File RLS is still compared (equal counts); when zero it is NOT_PROVEN.
     AND EXISTS (SELECT 1 FROM public.collection_run_publications h WHERE h.publication_id=p.id)
     AND NOT EXISTS (SELECT 1 FROM public.company_publications c WHERE c.publication_id=p.id)
     AND NOT EXISTS (SELECT 1 FROM public.publication_matches m JOIN public.company_publications c
