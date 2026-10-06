@@ -890,6 +890,48 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       assert.equal(cnaeRow.cnaeCode, '0111301');
       assert.ok(cnaeRow.segments.some((segment: { code: string }) => segment.code === 'sector.agribusiness'));
 
+      // A company with only its CNAEs (profile never saved) is compared by
+      // the segment of each CNAE; one with an empty saved profile is
+      // compared too ("Sem afinidade"), never "profile not filled".
+      {
+        const onlyCnae = await admin.query<{ id: string }>(
+          `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
+           VALUES ($1::uuid, 'Só CNAE Ltda.', $2) RETURNING id`,
+          [customer.tenantId, String(Date.now() + 1).padStart(14, '0').slice(-14)],
+        );
+        await admin.query(
+          `INSERT INTO company_cnaes (company_id, cnae_code, is_primary) VALUES ($1::uuid, '0111301', TRUE)`,
+          [onlyCnae.rows[0]!.id],
+        );
+        const byCnae = await app.inject({
+          method: 'GET',
+          url: `/api/v1/companies/${onlyCnae.rows[0]!.id}/publications/${publicationId}/affinity`,
+          headers: customer.headers,
+        });
+        assert.equal(byCnae.statusCode, 200, byCnae.body);
+        assert.equal(byCnae.json().status, 'OK');
+        assert.ok(byCnae.json().matches.some((m: { code: string }) => m.code === 'sector.agribusiness'));
+
+        const emptyProfile = await admin.query<{ id: string }>(
+          `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
+           VALUES ($1::uuid, 'Perfil Vazio Ltda.', $2) RETURNING id`,
+          [customer.tenantId, String(Date.now() + 2).padStart(14, '0').slice(-14)],
+        );
+        await admin.query(
+          `INSERT INTO company_tax_profiles (company_id, version_no, tax_regime, personalization, is_current)
+           VALUES ($1::uuid, 1, 'LUCRO_PRESUMIDO', '{}'::jsonb, true)`,
+          [emptyProfile.rows[0]!.id],
+        );
+        const empty = await app.inject({
+          method: 'GET',
+          url: `/api/v1/companies/${emptyProfile.rows[0]!.id}/publications/${publicationId}/affinity`,
+          headers: customer.headers,
+        });
+        assert.equal(empty.statusCode, 200, empty.body);
+        assert.equal(empty.json().status, 'OK');
+        assert.equal(empty.json().level, 'NONE');
+      }
+
       // Profile keeps the user's segment per CNAE; a CNAE activity or an
       // unknown item is refused.
       const profileUrl = `/api/v1/companies/${companyId}/tax-profile`;

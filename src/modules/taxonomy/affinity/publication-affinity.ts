@@ -62,6 +62,8 @@ export function affinityLevel(score: number, strong: boolean): AffinityLevel {
 export function computePublicationAffinity(input: {
   view: PublicationTaxonomyView;
   profileCodes: readonly string[];
+  /** The company has some tax-profile parameter, even without taxonomy codes. */
+  hasProfile?: boolean;
   /** Product concept code -> its group code, for the profile's products. */
   profileProductGroups: ReadonlyMap<string, string>;
   /** NCMs of the company (8 digits): profile, CNAEs and products. */
@@ -71,7 +73,7 @@ export function computePublicationAffinity(input: {
 }): PublicationAffinity {
   const profile = new Set(input.profileCodes);
   const companyNcms = new Set(input.profileNcms ?? []);
-  if (profile.size === 0 && companyNcms.size === 0) {
+  if (profile.size === 0 && companyNcms.size === 0 && !input.hasProfile) {
     return { status: 'NO_PROFILE', level: null, score: 0, matches: [] };
   }
 

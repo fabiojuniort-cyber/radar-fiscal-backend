@@ -91,6 +91,11 @@ test('no profile and not yet classified are reported as such', () => {
     computePublicationAffinity({ view: CV100, profileCodes: [], profileProductGroups: new Map() }).status,
     'NO_PROFILE',
   );
+  // Any profile parameter starts the comparison, even without codes.
+  assert.equal(
+    computePublicationAffinity({ view: CV100, profileCodes: [], profileProductGroups: new Map(), hasProfile: true }).level,
+    'NONE',
+  );
   assert.equal(
     computePublicationAffinity({ view: view([], 'DISABLED'), profileCodes: ['tax.icms'], profileProductGroups: new Map() }).status,
     'NOT_CLASSIFIED',
