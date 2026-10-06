@@ -104,6 +104,35 @@ separate DO2/DO2E section-exclusion policy.
 DO2/DO2E candidates do not need a routine-text proof, but provenance conflicts
 still block them. All other enabled act families are retained.
 
+## In-database READ ONLY dry run (2026-10-06)
+
+Production rows must not leave Railway, so the offline snapshot CLI above is
+not used against production. `npm run db:dou-cleanup-dry-run` runs **inside a
+Railway service** with `DOU_CLEANUP_DRY_RUN_DATABASE_URL` (private reference to
+an unfiltered role, never printed):
+
+- the session is forced `default_transaction_read_only=on`; everything runs in
+  ONE `REPEATABLE READ READ ONLY` transaction (consistent snapshot) and always
+  ends in `ROLLBACK`;
+- DOU publications (any origin in the `dou` source) are streamed in UUID key
+  order in batches of 500 with all their origins/versions; each batch goes
+  through the unchanged `planDouHistoricalCleanup`;
+- stdout carries only `DOU_CLEANUP_DRY_RUN={...}`: totals per disposition,
+  publications per decisive reason (`byReason`), candidates per DOU section,
+  `candidateSetSha256` (sorted `publicationId:evidenceSha256:reasons` lines)
+  and `runSha256`. No identifier, title, text or connection detail;
+- errors print a fixed label only; `--apply/--execute/--confirm/--delete/
+  --suppress` are refused. There is no write branch.
+
+`candidateSetSha256` is the anchor for the future executor: it must re-derive
+the set from the database and refuse to suppress anything unless the digest
+equals the approved dry run (any ingestion or metadata change in between
+invalidates the approval). Batch size does not change it (integration test).
+
+Since DOU-CLEAN-02 the executor target is SUPPRESS via
+`apply_publication_scope_transition` (no DELETE); the runner proven by the
+production canary (tribusca-control#84) is the template.
+
 ## Required execution gates — future separately reviewed work
 
 1. Record the Issue80 governance LOCK: owner, scope, expiry, exact code SHA,

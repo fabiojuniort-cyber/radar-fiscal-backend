@@ -448,3 +448,12 @@ test('malformed snapshots and duplicate IDs abort the whole plan, not partial ou
   ];
   for (const mutate of cases) { const input = snapshot(); mutate(input); throws(() => planDouHistoricalCleanup(input)); }
 });
+
+test('dry-run summary keys every decision by the planner reason that decided it', async () => {
+  const { primaryReason } = await import('../src/modules/collection/dou-historical-cleanup.dry-run.js');
+  equal(primaryReason('CANDIDATE', ['excluded_dou_section']), 'excluded_dou_section');
+  equal(primaryReason('CANDIDATE', ['contract_routine', 'strict_routine_contract_excerpt']), 'strict_routine_contract_excerpt');
+  equal(primaryReason('KEEP', ['CONTRATACAO_RELEVANTE', 'material_relevance']), 'material_relevance');
+  equal(primaryReason('REVIEW', ['not_unanimously_proven_routine', 'cnpj_only']), 'not_unanimously_proven_routine');
+  equal(primaryReason('REVIEW', ['brand_new_code']), 'unknown_reason');
+});
