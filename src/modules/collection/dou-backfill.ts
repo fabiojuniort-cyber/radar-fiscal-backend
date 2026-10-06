@@ -240,7 +240,7 @@ async function createOwnedBackfillRun(
     // commits first (and is seen below) or waits for this transaction.
     await sql`LOCK TABLE collection_runs IN SHARE ROW EXCLUSIVE MODE`.execute(trx);
     const source = await trx.selectFrom('sources')
-      .select(['id', 'connector_key', 'is_active', 'max_attempts'])
+      .select(['id', 'code', 'connector_key', 'is_active', 'max_attempts'])
       .where('id', '=', sourceId)
       .executeTakeFirst();
     if (!source || source.connector_key !== 'dou' || !source.is_active) {
@@ -266,6 +266,7 @@ async function createOwnedBackfillRun(
     return {
       id: run.id,
       sourceId: run.source_id,
+      sourceCode: source.code,
       connectorKey: 'dou',
       maxAttempts: source.max_attempts,
       correlationId: run.correlation_id,

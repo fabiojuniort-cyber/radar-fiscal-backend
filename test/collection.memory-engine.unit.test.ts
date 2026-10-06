@@ -246,6 +246,7 @@ test('successful empty spool counts zero and is disposed before SUCCESS_NO_RESUL
   assert.equal(result.status, 'SUCCESS_NO_RESULTS');
   assert.deepEqual(result.metrics, {
     found: 0, processed: 0, newPublications: 0, existingPublications: 0,
+    skippedByPolicy: 0, policyExclusions: [],
     newVersions: 0, itemErrors: 0, connectorPartialFailures: 0,
   });
   assert.equal(spool.spools[0]!.count, 0);

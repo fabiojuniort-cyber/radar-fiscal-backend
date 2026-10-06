@@ -7,6 +7,7 @@ import { parseDouEntries, parseDouZip, readDouZip, classifyDouAct, extractEmbedd
 import type { DouXmlEntry, DouArchiveContext } from '../src/modules/collection/dou.parser.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { classifyDouContractExcerpt } from '../src/modules/collection/dou-scope.rules.js';
+import { evaluatePublicationExclusionPolicy } from '../src/modules/collection/publication-exclusion-policy.js';
 import { fixtureEntries, makeZip, archiveContext } from './dou.fixtures.js';
 
 async function assertZipParity(entries: DouXmlEntry[], context: DouArchiveContext) {
@@ -62,6 +63,147 @@ function embeddedZipEntry(): DouXmlEntry {
     ].join(''),
   });
 }
+
+function exclusionNoticeEntry(part?: number, content = '<p>Objeto: aquisição de papel A4. Modalidade: dispensa de licitação. Processo: 123. Valor: R$ 100.</p>'): DouXmlEntry {
+  const entry = syntheticZipEntry({ matter: '12345678', section: 'DO3',
+    title: 'AVISO DE DISPENSA DE LICITAÇÃO', text: content, ...(part ? { part } : {}) });
+  return { ...entry, bytes: Buffer.from(Buffer.from(entry.bytes).toString('utf8')
+    .replace(/artCategory="[^"]*"/, 'artCategory="Órgão administrativo federal"')
+    .replace(/artType="[^"]*"/, 'artType="AVISO DE DISPENSA DE LICITAÇÃO"')
+    .replace(/ highlightImage="[^"]*"/, '')) };
+}
+
+function assertSameCanonicalNotice(
+  publication: ReturnType<typeof parseDouEntries>['publications'][number],
+  baseline: ReturnType<typeof parseDouEntries>['publications'][number],
+): void {
+  assert.equal(publication.title, baseline.title);
+  assert.equal(publication.content, baseline.content);
+  const before = normalizePublication({ sourceId: 'dou', publication: baseline });
+  const after = normalizePublication({ sourceId: 'dou', publication });
+  assert.equal(after.identityHash, before.identityHash);
+  assert.equal(after.contentHash, before.contentHash);
+}
+
+test('nonempty discarded body XML fields veto exclusion without changing canonical text, HTML or hashes', async () => {
+  const entry = exclusionNoticeEntry();
+  const context = archiveContext('DO3');
+  const baseline = parseDouEntries([entry], context).publications[0]!;
+  assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication: baseline }).decision, 'EXCLUDE');
+  const extras = [
+    ...['Anexo', 'Titulo', 'SubTitulo', 'Data', 'Midias'].map(field =>
+      `<${field}><![CDATA[Concede isenção do ICMS.]]></${field}>`),
+    '<Anexo><p>Concede isenção do ICMS.</p></Anexo>',
+    '<Anexo><img src="evidence.png"/></Anexo>',
+    '<Anexo href="evidence.pdf"/>',
+    'Concede isenção do ICMS.',
+  ];
+  for (const extra of extras) {
+    const changed = { ...entry, bytes: Buffer.from(Buffer.from(entry.bytes).toString('utf8')
+      .replace('</body>', `${extra}</body>`)) };
+    const publications = await assertZipParity([changed], context);
+    assert.equal(publications.length, 1);
+    const publication = publications[0]!;
+    assert.equal((publication.metadata!.dou as any).scopeStructureIncomplete, true, extra);
+    assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication }).reasonCode, 'INCOMPLETE_DOU_STRUCTURE', extra);
+    assertSameCanonicalNotice(publication, baseline);
+    assert.equal(publication.presentationHtml, baseline.presentationHtml);
+  }
+});
+
+test('empty extra XML fields and ordinary presentational styles do not invent missing evidence', () => {
+  const entry = exclusionNoticeEntry();
+  const changed = { ...entry, bytes: Buffer.from(Buffer.from(entry.bytes).toString('utf8')
+    .replace('</body>', '<Data/><Titulo> \n </Titulo><SubTitulo><![CDATA[\t]]></SubTitulo><Midias/><Anexo/></body>')
+    .replace('<p>Objeto:', '<p class="notice" style="text-align:left"><span style="font-weight:bold">Objeto:</span>')
+    .replace('</p>', '</p><input type="text"><input type="text" value=" " placeholder=" "><div title=" " aria-label=" " alt=" " background=" " style="background-color:white; text-align:center"></div>')) };
+  const result = parseDouEntries([changed], archiveContext('DO3'));
+  assert.deepEqual(result.partialFailures, []);
+  const publication = result.publications[0]!;
+  assert.equal((publication.metadata!.dou as any).scopeStructureIncomplete, undefined);
+  assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication }).decision, 'EXCLUDE');
+  assertSameCanonicalNotice(publication, parseDouEntries([entry], archiveContext('DO3')).publications[0]!);
+});
+
+test('discarded visual HTML, attribute text and CSS veto exclusion in every scope field without changing hashes', () => {
+  const entry = exclusionNoticeEntry();
+  const context = archiveContext('DO3');
+  const baseline = parseDouEntries([entry], context).publications[0]!;
+  assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication: baseline }).decision, 'EXCLUDE');
+  const media = [
+    '<input type="image" src="evidence.png">',
+    '<INPUT TYPE=" IMAGE " SRC="evidence.png">',
+    '<input type="text" value="Concede isenção do ICMS">',
+    '<input type="text" placeholder="Concede isenção do ICMS">',
+    '<option label="Concede isenção do ICMS"></option>',
+    '<optgroup label="Concede isenção do ICMS"></optgroup>',
+    '<progress value="50" max="100"></progress>',
+    '<meter value="50" max="100"></meter>',
+    '<select></select>',
+    '<custom-evidence></custom-evidence>',
+    '<table background="evidence.png"><tr><td>&nbsp;</td></tr></table>',
+    '<div alt="Concede isenção do ICMS"></div>',
+    '<span title="Concede isenção do ICMS"></span>',
+    '<div aria-label="Concede isenção do ICMS"></div>',
+    ...['label', 'src', 'href', 'data', 'srcdoc', 'aria-labelledby'].map(attribute =>
+      `<span ${attribute}="evidence"></span>`),
+    '<div style="background-image:url(evidence.png)"></div>',
+    '<div style="BACKGROUND: URL(&quot;evidence.png&quot;)"></div>',
+    '<div style="background-image:u/**/rl(evidence.png)"></div>',
+    '<div style="background-image:u\\72l(evidence.png)"></div>',
+    '<div style="background-image:linear-gradient(red,green)"></div>',
+    '<div style="content:\'Concede isenção do ICMS\'"></div>',
+    '<style>.anexo::before{content:"Concede isenção do ICMS"}</style>',
+    '<script>document.write("Concede isenção do ICMS")</script>',
+    '<link rel="alternate stylesheet" href="evidence.css">',
+  ];
+  for (const visual of media) {
+    for (const field of ['Identifica', 'Ementa', 'Texto']) {
+      const changed = { ...entry, bytes: Buffer.from(Buffer.from(entry.bytes).toString('utf8')
+        .replace(`]]></${field}>`, `${visual}]]></${field}>`)) };
+      const result = parseDouEntries([changed], context);
+      assert.deepEqual(result.partialFailures, []);
+      const publication = result.publications[0]!;
+      assert.equal((publication.metadata!.dou as any).scopeStructureIncomplete, true, `${field}: ${visual}`);
+      assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication }).reasonCode, 'INCOMPLETE_DOU_STRUCTURE');
+      assertSameCanonicalNotice(publication, baseline);
+    }
+  }
+});
+
+test('discarded XML and CSS in a later part veto exclusion for either multipart order', async () => {
+  const first = exclusionNoticeEntry(1, '<p>Objeto: aquisição de papel A4. Processo: 123.</p>');
+  const second = exclusionNoticeEntry(2, '<p>Valor: R$ 100.</p>');
+  const context = archiveContext('DO3');
+  const baseline = parseDouEntries([first, second], context).publications[0]!;
+  assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication: baseline }).decision, 'EXCLUDE');
+  for (const xml of [
+    Buffer.from(second.bytes).toString('utf8').replace('</body>', '<Anexo><p>Concede isenção do ICMS.</p></Anexo></body>'),
+    Buffer.from(second.bytes).toString('utf8').replace(']]></Texto>', '<div style="background-image:url(evidence.png)"></div>]]></Texto>'),
+  ]) {
+    const changed = { ...second, bytes: Buffer.from(xml) };
+    for (const entries of [[first, changed], [changed, first]]) {
+      const publications = await assertZipParity(entries, context);
+      const publication = publications[0]!;
+      assert.equal((publication.metadata!.dou as any).scopeStructureIncomplete, true);
+      assert.equal(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication }).reasonCode, 'INCOMPLETE_DOU_STRUCTURE');
+      assertSameCanonicalNotice(publication, baseline);
+    }
+  }
+});
+
+test('non-text DOU media cannot disappear from exclusion evidence', () => {
+  for (const media of ['<img src="evidence.png">', '<object data="evidence.pdf"></object>', '<svg><text>ICMS</text></svg>']) {
+    const entry = syntheticZipEntry({ matter: '12345678', section: 'DO3',
+      title: 'AVISO DE DISPENSA DE LICITAÇÃO',
+      text: `<p>Objeto: aquisição de papel A4. Processo: 123.</p>${media}` });
+    const result = parseDouEntries([entry], archiveContext('DO3'));
+    assert.equal(result.partialFailures.length, 0);
+    const publication = result.publications[0]!;
+    assert.equal((publication.metadata!.dou as Record<string, unknown>).scopeStructureIncomplete, true);
+    assert.notEqual(evaluatePublicationExclusionPolicy({ sourceCode: 'dou', publication }).decision, 'EXCLUDE');
+  }
+});
 
 test('streaming ZIP parser exactly preserves real fixture publications and arbitrary multipart order', async () => {
   await assertZipParity(await fixtureEntries('DO1'), archiveContext('DO1'));

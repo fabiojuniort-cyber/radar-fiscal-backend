@@ -7,9 +7,11 @@ import {
   finishCollectionAttempt,
   finishCollectionRun,
   heartbeatCollectionRun,
+  recordCollectionPolicyExclusions,
   scheduleCollectionRetry,
   startCollectionAttempt,
   type AcquiredCollectionRun,
+  type CollectionPolicyExclusionCount,
 } from './collection-run.repository.js';
 import type {
   ConnectorNewsItem,
@@ -34,6 +36,10 @@ import {
 import {
   normalizePublication,
 } from './publication.normalizer.js';
+import {
+  evaluatePublicationExclusionPolicy,
+  PUBLICATION_EXCLUSION_POLICY,
+} from './publication-exclusion-policy.js';
 import {
   persistPublication,
   recordCollectionItemFailure,
@@ -80,6 +86,10 @@ export interface CollectionEngineMetrics {
   found: number;
   /** Publications + news items persisted or recognized as existing. */
   processed: number;
+  /** Normalized publications excluded before any item/canonical persistence. */
+  skippedByPolicy: number;
+  /** Counts only; bounded by the versioned policy's configured rules. */
+  policyExclusions: CollectionPolicyExclusionCount[];
   newPublications: number;
   existingPublications: number;
   newVersions: number;
@@ -111,6 +121,8 @@ function emptyMetrics(): CollectionEngineMetrics {
   return {
     found: 0,
     processed: 0,
+    skippedByPolicy: 0,
+    policyExclusions: [],
     newPublications: 0,
     existingPublications: 0,
     newVersions: 0,
@@ -293,6 +305,23 @@ export async function processAcquiredCollectionRun(
   );
 
   const metrics = emptyMetrics();
+  const savePolicyMetrics = async (): Promise<void> => {
+    if (metrics.skippedByPolicy === 0) return;
+    const saved = await recordCollectionPolicyExclusions(db, {
+      runId: run.id,
+      workerId: run.workerId,
+      attemptId: attempt.id,
+      policyKey: PUBLICATION_EXCLUSION_POLICY.key,
+      policyVersion: PUBLICATION_EXCLUSION_POLICY.version,
+      skippedByPolicy: metrics.skippedByPolicy,
+      policyExclusions: metrics.policyExclusions,
+    });
+    if (!saved) {
+      throw new ConnectorError('Collection run ownership was lost before policy audit persistence.', {
+        code: 'COLLECTION_RUN_OWNERSHIP_LOST', kind: 'CANCELLED', retryable: false,
+      });
+    }
+  };
 
   logger.info(
     {
@@ -505,22 +534,44 @@ export async function processAcquiredCollectionRun(
           publication,
         });
 
-        const persisted = await db
-          .transaction()
-          .execute((trx) =>
-            persistPublication(trx, {
-              sourceId: run.sourceId,
-              runId: run.id,
-              attemptId: attempt.id,
-              publication: normalized,
-            }),
-          );
+        const policy = evaluatePublicationExclusionPolicy({
+          ...(run.sourceCode !== undefined ? { sourceCode: run.sourceCode } : {}),
+          publication: normalized,
+        });
+        if (policy.decision === 'EXCLUDE') {
+          metrics.skippedByPolicy += 1;
+          const existingCount = metrics.policyExclusions.find(count =>
+            count.sourceCode === (run.sourceCode ?? null) &&
+            count.normalizedActType === policy.normalizedActType &&
+            count.ruleId === (policy.ruleId ?? null) &&
+            count.policyKey === policy.policyKey &&
+            count.policyVersion === policy.policyVersion);
+          if (existingCount) existingCount.count += 1;
+          else metrics.policyExclusions.push({
+            sourceCode: run.sourceCode ?? null,
+            normalizedActType: policy.normalizedActType,
+            ruleId: policy.ruleId ?? null,
+            policyKey: policy.policyKey,
+            policyVersion: policy.policyVersion,
+            count: 1,
+          });
+        } else {
+          // KEEP and REVIEW both fail open. Never annotate canonical metadata:
+          // doing so would change hashes or restore an existing suppressed item.
+          const persisted = await db
+            .transaction()
+            .execute((trx) =>
+              persistPublication(trx, {
+                sourceId: run.sourceId,
+                runId: run.id,
+                attemptId: attempt.id,
+                publication: normalized,
+              }),
+            );
 
-        metrics.processed += 1;
-        dispositionMetric(
-          metrics,
-          persisted.disposition,
-        );
+          metrics.processed += 1;
+          dispositionMetric(metrics, persisted.disposition);
+        }
       } catch (error) {
         metrics.itemErrors += 1;
 
@@ -628,6 +679,8 @@ export async function processAcquiredCollectionRun(
     // receipts eligible. The finally path still handles every earlier exit.
     await disposePublicationSpool(outcome.result.publicationStream);
 
+    await savePolicyMetrics();
+
     await finishCollectionRun(db, {
       runId: run.id,
       workerId: run.workerId,
@@ -666,12 +719,13 @@ export async function processAcquiredCollectionRun(
     };
   } catch (error) {
     if (!(error instanceof ConnectorError) || !error.code.startsWith('PUBLICATION_SPOOL_')) throw error;
+    await savePolicyMetrics();
     // A corrupt/unreadable spool must never promote the attempt's receipts.
     await finishCollectionRun(db, {
       runId: run.id, workerId: run.workerId, status: 'PROCESSING_FAILED',
       errorSummary: error.code,
     });
-    logger.error({ runId: run.id, attemptId: attempt.id, errorCode: error.code }, 'Collection spool replay failed');
+    logger.error({ runId: run.id, attemptId: attempt.id, errorCode: error.code, ...metrics }, 'Collection spool replay failed');
     return { runId: run.id, attemptNo: attempt.attemptNo, state: 'TERMINAL', status: 'PROCESSING_FAILED', metrics };
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);

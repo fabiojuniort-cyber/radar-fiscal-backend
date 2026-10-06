@@ -18,6 +18,8 @@ import type { CollectionRunTerminalStatus } from './run-status.js';
 export interface AcquiredCollectionRun {
   id: string;
   sourceId: string;
+  /** Stable source code, not the connector key. Missing means unknown policy scope. */
+  sourceCode?: string;
   connectorKey: string;
   maxAttempts: number;
   correlationId: string;
@@ -63,6 +65,25 @@ export interface FinishAttemptInput {
   workerId?: string;
   sourceId?: string;
   connectorKey?: string;
+}
+
+export interface CollectionPolicyExclusionCount {
+  sourceCode: string | null;
+  normalizedActType: string;
+  ruleId: string | null;
+  policyKey: string;
+  policyVersion: string;
+  count: number;
+}
+
+export interface RecordCollectionPolicyExclusionsInput {
+  runId: string;
+  workerId: string;
+  attemptId: string;
+  policyKey: string;
+  policyVersion: string;
+  skippedByPolicy: number;
+  policyExclusions: CollectionPolicyExclusionCount[];
 }
 
 function asJson(value: unknown): Json {
@@ -177,6 +198,7 @@ export async function acquireNextCollectionRun(
     const candidate = await sql<{
       id: string;
       source_id: string;
+      source_code: string;
       connector_key: string;
       max_attempts: number;
       correlation_id: string;
@@ -185,6 +207,7 @@ export async function acquireNextCollectionRun(
       SELECT
         cr.id,
         cr.source_id,
+        s.code AS source_code,
         s.connector_key,
         s.max_attempts,
         cr.correlation_id,
@@ -274,6 +297,7 @@ export async function acquireNextCollectionRun(
     return {
       id: updated.id,
       sourceId: updated.source_id,
+      ...(row.source_code !== undefined ? { sourceCode: row.source_code } : {}),
       connectorKey: row.connector_key,
       maxAttempts: row.max_attempts,
       correlationId: updated.correlation_id,
@@ -706,6 +730,45 @@ export async function scheduleCollectionRetry(
       'Collection run is not owned by this worker.',
     );
   }
+}
+
+/** Save post-replay policy totals without rewriting connector/checkpoint metadata.
+ * The caller must do this before making the run terminal. An unsuccessful write
+ * must never publish a SUCCESS run whose exclusion audit is missing. */
+export async function recordCollectionPolicyExclusions(
+  db: Kysely<DB>,
+  input: RecordCollectionPolicyExclusionsInput,
+): Promise<boolean> {
+  if (input.skippedByPolicy === 0) return true;
+
+  return db.transaction().execute(async (trx) => {
+    // Keep the same run-first lock order as attempt completion and recovery.
+    const ownedRun = await trx.selectFrom('collection_runs')
+      .select('id')
+      .where('id', '=', input.runId)
+      .where('status', '=', 'RUNNING')
+      .where('worker_id', '=', input.workerId)
+      .forUpdate()
+      .executeTakeFirst();
+    if (!ownedRun) return false;
+
+    const audit = JSON.stringify({
+      publicationExclusionPolicy: {
+        policyKey: input.policyKey,
+        policyVersion: input.policyVersion,
+        skippedByPolicy: input.skippedByPolicy,
+        policyExclusions: input.policyExclusions,
+      },
+    });
+    const updated = await trx.updateTable('collection_attempts')
+      .set({ metadata: sql<Json>`coalesce(metadata, '{}'::jsonb) || ${audit}::jsonb` })
+      .where('id', '=', input.attemptId)
+      .where('collection_run_id', '=', input.runId)
+      .where('status', '=', 'SUCCESS')
+      .returning('id')
+      .executeTakeFirst();
+    return updated !== undefined;
+  });
 }
 
 export async function finishCollectionRun(

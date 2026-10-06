@@ -1,0 +1,27 @@
+act_type,normalized_act_type,source_scope,sections,type_triage,global_visible_count_reported,reason
+AVISO DE HOMOLOGAÇÃO E ADJUDICAÇÃO,AVISO DE HOMOLOGACAO E ADJUDICACAO,dou,DO3|DO3E,EXCLUDE_CANDIDATE,1386,Requires full positive routine-body proof and all safety vetoes
+AVISO DE HOMOLOGAÇÃO,AVISO DE HOMOLOGACAO,dou,DO3|DO3E,EXCLUDE_CANDIDATE,788,Requires full positive routine-body proof and all safety vetoes
+AVISO DE CREDENCIAMENTO,AVISO DE CREDENCIAMENTO,dou,DO3|DO3E,EXCLUDE_CANDIDATE,543,Requires full positive routine-body proof and all safety vetoes
+AVISO DE DISPENSA DE LICITAÇÃO,AVISO DE DISPENSA DE LICITACAO,dou,DO3|DO3E,EXCLUDE_CANDIDATE,456,Requires full positive routine-body proof and all safety vetoes
+AVISO DE INEXIGIBILIDADE DE LICITAÇÃO,AVISO DE INEXIGIBILIDADE DE LICITACAO,dou,DO3|DO3E,EXCLUDE_CANDIDATE,173,Requires full positive routine-body proof and all safety vetoes
+AVISO DE ADJUDICAÇÃO,AVISO DE ADJUDICACAO,dou,DO3|DO3E,EXCLUDE_CANDIDATE,171,Requires full positive routine-body proof and all safety vetoes
+AVISO DE DISPENSA DE LICITAÇÃO ELETRÔNICA,AVISO DE DISPENSA DE LICITACAO ELETRONICA,dou,DO3|DO3E,EXCLUDE_CANDIDATE,125,Requires full positive routine-body proof and all safety vetoes
+AVISO DE DISPENSA ELETRÔNICA,AVISO DE DISPENSA ELETRONICA,dou,DO3|DO3E,EXCLUDE_CANDIDATE,104,Requires full positive routine-body proof and all safety vetoes
+AVISO DE REGISTRO DE PREÇOS,AVISO DE REGISTRO DE PRECOS,dou,DO3|DO3E,EXCLUDE_CANDIDATE,81,Requires full positive routine-body proof and all safety vetoes
+EDITAL DE CONCURSO PÚBLICO,EDITAL DE CONCURSO PUBLICO,none,none,REVIEW,45,Not an active exception in v1
+EDITAL DE PROCESSO SELETIVO,EDITAL DE PROCESSO SELETIVO,none,none,REVIEW,19,Not an active exception in v1
+EDITAL ELEITORAL,EDITAL ELEITORAL,none,none,REVIEW,19,Not an active exception in v1
+ATO DE PESSOAL,ATO DE PESSOAL,none,none,REVIEW,1,Observed DO1 item remains in scope
+EXTRATO DE CONTRATO,EXTRATO DE CONTRATO,dou,all,D066_KEEP_REVIEW,,Not a type-only exception; existing governed classifier preserved
+EDITAL DE TRANSAÇÃO,EDITAL DE TRANSACAO,all,all,KEEP,,Fiscal normative material protected
+LEI,LEI,all,all,KEEP,,Normative type protected
+LEI COMPLEMENTAR,LEI COMPLEMENTAR,all,all,KEEP,,Normative type protected
+DECRETO,DECRETO,all,all,KEEP,,Normative type protected
+INSTRUÇÃO NORMATIVA,INSTRUCAO NORMATIVA,all,all,KEEP,,Normative type protected
+CONVÊNIO ICMS,CONVENIO ICMS,all,all,KEEP,,Fiscal type protected
+AJUSTE SINIEF,AJUSTE SINIEF,all,all,KEEP,,Fiscal type protected
+PROTOCOLO ICMS,PROTOCOLO ICMS,all,all,KEEP,,Fiscal type protected
+ATO COTEPE/ICMS,ATO COTEPE ICMS,all,all,KEEP,,Fiscal type protected
+SOLUÇÃO DE CONSULTA,SOLUCAO DE CONSULTA,all,all,KEEP,,Fiscal type protected
+SOLUÇÃO DE DIVERGÊNCIA,SOLUCAO DE DIVERGENCIA,all,all,KEEP,,Fiscal type protected
+NOTA TÉCNICA,NOTA TECNICA,all,all,KEEP,,Operational fiscal material protected

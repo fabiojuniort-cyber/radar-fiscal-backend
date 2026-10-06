@@ -20,6 +20,16 @@ interface Part {
 }
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const error = (code: string) => new ConnectorError(code, { code, kind: 'PROCESSING_ERROR', retryable: false });
+const scopeTextFields = new Set(['Identifica', 'Ementa', 'Texto']);
+const scopeTextHtmlTags = new Set([
+  'p', 'div', 'br', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th',
+  'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'span', 'b', 'strong', 'i', 'em', 'u', 's', 'strike', 'small', 'sub', 'sup', 'font', 'a',
+]);
+const unpreservedScopeAttributes = [
+  'background', 'alt', 'title', 'aria-label', 'aria-labelledby',
+  'label', 'value', 'placeholder', 'src', 'href', 'data', 'srcdoc',
+];
 
 export function douHtmlText(html: string): string {
   let out = ''; let hidden = 0;
@@ -35,10 +45,27 @@ export function douHtmlText(html: string): string {
 
 function hasUnpreservedScopeBlocks(html: string): boolean {
   // Keep the legacy canonical text/hash policy unchanged. The scope filter
-  // instead receives a conservative veto when block boundaries were lost.
+  // receives a conservative veto when boundaries or non-text evidence would
+  // be lost by douHtmlText; a notice cannot be excluded from text alone then.
   let found = false;
   const parser = new HtmlParser({
-    onopentag(name) { if (/^(?:section|article|blockquote|hr|dl|dt|dd)$/.test(name)) found = true; },
+    onopentag(name, attributes) {
+      // Admit only known text/presentation elements. Unfamiliar elements and
+      // controls may render evidence from attributes rather than text nodes.
+      const emptyTextInput = name === 'input' &&
+        (attributes.type?.trim().toLowerCase() ?? 'text') === 'text' &&
+        !attributes.value?.trim() && !attributes.placeholder?.trim();
+      if (!scopeTextHtmlTags.has(name) && !emptyTextInput) found = true;
+      // Legacy HTML attributes can carry images, tooltips or accessible text
+      // without text children; none of that evidence reaches douHtmlText.
+      if (unpreservedScopeAttributes.some(attribute => attributes[attribute]?.trim())) found = true;
+      // CSS can carry an image or generated text even when the element has no
+      // text children. Escaped CSS is uncertain evidence, not proof of absence.
+      const style = attributes.style?.replace(/\/\*[\s\S]*?\*\//g, '') ?? '';
+      if (/\\/.test(style) ||
+        /(?:url|image(?:-set)?|cross-fade|element|paint|(?:repeating-)?(?:linear|radial|conic)-gradient)\s*\(/i.test(style) ||
+        /(?:^|;)\s*(?:background(?:-image)?|content|(?:-webkit-)?mask(?:-image)?|border-image(?:-source)?)\s*:/i.test(style)) found = true;
+    },
   }, { decodeEntities: true });
   parser.end(html);
   return found;
@@ -70,7 +97,7 @@ function parsePart(entry: DouXmlEntry): Part {
     if (stack.length > 16) throw error('DOU_XML_DEPTH_LIMIT');
     // Legacy extraction retains only direct field text/CDATA, not XML children.
     // Preserve canonical text/hashes, but never prove IGNORE from truncated scope.
-    if (stack.length > 4 && stack[2] === 'body' && ['Identifica', 'Ementa', 'Texto'].includes(stack[3]!)) {
+    if (stack.length > 4 && stack[2] === 'body') {
       scopeStructureIncomplete = true;
     }
     if (node.name === 'article') {
@@ -81,9 +108,19 @@ function parsePart(entry: DouXmlEntry): Part {
     if (stack.length === 4 && stack[2] === 'body') {
       if (fields[node.name] !== undefined) throw error('DOU_DUPLICATE_XML_FIELD');
       fields[node.name] = '';
+      if (!scopeTextFields.has(node.name) && Object.values(node.attributes).some(value => String(value).trim())) {
+        scopeStructureIncomplete = true;
+      }
     }
   };
-  const append = (text: string) => { if (stack.length === 4 && stack[2] === 'body') fields[stack[3]!] += text; };
+  const append = (text: string) => {
+    // Extra body fields and unwrapped body text are not part of the legacy
+    // publication projection. Keep that projection, but retain their presence
+    // as a veto. Empty/whitespace-only fields remain harmless.
+    if (stack[2] === 'body' && text.trim() &&
+      (stack.length === 3 || (stack.length >= 4 && !scopeTextFields.has(stack[3]!)))) scopeStructureIncomplete = true;
+    if (stack.length === 4 && stack[2] === 'body') fields[stack[3]!] += text;
+  };
   parser.ontext = append; parser.oncdata = append; parser.onclosetag = () => { stack.pop(); };
   try { parser.write(xml).close(); } catch (e) { if (e instanceof ConnectorError) throw e; throw error('DOU_INVALID_XML'); }
   if (stack.length) throw error('DOU_INVALID_XML');
