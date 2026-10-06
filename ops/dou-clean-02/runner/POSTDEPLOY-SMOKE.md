@@ -53,7 +53,7 @@ Issue, PR ou resposta. Configurar por interface privada/referências Railway.
 | Variável | Valor/contrato |
 |---|---|
 | `MODE` | `smoke` ou `restore-only`; ausente desabilita |
-| `MODE=preflight` | somente preflight/grants/candidato/snapshot READ ONLY; imprime agregados e hash do ID público, sem ledger ou conteúdo |
+| `MODE=preflight` | somente conexão/grants/candidato/snapshot READ ONLY + GETs públicos do baseline; imprime agregados, hash do ID público e `BASELINE_HTTP_COHERENT`, sem ledger ou conteúdo |
 | `SMOKE_CANDIDATE_SHA256` | opcional: SHA-256 de UUID público já observado no Acervo; fixa o candidato sem relaxar nenhum filtro |
 | `UI_OBSERVATION_WINDOW` | `enabled` exige candidato fixado por hash; abre janela visual de até 40s, dentro do orçamento 60s, com RESTORE automático |
 | `PROD_DATABASE_ADMIN_URL` | Referência privada existente; nunca impressa ou passada no argv do psql |
@@ -177,6 +177,31 @@ fechamento da Issue #84. Archive/detail/facets/navigation autenticados ficam
 adversarial in-flight dos workers também fica `NOT_PROVEN`: este runner não inicia
 jobs nem substitui testes de concorrência da implementação. Ele apenas exige
 quiescência observada e preservação dos derivados durante o round-trip.
+
+## Ensaio end-to-end isolado (06/10/2026)
+
+Executado fora de produção: PostgreSQL 18 oficial com as migrations reais via
+`npm run db:prepare` (roles e verificações incluídas), backend do mesmo código de
+aplicação de `068506811…` atrás de TLS local e cópia do runner com **somente**
+`BASE_URL` trocada. Dados 100% sintéticos (publicação/versão/origem/arquivo/run).
+
+- `MODE=smoke`: `DOU_CLEAN_02_PUBLIC_SCOPE_SMOKE_PASS`, epochs base→+1→+2,
+  fingerprints idênticos, estado final IN_SCOPE; também com janela UI completa.
+- SIGTERM na janela: `RECOVERY_IN_SCOPE_CONFIRMED` em ~0,5 s.
+- SIGKILL na janela: alvo permanece OUT_OF_SCOPE (sem trap possível); novo smoke
+  recusado por journal existente; `restore-only` com confirmação errada recusado;
+  `restore-only` restaura e marca `recovery_verified`; repetição é idempotente.
+- Preflight reporta `BASELINE_HTTP_COHERENT` e dicas fixas (`HTTP_HINT_*`).
+
+Achados corrigidos por esse ensaio: `fingerprints.sql` inválido (colação "C" dos
+nomes de catálogo no CTE recursivo); `sleep` em primeiro plano adiava o trap de
+restauração por até toda a janela; o `sleep` herdava o lock do runner (fd 9).
+
+**Coerência de cache:** a API cacheia agregados/lista por epoch (TTL padrão
+60 min). Ingestão sem mudança de epoch deixa o cache defasado e o baseline aborta,
+antes do SUPPRESS, como projetado. Executar o smoke só após um preflight com
+`BASELINE_HTTP_COHERENT=true`, sem coleta/backfill entre ambos; nunca usar
+cache-buster nem reiniciar o backend para forçar coerência.
 
 ## Validação local feita / restante
 

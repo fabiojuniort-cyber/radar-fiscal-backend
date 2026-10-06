@@ -101,3 +101,20 @@ for rejected_url in 'postgresql://u@h/db' 'postgresql://u:p@h/db?host=/tmp' 'pos
   [[ -z $PASSFILE ]]
 done
 printf '%s\n' 'OFFLINE_CONNECTION_DECOMPOSITION_PASS'
+# Connection failures map to fixed labels; libpq text never reaches stdout.
+source <(awk '/^connection_probe\(\) \{/{a=1} a{print} a && /^}/{exit}' "$SCRIPT")
+log() { printf '%s\n' "$1"; }
+FAKE_BIN=$(mktemp -d)
+cat >"$FAKE_BIN/psql" <<'FAKE'
+#!/usr/bin/env bash
+printf 'psql: error: connection to server at "SENSITIVE_HOST_SENTINEL" failed: FATAL:  password authentication failed for user "SENSITIVE_USER_SENTINEL"\n' >&2
+exit 2
+FAKE
+chmod 700 "$FAKE_BIN/psql"
+set +e
+probe_output=$(PATH="$FAKE_BIN:$PATH" connection_probe)
+probe_rc=$?
+set -e
+rm -rf -- "$FAKE_BIN"
+[[ $probe_rc != 0 && $probe_output == FAILED_CONNECTION_AUTH ]]
+printf '%s\n' 'OFFLINE_CONNECTION_DIAGNOSTIC_REDACTION_PASS'

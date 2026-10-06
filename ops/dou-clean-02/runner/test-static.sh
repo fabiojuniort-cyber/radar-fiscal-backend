@@ -54,6 +54,12 @@ rg -q 'pg_has_role\(a.oid,l.relowner,.USAGE.\)' "$ROOT_DIR/sql/privileges.sql"
 rg -q 'if ! db preflight.sql "\$1"' "$SCRIPT"
 rg -q 'elif ! db privileges.sql "\$1.acl"' "$SCRIPT"
 rg -q 'trap on_exit EXIT' "$SCRIPT"
+# A foreground sleep would defer the restore trap for the whole UI window.
+rg -q '^    sleep "\$wait_seconds" 9>&- &$' "$SCRIPT"
+rg -q '^    wait "\$!"$' "$SCRIPT"
+if rg -n '^[[:space:]]*sleep "\$wait_seconds"$' "$SCRIPT"; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
+rg -q '^    PHASE=read_only_preflight_connection$' "$SCRIPT"
+rg -q "log 'BASELINE_HTTP_COHERENT=true'" "$SCRIPT"
 rg -q 'sync -f "\$tmp"' "$SCRIPT"
 rg -q 'chmod 600 "\$tmp"' "$SCRIPT"
 rg -q -- '--retry 0' "$SCRIPT"

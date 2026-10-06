@@ -89,6 +89,27 @@ connection_from_url() {
   export PGHOST=$host PGPORT=$port PGUSER=$user PGDATABASE=$database PGPASSFILE=$PASSFILE
   if [[ -n $sslmode ]]; then export PGSSLMODE=$sslmode; fi
 }
+# Connection diagnosis: libpq stderr is held in memory only, mapped to a fixed
+# label from this source file, then discarded. No host, user or error text.
+connection_probe() {
+  local err
+  if err=$(timeout --signal=TERM --kill-after=3s 15 psql -X --no-password --quiet --tuples-only \
+    --no-align --set=ON_ERROR_STOP=on --command="SELECT 'CONNECTED'" 2>&1 >/dev/null); then return 0; fi
+  case $err in
+    *'could not translate host name'*) log 'FAILED_CONNECTION_DNS' ;;
+    *'Network is unreachable'*|*'No route to host'*) log 'FAILED_CONNECTION_NETWORK' ;;
+    *'Connection refused'*) log 'FAILED_CONNECTION_REFUSED' ;;
+    *'password authentication failed'*) log 'FAILED_CONNECTION_AUTH' ;;
+    *'no password supplied'*|*'password file'*) log 'FAILED_CONNECTION_PASSFILE' ;;
+    *SSL*|*ssl*) log 'FAILED_CONNECTION_SSL' ;;
+    *'does not exist'*) log 'FAILED_CONNECTION_IDENTITY' ;;
+    *socket*) log 'FAILED_CONNECTION_LOCAL_SOCKET' ;;
+    *'timeout expired'*|'') log 'FAILED_CONNECTION_TIMEOUT_OR_SILENT' ;;
+    *) log 'FAILED_CONNECTION_OTHER' ;;
+  esac
+  err=
+  return 1
+}
 db() {
   local sql_file=$1 output=$2 access=${3:-read} operation_timeout
   operation_timeout=$(budget_seconds 25) || return 1
@@ -272,6 +293,21 @@ api_phase() {
   done
 }
 
+http_coherence_hints() {
+  local phase=$1 state=$WORK/$1-api-before.json
+  [[ -s $WORK/$phase-list.json && -s $WORK/$phase-v1.json && -s $WORK/$phase-v2.json ]] ||
+    { log 'HTTP_HINT_REQUEST_STATUS_OR_HEADER_REJECTED'; return 0; }
+  jq -e --arg id "$SMOKE_PUBLICATION_ID" '[.items[]?|select(.id==$id)]|length==1' "$WORK/$phase-list.json" >/dev/null ||
+    log 'HTTP_HINT_LIST_WITHOUT_CANDIDATE'
+  for version in v1 v2; do
+    jq -e --arg version "$version" --slurpfile s "$state" '
+      {totalPublications,totalSources,activeSources,importedToday}==$s[0][$version]
+    ' "$WORK/$phase-$version.json" >/dev/null || log "HTTP_HINT_${version^^}_STATS_DIFFER_FROM_SQL"
+  done
+  if [[ -s $WORK/$phase-api-after.json ]] && ! same_json "$state" "$WORK/$phase-api-after.json"; then
+    log 'HTTP_HINT_DATABASE_CHANGED_DURING_CHECK'
+  fi
+}
 verify_restored() {
   snapshot "$WORK/final-state.json" || return 1
   jq -e --slurpfile j "$JOURNAL" '
@@ -331,14 +367,29 @@ main() {
   [[ $MODE == restore-only || -z $SMOKE_CANDIDATE_SHA256 || $SMOKE_CANDIDATE_SHA256 =~ ^[a-f0-9]{64}$ ]] || die 'INVALID_PUBLIC_CANDIDATE_HASH'
 
   if [[ $MODE == preflight ]]; then
-    PHASE=read_only_preflight
+    PHASE=read_only_preflight_connection
+    connection_probe
+    PHASE=read_only_preflight_security
     security_preflight "$WORK/preflight.private"
+    PHASE=read_only_preflight_candidate
     db candidate.sql "$WORK/candidate.json"
     validate_candidate "$WORK/candidate.json" || die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
     load_candidate "$WORK/candidate.json"
+    PHASE=read_only_preflight_snapshot
     snapshot "$WORK/preflight-state.json"
     # Only aggregates and a hash of an already-public publication ID leave Railway.
     jq -c '{out_of_scope_total,epoch,v1,v2}' "$WORK/preflight-state.json"
+    # Public GETs only, exactly as the smoke baseline will issue them. The API
+    # caches aggregates per scope epoch, so ingestion without an epoch change can
+    # leave them stale; the smoke then aborts at baseline, before SUPPRESS. This
+    # reports only whether that baseline would currently hold (booleans/labels).
+    PHASE=read_only_preflight_http
+    if api_phase preflight true "$(jq -r '.epoch' "$WORK/preflight-state.json")"; then
+      log 'BASELINE_HTTP_COHERENT=true'
+    else
+      log 'BASELINE_HTTP_COHERENT=false'
+      http_coherence_hints preflight
+    fi
     log "PUBLIC_CANDIDATE_ID_SHA256=$(printf '%s' "$SMOKE_PUBLICATION_ID" | sha256sum | cut -d ' ' -f1)"
     FINISHED=1
     log 'READ_ONLY_PREFLIGHT_PASS; NO_SUPPRESS_OR_RESTORE'
@@ -367,6 +418,8 @@ main() {
   [[ ${RUNNER_SHA:-} =~ ^[a-f0-9]{40}$ && ${RAILWAY_GIT_COMMIT_SHA:-} == "$RUNNER_SHA" ]] || die 'REVIEWED_RUNNER_SHA_REQUIRED'
   [[ ${BACKUP_RESTORE_VERIFIED:-} == true && ${R3_LOCK_VERIFIED:-} == true && ${NO_HISTORICAL_BATCH_VERIFIED:-} == true && ${WORKER_NCM_DISABLED_VERIFIED:-} == true ]] || die 'R3_GATE_ATTESTATIONS_REQUIRED'
   [[ ! -e $JOURNAL && ! -L $JOURNAL ]] || die 'EXISTING_JOURNAL_USE_RESTORE_ONLY_OR_REVIEW_RETENTION'
+  PHASE=connection
+  connection_probe
   PHASE=preflight
   security_preflight "$WORK/preflight.private"
   PHASE=candidate
@@ -447,7 +500,12 @@ main() {
     wait_seconds=$((available - 5))
     (( wait_seconds > 0 )) || die 'NO_UI_OBSERVATION_BUDGET'
     log "UI_OBSERVATION_WINDOW_OPEN; AUTO_RESTORE_IN_${wait_seconds}_SECONDS"
-    sleep "$wait_seconds"
+    # Bash defers traps until a FOREGROUND child exits: a plain `sleep` would
+    # delay the TERM-triggered restore by up to the whole window (and Railway may
+    # SIGKILL meanwhile). The `wait` builtin returns as soon as a signal arrives;
+    # the child must not inherit the runner lock (fd 9) if the runner is killed.
+    sleep "$wait_seconds" 9>&- &
+    wait "$!"
   fi
   (( SECONDS - OUT_SCOPE_START <= 60 )) || die 'SUPPRESSION_WINDOW_EXCEEDED'
   PHASE=restore
