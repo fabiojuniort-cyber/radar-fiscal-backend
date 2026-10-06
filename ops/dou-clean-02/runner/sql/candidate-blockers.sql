@@ -28,6 +28,9 @@ SELECT jsonb_build_object(
   'open_collection_runs',(SELECT count(*) FROM public.collection_runs WHERE status IN ('PENDING','RUNNING')),
   'open_taxonomy_runs',(SELECT count(*) FROM public.publication_taxonomy_runs WHERE status IN ('PENDING','RUNNING')),
   'out_of_scope_total',(SELECT count(*) FROM public.publication_scope_state WHERE scope='OUT_OF_SCOPE'),
+  'publication_files_total',(SELECT count(*) FROM public.publication_files),
+  'publications_with_files',(SELECT count(DISTINCT v.publication_id) FROM public.publication_files f
+    JOIN public.publication_versions v ON v.id=f.publication_version_id),
   'window_rows',(SELECT count(*) FROM checks),
   'window_sources',(SELECT count(DISTINCT code) FROM checks),
   'not_hidden',(SELECT count(*) FILTER (WHERE not_hidden) FROM checks),
