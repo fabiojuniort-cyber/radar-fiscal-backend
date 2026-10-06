@@ -387,7 +387,7 @@ main() {
     if ! validate_candidate "$WORK/candidate.json"; then
       # Aggregate counts only, to choose a quiescent canary window.
       if db candidate-blockers.sql "$WORK/candidate-blockers.json"; then
-        jq -c '{candidate_blockers:{open_collection_runs,open_taxonomy_runs,out_of_scope_total}}' "$WORK/candidate-blockers.json"
+        jq -c '{candidate_blockers:.}' "$WORK/candidate-blockers.json"
       fi
       die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
     fi
