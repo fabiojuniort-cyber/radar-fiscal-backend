@@ -10,6 +10,10 @@ umask 077
 [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
 MODE="${MODE:-preflight}"
 [[ "$MODE" == preflight || "$MODE" == backup-restore ]] || exit 1
+# Pre-deploy backups (DOU-CLEAN-02) required the scope ledgers to be absent;
+# post-deploy backups (DOU-CLEAN-01 / #80) require them to be present.
+EXPECT_SCOPE_TABLES="${EXPECT_SCOPE_TABLES:-absent}"
+[[ "$EXPECT_SCOPE_TABLES" == absent || "$EXPECT_SCOPE_TABLES" == present ]] || exit 1
 DATA_DIR=/data
 mountpoint -q "$DATA_DIR" || { echo 'SCOPE_BACKUP_FAIL=missing_private_volume'; exit 1; }
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -32,7 +36,7 @@ trap 'echo "SCOPE_BACKUP_FAIL=line_$LINENO" >&2' ERR
 prod() { psql "$PROD" -X -qAt -v ON_ERROR_STOP=1 "$@" 2>>"$WORK/private.log"; }
 [[ "$(prod -c 'SHOW default_transaction_read_only')" == on ]]
 prod -c "SELECT json_build_object('serverMajor', current_setting('server_version_num')::int / 10000, 'databaseBytes', pg_database_size(current_database()), 'scopeAbsent', to_regclass('public.publication_scope_events') IS NULL AND to_regclass('public.publication_scope_state') IS NULL AND to_regclass('public.publication_scope_epoch_state') IS NULL);" > "$WORK/preflight.json"
-jq -e '.serverMajor == 18 and .scopeAbsent == true' "$WORK/preflight.json" >/dev/null
+jq -e --arg expect "$EXPECT_SCOPE_TABLES" '.serverMajor == 18 and .scopeAbsent == ($expect == "absent")' "$WORK/preflight.json" >/dev/null
 echo "SCOPE_PREFLIGHT=$(jq -c --arg sha "$CANDIDATE_SHA" --arg timestamp "$STAMP" '. + {candidateSha: $sha, timestamp: $timestamp}' "$WORK/preflight.json")"
 if [[ "$MODE" == preflight ]]; then echo 'SCOPE_PREFLIGHT_PASS'; exit 0; fi
 
