@@ -108,6 +108,26 @@ export async function runDouHistoricalCleanupDryRun(
   client: ClientBase,
   options: DouCleanupDryRunOptions = {},
 ): Promise<DouCleanupDryRunSummary> {
+  return (await deriveDouCleanupCandidates(client, options)).summary;
+}
+
+/** One candidate as re-derived from the database (kept in memory only). */
+export interface DouCleanupCandidate {
+  publicationId: string;
+  evidenceSha256: string;
+  reasonCodes: string[];
+  /** Persisted douScope decisions found on any origin/version envelope. */
+  persistedDecisions: string[];
+}
+
+/**
+ * Same read-only derivation as the dry run, also returning the candidate list
+ * for a gated executor. The list never leaves the process.
+ */
+export async function deriveDouCleanupCandidates(
+  client: ClientBase,
+  options: DouCleanupDryRunOptions = {},
+): Promise<{ summary: DouCleanupDryRunSummary; candidates: DouCleanupCandidate[] }> {
   const batchSize = options.batchSize ?? 500;
   if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 5_000) {
     throw new Error('batchSize must be between 1 and 5000');
@@ -137,6 +157,7 @@ export async function runDouHistoricalCleanupDryRun(
       withPersistedScopeKeep: 0, withPersistedScopeReview: 0, withPersistedScopeIgnore: 0, withoutPersistedScope: 0,
     };
     const candidateLines: string[] = [];
+    const candidates: DouCleanupCandidate[] = [];
     const batchDigests: string[] = [];
     let lastId: string | null = null;
 
@@ -217,6 +238,10 @@ export async function runDouHistoricalCleanupDryRun(
           if ([...decisions].some(value => value !== 'KEEP' && value !== 'IGNORE')) candidateImpact.withPersistedScopeReview += 1;
           if (decisions.has('IGNORE')) candidateImpact.withPersistedScopeIgnore += 1;
           if (!decisions.size) candidateImpact.withoutPersistedScope += 1;
+          candidates.push({
+            publicationId: decision.publicationId, evidenceSha256: decision.evidenceSha256,
+            reasonCodes: [...decision.reasonCodes], persistedDecisions: [...decisions].sort(),
+          });
         }
       }
       const candidateIds = plan.decisions.filter(row => row.disposition === 'CANDIDATE').map(row => row.publicationId);
@@ -242,7 +267,7 @@ export async function runDouHistoricalCleanupDryRun(
       }
     }
 
-    return {
+    const summary: DouCleanupDryRunSummary = {
       dryRunVersion: DOU_CLEANUP_DRY_RUN_VERSION,
       planVersion: DOU_CLEANUP_PLAN_VERSION,
       ruleVersion: DOU_SCOPE_RULE_VERSION,
@@ -258,6 +283,8 @@ export async function runDouHistoricalCleanupDryRun(
       candidateSetSha256: sha256(candidateLines.sort().join('\n')),
       runSha256: sha256(batchDigests.join('\n')),
     };
+    candidates.sort((left, right) => left.publicationId.localeCompare(right.publicationId));
+    return { summary, candidates };
   } finally {
     await client.query('ROLLBACK');
   }

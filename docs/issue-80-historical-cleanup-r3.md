@@ -133,6 +133,45 @@ Since DOU-CLEAN-02 the executor target is SUPPRESS via
 `apply_publication_scope_transition` (no DELETE); the runner proven by the
 production canary (tribusca-control#84) is the template.
 
+## Gated executor — SUPPRESS/RESTORE, no DELETE (2026-10-06)
+
+`DOU_CLEANUP_MODE=verify|apply|restore npm run db:dou-cleanup-execute`, run in
+the same one-shot Railway service as the dry run, with:
+
+| variable | contract |
+|---|---|
+| `DOU_CLEANUP_DATABASE_URL` | private reference to an unfiltered role; never printed |
+| `DOU_CLEANUP_APPROVED_CANDIDATE_SET_SHA256` / `_COUNT` | exactly the approved dry run |
+| `DOU_CLEANUP_CONFIRM` | `SUPPRESS_APPROVED_DOU_CANDIDATES` (apply) or `RESTORE_APPROVED_DOU_CANDIDATES` (restore) |
+| `R3_APPROVAL_SHA256` | required for `apply` |
+| `DOU_CLEANUP_CHUNK_SIZE` | optional, default 200 per transaction |
+
+Behaviour:
+
+1. Every mode re-derives the candidate set in one `REPEATABLE READ READ ONLY`
+   snapshot (same code as the dry run). `verify`/`apply` refuse unless digest
+   AND count equal the approval, and refuse any candidate carrying a persisted
+   `douScope` decision other than IGNORE.
+2. `apply` calls `apply_publication_scope_transition(..., 'SUPPRESS', ...)` per
+   candidate, in transactions of `CHUNK_SIZE`, with `lock_timeout` 5 s.
+   Operation ids are deterministic (`sha256(purpose, manifest, publication)` as a
+   UUID): a re-run after any interruption replays committed chunks
+   (`applied=false`) and continues. `policy_key=DOU_CLEAN_01_HISTORICAL`,
+   `reason_code=EXCLUDED_DOU_SECTION`, `manifest_sha256` = approved digest,
+   `evidence_sha256` = the planner's per-publication evidence digest.
+3. `verify` (read-only session) reports the state: suppressed by this policy and
+   manifest, candidates still in scope, candidate feed rows, global
+   OUT_OF_SCOPE and epoch. Suppression does not change the evidence, so the
+   digest still matches after `apply`.
+4. `restore` compensates only this manifest's current SUPPRESS events
+   (optimistic lock on the event id); it does not depend on the set still
+   matching. Afterwards the same manifest cannot silently re-suppress
+   (`PUBLICATION_SCOPE_OPERATION_SUPERSEDED`): a new approval is required.
+5. Errors print fixed labels or the `PUBLICATION_SCOPE_*` token only.
+
+Integration test on the real schema runs as the last CI step (scope events are
+append-only and cannot be cleaned up).
+
 ## Required execution gates — future separately reviewed work
 
 1. Record the Issue80 governance LOCK: owner, scope, expiry, exact code SHA,
