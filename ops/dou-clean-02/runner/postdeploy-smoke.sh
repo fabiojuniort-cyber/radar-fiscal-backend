@@ -64,6 +64,7 @@ db() {
   operation_timeout=$(budget_seconds 25) || return 1
   {
     printf '\\getenv publication_id SMOKE_PUBLICATION_ID\n'
+    printf '\\getenv controlled_publication_sha256 SMOKE_CANDIDATE_SHA256\n'
     printf '\\getenv version_ids SMOKE_VERSION_IDS\n'
     printf '\\getenv run_ids SMOKE_RUN_IDS\n'
     printf '\\getenv suppress_operation_id SMOKE_SUPPRESS_OPERATION_ID\n'
@@ -263,7 +264,7 @@ verify_restored() {
 }
 
 main() {
-  [[ $MODE == smoke || $MODE == restore-only ]] || die 'DISABLED_EXPLICIT_MODE_REQUIRED'
+  [[ $MODE == smoke || $MODE == restore-only || $MODE == preflight ]] || die 'DISABLED_EXPLICIT_MODE_REQUIRED'
   for command in psql jq curl flock sha256sum cut stat id date sync mktemp realpath mountpoint awk cmp timeout; do
     command -v "$command" >/dev/null || die 'REQUIRED_DEPENDENCY_MISSING'
   done
@@ -285,6 +286,23 @@ main() {
   export SMOKE_SUPPRESS_OPERATION_ID='' SMOKE_RESTORE_OPERATION_ID=''
   export SMOKE_EVIDENCE_SHA256='' SMOKE_MANIFEST_SHA256='' SMOKE_BASELINE_EPOCH='0'
   export SMOKE_ACTOR_REF=DOU_CLEAN_02_POSTDEPLOY_SMOKE_RUNNER
+  export SMOKE_CANDIDATE_SHA256=${SMOKE_CANDIDATE_SHA256:-}
+  [[ $MODE == restore-only || -z $SMOKE_CANDIDATE_SHA256 || $SMOKE_CANDIDATE_SHA256 =~ ^[a-f0-9]{64}$ ]] || die 'INVALID_PUBLIC_CANDIDATE_HASH'
+
+  if [[ $MODE == preflight ]]; then
+    PHASE=read_only_preflight
+    security_preflight "$WORK/preflight.private"
+    db candidate.sql "$WORK/candidate.json"
+    validate_candidate "$WORK/candidate.json" || die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
+    load_candidate "$WORK/candidate.json"
+    snapshot "$WORK/preflight-state.json"
+    # Only aggregates and a hash of an already-public publication ID leave Railway.
+    jq -c '{out_of_scope_total,epoch,v1,v2}' "$WORK/preflight-state.json"
+    log "PUBLIC_CANDIDATE_ID_SHA256=$(printf '%s' "$SMOKE_PUBLICATION_ID" | sha256sum | cut -d ' ' -f1)"
+    FINISHED=1
+    log 'READ_ONLY_PREFLIGHT_PASS; NO_SUPPRESS_OR_RESTORE'
+    return
+  fi
 
   if [[ $MODE == restore-only ]]; then
     PHASE=restore_only
@@ -301,6 +319,8 @@ main() {
   fi
 
   [[ ${CONFIRM_DOU_CLEAN_02:-} == SUPPRESS_ONE_AND_RESTORE && ${CONTROLLED_SELECTION_APPROVED:-} == true ]] || die 'EXPLICIT_SMOKE_AUTHORIZATION_REQUIRED'
+  [[ ${UI_OBSERVATION_WINDOW:-disabled} == disabled || ${UI_OBSERVATION_WINDOW:-disabled} == enabled ]] || die 'INVALID_UI_OBSERVATION_MODE'
+  [[ ${UI_OBSERVATION_WINDOW:-disabled} != enabled || -n $SMOKE_CANDIDATE_SHA256 ]] || die 'PINNED_PUBLIC_CANDIDATE_REQUIRED_FOR_UI'
   [[ ${R3_APPROVAL_SHA256:-} =~ ^[a-f0-9]{64}$ ]] || die 'R3_APPROVAL_HASH_REQUIRED'
   [[ ${BACKEND_DEPLOYED_SHA:-} == "$BACKEND_SHA" && ${WORKER_DEPLOYED_SHA:-} == "$BACKEND_SHA" && ${SCHEDULER_DEPLOYED_SHA:-} == "$BACKEND_SHA" ]] || die 'RUNTIME_SHA_ATTESTATIONS_REQUIRED'
   [[ ${RUNNER_SHA:-} =~ ^[a-f0-9]{40}$ && ${RAILWAY_GIT_COMMIT_SHA:-} == "$RUNNER_SHA" ]] || die 'REVIEWED_RUNNER_SHA_REQUIRED'
@@ -380,6 +400,14 @@ main() {
   db rls.sql "$WORK/suppressed-rls.json"
   jq -e --slurpfile j "$JOURNAL" '.publications=="0" and .versions=="0" and .origins=="0" and .files=="0" and .history_sha256==$j[0].baseline.rls.history_sha256' "$WORK/suppressed-rls.json" >/dev/null
   security_preflight "$WORK/suppressed-privileges.private"
+  if [[ ${UI_OBSERVATION_WINDOW:-disabled} == enabled ]]; then
+    local available wait_seconds
+    available=$(budget_seconds 45) || die 'NO_UI_OBSERVATION_BUDGET'
+    wait_seconds=$((available - 5))
+    (( wait_seconds > 0 )) || die 'NO_UI_OBSERVATION_BUDGET'
+    log "UI_OBSERVATION_WINDOW_OPEN; AUTO_RESTORE_IN_${wait_seconds}_SECONDS"
+    sleep "$wait_seconds"
+  fi
   (( SECONDS - OUT_SCOPE_START <= 60 )) || die 'SUPPRESSION_WINDOW_EXCEEDED'
   PHASE=restore
   recover || die 'RESTORE_NOT_CONFIRMED'

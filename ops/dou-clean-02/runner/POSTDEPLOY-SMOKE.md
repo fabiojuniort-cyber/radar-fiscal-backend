@@ -53,6 +53,9 @@ Issue, PR ou resposta. Configurar por interface privada/referências Railway.
 | Variável | Valor/contrato |
 |---|---|
 | `MODE` | `smoke` ou `restore-only`; ausente desabilita |
+| `MODE=preflight` | somente preflight/grants/candidato/snapshot READ ONLY; imprime agregados e hash do ID público, sem ledger ou conteúdo |
+| `SMOKE_CANDIDATE_SHA256` | opcional: SHA-256 de UUID público já observado no Acervo; fixa o candidato sem relaxar nenhum filtro |
+| `UI_OBSERVATION_WINDOW` | `enabled` exige candidato fixado por hash; abre janela visual de até 40s, dentro do orçamento 60s, com RESTORE automático |
 | `PROD_DATABASE_ADMIN_URL` | Referência privada existente; nunca impressa ou passada no argv do psql |
 | `RAILWAY_VOLUME_MOUNT_PATH` | `/data`, mount real exigido |
 | `RAILWAY_SERVICE_ID`, `RAILWAY_ENVIRONMENT_ID` | Presença de contexto Railway |
@@ -88,6 +91,15 @@ Diretório fixo `/data/dou-clean-02-postdeploy-smoke`, proprietário atual e mod
 arquivo temporário + flush + rename + flush; `flock` impede dupla execução nesse
 volume. Nova execução smoke recusa journal existente, mesmo concluído. Reter e
 revisar evidências antes de qualquer arquivamento manual; o script não as apaga.
+
+O preflight não cria journal nem arma recuperação; ele escreve evidências
+privadas no volume e só executa SQL READ ONLY. Para prova visual autenticada,
+o operador usa a sessão já aberta no produto, sem extrair cookie/token nem
+criar usuário. Aquecer antes as mesmas buscas, filtros, navegação e detalhe
+do ID público correspondente ao hash; durante a janela observar a ausência
+e após RESTORE observar a volta. O runner não promove essas observações a
+PASS automaticamente: devem ser verificadas e registradas separadamente.
+Se a janela visual expirar, ele restaura automaticamente e continua as provas.
 
 O journal contém candidato/UUIDs privados, operações distintas SUPPRESS/RESTORE,
 hashes, identidade do banco (system_identifier + database), baseline de hashes,

@@ -12,6 +12,8 @@ WITH ranked AS (
   SELECT p.id,r.code
   FROM ranked r JOIN public.publications p ON p.id=r.id
   WHERE r.start_rank+r.tie_size-1 <= 20 AND NOT p.is_hidden
+    AND (:'controlled_publication_sha256'='' OR
+      encode(sha256(convert_to(p.id::text,'UTF8')),'hex')=:'controlled_publication_sha256')
     AND (SELECT count(*) FROM public.publication_versions v WHERE v.publication_id=p.id AND v.is_current)=1
     AND EXISTS (SELECT 1 FROM public.publication_source_feed f WHERE f.publication_id=p.id AND NOT f.is_hidden)
     -- Require non-vacuous file-RLS and historical-import preservation proofs.

@@ -14,6 +14,14 @@ for mode in '' disabled unknown rehearsal; do
   [[ $status != 0 && $output == *DISABLED_EXPLICIT_MODE_REQUIRED* ]]
   [[ $output != *PRIVATE_DURABLE_JOURNAL_READY* && $output != *SMOKE_PASS* ]]
 done
+set +e
+preflight_output=$(env -i PATH=/usr/bin:/bin MODE=preflight bash "$SCRIPT")
+preflight_status=$?
+set -e
+[[ $preflight_status != 0 && $preflight_output != *READ_ONLY_PREFLIGHT_PASS* ]]
+rg -q 'READ_ONLY_PREFLIGHT_PASS; NO_SUPPRESS_OR_RESTORE' "$SCRIPT"
+rg -q 'PINNED_PUBLIC_CANDIDATE_REQUIRED_FOR_UI' "$SCRIPT"
+rg -q 'controlled_publication_sha256' "$ROOT_DIR/sql/candidate.sql"
 [[ $(awk '/atomic_journal "\$WORK\/journal-prepared.json"/{print NR}' "$SCRIPT") -lt \
    $(awk '/db suppress.sql/{print NR}' "$SCRIPT") ]]
 [[ $(awk '/ARMED=1/{line=NR} /db suppress.sql/{print line}' "$SCRIPT") -lt \
