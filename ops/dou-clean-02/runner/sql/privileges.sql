@@ -47,16 +47,16 @@ WITH RECURSIVE runtime_members(oid) AS (
   UNION ALL
   -- Check PUBLIC separately, including table/column grants and grant options.
   SELECT 1 FROM functions f
-  CROSS JOIN LATERAL aclexplode(coalesce(f.proacl,acldefault('f',f.proowner))) acl
+  CROSS JOIN LATERAL aclexplode(nullif(coalesce(f.proacl,acldefault('f',f.proowner)),'{}'::aclitem[])) acl
   WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE'
   UNION ALL
   SELECT 1 FROM ledgers l
-  CROSS JOIN LATERAL aclexplode(coalesce(l.relacl,acldefault('r',l.relowner))) acl
+  CROSS JOIN LATERAL aclexplode(nullif(coalesce(l.relacl,acldefault('r',l.relowner)),'{}'::aclitem[])) acl
   WHERE (acl.grantee=0 OR acl.grantee IN (SELECT oid FROM assumable))
     AND acl.privilege_type IN ('SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN')
   UNION ALL
   SELECT 1 FROM ledgers l JOIN pg_attribute column_acl ON column_acl.attrelid=l.oid
-  CROSS JOIN LATERAL aclexplode(coalesce(column_acl.attacl,'{}'::aclitem[])) acl
+  CROSS JOIN LATERAL aclexplode(nullif(column_acl.attacl,'{}'::aclitem[])) acl
   WHERE column_acl.attnum>0 AND NOT column_acl.attisdropped
     AND (acl.grantee=0 OR acl.grantee IN (SELECT oid FROM assumable))
     AND acl.privilege_type IN ('SELECT','INSERT','UPDATE','REFERENCES')
@@ -90,7 +90,7 @@ WITH RECURSIVE members(family,oid) AS (
       has_function_privilege(r.oid,'public.publication_scope_imported_today(uuid)','EXECUTE'))
   UNION ALL
   SELECT 1 FROM narrow n JOIN pg_proc p ON p.oid=n.signature::regprocedure
-  CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+  CROSS JOIN LATERAL aclexplode(nullif(coalesce(p.proacl,acldefault('f',p.proowner)),'{}'::aclitem[])) acl
   WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE'
 )
 SELECT 1 / CASE WHEN NOT EXISTS(SELECT 1 FROM violations)
