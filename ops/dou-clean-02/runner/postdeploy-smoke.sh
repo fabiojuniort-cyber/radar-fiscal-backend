@@ -182,11 +182,14 @@ load_candidate() {
   export SMOKE_PUBLICATION_ID SMOKE_VERSION_IDS SMOKE_RUN_IDS
 }
 validate_candidate() {
-  jq -e '
-    def uuid: type=="string" and test("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$");
+  # Exactly one JSON document: zero rows (no eligible candidate) must fail on
+  # any jq version, and a second row must never be silently ignored.
+  jq -se '
+    def uuid: type=="string" and test("\\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\z");
+    length==1 and (.[0] | type=="object" and
     (.publication_id|uuid) and (.source_code|type=="string" and length>=1 and length<=100) and
     (.version_ids|type=="array" and length>0 and all(.[];uuid)) and
-    (.run_ids|type=="array" and all(.[];uuid))
+    (.run_ids|type=="array" and all(.[];uuid)))
   ' "$1" >/dev/null
 }
 load_journal() {
@@ -348,6 +351,9 @@ main() {
   for command in psql jq curl flock sha256sum cut stat id date sync mktemp realpath mountpoint awk cmp timeout; do
     command -v "$command" >/dev/null || die 'REQUIRED_DEPENDENCY_MISSING'
   done
+  # Every gate below is `jq -e` on a file. jq 1.6 exits 0 on EMPTY input, so a
+  # query returning no row would pass vacuously. Fail closed on that semantics.
+  if printf '' | jq -e . >/dev/null; then die 'UNSAFE_JQ_EMPTY_INPUT_SEMANTICS'; fi
   [[ ${RAILWAY_VOLUME_MOUNT_PATH:-} == /data && -n ${RAILWAY_SERVICE_ID:-} && -n ${RAILWAY_ENVIRONMENT_ID:-} ]] || die 'PRIVATE_RAILWAY_RUNNER_REQUIRED'
   [[ ! -L /data && $(realpath /data) == /data ]] && mountpoint -q /data || die 'PRIVATE_VOLUME_REQUIRED'
   [[ ${PROD_DATABASE_ADMIN_URL:-} == postgres://* || ${PROD_DATABASE_ADMIN_URL:-} == postgresql://* ]] || die 'ADMIN_CONNECTION_REQUIRED'
@@ -378,7 +384,13 @@ main() {
     security_preflight "$WORK/preflight.private"
     PHASE=read_only_preflight_candidate
     db candidate.sql "$WORK/candidate.json"
-    validate_candidate "$WORK/candidate.json" || die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
+    if ! validate_candidate "$WORK/candidate.json"; then
+      # Aggregate counts only, to choose a quiescent canary window.
+      if db candidate-blockers.sql "$WORK/candidate-blockers.json"; then
+        jq -c '{candidate_blockers:{open_collection_runs,open_taxonomy_runs,out_of_scope_total}}' "$WORK/candidate-blockers.json"
+      fi
+      die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
+    fi
     load_candidate "$WORK/candidate.json"
     PHASE=read_only_preflight_snapshot
     if ! db state.sql "$WORK/preflight-state.json"; then

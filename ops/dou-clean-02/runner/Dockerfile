@@ -1,5 +1,7 @@
 # Backup and isolated restore execute entirely inside Railway.
-FROM postgres:18-bookworm
+# trixie ships jq 1.7: bookworm's jq 1.6 exits 0 for `jq -e` on EMPTY input,
+# which turned "no eligible candidate" into a vacuous pass in production.
+FROM postgres:18-trixie
 RUN apt-get update \
  && apt-get install -y --no-install-recommends jq ca-certificates util-linux curl \
  && rm -rf /var/lib/apt/lists/*

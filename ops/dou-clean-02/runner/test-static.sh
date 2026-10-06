@@ -61,6 +61,11 @@ if rg -n '^[[:space:]]*sleep "\$wait_seconds"$' "$SCRIPT"; then printf '%s\n' 'O
 rg -q '^    PHASE=read_only_preflight_connection$' "$SCRIPT"
 rg -q "log 'BASELINE_HTTP_COHERENT=true'" "$SCRIPT"
 rg -q '^BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;$' "$ROOT_DIR/sql/state-diagnose.sql"
+rg -q '^BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;$' "$ROOT_DIR/sql/candidate-blockers.sql"
+# jq 1.6 (bookworm) exits 0 for `jq -e` on empty input: image and runtime guard.
+rg -q '^FROM postgres:18-trixie$' "$ROOT_DIR/Dockerfile"
+rg -q "if printf '' \| jq -e \. >/dev/null; then die 'UNSAFE_JQ_EMPTY_INPUT_SEMANTICS'; fi" "$SCRIPT"
+rg -q "jq -se '" "$SCRIPT"
 rg -q 'sync -f "\$tmp"' "$SCRIPT"
 rg -q 'chmod 600 "\$tmp"' "$SCRIPT"
 rg -q -- '--retry 0' "$SCRIPT"
