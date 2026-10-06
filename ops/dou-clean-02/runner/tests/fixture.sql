@@ -133,3 +133,5 @@ GRANT EXECUTE ON FUNCTION public.publication_scope_is_in_scope(uuid),
   public.publication_scope_epoch() TO radar_app,radar_worker;
 GRANT EXECUTE ON FUNCTION public.publication_scope_imported_today(uuid) TO radar_app;
 GRANT EXECUTE ON FUNCTION public.publication_scope_lock_curator_version(uuid) TO radar_taxonomy_curator;
+-- The synthetic transition owner calls epoch(); production owner is postgres.
+GRANT EXECUTE ON FUNCTION public.publication_scope_epoch() TO fixture_scope_owner;
