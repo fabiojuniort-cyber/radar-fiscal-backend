@@ -5,7 +5,7 @@ SCRIPT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/postdeploy-smoke.s
 WORK=$(mktemp -d)
 JOURNAL=$WORK/journal.json
 cleanup() {
-  rm -f -- "$WORK/recovery-before.json" "$WORK/recovery-after.json" "$JOURNAL"
+  rm -f -- "$WORK/recovery-before.json" "$WORK/recovery-after.json" "$JOURNAL" "$WORK/security" "$WORK/security.acl"
   rmdir -- "$WORK"
 }
 trap cleanup EXIT
@@ -72,3 +72,14 @@ if recover; then printf '%s\n' 'OFFLINE_RECOVERY_FALSE_CONFIRMATION'; exit 1; fi
 STATE=$(printf '%s' "$SUPPRESSED" | jq '.current_event="other-operation"')
 must_fail_without_write
 printf '%s\n' 'OFFLINE_RECOVERY_CONTROL_PASS; DATABASE_CONCURRENCY_NOT_RUN'
+source <(awk '/^security_preflight\(\) \{/{active=1} active{print} active && /^}/{exit}' "$SCRIPT")
+db() {
+  printf '%s\n' 'CHECK_ROLE_BASELINE' 'SENSITIVE_DIAGNOSTIC_SENTINEL' 'CHECK_SET_ROLE_ACL_AND_OWNERSHIP' >"$2"
+  [[ $1 == preflight.sql ]]
+}
+set +e
+diagnostic=$(security_preflight "$WORK/security")
+diagnostic_rc=$?
+set -e
+[[ $diagnostic_rc != 0 && $diagnostic == FAILED_CHECK_SET_ROLE_ACL_AND_OWNERSHIP ]]
+printf '%s\n' 'OFFLINE_SECURITY_DIAGNOSTIC_REDACTION_PASS'

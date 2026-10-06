@@ -90,7 +90,14 @@ recovery_snapshot() {
     .barrier_acquired==true and .observed_isolation=="read committed"' "$1" >/dev/null
 }
 security_preflight() {
-  db preflight.sql "$1" && db privileges.sql "$1.acl"
+  local file
+  if ! db preflight.sql "$1"; then file=$1;
+  elif ! db privileges.sql "$1.acl"; then file=$1.acl;
+  else return 0; fi
+  # Only fixed source-code gate labels may be printed, never SQL errors/data.
+  awk '/^CHECK_(DATABASE_ROLE_AND_FUNCTIONS|MIGRATION_CHECKSUMS|HISTORY_COLUMNS|ROLE_BASELINE|SET_ROLE_ACL_AND_OWNERSHIP|NARROW_FUNCTION_AND_HISTORY_BOUNDARIES)$/ {last=$0}
+    END {if(last!="") print "FAILED_" last}' "$file"
+  return 1
 }
 fingerprints() {
   db fingerprints.sql "$1.lines" || return 1

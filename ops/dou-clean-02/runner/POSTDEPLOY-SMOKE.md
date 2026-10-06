@@ -107,6 +107,8 @@ contagens, epoch, RLS e feed. O conteúdo canônico é serializado/hashado **den
 do PostgreSQL**, não exportado. Respostas HTTP públicas e identificadores ficam
 em arquivos privados do volume; stdout contém somente status, hashes e contagens.
 Erros crus psql/curl são descartados. Não usar shell tracing ou imprimir o ambiente.
+Falha de segurança imprime somente o último rótulo CHECK de uma lista fixa
+versionada, precedido de FAILED_; erros e valores do SQL permanecem privados.
 
 Após o journal durável, EXIT/INT/TERM/HUP tentam compensação. Um COMMIT sem
 resposta é reconciliado pelo operation_id persistido, não por um event_id só em

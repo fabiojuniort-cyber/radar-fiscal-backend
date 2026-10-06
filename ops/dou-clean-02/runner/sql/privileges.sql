@@ -1,9 +1,11 @@
 -- Reusable PG18 security gate. Only booleans/assertions leave the server.
 -- SET ROLE reachability is distinct from inherited privileges (NOINHERIT).
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT 'CHECK_ROLE_BASELINE';
 SELECT 1 / CASE WHEN current_setting('server_version_num')::int / 10000=18
   AND (SELECT count(*) FROM pg_roles WHERE rolname IN ('radar_app','radar_worker','radar_taxonomy_curator'))=3
   THEN 1 ELSE 0 END;
+SELECT 'CHECK_SET_ROLE_ACL_AND_OWNERSHIP';
 WITH RECURSIVE runtime_members(oid) AS (
   -- Explicit memberships identify runtimes; do not use superuser shortcuts.
   SELECT oid FROM pg_roles WHERE rolname IN
@@ -65,6 +67,7 @@ SELECT 1 / CASE WHEN (SELECT count(*) FROM functions)=2 AND (SELECT count(*) FRO
   AND (SELECT count(*) FROM assumable)>=3 AND NOT EXISTS (SELECT 1 FROM unsafe)
   THEN 1 ELSE 0 END;
 -- Check each runtime family separately: SET ROLE cannot bypass narrow grants.
+SELECT 'CHECK_NARROW_FUNCTION_AND_HISTORY_BOUNDARIES';
 WITH RECURSIVE members(family,oid) AS (
   SELECT rolname,oid FROM pg_roles WHERE rolname IN ('radar_app','radar_worker','radar_taxonomy_curator')
   UNION
