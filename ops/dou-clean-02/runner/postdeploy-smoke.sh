@@ -6,7 +6,11 @@ set -Eeuo pipefail
 umask 077
 exec 2>/dev/null
 
-readonly BACKEND_SHA=068506811ae4c0a257816c38e899e3a1dccb0fb8
+# Backend follows main (auto-deploy); Worker/Scheduler are pinned separately.
+# 0685068..7ab527f (#161-#163) touches no migration, public route, cache, feed
+# or scope module; both releases carry the same scope implementation.
+readonly BACKEND_SHA=7ab527f3b3261993ca02a390f042be1db2dcd3cd
+readonly WORKER_SCHEDULER_SHA=068506811ae4c0a257816c38e899e3a1dccb0fb8
 readonly BASE_URL=https://radar-fiscal-backend-production.up.railway.app
 readonly ROOT=/data/dou-clean-02-postdeploy-smoke
 readonly JOURNAL=$ROOT/journal.json
@@ -436,7 +440,7 @@ main() {
   [[ ${UI_OBSERVATION_WINDOW:-disabled} == disabled || ${UI_OBSERVATION_WINDOW:-disabled} == enabled ]] || die 'INVALID_UI_OBSERVATION_MODE'
   [[ ${UI_OBSERVATION_WINDOW:-disabled} != enabled || -n $SMOKE_CANDIDATE_SHA256 ]] || die 'PINNED_PUBLIC_CANDIDATE_REQUIRED_FOR_UI'
   [[ ${R3_APPROVAL_SHA256:-} =~ ^[a-f0-9]{64}$ ]] || die 'R3_APPROVAL_HASH_REQUIRED'
-  [[ ${BACKEND_DEPLOYED_SHA:-} == "$BACKEND_SHA" && ${WORKER_DEPLOYED_SHA:-} == "$BACKEND_SHA" && ${SCHEDULER_DEPLOYED_SHA:-} == "$BACKEND_SHA" ]] || die 'RUNTIME_SHA_ATTESTATIONS_REQUIRED'
+  [[ ${BACKEND_DEPLOYED_SHA:-} == "$BACKEND_SHA" && ${WORKER_DEPLOYED_SHA:-} == "$WORKER_SCHEDULER_SHA" && ${SCHEDULER_DEPLOYED_SHA:-} == "$WORKER_SCHEDULER_SHA" ]] || die 'RUNTIME_SHA_ATTESTATIONS_REQUIRED'
   [[ ${RUNNER_SHA:-} =~ ^[a-f0-9]{40}$ && ${RAILWAY_GIT_COMMIT_SHA:-} == "$RUNNER_SHA" ]] || die 'REVIEWED_RUNNER_SHA_REQUIRED'
   [[ ${BACKUP_RESTORE_VERIFIED:-} == true && ${R3_LOCK_VERIFIED:-} == true && ${NO_HISTORICAL_BATCH_VERIFIED:-} == true && ${WORKER_NCM_DISABLED_VERIFIED:-} == true ]] || die 'R3_GATE_ATTESTATIONS_REQUIRED'
   [[ ! -e $JOURNAL && ! -L $JOURNAL ]] || die 'EXISTING_JOURNAL_USE_RESTORE_ONLY_OR_REVIEW_RETENTION'
@@ -471,10 +475,10 @@ main() {
 
   PHASE=journal
   jq -n --slurpfile candidate "$WORK/candidate.json" --slurpfile state "$WORK/baseline-state.json" \
-    --arg backend "$BACKEND_SHA" --arg runner "$RUNNER_SHA" --arg approval "$R3_APPROVAL_SHA256" \
+    --arg backend "$BACKEND_SHA" --arg workers "$WORKER_SCHEDULER_SHA" --arg runner "$RUNNER_SHA" --arg approval "$R3_APPROVAL_SHA256" \
     --arg suppress "$SMOKE_SUPPRESS_OPERATION_ID" --arg restore "$SMOKE_RESTORE_OPERATION_ID" \
     --arg actor "$SMOKE_ACTOR_REF" --arg at "$(date -u +%FT%TZ)" \
-    '{candidate:$candidate[0],database_fingerprint:$state[0].database_fingerprint,backend_sha:$backend,
+    '{candidate:$candidate[0],database_fingerprint:$state[0].database_fingerprint,backend_sha:$backend,worker_scheduler_sha:$workers,
       runner_sha:$runner,r3_approval_sha256:$approval,suppress_operation_id:$suppress,restore_operation_id:$restore,
       actor_ref:$actor,created_at:$at,allow_compensating_restore:true}' >"$WORK/manifest.json"
   jq -n --slurpfile state "$WORK/baseline-state.json" --slurpfile f "$WORK/baseline-fingerprints.json" \
