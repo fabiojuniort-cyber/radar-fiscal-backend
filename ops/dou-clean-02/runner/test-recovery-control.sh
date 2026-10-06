@@ -118,3 +118,13 @@ set -e
 rm -rf -- "$FAKE_BIN"
 [[ $probe_rc != 0 && $probe_output == FAILED_CONNECTION_AUTH ]]
 printf '%s\n' 'OFFLINE_CONNECTION_DIAGNOSTIC_REDACTION_PASS'
+# A failed state snapshot prints only the last fixed STATE_* label reached.
+source <(awk '/^state_diagnose\(\) \{/{a=1} a{print} a && /^}/{exit}' "$SCRIPT")
+db() {
+  printf '%s\n' 'STATE_EPOCH' 't' 'SENSITIVE_STATE_SENTINEL' 'STATE_FEED_EXPECTED' >"$2"
+  return 3
+}
+state_output=$(state_diagnose "$WORK/state-diagnose")
+rm -f -- "$WORK/state-diagnose"
+[[ $state_output == FAILED_AFTER_STATE_FEED_EXPECTED ]]
+printf '%s\n' 'OFFLINE_STATE_DIAGNOSTIC_REDACTION_PASS'

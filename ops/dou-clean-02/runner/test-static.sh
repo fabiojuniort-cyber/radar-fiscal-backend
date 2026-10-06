@@ -60,6 +60,7 @@ rg -q '^    wait "\$!"$' "$SCRIPT"
 if rg -n '^[[:space:]]*sleep "\$wait_seconds"$' "$SCRIPT"; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
 rg -q '^    PHASE=read_only_preflight_connection$' "$SCRIPT"
 rg -q "log 'BASELINE_HTTP_COHERENT=true'" "$SCRIPT"
+rg -q '^BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;$' "$ROOT_DIR/sql/state-diagnose.sql"
 rg -q 'sync -f "\$tmp"' "$SCRIPT"
 rg -q 'chmod 600 "\$tmp"' "$SCRIPT"
 rg -q -- '--retry 0' "$SCRIPT"

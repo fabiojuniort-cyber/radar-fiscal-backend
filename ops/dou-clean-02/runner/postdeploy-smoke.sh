@@ -150,6 +150,11 @@ security_preflight() {
     END {if(last!="") print "FAILED_" last}' "$file"
   return 1
 }
+state_diagnose() {
+  # Same READ ONLY components as state.sql, one statement per fixed label.
+  db state-diagnose.sql "$1" || true
+  awk '/^STATE_[A-Z0-9_]+$/ {last=$0} END {if(last!="") print "FAILED_AFTER_" last; else print "FAILED_STATE_NO_LABEL"}' "$1"
+}
 fingerprints() {
   db fingerprints.sql "$1.lines" || return 1
   jq -csS 'add' "$1.lines" >"$1" || return 1
@@ -376,6 +381,11 @@ main() {
     validate_candidate "$WORK/candidate.json" || die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
     load_candidate "$WORK/candidate.json"
     PHASE=read_only_preflight_snapshot
+    if ! db state.sql "$WORK/preflight-state.json"; then
+      state_diagnose "$WORK/preflight-state-diagnose.private"
+      exit 1
+    fi
+    PHASE=read_only_preflight_snapshot_shape
     snapshot "$WORK/preflight-state.json"
     # Only aggregates and a hash of an already-public publication ID leave Railway.
     jq -c '{out_of_scope_total,epoch,v1,v2}' "$WORK/preflight-state.json"
