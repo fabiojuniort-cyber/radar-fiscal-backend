@@ -42,10 +42,12 @@ test('in-database dry run is read-only, deterministic and prints only aggregates
          VALUES ($1, 'dou', 'DOU dry-run fixture', 'FEDERAL', 'https://example.invalid', 'dou', false)`, [sourceId]);
       created.source = sourceId;
     }
-    async function seed(title: string, actType: string, section: string | null, matter: string, content: string) {
+    async function seed(title: string, actType: string, section: string | null, matter: string, content: string,
+      scope?: Record<string, unknown>) {
       const publicationId = randomUUID();
       const page = matter.slice(-1);
-      const meta = section ? douMetadata(section, matter, page) : {};
+      const meta: Record<string, unknown> = section ? douMetadata(section, matter, page) : {};
+      if (scope) meta.douScope = scope;
       await admin.query(
         `INSERT INTO publications (id, identity_hash, identity_strength, identity_basis, jurisdiction_level, title, act_type, agency)
          VALUES ($1::uuid, encode(sha256(convert_to($4::text, 'UTF8')), 'hex'), 'STRONG', '{}', 'FEDERAL', $2, $3, 'União')`,
@@ -63,6 +65,7 @@ test('in-database dry run is read-only, deterministic and prints only aggregates
     await seed('PORTARIA Nº 1', 'PORTARIA', 'DO2', '71000001', 'Nomeação de servidor.');
     await seed('EXTRATO DE CONTRATO Nº 7/2026', 'EXTRATO DE CONTRATO', 'DO3', '71000002', routine);
     await seed('PORTARIA SEM PROVENIENCIA', 'PORTARIA', null, '71000003', 'Texto.');
+    await seed('PORTARIA Nº 4', 'PORTARIA', 'DO2', '71000004', 'Ato de pessoal.', { decision: 'KEEP', ruleVersion: 'dou-scope-v1' });
 
     const before = await admin.query<{ count: string }>(`SELECT count(*) FROM publication_scope_events`);
     const fixedNow = () => new Date('2026-10-06T00:00:00.000Z');
@@ -83,6 +86,11 @@ test('in-database dry run is read-only, deterministic and prints only aggregates
     ok((first.byReason.CANDIDATE.strict_routine_contract_excerpt ?? 0) >= 1);
     ok((first.byReason.REVIEW.missing_or_conflicting_dou_provenance ?? 0) >= 1);
     ok((first.candidatesBySection.DO2 ?? 0) >= 1 && (first.candidatesBySection.DO3 ?? 0) >= 1);
+    // Impact counters: the persisted KEEP on a DO2 candidate is surfaced, never hidden.
+    ok(first.candidateImpact.withPersistedScopeKeep >= 1);
+    ok(first.candidateImpact.withoutPersistedScope >= 2);
+    equal(typeof first.candidateImpact.alreadyHidden, 'number');
+    equal(first.candidateImpact.withCompanyLinks >= 0, true);
     // Batch size changes the per-batch anchors but never the candidate set.
     equal(first.candidateSetSha256, second.candidateSetSha256);
     deepEqual(first.counts, second.counts);

@@ -40,6 +40,18 @@ export interface DouCleanupDryRunSummary {
   byReason: Record<'CANDIDATE' | 'KEEP' | 'REVIEW', Record<string, number>>;
   /** Candidates per DOU section as recorded in the origin's provenance. */
   candidatesBySection: Record<string, number>;
+  /** What suppressing the candidates would touch (counts of candidates). */
+  candidateImpact: {
+    alreadyHidden: number;
+    withCompanyLinks: number;
+    withCompanyMatches: number;
+    withTaxonomyRuns: number;
+    withNcmMentions: number;
+    withPersistedScopeKeep: number;
+    withPersistedScopeReview: number;
+    withPersistedScopeIgnore: number;
+    withoutPersistedScope: number;
+  };
   /** Digest of sorted `publicationId:evidenceSha256:reasons` candidate lines. */
   candidateSetSha256: string;
   /** Digest of the ordered per-batch plan digests (whole-run audit anchor). */
@@ -120,6 +132,10 @@ export async function runDouHistoricalCleanupDryRun(
     const counts = { publicationsInspected: 0, candidatePublications: 0, keptPublications: 0, reviewPublications: 0 };
     const byReason: DouCleanupDryRunSummary['byReason'] = { CANDIDATE: {}, KEEP: {}, REVIEW: {} };
     const candidatesBySection: Record<string, number> = {};
+    const candidateImpact: DouCleanupDryRunSummary['candidateImpact'] = {
+      alreadyHidden: 0, withCompanyLinks: 0, withCompanyMatches: 0, withTaxonomyRuns: 0, withNcmMentions: 0,
+      withPersistedScopeKeep: 0, withPersistedScopeReview: 0, withPersistedScopeIgnore: 0, withoutPersistedScope: 0,
+    };
     const candidateLines: string[] = [];
     const batchDigests: string[] = [];
     let lastId: string | null = null;
@@ -191,7 +207,38 @@ export async function runDouHistoricalCleanupDryRun(
             .filter(origin => origin.source_id === sourceId)
             .map(origin => String(asObject(asObject(origin.metadata).dou).section ?? 'unknown')));
           for (const section of sections) candidatesBySection[section] = (candidatesBySection[section] ?? 0) + 1;
+          // Persisted scope decisions on any origin/version envelope.
+          const decisions = new Set((publication ? [
+            ...publication.origins.map(origin => origin.metadata),
+            ...publication.versions.map(version => version.source_metadata),
+          ] : []).map(meta => asObject(meta).douScope).filter(value => value !== undefined)
+            .map(value => String(asObject(value).decision ?? 'INVALID')));
+          if (decisions.has('KEEP')) candidateImpact.withPersistedScopeKeep += 1;
+          if ([...decisions].some(value => value !== 'KEEP' && value !== 'IGNORE')) candidateImpact.withPersistedScopeReview += 1;
+          if (decisions.has('IGNORE')) candidateImpact.withPersistedScopeIgnore += 1;
+          if (!decisions.size) candidateImpact.withoutPersistedScope += 1;
         }
+      }
+      const candidateIds = plan.decisions.filter(row => row.disposition === 'CANDIDATE').map(row => row.publicationId);
+      if (candidateIds.length) {
+        const impact = await client.query<{
+          hidden: string; company: string; matches: string; taxonomy: string; ncm: string;
+        }>(
+          `SELECT count(*) FILTER (WHERE p.is_hidden)::text AS hidden,
+             count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.company_publications c WHERE c.publication_id = p.id))::text AS company,
+             count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.publication_matches m
+               JOIN public.company_publications c ON c.id = m.company_publication_id WHERE c.publication_id = p.id))::text AS matches,
+             count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.publication_taxonomy_runs r
+               JOIN public.publication_versions v ON v.id = r.publication_version_id WHERE v.publication_id = p.id))::text AS taxonomy,
+             count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.publication_ncm_mentions n
+               JOIN public.publication_versions v ON v.id = n.publication_version_id WHERE v.publication_id = p.id))::text AS ncm
+           FROM public.publications p WHERE p.id = ANY($1::uuid[])`, [candidateIds]);
+        const row = impact.rows[0]!;
+        candidateImpact.alreadyHidden += Number(row.hidden);
+        candidateImpact.withCompanyLinks += Number(row.company);
+        candidateImpact.withCompanyMatches += Number(row.matches);
+        candidateImpact.withTaxonomyRuns += Number(row.taxonomy);
+        candidateImpact.withNcmMentions += Number(row.ncm);
       }
     }
 
@@ -207,6 +254,7 @@ export async function runDouHistoricalCleanupDryRun(
       counts,
       byReason,
       candidatesBySection,
+      candidateImpact,
       candidateSetSha256: sha256(candidateLines.sort().join('\n')),
       runSha256: sha256(batchDigests.join('\n')),
     };
