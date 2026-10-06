@@ -162,6 +162,11 @@ jobs:
       - name: TAX-11 curation end-to-end integration
         run: npx tsx --test test/taxonomy.curation.integration.test.ts
 
+      # Scope events are append-only: the executor fixtures cannot be cleaned
+      # up, so this runs after every other database test of the job.
+      - name: DOU-CLEAN-01 executor integration (append-only fixtures, runs last)
+        run: npx tsx --test test/dou-historical-cleanup.executor.integration.test.ts
+
       - name: Upload Product/NCM integration diagnostics
         if: always()
         continue-on-error: true
