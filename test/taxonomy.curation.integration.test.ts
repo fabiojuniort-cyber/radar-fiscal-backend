@@ -930,6 +930,19 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         assert.equal(empty.statusCode, 200, empty.body);
         assert.equal(empty.json().status, 'OK');
         assert.equal(empty.json().level, 'NONE');
+
+        // A single keyword is enough: here it names a tag of the act.
+        await admin.query(
+          `UPDATE company_tax_profiles SET personalization = $2::jsonb WHERE company_id = $1::uuid`,
+          [emptyProfile.rows[0]!.id, JSON.stringify({ keywords: ['Crédito presumido'] })],
+        );
+        const byKeyword = await app.inject({
+          method: 'GET',
+          url: `/api/v1/companies/${emptyProfile.rows[0]!.id}/publications/${publicationId}/affinity`,
+          headers: customer.headers,
+        });
+        assert.equal(byKeyword.statusCode, 200, byKeyword.body);
+        assert.deepEqual(byKeyword.json().matches.map((m: { code: string }) => m.code), ['theme.presumed_credit']);
       }
 
       // Profile keeps the user's segment per CNAE; a CNAE activity or an
