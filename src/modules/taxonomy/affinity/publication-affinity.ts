@@ -44,11 +44,11 @@ export const DIMENSION_WEIGHTS: Record<string, number> = {
   regime: 2,
   operation: 2,
   operation_purpose: 2,
-  treatment: 2,
+  // "Tema" absorbed "Tratamento" (isenção, redução de base, crédito presumido...).
+  theme: 2,
   tax_species: 1,
   document: 1,
   obligation: 1,
-  theme: 1,
 };
 
 /** An NCM of the company mentioned in the act is as specific as a product. */

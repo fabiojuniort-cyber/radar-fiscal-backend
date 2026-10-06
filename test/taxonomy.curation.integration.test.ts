@@ -19,6 +19,8 @@ import {
   parseProductSheet,
 } from '../src/modules/taxonomy/curation/curation.product-load.js';
 import { retireDimension } from '../src/modules/taxonomy/curation/curation.draft.js';
+import { mergeDimension } from '../src/modules/taxonomy/curation/curation.merge-dimension.js';
+import { findOpenDraft, loadReleaseView, pgRunner } from '../src/modules/taxonomy/curation/curation.read.js';
 
 /**
  * TAX-11 end-to-end gate. Runs as a dedicated, final CI step: it commits a
@@ -1126,6 +1128,18 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         const actType = await retireDimension(client, actor, 'act_type');
         assert.ok(actType.retiredConcepts.length > 0);
         assert.ok(actType.retiredConcepts.every((code) => code.startsWith('act_type.')));
+        // Folding a dimension into another (rolled back: the fixture keeps
+        // its documents). Production folds "Tratamento" into "Tema".
+        await client.query('SAVEPOINT merge_dimension');
+        const merge = await mergeDimension(client, actor, 'document', 'theme');
+        assert.ok(merge.steps.length > 0);
+        assert.deepEqual(merge.retired.sort(), merge.steps.map((step) => step.from).sort());
+        const mergedView = await loadReleaseView(pgRunner(client), (await findOpenDraft(pgRunner(client)))!.id);
+        const nfeTheme = mergedView!.concepts.find((concept) => concept.code === 'theme.nfe');
+        assert.equal(nfeTheme?.membershipStatus, 'INCLUDED');
+        assert.deepEqual(nfeTheme!.officialCodes, ['55'], 'official codes move with the item');
+        assert.ok(!mergedView!.concepts.some((concept) => concept.code.startsWith('document.')));
+        await client.query('ROLLBACK TO SAVEPOINT merge_dimension');
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK');
