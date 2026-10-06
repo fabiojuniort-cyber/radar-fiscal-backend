@@ -3,9 +3,11 @@
 -- Scope ledger and feed change intentionally and are audited separately.
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 WITH RECURSIVE edges(child,parent,child_cols,parent_cols) AS (
-  SELECT c.relname::text,p.relname::text,
-    string_agg(format('%I',ca.attname),',' ORDER BY k.n),
-    string_agg(format('%I',pa.attname),',' ORDER BY k.n)
+  -- Catalog `name` columns have collation "C"; the recursive term must match
+  -- the non-recursive literals (collation "default") column by column.
+  SELECT c.relname::text COLLATE "default",p.relname::text COLLATE "default",
+    string_agg(format('%I',ca.attname),',' ORDER BY k.n) COLLATE "default",
+    string_agg(format('%I',pa.attname),',' ORDER BY k.n) COLLATE "default"
   FROM pg_constraint f JOIN pg_class c ON c.oid=f.conrelid JOIN pg_class p ON p.oid=f.confrelid
   JOIN pg_namespace cn ON cn.oid=c.relnamespace JOIN pg_namespace pn ON pn.oid=p.relnamespace
   CROSS JOIN LATERAL unnest(f.conkey,f.confkey) WITH ORDINALITY k(c,p,n)
