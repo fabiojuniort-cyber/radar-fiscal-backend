@@ -47,7 +47,11 @@ does not yet have. It is **not** a process crash, transport fault, PostgreSQL cr
 recovery, authenticated API, complete production migration, or adversarial worker
 integration test. The fixture transition reproduces only the minimal locking,
 event, epoch, and optimistic-restore contract needed to exercise these SQL files.
-Material restoration is a no-op fixture used only for ACL tests.
+Material restoration and narrow helper bodies are inert fixtures used only
+for ACL tests. The fixture models the app's two public history columns and
+the migration's predicate/epoch/imported-today/curator EXECUTE grants.
+Negative cases also cover raw ledger SELECT, private history columns (direct
+and SET-able), PUBLIC narrow helpers, wrong-family EXECUTE and missing grants.
 
 Static-only command (does not start Docker or PostgreSQL):
 

@@ -15,9 +15,11 @@ CREATE ROLE radar_worker NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE;
 CREATE ROLE radar_taxonomy_curator NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE;
 CREATE ROLE radar_app_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE;
 CREATE ROLE radar_worker_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE;
+CREATE ROLE radar_taxonomy_curator_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE;
 CREATE ROLE fixture_runtime_noinherit NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS NOCREATEROLE;
 GRANT radar_app TO radar_app_runtime;
 GRANT radar_worker TO radar_worker_runtime;
+GRANT radar_taxonomy_curator TO radar_taxonomy_curator_runtime;
 GRANT radar_worker TO fixture_runtime_noinherit WITH INHERIT FALSE, SET TRUE;
 
 CREATE TABLE public.publications(id uuid PRIMARY KEY, is_hidden boolean NOT NULL DEFAULT false);
@@ -27,6 +29,11 @@ CREATE TABLE public.publication_source_feed(publication_id uuid, is_hidden boole
 CREATE TABLE public.company_publications(id uuid, publication_id uuid);
 CREATE TABLE public.publication_matches(company_publication_id uuid);
 CREATE TABLE public.collection_runs(status text);
+CREATE TABLE public.collection_run_publications(
+  collection_run_id uuid, disposition text, publication_id uuid,
+  publication_version_id uuid, detected_at timestamptz
+);
+GRANT SELECT(collection_run_id,disposition) ON public.collection_run_publications TO radar_app;
 CREATE TABLE public.publication_taxonomy_runs(status text);
 CREATE TABLE public.publication_scope_events(
   id uuid PRIMARY KEY, publication_id uuid NOT NULL, operation_id uuid UNIQUE NOT NULL,
@@ -110,3 +117,19 @@ BEGIN
 END $$;
 ALTER FUNCTION public.restore_publication_scope_on_material_change(uuid,text) OWNER TO fixture_material_owner;
 REVOKE ALL ON FUNCTION public.restore_publication_scope_on_material_change(uuid,text) FROM PUBLIC;
+-- Inert helper bodies model only the migration ACL contract for this fixture.
+CREATE FUNCTION public.publication_scope_company_publication_is_in_scope(uuid)
+RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+CREATE FUNCTION public.publication_scope_imported_today(uuid)
+RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
+CREATE FUNCTION public.publication_scope_lock_curator_version(uuid)
+RETURNS void LANGUAGE plpgsql AS $$ BEGIN RETURN; END $$;
+REVOKE ALL ON FUNCTION public.publication_scope_is_in_scope(uuid),
+  public.publication_scope_company_publication_is_in_scope(uuid),
+  public.publication_scope_epoch(), public.publication_scope_imported_today(uuid),
+  public.publication_scope_lock_curator_version(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.publication_scope_is_in_scope(uuid),
+  public.publication_scope_company_publication_is_in_scope(uuid),
+  public.publication_scope_epoch() TO radar_app,radar_worker;
+GRANT EXECUTE ON FUNCTION public.publication_scope_imported_today(uuid) TO radar_app;
+GRANT EXECUTE ON FUNCTION public.publication_scope_lock_curator_version(uuid) TO radar_taxonomy_curator;

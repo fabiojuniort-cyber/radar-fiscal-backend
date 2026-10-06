@@ -186,10 +186,11 @@ for signature in "$TRANSITION" "$MATERIAL"; do
 done
 
 for table in publication_scope_events publication_scope_state publication_scope_epoch_state; do
-  for privilege in INSERT UPDATE DELETE TRUNCATE REFERENCES TRIGGER MAINTAIN; do
+  for privilege in SELECT INSERT UPDATE DELETE TRUNCATE REFERENCES TRIGGER MAINTAIN; do
     reject_privilege "runtime $privilege on $table" "GRANT $privilege ON TABLE public.$table TO radar_worker;"
   done
   reject_privilege "PUBLIC UPDATE on $table" "GRANT UPDATE ON TABLE public.$table TO PUBLIC;"
+  reject_privilege "PUBLIC SELECT on $table" "GRANT SELECT ON TABLE public.$table TO PUBLIC;"
   reject_privilege "reachable ownership of $table" "ALTER TABLE public.$table OWNER TO fixture_escape_role; $set_bridge"
   query fixture_template 'REVOKE fixture_escape_role FROM fixture_runtime_noinherit;' >/dev/null
   column=publication_id
@@ -204,7 +205,7 @@ for table in publication_scope_events publication_scope_state publication_scope_
      SELECT 1 / CASE WHEN NOT has_any_column_privilege('fixture_runtime_noinherit','public.$table','UPDATE')
        AND pg_has_role('fixture_runtime_noinherit','fixture_escape_role','SET') THEN 1 ELSE 0 END;"
   query fixture_template 'REVOKE fixture_escape_role FROM fixture_runtime_noinherit;' >/dev/null
-  for privilege in INSERT UPDATE REFERENCES; do
+  for privilege in SELECT INSERT UPDATE REFERENCES; do
     reject_privilege "PUBLIC column $privilege on $table" "GRANT $privilege ($column) ON public.$table TO PUBLIC;"
   done
 done
@@ -225,5 +226,32 @@ query fixture_template 'REVOKE fixture_escape_role FROM fixture_runtime_noinheri
 reject_privilege 'reachable database ownership' \
   "ALTER DATABASE fixture_acl_$((case_no+1)) OWNER TO fixture_escape_role; $set_bridge"
 query fixture_template 'REVOKE fixture_escape_role FROM fixture_runtime_noinherit;' >/dev/null
+for column in publication_id publication_version_id detected_at; do
+  reject_privilege "private history column $column" "GRANT SELECT($column) ON public.collection_run_publications TO radar_app;"
+  reject_privilege "SET-able private history column $column" \
+    "GRANT SELECT($column) ON public.collection_run_publications TO fixture_escape_role;
+     GRANT fixture_escape_role TO radar_app_runtime WITH INHERIT FALSE, SET TRUE;"
+  query fixture_template 'REVOKE fixture_escape_role FROM radar_app_runtime;' >/dev/null
+done
+CURATOR='public.publication_scope_lock_curator_version(uuid)'
+IMPORTED='public.publication_scope_imported_today(uuid)'
+for signature in "$CURATOR" "$IMPORTED" public.publication_scope_is_in_scope\(uuid\) \
+  public.publication_scope_company_publication_is_in_scope\(uuid\) public.publication_scope_epoch\(\); do
+  reject_privilege "PUBLIC narrow helper EXECUTE $signature" "GRANT EXECUTE ON FUNCTION $signature TO PUBLIC;"
+done
+for role in radar_app radar_worker; do
+  reject_privilege "$role curator boundary" "GRANT EXECUTE ON FUNCTION $CURATOR TO $role;"
+done
+for role in radar_worker radar_taxonomy_curator; do
+  reject_privilege "$role imported-today boundary" "GRANT EXECUTE ON FUNCTION $IMPORTED TO $role;"
+done
+reject_privilege 'missing curator boundary' "REVOKE EXECUTE ON FUNCTION $CURATOR FROM radar_taxonomy_curator;"
+reject_privilege 'missing imported-today boundary' "REVOKE EXECUTE ON FUNCTION $IMPORTED FROM radar_app;"
+for role in radar_app radar_worker; do
+  for signature in public.publication_scope_is_in_scope\(uuid\) \
+    public.publication_scope_company_publication_is_in_scope\(uuid\) public.publication_scope_epoch\(\); do
+    reject_privilege "missing $role helper $signature" "REVOKE EXECUTE ON FUNCTION $signature FROM $role;"
+  done
+done
 sql_file fixture_template privileges.sql >"$TEMP_DIR/privileges-final-safe.out"
 printf '%s\n' 'PG18_ISOLATED_INTEGRATION_PASS'

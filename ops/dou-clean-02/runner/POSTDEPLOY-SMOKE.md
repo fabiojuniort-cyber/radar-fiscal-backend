@@ -73,6 +73,11 @@ explícitos e **todas** as roles assumíveis via `pg_has_role(..., 'SET')`, mesm
 `NOINHERIT`. Nega atributos SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB/REPLICATION,
 EXECUTE/ownership das duas funções governadas e DML/ownership/grants de escrita
 de tabela ou coluna nos três ledgers, incluindo PUBLIC e roles assumíveis.
+Também nega SELECT bruto de tabela/coluna nesses ledgers, leitura de
+publication_id/publication_version_id/detected_at do histórico pelo app e
+EXECUTE indevido da fronteira de curadoria e de imported_today. Verifica os
+grants positivos dos predicados/epoch para app/worker, do agregado para app e
+da fronteira para curator, e nega EXECUTE PUBLIC das cinco funções estreitas.
 Também rejeita ownership assumível do database ou schema `public`, que permitiria
 DDL destrutivo indireto mesmo sem ownership individual dos ledgers.
 

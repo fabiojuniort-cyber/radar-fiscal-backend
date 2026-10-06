@@ -7,7 +7,7 @@ SELECT 1 / CASE WHEN current_setting('server_version_num')::int / 10000=18
 WITH RECURSIVE runtime_members(oid) AS (
   -- Explicit memberships identify runtimes; do not use superuser shortcuts.
   SELECT oid FROM pg_roles WHERE rolname IN
-    ('radar_app','radar_worker','radar_taxonomy_curator','radar_app_runtime','radar_worker_runtime')
+    ('radar_app','radar_worker','radar_taxonomy_curator','radar_app_runtime','radar_worker_runtime','radar_taxonomy_curator_runtime')
   UNION
   SELECT m.member FROM pg_auth_members m JOIN runtime_members r ON r.oid=m.roleid
 ), assumable AS (
@@ -42,8 +42,8 @@ WITH RECURSIVE runtime_members(oid) AS (
   -- Owners may grant themselves privileges even after an explicit REVOKE.
   SELECT 1 FROM assumable a CROSS JOIN ledgers l
   WHERE a.oid=l.relowner OR pg_has_role(a.oid,l.relowner,'USAGE')
-    OR has_table_privilege(a.oid,l.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
-    OR has_any_column_privilege(a.oid,l.oid,'INSERT,UPDATE,REFERENCES')
+    OR has_table_privilege(a.oid,l.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    OR has_any_column_privilege(a.oid,l.oid,'SELECT,INSERT,UPDATE,REFERENCES')
   UNION ALL
   -- Check PUBLIC separately, including table/column grants and grant options.
   SELECT 1 FROM functions f
@@ -53,15 +53,56 @@ WITH RECURSIVE runtime_members(oid) AS (
   SELECT 1 FROM ledgers l
   CROSS JOIN LATERAL aclexplode(coalesce(l.relacl,acldefault('r',l.relowner))) acl
   WHERE (acl.grantee=0 OR acl.grantee IN (SELECT oid FROM assumable))
-    AND acl.privilege_type IN ('INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN')
+    AND acl.privilege_type IN ('SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN')
   UNION ALL
   SELECT 1 FROM ledgers l JOIN pg_attribute column_acl ON column_acl.attrelid=l.oid
   CROSS JOIN LATERAL aclexplode(coalesce(column_acl.attacl,'{}'::aclitem[])) acl
   WHERE column_acl.attnum>0 AND NOT column_acl.attisdropped
     AND (acl.grantee=0 OR acl.grantee IN (SELECT oid FROM assumable))
-    AND acl.privilege_type IN ('INSERT','UPDATE','REFERENCES')
+    AND acl.privilege_type IN ('SELECT','INSERT','UPDATE','REFERENCES')
 )
 SELECT 1 / CASE WHEN (SELECT count(*) FROM functions)=2 AND (SELECT count(*) FROM ledgers)=3
   AND (SELECT count(*) FROM assumable)>=3 AND NOT EXISTS (SELECT 1 FROM unsafe)
+  THEN 1 ELSE 0 END;
+-- Check each runtime family separately: SET ROLE cannot bypass narrow grants.
+WITH RECURSIVE members(family,oid) AS (
+  SELECT rolname,oid FROM pg_roles WHERE rolname IN ('radar_app','radar_worker','radar_taxonomy_curator')
+  UNION
+  SELECT r.family,m.member FROM pg_auth_members m JOIN members r ON r.oid=m.roleid
+), reachable AS (
+  SELECT DISTINCT r.family,c.oid FROM members r CROSS JOIN pg_roles c
+  WHERE c.oid=r.oid OR pg_has_role(r.oid,c.oid,'SET')
+), narrow(signature) AS (VALUES
+  ('public.publication_scope_is_in_scope(uuid)'),
+  ('public.publication_scope_company_publication_is_in_scope(uuid)'),
+  ('public.publication_scope_epoch()'),
+  ('public.publication_scope_imported_today(uuid)'),
+  ('public.publication_scope_lock_curator_version(uuid)')
+), violations AS (
+  SELECT 1 FROM reachable r
+  WHERE (r.family='radar_app' AND (
+    has_column_privilege(r.oid,'public.collection_run_publications','publication_id','SELECT') OR
+    has_column_privilege(r.oid,'public.collection_run_publications','publication_version_id','SELECT') OR
+    has_column_privilege(r.oid,'public.collection_run_publications','detected_at','SELECT')))
+    OR (r.family IN ('radar_app','radar_worker') AND
+      has_function_privilege(r.oid,'public.publication_scope_lock_curator_version(uuid)','EXECUTE'))
+    OR (r.family IN ('radar_worker','radar_taxonomy_curator') AND
+      has_function_privilege(r.oid,'public.publication_scope_imported_today(uuid)','EXECUTE'))
+  UNION ALL
+  SELECT 1 FROM narrow n JOIN pg_proc p ON p.oid=n.signature::regprocedure
+  CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+  WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE'
+)
+SELECT 1 / CASE WHEN NOT EXISTS(SELECT 1 FROM violations)
+  AND has_function_privilege('radar_taxonomy_curator','public.publication_scope_lock_curator_version(uuid)','EXECUTE')
+  AND has_function_privilege('radar_app','public.publication_scope_imported_today(uuid)','EXECUTE')
+  AND has_column_privilege('radar_app','public.collection_run_publications','collection_run_id','SELECT')
+  AND has_column_privilege('radar_app','public.collection_run_publications','disposition','SELECT')
+  AND NOT EXISTS (
+    SELECT 1 FROM (VALUES ('radar_app'),('radar_worker')) r(role_name)
+    CROSS JOIN (VALUES ('public.publication_scope_is_in_scope(uuid)'),
+      ('public.publication_scope_company_publication_is_in_scope(uuid)'),
+      ('public.publication_scope_epoch()')) f(signature)
+    WHERE NOT has_function_privilege(r.role_name,f.signature,'EXECUTE'))
   THEN 1 ELSE 0 END;
 ROLLBACK;
