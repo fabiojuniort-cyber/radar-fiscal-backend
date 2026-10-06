@@ -1,7 +1,19 @@
 -- Emergency recovery must not depend on aggregates, feed rebuild validation,
 -- API availability, migrations/grant checks, or the fingerprint graph.
-BEGIN READ ONLY;
+-- Barrier against an unacknowledged SUPPRESS/RESTORE still holding the target.
+-- READ ONLY would prohibit FOR UPDATE. No data is changed by this transaction.
+BEGIN ISOLATION LEVEL READ COMMITTED;
+SELECT true AS recovery_lock_acquired
+FROM public.publications
+WHERE id=:'publication_id'::uuid
+FOR UPDATE
+\gset
+-- A missing publication makes \gset fail under ON_ERROR_STOP. A lock timeout
+-- aborts without a state result. This MUST be a new statement after the lock:
+-- READ COMMITTED then observes the transition that committed while we waited.
 SELECT jsonb_build_object(
+  'barrier_acquired',:'recovery_lock_acquired'::boolean,
+  'observed_isolation',current_setting('transaction_isolation'),
   'database_fingerprint',encode(sha256(convert_to(
     (SELECT system_identifier::text FROM pg_control_system())||':'||current_database(),'UTF8')),'hex'),
   'canonical_exists',EXISTS(SELECT 1 FROM public.publications WHERE id=:'publication_id'::uuid),

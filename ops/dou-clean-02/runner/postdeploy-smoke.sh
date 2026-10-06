@@ -82,7 +82,15 @@ db() {
     >"$output" 2>/dev/null
 }
 snapshot() { db state.sql "$1" && jq -e 'type=="object" and .canonical_exists==true' "$1" >/dev/null; }
-recovery_snapshot() { db recovery-state.sql "$1" && jq -e 'type=="object" and .canonical_exists==true' "$1" >/dev/null; }
+recovery_snapshot() {
+  # FOR UPDATE barrier needs a read-write transaction, but performs no DML.
+  # Any timeout/error is NOT_CONFIRMED, even if an older file said IN_SCOPE.
+  db recovery-state.sql "$1" write && jq -e 'type=="object" and .canonical_exists==true and
+    .barrier_acquired==true and .observed_isolation=="read committed"' "$1" >/dev/null
+}
+security_preflight() {
+  db preflight.sql "$1" && db privileges.sql "$1.acl"
+}
 fingerprints() {
   db fingerprints.sql "$1.lines" || return 1
   jq -csS 'add' "$1.lines" >"$1" || return 1
@@ -155,8 +163,9 @@ recover() {
   [[ $(jq -r '.database_fingerprint' "$WORK/recovery-before.json") == \
     $(jq -r '.manifest.database_fingerprint' "$JOURNAL") ]] || return 1
   if jq -e '.in_scope==true' "$WORK/recovery-before.json" >/dev/null; then
-    # Already restored (including an independent material-change RESTORE), or
-    # SUPPRESS never committed. Do not overwrite a newer event to manufacture PASS.
+    # Only a fresh READ COMMITTED observation AFTER the row-lock barrier can
+    # confirm already restored / SUPPRESS never committed. Never infer this from
+    # a pre-lock snapshot while an unacknowledged transition may still commit.
     return 0
   fi
   jq -e '.suppress_event!=null and .current_event==.suppress_event.id' "$WORK/recovery-before.json" >/dev/null || return 1
@@ -239,7 +248,7 @@ verify_restored() {
   same_json "$WORK/final-fingerprints.json" <(jq '.baseline.fingerprints' "$JOURNAL") || return 1
   db rls.sql "$WORK/final-rls.json" || return 1
   same_json "$WORK/final-rls.json" <(jq '.baseline.rls' "$JOURNAL") || return 1
-  db preflight.sql "$WORK/final-privileges.private" || return 1
+  security_preflight "$WORK/final-privileges.private" || return 1
   api_phase final true "$(jq -r '.epoch' "$WORK/final-state.json")" || return 1
   same_json "$WORK/final-state.json" "$WORK/final-api-after.json" || return 1
   fingerprints "$WORK/final-fingerprints-recheck.json" || return 1
@@ -298,7 +307,7 @@ main() {
   [[ ${BACKUP_RESTORE_VERIFIED:-} == true && ${R3_LOCK_VERIFIED:-} == true && ${NO_HISTORICAL_BATCH_VERIFIED:-} == true && ${WORKER_NCM_DISABLED_VERIFIED:-} == true ]] || die 'R3_GATE_ATTESTATIONS_REQUIRED'
   [[ ! -e $JOURNAL && ! -L $JOURNAL ]] || die 'EXISTING_JOURNAL_USE_RESTORE_ONLY_OR_REVIEW_RETENTION'
   PHASE=preflight
-  db preflight.sql "$WORK/preflight.private"
+  security_preflight "$WORK/preflight.private"
   PHASE=candidate
   db candidate.sql "$WORK/candidate.json"
   validate_candidate "$WORK/candidate.json" || die 'NO_ELIGIBLE_CONTROLLED_PUBLIC_CANDIDATE'
@@ -370,7 +379,7 @@ main() {
   same_json "$WORK/suppressed-fingerprints.json" <(jq '.baseline.fingerprints' "$JOURNAL")
   db rls.sql "$WORK/suppressed-rls.json"
   jq -e --slurpfile j "$JOURNAL" '.publications=="0" and .versions=="0" and .origins=="0" and .files=="0" and .history_sha256==$j[0].baseline.rls.history_sha256' "$WORK/suppressed-rls.json" >/dev/null
-  db preflight.sql "$WORK/suppressed-privileges.private"
+  security_preflight "$WORK/suppressed-privileges.private"
   (( SECONDS - OUT_SCOPE_START <= 60 )) || die 'SUPPRESSION_WINDOW_EXCEEDED'
   PHASE=restore
   recover || die 'RESTORE_NOT_CONFIRMED'

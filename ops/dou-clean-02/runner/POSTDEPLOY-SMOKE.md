@@ -4,7 +4,9 @@
 `radar-fiscal-backend`, a partir de `068506811ae4c0a257816c38e899e3a1dccb0fb8`.
 Este pacote não autoriza merge, deploy, SQL produtivo, encerramento da Issue #84
 ou limpeza histórica. A execução futura é R3: artefato exato revisado, LOCK,
-autorização vigente, CI e rehearsal em PostgreSQL 18 isolado na Railway.
+autorização vigente, CI e validação PostgreSQL 18 isolada. O harness de fixtures
+abaixo é separado do smoke HTTP produtivo; não se deve usar o runner produtivo
+apontando a uma restauração enquanto sua URL HTTP continua em produção.
 
 ## Arquivos e implantação proposta
 
@@ -13,6 +15,11 @@ autorização vigente, CI e rehearsal em PostgreSQL 18 isolado na Railway.
 - `Dockerfile`: adiciona `curl` e chmod do novo script; preserva o CMD de
   `backup-restore.sh`. É overlay para o repo completo, não uma imagem independente.
 - `test-static.sh`: checks offline; não conecta a nenhum serviço.
+- `test-recovery-control.sh`: executa as funções reais de controle com DB mockado.
+- `test-pg18-isolated.sh` e `tests/`: rehearsal SQL em container PG18 sem rede,
+  somente fixtures sintéticas e socket Unix; nunca chamam o HTTP produtivo.
+- `.github/workflows/ci.yml`: step offline obrigatório, sem ambiente/segredos herdados;
+  job PG18 separado com fixtures e privilégios mínimos, sem credenciais de aplicação.
 
 O runner existente `dou-clean-02-backup-restore` pode usar esse overlay após
 revisão/autorização específicas. Não alterar automaticamente seu comando, suas
@@ -61,6 +68,13 @@ Esses campos são **atestados do operador**, não descoberta automática de CI,
 deploy, backup, revisão, LOCK ou da flag NCM. O runner não acessa Railway API.
 O banco é validado como PostgreSQL 18, usuário administrativo com visão não
 filtrada, migrations 033/034/035 de checksum conhecido e grants restritos.
+O gate de privilégios considera os runtimes identificados por memberships
+explícitos e **todas** as roles assumíveis via `pg_has_role(..., 'SET')`, mesmo
+`NOINHERIT`. Nega atributos SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB/REPLICATION,
+EXECUTE/ownership das duas funções governadas e DML/ownership/grants de escrita
+de tabela ou coluna nos três ledgers, incluindo PUBLIC e roles assumíveis.
+Também rejeita ownership assumível do database ou schema `public`, que permitiria
+DDL destrutivo indireto mesmo sem ownership individual dos ledgers.
 
 ## Segurança, journal e recuperação
 
@@ -82,6 +96,12 @@ resposta é reconciliado pelo operation_id persistido, não por um event_id só 
 memória. RESTORE usa exclusivamente o próprio SUPPRESS atual como optimistic
 lock. Outro evento atual nunca é sobrescrito. A recuperação usa SQL mínimo sem
 dependência de estatísticas/API/fingerprints; verifica read-back, não apenas exit0.
+Antes de qualquer confirmação de IN_SCOPE/no-op, ela adquire `FOR UPDATE` na
+publicação em uma transação READ COMMITTED; **outro statement após o lock** lê
+o estado. Assim uma transição sem ack que ainda detém o lock precisa terminar
+antes da decisão. Lock timeout/erro/falta do alvo resulta em NOT_CONFIRMED, nunca
+em confirmação baseada no snapshot anterior. O barrier é feito antes e depois
+da tentativa compensatória; não executa DML.
 
 SIGKILL, queda do container, disco/rede/banco indisponíveis não podem ser
 resolvidos por trap. **Não existe garantia de restauração enquanto o banco estiver
@@ -113,7 +133,8 @@ cron/Worker, batch histórico, hard-delete, alteração de grant ou bypass de RL
 4. Sob `SET LOCAL ROLE radar_app`, leituras diretas publication/version/origin/file
    retornam zero. Arquivos usam IDs de versão salvos antes, não join escondendo
    indevidamente a consulta. Histórico agregado permitido continua idêntico.
-5. Roles comuns e memberships continuam sem transição/material-restore.
+5. Roles comuns, descendentes e roles assumíveis via SET ROLE continuam sem
+   transição/material-restore, ownership ou escrita nos ledgers, inclusive PUBLIC.
 6. Primeira resposta das mesmas URLs, sem cache-buster, retry ou request
    `Cache-Control`, confirma ausência no v1 e totais -1 em v1/v2. v1 exige header
    epoch e `max-age=0, no-cache, must-revalidate`. **v2 neste SHA não emite header
@@ -138,12 +159,28 @@ quiescência observada e preservação dos derivados durante o round-trip.
 
 ## Validação local feita / restante
 
-Executado localmente: `bash -n` e `bash .../runner/test-static.sh` — PASS.
+Executado localmente: `bash -n`, checks estáticos e funções de recuperação com
+mocks (`bash .../runner/test-static.sh`) — PASS.
 Revisão read-only contra runbook, migrations e rotas do SHA fixado; revisão separada
 dos contratos API/SQL. Nenhum SQL/HTTP produtivo, deploy, variável ou write GitHub.
 
-**Ainda não executado:** integração real PostgreSQL 18 e fault-injection de
-processo/rede/durabilidade. Antes de uso produtivo, ensaiar em restore isolado Railway:
-fluxo nominal, erro HTTP após SUPPRESS, perda de ack COMMIT, TERM, KILL seguido de
-restore-only, grants incorretos, ausência de candidato, journal adulterado e evento
-concorrente. O teste estático não é prova de funcionamento do SQL na imagem.
+**Ainda não executado nesta preparação:** integração real PostgreSQL 18 e
+fault-injection de processo/rede/durabilidade. `test-pg18-isolated.sh` prepara
+fixtures sintéticas, roda os SQLs reais de transição/recuperação/privilégios e
+valida nominal, COMMIT concorrente sem ack, lock timeout e grants inseguros.
+O container usa `--network none`, sem portas, conexão apenas por socket Unix,
+imagem PG18 local (`--pull=never`) e não recebe credenciais produtivas.
+Isso torna a prova SQL reproduzível sem depender da BASE_URL fixa de produção.
+O job PG18 proposto no CI primeiro obtém a imagem oficial `postgres:18-bookworm`
+(único passo de provisionamento com rede); depois executa o harness com ambiente
+limpo e container `--network none`. O step estático não acessa rede. Nenhum desses
+jobs foi disparado nesta preparação e a suíte existente em PostgreSQL 16 é preservada.
+
+O runner `postdeploy-smoke.sh` continua **production-only**, com BASE_URL fixa e
+MODE=rehearsal recusado. O harness não o chama nem exercita suas rotas HTTP.
+Portanto o rehearsal SQL não comprova API/cache nem crash/durabilidade do runner
+inteiro. Smoke público, erro HTTP após SUPPRESS, TERM/KILL seguido de restore-only,
+ausência de candidato e journal adulterado continuam gates separados. Um futuro
+rehearsal end-to-end requer backend e banco ambos isolados e artefato dedicado
+revisado; nunca combinar banco isolado e endpoint produtivo. Não encerrar o gate
+R3 com base apenas nos checks estáticos/mocks ou na existência do harness.
