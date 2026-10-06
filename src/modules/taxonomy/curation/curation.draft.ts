@@ -973,6 +973,47 @@ async function setGroupSegments(
   }
 }
 
+/**
+ * Takes a whole dimension out of the DRAFT: its items are retired (so they
+ * no longer tag acts nor appear in the profile) and the dimension leaves the
+ * release. Previous releases keep it; nothing is published here.
+ */
+export async function retireDimension(
+  client: PoolClient,
+  actor: CuratorActor,
+  code: string,
+): Promise<{ retiredConcepts: string[] }> {
+  assertJustification(actor);
+  const draft = await requireOpenDraft(client);
+  const current = await requireDimension(client, draft.id, code);
+  const concepts = await client.query<{ code: string }>(
+    `
+      SELECT c.code
+      FROM taxonomy_release_concepts rc
+      JOIN taxonomy_concepts c ON c.id = rc.concept_id
+      WHERE rc.release_id = $1::uuid
+        AND c.dimension_id = $2::uuid
+        AND rc.membership_status = 'INCLUDED'
+      ORDER BY c.code
+    `,
+    [draft.id, current.dimension_id],
+  );
+  for (const row of concepts.rows) {
+    await updateConcept(client, actor, row.code, { membershipStatus: 'RETIRED' });
+  }
+  await client.query(
+    `UPDATE taxonomy_release_dimensions
+     SET membership_status = 'RETIRED', profile_visible = FALSE
+     WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
+    [draft.id, current.dimension_id],
+  );
+  await writeAudit(client, actor, 'TAXONOMY_CURATION_DIMENSION_RETIRED', draft.id, {
+    code,
+    retiredConcepts: concepts.rows.map((row) => row.code),
+  });
+  return { retiredConcepts: concepts.rows.map((row) => row.code) };
+}
+
 export async function createGroup(
   client: PoolClient,
   actor: CuratorActor,
