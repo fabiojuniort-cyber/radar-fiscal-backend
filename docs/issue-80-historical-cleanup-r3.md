@@ -172,6 +172,38 @@ Behaviour:
 Integration test on the real schema runs as the last CI step (scope events are
 append-only and cannot be cleaned up).
 
+### Production execution record (2026-10-06)
+
+Executed on production at 12:18 UTC with commit `a1c21fc`, between the 12:00
+DOU backfill tick (finished 12:11:21) and the 13:00 collection cycle.
+
+| step | deployment | outcome |
+|---|---|---|
+| fresh backup + isolated restore (`EXPECT_SCOPE_TABLES=present`) | `dc7a9d48` | `SCOPE_BACKUP_RESTORE_PASS`, `allPublicTableCountsEqual=true`, dump `fbdb31fb…` (455 MB) |
+| `verify` (pre) | `c43856e0` | `DOU_CLEANUP_VERIFY_PASS` |
+| `apply` | `e334dce2` | `DOU_CLEANUP_APPLY_PASS`, `applied=23024`, `replayed=0` |
+| `verify` (post) | `6a9caba2` | `DOU_CLEANUP_VERIFY_PASS`, `applied=0`, `replayed=0` |
+
+The approval gate was exercised for real: the backfill inserted 2,733 new
+publications between the pre-`verify` and the `apply`, moving the inspected
+universe from 111,242 to 113,975 (KEEP 78,692 -> 81,063, REVIEW 9,526 -> 9,888),
+while `candidateSetSha256` stayed `0e18e37a…` at 23,024 candidates (DO2 23,002 +
+DO2E 22). A set that had drifted by one act would have been refused with
+`CANDIDATE_SET_DIFFERS_FROM_APPROVED_DRY_RUN` before any write.
+
+Post-state, confirmed independently by the following `verify`:
+`outOfScopeByThisPolicy=23024`, `inScopeCandidates=0`, `candidateFeedRows=0`,
+`outOfScopeGlobal=23024`, scope epoch `2 -> 23026`. Nothing was deleted:
+publications, versions, origins, taxonomy, NCM and telemetry are untouched, and
+the 23,024 carry zero company links, matches, taxonomy runs or NCM mentions.
+Zero `strict_routine_contract_excerpt` candidates, so no EXTRATO DE CONTRATO was
+suppressed. Both one-shot services were disarmed afterwards
+(`DOU_CLEANUP_MODE=disarmed`, runner back to `postdeploy-smoke.sh`/`preflight`).
+
+NOT_PROVEN: the authenticated visual check of the Acervo UI. The database proof
+is complete and the #84 canary already proved RLS end to end, but no one has yet
+opened the product and confirmed the v2 total dropping from ~94.6k to ~71.5k.
+
 ## Required execution gates — future separately reviewed work
 
 1. Record the Issue80 governance LOCK: owner, scope, expiry, exact code SHA,
