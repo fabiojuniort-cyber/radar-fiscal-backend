@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Offline shell-control tests. PostgreSQL, HTTP, Docker and production are mocked.
+set -Eeuo pipefail
+SCRIPT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/postdeploy-smoke.sh
+WORK=$(mktemp -d)
+JOURNAL=$WORK/journal.json
+cleanup() {
+  rm -f -- "$WORK/recovery-before.json" "$WORK/recovery-after.json" "$JOURNAL" "$WORK/security" "$WORK/security.acl"
+  rmdir -- "$WORK"
+}
+trap cleanup EXIT
+# Extract exact function bodies, not a separately maintained implementation.
+source <(awk '/^recovery_snapshot\(\) \{/{active=1} active{print} active && /^}/{exit}' "$SCRIPT")
+source <(awk '/^recover\(\) \{/{active=1} active{print} active && /^}/{exit}' "$SCRIPT")
+printf '%s\n' '{"manifest":{"database_fingerprint":"isolated-fixture"}}' >"$JOURNAL"
+IN_SCOPE='{"canonical_exists":true,"barrier_acquired":true,"observed_isolation":"read committed","database_fingerprint":"isolated-fixture","in_scope":true,"current_event":null,"suppress_event":null,"restore_event":null}'
+SUPPRESSED='{"canonical_exists":true,"barrier_acquired":true,"observed_isolation":"read committed","database_fingerprint":"isolated-fixture","in_scope":false,"current_event":"own-suppress","suppress_event":{"id":"own-suppress"},"restore_event":null}'
+RESTORED='{"canonical_exists":true,"barrier_acquired":true,"observed_isolation":"read committed","database_fingerprint":"isolated-fixture","in_scope":true,"current_event":"own-restore","suppress_event":{"id":"own-suppress"},"restore_event":{"id":"own-restore"}}'
+STATE=$IN_SCOPE
+AFTER_RESTORE=$RESTORED
+READ_RC=0
+RESTORE_RC=0
+RESTORE_CALLS=0
+load_journal() { return 0; }
+db() {
+  case $1 in
+    recovery-state.sql)
+      # A row-lock barrier must NOT be requested through read-only db access.
+      [[ ${3:-read} == write ]] || return 90
+      printf '%s\n' "$STATE" >"$2"
+      return "$READ_RC"
+      ;;
+    restore.sql)
+      RESTORE_CALLS=$((RESTORE_CALLS+1))
+      STATE=$AFTER_RESTORE
+      return "$RESTORE_RC"
+      ;;
+    *) return 99 ;;
+  esac
+}
+must_fail_without_write() {
+  RESTORE_CALLS=0
+  if recover; then printf '%s\n' 'OFFLINE_RECOVERY_EXPECTED_FAILURE_MISSING'; exit 1; fi
+  [[ $RESTORE_CALLS == 0 ]]
+}
+# Already committed IN_SCOPE after a successful barrier is a safe no-op.
+recover
+[[ $RESTORE_CALLS == 0 ]]
+# Even an IN_SCOPE JSON on disk cannot turn timeout/error into confirmation.
+READ_RC=1
+must_fail_without_write
+READ_RC=0
+STATE=$(printf '%s' "$IN_SCOPE" | jq '.barrier_acquired=false')
+must_fail_without_write
+STATE=$(printf '%s' "$IN_SCOPE" | jq '.observed_isolation="repeatable read"')
+must_fail_without_write
+STATE=$(printf '%s' "$IN_SCOPE" | jq '.database_fingerprint="different-fixture"')
+must_fail_without_write
+# A restore may commit and lose its acknowledgement. Fresh read-back decides.
+STATE=$SUPPRESSED
+AFTER_RESTORE=$RESTORED
+RESTORE_RC=1
+recover
+[[ $RESTORE_CALLS == 1 ]]
+# Failure without a committed restore remains NOT_CONFIRMED.
+STATE=$SUPPRESSED
+AFTER_RESTORE=$SUPPRESSED
+RESTORE_CALLS=0
+if recover; then printf '%s\n' 'OFFLINE_RECOVERY_FALSE_CONFIRMATION'; exit 1; fi
+[[ $RESTORE_CALLS == 1 ]]
+# Never compensate a different current scope operation.
+STATE=$(printf '%s' "$SUPPRESSED" | jq '.current_event="other-operation"')
+must_fail_without_write
+printf '%s\n' 'OFFLINE_RECOVERY_CONTROL_PASS; DATABASE_CONCURRENCY_NOT_RUN'
+source <(awk '/^security_preflight\(\) \{/{active=1} active{print} active && /^}/{exit}' "$SCRIPT")
+db() {
+  printf '%s\n' 'CHECK_ROLE_BASELINE' 'SENSITIVE_DIAGNOSTIC_SENTINEL' 'CHECK_SET_ROLE_ACL_AND_OWNERSHIP' >"$2"
+  [[ $1 == preflight.sql ]]
+}
+set +e
+diagnostic=$(security_preflight "$WORK/security")
+diagnostic_rc=$?
+set -e
+[[ $diagnostic_rc != 0 && $diagnostic == FAILED_CHECK_SET_ROLE_ACL_AND_OWNERSHIP ]]
+printf '%s\n' 'OFFLINE_SECURITY_DIAGNOSTIC_REDACTION_PASS'
+# libpq never expands a URI held in PGDATABASE: the runner must decompose it.
+source <(awk '/^PASSFILE=$/{print} /^url_decode\(\) \{/{a=1} /^connection_from_url\(\) \{/{a=1} a{print} a && /^}/{a=0}' "$SCRIPT")
+unset PGHOST PGPORT PGUSER PGDATABASE PGPASSFILE PGSSLMODE
+connection_stdout=$(connection_from_url 'postgresql://sentinel%40user:S3NT%3AIN%5CEL@db.internal:6543/rail%20way?sslmode=require'; rm -f -- "$PASSFILE")
+[[ -z $connection_stdout ]]
+connection_from_url 'postgresql://sentinel%40user:S3NT%3AIN%5CEL@db.internal:6543/rail%20way?sslmode=require'
+[[ $PGHOST == db.internal && $PGPORT == 6543 && $PGUSER == sentinel@user && $PGDATABASE == 'rail way' && $PGSSLMODE == require ]]
+[[ $PGPASSFILE == "$PASSFILE" && $PASSFILE == /dev/shm/dou-clean-02-pgpass.* && $(stat -c '%a' "$PASSFILE") == 600 ]]
+[[ $(cat -- "$PASSFILE") == '*:*:*:*:S3NT\:IN\\EL' ]]
+if env | grep -q 'S3NT'; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
+rm -f -- "$PASSFILE"
+for rejected_url in 'postgresql://u@h/db' 'postgresql://u:p@h/db?host=/tmp' 'postgresql://u:p%0Ax@h/db' \
+  'postgresql://u:p@[::1]/db' 'mysql://u:p@h/db' 'postgresql://u:p@h:99999/db' 'postgresql://u:p@h:5432/'; do
+  PASSFILE=
+  if connection_from_url "$rejected_url"; then printf '%s\n' 'OFFLINE_CONNECTION_ACCEPTED_INVALID_URI'; exit 1; fi
+  [[ -z $PASSFILE ]]
+done
+printf '%s\n' 'OFFLINE_CONNECTION_DECOMPOSITION_PASS'
+# Connection failures map to fixed labels; libpq text never reaches stdout.
+source <(awk '/^connection_probe\(\) \{/{a=1} a{print} a && /^}/{exit}' "$SCRIPT")
+log() { printf '%s\n' "$1"; }
+FAKE_BIN=$(mktemp -d)
+cat >"$FAKE_BIN/psql" <<'FAKE'
+#!/usr/bin/env bash
+printf 'psql: error: connection to server at "SENSITIVE_HOST_SENTINEL" failed: FATAL:  password authentication failed for user "SENSITIVE_USER_SENTINEL"\n' >&2
+exit 2
+FAKE
+chmod 700 "$FAKE_BIN/psql"
+set +e
+probe_output=$(PATH="$FAKE_BIN:$PATH" connection_probe)
+probe_rc=$?
+set -e
+rm -rf -- "$FAKE_BIN"
+[[ $probe_rc != 0 && $probe_output == FAILED_CONNECTION_AUTH ]]
+printf '%s\n' 'OFFLINE_CONNECTION_DIAGNOSTIC_REDACTION_PASS'
+# A failed state snapshot prints only the last fixed STATE_* label reached.
+source <(awk '/^state_diagnose\(\) \{/{a=1} a{print} a && /^}/{exit}' "$SCRIPT")
+db() {
+  printf '%s\n' 'STATE_EPOCH' 't' 'SENSITIVE_STATE_SENTINEL' 'STATE_FEED_EXPECTED' >"$2"
+  return 3
+}
+state_output=$(state_diagnose "$WORK/state-diagnose")
+rm -f -- "$WORK/state-diagnose"
+[[ $state_output == FAILED_AFTER_STATE_FEED_EXPECTED ]]
+printf '%s\n' 'OFFLINE_STATE_DIAGNOSTIC_REDACTION_PASS'
