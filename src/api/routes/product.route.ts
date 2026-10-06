@@ -13,7 +13,7 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
-import { computePublicationAffinity } from '../../modules/taxonomy/affinity/publication-affinity.js';
+import { computePublicationAffinity, type ProfileTerm } from '../../modules/taxonomy/affinity/publication-affinity.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import {
   DISPLAY_TITLE_CONTENT_CHARS,
@@ -25,7 +25,8 @@ import {
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { isCnaeActivity } from '../../modules/taxonomy/curation/curation.constants.js';
 import { suggestSegmentsForCompany } from '../../modules/taxonomy/curation/curation.suggestions.js';
-import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
+import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
+import { currentWordingText, sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import {
   CnpjRegistryError,
   lookupCnpjRegistry,
@@ -186,6 +187,13 @@ const establishmentBodySchema = z.object({
     businessLocationCodeSchema,
   cnaes: cnaesBodySchema.default([]),
 });
+
+/** Names of the tax regime, matched against the act (tags and text). */
+const REGIME_LABELS: Record<string, string[]> = {
+  SIMPLES_NACIONAL: ['Simples Nacional'],
+  LUCRO_PRESUMIDO: ['Lucro Presumido'],
+  LUCRO_REAL: ['Lucro Real'],
+};
 
 const taxProfileBodySchema = z.object({
   taxRegime: z.enum([
@@ -2108,10 +2116,33 @@ export async function productRoutes(
             if (!row) return null;
             const profile = await trx
               .selectFrom('company_tax_profiles')
-              .select(['personalization'])
+              .select(['personalization', 'tax_regime'])
               .where('company_id', '=', row.id)
               .where('is_current', '=', true)
               .executeTakeFirst();
+            const productCount = await sql<{ count: number }>`
+              SELECT count(*)::int AS count FROM company_product_profiles
+              WHERE company_id = ${row.id}::uuid AND is_active = TRUE
+            `.execute(trx);
+            // Products the user typed (not in the Produtos table): by name.
+            const manualProducts = await sql<{ label: string }>`
+              SELECT DISTINCT product_label AS label FROM company_product_profiles
+              WHERE company_id = ${row.id}::uuid AND is_active = TRUE
+                AND product_release_concept_id IS NULL
+            `.execute(trx);
+            // Segment of each CNAE from the Segmento table: counts even before
+            // the profile is saved (the user's choice per CNAE wins).
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select('id')
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+            const suggested = release
+              ? await suggestSegmentsForCompany(kyselyRunner(trx), release.id, row.id)
+              : { segments: [], cnaes: [] };
             // Products the company parametrized per CNAE, linked to the
             // taxonomy Produtos table, also describe its profile.
             const products = await sql<{ code: string }>`
@@ -2138,6 +2169,9 @@ export async function productRoutes(
             return {
               ...row,
               profile,
+              productCount: productCount.rows[0]?.count ?? 0,
+              manualProducts: manualProducts.rows.map((item) => item.label),
+              cnaeSuggestions: suggested.cnaes,
               productCodes: products.rows.map((item) => item.code),
               ncmCodes: cnaeNcms.rows.map((item) => item.code),
             };
@@ -2148,18 +2182,31 @@ export async function productRoutes(
         }
 
         const taxonomy = recordValue(recordValue(company.profile?.personalization)?.taxonomy);
-        const cnaeSegmentCodes = Array.isArray(taxonomy?.cnaeSegments)
-          ? taxonomy.cnaeSegments.flatMap((item) => {
-              const code = recordValue(item)?.segmentCode;
-              return typeof code === 'string' ? [code] : [];
-            })
-          : [];
+        // Saved choice per CNAE (null = segment removed by the user); CNAEs
+        // without a saved choice keep the Segmento table suggestion.
+        const savedCnaeSegments = new Map<string, string | null>();
+        for (const item of Array.isArray(taxonomy?.cnaeSegments) ? taxonomy.cnaeSegments : []) {
+          const entry = recordValue(item);
+          if (typeof entry?.cnaeCode !== 'string') continue;
+          savedCnaeSegments.set(entry.cnaeCode, typeof entry.segmentCode === 'string' ? entry.segmentCode : null);
+        }
+        const cnaeSegmentCodes = [
+          ...[...savedCnaeSegments.values()].filter((code): code is string => Boolean(code)),
+          ...company.cnaeSuggestions
+            .filter((cnae) => !savedCnaeSegments.has(cnae.cnaeCode))
+            .flatMap((cnae) => cnae.segments.map((segment) => segment.code)),
+        ];
+        const regimeCodes = company.profile?.tax_regime === 'SIMPLES_NACIONAL' ? ['regime.simples_nacional'] : [];
+        // The company's own CNAE activities match the act's CNAE activity tags.
+        const cnaeActivityCodes = company.cnaeSuggestions.flatMap((cnae) => cnae.activityCodes ?? []);
         const profileCodes = [
           ...new Set([
             ...(Array.isArray(taxonomy?.conceptCodes)
               ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
               : []),
             ...cnaeSegmentCodes,
+            ...regimeCodes,
+            ...cnaeActivityCodes,
             ...company.productCodes,
           ]),
         ];
@@ -2192,6 +2239,7 @@ export async function productRoutes(
                   AND pv.is_current = TRUE
                   AND pnm.verification_status <> 'REJECTED'
                   AND pnm.ncm_code = ANY(${profileNcms}::text[])
+                  AND ${notSupersededNcmMention('pnm')}
                 ORDER BY pnm.ncm_code, (pnm.verification_status = 'CATALOG_MATCHED') DESC
               `.execute(app.db)
             ).rows
@@ -2212,8 +2260,31 @@ export async function productRoutes(
           }
         }
 
+        // Free-text items of the profile, matched against the act by name.
+        const profileTerms: ProfileTerm[] = [
+          ...(Array.isArray(personalization?.keywords) ? personalization.keywords : [])
+            .filter((term): term is string => typeof term === 'string')
+            .map((term) => ({ term, kind: 'keyword' as const })),
+          ...company.manualProducts.map((term) => ({ term, kind: 'product' as const })),
+          ...(REGIME_LABELS[company.profile?.tax_regime ?? ''] ?? []).map((term) => ({ term, kind: 'regime' as const })),
+        ];
+        let actText: string | null = null;
+        if (profileTerms.length > 0) {
+          const current = await sql<{ content_text: string | null; presentation_html: string | null }>`
+            SELECT pv.content_text, pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+            FROM publication_versions pv
+            WHERE pv.publication_id = ${request.params.publicationId}::uuid AND pv.is_current = TRUE
+          `.execute(app.db);
+          const row = current.rows[0];
+          actText = row ? currentWordingText(row.presentation_html) ?? row.content_text : null;
+        }
+
         const affinity = computePublicationAffinity({
           view,
+          profileTerms,
+          actText,
+          // Any parameter (saved profile, product or CNAE) starts the comparison.
+          hasProfile: Boolean(company.profile) || company.productCount > 0 || company.cnaeSuggestions.length > 0,
           profileCodes,
           profileProductGroups,
           profileNcms,

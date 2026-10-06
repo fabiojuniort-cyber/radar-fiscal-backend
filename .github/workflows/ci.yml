@@ -43,6 +43,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: DOU-CLEAN-02 runner offline guards
+        # No secrets, PostgreSQL, HTTP or Railway access.
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ripgrep jq
+          env -i PATH="$PATH" bash ops/dou-clean-02/runner/test-static.sh
+
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -163,3 +171,24 @@ jobs:
           path: product-ncm-integration.log
           retention-days: 1
           if-no-files-found: ignore
+
+  dou-clean-02-pg18:
+    name: DOU-CLEAN-02 isolated PG18 contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare official PostgreSQL 18 test image
+        # Image provisioning only. The SQL fixture itself has --network none.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ripgrep jq
+          docker pull postgres:18-bookworm
+
+      - name: Recovery barrier and privilege integration (synthetic fixtures only)
+        shell: bash
+        run: env -i PATH="$PATH" bash ops/dou-clean-02/runner/test-pg18-isolated.sh --run-isolated-fixture

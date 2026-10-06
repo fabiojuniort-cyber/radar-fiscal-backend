@@ -16,6 +16,12 @@ export interface TtlCacheOptions {
   staleMs?: number;
   /** Maximum number of keys kept (oldest inserted evicted first). */
   maxEntries?: number;
+  /**
+   * Optional monotonic/global version included in every effective cache key.
+   * Changing the version invalidates both fresh and stale entries immediately
+   * without requiring an in-process clear().
+   */
+  keyVersion?: () => Promise<string | number>;
   /** Called when a background reload fails; the previous value is kept. */
   onBackgroundError?: (error: unknown, key: string) => void;
   now?: () => number;
@@ -30,6 +36,8 @@ export interface TtlCacheOptions {
  * - After `ttlMs`, the previous value keeps being served for `staleMs`
  *   while one background reload runs, so readers do not wait on it.
  * - Failed loads are not cached.
+ * - `keyVersion`, when supplied, becomes part of the effective key so a
+ *   committed global visibility transition cannot reuse an older entry.
  *
  * Never cache tenant-scoped or user-scoped data here.
  */
@@ -38,6 +46,9 @@ export class TtlCache<T> {
   private readonly ttlMs: number;
   private readonly staleMs: number;
   private readonly maxEntries: number;
+  private readonly keyVersion:
+    | (() => Promise<string | number>)
+    | undefined;
   private readonly onBackgroundError:
     | ((error: unknown, key: string) => void)
     | undefined;
@@ -47,6 +58,7 @@ export class TtlCache<T> {
     this.ttlMs = options.ttlMs;
     this.staleMs = options.staleMs ?? 0;
     this.maxEntries = options.maxEntries ?? 100;
+    this.keyVersion = options.keyVersion;
     this.onBackgroundError = options.onBackgroundError;
     this.now = options.now ?? Date.now;
   }
@@ -56,8 +68,11 @@ export class TtlCache<T> {
       return loader();
     }
 
+    const effectiveKey = this.keyVersion
+      ? `${String(await this.keyVersion())}:${key}`
+      : key;
     const now = this.now();
-    const current = this.entries.get(key);
+    const current = this.entries.get(effectiveKey);
 
     if (current?.hasValue && current.freshUntil > now) {
       return current.value as T;
@@ -65,8 +80,8 @@ export class TtlCache<T> {
 
     if (current?.hasValue && current.staleUntil > now) {
       if (!current.pending) {
-        this.load(key, loader, current).catch((error: unknown) => {
-          this.onBackgroundError?.(error, key);
+        this.load(effectiveKey, loader, current).catch((error: unknown) => {
+          this.onBackgroundError?.(error, effectiveKey);
         });
       }
       return current.value as T;
@@ -76,7 +91,7 @@ export class TtlCache<T> {
       return current.pending;
     }
 
-    return this.load(key, loader, undefined);
+    return this.load(effectiveKey, loader, undefined);
   }
 
   clear(): void {

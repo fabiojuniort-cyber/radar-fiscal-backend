@@ -258,6 +258,19 @@ export async function classifyPublicationVersionLexically(
   try {
     await client.query('BEGIN');
 
+    const locked = await client.query<{ publication_id: string }>(
+      `SELECT p.id AS publication_id FROM publication_versions pv
+       JOIN publications p ON p.id = pv.publication_id
+       WHERE pv.id = $1::uuid FOR SHARE OF p`,
+      [input.publicationVersionId],
+    );
+    if (!locked.rows[0]) throw new Error('PUBLICATION_VERSION_NOT_FOUND');
+    const scope = await client.query<{ in_scope: boolean }>(
+      'SELECT public.publication_scope_is_in_scope($1::uuid) AS in_scope',
+      [locked.rows[0].publication_id],
+    );
+    if (!scope.rows[0]?.in_scope) throw new Error('PUBLICATION_OUT_OF_SCOPE');
+
     const publication = await loadPublication(
       client,
       input.publicationVersionId,

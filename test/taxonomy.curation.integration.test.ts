@@ -18,6 +18,7 @@ import {
   loadProductSheet,
   parseProductSheet,
 } from '../src/modules/taxonomy/curation/curation.product-load.js';
+import { retireDimension } from '../src/modules/taxonomy/curation/curation.draft.js';
 
 /**
  * TAX-11 end-to-end gate. Runs as a dedicated, final CI step: it commits a
@@ -890,6 +891,61 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       assert.equal(cnaeRow.cnaeCode, '0111301');
       assert.ok(cnaeRow.segments.some((segment: { code: string }) => segment.code === 'sector.agribusiness'));
 
+      // A company with only its CNAEs (profile never saved) is compared by
+      // the segment of each CNAE; one with an empty saved profile is
+      // compared too ("Sem afinidade"), never "profile not filled".
+      {
+        const onlyCnae = await admin.query<{ id: string }>(
+          `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
+           VALUES ($1::uuid, 'Só CNAE Ltda.', $2) RETURNING id`,
+          [customer.tenantId, String(Date.now() + 1).padStart(14, '0').slice(-14)],
+        );
+        await admin.query(
+          `INSERT INTO company_cnaes (company_id, cnae_code, is_primary) VALUES ($1::uuid, '0111301', TRUE)`,
+          [onlyCnae.rows[0]!.id],
+        );
+        const byCnae = await app.inject({
+          method: 'GET',
+          url: `/api/v1/companies/${onlyCnae.rows[0]!.id}/publications/${publicationId}/affinity`,
+          headers: customer.headers,
+        });
+        assert.equal(byCnae.statusCode, 200, byCnae.body);
+        assert.equal(byCnae.json().status, 'OK');
+        assert.ok(byCnae.json().matches.some((m: { code: string }) => m.code === 'sector.agribusiness'));
+
+        const emptyProfile = await admin.query<{ id: string }>(
+          `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
+           VALUES ($1::uuid, 'Perfil Vazio Ltda.', $2) RETURNING id`,
+          [customer.tenantId, String(Date.now() + 2).padStart(14, '0').slice(-14)],
+        );
+        await admin.query(
+          `INSERT INTO company_tax_profiles (company_id, version_no, tax_regime, personalization, is_current)
+           VALUES ($1::uuid, 1, 'LUCRO_PRESUMIDO', '{}'::jsonb, true)`,
+          [emptyProfile.rows[0]!.id],
+        );
+        const empty = await app.inject({
+          method: 'GET',
+          url: `/api/v1/companies/${emptyProfile.rows[0]!.id}/publications/${publicationId}/affinity`,
+          headers: customer.headers,
+        });
+        assert.equal(empty.statusCode, 200, empty.body);
+        assert.equal(empty.json().status, 'OK');
+        assert.equal(empty.json().level, 'NONE');
+
+        // A single keyword is enough: here it names a tag of the act.
+        await admin.query(
+          `UPDATE company_tax_profiles SET personalization = $2::jsonb WHERE company_id = $1::uuid`,
+          [emptyProfile.rows[0]!.id, JSON.stringify({ keywords: ['Crédito presumido'] })],
+        );
+        const byKeyword = await app.inject({
+          method: 'GET',
+          url: `/api/v1/companies/${emptyProfile.rows[0]!.id}/publications/${publicationId}/affinity`,
+          headers: customer.headers,
+        });
+        assert.equal(byKeyword.statusCode, 200, byKeyword.body);
+        assert.deepEqual(byKeyword.json().matches.map((m: { code: string }) => m.code), ['theme.presumed_credit']);
+      }
+
       // Profile keeps the user's segment per CNAE; a CNAE activity or an
       // unknown item is refused.
       const profileUrl = `/api/v1/companies/${companyId}/tax-profile`;
@@ -1058,6 +1114,26 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     });
     assert.equal(nextDraft.statusCode, 201, nextDraft.body);
     assert.equal(nextDraft.json().initialCuration, null, 'configured source is copied as is');
+    // "Tipo de ato" and "Esfera" leave the taxonomy: the act's type and
+    // jurisdiction come from its source.
+    {
+      const client = await app.curatorPool!.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+        const actor = { userId: 'ops:test', justification: 'Dimensões redundantes com os metadados do ato' };
+        // (this fixture release has no "sphere" dimension; production does)
+        const actType = await retireDimension(client, actor, 'act_type');
+        assert.ok(actType.retiredConcepts.length > 0);
+        assert.ok(actType.retiredConcepts.every((code) => code.startsWith('act_type.')));
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
     const nextPublish = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/taxonomy/drafts/current/publish',
@@ -1078,6 +1154,16 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.ok(!codesAfter.includes('theme.presumed_credit'), 'removal survives the new release');
     assert.ok(codesAfter.includes('product.soy'), 'manual tag survives the new release');
     assert.ok(codesAfter.includes('product.urea'));
+    assert.ok(!codesAfter.some((code: string) => code.startsWith('act_type.') || code.startsWith('sphere.')));
+    const retiredDimensions = await admin.query<{ code: string; membership_status: string }>(
+      `SELECT d.code, rd.membership_status
+       FROM taxonomy_release_dimensions rd
+       JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
+       JOIN taxonomy_releases r ON r.id = rd.release_id
+       WHERE r.version_major = $1 AND r.version_minor = 2 AND d.code = 'act_type'`,
+      [MAJOR],
+    );
+    assert.deepEqual(retiredDimensions.rows, [{ code: 'act_type', membership_status: 'RETIRED' }]);
     const archiveRemoved = await app.inject({
       method: 'GET',
       url: '/api/v2/archive?tag=theme.presumed_credit',

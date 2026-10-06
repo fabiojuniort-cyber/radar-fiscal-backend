@@ -146,14 +146,18 @@ The actual prototype/final origins are deployment configuration and must be conf
 Successful GET responses send:
 
 ```text
-Cache-Control: public, max-age=300
+Cache-Control: public, max-age=0, no-cache, must-revalidate
 ```
+
+Public clients and intermediaries must revalidate successful GET responses. This prevents a response containing a publication that has just transitioned to `OUT_OF_SCOPE` from remaining usable for the former five-minute client/CDN TTL.
 
 Since PERF-01, the server also keeps an in-process copy of the global
 aggregates (`/public/v1/sources`, `/public/v1/stats`, `/public/v1/publications`,
 `/public/v2/stats`, `/public/v2/sources` and the authenticated
-`/api/v2/archive/facets` and archive totals). See
-[catalog-performance.md](catalog-performance.md).
+`/api/v2/archive/facets` and archive totals). Publication-scope transitions
+advance a monotonic cache epoch used to version the affected server-side cache
+keys, so `SUPPRESS`/`RESTORE` invalidates those cached representations without
+requiring a process restart. See [catalog-performance.md](catalog-performance.md).
 
 ## Rate limit
 
@@ -172,7 +176,7 @@ The implementation uses existing structures/indexes:
 
 It does not scan `publication_versions`.
 
-The application runtime role already has SELECT grants on the global source/publication/collection tables and `v_source_monitoring` in migration 009.
+The application runtime role has SELECT grants on the global source/publication tables and `v_source_monitoring`. DOU-CLEAN-02 migration 035 limits direct collection audit reads to `collection_run_id` and `disposition`; `publication_scope_imported_today(uuid)` supplies the scope-filtered daily import count without exposing publication identifiers or timestamps. Historical monitoring counts remain stable through SUPPRESS/RESTORE.
 
 ## Production-schema verification limitation
 

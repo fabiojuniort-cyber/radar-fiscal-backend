@@ -68,6 +68,8 @@ export interface CnaeSegments {
   cnaeCode: string;
   isPrimary: boolean;
   segments: Array<{ code: string; label: string }>;
+  /** The CNAE activity item itself (7-digit code in the Segmento table). */
+  activityCodes?: string[];
 }
 
 /**
@@ -101,13 +103,16 @@ export function segmentsForCnaes(
     const digits = cnae.code.replace(/\D/g, '');
     const matched = matchSegmentsByCnae([{ code: digits, isPrimary: cnae.isPrimary }], candidates);
     const segments = new Map<string, { code: string; label: string }>();
+    const activityCodes: string[] = [];
     for (const match of matched) {
       for (const segment of segmentsOf(match.conceptCode)) segments.set(segment.code, segment);
+      if (isCnaeActivity(byCode.get(match.conceptCode)?.officialCodes ?? [])) activityCodes.push(match.conceptCode);
     }
     return {
       cnaeCode: digits,
       isPrimary: cnae.isPrimary,
       segments: [...segments.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')),
+      activityCodes,
     };
   });
 }

@@ -22,8 +22,12 @@ export interface AffinityMatch {
   label: string;
   dimensionCode: string;
   weight: number;
-  /** "PRODUCT_GROUP": the act cites the group of a product in the profile. */
-  via: 'SAME_ITEM' | 'PRODUCT_GROUP';
+  /**
+   * "PRODUCT_GROUP": the act cites the group of a product in the profile;
+   * "TEXT": a profile term (keyword, product typed by the user, regime) is
+   * written in the wording in force of the act.
+   */
+  via: 'SAME_ITEM' | 'PRODUCT_GROUP' | 'TEXT';
 }
 
 export interface PublicationAffinity {
@@ -52,6 +56,28 @@ export const NCM_WEIGHT = 3;
 
 const STRONG_DIMENSIONS = new Set(['product', 'sector', 'ncm']);
 
+/** Free-text items of the profile, matched by name. */
+export interface ProfileTerm {
+  term: string;
+  kind: 'keyword' | 'product' | 'regime';
+}
+
+const TERM_WEIGHTS: Record<ProfileTerm['kind'], number> = { product: 2, regime: 1, keyword: 1 };
+const TERM_DIMENSIONS: Record<ProfileTerm['kind'], string> = {
+  product: 'product_text',
+  regime: 'regime',
+  keyword: 'keyword',
+};
+
+function normalizeTerm(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 export function affinityLevel(score: number, strong: boolean): AffinityLevel {
   if (score >= 5 && strong) return 'HIGH';
   if (score >= 3) return 'MEDIUM';
@@ -62,16 +88,22 @@ export function affinityLevel(score: number, strong: boolean): AffinityLevel {
 export function computePublicationAffinity(input: {
   view: PublicationTaxonomyView;
   profileCodes: readonly string[];
+  /** The company has some tax-profile parameter, even without taxonomy codes. */
+  hasProfile?: boolean;
   /** Product concept code -> its group code, for the profile's products. */
   profileProductGroups: ReadonlyMap<string, string>;
   /** NCMs of the company (8 digits): profile, CNAEs and products. */
   profileNcms?: readonly string[];
   /** NCMs mentioned in the act, with their catalog description. */
   publicationNcms?: ReadonlyArray<{ code: string; description: string | null }>;
+  /** Keywords, products typed by the user and regime, matched by name. */
+  profileTerms?: readonly ProfileTerm[];
+  /** Wording in force of the act, for the profile terms. */
+  actText?: string | null;
 }): PublicationAffinity {
   const profile = new Set(input.profileCodes);
   const companyNcms = new Set(input.profileNcms ?? []);
-  if (profile.size === 0 && companyNcms.size === 0) {
+  if (profile.size === 0 && companyNcms.size === 0 && !input.hasProfile) {
     return { status: 'NO_PROFILE', level: null, score: 0, matches: [] };
   }
 
@@ -88,6 +120,37 @@ export function computePublicationAffinity(input: {
       via: 'SAME_ITEM',
     });
   }
+  // Profile terms: a tag of the act with the same name, or the term written
+  // in the act (neither depends on taxonomy codes in the profile).
+  const terms = (input.profileTerms ?? [])
+    .map((item) => ({ ...item, key: normalizeTerm(item.term) }))
+    .filter((item) => item.key.length >= 3);
+  const actTags = input.view.status === 'CLASSIFIED'
+    ? input.view.sections.flatMap((section) => section.tags).filter((tag) => !tag.removed)
+    : [];
+  const actText = input.actText ? ` ${normalizeTerm(input.actText)} ` : '';
+  for (const item of terms) {
+    const tag = actTags.find((candidate) => normalizeTerm(candidate.label) === item.key);
+    const weight = tag ? DIMENSION_WEIGHTS[tag.dimensionCode] ?? 0 : 0;
+    if (tag && weight > 0) {
+      const code = tag.conceptCode ?? `group:${tag.groupCode}`;
+      if (!matches.has(code)) {
+        matches.set(code, { code, label: tag.label, dimensionCode: tag.dimensionCode, weight, via: 'SAME_ITEM' });
+      }
+      continue;
+    }
+    const code = `text:${item.kind}:${item.key}`;
+    if (actText.includes(` ${item.key} `) && !matches.has(code)) {
+      matches.set(code, {
+        code,
+        label: item.term,
+        dimensionCode: TERM_DIMENSIONS[item.kind],
+        weight: TERM_WEIGHTS[item.kind],
+        via: 'TEXT',
+      });
+    }
+  }
+
   if (input.view.status !== 'CLASSIFIED' && matches.size === 0) {
     return { status: 'NOT_CLASSIFIED', level: null, score: 0, matches: [] };
   }

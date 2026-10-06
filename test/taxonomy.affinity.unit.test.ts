@@ -91,6 +91,11 @@ test('no profile and not yet classified are reported as such', () => {
     computePublicationAffinity({ view: CV100, profileCodes: [], profileProductGroups: new Map() }).status,
     'NO_PROFILE',
   );
+  // Any profile parameter starts the comparison, even without codes.
+  assert.equal(
+    computePublicationAffinity({ view: CV100, profileCodes: [], profileProductGroups: new Map(), hasProfile: true }).level,
+    'NONE',
+  );
   assert.equal(
     computePublicationAffinity({ view: view([], 'DISABLED'), profileCodes: ['tax.icms'], profileProductGroups: new Map() }).status,
     'NOT_CLASSIFIED',
@@ -141,4 +146,35 @@ test('NCMs of the company mentioned in the act count like a product, even before
     publicationNcms: [],
   });
   assert.equal(none.status, 'NOT_CLASSIFIED');
+});
+
+test('a single free-text item of the profile is compared: same tag name, or written in the act', () => {
+  const run = (profileTerms: Parameters<typeof computePublicationAffinity>[0]['profileTerms'], actText: string | null = null) =>
+    computePublicationAffinity({ view: CV100, profileCodes: [], profileProductGroups: new Map(), hasProfile: true, profileTerms, actText });
+
+  // A keyword equal to a tag of the act counts as that tag.
+  const keyword = run([{ term: 'reducao de base de calculo', kind: 'keyword' }]);
+  assert.deepEqual(keyword.matches.map((m) => m.code), ['theme.tax_base_reduction']);
+  // A product typed by the user equal to a product tag counts as that product.
+  assert.equal(run([{ term: 'Ureia', kind: 'product' }]).matches[0]?.code, 'product.urea');
+  // Otherwise the term written in the wording in force counts by text.
+  const text = run(
+    [{ term: 'Martelete', kind: 'product' }, { term: 'Lucro Real', kind: 'regime' }, { term: 'drone', kind: 'keyword' }],
+    'Ficam isentas as saídas de marteletes e do martelete rompedor por empresa do lucro real.',
+  );
+  assert.deepEqual(text.matches.map((m) => [m.label, m.via, m.weight]), [
+    ['Martelete', 'TEXT', 2],
+    ['Lucro Real', 'TEXT', 1],
+  ]);
+  assert.equal(text.level, 'MEDIUM');
+  // Text matches count even before the act is classified.
+  const unclassified = computePublicationAffinity({
+    view: view([], 'DISABLED'),
+    profileCodes: [],
+    profileProductGroups: new Map(),
+    hasProfile: true,
+    profileTerms: [{ term: 'Martelete', kind: 'product' }],
+    actText: 'martelete',
+  });
+  assert.equal(unclassified.status, 'OK');
 });

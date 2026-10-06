@@ -1002,6 +1002,19 @@ export async function taxonomyAdminRoutes(
         .find((tag) => tag.conceptCode === request.body.conceptCode);
 
       await withCuratorTransaction(curatorPool(), async (client) => {
+        // The view above may predate a concurrent SUPPRESS. The narrow
+        // definer locks canonical state without granting the curator SELECT.
+        try {
+          await client.query(
+            'SELECT public.publication_scope_lock_curator_version($1::uuid)',
+            [view.publicationVersionId],
+          );
+        } catch (error) {
+          if (error instanceof Error && error.message === 'PUBLICATION_OUT_OF_SCOPE') {
+            throw new CurationError('PUBLICATION_OUT_OF_SCOPE', 409);
+          }
+          throw error;
+        }
         const concept = await client.query<{ id: string }>(
           `SELECT rc.id FROM taxonomy_release_concepts rc
            JOIN taxonomy_concepts c ON c.id = rc.concept_id

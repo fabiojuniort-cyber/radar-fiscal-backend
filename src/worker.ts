@@ -150,6 +150,8 @@ async function enrichPublicationNcms(
   db: ReturnType<typeof createStandaloneDatabase>,
   limit: number,
 ): Promise<void> {
+  if (!env.PUBLICATION_NCM_ENRICHMENT_ENABLED) return;
+
   try {
     const result = await processPublicationNcmEnrichmentBatch(
       db,
@@ -254,6 +256,8 @@ async function run(): Promise<void> {
           env.COLLECTION_STALE_AFTER_MS,
         simulatedConnectors:
           env.COLLECTION_ENABLE_SIMULATED_CONNECTORS,
+        ncmEnrichmentEnabled:
+          env.PUBLICATION_NCM_ENRICHMENT_ENABLED,
         ncmIdleBatchSize: NCM_IDLE_BATCH_SIZE,
         ncmAfterCollectionBatchSize:
           NCM_AFTER_COLLECTION_BATCH_SIZE,

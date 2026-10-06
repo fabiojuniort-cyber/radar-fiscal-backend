@@ -16,6 +16,7 @@ interface Part {
   part: number;
   journal: string;
   hasHighlightImage: boolean;
+  scopeStructureIncomplete: boolean;
 }
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const error = (code: string) => new ConnectorError(code, { code, kind: 'PROCESSING_ERROR', retryable: false });
@@ -60,12 +61,18 @@ function parsePart(entry: DouXmlEntry): Part {
   const parser = sax.parser(true, { strictEntities: true, xmlns: false } as sax.SAXOptions & { strictEntities: boolean });
   const stack: string[] = []; const attrs: Record<string, string> = {}; const fields: Record<string, string> = {};
   let count = 0; let bodyCount = 0; let rootCount = 0;
+  let scopeStructureIncomplete = false;
   parser.ondoctype = () => { throw error('DOU_XML_DTD_FORBIDDEN'); };
   parser.onerror = () => { throw error('DOU_INVALID_XML'); };
   parser.onopentag = node => {
     if (!stack.length) { rootCount++; if (node.name !== 'xml') throw error('DOU_INVALID_XML_ROOT'); }
     stack.push(node.name);
     if (stack.length > 16) throw error('DOU_XML_DEPTH_LIMIT');
+    // Legacy extraction retains only direct field text/CDATA, not XML children.
+    // Preserve canonical text/hashes, but never prove IGNORE from truncated scope.
+    if (stack.length > 4 && stack[2] === 'body' && ['Identifica', 'Ementa', 'Texto'].includes(stack[3]!)) {
+      scopeStructureIncomplete = true;
+    }
     if (node.name === 'article') {
       if (stack.join('/') !== 'xml/article' || ++count !== 1) throw error('DOU_INVALID_ARTICLE_COUNT');
       for (const [key, value] of Object.entries(node.attributes)) attrs[key] = String(value);
@@ -95,7 +102,7 @@ function parsePart(entry: DouXmlEntry): Part {
   return {
     attrs, fields,
     entry: { name: entry.name, rawSha256: hash(entry.bytes), sizeBytes: entry.bytes.byteLength },
-    part: Number(match[4] ?? 1), journal: match[1]!, hasHighlightImage,
+    part: Number(match[4] ?? 1), journal: match[1]!, hasHighlightImage, scopeStructureIncomplete,
   };
 }
 
@@ -358,7 +365,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
   }
   const structural = classifyDouAct(officialTitle, a.artCategory!, a.artType ?? '');
   const scopeStructureIncomplete = parts.some(p =>
-    ['Identifica', 'Ementa', 'Texto'].some(field => hasUnpreservedScopeBlocks(p.fields[field] ?? '')));
+    p.scopeStructureIncomplete || ['Identifica', 'Ementa', 'Texto'].some(field => hasUnpreservedScopeBlocks(p.fields[field] ?? '')));
   const text = parts.map(p => douHtmlText(p.fields.Texto ?? '')).join('\n');
   const presentationHtml = parts
     .map(p => p.fields.Texto ?? '')

@@ -2,6 +2,7 @@ import {
   CURATED_ENGINE_KEY,
   CURATED_ENGINE_VERSION,
 } from '../classification/classification.curated.js';
+import { NOT_SUPERSEDED_NCM_MENTION_SQL } from '../ncm/publication-ncm.detector.js';
 import {
   DEFAULT_SECTION_ORDER,
   PROTECTED_EXCLUDED_SOURCES,
@@ -274,9 +275,10 @@ export async function loadPublicationTaxonomy(
   const productType = view.dimensions.find((d) => d.officialCodeType === 'NCM');
   if (productType) {
     const mentions = await run<{ ncm_code: string }>(
-      `SELECT DISTINCT ncm_code FROM publication_ncm_mentions
-       WHERE publication_version_id = $1::uuid
-         AND verification_status = 'CATALOG_MATCHED'`,
+      `SELECT DISTINCT ncm_code FROM publication_ncm_mentions pnm
+       WHERE pnm.publication_version_id = $1::uuid
+         AND pnm.verification_status = 'CATALOG_MATCHED'
+         AND ${NOT_SUPERSEDED_NCM_MENTION_SQL('pnm')}`,
       [current.id],
     );
     const taggedGroups = new Set(

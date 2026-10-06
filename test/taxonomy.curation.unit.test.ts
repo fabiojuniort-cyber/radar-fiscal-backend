@@ -173,9 +173,12 @@ test('CNAE to segment: a CNAE activity answers with the segment of its subsegmen
     cnaeCode: '0111301',
     isPrimary: true,
     segments: [{ code: 'sector.trifaros_agro', label: 'Agropecuária, pesca e insumos agrícolas' }],
+    // The CNAE activity item itself, for the affinity with the act's CNAE tags.
+    activityCodes: ['sector.cultivo_de_arroz'],
   });
   // No activity for this CNAE: the prefix item is the segment itself.
   assert.deepEqual(other!.segments, [{ code: 'sector.agribusiness', label: 'Agronegócio' }]);
+  assert.deepEqual(other!.activityCodes, []);
 });
 
 test('spreadsheet import: blank keeps, "—" clears, ✓ flags and comma separated synonyms', () => {

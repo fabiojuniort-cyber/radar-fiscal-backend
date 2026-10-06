@@ -161,6 +161,14 @@ const schema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+
+  // Operational kill switch for automatic NCM background scans. Keep enabled
+  // by default; R3 deploys may pause it explicitly to avoid an unplanned
+  // detector-version rescan while collection and the rest of the Worker stay live.
+  PUBLICATION_NCM_ENRICHMENT_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
 });
 
 const parsed = schema.safeParse(process.env);
