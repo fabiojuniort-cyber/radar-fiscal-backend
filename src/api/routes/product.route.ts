@@ -2109,10 +2109,27 @@ export async function productRoutes(
             if (!row) return null;
             const profile = await trx
               .selectFrom('company_tax_profiles')
-              .select(['personalization'])
+              .select(['personalization', 'tax_regime'])
               .where('company_id', '=', row.id)
               .where('is_current', '=', true)
               .executeTakeFirst();
+            const productCount = await sql<{ count: number }>`
+              SELECT count(*)::int AS count FROM company_product_profiles
+              WHERE company_id = ${row.id}::uuid AND is_active = TRUE
+            `.execute(trx);
+            // Segment of each CNAE from the Segmento table: counts even before
+            // the profile is saved (the user's choice per CNAE wins).
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select('id')
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+            const suggested = release
+              ? await suggestSegmentsForCompany(kyselyRunner(trx), release.id, row.id)
+              : { segments: [], cnaes: [] };
             // Products the company parametrized per CNAE, linked to the
             // taxonomy Produtos table, also describe its profile.
             const products = await sql<{ code: string }>`
@@ -2139,6 +2156,8 @@ export async function productRoutes(
             return {
               ...row,
               profile,
+              productCount: productCount.rows[0]?.count ?? 0,
+              cnaeSuggestions: suggested.cnaes,
               productCodes: products.rows.map((item) => item.code),
               ncmCodes: cnaeNcms.rows.map((item) => item.code),
             };
@@ -2149,18 +2168,28 @@ export async function productRoutes(
         }
 
         const taxonomy = recordValue(recordValue(company.profile?.personalization)?.taxonomy);
-        const cnaeSegmentCodes = Array.isArray(taxonomy?.cnaeSegments)
-          ? taxonomy.cnaeSegments.flatMap((item) => {
-              const code = recordValue(item)?.segmentCode;
-              return typeof code === 'string' ? [code] : [];
-            })
-          : [];
+        // Saved choice per CNAE (null = segment removed by the user); CNAEs
+        // without a saved choice keep the Segmento table suggestion.
+        const savedCnaeSegments = new Map<string, string | null>();
+        for (const item of Array.isArray(taxonomy?.cnaeSegments) ? taxonomy.cnaeSegments : []) {
+          const entry = recordValue(item);
+          if (typeof entry?.cnaeCode !== 'string') continue;
+          savedCnaeSegments.set(entry.cnaeCode, typeof entry.segmentCode === 'string' ? entry.segmentCode : null);
+        }
+        const cnaeSegmentCodes = [
+          ...[...savedCnaeSegments.values()].filter((code): code is string => Boolean(code)),
+          ...company.cnaeSuggestions
+            .filter((cnae) => !savedCnaeSegments.has(cnae.cnaeCode))
+            .flatMap((cnae) => cnae.segments.map((segment) => segment.code)),
+        ];
+        const regimeCodes = company.profile?.tax_regime === 'SIMPLES_NACIONAL' ? ['regime.simples_nacional'] : [];
         const profileCodes = [
           ...new Set([
             ...(Array.isArray(taxonomy?.conceptCodes)
               ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
               : []),
             ...cnaeSegmentCodes,
+            ...regimeCodes,
             ...company.productCodes,
           ]),
         ];
@@ -2216,6 +2245,8 @@ export async function productRoutes(
 
         const affinity = computePublicationAffinity({
           view,
+          // Any parameter (saved profile, product or CNAE) starts the comparison.
+          hasProfile: Boolean(company.profile) || company.productCount > 0 || company.cnaeSuggestions.length > 0,
           profileCodes,
           profileProductGroups,
           profileNcms,
