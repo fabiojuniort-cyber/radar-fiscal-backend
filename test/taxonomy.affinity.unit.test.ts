@@ -43,14 +43,14 @@ const CV100 = view([
   tag('product', 'product.soy', 'Soja', { removed: true }),
 ]);
 
-test('weights: product/segment 3, tax/operation 2, theme 1; act type does not count', () => {
+test('weights: product/segment 3, tax/operation/theme 2; act type does not count', () => {
   const result = computePublicationAffinity({
     view: CV100,
     profileCodes: ['sector.agribusiness', 'product.urea', 'tax.icms', 'theme.tax_base_reduction', 'act_type.icms_agreement'],
     profileProductGroups: new Map(),
   });
   assert.equal(result.status, 'OK');
-  assert.equal(result.score, 3 + 3 + 2 + 1);
+  assert.equal(result.score, 3 + 3 + 2 + 2);
   assert.equal(result.level, 'HIGH');
   assert.deepEqual(result.matches.map((m) => m.code), ['sector.agribusiness', 'product.urea', 'tax.icms', 'theme.tax_base_reduction']);
 });
