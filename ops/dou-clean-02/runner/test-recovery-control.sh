@@ -83,3 +83,21 @@ diagnostic_rc=$?
 set -e
 [[ $diagnostic_rc != 0 && $diagnostic == FAILED_CHECK_SET_ROLE_ACL_AND_OWNERSHIP ]]
 printf '%s\n' 'OFFLINE_SECURITY_DIAGNOSTIC_REDACTION_PASS'
+# libpq never expands a URI held in PGDATABASE: the runner must decompose it.
+source <(awk '/^PASSFILE=$/{print} /^url_decode\(\) \{/{a=1} /^connection_from_url\(\) \{/{a=1} a{print} a && /^}/{a=0}' "$SCRIPT")
+unset PGHOST PGPORT PGUSER PGDATABASE PGPASSFILE PGSSLMODE
+connection_stdout=$(connection_from_url 'postgresql://sentinel%40user:S3NT%3AIN%5CEL@db.internal:6543/rail%20way?sslmode=require'; rm -f -- "$PASSFILE")
+[[ -z $connection_stdout ]]
+connection_from_url 'postgresql://sentinel%40user:S3NT%3AIN%5CEL@db.internal:6543/rail%20way?sslmode=require'
+[[ $PGHOST == db.internal && $PGPORT == 6543 && $PGUSER == sentinel@user && $PGDATABASE == 'rail way' && $PGSSLMODE == require ]]
+[[ $PGPASSFILE == "$PASSFILE" && $PASSFILE == /dev/shm/dou-clean-02-pgpass.* && $(stat -c '%a' "$PASSFILE") == 600 ]]
+[[ $(cat -- "$PASSFILE") == '*:*:*:*:S3NT\:IN\\EL' ]]
+if env | grep -q 'S3NT'; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
+rm -f -- "$PASSFILE"
+for rejected_url in 'postgresql://u@h/db' 'postgresql://u:p@h/db?host=/tmp' 'postgresql://u:p%0Ax@h/db' \
+  'postgresql://u:p@[::1]/db' 'mysql://u:p@h/db' 'postgresql://u:p@h:99999/db' 'postgresql://u:p@h:5432/'; do
+  PASSFILE=
+  if connection_from_url "$rejected_url"; then printf '%s\n' 'OFFLINE_CONNECTION_ACCEPTED_INVALID_URI'; exit 1; fi
+  [[ -z $PASSFILE ]]
+done
+printf '%s\n' 'OFFLINE_CONNECTION_DECOMPOSITION_PASS'

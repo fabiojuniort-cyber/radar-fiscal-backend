@@ -57,6 +57,8 @@ Issue, PR ou resposta. Configurar por interface privada/referências Railway.
 | `SMOKE_CANDIDATE_SHA256` | opcional: SHA-256 de UUID público já observado no Acervo; fixa o candidato sem relaxar nenhum filtro |
 | `UI_OBSERVATION_WINDOW` | `enabled` exige candidato fixado por hash; abre janela visual de até 40s, dentro do orçamento 60s, com RESTORE automático |
 | `PROD_DATABASE_ADMIN_URL` | Referência privada existente; nunca impressa ou passada no argv do psql |
+
+Conexão: o libpq **não** expande uma URI mantida em `PGDATABASE` (só o argumento dbname é expandido); com a URI nessa variável o psql caía no socket local inexistente e o preflight falhava antes do primeiro label (`FAIL_PHASE_read_only_preflight` sem `FAILED_CHECK_*`, deployments `7a45fcb3`/`87a527b5`). O runner decompõe a URI em processo para `PGHOST`/`PGPORT`/`PGUSER`/`PGDATABASE` (+ `PGSSLMODE` quando presente) e grava a senha num passfile `0600` efêmero em `/dev/shm`, removido no EXIT depois da recuperação. Formatos fora de `postgres(ql)://user:senha@host[:porta]/db[?sslmode=…]` falham fechados com `ADMIN_CONNECTION_REQUIRED`; nada vai para argv, stdout ou o volume.
 | `RAILWAY_VOLUME_MOUNT_PATH` | `/data`, mount real exigido |
 | `RAILWAY_SERVICE_ID`, `RAILWAY_ENVIRONMENT_ID` | Presença de contexto Railway |
 | `CONFIRM_DOU_CLEAN_02` | `SUPPRESS_ONE_AND_RESTORE` para smoke |

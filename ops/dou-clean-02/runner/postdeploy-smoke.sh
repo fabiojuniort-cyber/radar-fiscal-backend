@@ -57,8 +57,38 @@ budget_seconds() {
 }
 
 # psql variables come from environment, NOT command-line arguments. All psql
-# errors are discarded, not copied to any public or private log. Connection URL
-# is supplied only through libpq's PGDATABASE environment parameter.
+# errors are discarded, not copied to any public or private log. libpq does NOT
+# expand a URI held in PGDATABASE (only a dbname argument is expanded), so the
+# admin URI is decomposed in-process into PGHOST/PGPORT/PGUSER/PGDATABASE and an
+# ephemeral 0600 passfile on tmpfs. Nothing reaches argv, stdout or the volume.
+PASSFILE=
+url_decode() {
+  local in=$1 out= hex
+  while [[ $in == *%* ]]; do
+    out+=${in%%\%*}; in=${in#*%}; hex=${in:0:2}
+    [[ $hex =~ ^[0-9A-Fa-f]{2}$ ]] && (( 16#$hex >= 32 && 16#$hex != 127 )) || return 1
+    printf -v hex "\\x$hex"; out+=$hex; in=${in:2}
+  done
+  printf '%s' "$out$in"
+}
+connection_from_url() {
+  local re='^postgres(ql)?://([^:@/?#]+):([^@/?#]+)@([A-Za-z0-9.-]+)(:([0-9]{1,5}))?/([^/?#]+)(\?sslmode=(disable|allow|prefer|require|verify-ca|verify-full))?$'
+  local user password database escaped host port sslmode
+  [[ $1 =~ $re ]] || return 1
+  host=${BASH_REMATCH[4]} port=${BASH_REMATCH[6]:-5432} sslmode=${BASH_REMATCH[9]}
+  user=$(url_decode "${BASH_REMATCH[2]}") || return 1
+  password=$(url_decode "${BASH_REMATCH[3]}") || return 1
+  database=$(url_decode "${BASH_REMATCH[7]}") || return 1
+  (( 10#$port >= 1 && 10#$port <= 65535 )) || return 1
+  [[ -n $user && -n $password && -n $database ]] || return 1
+  [[ -d /dev/shm && ! -L /dev/shm ]] || return 1
+  PASSFILE=$(mktemp /dev/shm/dou-clean-02-pgpass.XXXXXXXX) || return 1
+  chmod 600 "$PASSFILE" || return 1
+  escaped=${password//\\/\\\\}; escaped=${escaped//:/\\:}
+  printf '*:*:*:*:%s\n' "$escaped" >"$PASSFILE" || return 1
+  export PGHOST=$host PGPORT=$port PGUSER=$user PGDATABASE=$database PGPASSFILE=$PASSFILE
+  if [[ -n $sslmode ]]; then export PGSSLMODE=$sslmode; fi
+}
 db() {
   local sql_file=$1 output=$2 access=${3:-read} operation_timeout
   operation_timeout=$(budget_seconds 25) || return 1
@@ -195,6 +225,8 @@ on_exit() {
     fi
   fi
   if (( rc != 0 )); then log "FAIL_PHASE_${PHASE}"; fi
+  # Recovery above may still need the connection; drop the credential last.
+  if [[ -n $PASSFILE ]]; then rm -f -- "$PASSFILE"; fi
   exit "$rc"
 }
 trap on_exit EXIT
@@ -286,9 +318,11 @@ main() {
   flock -n 9 || die 'RUNNER_ALREADY_ACTIVE'
   WORK=$(mktemp -d "$ROOT/evidence.XXXXXXXX")
   chmod 700 "$WORK"
-  export PGDATABASE=$PROD_DATABASE_ADMIN_URL PGCONNECT_TIMEOUT=7 PGAPPNAME=dou-clean-02-postdeploy-smoke
-  export PGPASSFILE=/dev/null PGOPTIONS='-c statement_timeout=15000 -c lock_timeout=3000'
-  unset PROD_DATABASE_ADMIN_URL PGSERVICE PGSERVICEFILE
+  unset PGSERVICE PGSERVICEFILE PGHOSTADDR PGSSLMODE
+  connection_from_url "$PROD_DATABASE_ADMIN_URL" || die 'ADMIN_CONNECTION_REQUIRED'
+  export PGCONNECT_TIMEOUT=7 PGAPPNAME=dou-clean-02-postdeploy-smoke
+  export PGOPTIONS='-c statement_timeout=15000 -c lock_timeout=3000'
+  unset PROD_DATABASE_ADMIN_URL
   export SMOKE_PUBLICATION_ID='' SMOKE_VERSION_IDS='{}' SMOKE_RUN_IDS='{}'
   export SMOKE_SUPPRESS_OPERATION_ID='' SMOKE_RESTORE_OPERATION_ID=''
   export SMOKE_EVIDENCE_SHA256='' SMOKE_MANIFEST_SHA256='' SMOKE_BASELINE_EPOCH='0'

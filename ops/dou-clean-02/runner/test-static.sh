@@ -29,8 +29,11 @@ rg -q 'controlled_publication_sha256' "$ROOT_DIR/sql/candidate.sql"
 [[ $(awk '/verify_restored$/{line=NR} /DOU_CLEAN_02_PUBLIC_SCOPE_SMOKE_PASS/{print line}' "$SCRIPT") -lt \
    $(awk '/DOU_CLEAN_02_PUBLIC_SCOPE_SMOKE_PASS/{print NR}' "$SCRIPT") ]]
 # Metadata ACL strings legitimately contain DML names; reject actual commands.
-! rg -n --glob '*.sql' '^[[:space:]]*(DELETE[[:space:]]+FROM|TRUNCATE|DROP|ALTER|GRANT|REVOKE|INSERT[[:space:]]+INTO|UPDATE[[:space:]]+[a-z_])\b' "$ROOT_DIR/sql"
+# `! cmd` never triggers errexit; negative guards use explicit if.
+if rg -n --glob '*.sql' '^[[:space:]]*(DELETE[[:space:]]+FROM|TRUNCATE|DROP|ALTER|GRANT|REVOKE|INSERT[[:space:]]+INTO|UPDATE[[:space:]]+[a-z_])\b' "$ROOT_DIR/sql"; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
 rg -q 'psql -X --no-password.*ON_ERROR_STOP=on' "$SCRIPT"
+if rg -n 'PGDATABASE=\$PROD|psql .*PROD_DATABASE_ADMIN_URL' "$SCRIPT"; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
+rg -q 'connection_from_url "\$PROD_DATABASE_ADMIN_URL" \|\| die' "$SCRIPT"
 rg -q 'SET LOCAL ROLE radar_app' "$ROOT_DIR/sql/rls.sql"
 rg -q 'publication_version_id=ANY\(:.version_ids.::uuid\[\]\)' "$ROOT_DIR/sql/rls.sql"
 rg -q 'operation_id=:.suppress_operation_id.::uuid' "$ROOT_DIR/sql/restore.sql"
@@ -54,11 +57,11 @@ rg -q 'trap on_exit EXIT' "$SCRIPT"
 rg -q 'sync -f "\$tmp"' "$SCRIPT"
 rg -q 'chmod 600 "\$tmp"' "$SCRIPT"
 rg -q -- '--retry 0' "$SCRIPT"
-! rg -n -- '--insecure|--location|--verbose|set -x|PGPASSWORD|JWT_SECRET' "$SCRIPT"
+if rg -n -- '--insecure|--location|--verbose|set -x|PGPASSWORD|JWT_SECRET' "$SCRIPT"; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
 rg -q 'env -i PATH=.*bash ops/dou-clean-02/runner/test-static.sh' "$ROOT_DIR/../../../.github/workflows/ci.yml"
 rg -q -- '--network none' "$ROOT_DIR/test-pg18-isolated.sh"
 rg -q -- '--pull=never' "$ROOT_DIR/test-pg18-isolated.sh"
-! rg -n 'radar-fiscal-backend-production|up\.railway\.app|curl|postdeploy-smoke\.sh' "$ROOT_DIR/test-pg18-isolated.sh"
+if rg -n 'radar-fiscal-backend-production|up\.railway\.app|curl|postdeploy-smoke\.sh' "$ROOT_DIR/test-pg18-isolated.sh"; then printf '%s\n' 'OFFLINE_FORBIDDEN_PATTERN_FOUND'; exit 1; fi
 env -i PATH="$PATH" bash "$ROOT_DIR/test-recovery-control.sh"
 env -i PATH="$PATH" bash "$ROOT_DIR/test-pg18-isolated.sh" --syntax-only
 # Rehearsal rejects credential/configuration variables BEFORE Docker discovery.
