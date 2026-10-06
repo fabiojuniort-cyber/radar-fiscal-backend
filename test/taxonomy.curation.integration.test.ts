@@ -18,6 +18,7 @@ import {
   loadProductSheet,
   parseProductSheet,
 } from '../src/modules/taxonomy/curation/curation.product-load.js';
+import { retireDimension } from '../src/modules/taxonomy/curation/curation.draft.js';
 
 /**
  * TAX-11 end-to-end gate. Runs as a dedicated, final CI step: it commits a
@@ -1113,6 +1114,26 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     });
     assert.equal(nextDraft.statusCode, 201, nextDraft.body);
     assert.equal(nextDraft.json().initialCuration, null, 'configured source is copied as is');
+    // "Tipo de ato" and "Esfera" leave the taxonomy: the act's type and
+    // jurisdiction come from its source.
+    {
+      const client = await app.curatorPool!.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+        const actor = { userId: 'ops:test', justification: 'Dimensões redundantes com os metadados do ato' };
+        // (this fixture release has no "sphere" dimension; production does)
+        const actType = await retireDimension(client, actor, 'act_type');
+        assert.ok(actType.retiredConcepts.length > 0);
+        assert.ok(actType.retiredConcepts.every((code) => code.startsWith('act_type.')));
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
     const nextPublish = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/taxonomy/drafts/current/publish',
@@ -1133,6 +1154,16 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.ok(!codesAfter.includes('theme.presumed_credit'), 'removal survives the new release');
     assert.ok(codesAfter.includes('product.soy'), 'manual tag survives the new release');
     assert.ok(codesAfter.includes('product.urea'));
+    assert.ok(!codesAfter.some((code: string) => code.startsWith('act_type.') || code.startsWith('sphere.')));
+    const retiredDimensions = await admin.query<{ code: string; membership_status: string }>(
+      `SELECT d.code, rd.membership_status
+       FROM taxonomy_release_dimensions rd
+       JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
+       JOIN taxonomy_releases r ON r.id = rd.release_id
+       WHERE r.version_major = $1 AND r.version_minor = 2 AND d.code = 'act_type'`,
+      [MAJOR],
+    );
+    assert.deepEqual(retiredDimensions.rows, [{ code: 'act_type', membership_status: 'RETIRED' }]);
     const archiveRemoved = await app.inject({
       method: 'GET',
       url: '/api/v2/archive?tag=theme.presumed_credit',

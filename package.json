@@ -37,6 +37,7 @@
     "taxonomy:classify-one": "node dist/infrastructure/database/taxonomy-classify-one.js",
     "taxonomy:ncm-rescan-one": "node dist/infrastructure/database/taxonomy-ncm-rescan-one.js",
     "taxonomy:retire-legacy-segments": "node dist/infrastructure/database/taxonomy-retire-legacy-segments.js",
+    "taxonomy:retire-dimensions": "node dist/infrastructure/database/taxonomy-retire-dimensions.js",
     "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js",
     "db:dou-backfill": "node dist/infrastructure/database/dou-backfill.js",
     "db:ensure-nfe-encat-source": "node dist/infrastructure/database/ensure-nfe-encat-source.js",
