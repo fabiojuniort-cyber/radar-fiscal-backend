@@ -4,6 +4,7 @@ import { normalizeAliasText } from '../baseline/baseline.parser.js';
 import {
   createConcept,
   createDraft,
+  CurationError,
   retireDimension,
   updateConcept,
   updateDimension,
@@ -74,11 +75,33 @@ function matchingTarget(
   source: ConceptView,
   targets: readonly ConceptView[],
 ): ConceptView | null {
-  return (
-    targets.find((concept) => suffix(concept.code) === suffix(source.code)) ??
-    targets.find((concept) => sameLabel(concept.label, source.label)) ??
-    null
+  const suffixMatches = targets.filter(
+    (concept) => suffix(concept.code) === suffix(source.code),
   );
+  if (suffixMatches.length > 1) {
+    throw new CurationError(
+      'AMBIGUOUS_DIMENSION_MERGE_TARGET',
+      409,
+      `Mais de um alvo compartilha o sufixo de ${source.code}: ${suffixMatches
+        .map((concept) => concept.code)
+        .join(', ')}.`,
+    );
+  }
+  if (suffixMatches.length === 1) return suffixMatches[0]!;
+
+  const labelMatches = targets.filter((concept) =>
+    sameLabel(concept.label, source.label),
+  );
+  if (labelMatches.length > 1) {
+    throw new CurationError(
+      'AMBIGUOUS_DIMENSION_MERGE_TARGET',
+      409,
+      `Mais de um alvo compartilha o rótulo de ${source.code}: ${labelMatches
+        .map((concept) => concept.code)
+        .join(', ')}.`,
+    );
+  }
+  return labelMatches[0] ?? null;
 }
 
 export function planDimensionMerge(
@@ -94,7 +117,7 @@ export function planDimensionMerge(
   const targets = view.concepts.filter((concept) => concept.dimensionCode === into);
   const targetGroups = new Set(view.groups.filter((group) => group.dimensionCode === into).map((group) => group.code));
 
-  return included
+  const steps = included
     .filter((concept) => concept.dimensionCode === from)
     .map((source) => {
       const target = matchingTarget(source, targets);
@@ -114,6 +137,30 @@ export function planDimensionMerge(
         addedOfficialCodes: source.officialCodes.filter((code) => !target?.officialCodes.includes(code)),
       } satisfies MergeStep;
     });
+
+  const sourcesByTarget = new Map<string, string[]>();
+  for (const step of steps) {
+    sourcesByTarget.set(step.into, [
+      ...(sourcesByTarget.get(step.into) ?? []),
+      step.from,
+    ]);
+  }
+  const manyToOne = [...sourcesByTarget.entries()].filter(
+    ([, sources]) => sources.length > 1,
+  );
+  if (manyToOne.length > 0) {
+    throw new CurationError(
+      'AMBIGUOUS_DIMENSION_MERGE_MANY_TO_ONE',
+      409,
+      'Mais de um conceito de origem foi direcionado ao mesmo alvo: ' +
+        manyToOne
+          .map(([target, sources]) => `${sources.join(' + ')} → ${target}`)
+          .join('; ') +
+        '.',
+    );
+  }
+
+  return steps;
 }
 
 export interface DimensionMergeCompatibilityPlan {
