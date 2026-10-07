@@ -1,17 +1,25 @@
-# ACT-SCOPE-02 — smoke e preparação de banco
+# ACT-SCOPE-02 — operadores e evidências
 
-Issue tribusca-control#87, autorização explícita no checkpoint do usuário 07/10/2026, lease ACT-SCOPE-02-OPS registrado na Issue. R3 requer revisão independente do SHA exato e health antes de escrita.
+Frente: [tribusca-control#87](https://github.com/fabiojuniort-cyber/tribusca-control/issues/87). Autorização explícita do usuário para coleta real e SUPPRESS → validação → RESTORE, sem exclusão física. Operações produtivas exigem lease, SHA exato revisado, CI e saúde. Dumps, manifestos completos e diagnósticos privados permanecem no volume Railway.
 
-## Smoke
+## Coleta e verificação
 
-smoke.tsx (Bun/pg) usa DATABASE_ADMIN_URL existente sem imprimir credenciais. ACT_SCOPE_02_MODE=preflight/verify: READ ONLY. enqueue registra somente a próxima execução natural SCHEDULED do DOU, slot07/10/2026 17:00UTC (14:00 Brasília), iddca14937-8c41-477e-91f1-9b99f091692e. A mesma chave(source_id,scheduled_for,trigger_type) única/ON CONFLICT do scheduler impede outra execução desse slot. Não roda antes do horário normal. Valida cron/timezone, janela de preparação antes16:40UTC, política efetiva maior APPROVED=1r5, fonteativa, nenhuma outra run aberta. Slot existente com outro ID é recusa explícita, não sucesso fictício. Rerun com o mesmo ID é idempotente. Lease congela operacionalmente política1r5; revalidar antes aquisição e conferir versão/revisão nos stats após a execução.
+- `smoke.tsx`: procedimento original Bun/pg para o slot natural SCHEDULED de 07/10/2026 17:00 UTC, ID `dca14937-8c41-477e-91f1-9b99f091692e`. Enqueue utiliza a mesma chave única do scheduler, recusa conflitos e só é válido na janela codificada. Preflight/verify são somente leitura. O ciclo terminou SUCCESS_NO_RESULTS e não comprova KEEP/DISCARD.
+- `smoke-backfill.mjs`: coleta oficial de um único dia elegível (15/07/2026), uma tentativa, motor central existente, cron/90 minutos/política efetiva APPROVED 1r5 e concorrência revalidados. Dry-run padrão; --apply só com os gates. BACKFILL preserva o checkpoint de monitoramento. Timeout de 900000ms limita aquisição, sem promessa de teto total de persistência. Ver [BACKFILL-SMOKE.md](BACKFILL-SMOKE.md).
+- `verify-smoke.tsx`: verificador Bun/pg sempre READ ONLY, exige ACT_SCOPE_02_VERIFY_RUN_ID explícito. PASS depende de coleta terminal DOU, KEEP persistido, FILTERED_OUT sem vínculo canônico, todos os descartes ausentes das origens por chave externa, razão/política1r5/expiração3meses e ausência de conteúdo integral/summary, descartes expirados ou enforcement DOE-SP. Logs de diagnóstico usam apenas código seguro e status; não imprimem credenciais ou mensagens livres. NEW_VERSION aparece separadamente nos itens/métricas.
 
-Sem fontes/cron/checkpoints/config/worker alterados; worker usa motor central aprovado e coleta oficial normal. Persistência normal atualiza metadados/versões/checkpoints; retention rotineira elimina somente auditoria de descartes expirada conforme migration041. Não há exclusão de publications ou SUPPRESS/RESTORE neste smoke. Backup não se aplica ao mero enqueue de coleta normal não destrutiva; nenhum repair está incluído.
+A coleta usa o filtro antes da persistência. Não há filtro paralelo, reset de checkpoint, alteração de fonte/cron ou dados fabricados. Retenção rotineira remove somente auditoria expirada; nenhuma publication é apagada.
 
-verify exige KEEP persistido, FILTERED_OUT sem publication_id, descarte com source_item_key/externalId ausente das origens, razão/termo/policy1r5/+3meses, schema sem conteúdo/summary, zero enforcement DOE-SP. Para DOU a identidade é a chave externa, não URL de página compartilhada. PARTIAL_SUCCESS de aquisição só aceita filtro verde e ausência de falha do filtro.
+## Backup e restauração
 
-## Backup/restauração para Stage7
+`backup-restore.sh` / Dockerfile usam uma pasta, serviço e volume privados exclusivos ACT. MODE=preflight é READ ONLY. MODE=backup-restore mantém snapshot REPEATABLE READ READ ONLY em produção, cria pg_dump18 e restaura em cluster PostgreSQL18 novo, apenas Unix socket local. Produção nunca é alvo de createdb/pg_restore. Todas as contagens de tabelas públicas devem coincidir. EXPECT_SCOPE_TABLES=present; CANDIDATE_SHA identifica o artefato aprovado.
 
-backup-restore.sh e Dockerfile adaptam o procedimento existente de backup lógico, preservando nova pasta/volume/serviço ACT distintos. MODE=preflight é READ ONLY. MODE=backup-restore usa snapshot REPEATABLE READ READ ONLY na produção, pg_dump18 e restaura em clusterPostgres18 novo Unix-socket-only no próprio container Railway. Não usa produção como alvo de createdb/pg_restore. Contagens de todas as tabelas públicas restauradas devem coincidir; dump, logs e cluster permanecem em volume privado Railway, sem exportação para GitHub/cliente. EXPECT_SCOPE_TABLES=present. CANDIDATE_SHA identifica artefato aprovado, não polí­tica DOU-CLEAN. Nunca reutilizar/modificar runner/volume de outra frente.
+## Histórico reversível
 
-Antes da Stage7: smoke verde, backup/restore PASS, dry-run do executor separado, manifest aprovado/snapshotmaterial validado, revisão independente exata. Usar somente apply_publication_scope_transition; preservar estadosOUT preexistentes e KEEP. RESTORE apenas eventosSUPPRESS deste manifest/ACT. Ainda não há executor Stage7 neste commit.
+`stage7.cjs` / `stage7-runner.sh` implementam preparação somente leitura, ensaio isolado, roundtrip produtivo e recuperação. Ver [STAGE7.md](STAGE7.md) para variáveis, caminhos e gates.
+
+A simulação FULL_ARCHIVE aprovada fornece a decisão; o operador não reavalia regras fiscais. Somente DISCARD atualmente IN_SCOPE e com material estável entram no manifesto. Estados OUT anteriores, KEEP, origens mistas/DOE e divergências de material permanecem intocados. A preparação grava metadados/hashes privados, nunca corpos integrais.
+
+SUPPRESS e RESTORE usam exclusivamente apply_publication_scope_transition e eventos append-only. Lease e material são revalidados por lote. RESTORE compensa apenas eventos SUPPRESS atuais deste manifesto, tenta três vezes por lote, continua os demais e registra pendências privadas. Qualquer pendência impede PASS. Durante a supressão verifica feed e leitura normal radar_app iguais a zero; após compensação verifica retorno, contagens físicas, hash externo e avanço do epoch de cache. Recovery restore permanece permitido mesmo após expiração da lease ou mudança de política.
+
+O SHA operacional do ciclo documentado na Issue87 é `5dbc15f03c0bc36797ff145c4543891c56aab270`. Atualizações documentais posteriores não alteram esse identificador de execução. Não executar scripts de DOU-CLEAN como se pertencessem a ACT-SCOPE-02. Ao concluir, remover somente os serviços ACT e preservar o volume de backup.
