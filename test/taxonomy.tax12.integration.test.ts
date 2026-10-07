@@ -20,6 +20,7 @@ import { resolveCuratorDecisions } from '../src/modules/taxonomy/curation/curati
 import { buildAcceptedCodes } from '../src/modules/taxonomy/matching/taxonomy-matching.service.js';
 import {
   canonicalizeTaxonomyConceptCodes,
+  loadTaxonomyCodeCompatibility,
   parseTaxonomyCodeCompatibility,
 } from '../src/modules/taxonomy/taxonomy-code-compatibility.js';
 
@@ -726,58 +727,6 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.ok(compatibility.retiredCodes.includes(taxSpeciesCode));
 
 
-    // Consume the exact compatibility map produced by mergeDimension through
-    // the same runtime helpers used by monitoring profiles, company tax
-    // profiles/affinity preparation, and historical curator decisions.
-    const acceptedCodes = buildAcceptedCodes(
-      {
-        releasePolicy: 'CURRENT_PUBLISHED',
-        anyOf: [combinedTreatmentCode],
-        allOf: [],
-        noneOf: [],
-        includeDescendants: false,
-      },
-      activeView!.concepts.map((item) => ({
-        release_concept_id: item.releaseConceptId,
-        code: item.code,
-      })),
-      [],
-      compatibility,
-    );
-    assert.deepEqual(
-      [...(acceptedCodes.get(combinedTreatmentCode) ?? [])],
-      [combinedActiveThemeCode],
-      'monitoring profile criteria must resolve through the merge-produced map',
-    );
-
-    const canonicalProfileCodes = canonicalizeTaxonomyConceptCodes(
-      [combinedTreatmentCode, createHistoricalTreatmentCode],
-      compatibility,
-    );
-    assert.deepEqual(
-      canonicalProfileCodes,
-      [combinedActiveThemeCode, createdThemeCode].sort(),
-      'company tax profile codes must canonicalize through the merge-produced map',
-    );
-
-    const curatorDecisions = resolveCuratorDecisions(
-      [
-        {
-          concept_code: combinedTreatmentCode,
-          action: 'ADD',
-          rationale: 'TAX-12 runtime compatibility fixture',
-          created_at: new Date('2026-10-07T00:00:00Z'),
-          id: 'tax12-runtime-fixture',
-        },
-      ],
-      compatibility,
-    );
-    assert.equal(
-      curatorDecisions.get(combinedActiveThemeCode)?.concept_code,
-      combinedActiveThemeCode,
-      'historical curator decisions must resolve through the merge-produced map',
-    );
-
     // Defense in depth: even if a future retirement implementation forgets
     // one detached historical identity, publication validation must fail closed.
     const originalManifest = manifest.rows[0]?.manifest;
@@ -1019,6 +968,26 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     // Respect the real release lifecycle even in the fixture: DRAFT is not
     // withdrawable. Finalize the isolated draft, then withdraw the published
     // fixture so no editable curated draft leaks into later CI gates.
+    const finalValidationClient = await admin.connect();
+    try {
+      const finalView = await loadReleaseView(
+        pgRunner(finalValidationClient),
+        draft!.id,
+      );
+      assert.ok(finalView);
+      const finalIssues = await validateReleaseView(
+        finalValidationClient,
+        finalView!,
+      );
+      assert.deepEqual(
+        finalIssues.filter((issue) => issue.severity === 'BLOCKER'),
+        [],
+        'the repaired merge-produced manifest must pass the publish gate',
+      );
+    } finally {
+      finalValidationClient.release();
+    }
+
     await admin.query(
       `UPDATE taxonomy_releases
        SET status = 'PUBLISHED',
@@ -1030,6 +999,62 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
            artifact_sha256 = $3
        WHERE id = $1::uuid AND status = 'DRAFT'`,
       [draft!.id, 'c'.repeat(40), 'd'.repeat(64)],
+    );
+
+    // Reload the exact manifest from the now-PUBLISHED isolated fixture and
+    // consume it through the same runtime helpers used by monitoring profiles,
+    // company tax profiles/affinity preparation, and curator history.
+    const publishedCompatibility = await loadTaxonomyCodeCompatibility(
+      pgRunner(admin),
+      draft!.id,
+    );
+    const publishedAcceptedCodes = buildAcceptedCodes(
+      {
+        releasePolicy: 'CURRENT_PUBLISHED',
+        anyOf: [combinedTreatmentCode],
+        allOf: [],
+        noneOf: [],
+        includeDescendants: false,
+      },
+      activeView!.concepts.map((item) => ({
+        release_concept_id: item.releaseConceptId,
+        code: item.code,
+      })),
+      [],
+      publishedCompatibility,
+    );
+    assert.deepEqual(
+      [...(publishedAcceptedCodes.get(combinedTreatmentCode) ?? [])],
+      [combinedActiveThemeCode],
+      'monitoring profile criteria must resolve through the published merge-produced map',
+    );
+
+    const publishedProfileCodes = canonicalizeTaxonomyConceptCodes(
+      [combinedTreatmentCode, createHistoricalTreatmentCode],
+      publishedCompatibility,
+    );
+    assert.deepEqual(
+      publishedProfileCodes,
+      [combinedActiveThemeCode, createdThemeCode].sort(),
+      'company tax profile codes must canonicalize through the published merge-produced map',
+    );
+
+    const publishedCuratorDecisions = resolveCuratorDecisions(
+      [
+        {
+          concept_code: combinedTreatmentCode,
+          action: 'ADD',
+          rationale: 'TAX-12 published runtime compatibility fixture',
+          created_at: new Date('2026-10-07T00:00:00Z'),
+          id: 'tax12-published-runtime-fixture',
+        },
+      ],
+      publishedCompatibility,
+    );
+    assert.equal(
+      publishedCuratorDecisions.get(combinedActiveThemeCode)?.concept_code,
+      combinedActiveThemeCode,
+      'historical curator decisions must resolve through the published merge-produced map',
     );
     await admin.query(
       `UPDATE taxonomy_releases
