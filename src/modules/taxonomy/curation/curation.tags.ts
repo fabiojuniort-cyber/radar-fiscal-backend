@@ -4,6 +4,10 @@ import {
 } from '../classification/classification.curated.js';
 import { NOT_SUPERSEDED_NCM_MENTION_SQL } from '../ncm/publication-ncm.detector.js';
 import {
+  loadTaxonomyCodeCompatibility,
+  resolveTaxonomyConceptCode,
+} from '../taxonomy-code-compatibility.js';
+import {
   DEFAULT_SECTION_ORDER,
   PROTECTED_EXCLUDED_SOURCES,
 } from './curation.constants.js';
@@ -94,6 +98,8 @@ interface CuratorRow {
   concept_code: string;
   action: 'ADD' | 'REMOVE';
   rationale: string;
+  created_at: Date | string;
+  id: string;
 }
 
 export async function loadPublicationTaxonomy(
@@ -188,22 +194,31 @@ export async function loadPublicationTaxonomy(
       )
     : [];
 
-  // Curator decisions are per legislation version x concept identity and
-  // survive new releases: the latest ADD/REMOVE for the concept code wins,
-  // whatever release it was recorded against.
-  const curator = await run<CuratorRow>(
+  // Curator decisions survive release code migrations. Load all decisions
+  // newest-first, resolve each historical concept code through the current
+  // release compatibility map, then keep the newest decision per canonical
+  // code. Codes retired with no successor are intentionally ignored.
+  const compatibility = await loadTaxonomyCodeCompatibility(run, release.id);
+  const curatorHistory = await run<CuratorRow>(
     `
-      SELECT DISTINCT ON (c.code)
-        c.code AS concept_code, ct.action, ct.rationale
+      SELECT
+        c.code AS concept_code, ct.action, ct.rationale,
+        ct.created_at, ct.id
       FROM publication_taxonomy_curator_tags ct
       JOIN taxonomy_release_concepts rc ON rc.id = ct.release_concept_id
       JOIN taxonomy_concepts c ON c.id = rc.concept_id
       WHERE ct.publication_version_id = $1::uuid
-      ORDER BY c.code, ct.created_at DESC, ct.id DESC
+      ORDER BY ct.created_at DESC, ct.id DESC
     `,
     [current.id],
   );
-  const decisionByCode = new Map(curator.map((row) => [row.concept_code, row]));
+  const decisionByCode = new Map<string, CuratorRow>();
+  for (const row of curatorHistory) {
+    const canonical = resolveTaxonomyConceptCode(row.concept_code, compatibility);
+    if (!canonical || decisionByCode.has(canonical)) continue;
+    decisionByCode.set(canonical, { ...row, concept_code: canonical });
+  }
+  const curator = [...decisionByCode.values()];
 
   const settings = await loadRuntimeSettings(run);
   let status: PublicationTaxonomyStatus;
