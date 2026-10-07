@@ -2,11 +2,13 @@ import { Pool } from 'pg';
 import { z } from 'zod';
 
 import {
-  compileCollectionFilterPolicy,
   normalizeCollectionFilterType,
   type CollectionFilterMode,
-  type CollectionFilterPolicyInput,
 } from '../../modules/collection/collection-filter.engine.js';
+import {
+  serializeCollectionFilterDraft,
+  type CollectionFilterDraftInput,
+} from '../../modules/collection/collection-filter.admin.js';
 
 const env = z
   .object({
@@ -220,7 +222,7 @@ try {
       }
     }
 
-    const terms: CollectionFilterPolicyInput['terms'] = [
+    const terms: CollectionFilterDraftInput['terms'] = [
       ...STRONG_TERMS.map((text) => ({
         text,
         strength: 'STRONG' as const,
@@ -238,10 +240,7 @@ try {
       })),
     ];
 
-    const document: CollectionFilterPolicyInput & {
-      changeNotes: string;
-    } = {
-      version: 1,
+    const document: CollectionFilterDraftInput = {
       contextWindowWords: 12,
       weakScoreThreshold: 3,
       locationWeights: {
@@ -256,7 +255,8 @@ try {
         'ACT-SCOPE-02 initial conservative seed from observed archive types',
     };
 
-    compileCollectionFilterPolicy(document);
+    const serializedDocument =
+      serializeCollectionFilterDraft(document);
 
     const byMode = Object.fromEntries(
       [
@@ -295,7 +295,7 @@ try {
       policy_revision: number;
     }>(
       `SELECT * FROM collection_filter_save_draft($1::jsonb)`,
-      [JSON.stringify(document)],
+      [JSON.stringify(serializedDocument)],
     );
     const policy = saved.rows[0];
     if (!policy) {
