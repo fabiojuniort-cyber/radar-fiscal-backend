@@ -193,9 +193,13 @@ export function evaluateRuntimeCollectionFilter(
   const decision = evaluateCollectionFilter(runtime.policy, {
     sourceCode: runtime.sourceCode,
     section,
-    actType: publication.actType,
+    ...(publication.actType !== undefined
+      ? { actType: publication.actType }
+      : {}),
     title: publication.title,
-    body: publication.contentText,
+    ...(publication.contentText !== undefined
+      ? { body: publication.contentText }
+      : {}),
     evidenceComplete: evidenceComplete(publication),
     materialAttachmentsUnexamined:
       materialAttachmentsUnexamined(publication),
