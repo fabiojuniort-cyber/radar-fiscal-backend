@@ -18,7 +18,10 @@ import {
   type ConceptView,
   type ReleaseView,
 } from './curation.read.js';
-import { updateDraftTaxonomyCodeCompatibility } from '../taxonomy-code-compatibility.js';
+import {
+  loadTaxonomyCodeCompatibility,
+  updateDraftTaxonomyCodeCompatibility,
+} from '../taxonomy-code-compatibility.js';
 
 /**
  * Folds one dimension into another inside the open DRAFT (creates one when
@@ -72,7 +75,7 @@ function missingAliases(source: ConceptView, target: ConceptView | null): Concep
 }
 
 function matchingTarget(
-  source: ConceptView,
+  source: Pick<ConceptView, 'code' | 'label'>,
   targets: readonly ConceptView[],
 ): ConceptView | null {
   const suffixMatches = targets.filter(
@@ -166,6 +169,43 @@ export function planDimensionMerge(
 export interface DimensionMergeCompatibilityPlan {
   redirects: Record<string, string>;
   retiredCodes: string[];
+}
+
+export interface HistoricalConceptIdentity {
+  code: string;
+  label: string;
+}
+
+/**
+ * Completes treatment -> theme compatibility for historical concept identities
+ * that are not materialized in the current release. They must use the same
+ * suffix/label matching semantics as materialized concepts before falling
+ * back to explicit retirement.
+ */
+export function planDetachedHistoricalMergeCompatibility(
+  historicalSources: readonly HistoricalConceptIdentity[],
+  activeTargets: readonly ConceptView[],
+  coveredCodes: ReadonlySet<string>,
+): DimensionMergeCompatibilityPlan {
+  const redirects: Record<string, string> = {};
+  const retiredCodes: string[] = [];
+
+  for (const source of historicalSources) {
+    if (coveredCodes.has(source.code)) continue;
+    const target = matchingTarget(source, activeTargets);
+    if (target) {
+      redirects[source.code] = target.code;
+    } else {
+      retiredCodes.push(source.code);
+    }
+  }
+
+  return {
+    redirects: Object.fromEntries(
+      Object.entries(redirects).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    retiredCodes: [...new Set(retiredCodes)].sort(),
+  };
 }
 
 /**
@@ -311,33 +351,70 @@ export async function mergeDimension(
     }
   }
 
-  const compatibility = planDimensionMergeCompatibility(view, from, into, steps);
+  // Reload after MERGE/RESTORE/CREATE so detached historical Treatment
+  // identities are matched against the actual active Theme set of the draft.
+  const postMergeView = await loadReleaseView(
+    pgRunner(client),
+    draft.id,
+    { includeRetired: true },
+  );
+  if (!postMergeView) throw new Error('DRAFT_NOT_FOUND');
 
-  // Close the compatibility set over the entire historical concept identity
-  // space of the source dimension, not only concepts materialized in this
-  // release. A legacy code that no longer has release membership must still
-  // resolve deterministically to NO_MATCH instead of leaking through runtime
-  // matching as an unknown current code.
-  const historicalSourceCodes = await client.query<{ code: string }>(
-    `SELECT c.code
+  const compatibility = planDimensionMergeCompatibility(
+    postMergeView,
+    from,
+    into,
+    steps,
+  );
+  const existingCompatibility = await loadTaxonomyCodeCompatibility(
+    pgRunner(client),
+    draft.id,
+  );
+
+  // Close compatibility over the entire historical identity space, including
+  // concepts that have no taxonomy_release_concepts membership in this draft.
+  // Before retiring a detached Treatment code, apply the exact same suffix /
+  // label matching semantics used by the normal merge against active Themes.
+  const historicalSources = await client.query<HistoricalConceptIdentity>(
+    `SELECT c.code, latest.label
      FROM taxonomy_concepts c
      JOIN taxonomy_dimensions d ON d.id = c.dimension_id
+     JOIN LATERAL (
+       SELECT r.label
+       FROM taxonomy_concept_revisions r
+       WHERE r.concept_id = c.id
+       ORDER BY r.revision_no DESC
+       LIMIT 1
+     ) latest ON true
      WHERE d.code = $1
      ORDER BY c.code`,
     [from],
   );
   const coveredCodes = new Set([
+    ...Object.keys(existingCompatibility.redirects),
+    ...existingCompatibility.retiredCodes,
     ...Object.keys(compatibility.redirects),
     ...compatibility.retiredCodes,
   ]);
+  const activeTargets = postMergeView.concepts.filter(
+    (concept) =>
+      concept.dimensionCode === into &&
+      concept.membershipStatus === 'INCLUDED',
+  );
+  const detachedCompatibility = planDetachedHistoricalMergeCompatibility(
+    historicalSources.rows,
+    activeTargets,
+    coveredCodes,
+  );
   const completeCompatibility = {
-    redirects: compatibility.redirects,
+    redirects: {
+      ...compatibility.redirects,
+      ...detachedCompatibility.redirects,
+    },
     retiredCodes: [
       ...new Set([
         ...compatibility.retiredCodes,
-        ...historicalSourceCodes.rows
-          .map((row) => row.code)
-          .filter((code) => !coveredCodes.has(code)),
+        ...detachedCompatibility.retiredCodes,
       ]),
     ].sort(),
   };
