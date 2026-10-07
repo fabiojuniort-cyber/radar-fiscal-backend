@@ -2305,12 +2305,20 @@ export async function validateReleaseView(
     const historicalCompatibility = await client.query<{
       dimension_code: string;
       code: string;
+      label: string;
     }>(
       `
-        SELECT d.code AS dimension_code, c.code
+        SELECT d.code AS dimension_code, c.code, latest.label
         FROM taxonomy_release_dimensions rd
         JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
         JOIN taxonomy_concepts c ON c.dimension_id = rd.dimension_id
+        JOIN LATERAL (
+          SELECT r.label
+          FROM taxonomy_concept_revisions r
+          WHERE r.concept_id = c.id
+          ORDER BY r.revision_no DESC
+          LIMIT 1
+        ) latest ON true
         WHERE rd.release_id = $1::uuid
           AND rd.membership_status <> 'INCLUDED'
           AND d.code = ANY($2::text[])
@@ -2336,6 +2344,49 @@ export async function validateReleaseView(
             .join(', ') +
           '.',
       });
+    }
+
+    // A historical Treatment code may have been legitimately retired in an
+    // older release and later gain an active Theme successor. Retirement is
+    // no longer semantically valid in that case: suffix matching has priority,
+    // then normalized-label matching, exactly as in the merge planner.
+    const activeThemeTargets = included.filter(
+      (concept) => concept.dimensionCode === 'theme',
+    );
+    for (const row of historicalCompatibility.rows) {
+      if (
+        row.dimension_code !== 'treatment' ||
+        !retiredCompatibilityCodes.has(row.code)
+      ) {
+        continue;
+      }
+
+      const sourceSuffix = row.code.slice(row.code.indexOf('.') + 1);
+      const suffixMatches = activeThemeTargets.filter(
+        (concept) =>
+          concept.code.slice(concept.code.indexOf('.') + 1) === sourceSuffix,
+      );
+      const matchingTargets =
+        suffixMatches.length > 0
+          ? suffixMatches
+          : activeThemeTargets.filter(
+              (concept) =>
+                normalizeAliasText(concept.label) ===
+                normalizeAliasText(row.label),
+            );
+
+      if (matchingTargets.length > 0) {
+        issues.push({
+          severity: 'BLOCKER',
+          code: 'RETIRED_TREATMENT_HAS_ACTIVE_THEME_SUCCESSOR',
+          message:
+            `Compatibilidade inválida: ${row.code} está em retiredCodes, ` +
+            `mas possui sucessor Theme ativo: ${matchingTargets
+              .map((concept) => concept.code)
+              .join(', ')}.`,
+          subject: row.code,
+        });
+      }
     }
 
     try {
