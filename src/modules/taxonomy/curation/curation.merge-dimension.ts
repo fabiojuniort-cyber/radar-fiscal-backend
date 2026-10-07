@@ -265,7 +265,36 @@ export async function mergeDimension(
   }
 
   const compatibility = planDimensionMergeCompatibility(view, from, into, steps);
-  await updateDraftTaxonomyCodeCompatibility(client, draft.id, compatibility);
+
+  // Close the compatibility set over the entire historical concept identity
+  // space of the source dimension, not only concepts materialized in this
+  // release. A legacy code that no longer has release membership must still
+  // resolve deterministically to NO_MATCH instead of leaking through runtime
+  // matching as an unknown current code.
+  const historicalSourceCodes = await client.query<{ code: string }>(
+    `SELECT c.code
+     FROM taxonomy_concepts c
+     JOIN taxonomy_dimensions d ON d.id = c.dimension_id
+     WHERE d.code = $1
+     ORDER BY c.code`,
+    [from],
+  );
+  const coveredCodes = new Set([
+    ...Object.keys(compatibility.redirects),
+    ...compatibility.retiredCodes,
+  ]);
+  const completeCompatibility = {
+    redirects: compatibility.redirects,
+    retiredCodes: [
+      ...new Set([
+        ...compatibility.retiredCodes,
+        ...historicalSourceCodes.rows
+          .map((row) => row.code)
+          .filter((code) => !coveredCodes.has(code)),
+      ]),
+    ].sort(),
+  };
+  await updateDraftTaxonomyCodeCompatibility(client, draft.id, completeCompatibility);
 
   const retirement = await retireDimension(client, actor, from, {
     recordRetiredCodes: false,
