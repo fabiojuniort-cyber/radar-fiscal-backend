@@ -86,6 +86,7 @@ test('sinais tributários inequívocos preservam tipo DOU genérico mesmo no cor
     'DCTFWeb',
     'EFD-Reinf',
     'benefício fiscal',
+    'benefícios fiscais',
   ];
 
   for (const signal of signals) {
@@ -107,6 +108,28 @@ test('sinais tributários inequívocos preservam tipo DOU genérico mesmo no cor
     );
     assert.equal(decision.reasonCode, 'STRONG_TERM');
   }
+});
+
+test('regressão: Resolução SUFRAMA com benefícios fiscais no plural é preservada', () => {
+  const decision = evaluateCollectionFilter(
+    policyFor('DO1', 'RESOLUCAO'),
+    {
+      sourceCode: 'dou',
+      section: 'DO1',
+      actType: 'RESOLUCAO',
+      title: 'RESOLUÇÕES CAS-SUFRAMA DE 14 DE AGOSTO DE 2026',
+      body:
+        'Aprova projeto industrial na Zona Franca de Manaus com fruição de benefícios fiscais.',
+      ...complete,
+    },
+  );
+
+  assert.equal(decision.decision, 'KEEP');
+  assert.equal(decision.reasonCode, 'STRONG_TERM');
+  assert.equal(
+    decision.termHits.some((hit) => hit.text === 'BENEFICIOS FISCAIS'),
+    true,
+  );
 });
 
 test('termo fiscal ambíguo no corpo continua insuficiente isoladamente', () => {
