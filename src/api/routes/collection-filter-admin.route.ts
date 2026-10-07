@@ -134,6 +134,67 @@ export async function collectionFilterAdminRoutes(
     },
   );
 
+
+  typed.post(
+    '/api/v1/admin/collection-filter/simulations',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        body: z.object({
+          policyId: z.string().uuid(),
+          scope: z.enum(['FULL_ARCHIVE', 'RECENT']),
+          reviewMode: z.enum(['ALL', 'SAMPLE', 'NONE']),
+        }),
+      },
+    },
+    async (request, reply) =>
+      reply.send(
+        await requestCollectionFilterSimulation(
+          app.db,
+          request.auth!.userId,
+          request.body.policyId,
+          request.body.scope,
+          request.body.reviewMode,
+        ),
+      ),
+  );
+
+  typed.post(
+    '/api/v1/admin/collection-filter/approve',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        body: z.object({
+          policyId: z.string().uuid(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        return reply.send(
+          await approveCollectionFilterDraft(
+            app.db,
+            request.auth!.userId,
+            request.body.policyId,
+          ),
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : '';
+        if (
+          [
+            'collection_filter_draft_not_found',
+            'collection_filter_fresh_simulation_required',
+            'collection_filter_simulation_has_errors',
+          ].includes(message)
+        ) {
+          return reply.status(409).send({ error: message });
+        }
+        throw error;
+      }
+    },
+  );
+
   typed.get(
     '/api/v1/admin/collection-filter/new-types',
     {
