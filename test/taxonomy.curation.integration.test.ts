@@ -843,6 +843,10 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.equal(find('theme.presumed_credit').reason.type, 'TEXT');
     assert.equal(find('product.urea').section, 'Produtos');
     assert.equal(find('product.rice').reason.type, 'NCM');
+    // What the site marks in the legislation text.
+    assert.ok(find('theme.presumed_credit').highlight.terms.includes('Crédito presumido'));
+    assert.deepEqual(find('theme.presumed_credit').highlight.ncmPrefixes, []);
+    assert.ok(find('product.rice').highlight.ncmPrefixes.length > 0, 'products carry their NCM prefixes');
     assert.equal(find('product.rice').reason.term, '10063011');
     assert.equal(find('product.espalhante_adesivo').reason.type, 'SYNONYM');
     assert.equal(find('act_type.law'), undefined, 'generic label does not tag');

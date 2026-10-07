@@ -42,7 +42,21 @@ export interface PublicationTag {
   assertionId: string | null;
   removed: boolean;
   reason: TagReason;
+  /**
+   * What marks this tag in the legislation text (current wording only):
+   * every term that classifies it (label and synonyms) and, for products,
+   * the NCM prefixes. Empty for tags with no place in the text (curator
+   * tags, segments derived from products).
+   */
+  highlight: TagHighlight;
 }
+
+export interface TagHighlight {
+  terms: string[];
+  ncmPrefixes: string[];
+}
+
+const NO_HIGHLIGHT: TagHighlight = { terms: [], ncmPrefixes: [] };
 
 export interface PublicationTagSection {
   name: string;
@@ -218,7 +232,20 @@ export async function loadPublicationTaxonomy(
   };
 
   const tags = new Map<string, { section: string; tag: PublicationTag }>();
-  const add = (concept: ConceptView, tag: Omit<PublicationTag, 'kind' | 'conceptCode' | 'groupCode' | 'label' | 'dimensionCode' | 'groupLabel'>) => {
+  const ncmDimensions = new Set(
+    view.dimensions.filter((d) => d.officialCodeType === 'NCM').map((d) => d.code),
+  );
+  const highlightOf = (concept: ConceptView): TagHighlight => ({
+    terms: [
+      ...new Set([
+        ...(concept.classifyByLabel ? [concept.label] : []),
+        ...concept.aliases.map((alias) => alias.text),
+      ]),
+    ],
+    ncmPrefixes: ncmDimensions.has(concept.dimensionCode) ? concept.officialCodes : [],
+  });
+
+  const add = (concept: ConceptView, tag: Omit<PublicationTag, 'kind' | 'conceptCode' | 'groupCode' | 'label' | 'dimensionCode' | 'groupLabel' | 'highlight'>) => {
     const section = sectionOf(concept);
     if (!section) return;
     const group = concept.groupId ? groupById.get(concept.groupId) : undefined;
@@ -232,6 +259,7 @@ export async function loadPublicationTaxonomy(
         dimensionCode: concept.dimensionCode,
         groupLabel: group?.label ?? null,
         ...tag,
+        highlight: tag.origin === 'AUTOMATIC' ? highlightOf(concept) : NO_HIGHLIGHT,
       },
     });
   };
@@ -310,6 +338,7 @@ export async function loadPublicationTaxonomy(
             term: hit.ncm_code,
             excerpt: `NCM ${hit.ncm_code} citado na legislação`,
           },
+          highlight: { terms: [], ncmPrefixes: group.officialCodes },
         },
       });
     }
@@ -354,6 +383,7 @@ export async function loadPublicationTaxonomy(
             term: names.join(', '),
             excerpt: `Pelos produtos citados: ${shown}`,
           },
+          highlight: NO_HIGHLIGHT,
         },
       });
     }
