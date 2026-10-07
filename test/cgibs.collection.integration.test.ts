@@ -9,7 +9,7 @@ import type { DB } from '../src/infrastructure/database/database.types.js';
 import { acquireNextCollectionRun, createCollectionRun } from '../src/modules/collection/collection-run.repository.js';
 import { processAcquiredCollectionRun } from '../src/modules/collection/collection.engine.js';
 import { CgibsConnector } from '../src/modules/collection/cgibs.connector.js';
-import { readCgibsSourceState } from '../src/modules/collection/cgibs-source-state.repository.js';
+import { readCgibsPersistedOrigins, readCgibsSourceState } from '../src/modules/collection/cgibs-source-state.repository.js';
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
 import { CGIBS, dereHtml, emptyContainer, pdf, resolutionsHtml, zip } from './cgibs.fixtures.js';
 
@@ -68,7 +68,20 @@ test('CGIBS through collection engine is idempotent and versions only real chang
     now: () => new Date('2026-09-23T16:00:00Z'),
   }));
 
-  async function run() {
+  // Production wiring: the connector also reads what the database already
+  // holds, which is what lets an unchanged file be left alone.
+  const wiredRegistry = new ConnectorRegistry();
+  wiredRegistry.register(new CgibsConnector({
+    fetch: fetchImpl,
+    readState: source => readCgibsSourceState(db, source),
+    readPersistedOrigins: source => readCgibsPersistedOrigins(db, source),
+    // Production window: a file checked minutes ago is not due again, which
+    // is the state in which the text is not in hand.
+    maxRechecksPerRun: 100,
+    now: () => new Date('2026-09-23T16:00:00Z'),
+  }));
+
+  async function run(using: ConnectorRegistry = registry) {
     const runId = await createCollectionRun(db, {
       sourceId,
       scheduledFor: new Date(Date.now() - 60_000 + sequence++),
@@ -77,7 +90,7 @@ test('CGIBS through collection engine is idempotent and versions only real chang
     const acquired = await acquireNextCollectionRun(db, `cgibs-worker-${sourceId}`);
     assert.ok(acquired);
     assert.equal(acquired.id, runId);
-    return processAcquiredCollectionRun(db, registry, acquired, {
+    return processAcquiredCollectionRun(db, using, acquired, {
       timeoutMs: 10_000,
       heartbeatIntervalMs: 0,
     });
@@ -147,6 +160,52 @@ test('CGIBS through collection engine is idempotent and versions only real chang
     assert.equal(resolutionVersions.length, 2);
     assert.equal(resolutionVersions.filter((row) => row.is_current).length, 1);
     assert.equal(new Set(resolutionVersions.map((row) => row.content_hash)).size, 2);
+
+    // With the production wiring an unchanged catalog is left alone: the run
+    // still consults the source (so the health watchdog does not call it
+    // stale) but writes nothing, and above all adds no version. Re-emitting
+    // without the text, which only the downloaded bytes carry, is what would
+    // have written an empty version every other run.
+    const versionsBefore = await db.selectFrom('publication_versions as pv')
+      .innerJoin('publication_origins as po', 'po.publication_id', 'pv.publication_id')
+      .select(({ fn }) => [fn.countAll<string>().as('total')])
+      .where('po.source_id', '=', sourceId)
+      .executeTakeFirstOrThrow();
+
+    const persistedOrigins = await readCgibsPersistedOrigins(db, sourceId);
+    assert.equal(persistedOrigins.linked.size, origins.length, 'every persisted origin is reported back');
+    const checkpointNow = await readCgibsSourceState(db, sourceId);
+    const unread = Object.entries(checkpointNow.items)
+      .filter(([, item]) => item.contentExtraction === undefined)
+      .map(([key]) => key);
+    assert.deepEqual(unread, [], 'every checkpointed file records how its text was read');
+    for (const key of Object.keys(checkpointNow.items)) {
+      assert.ok(persistedOrigins.linked.has(key), `checkpoint key ${key} must match a persisted origin`);
+    }
+
+    const settledRun = await run(wiredRegistry);
+    assert.equal(settledRun.metrics.newPublications, 0);
+    assert.equal(settledRun.metrics.newVersions, 0);
+    assert.equal(settledRun.metrics.itemErrors, 0);
+    // Documents whose body comes from an HTML page carry their text on every
+    // run, so they are still emitted; only the file-anchored ones are skipped.
+    assert.ok(
+      settledRun.metrics.existingPublications < first.metrics.newPublications,
+      `file-anchored documents must be skipped (saw ${settledRun.metrics.existingPublications} of ${first.metrics.newPublications})`,
+    );
+
+    const versionsAfter = await db.selectFrom('publication_versions as pv')
+      .innerJoin('publication_origins as po', 'po.publication_id', 'pv.publication_id')
+      .select(({ fn }) => [fn.countAll<string>().as('total')])
+      .where('po.source_id', '=', sourceId)
+      .executeTakeFirstOrThrow();
+    assert.equal(versionsAfter.total, versionsBefore.total, 'a quiet run must not add a version');
+
+    const originsAfter = await db.selectFrom('publication_origins')
+      .select(({ fn }) => [fn.countAll<string>().as('total')])
+      .where('source_id', '=', sourceId)
+      .executeTakeFirstOrThrow();
+    assert.equal(originsAfter.total, String(origins.length), 'nothing is dropped by being skipped');
   } finally {
     const publicationIds = [...new Set(
       (await db.selectFrom('publication_origins')

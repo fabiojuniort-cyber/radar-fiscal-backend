@@ -2,6 +2,7 @@ import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { readCurrentCheckpoint } from './checkpoint.repository.js';
+import type { CgibsTextExtraction } from './cgibs.text.js';
 import {
   CGIBS_CONNECTOR_KEY,
   CGIBS_STATE_VERSION,
@@ -14,6 +15,14 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
+}
+
+const EXTRACTIONS: ReadonlySet<string> = new Set<CgibsTextExtraction>([
+  'PDF_TEXT', 'PDF_WITHOUT_TEXT', 'UNSUPPORTED_MEDIA', 'TOO_LARGE', 'UNREADABLE',
+]);
+
+function isExtraction(value: unknown): value is CgibsTextExtraction {
+  return typeof value === 'string' && EXTRACTIONS.has(value);
 }
 
 function storedFile(value: unknown): CgibsStoredFile | undefined {
@@ -35,6 +44,7 @@ function storedFile(value: unknown): CgibsStoredFile | undefined {
     ...(typeof item.identityKey === 'string' && item.identityKey.startsWith('CGIBS|') && item.identityKey.length <= 4096
       ? { identityKey: item.identityKey }
       : {}),
+    ...(isExtraction(item.contentExtraction) ? { contentExtraction: item.contentExtraction } : {}),
   };
 }
 
