@@ -86,6 +86,7 @@ test('sinais tributários inequívocos preservam tipo DOU genérico mesmo no cor
     'DCTFWeb',
     'EFD-Reinf',
     'benefício fiscal',
+    'benefícios fiscais',
   ];
 
   for (const signal of signals) {
