@@ -147,6 +147,13 @@ function isNonNormativePresentationClass(token: string): boolean {
   return NON_NORMATIVE_PRESENTATION_CLASSES.has(token) || isPreviousWordingClass(token);
 }
 
+const REVOKED_PLACEHOLDER =
+  /^(?:(?:cl[áa]usula|art(?:igo)?\.?|par[áa]grafo|inciso|al[íi]nea|item)\s+[\p{L}\p{N}º°ª.-]+|§\s*\d+[º°ª]?|[ivxlcdm]+|[a-z]|\d+[º°ª]?)\s*(?:[-–—:]\s*)?revogad[oa]s?\.?$/iu;
+
+function isRevokedPlaceholder(text: string): boolean {
+  return REVOKED_PLACEHOLDER.test(text.replace(/\s+/g, ' ').trim());
+}
+
 function allowedClasses(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const kept = raw
@@ -397,7 +404,11 @@ export function currentWordingText(html: string | null | undefined): string | un
           return;
         }
         const frame = frames.pop()!;
-        if (!frame.excluded) append(frame.text + separator);
+        if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
+          append(frame.text + separator);
+        } else if (frame.tag === 'p' && isRevokedPlaceholder(frame.text)) {
+          filtered = true;
+        }
       },
     },
     { decodeEntities: true, lowerCaseTags: true, lowerCaseAttributeNames: true, recognizeSelfClosing: true },
@@ -405,7 +416,11 @@ export function currentWordingText(html: string | null | undefined): string | un
   parser.end(html);
   while (frames.length > 0) {
     const frame = frames.pop()!;
-    if (!frame.excluded) append(frame.text);
+    if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
+      append(frame.text);
+    } else if (frame.tag === 'p' && isRevokedPlaceholder(frame.text)) {
+      filtered = true;
+    }
   }
 
   if (!filtered) return undefined;
