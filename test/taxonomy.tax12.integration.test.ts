@@ -164,6 +164,10 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     let detachedHistoricalTreatmentCode = '';
     let detachedHistoricalRedirectTreatmentCode = '';
     let detachedHistoricalRedirectThemeCode = '';
+    let detachedHistoricalRestoreTreatmentCode = '';
+    let detachedHistoricalCreateTreatmentCode = '';
+    let createTreatmentCode = '';
+    let createdThemeCode = '';
     let detachedHistoricalPlatformCode = '';
     let detachedHistoricalTaxSpeciesCode = '';
     let targetThemeCode = '';
@@ -213,6 +217,12 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         `treatment.tax12_detached_redirect_${suffix}`;
       detachedHistoricalRedirectThemeCode =
         `theme.tax12_detached_redirect_${suffix}`;
+      detachedHistoricalRestoreTreatmentCode =
+        `treatment.tax12_detached_restore_retired_${suffix}`;
+      detachedHistoricalCreateTreatmentCode =
+        `treatment.tax12_detached_create_retired_${suffix}`;
+      createTreatmentCode = `treatment.tax12_create_${suffix}`;
+      createdThemeCode = `theme.tax12_create_${suffix}`;
       detachedHistoricalPlatformCode = `platform.tax12_detached_${suffix}`;
       detachedHistoricalTaxSpeciesCode = `tax_species.tax12_detached_${suffix}`;
       platformCode = `platform.tax12_sped_${suffix}`;
@@ -237,6 +247,16 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
           detachedHistoricalRedirectTreatmentCode,
           'treatment',
           'Tratamento histórico com sucessor ativo',
+        ],
+        [
+          detachedHistoricalRestoreTreatmentCode,
+          'treatment',
+          'Benefício restaurado',
+        ],
+        [
+          detachedHistoricalCreateTreatmentCode,
+          'treatment',
+          'Benefício criado no merge',
         ],
         [
           detachedHistoricalPlatformCode,
@@ -287,6 +307,12 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         label: 'Benefício restaurado',
         groupId: treatmentGroup,
         officialCodes: ['200001'],
+      });
+      await concept(client, sourceId, dimensions, {
+        code: createTreatmentCode,
+        dimensionCode: 'treatment',
+        label: 'Benefício criado no merge',
+        groupId: treatmentGroup,
       });
       await concept(client, sourceId, dimensions, {
         code: retiredTreatmentCode,
@@ -380,7 +406,11 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
           JSON.stringify({
             version: 1,
             redirects: {},
-            retiredCodes: [detachedHistoricalRedirectTreatmentCode],
+            retiredCodes: [
+              detachedHistoricalRedirectTreatmentCode,
+              detachedHistoricalRestoreTreatmentCode,
+              detachedHistoricalCreateTreatmentCode,
+            ],
           }),
         ],
       );
@@ -417,6 +447,13 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       assert.equal(
         merged.steps.find((step) => step.from === treatmentCode)?.action,
         'RESTORE',
+      );
+      assert.deepEqual(
+        merged.steps
+          .filter((step) => step.from === createTreatmentCode)
+          .map((step) => [step.action, step.into]),
+        [['CREATE', createdThemeCode]],
+        'materialized Treatment creates the Theme used by detached stale compatibility',
       );
     });
 
@@ -532,7 +569,27 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.equal(
       compatibility.retiredCodes.includes(detachedHistoricalRedirectTreatmentCode),
       false,
-      'detached historical treatment with successor must not become retired',
+      'detached historical treatment with pre-existing active successor must not remain retired',
+    );
+    assert.equal(
+      compatibility.redirects[detachedHistoricalRestoreTreatmentCode],
+      targetThemeCode,
+      'stale detached retirement upgrades to redirect when its Theme successor is RESTORED during the merge',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(detachedHistoricalRestoreTreatmentCode),
+      false,
+      'RESTORE successor removes the stale detached retirement',
+    );
+    assert.equal(
+      compatibility.redirects[detachedHistoricalCreateTreatmentCode],
+      createdThemeCode,
+      'stale detached retirement upgrades to redirect when its Theme successor is CREATED during the merge',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(detachedHistoricalCreateTreatmentCode),
+      false,
+      'CREATE successor removes the stale detached retirement',
     );
     assert.ok(
       compatibility.retiredCodes.includes(detachedHistoricalPlatformCode),
@@ -585,6 +642,60 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       );
     } finally {
       compatibilityValidationClient.release();
+    }
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(originalManifest)],
+    );
+
+    // Defense in depth for the fifth-review variant: a manually stale
+    // retiredCode must never pass publication validation when a Theme
+    // successor is already active in the draft.
+    const staleRetirementManifest = JSON.parse(
+      JSON.stringify(originalManifest),
+    ) as {
+      taxonomyCompatibility?: {
+        redirects?: Record<string, string>;
+        retiredCodes?: string[];
+      };
+    };
+    assert.ok(staleRetirementManifest.taxonomyCompatibility);
+    staleRetirementManifest.taxonomyCompatibility!.redirects ??= {};
+    delete staleRetirementManifest.taxonomyCompatibility!.redirects![
+      detachedHistoricalRedirectTreatmentCode
+    ];
+    staleRetirementManifest.taxonomyCompatibility!.retiredCodes = [
+      ...new Set([
+        ...(staleRetirementManifest.taxonomyCompatibility!.retiredCodes ?? []),
+        detachedHistoricalRedirectTreatmentCode,
+      ]),
+    ].sort();
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(staleRetirementManifest)],
+    );
+    const staleValidationClient = await admin.connect();
+    try {
+      const staleValidationView = await loadReleaseView(
+        pgRunner(staleValidationClient),
+        draft!.id,
+      );
+      assert.ok(staleValidationView);
+      const issues = await validateReleaseView(
+        staleValidationClient,
+        staleValidationView!,
+      );
+      assert.ok(
+        issues.some(
+          (issue) =>
+            issue.severity === 'BLOCKER' &&
+            issue.code === 'RETIRED_TREATMENT_HAS_ACTIVE_THEME_SUCCESSOR' &&
+            issue.subject === detachedHistoricalRedirectTreatmentCode,
+        ),
+        'publish validation must block a stale retired Treatment that now has an active Theme successor',
+      );
+    } finally {
+      staleValidationClient.release();
     }
     await admin.query(
       'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
