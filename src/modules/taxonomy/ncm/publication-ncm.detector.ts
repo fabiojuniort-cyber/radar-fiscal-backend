@@ -8,9 +8,10 @@ import {
 } from '../../publication-scope/publication-scope.guard.js';
 
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
-// 1.1.0: reads only the wording in force (previous wordings of CONFAZ acts
-// are skipped) and accepts the "8417.8020" typing found in official annexes.
-export const PUBLICATION_NCM_DETECTOR_VERSION = '1.1.0';
+// 1.2.0: reads only operative legal text (excluding title/editorial history,
+// revoked placeholders and previous wordings) and accepts the "8417.8020"
+// typing found in official annexes.
+export const PUBLICATION_NCM_DETECTOR_VERSION = '1.2.0';
 
 export type PublicationNcmSourceField =
   | 'CONTENT_TEXT'
@@ -122,7 +123,7 @@ export function selectText(row: VersionForNcmScan): {
     // Acts that keep previous wordings on the page (CONFAZ annexes in green,
     // "Redação anterior"): only the wording in force counts.
     const current = currentWordingText(row.presentation_html);
-    if (current) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
+    if (current !== undefined) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
     return { text: row.content_text!, sourceField: 'CONTENT_TEXT', currentWordingOnly: false };
   }
 
