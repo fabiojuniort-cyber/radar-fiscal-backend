@@ -102,7 +102,15 @@ async function usage(codes: string[]): Promise<unknown> {
 class Rollback extends Error {}
 
 const pool = new Pool({ connectionString, max: 1 });
-let result: { draftVersion: string; draftCreated: boolean; steps: MergeStep[]; retired: string[] } | undefined;
+let result:
+  | {
+      draftVersion: string;
+      draftCreated: boolean;
+      steps: MergeStep[];
+      retired: string[];
+      transferredOfficialCodeType: string | null;
+    }
+  | undefined;
 try {
   await withCuratorTransaction(pool, async (client) => {
     result = await mergeDimension(client, actor, from, into, groupMap);
@@ -123,7 +131,9 @@ console.log(
       draftVersion: result?.draftVersion,
       draftCreated: result?.draftCreated,
       merged: result?.steps.filter((step) => step.action === 'MERGE').length,
+      restored: result?.steps.filter((step) => step.action === 'RESTORE').length,
       created: result?.steps.filter((step) => step.action === 'CREATE').length,
+      transferredOfficialCodeType: result?.transferredOfficialCodeType ?? null,
       steps: result?.steps,
       retired: result?.retired,
       usage: await usage(result?.steps.map((step) => step.from) ?? []),
