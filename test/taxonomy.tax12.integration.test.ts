@@ -373,11 +373,22 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.ok(compatibility.retiredCodes.includes(taxSpeciesCode));
 
     const residue = await admin.query<{
+      concepts: number;
       groups: number;
       rules: number;
       relations: number;
     }>(
       `SELECT
+         (
+           SELECT count(*)::int
+           FROM taxonomy_release_concepts rc
+           JOIN taxonomy_concepts c ON c.id = rc.concept_id
+           JOIN taxonomy_release_dimensions rd
+             ON rd.release_id = rc.release_id AND rd.dimension_id = c.dimension_id
+           WHERE rc.release_id = $1::uuid
+             AND rc.membership_status = 'INCLUDED'
+             AND rd.membership_status <> 'INCLUDED'
+         ) AS concepts,
          (
            SELECT count(*)::int
            FROM taxonomy_release_groups g
@@ -406,7 +417,12 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
          ) AS relations`,
       [draft!.id],
     );
-    assert.deepEqual(residue.rows[0], { groups: 0, rules: 0, relations: 0 });
+    assert.deepEqual(residue.rows[0], {
+      concepts: 0,
+      groups: 0,
+      rules: 0,
+      relations: 0,
+    });
 
     // Applying the same merge again is a no-op, not DIMENSION_NOT_FOUND.
     await withCuratorTransaction(app.curatorPool!, async (curator) => {
