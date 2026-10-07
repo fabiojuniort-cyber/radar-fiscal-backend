@@ -305,6 +305,80 @@ export async function listCollectionFilterNewTypes(
   });
 }
 
+export async function listCollectionFilterDiscards(
+  db: Kysely<DB>,
+  userId: string,
+  options: {
+    sourceCode?: string | undefined;
+    limit?: number | undefined;
+    offset?: number | undefined;
+  } = {},
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+    const offset = Math.max(options.offset ?? 0, 0);
+    const sourceCode = options.sourceCode?.trim().toLowerCase() || null;
+    const result = await sql<any>`
+      SELECT
+        d.id,
+        d.source_code,
+        d.connector_key,
+        d.section,
+        d.raw_type,
+        d.canonical_type,
+        d.title,
+        d.act_number,
+        d.published_on,
+        d.official_url,
+        d.reason_code,
+        d.decisive_term,
+        d.policy_version,
+        d.policy_revision,
+        d.discarded_at,
+        d.expires_at
+      FROM collection_filter_discards d
+      WHERE (${sourceCode}::text IS NULL OR d.source_code=${sourceCode})
+      ORDER BY d.discarded_at DESC,d.id DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `.execute(trx);
+    return result.rows;
+  });
+}
+
+export async function listCollectionFilterDiscardAlerts(
+  db: Kysely<DB>,
+  userId: string,
+  options: {
+    status?: 'OPEN' | 'ACKNOWLEDGED' | undefined;
+    limit?: number | undefined;
+  } = {},
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const status = options.status ?? null;
+    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+    const result = await sql<any>`
+      SELECT
+        a.id,
+        a.collection_run_id,
+        a.source_code,
+        a.discard_rate,
+        a.baseline_rate,
+        a.threshold_rate,
+        a.found_count,
+        a.discard_count,
+        a.status,
+        a.created_at,
+        a.acknowledged_at
+      FROM collection_filter_discard_alerts a
+      WHERE (${status}::text IS NULL OR a.status=${status})
+      ORDER BY a.created_at DESC,a.id DESC
+      LIMIT ${limit}
+    `.execute(trx);
+    return result.rows;
+  });
+}
+
 export async function resolveCollectionFilterNewType(
   db: Kysely<DB>,
   userId: string,
