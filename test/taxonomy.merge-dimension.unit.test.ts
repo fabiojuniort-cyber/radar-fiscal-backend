@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  planDetachedHistoricalMergeCompatibility,
   planDimensionMerge,
   planDimensionMergeCompatibility,
 } from '../src/modules/taxonomy/curation/curation.merge-dimension.js';
@@ -118,6 +119,29 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
   );
 });
 
+
+test('detached historical Treatment redirects to an active Theme before retirement', () => {
+  const result = planDetachedHistoricalMergeCompatibility(
+    [
+      { code: 'treatment.exemption', label: 'Isenção histórica' },
+      { code: 'treatment.legacy_by_label', label: 'Crédito presumido' },
+      { code: 'treatment.orphan', label: 'Tratamento sem sucessor' },
+    ],
+    [
+      concept('theme.exemption', 'Isenção'),
+      concept('theme.presumed_credit', 'Crédito presumido'),
+    ],
+    new Set<string>(),
+  );
+
+  assert.equal(result.redirects['treatment.exemption'], 'theme.exemption');
+  assert.equal(
+    result.redirects['treatment.legacy_by_label'],
+    'theme.presumed_credit',
+    'detached histories use the same label fallback as the normal merge',
+  );
+  assert.deepEqual(result.retiredCodes, ['treatment.orphan']);
+});
 
 test('planDimensionMerge rejects ambiguous target labels instead of picking the first', () => {
   assert.throws(
