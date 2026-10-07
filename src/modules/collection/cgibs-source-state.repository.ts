@@ -5,6 +5,7 @@ import { readCurrentCheckpoint } from './checkpoint.repository.js';
 import {
   CGIBS_CONNECTOR_KEY,
   CGIBS_STATE_VERSION,
+  type CgibsPersistedOrigins,
   type CgibsSourceState,
   type CgibsStoredFile,
 } from './cgibs.connector.js';
@@ -38,34 +39,50 @@ function storedFile(value: unknown): CgibsStoredFile | undefined {
 }
 
 /**
- * Identity key each persisted origin of the source is linked to. A CGIBS
- * origin is the stable path of one published file, so the document it names
- * never changes: a different act is a different file and therefore a
- * different origin. The identity it already owns is the reference whenever
- * the checkpoint does not carry one (first run after this change, dropped
- * checkpoint, or an item that failed in the last run), because persistence
- * rejects any other key for that origin.
+ * What the database already holds for the origins of this source.
+ *
+ * `identityKeys` is the identity each origin owns, for identities derived
+ * from the listing (canonical key). A CGIBS origin is the stable path of one
+ * published file, so the document it names never changes: a different act is
+ * a different file and therefore a different origin. The identity it already
+ * owns is the reference whenever the checkpoint does not carry one (first run
+ * after this change, dropped checkpoint, or an item that failed in the last
+ * run), because persistence rejects any other key for that origin.
+ *
+ * `linked` is every origin that already has a publication, including the
+ * numbered acts whose identity is strong rather than canonical. It is the
+ * proof that lets an unchanged file be skipped instead of re-emitted: an
+ * origin missing from it has nothing persisted yet and must be emitted even
+ * when its bytes are unchanged.
  */
-export async function readCgibsPersistedIdentityKeys(
+export async function readCgibsPersistedOrigins(
   db: Kysely<DB>,
   sourceId: string,
-): Promise<Record<string, string>> {
+): Promise<CgibsPersistedOrigins> {
   const linked = await db
     .selectFrom('publication_origins as o')
     .innerJoin('publications as p', 'p.id', 'o.publication_id')
-    .select(['o.external_id', sql<string | null>`p.identity_basis ->> 'sourceKey'`.as('source_key')])
+    .select([
+      'o.external_id',
+      sql<string | null>`p.identity_basis ->> 'sourceKey'`.as('source_key'),
+      sql<string | null>`p.identity_basis ->> 'sourceKeyType'`.as('source_key_type'),
+    ])
     .where('o.source_id', '=', sourceId)
     .where('o.external_id', 'is not', null)
-    .where(sql<boolean>`p.identity_basis ->> 'sourceKeyType' = 'CANONICAL_KEY'`)
     .execute();
-  const keys: Record<string, string> = {};
+
+  const identityKeys: Record<string, string> = {};
+  const persisted = new Set<string>();
   for (const row of linked) {
+    const externalId = row.external_id;
+    if (!externalId) continue;
+    persisted.add(externalId);
     const key = row.source_key;
-    if (row.external_id && key && key.startsWith('CGIBS|') && key.length <= 4096) {
-      keys[row.external_id] = key;
+    if (row.source_key_type === 'CANONICAL_KEY' && key && key.startsWith('CGIBS|') && key.length <= 4096) {
+      identityKeys[externalId] = key;
     }
   }
-  return keys;
+  return { identityKeys, linked: persisted };
 }
 
 export async function readCgibsSourceState(
