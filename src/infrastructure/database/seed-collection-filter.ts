@@ -241,7 +241,6 @@ try {
     ];
 
     const document: CollectionFilterDraftInput = {
-      version: 1,
       contextWindowWords: 12,
       weakScoreThreshold: 3,
       locationWeights: {
