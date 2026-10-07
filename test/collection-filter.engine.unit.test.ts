@@ -161,6 +161,40 @@ test('CNPJ/processo/valor não podem ser termos positivos autônomos', () => {
   }
 });
 
+test('termos duplicados ou conflitantes no mesmo escopo são recusados', () => {
+  const common = {
+    version: 1,
+    contextWindowWords: 5,
+    weakScoreThreshold: 3,
+    locationWeights: { title: 3, summary: 2, body: 1 },
+    rules: [],
+  } as const;
+
+  assert.throws(
+    () =>
+      compileCollectionFilterPolicy({
+        ...common,
+        terms: [
+          { text: 'tributário', strength: 'WEAK' },
+          { text: 'TRIBUTARIO', strength: 'WEAK' },
+        ],
+      }),
+    /duplicate filter term/,
+  );
+
+  assert.throws(
+    () =>
+      compileCollectionFilterPolicy({
+        ...common,
+        terms: [
+          { text: 'regularidade fiscal', strength: 'WEAK' },
+          { text: 'regularidade fiscal', strength: 'NEGATIVE' },
+        ],
+      }),
+    /conflicting filter term strength/,
+  );
+});
+
 test('EXTRATO DE CONTRATO não é preservado por CNPJ isolado', () => {
   const decision = evaluateCollectionFilter(basePolicy(), {
     sourceCode: 'dou',
