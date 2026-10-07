@@ -14,6 +14,7 @@ import { healthRoutes } from './api/routes/health.route.js';
 import { newsRoutes } from './api/routes/news.route.js';
 import { productNcmRoutes } from './api/routes/product-ncm.route.js';
 import { platformAdminRoutes } from './api/routes/platform-admin.route.js';
+import { collectionFilterAdminRoutes } from './api/routes/collection-filter-admin.route.js';
 import { publicRoutes } from './api/routes/public.route.js';
 import { productRoutes } from './api/routes/product.route.js';
 import { taxonomyAdminRoutes } from './api/routes/taxonomy-admin.route.js';
@@ -55,6 +56,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(companyManualRoutes);
   await app.register(establishmentManualRoutes);
   await app.register(platformAdminRoutes);
+  await app.register(collectionFilterAdminRoutes);
   await app.register(taxonomyAdminRoutes);
   await app.register(publicationTaxonomyRoutes);
 
