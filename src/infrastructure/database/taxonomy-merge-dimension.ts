@@ -91,7 +91,38 @@ async function usage(codes: string[]): Promise<unknown> {
       `,
       [codes],
     );
-    return { classifierTags: tags.rows, curatorTags: curator.rows, profiles: profiles.rows };
+    const monitoringProfiles = await pool.query<{ code: string; profiles: number }>(
+      `
+        SELECT criterion.code, count(DISTINCT p.id)::int AS profiles
+        FROM monitoring_profiles p
+        CROSS JOIN LATERAL (
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'anyOf') = 'array'
+              THEN p.criteria->'taxonomy'->'anyOf' ELSE '[]'::jsonb END
+          ) AS code
+          UNION ALL
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'allOf') = 'array'
+              THEN p.criteria->'taxonomy'->'allOf' ELSE '[]'::jsonb END
+          )
+          UNION ALL
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'noneOf') = 'array'
+              THEN p.criteria->'taxonomy'->'noneOf' ELSE '[]'::jsonb END
+          )
+        ) criterion
+        WHERE criterion.code = ANY($1::text[])
+        GROUP BY criterion.code
+        ORDER BY criterion.code
+      `,
+      [codes],
+    );
+    return {
+      classifierTags: tags.rows,
+      curatorTags: curator.rows,
+      companyTaxProfiles: profiles.rows,
+      monitoringProfiles: monitoringProfiles.rows,
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   } finally {
