@@ -17,6 +17,7 @@ import {
   type ConceptView,
   type ReleaseView,
 } from './curation.read.js';
+import { updateDraftTaxonomyCodeCompatibility } from '../taxonomy-code-compatibility.js';
 
 /**
  * Folds one dimension into another inside the open DRAFT (creates one when
@@ -200,12 +201,18 @@ export async function mergeDimension(
     }
   }
 
-  const { retiredConcepts } = await retireDimension(client, actor, from);
+  await updateDraftTaxonomyCodeCompatibility(client, draft.id, {
+    redirects: Object.fromEntries(steps.map((step) => [step.from, step.into])),
+  });
+
+  const retirement = await retireDimension(client, actor, from, {
+    recordRetiredCodes: false,
+  });
   return {
     draftVersion: draft.version,
     draftCreated,
     steps,
-    retired: retiredConcepts,
+    retired: retirement.retiredConcepts,
     transferredOfficialCodeType,
   };
 }
