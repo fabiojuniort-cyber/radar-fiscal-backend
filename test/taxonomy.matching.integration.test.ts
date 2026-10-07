@@ -82,6 +82,8 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
       randomUUID();
     const companyId = randomUUID();
     const profileId = randomUUID();
+    const legacyProfileId = randomUUID();
+    const retiredProfileId = randomUUID();
     const invalidProfileId =
       randomUUID();
     const publicationId =
@@ -116,6 +118,10 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
     const childCode =
       dimensionCode +
       '.presumed_credit';
+    const legacyParentCode =
+      dimensionCode + '.legacy_benefit';
+    const retiredLegacyCode =
+      dimensionCode + '.retired_legacy';
     const versionMajor =
       1800000000 +
       (
@@ -217,6 +223,50 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
 
     await admin.query(
       [
+        'INSERT INTO monitoring_profiles (',
+        'id,company_id,name,criteria,criteria_schema_version,profile_version',
+        ') VALUES ($1,$2,$3,$4::jsonb,2,1)',
+      ].join(' '),
+      [
+        legacyProfileId,
+        companyId,
+        'TAX12 Legacy Treatment Code',
+        JSON.stringify({
+          taxonomy: {
+            releasePolicy: 'CURRENT_PUBLISHED',
+            anyOf: [legacyParentCode],
+            allOf: [],
+            noneOf: [],
+            includeDescendants: true,
+          },
+        }),
+      ],
+    );
+
+    await admin.query(
+      [
+        'INSERT INTO monitoring_profiles (',
+        'id,company_id,name,criteria,criteria_schema_version,profile_version',
+        ') VALUES ($1,$2,$3,$4::jsonb,2,1)',
+      ].join(' '),
+      [
+        retiredProfileId,
+        companyId,
+        'TAX12 Retired Code',
+        JSON.stringify({
+          taxonomy: {
+            releasePolicy: 'CURRENT_PUBLISHED',
+            anyOf: [retiredLegacyCode],
+            allOf: [],
+            noneOf: [],
+            includeDescendants: false,
+          },
+        }),
+      ],
+    );
+
+    await admin.query(
+      [
         'INSERT INTO publications (',
         'id,identity_hash,identity_strength,identity_basis,jurisdiction_level,title',
         ') VALUES ($1,$2,',
@@ -254,6 +304,22 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
       [
         releaseId,
         versionMajor,
+      ],
+    );
+
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [
+        releaseId,
+        JSON.stringify({
+          taxonomyCompatibility: {
+            version: 1,
+            redirects: {
+              [legacyParentCode]: parentCode,
+            },
+            retiredCodes: [retiredLegacyCode],
+          },
+        }),
       ],
     );
 
@@ -611,6 +677,30 @@ test('TAX-09 matches private profiles from global effective taxonomy without bre
       status.rows[0]?.status,
       'RELEVANT',
     );
+
+    const legacy = await matchPublicationByTaxonomy(
+      worker,
+      {
+        tenantId,
+        monitoringProfileId: legacyProfileId,
+        publicationVersionId,
+      },
+    );
+    assert.equal(legacy.disposition, 'MATCHED_CREATED');
+    assert.deepEqual(legacy.matchedCriteriaCodes, [legacyParentCode]);
+    assert.deepEqual(legacy.matchedAssertionCodes, [childCode]);
+
+    const retired = await matchPublicationByTaxonomy(
+      worker,
+      {
+        tenantId,
+        monitoringProfileId: retiredProfileId,
+        publicationVersionId,
+      },
+    );
+    assert.equal(retired.disposition, 'NO_MATCH');
+    assert.deepEqual(retired.matchedCriteriaCodes, []);
+    assert.deepEqual(retired.matchedAssertionCodes, []);
 
     await assert.rejects(
       matchPublicationByTaxonomy(
