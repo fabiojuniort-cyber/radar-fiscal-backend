@@ -390,9 +390,14 @@ export async function mergeDimension(
      ORDER BY c.code`,
     [from],
   );
+  // Existing redirects are already semantically resolved and can be
+  // preserved. Existing retiredCodes are different: they may be stale if a
+  // Theme successor became active in this merge (including RESTORE/CREATE).
+  // Re-evaluate those detached historical identities before keeping them
+  // retired. Compatibility computed from the current post-merge view is
+  // already fresh and can remain covered.
   const coveredCodes = new Set([
     ...Object.keys(existingCompatibility.redirects),
-    ...existingCompatibility.retiredCodes,
     ...Object.keys(compatibility.redirects),
     ...compatibility.retiredCodes,
   ]);
