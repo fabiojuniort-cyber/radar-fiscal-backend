@@ -19,6 +19,7 @@ import {
   revokeSession,
   rotateRefreshToken,
 } from '../../modules/auth/auth.service.js';
+import { readPlatformAccessInContext } from '../../modules/auth/platform-role.js';
 import {
   PublicSignupCompanyExistsError,
   PublicSignupEmailExistsError,
@@ -363,12 +364,18 @@ export async function authRoutes(
             .orderBy('tenants.name')
             .execute();
 
+          const platformAccess = await readPlatformAccessInContext(
+            trx,
+            user.id,
+          );
+
           return {
             user: {
               id: user.id,
               email: user.email,
               name: user.name,
             },
+            platformAccess,
             memberships: memberships.map(
               (membership) => ({
                 tenantId:
