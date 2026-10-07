@@ -146,8 +146,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
        SET status = 'WITHDRAWN', withdrawn_at = now(),
            withdrawal_reason = 'TAX-12 integration isolation',
            withdrawn_by_actor = 'tax-12-test'
-       WHERE status IN ('DRAFT','IN_REVIEW','APPROVED')
-         AND manifest ->> 'kind' = 'TAX-11_CURATED_RELEASE'`,
+       WHERE status IN ('DRAFT','IN_REVIEW','APPROVED')`,
     );
 
     const max = await admin.query<{ major: number }>(
