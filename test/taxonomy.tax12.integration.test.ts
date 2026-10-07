@@ -162,6 +162,8 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     let retiredTreatmentCode = '';
     let redirectedRetiredTreatmentCode = '';
     let detachedHistoricalTreatmentCode = '';
+    let detachedHistoricalRedirectTreatmentCode = '';
+    let detachedHistoricalRedirectThemeCode = '';
     let detachedHistoricalPlatformCode = '';
     let detachedHistoricalTaxSpeciesCode = '';
     let targetThemeCode = '';
@@ -207,6 +209,10 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       retiredTreatmentCode = `treatment.tax12_retired_${suffix}`;
       redirectedRetiredTreatmentCode = `treatment.tax12_retired_alias_${suffix}`;
       detachedHistoricalTreatmentCode = `treatment.tax12_detached_${suffix}`;
+      detachedHistoricalRedirectTreatmentCode =
+        `treatment.tax12_detached_redirect_${suffix}`;
+      detachedHistoricalRedirectThemeCode =
+        `theme.tax12_detached_redirect_${suffix}`;
       detachedHistoricalPlatformCode = `platform.tax12_detached_${suffix}`;
       detachedHistoricalTaxSpeciesCode = `tax_species.tax12_detached_${suffix}`;
       platformCode = `platform.tax12_sped_${suffix}`;
@@ -226,6 +232,11 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
           detachedHistoricalTreatmentCode,
           'treatment',
           'Tratamento histórico fora da release',
+        ],
+        [
+          detachedHistoricalRedirectTreatmentCode,
+          'treatment',
+          'Tratamento histórico com sucessor ativo',
         ],
         [
           detachedHistoricalPlatformCode,
@@ -256,6 +267,13 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
           [detachedHistorical.rows[0]!.id, label],
         );
       }
+
+      await concept(client, sourceId, dimensions, {
+        code: detachedHistoricalRedirectThemeCode,
+        dimensionCode: 'theme',
+        label: 'Tratamento histórico com sucessor ativo',
+        groupId: themeGroup,
+      });
 
       const anchor = await concept(client, sourceId, dimensions, {
         code: `theme.tax12_anchor_${suffix}`,
@@ -481,7 +499,17 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     );
     assert.ok(
       compatibility.retiredCodes.includes(detachedHistoricalTreatmentCode),
-      'historical treatment identities outside the current release are explicitly retired',
+      'detached historical treatment without successor is explicitly retired',
+    );
+    assert.equal(
+      compatibility.redirects[detachedHistoricalRedirectTreatmentCode],
+      detachedHistoricalRedirectThemeCode,
+      'detached historical treatment with an active Theme successor redirects instead of retiring',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(detachedHistoricalRedirectTreatmentCode),
+      false,
+      'detached historical treatment with successor must not become retired',
     );
     assert.ok(
       compatibility.retiredCodes.includes(detachedHistoricalPlatformCode),
