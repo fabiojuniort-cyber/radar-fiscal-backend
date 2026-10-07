@@ -161,6 +161,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     let treatmentCode = '';
     let retiredTreatmentCode = '';
     let redirectedRetiredTreatmentCode = '';
+    let detachedHistoricalTreatmentCode = '';
     let targetThemeCode = '';
     let platformCode = '';
     let taxSpeciesCode = '';
@@ -203,6 +204,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       treatmentCode = `treatment.tax12_restore_${suffix}`;
       retiredTreatmentCode = `treatment.tax12_retired_${suffix}`;
       redirectedRetiredTreatmentCode = `treatment.tax12_retired_alias_${suffix}`;
+      detachedHistoricalTreatmentCode = `treatment.tax12_detached_${suffix}`;
       platformCode = `platform.tax12_sped_${suffix}`;
       taxSpeciesCode = `tax_species.tax12_tax_${suffix}`;
 
@@ -214,6 +216,24 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         groupId: themeGroup,
       });
       restoredConceptId = target.conceptId;
+
+      const detachedHistorical = await client.query<{ id: string }>(
+        `INSERT INTO taxonomy_concepts (code, dimension_id)
+         VALUES ($1, $2::uuid)
+         RETURNING id`,
+        [detachedHistoricalTreatmentCode, dimensions.get('treatment')],
+      );
+      await client.query(
+        `INSERT INTO taxonomy_concept_revisions (
+           concept_id, revision_no, label, definition,
+           governance_status, evidence_status
+         ) VALUES (
+           $1::uuid, 1, 'Tratamento histórico fora da release',
+           'Identidade histórica sem membership na release corrente',
+           'DEPRECATED', 'DOCUMENTED'
+         )`,
+        [detachedHistorical.rows[0]!.id],
+      );
 
       const anchor = await concept(client, sourceId, dimensions, {
         code: `theme.tax12_anchor_${suffix}`,
@@ -436,6 +456,10 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.ok(
       compatibility.retiredCodes.includes(retiredTreatmentCode),
       'historical retired treatment codes without successor are explicitly retired',
+    );
+    assert.ok(
+      compatibility.retiredCodes.includes(detachedHistoricalTreatmentCode),
+      'historical treatment identities outside the current release are explicitly retired',
     );
     assert.ok(compatibility.retiredCodes.includes(platformCode));
     assert.ok(compatibility.retiredCodes.includes(taxSpeciesCode));
