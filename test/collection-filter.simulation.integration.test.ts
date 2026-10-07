@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import test from 'node:test';
 
 import { sql } from 'kysely';
@@ -37,6 +38,8 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
       actType: string;
       text: string;
       section?: string;
+      originMetadata?: Record<string, unknown>;
+      sourceMetadata?: Record<string, unknown>;
     },
   ): Promise<string> {
     const publicationId = randomUUID();
@@ -70,7 +73,17 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
         `ext-${publicationId}`,
         `https://example.invalid/${publicationId}`,
         JSON.stringify({
-          dou: { section: input.section ?? '' },
+          ...(input.originMetadata ?? {}),
+          dou: {
+            ...(
+              input.originMetadata?.dou &&
+              typeof input.originMetadata.dou === 'object' &&
+              !Array.isArray(input.originMetadata.dou)
+                ? input.originMetadata.dou as Record<string, unknown>
+                : {}
+            ),
+            section: input.section ?? '',
+          },
         }),
       ],
     );
@@ -79,13 +92,14 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
          publication_id,version_no,content_hash,content_text,
          relevant_excerpt,source_metadata,is_current
        ) VALUES(
-         $1,1,$2,$3,$4,'{}'::jsonb,true
+         $1,1,$2,$3,$4,$5::jsonb,true
        )`,
       [
         publicationId,
         createHash('sha256').update(input.text).digest('hex'),
         input.text,
         input.text.slice(0, 180),
+        JSON.stringify(input.sourceMetadata ?? {}),
       ],
     );
     return publicationId;
@@ -213,6 +227,43 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
       actType: 'PORTARIA',
       text: 'ICMS no DOE-SP não pertence à ACT-SCOPE-02.',
     });
+    const incompleteId = await publication({
+      sourceId,
+      sourceCode,
+      section: 'DO1',
+      title: 'Portaria administrativa com estrutura incompleta',
+      actType: 'PORTARIA',
+      text: 'Dispõe sobre escala interna de servidores.',
+      sourceMetadata: {
+        dou: { scopeStructureIncomplete: true },
+      },
+    });
+    const attachmentId = await publication({
+      sourceId,
+      sourceCode,
+      section: 'DO1',
+      title: 'Portaria administrativa com anexo',
+      actType: 'PORTARIA',
+      text: 'Dispõe sobre escala interna de servidores.',
+      sourceMetadata: {
+        files: [
+          {
+            metadata: { kind: 'ATTACHMENT' },
+          },
+        ],
+      },
+    });
+    const typeConflictId = await publication({
+      sourceId,
+      sourceCode,
+      section: 'DO1',
+      title: 'Portaria administrativa com tipo conflitante',
+      actType: 'PORTARIA',
+      text: 'Dispõe sobre escala interna de servidores.',
+      sourceMetadata: {
+        dou: { sourceActType: 'EDITAL' },
+      },
+    });
 
     const policy = await admin.query<{ id: string }>(
       `INSERT INTO collection_filter_policies(
@@ -249,6 +300,37 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
     );
     const simulationId = simulation.rows[0]!.id;
 
+    const baseWorkerId = `stage5-test-${suffix}`;
+    const runtimeWorkerId =
+      `${baseWorkerId}:${hostname()}:${process.pid}`.slice(0, 200);
+
+    const claimed = await sql<{
+      simulation_id: string;
+    }>`
+      SELECT *
+      FROM collection_filter_claim_simulation(${runtimeWorkerId})
+    `.execute(worker);
+    assert.equal(claimed.rows[0]?.simulation_id, simulationId);
+
+    const snapshot = await admin.query<{
+      snapshot_at: Date | null;
+    }>(
+      `SELECT snapshot_at
+       FROM collection_filter_simulations
+       WHERE id=$1`,
+      [simulationId],
+    );
+    assert.ok(snapshot.rows[0]?.snapshot_at);
+
+    const afterSnapshotId = await publication({
+      sourceId,
+      sourceCode,
+      section: 'DO1',
+      title: 'Portaria criada depois do snapshot',
+      actType: 'PORTARIA',
+      text: 'ICMS publicado depois do snapshot lógico.',
+    });
+
     let terminal:
       | Awaited<ReturnType<typeof processCollectionFilterSimulationBatch>>
       | undefined;
@@ -256,7 +338,7 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
       const result = await processCollectionFilterSimulationBatch(
         worker,
         {
-          workerId: `stage5-test-${suffix}`,
+          workerId: baseWorkerId,
           batchSize: 1000,
         },
       );
@@ -285,7 +367,16 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
        ORDER BY publication_id`,
       [
         simulationId,
-        [keepId, discardId, unknownId, doeId],
+        [
+          keepId,
+          discardId,
+          unknownId,
+          doeId,
+          incompleteId,
+          attachmentId,
+          typeConflictId,
+          afterSnapshotId,
+        ],
       ],
     );
 
@@ -296,9 +387,36 @@ test('ACT-SCOPE-02 Stage 5: worker simulates with least privilege, keeps unknown
     assert.equal(byId.get(discardId)?.decision, 'DISCARD');
     assert.equal(byId.get(unknownId)?.decision, 'KEEP');
     assert.equal(byId.get(unknownId)?.reason_code, 'UNKNOWN_TYPE');
+    assert.equal(byId.get(incompleteId)?.decision, 'KEEP');
+    assert.equal(
+      byId.get(incompleteId)?.reason_code,
+      'INCOMPLETE_EVIDENCE',
+    );
+    assert.equal(byId.get(attachmentId)?.decision, 'KEEP');
+    assert.equal(
+      byId.get(attachmentId)?.reason_code,
+      'UNEXAMINED_MATERIAL',
+    );
+    assert.equal(byId.get(typeConflictId)?.decision, 'KEEP');
+    assert.equal(
+      byId.get(typeConflictId)?.reason_code,
+      'TYPE_CONFLICT',
+    );
     assert.equal(byId.has(doeId), false);
+    assert.equal(
+      byId.has(afterSnapshotId),
+      false,
+      'publication created after snapshot must not enter FULL_ARCHIVE simulation',
+    );
     assert.ok(
-      [keepId, discardId, unknownId].every(
+      [
+        keepId,
+        discardId,
+        unknownId,
+        incompleteId,
+        attachmentId,
+        typeConflictId,
+      ].every(
         (id) => byId.get(id)?.review_sample === true,
       ),
     );
