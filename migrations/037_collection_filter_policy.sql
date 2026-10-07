@@ -97,6 +97,17 @@ ON collection_filter_terms (
     policy_id, lower(source_code), lower(section), canonical_type
 );
 
+CREATE UNIQUE INDEX uq_collection_filter_terms_effective
+ON collection_filter_terms (
+    policy_id,
+    normalized_term,
+    strength,
+    COALESCE(lower(source_code), ''),
+    COALESCE(lower(section), ''),
+    COALESCE(lower(canonical_type), ''),
+    location_scope
+);
+
 REVOKE ALL ON
     collection_filter_policies,
     collection_filter_type_rules,
