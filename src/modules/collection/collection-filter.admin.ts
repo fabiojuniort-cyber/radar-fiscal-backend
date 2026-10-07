@@ -43,6 +43,16 @@ export interface CollectionFilterDraftInput {
 }
 
 function serializableDraft(input: CollectionFilterDraftInput) {
+  const excludedSources = new Set(['doe-sp', 'doe-sp-legado']);
+  const configuredSources = [
+    ...input.rules.map((item) => item.sourceCode),
+    ...input.aliases.map((item) => item.sourceCode),
+    ...input.terms.flatMap((item) => item.sourceCode ? [item.sourceCode] : []),
+  ].map((value) => value.trim().toLowerCase());
+  if (configuredSources.some((value) => excludedSources.has(value))) {
+    throw new Error('doe_sp_out_of_scope');
+  }
+
   const compiled = compileCollectionFilterPolicy({
     version: 1,
     contextWindowWords: input.contextWindowWords,
@@ -432,57 +442,4 @@ export function collectionFilterAdminErrorCode(
     'invalid_new_type_status',
   ]);
   return known.has(error.message) ? error.message : null;
-}
-
-
-export async function requestCollectionFilterSimulation(
-  db: Kysely<DB>,
-  userId: string,
-  policyId: string,
-  scope: 'FULL_ARCHIVE' | 'RECENT',
-  reviewMode: 'ALL' | 'SAMPLE' | 'NONE',
-) {
-  return withUserContext(db, userId, async (trx) => {
-    const result = await sql<{
-      simulation_id: string;
-      policy_revision: number;
-      action: string;
-    }>`SELECT * FROM collection_filter_request_simulation(
-      ${policyId}::uuid,
-      ${scope},
-      ${reviewMode}
-    )`.execute(trx);
-    const row = result.rows[0];
-    if (!row) throw new Error('collection_filter_simulation_request_failed');
-    return {
-      simulationId: row.simulation_id,
-      policyRevision: Number(row.policy_revision),
-      action: row.action,
-    };
-  });
-}
-
-export async function approveCollectionFilterDraft(
-  db: Kysely<DB>,
-  userId: string,
-  policyId: string,
-) {
-  return withUserContext(db, userId, async (trx) => {
-    const result = await sql<{
-      policy_id: string;
-      policy_version: number;
-      policy_revision: number;
-      simulation_id: string;
-    }>`SELECT * FROM collection_filter_approve_draft(
-      ${policyId}::uuid
-    )`.execute(trx);
-    const row = result.rows[0];
-    if (!row) throw new Error('collection_filter_approval_failed');
-    return {
-      policyId: row.policy_id,
-      version: Number(row.policy_version),
-      revision: Number(row.policy_revision),
-      simulationId: row.simulation_id,
-    };
-  });
 }
