@@ -6,6 +6,7 @@ import {
   createDraft,
   retireDimension,
   updateConcept,
+  updateDimension,
   type ConceptAliasInput,
   type CuratorActor,
 } from './curation.draft.js';
@@ -16,6 +17,7 @@ import {
   type ConceptView,
   type ReleaseView,
 } from './curation.read.js';
+import { updateDraftTaxonomyCodeCompatibility } from '../taxonomy-code-compatibility.js';
 
 /**
  * Folds one dimension into another inside the open DRAFT (creates one when
@@ -31,9 +33,9 @@ import {
 export interface MergeStep {
   from: string;
   label: string;
-  action: 'MERGE' | 'CREATE';
+  action: 'MERGE' | 'RESTORE' | 'CREATE';
   into: string;
-  /** Target group code (CREATE only). */
+  /** Target group code (CREATE only). RESTORE keeps the historical target group. */
   group: string | null;
   addedAliases: string[];
   addedOfficialCodes: string[];
@@ -68,6 +70,17 @@ function missingAliases(source: ConceptView, target: ConceptView | null): Concep
   return result;
 }
 
+function matchingTarget(
+  source: ConceptView,
+  targets: readonly ConceptView[],
+): ConceptView | null {
+  return (
+    targets.find((concept) => suffix(concept.code) === suffix(source.code)) ??
+    targets.find((concept) => sameLabel(concept.label, source.label)) ??
+    null
+  );
+}
+
 export function planDimensionMerge(
   view: Pick<ReleaseView, 'concepts' | 'groups'>,
   from: string,
@@ -75,22 +88,26 @@ export function planDimensionMerge(
   groupMap: Readonly<Record<string, string>> = {},
 ): MergeStep[] {
   const included = view.concepts.filter((concept) => concept.membershipStatus === 'INCLUDED');
-  const targets = included.filter((concept) => concept.dimensionCode === into);
+  // Retired target concepts keep their immutable identity/code. They must be
+  // restored instead of recreated, otherwise explicit createConcept(code)
+  // correctly rejects the duplicate historical identity.
+  const targets = view.concepts.filter((concept) => concept.dimensionCode === into);
   const targetGroups = new Set(view.groups.filter((group) => group.dimensionCode === into).map((group) => group.code));
 
   return included
     .filter((concept) => concept.dimensionCode === from)
     .map((source) => {
-      const target =
-        targets.find((concept) => suffix(concept.code) === suffix(source.code)) ??
-        targets.find((concept) => sameLabel(concept.label, source.label)) ??
-        null;
+      const target = matchingTarget(source, targets);
       const sourceGroup = source.groupCode ?? '';
       const mappedGroup = groupMap[sourceGroup] ?? sourceGroup;
       return {
         from: source.code,
         label: source.label,
-        action: target ? 'MERGE' : 'CREATE',
+        action: target
+          ? target.membershipStatus === 'INCLUDED'
+            ? 'MERGE'
+            : 'RESTORE'
+          : 'CREATE',
         into: target?.code ?? `${into}.${suffix(source.code)}`,
         group: target ? null : targetGroups.has(mappedGroup) ? mappedGroup : null,
         addedAliases: missingAliases(source, target).map((alias) => alias.text),
@@ -99,21 +116,105 @@ export function planDimensionMerge(
     });
 }
 
+export interface DimensionMergeCompatibilityPlan {
+  redirects: Record<string, string>;
+  retiredCodes: string[];
+}
+
+/**
+ * Builds a complete compatibility outcome for every code carried by the
+ * source dimension, including concepts already RETIRED before the merge.
+ *
+ * A historical source code redirects only when its semantic target will be
+ * active after this merge. Otherwise the code is explicitly retired so
+ * runtime matching resolves it to NO_MATCH instead of leaking a stale code.
+ */
+export function planDimensionMergeCompatibility(
+  view: Pick<ReleaseView, 'concepts'>,
+  from: string,
+  into: string,
+  steps: readonly MergeStep[],
+): DimensionMergeCompatibilityPlan {
+  const sources = view.concepts.filter((concept) => concept.dimensionCode === from);
+  const targets = view.concepts.filter((concept) => concept.dimensionCode === into);
+  const finalActiveTargets = new Set(
+    targets
+      .filter((concept) => concept.membershipStatus === 'INCLUDED')
+      .map((concept) => concept.code),
+  );
+  for (const step of steps) finalActiveTargets.add(step.into);
+
+  const stepBySource = new Map(steps.map((step) => [step.from, step]));
+  const redirects: Record<string, string> = {};
+  const retiredCodes: string[] = [];
+
+  for (const source of sources) {
+    const step = stepBySource.get(source.code);
+    if (step) {
+      redirects[source.code] = step.into;
+      continue;
+    }
+
+    const target = matchingTarget(source, targets);
+    if (target && finalActiveTargets.has(target.code)) {
+      redirects[source.code] = target.code;
+    } else {
+      retiredCodes.push(source.code);
+    }
+  }
+
+  return {
+    redirects: Object.fromEntries(
+      Object.entries(redirects).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    retiredCodes: [...new Set(retiredCodes)].sort(),
+  };
+}
+
 export async function mergeDimension(
   client: PoolClient,
   actor: CuratorActor,
   from: string,
   into: string,
   groupMap: Readonly<Record<string, string>> = {},
-): Promise<{ draftVersion: string; draftCreated: boolean; steps: MergeStep[]; retired: string[] }> {
+): Promise<{
+  draftVersion: string;
+  draftCreated: boolean;
+  steps: MergeStep[];
+  retired: string[];
+  transferredOfficialCodeType: string | null;
+}> {
   let draft = await findOpenDraft(pgRunner(client));
   let draftCreated = false;
   if (!draft) {
     draft = (await createDraft(client, actor)).draft;
     draftCreated = true;
   }
-  const view = await loadReleaseView(pgRunner(client), draft.id);
+  const view = await loadReleaseView(pgRunner(client), draft.id, { includeRetired: true });
   if (!view) throw new Error('DRAFT_NOT_FOUND');
+
+  const sourceDimension = view.dimensions.find((dimension) => dimension.code === from);
+  const targetDimension = view.dimensions.find((dimension) => dimension.code === into);
+  if (!sourceDimension || !targetDimension) throw new Error('DIMENSION_NOT_FOUND');
+
+  // Official-code semantics belong to the merged table after the fold. This
+  // is critical for treatment -> theme: cClassTrib must keep classifying the
+  // same concepts after Treatment is retired.
+  let transferredOfficialCodeType: string | null = null;
+  if (sourceDimension.officialCodeType) {
+    if (
+      targetDimension.officialCodeType &&
+      targetDimension.officialCodeType !== sourceDimension.officialCodeType
+    ) {
+      throw new Error('OFFICIAL_CODE_TYPE_CONFLICT');
+    }
+    if (!targetDimension.officialCodeType) {
+      await updateDimension(client, actor, into, {
+        officialCodeType: sourceDimension.officialCodeType,
+      });
+      transferredOfficialCodeType = sourceDimension.officialCodeType;
+    }
+  }
 
   const steps = planDimensionMerge(view, from, into, groupMap);
   const byCode = new Map(view.concepts.map((concept) => [concept.code, concept]));
@@ -126,15 +227,22 @@ export async function mergeDimension(
     const target = byCode.get(step.into) ?? null;
     const aliases = missingAliases(source, target);
     if (target) {
-      if (aliases.length === 0 && step.addedOfficialCodes.length === 0 && (target.classifyByLabel || !source.classifyByLabel)) {
+      const restore = step.action === 'RESTORE';
+      if (
+        !restore &&
+        aliases.length === 0 &&
+        step.addedOfficialCodes.length === 0 &&
+        (target.classifyByLabel || !source.classifyByLabel)
+      ) {
         continue;
       }
       await updateConcept(client, actor, target.code, {
+        ...(restore ? { membershipStatus: 'INCLUDED' as const } : {}),
         aliases: [
           ...target.aliases.map((alias) => ({ text: alias.text, aliasType: alias.aliasType as ConceptAliasInput['aliasType'] })),
           ...aliases,
         ],
-        officialCodes: [...target.officialCodes, ...step.addedOfficialCodes],
+        officialCodes: [...new Set([...target.officialCodes, ...step.addedOfficialCodes])],
         classifyByLabel: target.classifyByLabel || source.classifyByLabel,
       });
     } else {
@@ -156,6 +264,17 @@ export async function mergeDimension(
     }
   }
 
-  const { retiredConcepts } = await retireDimension(client, actor, from);
-  return { draftVersion: draft.version, draftCreated, steps, retired: retiredConcepts };
+  const compatibility = planDimensionMergeCompatibility(view, from, into, steps);
+  await updateDraftTaxonomyCodeCompatibility(client, draft.id, compatibility);
+
+  const retirement = await retireDimension(client, actor, from, {
+    recordRetiredCodes: false,
+  });
+  return {
+    draftVersion: draft.version,
+    draftCreated,
+    steps,
+    retired: retirement.retiredConcepts,
+    transferredOfficialCodeType,
+  };
 }
