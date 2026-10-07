@@ -162,6 +162,8 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     let retiredTreatmentCode = '';
     let redirectedRetiredTreatmentCode = '';
     let detachedHistoricalTreatmentCode = '';
+    let detachedHistoricalPlatformCode = '';
+    let detachedHistoricalTaxSpeciesCode = '';
     let targetThemeCode = '';
     let platformCode = '';
     let taxSpeciesCode = '';
@@ -205,6 +207,8 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       retiredTreatmentCode = `treatment.tax12_retired_${suffix}`;
       redirectedRetiredTreatmentCode = `treatment.tax12_retired_alias_${suffix}`;
       detachedHistoricalTreatmentCode = `treatment.tax12_detached_${suffix}`;
+      detachedHistoricalPlatformCode = `platform.tax12_detached_${suffix}`;
+      detachedHistoricalTaxSpeciesCode = `tax_species.tax12_detached_${suffix}`;
       platformCode = `platform.tax12_sped_${suffix}`;
       taxSpeciesCode = `tax_species.tax12_tax_${suffix}`;
 
@@ -217,23 +221,41 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       });
       restoredConceptId = target.conceptId;
 
-      const detachedHistorical = await client.query<{ id: string }>(
-        `INSERT INTO taxonomy_concepts (code, dimension_id)
-         VALUES ($1, $2::uuid)
-         RETURNING id`,
-        [detachedHistoricalTreatmentCode, dimensions.get('treatment')],
-      );
-      await client.query(
-        `INSERT INTO taxonomy_concept_revisions (
-           concept_id, revision_no, label, definition,
-           governance_status, evidence_status
-         ) VALUES (
-           $1::uuid, 1, 'Tratamento histórico fora da release',
-           'Identidade histórica sem membership na release corrente',
-           'DEPRECATED', 'DOCUMENTED'
-         )`,
-        [detachedHistorical.rows[0]!.id],
-      );
+      for (const [historicalCode, dimensionCode, label] of [
+        [
+          detachedHistoricalTreatmentCode,
+          'treatment',
+          'Tratamento histórico fora da release',
+        ],
+        [
+          detachedHistoricalPlatformCode,
+          'platform',
+          'Plataforma histórica fora da release',
+        ],
+        [
+          detachedHistoricalTaxSpeciesCode,
+          'tax_species',
+          'Espécie tributária histórica fora da release',
+        ],
+      ] as const) {
+        const detachedHistorical = await client.query<{ id: string }>(
+          `INSERT INTO taxonomy_concepts (code, dimension_id)
+           VALUES ($1, $2::uuid)
+           RETURNING id`,
+          [historicalCode, dimensions.get(dimensionCode)],
+        );
+        await client.query(
+          `INSERT INTO taxonomy_concept_revisions (
+             concept_id, revision_no, label, definition,
+             governance_status, evidence_status
+           ) VALUES (
+             $1::uuid, 1, $2,
+             'Identidade histórica sem membership na release corrente',
+             'DEPRECATED', 'DOCUMENTED'
+           )`,
+          [detachedHistorical.rows[0]!.id, label],
+        );
+      }
 
       const anchor = await concept(client, sourceId, dimensions, {
         code: `theme.tax12_anchor_${suffix}`,
@@ -461,8 +483,62 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       compatibility.retiredCodes.includes(detachedHistoricalTreatmentCode),
       'historical treatment identities outside the current release are explicitly retired',
     );
+    assert.ok(
+      compatibility.retiredCodes.includes(detachedHistoricalPlatformCode),
+      'historical platform identities outside the current release are explicitly retired',
+    );
+    assert.ok(
+      compatibility.retiredCodes.includes(detachedHistoricalTaxSpeciesCode),
+      'historical tax-species identities outside the current release are explicitly retired',
+    );
     assert.ok(compatibility.retiredCodes.includes(platformCode));
     assert.ok(compatibility.retiredCodes.includes(taxSpeciesCode));
+
+    // Defense in depth: even if a future retirement implementation forgets
+    // one detached historical identity, publication validation must fail closed.
+    const originalManifest = manifest.rows[0]?.manifest;
+    const incompleteManifest = JSON.parse(
+      JSON.stringify(originalManifest),
+    ) as {
+      taxonomyCompatibility?: {
+        retiredCodes?: string[];
+      };
+    };
+    assert.ok(incompleteManifest.taxonomyCompatibility?.retiredCodes);
+    incompleteManifest.taxonomyCompatibility!.retiredCodes =
+      incompleteManifest.taxonomyCompatibility!.retiredCodes!.filter(
+        (code) => code !== detachedHistoricalPlatformCode,
+      );
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(incompleteManifest)],
+    );
+    const compatibilityValidationClient = await admin.connect();
+    try {
+      const compatibilityValidationView = await loadReleaseView(
+        pgRunner(compatibilityValidationClient),
+        draft!.id,
+      );
+      assert.ok(compatibilityValidationView);
+      const issues = await validateReleaseView(
+        compatibilityValidationClient,
+        compatibilityValidationView!,
+      );
+      assert.ok(
+        issues.some(
+          (issue) =>
+            issue.severity === 'BLOCKER' &&
+            issue.code === 'INCOMPLETE_RETIRED_DIMENSION_COMPATIBILITY',
+        ),
+        'publish validation must block an uncovered historical code from a retired dimension',
+      );
+    } finally {
+      compatibilityValidationClient.release();
+    }
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(originalManifest)],
+    );
 
     const mappingsAfterRetirement = await admin.query<{ count: number }>(
       `SELECT count(*)::int AS count
