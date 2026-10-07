@@ -64,6 +64,7 @@ export const INITIAL_COLLECTION_FILTER_STRONG_TERMS = [
   'REIDI',
   'EQBEN',
   'TFAC',
+  'CORAT',
   'NF-E',
   'NFS-E',
   'CT-E',
