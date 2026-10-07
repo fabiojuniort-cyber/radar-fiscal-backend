@@ -119,7 +119,7 @@ export async function collectionFilterAdminRoutes(
           error instanceof Error &&
           (
             error instanceof RangeError ||
-            /duplicate|conflicting|cannot preserve|must not be blank/.test(
+            /duplicate|conflicting|cannot preserve|must not be blank|doe_sp_out_of_scope/.test(
               error.message,
             )
           )
