@@ -461,6 +461,7 @@ export function collectionFilterAdminErrorCode(
     'platform_admin_required',
     'collection_filter_draft_not_found',
     'collection_filter_fresh_simulation_required',
+    'collection_filter_full_archive_simulation_required',
     'collection_filter_simulation_has_errors',
     'invalid_simulation_scope',
     'invalid_simulation_review_mode',
