@@ -6,6 +6,7 @@ import { NOT_SUPERSEDED_NCM_MENTION_SQL } from '../ncm/publication-ncm.detector.
 import {
   loadTaxonomyCodeCompatibility,
   resolveTaxonomyConceptCode,
+  type TaxonomyCodeCompatibility,
 } from '../taxonomy-code-compatibility.js';
 import {
   DEFAULT_SECTION_ORDER,
@@ -94,12 +95,25 @@ interface AutomaticRow {
   latest_review: 'CONFIRM' | 'REJECT' | null;
 }
 
-interface CuratorRow {
+export interface CuratorRow {
   concept_code: string;
   action: 'ADD' | 'REMOVE';
   rationale: string;
   created_at: Date | string;
   id: string;
+}
+
+export function resolveCuratorDecisions(
+  curatorHistory: readonly CuratorRow[],
+  compatibility: TaxonomyCodeCompatibility,
+): Map<string, CuratorRow> {
+  const decisionByCode = new Map<string, CuratorRow>();
+  for (const row of curatorHistory) {
+    const canonical = resolveTaxonomyConceptCode(row.concept_code, compatibility);
+    if (!canonical || decisionByCode.has(canonical)) continue;
+    decisionByCode.set(canonical, { ...row, concept_code: canonical });
+  }
+  return decisionByCode;
 }
 
 export async function loadPublicationTaxonomy(
@@ -212,12 +226,7 @@ export async function loadPublicationTaxonomy(
     `,
     [current.id],
   );
-  const decisionByCode = new Map<string, CuratorRow>();
-  for (const row of curatorHistory) {
-    const canonical = resolveTaxonomyConceptCode(row.concept_code, compatibility);
-    if (!canonical || decisionByCode.has(canonical)) continue;
-    decisionByCode.set(canonical, { ...row, concept_code: canonical });
-  }
+  const decisionByCode = resolveCuratorDecisions(curatorHistory, compatibility);
   const curator = [...decisionByCode.values()];
 
   const settings = await loadRuntimeSettings(run);
