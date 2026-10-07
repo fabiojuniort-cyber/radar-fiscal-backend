@@ -260,6 +260,27 @@ export function compileCollectionFilterPolicy(
     };
   });
 
+  const termScopes = new Map<string, CollectionFilterTermStrength>();
+  for (const term of terms) {
+    const scopeKey = [
+      term.normalized,
+      term.sourceCode ?? '',
+      term.section ?? '',
+      term.canonicalType ?? '',
+      term.locationScope,
+    ].join('\u0000');
+    const existing = termScopes.get(scopeKey);
+    if (existing) {
+      if (existing === term.original.strength) {
+        throw new Error(`duplicate filter term: ${term.normalized}`);
+      }
+      throw new Error(
+        `conflicting filter term strength: ${term.normalized}`,
+      );
+    }
+    termScopes.set(scopeKey, term.original.strength);
+  }
+
   return {
     version: input.version,
     contextWindowWords: input.contextWindowWords,
