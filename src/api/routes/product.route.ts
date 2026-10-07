@@ -25,6 +25,11 @@ import {
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { isCnaeActivity } from '../../modules/taxonomy/curation/curation.constants.js';
 import { suggestSegmentsForCompany } from '../../modules/taxonomy/curation/curation.suggestions.js';
+import {
+  canonicalizeTaxonomyConceptCodes,
+  loadTaxonomyCodeCompatibility,
+  type TaxonomyCodeCompatibility,
+} from '../../modules/taxonomy/taxonomy-code-compatibility.js';
 import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
 import { currentWordingText, sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import {
@@ -257,6 +262,29 @@ function recordValue(
     !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
+}
+
+function currentTaxonomyPersonalization(
+  personalization: unknown,
+  release: { id: string; version: string | null } | null,
+  compatibility: TaxonomyCodeCompatibility | null,
+): unknown {
+  if (!release?.version || !compatibility) return personalization;
+  const root = recordValue(personalization);
+  const taxonomy = recordValue(root?.taxonomy);
+  if (!root || !taxonomy) return personalization;
+  const rawCodes = Array.isArray(taxonomy.conceptCodes)
+    ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
+    : [];
+  return {
+    ...root,
+    taxonomy: {
+      ...taxonomy,
+      releaseId: release.id,
+      releaseVersion: release.version,
+      conceptCodes: canonicalizeTaxonomyConceptCodes(rawCodes, compatibility),
+    },
+  };
 }
 
 /** Last day in force read from the act's current wording (CONFAZ). */
@@ -2034,12 +2062,12 @@ export async function productRoutes(
       }
 
       try {
-        const profile = await withTenantContext(
+        const result = await withTenantContext(
           app.db,
           request.auth.userId,
           tenantId,
-          async (trx) =>
-            trx
+          async (trx) => {
+            const profile = await trx
               .selectFrom('company_tax_profiles')
               .select([
                 'id',
@@ -2054,23 +2082,45 @@ export async function productRoutes(
               ])
               .where('company_id', '=', request.params.companyId)
               .where('is_current', '=', true)
-              .executeTakeFirst(),
+              .executeTakeFirst();
+
+            if (!profile) {
+              return { profile: null, release: null, compatibility: null };
+            }
+
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select(['id', 'version'])
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+            const compatibility = release
+              ? await loadTaxonomyCodeCompatibility(kyselyRunner(trx), release.id)
+              : null;
+            return { profile, release: release ?? null, compatibility };
+          },
         );
 
         return reply.status(200).send({
-          profile: profile
+          profile: result.profile
             ? {
-                id: profile.id,
-                companyId: profile.company_id,
-                versionNo: profile.version_no,
-                taxRegime: profile.tax_regime,
-                segments: profile.segments,
-                activities: profile.activities,
-                personalization: profile.personalization,
-                validFrom: profile.valid_from
-                  ? new Date(profile.valid_from).toISOString().slice(0, 10)
+                id: result.profile.id,
+                companyId: result.profile.company_id,
+                versionNo: result.profile.version_no,
+                taxRegime: result.profile.tax_regime,
+                segments: result.profile.segments,
+                activities: result.profile.activities,
+                personalization: currentTaxonomyPersonalization(
+                  result.profile.personalization,
+                  result.release,
+                  result.compatibility,
+                ),
+                validFrom: result.profile.valid_from
+                  ? new Date(result.profile.valid_from).toISOString().slice(0, 10)
                   : null,
-                createdAt: new Date(profile.created_at).toISOString(),
+                createdAt: new Date(result.profile.created_at).toISOString(),
               }
             : null,
         });
@@ -2199,7 +2249,7 @@ export async function productRoutes(
         const regimeCodes = company.profile?.tax_regime === 'SIMPLES_NACIONAL' ? ['regime.simples_nacional'] : [];
         // The company's own CNAE activities match the act's CNAE activity tags.
         const cnaeActivityCodes = company.cnaeSuggestions.flatMap((cnae) => cnae.activityCodes ?? []);
-        const profileCodes = [
+        const rawProfileCodes = [
           ...new Set([
             ...(Array.isArray(taxonomy?.conceptCodes)
               ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
@@ -2218,6 +2268,12 @@ export async function productRoutes(
         if (view.status === 'NOT_FOUND') {
           return reply.status(404).send({ error: 'publication_not_found' });
         }
+        const compatibility = view.release
+          ? await loadTaxonomyCodeCompatibility(kyselyRunner(app.db), view.release.id)
+          : null;
+        const profileCodes = compatibility
+          ? canonicalizeTaxonomyConceptCodes(rawProfileCodes, compatibility)
+          : rawProfileCodes;
 
         const personalization = recordValue(company.profile?.personalization);
         const profileNcms = [
