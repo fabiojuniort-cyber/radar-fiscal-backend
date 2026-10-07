@@ -42,7 +42,7 @@ export interface CollectionFilterDraftInput {
   }>;
 }
 
-function serializableDraft(input: CollectionFilterDraftInput) {
+export function serializeCollectionFilterDraft(input: CollectionFilterDraftInput) {
   const excludedSources = new Set(['doe-sp', 'doe-sp-legado']);
   const configuredSources = [
     ...input.rules.map((item) => item.sourceCode),
@@ -127,7 +127,7 @@ export async function saveCollectionFilterDraft(
   userId: string,
   input: CollectionFilterDraftInput,
 ) {
-  const document = serializableDraft(input);
+  const document = serializeCollectionFilterDraft(input);
   return withUserContext(db, userId, async (trx) => {
     const result = await sql<{
       policy_id: string;
