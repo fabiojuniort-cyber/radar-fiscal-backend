@@ -64,3 +64,9 @@ Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro 
 - Provider de terceiro não deve ser adicionado a produção quando seus termos de uso/licenciamento forem incompatíveis ou não comprovados para um SaaS multi-tenant.
 - Persistir somente os campos necessários ao produto; nenhum provider cadastral autoriza expor QSA ou ampliar o conjunto de dados sem escopo específico.
 - Cadastro manual de matriz deve ser atômico: empresa e estabelecimento matriz são criados/reativados na mesma transação; Local Negócio e IE manuais mantêm proveniência manual e não são sobrescritos por indisponibilidade externa.
+
+## CI com custo controlado
+
+Durante implementação, trabalhe em PR **draft** e envie blocos coerentes de commits. O draft roda checks rápidos e termina com `DRAFT_FAST_ONLY`: aviso intencional de regressão completa pendente, não uma falha do produto. **Não rerodar esse CI nem criar commits só para eliminar o aviso.**
+
+Quando estiver pronto, marque **Ready for review** para disparar todos os gates completos; cada atualização posterior do head também roda a regressão completa. Só faça merge com CI completo verde no head atual e revisão exigida pela governança. Main mantém a regressão completa. Procedimento, seleção PG18 e rollback: `docs/ci-cost-02.md`.

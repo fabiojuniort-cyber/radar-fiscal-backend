@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     branches:
       - main
   push:
@@ -17,10 +18,14 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      full_regression: ${{ steps.ci-plan.outputs.full_regression }}
+      pg18_required: ${{ steps.ci-plan.outputs.pg18_required }}
 
     services:
       postgres:
-        image: postgres:16
+        # An empty image disables the service for draft fast checks.
+        image: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft != true) && 'postgres:16' || '' }}
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
@@ -48,7 +53,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      - name: Validate CI routing
+        run: python3 -m unittest discover -s .github/scripts -p test_ci_plan.py
+
+      - name: Plan CI gates
+        id: ci-plan
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_DRAFT: ${{ github.event.pull_request.draft || false }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/ci-plan.py --kind backend
+
       - name: DOU-CLEAN-02 runner offline guards
+        if: steps.ci-plan.outputs.pg18_required == 'true'
         # No secrets, PostgreSQL, HTTP or Railway access.
         shell: bash
         run: |
@@ -109,55 +128,71 @@ jobs:
         run: npx tsx --test test/publication-ncm.detector.unit.test.ts
 
       - name: Prepare PostgreSQL test database
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run db:prepare
 
       - name: NEWS worker privilege policy
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: node dist/infrastructure/database/verify-news-worker-runtime-role.js
 
       - name: NEWS worker runtime persistence
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/news.worker-runtime.integration.test.ts
 
       - name: Collection persistence integration tests
+        if: steps.ci-plan.outputs.full_regression == 'true'
         shell: bash
         run: |
           export DATABASE_URL="postgresql://radar_worker_runtime:${DB_RUNTIME_PASSWORD}@localhost:5432/radar_fiscal_test"
           npm run test:collection-integration
 
       - name: DOE-SP NCM evidence rebuild guard
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/doe-sp.ncm-rebuild-guard.integration.test.ts
 
       - name: Authentication and RLS integration tests
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run test:integration
 
       - name: News API integration test
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/news.api.integration.test.ts
 
       - name: TAX-06 baseline dry-run
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run taxonomy:baseline:dry-run
 
       - name: TAX-06 baseline integration tests
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run test:taxonomy-baseline-integration
 
       # TAX-10 intentionally runs as a dedicated sequential gate after TAX-06.
       - name: TAX-10 v1.1 successor integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.v1-1.integration.test.ts
 
       - name: NCM official catalog idempotency
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/ncm-catalog.import.integration.test.ts
 
       - name: Publication NCM enrichment integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/publication-ncm.enrichment.integration.test.ts
 
       - name: Archive NCM filter integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/archive-ncm-filter.integration.test.ts
 
       - name: Archive act-type scale/filter integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/archive-act-type-filter.integration.test.ts
 
       - name: Archive date filter integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/archive-date-filter.integration.test.ts
 
       - name: Product/NCM API integration test
+        if: steps.ci-plan.outputs.full_regression == 'true'
         shell: bash
         run: |
           set -o pipefail
@@ -165,12 +200,22 @@ jobs:
 
       # TAX-11 commits a high-numbered curated release; keep it the last gate.
       - name: TAX-11 curation end-to-end integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.curation.integration.test.ts
 
       # Scope events are append-only: the executor fixtures cannot be cleaned
       # up, so this runs after every other database test of the job.
       - name: DOU-CLEAN-01 executor integration (append-only fixtures, runs last)
+        if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/dou-historical-cleanup.executor.integration.test.ts
+
+
+      - name: Require full regression before merge
+        if: ${{ !cancelled() }}
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_DRAFT: ${{ github.event.pull_request.draft || false }}
+        run: python3 .github/scripts/ci-plan.py --kind backend --require-full
 
       - name: Upload Product/NCM integration diagnostics
         if: always()
@@ -184,6 +229,8 @@ jobs:
 
   dou-clean-02-pg18:
     name: DOU-CLEAN-02 isolated PG18 contracts
+    needs: verify
+    if: needs.verify.result == 'success' && needs.verify.outputs.pg18_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
