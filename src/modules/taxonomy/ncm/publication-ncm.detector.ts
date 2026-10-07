@@ -122,7 +122,7 @@ export function selectText(row: VersionForNcmScan): {
     // Acts that keep previous wordings on the page (CONFAZ annexes in green,
     // "Redação anterior"): only the wording in force counts.
     const current = currentWordingText(row.presentation_html);
-    if (current) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
+    if (current !== undefined) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
     return { text: row.content_text!, sourceField: 'CONTENT_TEXT', currentWordingOnly: false };
   }
 
