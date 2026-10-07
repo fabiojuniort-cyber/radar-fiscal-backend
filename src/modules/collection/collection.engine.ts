@@ -498,37 +498,7 @@ export async function processAcquiredCollectionRun(
 
     let filterRuntime: Awaited<
       ReturnType<typeof loadApprovedCollectionFilterRuntime>
-    > = null;
-    try {
-      filterRuntime = await loadApprovedCollectionFilterRuntime(
-        db,
-        run.sourceId,
-      );
-    } catch (error) {
-      await disposePublicationSpool(outcome.result.publicationStream);
-      await finishCollectionRun(db, {
-        runId: run.id,
-        workerId: run.workerId,
-        status: 'PROCESSING_FAILED',
-        errorSummary: 'COLLECTION_FILTER_RUNTIME_UNAVAILABLE',
-      });
-      logger.error(
-        {
-          sourceId: run.sourceId,
-          runId: run.id,
-          attemptId: attempt.id,
-          error: errorMessage(error),
-        },
-        'Approved collection filter could not be loaded; persistence blocked',
-      );
-      return {
-        runId: run.id,
-        attemptNo: attempt.attemptNo,
-        state: 'TERMINAL',
-        status: 'PROCESSING_FAILED',
-        metrics,
-      };
-    }
+    > | undefined;
 
     let filterEvaluated = 0;
     let filteredPublications = 0;
@@ -548,6 +518,20 @@ export async function processAcquiredCollectionRun(
           sourceId: run.sourceId,
           publication,
         });
+
+        if (filterRuntime === undefined) {
+          try {
+            filterRuntime = await loadApprovedCollectionFilterRuntime(
+              db,
+              run.sourceId,
+            );
+          } catch (error) {
+            throw Object.assign(
+              new Error('COLLECTION_FILTER_RUNTIME_UNAVAILABLE'),
+              { cause: error },
+            );
+          }
+        }
 
         const runtimeDecision = filterRuntime
           ? evaluateRuntimeCollectionFilter(
