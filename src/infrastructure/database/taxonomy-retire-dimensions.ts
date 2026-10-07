@@ -8,6 +8,7 @@ import {
   retireDimension,
   withCuratorTransaction,
   type CuratorActor,
+  type RetireDimensionResult,
 } from '../../modules/taxonomy/curation/curation.draft.js';
 import { resolveCuratorDatabaseUrl } from './curator-url.js';
 
@@ -52,7 +53,11 @@ const actor: CuratorActor = {
 class Rollback extends Error {}
 
 const pool = new Pool({ connectionString, max: 1 });
-const result: { draftVersion?: string; draftCreated: boolean; retired: Record<string, string[]> } = {
+const result: {
+  draftVersion?: string;
+  draftCreated: boolean;
+  retired: Record<string, RetireDimensionResult>;
+} = {
   draftCreated: false,
   retired: {},
 };
@@ -65,7 +70,7 @@ try {
     }
     result.draftVersion = draft.version;
     for (const code of dimensions) {
-      result.retired[code] = (await retireDimension(client, actor, code)).retiredConcepts;
+      result.retired[code] = await retireDimension(client, actor, code);
     }
     if (!confirm) throw new Rollback();
   });
@@ -81,6 +86,18 @@ console.log(
       saved: confirm,
       draftVersion: result.draftVersion,
       draftCreated: result.draftCreated,
-      retired: Object.fromEntries(Object.entries(result.retired).map(([code, items]) => [code, { count: items.length, items }])),
+      retired: Object.fromEntries(
+        Object.entries(result.retired).map(([code, item]) => [
+          code,
+          {
+            count: item.retiredConcepts.length,
+            items: item.retiredConcepts,
+            removedGroups: item.removedGroups,
+            removedRelationRules: item.removedRelationRules,
+            removedRelations: item.removedRelations,
+            removedOfficialMappings: item.removedOfficialMappings,
+          },
+        ]),
+      ),
     }),
 );
