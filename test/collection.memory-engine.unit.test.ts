@@ -40,6 +40,18 @@ function scriptedDatabase(t: TestContext, steps: QueryStep[], events: string[]) 
   driver.acquireConnection = async () => ({
     async executeQuery<R>(query: CompiledQuery): Promise<QueryResult<R>> {
       queries.push(query);
+      if (/^select "id", "code", "connector_key" from "sources"/.test(query.sql)) {
+        return {
+          rows: [{
+            id: String(query.parameters[0] ?? 'fixture-source'),
+            code: 'dou',
+            connector_key: 'dou',
+          }] as R[],
+        };
+      }
+      if (/FROM collection_filter_policies p/.test(query.sql)) {
+        return { rows: [] as R[] };
+      }
       const step = remaining.shift();
       assert.ok(step, `Unexpected query: ${query.sql}`);
       assert.match(query.sql, step.sql);
