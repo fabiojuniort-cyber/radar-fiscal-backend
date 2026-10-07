@@ -285,6 +285,9 @@ export async function loadReleaseView(
   const membershipFilter = options.includeRetired
     ? ''
     : `AND rc.membership_status = 'INCLUDED'`;
+  const dimensionMembershipFilter = options.includeRetired
+    ? ''
+    : `AND rd.membership_status = 'INCLUDED'`;
 
   const dimensionRows = await run<DimensionRow>(
     `
@@ -305,7 +308,7 @@ export async function loadReleaseView(
       JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
       JOIN taxonomy_dimension_revisions dr ON dr.id = rd.dimension_revision_id
       WHERE rd.release_id = $1::uuid
-        AND rd.membership_status = 'INCLUDED'
+        ${dimensionMembershipFilter}
       ORDER BY d.code
     `,
     [releaseId],
@@ -326,7 +329,11 @@ export async function loadReleaseView(
         ) AS segment_codes
       FROM taxonomy_release_groups g
       JOIN taxonomy_dimensions d ON d.id = g.dimension_id
+      JOIN taxonomy_release_dimensions rd
+        ON rd.release_id = g.release_id
+       AND rd.dimension_id = g.dimension_id
       WHERE g.release_id = $1::uuid
+        ${dimensionMembershipFilter}
       ORDER BY d.code, g.display_order, g.label
     `,
     [releaseId],
@@ -371,9 +378,13 @@ export async function loadReleaseView(
       JOIN taxonomy_concepts c ON c.id = rc.concept_id
       JOIN taxonomy_concept_revisions cr ON cr.id = rc.concept_revision_id
       JOIN taxonomy_dimensions d ON d.id = c.dimension_id
+      JOIN taxonomy_release_dimensions rd
+        ON rd.release_id = rc.release_id
+       AND rd.dimension_id = c.dimension_id
       LEFT JOIN taxonomy_release_groups g ON g.id = rc.group_id
       WHERE rc.release_id = $1::uuid
         ${membershipFilter}
+        ${dimensionMembershipFilter}
       ORDER BY d.code, rc.display_order NULLS LAST, cr.label, c.code
     `,
     [releaseId],
