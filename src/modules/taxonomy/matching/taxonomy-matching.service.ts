@@ -324,7 +324,7 @@ export async function matchPublicationByTaxonomy(
       'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
       [
         [
-          'taxonomy-match-v1',
+          TAXONOMY_MATCH_ENGINE_VERSION,
           input.tenantId,
           input.monitoringProfileId,
           input.publicationVersionId,
