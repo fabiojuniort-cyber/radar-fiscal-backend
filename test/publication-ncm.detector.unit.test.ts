@@ -112,6 +112,19 @@ test('selectText does not fall back to full content when every marked block is n
   assert.deepEqual(extractNcmCandidates(selected.text), []);
 });
 
+test('currentWordingText excludes editorial notes nested inside current table rows', () => {
+  const html = [
+    '<table><tr>',
+    '<td><p class="A5-1TextoAcordo">Produto vigente 3102.10.90</p></td>',
+    '<td><p class="A8-1Remissao">Alterado pelo Convênio 79/25; histórico 8701.90.00.</p></td>',
+    '</tr></table>',
+  ].join('');
+
+  const current = currentWordingText(html) ?? '';
+  assert.match(current, /3102\.10\.90/);
+  assert.doesNotMatch(current, /8701\.90\.00|Alterado pelo Convênio/);
+});
+
 test('currentWordingText omits revoked placeholders but keeps operative revocation clauses', () => {
   const html = [
     '<p class="DataPublicao">Alterado pelo Convênio ICMS 26/21.</p>',
