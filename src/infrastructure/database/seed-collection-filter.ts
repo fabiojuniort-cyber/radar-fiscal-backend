@@ -7,6 +7,9 @@ import {
   type CollectionFilterMode,
   type CollectionFilterPolicyInput,
 } from '../../modules/collection/collection-filter.engine.js';
+import {
+  serializeCollectionFilterDraft,
+} from '../../modules/collection/collection-filter.admin.js';
 
 const env = z
   .object({
@@ -258,6 +261,9 @@ try {
 
     compileCollectionFilterPolicy(document);
 
+    const serializedDocument =
+      serializeCollectionFilterDraft(document);
+
     const byMode = Object.fromEntries(
       [
         'KEEP_ALWAYS',
@@ -295,7 +301,7 @@ try {
       policy_revision: number;
     }>(
       `SELECT * FROM collection_filter_save_draft($1::jsonb)`,
-      [JSON.stringify(document)],
+      [JSON.stringify(serializedDocument)],
     );
     const policy = saved.rows[0];
     if (!policy) {
