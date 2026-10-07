@@ -13,6 +13,7 @@ import {
 import type { NormalizedPublication } from './publication.normalizer.js';
 
 const EXCLUDED_SOURCES = new Set(['doe-sp', 'doe-sp-legado']);
+const ENFORCED_SOURCES = new Set(['dou']);
 
 export interface ApprovedCollectionFilterRuntime {
   policyId: string;
@@ -110,6 +111,7 @@ export async function loadApprovedCollectionFilterRuntime(
 
   const sourceCode = source.code.trim().toLowerCase();
   if (EXCLUDED_SOURCES.has(sourceCode)) return null;
+  if (!ENFORCED_SOURCES.has(sourceCode)) return null;
 
   const result = await sql<{
     policy_id: string;
@@ -170,7 +172,9 @@ export async function loadApprovedCollectionFilterRuntime(
   `.execute(db);
 
   const row = result.rows[0];
-  if (!row) return null;
+  if (!row) {
+    throw new Error('approved_collection_filter_required');
+  }
 
   await sql`SELECT collection_filter_cleanup_discards()`.execute(db);
 
