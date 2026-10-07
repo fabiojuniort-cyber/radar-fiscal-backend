@@ -2305,12 +2305,27 @@ export async function validateReleaseView(
     const historicalCompatibility = await client.query<{
       dimension_code: string;
       code: string;
+      label: string;
     }>(
       `
-        SELECT d.code AS dimension_code, c.code
+        SELECT d.code AS dimension_code, c.code, historical_revision.label
         FROM taxonomy_release_dimensions rd
         JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
         JOIN taxonomy_concepts c ON c.dimension_id = rd.dimension_id
+        LEFT JOIN taxonomy_release_concepts rc
+          ON rc.release_id = rd.release_id
+         AND rc.concept_id = c.id
+        JOIN taxonomy_concept_revisions historical_revision
+          ON historical_revision.id = COALESCE(
+            rc.concept_revision_id,
+            (
+              SELECT r.id
+              FROM taxonomy_concept_revisions r
+              WHERE r.concept_id = c.id
+              ORDER BY r.revision_no DESC
+              LIMIT 1
+            )
+          )
         WHERE rd.release_id = $1::uuid
           AND rd.membership_status <> 'INCLUDED'
           AND d.code = ANY($2::text[])
@@ -2333,6 +2348,54 @@ export async function validateReleaseView(
           'Compatibilidade histórica incompleta para dimensão(ões) retirada(s): ' +
           uncoveredHistoricalCodes
             .map((row) => `${row.dimension_code}:${row.code}`)
+            .join(', ') +
+          '.',
+      });
+    }
+
+    // A retired Treatment identity is only valid while no active Theme
+    // successor exists. Old manifests may carry a retiredCode from a release
+    // where the successor did not exist yet; publishing that state after a
+    // later RESTORE/CREATE would silently drop historical profile criteria.
+    const activeThemes = included.filter(
+      (concept) => concept.dimensionCode === 'theme',
+    );
+    const staleRetiredTreatments = historicalCompatibility.rows.flatMap(
+      (row) => {
+        if (
+          row.dimension_code !== 'treatment' ||
+          !retiredCompatibilityCodes.has(row.code)
+        ) {
+          return [];
+        }
+
+        const sourceSuffix = row.code.slice(row.code.indexOf('.') + 1);
+        const suffixMatches = activeThemes.filter(
+          (concept) =>
+            concept.code.slice(concept.code.indexOf('.') + 1) === sourceSuffix,
+        );
+        if (suffixMatches.length === 1) {
+          return [{ source: row.code, target: suffixMatches[0]!.code }];
+        }
+        if (suffixMatches.length > 1) return [];
+
+        const normalizedLabel = normalizeAliasText(row.label);
+        const labelMatches = activeThemes.filter(
+          (concept) => normalizeAliasText(concept.label) === normalizedLabel,
+        );
+        return labelMatches.length === 1
+          ? [{ source: row.code, target: labelMatches[0]!.code }]
+          : [];
+      },
+    );
+    if (staleRetiredTreatments.length > 0) {
+      issues.push({
+        severity: 'BLOCKER',
+        code: 'RETIRED_TREATMENT_HAS_ACTIVE_SUCCESSOR',
+        message:
+          'Compatibilidade histórica inválida: Treatment marcado como retirado possui Theme ativo correspondente: ' +
+          staleRetiredTreatments
+            .map(({ source, target }) => `${source} → ${target}`)
             .join(', ') +
           '.',
       });

@@ -120,6 +120,78 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
 });
 
 
+test('historical Treatment ignores a RETIRED suffix target and falls back to an active Theme by label', () => {
+  const compatibility = planDimensionMergeCompatibility(
+    {
+      concepts: [
+        concept('theme.legacy_exemption', 'Tema legado', {
+          membershipStatus: 'RETIRED',
+        }),
+        concept('theme.exemption', 'Isenção'),
+        concept('treatment.legacy_exemption', 'Isenção', {
+          membershipStatus: 'RETIRED',
+        }),
+      ],
+    },
+    'treatment',
+    'theme',
+    [],
+  );
+
+  assert.deepEqual(compatibility.redirects, {
+    'treatment.legacy_exemption': 'theme.exemption',
+  });
+  assert.deepEqual(compatibility.retiredCodes, []);
+});
+
+test('active suffix target keeps deterministic precedence over label fallback', () => {
+  const compatibility = planDimensionMergeCompatibility(
+    {
+      concepts: [
+        concept('theme.legacy_exemption', 'Outro rótulo'),
+        concept('theme.exemption', 'Isenção'),
+        concept('treatment.legacy_exemption', 'Isenção', {
+          membershipStatus: 'RETIRED',
+        }),
+      ],
+    },
+    'treatment',
+    'theme',
+    [],
+  );
+
+  assert.equal(
+    compatibility.redirects['treatment.legacy_exemption'],
+    'theme.legacy_exemption',
+  );
+});
+
+test('historical Treatment rejects ambiguous active label fallback', () => {
+  assert.throws(
+    () =>
+      planDimensionMergeCompatibility(
+        {
+          concepts: [
+            concept('theme.first', 'Isenção'),
+            concept('theme.second', 'Isenção'),
+            concept('treatment.legacy', 'Isenção', {
+              membershipStatus: 'RETIRED',
+            }),
+          ],
+        },
+        'treatment',
+        'theme',
+        [],
+      ),
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      (error as Error & { code: string }).code ===
+        'AMBIGUOUS_DIMENSION_MERGE_TARGET',
+  );
+});
+
+
 test('detached historical Treatment redirects to an active Theme before retirement', () => {
   const result = planDetachedHistoricalMergeCompatibility(
     [
