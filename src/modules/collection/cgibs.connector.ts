@@ -55,6 +55,8 @@ export interface CgibsStoredFile {
   filename?: string;
   sourceEtag?: string;
   sourceLastModified?: string;
+  /** Identity this origin owns; see resolveIdentityKey. */
+  identityKey?: string;
 }
 
 export interface CgibsSourceState {
@@ -65,6 +67,7 @@ export interface CgibsConnectorOptions {
   fetch?: typeof fetch;
   now?: () => Date;
   readState?: (sourceId: string) => Promise<CgibsSourceState>;
+  readPersistedIdentityKeys?: (sourceId: string) => Promise<Record<string, string>>;
   client?: Omit<CgibsClientOptions, 'fetch'>;
   revisitAfterMs?: number;
   maxRechecksPerRun?: number;
@@ -109,7 +112,39 @@ function connectorFile(item: CgibsDocumentDescriptor, stored: CgibsStoredFile): 
   };
 }
 
-function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile): ConnectorPublication {
+/**
+ * Identity an origin is published under.
+ *
+ * A CGIBS origin is the stable path of one published file, so it always names
+ * the same document: a new act, or a new official version of one, is a new
+ * file at a new path and therefore a new origin. The derived key, by
+ * contrast, is built from what the listing page says (family, document
+ * family, version read from the title text, restricted-production scope), so
+ * the portal rewording a title, moving a document between listings or
+ * editing a section silently changes it. Persistence then refuses the write,
+ * because the origin is already linked to the previous identity.
+ *
+ * So an origin that already owns an identity keeps it, and only a genuinely
+ * new origin takes the derived key. The reworded listing becomes a new
+ * version of the same publication instead of a conflict. The reference is
+ * the checkpoint, falling back to the identity persisted for that origin —
+ * which is what matters for an item that failed in the last run, since
+ * persistence accepts no other key for it.
+ */
+function resolveIdentityKey(
+  item: CgibsDocumentDescriptor,
+  previous: CgibsStoredFile | undefined,
+  persisted: Record<string, string>,
+): string {
+  if (!item.fileUrl) return item.identityKey;
+  return previous?.identityKey ?? persisted[stateKey(item)] ?? item.identityKey;
+}
+
+function publicationFor(
+  item: CgibsDocumentDescriptor,
+  stored?: CgibsStoredFile,
+  identityKey: string = item.identityKey,
+): ConnectorPublication {
   const canUseStrongIdentity =
     item.actNumber !== undefined &&
     item.publishedAt !== undefined &&
@@ -132,7 +167,7 @@ function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile)
       : {}),
     officialUrl: item.officialUrl,
     ...(item.externalId ? { externalId: item.externalId } : {}),
-    ...(!canUseStrongIdentity ? { identityKey: item.identityKey } : {}),
+    ...(!canUseStrongIdentity ? { identityKey } : {}),
     ...(stored ? { files: [connectorFile(item, stored)] } : {}),
     metadata: {
       ...item.metadata,
@@ -144,7 +179,7 @@ function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile)
       ...(item.officialVersion ? { officialVersion: item.officialVersion } : {}),
       ...(item.section ? { section: item.section } : {}),
       ...(item.pageUrl ? { listingOrPageUrl: item.pageUrl } : {}),
-      normativeKey: item.identityKey,
+      normativeKey: identityKey,
     },
   };
 }
@@ -191,6 +226,7 @@ export class CgibsConnector implements CollectionConnector {
   async collect(context: ConnectorExecutionContext): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
     const state = await this.#options.readState?.(context.sourceId) ?? { items: {} };
+    const persistedIdentityKeys = await this.#options.readPersistedIdentityKeys?.(context.sourceId) ?? {};
     const revisitAfterMs = this.#options.revisitAfterMs ?? DEFAULT_REVISIT_AFTER_MS;
     const maxRechecksPerRun = this.#options.maxRechecksPerRun ?? DEFAULT_MAX_RECHECKS_PER_RUN;
     const maxDetailPagesPerRun = this.#options.maxDetailPagesPerRun ?? DEFAULT_MAX_DETAIL_PAGES_PER_RUN;
@@ -271,6 +307,7 @@ export class CgibsConnector implements CollectionConnector {
     let recheckedKnownCount = 0;
     let rechecksUsed = 0;
     let newFileDownloadCount = 0;
+    let keptIdentityCount = 0;
 
     for (const item of discovered) {
       context.signal.throwIfAborted();
@@ -282,12 +319,14 @@ export class CgibsConnector implements CollectionConnector {
 
       const key = stateKey(item);
       const previous = state.items[key];
+      const identityKey = resolveIdentityKey(item, previous, persistedIdentityKeys);
+      if (identityKey !== item.identityKey) keptIdentityCount += 1;
       const shouldRecheck = previous && due(previous, now, revisitAfterMs) && rechecksUsed < maxRechecksPerRun;
 
       if (previous && !shouldRecheck) {
-        nextItems[key] = previous;
+        nextItems[key] = { ...previous, identityKey };
         reusedCheckpointCount += 1;
-        publications.push(publicationFor(item, previous));
+        publications.push(publicationFor(item, previous, identityKey));
         continue;
       }
 
@@ -338,13 +377,13 @@ export class CgibsConnector implements CollectionConnector {
             ...(response.sourceLastModified ? { sourceLastModified: response.sourceLastModified } : {}),
           };
         }
-        nextItems[key] = stored;
-        publications.push(publicationFor(item, stored));
+        nextItems[key] = { ...stored, identityKey };
+        publications.push(publicationFor(item, stored, identityKey));
       } catch (error) {
         if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
         if (previous) {
-          nextItems[key] = previous;
-          publications.push(publicationFor(item, previous));
+          nextItems[key] = { ...previous, identityKey };
+          publications.push(publicationFor(item, previous, identityKey));
         }
         const failure = failureInfo(error);
         partialFailures.push({
@@ -372,6 +411,7 @@ export class CgibsConnector implements CollectionConnector {
           reusedCheckpointCount,
           recheckedKnownCount,
           newFileDownloadCount,
+          keptIdentityCount,
           revisitAfterMs,
           maxRechecksPerRun,
           partialFailureCount: partialFailures.length,

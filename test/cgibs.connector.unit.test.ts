@@ -207,3 +207,89 @@ test('successful empty source returns zero publications without marking source u
   assert.equal(result.partialFailures?.length ?? 0, 0);
   assert.equal((result.metadata as { cgibs: { seedsSucceeded: number } }).cgibs.seedsSucceeded, 12);
 });
+
+// Issue: the CGIBS listing drives the derived identity (family, document
+// family, version read from the title, restricted-production scope) while the
+// origin is the stable file path. A reworded listing therefore asked
+// persistence to move an origin to a new identity, which it refuses:
+// "Publication origin is already linked to another publication identity."
+const LEGACY_KEY = 'CGIBS|DOC|TECHNICAL_DOCUMENTS|MANUAL_LEGADO|SEM_VERSAO|GERAL';
+
+/**
+ * A file-anchored document that carries a derived identityKey, i.e. one the
+ * listing text defines rather than a numbered act with a strong identity.
+ * That is the shape the production conflict has (a versioned manual).
+ */
+function fileOrigin(publications: Array<{ externalId?: string; officialUrl: string; identityKey?: string }>): string {
+  const match = publications.find(
+    (p) => (p.externalId ?? p.officialUrl).includes('/upload/arquivos/') && p.identityKey !== undefined,
+  );
+  assert.ok(match, 'fixture must expose a file-anchored document with a derived identity');
+  return match.externalId ?? match.officialUrl;
+}
+
+test('an origin keeps the identity it already owns when the listing would change it', async () => {
+  const baseline = await new CgibsConnector({
+    fetch: portal().fetch,
+    now: () => new Date('2026-09-23T12:00:00Z'),
+  }).collect(CONTEXT);
+  const origin = fileOrigin(baseline.publications);
+  const derived = baseline.publications.find((p) => (p.externalId ?? p.officialUrl) === origin)!.identityKey;
+  assert.ok(derived && derived !== LEGACY_KEY);
+
+  const kept = await new CgibsConnector({
+    fetch: portal().fetch,
+    readPersistedIdentityKeys: async () => ({ [origin]: LEGACY_KEY }),
+    now: () => new Date('2026-09-23T12:00:00Z'),
+  }).collect(CONTEXT);
+
+  const publication = kept.publications.find((p) => (p.externalId ?? p.officialUrl) === origin)!;
+  assert.equal(publication.identityKey, LEGACY_KEY);
+  assert.equal(
+    normalizePublication({ sourceId: CONTEXT.sourceId, publication }).identityBasis.sourceKey,
+    LEGACY_KEY,
+    'the persisted identity is what reaches the database, so the write no longer conflicts',
+  );
+  assert.equal((publication.metadata as { normativeKey?: string }).normativeKey, LEGACY_KEY);
+  assert.equal((kept.metadata as { cgibs: { keptIdentityCount: number } }).cgibs.keptIdentityCount, 1);
+
+  // Every other origin still takes its derived identity.
+  for (const other of kept.publications) {
+    if ((other.externalId ?? other.officialUrl) === origin) continue;
+    assert.notEqual(other.identityKey, LEGACY_KEY);
+  }
+});
+
+test('the checkpoint carries the identity forward, so a replay never re-derives it', async () => {
+  const first = await new CgibsConnector({
+    fetch: portal().fetch,
+    readPersistedIdentityKeys: async () => {
+      const seeded = await new CgibsConnector({ fetch: portal().fetch, now: () => new Date('2026-09-23T12:00:00Z') }).collect(CONTEXT);
+      return { [fileOrigin(seeded.publications)]: LEGACY_KEY };
+    },
+    now: () => new Date('2026-09-23T12:00:00Z'),
+  }).collect(CONTEXT);
+  const origin = fileOrigin(first.publications);
+  const state = first.checkpoint!.state as unknown as CgibsSourceState;
+  assert.equal(state.items[origin]!.identityKey, LEGACY_KEY, 'checkpoint remembers the owned identity');
+
+  // The database is no longer consulted: the checkpoint alone keeps it stable.
+  const replay = await new CgibsConnector({
+    fetch: portal().fetch,
+    readState: async () => state,
+    now: () => new Date('2026-09-23T12:05:00Z'),
+  }).collect(CONTEXT);
+  assert.equal(replay.publications.find((p) => (p.externalId ?? p.officialUrl) === origin)!.identityKey, LEGACY_KEY);
+});
+
+test('a brand-new origin still takes the identity derived from the listing', async () => {
+  const run = await new CgibsConnector({
+    fetch: portal().fetch,
+    readPersistedIdentityKeys: async () => ({}),
+    now: () => new Date('2026-09-23T12:00:00Z'),
+  }).collect(CONTEXT);
+  assert.equal((run.metadata as { cgibs: { keptIdentityCount: number } }).cgibs.keptIdentityCount, 0);
+  for (const publication of run.publications) {
+    assert.ok(publication.identityKey === undefined || publication.identityKey.startsWith('CGIBS|'));
+  }
+});
