@@ -119,9 +119,9 @@ BEGIN
     RETURNING * INTO v_policy;
   END IF;
 
-  DELETE FROM public.collection_filter_terms WHERE policy_id=v_policy.id;
-  DELETE FROM public.collection_filter_type_aliases WHERE policy_id=v_policy.id;
-  DELETE FROM public.collection_filter_type_rules WHERE policy_id=v_policy.id;
+  DELETE FROM public.collection_filter_terms AS t WHERE t.policy_id=v_policy.id;
+  DELETE FROM public.collection_filter_type_aliases AS a WHERE a.policy_id=v_policy.id;
+  DELETE FROM public.collection_filter_type_rules AS r WHERE r.policy_id=v_policy.id;
 
   INSERT INTO public.collection_filter_type_rules(
     policy_id,source_code,section,canonical_type,mode,help_text
