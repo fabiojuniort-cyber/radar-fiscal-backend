@@ -9,7 +9,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 
 import { env } from '../../config/env.js';
-import { withUserContext } from '../../infrastructure/database/tenant-context.js';
+import { isPlatformAdmin, readPlatformAccess } from '../../modules/auth/platform-role.js';
 import {
   CCLASSTRIB_CATALOG,
   parseCclasstribCsv,
@@ -141,25 +141,6 @@ const conceptBody = z.object({
 const justificationBody = z.object({ justification });
 
 class NotCuratorError extends Error {}
-
-async function isTaxonomyCurator(
-  app: FastifyInstance,
-  userId: string,
-): Promise<boolean> {
-  return withUserContext(app.db, userId, async (trx) => {
-    const result = await sql<{ ok: number }>`
-      SELECT 1 AS ok
-      FROM platform_user_roles r
-      JOIN app_users u ON u.id = r.user_id
-      WHERE r.user_id = ${userId}::uuid
-        AND r.role = 'TAXONOMY_CURATOR'
-        AND r.revoked_at IS NULL
-        AND u.status = 'ACTIVE'
-      LIMIT 1
-    `.execute(trx);
-    return result.rows.length > 0;
-  });
-}
 
 function actorFrom(request: FastifyRequest, text: string): CuratorActor {
   return { userId: request.auth!.userId, justification: text };
@@ -394,14 +375,14 @@ export async function taxonomyAdminRoutes(
 ): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
-  const requireCurator = async (
+  const requirePlatformAdmin = async (
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<void> => {
     await app.authenticate(request, reply);
     if (reply.sent) return;
-    if (!request.auth || !(await isTaxonomyCurator(app, request.auth.userId))) {
-      await reply.status(403).send({ error: 'taxonomy_curator_required' });
+    if (!request.auth || !(await isPlatformAdmin(app.db, request.auth.userId))) {
+      await reply.status(403).send({ error: 'platform_admin_required' });
     }
   };
 
@@ -423,8 +404,9 @@ export async function taxonomyAdminRoutes(
     { preHandler: app.authenticate },
     async (request, reply) => {
       if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
+      const access = await readPlatformAccess(app.db, request.auth.userId);
       return reply.send({
-        taxonomyCurator: await isTaxonomyCurator(app, request.auth.userId),
+        ...access,
         curatorDatabase: app.curatorPool !== null,
       });
     },
@@ -432,7 +414,7 @@ export async function taxonomyAdminRoutes(
 
   typed.get(
     '/api/v1/admin/taxonomy/state',
-    { preHandler: requireCurator },
+    { preHandler: requirePlatformAdmin },
     async (_request, reply) => {
       const run = kyselyRunner(app.db);
       const [published, draft, settings, catalogs] = await Promise.all([
@@ -459,7 +441,7 @@ export async function taxonomyAdminRoutes(
 
   typed.get(
     '/api/v1/admin/taxonomy/releases/:releaseId',
-    { preHandler: requireCurator, schema: { params: releaseParams } },
+    { preHandler: requirePlatformAdmin, schema: { params: releaseParams } },
     async (request, reply) => {
       const view = await loadReleaseView(kyselyRunner(app.db), request.params.releaseId, {
         includeRetired: true,
@@ -471,7 +453,7 @@ export async function taxonomyAdminRoutes(
 
   typed.get(
     '/api/v1/admin/taxonomy/drafts/current/review',
-    { preHandler: requireCurator },
+    { preHandler: requirePlatformAdmin },
     async (_request, reply) => {
       const pool = curatorPool();
       const client = await pool.connect();
@@ -501,7 +483,7 @@ export async function taxonomyAdminRoutes(
 
   typed.post(
     '/api/v1/admin/taxonomy/drafts',
-    { preHandler: requireCurator, schema: { body: justificationBody } },
+    { preHandler: requirePlatformAdmin, schema: { body: justificationBody } },
     async (request, reply) => {
       const result = await withCuratorTransaction(curatorPool(), (client) =>
         createDraft(client, actorFrom(request, request.body.justification)),
@@ -512,7 +494,7 @@ export async function taxonomyAdminRoutes(
 
   typed.patch(
     '/api/v1/admin/taxonomy/drafts/current/dimensions/:code',
-    { preHandler: requireCurator, schema: { params: dimensionParams, body: dimensionBody } },
+    { preHandler: requirePlatformAdmin, schema: { params: dimensionParams, body: dimensionBody } },
     async (request, reply) => {
       const { justification: text, ...patch } = request.body;
       await withCuratorTransaction(curatorPool(), (client) =>
@@ -524,7 +506,7 @@ export async function taxonomyAdminRoutes(
 
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/dimensions/:code/groups',
-    { preHandler: requireCurator, schema: { params: dimensionParams, body: groupBody } },
+    { preHandler: requirePlatformAdmin, schema: { params: dimensionParams, body: groupBody } },
     async (request, reply) => {
       const { justification: text, ...input } = request.body;
       const id = await withCuratorTransaction(curatorPool(), (client) =>
@@ -536,7 +518,7 @@ export async function taxonomyAdminRoutes(
 
   typed.patch(
     '/api/v1/admin/taxonomy/drafts/current/groups/:groupId',
-    { preHandler: requireCurator, schema: { params: groupParams, body: groupBody } },
+    { preHandler: requirePlatformAdmin, schema: { params: groupParams, body: groupBody } },
     async (request, reply) => {
       const { justification: text, ...input } = request.body;
       await withCuratorTransaction(curatorPool(), (client) =>
@@ -548,7 +530,7 @@ export async function taxonomyAdminRoutes(
 
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/groups/:groupId/delete',
-    { preHandler: requireCurator, schema: { params: groupParams, body: justificationBody } },
+    { preHandler: requirePlatformAdmin, schema: { params: groupParams, body: justificationBody } },
     async (request, reply) => {
       await withCuratorTransaction(curatorPool(), (client) =>
         deleteGroup(client, actorFrom(request, request.body.justification), request.params.groupId),
@@ -559,7 +541,7 @@ export async function taxonomyAdminRoutes(
 
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/dimensions/:code/concepts',
-    { preHandler: requireCurator, schema: { params: dimensionParams, body: conceptBody } },
+    { preHandler: requirePlatformAdmin, schema: { params: dimensionParams, body: conceptBody } },
     async (request, reply) => {
       const { justification: text, ...input } = request.body;
       const code = await withCuratorTransaction(curatorPool(), (client) =>
@@ -571,7 +553,7 @@ export async function taxonomyAdminRoutes(
 
   typed.patch(
     '/api/v1/admin/taxonomy/drafts/current/concepts/:code',
-    { preHandler: requireCurator, schema: { params: conceptParams, body: conceptBody } },
+    { preHandler: requirePlatformAdmin, schema: { params: conceptParams, body: conceptBody } },
     async (request, reply) => {
       const { justification: text, code: _code, ...input } = request.body;
       await withCuratorTransaction(curatorPool(), (client) =>
@@ -584,7 +566,7 @@ export async function taxonomyAdminRoutes(
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/dimensions/:code/import',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       bodyLimit: 5 * 1024 * 1024,
       schema: {
         params: dimensionParams,
@@ -608,7 +590,7 @@ export async function taxonomyAdminRoutes(
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/dimensions/:code/rows',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       bodyLimit: 5 * 1024 * 1024,
       schema: {
         params: dimensionParams,
@@ -663,7 +645,7 @@ export async function taxonomyAdminRoutes(
   typed.get(
     '/api/v1/admin/taxonomy/releases/:releaseId/dimensions/:code/export.csv',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       schema: { params: releaseParams.merge(dimensionParams) },
     },
     async (request, reply) => {
@@ -726,7 +708,7 @@ export async function taxonomyAdminRoutes(
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/publish',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       schema: {
         body: z.object({ justification, changeNotes: z.string().trim().min(3).max(4000) }),
       },
@@ -746,7 +728,7 @@ export async function taxonomyAdminRoutes(
   typed.put(
     '/api/v1/admin/taxonomy/settings/classification',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       schema: { body: z.object({ justification, enabled: z.boolean() }) },
     },
     async (request, reply) => {
@@ -765,7 +747,7 @@ export async function taxonomyAdminRoutes(
   typed.put(
     '/api/v1/admin/taxonomy/settings/excluded-sources',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       schema: {
         body: z.object({
           justification,
@@ -800,7 +782,7 @@ export async function taxonomyAdminRoutes(
   typed.get(
     '/api/v1/admin/taxonomy/catalogs/search',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       schema: {
         querystring: z.object({
           catalog: z.enum(['NCM', 'CNAE', 'CCLASSTRIB']),
@@ -838,7 +820,7 @@ export async function taxonomyAdminRoutes(
   typed.post(
     '/api/v1/admin/taxonomy/catalogs/:catalog/check',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       bodyLimit: 10 * 1024 * 1024,
       schema: {
         params: catalogParams,
@@ -875,7 +857,7 @@ export async function taxonomyAdminRoutes(
   typed.post(
     '/api/v1/admin/taxonomy/catalogs/:catalog/import',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       bodyLimit: 10 * 1024 * 1024,
       schema: {
         params: catalogParams,
@@ -959,7 +941,7 @@ export async function taxonomyAdminRoutes(
 
   typed.get(
     '/api/v1/admin/taxonomy/publications/:publicationId/tags',
-    { preHandler: requireCurator, schema: { params: publicationParams } },
+    { preHandler: requirePlatformAdmin, schema: { params: publicationParams } },
     async (request, reply) => {
       const view = await loadPublicationTaxonomy(
         kyselyRunner(app.db),
@@ -973,7 +955,7 @@ export async function taxonomyAdminRoutes(
   typed.post(
     '/api/v1/admin/taxonomy/publications/:publicationId/tags',
     {
-      preHandler: requireCurator,
+      preHandler: requirePlatformAdmin,
       schema: {
         params: publicationParams,
         body: z.object({
