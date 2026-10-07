@@ -2062,12 +2062,12 @@ export async function productRoutes(
       }
 
       try {
-        const profile = await withTenantContext(
+        const result = await withTenantContext(
           app.db,
           request.auth.userId,
           tenantId,
-          async (trx) =>
-            trx
+          async (trx) => {
+            const profile = await trx
               .selectFrom('company_tax_profiles')
               .select([
                 'id',
@@ -2082,23 +2082,45 @@ export async function productRoutes(
               ])
               .where('company_id', '=', request.params.companyId)
               .where('is_current', '=', true)
-              .executeTakeFirst(),
+              .executeTakeFirst();
+
+            if (!profile) {
+              return { profile: null, release: null, compatibility: null };
+            }
+
+            const release = await trx
+              .selectFrom('taxonomy_releases')
+              .select(['id', 'version'])
+              .where('status', '=', 'PUBLISHED')
+              .orderBy('version_major', 'desc')
+              .orderBy('version_minor', 'desc')
+              .orderBy('version_patch', 'desc')
+              .executeTakeFirst();
+            const compatibility = release
+              ? await loadTaxonomyCodeCompatibility(kyselyRunner(trx), release.id)
+              : null;
+            return { profile, release: release ?? null, compatibility };
+          },
         );
 
         return reply.status(200).send({
-          profile: profile
+          profile: result.profile
             ? {
-                id: profile.id,
-                companyId: profile.company_id,
-                versionNo: profile.version_no,
-                taxRegime: profile.tax_regime,
-                segments: profile.segments,
-                activities: profile.activities,
-                personalization: profile.personalization,
-                validFrom: profile.valid_from
-                  ? new Date(profile.valid_from).toISOString().slice(0, 10)
+                id: result.profile.id,
+                companyId: result.profile.company_id,
+                versionNo: result.profile.version_no,
+                taxRegime: result.profile.tax_regime,
+                segments: result.profile.segments,
+                activities: result.profile.activities,
+                personalization: currentTaxonomyPersonalization(
+                  result.profile.personalization,
+                  result.release,
+                  result.compatibility,
+                ),
+                validFrom: result.profile.valid_from
+                  ? new Date(result.profile.valid_from).toISOString().slice(0, 10)
                   : null,
-                createdAt: new Date(profile.created_at).toISOString(),
+                createdAt: new Date(result.profile.created_at).toISOString(),
               }
             : null,
         });
