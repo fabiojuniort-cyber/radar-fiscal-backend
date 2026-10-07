@@ -34,6 +34,7 @@ import {
 } from './curation.seed.js';
 import {
   parseTaxonomyCodeCompatibility,
+  resolveTaxonomyConceptCode,
   updateDraftTaxonomyCodeCompatibility,
 } from '../taxonomy-code-compatibility.js';
 
@@ -2172,6 +2173,123 @@ export async function validateReleaseView(
   }
 
   if (client) {
+    const releaseId = view.release.id;
+    const residue = await client.query<{
+      orphan_groups: number;
+      orphan_relation_rules: number;
+      orphan_relations: number;
+    }>(
+      `
+        SELECT
+          (
+            SELECT count(*)::int
+            FROM taxonomy_release_groups g
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id = g.release_id
+             AND rd.dimension_id = g.dimension_id
+            WHERE g.release_id = $1::uuid
+              AND rd.membership_status <> 'INCLUDED'
+          ) AS orphan_groups,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_release_relation_rules rr
+            JOIN taxonomy_release_dimensions src
+              ON src.release_id = rr.release_id
+             AND src.dimension_id = rr.source_dimension_id
+            JOIN taxonomy_release_dimensions tgt
+              ON tgt.release_id = rr.release_id
+             AND tgt.dimension_id = rr.target_dimension_id
+            WHERE rr.release_id = $1::uuid
+              AND (
+                src.membership_status <> 'INCLUDED'
+                OR tgt.membership_status <> 'INCLUDED'
+              )
+          ) AS orphan_relation_rules,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_concept_relations rel
+            JOIN taxonomy_release_concepts src_rc
+              ON src_rc.id = rel.source_release_concept_id
+            JOIN taxonomy_concepts src_c ON src_c.id = src_rc.concept_id
+            JOIN taxonomy_release_dimensions src_rd
+              ON src_rd.release_id = rel.release_id
+             AND src_rd.dimension_id = src_c.dimension_id
+            JOIN taxonomy_release_concepts tgt_rc
+              ON tgt_rc.id = rel.target_release_concept_id
+            JOIN taxonomy_concepts tgt_c ON tgt_c.id = tgt_rc.concept_id
+            JOIN taxonomy_release_dimensions tgt_rd
+              ON tgt_rd.release_id = rel.release_id
+             AND tgt_rd.dimension_id = tgt_c.dimension_id
+            WHERE rel.release_id = $1::uuid
+              AND (
+                src_rc.membership_status <> 'INCLUDED'
+                OR tgt_rc.membership_status <> 'INCLUDED'
+                OR src_rd.membership_status <> 'INCLUDED'
+                OR tgt_rd.membership_status <> 'INCLUDED'
+              )
+          ) AS orphan_relations
+      `,
+      [releaseId],
+    );
+    const residueRow = residue.rows[0];
+    for (const [code, count, message] of [
+      ['RETIRED_DIMENSION_GROUPS', residueRow?.orphan_groups ?? 0, 'Há grupos pertencentes a dimensões retiradas.'],
+      ['RETIRED_DIMENSION_RELATION_RULES', residueRow?.orphan_relation_rules ?? 0, 'Há regras de relação apontando para dimensões retiradas.'],
+      ['RETIRED_DIMENSION_RELATIONS', residueRow?.orphan_relations ?? 0, 'Há relações apontando para conceitos/dimensões retirados.'],
+    ] as const) {
+      if (count > 0) {
+        issues.push({
+          severity: 'BLOCKER',
+          code,
+          message: `${message} Quantidade: ${count}.`,
+        });
+      }
+    }
+
+    const manifestRow = await client.query<{ manifest: unknown }>(
+      'SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid',
+      [releaseId],
+    );
+    const compatibility = parseTaxonomyCodeCompatibility(manifestRow.rows[0]?.manifest);
+    const includedCodes = new Set(included.map((concept) => concept.code));
+    try {
+      for (const [from, directTarget] of Object.entries(compatibility.redirects)) {
+        const target = resolveTaxonomyConceptCode(from, compatibility);
+        if (!target || !includedCodes.has(target)) {
+          issues.push({
+            severity: 'BLOCKER',
+            code: 'INVALID_TAXONOMY_CODE_REDIRECT',
+            message: `Compatibilidade inválida: ${from} → ${directTarget} não resolve para um conceito ativo.`,
+            subject: from,
+          });
+        }
+        if (includedCodes.has(from) && from !== target) {
+          issues.push({
+            severity: 'BLOCKER',
+            code: 'ACTIVE_CODE_HAS_REDIRECT',
+            message: `Compatibilidade ambígua: ${from} ainda está ativo e também redireciona para ${target}.`,
+            subject: from,
+          });
+        }
+      }
+    } catch (error) {
+      issues.push({
+        severity: 'BLOCKER',
+        code: 'TAXONOMY_CODE_REDIRECT_CYCLE',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    for (const retiredCode of compatibility.retiredCodes) {
+      if (includedCodes.has(retiredCode)) {
+        issues.push({
+          severity: 'BLOCKER',
+          code: 'RETIRED_CODE_STILL_ACTIVE',
+          message: `Compatibilidade inválida: ${retiredCode} está marcado como retirado, mas continua ativo.`,
+          subject: retiredCode,
+        });
+      }
+    }
+
     const catalogTypes: Array<[OfficialCodeType, string]> = [
       ['NCM', 'NCM'],
       ['CNAE', 'CNAE'],
