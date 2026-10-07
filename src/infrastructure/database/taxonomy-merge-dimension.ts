@@ -91,7 +91,38 @@ async function usage(codes: string[]): Promise<unknown> {
       `,
       [codes],
     );
-    return { classifierTags: tags.rows, curatorTags: curator.rows, profiles: profiles.rows };
+    const monitoringProfiles = await pool.query<{ code: string; profiles: number }>(
+      `
+        SELECT criterion.code, count(DISTINCT p.id)::int AS profiles
+        FROM monitoring_profiles p
+        CROSS JOIN LATERAL (
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'anyOf') = 'array'
+              THEN p.criteria->'taxonomy'->'anyOf' ELSE '[]'::jsonb END
+          ) AS code
+          UNION ALL
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'allOf') = 'array'
+              THEN p.criteria->'taxonomy'->'allOf' ELSE '[]'::jsonb END
+          )
+          UNION ALL
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'noneOf') = 'array'
+              THEN p.criteria->'taxonomy'->'noneOf' ELSE '[]'::jsonb END
+          )
+        ) criterion
+        WHERE criterion.code = ANY($1::text[])
+        GROUP BY criterion.code
+        ORDER BY criterion.code
+      `,
+      [codes],
+    );
+    return {
+      classifierTags: tags.rows,
+      curatorTags: curator.rows,
+      companyTaxProfiles: profiles.rows,
+      monitoringProfiles: monitoringProfiles.rows,
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   } finally {
@@ -102,7 +133,15 @@ async function usage(codes: string[]): Promise<unknown> {
 class Rollback extends Error {}
 
 const pool = new Pool({ connectionString, max: 1 });
-let result: { draftVersion: string; draftCreated: boolean; steps: MergeStep[]; retired: string[] } | undefined;
+let result:
+  | {
+      draftVersion: string;
+      draftCreated: boolean;
+      steps: MergeStep[];
+      retired: string[];
+      transferredOfficialCodeType: string | null;
+    }
+  | undefined;
 try {
   await withCuratorTransaction(pool, async (client) => {
     result = await mergeDimension(client, actor, from, into, groupMap);
@@ -123,7 +162,9 @@ console.log(
       draftVersion: result?.draftVersion,
       draftCreated: result?.draftCreated,
       merged: result?.steps.filter((step) => step.action === 'MERGE').length,
+      restored: result?.steps.filter((step) => step.action === 'RESTORE').length,
       created: result?.steps.filter((step) => step.action === 'CREATE').length,
+      transferredOfficialCodeType: result?.transferredOfficialCodeType ?? null,
       steps: result?.steps,
       retired: result?.retired,
       usage: await usage(result?.steps.map((step) => step.from) ?? []),
