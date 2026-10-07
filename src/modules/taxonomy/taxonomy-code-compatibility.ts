@@ -97,23 +97,31 @@ export async function loadTaxonomyCodeCompatibility(
   return parseTaxonomyCodeCompatibility(rows[0]?.manifest);
 }
 
-export async function updateDraftTaxonomyCodeCompatibility(
-  client: PoolClient,
-  releaseId: string,
-  patch: {
-    redirects?: Readonly<Record<string, string>>;
-    retiredCodes?: readonly string[];
-  },
-): Promise<TaxonomyCodeCompatibility> {
-  const current = await client.query<{ manifest: unknown }>(
-    "SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid AND status = 'DRAFT'",
-    [releaseId],
-  );
-  if (!current.rows[0]) {
-    throw new Error('DRAFT_NOT_FOUND');
-  }
+export interface TaxonomyCodeCompatibilityPatch {
+  redirects?: Readonly<Record<string, string>>;
+  retiredCodes?: readonly string[];
+}
 
-  const compatibility = parseTaxonomyCodeCompatibility(current.rows[0].manifest);
+function terminalRedirectTarget(
+  code: string,
+  redirects: Readonly<Record<string, string>>,
+): string {
+  const visited = new Set<string>();
+  let current = code;
+  while (redirects[current]) {
+    if (visited.has(current)) {
+      throw new Error('TAXONOMY_CODE_REDIRECT_CYCLE:' + code);
+    }
+    visited.add(current);
+    current = redirects[current]!;
+  }
+  return current;
+}
+
+export function applyTaxonomyCodeCompatibilityPatch(
+  compatibility: TaxonomyCodeCompatibility,
+  patch: TaxonomyCodeCompatibilityPatch,
+): TaxonomyCodeCompatibility {
   const redirects = { ...compatibility.redirects };
   const retired = new Set(compatibility.retiredCodes);
 
@@ -129,6 +137,18 @@ export async function updateDraftTaxonomyCodeCompatibility(
     if (!redirects[code]) retired.add(code);
   }
 
+  // If a canonical target is retired, every inherited alias that resolves to
+  // it also becomes retired. Keeping alias -> retired-target redirects would
+  // be fail-closed at publish time but would make the next release impossible
+  // to publish without manually repairing compatibility.
+  const aliasesOfRetiredTargets = Object.keys(redirects).filter((from) =>
+    retired.has(terminalRedirectTarget(from, redirects)),
+  );
+  for (const from of aliasesOfRetiredTargets) {
+    delete redirects[from];
+    retired.add(from);
+  }
+
   // Collapse inherited redirect chains to the newest canonical code and
   // refuse cycles before they can become part of a published release.
   const merged: TaxonomyCodeCompatibility = {
@@ -141,13 +161,30 @@ export async function updateDraftTaxonomyCodeCompatibility(
     if (resolved) redirects[from] = resolved;
   }
 
-  const next: TaxonomyCodeCompatibility = {
+  return {
     version: 1,
     redirects: Object.fromEntries(
       Object.entries(redirects).sort(([left], [right]) => left.localeCompare(right)),
     ),
     retiredCodes: [...retired].sort(),
   };
+}
+
+export async function updateDraftTaxonomyCodeCompatibility(
+  client: PoolClient,
+  releaseId: string,
+  patch: TaxonomyCodeCompatibilityPatch,
+): Promise<TaxonomyCodeCompatibility> {
+  const current = await client.query<{ manifest: unknown }>(
+    "SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid AND status = 'DRAFT'",
+    [releaseId],
+  );
+  if (!current.rows[0]) {
+    throw new Error('DRAFT_NOT_FOUND');
+  }
+
+  const compatibility = parseTaxonomyCodeCompatibility(current.rows[0].manifest);
+  const next = applyTaxonomyCodeCompatibilityPatch(compatibility, patch);
 
   const updated = await client.query(
     `
