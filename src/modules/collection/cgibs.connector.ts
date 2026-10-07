@@ -7,6 +7,7 @@ import type {
   ConnectorResult,
 } from './connector.contract.js';
 import { ConnectorError } from './connector.error.js';
+import { extractCgibsText, type CgibsTextExtraction } from './cgibs.text.js';
 import {
   CGIBS_BASE_URL,
   CgibsClient,
@@ -55,6 +56,15 @@ export interface CgibsStoredFile {
   filename?: string;
   sourceEtag?: string;
   sourceLastModified?: string;
+  /** Identity this origin owns; see resolveIdentityKey. */
+  identityKey?: string;
+  /** Outcome of reading the file's text; absent means never attempted. */
+  contentExtraction?: CgibsTextExtraction;
+}
+
+export interface CgibsPersistedOrigins {
+  identityKeys: Record<string, string>;
+  linked: Set<string>;
 }
 
 export interface CgibsSourceState {
@@ -65,6 +75,7 @@ export interface CgibsConnectorOptions {
   fetch?: typeof fetch;
   now?: () => Date;
   readState?: (sourceId: string) => Promise<CgibsSourceState>;
+  readPersistedOrigins?: (sourceId: string) => Promise<CgibsPersistedOrigins>;
   client?: Omit<CgibsClientOptions, 'fetch'>;
   revisitAfterMs?: number;
   maxRechecksPerRun?: number;
@@ -109,7 +120,56 @@ function connectorFile(item: CgibsDocumentDescriptor, stored: CgibsStoredFile): 
   };
 }
 
-function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile): ConnectorPublication {
+/**
+ * Identity an origin is published under.
+ *
+ * A CGIBS origin is the stable path of one published file, so it always names
+ * the same document: a new act, or a new official version of one, is a new
+ * file at a new path and therefore a new origin. The derived key, by
+ * contrast, is built from what the listing page says (family, document
+ * family, version read from the title text, restricted-production scope), so
+ * the portal rewording a title, moving a document between listings or
+ * editing a section silently changes it. Persistence then refuses the write,
+ * because the origin is already linked to the previous identity.
+ *
+ * So an origin that already owns an identity keeps it, and only a genuinely
+ * new origin takes the derived key. The reworded listing becomes a new
+ * version of the same publication instead of a conflict. The reference is
+ * the checkpoint, falling back to the identity persisted for that origin —
+ * which is what matters for an item that failed in the last run, since
+ * persistence accepts no other key for it.
+ */
+function resolveIdentityKey(
+  item: CgibsDocumentDescriptor,
+  previous: CgibsStoredFile | undefined,
+  persisted: Record<string, string>,
+): string {
+  if (!item.fileUrl) return item.identityKey;
+  return previous?.identityKey ?? persisted[stateKey(item)] ?? item.identityKey;
+}
+
+/**
+ * Whether an unchanged file still has to be emitted.
+ *
+ * The catalog is re-listed on every run, but re-emitting a document whose
+ * bytes did not change would be a no-op at best. It is worse than that here:
+ * the text is extracted from the downloaded bytes, so a run that reuses the
+ * checkpoint has no text to send, and the content hash covers the text, so
+ * the publication would alternate between having a body and not having one,
+ * creating an empty version every other run. An unchanged file is therefore
+ * left alone — but only once its text has been read and the origin is proven
+ * persisted, so a document that never landed is never silently skipped.
+ */
+function settled(previous: CgibsStoredFile | undefined, key: string, linked: ReadonlySet<string>): boolean {
+  return previous?.contentExtraction !== undefined && linked.has(key);
+}
+
+function publicationFor(
+  item: CgibsDocumentDescriptor,
+  stored?: CgibsStoredFile,
+  identityKey: string = item.identityKey,
+  text?: string,
+): ConnectorPublication {
   const canUseStrongIdentity =
     item.actNumber !== undefined &&
     item.publishedAt !== undefined &&
@@ -123,7 +183,7 @@ function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile)
     ...(item.actNumber ? { actNumber: item.actNumber } : {}),
     ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
     ...(item.effectiveAt ? { effectiveAt: item.effectiveAt } : {}),
-    ...(item.content ? { content: item.content } : {}),
+    ...(text ?? item.content ? { content: text ?? item.content } : {}),
     ...(item.presentationHtml
       ? {
           presentationHtml:
@@ -132,7 +192,7 @@ function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile)
       : {}),
     officialUrl: item.officialUrl,
     ...(item.externalId ? { externalId: item.externalId } : {}),
-    ...(!canUseStrongIdentity ? { identityKey: item.identityKey } : {}),
+    ...(!canUseStrongIdentity ? { identityKey } : {}),
     ...(stored ? { files: [connectorFile(item, stored)] } : {}),
     metadata: {
       ...item.metadata,
@@ -144,7 +204,7 @@ function publicationFor(item: CgibsDocumentDescriptor, stored?: CgibsStoredFile)
       ...(item.officialVersion ? { officialVersion: item.officialVersion } : {}),
       ...(item.section ? { section: item.section } : {}),
       ...(item.pageUrl ? { listingOrPageUrl: item.pageUrl } : {}),
-      normativeKey: item.identityKey,
+      normativeKey: identityKey,
     },
   };
 }
@@ -191,6 +251,8 @@ export class CgibsConnector implements CollectionConnector {
   async collect(context: ConnectorExecutionContext): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
     const state = await this.#options.readState?.(context.sourceId) ?? { items: {} };
+    const persisted = await this.#options.readPersistedOrigins?.(context.sourceId)
+      ?? { identityKeys: {}, linked: new Set<string>() };
     const revisitAfterMs = this.#options.revisitAfterMs ?? DEFAULT_REVISIT_AFTER_MS;
     const maxRechecksPerRun = this.#options.maxRechecksPerRun ?? DEFAULT_MAX_RECHECKS_PER_RUN;
     const maxDetailPagesPerRun = this.#options.maxDetailPagesPerRun ?? DEFAULT_MAX_DETAIL_PAGES_PER_RUN;
@@ -271,6 +333,9 @@ export class CgibsConnector implements CollectionConnector {
     let recheckedKnownCount = 0;
     let rechecksUsed = 0;
     let newFileDownloadCount = 0;
+    let keptIdentityCount = 0;
+    let skippedUnchangedCount = 0;
+    const unreadableByReason: Record<string, number> = {};
 
     for (const item of discovered) {
       context.signal.throwIfAborted();
@@ -282,12 +347,25 @@ export class CgibsConnector implements CollectionConnector {
 
       const key = stateKey(item);
       const previous = state.items[key];
-      const shouldRecheck = previous && due(previous, now, revisitAfterMs) && rechecksUsed < maxRechecksPerRun;
+      const identityKey = resolveIdentityKey(item, previous, persisted.identityKeys);
+      if (identityKey !== item.identityKey) keptIdentityCount += 1;
+      // A known file whose text was never read must be fetched once, whatever
+      // the revisit window says: that is how the catalog that predates text
+      // extraction gets its body, spread over runs by the same recheck budget.
+      const needsText = previous !== undefined && previous.contentExtraction === undefined;
+      const shouldRecheck =
+        previous !== undefined &&
+        (needsText || due(previous, now, revisitAfterMs)) &&
+        rechecksUsed < maxRechecksPerRun;
 
       if (previous && !shouldRecheck) {
-        nextItems[key] = previous;
+        nextItems[key] = { ...previous, identityKey };
         reusedCheckpointCount += 1;
-        publications.push(publicationFor(item, previous));
+        if (settled(previous, key, persisted.linked)) {
+          skippedUnchangedCount += 1;
+          continue;
+        }
+        publications.push(publicationFor(item, previous, identityKey));
         continue;
       }
 
@@ -311,6 +389,7 @@ export class CgibsConnector implements CollectionConnector {
         );
 
         let stored: CgibsStoredFile;
+        let text: string | undefined;
         if (response.status === 'NOT_MODIFIED') {
           if (!previous) {
             throw new ConnectorError('CGIBS_304_WITHOUT_CHECKPOINT', {
@@ -328,23 +407,33 @@ export class CgibsConnector implements CollectionConnector {
           };
         } else {
           downloadedCount += 1;
+          const extracted = await extractCgibsText(response.bytes, response.mimeType);
+          text = extracted.text || undefined;
+          if (extracted.extraction !== 'PDF_TEXT') {
+            unreadableByReason[extracted.extraction] = (unreadableByReason[extracted.extraction] ?? 0) + 1;
+          }
           stored = {
             rawSha256: response.rawSha256,
             sizeBytes: response.sizeBytes,
             mimeType: response.mimeType,
+            contentExtraction: extracted.extraction,
             checkedAt: now.toISOString(),
             ...(response.filename ? { filename: response.filename } : {}),
             ...(response.sourceEtag ? { sourceEtag: response.sourceEtag } : {}),
             ...(response.sourceLastModified ? { sourceLastModified: response.sourceLastModified } : {}),
           };
         }
-        nextItems[key] = stored;
-        publications.push(publicationFor(item, stored));
+        nextItems[key] = { ...stored, identityKey };
+        if (response.status === 'NOT_MODIFIED' && settled(previous, key, persisted.linked)) {
+          skippedUnchangedCount += 1;
+          continue;
+        }
+        publications.push(publicationFor(item, stored, identityKey, text));
       } catch (error) {
         if (error instanceof ConnectorError && error.kind === 'CANCELLED') throw error;
         if (previous) {
-          nextItems[key] = previous;
-          publications.push(publicationFor(item, previous));
+          nextItems[key] = { ...previous, identityKey };
+          publications.push(publicationFor(item, previous, identityKey));
         }
         const failure = failureInfo(error);
         partialFailures.push({
@@ -372,6 +461,9 @@ export class CgibsConnector implements CollectionConnector {
           reusedCheckpointCount,
           recheckedKnownCount,
           newFileDownloadCount,
+          keptIdentityCount,
+          skippedUnchangedCount,
+          unreadableByReason,
           revisitAfterMs,
           maxRechecksPerRun,
           partialFailureCount: partialFailures.length,
