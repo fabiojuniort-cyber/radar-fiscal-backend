@@ -2,13 +2,12 @@ import { Pool } from 'pg';
 import { z } from 'zod';
 
 import {
-  compileCollectionFilterPolicy,
   normalizeCollectionFilterType,
   type CollectionFilterMode,
-  type CollectionFilterPolicyInput,
 } from '../../modules/collection/collection-filter.engine.js';
 import {
   serializeCollectionFilterDraft,
+  type CollectionFilterDraftInput,
 } from '../../modules/collection/collection-filter.admin.js';
 
 const env = z
@@ -223,7 +222,7 @@ try {
       }
     }
 
-    const terms: CollectionFilterPolicyInput['terms'] = [
+    const terms: CollectionFilterDraftInput['terms'] = [
       ...STRONG_TERMS.map((text) => ({
         text,
         strength: 'STRONG' as const,
@@ -241,9 +240,7 @@ try {
       })),
     ];
 
-    const document: CollectionFilterPolicyInput & {
-      changeNotes: string;
-    } = {
+    const document: CollectionFilterDraftInput = {
       version: 1,
       contextWindowWords: 12,
       weakScoreThreshold: 3,
@@ -258,8 +255,6 @@ try {
       changeNotes:
         'ACT-SCOPE-02 initial conservative seed from observed archive types',
     };
-
-    compileCollectionFilterPolicy(document);
 
     const serializedDocument =
       serializeCollectionFilterDraft(document);
