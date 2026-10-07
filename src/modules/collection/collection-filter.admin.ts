@@ -237,3 +237,174 @@ export async function resolveCollectionFilterNewType(
     return { id, status };
   });
 }
+
+
+export async function requestCollectionFilterSimulation(
+  db: Kysely<DB>,
+  userId: string,
+  policyId: string,
+  scope: 'FULL_ARCHIVE' | 'RECENT',
+  reviewMode: 'ALL' | 'SAMPLE' | 'NONE',
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const result = await sql<{
+      simulation_id: string;
+      policy_revision: number;
+      action: string;
+    }>`
+      SELECT * FROM collection_filter_request_simulation(
+        ${policyId}::uuid,
+        ${scope},
+        ${reviewMode}
+      )
+    `.execute(trx);
+    const row = result.rows[0];
+    if (!row) throw new Error('collection_filter_simulation_request_failed');
+    return {
+      simulationId: row.simulation_id,
+      policyRevision: Number(row.policy_revision),
+      action: row.action,
+    };
+  });
+}
+
+export async function listCollectionFilterSimulationItems(
+  db: Kysely<DB>,
+  userId: string,
+  simulationId: string,
+  options: {
+    decision?: 'KEEP' | 'DISCARD';
+    sampleOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {},
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+    const offset = Math.max(options.offset ?? 0, 0);
+    const decision = options.decision ?? null;
+    const sampleOnly = options.sampleOnly ?? false;
+    const result = await sql<any>`
+      SELECT
+        i.simulation_id,
+        i.publication_id,
+        i.source_code,
+        i.section,
+        i.raw_type,
+        i.canonical_type,
+        i.decision,
+        i.reason_code,
+        i.decisive_term,
+        i.excerpt,
+        i.title,
+        i.published_on,
+        i.official_url,
+        i.review_sample,
+        f.marked_error,
+        f.expected_decision,
+        f.note
+      FROM collection_filter_simulation_items i
+      LEFT JOIN collection_filter_simulation_feedback f
+        ON f.simulation_id=i.simulation_id
+       AND f.publication_id=i.publication_id
+      WHERE i.simulation_id=${simulationId}::uuid
+        AND (${decision}::text IS NULL OR i.decision=${decision})
+        AND (NOT ${sampleOnly}::boolean OR i.review_sample)
+      ORDER BY i.review_sample DESC, i.published_on DESC NULLS LAST, i.publication_id
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `.execute(trx);
+    return result.rows;
+  });
+}
+
+export async function saveCollectionFilterSimulationFeedback(
+  db: Kysely<DB>,
+  userId: string,
+  input: {
+    simulationId: string;
+    publicationId: string;
+    markedError: boolean;
+    expectedDecision?: 'KEEP' | 'DISCARD' | null;
+    note?: string | null;
+  },
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const result = await sql<{
+      simulation_id: string;
+      publication_id: string;
+      marked_error: boolean;
+      expected_decision: string | null;
+      note: string | null;
+    }>`
+      INSERT INTO collection_filter_simulation_feedback(
+        simulation_id,
+        publication_id,
+        marked_error,
+        expected_decision,
+        note,
+        created_by
+      )
+      VALUES(
+        ${input.simulationId}::uuid,
+        ${input.publicationId}::uuid,
+        ${input.markedError},
+        ${input.expectedDecision ?? null},
+        ${input.note ?? null},
+        app_current_user_id()
+      )
+      ON CONFLICT (simulation_id,publication_id)
+      DO UPDATE SET
+        marked_error=EXCLUDED.marked_error,
+        expected_decision=EXCLUDED.expected_decision,
+        note=EXCLUDED.note,
+        updated_at=now()
+      RETURNING simulation_id,publication_id,marked_error,expected_decision,note
+    `.execute(trx);
+    const row = result.rows[0];
+    if (!row) throw new Error('collection_filter_feedback_save_failed');
+    return row;
+  });
+}
+
+export async function approveCollectionFilterDraft(
+  db: Kysely<DB>,
+  userId: string,
+  policyId: string,
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const result = await sql<{
+      policy_id: string;
+      policy_version: number;
+      policy_revision: number;
+      simulation_id: string;
+    }>`
+      SELECT * FROM collection_filter_approve_draft(${policyId}::uuid)
+    `.execute(trx);
+    const row = result.rows[0];
+    if (!row) throw new Error('collection_filter_approval_failed');
+    return {
+      policyId: row.policy_id,
+      version: Number(row.policy_version),
+      revision: Number(row.policy_revision),
+      simulationId: row.simulation_id,
+    };
+  });
+}
+
+export function collectionFilterAdminErrorCode(
+  error: unknown,
+): string | null {
+  if (!(error instanceof Error)) return null;
+  const known = new Set([
+    'platform_admin_required',
+    'collection_filter_draft_not_found',
+    'collection_filter_fresh_simulation_required',
+    'collection_filter_simulation_has_errors',
+    'invalid_simulation_scope',
+    'invalid_simulation_review_mode',
+    'new_type_not_found',
+    'invalid_new_type_status',
+  ]);
+  return known.has(error.message) ? error.message : null;
+}
