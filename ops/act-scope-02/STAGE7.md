@@ -1,0 +1,13 @@
+# ACT-SCOPE-02 reversible historical verification
+
+`stage7.cjs` and `stage7-runner.sh` are R3 operator artifacts, not an alternate collection filter. No canonical DELETE or update occurs. The approved FULL_ARCHIVE simulation is the decision source. Only currently IN_SCOPE DOU DISCARD candidates with stable pre-snapshot material are eligible. Already OUT_OF_SCOPE, mixed origins, post-snapshot updates, files and changed descriptors fail open and are reported as exclusions.
+
+MODE defaults to `prepare`, production READ ONLY, and writes a private metadata/hash manifest to the Railway volume. Full publication bodies never appear in output or manifests. Review the exact candidate digest/count, exclusions, physical counts, independent artifact review and live lease before writing.
+
+`MODE=rehearse` starts only the existing restored Unix-socket PG18 cluster for backup SHA `20acd13cc7eb20d2b7d1d0de8de4dfd3d663965454f95e1f72e90b626189891d`. It prepares its own private manifest, commits SUPPRESS batches of 200, confirms normal radar_app visibility and feed are zero, then commits RESTORE compensation and verifies original visibility, physical counts and unrelated scope state. It stops the local cluster on exit. Production URLs are unset before Node; no TCP restore server is started.
+
+Production `MODE=roundtrip` requires the reviewed artifact SHA, reviewed manifest digest/count, passing backup evidence and exact-artifact rehearsal, positive real KEEP/DISCARD smoke and unexpired lease. Recheck baseline and material under canonical row locks; transitions use the existing narrow `apply_publication_scope_transition` function only. Audit events use ACT_SCOPE_02_HISTORICAL_V1R5; deterministic operation IDs permit recovery. A finally block compensates any committed SUPPRESS chunks, even after a later guard/visibility failure. RESTORE only targets this manifest's own current SUPPRESS events, preserving legacy OUT_OF_SCOPE. Material-change compensation by the database is respected.
+
+`MODE=restore` is recovery and deliberately does not require the policy or smoke to remain unchanged. It still requires the valid reviewed private manifest and only compensates this operation's current events. It verifies normal visibility and preservation afterward. A superseding unrelated transition is never overwritten. Failure cannot be reported as PASS.
+
+Required production variables: PROD_DATABASE_ADMIN_URL (Railway reference), CANDIDATE_SHA, REVIEWED_SHA, APPROVED_MANIFEST_SHA, APPROVED_COUNT, BACKUP_EVIDENCE (private absolute evidence path), BACKUP_SHA, SMOKE_RUN_ID, LEASE_UNTIL. All dumps, full diagnostics, manifests and rehearsal proof remain on the private Railway volume. Preserve that volume when cleaning up ACT-only temporary services.
