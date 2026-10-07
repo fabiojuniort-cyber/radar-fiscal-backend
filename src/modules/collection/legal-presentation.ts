@@ -388,7 +388,9 @@ export function currentWordingText(html: string | null | undefined): string | un
         if (previous && row) row.excluded = true;
 
         if (tag === 'tr' || tag === 'p' || excluded) {
-          frames.push({ tag, text: '', excluded: excluded && !row });
+          // Editorial notes are excluded even when nested in a current table
+          // row. Only previous-wording markers poison the whole row.
+          frames.push({ tag, text: '', excluded });
         }
         if (tag === 'br') append('\n');
       },
