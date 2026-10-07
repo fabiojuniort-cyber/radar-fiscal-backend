@@ -129,9 +129,22 @@ const PREVIOUS_WORDING_CLASSES = new Set([
   'A8-2RemissaoAnt',
 ]);
 const PREVIOUS_WORDING_TABLE_CLASS = /^(?:A\d+-\d+)?Tabela[A-Za-z]*verde$/;
+const NON_NORMATIVE_PRESENTATION_CLASSES = new Set([
+  'TituloAcordo',
+  'AcordoTipo',
+  'Ementa',
+  'DataPublicao',
+  'A2DataPublicacao',
+  'Remisso',
+  'A8-1Remissao',
+]);
 
 export function isPreviousWordingClass(token: string): boolean {
   return PREVIOUS_WORDING_CLASSES.has(token) || PREVIOUS_WORDING_TABLE_CLASS.test(token);
+}
+
+function isNonNormativePresentationClass(token: string): boolean {
+  return NON_NORMATIVE_PRESENTATION_CLASSES.has(token) || isPreviousWordingClass(token);
 }
 
 function allowedClasses(raw: string | undefined): string | undefined {
@@ -334,18 +347,20 @@ export function sanitizeLegalPresentationHtml(
 const BLOCK_TAGS = new Set(['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'section']);
 
 /**
- * Text of the wording IN FORCE of a sanitized presentation: paragraphs in a
- * previous-wording style are dropped and, in tables, the whole row that
- * holds one (an annex item in its old wording). Returns undefined when the
- * page marks no previous wording, so callers keep the stored content text.
+ * Operative legal text of a sanitized presentation. CONFAZ headings,
+ * ementa/publication-history blocks, editorial remission notes and previous
+ * wordings are not normative content and therefore cannot classify or mark
+ * taxonomy tags. Previous-wording styles inside annex tables exclude the
+ * whole row. Returns undefined only when the page exposes none of these
+ * source-specific markers, so callers can safely fall back to stored text.
  */
 export function currentWordingText(html: string | null | undefined): string | undefined {
   if (!html) return undefined;
 
-  type Frame = { tag: string; text: string; previous: boolean };
+  type Frame = { tag: string; text: string; excluded: boolean };
   const frames: Frame[] = [];
   let output = '';
-  let marked = false;
+  let filtered = false;
 
   const append = (text: string) => {
     const top = frames[frames.length - 1];
@@ -357,12 +372,16 @@ export function currentWordingText(html: string | null | undefined): string | un
     {
       onopentag(name, attributes) {
         const tag = name.toLowerCase();
-        const previous = (attributes.class ?? '').split(/\s+/).some(isPreviousWordingClass);
-        if (previous) marked = true;
+        const classes = (attributes.class ?? '').split(/\s+/).filter(Boolean);
+        const previous = classes.some(isPreviousWordingClass);
+        const excluded = classes.some(isNonNormativePresentationClass);
+        if (excluded) filtered = true;
+
         const row = [...frames].reverse().find((frame) => frame.tag === 'tr');
-        if (previous && row) row.previous = true;
-        if (tag === 'tr' || tag === 'p' || previous) {
-          frames.push({ tag, text: '', previous: previous && !row });
+        if (previous && row) row.excluded = true;
+
+        if (tag === 'tr' || tag === 'p' || excluded) {
+          frames.push({ tag, text: '', excluded: excluded && !row });
         }
         if (tag === 'br') append('\n');
       },
@@ -378,7 +397,7 @@ export function currentWordingText(html: string | null | undefined): string | un
           return;
         }
         const frame = frames.pop()!;
-        if (!frame.previous) append(frame.text + separator);
+        if (!frame.excluded) append(frame.text + separator);
       },
     },
     { decodeEntities: true, lowerCaseTags: true, lowerCaseAttributeNames: true, recognizeSelfClosing: true },
@@ -386,10 +405,10 @@ export function currentWordingText(html: string | null | undefined): string | un
   parser.end(html);
   while (frames.length > 0) {
     const frame = frames.pop()!;
-    if (!frame.previous) append(frame.text);
+    if (!frame.excluded) append(frame.text);
   }
 
-  if (!marked) return undefined;
+  if (!filtered) return undefined;
   return output
     .split('\n')
     .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
