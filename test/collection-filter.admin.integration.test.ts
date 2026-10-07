@@ -515,7 +515,7 @@ test(
         url:
           `/api/v1/admin/collection-filter/new-types/${newTypeId}/resolve`,
         headers: platformAdmin.headers,
-        payload: { status: 'RESOLVED' },
+        payload: { status: 'RESOLVED', canonicalType: 'ATO DESCONHECIDO' },
       });
       assert.equal(resolved.statusCode, 200, resolved.body);
       assert.equal(resolved.json().status, 'RESOLVED');
