@@ -9,7 +9,7 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-export const CURATED_ENGINE_VERSION = '2.2.0';
+export const CURATED_ENGINE_VERSION = '2.3.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
@@ -173,9 +173,9 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
 export function planCuratedClassification(
   input: CuratedClassificationInput,
 ): CuratedClassificationPlan {
-  const raw = [input.title.trim(), input.contentText?.trim() ?? '']
-    .filter(Boolean)
-    .join('\n');
+  // The publication title is display metadata, not legal evidence. Taxonomy
+  // assertions must originate only from the valid legal text selected upstream.
+  const raw = input.contentText?.trim() ?? '';
   const normalized = normalizeWithIndex(raw);
   const ncmCodes = [...new Set(input.ncmCodes)].sort();
   const cclasstrib = extractCclasstribCodes(raw);
@@ -251,7 +251,7 @@ export function planCuratedClassification(
   }
 
   const configSnapshot = {
-    policyVersion: 2,
+    policyVersion: 3,
     engine: CURATED_ENGINE_KEY,
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
     autoAliasTypes: 'ALL',
