@@ -8,6 +8,11 @@ on:
     branches:
       - main
 
+# Replace only older runs of the same PR. Non-PR runs have independent groups.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
