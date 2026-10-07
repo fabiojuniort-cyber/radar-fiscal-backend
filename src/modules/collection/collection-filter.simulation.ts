@@ -33,6 +33,7 @@ interface SimulationRow {
   body: string | null;
   evidence_complete: boolean;
   material_attachments_unexamined: boolean;
+  type_conflict: boolean;
   provenance_conflict: boolean;
   origins: unknown;
 }
@@ -294,6 +295,7 @@ export async function processCollectionFilterSimulationBatch(
         evidenceComplete: row.evidence_complete,
         materialAttachmentsUnexamined:
           row.material_attachments_unexamined,
+        typeConflict: row.type_conflict,
         provenanceConflict:
           row.provenance_conflict ||
           eligibleOrigins.length === 0,
