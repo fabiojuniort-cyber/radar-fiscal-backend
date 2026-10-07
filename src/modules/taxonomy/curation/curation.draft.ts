@@ -32,6 +32,10 @@ import {
   OFFICIAL_CODE_SEEDS,
   SEED_NOTE,
 } from './curation.seed.js';
+import {
+  parseTaxonomyCodeCompatibility,
+  updateDraftTaxonomyCodeCompatibility,
+} from '../taxonomy-code-compatibility.js';
 
 export class CurationError extends Error {
   constructor(
@@ -714,6 +718,14 @@ export async function createDraft(
   const sourceConfigured =
     sourceView?.dimensions.some((dimension) => dimension.configured) ?? false;
 
+  const sourceManifest = await client.query<{ manifest: unknown }>(
+    'SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid',
+    [source.id],
+  );
+  const inheritedCompatibility = parseTaxonomyCodeCompatibility(
+    sourceManifest.rows[0]?.manifest,
+  );
+
   const [major, minor, patch] = await nextVersion(client, source);
   const inserted = await client.query<{ id: string }>(
     `
@@ -734,6 +746,7 @@ export async function createDraft(
         kind: CURATED_RELEASE_KIND,
         sourceReleaseId: source.id,
         sourceVersion: source.version,
+        taxonomyCompatibility: inheritedCompatibility,
       }),
       `curator:${actor.userId}`,
     ],
@@ -978,40 +991,168 @@ async function setGroupSegments(
  * no longer tag acts nor appear in the profile) and the dimension leaves the
  * release. Previous releases keep it; nothing is published here.
  */
+export interface RetireDimensionResult {
+  retiredConcepts: string[];
+  removedGroups: number;
+  removedRelationRules: number;
+  removedRelations: number;
+  removedOfficialMappings: number;
+}
+
 export async function retireDimension(
   client: PoolClient,
   actor: CuratorActor,
   code: string,
-): Promise<{ retiredConcepts: string[] }> {
+  options: { recordRetiredCodes?: boolean } = {},
+): Promise<RetireDimensionResult> {
   assertJustification(actor);
   const draft = await requireOpenDraft(client);
   const current = await requireDimension(client, draft.id, code);
-  const concepts = await client.query<{ code: string }>(
+  const concepts = await client.query<{
+    release_concept_id: string;
+    code: string;
+    membership_status: string;
+  }>(
     `
-      SELECT c.code
+      SELECT rc.id AS release_concept_id, c.code, rc.membership_status
       FROM taxonomy_release_concepts rc
       JOIN taxonomy_concepts c ON c.id = rc.concept_id
       WHERE rc.release_id = $1::uuid
         AND c.dimension_id = $2::uuid
-        AND rc.membership_status = 'INCLUDED'
       ORDER BY c.code
     `,
     [draft.id, current.dimension_id],
   );
-  for (const row of concepts.rows) {
+  const conceptIds = concepts.rows.map((row) => row.release_concept_id);
+
+  if (conceptIds.length > 0) {
+    const evidence = await client.query<{ relation_evidence: number; mapping_evidence: number }>(
+      `
+        SELECT
+          (
+            SELECT count(*)::int
+            FROM taxonomy_relation_evidence e
+            JOIN taxonomy_concept_relations r ON r.id = e.relation_id
+            WHERE r.release_id = $1::uuid
+              AND (
+                r.source_release_concept_id = ANY($2::uuid[])
+                OR r.target_release_concept_id = ANY($2::uuid[])
+              )
+          ) AS relation_evidence,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_official_mapping_evidence e
+            JOIN taxonomy_official_mappings m ON m.id = e.official_mapping_id
+            WHERE m.release_id = $1::uuid
+              AND m.release_concept_id = ANY($2::uuid[])
+          ) AS mapping_evidence
+      `,
+      [draft.id, conceptIds],
+    );
+    const row = evidence.rows[0];
+    if ((row?.relation_evidence ?? 0) > 0 || (row?.mapping_evidence ?? 0) > 0) {
+      throw new CurationError(
+        'RETIRED_DIMENSION_HAS_EVIDENCE',
+        409,
+        'A dimensão possui relações/mapeamentos com evidência e não pode ser retirada sem migração explícita.',
+      );
+    }
+  }
+
+  let removedRelations = 0;
+  let removedOfficialMappings = 0;
+  if (conceptIds.length > 0) {
+    const relations = await client.query(
+      `
+        DELETE FROM taxonomy_concept_relations
+        WHERE release_id = $1::uuid
+          AND (
+            source_release_concept_id = ANY($2::uuid[])
+            OR target_release_concept_id = ANY($2::uuid[])
+          )
+      `,
+      [draft.id, conceptIds],
+    );
+    removedRelations = relations.rowCount ?? 0;
+
+    const mappings = await client.query(
+      `
+        DELETE FROM taxonomy_official_mappings
+        WHERE release_id = $1::uuid
+          AND release_concept_id = ANY($2::uuid[])
+      `,
+      [draft.id, conceptIds],
+    );
+    removedOfficialMappings = mappings.rowCount ?? 0;
+  }
+
+  const relationRules = await client.query(
+    `
+      DELETE FROM taxonomy_release_relation_rules
+      WHERE release_id = $1::uuid
+        AND (source_dimension_id = $2::uuid OR target_dimension_id = $2::uuid)
+    `,
+    [draft.id, current.dimension_id],
+  );
+
+  const groups = await client.query<{ id: string }>(
+    `
+      SELECT id
+      FROM taxonomy_release_groups
+      WHERE release_id = $1::uuid AND dimension_id = $2::uuid
+    `,
+    [draft.id, current.dimension_id],
+  );
+  const groupIds = groups.rows.map((row) => row.id);
+  if (groupIds.length > 0) {
+    await client.query(
+      `
+        UPDATE taxonomy_release_concepts
+        SET group_id = NULL
+        WHERE release_id = $1::uuid AND group_id = ANY($2::uuid[])
+      `,
+      [draft.id, groupIds],
+    );
+    await client.query(
+      'DELETE FROM taxonomy_release_group_segments WHERE group_id = ANY($1::uuid[])',
+      [groupIds],
+    );
+    await client.query(
+      'DELETE FROM taxonomy_release_groups WHERE id = ANY($1::uuid[])',
+      [groupIds],
+    );
+  }
+
+  const included = concepts.rows.filter((row) => row.membership_status === 'INCLUDED');
+  for (const row of included) {
     await updateConcept(client, actor, row.code, { membershipStatus: 'RETIRED' });
   }
+
   await client.query(
     `UPDATE taxonomy_release_dimensions
      SET membership_status = 'RETIRED', profile_visible = FALSE
      WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
     [draft.id, current.dimension_id],
   );
+
+  if (options.recordRetiredCodes !== false) {
+    await updateDraftTaxonomyCodeCompatibility(client, draft.id, {
+      retiredCodes: concepts.rows.map((row) => row.code),
+    });
+  }
+
+  const result: RetireDimensionResult = {
+    retiredConcepts: concepts.rows.map((row) => row.code),
+    removedGroups: groupIds.length,
+    removedRelationRules: relationRules.rowCount ?? 0,
+    removedRelations,
+    removedOfficialMappings,
+  };
   await writeAudit(client, actor, 'TAXONOMY_CURATION_DIMENSION_RETIRED', draft.id, {
     code,
-    retiredConcepts: concepts.rows.map((row) => row.code),
+    ...result,
   });
-  return { retiredConcepts: concepts.rows.map((row) => row.code) };
+  return result;
 }
 
 export async function createGroup(
@@ -2155,7 +2296,7 @@ export async function publishDraft(
 
   const draft = await requireOpenDraft(client);
   const run = pgRunner(client);
-  const view = await loadReleaseView(run, draft.id, { includeRetired: true });
+  const view = await loadReleaseView(run, draft.id);
   if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
 
   const issues = await validateReleaseView(client, view);
@@ -2183,8 +2324,17 @@ export async function publishDraft(
       ? input.gitSha
       : createHash('sha1').update(snapshotJson, 'utf8').digest('hex');
 
+  const draftManifest = await client.query<{ manifest: unknown }>(
+    'SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid',
+    [draft.id],
+  );
+  const taxonomyCompatibility = parseTaxonomyCodeCompatibility(
+    draftManifest.rows[0]?.manifest,
+  );
+
   const manifest = {
     kind: CURATED_RELEASE_KIND,
+    taxonomyCompatibility,
     sourceReleaseId: draft.previousReleaseId,
     sourceVersion: latest?.version ?? null,
     snapshotSha256,
