@@ -8,10 +8,15 @@ import { z } from 'zod';
 
 import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
 import {
+  approveCollectionFilterDraft,
+  collectionFilterAdminErrorCode,
   listCollectionFilterNewTypes,
+  listCollectionFilterSimulationItems,
   readCollectionFilterAdminState,
+  requestCollectionFilterSimulation,
   resolveCollectionFilterNewType,
   saveCollectionFilterDraft,
+  saveCollectionFilterSimulationFeedback,
 } from '../../modules/collection/collection-filter.admin.js';
 
 const mode = z.enum([
@@ -170,4 +175,122 @@ export async function collectionFilterAdminRoutes(
         ),
       ),
   );
+  typed.post(
+    '/api/v1/admin/collection-filter/drafts/:policyId/simulations',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        params: z.object({ policyId: z.string().uuid() }),
+        body: z.object({
+          scope: z.enum(['FULL_ARCHIVE', 'RECENT']).default('FULL_ARCHIVE'),
+          reviewMode: z.enum(['ALL', 'SAMPLE', 'NONE']).default('SAMPLE'),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        const result = await requestCollectionFilterSimulation(
+          app.db,
+          request.auth!.userId,
+          request.params.policyId,
+          request.body.scope,
+          request.body.reviewMode,
+        );
+        return reply.status(result.action === 'CREATED' ? 202 : 200).send(result);
+      } catch (error) {
+        const code = collectionFilterAdminErrorCode(error);
+        if (code) {
+          return reply.status(code === 'platform_admin_required' ? 403 : 409).send({
+            error: code,
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
+    '/api/v1/admin/collection-filter/simulations/:simulationId/items',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        params: z.object({ simulationId: z.string().uuid() }),
+        querystring: z.object({
+          decision: z.enum(['KEEP', 'DISCARD']).optional(),
+          sampleOnly: z.coerce.boolean().default(false),
+          limit: z.coerce.number().int().min(1).max(500).default(100),
+          offset: z.coerce.number().int().min(0).default(0),
+        }),
+      },
+    },
+    async (request, reply) =>
+      reply.send({
+        items: await listCollectionFilterSimulationItems(
+          app.db,
+          request.auth!.userId,
+          request.params.simulationId,
+          request.query,
+        ),
+      }),
+  );
+
+  typed.put(
+    '/api/v1/admin/collection-filter/simulations/:simulationId/items/:publicationId/feedback',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        params: z.object({
+          simulationId: z.string().uuid(),
+          publicationId: z.string().uuid(),
+        }),
+        body: z.object({
+          markedError: z.boolean().default(true),
+          expectedDecision: z.enum(['KEEP', 'DISCARD']).nullable().optional(),
+          note: z.string().trim().max(2000).nullable().optional(),
+        }),
+      },
+    },
+    async (request, reply) =>
+      reply.send(
+        await saveCollectionFilterSimulationFeedback(
+          app.db,
+          request.auth!.userId,
+          {
+            simulationId: request.params.simulationId,
+            publicationId: request.params.publicationId,
+            ...request.body,
+          },
+        ),
+      ),
+  );
+
+  typed.post(
+    '/api/v1/admin/collection-filter/drafts/:policyId/approve',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        params: z.object({ policyId: z.string().uuid() }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        return reply.send(
+          await approveCollectionFilterDraft(
+            app.db,
+            request.auth!.userId,
+            request.params.policyId,
+          ),
+        );
+      } catch (error) {
+        const code = collectionFilterAdminErrorCode(error);
+        if (code) {
+          return reply.status(code === 'platform_admin_required' ? 403 : 409).send({
+            error: code,
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
 }
