@@ -278,6 +278,214 @@ test(
         'invalid_collection_filter_draft',
       );
 
+      const doeRejected = await app.inject({
+        method: 'PUT',
+        url: '/api/v1/admin/collection-filter/draft',
+        headers: platformAdmin.headers,
+        payload: {
+          ...draft,
+          rules: [
+            {
+              sourceCode: 'doe-sp',
+              section: '',
+              canonicalType: 'PORTARIA',
+              mode: 'KEEP_ALWAYS',
+            },
+          ],
+        },
+      });
+      assert.equal(doeRejected.statusCode, 400, doeRejected.body);
+      assert.equal(
+        doeRejected.json().error,
+        'invalid_collection_filter_draft',
+      );
+
+      const requested = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
+        headers: platformAdmin.headers,
+        payload: {
+          scope: 'FULL_ARCHIVE',
+          reviewMode: 'SAMPLE',
+        },
+      });
+      assert.equal(requested.statusCode, 202, requested.body);
+      const requestedJson = requested.json<{
+        simulationId: string;
+        policyRevision: number;
+        action: string;
+      }>();
+      assert.equal(requestedJson.policyRevision, 2);
+      assert.equal(requestedJson.action, 'CREATED');
+
+      const repeated = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
+        headers: platformAdmin.headers,
+        payload: {
+          scope: 'FULL_ARCHIVE',
+          reviewMode: 'SAMPLE',
+        },
+      });
+      assert.equal(repeated.statusCode, 200, repeated.body);
+      assert.equal(
+        repeated.json().simulationId,
+        requestedJson.simulationId,
+      );
+      assert.equal(repeated.json().action, 'EXISTING');
+
+      const prematureApproval = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
+        headers: platformAdmin.headers,
+      });
+      assert.equal(
+        prematureApproval.statusCode,
+        409,
+        prematureApproval.body,
+      );
+      assert.equal(
+        prematureApproval.json().error,
+        'collection_filter_fresh_simulation_required',
+      );
+
+      const simulatedPublicationId = randomUUID();
+      await admin.query(
+        `UPDATE collection_filter_simulations
+            SET status='COMPLETED',
+                metrics='{"inspected":1,"keep":0,"discard":1}'::jsonb,
+                completed_at=now()
+          WHERE id=$1::uuid`,
+        [requestedJson.simulationId],
+      );
+      await admin.query(
+        `INSERT INTO collection_filter_simulation_items(
+           simulation_id,publication_id,source_code,section,
+           raw_type,canonical_type,decision,reason_code,
+           decisive_term,excerpt,title,published_on,official_url,review_sample
+         ) VALUES(
+           $1::uuid,$2::uuid,'dou','DO1',
+           'PORTARIA','PORTARIA','DISCARD','weak_score_below_threshold',
+           NULL,'trecho','Portaria de teste','2026-10-06',
+           'https://example.test/ato',true
+         )`,
+        [requestedJson.simulationId, simulatedPublicationId],
+      );
+
+      const sample = await app.inject({
+        method: 'GET',
+        url:
+          `/api/v1/admin/collection-filter/simulations/${requestedJson.simulationId}/items?sampleOnly=true`,
+        headers: platformAdmin.headers,
+      });
+      assert.equal(sample.statusCode, 200, sample.body);
+      assert.equal(sample.json().items.length, 1);
+
+      const markedError = await app.inject({
+        method: 'PUT',
+        url:
+          `/api/v1/admin/collection-filter/simulations/${requestedJson.simulationId}/items/${simulatedPublicationId}/feedback`,
+        headers: platformAdmin.headers,
+        payload: {
+          markedError: true,
+          expectedDecision: 'KEEP',
+          note: 'Falso descarte no teste.',
+        },
+      });
+      assert.equal(markedError.statusCode, 200, markedError.body);
+
+      const blockedByError = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
+        headers: platformAdmin.headers,
+      });
+      assert.equal(blockedByError.statusCode, 409, blockedByError.body);
+      assert.equal(
+        blockedByError.json().error,
+        'collection_filter_simulation_has_errors',
+      );
+
+      const clearedError = await app.inject({
+        method: 'PUT',
+        url:
+          `/api/v1/admin/collection-filter/simulations/${requestedJson.simulationId}/items/${simulatedPublicationId}/feedback`,
+        headers: platformAdmin.headers,
+        payload: {
+          markedError: false,
+          expectedDecision: 'KEEP',
+          note: 'Revisado para continuar o teste de stale simulation.',
+        },
+      });
+      assert.equal(clearedError.statusCode, 200, clearedError.body);
+
+      const editedAfterSimulation = await app.inject({
+        method: 'PUT',
+        url: '/api/v1/admin/collection-filter/draft',
+        headers: platformAdmin.headers,
+        payload: {
+          ...draft,
+          changeNotes: 'Terceira revisão após simulação',
+        },
+      });
+      assert.equal(
+        editedAfterSimulation.statusCode,
+        200,
+        editedAfterSimulation.body,
+      );
+      assert.equal(editedAfterSimulation.json().revision, 3);
+
+      const staleSimulation = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
+        headers: platformAdmin.headers,
+      });
+      assert.equal(staleSimulation.statusCode, 409, staleSimulation.body);
+      assert.equal(
+        staleSimulation.json().error,
+        'collection_filter_fresh_simulation_required',
+      );
+
+      const freshRequested = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
+        headers: platformAdmin.headers,
+        payload: {
+          scope: 'FULL_ARCHIVE',
+          reviewMode: 'NONE',
+        },
+      });
+      assert.equal(freshRequested.statusCode, 202, freshRequested.body);
+      assert.equal(freshRequested.json().policyRevision, 3);
+
+      await admin.query(
+        `UPDATE collection_filter_simulations
+            SET status='COMPLETED',
+                metrics='{"inspected":1,"keep":1,"discard":0}'::jsonb,
+                completed_at=now()
+          WHERE id=$1::uuid`,
+        [freshRequested.json().simulationId],
+      );
+
+      const approved = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
+        headers: platformAdmin.headers,
+      });
+      assert.equal(approved.statusCode, 200, approved.body);
+      assert.equal(approved.json().version, 1);
+      assert.equal(approved.json().revision, 3);
+      assert.equal(
+        approved.json().simulationId,
+        freshRequested.json().simulationId,
+      );
+
       const newTypeId = randomUUID();
       await admin.query(
         `INSERT INTO collection_filter_new_types (
