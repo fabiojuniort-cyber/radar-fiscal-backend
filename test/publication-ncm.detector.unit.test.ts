@@ -112,6 +112,20 @@ test('selectText does not fall back to full content when every marked block is n
   assert.deepEqual(extractNcmCandidates(selected.text), []);
 });
 
+test('currentWordingText omits revoked placeholders but keeps operative revocation clauses', () => {
+  const html = [
+    '<p class="DataPublicao">Alterado pelo Convênio ICMS 26/21.</p>',
+    '<p class="TextoAcordo">II - REVOGADO</p>',
+    '<p class="TextoAcordo">Ficam revogadas as disposições em contrário.</p>',
+    '<p class="TextoAcordo">Cláusula primeira: texto vigente.</p>',
+  ].join('');
+
+  const current = currentWordingText(html) ?? '';
+  assert.doesNotMatch(current, /II - REVOGADO/);
+  assert.match(current, /Ficam revogadas as disposições em contrário/);
+  assert.match(current, /Cláusula primeira: texto vigente/);
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
