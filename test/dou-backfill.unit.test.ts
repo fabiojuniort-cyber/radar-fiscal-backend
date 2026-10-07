@@ -65,7 +65,7 @@ function scriptedDatabase(steps: QueryStep[]) {
         return {
           rows: [{
             id: String(query.parameters[0] ?? 'fixture-source'),
-            code: 'dou',
+            code: 'fixture-test',
             connector_key: 'dou',
           }] as R[],
         };
