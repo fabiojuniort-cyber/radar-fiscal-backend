@@ -94,6 +94,25 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
 });
 
+test('curated classifier never uses the base-legal title as taxonomy evidence', () => {
+  const plan = planCuratedClassification({
+    publicationVersionId: '00000000-0000-4000-8000-000000000001',
+    taxonomyReleaseId: '00000000-0000-4000-8000-000000000002',
+    title: 'CONVÊNIO ICMS 100/97 — Fertilizantes e ICMS',
+    contentText: 'Cláusula primeira: aplica-se exclusivamente a sementes.',
+    ncmCodes: [],
+    concepts: [
+      concept('tax.icms', 'ICMS'),
+      concept('product.fertilizers', 'Fertilizantes'),
+      concept('product.seeds', 'Sementes'),
+    ],
+  });
+
+  assert.deepEqual(plan.assertions.map((item) => item.conceptCode), ['product.seeds']);
+  assert.equal(plan.configSnapshot.textScope, 'OPERATIVE_LEGAL_BODY_ONLY');
+  assert.equal(plan.configSnapshot.policyVersion, 3);
+});
+
 test('label matching respects token boundaries and maps excerpts back to raw text', () => {
   const normalized = normalizeWithIndex('Lei Complementar nº 214, de 2025 — Imposto Seletivo.');
   assert.equal(normalized.text, 'lei complementar n 214 de 2025 imposto seletivo');
