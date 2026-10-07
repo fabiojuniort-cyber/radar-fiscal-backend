@@ -158,6 +158,9 @@ jobs:
           set -o pipefail
           npx tsx --test test/product-ncm.integration.test.ts 2>&1 | tee product-ncm-integration.log
 
+      - name: TAX-12 compatibility and graph hygiene integration
+        run: npx tsx --test test/taxonomy.tax12.integration.test.ts
+
       # TAX-11 commits a high-numbered curated release; keep it the last gate.
       - name: TAX-11 curation end-to-end integration
         run: npx tsx --test test/taxonomy.curation.integration.test.ts
