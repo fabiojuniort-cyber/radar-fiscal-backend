@@ -19,6 +19,13 @@ import type {
 import { connectorPublicationCount } from './connector.contract.js';
 import { ConnectorError } from './connector.error.js';
 import { createCollectionMemoryProbe } from './collection.memory.js';
+import {
+  evaluateRuntimeCollectionFilter,
+  loadApprovedCollectionFilterRuntime,
+  recordRuntimeCollectionDiscard,
+  recordRuntimeDiscardRate,
+  recordRuntimeUnknownType,
+} from './collection-filter.runtime.js';
 import { disposePublicationSpool } from './publication-spool.js';
 import {
   executeConnector,
@@ -488,6 +495,13 @@ export async function processAcquiredCollectionRun(
 
     const newsItems = outcome.result.newsItems ?? [];
     metrics.found = connectorPublicationCount(outcome.result) + newsItems.length;
+
+    let filterRuntime: Awaited<
+      ReturnType<typeof loadApprovedCollectionFilterRuntime>
+    > | undefined;
+
+    let filterEvaluated = 0;
+    let filteredPublications = 0;
     metrics.connectorPartialFailures =
       outcome.result.partialFailures?.length ?? 0;
 
@@ -505,16 +519,68 @@ export async function processAcquiredCollectionRun(
           publication,
         });
 
+        if (filterRuntime === undefined) {
+          try {
+            filterRuntime = await loadApprovedCollectionFilterRuntime(
+              db,
+              run.sourceId,
+            );
+          } catch (error) {
+            throw Object.assign(
+              new Error('COLLECTION_FILTER_RUNTIME_UNAVAILABLE'),
+              { cause: error },
+            );
+          }
+        }
+
+        const runtimeDecision = filterRuntime
+          ? evaluateRuntimeCollectionFilter(
+              filterRuntime,
+              normalized,
+            )
+          : null;
+
+        if (runtimeDecision) {
+          filterEvaluated += 1;
+        }
+
+        if (
+          filterRuntime &&
+          runtimeDecision?.decision.decision === 'DISCARD'
+        ) {
+          await recordRuntimeCollectionDiscard(db, {
+            runtime: filterRuntime,
+            runId: run.id,
+            attemptId: attempt.id,
+            publication: normalized,
+            decision: runtimeDecision,
+          });
+          filteredPublications += 1;
+          metrics.processed += 1;
+          continue;
+        }
+
         const persisted = await db
           .transaction()
-          .execute((trx) =>
-            persistPublication(trx, {
+          .execute(async (trx) => {
+            const result = await persistPublication(trx, {
               sourceId: run.sourceId,
               runId: run.id,
               attemptId: attempt.id,
               publication: normalized,
-            }),
-          );
+            });
+            if (
+              filterRuntime &&
+              runtimeDecision?.decision.requiresNewTypeReview
+            ) {
+              await recordRuntimeUnknownType(trx, {
+                runtime: filterRuntime,
+                publicationId: result.publicationId,
+                decision: runtimeDecision,
+              });
+            }
+            return result;
+          });
 
         metrics.processed += 1;
         dispositionMetric(
@@ -619,6 +685,39 @@ export async function processAcquiredCollectionRun(
       }
     }
 
+    if (filterRuntime && filterEvaluated > 0) {
+      try {
+        const alerted = await recordRuntimeDiscardRate(db, {
+          runtime: filterRuntime,
+          runId: run.id,
+          foundCount: filterEvaluated,
+          discardCount: filteredPublications,
+        });
+        if (alerted) {
+          logger.warn(
+            {
+              sourceId: run.sourceId,
+              runId: run.id,
+              filterEvaluated,
+              filteredPublications,
+              policyVersion: filterRuntime.policyVersion,
+              policyRevision: filterRuntime.policyRevision,
+            },
+            'Abnormal collection filter discard rate detected',
+          );
+        }
+      } catch (error) {
+        logger.error(
+          {
+            sourceId: run.sourceId,
+            runId: run.id,
+            error: errorMessage(error),
+          },
+          'Collection filter discard-rate telemetry failed',
+        );
+      }
+    }
+
     const status = terminalStatusAfterProcessing(
       outcome,
       metrics,
@@ -646,6 +745,10 @@ export async function processAcquiredCollectionRun(
         status,
         durationMs: outcome.durationMs,
         ...metrics,
+        filterEvaluated,
+        filteredPublications,
+        filterPolicyVersion: filterRuntime?.policyVersion ?? null,
+        filterPolicyRevision: filterRuntime?.policyRevision ?? null,
         newsFound: newsItems.length,
         ...(outcome.result.completion?.complete === false
           ? {

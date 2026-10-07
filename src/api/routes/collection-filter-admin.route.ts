@@ -10,6 +10,8 @@ import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
 import {
   approveCollectionFilterDraft,
   collectionFilterAdminErrorCode,
+  listCollectionFilterDiscardAlerts,
+  listCollectionFilterDiscards,
   listCollectionFilterNewTypes,
   listCollectionFilterSimulationItems,
   readCollectionFilterAdminState,
@@ -134,6 +136,49 @@ export async function collectionFilterAdminRoutes(
     },
   );
 
+
+  typed.get(
+    '/api/v1/admin/collection-filter/discarded',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        querystring: z.object({
+          sourceCode: z.string().trim().min(1).max(100).optional(),
+          limit: z.coerce.number().int().min(1).max(500).default(100),
+          offset: z.coerce.number().int().min(0).default(0),
+        }),
+      },
+    },
+    async (request, reply) =>
+      reply.send({
+        items: await listCollectionFilterDiscards(
+          app.db,
+          request.auth!.userId,
+          request.query,
+        ),
+      }),
+  );
+
+  typed.get(
+    '/api/v1/admin/collection-filter/discard-alerts',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: {
+        querystring: z.object({
+          status: z.enum(['OPEN', 'ACKNOWLEDGED']).optional(),
+          limit: z.coerce.number().int().min(1).max(500).default(100),
+        }),
+      },
+    },
+    async (request, reply) =>
+      reply.send({
+        items: await listCollectionFilterDiscardAlerts(
+          app.db,
+          request.auth!.userId,
+          request.query,
+        ),
+      }),
+  );
 
   typed.get(
     '/api/v1/admin/collection-filter/new-types',
