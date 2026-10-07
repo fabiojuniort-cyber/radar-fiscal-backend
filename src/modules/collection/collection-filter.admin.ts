@@ -18,27 +18,27 @@ export interface CollectionFilterDraftInput {
     summary: number;
     body: number;
   };
-  changeNotes?: string | null;
+  changeNotes?: string | null | undefined;
   rules: Array<{
     sourceCode: string;
-    section?: string;
+    section?: string | undefined;
     canonicalType: string;
     mode: CollectionFilterMode;
-    helpText?: string | null;
+    helpText?: string | null | undefined;
   }>;
   aliases: Array<{
     sourceCode: string;
-    section?: string;
+    section?: string | undefined;
     alias: string;
     canonicalType: string;
   }>;
   terms: Array<{
     text: string;
     strength: CollectionFilterTermStrength;
-    sourceCode?: string;
-    section?: string;
-    canonicalType?: string;
-    locationScope?: 'ANY' | 'TITLE' | 'SUMMARY' | 'BODY';
+    sourceCode?: string | undefined;
+    section?: string | undefined;
+    canonicalType?: string | undefined;
+    locationScope?: 'ANY' | 'TITLE' | 'SUMMARY' | 'BODY' | undefined;
   }>;
 }
 
@@ -308,10 +308,10 @@ export async function listCollectionFilterSimulationItems(
   userId: string,
   simulationId: string,
   options: {
-    decision?: 'KEEP' | 'DISCARD';
-    sampleOnly?: boolean;
-    limit?: number;
-    offset?: number;
+    decision?: 'KEEP' | 'DISCARD' | undefined;
+    sampleOnly?: boolean | undefined;
+    limit?: number | undefined;
+    offset?: number | undefined;
   } = {},
 ) {
   return withUserContext(db, userId, async (trx) => {
@@ -360,8 +360,8 @@ export async function saveCollectionFilterSimulationFeedback(
     simulationId: string;
     publicationId: string;
     markedError: boolean;
-    expectedDecision?: 'KEEP' | 'DISCARD' | null;
-    note?: string | null;
+    expectedDecision?: 'KEEP' | 'DISCARD' | null | undefined;
+    note?: string | null | undefined;
   },
 ) {
   return withUserContext(db, userId, async (trx) => {
