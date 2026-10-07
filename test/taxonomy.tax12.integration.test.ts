@@ -218,6 +218,29 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       platformCode = `platform.tax12_sped_${suffix}`;
       taxSpeciesCode = `tax_species.tax12_tax_${suffix}`;
 
+      // Reproduce the fifth-review blocker: this detached Treatment was
+      // retired in an older release when no successor was available. The
+      // current merge must re-evaluate it after Theme becomes active and
+      // promote retiredCode -> redirect.
+      await client.query(
+        `UPDATE taxonomy_releases
+         SET manifest = jsonb_set(
+           COALESCE(manifest, '{}'::jsonb),
+           '{taxonomyCompatibility}',
+           $2::jsonb,
+           true
+         )
+         WHERE id = $1::uuid`,
+        [
+          sourceId,
+          JSON.stringify({
+            version: 1,
+            redirects: {},
+            retiredCodes: [detachedHistoricalRedirectTreatmentCode],
+          }),
+        ],
+      );
+
       const target = await concept(client, sourceId, dimensions, {
         code: targetThemeCode,
         dimensionCode: 'theme',
@@ -509,7 +532,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.equal(
       compatibility.retiredCodes.includes(detachedHistoricalRedirectTreatmentCode),
       false,
-      'detached historical treatment with successor must not become retired',
+      'a pre-existing retiredCode must be removed when a Theme successor now exists',
     );
     assert.ok(
       compatibility.retiredCodes.includes(detachedHistoricalPlatformCode),
@@ -562,6 +585,61 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       );
     } finally {
       compatibilityValidationClient.release();
+    }
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(originalManifest)],
+    );
+
+    // Defense in depth for the fifth-review blocker: even if a future merge
+    // leaves an inherited retiredCode instead of promoting it to a redirect,
+    // publishing must fail because the active Theme successor is observable.
+    const staleRetiredManifest = JSON.parse(
+      JSON.stringify(originalManifest),
+    ) as {
+      taxonomyCompatibility?: {
+        version?: number;
+        redirects?: Record<string, string>;
+        retiredCodes?: string[];
+      };
+    };
+    assert.ok(staleRetiredManifest.taxonomyCompatibility);
+    delete staleRetiredManifest.taxonomyCompatibility!.redirects?.[
+      detachedHistoricalRedirectTreatmentCode
+    ];
+    staleRetiredManifest.taxonomyCompatibility!.retiredCodes = [
+      ...new Set([
+        ...(staleRetiredManifest.taxonomyCompatibility!.retiredCodes ?? []),
+        detachedHistoricalRedirectTreatmentCode,
+      ]),
+    ].sort();
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(staleRetiredManifest)],
+    );
+    const staleRetiredValidationClient = await admin.connect();
+    try {
+      const staleRetiredView = await loadReleaseView(
+        pgRunner(staleRetiredValidationClient),
+        draft!.id,
+      );
+      assert.ok(staleRetiredView);
+      const issues = await validateReleaseView(
+        staleRetiredValidationClient,
+        staleRetiredView!,
+      );
+      assert.ok(
+        issues.some(
+          (issue) =>
+            issue.severity === 'BLOCKER' &&
+            issue.code === 'RETIRED_TREATMENT_HAS_ACTIVE_SUCCESSOR' &&
+            issue.message.includes(detachedHistoricalRedirectTreatmentCode) &&
+            issue.message.includes(detachedHistoricalRedirectThemeCode),
+        ),
+        'publish validation must reject a stale retired Treatment when its Theme successor is active',
+      );
+    } finally {
+      staleRetiredValidationClient.release();
     }
     await admin.query(
       'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
