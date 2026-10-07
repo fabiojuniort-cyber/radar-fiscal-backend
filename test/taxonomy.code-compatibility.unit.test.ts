@@ -97,3 +97,31 @@ test('retiring a canonical target retires inherited upstream aliases too', () =>
   assert.equal(resolveTaxonomyConceptCode('legacy.a', next), null);
   assert.equal(resolveTaxonomyConceptCode('legacy.b', next), null);
 });
+
+
+test('a redirect patch promotes a previously retired code when a successor exists', () => {
+  const next = applyTaxonomyCodeCompatibilityPatch(
+    {
+      version: 1,
+      redirects: {},
+      retiredCodes: ['treatment.legacy_exemption'],
+    },
+    {
+      redirects: {
+        'treatment.legacy_exemption': 'theme.exemption',
+      },
+    },
+  );
+
+  assert.deepEqual(next.redirects, {
+    'treatment.legacy_exemption': 'theme.exemption',
+  });
+  assert.equal(
+    next.retiredCodes.includes('treatment.legacy_exemption'),
+    false,
+  );
+  assert.equal(
+    resolveTaxonomyConceptCode('treatment.legacy_exemption', next),
+    'theme.exemption',
+  );
+});

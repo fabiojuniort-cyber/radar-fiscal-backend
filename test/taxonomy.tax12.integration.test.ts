@@ -16,7 +16,13 @@ import {
   loadReleaseView,
   pgRunner,
 } from '../src/modules/taxonomy/curation/curation.read.js';
-import { parseTaxonomyCodeCompatibility } from '../src/modules/taxonomy/taxonomy-code-compatibility.js';
+import { resolveCuratorDecisions } from '../src/modules/taxonomy/curation/curation.tags.js';
+import { buildAcceptedCodes } from '../src/modules/taxonomy/matching/taxonomy-matching.service.js';
+import {
+  canonicalizeTaxonomyConceptCodes,
+  loadTaxonomyCodeCompatibility,
+  parseTaxonomyCodeCompatibility,
+} from '../src/modules/taxonomy/taxonomy-code-compatibility.js';
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
 if (!adminUrl) throw new Error('DATABASE_ADMIN_URL is required');
@@ -161,6 +167,17 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     let treatmentCode = '';
     let retiredTreatmentCode = '';
     let redirectedRetiredTreatmentCode = '';
+    let revisionPinnedTreatmentCode = '';
+    let revisionPinnedActiveThemeCode = '';
+    let suffixShadowTreatmentCode = '';
+    let suffixShadowRetiredThemeCode = '';
+    let suffixShadowActiveThemeCode = '';
+    let combinedTreatmentCode = '';
+    let combinedRetiredThemeCode = '';
+    let combinedActiveThemeCode = '';
+    let createSourceTreatmentCode = '';
+    let createHistoricalTreatmentCode = '';
+    let createdThemeCode = '';
     let detachedHistoricalTreatmentCode = '';
     let detachedHistoricalRedirectTreatmentCode = '';
     let detachedHistoricalRedirectThemeCode = '';
@@ -208,6 +225,17 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       treatmentCode = `treatment.tax12_restore_${suffix}`;
       retiredTreatmentCode = `treatment.tax12_retired_${suffix}`;
       redirectedRetiredTreatmentCode = `treatment.tax12_retired_alias_${suffix}`;
+      revisionPinnedTreatmentCode = `treatment.tax12_revision_source_${suffix}`;
+      revisionPinnedActiveThemeCode = `theme.tax12_revision_target_${suffix}`;
+      suffixShadowTreatmentCode = `treatment.tax12_suffix_shadow_${suffix}`;
+      suffixShadowRetiredThemeCode = `theme.tax12_suffix_shadow_${suffix}`;
+      suffixShadowActiveThemeCode = `theme.tax12_active_reduction_${suffix}`;
+      combinedTreatmentCode = `treatment.tax12_combined_${suffix}`;
+      combinedRetiredThemeCode = `theme.tax12_combined_${suffix}`;
+      combinedActiveThemeCode = `theme.tax12_active_credit_${suffix}`;
+      createSourceTreatmentCode = `treatment.tax12_create_${suffix}`;
+      createHistoricalTreatmentCode = `treatment.tax12_legacy_create_${suffix}`;
+      createdThemeCode = `theme.tax12_create_${suffix}`;
       detachedHistoricalTreatmentCode = `treatment.tax12_detached_${suffix}`;
       detachedHistoricalRedirectTreatmentCode =
         `treatment.tax12_detached_redirect_${suffix}`;
@@ -218,6 +246,36 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       platformCode = `platform.tax12_sped_${suffix}`;
       taxSpeciesCode = `tax_species.tax12_tax_${suffix}`;
 
+      // Reproduce the fifth-review blocker: this detached Treatment was
+      // retired in an older release when no successor was available. The
+      // current merge must re-evaluate it after Theme becomes active and
+      // promote retiredCode -> redirect.
+      await client.query(
+        `UPDATE taxonomy_releases
+         SET manifest = jsonb_set(
+           COALESCE(manifest, '{}'::jsonb),
+           '{taxonomyCompatibility}',
+           $2::jsonb,
+           true
+         )
+         WHERE id = $1::uuid`,
+        [
+          sourceId,
+          JSON.stringify({
+            version: 1,
+            redirects: {},
+            retiredCodes: [
+              detachedHistoricalRedirectTreatmentCode,
+              redirectedRetiredTreatmentCode,
+              revisionPinnedTreatmentCode,
+              suffixShadowTreatmentCode,
+              combinedTreatmentCode,
+              createHistoricalTreatmentCode,
+            ],
+          }),
+        ],
+      );
+
       const target = await concept(client, sourceId, dimensions, {
         code: targetThemeCode,
         dimensionCode: 'theme',
@@ -226,6 +284,40 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         groupId: themeGroup,
       });
       restoredConceptId = target.conceptId;
+
+
+      await concept(client, sourceId, dimensions, {
+        code: revisionPinnedActiveThemeCode,
+        dimensionCode: 'theme',
+        label: 'Isenção revisionada',
+        groupId: themeGroup,
+      });
+      await concept(client, sourceId, dimensions, {
+        code: suffixShadowRetiredThemeCode,
+        dimensionCode: 'theme',
+        label: 'Tema retirado por sufixo',
+        membership: 'RETIRED',
+        groupId: themeGroup,
+      });
+      await concept(client, sourceId, dimensions, {
+        code: suffixShadowActiveThemeCode,
+        dimensionCode: 'theme',
+        label: 'Redução de base',
+        groupId: themeGroup,
+      });
+      await concept(client, sourceId, dimensions, {
+        code: combinedRetiredThemeCode,
+        dimensionCode: 'theme',
+        label: 'Tema combinado retirado',
+        membership: 'RETIRED',
+        groupId: themeGroup,
+      });
+      await concept(client, sourceId, dimensions, {
+        code: combinedActiveThemeCode,
+        dimensionCode: 'theme',
+        label: 'Crédito presumido',
+        groupId: themeGroup,
+      });
 
       for (const [historicalCode, dimensionCode, label] of [
         [
@@ -273,6 +365,66 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         dimensionCode: 'theme',
         label: 'Tratamento histórico com sucessor ativo',
         groupId: themeGroup,
+      });
+
+      const revisionPinned = await concept(client, sourceId, dimensions, {
+        code: revisionPinnedTreatmentCode,
+        dimensionCode: 'treatment',
+        label: 'Isenção revisionada',
+        membership: 'RETIRED',
+        groupId: treatmentGroup,
+      });
+      await client.query(
+        `INSERT INTO taxonomy_concept_revisions (
+           concept_id, revision_no, label, definition,
+           governance_status, evidence_status
+         ) VALUES (
+           $1::uuid, 2, 'Tratamento antigo sem correspondência',
+           'Revisão posterior que não pertence à release',
+           'DEPRECATED', 'DOCUMENTED'
+         )`,
+        [revisionPinned.conceptId],
+      );
+
+      await concept(client, sourceId, dimensions, {
+        code: suffixShadowTreatmentCode,
+        dimensionCode: 'treatment',
+        label: 'Redução de base',
+        membership: 'RETIRED',
+        groupId: treatmentGroup,
+      });
+
+      const combined = await concept(client, sourceId, dimensions, {
+        code: combinedTreatmentCode,
+        dimensionCode: 'treatment',
+        label: 'Crédito presumido',
+        membership: 'RETIRED',
+        groupId: treatmentGroup,
+      });
+      await client.query(
+        `INSERT INTO taxonomy_concept_revisions (
+           concept_id, revision_no, label, definition,
+           governance_status, evidence_status
+         ) VALUES (
+           $1::uuid, 2, 'Tratamento combinado sem correspondência',
+           'Revisão posterior que não pertence à release',
+           'DEPRECATED', 'DOCUMENTED'
+         )`,
+        [combined.conceptId],
+      );
+
+      await concept(client, sourceId, dimensions, {
+        code: createHistoricalTreatmentCode,
+        dimensionCode: 'treatment',
+        label: 'Benefício criado',
+        membership: 'RETIRED',
+        groupId: treatmentGroup,
+      });
+      await concept(client, sourceId, dimensions, {
+        code: createSourceTreatmentCode,
+        dimensionCode: 'treatment',
+        label: 'Benefício criado',
+        groupId: treatmentGroup,
       });
 
       const anchor = await concept(client, sourceId, dimensions, {
@@ -395,6 +547,11 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         merged.steps.find((step) => step.from === treatmentCode)?.action,
         'RESTORE',
       );
+      const created = merged.steps.find(
+        (step) => step.from === createSourceTreatmentCode,
+      );
+      assert.equal(created?.action, 'CREATE');
+      assert.equal(created?.into, createdThemeCode);
     });
 
     const draftAfterMerge = await findOpenDraft(pgRunner(admin));
@@ -491,7 +648,54 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.equal(
       compatibility.redirects[redirectedRetiredTreatmentCode],
       targetThemeCode,
-      'historical retired treatment codes redirect when an active successor exists',
+      'inherited retired Treatment redirects after its Theme is restored',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(redirectedRetiredTreatmentCode),
+      false,
+      'RESTORE removes the inherited retiredCode when the successor becomes active',
+    );
+    assert.equal(
+      compatibility.redirects[revisionPinnedTreatmentCode],
+      revisionPinnedActiveThemeCode,
+      'materialized historical Treatment matches with the revision pinned to the release',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(revisionPinnedTreatmentCode),
+      false,
+    );
+    assert.equal(
+      compatibility.redirects[suffixShadowTreatmentCode],
+      suffixShadowActiveThemeCode,
+      'a RETIRED suffix Theme must not block fallback to an active Theme by label',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(suffixShadowTreatmentCode),
+      false,
+    );
+    assert.equal(
+      compatibility.redirects[combinedTreatmentCode],
+      combinedActiveThemeCode,
+      'revision pinning and active-target fallback work together',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(combinedTreatmentCode),
+      false,
+    );
+    assert.equal(
+      compatibility.redirects[createSourceTreatmentCode],
+      createdThemeCode,
+      'the included Treatment source redirects to the Theme created by the merge',
+    );
+    assert.equal(
+      compatibility.redirects[createHistoricalTreatmentCode],
+      createdThemeCode,
+      'inherited retired Treatment redirects after CREATE makes its Theme successor active',
+    );
+    assert.equal(
+      compatibility.retiredCodes.includes(createHistoricalTreatmentCode),
+      false,
+      'CREATE removes the inherited retiredCode when the successor becomes active',
     );
     assert.ok(
       compatibility.retiredCodes.includes(retiredTreatmentCode),
@@ -509,7 +713,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     assert.equal(
       compatibility.retiredCodes.includes(detachedHistoricalRedirectTreatmentCode),
       false,
-      'detached historical treatment with successor must not become retired',
+      'a pre-existing retiredCode must be removed when a Theme successor now exists',
     );
     assert.ok(
       compatibility.retiredCodes.includes(detachedHistoricalPlatformCode),
@@ -521,6 +725,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     );
     assert.ok(compatibility.retiredCodes.includes(platformCode));
     assert.ok(compatibility.retiredCodes.includes(taxSpeciesCode));
+
 
     // Defense in depth: even if a future retirement implementation forgets
     // one detached historical identity, publication validation must fail closed.
@@ -566,6 +771,75 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     await admin.query(
       'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
       [draft!.id, JSON.stringify(originalManifest)],
+    );
+
+    const expectStaleRetiredBlocked = async (
+      sourceCode: string,
+      targetCode: string,
+      reason: string,
+    ): Promise<void> => {
+      const staleManifest = JSON.parse(
+        JSON.stringify(originalManifest),
+      ) as {
+        taxonomyCompatibility?: {
+          version?: number;
+          redirects?: Record<string, string>;
+          retiredCodes?: string[];
+        };
+      };
+      assert.ok(staleManifest.taxonomyCompatibility);
+      delete staleManifest.taxonomyCompatibility!.redirects?.[sourceCode];
+      staleManifest.taxonomyCompatibility!.retiredCodes = [
+        ...new Set([
+          ...(staleManifest.taxonomyCompatibility!.retiredCodes ?? []),
+          sourceCode,
+        ]),
+      ].sort();
+      await admin.query(
+        'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+        [draft!.id, JSON.stringify(staleManifest)],
+      );
+      const staleClient = await admin.connect();
+      try {
+        const staleView = await loadReleaseView(
+          pgRunner(staleClient),
+          draft!.id,
+        );
+        assert.ok(staleView);
+        const issues = await validateReleaseView(staleClient, staleView!);
+        assert.ok(
+          issues.some(
+            (issue) =>
+              issue.severity === 'BLOCKER' &&
+              issue.code === 'RETIRED_TREATMENT_HAS_ACTIVE_SUCCESSOR' &&
+              issue.message.includes(sourceCode) &&
+              issue.message.includes(targetCode),
+          ),
+          reason,
+        );
+      } finally {
+        staleClient.release();
+      }
+      await admin.query(
+        'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+        [draft!.id, JSON.stringify(originalManifest)],
+      );
+    };
+
+    await expectStaleRetiredBlocked(
+      detachedHistoricalRedirectTreatmentCode,
+      detachedHistoricalRedirectThemeCode,
+      'publish validation must reject a stale detached retired Treatment',
+    );
+    await expectStaleRetiredBlocked(
+      revisionPinnedTreatmentCode,
+      revisionPinnedActiveThemeCode,
+      'validator must use the release-pinned revision, not a later global revision',
+    );
+    await expectStaleRetiredBlocked(
+      combinedTreatmentCode,
+      combinedActiveThemeCode,
+      'validator must still block stale retirement when revision pinning and retired-suffix fallback are combined',
     );
 
     const mappingsAfterRetirement = await admin.query<{ count: number }>(
@@ -694,6 +968,26 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     // Respect the real release lifecycle even in the fixture: DRAFT is not
     // withdrawable. Finalize the isolated draft, then withdraw the published
     // fixture so no editable curated draft leaks into later CI gates.
+    const finalValidationClient = await admin.connect();
+    try {
+      const finalView = await loadReleaseView(
+        pgRunner(finalValidationClient),
+        draft!.id,
+      );
+      assert.ok(finalView);
+      const finalIssues = await validateReleaseView(
+        finalValidationClient,
+        finalView!,
+      );
+      assert.deepEqual(
+        finalIssues.filter((issue) => issue.severity === 'BLOCKER'),
+        [],
+        'the repaired merge-produced manifest must pass the publish gate',
+      );
+    } finally {
+      finalValidationClient.release();
+    }
+
     await admin.query(
       `UPDATE taxonomy_releases
        SET status = 'PUBLISHED',
@@ -705,6 +999,62 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
            artifact_sha256 = $3
        WHERE id = $1::uuid AND status = 'DRAFT'`,
       [draft!.id, 'c'.repeat(40), 'd'.repeat(64)],
+    );
+
+    // Reload the exact manifest from the now-PUBLISHED isolated fixture and
+    // consume it through the same runtime helpers used by monitoring profiles,
+    // company tax profiles/affinity preparation, and curator history.
+    const publishedCompatibility = await loadTaxonomyCodeCompatibility(
+      pgRunner(admin),
+      draft!.id,
+    );
+    const publishedAcceptedCodes = buildAcceptedCodes(
+      {
+        releasePolicy: 'CURRENT_PUBLISHED',
+        anyOf: [combinedTreatmentCode],
+        allOf: [],
+        noneOf: [],
+        includeDescendants: false,
+      },
+      activeView!.concepts.map((item) => ({
+        release_concept_id: item.releaseConceptId,
+        code: item.code,
+      })),
+      [],
+      publishedCompatibility,
+    );
+    assert.deepEqual(
+      [...(publishedAcceptedCodes.get(combinedTreatmentCode) ?? [])],
+      [combinedActiveThemeCode],
+      'monitoring profile criteria must resolve through the published merge-produced map',
+    );
+
+    const publishedProfileCodes = canonicalizeTaxonomyConceptCodes(
+      [combinedTreatmentCode, createHistoricalTreatmentCode],
+      publishedCompatibility,
+    );
+    assert.deepEqual(
+      publishedProfileCodes,
+      [combinedActiveThemeCode, createdThemeCode].sort(),
+      'company tax profile codes must canonicalize through the published merge-produced map',
+    );
+
+    const publishedCuratorDecisions = resolveCuratorDecisions(
+      [
+        {
+          concept_code: combinedTreatmentCode,
+          action: 'ADD',
+          rationale: 'TAX-12 published runtime compatibility fixture',
+          created_at: new Date('2026-10-07T00:00:00Z'),
+          id: 'tax12-published-runtime-fixture',
+        },
+      ],
+      publishedCompatibility,
+    );
+    assert.equal(
+      publishedCuratorDecisions.get(combinedActiveThemeCode)?.concept_code,
+      combinedActiveThemeCode,
+      'historical curator decisions must resolve through the published merge-produced map',
     );
     await admin.query(
       `UPDATE taxonomy_releases
