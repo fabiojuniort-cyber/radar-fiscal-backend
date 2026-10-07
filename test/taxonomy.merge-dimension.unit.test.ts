@@ -117,3 +117,50 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
     'already-retired historical codes without an active successor become explicit retiredCodes',
   );
 });
+
+
+test('planDimensionMerge rejects ambiguous target labels instead of picking the first', () => {
+  assert.throws(
+    () =>
+      planDimensionMerge(
+        {
+          groups: [],
+          concepts: [
+            concept('theme.first', 'Benefício duplicado'),
+            concept('theme.second', 'Benefício duplicado'),
+            concept('treatment.legacy', 'Benefício duplicado'),
+          ],
+        },
+        'treatment',
+        'theme',
+      ),
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      (error as Error & { code: string }).code ===
+        'AMBIGUOUS_DIMENSION_MERGE_TARGET',
+  );
+});
+
+test('planDimensionMerge rejects two source concepts mapped to the same target', () => {
+  assert.throws(
+    () =>
+      planDimensionMerge(
+        {
+          groups: [],
+          concepts: [
+            concept('theme.exemption', 'Isenção'),
+            concept('treatment.exemption', 'Isenção'),
+            concept('treatment.legacy_exemption', 'Isenção'),
+          ],
+        },
+        'treatment',
+        'theme',
+      ),
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      (error as Error & { code: string }).code ===
+        'AMBIGUOUS_DIMENSION_MERGE_MANY_TO_ONE',
+  );
+});
