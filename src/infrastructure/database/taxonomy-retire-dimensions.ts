@@ -18,11 +18,9 @@ import { resolveCuratorDatabaseUrl } from './curator-url.js';
  *   node dist/infrastructure/database/taxonomy-retire-dimensions.js \
  *     --dimensions=act_type,sphere [--confirm]
  *
- * "Tipo de ato" and "Esfera" repeat what each act already carries from its
- * source (act type and jurisdiction, used by the Acervo filters) and do not
- * count in the affinity; as tags they only add noise. Without --confirm
- * everything runs and is rolled back (dry run). Nothing is published: the
- * curator reviews the DRAFT before publishing.
+ * Whole dimensions leave only the new DRAFT; published history is immutable.
+ * Without --confirm everything runs and is rolled back (dry run). Nothing is
+ * published: the curator reviews the DRAFT before publishing.
  */
 
 const confirm = process.argv.includes('--confirm');
@@ -47,8 +45,60 @@ if (!connectionString) {
 
 const actor: CuratorActor = {
   userId: 'ops:taxonomy-retire-dimensions',
-  justification: 'Dimensões redundantes com os metadados do ato (tipo de ato e esfera vêm da fonte)',
+  justification: 'Retirada de dimensões aprovada para a taxonomia corrente',
 };
+
+async function usage(codes: string[]): Promise<unknown> {
+  const url = process.env.DATABASE_ADMIN_URL;
+  if (!url || codes.length === 0) return 'skipped';
+  const pool = new Pool({ connectionString: url, max: 1 });
+  try {
+    const companies = await pool.query<{ code: string; companies: number }>(
+      `
+        SELECT code, count(DISTINCT p.company_id)::int AS companies
+        FROM company_tax_profiles p,
+          jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.personalization->'taxonomy'->'conceptCodes') = 'array'
+              THEN p.personalization->'taxonomy'->'conceptCodes' ELSE '[]'::jsonb END
+          ) AS code
+        WHERE code = ANY($1::text[])
+        GROUP BY code ORDER BY code
+      `,
+      [codes],
+    );
+    const monitoring = await pool.query<{ code: string; profiles: number }>(
+      `
+        SELECT criterion.code, count(DISTINCT p.id)::int AS profiles
+        FROM monitoring_profiles p
+        CROSS JOIN LATERAL (
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'anyOf') = 'array'
+              THEN p.criteria->'taxonomy'->'anyOf' ELSE '[]'::jsonb END
+          ) AS code
+          UNION ALL
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'allOf') = 'array'
+              THEN p.criteria->'taxonomy'->'allOf' ELSE '[]'::jsonb END
+          )
+          UNION ALL
+          SELECT jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(p.criteria->'taxonomy'->'noneOf') = 'array'
+              THEN p.criteria->'taxonomy'->'noneOf' ELSE '[]'::jsonb END
+          )
+        ) criterion
+        WHERE criterion.code = ANY($1::text[])
+        GROUP BY criterion.code ORDER BY criterion.code
+      `,
+      [codes],
+    );
+    return {
+      companyTaxProfiles: companies.rows,
+      monitoringProfiles: monitoring.rows,
+    };
+  } finally {
+    await pool.end();
+  }
+}
 
 class Rollback extends Error {}
 
@@ -86,6 +136,9 @@ console.log(
       saved: confirm,
       draftVersion: result.draftVersion,
       draftCreated: result.draftCreated,
+      usage: await usage(
+        Object.values(result.retired).flatMap((item) => item.retiredConcepts),
+      ),
       retired: Object.fromEntries(
         Object.entries(result.retired).map(([code, item]) => [
           code,
