@@ -32,6 +32,11 @@ import {
   OFFICIAL_CODE_SEEDS,
   SEED_NOTE,
 } from './curation.seed.js';
+import {
+  parseTaxonomyCodeCompatibility,
+  resolveTaxonomyConceptCode,
+  updateDraftTaxonomyCodeCompatibility,
+} from '../taxonomy-code-compatibility.js';
 
 export class CurationError extends Error {
   constructor(
@@ -714,6 +719,14 @@ export async function createDraft(
   const sourceConfigured =
     sourceView?.dimensions.some((dimension) => dimension.configured) ?? false;
 
+  const sourceManifest = await client.query<{ manifest: unknown }>(
+    'SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid',
+    [source.id],
+  );
+  const inheritedCompatibility = parseTaxonomyCodeCompatibility(
+    sourceManifest.rows[0]?.manifest,
+  );
+
   const [major, minor, patch] = await nextVersion(client, source);
   const inserted = await client.query<{ id: string }>(
     `
@@ -734,6 +747,7 @@ export async function createDraft(
         kind: CURATED_RELEASE_KIND,
         sourceReleaseId: source.id,
         sourceVersion: source.version,
+        taxonomyCompatibility: inheritedCompatibility,
       }),
       `curator:${actor.userId}`,
     ],
@@ -978,40 +992,182 @@ async function setGroupSegments(
  * no longer tag acts nor appear in the profile) and the dimension leaves the
  * release. Previous releases keep it; nothing is published here.
  */
+export interface RetireDimensionResult {
+  retiredConcepts: string[];
+  removedGroups: number;
+  removedRelationRules: number;
+  removedRelations: number;
+  removedOfficialMappings: number;
+}
+
 export async function retireDimension(
   client: PoolClient,
   actor: CuratorActor,
   code: string,
-): Promise<{ retiredConcepts: string[] }> {
+  options: { recordRetiredCodes?: boolean } = {},
+): Promise<RetireDimensionResult> {
   assertJustification(actor);
   const draft = await requireOpenDraft(client);
   const current = await requireDimension(client, draft.id, code);
-  const concepts = await client.query<{ code: string }>(
+  const concepts = await client.query<{
+    release_concept_id: string;
+    code: string;
+    membership_status: string;
+  }>(
     `
-      SELECT c.code
+      SELECT rc.id AS release_concept_id, c.code, rc.membership_status
       FROM taxonomy_release_concepts rc
       JOIN taxonomy_concepts c ON c.id = rc.concept_id
       WHERE rc.release_id = $1::uuid
         AND c.dimension_id = $2::uuid
-        AND rc.membership_status = 'INCLUDED'
       ORDER BY c.code
     `,
     [draft.id, current.dimension_id],
   );
-  for (const row of concepts.rows) {
+  const conceptIds = concepts.rows.map((row) => row.release_concept_id);
+  // Compatibility must cover the full historical identity space of a retired
+  // dimension, not only concepts still materialized in the current draft.
+  // Old monitoring/company profiles can legitimately contain codes whose
+  // taxonomy_concepts identity survived after its release membership vanished.
+  const historicalConcepts = await client.query<{ code: string }>(
+    `
+      SELECT c.code
+      FROM taxonomy_concepts c
+      WHERE c.dimension_id = $1::uuid
+      ORDER BY c.code
+    `,
+    [current.dimension_id],
+  );
+  const historicalCodes = historicalConcepts.rows.map((row) => row.code);
+
+  if (conceptIds.length > 0) {
+    const evidence = await client.query<{ relation_evidence: number; mapping_evidence: number }>(
+      `
+        SELECT
+          (
+            SELECT count(*)::int
+            FROM taxonomy_relation_evidence e
+            JOIN taxonomy_concept_relations r ON r.id = e.relation_id
+            WHERE r.release_id = $1::uuid
+              AND (
+                r.source_release_concept_id = ANY($2::uuid[])
+                OR r.target_release_concept_id = ANY($2::uuid[])
+              )
+          ) AS relation_evidence,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_official_mapping_evidence e
+            JOIN taxonomy_official_mappings m ON m.id = e.official_mapping_id
+            WHERE m.release_id = $1::uuid
+              AND m.release_concept_id = ANY($2::uuid[])
+          ) AS mapping_evidence
+      `,
+      [draft.id, conceptIds],
+    );
+    const row = evidence.rows[0];
+    if ((row?.relation_evidence ?? 0) > 0 || (row?.mapping_evidence ?? 0) > 0) {
+      throw new CurationError(
+        'RETIRED_DIMENSION_HAS_EVIDENCE',
+        409,
+        'A dimensão possui relações/mapeamentos com evidência e não pode ser retirada sem migração explícita.',
+      );
+    }
+  }
+
+  let removedRelations = 0;
+  let removedOfficialMappings = 0;
+  if (conceptIds.length > 0) {
+    const relations = await client.query(
+      `
+        DELETE FROM taxonomy_concept_relations
+        WHERE release_id = $1::uuid
+          AND (
+            source_release_concept_id = ANY($2::uuid[])
+            OR target_release_concept_id = ANY($2::uuid[])
+          )
+      `,
+      [draft.id, conceptIds],
+    );
+    removedRelations = relations.rowCount ?? 0;
+
+    const mappings = await client.query(
+      `
+        DELETE FROM taxonomy_official_mappings
+        WHERE release_id = $1::uuid
+          AND release_concept_id = ANY($2::uuid[])
+      `,
+      [draft.id, conceptIds],
+    );
+    removedOfficialMappings = mappings.rowCount ?? 0;
+  }
+
+  const relationRules = await client.query(
+    `
+      DELETE FROM taxonomy_release_relation_rules
+      WHERE release_id = $1::uuid
+        AND (source_dimension_id = $2::uuid OR target_dimension_id = $2::uuid)
+    `,
+    [draft.id, current.dimension_id],
+  );
+
+  const groups = await client.query<{ id: string }>(
+    `
+      SELECT id
+      FROM taxonomy_release_groups
+      WHERE release_id = $1::uuid AND dimension_id = $2::uuid
+    `,
+    [draft.id, current.dimension_id],
+  );
+  const groupIds = groups.rows.map((row) => row.id);
+  if (groupIds.length > 0) {
+    await client.query(
+      `
+        UPDATE taxonomy_release_concepts
+        SET group_id = NULL
+        WHERE release_id = $1::uuid AND group_id = ANY($2::uuid[])
+      `,
+      [draft.id, groupIds],
+    );
+    await client.query(
+      'DELETE FROM taxonomy_release_group_segments WHERE group_id = ANY($1::uuid[])',
+      [groupIds],
+    );
+    await client.query(
+      'DELETE FROM taxonomy_release_groups WHERE id = ANY($1::uuid[])',
+      [groupIds],
+    );
+  }
+
+  const included = concepts.rows.filter((row) => row.membership_status === 'INCLUDED');
+  for (const row of included) {
     await updateConcept(client, actor, row.code, { membershipStatus: 'RETIRED' });
   }
+
   await client.query(
     `UPDATE taxonomy_release_dimensions
      SET membership_status = 'RETIRED', profile_visible = FALSE
      WHERE release_id = $1::uuid AND dimension_id = $2::uuid`,
     [draft.id, current.dimension_id],
   );
+
+  if (options.recordRetiredCodes !== false) {
+    await updateDraftTaxonomyCodeCompatibility(client, draft.id, {
+      retiredCodes: historicalCodes,
+    });
+  }
+
+  const result: RetireDimensionResult = {
+    retiredConcepts: concepts.rows.map((row) => row.code),
+    removedGroups: groupIds.length,
+    removedRelationRules: relationRules.rowCount ?? 0,
+    removedRelations,
+    removedOfficialMappings,
+  };
   await writeAudit(client, actor, 'TAXONOMY_CURATION_DIMENSION_RETIRED', draft.id, {
     code,
-    retiredConcepts: concepts.rows.map((row) => row.code),
+    ...result,
   });
-  return { retiredConcepts: concepts.rows.map((row) => row.code) };
+  return result;
 }
 
 export async function createGroup(
@@ -2031,6 +2187,195 @@ export async function validateReleaseView(
   }
 
   if (client) {
+    const releaseId = view.release.id;
+    const residue = await client.query<{
+      orphan_concepts: number;
+      orphan_groups: number;
+      orphan_relation_rules: number;
+      orphan_relations: number;
+      orphan_official_mappings: number;
+    }>(
+      `
+        SELECT
+          (
+            SELECT count(*)::int
+            FROM taxonomy_release_concepts rc
+            JOIN taxonomy_concepts c ON c.id = rc.concept_id
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id = rc.release_id
+             AND rd.dimension_id = c.dimension_id
+            WHERE rc.release_id = $1::uuid
+              AND rc.membership_status = 'INCLUDED'
+              AND rd.membership_status <> 'INCLUDED'
+          ) AS orphan_concepts,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_release_groups g
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id = g.release_id
+             AND rd.dimension_id = g.dimension_id
+            WHERE g.release_id = $1::uuid
+              AND rd.membership_status <> 'INCLUDED'
+          ) AS orphan_groups,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_release_relation_rules rr
+            JOIN taxonomy_release_dimensions src
+              ON src.release_id = rr.release_id
+             AND src.dimension_id = rr.source_dimension_id
+            JOIN taxonomy_release_dimensions tgt
+              ON tgt.release_id = rr.release_id
+             AND tgt.dimension_id = rr.target_dimension_id
+            WHERE rr.release_id = $1::uuid
+              AND (
+                src.membership_status <> 'INCLUDED'
+                OR tgt.membership_status <> 'INCLUDED'
+              )
+          ) AS orphan_relation_rules,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_concept_relations rel
+            JOIN taxonomy_release_concepts src_rc
+              ON src_rc.id = rel.source_release_concept_id
+            JOIN taxonomy_concepts src_c ON src_c.id = src_rc.concept_id
+            JOIN taxonomy_release_dimensions src_rd
+              ON src_rd.release_id = rel.release_id
+             AND src_rd.dimension_id = src_c.dimension_id
+            JOIN taxonomy_release_concepts tgt_rc
+              ON tgt_rc.id = rel.target_release_concept_id
+            JOIN taxonomy_concepts tgt_c ON tgt_c.id = tgt_rc.concept_id
+            JOIN taxonomy_release_dimensions tgt_rd
+              ON tgt_rd.release_id = rel.release_id
+             AND tgt_rd.dimension_id = tgt_c.dimension_id
+            WHERE rel.release_id = $1::uuid
+              AND (
+                src_rc.membership_status <> 'INCLUDED'
+                OR tgt_rc.membership_status <> 'INCLUDED'
+                OR src_rd.membership_status <> 'INCLUDED'
+                OR tgt_rd.membership_status <> 'INCLUDED'
+              )
+          ) AS orphan_relations,
+          (
+            SELECT count(*)::int
+            FROM taxonomy_official_mappings m
+            JOIN taxonomy_release_concepts rc
+              ON rc.id = m.release_concept_id
+             AND rc.release_id = m.release_id
+            JOIN taxonomy_concepts c ON c.id = rc.concept_id
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id = m.release_id
+             AND rd.dimension_id = c.dimension_id
+            WHERE m.release_id = $1::uuid
+              AND (
+                rc.membership_status <> 'INCLUDED'
+                OR rd.membership_status <> 'INCLUDED'
+              )
+          ) AS orphan_official_mappings
+      `,
+      [releaseId],
+    );
+    const residueRow = residue.rows[0];
+    for (const [code, count, message] of [
+      ['RETIRED_DIMENSION_CONCEPTS', residueRow?.orphan_concepts ?? 0, 'Há conceitos ativos pertencentes a dimensões retiradas.'],
+      ['RETIRED_DIMENSION_GROUPS', residueRow?.orphan_groups ?? 0, 'Há grupos pertencentes a dimensões retiradas.'],
+      ['RETIRED_DIMENSION_RELATION_RULES', residueRow?.orphan_relation_rules ?? 0, 'Há regras de relação apontando para dimensões retiradas.'],
+      ['RETIRED_DIMENSION_RELATIONS', residueRow?.orphan_relations ?? 0, 'Há relações apontando para conceitos/dimensões retirados.'],
+      ['RETIRED_DIMENSION_OFFICIAL_MAPPINGS', residueRow?.orphan_official_mappings ?? 0, 'Há mapeamentos oficiais apontando para conceitos/dimensões retirados.'],
+    ] as const) {
+      if (count > 0) {
+        issues.push({
+          severity: 'BLOCKER',
+          code,
+          message: `${message} Quantidade: ${count}.`,
+        });
+      }
+    }
+
+    const manifestRow = await client.query<{ manifest: unknown }>(
+      'SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid',
+      [releaseId],
+    );
+    const compatibility = parseTaxonomyCodeCompatibility(manifestRow.rows[0]?.manifest);
+    const includedCodes = new Set(included.map((concept) => concept.code));
+
+    // TAX-12 removes these dimensions from the current taxonomy. Every
+    // historical identity under them must therefore be explicitly closed by
+    // either a redirect or retiredCodes, even when that identity has no
+    // taxonomy_release_concepts membership in the current draft.
+    const historicalCompatibility = await client.query<{
+      dimension_code: string;
+      code: string;
+    }>(
+      `
+        SELECT d.code AS dimension_code, c.code
+        FROM taxonomy_release_dimensions rd
+        JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
+        JOIN taxonomy_concepts c ON c.dimension_id = rd.dimension_id
+        WHERE rd.release_id = $1::uuid
+          AND rd.membership_status <> 'INCLUDED'
+          AND d.code = ANY($2::text[])
+        ORDER BY d.code, c.code
+      `,
+      [releaseId, ['treatment', 'platform', 'tax_species']],
+    );
+    const redirectedCodes = new Set(Object.keys(compatibility.redirects));
+    const retiredCompatibilityCodes = new Set(compatibility.retiredCodes);
+    const uncoveredHistoricalCodes = historicalCompatibility.rows.filter(
+      (row) =>
+        !redirectedCodes.has(row.code) &&
+        !retiredCompatibilityCodes.has(row.code),
+    );
+    if (uncoveredHistoricalCodes.length > 0) {
+      issues.push({
+        severity: 'BLOCKER',
+        code: 'INCOMPLETE_RETIRED_DIMENSION_COMPATIBILITY',
+        message:
+          'Compatibilidade histórica incompleta para dimensão(ões) retirada(s): ' +
+          uncoveredHistoricalCodes
+            .map((row) => `${row.dimension_code}:${row.code}`)
+            .join(', ') +
+          '.',
+      });
+    }
+
+    try {
+      for (const [from, directTarget] of Object.entries(compatibility.redirects)) {
+        const target = resolveTaxonomyConceptCode(from, compatibility);
+        if (!target || !includedCodes.has(target)) {
+          issues.push({
+            severity: 'BLOCKER',
+            code: 'INVALID_TAXONOMY_CODE_REDIRECT',
+            message: `Compatibilidade inválida: ${from} → ${directTarget} não resolve para um conceito ativo.`,
+            subject: from,
+          });
+        }
+        if (includedCodes.has(from) && from !== target) {
+          issues.push({
+            severity: 'BLOCKER',
+            code: 'ACTIVE_CODE_HAS_REDIRECT',
+            message: `Compatibilidade ambígua: ${from} ainda está ativo e também redireciona para ${target}.`,
+            subject: from,
+          });
+        }
+      }
+    } catch (error) {
+      issues.push({
+        severity: 'BLOCKER',
+        code: 'TAXONOMY_CODE_REDIRECT_CYCLE',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    for (const retiredCode of compatibility.retiredCodes) {
+      if (includedCodes.has(retiredCode)) {
+        issues.push({
+          severity: 'BLOCKER',
+          code: 'RETIRED_CODE_STILL_ACTIVE',
+          message: `Compatibilidade inválida: ${retiredCode} está marcado como retirado, mas continua ativo.`,
+          subject: retiredCode,
+        });
+      }
+    }
+
     const catalogTypes: Array<[OfficialCodeType, string]> = [
       ['NCM', 'NCM'],
       ['CNAE', 'CNAE'],
@@ -2155,7 +2500,7 @@ export async function publishDraft(
 
   const draft = await requireOpenDraft(client);
   const run = pgRunner(client);
-  const view = await loadReleaseView(run, draft.id, { includeRetired: true });
+  const view = await loadReleaseView(run, draft.id);
   if (!view) throw new CurationError('DRAFT_NOT_FOUND', 500);
 
   const issues = await validateReleaseView(client, view);
@@ -2183,8 +2528,17 @@ export async function publishDraft(
       ? input.gitSha
       : createHash('sha1').update(snapshotJson, 'utf8').digest('hex');
 
+  const draftManifest = await client.query<{ manifest: unknown }>(
+    'SELECT manifest FROM taxonomy_releases WHERE id = $1::uuid',
+    [draft.id],
+  );
+  const taxonomyCompatibility = parseTaxonomyCodeCompatibility(
+    draftManifest.rows[0]?.manifest,
+  );
+
   const manifest = {
     kind: CURATED_RELEASE_KIND,
+    taxonomyCompatibility,
     sourceReleaseId: draft.previousReleaseId,
     sourceVersion: latest?.version ?? null,
     snapshotSha256,
