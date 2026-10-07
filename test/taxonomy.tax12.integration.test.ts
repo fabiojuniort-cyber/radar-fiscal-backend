@@ -591,6 +591,61 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       [draft!.id, JSON.stringify(originalManifest)],
     );
 
+    // Fifth-review publish-gate regression: if a stale retiredCode is
+    // reintroduced after the merge, publishing must fail closed because the
+    // active Theme successor is now known.
+    const staleRetiredManifest = JSON.parse(
+      JSON.stringify(originalManifest),
+    ) as {
+      taxonomyCompatibility?: {
+        redirects?: Record<string, string>;
+        retiredCodes?: string[];
+      };
+    };
+    assert.ok(staleRetiredManifest.taxonomyCompatibility);
+    delete staleRetiredManifest.taxonomyCompatibility!.redirects?.[
+      detachedHistoricalRedirectTreatmentCode
+    ];
+    staleRetiredManifest.taxonomyCompatibility!.retiredCodes = [
+      ...new Set([
+        ...(staleRetiredManifest.taxonomyCompatibility!.retiredCodes ?? []),
+        detachedHistoricalRedirectTreatmentCode,
+      ]),
+    ].sort();
+
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(staleRetiredManifest)],
+    );
+    const staleRetiredValidationClient = await admin.connect();
+    try {
+      const staleRetiredValidationView = await loadReleaseView(
+        pgRunner(staleRetiredValidationClient),
+        draft!.id,
+      );
+      assert.ok(staleRetiredValidationView);
+      const staleIssues = await validateReleaseView(
+        staleRetiredValidationClient,
+        staleRetiredValidationView!,
+      );
+      assert.ok(
+        staleIssues.some(
+          (issue) =>
+            issue.severity === 'BLOCKER' &&
+            issue.code === 'RETIRED_TREATMENT_HAS_ACTIVE_THEME_SUCCESSOR' &&
+            issue.subject === detachedHistoricalRedirectTreatmentCode,
+        ),
+        'publish validation must block a stale Treatment retiredCode when a Theme successor is active',
+      );
+    } finally {
+      staleRetiredValidationClient.release();
+    }
+
+    await admin.query(
+      'UPDATE taxonomy_releases SET manifest = $2::jsonb WHERE id = $1::uuid',
+      [draft!.id, JSON.stringify(originalManifest)],
+    );
+
     const mappingsAfterRetirement = await admin.query<{ count: number }>(
       `SELECT count(*)::int AS count
        FROM taxonomy_official_mappings
