@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { planDimensionMerge } from '../src/modules/taxonomy/curation/curation.merge-dimension.js';
+import {
+  planDimensionMerge,
+  planDimensionMergeCompatibility,
+} from '../src/modules/taxonomy/curation/curation.merge-dimension.js';
 import type { ConceptView, GroupView } from '../src/modules/taxonomy/curation/curation.read.js';
 
 function concept(code: string, label: string, extra: Partial<ConceptView> = {}): ConceptView {
@@ -48,6 +51,10 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
           aliases: [{ text: 'Isento', aliasType: 'EXACT_LEXICAL' }, { text: 'isenções', aliasType: 'EXACT_LEXICAL' }],
         }),
         concept('treatment.st', 'Substituição Tributária'),
+        concept('theme.zero_rate', 'Alíquota zero', {
+          membershipStatus: 'RETIRED',
+          groupCode: 'beneficios',
+        }),
         concept('treatment.zero_rate', 'Alíquota zero', { groupCode: 'beneficios' }),
         concept('treatment.monophase', 'Monofásico', { groupCode: 'cobranca_especial' }),
         concept('treatment.old', 'Retirado', { membershipStatus: 'RETIRED' }),
@@ -63,11 +70,50 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
     [
       ['treatment.exemption', 'MERGE', 'theme.exemption', null],
       ['treatment.st', 'MERGE', 'theme.tax_substitution', null],
-      ['treatment.zero_rate', 'CREATE', 'theme.zero_rate', 'beneficios'],
+      ['treatment.zero_rate', 'RESTORE', 'theme.zero_rate', null],
       ['treatment.monophase', 'CREATE', 'theme.monophase', 'cobranca_pagamento'],
     ],
   );
   assert.deepEqual(steps[0]!.addedAliases, ['isenções'], 'aliases already on the target are not repeated');
   assert.deepEqual(steps[0]!.addedOfficialCodes, ['200001']);
   assert.deepEqual(steps[1]!.addedAliases, [], 'same label in another case is not an alias');
+  assert.equal(
+    steps.find((step) => step.from === 'treatment.zero_rate')?.action,
+    'RESTORE',
+    'retired target identity is reused instead of recreated',
+  );
+
+  const compatibility = planDimensionMergeCompatibility(
+    {
+      concepts: [
+        concept('theme.exemption', 'Isenção'),
+        concept('theme.tax_substitution', 'Substituição tributária'),
+        concept('theme.zero_rate', 'Alíquota zero', { membershipStatus: 'RETIRED' }),
+        concept('treatment.exemption', 'Isenção'),
+        concept('treatment.st', 'Substituição Tributária'),
+        concept('treatment.zero_rate', 'Alíquota zero'),
+        concept('treatment.monophase', 'Monofásico'),
+        concept('treatment.old', 'Retirado', { membershipStatus: 'RETIRED' }),
+        concept('treatment.legacy_exemption', 'Isenção', { membershipStatus: 'RETIRED' }),
+      ],
+    },
+    'treatment',
+    'theme',
+    steps,
+  );
+
+  assert.equal(compatibility.redirects['treatment.exemption'], 'theme.exemption');
+  assert.equal(compatibility.redirects['treatment.st'], 'theme.tax_substitution');
+  assert.equal(compatibility.redirects['treatment.zero_rate'], 'theme.zero_rate');
+  assert.equal(compatibility.redirects['treatment.monophase'], 'theme.monophase');
+  assert.equal(
+    compatibility.redirects['treatment.legacy_exemption'],
+    'theme.exemption',
+    'already-retired historical codes redirect when an active successor exists',
+  );
+  assert.deepEqual(
+    compatibility.retiredCodes,
+    ['treatment.old'],
+    'already-retired historical codes without an active successor become explicit retiredCodes',
+  );
 });
