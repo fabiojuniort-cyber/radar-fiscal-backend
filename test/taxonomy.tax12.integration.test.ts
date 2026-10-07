@@ -362,6 +362,29 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
         ],
       );
 
+      // Reproduce the fifth-review blocker exactly: this detached Treatment
+      // identity was inherited as retired when no successor was available.
+      // The Theme successor now exists in the release being merged, so the
+      // merge must upgrade the stale retirement to a redirect.
+      await client.query(
+        `UPDATE taxonomy_releases
+         SET manifest = jsonb_set(
+           COALESCE(manifest, '{}'::jsonb),
+           '{taxonomyCompatibility}',
+           $2::jsonb,
+           true
+         )
+         WHERE id = $1::uuid`,
+        [
+          sourceId,
+          JSON.stringify({
+            version: 1,
+            redirects: {},
+            retiredCodes: [detachedHistoricalRedirectTreatmentCode],
+          }),
+        ],
+      );
+
       await client.query(
         `UPDATE taxonomy_releases
          SET status = 'PUBLISHED', approved_at = now(), published_at = now(),
