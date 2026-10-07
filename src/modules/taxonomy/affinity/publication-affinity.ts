@@ -46,7 +46,6 @@ export const DIMENSION_WEIGHTS: Record<string, number> = {
   operation_purpose: 2,
   // "Tema" absorbed "Tratamento" (isenção, redução de base, crédito presumido...).
   theme: 2,
-  tax_species: 1,
   document: 1,
   obligation: 1,
 };
