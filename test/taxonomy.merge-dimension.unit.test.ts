@@ -48,6 +48,10 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
           aliases: [{ text: 'Isento', aliasType: 'EXACT_LEXICAL' }, { text: 'isenções', aliasType: 'EXACT_LEXICAL' }],
         }),
         concept('treatment.st', 'Substituição Tributária'),
+        concept('theme.zero_rate', 'Alíquota zero', {
+          membershipStatus: 'RETIRED',
+          groupCode: 'beneficios',
+        }),
         concept('treatment.zero_rate', 'Alíquota zero', { groupCode: 'beneficios' }),
         concept('treatment.monophase', 'Monofásico', { groupCode: 'cobranca_especial' }),
         concept('treatment.old', 'Retirado', { membershipStatus: 'RETIRED' }),
@@ -63,11 +67,16 @@ test('planDimensionMerge merges by code or label and recreates the rest in the t
     [
       ['treatment.exemption', 'MERGE', 'theme.exemption', null],
       ['treatment.st', 'MERGE', 'theme.tax_substitution', null],
-      ['treatment.zero_rate', 'CREATE', 'theme.zero_rate', 'beneficios'],
+      ['treatment.zero_rate', 'RESTORE', 'theme.zero_rate', null],
       ['treatment.monophase', 'CREATE', 'theme.monophase', 'cobranca_pagamento'],
     ],
   );
   assert.deepEqual(steps[0]!.addedAliases, ['isenções'], 'aliases already on the target are not repeated');
   assert.deepEqual(steps[0]!.addedOfficialCodes, ['200001']);
   assert.deepEqual(steps[1]!.addedAliases, [], 'same label in another case is not an alias');
+  assert.equal(
+    steps.find((step) => step.from === 'treatment.zero_rate')?.action,
+    'RESTORE',
+    'retired target identity is reused instead of recreated',
+  );
 });
