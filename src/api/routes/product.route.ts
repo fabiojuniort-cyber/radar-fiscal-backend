@@ -25,6 +25,11 @@ import {
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { isCnaeActivity } from '../../modules/taxonomy/curation/curation.constants.js';
 import { suggestSegmentsForCompany } from '../../modules/taxonomy/curation/curation.suggestions.js';
+import {
+  canonicalizeTaxonomyConceptCodes,
+  loadTaxonomyCodeCompatibility,
+  type TaxonomyCodeCompatibility,
+} from '../../modules/taxonomy/taxonomy-code-compatibility.js';
 import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
 import { currentWordingText, sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import {
@@ -257,6 +262,29 @@ function recordValue(
     !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
+}
+
+function currentTaxonomyPersonalization(
+  personalization: unknown,
+  release: { id: string; version: string } | null,
+  compatibility: TaxonomyCodeCompatibility | null,
+): unknown {
+  if (!release || !compatibility) return personalization;
+  const root = recordValue(personalization);
+  const taxonomy = recordValue(root?.taxonomy);
+  if (!root || !taxonomy) return personalization;
+  const rawCodes = Array.isArray(taxonomy.conceptCodes)
+    ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
+    : [];
+  return {
+    ...root,
+    taxonomy: {
+      ...taxonomy,
+      releaseId: release.id,
+      releaseVersion: release.version,
+      conceptCodes: canonicalizeTaxonomyConceptCodes(rawCodes, compatibility),
+    },
+  };
 }
 
 /** Last day in force read from the act's current wording (CONFAZ). */
