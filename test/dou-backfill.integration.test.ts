@@ -315,11 +315,59 @@ test('backfill coverage rejects publication persistence failures but keeps parse
 
 test('administrative DOU backfill runs explicit past dates through the engine without touching monitoring', async (t) => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
+  assert.ok(process.env.DATABASE_URL, 'DATABASE_URL worker runtime is required');
   const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 4 }) }) });
+  const runtimeDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_URL, max: 4 }) }) });
   const sourceId = randomUUID();
+  const policyId = randomUUID();
   const fetch = await fixtureFetch();
   const base = { sourceId, credentials, fetch, now, timeoutMs: 10_000, sleep: async () => undefined };
   try {
+    const existingApproved = await db
+      .selectFrom('collection_filter_policies')
+      .select('id')
+      .where('status', '=', 'APPROVED')
+      .executeTakeFirst();
+    assert.equal(existingApproved, undefined, 'fixture requires no pre-existing approved filter policy');
+
+    const maxVersion = await db
+      .selectFrom('collection_filter_policies')
+      .select(({ fn }) => fn.max<number>('version').as('version'))
+      .executeTakeFirst();
+    await db.insertInto('collection_filter_policies').values({
+      id: policyId,
+      version: Number(maxVersion?.version ?? 0) + 1,
+      revision: 1,
+      status: 'APPROVED',
+      context_window_words: 12,
+      weak_score_threshold: 3,
+      title_weight: 3,
+      summary_weight: 2,
+      body_weight: 1,
+      change_notes: 'DOU backfill integration permissive fixture',
+      approved_at: new Date(),
+    }).execute();
+
+    const fixtureTypes = [
+      'RETIFICACAO',
+      'SOLUCAO DE CONSULTA',
+      'ATO DECLARATORIO',
+      'DESPACHO',
+      'PORTARIA',
+      'INSTRUCAO NORMATIVA',
+    ];
+    await db.insertInto('collection_filter_type_rules').values(
+      ['DO1', 'DO1E'].flatMap((section) =>
+        fixtureTypes.map((canonicalType) => ({
+          policy_id: policyId,
+          source_code: 'dou',
+          section,
+          canonical_type: canonicalType,
+          mode: 'KEEP_ALWAYS' as const,
+        })),
+      ),
+    ).execute();
+
     await db.insertInto('sources').values({
       // The hourly tick resolves the source by its production code.
       id: sourceId, code: 'dou', name: 'DOU backfill', jurisdiction_level: 'FEDERAL',
@@ -327,7 +375,7 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
     }).execute();
 
     await t.test('a batch persists real matters as a BACKFILL run owned by the script', async () => {
-      const result = await runDouBackfillBatch(db, { ...base, dates: ['2026-09-19', '2026-09-18'], workerId: 'backfill-test' });
+      const result = await runDouBackfillBatch(runtimeDb, { ...base, dates: ['2026-09-19', '2026-09-18'], workerId: 'backfill-test' });
       assert.equal(result.result.state, 'TERMINAL');
       assert.equal(result.result.status, 'SUCCESS');
       assert.equal(result.result.metrics.newPublications, 10);
@@ -348,16 +396,16 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
 
     await t.test('re-running a covered date is idempotent', async () => {
       const coverage = await readDouBackfillCoverage(db, sourceId);
-      const replay = await runDouBackfillBatch(db, { ...base, dates: ['2026-09-18'], workerId: 'backfill-test', receipts: coverage.receipts });
+      const replay = await runDouBackfillBatch(runtimeDb, { ...base, dates: ['2026-09-18'], workerId: 'backfill-test', receipts: coverage.receipts });
       assert.equal(replay.result.status, 'SUCCESS_NO_RESULTS', 'unchanged packages are skipped by receipt');
-      const again = await runDouBackfillBatch(db, { ...base, dates: ['2026-09-18'], workerId: 'backfill-test' });
+      const again = await runDouBackfillBatch(runtimeDb, { ...base, dates: ['2026-09-18'], workerId: 'backfill-test' });
       assert.equal(again.result.metrics.existingPublications, 10, 'without receipts: re-parsed, deduplicated');
       assert.equal(again.result.metrics.newPublications, 0);
       assert.equal(again.result.metrics.newVersions, 0);
     });
 
     await t.test('a batch made only of dates without edition finishes instead of retrying forever', async () => {
-      const empty = await runDouBackfillBatch(db, { ...base, dates: ['2026-09-20', '2026-09-13'], workerId: 'backfill-test' });
+      const empty = await runDouBackfillBatch(runtimeDb, { ...base, dates: ['2026-09-20', '2026-09-13'], workerId: 'backfill-test' });
       assert.equal(empty.result.status, 'SUCCESS_NO_RESULTS');
       assert.equal(empty.attempts, 1);
     });
@@ -371,7 +419,7 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
 
     await t.test('an open run blocks the backfill; a backfill run is never acquirable by the worker', async () => {
       const open = await createCollectionRun(db, { sourceId, scheduledFor: new Date(Date.now() + 3_600_000), triggerType: 'MANUAL' });
-      await assert.rejects(runDouBackfillBatch(db, { ...base, dates: ['2026-09-17'], workerId: 'backfill-test' }), DouBackfillBlockedError);
+      await assert.rejects(runDouBackfillBatch(runtimeDb, { ...base, dates: ['2026-09-17'], workerId: 'backfill-test' }), DouBackfillBlockedError);
       await db.updateTable('collection_runs').set({ status: 'CANCELLED', finished_at: new Date() }).where('id', '=', open).execute();
 
       let acquiredByWorker: string | undefined;
@@ -380,12 +428,12 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
         if (acquired && acquired.sourceId === sourceId) acquiredByWorker = acquired.id;
         return fetch(input, init);
       };
-      await runDouBackfillBatch(db, { ...base, fetch: slowFetch, dates: ['2026-09-17'], workerId: 'backfill-test' });
+      await runDouBackfillBatch(runtimeDb, { ...base, fetch: slowFetch, dates: ['2026-09-17'], workerId: 'backfill-test' });
       assert.equal(acquiredByWorker, undefined);
     });
 
     await t.test('hourly tick: one date per run, throttled to one run per interval, complete when nothing is missing', async () => {
-      const tick = (overrides: Record<string, unknown> = {}) => runDouBackfillTick(db, {
+      const tick = (overrides: Record<string, unknown> = {}) => runDouBackfillTick(runtimeDb, {
         from: '2026-09-15', workerId: 'tick-worker', credentials, fetch, now, timeoutMs: 10_000, isCronDue, ...overrides,
       });
       // Covered so far: 13, 17, 18, 19, 20 (plus the monitoring window). Missing: 01/10 .. 21/09, 16, 15.
@@ -402,14 +450,14 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
       assert.equal(rest.state === 'RAN' && rest.batch.dates.length, 4);
       assert.equal(rest.state === 'RAN' && rest.batch.dates[0], '2026-09-30');
 
-      const complete = await runDouBackfillTick(db, {
+      const complete = await runDouBackfillTick(runtimeDb, {
         from: '2026-09-17', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1,
         // Everything from 17/09 is covered once the remaining dates are consulted.
       });
       assert.notEqual(complete.state, 'SKIPPED');
       let state = complete.state;
       for (let guard = 0; state === 'RAN' && guard < 10; guard += 1) {
-        state = (await runDouBackfillTick(db, { from: '2026-09-17', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1, datesPerRun: 4 })).state;
+        state = (await runDouBackfillTick(runtimeDb, { from: '2026-09-17', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1, datesPerRun: 4 })).state;
       }
       assert.equal(state, 'COMPLETE');
     });
@@ -430,12 +478,12 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
       assert.ok(missing.length >= 2);
 
       await failedRun();
-      const rotated = await runDouBackfillTick(db, tickArgs);
+      const rotated = await runDouBackfillTick(runtimeDb, tickArgs);
       assert.deepEqual(rotated.state === 'RAN' && rotated.batch.dates, [missing[1]], 'after one failure the next date is tried');
 
       const remaining = planDouBackfillDates({ from: '2026-09-01', to: '2026-10-01', today: '2026-10-04', covered: (await readDouBackfillCoverage(db, sourceId)).covered });
       for (let i = 0; i < 2 * remaining.length; i += 1) await failedRun();
-      const stalled = await runDouBackfillTick(db, tickArgs);
+      const stalled = await runDouBackfillTick(runtimeDb, tickArgs);
       assert.equal(stalled.state, 'STALLED');
       assert.deepEqual(stalled.state === 'STALLED' && stalled.remainingDates, remaining);
       await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).where('status', '=', 'SOURCE_UNAVAILABLE').execute();
@@ -444,13 +492,13 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
     await t.test('hourly tick never starts close to a scheduled DOU cycle', async () => {
       await db.updateTable('sources').set({ schedule_cron: '10 12 * * *', schedule_timezone: 'America/Sao_Paulo' }).where('id', '=', sourceId).execute();
       // now() is 12:00 in São Paulo: the 12:10 cycle is within the 20-minute guard.
-      const skipped = await runDouBackfillTick(db, { from: '2026-09-15', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1 });
+      const skipped = await runDouBackfillTick(runtimeDb, { from: '2026-09-15', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1 });
       assert.deepEqual(skipped, { state: 'SKIPPED', reason: 'SCHEDULED_CYCLE_DUE' });
       await db.updateTable('sources').set({ schedule_cron: null }).where('id', '=', sourceId).execute();
     });
 
     await t.test('dates inside the monitoring window are refused', async () => {
-      await assert.rejects(runDouBackfillBatch(db, { ...base, dates: ['2026-10-02'], workerId: 'backfill-test' }), RangeError);
+      await assert.rejects(runDouBackfillBatch(runtimeDb, { ...base, dates: ['2026-10-02'], workerId: 'backfill-test' }), RangeError);
     });
   } finally {
     const ids = [...new Set((await db.selectFrom('publication_origins').select('publication_id').where('source_id', '=', sourceId).execute()).map((row) => row.publication_id))];
@@ -458,6 +506,7 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
     await db.deleteFrom('publication_origins').where('source_id', '=', sourceId).execute();
     if (ids.length) await db.deleteFrom('publications').where('id', 'in', ids).execute();
     await db.deleteFrom('sources').where('id', '=', sourceId).execute();
-    await db.destroy();
+    await db.deleteFrom('collection_filter_policies').where('id', '=', policyId).execute();
+    await Promise.all([runtimeDb.destroy(), db.destroy()]);
   }
 });
