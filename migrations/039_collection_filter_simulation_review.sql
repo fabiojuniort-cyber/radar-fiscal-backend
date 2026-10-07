@@ -147,11 +147,11 @@ BEGIN
   END IF;
 
   SELECT * INTO v_existing
-  FROM public.collection_filter_simulations
-  WHERE policy_id=v_policy.id
-    AND policy_revision=v_policy.revision
-    AND status IN ('PENDING','RUNNING')
-  ORDER BY created_at DESC
+  FROM public.collection_filter_simulations AS s
+  WHERE s.policy_id=v_policy.id
+    AND s.policy_revision=v_policy.revision
+    AND s.status IN ('PENDING','RUNNING')
+  ORDER BY s.created_at DESC
   LIMIT 1;
 
   IF FOUND THEN
@@ -236,12 +236,12 @@ BEGIN
   ) INTO v_first_publication;
 
   SELECT * INTO v_simulation
-  FROM public.collection_filter_simulations
-  WHERE policy_id=v_policy.id
-    AND policy_revision=v_policy.revision
-    AND status='COMPLETED'
-    AND (NOT v_first_publication OR scope='FULL_ARCHIVE')
-  ORDER BY completed_at DESC NULLS LAST, created_at DESC
+  FROM public.collection_filter_simulations AS s
+  WHERE s.policy_id=v_policy.id
+    AND s.policy_revision=v_policy.revision
+    AND s.status='COMPLETED'
+    AND (NOT v_first_publication OR s.scope='FULL_ARCHIVE')
+  ORDER BY s.completed_at DESC NULLS LAST, s.created_at DESC
   LIMIT 1;
 
   IF NOT FOUND THEN
