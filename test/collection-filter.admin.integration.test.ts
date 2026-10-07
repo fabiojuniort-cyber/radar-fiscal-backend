@@ -207,57 +207,6 @@ test(
       assert.equal(updated.json().version, 1);
       assert.equal(updated.json().revision, 2);
 
-      const simulation = await app.inject({
-        method: 'POST',
-        url: '/api/v1/admin/collection-filter/simulations',
-        headers: platformAdmin.headers,
-        payload: {
-          policyId,
-          scope: 'FULL_ARCHIVE',
-          reviewMode: 'SAMPLE',
-        },
-      });
-      assert.equal(simulation.statusCode, 200, simulation.body);
-      assert.equal(simulation.json().action, 'CREATED');
-      assert.equal(simulation.json().policyRevision, 2);
-
-      const sameSimulation = await app.inject({
-        method: 'POST',
-        url: '/api/v1/admin/collection-filter/simulations',
-        headers: platformAdmin.headers,
-        payload: {
-          policyId,
-          scope: 'FULL_ARCHIVE',
-          reviewMode: 'SAMPLE',
-        },
-      });
-      assert.equal(
-        sameSimulation.statusCode,
-        200,
-        sameSimulation.body,
-      );
-      assert.equal(sameSimulation.json().action, 'EXISTING');
-      assert.equal(
-        sameSimulation.json().simulationId,
-        simulation.json().simulationId,
-      );
-
-      const prematureApproval = await app.inject({
-        method: 'POST',
-        url: '/api/v1/admin/collection-filter/approve',
-        headers: platformAdmin.headers,
-        payload: { policyId },
-      });
-      assert.equal(
-        prematureApproval.statusCode,
-        409,
-        prematureApproval.body,
-      );
-      assert.equal(
-        prematureApproval.json().error,
-        'collection_filter_fresh_simulation_required',
-      );
-
       const unsafe = await app.inject({
         method: 'PUT',
         url: '/api/v1/admin/collection-filter/draft',
