@@ -2175,12 +2175,24 @@ export async function validateReleaseView(
   if (client) {
     const releaseId = view.release.id;
     const residue = await client.query<{
+      orphan_concepts: number;
       orphan_groups: number;
       orphan_relation_rules: number;
       orphan_relations: number;
     }>(
       `
         SELECT
+          (
+            SELECT count(*)::int
+            FROM taxonomy_release_concepts rc
+            JOIN taxonomy_concepts c ON c.id = rc.concept_id
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id = rc.release_id
+             AND rd.dimension_id = c.dimension_id
+            WHERE rc.release_id = $1::uuid
+              AND rc.membership_status = 'INCLUDED'
+              AND rd.membership_status <> 'INCLUDED'
+          ) AS orphan_concepts,
           (
             SELECT count(*)::int
             FROM taxonomy_release_groups g
@@ -2233,6 +2245,7 @@ export async function validateReleaseView(
     );
     const residueRow = residue.rows[0];
     for (const [code, count, message] of [
+      ['RETIRED_DIMENSION_CONCEPTS', residueRow?.orphan_concepts ?? 0, 'Há conceitos ativos pertencentes a dimensões retiradas.'],
       ['RETIRED_DIMENSION_GROUPS', residueRow?.orphan_groups ?? 0, 'Há grupos pertencentes a dimensões retiradas.'],
       ['RETIRED_DIMENSION_RELATION_RULES', residueRow?.orphan_relation_rules ?? 0, 'Há regras de relação apontando para dimensões retiradas.'],
       ['RETIRED_DIMENSION_RELATIONS', residueRow?.orphan_relations ?? 0, 'Há relações apontando para conceitos/dimensões retirados.'],
