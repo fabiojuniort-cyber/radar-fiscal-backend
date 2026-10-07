@@ -91,6 +91,7 @@ test('sinais tributários inequívocos preservam tipo DOU genérico mesmo no cor
     'REIDI',
     'EQBEN',
     'TFAC',
+    'CORAT',
   ];
 
   for (const signal of signals) {
@@ -181,6 +182,28 @@ test('regressão: incidência de TFAC é preservada sem tornar taxa genérica fo
     },
   );
   assert.equal(feeDecision.decision, 'DISCARD');
+});
+
+test('regressão: retificação CORAT de ADE sobre devedor contumaz é preservada', () => {
+  const decision = evaluateCollectionFilter(
+    policyFor('DO1', 'ATO DECLARATORIO'),
+    {
+      sourceCode: 'dou',
+      section: 'DO1',
+      actType: 'ATO DECLARATORIO',
+      title: 'RETIFICAÇÃO',
+      body:
+        'No art. 1º dos Atos Declaratórios Executivos Corat nºs. 55, 56, 57, 58 e 59, de 4 de agosto de 2026, onde se lê Instrução Normativa RFB nº 2.119, de 6 de dezembro de 2026, leia-se Instrução Normativa RFB nº 2.119, de 6 de dezembro de 2022.',
+      ...complete,
+    },
+  );
+
+  assert.equal(decision.decision, 'KEEP');
+  assert.equal(decision.reasonCode, 'STRONG_TERM');
+  assert.equal(
+    decision.termHits.some((hit) => hit.text === 'CORAT'),
+    true,
+  );
 });
 
 test('termo fiscal ambíguo no corpo continua insuficiente isoladamente', () => {
