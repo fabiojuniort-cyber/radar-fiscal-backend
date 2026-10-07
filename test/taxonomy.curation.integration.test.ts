@@ -220,7 +220,9 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     const customer = await registerAndLogin(app, 'customer');
     await admin.query(
       `INSERT INTO platform_user_roles (user_id, role, granted_by)
-       VALUES ($1, 'TAXONOMY_CURATOR', 'tax-11-test')`,
+       VALUES
+         ($1, 'TAXONOMY_CURATOR', 'tax-11-test'),
+         ($1, 'PLATFORM_ADMIN', 'tax-11-test')`,
       [curator.userId],
     );
 
@@ -234,7 +236,12 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     const meCustomer = await app.inject({ method: 'GET', url: '/api/v1/admin/me', headers: customer.headers });
     assert.equal(meCustomer.json().taxonomyCurator, false);
     const meCurator = await app.inject({ method: 'GET', url: '/api/v1/admin/me', headers: curator.headers });
-    assert.deepEqual(meCurator.json(), { taxonomyCurator: true, curatorDatabase: true });
+    assert.deepEqual(meCurator.json(), {
+      platformAdmin: true,
+      taxonomyCurator: true,
+      licenseBypass: true,
+      curatorDatabase: true,
+    });
 
     const state = await app.inject({ method: 'GET', url: '/api/v1/admin/taxonomy/state', headers: curator.headers });
     assert.equal(state.statusCode, 200, state.body);
