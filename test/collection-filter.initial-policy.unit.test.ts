@@ -87,6 +87,10 @@ test('sinais tributários inequívocos preservam tipo DOU genérico mesmo no cor
     'EFD-Reinf',
     'benefício fiscal',
     'benefícios fiscais',
+    'incentivos fiscais',
+    'REIDI',
+    'EQBEN',
+    'TFAC',
   ];
 
   for (const signal of signals) {
@@ -130,6 +134,53 @@ test('regressão: Resolução SUFRAMA com benefícios fiscais no plural é prese
     decision.termHits.some((hit) => hit.text === 'BENEFICIOS FISCAIS'),
     true,
   );
+});
+
+test('regressão: retificação EQBEN de habilitação REIDI é preservada', () => {
+  const decision = evaluateCollectionFilter(
+    policyFor('DO1', 'ATO DECLARATORIO'),
+    {
+      sourceCode: 'dou',
+      section: 'DO1',
+      actType: 'ATO DECLARATORIO',
+      title: 'Retificação',
+      body:
+        'No Ato Declaratório Executivo EQBEN/DELEBEN/SRRF08ª/RFB, fica corrigida a habilitação ao REIDI.',
+      ...complete,
+    },
+  );
+
+  assert.equal(decision.decision, 'KEEP');
+  assert.equal(decision.reasonCode, 'STRONG_TERM');
+});
+
+test('regressão: incidência de TFAC é preservada sem tornar taxa genérica forte', () => {
+  const taxDecision = evaluateCollectionFilter(
+    policyFor('DO1', 'PORTARIA'),
+    {
+      sourceCode: 'dou',
+      section: 'DO1',
+      actType: 'PORTARIA',
+      title: 'Portaria de fiscalização da aviação civil',
+      body: 'Disciplina hipóteses de incidência de TFAC no âmbito da ANAC.',
+      ...complete,
+    },
+  );
+  assert.equal(taxDecision.decision, 'KEEP');
+  assert.equal(taxDecision.reasonCode, 'STRONG_TERM');
+
+  const feeDecision = evaluateCollectionFilter(
+    policyFor('DO3', 'EDITAL'),
+    {
+      sourceCode: 'dou',
+      section: 'DO3',
+      actType: 'EDITAL',
+      title: 'Edital de concurso',
+      body: 'Prevê isenção da taxa de inscrição para candidatos elegíveis.',
+      ...complete,
+    },
+  );
+  assert.equal(feeDecision.decision, 'DISCARD');
 });
 
 test('termo fiscal ambíguo no corpo continua insuficiente isoladamente', () => {
