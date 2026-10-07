@@ -34,6 +34,7 @@ test('structured CONFAZ text keeps only the operative legal body', () => {
       '<p class="TextoAcordo">Cláusula primeira Fica reduzida a base de cálculo do ICMS para fertilizantes. NCM 7312.00.00.</p>' +
       '<p class="A8-1Remissao">Nova redação dada pelo Convênio ICMS 99/04 para sementes.</p>' +
       '<p class="A5-1TextoAcordo">II - REVOGADO</p>' +
+      '<p class="TextoAcordo"><b>Cláusula terceira</b> REVOGADA</p>' +
       '<p class="A8-2RemissaoAnt">Redação original, efeitos até 31.12.21.</p>' +
       '<p class="A8-3RedacaoAnt">Texto anterior sobre defensivos.</p>' +
       '<table>' +
@@ -52,7 +53,8 @@ test('structured CONFAZ text keeps only the operative legal body', () => {
   assert.doesNotMatch(current, /Alterado pelos/);
   assert.doesNotMatch(current, /Reduz a base de cálculo do ICMS\.$/m);
   assert.doesNotMatch(current, /Nova redação dada/);
-  assert.doesNotMatch(current, /REVOGADO/);
+  assert.doesNotMatch(current, /REVOGAD[OA]/);
+  assert.doesNotMatch(current, /Cláusula terceira/);
   assert.doesNotMatch(current, /Redação original/);
   assert.doesNotMatch(current, /defensivos/);
   assert.doesNotMatch(current, /7612\.90\.19/);
