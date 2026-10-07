@@ -390,9 +390,13 @@ export async function mergeDimension(
      ORDER BY c.code`,
     [from],
   );
+  // Existing redirects remain authoritative while they still validate, but
+  // inherited retiredCodes are deliberately NOT considered covered here.
+  // A code that had no successor in an older release may gain one during the
+  // current merge (active, RESTORE or CREATE) and must then be promoted from
+  // retiredCodes to a redirect.
   const coveredCodes = new Set([
     ...Object.keys(existingCompatibility.redirects),
-    ...existingCompatibility.retiredCodes,
     ...Object.keys(compatibility.redirects),
     ...compatibility.retiredCodes,
   ]);
