@@ -88,7 +88,7 @@
     "test:taxonomy-candidates": "tsx --test test/taxonomy.candidates.unit.test.ts test/taxonomy.candidates.integration.test.ts",
     "test:taxonomy-matching": "tsx --test test/taxonomy.matching.unit.test.ts test/taxonomy.matching.integration.test.ts",
     "platform:grant-admin": "node dist/infrastructure/database/grant-platform-admin.js",
-    "test:collection-filter": "tsx --test test/collection-filter.engine.unit.test.ts",
+    "test:collection-filter": "tsx --test test/collection-filter.engine.unit.test.ts test/collection-filter.initial-policy.unit.test.ts",
     "collection-filter:seed-initial": "node dist/infrastructure/database/seed-collection-filter.js"
   },
   "dependencies": {
