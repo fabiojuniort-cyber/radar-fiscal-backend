@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  applyTaxonomyCodeCompatibilityPatch,
   canonicalizeTaxonomyConceptCodes,
   parseTaxonomyCodeCompatibility,
   resolveTaxonomyConceptCode,
@@ -66,4 +67,33 @@ test('taxonomy compatibility rejects redirect cycles', () => {
     () => resolveTaxonomyConceptCode('legacy.a', compatibility),
     /TAXONOMY_CODE_REDIRECT_CYCLE/,
   );
+});
+
+
+test('retiring a canonical target retires inherited upstream aliases too', () => {
+  const next = applyTaxonomyCodeCompatibilityPatch(
+    {
+      version: 1,
+      redirects: {
+        'legacy.a': 'legacy.b',
+        'legacy.b': 'theme.x',
+        'legacy.keep': 'theme.keep',
+      },
+      retiredCodes: [],
+    },
+    {
+      retiredCodes: ['theme.x'],
+    },
+  );
+
+  assert.deepEqual(next.redirects, {
+    'legacy.keep': 'theme.keep',
+  });
+  assert.deepEqual(next.retiredCodes, [
+    'legacy.a',
+    'legacy.b',
+    'theme.x',
+  ]);
+  assert.equal(resolveTaxonomyConceptCode('legacy.a', next), null);
+  assert.equal(resolveTaxonomyConceptCode('legacy.b', next), null);
 });
