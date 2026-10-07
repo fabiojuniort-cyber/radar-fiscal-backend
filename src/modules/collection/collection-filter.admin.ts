@@ -245,13 +245,13 @@ export async function readCollectionFilterAdminState(
 export async function listCollectionFilterNewTypes(
   db: Kysely<DB>,
   userId: string,
-  status: 'OPEN' | 'RESOLVED' | 'IGNORED' = 'OPEN',
+  status: 'OPEN' | 'RESOLVED' | 'MERGED' = 'OPEN',
 ) {
   return withUserContext(db, userId, async (trx) => {
     const result = await sql<any>`
       SELECT id,source_code,section,normalized_type,sample_raw_type,
              occurrence_count,first_seen_at,last_seen_at,
-             sample_publication_ids,status,resolved_at
+             sample_publication_ids,status,resolved_canonical_type,resolved_at
       FROM collection_filter_new_types
       WHERE status=${status}
       ORDER BY occurrence_count DESC,last_seen_at DESC
@@ -265,11 +265,16 @@ export async function resolveCollectionFilterNewType(
   db: Kysely<DB>,
   userId: string,
   id: string,
-  status: 'RESOLVED' | 'IGNORED',
+  status: 'RESOLVED' | 'MERGED',
+  canonicalType: string,
 ) {
   return withUserContext(db, userId, async (trx) => {
-    await sql`SELECT collection_filter_resolve_new_type(${id}::uuid,${status})`.execute(trx);
-    return { id, status };
+    await sql`SELECT collection_filter_resolve_new_type(
+      ${id}::uuid,
+      ${status},
+      ${canonicalType}
+    )`.execute(trx);
+    return { id, status, canonicalType };
   });
 }
 
