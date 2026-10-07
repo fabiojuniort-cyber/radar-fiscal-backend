@@ -300,6 +300,42 @@ test(
         'invalid_collection_filter_draft',
       );
 
+      const recentOnly = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
+        headers: platformAdmin.headers,
+        payload: {
+          scope: 'RECENT',
+          reviewMode: 'NONE',
+        },
+      });
+      assert.equal(recentOnly.statusCode, 202, recentOnly.body);
+      await admin.query(
+        `UPDATE collection_filter_simulations
+            SET status='COMPLETED',
+                metrics='{"inspected":1,"keep":1,"discard":0}'::jsonb,
+                completed_at=now()
+          WHERE id=$1::uuid`,
+        [recentOnly.json().simulationId],
+      );
+
+      const firstRecentBlocked = await app.inject({
+        method: 'POST',
+        url:
+          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
+        headers: platformAdmin.headers,
+      });
+      assert.equal(
+        firstRecentBlocked.statusCode,
+        409,
+        firstRecentBlocked.body,
+      );
+      assert.equal(
+        firstRecentBlocked.json().error,
+        'collection_filter_full_archive_simulation_required',
+      );
+
       const requested = await app.inject({
         method: 'POST',
         url:
