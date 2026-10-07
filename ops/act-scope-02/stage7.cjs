@@ -96,7 +96,7 @@ function readManifest() {
 }
 async function productionGates() {
   if(local) return;
-  if(!process.env.LEASE_UNTIL||Date.now()>=Date.parse(process.env.LEASE_UNTIL)||!Number.isFinite(Date.parse(process.env.LEASE_UNTIL))) refuse('LEASE_EXPIRED');
+  checkLease();
   const evidence=JSON.parse(fs.readFileSync(process.env.BACKUP_EVIDENCE||'', 'utf8'));
   if(evidence.result!=='PASS'||!evidence.allPublicTableCountsEqual||evidence.dumpSha256!==process.env.BACKUP_SHA) refuse('BACKUP_PROOF_REQUIRED');
   if(!/^[0-9a-f]{40}$/.test(process.env.CANDIDATE_SHA||'')||process.env.REVIEWED_SHA!==process.env.CANDIDATE_SHA) refuse('EXACT_ARTIFACT_REVIEW_REQUIRED');
@@ -110,13 +110,22 @@ async function productionGates() {
    JOIN sources src ON src.id=cr.source_id WHERE cr.id=$1 AND src.code='dou' AND st.policy_id=$2 AND st.policy_version=1 AND st.policy_revision=5`,[process.env.SMOKE_RUN_ID,POLICY])).rows[0];
   if(!r||!['SUCCESS','PARTIAL_SUCCESS'].includes(r.status)||r.kept<1||Number(r.discard_count)<1||r.valid_discards!==Number(r.discard_count)||r.bad_links!==0) refuse('REAL_SMOKE_REQUIRED');
 }
+function checkLease() {
+  if(!local&&(!process.env.LEASE_UNTIL||!Number.isFinite(Date.parse(process.env.LEASE_UNTIL))||Date.now()>=Date.parse(process.env.LEASE_UNTIL))) refuse('LEASE_EXPIRED');
+}
 async function transition(m,action) {
   let count=0;
+  const failedChunks=[];
   for(let start=0;start<m.candidates.length;start+=200) {
     const chunk=m.candidates.slice(start,start+200);
+    if(action==='SUPPRESS') checkLease();
+    let completed=false;
+    for(let attempt=1;attempt<=(action==='RESTORE'?3:1);attempt++) {
+    try {
     count+=await transaction(async()=>{
       await c.query('SELECT id FROM publications WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',[chunk.map(r=>r.id)]);
       if(action==='SUPPRESS') {
+        checkLease();
         await guard();
         const actual=(await c.query(candidateSql,[SIM,chunk.map(r=>r.id)])).rows;
         if(actual.length!==chunk.length||actual.some((r,i)=>!r.stable||r.scope!=='IN_SCOPE'||r.expected!==chunk[i].expected||fingerprint(r)!==chunk[i].evidence)) refuse('MATERIAL_OR_SCOPE_DRIFT');
@@ -133,8 +142,25 @@ async function transition(m,action) {
         if(r.applied) n++;
       } return n;
     });
+    completed=true;break;
+    } catch(error) {
+      if(action==='SUPPRESS') throw error;
+      // Recovery must attempt the remaining committed batches despite a
+      // blocked row or failed transaction in this batch. Never report PASS
+      // when own current SUPPRESS events remain.
+      log('RESTORE_RETRY',{start,attempt,count:chunk.length});
+    }
+    }
+    if(!completed) failedChunks.push(chunk.map(r=>r.id));
     if(start%2000===0) log('PROGRESS',{action,processed:Math.min(start+200,m.candidates.length),applied:count});
-  } return count;
+  }
+  if(action==='RESTORE') {
+    const remaining=(await c.query(`SELECT s.publication_id FROM publication_scope_state s JOIN publication_scope_events e ON e.id=s.current_event_id WHERE s.scope='OUT_OF_SCOPE' AND e.action='SUPPRESS' AND e.policy_key=$1 AND e.manifest_sha256::text=$2 ORDER BY s.publication_id`,[KEY,m.digest])).rows.map(r=>r.publication_id);
+    fs.writeFileSync(path.join(dir,'recovery-pending.json'),JSON.stringify({manifest:m.digest,remaining,failedChunks}),{mode:0o600});
+    log('RECOVERY_STATUS',{remaining:remaining.length,failedChunks:failedChunks.length,remainingSha:sha(remaining)});
+    if(remaining.length) refuse('RESTORE_PENDING_RECOVERY');
+  }
+  return count;
 }
 async function verify(m,suppressed) {
   const ids=m.candidates.map(r=>r.id);const b=await transaction(()=>baseline(ids),true);

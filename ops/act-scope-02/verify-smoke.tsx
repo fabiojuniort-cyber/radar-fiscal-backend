@@ -40,7 +40,13 @@ try {
   && e.valid_discard_metadata===e.discards && e.discard_absent_from_origins===e.discards
   && e.doe_sp_discards===0 && e.doe_sp_stats===0 && e.forbidden_content_columns===0 && e.expired_remaining===0
   && Number(s.discard_count)===e.discards && filtered===e.discards;
- const result={result:passed?"PASS":"PENDING_OR_FAILED",mode:MODE,run:run.rows,stats:stats.rows,items:items.rows,evidence:evidence.rows,reasons:reasons.rows};
+ const attempts=await c.query("SELECT attempt_no,status,CASE WHEN error_code ~ '^[A-Z0-9_:-]+"PASS":"PENDING_OR_FAILED",mode:MODE,run:run.rows,stats:stats.rows,items:items.rows,evidence:evidence.rows,reasons:reasons.rows};
+ if(!passed) process.exitCode=2;
+ await c.query("ROLLBACK");
+ console.log("ACT_SCOPE_02_SMOKE="+JSON.stringify(result));
+}catch(e){await c.query("ROLLBACK").catch(()=>{});console.error("ACT_SCOPE_02_SMOKE_REFUSED="+(/^[A-Z_]+$/.test(e?.message||"")?e.message:"OPERATION_FAILED"));process.exitCode=1}finally{await c.end()}
+ THEN error_code ELSE 'REDACTED_OR_NULL' END AS error_code,http_status,retryable,retry_after_seconds FROM collection_attempts WHERE collection_run_id=$1 ORDER BY attempt_no",[RUN]);
+ const result={attempts:attempts.rows,result:passed?"PASS":"PENDING_OR_FAILED",mode:MODE,run:run.rows,stats:stats.rows,items:items.rows,evidence:evidence.rows,reasons:reasons.rows};
  if(!passed) process.exitCode=2;
  await c.query("ROLLBACK");
  console.log("ACT_SCOPE_02_SMOKE="+JSON.stringify(result));
