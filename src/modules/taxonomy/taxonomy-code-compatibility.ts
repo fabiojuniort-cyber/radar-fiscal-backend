@@ -121,6 +121,8 @@ export async function updateDraftTaxonomyCodeCompatibility(
     if (!from || !to || from === to) continue;
     redirects[from] = to;
     retired.delete(from);
+    // Redirect targets are active successors (including RESTORE targets).
+    retired.delete(to);
   }
 
   for (const code of patch.retiredCodes ?? []) {
