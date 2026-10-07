@@ -25,6 +25,8 @@ import {
   planLegacySegmentRetirement,
 } from '../src/modules/taxonomy/curation/curation.legacy-segments.js';
 import { matchSegmentsByCnae, segmentsForCnaes } from '../src/modules/taxonomy/curation/curation.suggestions.js';
+import { resolveCuratorDecisions } from '../src/modules/taxonomy/curation/curation.tags.js';
+import { parseTaxonomyCodeCompatibility } from '../src/modules/taxonomy/taxonomy-code-compatibility.js';
 
 function concept(
   code: string,
@@ -249,6 +251,50 @@ test('spreadsheet import: blank keeps, "—" clears, ✓ flags and comma separat
   assert.equal(onlyProfile[0]!.group, undefined);
   assert.equal(onlyProfile[0]!.officialCodes, undefined);
   assert.equal(onlyProfile[0]!.synonyms, undefined);
+});
+
+test('curator decisions survive treatment redirects and ignore retired codes', () => {
+  const compatibility = parseTaxonomyCodeCompatibility({
+    taxonomyCompatibility: {
+      version: 1,
+      redirects: {
+        'treatment.exemption': 'theme.exemption',
+      },
+      retiredCodes: ['platform.sped'],
+    },
+  });
+  const history = [
+    {
+      concept_code: 'treatment.exemption',
+      action: 'REMOVE' as const,
+      rationale: 'decisão antiga mais recente',
+      created_at: '2026-10-07T10:00:00Z',
+      id: '3',
+    },
+    {
+      concept_code: 'theme.exemption',
+      action: 'ADD' as const,
+      rationale: 'decisão anterior no código novo',
+      created_at: '2026-10-06T10:00:00Z',
+      id: '2',
+    },
+    {
+      concept_code: 'platform.sped',
+      action: 'ADD' as const,
+      rationale: 'não possui sucessor',
+      created_at: '2026-10-05T10:00:00Z',
+      id: '1',
+    },
+  ];
+
+  const resolved = resolveCuratorDecisions(history, compatibility);
+  assert.equal(resolved.size, 1);
+  assert.equal(resolved.get('theme.exemption')?.action, 'REMOVE');
+  assert.equal(
+    resolved.get('theme.exemption')?.rationale,
+    'decisão antiga mais recente',
+  );
+  assert.equal(resolved.has('platform.sped'), false);
 });
 
 test('official codes are normalized and validated by type', () => {

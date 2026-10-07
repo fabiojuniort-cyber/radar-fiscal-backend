@@ -3,6 +3,8 @@ import type {
   PoolClient,
 } from 'pg';
 
+import { pgRunner } from '../curation/curation.read.js';
+
 import {
   canonicalJson,
   sha256Hex,
@@ -12,9 +14,14 @@ import {
   parseTaxonomyMonitoringCriteria,
   type TaxonomyMonitoringCriteria,
 } from './taxonomy-criteria.js';
+import {
+  loadTaxonomyCodeCompatibility,
+  resolveTaxonomyConceptCode,
+  type TaxonomyCodeCompatibility,
+} from '../taxonomy-code-compatibility.js';
 
 export const TAXONOMY_MATCH_ENGINE_VERSION =
-  'taxonomy-match-v1';
+  'taxonomy-match-v2';
 
 export type TaxonomyMatchDisposition =
   | 'MATCHED_CREATED'
@@ -47,10 +54,11 @@ interface NarrowerEdgeRow {
   parent_id: string;
 }
 
-function buildAcceptedCodes(
+export function buildAcceptedCodes(
   criteria: TaxonomyMonitoringCriteria,
   concepts: readonly ReleaseConceptRow[],
   edges: readonly NarrowerEdgeRow[],
+  compatibility: TaxonomyCodeCompatibility,
 ): Map<string, ReadonlySet<string>> {
   const byCode = new Map(
     concepts.map((row) => [
@@ -95,7 +103,17 @@ function buildAcceptedCodes(
     >();
 
   for (const code of criteriaCodes) {
-    const root = byCode.get(code);
+    const canonicalCode = resolveTaxonomyConceptCode(code, compatibility);
+
+    // A criterion that belonged to a deliberately retired dimension remains
+    // resolvable but can no longer match. This is safer than silently
+    // broadening anyOf/allOf semantics by dropping the criterion.
+    if (canonicalCode === null) {
+      result.set(code, new Set<string>());
+      continue;
+    }
+
+    const root = byCode.get(canonicalCode);
 
     if (!root) {
       throw new Error(
@@ -105,7 +123,7 @@ function buildAcceptedCodes(
     }
 
     const accepted =
-      new Set<string>([code]);
+      new Set<string>([canonicalCode]);
 
     if (criteria.includeDescendants) {
       const queue = [root];
@@ -306,7 +324,7 @@ export async function matchPublicationByTaxonomy(
       'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
       [
         [
-          'taxonomy-match-v1',
+          TAXONOMY_MATCH_ENGINE_VERSION,
           input.tenantId,
           input.monitoringProfileId,
           input.publicationVersionId,
@@ -343,11 +361,18 @@ export async function matchPublicationByTaxonomy(
           )
         : { rows: [] };
 
+    const compatibility =
+      await loadTaxonomyCodeCompatibility(
+        pgRunner(client),
+        releaseRow.id,
+      );
+
     const acceptedCodes =
       buildAcceptedCodes(
         criteria,
         concepts.rows,
         edges.rows,
+        compatibility,
       );
 
     const assertions =
@@ -467,6 +492,10 @@ export async function matchPublicationByTaxonomy(
         criteria.releasePolicy,
       ruleEngineVersion:
         TAXONOMY_MATCH_ENGINE_VERSION,
+      taxonomyCompatibility: {
+        redirects: compatibility.redirects,
+        retiredCodes: compatibility.retiredCodes,
+      },
     };
 
     const materialHash =

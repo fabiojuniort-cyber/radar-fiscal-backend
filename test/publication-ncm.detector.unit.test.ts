@@ -139,6 +139,36 @@ test('currentWordingText omits revoked placeholders but keeps operative revocati
   assert.match(current, /Cláusula primeira: texto vigente/);
 });
 
+test('currentWordingText mirrors the real CV100/97 and CV52/91 editorial classes', () => {
+  const html = [
+    '<p class="TituloAcordo">CONVÊNIO ICMS 100/97</p>',
+    '<p class="DataPublicao">Alterado pelos Convs. ICMS 26/21 e 79/25; NCM 8701.90.00.</p>',
+    '<p class="A2DataPublicacao">Prorrogado até 31.12.27; NCM 3925.10.00.</p>',
+    '<p class="Ementa">Reduz a base de cálculo do ICMS; NCM 7612.90.19.</p>',
+    '<p class="A8-1Remissao">Nova redação dada pelo Conv. ICMS 99/04; NCM 1006.20.99.</p>',
+    '<p class="A5-1TextoAcordo">I - fertilizantes, NCM 3102.10.90.</p>',
+    '<p class="A8-2RemissaoAnt">Redação original, efeitos até 18.10.04.</p>',
+    '<p class="A8-3RedacaoAnt">I - redação anterior, NCM 1006.30.11.</p>',
+    '<table><tr><td><p class="TabelaSubtituloverde">39.1</p></td>',
+    '<td><p class="Tabelajustificadoverde">Máquinas antigas</p></td>',
+    '<td><p class="TabelaSubtituloverde">8450.11.00</p></td></tr></table>',
+    '<p class="TextoAcordo">Cláusula terceira REVOGADA</p>',
+    '<p class="TextoAcordo">Ficam revogadas as disposições em contrário; NCM 9999.99.99.</p>',
+  ].join('');
+
+  const current = currentWordingText(html) ?? '';
+  assert.match(current, /3102\.10\.90/);
+  assert.match(current, /9999\.99\.99/);
+  assert.doesNotMatch(
+    current,
+    /CONVÊNIO ICMS 100\/97|8701\.90\.00|3925\.10\.00|7612\.90\.19|1006\.20\.99|1006\.30\.11|8450\.11\.00|Cláusula terceira REVOGADA/,
+  );
+  assert.deepEqual(
+    extractNcmCandidates(current).map((candidate) => candidate.code),
+    ['31021090', '99999999'],
+  );
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
