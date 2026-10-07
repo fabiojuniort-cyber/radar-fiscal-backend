@@ -266,10 +266,10 @@ function recordValue(
 
 function currentTaxonomyPersonalization(
   personalization: unknown,
-  release: { id: string; version: string } | null,
+  release: { id: string; version: string | null } | null,
   compatibility: TaxonomyCodeCompatibility | null,
 ): unknown {
-  if (!release || !compatibility) return personalization;
+  if (!release?.version || !compatibility) return personalization;
   const root = recordValue(personalization);
   const taxonomy = recordValue(root?.taxonomy);
   if (!root || !taxonomy) return personalization;
