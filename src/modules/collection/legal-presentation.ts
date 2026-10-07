@@ -341,6 +341,7 @@ const LEGAL_BODY_CLASSES = new Set([
 
 const NON_OPERATIVE_EDITORIAL_CLASSES = new Set([
   'TituloAcordo',
+  'AcordoTipo',
   'DataPublicao',
   'A2DataPublicacao',
   'Ementa',
