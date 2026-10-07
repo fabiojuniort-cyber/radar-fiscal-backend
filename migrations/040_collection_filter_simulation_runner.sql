@@ -263,7 +263,7 @@ BEGIN
         WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
       ) AS origin_type_conflict,
       bool_or(
-        COALESCE((po.metadata->'dou'->>'scopeStructureIncomplete')::boolean,false)
+        COALESCE(po.metadata->'dou'->>'scopeStructureIncomplete'='true',false)
         OR po.metadata->'dou' ? 'titleFallback'
       ) FILTER (
         WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
@@ -323,7 +323,7 @@ BEGIN
       e.content_text IS NOT NULL
       AND btrim(e.content_text)<>''
       AND NOT COALESCE(e.origin_structure_incomplete,false)
-      AND NOT COALESCE((e.source_metadata->'dou'->>'scopeStructureIncomplete')::boolean,false)
+      AND NOT COALESCE(e.source_metadata->'dou'->>'scopeStructureIncomplete'='true',false)
       AND NOT (COALESCE(e.source_metadata->'dou','{}'::jsonb) ? 'titleFallback')
     ) AS evidence_complete,
     (
