@@ -73,6 +73,45 @@ test('selectText reads only the wording in force when the page marks previous wo
   assert.equal(plain.text, row.content_text);
 });
 
+test('selectText excludes CONFAZ title, ementa, history and editorial notes', () => {
+  const presentation = [
+    '<p class="TituloAcordo">CONVÊNIO ICMS 100/97</p>',
+    '<p class="Ementa">Reduz o ICMS de 7612.90.19.</p>',
+    '<p class="DataPublicao">Alterado pelo Convênio ICMS 52/91 e menciona 8701.90.00.</p>',
+    '<p class="Remisso">Nova redação pelo Convênio ICMS 79/25, NCM 3925.10.00.</p>',
+    '<p class="TextoAcordo">Cláusula primeira: produto 3102.10.90.</p>',
+    '<p class="RedaoAnt">Redação anterior: produto 1006.30.11.</p>',
+  ].join('');
+  const row = {
+    publication_version_id: 'v1',
+    content_text: 'CONVÊNIO ICMS 100/97 7612.90.19 8701.90.00 3925.10.00 3102.10.90 1006.30.11',
+    relevant_excerpt: null,
+    presentation_html: presentation,
+  };
+
+  const selected = selectText(row);
+  assert.equal(selected.currentWordingOnly, true);
+  assert.match(selected.text, /3102\.10\.90/);
+  assert.doesNotMatch(selected.text, /7612\.90\.19|8701\.90\.00|3925\.10\.00|1006\.30\.11|CONVÊNIO ICMS 100\/97/);
+  assert.deepEqual(
+    extractNcmCandidates(selected.text).map((candidate) => candidate.code),
+    ['31021090'],
+  );
+});
+
+test('selectText does not fall back to full content when every marked block is non-normative', () => {
+  const row = {
+    publication_version_id: 'v1',
+    content_text: 'histórico 8701.90.00',
+    relevant_excerpt: null,
+    presentation_html: '<p class="DataPublicao">Histórico 8701.90.00.</p>',
+  };
+  const selected = selectText(row);
+  assert.equal(selected.currentWordingOnly, true);
+  assert.equal(selected.text, '');
+  assert.deepEqual(extractNcmCandidates(selected.text), []);
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
