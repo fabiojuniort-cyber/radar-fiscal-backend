@@ -1,7 +1,7 @@
 import { sql, type Kysely, type RawBuilder, type Transaction } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
-import { currentWordingText } from '../../collection/legal-presentation.js';
+import { operativeLegalText } from '../../collection/legal-presentation.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
@@ -122,7 +122,7 @@ export function selectText(row: VersionForNcmScan): {
   if (content) {
     // Acts that keep previous wordings on the page (CONFAZ annexes in green,
     // "Redação anterior"): only the wording in force counts.
-    const current = currentWordingText(row.presentation_html);
+    const current = operativeLegalText(row.presentation_html);
     if (current !== undefined) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
     return { text: row.content_text!, sourceField: 'CONTENT_TEXT', currentWordingOnly: false };
   }
