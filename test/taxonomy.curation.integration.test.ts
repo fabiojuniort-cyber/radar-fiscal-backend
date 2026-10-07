@@ -18,9 +18,13 @@ import {
   loadProductSheet,
   parseProductSheet,
 } from '../src/modules/taxonomy/curation/curation.product-load.js';
-import { retireDimension } from '../src/modules/taxonomy/curation/curation.draft.js';
+import {
+  retireDimension,
+  withCuratorTransaction,
+} from '../src/modules/taxonomy/curation/curation.draft.js';
 import { mergeDimension } from '../src/modules/taxonomy/curation/curation.merge-dimension.js';
 import { findOpenDraft, loadReleaseView, pgRunner } from '../src/modules/taxonomy/curation/curation.read.js';
+import { updateDraftTaxonomyCodeCompatibility } from '../src/modules/taxonomy/taxonomy-code-compatibility.js';
 
 /**
  * TAX-11 end-to-end gate. Runs as a dedicated, final CI step: it commits a
@@ -694,6 +698,17 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       }
     }
 
+    await withCuratorTransaction(app.curatorPool!, async (client) => {
+      const open = await findOpenDraft(pgRunner(client));
+      assert.ok(open);
+      await updateDraftTaxonomyCodeCompatibility(client, open!.id, {
+        redirects: {
+          'treatment.presumed_credit': 'theme.presumed_credit',
+        },
+        retiredCodes: ['platform.sped', 'tax_species.tax'],
+      });
+    });
+
     const published = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/taxonomy/drafts/current/publish',
@@ -884,26 +899,6 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
 
       // TAX-12 compatibility: a profile saved with a Treatment-era code is
       // projected to the current Theme code and keeps its affinity.
-      await admin.query(
-        `UPDATE taxonomy_releases
-         SET manifest = jsonb_set(
-           COALESCE(manifest, '{}'::jsonb),
-           '{taxonomyCompatibility}',
-           $2::jsonb,
-           true
-         )
-         WHERE id = $1::uuid`,
-        [
-          tagView.release.id,
-          JSON.stringify({
-            version: 1,
-            redirects: {
-              'treatment.presumed_credit': 'theme.presumed_credit',
-            },
-            retiredCodes: ['platform.sped', 'tax_species.tax'],
-          }),
-        ],
-      );
       const legacyCompany = await admin.query<{ id: string }>(
         `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
          VALUES ($1::uuid, 'Perfil Legado TAX-12 Ltda.', $2) RETURNING id`,
