@@ -18,9 +18,13 @@ import {
   loadProductSheet,
   parseProductSheet,
 } from '../src/modules/taxonomy/curation/curation.product-load.js';
-import { retireDimension } from '../src/modules/taxonomy/curation/curation.draft.js';
+import {
+  retireDimension,
+  withCuratorTransaction,
+} from '../src/modules/taxonomy/curation/curation.draft.js';
 import { mergeDimension } from '../src/modules/taxonomy/curation/curation.merge-dimension.js';
 import { findOpenDraft, loadReleaseView, pgRunner } from '../src/modules/taxonomy/curation/curation.read.js';
+import { updateDraftTaxonomyCodeCompatibility } from '../src/modules/taxonomy/taxonomy-code-compatibility.js';
 
 /**
  * TAX-11 end-to-end gate. Runs as a dedicated, final CI step: it commits a
@@ -694,6 +698,17 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       }
     }
 
+    await withCuratorTransaction(app.curatorPool!, async (client) => {
+      const open = await findOpenDraft(pgRunner(client));
+      assert.ok(open);
+      await updateDraftTaxonomyCodeCompatibility(client, open!.id, {
+        redirects: {
+          'treatment.presumed_credit': 'theme.presumed_credit',
+        },
+        retiredCodes: ['platform.sped', 'tax_species.tax'],
+      });
+    });
+
     const published = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/taxonomy/drafts/current/publish',
@@ -881,6 +896,57 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       assert.equal(body.company.name, 'Agro Teste S.A.');
       assert.equal(body.level, 'HIGH');
       assert.deepEqual(body.matches.map((m: { code: string }) => m.code).sort(), ['product.urea', 'sector.agribusiness']);
+
+      // TAX-12 compatibility: a profile saved with a Treatment-era code is
+      // projected to the current Theme code and keeps its affinity.
+      const legacyCompany = await admin.query<{ id: string }>(
+        `INSERT INTO companies (tenant_id, legal_name, head_office_cnpj)
+         VALUES ($1::uuid, 'Perfil Legado TAX-12 Ltda.', $2) RETURNING id`,
+        [customer.tenantId, String(Date.now() + 10).padStart(14, '0').slice(-14)],
+      );
+      const legacyCompanyId = legacyCompany.rows[0]!.id;
+      await admin.query(
+        `INSERT INTO company_tax_profiles (
+           company_id, version_no, tax_regime, personalization, is_current
+         ) VALUES ($1::uuid, 1, 'LUCRO_REAL', $2::jsonb, true)`,
+        [
+          legacyCompanyId,
+          JSON.stringify({
+            taxonomy: {
+              releaseId: 'historical-release',
+              releaseVersion: 'v0.0.0',
+              conceptCodes: [
+                'treatment.presumed_credit',
+                'platform.sped',
+              ],
+            },
+          }),
+        ],
+      );
+      const legacyProfile = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${legacyCompanyId}/tax-profile`,
+        headers: customer.headers,
+      });
+      assert.equal(legacyProfile.statusCode, 200, legacyProfile.body);
+      assert.equal(legacyProfile.json().profile.personalization.taxonomy.releaseId, tagView.release.id);
+      assert.deepEqual(
+        legacyProfile.json().profile.personalization.taxonomy.conceptCodes,
+        ['theme.presumed_credit'],
+      );
+
+      const legacyAffinity = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${legacyCompanyId}/publications/${publicationId}/affinity`,
+        headers: customer.headers,
+      });
+      assert.equal(legacyAffinity.statusCode, 200, legacyAffinity.body);
+      assert.ok(
+        legacyAffinity.json().matches.some(
+          (match: { code: string }) => match.code === 'theme.presumed_credit',
+        ),
+        legacyAffinity.body,
+      );
 
       // Another tenant cannot read this company's affinity.
       const other = await app.inject({ method: 'GET', url: affinityUrl, headers: curator.headers });
