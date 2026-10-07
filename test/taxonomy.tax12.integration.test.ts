@@ -420,6 +420,15 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
       );
       assert.equal(again.steps.length, 0);
     });
+
+    await admin.query(
+      `UPDATE taxonomy_releases
+       SET status = 'WITHDRAWN', withdrawn_at = now(),
+           withdrawal_reason = 'TAX-12 integration completed',
+           withdrawn_by_actor = 'tax-12-test'
+       WHERE id = $1::uuid AND status = 'DRAFT'`,
+      [draft!.id],
+    );
   } finally {
     await app.close();
     await admin.end();
