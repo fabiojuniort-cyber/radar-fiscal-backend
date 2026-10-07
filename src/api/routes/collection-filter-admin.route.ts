@@ -201,7 +201,7 @@ export async function collectionFilterAdminRoutes(
       preHandler: requirePlatformAdmin,
       schema: {
         querystring: z.object({
-          status: z.enum(['OPEN', 'RESOLVED', 'IGNORED']).default('OPEN'),
+          status: z.enum(['OPEN', 'RESOLVED', 'MERGED']).default('OPEN'),
         }),
       },
     },
@@ -222,7 +222,8 @@ export async function collectionFilterAdminRoutes(
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({
-          status: z.enum(['RESOLVED', 'IGNORED']),
+          status: z.enum(['RESOLVED', 'MERGED']),
+          canonicalType: z.string().trim().min(1).max(300),
         }),
       },
     },
@@ -233,6 +234,7 @@ export async function collectionFilterAdminRoutes(
           request.auth!.userId,
           request.params.id,
           request.body.status,
+          request.body.canonicalType,
         ),
       ),
   );
