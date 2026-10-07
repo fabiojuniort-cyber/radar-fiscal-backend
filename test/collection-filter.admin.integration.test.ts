@@ -334,7 +334,7 @@ test(
       );
       assert.equal(
         prematureApproval.json().error,
-        'collection_filter_fresh_simulation_required',
+        'collection_filter_full_archive_simulation_required',
       );
 
       const simulatedPublicationId = randomUUID();
