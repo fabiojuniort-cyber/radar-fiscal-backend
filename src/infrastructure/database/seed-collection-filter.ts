@@ -288,9 +288,7 @@ try {
             next: 'FULL_ARCHIVE_SAMPLE_WOULD_BE_REQUESTED',
           }),
       );
-      return;
-    }
-
+    } else {
     const saved = await client.query<{
       policy_id: string;
       policy_version: number;
@@ -337,6 +335,7 @@ try {
             requested.rows[0]?.action ?? null,
         }),
     );
+    }
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
