@@ -6,6 +6,7 @@ ALTER TABLE collection_filter_simulations
   ADD COLUMN worker_id TEXT,
   ADD COLUMN started_at TIMESTAMPTZ,
   ADD COLUMN heartbeat_at TIMESTAMPTZ,
+  ADD COLUMN snapshot_at TIMESTAMPTZ,
   ADD COLUMN last_publication_id UUID,
   ADD COLUMN processed_count BIGINT NOT NULL DEFAULT 0
     CHECK (processed_count >= 0);
@@ -38,7 +39,7 @@ DECLARE
   v_policy public.collection_filter_policies%ROWTYPE;
   v_document JSONB;
 BEGIN
-  IF NOT pg_catalog.pg_has_role(current_user, 'radar_worker', 'MEMBER') THEN
+  IF NOT pg_catalog.pg_has_role(session_user, 'radar_worker', 'MEMBER') THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='collection_filter_worker_required';
   END IF;
   IF v_worker IS NULL OR v_worker='' OR length(v_worker) > 200 THEN
@@ -96,6 +97,7 @@ BEGIN
            worker_id=v_worker,
            started_at=COALESCE(s.started_at,now()),
            heartbeat_at=now(),
+           snapshot_at=COALESCE(s.snapshot_at,now()),
            error_code=NULL
      WHERE s.id=v_sim.id
      RETURNING * INTO v_sim;
@@ -116,8 +118,10 @@ BEGIN
     END IF;
 
     UPDATE public.collection_filter_simulations s
-       SET heartbeat_at=now()
-     WHERE s.id=v_sim.id;
+       SET heartbeat_at=now(),
+           snapshot_at=COALESCE(s.snapshot_at,now())
+     WHERE s.id=v_sim.id
+     RETURNING * INTO v_sim;
   END IF;
 
   SELECT jsonb_build_object(
@@ -196,6 +200,7 @@ RETURNS TABLE (
   body TEXT,
   evidence_complete BOOLEAN,
   material_attachments_unexamined BOOLEAN,
+  type_conflict BOOLEAN,
   provenance_conflict BOOLEAN,
   origins JSONB
 )
@@ -207,7 +212,7 @@ DECLARE
   v_sim public.collection_filter_simulations%ROWTYPE;
   v_limit INTEGER;
 BEGIN
-  IF NOT pg_catalog.pg_has_role(current_user, 'radar_worker', 'MEMBER') THEN
+  IF NOT pg_catalog.pg_has_role(session_user, 'radar_worker', 'MEMBER') THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='collection_filter_worker_required';
   END IF;
   v_limit := LEAST(GREATEST(COALESCE(p_limit,500),1),1000);
@@ -231,6 +236,7 @@ BEGIN
       p.primary_official_url,
       p.act_type,
       p.last_seen_at,
+      pv.id AS publication_version_id,
       pv.content_text,
       pv.relevant_excerpt,
       pv.source_metadata,
@@ -247,21 +253,58 @@ BEGIN
         COALESCE(po.metadata->'dou'->>'section','')
       )) FILTER (
         WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
-      ) AS eligible_origin_shapes
+      ) AS eligible_origin_shapes,
+      bool_or(
+        src.code='dou'
+        AND NULLIF(btrim(po.metadata->'dou'->>'sourceActType'),'') IS NOT NULL
+        AND lower(btrim(po.metadata->'dou'->>'sourceActType'))
+            IS DISTINCT FROM lower(btrim(COALESCE(p.act_type,'')))
+      ) FILTER (
+        WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
+      ) AS origin_type_conflict,
+      bool_or(
+        COALESCE((po.metadata->'dou'->>'scopeStructureIncomplete')::boolean,false)
+        OR po.metadata->'dou' ? 'titleFallback'
+      ) FILTER (
+        WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
+      ) AS origin_structure_incomplete,
+      bool_or(
+        EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(po.metadata->'files','[]'::jsonb)) ofile
+          WHERE ofile->'metadata'->>'kind'='ATTACHMENT'
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(po.metadata->'dou'->'parts','[]'::jsonb)) opart
+          WHERE opart->>'hasHighlightImage'='true'
+        )
+      ) FILTER (
+        WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
+      ) AS origin_material_unexamined
     FROM public.publications p
-    JOIN public.publication_origins po ON po.publication_id=p.id
+    JOIN public.publication_origins po
+      ON po.publication_id=p.id
+     AND po.first_seen_at <= v_sim.snapshot_at
     JOIN public.sources src ON src.id=po.source_id
-    LEFT JOIN public.publication_versions pv
-      ON pv.publication_id=p.id AND pv.is_current
+    LEFT JOIN LATERAL (
+      SELECT pv0.id,pv0.content_text,pv0.relevant_excerpt,pv0.source_metadata
+      FROM public.publication_versions pv0
+      WHERE pv0.publication_id=p.id
+        AND pv0.captured_at <= v_sim.snapshot_at
+      ORDER BY pv0.captured_at DESC,pv0.version_no DESC
+      LIMIT 1
+    ) pv ON true
     WHERE NOT p.is_hidden
+      AND p.created_at <= v_sim.snapshot_at
       AND (p_after_id IS NULL OR p.id > p_after_id)
       AND (
         v_sim.scope='FULL_ARCHIVE'
-        OR p.last_seen_at >= now() - interval '30 days'
+        OR p.last_seen_at >= v_sim.snapshot_at - interval '30 days'
       )
     GROUP BY
       p.id,p.title,p.published_on,p.primary_official_url,p.act_type,p.last_seen_at,
-      pv.content_text,pv.relevant_excerpt,pv.source_metadata
+      pv.id,pv.content_text,pv.relevant_excerpt,pv.source_metadata
     HAVING count(*) FILTER (
       WHERE src.code NOT IN ('doe-sp','doe-sp-legado')
     ) > 0
@@ -276,12 +319,39 @@ BEGIN
     e.act_type,
     e.relevant_excerpt,
     e.content_text,
-    (e.content_text IS NOT NULL AND btrim(e.content_text)<>'') AS evidence_complete,
-    EXISTS (
-      SELECT 1
-      FROM jsonb_array_elements(COALESCE(e.source_metadata->'files','[]'::jsonb)) f
-      WHERE f->'metadata'->>'kind'='ATTACHMENT'
+    (
+      e.content_text IS NOT NULL
+      AND btrim(e.content_text)<>''
+      AND NOT COALESCE(e.origin_structure_incomplete,false)
+      AND NOT COALESCE((e.source_metadata->'dou'->>'scopeStructureIncomplete')::boolean,false)
+      AND NOT (COALESCE(e.source_metadata->'dou','{}'::jsonb) ? 'titleFallback')
+    ) AS evidence_complete,
+    (
+      COALESCE(e.origin_material_unexamined,false)
+      OR EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(e.source_metadata->'files','[]'::jsonb)) f
+        WHERE f->'metadata'->>'kind'='ATTACHMENT'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(e.source_metadata->'dou'->'parts','[]'::jsonb)) part
+        WHERE part->>'hasHighlightImage'='true'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.publication_files pf
+        WHERE pf.publication_version_id=e.publication_version_id
+      )
     ) AS material_attachments_unexamined,
+    (
+      COALESCE(e.origin_type_conflict,false)
+      OR (
+        NULLIF(btrim(e.source_metadata->'dou'->>'sourceActType'),'') IS NOT NULL
+        AND lower(btrim(e.source_metadata->'dou'->>'sourceActType'))
+            IS DISTINCT FROM lower(btrim(COALESCE(e.act_type,'')))
+      )
+    ) AS type_conflict,
     e.eligible_origin_shapes > 1 AS provenance_conflict,
     COALESCE(e.eligible_origins,'[]'::jsonb)
   FROM eligible e
@@ -304,7 +374,7 @@ AS $$
 DECLARE
   v_count INTEGER;
 BEGIN
-  IF NOT pg_catalog.pg_has_role(current_user, 'radar_worker', 'MEMBER') THEN
+  IF NOT pg_catalog.pg_has_role(session_user, 'radar_worker', 'MEMBER') THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='collection_filter_worker_required';
   END IF;
 
@@ -392,7 +462,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  IF NOT pg_catalog.pg_has_role(current_user, 'radar_worker', 'MEMBER') THEN
+  IF NOT pg_catalog.pg_has_role(session_user, 'radar_worker', 'MEMBER') THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='collection_filter_worker_required';
   END IF;
 
@@ -422,7 +492,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  IF NOT pg_catalog.pg_has_role(current_user, 'radar_worker', 'MEMBER') THEN
+  IF NOT pg_catalog.pg_has_role(session_user, 'radar_worker', 'MEMBER') THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='collection_filter_worker_required';
   END IF;
 
