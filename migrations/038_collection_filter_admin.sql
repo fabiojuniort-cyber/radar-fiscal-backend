@@ -19,7 +19,8 @@ CREATE TABLE collection_filter_new_types (
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   sample_publication_ids UUID[] NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'OPEN'
-    CHECK (status IN ('OPEN','RESOLVED','IGNORED')),
+    CHECK (status IN ('OPEN','RESOLVED','MERGED')),
+  resolved_canonical_type TEXT,
   resolved_at TIMESTAMPTZ,
   resolved_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
   UNIQUE (source_code, section, normalized_type)
@@ -164,7 +165,8 @@ GRANT EXECUTE ON FUNCTION collection_filter_save_draft(JSONB) TO radar_app;
 
 CREATE OR REPLACE FUNCTION collection_filter_resolve_new_type(
   p_id UUID,
-  p_status TEXT
+  p_status TEXT,
+  p_canonical_type TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -176,11 +178,17 @@ BEGIN
   IF v_actor IS NULL OR NOT public.app_user_is_platform_admin() THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='platform_admin_required';
   END IF;
-  IF p_status NOT IN ('RESOLVED','IGNORED') THEN
+  IF p_status NOT IN ('RESOLVED','MERGED') THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='invalid_new_type_status';
   END IF;
+  IF p_canonical_type IS NULL OR btrim(p_canonical_type) = '' THEN
+    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='canonical_type_required';
+  END IF;
   UPDATE public.collection_filter_new_types
-  SET status=p_status,resolved_at=now(),resolved_by=v_actor
+  SET status=p_status,
+      resolved_canonical_type=btrim(p_canonical_type),
+      resolved_at=now(),
+      resolved_by=v_actor
   WHERE id=p_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='new_type_not_found';
@@ -188,5 +196,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION collection_filter_resolve_new_type(UUID,TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION collection_filter_resolve_new_type(UUID,TEXT) TO radar_app;
+REVOKE ALL ON FUNCTION collection_filter_resolve_new_type(UUID,TEXT,TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION collection_filter_resolve_new_type(UUID,TEXT,TEXT) TO radar_app;
