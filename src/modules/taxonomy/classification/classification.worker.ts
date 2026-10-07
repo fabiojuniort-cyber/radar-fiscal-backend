@@ -1,7 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
-import { currentWordingText } from '../../collection/legal-presentation.js';
+import { operativeLegalText } from '../../collection/legal-presentation.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
@@ -107,7 +107,7 @@ export async function loadClassificationConcepts(
 
 /** The wording in force: previous wordings kept on the page do not classify the act. */
 function classificationText(row: PendingVersion): string | null {
-  if (row.content_text?.trim()) return currentWordingText(row.presentation_html) ?? row.content_text;
+  if (row.content_text?.trim()) return operativeLegalText(row.presentation_html) ?? row.content_text;
   return row.relevant_excerpt;
 }
 

@@ -82,7 +82,7 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   // A single kind of synonym: every synonym classifies, whatever its stored type.
   assert.equal(byCode.get('tax.cofins')!.matchedTerm, 'NF-e');
   assert.equal(byCode.get('theme.presumed_credit')!.reasonCode, 'CANONICAL_LABEL');
-  assert.match(byCode.get('theme.presumed_credit')!.excerpt, /Crédito Presumido/);
+  assert.match(byCode.get('theme.presumed_credit')!.excerpt, /crédito presumido/i);
   assert.match(byCode.get('product.urea')!.excerpt, /UREIA/);
   assert.equal(byCode.get('tax.iss')!.reasonCode, 'ABBREVIATION_ALIAS');
   assert.equal(byCode.get('tax.iss')!.matchedTerm, 'ISSQN');
@@ -90,7 +90,7 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.equal(byCode.get('product.rice')!.matchedTerm, '10063011');
   assert.equal(byCode.get('treatment.rate_reduction')!.reasonCode, 'OFFICIAL_CODE_CCLASSTRIB');
   assert.equal(byCode.get('treatment.rate_reduction')!.matchedTerm, '200034');
-  assert.equal(plan.engineVersion, '2.2.0');
+  assert.equal(plan.engineVersion, '2.3.0');
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
 });
 
@@ -366,7 +366,7 @@ test('release diff reports added, removed and changed concepts and groups', () =
   assert.deepEqual(diff.addedGroups, ['document/mercadorias']);
 });
 
-test('engine 2.2.0: Roman-numeral terms ignore item numbering; matching ignores case and accents', () => {
+test('engine 2.3.0: Roman-numeral terms ignore item numbering; matching ignores case and accents', () => {
   const concepts = [
     { releaseConceptId: 'rc-ii', code: 'tax.ii', label: 'II', classifyByLabel: true, aliases: [], ncmPrefixes: [], cclasstribCodes: [] },
     { releaseConceptId: 'rc-ipi', code: 'tax.ipi', label: 'IPI', classifyByLabel: true, aliases: [], ncmPrefixes: [], cclasstribCodes: [] },

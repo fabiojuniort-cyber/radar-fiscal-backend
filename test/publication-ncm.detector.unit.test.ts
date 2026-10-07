@@ -67,8 +67,14 @@ test('selectText reads only the wording in force when the page marks previous wo
     extractNcmCandidates(selected.text).map((candidate) => candidate.code),
     ['39173290', '39251000'],
   );
-  // Without previous-wording marks the stored content text is kept.
-  const plain = selectText({ ...row, presentation_html: '<p class="TextoAcordo">8701.90.00</p>' });
+  // Structured CONFAZ pages always use the operative legal body, even when
+  // they contain no previous-wording marker.
+  const structured = selectText({ ...row, presentation_html: '<p class="TextoAcordo">8701.90.00</p>' });
+  assert.equal(structured.currentWordingOnly, true);
+  assert.equal(structured.text, '8701.90.00');
+
+  // Unstructured sources keep the legacy fallback to stored content text.
+  const plain = selectText({ ...row, presentation_html: '<p>8701.90.00</p>' });
   assert.equal(plain.currentWordingOnly, false);
   assert.equal(plain.text, row.content_text);
 });
