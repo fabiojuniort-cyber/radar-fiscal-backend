@@ -6,6 +6,10 @@ import {
   type CollectionFilterMode,
 } from '../../modules/collection/collection-filter.engine.js';
 import {
+  initialCollectionFilterMode,
+  initialCollectionFilterTerms,
+} from '../../modules/collection/collection-filter.initial-policy.js';
+import {
   serializeCollectionFilterDraft,
   type CollectionFilterDraftInput,
 } from '../../modules/collection/collection-filter.admin.js';
@@ -36,69 +40,6 @@ const dryRun = process.argv.includes('--dry-run');
 const replaceExistingDraft = process.argv.includes(
   '--replace-existing-draft',
 );
-
-const TAX_SOURCES = new Set([
-  'confaz',
-  'rfb-normas',
-  'cgibs',
-  'nfe-encat',
-  'sped',
-]);
-
-const STRONG_TERMS = [
-  'ICMS',
-  'ISS',
-  'ISSQN',
-  'IBS',
-  'CBS',
-  'PIS',
-  'COFINS',
-  'IPI',
-  'SUBSTITUICAO TRIBUTARIA',
-  'CREDITO PRESUMIDO',
-  'DIFERIMENTO',
-  'ISENCAO',
-  'REDUCAO DE BASE',
-  'NF-E',
-  'NFS-E',
-  'CT-E',
-  'MDF-E',
-  'EFD',
-  'SPED',
-  'NCM',
-  'CONVENIO ICMS',
-  'AJUSTE SINIEF',
-] as const;
-
-const WEAK_TERMS = [
-  'TRIBUTARIO',
-  'TRIBUTARIA',
-  'FISCAL',
-  'ALIQUOTA',
-  'CREDITO',
-  'BENEFICIO FISCAL',
-  'PRODUTOR RURAL',
-  'AGRONEGOCIO',
-  'FERTILIZANTE',
-  'DEFENSIVO',
-] as const;
-
-const NEGATIVE_TERMS = [
-  'REGULARIDADE FISCAL',
-  'CERTIDAO NEGATIVA',
-] as const;
-
-function modeFor(
-  sourceCode: string,
-  canonicalType: string,
-): CollectionFilterMode {
-  if (TAX_SOURCES.has(sourceCode)) return 'KEEP_ALWAYS';
-  if (sourceCode !== 'dou') return 'KEEP_ALWAYS';
-  if (canonicalType === 'EXTRATO DE CONTRATO') {
-    return 'EXCLUDE_UNLESS_STRONG';
-  }
-  return 'KEEP_IF_TAX_TERM';
-}
 
 function maskEmail(value: string): string {
   const [local = '', domain = ''] = value.split('@');
@@ -217,28 +158,12 @@ try {
           sourceCode,
           section,
           canonicalType,
-          mode: modeFor(sourceCode, canonicalType),
+          mode: initialCollectionFilterMode(sourceCode, canonicalType),
         });
       }
     }
 
-    const terms: CollectionFilterDraftInput['terms'] = [
-      ...STRONG_TERMS.map((text) => ({
-        text,
-        strength: 'STRONG' as const,
-        locationScope: 'ANY' as const,
-      })),
-      ...WEAK_TERMS.map((text) => ({
-        text,
-        strength: 'WEAK' as const,
-        locationScope: 'ANY' as const,
-      })),
-      ...NEGATIVE_TERMS.map((text) => ({
-        text,
-        strength: 'NEGATIVE' as const,
-        locationScope: 'ANY' as const,
-      })),
-    ];
+    const terms = initialCollectionFilterTerms();
 
     const document: CollectionFilterDraftInput = {
       contextWindowWords: 12,
