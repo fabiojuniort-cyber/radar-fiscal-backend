@@ -173,9 +173,9 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
 export function planCuratedClassification(
   input: CuratedClassificationInput,
 ): CuratedClassificationPlan {
-  const raw = [input.title.trim(), input.contentText?.trim() ?? '']
-    .filter(Boolean)
-    .join('\n');
+  // Taxonomy evidence must come from the legal body, never from the
+  // publication/base-legal title shown by the portal.
+  const raw = input.contentText?.trim() ?? '';
   const normalized = normalizeWithIndex(raw);
   const ncmCodes = [...new Set(input.ncmCodes)].sort();
   const cclasstrib = extractCclasstribCodes(raw);
@@ -251,8 +251,9 @@ export function planCuratedClassification(
   }
 
   const configSnapshot = {
-    policyVersion: 2,
+    policyVersion: 3,
     engine: CURATED_ENGINE_KEY,
+    textScope: 'OPERATIVE_LEGAL_BODY_ONLY',
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
     autoAliasTypes: 'ALL',
     officialCodes: ['NCM_PREFIX_ON_DETECTED_MENTIONS', 'CCLASSTRIB_CITED'],
