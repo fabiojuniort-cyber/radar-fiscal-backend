@@ -209,6 +209,7 @@ DECLARE
   v_actor UUID := public.app_current_user_id();
   v_policy public.collection_filter_policies%ROWTYPE;
   v_simulation public.collection_filter_simulations%ROWTYPE;
+  v_first_publication BOOLEAN;
 BEGIN
   IF v_actor IS NULL OR NOT public.app_user_is_platform_admin() THEN
     RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='platform_admin_required';
@@ -227,15 +228,35 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='collection_filter_draft_not_found';
   END IF;
 
+  SELECT NOT EXISTS (
+    SELECT 1
+    FROM public.collection_filter_policies previous
+    WHERE previous.id <> v_policy.id
+      AND previous.status IN ('APPROVED','SUPERSEDED')
+  ) INTO v_first_publication;
+
   SELECT * INTO v_simulation
   FROM public.collection_filter_simulations
   WHERE policy_id=v_policy.id
     AND policy_revision=v_policy.revision
     AND status='COMPLETED'
+    AND (NOT v_first_publication OR scope='FULL_ARCHIVE')
   ORDER BY completed_at DESC NULLS LAST, created_at DESC
   LIMIT 1;
 
   IF NOT FOUND THEN
+    IF v_first_publication AND EXISTS (
+      SELECT 1
+      FROM public.collection_filter_simulations s
+      WHERE s.policy_id=v_policy.id
+        AND s.policy_revision=v_policy.revision
+        AND s.status='COMPLETED'
+        AND s.scope <> 'FULL_ARCHIVE'
+    ) THEN
+      RAISE EXCEPTION USING
+        ERRCODE='P0001',
+        MESSAGE='collection_filter_full_archive_simulation_required';
+    END IF;
     RAISE EXCEPTION USING
       ERRCODE='P0001',
       MESSAGE='collection_filter_fresh_simulation_required';
