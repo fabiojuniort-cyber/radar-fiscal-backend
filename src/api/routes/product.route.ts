@@ -2249,7 +2249,7 @@ export async function productRoutes(
         const regimeCodes = company.profile?.tax_regime === 'SIMPLES_NACIONAL' ? ['regime.simples_nacional'] : [];
         // The company's own CNAE activities match the act's CNAE activity tags.
         const cnaeActivityCodes = company.cnaeSuggestions.flatMap((cnae) => cnae.activityCodes ?? []);
-        const profileCodes = [
+        const rawProfileCodes = [
           ...new Set([
             ...(Array.isArray(taxonomy?.conceptCodes)
               ? taxonomy.conceptCodes.filter((code): code is string => typeof code === 'string')
@@ -2268,6 +2268,12 @@ export async function productRoutes(
         if (view.status === 'NOT_FOUND') {
           return reply.status(404).send({ error: 'publication_not_found' });
         }
+        const compatibility = view.release
+          ? await loadTaxonomyCodeCompatibility(kyselyRunner(app.db), view.release.id)
+          : null;
+        const profileCodes = compatibility
+          ? canonicalizeTaxonomyConceptCodes(rawProfileCodes, compatibility)
+          : rawProfileCodes;
 
         const personalization = recordValue(company.profile?.personalization);
         const profileNcms = [
