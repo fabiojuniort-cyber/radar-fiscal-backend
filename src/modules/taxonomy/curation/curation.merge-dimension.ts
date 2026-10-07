@@ -231,6 +231,13 @@ export function planDimensionMergeCompatibility(
   );
   for (const step of steps) finalActiveTargets.add(step.into);
 
+  // Historical sources may only redirect to targets that are actually active
+  // after this merge. A RETIRED Theme with a matching suffix must not consume
+  // the search and prevent label fallback to a different active Theme.
+  const activeTargets = targets.filter((concept) =>
+    finalActiveTargets.has(concept.code),
+  );
+
   const stepBySource = new Map(steps.map((step) => [step.from, step]));
   const redirects: Record<string, string> = {};
   const retiredCodes: string[] = [];
@@ -242,8 +249,8 @@ export function planDimensionMergeCompatibility(
       continue;
     }
 
-    const target = matchingTarget(source, targets);
-    if (target && finalActiveTargets.has(target.code)) {
+    const target = matchingTarget(source, activeTargets);
+    if (target) {
       redirects[source.code] = target.code;
     } else {
       retiredCodes.push(source.code);
@@ -387,8 +394,14 @@ export async function mergeDimension(
        LIMIT 1
      ) latest ON true
      WHERE d.code = $1
+       AND NOT EXISTS (
+         SELECT 1
+         FROM taxonomy_release_concepts rc
+         WHERE rc.release_id = $2::uuid
+           AND rc.concept_id = c.id
+       )
      ORDER BY c.code`,
-    [from],
+    [from, draft.id],
   );
   // Existing redirects are already semantically resolved and can be
   // preserved. Existing retiredCodes are different: they may be stale if a
