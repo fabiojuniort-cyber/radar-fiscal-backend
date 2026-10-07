@@ -1025,6 +1025,20 @@ export async function retireDimension(
     [draft.id, current.dimension_id],
   );
   const conceptIds = concepts.rows.map((row) => row.release_concept_id);
+  // Compatibility must cover the full historical identity space of a retired
+  // dimension, not only concepts still materialized in the current draft.
+  // Old monitoring/company profiles can legitimately contain codes whose
+  // taxonomy_concepts identity survived after its release membership vanished.
+  const historicalConcepts = await client.query<{ code: string }>(
+    `
+      SELECT c.code
+      FROM taxonomy_concepts c
+      WHERE c.dimension_id = $1::uuid
+      ORDER BY c.code
+    `,
+    [current.dimension_id],
+  );
+  const historicalCodes = historicalConcepts.rows.map((row) => row.code);
 
   if (conceptIds.length > 0) {
     const evidence = await client.query<{ relation_evidence: number; mapping_evidence: number }>(
@@ -1138,7 +1152,7 @@ export async function retireDimension(
 
   if (options.recordRetiredCodes !== false) {
     await updateDraftTaxonomyCodeCompatibility(client, draft.id, {
-      retiredCodes: concepts.rows.map((row) => row.code),
+      retiredCodes: historicalCodes,
     });
   }
 
@@ -2283,6 +2297,47 @@ export async function validateReleaseView(
     );
     const compatibility = parseTaxonomyCodeCompatibility(manifestRow.rows[0]?.manifest);
     const includedCodes = new Set(included.map((concept) => concept.code));
+
+    // TAX-12 removes these dimensions from the current taxonomy. Every
+    // historical identity under them must therefore be explicitly closed by
+    // either a redirect or retiredCodes, even when that identity has no
+    // taxonomy_release_concepts membership in the current draft.
+    const historicalCompatibility = await client.query<{
+      dimension_code: string;
+      code: string;
+    }>(
+      `
+        SELECT d.code AS dimension_code, c.code
+        FROM taxonomy_release_dimensions rd
+        JOIN taxonomy_dimensions d ON d.id = rd.dimension_id
+        JOIN taxonomy_concepts c ON c.dimension_id = rd.dimension_id
+        WHERE rd.release_id = $1::uuid
+          AND rd.membership_status <> 'INCLUDED'
+          AND d.code = ANY($2::text[])
+        ORDER BY d.code, c.code
+      `,
+      [releaseId, ['treatment', 'platform', 'tax_species']],
+    );
+    const redirectedCodes = new Set(Object.keys(compatibility.redirects));
+    const retiredCompatibilityCodes = new Set(compatibility.retiredCodes);
+    const uncoveredHistoricalCodes = historicalCompatibility.rows.filter(
+      (row) =>
+        !redirectedCodes.has(row.code) &&
+        !retiredCompatibilityCodes.has(row.code),
+    );
+    if (uncoveredHistoricalCodes.length > 0) {
+      issues.push({
+        severity: 'BLOCKER',
+        code: 'INCOMPLETE_RETIRED_DIMENSION_COMPATIBILITY',
+        message:
+          'Compatibilidade histórica incompleta para dimensão(ões) retirada(s): ' +
+          uncoveredHistoricalCodes
+            .map((row) => `${row.dimension_code}:${row.code}`)
+            .join(', ') +
+          '.',
+      });
+    }
+
     try {
       for (const [from, directTarget] of Object.entries(compatibility.redirects)) {
         const target = resolveTaxonomyConceptCode(from, compatibility);
