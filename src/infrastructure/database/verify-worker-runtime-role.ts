@@ -240,6 +240,69 @@ async function run(): Promise<void> {
       );
     }
 
+    const collectionFilterPrivileges = await pool.query<{
+      can_update_simulation: boolean;
+      can_insert_item: boolean;
+      can_claim: boolean;
+      can_batch: boolean;
+      can_record: boolean;
+      can_finish: boolean;
+      can_fail: boolean;
+    }>(`
+      SELECT
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_simulations',
+          'UPDATE'
+        ) AS can_update_simulation,
+        has_table_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_simulation_items',
+          'INSERT'
+        ) AS can_insert_item,
+        has_function_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_claim_simulation(text)',
+          'EXECUTE'
+        ) AS can_claim,
+        has_function_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_simulation_batch(uuid,text,uuid,integer)',
+          'EXECUTE'
+        ) AS can_batch,
+        has_function_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_record_simulation_batch(uuid,text,uuid,jsonb,jsonb)',
+          'EXECUTE'
+        ) AS can_record,
+        has_function_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_finish_simulation(uuid,text,jsonb)',
+          'EXECUTE'
+        ) AS can_finish,
+        has_function_privilege(
+          'radar_worker_runtime',
+          'public.collection_filter_fail_simulation(uuid,text,text)',
+          'EXECUTE'
+        ) AS can_fail
+    `);
+
+    const filterPrivilege = collectionFilterPrivileges.rows[0];
+    if (
+      !filterPrivilege ||
+      filterPrivilege.can_update_simulation ||
+      filterPrivilege.can_insert_item ||
+      !filterPrivilege.can_claim ||
+      !filterPrivilege.can_batch ||
+      !filterPrivilege.can_record ||
+      !filterPrivilege.can_finish ||
+      !filterPrivilege.can_fail
+    ) {
+      throw new Error(
+        'Worker collection-filter simulation privileges do not match least-privilege policy.',
+      );
+    }
+
     const taxonomyPrivileges = await pool.query<{
       table_name: string;
       can_select: boolean;
