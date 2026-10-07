@@ -58,9 +58,32 @@ function serializableDraft(input: CollectionFilterDraftInput) {
     contextWindowWords: input.contextWindowWords,
     weakScoreThreshold: input.weakScoreThreshold,
     locationWeights: input.locationWeights,
-    rules: input.rules,
-    aliases: input.aliases,
-    terms: input.terms,
+    rules: input.rules.map((rule) => ({
+      sourceCode: rule.sourceCode,
+      canonicalType: rule.canonicalType,
+      mode: rule.mode,
+      ...(rule.section !== undefined ? { section: rule.section } : {}),
+    })),
+    aliases: input.aliases.map((alias) => ({
+      sourceCode: alias.sourceCode,
+      alias: alias.alias,
+      canonicalType: alias.canonicalType,
+      ...(alias.section !== undefined ? { section: alias.section } : {}),
+    })),
+    terms: input.terms.map((term) => ({
+      text: term.text,
+      strength: term.strength,
+      ...(term.sourceCode !== undefined
+        ? { sourceCode: term.sourceCode }
+        : {}),
+      ...(term.section !== undefined ? { section: term.section } : {}),
+      ...(term.canonicalType !== undefined
+        ? { canonicalType: term.canonicalType }
+        : {}),
+      ...(term.locationScope !== undefined
+        ? { locationScope: term.locationScope }
+        : {}),
+    })),
   });
 
   return {
