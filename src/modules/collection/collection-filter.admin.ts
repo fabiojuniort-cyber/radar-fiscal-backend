@@ -187,9 +187,34 @@ export async function readCollectionFilterAdminState(
         changeNotes: policy.change_notes,
         createdAt: policy.created_at,
         approvedAt: policy.approved_at,
-        rules: rules.rows.filter((row:any) => row.policy_id === policy.id),
-        aliases: aliases.rows.filter((row:any) => row.policy_id === policy.id),
-        terms: terms.rows.filter((row:any) => row.policy_id === policy.id),
+        rules: rules.rows
+          .filter((row:any) => row.policy_id === policy.id)
+          .map((row:any) => ({
+            sourceCode: row.source_code,
+            section: row.section,
+            canonicalType: row.canonical_type,
+            mode: row.mode,
+            helpText: row.help_text,
+          })),
+        aliases: aliases.rows
+          .filter((row:any) => row.policy_id === policy.id)
+          .map((row:any) => ({
+            sourceCode: row.source_code,
+            section: row.section,
+            alias: row.normalized_alias,
+            canonicalType: row.canonical_type,
+          })),
+        terms: terms.rows
+          .filter((row:any) => row.policy_id === policy.id)
+          .map((row:any) => ({
+            text: row.term_text,
+            normalizedTerm: row.normalized_term,
+            strength: row.strength,
+            sourceCode: row.source_code,
+            section: row.section,
+            canonicalType: row.canonical_type,
+            locationScope: row.location_scope,
+          })),
       };
     }
 
@@ -407,4 +432,57 @@ export function collectionFilterAdminErrorCode(
     'invalid_new_type_status',
   ]);
   return known.has(error.message) ? error.message : null;
+}
+
+
+export async function requestCollectionFilterSimulation(
+  db: Kysely<DB>,
+  userId: string,
+  policyId: string,
+  scope: 'FULL_ARCHIVE' | 'RECENT',
+  reviewMode: 'ALL' | 'SAMPLE' | 'NONE',
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const result = await sql<{
+      simulation_id: string;
+      policy_revision: number;
+      action: string;
+    }>`SELECT * FROM collection_filter_request_simulation(
+      ${policyId}::uuid,
+      ${scope},
+      ${reviewMode}
+    )`.execute(trx);
+    const row = result.rows[0];
+    if (!row) throw new Error('collection_filter_simulation_request_failed');
+    return {
+      simulationId: row.simulation_id,
+      policyRevision: Number(row.policy_revision),
+      action: row.action,
+    };
+  });
+}
+
+export async function approveCollectionFilterDraft(
+  db: Kysely<DB>,
+  userId: string,
+  policyId: string,
+) {
+  return withUserContext(db, userId, async (trx) => {
+    const result = await sql<{
+      policy_id: string;
+      policy_version: number;
+      policy_revision: number;
+      simulation_id: string;
+    }>`SELECT * FROM collection_filter_approve_draft(
+      ${policyId}::uuid
+    )`.execute(trx);
+    const row = result.rows[0];
+    if (!row) throw new Error('collection_filter_approval_failed');
+    return {
+      policyId: row.policy_id,
+      version: Number(row.policy_version),
+      revision: Number(row.policy_revision),
+      simulationId: row.simulation_id,
+    };
+  });
 }
