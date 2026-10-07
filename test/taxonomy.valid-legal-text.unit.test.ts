@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  currentWordingText,
+  operativeLegalText,
   sanitizeLegalPresentationHtml,
 } from '../src/modules/collection/legal-presentation.js';
 import {
@@ -44,7 +44,7 @@ test('structured CONFAZ text keeps only the operative legal body', () => {
   );
 
   assert.ok(html);
-  const current = currentWordingText(html);
+  const current = operativeLegalText(html);
   assert.ok(current);
   assert.match(current, /ICMS para fertilizantes/);
   assert.match(current, /7312\.00\.00/);
