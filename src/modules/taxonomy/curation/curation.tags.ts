@@ -69,7 +69,18 @@ export interface PublicationTagSection {
   tags: PublicationTag[];
 }
 
+/** Historical SUCCESS is evidence of a past scan, NOT proof of current
+ * legal validity. Never use it to create current tags or highlights. */
+export interface HistoricalClassificationSummary {
+  releaseVersion: string;
+  engineVersion: string;
+  scannedAt: string;
+  assertionCount: number;
+  revalidationRequired: true;
+}
+
 export interface PublicationTaxonomyView {
+  historicalClassification?: HistoricalClassificationSummary | null;
   publicationId: string;
   publicationVersionId: string | null;
   release: ReleaseSummary | null;
@@ -178,6 +189,47 @@ export async function loadPublicationTaxonomy(
     )
   )[0];
 
+  // B5: surface historical work without presenting stale assertions as
+  // current, valid taxonomy tags. Do NOT feed these rows to 'automatic'.
+  const historicalRow = scan?.status === 'SUCCESS' ? undefined : (
+    await run<{
+      release_version: string;
+      engine_version: string;
+      scanned_at: Date | string;
+      assertion_count: number;
+    }>(
+      `
+        SELECT r.version AS release_version,
+               s.engine_version,
+               s.scanned_at,
+               s.assertion_count
+        FROM publication_taxonomy_scans s
+        JOIN taxonomy_releases r ON r.id = s.taxonomy_release_id
+        WHERE s.publication_version_id = $1::uuid
+          AND s.status = 'SUCCESS'
+          AND r.status IN ('PUBLISHED', 'WITHDRAWN')
+          AND NOT (
+            s.taxonomy_release_id = $2::uuid
+            AND s.engine_key = $3
+            AND s.engine_version = $4
+          )
+        ORDER BY s.scanned_at DESC, s.id DESC
+        LIMIT 1
+      `,
+      [current.id, release.id, CURATED_ENGINE_KEY, CURATED_ENGINE_VERSION],
+    )
+  )[0];
+  const historicalClassification: HistoricalClassificationSummary | null =
+    historicalRow
+      ? {
+        releaseVersion: historicalRow.release_version,
+        engineVersion: historicalRow.engine_version,
+        scannedAt: new Date(historicalRow.scanned_at).toISOString(),
+        assertionCount: historicalRow.assertion_count,
+        revalidationRequired: true,
+      }
+      : null;
+
   const automatic = scan?.run_id
     ? await run<AutomaticRow>(
         `
@@ -238,7 +290,7 @@ export async function loadPublicationTaxonomy(
   else status = 'PENDING';
 
   const view = await loadReleaseView(run, release.id);
-  if (!view) return { ...base, status };
+  if (!view) return { ...base, status, historicalClassification };
 
   const conceptById = new Map(
     view.concepts.map((concept) => [concept.releaseConceptId, concept]),
@@ -448,6 +500,7 @@ export async function loadPublicationTaxonomy(
     ...base,
     status,
     classifiedAt: scan?.status === 'SUCCESS' ? new Date(scan.scanned_at).toISOString() : null,
+    historicalClassification,
     sections: ordered,
   };
 }
