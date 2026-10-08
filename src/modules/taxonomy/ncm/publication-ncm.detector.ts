@@ -280,6 +280,7 @@ export async function persistSuccessfulScan(
       match_count = EXCLUDED.match_count,
       error_message = NULL,
       scanned_at = now()
+    WHERE publication_ncm_scans.status <> 'SUCCESS'
   `.execute(trx);
 
   return insertedMatches;
