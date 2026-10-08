@@ -547,7 +547,7 @@ export async function classifySinglePublication(
     contentText: scopeCurrent ? verified.currentText : null,
     verifiedCurrentFragments: scopeCurrent ? verified.currentFragments : [],
     ncmCodes: scopeCurrent && currentNcm ? currentNcm.codes : [],
-    legalScopeFingerprint: currentNcm?.fingerprint,
+    ...(currentNcm ? { legalScopeFingerprint: currentNcm.fingerprint } : {}),
     concepts,
     codeGitSha: input.codeGitSha ?? null,
   });
