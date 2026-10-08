@@ -73,17 +73,7 @@ export async function createManualCompanyRegistration(
   }
   if (!input.cnaes?.length) throw new ManualCnaeValidationError('invalid_cnae');
 
-  const company = existingCompany
-    ? await trx
-        .updateTable('companies')
-        .set({
-          legal_name: input.legalName,
-          is_active: true,
-        })
-        .where('id', '=', existingCompany.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  const company = await trx
         .insertInto('companies')
         .values({
           tenant_id: tenantId,
