@@ -8,6 +8,7 @@ import {
   validateLegalScopeEvidence,
   type LegalScopeEvidenceV1,
 } from '../../modules/taxonomy/legal-scope/legal-scope-evidence.js';
+import { OFFICIAL_EVIDENCE_HOSTS } from '../../modules/taxonomy/legal-scope/legal-scope.repository.js';
 
 /**
  * TAX13/B4 administrative, version-bound human attestation.
@@ -33,10 +34,6 @@ const required = (name: string): string => {
   const value = arg(name);
   if (!value?.trim()) throw new Error('MISSING_ARGUMENT_' + name.toUpperCase());
   return value.trim();
-};
-
-const HOSTS: Readonly<Record<string, readonly string[]>> = {
-  confaz: ['www.confaz.fazenda.gov.br'],
 };
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -83,7 +80,7 @@ try {
 
   const row = res.rows[0];
   if (!row) throw new Error('CURRENT_PUBLICATION_OR_ORIGIN_NOT_FOUND');
-  const hosts = HOSTS[row.source_code];
+  const hosts = OFFICIAL_EVIDENCE_HOSTS[row.source_code];
   if (!hosts) throw new Error('UNSUPPORTED_OFFICIAL_SOURCE_REVIEW');
   if (row.source_id !== manifest.sourceId || row.official_url !== manifest.officialUrl) {
     throw new Error('SOURCE_ORIGIN_MANIFEST_MISMATCH');
