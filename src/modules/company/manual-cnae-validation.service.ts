@@ -16,7 +16,9 @@ export class ManualCnaeValidationError extends Error {
 export async function validateAndEnsureOfficialCnaes(
   trx: Transaction<DB>,
   submitted: readonly CnpjRegistryCnae[] | undefined,
+  allowEmpty = false,
 ): Promise<CnpjRegistryCnae[]> {
+  if (allowEmpty && submitted?.length === 0) return [];
   if (!submitted?.length || submitted.length > 100 ||
       submitted.filter((entry) => entry.isPrimary).length !== 1 ||
       new Set(submitted.map((entry) => entry.code)).size !== submitted.length ||
