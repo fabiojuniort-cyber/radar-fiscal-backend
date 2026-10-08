@@ -664,6 +664,9 @@ JOIN current_catalog cat ON TRUE
 JOIN public.publication_ncm_scan_evidence scan
   ON scan.publication_version_id=pv.id
   AND scan.legal_scope_attestation_id=a.id
+  AND scan.detector_key='ncm.catalog.regex'
+  AND scan.detector_version='1.3.0'
+  AND scan.source_field='CONTENT_TEXT'
   AND scan.legal_as_of=r.d
   AND scan.recheck_on=a.recheck_on
   AND scan.html_sha256=a.html_sha256
