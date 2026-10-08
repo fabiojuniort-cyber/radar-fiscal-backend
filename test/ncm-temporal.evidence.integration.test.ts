@@ -472,7 +472,7 @@ test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method at
     { name: 'blank supporting act', html: '<p>NCM 1006.30.11</p>',
       parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: [''] },
     { name: 'control character supporting act', html: '<p>NCM 1006.30.11</p>',
-      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A\\u0001B'] },
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A\u0001B'] },
     { name: 'oversized supporting act', html: '<p>NCM 1006.30.11</p>',
       parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A'.repeat(257)] },
   ] as const;
