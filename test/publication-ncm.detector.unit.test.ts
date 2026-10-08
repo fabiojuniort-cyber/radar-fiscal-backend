@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { extractActBodyHtml } from '../src/modules/collection/confaz.connector.js';
 import {
   currentWordingText,
   sanitizeLegalPresentationHtml,
@@ -306,6 +308,26 @@ test('an unverified annex heading prevents classification of all following unmar
   assert.doesNotMatch(text, /8701\.90\.00|ANEXO II|ANEXO III/);
   assert.match(text, /3102\.10\.90|3925\.10\.00/);
   assert.deepEqual(extractNcmCandidates(text).map(row => row.code), ['31021090', '39251000']);
+});
+
+test('saved official Convênios 100/97 and 52/91 preserve current body and ignore historical annex NCM', () => {
+  const conv100 = readFileSync('ops/confaz/acts/CV100_97.html', 'utf8');
+  const conv52 = readFileSync('ops/confaz/acts/CV052_91.html', 'utf8');
+  const legalText = (html: string) => {
+    const extracted = extractActBodyHtml(html);
+    assert.ok(extracted, 'saved CONFAZ act must have an extractable legal body');
+    const sanitized = sanitizeLegalPresentationHtml(extracted);
+    assert.ok(sanitized, 'saved CONFAZ body should survive sanitization');
+    return currentWordingText(sanitized) ?? '';
+  };
+  const current100 = legalText(conv100);
+  assert.match(current100, /calcário e gesso/);
+  assert.doesNotMatch(current100, /CONVÊNIO ICMS 100\/97|Publicado no DOU de 06\.11\.97/);
+
+  const current52 = legalText(conv52);
+  assert.match(current52, /7307\.19\.20/, 'current industrial annex NCM must be preserved');
+  assert.doesNotMatch(current52, /8450\.11\.00/, 'historical green annex row must not classify');
+  assert.doesNotMatch(current52, /CONVÊNIO ICMS 52\/91|Publicação DOU de 30\.09\.91/);
 });
 
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
