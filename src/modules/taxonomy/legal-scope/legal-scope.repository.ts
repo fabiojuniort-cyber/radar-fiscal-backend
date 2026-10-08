@@ -19,6 +19,9 @@ export const OFFICIAL_EVIDENCE_HOSTS: Readonly<Record<string, readonly string[]>
 export type LegalScopeReadResult = LegalScopeValidation & {
   attestationId: string | null;
   asOf: string;
+  /** Only populated after full content-addressed row validation. */
+  htmlSha256: string | null;
+  recheckOn: string | null;
 };
 
 export interface AttestationRow {
@@ -46,6 +49,8 @@ function unverified(asOf: string, reason: string): LegalScopeReadResult {
     currentSegments: 0,
     attestationId: null,
     asOf,
+    htmlSha256: null,
+    recheckOn: null,
   };
 }
 
@@ -131,5 +136,7 @@ export function verifyPersistedLegalScopeRow(
     ...checked,
     attestationId: checked.valid ? row.id : null,
     asOf: input.asOf,
+    htmlSha256: checked.valid ? row.html_sha256 : null,
+    recheckOn: checked.valid ? row.recheck_on : null,
   };
 }
