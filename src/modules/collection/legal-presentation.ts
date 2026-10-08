@@ -427,7 +427,7 @@ const BLOCK_TAGS = new Set(['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4'
  * source-specific markers, so callers can safely fall back to stored text.
  */
 export function currentWordingText(html: string | null | undefined): string | undefined {
-  if (!html) return undefined;
+  if (!html || Buffer.byteLength(html, 'utf8') > MAX_PRESENTATION_HTML_BYTES) return undefined;
 
   type Frame = { tag: string; text: string; excluded: boolean; annexRestriction: 'previous' | 'revoked' | 'unverified' | null; legalStatus: string | undefined; currentCellText: string };
   const frames: Frame[] = [];
