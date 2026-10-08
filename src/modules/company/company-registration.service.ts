@@ -175,17 +175,6 @@ export async function createCompanyFromRegistry(
         .returning('id')
         .executeTakeFirstOrThrow();
 
-  const existingEstablishment = await trx
-    .selectFrom('establishments')
-    .select([
-      'id',
-      'is_head_office',
-      'business_location_code',
-    ])
-    .where('company_id', '=', company.id)
-    .where('cnpj', '=', record.cnpj)
-    .executeTakeFirst();
-
   const establishment = await trx
         .insertInto('establishments')
         .values({
