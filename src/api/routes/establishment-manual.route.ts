@@ -12,6 +12,8 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
+import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import {
   createOrReactivateManualEstablishment,
   ManualEstablishmentConflictError,
@@ -140,6 +142,7 @@ const bodySchema = z.object({
   businessLocationCode:
     businessLocationCodeSchema,
   cnaes: cnaesSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 function tenantIdFromRequest(
@@ -299,6 +302,13 @@ export async function establishmentManualRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
+        if (error instanceof ManualCnaeValidationError) {
+          return reply.status(error.code === 'cnae_catalog_unavailable' ? 503 : 400)
+            .send({ error: error.code });
+        }
         if (
           error instanceof
           TenantAccessDeniedError
