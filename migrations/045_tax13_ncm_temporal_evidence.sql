@@ -170,3 +170,85 @@ FOR INSERT TO radar_worker WITH CHECK (EXISTS (
 REVOKE ALL ON FUNCTION public.tax13_ncm_scan_append_only() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.tax13_ncm_scan_validate_provenance() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.tax13_ncm_scan_code_validate() FROM PUBLIC;
+
+-- Minimal read-only projection for existing TAX11 API routes. No SELECT on
+-- either private ledger is granted to radar_app. The SECURITY DEFINER query
+-- explicitly enforces current publication scope and recomputes catalog/HTML
+-- integrity before releasing the exact scan fingerprint. Never returns the
+-- legal manifest or authorizes visual legal-scope highlighting.
+CREATE FUNCTION public.tax13_current_ncm_scan_fingerprint(p_version UUID)
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+WITH reference_day AS (
+    SELECT (current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date AS d
+), current_version AS (
+    SELECT pv.id, pv.source_metadata -> 'presentation' ->> 'html' AS html
+    FROM public.publication_versions pv
+    WHERE pv.id=p_version AND pv.is_current
+      AND pv.source_metadata -> 'presentation' ->> 'format'='SANITIZED_HTML'
+      AND public.publication_scope_is_in_scope(pv.publication_id)
+), newest_proof AS (
+    SELECT a.* FROM public.publication_legal_scope_attestations a
+    CROSS JOIN reference_day r
+    WHERE a.publication_version_id=p_version AND a.valid_as_of=r.d
+    ORDER BY a.created_at DESC, a.id DESC LIMIT 1
+), current_catalog AS (
+    SELECT ed.id,
+      encode(sha256(convert_to(
+        concat_ws(':', ed.edition_code, ed.source_sha256,
+          coalesce((SELECT string_agg(
+            entry.id::text || ':' || entry.official_code || ':' ||
+            entry.description || ':' || entry.metadata::text,
+            ';' ORDER BY entry.id
+          ) FROM public.official_catalog_entries entry
+          WHERE entry.catalog_edition_id=ed.id), '')), 'UTF8')), 'hex') AS checksum
+    FROM public.official_catalog_editions ed
+    JOIN public.official_catalogs c ON c.id=ed.catalog_id
+    CROSS JOIN reference_day r
+    WHERE c.code='NCM'
+      AND (ed.valid_from IS NULL OR ed.valid_from<=r.d)
+      AND (ed.valid_to IS NULL OR ed.valid_to>=r.d)
+      AND ed.status <> 'WITHDRAWN'
+    ORDER BY ed.valid_from DESC NULLS LAST, ed.created_at DESC, ed.id DESC
+    LIMIT 1
+)
+SELECT scan.run_fingerprint::text
+FROM current_version pv
+CROSS JOIN reference_day r
+JOIN newest_proof a ON a.publication_version_id=pv.id
+JOIN current_catalog catalog ON TRUE
+JOIN public.publication_ncm_scan_evidence scan
+  ON scan.publication_version_id=pv.id
+ AND scan.legal_scope_attestation_id=a.id
+ AND scan.legal_as_of=r.d
+ AND scan.recheck_on=a.recheck_on
+ AND scan.html_sha256=a.html_sha256
+ AND scan.coverage='COMPLETE' AND scan.outcome='SUCCESS'
+ AND scan.catalog_edition_id=catalog.id
+ AND scan.catalog_sha256=catalog.checksum
+WHERE a.coverage='COMPLETE' AND a.recheck_on>r.d
+  AND a.html_sha256=encode(sha256(convert_to(pv.html,'UTF8')),'hex')
+LIMIT 1;
+$$;
+
+CREATE FUNCTION public.tax13_public_current_ncm_codes(p_version UUID)
+RETURNS TABLE(ncm_code TEXT)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+    SELECT DISTINCT c.ncm_code::text
+    FROM public.publication_ncm_scan_evidence_codes c
+    JOIN public.publication_ncm_scan_evidence scan
+      ON scan.id=c.scan_evidence_id
+    WHERE scan.publication_version_id=p_version
+      AND scan.run_fingerprint::text=public.tax13_current_ncm_scan_fingerprint(p_version)
+    ORDER BY 1;
+$$;
+REVOKE ALL ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID)
+  FROM PUBLIC, radar_app, radar_worker, radar_taxonomy_curator;
+REVOKE ALL ON FUNCTION public.tax13_public_current_ncm_codes(UUID)
+  FROM PUBLIC, radar_app, radar_worker, radar_taxonomy_curator;
+GRANT EXECUTE ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID),
+  public.tax13_public_current_ncm_codes(UUID) TO radar_app, radar_worker;
