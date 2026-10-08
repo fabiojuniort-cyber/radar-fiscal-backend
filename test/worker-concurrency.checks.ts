@@ -71,8 +71,11 @@ class WorkerProbe implements KyselyPlugin {
         query.includes('=ANY(')
       : this.stage === 'taxonomy' &&
         query.includes('FROM public.publication_ncm_scan_evidence_codes');
-    if (work) {
-      this.workReads += 1;
+    // TAX13 revalidates temporal NCM codes before committing classification.
+    // Rechecking the same evidence within one attempt is not a second work
+    // attempt; keep the injected fault on the FIRST real code read.
+    if (work && this.workReads === 0) {
+      this.workReads = 1;
       if (this.fail) throw new Error(`controlled ${this.stage} worker failure`);
     }
     return args.result;
