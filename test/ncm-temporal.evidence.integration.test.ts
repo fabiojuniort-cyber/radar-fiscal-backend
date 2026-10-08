@@ -433,3 +433,86 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     await admin.end();
   }
 });
+
+test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method attestations', async () => {
+  const admin = new Pool({ connectionString: adminUrl, max: 2 });
+  const worker = createStandaloneDatabase({
+    connectionString: workerUrl.toString(), poolMax: 2,
+    idleTimeoutMs: 5000, connectionTimeoutMs: 5000,
+  });
+  const cases = [
+    { name: 'previous class', html: '<p class="RedaoAnt">NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'] },
+    { name: 'title', html: '<p class="TituloAcordo">NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'] },
+    { name: 'revoked attribute', html: '<p data-legal-status="revoked">NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'] },
+    { name: 'revoked annex', html: '<p>ANEXO II - REVOGADO</p><p>NCM 1006.30.11</p>',
+      parts: ['ANEXO II - REVOGADO', 'NCM 1006.30.11'], statuses: ['REVOKED','CURRENT'] },
+    { name: 'cross-node NCM', html: '<p>1006.</p><p>30.11</p>',
+      parts: ['1006.30.11'], statuses: ['CURRENT'] },
+    { name: 'missing method', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], missingMethod: true },
+  ] as const;
+  try {
+    await admin.query(`INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key)
+      VALUES ('confaz','CONFAZ','FEDERAL','https://www.confaz.fazenda.gov.br','confaz')
+      ON CONFLICT (code) DO NOTHING`);
+    const source = (await admin.query<{ id: string }>(
+      "SELECT id FROM sources WHERE code='confaz'")).rows[0]!.id;
+    const day = brazilLegalReferenceDate();
+    for (const sample of cases) {
+      const publicationId = (await admin.query<{ id: string }>(
+        `INSERT INTO publications(identity_hash,identity_strength,identity_basis,
+           jurisdiction_level,title,published_on)
+         VALUES ($1,'STRONG','{}'::jsonb,'FEDERAL','R3 SQL synthetic legal scope','9999-12-31')
+         RETURNING id`, [h(randomUUID())])).rows[0]!.id;
+      const versionId = (await admin.query<{ id: string }>(
+        `INSERT INTO publication_versions(publication_id,version_no,content_hash,
+           content_text,source_metadata,is_current)
+         VALUES ($1,1,$2,$3,$4::jsonb,TRUE) RETURNING id`,
+        [publicationId, h(sample.html), renderedLegalText(sample.html),
+          JSON.stringify({ presentation: { format: 'SANITIZED_HTML', html: sample.html } })]
+      )).rows[0]!.id;
+      const officialUrl = 'https://www.confaz.fazenda.gov.br/test-only/r3/' + versionId;
+      const originId = (await admin.query<{ id: string }>(
+        `INSERT INTO publication_origins(publication_id,source_id,official_url)
+         VALUES ($1::uuid,$2::uuid,$3) RETURNING id`,
+        [publicationId,source,officialUrl])).rows[0]!.id;
+      let offset = 0;
+      const segments: Array<Record<string, unknown>> = sample.parts.map((part, index) => {
+        const start = offset; offset += part.length;
+        return { start, end: offset, textSha256: h(part),
+          status: sample.statuses[index],
+          method: 'OFFICIAL_AMENDMENT', evidenceUrls: [officialUrl] };
+      });
+      if ('missingMethod' in sample && sample.missingMethod) delete segments[0]!.method;
+      const recheckOn = nextDate(day, 3);
+      const verifiedAt = new Date(Date.now() - 60_000).toISOString();
+      const manifest = { version: 1, publicationVersionId: versionId, sourceId: source,
+        officialUrl, htmlSha256: h(sample.html), validAsOf: day, recheckOn,
+        verifiedAt, coverage: 'COMPLETE', segments };
+      const attestationId = (await admin.query<{ id: string }>(
+        `INSERT INTO publication_legal_scope_attestations(
+           publication_version_id,source_id,publication_origin_id,official_url,
+           html_sha256,valid_as_of,verified_at,recheck_on,coverage,manifest,
+           attestor_kind,attestor_ref
+         ) VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6::date,$7::timestamptz,
+           $8::date,'COMPLETE',$9::jsonb,'HUMAN_REVIEW','R3-CI') RETURNING id`,
+        [versionId,source,originId,officialUrl,h(sample.html),day,verifiedAt,
+          recheckOn,JSON.stringify(manifest)])).rows[0]!.id;
+      const checked = await readVerifiedLegalScope(worker, {
+        publicationVersionId: versionId, sanitizedHtml: sample.html, asOf: day,
+      });
+      assert.equal(checked.valid, false, sample.name + ' Node must reject');
+      const projected = await admin.query<{ fragments: string[] | null }>(
+        'SELECT public.tax13_legal_current_fragments($1::uuid) AS fragments',
+        [attestationId]);
+      assert.equal(projected.rows[0]?.fragments, null,
+        sample.name + ' SQL must reject same invalid DOM');
+    }
+  } finally {
+    await worker.destroy();
+    await admin.end();
+  }
+});
