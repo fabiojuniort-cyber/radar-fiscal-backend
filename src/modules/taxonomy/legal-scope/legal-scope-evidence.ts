@@ -129,6 +129,7 @@ export function validateLegalScopeEvidence(
   if (!DIGEST.test(evidence.htmlSha256) ||
       evidence.htmlSha256 !== sha256(ctx.sanitizedHtml)) return fail('HTML_HASH_MISMATCH');
   if (!['COMPLETE', 'PARTIAL', 'UNVERIFIED'].includes(evidence.coverage)) return fail('INVALID_COVERAGE');
+  if (!Array.isArray(evidence.segments)) return fail('INVALID_SEGMENTS');
   if (evidence.segments.length > 50000) return fail('SEGMENT_LIMIT_EXCEEDED');
   const allowHosts = new Set(ctx.trustedEvidenceHosts.map((h) => h.toLowerCase()));
   if (!allowHosts.has(sourceUrl.hostname.toLowerCase())) return fail('SOURCE_NOT_REGISTERED');
@@ -136,6 +137,7 @@ export function validateLegalScopeEvidence(
   const accepted: string[] = [];
   let lastEnd = 0;
   for (const segment of evidence.segments) {
+    if (!segment || typeof segment !== 'object') return fail('INVALID_SEGMENT');
     if (!Number.isSafeInteger(segment.start) || !Number.isSafeInteger(segment.end) ||
         segment.start < lastEnd || segment.end <= segment.start || segment.end > text.length) {
       return fail('INVALID_SEGMENT_BOUNDS');
