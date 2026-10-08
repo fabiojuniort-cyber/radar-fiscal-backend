@@ -1034,7 +1034,7 @@ export async function productRoutes(
             if (!edition) return null;
 
             const search = request.query.search.trim();
-            const numeric = search.replace(/\\D/g, '');
+            const numeric = search.replace(/\D/g, '');
             const pattern = `%${search}%`;
             const numericPattern = `%${numeric}%`;
             const entries = await sql<{ official_code: string; description: string }>`
@@ -1060,7 +1060,7 @@ export async function productRoutes(
             return {
               source: edition.source_url,
               items: entries.rows.map((row) => ({
-                code: row.official_code.replace(/\\D/g, ''),
+                code: row.official_code.replace(/\D/g, ''),
                 description: row.description,
               })),
             };
