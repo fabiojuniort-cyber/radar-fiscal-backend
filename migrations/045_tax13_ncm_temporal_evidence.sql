@@ -114,9 +114,11 @@ RETURNS trigger LANGUAGE plpgsql
 SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
     scan_edition UUID;
+    scan_as_of DATE;
     scan_inserting_xid TEXT;
 BEGIN
-    SELECT catalog_edition_id, xmin::text INTO scan_edition, scan_inserting_xid
+    SELECT catalog_edition_id, legal_as_of, xmin::text
+    INTO scan_edition, scan_as_of, scan_inserting_xid
     FROM public.publication_ncm_scan_evidence WHERE id=NEW.scan_evidence_id;
     -- A header becomes sealed when its inserting transaction commits.
     -- Codes can only be written by that same transaction; no worker can
@@ -131,6 +133,10 @@ BEGIN
         AND e.catalog_edition_id=scan_edition
         AND regexp_replace(e.official_code, '[^0-9]', '', 'g')=NEW.ncm_code
         AND COALESCE(e.metadata ->> 'assignable', 'false')='true'
+        AND (nullif(e.metadata ->> 'normalizedValidFrom', '') IS NULL
+          OR (e.metadata ->> 'normalizedValidFrom')::date <= scan_as_of)
+        AND (nullif(e.metadata ->> 'normalizedValidTo', '') IS NULL
+          OR (e.metadata ->> 'normalizedValidTo')::date >= scan_as_of)
     ) THEN
       RAISE EXCEPTION 'TAX13_NCM_SCAN_CODE_CATALOG_MISMATCH';
     END IF;
