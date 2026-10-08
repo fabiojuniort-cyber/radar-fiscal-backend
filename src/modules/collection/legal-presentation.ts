@@ -429,7 +429,7 @@ const BLOCK_TAGS = new Set(['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4'
 export function currentWordingText(html: string | null | undefined): string | undefined {
   if (!html) return undefined;
 
-  type Frame = { tag: string; text: string; excluded: boolean; annexRestriction: 'previous' | 'revoked' | 'unverified' | null };
+  type Frame = { tag: string; text: string; excluded: boolean; annexRestriction: 'previous' | 'revoked' | 'unverified' | null; legalStatus?: string; currentCellText: string };
   const frames: Frame[] = [];
   let output = '';
   let filtered = false;
@@ -457,9 +457,9 @@ export function currentWordingText(html: string | null | undefined): string | un
         if (previous && row) row.excluded = true;
 
         if (tag === 'tr' || tag === 'p' || tag === 'td' || tag === 'th' || /^h[1-6]$/.test(tag) || excluded || status !== undefined) {
-          // A source adapter can exclude a single cell/item using its own
-          // status. CONFAZ previous-wording table styles remain row-scoped.
-          frames.push({ tag, text: '', excluded, annexRestriction });
+          // Historical styles in a mixed row make unverified sibling cells
+          // ineligible, but an explicitly-current sibling must survive.
+          frames.push({ tag, text: '', excluded, annexRestriction, legalStatus: status, currentCellText: '' });
         }
         if (tag === 'br') append('\n');
       },
@@ -480,7 +480,19 @@ export function currentWordingText(html: string | null | undefined): string | un
         const revokedCell = (frame.tag === 'p' || frame.tag === 'td' || frame.tag === 'th')
           && isRevokedPlaceholder(frame.text);
         if (!frame.excluded && !revokedCell && !editorial) {
-          append(frame.text + separator);
+          if (frame.tag === 'tr' && frame.excluded) {
+            append(frame.currentCellText + separator);
+          } else {
+            const row = [...frames].reverse().find((parent) => parent.tag === 'tr');
+            if (row && (frame.tag === 'td' || frame.tag === 'th') && frame.legalStatus === 'current') {
+              row.currentCellText += frame.text + separator;
+              append(frame.text + separator);
+            } else {
+              append(frame.text + separator);
+            }
+          }
+        } else if (frame.tag === 'tr' && frame.excluded) {
+          append(frame.currentCellText + separator);
         } else if (frame.annexRestriction && ANNEX_HEADING.test(frame.text.trim())) {
           // Preserve an excluded annex heading only as a boundary signal.
           // This also keeps unverified annex rows out of taxonomy evidence.
@@ -505,7 +517,9 @@ export function currentWordingText(html: string | null | undefined): string | un
     const revokedCell = (frame.tag === 'p' || frame.tag === 'td' || frame.tag === 'th')
       && isRevokedPlaceholder(frame.text);
     if (!frame.excluded && !revokedCell && !editorial) {
-      append(frame.text);
+      append(frame.tag === 'tr' && frame.excluded ? frame.currentCellText : frame.text);
+    } else if (frame.tag === 'tr' && frame.excluded) {
+      append(frame.currentCellText);
     } else if (frame.annexRestriction && ANNEX_HEADING.test(frame.text.trim())) {
       const reason = frame.annexRestriction === 'unverified'
         ? 'sem vigência confirmada' : frame.annexRestriction === 'revoked' ? 'revogado' : 'redação anterior';
