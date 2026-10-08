@@ -105,10 +105,11 @@ export async function loadClassificationConcepts(
   return concepts;
 }
 
-/** The wording in force: previous wordings kept on the page do not classify the act. */
+/** An unscoped stored body or relevant excerpt is not proof of vigência.
+ * Fail closed: do not manufacture current-text assertions from missing,
+ * oversized or ambiguous presentation HTML. */
 function classificationText(row: PendingVersion): string | null {
-  if (row.content_text?.trim()) return currentWordingText(row.presentation_html) ?? row.content_text;
-  return row.relevant_excerpt;
+  return currentWordingText(row.presentation_html) ?? null;
 }
 
 async function selectPending(
