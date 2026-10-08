@@ -100,24 +100,24 @@ export async function readCurrentNcmEvidence(
   // A caller may hold a proof object from before a same-day supersession.
   // Never trust that cached object: newest legal event wins at read time.
   const latest = await sql<{ id: string }>`
-    SELECT a.id FROM public.publication_legal_scope_attestations a
-    WHERE a.publication_version_id=${publicationVersionId}::uuid
-      AND a.valid_as_of=${evidence.asOf}::date
-    ORDER BY a.created_at DESC, a.id DESC LIMIT 1
+    SELECT public.tax13_effective_attestation_id(
+      ${publicationVersionId}::uuid, ${evidence.asOf}::date
+    ) AS id
   `.execute(db);
   if (latest.rows[0]?.id !== evidence.attestationId) return null;
   const edition = await currentNcmEdition(db, evidence.asOf);
   const fingerprint = ncmTemporalFingerprint(publicationVersionId, evidence, edition);
   const run = await sql<{ id: string }>`
-    SELECT id FROM public.publication_ncm_scan_evidence
-    WHERE publication_version_id=${publicationVersionId}::uuid
-      AND legal_scope_attestation_id=${evidence.attestationId}::uuid
-      AND legal_as_of=${evidence.asOf}::date
-      AND recheck_on > ${evidence.asOf}::date
-      AND catalog_edition_id=${edition.id}::uuid
-      AND catalog_sha256=${edition.checksum}
-      AND run_fingerprint=${fingerprint}
-      AND outcome='SUCCESS' AND coverage='COMPLETE'
+    SELECT scan.id FROM public.publication_ncm_scan_evidence scan
+    WHERE scan.publication_version_id=${publicationVersionId}::uuid
+      AND scan.legal_scope_attestation_id=${evidence.attestationId}::uuid
+      AND scan.legal_as_of=${evidence.asOf}::date
+      AND scan.recheck_on > ${evidence.asOf}::date
+      AND scan.catalog_edition_id=${edition.id}::uuid
+      AND scan.catalog_sha256=${edition.checksum}
+      AND scan.run_fingerprint=${fingerprint}
+      AND scan.outcome='SUCCESS' AND scan.coverage='COMPLETE'
+      AND public.tax13_ncm_scan_consistent(scan.id)
     LIMIT 1
   `.execute(db);
   if (!run.rows[0]) return null;
