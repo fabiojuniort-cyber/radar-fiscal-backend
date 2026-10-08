@@ -156,24 +156,56 @@ function parsedLegalText(html: string): { text: string; spans: LegalTextSpan[] }
   const spans: LegalTextSpan[] = [];
   // Capture DOM ancestry in the *same* parser that defines UTF-16 offsets.
   // Never infer CURRENT from these classes: they are exclusion-only signals.
-  const stack: Array<{ name: string; excluded: boolean }> = [];
+  type Frame = {
+    name: string;
+    excluded: boolean;
+    explicitlyHistorical: boolean;
+    text: string;
+    firstSpan: number;
+  };
+  const stack: Frame[] = [];
   let historicalAnnex = false;
+  const isAnnotatedHistory = () => stack.some((frame) => frame.explicitlyHistorical);
+  const setAnnexScope = (heading: string, annotated: boolean, firstSpan: number) => {
+    const line = heading.replace(/\s+/g, ' ').trim();
+    if (!ANNEX_HEADING.test(line)) return;
+    historicalAnnex = annotated || HISTORICAL_ANNEX.test(line);
+    // A split heading ("ANEXO" + " II") must not itself be CURRENT.
+    for (let i = firstSpan; i < spans.length; i++) spans[i]!.excluded = true;
+  };
   const parser = new Parser({
     onopentag(name, attrs) {
+      const status = attrs['data-legal-status'];
       stack.push({
         name,
         excluded: (stack.at(-1)?.excluded ?? false) || excludedTag(name, attrs),
+        explicitlyHistorical: status !== undefined && status !== 'current',
+        text: '',
+        firstSpan: spans.length,
       });
     },
     onclosetag(name) {
       const index = stack.findLastIndex((item) => item.name === name);
-      if (index >= 0) stack.length = index;
+      if (index < 0) return;
+      const frame = stack[index]!;
+      // Close the logical heading only after its nested TH/TD/P/STRONG text
+      // is complete; otherwise inherited revoked attributes are lost on TD.
+      if (['th', 'td', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(name)) {
+        setAnnexScope(
+          frame.text,
+          stack.slice(0, index + 1).some((item) => item.explicitlyHistorical),
+          frame.firstSpan,
+        );
+      }
+      stack.length = index;
     },
     ontext(value) {
       if (!value) return;
+      for (const frame of stack) frame.text += value;
       const line = value.replace(/\s+/g, ' ').trim();
-      const annexHeading = ANNEX_HEADING.test(line);
-      if (annexHeading) historicalAnnex = HISTORICAL_ANNEX.test(line);
+      if (ANNEX_HEADING.test(line)) {
+        setAnnexScope(value, isAnnotatedHistory(), spans.length);
+      }
       const start = text.length;
       text += value;
       spans.push({
