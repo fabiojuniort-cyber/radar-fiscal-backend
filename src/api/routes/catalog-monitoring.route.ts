@@ -341,6 +341,10 @@ function buildArchivePlan(
         JOIN publication_versions tag_pv
           ON tag_pv.id = tag_s.publication_version_id
          AND tag_pv.is_current = true
+        JOIN publication_taxonomy_runs tag_run
+          ON tag_run.id = tag_s.run_id
+         AND tag_run.config_snapshot ->> 'legalScopeFingerprint' =
+           public.tax13_current_ncm_scan_fingerprint(tag_pv.id)
         LEFT JOIN LATERAL (
           SELECT ct.action
           FROM publication_taxonomy_curator_tags ct
@@ -385,6 +389,7 @@ function buildArchivePlan(
           ON tag_pv.id = latest_ct.publication_version_id
          AND tag_pv.is_current = true
         WHERE latest_ct.action = 'ADD'
+          AND public.tax13_current_ncm_scan_fingerprint(tag_pv.id) IS NOT NULL
           AND EXISTS (
             SELECT 1
             FROM taxonomy_release_concepts cur_rc

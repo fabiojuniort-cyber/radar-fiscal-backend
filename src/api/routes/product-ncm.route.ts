@@ -780,7 +780,7 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
-      const result = await sql<PublicationNcmRow>`
+      const historical = await sql<PublicationNcmRow>`
         SELECT DISTINCT ON (pnm.ncm_code)
           pnm.ncm_code,
           e.description,
@@ -805,19 +805,41 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
           pnm.confidence DESC NULLS LAST,
           pnm.created_at DESC
       `.execute(app.db);
+      // Historical catalog detections remain available, but they are not
+      // CURRENT legal evidence and must never populate the positive items list.
+      const current = await sql<PublicationNcmRow>`
+        SELECT DISTINCT ON (nc.ncm_code)
+          nc.ncm_code, e.description,
+          'CURRENT_ATTESTED'::text AS verification_status,
+          'LEGAL_SCOPE_ATTESTED'::text AS method_type,
+          'tribusca.taxonomy.ncm'::text AS detector_key,
+          '1.3.0'::text AS detector_version,
+          NULL::numeric AS confidence, NULL::text AS excerpt
+        FROM publication_versions pv
+        CROSS JOIN LATERAL public.tax13_public_current_ncm_codes(pv.id) nc
+        LEFT JOIN official_catalog_entries e
+          ON regexp_replace(e.official_code,'[^0-9]','','g')=nc.ncm_code
+        WHERE pv.publication_id = ${request.params.publicationId}::uuid
+          AND pv.is_current = TRUE
+        ORDER BY nc.ncm_code, e.description NULLS LAST
+      `.execute(app.db);
+      const serialize = (row: PublicationNcmRow) => ({
+        code: row.ncm_code,
+        description: row.description,
+        verificationStatus: row.verification_status,
+        method: {
+          type: row.method_type,
+          detectorKey: row.detector_key,
+          detectorVersion: row.detector_version,
+        },
+        confidence: row.confidence === null ? null : Number(row.confidence),
+        excerpt: row.excerpt,
+      });
       return reply.status(200).send({
-        items: result.rows.map((row) => ({
-          code: row.ncm_code,
-          description: row.description,
-          verificationStatus: row.verification_status,
-          method: {
-            type: row.method_type,
-            detectorKey: row.detector_key,
-            detectorVersion: row.detector_version,
-          },
-          confidence: row.confidence === null ? null : Number(row.confidence),
-          excerpt: row.excerpt,
-        })),
+        // Compatibility field now contains only trusted CURRENT entries.
+        items: current.rows.map(serialize),
+        attestedCurrentNcmCodes: current.rows.map((row) => row.ncm_code),
+        historicalCatalogMentions: historical.rows.map(serialize),
       });
     },
   );

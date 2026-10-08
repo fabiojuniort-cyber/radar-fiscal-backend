@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     branches:
       - main
+      # TAX13 stacked review: validate PR #192 directly against the unmerged
+      # TAX13-R2 phase-2 base (#186). This does not authorize a main merge.
+      - fix/taxonomy-valid-legal-text
   push:
     branches:
       - main
@@ -127,6 +130,9 @@ jobs:
       - name: Publication NCM detector unit tests
         run: npx tsx --test test/publication-ncm.detector.unit.test.ts
 
+      - name: TAX13 NCM temporal fingerprint unit tests
+        run: npx tsx --test test/ncm-temporal.evidence.unit.test.ts
+
       - name: Prepare PostgreSQL test database
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run db:prepare
@@ -207,6 +213,10 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.curation.integration.test.ts
 
+      - name: TAX13 NCM temporal ledger adversarial integration (PG16)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/ncm-temporal.evidence.integration.test.ts
+
       # Scope events are append-only: the executor fixtures cannot be cleaned
       # up, so this runs after every other database test of the job.
       - name: DOU-CLEAN-01 executor integration (append-only fixtures, runs last)
@@ -253,3 +263,49 @@ jobs:
       - name: Recovery barrier and privilege integration (synthetic fixtures only)
         shell: bash
         run: env -i PATH="$PATH" bash ops/dou-clean-02/runner/test-pg18-isolated.sh --run-isolated-fixture
+
+  tax13-ncm-pg18:
+    name: TAX13 NCM temporal PG18 integration
+    needs: verify
+    if: needs.verify.result == 'success' && needs.verify.outputs.pg18_required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build PG18 migration runner
+        run: npm run build
+      - name: Migrate and verify PostgreSQL 18 runtime roles
+        run: npm run db:prepare
+      - name: Seed NCM edition fixture
+        run: npx tsx --test test/ncm-catalog.import.integration.test.ts
+      - name: Temporal supersession and RLS PG18
+        run: npx tsx --test test/ncm-temporal.evidence.integration.test.ts

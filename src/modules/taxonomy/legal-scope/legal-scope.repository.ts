@@ -19,6 +19,9 @@ export const OFFICIAL_EVIDENCE_HOSTS: Readonly<Record<string, readonly string[]>
 export type LegalScopeReadResult = LegalScopeValidation & {
   attestationId: string | null;
   asOf: string;
+  /** Only populated after full content-addressed row validation. */
+  htmlSha256: string | null;
+  recheckOn: string | null;
 };
 
 export interface AttestationRow {
@@ -46,6 +49,8 @@ function unverified(asOf: string, reason: string): LegalScopeReadResult {
     currentSegments: 0,
     attestationId: null,
     asOf,
+    htmlSha256: null,
+    recheckOn: null,
   };
 }
 
@@ -88,8 +93,10 @@ export async function readVerifiedLegalScope(
     WHERE a.publication_version_id = ${input.publicationVersionId}::uuid
       AND a.valid_as_of = ${input.asOf}::date
       AND public.publication_scope_is_in_scope(pv.publication_id)
-    ORDER BY a.created_at DESC, a.id DESC
-    LIMIT 1
+      AND a.id = public.tax13_effective_attestation_id(
+        ${input.publicationVersionId}::uuid, ${input.asOf}::date
+      )
+        LIMIT 1
   `.execute(db);
 
   return verifyPersistedLegalScopeRow(result.rows[0], input);
@@ -131,5 +138,7 @@ export function verifyPersistedLegalScopeRow(
     ...checked,
     attestationId: checked.valid ? row.id : null,
     asOf: input.asOf,
+    htmlSha256: checked.valid ? row.html_sha256 : null,
+    recheckOn: checked.valid ? row.recheck_on : null,
   };
 }

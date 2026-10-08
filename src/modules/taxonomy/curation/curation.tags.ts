@@ -2,7 +2,6 @@ import {
   CURATED_ENGINE_KEY,
   CURATED_ENGINE_VERSION,
 } from '../classification/classification.curated.js';
-import { NOT_SUPERSEDED_NCM_MENTION_SQL } from '../ncm/publication-ncm.detector.js';
 import {
   loadTaxonomyCodeCompatibility,
   resolveTaxonomyConceptCode,
@@ -179,11 +178,15 @@ export async function loadPublicationTaxonomy(
       scanned_at: Date | string;
     }>(
       `
-        SELECT status, run_id, scanned_at
-        FROM publication_taxonomy_scans
-        WHERE publication_version_id = $1::uuid
-          AND taxonomy_release_id = $2::uuid
-          AND engine_key = $3 AND engine_version = $4
+        SELECT s.status, s.run_id, s.scanned_at
+        FROM publication_taxonomy_scans s
+        LEFT JOIN publication_taxonomy_runs r ON r.id=s.run_id
+        WHERE s.publication_version_id = $1::uuid
+          AND s.taxonomy_release_id = $2::uuid
+          AND s.engine_key = $3 AND s.engine_version = $4
+          AND (s.status <> 'SUCCESS' OR
+            r.config_snapshot ->> 'legalScopeFingerprint' =
+              public.tax13_current_ncm_scan_fingerprint($1::uuid))
       `,
       [current.id, release.id, CURATED_ENGINE_KEY, CURATED_ENGINE_VERSION],
     )
@@ -208,15 +211,10 @@ export async function loadPublicationTaxonomy(
         WHERE s.publication_version_id = $1::uuid
           AND s.status = 'SUCCESS'
           AND r.status IN ('PUBLISHED', 'WITHDRAWN')
-          AND NOT (
-            s.taxonomy_release_id = $2::uuid
-            AND s.engine_key = $3
-            AND s.engine_version = $4
-          )
         ORDER BY s.scanned_at DESC, s.id DESC
         LIMIT 1
       `,
-      [current.id, release.id, CURATED_ENGINE_KEY, CURATED_ENGINE_VERSION],
+      [current.id],
     )
   )[0];
   const historicalClassification: HistoricalClassificationSummary | null =
@@ -279,7 +277,9 @@ export async function loadPublicationTaxonomy(
     [current.id],
   );
   const decisionByCode = resolveCuratorDecisions(curatorHistory, compatibility);
-  const curator = [...decisionByCode.values()];
+  // A curator decision is retained in audit history, but no CURRENT tag
+  // may be projected when the publication has lost its legal proof.
+  const curator = scan?.status === 'SUCCESS' ? [...decisionByCode.values()] : [];
 
   const settings = await loadRuntimeSettings(run);
   let status: PublicationTaxonomyStatus;
@@ -377,12 +377,9 @@ export async function loadPublicationTaxonomy(
   // Product groups whose NCM prefix matches a detected NCM but none of whose
   // items was tagged: show the group itself, explaining the NCM.
   const productType = view.dimensions.find((d) => d.officialCodeType === 'NCM');
-  if (productType) {
+  if (productType && scan?.status === 'SUCCESS') {
     const mentions = await run<{ ncm_code: string }>(
-      `SELECT DISTINCT ncm_code FROM publication_ncm_mentions pnm
-       WHERE pnm.publication_version_id = $1::uuid
-         AND pnm.verification_status = 'CATALOG_MATCHED'
-         AND ${NOT_SUPERSEDED_NCM_MENTION_SQL('pnm')}`,
+      `SELECT ncm_code FROM public.tax13_public_current_ncm_codes($1::uuid)`,
       [current.id],
     );
     const taggedGroups = new Set(

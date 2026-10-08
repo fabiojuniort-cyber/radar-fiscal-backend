@@ -58,7 +58,8 @@ class WorkerProbe implements KyselyPlugin {
   async transformResult(args: PluginTransformResultArgs) {
     const query = this.queries.get(args.queryId) ?? '';
     const selection = this.stage === 'ncm'
-      ? query.includes('LEFT JOIN publication_ncm_scans pns')
+      ? query.includes('FROM publications p') &&
+        query.includes('FROM public.publication_ncm_scan_evidence e')
       : this.stage === 'taxonomy' && query.includes('LEFT JOIN publication_taxonomy_scans s');
     if (selection) {
       this.selectedIds = args.result.rows.map((row) => row.publication_version_id);
@@ -66,10 +67,15 @@ class WorkerProbe implements KyselyPlugin {
       await bounded(this.proceed.promise);
     }
     const work = this.stage === 'ncm'
-      ? query.includes('FROM official_catalog_entries oce')
-      : this.stage === 'taxonomy' && query.includes('SELECT DISTINCT ncm_code');
-    if (work) {
-      this.workReads += 1;
+      ? query.includes('FROM public.official_catalog_entries e') &&
+        query.includes('=ANY(')
+      : this.stage === 'taxonomy' &&
+        query.includes('FROM public.publication_ncm_scan_evidence_codes');
+    // TAX13 revalidates temporal NCM codes before committing classification.
+    // Rechecking the same evidence within one attempt is not a second work
+    // attempt; keep the injected fault on the FIRST real code read.
+    if (work && this.workReads === 0) {
+      this.workReads = 1;
       if (this.fail) throw new Error(`controlled ${this.stage} worker failure`);
     }
     return args.result;
@@ -205,7 +211,9 @@ export async function checkWorkerConcurrency(
       assert.equal(seals.length, 1);
       assert.equal(seals[0]?.status, 'SUCCESS');
       assert.equal(seals[0]?.error_message, null);
-      assert.equal(seals[0]?.attempt_count, stage === 'ncm' || order === 'success-first' ? 1 : 2);
+      assert.equal(seals[0]?.attempt_count,
+        stage === 'ncm' || order !== 'failure-first' ? 1 : 2,
+        'same temporal fingerprint is one logical attempt even with two successful workers');
       const artifacts = await admin.query(
         `SELECT r.id, c.code, a.reason_code, count(s.id)::int AS spans
          FROM publication_taxonomy_runs r

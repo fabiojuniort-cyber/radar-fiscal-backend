@@ -30,8 +30,7 @@ import {
   loadTaxonomyCodeCompatibility,
   type TaxonomyCodeCompatibility,
 } from '../../modules/taxonomy/taxonomy-code-compatibility.js';
-import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
-import { currentWordingText, sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
+import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import { unavailablePublicLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.public-projection.js';
 import {
   CnpjRegistryError,
@@ -2288,16 +2287,16 @@ export async function productRoutes(
         const publicationNcms = profileNcms.length
           ? (
               await sql<{ code: string; description: string | null }>`
-                SELECT DISTINCT ON (pnm.ncm_code) pnm.ncm_code AS code, e.description
+                SELECT DISTINCT ON (nc.ncm_code) nc.ncm_code AS code,
+                  e.description
                 FROM publication_versions pv
-                JOIN publication_ncm_mentions pnm ON pnm.publication_version_id = pv.id
-                LEFT JOIN official_catalog_entries e ON e.id = pnm.official_catalog_entry_id
+                CROSS JOIN LATERAL public.tax13_public_current_ncm_codes(pv.id) nc
+                LEFT JOIN official_catalog_entries e
+                  ON regexp_replace(e.official_code, '[^0-9]', '', 'g')=nc.ncm_code
                 WHERE pv.publication_id = ${request.params.publicationId}::uuid
                   AND pv.is_current = TRUE
-                  AND pnm.verification_status <> 'REJECTED'
-                  AND pnm.ncm_code = ANY(${profileNcms}::text[])
-                  AND ${notSupersededNcmMention('pnm')}
-                ORDER BY pnm.ncm_code, (pnm.verification_status = 'CATALOG_MATCHED') DESC
+                  AND nc.ncm_code = ANY(${profileNcms}::text[])
+                ORDER BY nc.ncm_code, e.description NULLS LAST
               `.execute(app.db)
             ).rows
           : [];
@@ -2325,21 +2324,24 @@ export async function productRoutes(
           ...company.manualProducts.map((term) => ({ term, kind: 'product' as const })),
           ...(REGIME_LABELS[company.profile?.tax_regime ?? ''] ?? []).map((term) => ({ term, kind: 'regime' as const })),
         ];
-        let actText: string | null = null;
+        let actFragments: string[] = [];
         if (profileTerms.length > 0) {
-          const current = await sql<{ content_text: string | null; presentation_html: string | null }>`
-            SELECT pv.content_text, pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+          const current = await sql<{ attested_fragments: string[] | null }>`
+            SELECT public.tax13_public_current_legal_fragments(pv.id) AS attested_fragments
             FROM publication_versions pv
-            WHERE pv.publication_id = ${request.params.publicationId}::uuid AND pv.is_current = TRUE
+            WHERE pv.publication_id = ${request.params.publicationId}::uuid
+              AND pv.is_current = TRUE
           `.execute(app.db);
-          const row = current.rows[0];
-          actText = row ? currentWordingText(row.presentation_html) ?? row.content_text : null;
+          const candidate = current.rows[0]?.attested_fragments;
+          actFragments = Array.isArray(candidate)
+            ? candidate.filter((text): text is string => typeof text === 'string')
+            : [];
         }
 
         const affinity = computePublicationAffinity({
           view,
           profileTerms,
-          actText,
+          actFragments,
           // Any parameter (saved profile, product or CNAE) starts the comparison.
           hasProfile: Boolean(company.profile) || company.productCount > 0 || company.cnaeSuggestions.length > 0,
           profileCodes,

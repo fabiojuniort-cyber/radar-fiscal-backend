@@ -178,3 +178,20 @@ test('a single free-text item of the profile is compared: same tag name, or writ
   });
   assert.equal(unclassified.status, 'OK');
 });
+
+test('R3 F05: lexical relevance must not span independent CURRENT legal fragments', () => {
+  const run = (actFragments: string[]) => computePublicationAffinity({
+    view: view([], 'PENDING'),
+    profileCodes: [],
+    profileProductGroups: new Map(),
+    hasProfile: true,
+    profileTerms: [{ term: 'crédito presumido', kind: 'keyword' }],
+    actFragments,
+  });
+  const separate = run(['Crédito', 'presumido']);
+  assert.equal(separate.matches.some((match) => match.via === 'TEXT'), false);
+  assert.equal(separate.status, 'NOT_CLASSIFIED');
+  const together = run(['Concede-se crédito presumido para operações internas.']);
+  assert.equal(together.matches[0]?.via, 'TEXT');
+  assert.equal(together.matches[0]?.label, 'crédito presumido');
+});

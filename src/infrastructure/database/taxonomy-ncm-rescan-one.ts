@@ -11,6 +11,7 @@ import {
   persistSuccessfulScan,
   selectText,
 } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
+import { persistTemporalNcmScan } from '../../modules/taxonomy/ncm/ncm-temporal.evidence.js';
 import { brazilLegalReferenceDate } from '../../modules/taxonomy/legal-scope/legal-scope-evidence.js';
 import { readVerifiedLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.repository.js';
 import type { DB } from './database.types.js';
@@ -76,7 +77,8 @@ try {
   // content actually backed by the audited official-scope ledger can
   // be saved as the 1.3.0 detector SUCCESS seal. Never let an unverified
   // HTML style or a curator CLI flag supersede earlier NCM evidence.
-  if (confirm && (!evidence.valid || evidence.currentSegments === 0)) {
+  if (confirm && (!evidence.valid || evidence.coverage !== 'COMPLETE' ||
+      evidence.currentSegments === 0)) {
     throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
       (evidence.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
   }
@@ -92,7 +94,16 @@ try {
   const inForce = new Set(candidates.map((candidate) => candidate.code));
   const matched = await db.transaction().execute(async (trx) => {
     const found = await catalogMatches(trx, [...inForce]);
-    if (confirm) await persistSuccessfulScan(trx, row, sourceField, candidates, currentWordingOnly);
+    if (confirm) {
+      const temporal = await persistTemporalNcmScan(trx, {
+        publicationVersionId: row.publication_version_id,
+        sanitizedHtml: row.presentation_html ?? '',
+        asOf,
+      });
+      if (temporal.inserted) {
+        await persistSuccessfulScan(trx, row, sourceField, candidates, currentWordingOnly);
+      }
+    }
     return found;
   });
 

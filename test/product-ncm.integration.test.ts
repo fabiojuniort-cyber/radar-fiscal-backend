@@ -354,15 +354,17 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
       headers: firstHeaders,
     });
     assert.equal(publicationNcms.statusCode, 200);
-    const mention = publicationNcms.json<{
-      items: Array<{ code: string; description: string | null }>;
-    }>().items[0];
-    assert.equal(mention?.code, '10063011');
-    assert.equal(
-      mention?.description,
-      'Arroz semibranqueado ou branqueado.',
-    );
-
+    // R2-06: legacy CATALOG_MATCHED is historical, never CURRENT.
+    const mentions = publicationNcms.json<{
+      items: Array<{ code: string }>;
+      attestedCurrentNcmCodes: string[];
+      historicalCatalogMentions: Array<{ code: string; description: string | null }>;
+    }>();
+    assert.deepEqual(mentions.items, []);
+    assert.deepEqual(mentions.attestedCurrentNcmCodes, []);
+    assert.equal(mentions.historicalCatalogMentions[0]?.code, '10063011');
+    assert.equal(mentions.historicalCatalogMentions[0]?.description,
+      'Arroz semibranqueado ou branqueado.');
     // Card NCM of the tax profile: only catalog NCMs; matches the act's NCMs.
     const profileBody = (ncmCodes: string[]) => ({
       taxRegime: 'LUCRO_REAL',
@@ -392,8 +394,10 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
     });
     assert.equal(affinity.statusCode, 200, affinity.body);
     const affinityBody = affinity.json<{ status: string; matches: Array<{ code: string; dimensionCode: string }> }>();
-    assert.equal(affinityBody.status, 'OK');
-    assert.deepEqual(affinityBody.matches.map((m) => [m.dimensionCode, m.code]), [['ncm', '10063011']]);
+    assert.ok(['OK', 'NOT_CLASSIFIED'].includes(affinityBody.status));
+    assert.equal(affinityBody.matches.some((m) =>
+      m.dimensionCode === 'ncm' && m.code === '10063011'), false,
+    'R2-06 historical-only NCM must not confer SAME_ITEM affinity');
 
     const remove = await app.inject({
       method: 'DELETE',
