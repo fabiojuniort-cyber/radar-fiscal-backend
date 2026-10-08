@@ -12,6 +12,7 @@ import {
   resetClassificationConceptCache,
 } from '../src/modules/taxonomy/classification/classification.worker.js';
 import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
+import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
 
 function signal() {
   let resolve!: () => void;
@@ -104,6 +105,7 @@ export async function checkWorkerConcurrency(
        JSON.stringify({presentation: {html: '<p data-legal-status="current">' + content + '</p>'}})],
     );
     const versionId = version.rows[0]!.id;
+    await seedTestLegalScopeAttestation(admin, versionId);
     const probes = [new WorkerProbe(), new WorkerProbe()];
     const workers = probes.map((probe) => createStandaloneDatabase({
       connectionString, poolMax: 1, idleTimeoutMs: 5_000, connectionTimeoutMs: 5_000,
