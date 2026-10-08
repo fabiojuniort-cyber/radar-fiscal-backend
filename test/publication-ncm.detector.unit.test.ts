@@ -258,6 +258,22 @@ test('unknown or uncertain legal status cannot become affirmative evidence', () 
   );
 });
 
+test('general legal headings and publication notes do not classify in structured HTML', () => {
+  const html = [
+    '<h1>LEI COMPLEMENTAR Nº 214, DE 16 DE JANEIRO DE 2025</h1>',
+    '<p>Publicado no Diário Oficial em 17/01/2025, NCM 8701.90.00.</p>',
+    '<p>Alterado pela Lei nº 99/2026; NCM 7612.90.19.</p>',
+    '<p>Art. 1º Incide o IBS sobre sementes, NCM 3102.10.90.</p>',
+    '<p>Redação anterior: aplica-se às máquinas 1006.30.11.</p>',
+    '<p>ANEXO I</p>',
+    '<table><tr><td>Produto atual</td><td>3925.10.00</td></tr></table>',
+  ].join('');
+  const selected = currentWordingText(html) ?? '';
+  assert.match(selected, /Art\. 1º Incide o IBS/);
+  assert.match(selected, /3102\.10\.90|3925\.10\.00/);
+  assert.doesNotMatch(selected, /LEI COMPLEMENTAR|8701\.90\.00|7612\.90\.19|1006\.30\.11|ANEXO I/);
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
