@@ -471,10 +471,10 @@ $$;
 CREATE FUNCTION public.tax13_ncm_detect_codes(p_fragment TEXT)
 RETURNS TABLE(code TEXT) LANGUAGE sql IMMUTABLE
 SET search_path = pg_catalog, public, pg_temp AS $$
-    SELECT DISTINCT regexp_replace((hit.match)[1], '[^0-9]', '', 'g')
+    SELECT DISTINCT regexp_replace((hit.capture)[1], '[^0-9]', '', 'g')
     FROM regexp_matches(p_fragment,
       '(?<![0-9.])([0-9]{8}|[0-9]{4}[.][0-9]{2}[.][0-9]{2}|[0-9]{4}[.][0-9]{4})(?![0-9]|[.][0-9])',
-      'g') AS hit(match);
+      'g') AS hit(capture);
 $$;
 
 CREATE FUNCTION public.tax13_ncm_scan_consistent(p_scan UUID)
