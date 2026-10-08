@@ -159,7 +159,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
       [conceptRevId, conceptId]);
     await admin.query(`INSERT INTO taxonomy_releases
       (id,version_major,version_minor,version_patch,created_by_actor)
-      VALUES ($1,$2,0,0,'TAX13-R2-CI')`,
+      VALUES ($1,0,$2,0,'TAX13-R2-CI')`,
       [releaseId, Number.parseInt(suffix.slice(0,7),16)]);
     await admin.query(`INSERT INTO taxonomy_release_dimensions
       (release_id,dimension_id,dimension_revision_id) VALUES ($1,$2,$3)`,
