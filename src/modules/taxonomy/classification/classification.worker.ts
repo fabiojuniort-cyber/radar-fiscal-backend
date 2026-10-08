@@ -544,8 +544,8 @@ export async function classifySinglePublication(
     taxonomyReleaseId: input.releaseId,
     // Editorial titles are not independently attested CURRENT evidence.
         title: '',
-    contentText: scopeCurrent ? verified.currentText : null,
-    verifiedCurrentFragments: scopeCurrent ? verified.currentFragments : [],
+    contentText: scopeCurrent && currentNcm ? verified.currentText : null,
+    verifiedCurrentFragments: scopeCurrent && currentNcm ? verified.currentFragments : [],
     ncmCodes: scopeCurrent && currentNcm ? currentNcm.codes : [],
     ...(currentNcm ? { legalScopeFingerprint: currentNcm.fingerprint } : {}),
     concepts,
