@@ -202,6 +202,19 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
             (publication_id, source_id, official_url)
           VALUES ($1::uuid, $2::uuid, $3) RETURNING id
         `, [publication.rows[0]!.id, source.rows[0]!.id, originUrl]);
+        const verifiedAt = new Date(Date.now() - 60_000).toISOString();
+        const scopeManifest = JSON.stringify({
+          version: 1,
+          publicationVersionId: version.rows[0]!.id,
+          sourceId: source.rows[0]!.id,
+          officialUrl: originUrl,
+          htmlSha256: hash,
+          validAsOf: '2026-10-08',
+          verifiedAt,
+          recheckOn: '2099-01-01',
+          coverage: 'UNVERIFIED',
+          segments: [],
+        });
         const attestation = await client.query<{ id: string }>(`
           INSERT INTO public.publication_legal_scope_attestations
             (publication_version_id, source_id, publication_origin_id,
@@ -209,10 +222,10 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
              recheck_on, coverage, manifest, attestor_kind, attestor_ref)
           VALUES
             ($1::uuid,$2::uuid,$3::uuid,$4,$5,'2026-10-08',
-             now()-interval '1 minute','2099-01-01','UNVERIFIED',
-             '{"version":1,"segments":[]}'::jsonb,'HUMAN_REVIEW','tax13-b4-ci')
+             $6::timestamptz,'2099-01-01','UNVERIFIED',
+             $7::jsonb,'HUMAN_REVIEW','tax13-b4-ci')
           RETURNING id
-        `, [version.rows[0]!.id, source.rows[0]!.id, origin.rows[0]!.id, originUrl, hash]);
+        `, [version.rows[0]!.id, source.rows[0]!.id, origin.rows[0]!.id, originUrl, hash, verifiedAt, scopeManifest]);
         assert.ok(attestation.rows[0]?.id);
 
         for (const [label, command] of [
