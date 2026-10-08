@@ -9,6 +9,8 @@ import {
   type LegalScopeValidationContext,
 } from '../src/modules/taxonomy/legal-scope/legal-scope-evidence.js';
 
+import { verifyPersistedLegalScopeRow, type AttestationRow } from '../src/modules/taxonomy/legal-scope/legal-scope.repository.js';
+
 const digest = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
 const html = '<p>ANEXO II</p><table><tr><td>8701.90.00 revogado</td>' +
   '<td>7307.19.20 vigente</td></tr></table>';
@@ -122,4 +124,32 @@ test('TAX13 B4 fails closed on malformed persisted evidence JSON', () => {
   assert.equal(validateLegalScopeEvidence(invalid as unknown as LegalScopeEvidenceV1, ctx).reason, 'INVALID_SEGMENTS');
   invalid.segments = [null];
   assert.equal(validateLegalScopeEvidence(invalid as unknown as LegalScopeEvidenceV1, ctx).reason, 'INVALID_SEGMENT');
+});
+
+test('TAX13 B4 verified ledger row is the only trusted source of active fragment', () => {
+  const valid=manifest();
+  const row: AttestationRow = {
+    id:'00000000-0000-4000-8000-000000000002',
+    manifest:valid,
+    source_id:ctx.sourceId,
+    source_code:'confaz',
+    official_url:ctx.officialUrl,
+    origin_url:ctx.officialUrl,
+    html_sha256:valid.htmlSha256,
+    valid_as_of:valid.validAsOf,
+    recheck_on:valid.recheckOn,
+    verified_at:new Date(valid.verifiedAt),
+    coverage:valid.coverage,
+    attestor_kind:'HUMAN_REVIEW',
+  };
+  const input={publicationVersionId:ctx.publicationVersionId,sanitizedHtml:html,asOf:ctx.validAsOf};
+  const result=verifyPersistedLegalScopeRow(row,input);
+  assert.equal(result.valid,true);
+  assert.equal(result.currentText,current);
+  assert.equal(result.attestationId,row.id);
+  assert.equal(verifyPersistedLegalScopeRow(undefined,input).reason,'ATTESTATION_MISSING');
+  assert.equal(verifyPersistedLegalScopeRow({...row,source_code:'unknown-source'},input).reason,'SOURCE_ADAPTER_NOT_ATTESTED');
+  assert.equal(verifyPersistedLegalScopeRow({...row,html_sha256:digest('other')},input).reason,'ATTESTATION_RECORD_MISMATCH');
+  assert.equal(verifyPersistedLegalScopeRow({...row,origin_url:'https://attacker.example'},input).reason,'ATTESTATION_RECORD_MISMATCH');
+  assert.equal(verifyPersistedLegalScopeRow({...row,attestor_kind:'REMOTE_METADATA'},input).reason,'ATTESTATION_RECORD_MISMATCH');
 });
