@@ -21,7 +21,7 @@ export type LegalScopeReadResult = LegalScopeValidation & {
   asOf: string;
 };
 
-interface AttestationRow {
+export interface AttestationRow {
   id: string;
   manifest: LegalScopeEvidenceV1;
   source_id: string;
@@ -91,7 +91,14 @@ export async function readVerifiedLegalScope(
     LIMIT 1
   `.execute(db);
 
-  const row = result.rows[0];
+  return verifyPersistedLegalScopeRow(result.rows[0], input);
+}
+
+/** Pure boundary: DB ledger fields must match the manifest before trust. */
+export function verifyPersistedLegalScopeRow(
+  row: AttestationRow | undefined,
+  input: { publicationVersionId: string; sanitizedHtml: string; asOf: string },
+): LegalScopeReadResult {
   if (!row) return unverified(input.asOf, 'ATTESTATION_MISSING');
   const hosts = OFFICIAL_EVIDENCE_HOSTS[row.source_code];
   if (!hosts) return unverified(input.asOf, 'SOURCE_ADAPTER_NOT_ATTESTED');
