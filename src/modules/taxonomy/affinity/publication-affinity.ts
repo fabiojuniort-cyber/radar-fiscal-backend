@@ -97,7 +97,9 @@ export function computePublicationAffinity(input: {
   publicationNcms?: ReadonlyArray<{ code: string; description: string | null }>;
   /** Keywords, products typed by the user and regime, matched by name. */
   profileTerms?: readonly ProfileTerm[];
-  /** Wording in force of the act, for the profile terms. */
+  /** Exact CURRENT legal fragments; never join independent text nodes. */
+  actFragments?: readonly string[] | null;
+  /** Legacy single-fragment caller support only. */
   actText?: string | null;
 }): PublicationAffinity {
   const profile = new Set(input.profileCodes);
@@ -127,7 +129,10 @@ export function computePublicationAffinity(input: {
   const actTags = input.view.status === 'CLASSIFIED'
     ? input.view.sections.flatMap((section) => section.tags).filter((tag) => !tag.removed)
     : [];
-  const actText = input.actText ? ` ${normalizeTerm(input.actText)} ` : '';
+  // A phrase cannot span separate legal fragments. Preserve the boundaries
+  // through normalization rather than using a concatenated presentation.
+  const fragments = (input.actFragments ?? (input.actText ? [input.actText] : []))
+    .map((fragment) => ` ${normalizeTerm(fragment)} `);
   for (const item of terms) {
     const tag = actTags.find((candidate) => normalizeTerm(candidate.label) === item.key);
     const weight = tag ? DIMENSION_WEIGHTS[tag.dimensionCode] ?? 0 : 0;
@@ -139,7 +144,7 @@ export function computePublicationAffinity(input: {
       continue;
     }
     const code = `text:${item.kind}:${item.key}`;
-    if (actText.includes(` ${item.key} `) && !matches.has(code)) {
+    if (fragments.some((fragment) => fragment.includes(` ${item.key} `)) && !matches.has(code)) {
       matches.set(code, {
         code,
         label: item.term,
