@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
+import { sql, type Transaction } from 'kysely';
+import type { DB } from '../src/infrastructure/database/database.types.js';
 
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
 import {
@@ -14,6 +16,7 @@ import { sanitizeLegalPresentationHtml } from '../src/modules/collection/legal-p
 import { readVerifiedLegalScope } from '../src/modules/taxonomy/legal-scope/legal-scope.repository.js';
 import {
   persistTemporalNcmScan, readCurrentNcmEvidence,
+  currentNcmEdition, ncmTemporalFingerprint,
 } from '../src/modules/taxonomy/ncm/ncm-temporal.evidence.js';
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
@@ -84,6 +87,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
       date: string, statuses: Array<'CURRENT' | 'REVOKED' | 'EDITORIAL'>,
       coverage: 'COMPLETE' | 'PARTIAL' = 'COMPLETE',
       supersedes: string | null = null,
+      options?: { client?: PoolClient; id?: string },
     ): Promise<string> => {
       let index = 0;
       const segments = parts.map((part, i) => {
@@ -102,18 +106,19 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
         verifiedAt: new Date(Date.now() - 60_000).toISOString(),
         recheckOn: nextDate(date, 3), coverage, segments,
       };
-      const row = await admin.query<{ id: string }>(
+      const row = await (options?.client ?? admin).query<{ id: string }>(
         `INSERT INTO publication_legal_scope_attestations(
           publication_version_id,source_id,publication_origin_id,official_url,
           html_sha256,valid_as_of,verified_at,recheck_on,coverage,manifest,
-          attestor_kind,attestor_ref,supersedes_attestation_id
+          attestor_kind,attestor_ref,supersedes_attestation_id,id
         ) VALUES (
           $1::uuid,$2::uuid,$3::uuid,$4,$5,$6::date,$7::timestamptz,
-          $8::date,$9,$10::jsonb,'HUMAN_REVIEW','CI-TEMPORAL',$11::uuid
+          $8::date,$9,$10::jsonb,'HUMAN_REVIEW','CI-TEMPORAL',$11::uuid,
+          coalesce($12::uuid,gen_random_uuid())
         ) RETURNING id`,
         [versionId, sourceId, originId, officialUrl, h(html),
           date, manifest.verifiedAt, manifest.recheckOn, coverage,
-          JSON.stringify(manifest), supersedes],
+          JSON.stringify(manifest), supersedes, options?.id ?? null],
       );
       return row.rows[0]!.id;
     };
@@ -126,6 +131,44 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     const a0 = await attest(d0, ['EDITORIAL','CURRENT','REVOKED','REVOKED']);
     const firstProof = await readProof(d0);
     assert.equal(firstProof.valid, true, firstProof.reason ?? undefined);
+    // Independent R2-03/04: a permitted worker INSERT must not forge a
+    // REVOKED NCM or seal a SUCCESS with missing code rows.
+    const edition0 = await currentNcmEdition(worker, d0);
+    const fingerprint0 = ncmTemporalFingerprint(versionId, firstProof, edition0);
+    const insertHeader = async (trx: Transaction<DB>) => {
+      const inserted = await sql<{ id: string }>`
+        INSERT INTO public.publication_ncm_scan_evidence (
+          publication_version_id,detector_key,detector_version,
+          legal_scope_attestation_id,legal_as_of,recheck_on,coverage,
+          html_sha256,current_fragments_sha256,catalog_edition_id,catalog_sha256,
+          run_fingerprint,source_field,candidate_count,match_count,outcome
+        ) VALUES (
+          ${versionId}::uuid,'tribusca.taxonomy.ncm','1.3.0',
+          ${firstProof.attestationId}::uuid,${d0}::date,${firstProof.recheckOn}::date,
+          'COMPLETE',${h(html)},${h(JSON.stringify(firstProof.currentFragments))},
+          ${edition0.id}::uuid,${edition0.checksum},${fingerprint0},
+          'CONTENT_TEXT',1,1,'SUCCESS'
+        ) RETURNING id
+      `.execute(trx);
+      return inserted.rows[0]!.id;
+    };
+    await assert.rejects(worker.transaction().execute(async (trx) => {
+      await insertHeader(trx); // match_count=1 but no codes at COMMIT
+    }), /TAX13_NCM_SCAN_INCOMPLETE_OR_UNVERIFIED/, 'R2-04 incomplete SUCCESS');
+    await assert.rejects(worker.transaction().execute(async (trx) => {
+      const scanId = await insertHeader(trx);
+      const entry = await sql<{ id: string }>`
+        SELECT id FROM official_catalog_entries
+        WHERE catalog_edition_id=${edition0.id}::uuid
+          AND regexp_replace(official_code,'[^0-9]','','g')='10062099'
+        LIMIT 1
+      `.execute(trx);
+      assert.ok(entry.rows[0]?.id, 'revoked-text NCM is a real catalog entry');
+      await sql`INSERT INTO public.publication_ncm_scan_evidence_codes(
+        scan_evidence_id,ncm_code,catalog_entry_id,fragment_index,excerpt
+      ) VALUES (${scanId}::uuid,'10062099',${entry.rows[0]!.id}::uuid,999,
+        'fabricated REVOKED fragment')`.execute(trx);
+    }), /TAX13_NCM_SCAN_CODE_NOT_IN_CURRENT_FRAGMENT/, 'R2-03 worker forged REVOKED code');
     const first = await rescan(d0);
     assert.equal(first.inserted, true);
     assert.equal(first.matches, 1);
@@ -139,6 +182,19 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
       [versionId]);
     assert.match(bridge0.rows[0]!.fingerprint!, /^[a-f0-9]{64}$/);
     assert.equal(bridge0.rows[0]?.code, '10063011');
+
+    // R2-02: URL/provenance drift invalidates worker AND SQL bridge.
+    await admin.query(`UPDATE publication_origins SET official_url=$2 WHERE id=$1::uuid`,
+      [originId,officialUrl + '/changed']);
+    const drift = await readProof(d0);
+    assert.equal(drift.valid,false);
+    assert.equal(drift.reason,'ATTESTATION_RECORD_MISMATCH');
+    const invalidBridge = await admin.query<{ fingerprint: string | null }>(
+      `SELECT public.tax13_current_ncm_scan_fingerprint($1::uuid) AS fingerprint`,[versionId]);
+    assert.equal(invalidBridge.rows[0]?.fingerprint,null,'R2-02 provenance drift');
+    await admin.query(`UPDATE publication_origins SET official_url=$2 WHERE id=$1::uuid`,
+      [originId,officialUrl]);
+
 
     // Tenant matching reads the effective-assertions view (020), bypassing
     // the taxonomy detail endpoint. Prove an old curated SUCCESS cannot flow
@@ -254,6 +310,27 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     assert.equal((await rescan(d0)).inserted, true);
     assert.deepEqual((await readCurrentNcmEvidence(worker, versionId, changed))?.codes,
       ['10062099']);
+
+    // R2-01: explicit successor must prevail with identical transaction
+    // timestamp and deliberately smaller UUID; never sort UUID as time.
+    const tieDate = nextDate(d0, 2);
+    const connection = await admin.connect();
+    try {
+      await connection.query('BEGIN');
+      const priorId = await attest(tieDate, ['EDITORIAL','CURRENT','REVOKED','REVOKED'],
+        'COMPLETE', null, { client: connection, id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+      const successorId = await attest(tieDate, ['EDITORIAL','REVOKED','CURRENT','REVOKED'],
+        'COMPLETE', priorId, { client: connection, id: '00000000-0000-4000-8000-000000000001' });
+      await connection.query('COMMIT');
+      const selected = await readProof(tieDate);
+      assert.equal(selected.attestationId,successorId,'R2-01 supersession wins UUID tie');
+      await rescan(tieDate);
+      assert.deepEqual((await readCurrentNcmEvidence(worker,versionId,selected))?.codes,
+        ['10062099']);
+    } catch (error) {
+      await connection.query('ROLLBACK');
+      throw error;
+    } finally { connection.release(); }
 
     // Fresh COMPLETE(0) attestation must not destroy or relabel old Y/X events.
     await attest(d0, ['EDITORIAL','REVOKED','REVOKED','CURRENT'], 'COMPLETE', sameDay);
