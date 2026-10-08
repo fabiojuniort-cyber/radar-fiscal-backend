@@ -154,6 +154,10 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run test:integration
 
+      - name: ONB-01 adversarial tenant/CNAE/company integration
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/onboarding-integrity.integration.test.ts
+
       - name: News API integration test
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/news.api.integration.test.ts
@@ -253,3 +257,62 @@ jobs:
       - name: Recovery barrier and privilege integration (synthetic fixtures only)
         shell: bash
         run: env -i PATH="$PATH" bash ops/dou-clean-02/runner/test-pg18-isolated.sh --run-isolated-fixture
+
+  onb01-pg18:
+    name: ONB-01 migrations 042-043 and identity/RLS on PostgreSQL 18
+    needs: verify
+    if: needs.verify.result == 'success' && needs.verify.outputs.full_regression == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply complete migrations including ONB-01 042 and 043
+        run: npm run db:prepare
+      - name: Verify onboarding migration on PostgreSQL 18
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 -Atc "
+            SELECT CASE WHEN EXISTS(
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public'
+                AND table_name='tenant_onboarding_profiles'
+                AND column_name='company_name'
+                AND is_nullable='YES'
+            ) AND EXISTS(
+              SELECT 1 FROM pg_trigger WHERE tgname='trg_establishment_company_root'
+            ) THEN 'PASS' ELSE 'BLOCK' END;
+          " | grep -qx PASS
+      - name: Signup consent and authentication/RLS on PG18
+        run: npx tsx --test test/public-signup.integration.test.ts
+      - name: Adversarial CNAE/branch/isolation on PG18
+        run: npx tsx --test test/onboarding-integrity.integration.test.ts
