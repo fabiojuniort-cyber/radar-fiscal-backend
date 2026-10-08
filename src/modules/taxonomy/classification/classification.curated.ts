@@ -49,6 +49,8 @@ export interface CuratedClassificationInput {
   ncmCodes: readonly string[];
   concepts: readonly CuratedConceptInput[];
   codeGitSha?: string | null;
+  /** Temporal proof identity, so new legal evidence invalidates old runs. */
+  legalScopeFingerprint?: string;
 }
 
 export interface CuratedClassificationPlan {
@@ -274,7 +276,9 @@ export function planCuratedClassification(
   }
 
   const configSnapshot = {
-    policyVersion: input.verifiedCurrentFragments === undefined ? 3 : 4,
+    policyVersion: input.legalScopeFingerprint ? 5 :
+      input.verifiedCurrentFragments === undefined ? 3 : 4,
+    ...(input.legalScopeFingerprint ? { legalScopeFingerprint: input.legalScopeFingerprint } : {}),
     ...(input.verifiedCurrentFragments === undefined ? {} : {
       matchScope: 'PER_ATTESTED_CURRENT_FRAGMENT',
     }),
@@ -301,7 +305,8 @@ export function planCuratedClassification(
   const inputSha256 = sha256Hex(JSON.stringify(
     input.verifiedCurrentFragments === undefined
       ? { raw, ncmCodes }
-      : { raw, ncmCodes, verifiedCurrentFragments: input.verifiedCurrentFragments },
+      : { raw, ncmCodes, verifiedCurrentFragments: input.verifiedCurrentFragments,
+          legalScopeFingerprint: input.legalScopeFingerprint ?? null },
   ));
   const fingerprint = buildClassificationFingerprint({
     publicationVersionId: input.publicationVersionId,
