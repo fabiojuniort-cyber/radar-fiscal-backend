@@ -433,8 +433,8 @@ BEGIN
     -- treated as CURRENT; SHA checks on every legal segment reject divergence.
     FOR segment IN SELECT value FROM jsonb_array_elements(record_.manifest->'segments')
     LOOP
-      IF segment->>'start' !~ '^[0-9]+$' OR segment->>'end' !~ '^[0-9]+$'
-        OR segment->>'textSha256' !~ '^[a-f0-9]{64}$'
+      IF coalesce(segment->>'start','') !~ '^[0-9]+$' OR coalesce(segment->>'end','') !~ '^[0-9]+$'
+        OR coalesce(segment->>'textSha256','') !~ '^[a-f0-9]{64}$'
       THEN RETURN NULL;
       END IF;
       start_at := (segment->>'start')::integer;
@@ -446,7 +446,9 @@ BEGIN
       piece := substr(legal_text,start_at+1,end_at-start_at);
       IF encode(sha256(convert_to(piece,'UTF8')),'hex') IS DISTINCT FROM
            segment->>'textSha256'
-        OR segment->>'status' NOT IN
+        OR coalesce(segment->>'method','') NOT IN
+           ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT','ORIGINAL_PUBLICATION','HUMAN_REVIEW')
+        OR coalesce(segment->>'status','') NOT IN
            ('CURRENT','PREVIOUS','REVOKED','EDITORIAL','UNVERIFIED')
       THEN RETURN NULL;
       END IF;
@@ -461,11 +463,11 @@ BEGIN
       FOR evidence_url IN SELECT value
         FROM jsonb_array_elements_text(segment->'evidenceUrls') AS e(value)
       LOOP
-        IF evidence_url !~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
+        IF coalesce(evidence_url,'') !~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
         THEN RETURN NULL; END IF;
       END LOOP;
       IF segment->>'status'='CURRENT' THEN
-        IF segment->>'method' NOT IN ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT')
+        IF coalesce(segment->>'method','') NOT IN ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT')
           OR jsonb_typeof(segment->'evidenceUrls') IS DISTINCT FROM 'array'
           OR jsonb_array_length(segment->'evidenceUrls')=0
         THEN RETURN NULL;
