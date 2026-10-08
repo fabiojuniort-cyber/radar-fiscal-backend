@@ -422,7 +422,7 @@ export async function processPublicationTaxonomyBatch(
       // Never seal zero assertions or reclassify the archive from an
       // unverified headline, revoked wording, or stale attestation.
       // The publication remains pending, preserving previous releases.
-      if (!verified.valid || verified.currentSegments === 0) continue;
+      if (!verified.valid || verified.coverage !== 'COMPLETE' || verified.currentSegments === 0) continue;
       const plan = planCuratedClassification({
         publicationVersionId: row.publication_version_id,
         taxonomyReleaseId: release.id,
