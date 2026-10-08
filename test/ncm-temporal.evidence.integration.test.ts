@@ -135,7 +135,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     // REVOKED NCM or seal a SUCCESS with missing code rows.
     const edition0 = await currentNcmEdition(worker, d0);
     const fingerprint0 = ncmTemporalFingerprint(versionId, firstProof, edition0);
-    const insertHeader = async (trx: Transaction<DB>) => {
+    const insertHeader = async (trx: Transaction<DB>, fingerprint = fingerprint0) => {
       const inserted = await sql<{ id: string }>`
         INSERT INTO public.publication_ncm_scan_evidence (
           publication_version_id,detector_key,detector_version,
@@ -146,7 +146,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
           ${versionId}::uuid,'ncm.catalog.regex','1.3.0',
           ${firstProof.attestationId}::uuid,${d0}::date,${firstProof.recheckOn}::date,
           'COMPLETE',${h(html)},${h(JSON.stringify(firstProof.currentFragments))},
-          ${edition0.id}::uuid,${edition0.checksum},${fingerprint0},
+          ${edition0.id}::uuid,${edition0.checksum},${fingerprint},
           'CONTENT_TEXT',1,1,'SUCCESS'
         ) RETURNING id
       `.execute(trx);
@@ -169,6 +169,22 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
       ) VALUES (${scanId}::uuid,'10062099',${entry.rows[0]!.id}::uuid,999,
         'fabricated REVOKED fragment')`.execute(trx);
     }), /TAX13_NCM_SCAN_CODE_NOT_IN_CURRENT_FRAGMENT/, 'R2-03 worker forged REVOKED code');
+    // R3 F03: all codes/header match the real attestation, but a forged
+    // run_fingerprint must be rejected by SQL before a positive API projection.
+    await assert.rejects(worker.transaction().execute(async (trx) => {
+      const forged = await insertHeader(trx, h('forged-' + randomUUID()));
+      const entry = await sql<{ id: string }>`
+        SELECT id FROM official_catalog_entries
+        WHERE catalog_edition_id=${edition0.id}::uuid
+          AND regexp_replace(official_code,'[^0-9]','','g')='10063011'
+        LIMIT 1
+      `.execute(trx);
+      assert.ok(entry.rows[0]?.id, 'current-text NCM catalog entry must exist');
+      await sql`INSERT INTO publication_ncm_scan_evidence_codes(
+        scan_evidence_id,ncm_code,catalog_entry_id,fragment_index,excerpt
+      ) VALUES (${forged}::uuid,'10063011',${entry.rows[0]!.id}::uuid,0,
+        'NCM 1006.30.11')`.execute(trx);
+    }), /TAX13_NCM_SCAN_INCOMPLETE_OR_UNVERIFIED/, 'R3 F03 arbitrary fingerprint');
     const first = await rescan(d0);
     assert.equal(first.inserted, true);
     assert.equal(first.matches, 1);
