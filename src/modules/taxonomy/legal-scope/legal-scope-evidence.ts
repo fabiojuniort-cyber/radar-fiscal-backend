@@ -205,7 +205,7 @@ export function validateLegalScopeEvidence(
          segment.supportingActs.length > 25 ||
          segment.supportingActs.some((act) =>
            typeof act !== 'string' || act.trim().length === 0 ||
-           act.length > 256 || /[\\u0000-\\u001f]/.test(act)))) {
+           act.length > 256 || /[\u0000-\u001f]/.test(act)))) {
       return fail('INVALID_SUPPORTING_ACTS');
     }
     if (!Array.isArray(segment.evidenceUrls) || segment.evidenceUrls.length > 25) {

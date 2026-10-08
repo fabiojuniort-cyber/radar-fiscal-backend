@@ -285,7 +285,7 @@ test('TAX13 refuses malformed or excessive supportingActs and URL arrays', () =>
     [[''], 'INVALID_SUPPORTING_ACTS'],
     [['CONVÊNIO 10/26'.repeat(30)], 'INVALID_SUPPORTING_ACTS'],
     [Array.from({length: 26}, (_, i) => 'ACT ' + i), 'INVALID_SUPPORTING_ACTS'],
-    [['ACT\\nWITH NEWLINE'], 'INVALID_SUPPORTING_ACTS'],
+    [['ACT\nWITH NEWLINE'], 'INVALID_SUPPORTING_ACTS'],
   ];
   for (const [value, reason] of variations) {
     const row = manifest();
