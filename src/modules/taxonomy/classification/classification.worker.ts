@@ -151,12 +151,7 @@ async function selectPending(
               AND evidence.recheck_on > ${asOf}::date
               AND evidence.catalog_edition_id = ${edition.id}::uuid
               AND evidence.catalog_sha256 = ${edition.checksum}
-              AND evidence.legal_scope_attestation_id = (
-                SELECT newest.id FROM public.publication_legal_scope_attestations newest
-                WHERE newest.publication_version_id = pv.id
-                  AND newest.valid_as_of = ${asOf}::date
-                ORDER BY newest.created_at DESC, newest.id DESC LIMIT 1
-              )
+              AND evidence.legal_scope_attestation_id = public.tax13_effective_attestation_id(pv.id, ${asOf}::date)
           )
         )
         OR (
@@ -183,12 +178,7 @@ async function selectPending(
           AND evidence.catalog_edition_id = ${edition.id}::uuid
           AND evidence.catalog_sha256 = ${edition.checksum}
           AND evidence.outcome = 'SUCCESS'
-          AND evidence.legal_scope_attestation_id = (
-            SELECT latest.id FROM public.publication_legal_scope_attestations latest
-            WHERE latest.publication_version_id = pv.id
-              AND latest.valid_as_of = ${asOf}::date
-            ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
-          )
+          AND evidence.legal_scope_attestation_id = public.tax13_effective_attestation_id(pv.id, ${asOf}::date)
       )
       AND NOT EXISTS (
         SELECT 1
