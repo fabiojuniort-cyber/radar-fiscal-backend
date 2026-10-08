@@ -63,3 +63,18 @@ test('TAX13 scoped: revoked and previous paragraphs do not contaminate current b
   assert.match(selected, /7307\.19\.20/);
   assert.doesNotMatch(selected, /9999\.99\.99|8450\.11\.00|1006\.30\.11|CONVÊNIO ICMS 52\/91/);
 });
+
+test('TAX13 F1 R2: nested P annex title inherits TH/TD revocation or unverified status', () => {
+  for (const cell of ['th', 'td']) {
+    for (const status of ['revoked', 'unverified']) {
+      const html =
+        `<table><tr><${cell} data-legal-status="${status}"><p>ANEXO II</p></${cell}></tr>` +
+        '<tr><td>8450.11.00</td></tr>' +
+        '<tr><th><p>ANEXO III</p></th></tr>' +
+        '<tr><td>7307.19.20</td></tr></table>';
+      const preview = tax13ScopedPresentationText(html) ?? '';
+      assert.doesNotMatch(preview, /8450\.11\.00/);
+      assert.match(preview, /7307\.19\.20/);
+    }
+  }
+});
