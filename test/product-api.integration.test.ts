@@ -9,6 +9,7 @@ import type { FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
 
 import { buildApp } from '../src/app.js';
+import { ensureCnaeFixture } from './onboarding-cnae-fixture.js';
 
 const PASSWORD = 'Launch-Seguro-2026!';
 
@@ -119,6 +120,7 @@ test(
 
     try {
       await app.ready();
+      await ensureCnaeFixture(admin);
 
       const first = await registerAndLogin(
         app,
@@ -661,6 +663,7 @@ test(
         cnpjFromSeed('887760000001');
       const branchRegistryCnpj =
         cnpjFromSeed('887760000002');
+      const invalidRegistryCnpj = cnpjFromSeed('776650000001');
       const originalFetch =
         globalThis.fetch;
 
@@ -686,8 +689,8 @@ test(
                   logradouro: 'Avenida das Empresas',
                   numero: '100',
                   bairro: 'Centro',
-                  cnae_fiscal: 4683400,
-                  cnae_fiscal_descricao: 'Comércio atacadista de defensivos agrícolas',
+                  cnae_fiscal: requestedCnpj === invalidRegistryCnpj ? 9999999 : 4683400,
+                  cnae_fiscal_descricao: 'DESCRIÇÃO FALSA DO PROVEDOR — NÃO PROPAGAR',
                   cnaes_secundarios: [
                     {
                       codigo: 4623108,
@@ -741,6 +744,25 @@ test(
 
             return new Response('unexpected request', { status: 500 });
           };
+
+        // An invalid registry CNAE must not create a company or poison global cnaes.
+        const rejectedRegistry = await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies/from-cnpj',
+          headers: firstHeaders,
+          payload: { cnpj: invalidRegistryCnpj },
+        });
+        assert.equal(rejectedRegistry.statusCode, 400, rejectedRegistry.body);
+        assert.equal(rejectedRegistry.json<{ error: string }>().error, 'invalid_cnae');
+        const fakeRegistryCnae = await admin.query(
+          "SELECT code FROM cnaes WHERE code = '9999999'",
+        );
+        assert.equal(fakeRegistryCnae.rowCount, 0);
+        const rolledBackCompany = await admin.query(
+          'SELECT id FROM companies WHERE head_office_cnpj = $1',
+          [invalidRegistryCnpj],
+        );
+        assert.equal(rolledBackCompany.rowCount, 0);
 
         const registryCreate =
           await app.inject({
@@ -862,6 +884,21 @@ test(
           3,
         );
 
+
+        const canonicalCnaes = await admin.query<{ code: string; description: string; official_description: string }>(`
+          SELECT c.code, c.description, entry.description AS official_description
+          FROM cnaes c
+          JOIN official_catalogs cat ON cat.code = 'CNAE'
+          JOIN official_catalog_editions ed ON ed.catalog_id = cat.id AND ed.status = 'CURRENT'
+          JOIN official_catalog_entries entry ON entry.catalog_edition_id = ed.id
+            AND regexp_replace(entry.official_code, '[^0-9]', '', 'g') = c.code
+          WHERE c.code IN ('4683400', '4623108', '4632001')
+        `);
+        assert.equal(canonicalCnaes.rowCount, 3);
+        for (const row of canonicalCnaes.rows) {
+          assert.equal(row.description, row.official_description);
+        }
+
         const branchRegistryCreate =
           await app.inject({
             method: 'POST',
@@ -912,6 +949,16 @@ test(
           branchBody.establishment
             .cnaes.length,
           3,
+        );
+
+        const afterAutomaticBranch = await admin.query<{ code: string; description: string }>(
+          "SELECT code, description FROM cnaes WHERE code IN ('4683400', '4623108', '4632001') ORDER BY code",
+        );
+        assert.deepEqual(
+          afterAutomaticBranch.rows,
+          canonicalCnaes.rows.map(({ code, description }) => ({ code, description }))
+            .sort((a, b) => a.code.localeCompare(b.code)),
+          'New automatic branch must never rewrite global CNAE descriptions',
         );
 
         const deleteRegistryCompany =
