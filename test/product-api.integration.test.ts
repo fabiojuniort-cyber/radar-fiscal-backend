@@ -764,6 +764,38 @@ test(
         );
         assert.equal(rolledBackCompany.rowCount, 0);
 
+        // Integrated recovery: after the provider's bad CNAE is rejected,
+        // the same authorized user can select a CURRENT official CNAE and
+        // create the matrix through the real API with PostgreSQL persistence.
+        const officialOptions = await app.inject({
+          method: 'GET',
+          url: '/api/v1/cnae-catalog?search=6201501',
+          headers: firstHeaders,
+        });
+        assert.equal(officialOptions.statusCode, 200, officialOptions.body);
+        const available = officialOptions.json<{ items: Array<{ code: string; description: string }> }>().items;
+        const selected = available.find((item) => item.code === '6201501');
+        assert.ok(selected, 'Official fallback options should include eligible CNAE');
+
+        const recoveredManually = await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies/manual',
+          headers: firstHeaders,
+          payload: {
+            cnpj: invalidRegistryCnpj,
+            legalName: 'Matriz recuperada com CNAE oficial',
+            uf: 'GO',
+            cnaes: [{ ...selected, isPrimary: true }],
+          },
+        });
+        assert.equal(recoveredManually.statusCode, 201, recoveredManually.body);
+        const manuallyCreatedId = recoveredManually.json<{ company: { id: string } }>().company.id;
+        const recoveredFromDb = await admin.query<{ head_office_cnpj: string }>(
+          'SELECT head_office_cnpj FROM companies WHERE id = $1',
+          [manuallyCreatedId],
+        );
+        assert.equal(recoveredFromDb.rows[0]?.head_office_cnpj, invalidRegistryCnpj);
+
         const registryCreate =
           await app.inject({
             method: 'POST',
