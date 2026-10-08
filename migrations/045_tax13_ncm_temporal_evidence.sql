@@ -266,3 +266,71 @@ REVOKE ALL ON FUNCTION public.tax13_public_current_ncm_codes(UUID)
   FROM PUBLIC, radar_app, radar_worker, radar_taxonomy_curator;
 GRANT EXECUTE ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID),
   public.tax13_public_current_ncm_codes(UUID) TO radar_app, radar_worker;
+
+-- Close the last positive-read channel: tenant matching consumes the 020
+-- effective-assertions view directly. Historic curated successes remain in
+-- publication_taxonomy_runs but cannot trigger NEW positive tenant matches.
+-- Keep the view's column contract stable for TAX07/manual engine consumers.
+CREATE OR REPLACE VIEW public.v_publication_taxonomy_effective_assertions AS
+WITH assertion_state AS (
+    SELECT
+        a.id,
+        a.run_id,
+        a.taxonomy_release_id,
+        a.release_concept_id,
+        a.supersedes_assertion_id,
+        a.assertion_status,
+        a.confidence,
+        a.decision_origin,
+        a.reason_code,
+        a.created_at,
+        r.publication_version_id,
+        (
+            SELECT review.decision
+            FROM public.publication_taxonomy_reviews review
+            WHERE review.assertion_id = a.id
+            ORDER BY review.created_at DESC, review.id DESC
+            LIMIT 1
+        ) AS latest_review_decision
+    FROM public.publication_taxonomy_assertions a
+    JOIN public.publication_taxonomy_runs r ON r.id = a.run_id
+    WHERE r.status IN ('SUCCESS', 'PARTIAL')
+      AND (
+        r.engine_key <> 'tribusca.taxonomy.curated'
+        OR (
+          r.engine_version = '2.4.0'
+          AND r.config_snapshot ->> 'legalScopeFingerprint' =
+             public.tax13_current_ncm_scan_fingerprint(r.publication_version_id)
+          AND EXISTS (
+            SELECT 1 FROM public.publication_taxonomy_scans s
+            WHERE s.run_id = r.id AND s.status = 'SUCCESS'
+          )
+        )
+      )
+),
+eligible AS (
+    SELECT *
+    FROM assertion_state
+    WHERE latest_review_decision IS DISTINCT FROM 'REJECT'
+      AND (assertion_status = 'CONFIRMED'
+           OR latest_review_decision = 'CONFIRM')
+),
+superseded AS (
+    SELECT DISTINCT supersedes_assertion_id AS id
+    FROM eligible WHERE supersedes_assertion_id IS NOT NULL
+)
+SELECT
+    e.id AS assertion_id,
+    e.run_id,
+    e.publication_version_id,
+    e.taxonomy_release_id,
+    e.release_concept_id,
+    e.assertion_status,
+    e.confidence,
+    e.decision_origin,
+    e.reason_code,
+    e.created_at
+FROM eligible e
+WHERE NOT EXISTS (
+    SELECT 1 FROM superseded s WHERE s.id = e.id
+);
