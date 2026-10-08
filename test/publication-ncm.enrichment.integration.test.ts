@@ -32,7 +32,8 @@ function runtimeUrl(databaseUrl: string, password: string): string {
 
 async function createPublicationFixture(
   admin: Pool,
-  input: { title: string; publishedOn: string; text: string; scoped?: boolean },
+  input: { title: string; publishedOn: string; text: string; scoped?: boolean;
+    coverage?: 'COMPLETE' | 'PARTIAL' },
 ): Promise<{ publicationId: string; versionId: string }> {
   const publication = await admin.query<{ id: string }>(
     `INSERT INTO publications (
@@ -63,7 +64,7 @@ async function createPublicationFixture(
   );
 
   if (input.scoped !== false) {
-    await seedTestLegalScopeAttestation(admin, version.rows[0]!.id);
+    await seedTestLegalScopeAttestation(admin, version.rows[0]!.id, input.coverage);
   }
   return { publicationId, versionId: version.rows[0]!.id };
 }
@@ -244,8 +245,9 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
     );
     assert.equal(duplicateCount.rows[0]?.count, 2);
 
-    // What an older detector version found (e.g. in a previous wording) stays
-    // as evidence, but readers skip it once the newer version scanned.
+    // R2 BLOCK-01: do not hide earlier catalog evidence merely because a
+    // newer scoped detector succeeded. It is HISTORICAL/UNVERIFIED, not
+    // CURRENT evidence or proof of a globally absent NCM.
     const legacyCatalog = await admin.query<{ id: string }>(
       `SELECT e.id FROM official_catalog_entries e
        JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
@@ -265,7 +267,25 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
        WHERE pnm.publication_version_id = $1::uuid AND ${NOT_SUPERSEDED_NCM_MENTION_SQL('pnm')}`,
       [zeroMatch.versionId],
     );
-    assert.equal(visible.rows[0]?.count, 0);
+    assert.equal(visible.rows[0]?.count, 1,
+      'legacy mention must remain queryable when 1.3.0 is not global proof');
+    // R2 BLOCK-01: partial legal coverage must not seal a NCM scan.
+    // A candidate in an unreviewed annex may still matter for historical
+    // search even when the attested CURRENT fragment has no NCM.
+    const partial = await createPublicationFixture(admin, {
+      title: 'R2 partial attestation does not supersede legacy',
+      publishedOn: '9999-12-29',
+      text: 'NCM 1006.30.11 potencialmente no anexo não revisado.',
+      coverage: 'PARTIAL',
+    });
+    fixtures.push(partial);
+    const partialBatch = await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
+    assert.equal(partialBatch.succeeded, 0);
+    const partialScan = await admin.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM publication_ncm_scans WHERE publication_version_id=$1::uuid AND detector_version=$2',
+      [partial.versionId, PUBLICATION_NCM_DETECTOR_VERSION],
+    );
+    assert.equal(partialScan.rows[0]?.count, 0, 'PARTIAL must not seal global NCM evidence');
     // B2 regression: legacy text-only documents remain unverified, even
     // if their raw text contains NCM candidates from current catalogs.
     const unscoped = await createPublicationFixture(admin, {

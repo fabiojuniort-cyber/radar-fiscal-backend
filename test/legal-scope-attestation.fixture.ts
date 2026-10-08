@@ -17,6 +17,7 @@ import {
 export async function seedTestLegalScopeAttestation(
   admin: Pool,
   publicationVersionId: string,
+  coverage: 'COMPLETE' | 'PARTIAL' = 'COMPLETE',
 ): Promise<string> {
   const version = await admin.query<{
     publication_id: string;
@@ -81,7 +82,7 @@ export async function seedTestLegalScopeAttestation(
     htmlSha256:h(html),validAsOf,
     verifiedAt:new Date(Date.now()-60_000).toISOString(),
     recheckOn:recheck.toISOString().slice(0,10),
-    coverage:'COMPLETE',
+    coverage,
     segments:[
       ...(withTitle ? [{
         start:0,end:bodyStart,textSha256:h(fixtureTitle),
@@ -104,9 +105,9 @@ export async function seedTestLegalScopeAttestation(
        html_sha256,valid_as_of,verified_at,recheck_on,coverage,
        manifest,attestor_kind,attestor_ref)
     VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6::date,$7::timestamptz,
-            $8::date,'COMPLETE',$9::jsonb,'HUMAN_REVIEW','CI-ONLY-SYNTHETIC')
+            $8::date,$10,$9::jsonb,'HUMAN_REVIEW','CI-ONLY-SYNTHETIC')
     RETURNING id
   `,[publicationVersionId,sourceId,origin.rows[0]!.id,url,h(html),
-    validAsOf,m.verifiedAt,m.recheckOn,JSON.stringify(m)]);
+    validAsOf,m.verifiedAt,m.recheckOn,JSON.stringify(m),coverage]);
   return inserted.rows[0]!.id;
 }
