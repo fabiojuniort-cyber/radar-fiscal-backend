@@ -58,7 +58,8 @@ class WorkerProbe implements KyselyPlugin {
   async transformResult(args: PluginTransformResultArgs) {
     const query = this.queries.get(args.queryId) ?? '';
     const selection = this.stage === 'ncm'
-      ? query.includes('LEFT JOIN publication_ncm_scans pns')
+      ? query.includes('FROM publications p') &&
+        query.includes('FROM public.publication_ncm_scan_evidence e')
       : this.stage === 'taxonomy' && query.includes('LEFT JOIN publication_taxonomy_scans s');
     if (selection) {
       this.selectedIds = args.result.rows.map((row) => row.publication_version_id);
@@ -66,8 +67,10 @@ class WorkerProbe implements KyselyPlugin {
       await bounded(this.proceed.promise);
     }
     const work = this.stage === 'ncm'
-      ? query.includes('FROM official_catalog_entries oce')
-      : this.stage === 'taxonomy' && query.includes('SELECT DISTINCT ncm_code');
+      ? query.includes('FROM public.official_catalog_entries e') &&
+        query.includes('=ANY(')
+      : this.stage === 'taxonomy' &&
+        query.includes('FROM public.publication_ncm_scan_evidence_codes');
     if (work) {
       this.workReads += 1;
       if (this.fail) throw new Error(`controlled ${this.stage} worker failure`);
