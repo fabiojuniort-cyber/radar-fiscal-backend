@@ -179,7 +179,7 @@ async function insertFixtureRelease(admin: Pool): Promise<string> {
   }
 }
 
-async function createPublication(admin: Pool, title: string, text: string) {
+async function createPublication(admin: Pool, title: string, text: string, attested = true) {
   const publication = await admin.query<{ id: string }>(
     `INSERT INTO publications (
        identity_hash, identity_strength, identity_basis,
@@ -197,7 +197,7 @@ async function createPublication(admin: Pool, title: string, text: string) {
     [publicationId, createHash('sha256').update(text).digest('hex'), text,
      JSON.stringify({presentation: {html: '<p data-legal-status="current" class="TextoAcordo">' + text + '</p>'}})],
   );
-  await seedTestLegalScopeAttestation(admin, version.rows[0]!.id);
+  if (attested) await seedTestLegalScopeAttestation(admin, version.rows[0]!.id);
   return { publicationId, versionId: version.rows[0]!.id };
 }
 
@@ -825,6 +825,42 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         headers: customer.headers,
       });
       assert.equal(classifiedOne.json().status, 'CLASSIFIED');
+
+      // TAX13/B4 adversarial: a synthetic 1.2.0 NCM SUCCESS stamp alone
+      // must not authorize a legal-body classification without an attestation.
+      const unverified = await createPublication(
+        admin,
+        'Historical revoked annex fixture',
+        'Texto não revisado com ureia NCM 1006.30.11.',
+        false,
+      );
+      await admin.query(`
+        INSERT INTO publication_ncm_scans (
+          publication_version_id, detector_key, detector_version,
+          status, source_field
+        ) VALUES ($1::uuid, 'ncm.catalog.regex', '1.2.0', 'SUCCESS', 'CONTENT_TEXT')
+      `, [unverified.versionId]);
+      const withoutEvidence = await classifySinglePublication(worker, {
+        publicationId: unverified.publicationId,
+        releaseId,
+        persist: false,
+      });
+      assert.deepEqual(withoutEvidence.tags, [], 'preview must not use unverified HTML or stored NCMs');
+      await assert.rejects(
+        classifySinglePublication(worker, {
+          publicationId: unverified.publicationId,
+          releaseId,
+          persist: true,
+        }),
+        /TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED/,
+      );
+      const unsafeSeal = await admin.query<{count:number}>(`
+        SELECT count(*)::int AS count FROM publication_taxonomy_scans
+        WHERE publication_version_id=$1::uuid
+          AND engine_version='2.3.0'
+      `, [unverified.versionId]);
+      assert.equal(unsafeSeal.rows[0]?.count, 0, 'unverified text cannot receive a new taxonomy SUCCESS');
+
     }
 
     const enable = await app.inject({
