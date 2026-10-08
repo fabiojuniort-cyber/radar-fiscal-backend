@@ -475,6 +475,32 @@ test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method at
       parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A\u0001B'] },
     { name: 'oversized supporting act', html: '<p>NCM 1006.30.11</p>',
       parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A'.repeat(257)] },
+    // R5 F01: the SQL exclusion normalizer must implement JS whitespace/trim.
+    ...(['\t', '\n', '\u00a0', '\u2003'] as const).flatMap((ws, index) => [
+      { name: 'R5 act leading whitespace ' + index,
+        html: '<p>' + ws + 'Lei Complementar 10063011</p>',
+        parts: [ws + 'Lei Complementar 10063011'], statuses: ['CURRENT'] },
+      { name: 'R5 act trailing whitespace ' + index,
+        html: '<p>Lei Complementar 10063011' + ws + '</p>',
+        parts: ['Lei Complementar 10063011' + ws], statuses: ['CURRENT'] },
+    ]),
+    { name: 'R5 artigo with dot revocation', html: '<p>Artigo. 10063011 - revogado.</p>',
+      parts: ['Artigo. 10063011 - revogado.'], statuses: ['CURRENT'] },
+    { name: 'R5 unaccented superseded annex',
+      html: '<p>ANEXO II - SUBSTITUIDO</p><p>NCM 1006.30.11</p>',
+      parts: ['ANEXO II - SUBSTITUIDO', 'NCM 1006.30.11'],
+      statuses: ['REVOKED', 'CURRENT'] },
+    { name: 'R5 indented revoked annex',
+      html: '<p>\tANEXO II - REVOGADO</p><p>NCM 1006.30.11</p>',
+      parts: ['\tANEXO II - REVOGADO', 'NCM 1006.30.11'],
+      statuses: ['REVOKED', 'CURRENT'] },
+    // R5 F02: JS trim() rejects references composed of Unicode whitespace.
+    ...([0x2003, 0x2007, 0x202f, 0xfeff] as const).map((code) => ({
+      name: 'R5 whitespace-only supporting act ' + code.toString(16),
+      html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'],
+      supportingActs: [String.fromCodePoint(code)],
+    })),
   ] as const;
   try {
     await admin.query(`INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key)
