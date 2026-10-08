@@ -33,7 +33,6 @@ export async function validateAndEnsureOfficialCnaes(
     WHERE catalog.code = 'CNAE' AND ed.status = 'CURRENT'
     ORDER BY ed.created_at DESC
     LIMIT 1
-    FOR SHARE OF ed
   `.execute(trx);
   const edition = editions.rows[0];
   if (!edition) throw new ManualCnaeValidationError('cnae_catalog_unavailable');
