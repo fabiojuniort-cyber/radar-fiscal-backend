@@ -14,6 +14,7 @@ import {
 } from '../src/modules/taxonomy/classification/classification.worker.js';
 import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
 import { checkWorkerConcurrency } from './worker-concurrency.checks.js';
+import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
 import {
   loadProductSheet,
   parseProductSheet,
@@ -196,6 +197,7 @@ async function createPublication(admin: Pool, title: string, text: string) {
     [publicationId, createHash('sha256').update(text).digest('hex'), text,
      JSON.stringify({presentation: {html: '<p data-legal-status="current" class="TextoAcordo">' + text + '</p>'}})],
   );
+  await seedTestLegalScopeAttestation(admin, version.rows[0]!.id);
   return { publicationId, versionId: version.rows[0]!.id };
 }
 
