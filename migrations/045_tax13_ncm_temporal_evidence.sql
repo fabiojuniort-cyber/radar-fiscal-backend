@@ -439,8 +439,22 @@ BEGIN
       RETURN NULL;
     END IF;
     html := record_.live_metadata->'presentation'->>'html';
-    IF html IS NULL OR record_.html_sha256 IS DISTINCT FROM
-        encode(sha256(convert_to(html,'UTF8')),'hex') THEN RETURN NULL;
+    -- TAX13-R6: Node's canonical sanitizer rejects HTML over 2 MiB of
+    -- original UTF-8 bytes. A correct SHA256 cannot override this ceiling.
+    -- SQL char_length/substr use Unicode code points, while Node uses UTF-16
+    -- code units. PostgreSQL casefold (~*) also diverges from JS /iu.
+    -- Fail closed for unsupported Unicode rather than guessing CURRENT.
+    -- Supported legal text is ASCII/Latin-1 plus explicitly listed common
+    -- typography and ECMAScript whitespace. Code points outside this
+    -- audited subset (including astral and Latin-Extended casefold aliases)
+    -- require a future separately attested Node-authoritative adapter.
+    -- Never normalize the bytes used by hashes, fragments or offsets.
+    IF html IS NULL
+      OR octet_length(html) > 2097152
+      OR html ~ U&'[^\0009-\000D\0020-\00FF\1680\2000-\200A\2010-\201F\2028\2029\202F\205F\20AC\2122\3000\FEFF]'
+      OR record_.html_sha256 IS DISTINCT FROM
+         encode(sha256(convert_to(html,'UTF8')),'hex')
+    THEN RETURN NULL;
     END IF;
     -- Fail closed: only flat, canonical paragraphs with recognized classes
     -- are safe to reparse in PostgreSQL. Rebuild ALL HTML and require exact
