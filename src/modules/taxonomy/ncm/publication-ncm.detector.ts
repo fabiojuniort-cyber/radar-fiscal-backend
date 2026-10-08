@@ -8,9 +8,9 @@ import {
 } from '../../publication-scope/publication-scope.guard.js';
 
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
-// 1.1.0: reads only the wording in force (previous wordings of CONFAZ acts
-// are skipped) and accepts the "8417.8020" typing found in official annexes.
-export const PUBLICATION_NCM_DETECTOR_VERSION = '1.1.0';
+// 1.2.0: taxonomy evidence only from in-scope operative legal body and
+// source-verified current annex fragments; supersedes prior NCM findings.
+export const PUBLICATION_NCM_DETECTOR_VERSION = '1.2.0';
 
 export type PublicationNcmSourceField =
   | 'CONTENT_TEXT'
