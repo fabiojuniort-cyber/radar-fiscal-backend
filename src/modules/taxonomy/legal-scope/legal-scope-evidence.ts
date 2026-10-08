@@ -106,14 +106,37 @@ function checkedHttps(value: string): URL | null {
   }
 }
 
-/** Text-node order matches the sanitized legal body; offsets count JS UTF-16 units. */
-export function renderedLegalText(html: string): string {
+interface LegalTextSpan {
+  start: number;
+  end: number;
+}
+
+/**
+ * Store the original DOM text callback boundaries. Adjacent table cells,
+ * paragraphs or unrelated HTML nodes must never be promoted to one CURRENT
+ * legal passage only because the plain-text extractor concatenates them.
+ *
+ * The parser may split a text node at an entity boundary; treating those
+ * callbacks as independent is intentionally conservative (fail-closed).
+ */
+function parsedLegalText(html: string): { text: string; spans: LegalTextSpan[] } {
   let text = '';
+  const spans: LegalTextSpan[] = [];
   const parser = new Parser({
-    ontext(value) { text += value; },
+    ontext(value) {
+      if (!value) return;
+      const start = text.length;
+      text += value;
+      spans.push({ start, end: text.length });
+    },
   }, { decodeEntities: true, lowerCaseTags: true });
   parser.end(html);
-  return text;
+  return { text, spans };
+}
+
+/** Text-node order matches the sanitized legal body; offsets count JS UTF-16 units. */
+export function renderedLegalText(html: string): string {
+  return parsedLegalText(html).text;
 }
 
 const fail = (reason: string): LegalScopeValidation => ({
@@ -149,9 +172,10 @@ export function validateLegalScopeEvidence(
   if (evidence.segments.length > 50000) return fail('SEGMENT_LIMIT_EXCEEDED');
   const allowHosts = new Set(ctx.trustedEvidenceHosts.map((h) => h.toLowerCase()));
   if (!allowHosts.has(sourceUrl.hostname.toLowerCase())) return fail('SOURCE_NOT_REGISTERED');
-  const text = renderedLegalText(ctx.sanitizedHtml);
+  const { text, spans } = parsedLegalText(ctx.sanitizedHtml);
   const accepted: string[] = [];
   let lastEnd = 0;
+  let textNodeIndex = 0;
   for (const segment of evidence.segments) {
     if (!segment || typeof segment !== 'object') return fail('INVALID_SEGMENT');
     if (!Number.isSafeInteger(segment.start) || !Number.isSafeInteger(segment.end) ||
@@ -174,12 +198,34 @@ export function validateLegalScopeEvidence(
         !['OFFICIAL_CONSOLIDATION', 'OFFICIAL_AMENDMENT', 'ORIGINAL_PUBLICATION', 'HUMAN_REVIEW'].includes(segment.method)) {
       return fail('INVALID_SEGMENT_STATUS');
     }
-    if (!Array.isArray(segment.evidenceUrls)) return fail('EVIDENCE_URLS_MISSING');
+    // Optional legal references are audit material exposed in a future draft.
+    // Persisted JSON is still untrusted until its shape is validated here.
+    if (segment.supportingActs !== undefined &&
+        (!Array.isArray(segment.supportingActs) ||
+         segment.supportingActs.length > 25 ||
+         segment.supportingActs.some((act) =>
+           typeof act !== 'string' || act.trim().length === 0 ||
+           act.length > 256 || /[\\u0000-\\u001f]/.test(act)))) {
+      return fail('INVALID_SUPPORTING_ACTS');
+    }
+    if (!Array.isArray(segment.evidenceUrls) || segment.evidenceUrls.length > 25) {
+      return fail('INVALID_EVIDENCE_URLS');
+    }
     for (const evidenceUrl of segment.evidenceUrls) {
       const url = checkedHttps(evidenceUrl);
       if (!url || !allowHosts.has(url.hostname.toLowerCase())) return fail('UNTRUSTED_EVIDENCE_URL');
     }
     if (segment.status === 'CURRENT') {
+      // One CURRENT assertion must remain within one exact parser text
+      // callback. A cross-cell/cross-paragraph interval could fabricate a
+      // phrase not present in any individual legal passage. Historical
+      // segments may still span multiple nodes for exhaustive audit coverage.
+      while (textNodeIndex < spans.length &&
+             spans[textNodeIndex]!.end <= segment.start) textNodeIndex++;
+      const node = spans[textNodeIndex];
+      if (!node || segment.start < node.start || segment.end > node.end) {
+        return fail('CURRENT_SPANS_DISTINCT_TEXT_NODES');
+      }
       // Original publication alone cannot prove no subsequent amendment.
       if (!['OFFICIAL_CONSOLIDATION', 'OFFICIAL_AMENDMENT'].includes(segment.method) ||
           segment.evidenceUrls.length === 0 || evidence.coverage === 'UNVERIFIED') {

@@ -207,3 +207,95 @@ test('TAX13 B4 COMPLETE must cover all non-whitespace legal text, including hist
   assert.equal(accepted.valid,true);
   assert.equal(accepted.currentText,current);
 });
+
+test('TAX13 refuses CURRENT crossing adjacent clauses and table cells', () => {
+  const cases = [
+    '<p>Crédito</p><p>presumido</p>',
+    '<table><tr><td>Crédito</td><td>presumido</td></tr></table>',
+    '<p>cClassTrib</p><span>200034</span>',
+  ];
+  for (const legalHtml of cases) {
+    const joined = renderedLegalText(legalHtml);
+    const row = manifest();
+    row.htmlSha256 = digest(legalHtml);
+    row.segments = [{
+      start: 0,
+      end: joined.length,
+      textSha256: digest(joined),
+      status: 'CURRENT',
+      method: 'OFFICIAL_CONSOLIDATION',
+      evidenceUrls: [ctx.officialUrl],
+    }];
+    const result = validateLegalScopeEvidence(row, {
+      ...ctx, sanitizedHtml: legalHtml,
+    });
+    assert.equal(result.reason, 'CURRENT_SPANS_DISTINCT_TEXT_NODES', legalHtml);
+    assert.equal(result.currentText, '', legalHtml);
+    assert.deepEqual(result.currentFragments, [], legalHtml);
+  }
+});
+
+test('TAX13 accepts single-node CURRENT but never joins separately attested cells', () => {
+  const legalHtml = '<table><tr><td>Crédito</td><td>presumido</td></tr></table>';
+  const first = 'Crédito';
+  const second = 'presumido';
+  const row = manifest();
+  row.htmlSha256 = digest(legalHtml);
+  row.segments = [first, second].map((value, i) => ({
+    start: i === 0 ? 0 : first.length,
+    end: i === 0 ? first.length : first.length + second.length,
+    textSha256: digest(value),
+    status: 'CURRENT' as const,
+    method: 'OFFICIAL_CONSOLIDATION' as const,
+    evidenceUrls: [ctx.officialUrl],
+  }));
+  const result = validateLegalScopeEvidence(row, {
+    ...ctx, sanitizedHtml: legalHtml,
+  });
+  assert.equal(result.valid, true);
+  assert.equal(result.currentSegments, 2);
+  assert.deepEqual(result.currentFragments, [first, second]);
+});
+
+test('TAX13 preserves COMPLETE historical coverage across nodes but refuses spanning CURRENT', () => {
+  const legalHtml = '<p>Redação anterior</p><p>texto revogado</p><p>Texto atual</p>';
+  const plain = renderedLegalText(legalHtml);
+  const current = 'Texto atual';
+  const offset = plain.indexOf(current);
+  const row = manifest();
+  row.htmlSha256 = digest(legalHtml);
+  row.coverage = 'COMPLETE';
+  row.segments = [
+    { start: 0, end: offset, textSha256: digest(plain.slice(0, offset)),
+      status: 'PREVIOUS', method: 'ORIGINAL_PUBLICATION', evidenceUrls: [] },
+    { start: offset, end: plain.length, textSha256: digest(current),
+      status: 'CURRENT', method: 'OFFICIAL_CONSOLIDATION', evidenceUrls: [ctx.officialUrl] },
+  ];
+  const result = validateLegalScopeEvidence(row, {
+    ...ctx, sanitizedHtml: legalHtml,
+  });
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.currentFragments, [current]);
+});
+
+test('TAX13 refuses malformed or excessive supportingActs and URL arrays', () => {
+  const variations: Array<[unknown, string]> = [
+    ['CONVÊNIO 10/26', 'INVALID_SUPPORTING_ACTS'],
+    [[42], 'INVALID_SUPPORTING_ACTS'],
+    [[''], 'INVALID_SUPPORTING_ACTS'],
+    [['CONVÊNIO 10/26'.repeat(30)], 'INVALID_SUPPORTING_ACTS'],
+    [Array.from({length: 26}, (_, i) => 'ACT ' + i), 'INVALID_SUPPORTING_ACTS'],
+    [['ACT\\nWITH NEWLINE'], 'INVALID_SUPPORTING_ACTS'],
+  ];
+  for (const [value, reason] of variations) {
+    const row = manifest();
+    row.segments[0]!.supportingActs = value as string[];
+    assert.equal(validateLegalScopeEvidence(row, ctx).reason, reason);
+  }
+  const excessiveUrls = manifest();
+  excessiveUrls.segments[0]!.evidenceUrls = Array.from({
+    length: 26,
+  }, () => ctx.officialUrl);
+  assert.equal(validateLegalScopeEvidence(excessiveUrls, ctx).reason,
+    'INVALID_EVIDENCE_URLS');
+});
