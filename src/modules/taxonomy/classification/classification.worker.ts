@@ -402,6 +402,7 @@ export async function processPublicationTaxonomyBatch(
         // Editorial titles are not independently attested CURRENT evidence.
         title: '',
         contentText: verified.currentText,
+        verifiedCurrentFragments: verified.currentFragments,
         ncmCodes: await ncmCodesFor(db, row.publication_version_id),
         concepts,
         codeGitSha: options.codeGitSha ?? null,
@@ -497,6 +498,7 @@ export async function classifySinglePublication(
     // Editorial titles are not independently attested CURRENT evidence.
         title: '',
     contentText: scopeCurrent ? verified.currentText : null,
+    verifiedCurrentFragments: scopeCurrent ? verified.currentFragments : [],
     ncmCodes: scopeCurrent ? await ncmCodesFor(db, row.publication_version_id) : [],
     concepts,
     codeGitSha: input.codeGitSha ?? null,

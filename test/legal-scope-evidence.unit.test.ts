@@ -53,9 +53,30 @@ test('TAX13 B4 accepts only the attested cell and excludes older sibling', () =>
   const r = validateLegalScopeEvidence(manifest(), ctx);
   assert.equal(r.valid, true);
   assert.equal(r.currentText, current);
+  assert.deepEqual(r.currentFragments, [current]);
   assert.equal(r.coverage, 'PARTIAL');
   assert.equal(r.currentSegments, 1);
   assert.doesNotMatch(r.currentText, /8701\.90\.00|ANEXO II/);
+});
+
+test('TAX13 B4 preserves separate CURRENT fragments without manufacturing legal text', () => {
+  const splitHtml = '<p>Crédito</p><p>presumido</p>';
+  const splitText = renderedLegalText(splitHtml);
+  const first = 'Crédito';
+  const second = 'presumido';
+  assert.equal(splitText, first + second);
+  const attestation = manifest();
+  attestation.htmlSha256 = digest(splitHtml);
+  attestation.segments = [
+    { start: 0, end: first.length, textSha256: digest(first), status: 'CURRENT',
+      method: 'OFFICIAL_CONSOLIDATION', evidenceUrls: [ctx.officialUrl] },
+    { start: first.length, end: splitText.length, textSha256: digest(second), status: 'CURRENT',
+      method: 'OFFICIAL_CONSOLIDATION', evidenceUrls: [ctx.officialUrl] },
+  ];
+  const result = validateLegalScopeEvidence(attestation, { ...ctx, sanitizedHtml: splitHtml });
+  assert.equal(result.valid, true);
+  assert.equal(result.currentText, 'Crédito\\npresumido'.replace('\\n', '\n'));
+  assert.deepEqual(result.currentFragments, [first, second]);
 });
 
 test('TAX13 B4 refuses forged status in source HTML without internal attestation', () => {

@@ -42,6 +42,7 @@ function unverified(asOf: string, reason: string): LegalScopeReadResult {
     reason,
     coverage: 'UNVERIFIED',
     currentText: '',
+    currentFragments: [],
     currentSegments: 0,
     attestationId: null,
     asOf,

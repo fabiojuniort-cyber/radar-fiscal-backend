@@ -65,6 +65,8 @@ export interface LegalScopeValidation {
   reason: string | null;
   coverage: LegalScopeEvidenceV1['coverage'] | 'UNVERIFIED';
   currentText: string;
+  /** Distinct attested CURRENT intervals. A lexical term may not span two intervals. */
+  currentFragments: string[];
   currentSegments: number;
 }
 
@@ -115,7 +117,7 @@ export function renderedLegalText(html: string): string {
 }
 
 const fail = (reason: string): LegalScopeValidation => ({
-  valid: false, reason, coverage: 'UNVERIFIED', currentText: '', currentSegments: 0,
+  valid: false, reason, coverage: 'UNVERIFIED', currentText: '', currentFragments: [], currentSegments: 0,
 });
 
 /**
@@ -190,13 +192,14 @@ export function validateLegalScopeEvidence(
     return fail('INCOMPLETE_SCOPE_COVERAGE');
   }
   if (accepted.length === 0) {
-    return { valid: true, reason: null, coverage: evidence.coverage, currentText: '', currentSegments: 0 };
+    return { valid: true, reason: null, coverage: evidence.coverage, currentText: '', currentFragments: [], currentSegments: 0 };
   }
   return {
     valid: true,
     reason: null,
     coverage: evidence.coverage,
     currentText: accepted.join('\n'),
+    currentFragments: accepted,
     currentSegments: accepted.length,
   };
 }

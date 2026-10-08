@@ -96,6 +96,38 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
 });
 
+test('TAX13 B4 classifier refuses phantom terms or cClassTrib spanning separate attested fragments', () => {
+  const common = {
+    publicationVersionId: '00000000-0000-4000-8000-000000000001',
+    taxonomyReleaseId: '00000000-0000-4000-8000-000000000002',
+    title: '',
+    ncmCodes: [],
+    concepts: [
+      concept('theme.presumed_credit', 'Crédito presumido'),
+      concept('theme.cclasstrib', 'Marcador fiscal', {
+        classifyByLabel: false, cclasstribCodes: ['200'],
+      }),
+    ],
+  };
+  const split = planCuratedClassification({
+    ...common,
+    contentText: 'Crédito\\npresumido\\ncClassTrib\\n200034'.replaceAll('\\n', '\n'),
+    verifiedCurrentFragments: ['Crédito', 'presumido', 'cClassTrib', '200034'],
+  });
+  assert.deepEqual(split.assertions, []);
+  assert.equal(split.configSnapshot.policyVersion, 4);
+  assert.equal(split.configSnapshot.matchScope, 'PER_ATTESTED_CURRENT_FRAGMENT');
+
+  const contiguous = planCuratedClassification({
+    ...common,
+    contentText: 'Crédito presumido. cClassTrib 200034',
+    verifiedCurrentFragments: ['Crédito presumido. cClassTrib 200034'],
+  });
+  assert.deepEqual(contiguous.assertions.map((a) => a.conceptCode),
+    ['theme.cclasstrib', 'theme.presumed_credit']);
+  assert.notEqual(split.fingerprint.runFingerprint, contiguous.fingerprint.runFingerprint);
+});
+
 test('curated classifier never uses the base-legal title as taxonomy evidence', () => {
   const plan = planCuratedClassification({
     publicationVersionId: '00000000-0000-4000-8000-000000000001',
