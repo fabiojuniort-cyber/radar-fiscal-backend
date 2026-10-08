@@ -526,7 +526,8 @@ export async function classifySinglePublication(
     sanitizedHtml: row.presentation_html ?? '',
     asOf,
   });
-  const scopeCurrent = verified.valid && verified.currentSegments > 0;
+  const scopeCurrent = verified.valid && verified.coverage === 'COMPLETE' &&
+    verified.currentSegments > 0;
   if (input.persist && !scopeCurrent) {
     // Preserve the publication scope suppression/rebuild race contract:
     // acquire the canonical publication SHARE lock before reporting that
