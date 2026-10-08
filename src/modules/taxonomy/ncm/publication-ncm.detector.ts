@@ -396,6 +396,12 @@ async function selectBatch(
           AND a.valid_as_of = ${asOf}::date
           AND a.recheck_on > ${asOf}::date
           AND a.coverage = 'COMPLETE'
+          AND a.id = (
+            SELECT latest.id FROM public.publication_legal_scope_attestations latest
+            WHERE latest.publication_version_id = pv.id
+              AND latest.valid_as_of = ${asOf}::date
+            ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
+          )
       )
       -- A SUCCESS on a different attestation, day or NCM edition is never
       -- evidence of completion. Legacy 028 statuses do not gate this path.
