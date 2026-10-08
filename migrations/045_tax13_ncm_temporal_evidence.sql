@@ -578,15 +578,19 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
     record_ public.publication_ncm_scan_evidence%ROWTYPE;
+    header_xmin TEXT;
     fragments JSONB;
     fragment TEXT;
 BEGIN
-    SELECT * INTO record_ FROM public.publication_ncm_scan_evidence
-    WHERE id=NEW.scan_evidence_id;
-    IF NOT FOUND OR record_.xmin::text IS DISTINCT FROM
+    SELECT scan.xmin::text INTO header_xmin
+    FROM public.publication_ncm_scan_evidence scan
+    WHERE scan.id=NEW.scan_evidence_id;
+    IF NOT FOUND OR header_xmin IS DISTINCT FROM
        (txid_current() % 4294967296)::text THEN
        RAISE EXCEPTION 'TAX13_NCM_SCAN_CODES_SEALED';
     END IF;
+    SELECT * INTO record_ FROM public.publication_ncm_scan_evidence
+    WHERE id=NEW.scan_evidence_id;
     fragments := public.tax13_legal_current_fragments(record_.legal_scope_attestation_id);
     IF fragments IS NULL OR NEW.fragment_index>=jsonb_array_length(fragments) THEN
        RAISE EXCEPTION 'TAX13_NCM_SCAN_CODE_NOT_IN_CURRENT_FRAGMENT';
