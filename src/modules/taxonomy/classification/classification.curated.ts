@@ -9,7 +9,9 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-export const CURATED_ENGINE_VERSION = '2.2.0';
+// 2.3.0 changes legal text scope: titles, editorial/old wording and revoked
+// annex fragments are not automatic taxonomy evidence.
+export const CURATED_ENGINE_VERSION = '2.3.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
