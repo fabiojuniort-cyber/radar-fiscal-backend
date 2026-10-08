@@ -776,3 +776,18 @@ REVOKE ALL ON FUNCTION public.tax13_public_current_legal_text(UUID)
 FROM PUBLIC, radar_worker, radar_taxonomy_curator;
 GRANT EXECUTE ON FUNCTION public.tax13_public_current_legal_text(UUID)
 TO radar_app;
+
+-- Preserve legal text-node boundaries for tenant affinity.
+-- Never join two independently verified CURRENT fragments into one phrase.
+CREATE FUNCTION public.tax13_public_current_legal_fragments(p_version UUID)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT public.tax13_legal_current_fragments(
+    public.tax13_effective_attestation_id(
+      p_version,(current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date))
+  WHERE public.tax13_current_ncm_scan_fingerprint(p_version) IS NOT NULL;
+$$;
+REVOKE ALL ON FUNCTION public.tax13_public_current_legal_fragments(UUID)
+FROM PUBLIC, radar_worker, radar_taxonomy_curator;
+GRANT EXECUTE ON FUNCTION public.tax13_public_current_legal_fragments(UUID)
+TO radar_app;
