@@ -274,6 +274,26 @@ test('general legal headings and publication notes do not classify in structured
   assert.doesNotMatch(selected, /LEI COMPLEMENTAR|8701\.90\.00|7612\.90\.19|1006\.30\.11|ANEXO I/);
 });
 
+test('a revoked cell in a mixed annex row is not classification evidence', () => {
+  const html = [
+    '<p>ANEXO I</p>',
+    '<table><tr>',
+    '<td>II - REVOGADO</td>',
+    '<td>Insumos agropecuários vigentes: NCM 3102.10.90.</td>',
+    '</tr><tr>',
+    '<td>Produto anterior</td><td data-legal-status="previous">8701.90.00</td>',
+    '<td data-legal-status="current">Produto novo 3925.10.00.</td>',
+    '</tr></table>',
+  ].join('');
+  const wording = currentWordingText(html) ?? '';
+  assert.doesNotMatch(wording, /II - REVOGADO|8701\.90\.00|ANEXO I/);
+  assert.match(wording, /Insumos agropecuários vigentes|3102\.10\.90|3925\.10\.00/);
+  assert.deepEqual(
+    extractNcmCandidates(wording).map(item => item.code),
+    ['31021090', '39251000'],
+  );
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
