@@ -396,6 +396,7 @@ DECLARE
     node_ RECORD;
     node_start INTEGER;
     node_excluded BOOLEAN;
+    normalized_line TEXT;
     historical_annex BOOLEAN := false;
 BEGIN
     SELECT a.*, pv.id AS live_version, pv.source_metadata AS live_metadata,
@@ -465,18 +466,24 @@ BEGIN
         coalesce(node_.capture[1],'') || '>' || node_.capture[3] || '</p>';
       node_start := char_length(legal_text);
       legal_text := legal_text || node_.capture[3];
+      -- JS standaloneNonNormative() normalizes ECMAScript whitespace before
+      -- exclusions. Never normalize actual fragment text/offsets/hashes.
+      -- Include all ES2026 WhiteSpace + LineTerminator characters explicitly:
+      -- POSIX [:space:] and btrim() alone miss NBSP, EM SPACE and BOM.
+      normalized_line := btrim(regexp_replace(
+        node_.capture[3], U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+', ' ', 'g'));
       node_excluded := coalesce(node_.capture[1],'') IN
         (' class="TituloAcordo"',' class="RedaoAnt"');
-      IF btrim(node_.capture[3]) ~* '^ANEXO[[:space:]]+(UNICO|ÚNICO|[IVXLCDM]+|[0-9]+)([[:space:]]*$|[[:space:]]*[-–—:.(])' THEN
-        historical_annex := node_.capture[3] ~* '(REVOGAD|REDAÇÃO[[:space:]]+(ANTERIOR|ORIGINAL)|TEXTO[[:space:]]+ANTERIOR|SEM[[:space:]]+(VIGÊNCIA|EFEITO)|SUBSTITUÍD)';
+      IF normalized_line ~* '^ANEXO[[:space:]]+(UNICO|ÚNICO|[IVXLCDM]+|[0-9]+)([[:space:]]*$|[[:space:]]*[-–—:.(])' THEN
+        historical_annex := normalized_line ~* '(REVOGAD|REDAÇÃO[[:space:]]+(ANTERIOR|ORIGINAL)|TEXTO[[:space:]]+ANTERIOR|SEM[[:space:]]+(VIGÊNCIA|EFEITO)|SUBSTITU[ÍI]D)';
         node_excluded := TRUE;
       END IF;
       node_excluded := node_excluded OR historical_annex
-        OR btrim(node_.capture[3]) ~* '^(PUBLICAD[OA]|RATIFICAD[OA]|ALTERAD[OA]|PRORROGAD[OA]|VIDE[[:space:]]|REDAÇÃO[[:space:]]+ANTERIOR|TEXTO[[:space:]]+ANTERIOR|NOVA[[:space:]]+REDAÇÃO)'
+        OR normalized_line ~* '^(PUBLICAD[OA]|RATIFICAD[OA]|ALTERAD[OA]|PRORROGAD[OA]|VIDE[[:space:]]|REDAÇÃO[[:space:]]+ANTERIOR|TEXTO[[:space:]]+ANTERIOR|NOVA[[:space:]]+REDAÇÃO)'
         -- Mirror Node ACT_IDENTIFIER, including dated and qualified acts.
-        OR btrim(node_.capture[3]) ~* '^(CONVÊNIO([[:space:]]+ICMS)?|AJUSTE[[:space:]]+SINIEF|ATO[[:space:]]+COTEPE([/]ICMS)?|PROTOCOLO[[:space:]]+ICMS|LEI([[:space:]]+COMPLEMENTAR)?|DECRETO|PORTARIA|RESOLUÇÃO)[[:space:]]+(N[ºO°.]?[[:space:]]*)?[0-9]+([./-][0-9]+)*([[:space:]]*,?[[:space:]]+DE[[:space:]]+[0-9]{1,2}[[:space:]]+DE[[:space:]]+[[:alpha:]]+[[:space:]]+DE[[:space:]]+[0-9]{4})?[.]?$'
+        OR normalized_line ~* '^(CONVÊNIO([[:space:]]+ICMS)?|AJUSTE[[:space:]]+SINIEF|ATO[[:space:]]+COTEPE([/]ICMS)?|PROTOCOLO[[:space:]]+ICMS|LEI([[:space:]]+COMPLEMENTAR)?|DECRETO|PORTARIA|RESOLUÇÃO)[[:space:]]+(N[ºO°.]?[[:space:]]*)?[0-9]+([./-][0-9]+)*([[:space:]]*,?[[:space:]]+DE[[:space:]]+[0-9]{1,2}[[:space:]]+DE[[:space:]]+[[:alpha:]]+[[:space:]]+DE[[:space:]]+[0-9]{4})?[.]?$'
         -- A revoked placeholder cannot assert a CURRENT NCM.
-        OR btrim(node_.capture[3]) ~* '^([0-9]+[º°ª]?|[IVXLCDM]+|[A-Z]|§[[:space:]]*[0-9]+[º°ª]?|(CL[ÁA]USULA|ART([.]|IGO)?|PAR[ÁA]GRAFO|INCISO|AL[ÍI]NEA|ITEM)[[:space:]]+[^[:space:]]+)[[:space:]]*([-–—:][[:space:]]*)?REVOGAD[OA]S?[.]?$';
+        OR normalized_line ~* '^([0-9]+[º°ª]?|[IVXLCDM]+|[A-Z]|§[[:space:]]*[0-9]+[º°ª]?|(CL[ÁA]USULA|ART(IGO)?[.]?|PAR[ÁA]GRAFO|INCISO|AL[ÍI]NEA|ITEM)[[:space:]]+[^[:space:]]+)[[:space:]]*([-–—:][[:space:]]*)?REVOGAD[OA]S?[.]?$';
       node_ranges := node_ranges || jsonb_build_array(
         jsonb_build_object('start',node_start,
           'end',char_length(legal_text),'excluded',node_excluded));
@@ -532,7 +539,7 @@ BEGIN
           support_act_text := support_act #>> '{}';
           -- Byte length is a conservative bound for JS UTF-16 length.
           IF support_act_text IS NULL OR octet_length(support_act_text)>256
-            OR btrim(replace(support_act_text,U&'\00A0',' '))=''
+            OR btrim(regexp_replace(support_act_text, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+', ' ', 'g'))=''
             OR support_act_text ~ '[[:cntrl:]]'
           THEN RETURN NULL; END IF;
         END LOOP;
