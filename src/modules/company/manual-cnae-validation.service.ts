@@ -43,6 +43,8 @@ export async function validateAndEnsureOfficialCnaes(
     WHERE entry.catalog_edition_id = ${edition.id}::uuid
       AND entry.metadata->>'level' = 'SUBCLASSE'
       AND entry.metadata->>'assignable' = 'true'
+      AND regexp_replace(entry.official_code, '[^0-9]', '', 'g')
+          = ANY(${submitted.map((entry) => entry.code)}::text[])
   `.execute(trx);
   const official = new Map(canonical.rows.map((row) => [row.code, row.description]));
   if (submitted.some((entry) => !official.has(entry.code))) {
