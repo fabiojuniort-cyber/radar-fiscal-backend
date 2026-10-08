@@ -208,7 +208,7 @@ WITH reference_day AS (
     CROSS JOIN reference_day r
     WHERE a.publication_version_id=p_version AND a.valid_as_of=r.d
     ORDER BY a.created_at DESC, a.id DESC LIMIT 1
-), current_catalog AS (
+), ncm_catalog_snapshot AS (
     SELECT ed.id,
       encode(sha256(convert_to(
         concat_ws(':', ed.edition_code, ed.source_sha256,
@@ -232,7 +232,7 @@ SELECT scan.run_fingerprint::text
 FROM current_version pv
 CROSS JOIN reference_day r
 JOIN newest_proof a ON a.publication_version_id=pv.id
-JOIN current_catalog catalog ON TRUE
+JOIN ncm_catalog_snapshot catalog ON TRUE
 JOIN public.publication_ncm_scan_evidence scan
   ON scan.publication_version_id=pv.id
  AND scan.legal_scope_attestation_id=a.id
