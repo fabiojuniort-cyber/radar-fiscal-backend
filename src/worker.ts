@@ -12,7 +12,6 @@ import { isCronDue } from './modules/collection/cron.js';
 import { runDouBackfillTick } from './modules/collection/dou-backfill.js';
 import {
   processPublicationNcmEnrichmentBatch,
-  PUBLICATION_NCM_DETECTOR_VERSION,
 } from './modules/taxonomy/ncm/publication-ncm.detector.js';
 import {
   processPublicationTaxonomyBatch,
@@ -32,8 +31,8 @@ let stopping = false;
 // TAX13 B5: the new detector must not silently backfill ~96k current
 // publications when an unrelated Worker deployment upgrades its version.
 // A separately reviewed, explicit opt-in is required to resume GLOBAL NCM.
-const GLOBAL_NCM_RESCAN_ALLOWED = PUBLICATION_NCM_DETECTOR_VERSION !== '1.2.0'
-  || process.env.TAX13_GLOBAL_NCM_RESCAN_APPROVED === 'true';
+const GLOBAL_NCM_RESCAN_ALLOWED =
+  process.env.TAX13_GLOBAL_NCM_RESCAN_APPROVED === 'true';
 const NCM_IDLE_BATCH_SIZE = 10;
 const NCM_AFTER_COLLECTION_BATCH_SIZE = 5;
 // TAX-11: classification runs only while the curator keeps it enabled.
