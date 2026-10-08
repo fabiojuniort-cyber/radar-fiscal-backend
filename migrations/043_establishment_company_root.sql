@@ -16,6 +16,11 @@ BEGIN
           USING ERRCODE = '23514',
                 CONSTRAINT = 'chk_establishment_company_root';
     END IF;
+    IF NOT NEW.is_head_office AND NEW.cnpj = v_head_office_cnpj THEN
+        RAISE EXCEPTION 'head_office_conflict'
+          USING ERRCODE = '23514',
+                CONSTRAINT = 'chk_establishment_branch_distinct_from_matrix';
+    END IF;
     IF NEW.is_head_office AND NEW.cnpj <> v_head_office_cnpj THEN
         RAISE EXCEPTION 'head_office_conflict'
           USING ERRCODE = '23514',
