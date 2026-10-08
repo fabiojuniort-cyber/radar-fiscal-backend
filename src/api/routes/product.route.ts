@@ -1329,6 +1329,7 @@ export async function productRoutes(
               request.body.companyId,
               created.id,
               request.body.cnaes,
+              true, // Legacy generic route may clear CNAEs; ONB-01 manual requires one.
             );
 
             return created;
@@ -1640,6 +1641,7 @@ export async function productRoutes(
               existing.company_id,
               existing.id,
               request.body.cnaes,
+              true, // Legacy generic route may clear CNAEs; ONB-01 manual requires one.
             );
 
             return {
@@ -1787,6 +1789,7 @@ export async function productRoutes(
               target.company_id,
               target.id,
               registry.cnaes,
+              true, // Legacy generic route may clear CNAEs; ONB-01 manual requires one.
             );
           },
         );
