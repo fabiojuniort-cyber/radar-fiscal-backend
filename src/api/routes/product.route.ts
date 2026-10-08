@@ -74,6 +74,7 @@ const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   businessLocationCode:
     businessLocationCodeSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 const companyUpdateBodySchema = z.object({
@@ -88,6 +89,7 @@ const establishmentFromCnpjBodySchema = z.object({
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
   businessLocationCode:
     businessLocationCodeSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 const cnaeBodySchema = z.object({
@@ -706,6 +708,7 @@ export async function productRoutes(
               registry,
               stateRegistration,
               request.body.businessLocationCode,
+              request.body.reactivateInactive,
             );
           },
         );
@@ -1466,6 +1469,7 @@ export async function productRoutes(
                 request.body.typeCode,
                 stateRegistration,
                 request.body.businessLocationCode,
+                request.body.reactivateInactive,
               );
 
             return { establishmentId };
