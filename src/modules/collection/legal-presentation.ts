@@ -109,6 +109,8 @@ export const LEGAL_PRESENTATION_CLASSES = new Set([
   'A2DataPublicacao',
   'TextoAcordo',
   'A5-1TextoAcordo',
+  'Subtitulo',
+  'A6-1Subtitulo',
   'RedaoAnt',
   'A8-3RedacaoAnt',
   'Remisso',
@@ -137,6 +139,8 @@ const NON_NORMATIVE_PRESENTATION_CLASSES = new Set([
   'A2DataPublicacao',
   'Remisso',
   'A8-1Remissao',
+  'Subtitulo',
+  'A6-1Subtitulo',
 ]);
 
 export function isPreviousWordingClass(token: string): boolean {
@@ -483,6 +487,9 @@ export function currentWordingText(html: string | null | undefined): string | un
           const reason = frame.annexRestriction === 'unverified'
             ? 'sem vigência confirmada' : frame.annexRestriction === 'revoked' ? 'revogado' : 'redação anterior';
           append(frame.text + ' — ' + reason + '\n');
+        } else if (frame.excluded && ANNEX_HEADING.test(frame.text.trim())) {
+          // The heading itself is editorial, but it starts a new annex section.
+          append(frame.text + '\n');
         } else if (editorial || revokedCell) {
           filtered = true;
         }
@@ -503,6 +510,8 @@ export function currentWordingText(html: string | null | undefined): string | un
       const reason = frame.annexRestriction === 'unverified'
         ? 'sem vigência confirmada' : frame.annexRestriction === 'revoked' ? 'revogado' : 'redação anterior';
       append(frame.text + ' — ' + reason + '\n');
+    } else if (frame.excluded && ANNEX_HEADING.test(frame.text.trim())) {
+      append(frame.text + '\n');
     } else if (editorial || revokedCell) {
       filtered = true;
     }
