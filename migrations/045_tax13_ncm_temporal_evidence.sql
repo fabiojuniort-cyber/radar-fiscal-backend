@@ -379,6 +379,7 @@ DECLARE
     legal_text TEXT;
     piece TEXT;
     segment JSONB;
+    evidence_url TEXT;
     fragments JSONB := '[]'::jsonb;
     start_at INTEGER;
     end_at INTEGER;
@@ -449,6 +450,20 @@ BEGIN
            ('CURRENT','PREVIOUS','REVOKED','EDITORIAL','UNVERIFIED')
       THEN RETURN NULL;
       END IF;
+      -- The worker checks URLs for every status, not only CURRENT.
+      -- Source-admin evidence cannot authorize a foreign or non-HTTPS host.
+      IF jsonb_typeof(segment->'evidenceUrls') IS DISTINCT FROM 'array'
+        OR jsonb_array_length(segment->'evidenceUrls')>25
+        OR (segment ? 'supportingActs' AND
+          (jsonb_typeof(segment->'supportingActs') IS DISTINCT FROM 'array'
+           OR jsonb_array_length(segment->'supportingActs')>25))
+      THEN RETURN NULL; END IF;
+      FOR evidence_url IN SELECT value
+        FROM jsonb_array_elements_text(segment->'evidenceUrls') AS e(value)
+      LOOP
+        IF evidence_url !~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
+        THEN RETURN NULL; END IF;
+      END LOOP;
       IF segment->>'status'='CURRENT' THEN
         IF segment->>'method' NOT IN ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT')
           OR jsonb_typeof(segment->'evidenceUrls') IS DISTINCT FROM 'array'
