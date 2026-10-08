@@ -453,6 +453,28 @@ test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method at
       parts: ['1006.30.11'], statuses: ['CURRENT'] },
     { name: 'missing method', html: '<p>NCM 1006.30.11</p>',
       parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], missingMethod: true },
+    // R4 F01: Node ACT_IDENTIFIER and REVOKED_PLACEHOLDER exclusions.
+    { name: 'dated act', html: '<p>Convênio 10063011, de 8 de outubro de 2026.</p>',
+      parts: ['Convênio 10063011, de 8 de outubro de 2026.'], statuses: ['CURRENT'] },
+    { name: 'complementary law', html: '<p>Lei Complementar 10063011</p>',
+      parts: ['Lei Complementar 10063011'], statuses: ['CURRENT'] },
+    { name: 'revoked placeholder', html: '<p>10063011 - revogado.</p>',
+      parts: ['10063011 - revogado.'], statuses: ['CURRENT'] },
+    // R4 F02: JSONB ->> must not coerce a string into integer or vice versa.
+    { name: 'start as JSON string', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], stringStart: true },
+    { name: 'end as JSON string', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], stringEnd: true },
+    { name: 'version as JSON string', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], stringVersion: true },
+    { name: 'numeric supporting act', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: [7] },
+    { name: 'blank supporting act', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: [''] },
+    { name: 'control character supporting act', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A\\u0001B'] },
+    { name: 'oversized supporting act', html: '<p>NCM 1006.30.11</p>',
+      parts: ['NCM 1006.30.11'], statuses: ['CURRENT'], supportingActs: ['A'.repeat(257)] },
   ] as const;
   try {
     await admin.query(`INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key)
@@ -487,11 +509,15 @@ test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method at
           method: 'OFFICIAL_AMENDMENT', evidenceUrls: [officialUrl] };
       });
       if ('missingMethod' in sample && sample.missingMethod) delete segments[0]!.method;
+      if ('stringStart' in sample && sample.stringStart) segments[0]!.start = '0';
+      if ('stringEnd' in sample && sample.stringEnd) segments[0]!.end = String(sample.parts[0]!.length);
+      if ('supportingActs' in sample) segments[0]!.supportingActs = sample.supportingActs;
       const recheckOn = nextDate(day, 3);
       const verifiedAt = new Date(Date.now() - 60_000).toISOString();
-      const manifest = { version: 1, publicationVersionId: versionId, sourceId: source,
+      const manifest: Record<string, unknown> = { version: 1, publicationVersionId: versionId, sourceId: source,
         officialUrl, htmlSha256: h(sample.html), validAsOf: day, recheckOn,
         verifiedAt, coverage: 'COMPLETE', segments };
+      if ('stringVersion' in sample && sample.stringVersion) manifest.version = '1';
       const attestationId = (await admin.query<{ id: string }>(
         `INSERT INTO publication_legal_scope_attestations(
            publication_version_id,source_id,publication_origin_id,official_url,
