@@ -161,3 +161,28 @@ test('TAX13 B4 normative date is Brazil-local at UTC midnight boundary', () => {
   assert.equal(brazilLegalReferenceDate(new Date('2026-10-08T01:59:59.000Z')), '2026-10-07');
   assert.equal(brazilLegalReferenceDate(new Date('2026-10-08T03:00:00.000Z')), '2026-10-08');
 });
+
+test('TAX13 B4 COMPLETE must cover all non-whitespace legal text, including history', () => {
+  const partial = manifest();
+  partial.coverage = 'COMPLETE';
+  assert.equal(validateLegalScopeEvidence(partial, ctx).reason, 'INCOMPLETE_SCOPE_COVERAGE');
+
+  const reviewed = manifest();
+  reviewed.coverage = 'COMPLETE';
+  const leading = text.slice(0, start);
+  const tail = text.slice(start + current.length);
+  reviewed.segments = [
+    {start:0,end:start,textSha256:digest(leading),status:'PREVIOUS',
+      method:'ORIGINAL_PUBLICATION', evidenceUrls:[]},
+    {...reviewed.segments[0]!},
+  ];
+  if (tail.trim()) {
+    reviewed.segments.push({
+      start:start + current.length,end:text.length,textSha256:digest(tail),
+      status:'UNVERIFIED',method:'ORIGINAL_PUBLICATION',evidenceUrls:[],
+    });
+  }
+  const accepted=validateLegalScopeEvidence(reviewed,ctx);
+  assert.equal(accepted.valid,true);
+  assert.equal(accepted.currentText,current);
+});
