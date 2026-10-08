@@ -386,6 +386,7 @@ DECLARE
     preceding INTEGER := 0;
     count_segments INTEGER := 0;
     html_rebuilt TEXT := '';
+    canonical_html TEXT;
     node_ranges JSONB := '[]'::jsonb;
     node_ RECORD;
     node_start INTEGER;
@@ -439,9 +440,18 @@ BEGIN
     -- equality. Unknown nesting, entities, wrappers, metadata, DOM attributes
     -- and markup are not assumed CURRENT. A richer adapter must validate
     -- unsupported HTML before any positive legal status is projected.
+    -- Official sanitized paragraphs may contain this exact inert current
+    -- attribute. Node accepts it but does not use it to prove vigencia.
+    -- Remove ONLY the recognized opening-tag form before strict reparsing.
+    -- Historical/revoked attributes and arbitrary markup remain rejected.
+    canonical_html := replace(
+      replace(html,
+        '<p class="TextoAcordo" data-legal-status="current">',
+        '<p class="TextoAcordo">'),
+      '<p data-legal-status="current">','<p>');
     legal_text := '';
     FOR node_ IN
-      SELECT capture FROM regexp_matches(html,
+      SELECT capture FROM regexp_matches(canonical_html,
         '<p( class="(TextoAcordo|TituloAcordo|RedaoAnt)")?>([^<>&]+)</p>',
         'g') AS mt(capture)
     LOOP
@@ -462,7 +472,7 @@ BEGIN
         jsonb_build_object('start',node_start,
           'end',char_length(legal_text),'excluded',node_excluded));
     END LOOP;
-    IF html_rebuilt IS DISTINCT FROM html OR jsonb_array_length(node_ranges)=0
+    IF html_rebuilt IS DISTINCT FROM canonical_html OR jsonb_array_length(node_ranges)=0
     THEN RETURN NULL; END IF;
     FOR segment IN SELECT value FROM jsonb_array_elements(record_.manifest->'segments')
     LOOP
