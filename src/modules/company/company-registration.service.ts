@@ -163,18 +163,7 @@ export async function createCompanyFromRegistry(
   }
   await upsertCnaes(trx, record.cnaes);
 
-  const company = existingCompany
-    ? await trx
-        .updateTable('companies')
-        .set({
-          legal_name: record.legalName,
-          trade_name: record.tradeName,
-          is_active: true,
-        })
-        .where('id', '=', existingCompany.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  const company = await trx
         .insertInto('companies')
         .values({
           tenant_id: tenantId,
@@ -197,47 +186,7 @@ export async function createCompanyFromRegistry(
     .where('cnpj', '=', record.cnpj)
     .executeTakeFirst();
 
-  const establishment = existingEstablishment
-    ? await trx
-        .updateTable('establishments')
-        .set({
-          name:
-            record.tradeName ??
-            record.legalName,
-          establishment_type_code:
-            'HEAD_OFFICE',
-          is_head_office: true,
-          uf: record.uf,
-          municipality_name:
-            record.municipalityName,
-          municipality_ibge_code:
-            record.municipalityIbgeCode,
-          postal_code: record.postalCode,
-          street: record.street,
-          street_number:
-            record.streetNumber,
-          complement: record.complement,
-          district: record.district,
-          business_location_code:
-            businessLocationCode === undefined
-              ? existingEstablishment.business_location_code
-              : businessLocationCode,
-          state_registration:
-            stateRegistration?.registration ?? null,
-          state_registration_status:
-            stateRegistration?.registrationStatus ?? null,
-          state_registration_source:
-            stateRegistration?.source ?? null,
-          state_registration_checked_at:
-            stateRegistration?.checkedAt ?? null,
-          state_registration_lookup_status:
-            stateRegistration?.lookupStatus ?? null,
-          is_active: true,
-        })
-        .where('id', '=', existingEstablishment.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  const establishment = await trx
         .insertInto('establishments')
         .values({
           company_id: company.id,
@@ -334,50 +283,7 @@ export async function createEstablishmentFromRegistry(
   }
   await upsertCnaes(trx, record.cnaes);
 
-  const establishment = existingEstablishment
-    ? await trx
-        .updateTable('establishments')
-        .set({
-          name:
-            record.tradeName ??
-            record.legalName,
-          establishment_type_code:
-            existingEstablishment.is_head_office
-              ? 'HEAD_OFFICE'
-              : typeCode,
-          is_head_office:
-            existingEstablishment.is_head_office,
-          uf: record.uf,
-          municipality_name:
-            record.municipalityName,
-          municipality_ibge_code:
-            record.municipalityIbgeCode,
-          postal_code: record.postalCode,
-          street: record.street,
-          street_number:
-            record.streetNumber,
-          complement: record.complement,
-          district: record.district,
-          business_location_code:
-            businessLocationCode === undefined
-              ? existingEstablishment.business_location_code
-              : businessLocationCode,
-          state_registration:
-            stateRegistration?.registration ?? null,
-          state_registration_status:
-            stateRegistration?.registrationStatus ?? null,
-          state_registration_source:
-            stateRegistration?.source ?? null,
-          state_registration_checked_at:
-            stateRegistration?.checkedAt ?? null,
-          state_registration_lookup_status:
-            stateRegistration?.lookupStatus ?? null,
-          is_active: true,
-        })
-        .where('id', '=', existingEstablishment.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  const establishment = await trx
         .insertInto('establishments')
         .values({
           company_id: companyId,
