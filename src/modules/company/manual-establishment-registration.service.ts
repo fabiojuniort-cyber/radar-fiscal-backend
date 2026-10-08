@@ -2,7 +2,9 @@ import type { Transaction } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import type { CnpjRegistryCnae } from './cnpj-registry.service.js';
-import { replaceManualEstablishmentCnaes } from './company-registration.service.js';
+import { replaceManualEstablishmentCnaes, rebuildCompanyCnaes } from './company-registration.service.js';
+import { CompanyIdentityError, ensureSameCompanyRoot } from './company-identity.guard.js';
+import { ManualCnaeValidationError } from './manual-cnae-validation.service.js';
 
 export class ManualEstablishmentConflictError extends Error {
   constructor(
@@ -28,6 +30,7 @@ export type ManualEstablishmentRegistrationInput = {
   stateRegistration?: string | null | undefined;
   businessLocationCode?: string | null | undefined;
   cnaes?: CnpjRegistryCnae[] | undefined;
+  reactivateInactive?: boolean | undefined;
 };
 
 export type ManualEstablishmentRegistrationResult = {
@@ -41,11 +44,19 @@ export async function createOrReactivateManualEstablishment(
   trx: Transaction<DB>,
   input: ManualEstablishmentRegistrationInput,
 ): Promise<ManualEstablishmentRegistrationResult> {
+  const company = await trx.selectFrom('companies')
+    .select('head_office_cnpj').where('id', '=', input.companyId)
+    .where('is_active', '=', true).forUpdate().executeTakeFirst();
+  if (!company) throw new CompanyIdentityError('establishment_cnpj_root_mismatch');
+  ensureSameCompanyRoot(company.head_office_cnpj, input.cnpj);
+
   const existing = await trx
     .selectFrom('establishments')
     .select([
       'id',
       'is_head_office',
+      'is_active',
+      'name',
       'municipality_name',
       'municipality_ibge_code',
       'postal_code',
@@ -62,6 +73,7 @@ export async function createOrReactivateManualEstablishment(
     ])
     .where('company_id', '=', input.companyId)
     .where('cnpj', '=', input.cnpj)
+    .forUpdate()
     .executeTakeFirst();
 
   if (existing?.is_head_office) {
@@ -69,6 +81,21 @@ export async function createOrReactivateManualEstablishment(
       'head_office_conflict',
     );
   }
+  if (existing?.is_active) throw new CompanyIdentityError('establishment_conflict');
+  if (existing && !input.reactivateInactive) throw new CompanyIdentityError('reactivation_required');
+  if (existing) {
+    await trx.updateTable('establishments').set({ is_active: true })
+      .where('id', '=', existing.id).execute();
+    await rebuildCompanyCnaes(trx, input.companyId);
+    return {
+      establishmentId: existing.id,
+      businessLocationCode: existing.business_location_code,
+      stateRegistration: existing.state_registration,
+      stateRegistrationSource: existing.state_registration_source,
+    };
+  }
+  if (!input.cnaes?.length) throw new ManualCnaeValidationError('invalid_cnae');
+
 
   const preserve = <T>(
     incoming: T | undefined,
