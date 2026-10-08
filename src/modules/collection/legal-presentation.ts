@@ -429,7 +429,7 @@ const BLOCK_TAGS = new Set(['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4'
 export function currentWordingText(html: string | null | undefined): string | undefined {
   if (!html) return undefined;
 
-  type Frame = { tag: string; text: string; excluded: boolean; annexRestriction: 'previous' | 'revoked' | 'unverified' | null; legalStatus?: string; currentCellText: string };
+  type Frame = { tag: string; text: string; excluded: boolean; annexRestriction: 'previous' | 'revoked' | 'unverified' | null; legalStatus: string | undefined; currentCellText: string };
   const frames: Frame[] = [];
   let output = '';
   let filtered = false;
