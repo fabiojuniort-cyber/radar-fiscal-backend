@@ -388,15 +388,15 @@ export async function processPublicationTaxonomyBatch(
   result.releaseId = release.id;
 
   const concepts = await loadClassificationConcepts(db, release.id);
+  const asOf = brazilLegalReferenceDate();
   const pending = await selectPending(
     db,
     release.id,
     [...new Set([...settings.classificationExcludedSources, ...PROTECTED_EXCLUDED_SOURCES])],
     limit,
+    asOf,
   );
   result.selected = pending.length;
-
-  const asOf = brazilLegalReferenceDate();
   for (const row of pending) {
     try {
       const verified = await readVerifiedLegalScope(db, {
