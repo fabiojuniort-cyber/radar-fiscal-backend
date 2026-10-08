@@ -6,6 +6,7 @@ import { sql } from 'kysely';
 import { Pool } from 'pg';
 
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
+import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
@@ -61,6 +62,9 @@ async function createPublicationFixture(
     ],
   );
 
+  if (input.scoped !== false) {
+    await seedTestLegalScopeAttestation(admin, version.rows[0]!.id);
+  }
   return { publicationId, versionId: version.rows[0]!.id };
 }
 
@@ -272,14 +276,13 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
     });
     fixtures.push(unscoped);
     const rawResult = await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
-    assert.equal(rawResult.selected, 1);
     assert.equal(rawResult.candidates, 0);
     assert.equal(rawResult.matches, 0);
-    const rawScan = await admin.query<{ source_field: string }>(
-      'SELECT source_field FROM publication_ncm_scans WHERE publication_version_id=$1::uuid AND detector_version=$2',
+    const rawScan = await admin.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM publication_ncm_scans WHERE publication_version_id=$1::uuid AND detector_version=$2',
       [unscoped.versionId, PUBLICATION_NCM_DETECTOR_VERSION],
     );
-    assert.equal(rawScan.rows[0]?.source_field, 'NONE');
+    assert.equal(rawScan.rows[0]?.count, 0, 'UNVERIFIED must never become a SUCCESS scan');
   } finally {
     await db.destroy();
 
