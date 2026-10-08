@@ -87,6 +87,69 @@ test(
     try {
       await app.ready();
 
+      await t.test('ONB-01 creates a user-only tenant without company while preserving login and consent', async () => {
+        const email = `onb01-${randomUUID()}@example.test`;
+        rateHashes.push(normalizedRateHash(email));
+        const response = await app.inject({
+          method: 'POST',
+          url: '/auth/register',
+          payload: {
+            name: 'Pessoa Sem Empresa',
+            email,
+            password: PASSWORD,
+            confirmPassword: PASSWORD,
+            acceptedTerms: true,
+          },
+        });
+        assert.equal(response.statusCode, 201, response.body);
+        const body = response.json<{
+          user: { id: string };
+          tenant: { id: string; name: string };
+          membership: { role: string };
+        }>();
+        userIds.push(body.user.id);
+        tenantIds.push(body.tenant.id);
+        assert.equal(body.tenant.name, 'Conta de Pessoa Sem Empresa');
+        assert.equal(body.membership.role, 'OWNER');
+
+        const created = await admin.query<{
+          company_name: string | null;
+          cnpj: string | null;
+          terms_accepted_at: Date | null;
+          companies: string;
+        }>(`
+          SELECT p.company_name, p.cnpj, p.terms_accepted_at,
+                 (SELECT COUNT(*)::text FROM companies c WHERE c.tenant_id = p.tenant_id) AS companies
+          FROM tenant_onboarding_profiles p
+          WHERE p.tenant_id = $1
+        `, [body.tenant.id]);
+        assert.equal(created.rowCount, 1);
+        assert.equal(created.rows[0]?.company_name, null);
+        assert.equal(created.rows[0]?.cnpj, null);
+        assert.ok(created.rows[0]?.terms_accepted_at);
+        assert.equal(created.rows[0]?.companies, '0');
+
+        const logged = await login(app, email);
+        assert.equal(logged.statusCode, 200);
+        const token = logged.json<{ accessToken: string }>().accessToken;
+        const account = await app.inject({
+          method: 'GET',
+          url: '/api/v1/account',
+          headers: {
+            authorization: `Bearer ${token}`,
+            'x-tenant-id': body.tenant.id,
+          },
+        });
+        assert.equal(account.statusCode, 200);
+        const accountBody = account.json<{
+          onboarding: { companyName: string | null; cnpj: string | null };
+          companies: unknown[];
+        }>();
+        assert.equal(accountBody.onboarding.companyName, null);
+        assert.equal(accountBody.onboarding.cnpj, null);
+        assert.deepEqual(accountBody.companies, []);
+      });
+
       await t.test(
         'creates tenant, user, Argon2id credential, OWNER membership and onboarding profile atomically',
         async () => {
