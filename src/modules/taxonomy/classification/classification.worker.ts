@@ -155,6 +155,20 @@ async function selectPending(
           AND n.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
           AND n.status = 'SUCCESS'
           AND (n.scanned_at AT TIME ZONE 'America/Sao_Paulo')::date = ${asOf}::date
+          AND EXISTS (
+            SELECT 1 FROM public.publication_legal_scope_attestations a
+            WHERE a.publication_version_id = pv.id
+              AND a.valid_as_of = ${asOf}::date
+              AND a.recheck_on > ${asOf}::date
+              AND a.coverage = 'COMPLETE'
+              AND a.created_at <= n.scanned_at
+              AND NOT EXISTS (
+                SELECT 1 FROM public.publication_legal_scope_attestations newer
+                WHERE newer.publication_version_id = a.publication_version_id
+                  AND newer.valid_as_of = a.valid_as_of
+                  AND (newer.created_at, newer.id) > (a.created_at, a.id)
+              )
+          )
       )
       AND NOT EXISTS (
         SELECT 1
