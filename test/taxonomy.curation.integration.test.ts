@@ -194,7 +194,7 @@ async function createPublication(admin: Pool, title: string, text: string) {
      ) VALUES ($1::uuid, 1, $2, $3, $4::jsonb, TRUE)
      RETURNING id`,
     [publicationId, createHash('sha256').update(text).digest('hex'), text,
-     JSON.stringify({presentation: {html: '<p class="TextoAcordo">' + text + '</p>'}})],
+     JSON.stringify({presentation: {html: '<p data-legal-status="current" class="TextoAcordo">' + text + '</p>'}})],
   );
   return { publicationId, versionId: version.rows[0]!.id };
 }
