@@ -684,7 +684,7 @@ WITH reference_day AS (
   SELECT a.* FROM public.publication_legal_scope_attestations a
   CROSS JOIN reference_day r
   WHERE a.id=public.tax13_effective_attestation_id(p_version,r.d)
-), current_catalog AS (
+), ncm_catalog_current AS (
   SELECT ed.id,
     encode(sha256(convert_to(
       concat_ws(':',ed.edition_code,ed.source_sha256,
@@ -706,7 +706,7 @@ SELECT scan.run_fingerprint::text
 FROM current_version pv
 CROSS JOIN reference_day r
 JOIN effective_proof a ON a.publication_version_id=pv.id
-JOIN current_catalog cat ON TRUE
+JOIN ncm_catalog_current cat ON TRUE
 JOIN public.publication_ncm_scan_evidence scan
   ON scan.publication_version_id=pv.id
   AND scan.legal_scope_attestation_id=a.id
