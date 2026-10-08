@@ -154,6 +154,38 @@ function isRevokedPlaceholder(text: string): boolean {
   return REVOKED_PLACEHOLDER.test(text.replace(/\s+/g, ' ').trim());
 }
 
+/**
+ * Annex headings are metadata, not a taxonomy hit. A revoked or historical
+ * annex suppresses its contents until the next annex heading, including rows
+ * whose HTML class is indistinguishable from the current version. An active
+ * annex, including its tables, remains in scope.
+ *
+ * Deliberately require a heading delimiter: "Anexo I dispõe ..." is a
+ * normative sentence, not the beginning of an annex section.
+ */
+const ANNEX_HEADING = /^anexo\s+(?:único|unico|[ivxlcdm]+|\d+)(?=\s*$|\s*[-–—:.(])/iu;
+const HISTORICAL_ANNEX_HEADING =
+  /\b(?:revogad[oa]s?|redação\s+(?:anterior|original)|texto\s+anterior|substitu[íi]d[oa]s?|sem\s+(?:efeito|vigência))\b/iu;
+
+function excludeHistoricalAnnexes(lines: string[]): { lines: string[]; filtered: boolean } {
+  const included: string[] = [];
+  let historicalAnnex = false;
+  let filtered = false;
+  for (const line of lines) {
+    if (ANNEX_HEADING.test(line)) {
+      historicalAnnex = HISTORICAL_ANNEX_HEADING.test(line);
+      filtered = true; // headings are not normative evidence, even for current annexes
+      continue;
+    }
+    if (historicalAnnex) {
+      filtered = true;
+      continue;
+    }
+    included.push(line);
+  }
+  return { lines: included, filtered };
+}
+
 function allowedClasses(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const kept = raw
@@ -425,10 +457,11 @@ export function currentWordingText(html: string | null | undefined): string | un
     }
   }
 
-  if (!filtered) return undefined;
-  return output
+  const lines = output
     .split('\n')
     .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
+  const annexes = excludeHistoricalAnnexes(lines);
+  if (!filtered && !annexes.filtered) return undefined;
+  return annexes.lines.join('\n');
 }
