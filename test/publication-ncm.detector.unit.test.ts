@@ -346,6 +346,9 @@ test('R2 B2 NCM detector fails closed on missing, raw, oversized, or unmarked HT
   }
   const excerptOnly = selectText({ ...row, content_text: null, presentation_html: null });
   assert.equal(excerptOnly.sourceField, 'NONE');
+  const overLimit = selectText({ ...row, presentation_html: '<p data-legal-status="current">' + 'X'.repeat(2 * 1024 * 1024) + '8450.11.00</p>' });
+  assert.equal(overLimit.sourceField, 'NONE');
+  assert.equal(overLimit.text, '');
 });
 
 test('saved official Convênios 100/97 and 52/91 preserve current body and ignore historical annex NCM', () => {
