@@ -88,6 +88,8 @@ test('TAX13 B4 rejects expired, undated and untrusted legal evidence', () => {
   const badUrl=manifest();
   badUrl.segments[0]!.evidenceUrls=['https://attacker.example/act'];
   assert.equal(validateLegalScopeEvidence(badUrl,ctx).reason,'UNTRUSTED_EVIDENCE_URL');
+  badUrl.segments[0]!.evidenceUrls=['https://www.confaz.fazenda.gov.br:8443/alteracao'];
+  assert.equal(validateLegalScopeEvidence(badUrl,ctx).reason,'UNTRUSTED_EVIDENCE_URL');
   const original=manifest();
   original.segments[0]!.method='ORIGINAL_PUBLICATION';
   assert.equal(validateLegalScopeEvidence(original,ctx).reason,'CURRENT_WITHOUT_OFFICIAL_PROOF');
