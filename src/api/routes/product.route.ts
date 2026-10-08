@@ -13,6 +13,7 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
 import { computePublicationAffinity, type ProfileTerm } from '../../modules/taxonomy/affinity/publication-affinity.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import {
@@ -764,6 +765,9 @@ export async function productRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
         const handledTenant =
           handleTenantError(error, reply);
         if (handledTenant) return handledTenant;
@@ -1513,6 +1517,9 @@ export async function productRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
         const handledTenant = handleTenantError(error, reply);
         if (handledTenant) return handledTenant;
 
