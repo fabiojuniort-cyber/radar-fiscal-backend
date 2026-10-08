@@ -480,6 +480,12 @@ export async function classifySinglePublication(
   });
   const scopeCurrent = verified.valid && verified.currentSegments > 0;
   if (input.persist && !scopeCurrent) {
+    // Preserve the publication scope suppression/rebuild race contract:
+    // acquire the canonical publication SHARE lock before reporting that
+    // evidence is missing. An in-flight SUPPRESS must win the lock first
+    // and report PUBLICATION_OUT_OF_SCOPE, not an unrelated B4 error.
+    await db.transaction().execute((trx) =>
+      lockPublicationVersionInScope(trx, row.publication_version_id));
     throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
       (verified.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
   }
