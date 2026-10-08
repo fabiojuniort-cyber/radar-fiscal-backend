@@ -182,7 +182,7 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/publication-ncm.enrichment.integration.test.ts
 
-       - name: Archive NCM filter integration
+      - name: Archive NCM filter integration
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/archive-ncm-filter.integration.test.ts
 
