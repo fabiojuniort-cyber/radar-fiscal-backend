@@ -21,13 +21,18 @@ export async function seedTestLegalScopeAttestation(
   const version = await admin.query<{
     publication_id: string;
     presentation_html: string | null;
+    presentation_format: string | null;
   }>(`
     SELECT publication_id,
+      source_metadata -> 'presentation' ->> 'format' AS presentation_format,
       source_metadata -> 'presentation' ->> 'html' AS presentation_html
     FROM public.publication_versions WHERE id=$1::uuid
   `, [publicationVersionId]);
   const row=version.rows[0];
   if (!row?.presentation_html) throw new Error('TEST_PRESENTATION_REQUIRED');
+  if (row.presentation_format !== 'SANITIZED_HTML') {
+    throw new Error('TEST_SANITIZED_PRESENTATION_FORMAT_REQUIRED');
+  }
 
   await admin.query(`
     INSERT INTO public.sources (code,name,jurisdiction_level,base_url,connector_key)

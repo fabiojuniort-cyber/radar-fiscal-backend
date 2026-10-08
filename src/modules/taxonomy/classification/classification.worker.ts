@@ -118,7 +118,10 @@ async function selectPending(
       p.title,
       pv.content_text,
       pv.relevant_excerpt,
-      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+      CASE WHEN pv.source_metadata -> 'presentation' ->> 'format' = 'SANITIZED_HTML'
+        THEN pv.source_metadata -> 'presentation' ->> 'html'
+        ELSE NULL
+      END AS presentation_html
     FROM publications p
     JOIN publication_versions pv
       ON pv.publication_id = p.id
@@ -455,7 +458,10 @@ export async function classifySinglePublication(
 ): Promise<SinglePublicationClassification> {
   const current = await sql<PendingVersion>`
     SELECT pv.id AS publication_version_id, p.title, pv.content_text, pv.relevant_excerpt,
-      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+      CASE WHEN pv.source_metadata -> 'presentation' ->> 'format' = 'SANITIZED_HTML'
+        THEN pv.source_metadata -> 'presentation' ->> 'html'
+        ELSE NULL
+      END AS presentation_html
     FROM publications p
     JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
     WHERE p.id = ${input.publicationId}::uuid

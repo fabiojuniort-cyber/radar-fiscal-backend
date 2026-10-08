@@ -57,7 +57,7 @@ async function createPublicationFixture(
       publicationId,
       createHash('sha256').update(input.text).digest('hex'),
       input.text,
-      JSON.stringify({presentation: {html: input.scoped === false ? null :
+      JSON.stringify({presentation: {format: input.scoped === false ? 'PRESERVED_TEXT' : 'SANITIZED_HTML', html: input.scoped === false ? null :
         '<p class="TituloAcordo">CONVÊNIO ICMS — fixture</p><p class="TextoAcordo">' + input.text + '</p>'}}),
     ],
   );

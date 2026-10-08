@@ -195,7 +195,7 @@ async function createPublication(admin: Pool, title: string, text: string, attes
      ) VALUES ($1::uuid, 1, $2, $3, $4::jsonb, TRUE)
      RETURNING id`,
     [publicationId, createHash('sha256').update(text).digest('hex'), text,
-     JSON.stringify({presentation: {html: '<p class="TextoAcordo" data-legal-status="current">' + text + '</p>'}})],
+     JSON.stringify({presentation: {format: 'SANITIZED_HTML', html: '<p class="TextoAcordo" data-legal-status="current">' + text + '</p>'}})],
   );
   if (attested) await seedTestLegalScopeAttestation(admin, version.rows[0]!.id);
   return { publicationId, versionId: version.rows[0]!.id };

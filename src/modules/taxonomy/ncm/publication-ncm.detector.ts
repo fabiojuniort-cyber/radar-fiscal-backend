@@ -373,7 +373,10 @@ async function selectBatch(
       pv.id AS publication_version_id,
       pv.content_text,
       pv.relevant_excerpt,
-      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+      CASE WHEN pv.source_metadata -> 'presentation' ->> 'format' = 'SANITIZED_HTML'
+        THEN pv.source_metadata -> 'presentation' ->> 'html'
+        ELSE NULL
+      END AS presentation_html
     FROM publications p
     JOIN publication_versions pv
       ON pv.publication_id = p.id
