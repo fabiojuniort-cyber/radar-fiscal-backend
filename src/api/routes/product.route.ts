@@ -14,6 +14,7 @@ import {
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
 import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
+import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import { computePublicationAffinity, type ProfileTerm } from '../../modules/taxonomy/affinity/publication-affinity.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import {
@@ -409,7 +410,10 @@ function handleTenantError(
       error: 'tenant_access_denied',
     });
   }
-
+  if (error instanceof ManualCnaeValidationError) {
+    return reply.status(error.code === 'cnae_catalog_unavailable' ? 503 : 400)
+      .send({ error: error.code });
+  }
   return null;
 }
 
