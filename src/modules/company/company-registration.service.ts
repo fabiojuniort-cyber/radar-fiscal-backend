@@ -330,8 +330,9 @@ export async function replaceManualEstablishmentCnaes(
   companyId: string,
   establishmentId: string,
   cnaes: CnpjRegistryCnae[],
+  allowEmpty = false,
 ): Promise<void> {
-  const canonicalCnaes = await validateAndEnsureOfficialCnaes(trx, cnaes);
+  const canonicalCnaes = await validateAndEnsureOfficialCnaes(trx, cnaes, allowEmpty);
   await replaceEstablishmentCnaes(
     trx,
     establishmentId,
