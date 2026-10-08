@@ -2,6 +2,8 @@ import { sql, type Kysely, type RawBuilder, type Transaction } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
 import { currentWordingText } from '../../collection/legal-presentation.js';
+import { brazilLegalReferenceDate } from '../legal-scope/legal-scope-evidence.js';
+import { readVerifiedLegalScope } from '../legal-scope/legal-scope.repository.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
@@ -344,6 +346,7 @@ async function markFailedScan(
 async function selectBatch(
   db: Kysely<DB>,
   limit: number,
+  asOf: string,
 ): Promise<VersionForNcmScan[]> {
   const result = await sql<VersionForNcmScan>`
     SELECT
@@ -360,6 +363,16 @@ async function selectBatch(
      AND pns.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
      AND pns.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
     WHERE public.publication_scope_is_in_scope(p.id)
+      -- Without an audited provenance manifest the new version must NOT
+      -- create a SUCCESS scan and supersede older NCM findings.
+      AND EXISTS (
+        SELECT 1
+        FROM public.publication_legal_scope_attestations a
+        WHERE a.publication_version_id = pv.id
+          AND a.valid_as_of = ${asOf}::date
+          AND a.recheck_on > ${asOf}::date
+          AND a.coverage IN ('PARTIAL','COMPLETE')
+      )
       AND (
         pns.id IS NULL
         OR (
@@ -384,7 +397,8 @@ export async function processPublicationNcmEnrichmentBatch(
   const limit = Math.max(1, Math.min(options.limit ?? 10, 100));
   await assertCurrentNcmCatalog(db);
 
-  const rows = await selectBatch(db, limit);
+  const asOf = brazilLegalReferenceDate();
+  const rows = await selectBatch(db, limit, asOf);
   const result: PublicationNcmBatchResult = {
     selected: rows.length,
     succeeded: 0,
@@ -394,8 +408,25 @@ export async function processPublicationNcmEnrichmentBatch(
   };
 
   for (const row of rows) {
-    const { text, sourceField, currentWordingOnly } = selectText(row);
-    const candidates = extractNcmCandidates(text);
+    // The official attestation is the only source of CURRENT legal text.
+    // Invalid, stale and partial/unreviewed HTML never becomes SUCCESS.
+    // In particular, zero matches without proof must not hide old findings.
+    let verified;
+    try {
+      verified = await readVerifiedLegalScope(db, {
+        publicationVersionId: row.publication_version_id,
+        sanitizedHtml: row.presentation_html ?? '',
+        asOf,
+      });
+    } catch (error) {
+      // Operational faults are not evidence of zero current NCMs.
+      // Surface the failure rather than sealing this publication as SUCCESS.
+      throw error;
+    }
+    if (!verified.valid || verified.currentSegments === 0) continue;
+    const sourceField: PublicationNcmSourceField = 'CONTENT_TEXT';
+    const currentWordingOnly = true;
+    const candidates = extractNcmCandidates(verified.currentText);
     result.candidates += candidates.length;
 
     try {
