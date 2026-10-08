@@ -29,7 +29,9 @@ export async function ensureCnaeFixture(admin: Pool): Promise<void> {
     CROSS JOIN (
       VALUES
         ('6201-5/01', 'Desenvolvimento de programas de computador sob encomenda'),
-        ('4632-0/01', 'Comércio atacadista de cereais e leguminosas beneficiados')
+        ('4632-0/01', 'Comércio atacadista de cereais e leguminosas beneficiados'),
+        ('4683-4/00', 'Comércio atacadista de defensivos agrícolas, adubos, fertilizantes e corretivos do solo'),
+        ('4623-1/08', 'Comércio atacadista de matérias-primas agrícolas com atividade de fracionamento e acondicionamento associada')
     ) AS fixtures(code, description)
     WHERE c.code = 'CNAE' AND e.status = 'CURRENT'
     ON CONFLICT (catalog_edition_id, official_code) DO NOTHING;
