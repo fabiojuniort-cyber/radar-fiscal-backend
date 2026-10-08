@@ -152,6 +152,13 @@ export function validateLegalScopeEvidence(
   let lastEnd = 0;
   for (const segment of evidence.segments) {
     if (!segment || typeof segment !== 'object') return fail('INVALID_SEGMENT');
+    // COMPLETE means every normative/non-empty text region was reviewed,
+    // including historical/editorial/UNVERIFIED fragments; otherwise clients
+    // could mistake partial legal coverage for exhaustive legal certainty.
+    if (evidence.coverage === 'COMPLETE' &&
+        text.slice(lastEnd, segment.start).trim() !== '') {
+      return fail('INCOMPLETE_SCOPE_COVERAGE');
+    }
     if (!Number.isSafeInteger(segment.start) || !Number.isSafeInteger(segment.end) ||
         segment.start < lastEnd || segment.end <= segment.start || segment.end > text.length) {
       return fail('INVALID_SEGMENT_BOUNDS');
@@ -178,6 +185,9 @@ export function validateLegalScopeEvidence(
       }
       accepted.push(text.slice(segment.start, segment.end));
     }
+  }
+  if (evidence.coverage === 'COMPLETE' && text.slice(lastEnd).trim() !== '') {
+    return fail('INCOMPLETE_SCOPE_COVERAGE');
   }
   if (accepted.length === 0) {
     return { valid: true, reason: null, coverage: evidence.coverage, currentText: '', currentSegments: 0 };
