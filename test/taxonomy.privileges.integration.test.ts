@@ -119,6 +119,60 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
       );
     });
 
+    await t.test('TAX13 legal-scope ledger is FORCE RLS and admin-write only', async () => {
+      const result = await client.query<{
+        rls: boolean;
+        forced: boolean;
+        app_read: boolean;
+        worker_read: boolean;
+        worker_write: boolean;
+        curator_read: boolean;
+        curator_write: boolean;
+      }>(`
+        SELECT cls.relrowsecurity AS rls,
+               cls.relforcerowsecurity AS forced,
+               has_table_privilege('radar_app_runtime', cls.oid, 'SELECT') AS app_read,
+               has_table_privilege('radar_worker_runtime', cls.oid, 'SELECT') AS worker_read,
+               has_table_privilege('radar_worker_runtime', cls.oid, 'INSERT') AS worker_write,
+               has_table_privilege('radar_taxonomy_curator', cls.oid, 'SELECT') AS curator_read,
+               has_table_privilege('radar_taxonomy_curator', cls.oid, 'INSERT') AS curator_write
+        FROM pg_class cls
+        WHERE cls.oid = 'public.publication_legal_scope_attestations'::regclass
+      `);
+      assert.deepEqual(result.rows[0], {
+        rls: true,
+        forced: true,
+        app_read: false,
+        worker_read: true,
+        worker_write: false,
+        curator_read: false,
+        curator_write: false,
+      });
+
+      await withRole(client, 'radar_worker_runtime', async () => {
+        await client.query('SELECT id FROM public.publication_legal_scope_attestations LIMIT 1');
+      });
+      await assert.rejects(
+        withRole(client, 'radar_app_runtime', async () => {
+          await client.query('SELECT id FROM public.publication_legal_scope_attestations LIMIT 1');
+        }),
+        /permission denied/,
+      );
+    });
+
+    await t.test('TAX13 legal scope has immutable and provenance triggers', async () => {
+      const triggerNames = await client.query<{tgname:string}>(`
+        SELECT tgname FROM pg_trigger
+        WHERE tgrelid = 'public.publication_legal_scope_attestations'::regclass
+          AND NOT tgisinternal
+        ORDER BY tgname
+      `);
+      assert.deepEqual(triggerNames.rows.map(r => r.tgname), [
+        'trg_tax13_legal_scope_append_only',
+        'trg_tax13_legal_scope_provenance',
+      ]);
+    });
+
     await t.test('app runtime is taxonomy read-only', async () => {
       await withRole(client, 'radar_app_runtime', async () => {
         await client.query('SELECT count(*) FROM taxonomy_releases');
