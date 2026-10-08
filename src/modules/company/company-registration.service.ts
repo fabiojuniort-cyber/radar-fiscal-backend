@@ -8,6 +8,7 @@ import type {
 import type {
   StateRegistrationLookup,
 } from './state-registration.service.js';
+import { validateAndEnsureOfficialCnaes } from './manual-cnae-validation.service.js';
 
 async function upsertCnaes(
   trx: Transaction<DB>,
@@ -394,11 +395,11 @@ export async function replaceManualEstablishmentCnaes(
   establishmentId: string,
   cnaes: CnpjRegistryCnae[],
 ): Promise<void> {
-  await upsertCnaes(trx, cnaes);
+  const canonicalCnaes = await validateAndEnsureOfficialCnaes(trx, cnaes);
   await replaceEstablishmentCnaes(
     trx,
     establishmentId,
-    cnaes,
+    canonicalCnaes,
   );
   await rebuildCompanyCnaes(
     trx,
