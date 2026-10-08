@@ -117,24 +117,15 @@ export function selectText(row: VersionForNcmScan): {
   sourceField: PublicationNcmSourceField;
   currentWordingOnly: boolean;
 } {
-  const content = row.content_text?.trim();
-  if (content) {
-    // Acts that keep previous wordings on the page (CONFAZ annexes in green,
-    // "Redação anterior"): only the wording in force counts.
-    const current = currentWordingText(row.presentation_html);
-    if (current !== undefined) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
-    return { text: row.content_text!, sourceField: 'CONTENT_TEXT', currentWordingOnly: false };
+  // Unscoped stored text/excerpts contain titles, revoked amendments and
+  // external annex references. They cannot be a source of affirmative NCM
+  // evidence. Only the legal-scope selection can authorize a detector match.
+  // In particular: absent/oversized/ambiguous HTML must NOT fall back to
+  // content_text or relevant_excerpt, even if one of those is non-empty.
+  const current = currentWordingText(row.presentation_html);
+  if (current !== undefined) {
+    return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
   }
-
-  const excerpt = row.relevant_excerpt?.trim();
-  if (excerpt) {
-    return {
-      text: row.relevant_excerpt!,
-      sourceField: 'RELEVANT_EXCERPT',
-      currentWordingOnly: false,
-    };
-  }
-
   return { text: '', sourceField: 'NONE', currentWordingOnly: false };
 }
 
