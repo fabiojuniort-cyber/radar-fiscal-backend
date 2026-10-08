@@ -153,7 +153,8 @@ export async function createCompanyFromRegistry(
       .where('id', '=', existingCompany.id).execute();
     await trx.updateTable('establishments')
       .set({ is_active: true })
-      .where('company_id', '=', existingCompany.id).execute();
+      .where('company_id', '=', existingCompany.id)
+      .where('is_head_office', '=', true).execute();
     const headOffice = await trx.selectFrom('establishments')
       .select('id').where('company_id', '=', existingCompany.id)
       .where('is_head_office', '=', true).executeTakeFirst();
