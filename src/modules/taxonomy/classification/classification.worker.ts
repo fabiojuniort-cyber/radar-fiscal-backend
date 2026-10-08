@@ -334,6 +334,8 @@ async function persistSuccess(
         attempt_count = publication_taxonomy_scans.attempt_count + 1,
         error_message = NULL,
         scanned_at = now()
+      WHERE publication_taxonomy_scans.status <> 'SUCCESS'
+         OR publication_taxonomy_scans.run_id IS DISTINCT FROM EXCLUDED.run_id
     `.execute(trx);
 
     return assertionCount;
