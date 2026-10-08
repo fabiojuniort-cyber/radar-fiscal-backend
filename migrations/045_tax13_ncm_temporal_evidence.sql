@@ -26,7 +26,10 @@ CREATE TABLE public.publication_ncm_scan_evidence (
     outcome TEXT NOT NULL CHECK (outcome = 'SUCCESS'),
     supersedes_scan_id UUID
         REFERENCES public.publication_ncm_scan_evidence(id) ON DELETE RESTRICT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- A transaction may have started before another worker committed its
+    -- predecessor. The scan event timestamp must reflect this INSERT statement
+    -- (after the per-version advisory lock), not transaction start time.
+    created_at TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp(),
     CONSTRAINT chk_tax13_ncm_reference_window CHECK (recheck_on > legal_as_of),
     CONSTRAINT chk_tax13_ncm_no_self_supersession
         CHECK (supersedes_scan_id IS NULL OR supersedes_scan_id <> id)
