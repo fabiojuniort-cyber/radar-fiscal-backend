@@ -494,6 +494,7 @@ export async function classifySinglePublication(
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
+  const asOf = brazilLegalReferenceDate();
   const ncmScan = await sql<{ status: string }>`
     SELECT status FROM publication_ncm_scans
     WHERE publication_version_id = ${row.publication_version_id}::uuid
@@ -507,7 +508,7 @@ export async function classifySinglePublication(
   const verified = await readVerifiedLegalScope(db, {
     publicationVersionId: row.publication_version_id,
     sanitizedHtml: row.presentation_html ?? '',
-    asOf: brazilLegalReferenceDate(),
+    asOf,
   });
   const scopeCurrent = verified.valid && verified.currentSegments > 0;
   if (input.persist && !scopeCurrent) {
