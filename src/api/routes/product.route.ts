@@ -1,3 +1,4 @@
+import { readCompanyRegistration, readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
   FastifyReply,
@@ -13,6 +14,8 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { CompanyIdentityError, ensureHeadOfficeCnpj } from '../../modules/company/company-identity.guard.js';
+import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import { computePublicationAffinity, type ProfileTerm } from '../../modules/taxonomy/affinity/publication-affinity.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import {
@@ -72,6 +75,7 @@ const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   businessLocationCode:
     businessLocationCodeSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 const companyUpdateBodySchema = z.object({
@@ -86,6 +90,7 @@ const establishmentFromCnpjBodySchema = z.object({
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
   businessLocationCode:
     businessLocationCodeSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 const cnaeBodySchema = z.object({
@@ -408,7 +413,10 @@ function handleTenantError(
       error: 'tenant_access_denied',
     });
   }
-
+  if (error instanceof ManualCnaeValidationError) {
+    return reply.status(error.code === 'cnae_catalog_unavailable' ? 503 : 400)
+      .send({ error: error.code });
+  }
   return null;
 }
 
@@ -591,6 +599,7 @@ export async function productRoutes(
       }
 
       try {
+        ensureHeadOfficeCnpj(request.body.cnpj);
         const company = await withTenantContext(
           app.db,
           request.auth.userId,
@@ -639,6 +648,9 @@ export async function productRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
 
@@ -695,13 +707,15 @@ export async function productRoutes(
               return null;
             }
 
-            return createCompanyFromRegistry(
+            const registered = await createCompanyFromRegistry(
               trx,
               tenantId,
               registry,
               stateRegistration,
               request.body.businessLocationCode,
+              request.body.reactivateInactive,
             );
+            return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
           },
         );
 
@@ -710,49 +724,7 @@ export async function productRoutes(
         }
 
         return reply.status(201).send({
-          company: {
-            id: created.companyId,
-            legalName: registry.legalName,
-            tradeName: registry.tradeName,
-            cnpj: registry.cnpj,
-            businessLocationCode:
-              request.body.businessLocationCode ?? null,
-          },
-          establishment: {
-            id: created.establishmentId,
-            cnpj: registry.cnpj,
-            name:
-              registry.tradeName ??
-              registry.legalName,
-            typeCode: 'HEAD_OFFICE',
-            isHeadOffice: true,
-            uf: registry.uf,
-            municipalityName:
-              registry.municipalityName,
-            municipalityIbgeCode:
-              registry.municipalityIbgeCode,
-            postalCode:
-              registry.postalCode,
-            street: registry.street,
-            streetNumber:
-              registry.streetNumber,
-            complement:
-              registry.complement,
-            district: registry.district,
-            businessLocationCode:
-              request.body.businessLocationCode ?? null,
-            stateRegistration:
-              stateRegistration.registration,
-            stateRegistrationStatus:
-              stateRegistration.registrationStatus,
-            stateRegistrationLookupStatus:
-              stateRegistration.lookupStatus,
-            stateRegistrationSource:
-              stateRegistration.source,
-            stateRegistrationCheckedAt:
-              stateRegistration.checkedAt,
-            cnaes: registry.cnaes,
-          },
+          ...created,
           registry: {
             source: registry.source,
             consultedAt:
@@ -764,6 +736,9 @@ export async function productRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
         const handledTenant =
           handleTenantError(error, reply);
         if (handledTenant) return handledTenant;
@@ -987,6 +962,89 @@ export async function productRoutes(
         }
 
         return reply.status(204).send();
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
+  // ONB-01: only the CURRENT official IBGE/CONCLA catalog is eligible
+  // for manual CNAE selection. Never synthesize options from tenant data.
+  typed.get(
+    '/api/v1/cnae-catalog',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        querystring: z.object({
+          search: z.string().trim().max(80).default(''),
+        }),
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const catalog = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            const current = await sql<{ id: string; source_url: string | null }>`
+              SELECT edition.id, edition.source_url
+              FROM official_catalog_editions AS edition
+              JOIN official_catalogs AS catalog ON catalog.id = edition.catalog_id
+              WHERE catalog.code = 'CNAE' AND edition.status = 'CURRENT'
+              ORDER BY edition.created_at DESC
+              LIMIT 1
+            `.execute(trx);
+            const edition = current.rows[0];
+            if (!edition) return null;
+
+            const search = request.query.search.trim();
+            const numeric = search.replace(/\D/g, '');
+            const pattern = `%${search}%`;
+            const numericPattern = `%${numeric}%`;
+            const entries = await sql<{ official_code: string; description: string }>`
+              SELECT entry.official_code, entry.description
+              FROM official_catalog_entries AS entry
+              WHERE entry.catalog_edition_id = ${edition.id}::uuid
+                AND entry.metadata->>'level' = 'SUBCLASSE'
+                AND entry.metadata->>'assignable' = 'true'
+                AND (
+                  ${search} = ''
+                  OR entry.description ILIKE ${pattern}
+                  OR entry.official_code ILIKE ${pattern}
+                  OR (
+                    ${numeric} <> ''
+                    AND regexp_replace(entry.official_code, '[^0-9]', '', 'g')
+                        LIKE ${numericPattern}
+                  )
+                )
+              ORDER BY entry.official_code
+              LIMIT 40
+            `.execute(trx);
+
+            return {
+              source: edition.source_url,
+              items: entries.rows.map((row) => ({
+                code: row.official_code.replace(/\D/g, ''),
+                description: row.description,
+              })),
+            };
+          },
+        );
+        if (!catalog) {
+          return reply.status(503).send({ error: 'cnae_catalog_unavailable' });
+        }
+        return reply.status(200).send(catalog);
       } catch (error) {
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
@@ -1242,6 +1300,7 @@ export async function productRoutes(
               request.body.companyId,
               created.id,
               request.body.cnaes,
+              true, // Legacy generic route may clear CNAEs; ONB-01 manual requires one.
             );
 
             return created;
@@ -1374,9 +1433,10 @@ export async function productRoutes(
                 request.body.typeCode,
                 stateRegistration,
                 request.body.businessLocationCode,
+                request.body.reactivateInactive,
               );
 
-            return { establishmentId };
+            return readRegistrationEstablishment(trx, establishmentId);
           },
         );
 
@@ -1393,35 +1453,7 @@ export async function productRoutes(
         }
 
         return reply.status(201).send({
-          establishment: {
-            id: result.establishmentId,
-            companyId: request.params.companyId,
-            cnpj: registry.cnpj,
-            name: registry.tradeName ?? registry.legalName,
-            typeCode: request.body.typeCode,
-            isHeadOffice: false,
-            uf: registry.uf,
-            municipalityName: registry.municipalityName,
-            municipalityIbgeCode: registry.municipalityIbgeCode,
-            postalCode: registry.postalCode,
-            street: registry.street,
-            streetNumber: registry.streetNumber,
-            complement: registry.complement,
-            district: registry.district,
-            businessLocationCode:
-              request.body.businessLocationCode ?? null,
-            stateRegistration:
-              stateRegistration.registration,
-            stateRegistrationStatus:
-              stateRegistration.registrationStatus,
-            stateRegistrationLookupStatus:
-              stateRegistration.lookupStatus,
-            stateRegistrationSource:
-              stateRegistration.source,
-            stateRegistrationCheckedAt:
-              stateRegistration.checkedAt,
-            cnaes: registry.cnaes,
-          },
+          establishment: result,
           registry: {
             source: registry.source,
             consultedAt: registry.consultedAt,
@@ -1430,6 +1462,9 @@ export async function productRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
         const handledTenant = handleTenantError(error, reply);
         if (handledTenant) return handledTenant;
 
@@ -1550,6 +1585,7 @@ export async function productRoutes(
               existing.company_id,
               existing.id,
               request.body.cnaes,
+              true, // Legacy generic route may clear CNAEs; ONB-01 manual requires one.
             );
 
             return {
@@ -1697,6 +1733,7 @@ export async function productRoutes(
               target.company_id,
               target.id,
               registry.cnaes,
+              true, // Legacy generic route may clear CNAEs; ONB-01 manual requires one.
             );
           },
         );

@@ -6,14 +6,12 @@ import type { FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
 
 import { buildApp } from '../src/app.js';
+import { ensureCnaeFixture } from './onboarding-cnae-fixture.js';
 
 const PASSWORD = 'Manual-Filial-2026!';
 
-function cnpjFromSeed(seed: string): string {
-  const digits = seed
-    .replace(/\D/g, '')
-    .padEnd(12, '6')
-    .slice(0, 12);
+function cnpjFromSeed(seed: string, suffix = '0001'): string {
+  const digits = seed.replace(/\D/g, '').padEnd(8, '6').slice(0, 8) + suffix;
 
   const calculate = (
     value: string,
@@ -109,6 +107,7 @@ test(
 
     try {
       await app.ready();
+      await ensureCnaeFixture(admin);
 
       const owner = await registerAndLogin(
         app,
@@ -125,9 +124,7 @@ test(
       const matrixCnpj = cnpjFromSeed(
         randomUUID(),
       );
-      const branchCnpj = cnpjFromSeed(
-        randomUUID(),
-      );
+      const branchCnpj = cnpjFromSeed(matrixCnpj, '0002');
 
       const companyCreate = await app.inject({
         method: 'POST',
@@ -139,6 +136,7 @@ test(
             'Empresa Manual com Filial Ltda.',
           uf: 'GO',
           businessLocationCode: 'MATRIZ-001',
+          cnaes: [{ code: '6201501', description: 'Desenvolvimento de programas', isPrimary: true }],
         },
       });
 
@@ -218,6 +216,7 @@ test(
           companyId: company.id,
           cnpj: branchCnpj,
           name: 'Filial Manual Reativada',
+          reactivateInactive: true,
           typeCode: 'OTHER',
           uf: 'GO',
         },

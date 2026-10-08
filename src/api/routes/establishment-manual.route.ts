@@ -1,3 +1,4 @@
+import { readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
   FastifyRequest,
@@ -12,6 +13,8 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
+import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import {
   createOrReactivateManualEstablishment,
   ManualEstablishmentConflictError,
@@ -140,6 +143,7 @@ const bodySchema = z.object({
   businessLocationCode:
     businessLocationCodeSchema,
   cnaes: cnaesSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 function tenantIdFromRequest(
@@ -256,10 +260,11 @@ export async function establishmentManualRoutes(
               return 'TYPE_NOT_FOUND' as const;
             }
 
-            return createOrReactivateManualEstablishment(
+            const registered = await createOrReactivateManualEstablishment(
               trx,
               request.body,
             );
+            return readRegistrationEstablishment(trx, registered.establishmentId);
           },
         );
 
@@ -282,23 +287,16 @@ export async function establishmentManualRoutes(
         }
 
         return reply.status(201).send({
-          establishment: {
-            id: result.establishmentId,
-            companyId: request.body.companyId,
-            cnpj: request.body.cnpj,
-            name: request.body.name,
-            typeCode: request.body.typeCode,
-            isHeadOffice: false,
-            uf: request.body.uf,
-            businessLocationCode:
-              result.businessLocationCode,
-            stateRegistration:
-              result.stateRegistration,
-            stateRegistrationSource:
-              result.stateRegistrationSource,
-          },
+          establishment: result,
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
+        if (error instanceof ManualCnaeValidationError) {
+          return reply.status(error.code === 'cnae_catalog_unavailable' ? 503 : 400)
+            .send({ error: error.code });
+        }
         if (
           error instanceof
           TenantAccessDeniedError

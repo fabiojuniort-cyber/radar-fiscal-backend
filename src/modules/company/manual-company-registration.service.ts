@@ -2,7 +2,9 @@ import type { Transaction } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import type { CnpjRegistryCnae } from './cnpj-registry.service.js';
-import { replaceManualEstablishmentCnaes } from './company-registration.service.js';
+import { replaceManualEstablishmentCnaes, rebuildCompanyCnaes } from './company-registration.service.js';
+import { CompanyIdentityError, ensureHeadOfficeCnpj } from './company-identity.guard.js';
+import { ManualCnaeValidationError } from './manual-cnae-validation.service.js';
 
 export type ManualCompanyRegistrationInput = {
   cnpj: string;
@@ -19,6 +21,7 @@ export type ManualCompanyRegistrationInput = {
   stateRegistration?: string | null | undefined;
   businessLocationCode?: string | null | undefined;
   cnaes?: CnpjRegistryCnae[] | undefined;
+  reactivateInactive?: boolean | undefined;
 };
 
 export type ManualCompanyRegistrationResult = {
@@ -35,24 +38,42 @@ export async function createManualCompanyRegistration(
   tenantId: string,
   input: ManualCompanyRegistrationInput,
 ): Promise<ManualCompanyRegistrationResult> {
+  ensureHeadOfficeCnpj(input.cnpj);
   const existingCompany = await trx
     .selectFrom('companies')
-    .select('id')
+    .select(['id', 'is_active'])
     .where('tenant_id', '=', tenantId)
     .where('head_office_cnpj', '=', input.cnpj)
+    .forUpdate()
     .executeTakeFirst();
 
-  const company = existingCompany
-    ? await trx
-        .updateTable('companies')
-        .set({
-          legal_name: input.legalName,
-          is_active: true,
-        })
-        .where('id', '=', existingCompany.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  if (existingCompany?.is_active) throw new CompanyIdentityError('company_cnpj_exists');
+  if (existingCompany && !input.reactivateInactive) {
+    throw new CompanyIdentityError('reactivation_required');
+  }
+  if (existingCompany) {
+    const original = await trx.selectFrom('establishments')
+      .select(['id', 'name', 'business_location_code', 'state_registration',
+        'state_registration_source'])
+      .where('company_id', '=', existingCompany.id)
+      .where('is_head_office', '=', true).executeTakeFirst();
+    if (!original) throw new CompanyIdentityError('head_office_conflict');
+    await trx.updateTable('companies').set({ is_active: true })
+      .where('id', '=', existingCompany.id).execute();
+    await trx.updateTable('establishments').set({ is_active: true })
+      .where('id', '=', original.id).execute();
+    await rebuildCompanyCnaes(trx, existingCompany.id);
+    return {
+      companyId: existingCompany.id, establishmentId: original.id,
+      establishmentName: original.name,
+      businessLocationCode: original.business_location_code,
+      stateRegistration: original.state_registration,
+      stateRegistrationSource: original.state_registration_source,
+    };
+  }
+  if (!input.cnaes?.length) throw new ManualCnaeValidationError('invalid_cnae');
+
+  const company = await trx
         .insertInto('companies')
         .values({
           tenant_id: tenantId,
