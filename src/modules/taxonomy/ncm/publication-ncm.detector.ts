@@ -396,12 +396,7 @@ async function selectBatch(
           AND a.valid_as_of = ${asOf}::date
           AND a.recheck_on > ${asOf}::date
           AND a.coverage = 'COMPLETE'
-          AND a.id = (
-            SELECT latest.id FROM public.publication_legal_scope_attestations latest
-            WHERE latest.publication_version_id = pv.id
-              AND latest.valid_as_of = ${asOf}::date
-            ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
-          )
+          AND a.id = public.tax13_effective_attestation_id(pv.id, ${asOf}::date)
       )
       -- A SUCCESS on a different attestation, day or NCM edition is never
       -- evidence of completion. Legacy 028 statuses do not gate this path.
@@ -414,14 +409,10 @@ async function selectBatch(
           AND e.recheck_on > ${asOf}::date
           AND e.catalog_edition_id = ${edition.id}::uuid
           AND e.catalog_sha256 = ${edition.checksum}
-          AND e.legal_scope_attestation_id = (
-            SELECT latest.id
-            FROM public.publication_legal_scope_attestations latest
-            WHERE latest.publication_version_id = pv.id
-              AND latest.valid_as_of = ${asOf}::date
-            ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
-          )
+          AND e.legal_scope_attestation_id = public.tax13_effective_attestation_id(pv.id, ${asOf}::date)
           AND e.outcome = 'SUCCESS'
+          AND public.tax13_ncm_scan_consistent(e.id)
+          AND e.run_fingerprint = public.tax13_current_ncm_scan_fingerprint(pv.id)
       )
     ORDER BY
       p.published_on DESC NULLS LAST,
