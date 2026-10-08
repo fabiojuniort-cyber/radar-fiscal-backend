@@ -1,7 +1,8 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
-import { currentWordingText } from '../../collection/legal-presentation.js';
+import { brazilLegalReferenceDate } from '../legal-scope/legal-scope-evidence.js';
+import { readVerifiedLegalScope } from '../legal-scope/legal-scope.repository.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
@@ -16,6 +17,7 @@ import {
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
+  extractNcmCandidates,
 } from '../ncm/publication-ncm.detector.js';
 import {
   CURATED_ENGINE_KEY,
@@ -105,17 +107,12 @@ export async function loadClassificationConcepts(
   return concepts;
 }
 
-/** The wording in force: previous wordings kept on the page do not classify the act. */
-function classificationText(row: PendingVersion): string | null {
-  if (row.content_text?.trim()) return currentWordingText(row.presentation_html) ?? row.content_text;
-  return row.relevant_excerpt;
-}
-
 async function selectPending(
   db: Kysely<DB>,
   releaseId: string,
   excludedSources: readonly string[],
   limit: number,
+  asOf: string,
 ): Promise<PendingVersion[]> {
   const result = await sql<PendingVersion>`
     SELECT
@@ -123,7 +120,10 @@ async function selectPending(
       p.title,
       pv.content_text,
       pv.relevant_excerpt,
-      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+      CASE WHEN pv.source_metadata -> 'presentation' ->> 'format' = 'SANITIZED_HTML'
+        THEN pv.source_metadata -> 'presentation' ->> 'html'
+        ELSE NULL
+      END AS presentation_html
     FROM publications p
     JOIN publication_versions pv
       ON pv.publication_id = p.id
@@ -154,6 +154,21 @@ async function selectPending(
           AND n.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
           AND n.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
           AND n.status = 'SUCCESS'
+          AND (n.scanned_at AT TIME ZONE 'America/Sao_Paulo')::date = ${asOf}::date
+          AND EXISTS (
+            SELECT 1 FROM public.publication_legal_scope_attestations a
+            WHERE a.publication_version_id = pv.id
+              AND a.valid_as_of = ${asOf}::date
+              AND a.recheck_on > ${asOf}::date
+              AND a.coverage = 'COMPLETE'
+              AND a.created_at <= n.scanned_at
+              AND NOT EXISTS (
+                SELECT 1 FROM public.publication_legal_scope_attestations newer
+                WHERE newer.publication_version_id = a.publication_version_id
+                  AND newer.valid_as_of = a.valid_as_of
+                  AND (newer.created_at, newer.id) > (a.created_at, a.id)
+              )
+          )
       )
       AND NOT EXISTS (
         SELECT 1
@@ -174,7 +189,13 @@ async function selectPending(
 async function ncmCodesFor(
   db: Kysely<DB>,
   publicationVersionId: string,
+  verifiedCurrentFragments: readonly string[],
 ): Promise<string[]> {
+  // Scope CURRENT is recalculated for the actual reference date.
+  // Stored legacy mentions cannot act as affirmative evidence on another day.
+  const codes = new Set(verifiedCurrentFragments.flatMap((fragment) =>
+    extractNcmCandidates(fragment).map((candidate) => candidate.code)));
+  if (codes.size === 0) return [];
   const result = await sql<{ ncm_code: string }>`
     SELECT DISTINCT ncm_code
     FROM publication_ncm_mentions
@@ -183,7 +204,8 @@ async function ncmCodesFor(
       AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
       AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
   `.execute(db);
-  return result.rows.map((row) => row.ncm_code);
+  return result.rows.map((row) => row.ncm_code)
+    .filter((code) => codes.has(code));
 }
 
 async function persistSuccess(
@@ -381,22 +403,34 @@ export async function processPublicationTaxonomyBatch(
   result.releaseId = release.id;
 
   const concepts = await loadClassificationConcepts(db, release.id);
+  const asOf = brazilLegalReferenceDate();
   const pending = await selectPending(
     db,
     release.id,
     [...new Set([...settings.classificationExcludedSources, ...PROTECTED_EXCLUDED_SOURCES])],
     limit,
+    asOf,
   );
   result.selected = pending.length;
-
   for (const row of pending) {
     try {
+      const verified = await readVerifiedLegalScope(db, {
+        publicationVersionId: row.publication_version_id,
+        sanitizedHtml: row.presentation_html ?? '',
+        asOf,
+      });
+      // Never seal zero assertions or reclassify the archive from an
+      // unverified headline, revoked wording, or stale attestation.
+      // The publication remains pending, preserving previous releases.
+      if (!verified.valid || verified.coverage !== 'COMPLETE' || verified.currentSegments === 0) continue;
       const plan = planCuratedClassification({
         publicationVersionId: row.publication_version_id,
         taxonomyReleaseId: release.id,
-        title: row.title,
-        contentText: classificationText(row),
-        ncmCodes: await ncmCodesFor(db, row.publication_version_id),
+        // Editorial titles are not independently attested CURRENT evidence.
+        title: '',
+        contentText: verified.currentText,
+        verifiedCurrentFragments: verified.currentFragments,
+        ncmCodes: await ncmCodesFor(db, row.publication_version_id, verified.currentFragments),
         concepts,
         codeGitSha: options.codeGitSha ?? null,
       });
@@ -448,7 +482,10 @@ export async function classifySinglePublication(
 ): Promise<SinglePublicationClassification> {
   const current = await sql<PendingVersion>`
     SELECT pv.id AS publication_version_id, p.title, pv.content_text, pv.relevant_excerpt,
-      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+      CASE WHEN pv.source_metadata -> 'presentation' ->> 'format' = 'SANITIZED_HTML'
+        THEN pv.source_metadata -> 'presentation' ->> 'html'
+        ELSE NULL
+      END AS presentation_html
     FROM publications p
     JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
     WHERE p.id = ${input.publicationId}::uuid
@@ -457,23 +494,62 @@ export async function classifySinglePublication(
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
+  const asOf = brazilLegalReferenceDate();
   const ncmScan = await sql<{ status: string }>`
     SELECT status FROM publication_ncm_scans
     WHERE publication_version_id = ${row.publication_version_id}::uuid
       AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
       AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
+      AND status = 'SUCCESS'
+      AND (scanned_at AT TIME ZONE 'America/Sao_Paulo')::date = ${asOf}::date
+      AND scanned_at >= (
+        SELECT MAX(a.created_at)
+        FROM public.publication_legal_scope_attestations a
+        WHERE a.publication_version_id = ${row.publication_version_id}::uuid
+          AND a.valid_as_of = ${asOf}::date
+          AND a.recheck_on > ${asOf}::date
+          AND a.coverage = 'COMPLETE'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.publication_legal_scope_attestations newer
+        WHERE newer.publication_version_id = ${row.publication_version_id}::uuid
+          AND newer.valid_as_of = ${asOf}::date
+          AND newer.created_at > scanned_at
+      )
     LIMIT 1
   `.execute(db);
   const ncmScanned = ncmScan.rows[0]?.status === 'SUCCESS';
+  const verified = await readVerifiedLegalScope(db, {
+    publicationVersionId: row.publication_version_id,
+    sanitizedHtml: row.presentation_html ?? '',
+    asOf,
+  });
+  const scopeCurrent = verified.valid && verified.coverage === 'COMPLETE' &&
+    verified.currentSegments > 0;
+  if (input.persist && !scopeCurrent) {
+    // Preserve the publication scope suppression/rebuild race contract:
+    // acquire the canonical publication SHARE lock before reporting that
+    // evidence is missing. An in-flight SUPPRESS must win the lock first
+    // and report PUBLICATION_OUT_OF_SCOPE, not an unrelated B4 error.
+    await db.transaction().execute((trx) =>
+      lockPublicationVersionInScope(trx, row.publication_version_id));
+    throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
+      (verified.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
+  }
+
+  // Report a missing legal proof before the derivative NCM seal. A scan
+  // stamp never substitutes for an official scope attestation.
   if (input.persist && !ncmScanned) throw new Error('NCM_SCAN_NOT_SUCCESS');
 
   const concepts = await loadClassificationConcepts(db, input.releaseId);
   const plan = planCuratedClassification({
     publicationVersionId: row.publication_version_id,
     taxonomyReleaseId: input.releaseId,
-    title: row.title,
-    contentText: classificationText(row),
-    ncmCodes: await ncmCodesFor(db, row.publication_version_id),
+    // Editorial titles are not independently attested CURRENT evidence.
+        title: '',
+    contentText: scopeCurrent ? verified.currentText : null,
+    verifiedCurrentFragments: scopeCurrent ? verified.currentFragments : [],
+    ncmCodes: scopeCurrent ? await ncmCodesFor(db, row.publication_version_id, verified.currentFragments) : [],
     concepts,
     codeGitSha: input.codeGitSha ?? null,
   });

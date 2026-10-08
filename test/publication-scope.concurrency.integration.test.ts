@@ -6,6 +6,7 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { Pool, type PoolClient } from 'pg';
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { classifySinglePublication } from '../src/modules/taxonomy/classification/classification.worker.js';
+import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
 import { classifyPublicationVersionLexically } from '../src/modules/taxonomy/classification/classification.repository.js';
 import { matchPublicationByTaxonomy } from '../src/modules/taxonomy/matching/taxonomy-matching.service.js';
 import { persistSuccessfulScan, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
@@ -46,8 +47,9 @@ test('SUPPRESS races real NCM, classification, matching and curator commit paths
   try {
     await admin.query(`INSERT INTO publications(id,identity_hash,identity_strength,identity_basis,jurisdiction_level,title)
       VALUES($1,$2,'SOURCE_SCOPED','{}','FEDERAL','scope concurrency fixture')`, [pub, hash(suffix)]);
-    await admin.query(`INSERT INTO publication_versions(id,publication_id,version_no,content_hash,content_text)
-      VALUES($1,$2,1,$3,'controlled race')`, [ver, pub, hash(ver)]);
+    await admin.query(`INSERT INTO publication_versions(id,publication_id,version_no,content_hash,content_text,source_metadata)
+      VALUES($1,$2,1,$3,'controlled race', $4::jsonb)`, [ver, pub, hash(ver), JSON.stringify({presentation: {format: 'SANITIZED_HTML', html: '<p class="TextoAcordo">controlled race</p>'}})]);
+    await seedTestLegalScopeAttestation(admin, ver);
     await admin.query(`INSERT INTO publication_ncm_scans(publication_version_id,detector_key,detector_version,status,source_field)
       VALUES($1,$2,$3,'SUCCESS','CONTENT_TEXT')`, [ver, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION]);
     await admin.query(`INSERT INTO taxonomy_releases(id,version_major,version_minor,version_patch,status,

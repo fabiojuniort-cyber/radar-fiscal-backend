@@ -6,6 +6,7 @@ import { sql } from 'kysely';
 import { Pool } from 'pg';
 
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
+import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
@@ -31,7 +32,8 @@ function runtimeUrl(databaseUrl: string, password: string): string {
 
 async function createPublicationFixture(
   admin: Pool,
-  input: { title: string; publishedOn: string; text: string },
+  input: { title: string; publishedOn: string; text: string; scoped?: boolean;
+    coverage?: 'COMPLETE' | 'PARTIAL' },
 ): Promise<{ publicationId: string; versionId: string }> {
   const publication = await admin.query<{ id: string }>(
     `INSERT INTO publications (
@@ -49,16 +51,21 @@ async function createPublicationFixture(
 
   const version = await admin.query<{ id: string }>(
     `INSERT INTO publication_versions (
-       publication_id, version_no, content_hash, content_text, is_current
-     ) VALUES ($1::uuid, 1, $2, $3, TRUE)
+       publication_id, version_no, content_hash, content_text, source_metadata, is_current
+     ) VALUES ($1::uuid, 1, $2, $3, $4::jsonb, TRUE)
      RETURNING id`,
     [
       publicationId,
       createHash('sha256').update(input.text).digest('hex'),
       input.text,
+      JSON.stringify({presentation: {format: input.scoped === false ? 'PRESERVED_TEXT' : 'SANITIZED_HTML', html: input.scoped === false ? null :
+        '<p class="TituloAcordo">CONVÊNIO ICMS — fixture</p><p class="TextoAcordo">' + input.text + '</p>'}}),
     ],
   );
 
+  if (input.scoped !== false) {
+    await seedTestLegalScopeAttestation(admin, version.rows[0]!.id, input.coverage);
+  }
   return { publicationId, versionId: version.rows[0]!.id };
 }
 
@@ -238,8 +245,9 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
     );
     assert.equal(duplicateCount.rows[0]?.count, 2);
 
-    // What an older detector version found (e.g. in a previous wording) stays
-    // as evidence, but readers skip it once the newer version scanned.
+    // R2 BLOCK-01: do not hide earlier catalog evidence merely because a
+    // newer scoped detector succeeded. It is HISTORICAL/UNVERIFIED, not
+    // CURRENT evidence or proof of a globally absent NCM.
     const legacyCatalog = await admin.query<{ id: string }>(
       `SELECT e.id FROM official_catalog_entries e
        JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
@@ -259,7 +267,42 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
        WHERE pnm.publication_version_id = $1::uuid AND ${NOT_SUPERSEDED_NCM_MENTION_SQL('pnm')}`,
       [zeroMatch.versionId],
     );
-    assert.equal(visible.rows[0]?.count, 0);
+    assert.equal(visible.rows[0]?.count, 1,
+      'legacy mention must remain queryable when 1.3.0 is not global proof');
+    // R2 BLOCK-01: partial legal coverage must not seal a NCM scan.
+    // A candidate in an unreviewed annex may still matter for historical
+    // search even when the attested CURRENT fragment has no NCM.
+    const partial = await createPublicationFixture(admin, {
+      title: 'R2 partial attestation does not supersede legacy',
+      publishedOn: '9999-12-29',
+      text: 'NCM 1006.30.11 potencialmente no anexo não revisado.',
+      coverage: 'PARTIAL',
+    });
+    fixtures.push(partial);
+    const partialBatch = await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
+    assert.equal(partialBatch.succeeded, 0);
+    const partialScan = await admin.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM publication_ncm_scans WHERE publication_version_id=$1::uuid AND detector_version=$2',
+      [partial.versionId, PUBLICATION_NCM_DETECTOR_VERSION],
+    );
+    assert.equal(partialScan.rows[0]?.count, 0, 'PARTIAL must not seal global NCM evidence');
+    // B2 regression: legacy text-only documents remain unverified, even
+    // if their raw text contains NCM candidates from current catalogs.
+    const unscoped = await createPublicationFixture(admin, {
+      title: 'Unverified raw legal content fixture',
+      publishedOn: '9999-12-29',
+      text: 'Histórico não verificado 1006.30.11 e 10062099.',
+      scoped: false,
+    });
+    fixtures.push(unscoped);
+    const rawResult = await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
+    assert.equal(rawResult.candidates, 0);
+    assert.equal(rawResult.matches, 0);
+    const rawScan = await admin.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM publication_ncm_scans WHERE publication_version_id=$1::uuid AND detector_version=$2',
+      [unscoped.versionId, PUBLICATION_NCM_DETECTOR_VERSION],
+    );
+    assert.equal(rawScan.rows[0]?.count, 0, 'UNVERIFIED must never become a SUCCESS scan');
   } finally {
     await db.destroy();
 

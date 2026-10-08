@@ -9,7 +9,9 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-export const CURATED_ENGINE_VERSION = '2.2.0';
+// 2.4.0 only consumes audited legal-scope CURRENT fragments. This must
+// never reuse SUCCESS seals from 2.3.0's pre-attestation heuristics.
+export const CURATED_ENGINE_VERSION = '2.4.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
@@ -42,6 +44,8 @@ export interface CuratedClassificationInput {
   taxonomyReleaseId: string;
   title: string;
   contentText?: string | null;
+  /** From validated legal-scope evidence only; never cross these boundaries. */
+  verifiedCurrentFragments?: readonly string[];
   ncmCodes: readonly string[];
   concepts: readonly CuratedConceptInput[];
   codeGitSha?: string | null;
@@ -173,12 +177,31 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
 export function planCuratedClassification(
   input: CuratedClassificationInput,
 ): CuratedClassificationPlan {
-  const raw = [input.title.trim(), input.contentText?.trim() ?? '']
-    .filter(Boolean)
-    .join('\n');
-  const normalized = normalizeWithIndex(raw);
+  // Taxonomy evidence must come from the legal body, never from the
+  // publication/base-legal title shown by the portal.
+  const raw = input.contentText?.trim() ?? '';
+  // The audited ledger returns individual CURRENT spans. Joining them with a
+  // newline is fine for display, but matching across that join could fabricate
+  // a term that occurs in NONE of the original legal provisions.
+  const fragments = input.verifiedCurrentFragments ?? [raw];
+  const lexicalFragments = fragments.map((fragment) => ({
+    fragment,
+    normalized: normalizeWithIndex(fragment),
+  }));
+  const findVerifiedTerm = (term: string): string | null => {
+    for (const item of lexicalFragments) {
+      const excerpt = findTerm(item.fragment, item.normalized, term);
+      if (excerpt) return excerpt;
+    }
+    return null;
+  };
   const ncmCodes = [...new Set(input.ncmCodes)].sort();
-  const cclasstrib = extractCclasstribCodes(raw);
+  const cclasstrib = new Map<string, string>();
+  for (const fragment of fragments) {
+    for (const [code, excerpt] of extractCclasstribCodes(fragment)) {
+      if (!cclasstrib.has(code)) cclasstrib.set(code, excerpt);
+    }
+  }
 
   const found = new Map<string, CuratedAssertion>();
   const keep = (assertion: CuratedAssertion) => {
@@ -190,7 +213,7 @@ export function planCuratedClassification(
 
   for (const concept of input.concepts) {
     if (concept.classifyByLabel) {
-      const excerpt = findTerm(raw, normalized, concept.label);
+      const excerpt = findVerifiedTerm(concept.label);
       if (excerpt) {
         keep({
           releaseConceptId: concept.releaseConceptId,
@@ -206,7 +229,7 @@ export function planCuratedClassification(
     // One kind of synonym for the curator (PO decision): every synonym
     // marks the legislação where it appears, whatever its stored type.
     for (const alias of concept.aliases) {
-      const excerpt = findTerm(raw, normalized, alias.text);
+      const excerpt = findVerifiedTerm(alias.text);
       if (!excerpt) continue;
       keep({
         releaseConceptId: concept.releaseConceptId,
@@ -251,8 +274,12 @@ export function planCuratedClassification(
   }
 
   const configSnapshot = {
-    policyVersion: 2,
+    policyVersion: input.verifiedCurrentFragments === undefined ? 3 : 4,
+    ...(input.verifiedCurrentFragments === undefined ? {} : {
+      matchScope: 'PER_ATTESTED_CURRENT_FRAGMENT',
+    }),
     engine: CURATED_ENGINE_KEY,
+    textScope: 'OPERATIVE_LEGAL_BODY_ONLY',
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
     autoAliasTypes: 'ALL',
     officialCodes: ['NCM_PREFIX_ON_DETECTED_MENTIONS', 'CCLASSTRIB_CITED'],
@@ -271,7 +298,11 @@ export function planCuratedClassification(
     ),
   };
 
-  const inputSha256 = sha256Hex(JSON.stringify({ raw, ncmCodes }));
+  const inputSha256 = sha256Hex(JSON.stringify(
+    input.verifiedCurrentFragments === undefined
+      ? { raw, ncmCodes }
+      : { raw, ncmCodes, verifiedCurrentFragments: input.verifiedCurrentFragments },
+  ));
   const fingerprint = buildClassificationFingerprint({
     publicationVersionId: input.publicationVersionId,
     taxonomyReleaseId: input.taxonomyReleaseId,

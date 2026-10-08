@@ -7,22 +7,25 @@ import {
   assertCurrentNcmCatalog,
   catalogMatches,
   extractNcmCandidates,
+  codesOutsideAttestedCurrent,
   persistSuccessfulScan,
   selectText,
 } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
+import { brazilLegalReferenceDate } from '../../modules/taxonomy/legal-scope/legal-scope-evidence.js';
+import { readVerifiedLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.repository.js';
 import type { DB } from './database.types.js';
 
 /**
  * Re-detects the NCMs of ONE publication (its current version) and reports
- * them against the wording in force:
+ * them against only explicitly attested CURRENT fragments:
  *
  *   node dist/infrastructure/database/taxonomy-ncm-rescan-one.js \
  *     --publication=<uuid> [--confirm]
  *
- * Prints the codes of the wording in force found in the current NCM
- * catalog, those missing from the catalog and those that appear only in
- * previous wordings (ignored). With --confirm the scan is saved and replaces
- * what older detector versions found for this version.
+ * Prints the NCMs in the attested CURRENT fragments separately from the
+ * unverified candidates elsewhere in raw content (not presumed PREVIOUS).
+ * --confirm requires legal proof and writes detector 1.3.0 without erasing
+ * historical scans or overwriting previous classifications.
  */
 
 const arg = (name: string) =>
@@ -63,9 +66,29 @@ try {
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
-  const { text, sourceField, currentWordingOnly } = selectText(row);
+  const asOf = arg('as-of') ?? brazilLegalReferenceDate();
+  const evidence = await readVerifiedLegalScope(db, {
+    publicationVersionId: row.publication_version_id,
+    sanitizedHtml: row.presentation_html ?? '',
+    asOf,
+  });
+  // A dry-run may explain historical vs. current candidates, but only
+  // content actually backed by the audited official-scope ledger can
+  // be saved as the 1.3.0 detector SUCCESS seal. Never let an unverified
+  // HTML style or a curator CLI flag supersede earlier NCM evidence.
+  if (confirm && (!evidence.valid || evidence.currentSegments === 0)) {
+    throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
+      (evidence.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
+  }
+  // No "in force" assertion, even in a dry-run, without audited evidence.
+  const trusted = evidence.valid && evidence.currentSegments > 0;
+  const text = trusted ? evidence.currentText : '';
+  const sourceField = trusted ? 'CONTENT_TEXT' as const : 'NONE' as const;
+  const currentWordingOnly = trusted;
   const candidates = extractNcmCandidates(text);
-  const everywhere = extractNcmCandidates(row.content_text ?? '');
+  const heuristicPreview = !trusted
+    ? extractNcmCandidates(selectText(row).text)
+    : [];
   const inForce = new Set(candidates.map((candidate) => candidate.code));
   const matched = await db.transaction().execute(async (trx) => {
     const found = await catalogMatches(trx, [...inForce]);
@@ -78,14 +101,20 @@ try {
     'TAXONOMY_NCM_RESCAN_ONE=' +
       JSON.stringify({
         publicationVersionId: row.publication_version_id,
+        asOf,
+        legalScopeVerified: evidence.valid,
+        legalScopeReason: evidence.reason,
+        legalScopeAttestationId: evidence.attestationId,
+        unverifiedHeuristicPreview: sorted(heuristicPreview.map((item) => item.code)),
         currentWordingOnly,
         persisted: confirm,
         inForceCount: inForce.size,
         matchedCount: matched.size,
         matched: sorted(matched.keys()),
         notInCurrentCatalog: sorted([...inForce].filter((code) => !matched.has(code))),
-        previousWordingOnly: sorted(
-          new Set(everywhere.map((candidate) => candidate.code).filter((code) => !inForce.has(code))),
+        // These are NOT automatically "previous wording": provenance unknown.
+        outsideAttestedCurrentUnverified: sorted(
+          codesOutsideAttestedCurrent(row.content_text, text),
         ),
       }),
   );

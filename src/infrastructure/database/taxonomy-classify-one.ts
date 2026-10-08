@@ -43,6 +43,13 @@ if (releaseKind === 'draft' && confirm) {
   console.error('A draft release is preview only: run without --confirm.');
   process.exit(1);
 }
+if (confirm) {
+  // TAX13/B4 P0: classifySinglePublication still consumes heuristic legal
+  // wording. Publishing its result would incorrectly assert verified vigência.
+  // Re-enable only after the classifier consumes the audited ledger directly,
+  // with independent R2 approval, and no dependency on remote CSS.
+  throw new Error('TAX13_CLASSIFICATION_CONFIRM_BLOCKED_PENDING_B4');
+}
 
 const db = new Kysely<DB>({
   dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl, max: 2 }) }),

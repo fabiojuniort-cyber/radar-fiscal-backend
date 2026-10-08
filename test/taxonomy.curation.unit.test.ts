@@ -84,7 +84,7 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   // A single kind of synonym: every synonym classifies, whatever its stored type.
   assert.equal(byCode.get('tax.cofins')!.matchedTerm, 'NF-e');
   assert.equal(byCode.get('theme.presumed_credit')!.reasonCode, 'CANONICAL_LABEL');
-  assert.match(byCode.get('theme.presumed_credit')!.excerpt, /Crédito Presumido/);
+  assert.match(byCode.get('theme.presumed_credit')!.excerpt, /crédito presumido/i);
   assert.match(byCode.get('product.urea')!.excerpt, /UREIA/);
   assert.equal(byCode.get('tax.iss')!.reasonCode, 'ABBREVIATION_ALIAS');
   assert.equal(byCode.get('tax.iss')!.matchedTerm, 'ISSQN');
@@ -92,8 +92,59 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.equal(byCode.get('product.rice')!.matchedTerm, '10063011');
   assert.equal(byCode.get('treatment.rate_reduction')!.reasonCode, 'OFFICIAL_CODE_CCLASSTRIB');
   assert.equal(byCode.get('treatment.rate_reduction')!.matchedTerm, '200034');
-  assert.equal(plan.engineVersion, '2.2.0');
+  assert.equal(plan.engineVersion, '2.4.0');
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
+});
+
+test('TAX13 B4 classifier refuses phantom terms or cClassTrib spanning separate attested fragments', () => {
+  const common = {
+    publicationVersionId: '00000000-0000-4000-8000-000000000001',
+    taxonomyReleaseId: '00000000-0000-4000-8000-000000000002',
+    title: '',
+    ncmCodes: [],
+    concepts: [
+      concept('theme.presumed_credit', 'Crédito presumido'),
+      concept('theme.cclasstrib', 'Marcador fiscal', {
+        classifyByLabel: false, cclasstribCodes: ['200'],
+      }),
+    ],
+  };
+  const split = planCuratedClassification({
+    ...common,
+    contentText: 'Crédito\\npresumido\\ncClassTrib\\n200034'.replaceAll('\\n', '\n'),
+    verifiedCurrentFragments: ['Crédito', 'presumido', 'cClassTrib', '200034'],
+  });
+  assert.deepEqual(split.assertions, []);
+  assert.equal(split.configSnapshot.policyVersion, 4);
+  assert.equal(split.configSnapshot.matchScope, 'PER_ATTESTED_CURRENT_FRAGMENT');
+
+  const contiguous = planCuratedClassification({
+    ...common,
+    contentText: 'Crédito presumido. cClassTrib 200034',
+    verifiedCurrentFragments: ['Crédito presumido. cClassTrib 200034'],
+  });
+  assert.deepEqual(contiguous.assertions.map((a) => a.conceptCode),
+    ['theme.cclasstrib', 'theme.presumed_credit']);
+  assert.notEqual(split.fingerprint.runFingerprint, contiguous.fingerprint.runFingerprint);
+});
+
+test('curated classifier never uses the base-legal title as taxonomy evidence', () => {
+  const plan = planCuratedClassification({
+    publicationVersionId: '00000000-0000-4000-8000-000000000001',
+    taxonomyReleaseId: '00000000-0000-4000-8000-000000000002',
+    title: 'CONVÊNIO ICMS 100/97 — Fertilizantes e ICMS',
+    contentText: 'Cláusula primeira: aplica-se exclusivamente a sementes.',
+    ncmCodes: [],
+    concepts: [
+      concept('tax.icms', 'ICMS'),
+      concept('product.fertilizers', 'Fertilizantes'),
+      concept('product.seeds', 'Sementes'),
+    ],
+  });
+
+  assert.deepEqual(plan.assertions.map((item) => item.conceptCode), ['product.seeds']);
+  assert.equal(plan.configSnapshot.textScope, 'OPERATIVE_LEGAL_BODY_ONLY');
+  assert.equal(plan.configSnapshot.policyVersion, 3);
 });
 
 test('label matching respects token boundaries and maps excerpts back to raw text', () => {

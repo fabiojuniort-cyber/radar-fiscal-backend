@@ -2,15 +2,18 @@ import { sql, type Kysely, type RawBuilder, type Transaction } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
 import { currentWordingText } from '../../collection/legal-presentation.js';
+import { brazilLegalReferenceDate } from '../legal-scope/legal-scope-evidence.js';
+import { readVerifiedLegalScope } from '../legal-scope/legal-scope.repository.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
 } from '../../publication-scope/publication-scope.guard.js';
 
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
-// 1.1.0: reads only the wording in force (previous wordings of CONFAZ acts
-// are skipped) and accepts the "8417.8020" typing found in official annexes.
-export const PUBLICATION_NCM_DETECTOR_VERSION = '1.1.0';
+// 1.3.0: candidate extraction exclusively from an audited, date-bound
+// legal-scope attestation, never merely from CSS or remote status attributes.
+// Prior 1.2.0 SUCCESS scans remain historical and are NOT accepted as proof.
+export const PUBLICATION_NCM_DETECTOR_VERSION = '1.3.0';
 
 export type PublicationNcmSourceField =
   | 'CONTENT_TEXT'
@@ -30,6 +33,9 @@ export function NOT_SUPERSEDED_NCM_MENTION_SQL(alias: string): string {
       AND newer_scan.detector_key = ${alias}.detector_key
       AND newer_scan.status = 'SUCCESS'
       AND newer_scan.detector_version > ${alias}.detector_version
+      -- R2-01: 1.3.0 may only ever be scoped evidence; it cannot make
+      -- every legacy NCM vanish in unchecked areas of the document.
+      AND newer_scan.detector_version IN ('1.1.0', '1.2.0')
   )`;
 }
 
@@ -112,29 +118,39 @@ export function extractNcmCandidates(text: string): NcmCandidate[] {
   return [...byCode.values()];
 }
 
+/**
+ * Diagnostic only: codes found in unscoped raw content but absent from the
+ * date-bound, attested CURRENT fragments. Their legal status is UNKNOWN:
+ * they could be editorial citations, revoked wording, uncovered annexes or
+ * text not stored in the certified presentation. Never label them PREVIOUS
+ * or feed them into a persisted CURRENT classification.
+ */
+export function codesOutsideAttestedCurrent(
+  rawContentText: string | null | undefined,
+  attestedCurrentText: string | null | undefined,
+): string[] {
+  const current = new Set(
+    extractNcmCandidates(attestedCurrentText ?? '').map((item) => item.code),
+  );
+  return [...new Set(
+    extractNcmCandidates(rawContentText ?? '').map((item) => item.code),
+  )].filter((code) => !current.has(code)).sort();
+}
+
 export function selectText(row: VersionForNcmScan): {
   text: string;
   sourceField: PublicationNcmSourceField;
   currentWordingOnly: boolean;
 } {
-  const content = row.content_text?.trim();
-  if (content) {
-    // Acts that keep previous wordings on the page (CONFAZ annexes in green,
-    // "Redação anterior"): only the wording in force counts.
-    const current = currentWordingText(row.presentation_html);
-    if (current) return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
-    return { text: row.content_text!, sourceField: 'CONTENT_TEXT', currentWordingOnly: false };
+  // Unscoped stored text/excerpts contain titles, revoked amendments and
+  // external annex references. They cannot be a source of affirmative NCM
+  // evidence. Only the legal-scope selection can authorize a detector match.
+  // In particular: absent/oversized/ambiguous HTML must NOT fall back to
+  // content_text or relevant_excerpt, even if one of those is non-empty.
+  const current = currentWordingText(row.presentation_html);
+  if (current !== undefined) {
+    return { text: current, sourceField: 'CONTENT_TEXT', currentWordingOnly: true };
   }
-
-  const excerpt = row.relevant_excerpt?.trim();
-  if (excerpt) {
-    return {
-      text: row.relevant_excerpt!,
-      sourceField: 'RELEVANT_EXCERPT',
-      currentWordingOnly: false,
-    };
-  }
-
   return { text: '', sourceField: 'NONE', currentWordingOnly: false };
 }
 
@@ -289,6 +305,7 @@ export async function persistSuccessfulScan(
       match_count = EXCLUDED.match_count,
       error_message = NULL,
       scanned_at = now()
+    WHERE publication_ncm_scans.status <> 'SUCCESS'
   `.execute(trx);
 
   return insertedMatches;
@@ -352,13 +369,17 @@ async function markFailedScan(
 async function selectBatch(
   db: Kysely<DB>,
   limit: number,
+  asOf: string,
 ): Promise<VersionForNcmScan[]> {
   const result = await sql<VersionForNcmScan>`
     SELECT
       pv.id AS publication_version_id,
       pv.content_text,
       pv.relevant_excerpt,
-      pv.source_metadata -> 'presentation' ->> 'html' AS presentation_html
+      CASE WHEN pv.source_metadata -> 'presentation' ->> 'format' = 'SANITIZED_HTML'
+        THEN pv.source_metadata -> 'presentation' ->> 'html'
+        ELSE NULL
+      END AS presentation_html
     FROM publications p
     JOIN publication_versions pv
       ON pv.publication_id = p.id
@@ -368,6 +389,16 @@ async function selectBatch(
      AND pns.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
      AND pns.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
     WHERE public.publication_scope_is_in_scope(p.id)
+      -- Without an audited provenance manifest the new version must NOT
+      -- create a SUCCESS scan and supersede older NCM findings.
+      AND EXISTS (
+        SELECT 1
+        FROM public.publication_legal_scope_attestations a
+        WHERE a.publication_version_id = pv.id
+          AND a.valid_as_of = ${asOf}::date
+          AND a.recheck_on > ${asOf}::date
+          AND a.coverage = 'COMPLETE'
+      )
       AND (
         pns.id IS NULL
         OR (
@@ -392,7 +423,8 @@ export async function processPublicationNcmEnrichmentBatch(
   const limit = Math.max(1, Math.min(options.limit ?? 10, 100));
   await assertCurrentNcmCatalog(db);
 
-  const rows = await selectBatch(db, limit);
+  const asOf = brazilLegalReferenceDate();
+  const rows = await selectBatch(db, limit, asOf);
   const result: PublicationNcmBatchResult = {
     selected: rows.length,
     succeeded: 0,
@@ -402,8 +434,27 @@ export async function processPublicationNcmEnrichmentBatch(
   };
 
   for (const row of rows) {
-    const { text, sourceField, currentWordingOnly } = selectText(row);
-    const candidates = extractNcmCandidates(text);
+    // The official attestation is the only source of CURRENT legal text.
+    // Invalid, stale and partial/unreviewed HTML never becomes SUCCESS.
+    // In particular, zero matches without proof must not hide old findings.
+    let verified;
+    try {
+      verified = await readVerifiedLegalScope(db, {
+        publicationVersionId: row.publication_version_id,
+        sanitizedHtml: row.presentation_html ?? '',
+        asOf,
+      });
+    } catch (error) {
+      // Operational faults are not evidence of zero current NCMs.
+      // Surface the failure rather than sealing this publication as SUCCESS.
+      throw error;
+    }
+    // PARTIAL is not proof of the absence of NCMs in unreviewed annexes.
+    if (!verified.valid || verified.coverage !== 'COMPLETE' ||
+        verified.currentSegments === 0) continue;
+    const sourceField: PublicationNcmSourceField = 'CONTENT_TEXT';
+    const currentWordingOnly = true;
+    const candidates = extractNcmCandidates(verified.currentText);
     result.candidates += candidates.length;
 
     try {
