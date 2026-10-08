@@ -671,3 +671,28 @@ REVOKE ALL ON FUNCTION public.tax13_effective_attestation_id(UUID,DATE),
   public.tax13_ncm_scan_seal_complete() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.tax13_effective_attestation_id(UUID,DATE),
   public.tax13_ncm_scan_consistent(UUID) TO radar_worker;
+
+
+-- Only wording verified under the same current temporal scan may influence
+-- tenant affinity. This is deliberately a read projection, not an annotation
+-- license; absent/partial/stale proof returns NULL (never content_text).
+CREATE FUNCTION public.tax13_public_current_legal_text(p_version UUID)
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp AS $$
+WITH proof AS (
+  SELECT public.tax13_effective_attestation_id(
+     p_version,(current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date
+  ) id
+  WHERE public.tax13_current_ncm_scan_fingerprint(p_version) IS NOT NULL
+), fragments AS (
+  SELECT public.tax13_legal_current_fragments(proof.id) data
+  FROM proof
+)
+SELECT string_agg(f.value,E'\n' ORDER BY f.ordinality)
+FROM fragments CROSS JOIN LATERAL jsonb_array_elements_text(fragments.data)
+  WITH ORDINALITY AS f(value,ordinality);
+$$;
+REVOKE ALL ON FUNCTION public.tax13_public_current_legal_text(UUID)
+FROM PUBLIC, radar_worker, radar_taxonomy_curator;
+GRANT EXECUTE ON FUNCTION public.tax13_public_current_legal_text(UUID)
+TO radar_app;
