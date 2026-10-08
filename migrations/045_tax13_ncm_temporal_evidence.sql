@@ -114,9 +114,17 @@ RETURNS trigger LANGUAGE plpgsql
 SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
     scan_edition UUID;
+    scan_inserting_xid TEXT;
 BEGIN
-    SELECT catalog_edition_id INTO scan_edition
+    SELECT catalog_edition_id, xmin::text INTO scan_edition, scan_inserting_xid
     FROM public.publication_ncm_scan_evidence WHERE id=NEW.scan_evidence_id;
+    -- A header becomes sealed when its inserting transaction commits.
+    -- Codes can only be written by that same transaction; no worker can
+    -- append a 'new' positive code to an immutable historical success.
+    IF scan_inserting_xid IS DISTINCT FROM
+       (txid_current() % 4294967296)::text THEN
+      RAISE EXCEPTION 'TAX13_NCM_SCAN_CODES_SEALED';
+    END IF;
     IF scan_edition IS NULL OR NOT EXISTS (
       SELECT 1 FROM public.official_catalog_entries e
       WHERE e.id=NEW.catalog_entry_id
