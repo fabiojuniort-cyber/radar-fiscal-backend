@@ -70,9 +70,12 @@ AS $$
 DECLARE
     origin_publication UUID;
     version_publication UUID;
+    origin_url TEXT;
     supersedes_version UUID;
+    supersedes_source UUID;
+    supersedes_origin UUID;
 BEGIN
-    SELECT po.publication_id INTO origin_publication
+    SELECT po.publication_id, po.official_url INTO origin_publication, origin_url
     FROM public.publication_origins po
     WHERE po.id = NEW.publication_origin_id AND po.source_id = NEW.source_id;
 
@@ -81,15 +84,31 @@ BEGIN
     WHERE pv.id = NEW.publication_version_id;
 
     IF origin_publication IS NULL OR version_publication IS NULL
-       OR origin_publication <> version_publication THEN
+       OR origin_publication <> version_publication
+       OR origin_url IS DISTINCT FROM NEW.official_url THEN
         RAISE EXCEPTION 'TAX13_LEGAL_SCOPE_SOURCE_VERSION_MISMATCH';
     END IF;
 
+    -- The persisted JSON cannot claim a different version, source, origin,
+    -- official URL or document hash from the audited SQL columns.
+    IF NEW.manifest ->> 'publicationVersionId' IS DISTINCT FROM NEW.publication_version_id::text
+       OR NEW.manifest ->> 'sourceId' IS DISTINCT FROM NEW.source_id::text
+       OR NEW.manifest ->> 'officialUrl' IS DISTINCT FROM NEW.official_url
+       OR NEW.manifest ->> 'htmlSha256' IS DISTINCT FROM NEW.html_sha256
+       OR NEW.manifest ->> 'validAsOf' IS DISTINCT FROM to_char(NEW.valid_as_of, 'YYYY-MM-DD')
+       OR NEW.manifest ->> 'recheckOn' IS DISTINCT FROM to_char(NEW.recheck_on, 'YYYY-MM-DD')
+       OR NEW.manifest ->> 'coverage' IS DISTINCT FROM NEW.coverage THEN
+        RAISE EXCEPTION 'TAX13_LEGAL_SCOPE_MANIFEST_MISMATCH';
+    END IF;
+
     IF NEW.supersedes_attestation_id IS NOT NULL THEN
-        SELECT a.publication_version_id INTO supersedes_version
+        SELECT a.publication_version_id, a.source_id, a.publication_origin_id
+        INTO supersedes_version, supersedes_source, supersedes_origin
         FROM public.publication_legal_scope_attestations a
         WHERE a.id = NEW.supersedes_attestation_id;
-        IF supersedes_version IS NULL OR supersedes_version <> NEW.publication_version_id THEN
+        IF supersedes_version IS DISTINCT FROM NEW.publication_version_id
+           OR supersedes_source IS DISTINCT FROM NEW.source_id
+           OR supersedes_origin IS DISTINCT FROM NEW.publication_origin_id THEN
             RAISE EXCEPTION 'TAX13_LEGAL_SCOPE_INVALID_SUPERSESSION';
         END IF;
     END IF;
