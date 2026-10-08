@@ -190,10 +190,11 @@ async function createPublication(admin: Pool, title: string, text: string) {
   const publicationId = publication.rows[0]!.id;
   const version = await admin.query<{ id: string }>(
     `INSERT INTO publication_versions (
-       publication_id, version_no, content_hash, content_text, is_current
-     ) VALUES ($1::uuid, 1, $2, $3, TRUE)
+       publication_id, version_no, content_hash, content_text, source_metadata, is_current
+     ) VALUES ($1::uuid, 1, $2, $3, $4::jsonb, TRUE)
      RETURNING id`,
-    [publicationId, createHash('sha256').update(text).digest('hex'), text],
+    [publicationId, createHash('sha256').update(text).digest('hex'), text,
+     JSON.stringify({presentation: {html: '<p class="TextoAcordo">' + text + '</p>'}})],
   );
   return { publicationId, versionId: version.rows[0]!.id };
 }
