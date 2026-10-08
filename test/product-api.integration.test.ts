@@ -928,6 +928,18 @@ test(
           204,
         );
 
+        const withoutConsent = await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies/from-cnpj',
+          headers: firstHeaders,
+          payload: { cnpj: registryCnpj },
+        });
+        assert.equal(withoutConsent.statusCode, 409);
+        assert.equal(
+          withoutConsent.json<{ error: string }>().error,
+          'reactivation_required',
+        );
+
         const registryRecreate =
           await app.inject({
             method: 'POST',
@@ -935,6 +947,7 @@ test(
             headers: firstHeaders,
             payload: {
               cnpj: registryCnpj,
+              reactivateInactive: true,
             },
           });
 
