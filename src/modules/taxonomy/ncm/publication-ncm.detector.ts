@@ -33,6 +33,9 @@ export function NOT_SUPERSEDED_NCM_MENTION_SQL(alias: string): string {
       AND newer_scan.detector_key = ${alias}.detector_key
       AND newer_scan.status = 'SUCCESS'
       AND newer_scan.detector_version > ${alias}.detector_version
+      -- R2-01: 1.3.0 may only ever be scoped evidence; it cannot make
+      -- every legacy NCM vanish in unchecked areas of the document.
+      AND newer_scan.detector_version IN ('1.1.0', '1.2.0')
   )`;
 }
 
@@ -394,7 +397,7 @@ async function selectBatch(
         WHERE a.publication_version_id = pv.id
           AND a.valid_as_of = ${asOf}::date
           AND a.recheck_on > ${asOf}::date
-          AND a.coverage IN ('PARTIAL','COMPLETE')
+          AND a.coverage = 'COMPLETE'
       )
       AND (
         pns.id IS NULL
@@ -446,7 +449,9 @@ export async function processPublicationNcmEnrichmentBatch(
       // Surface the failure rather than sealing this publication as SUCCESS.
       throw error;
     }
-    if (!verified.valid || verified.currentSegments === 0) continue;
+    // PARTIAL is not proof of the absence of NCMs in unreviewed annexes.
+    if (!verified.valid || verified.coverage !== 'COMPLETE' ||
+        verified.currentSegments === 0) continue;
     const sourceField: PublicationNcmSourceField = 'CONTENT_TEXT';
     const currentWordingOnly = true;
     const candidates = extractNcmCandidates(verified.currentText);
