@@ -995,6 +995,89 @@ export async function productRoutes(
     },
   );
 
+  // ONB-01: only the CURRENT official IBGE/CONCLA catalog is eligible
+  // for manual CNAE selection. Never synthesize options from tenant data.
+  typed.get(
+    '/api/v1/cnae-catalog',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        querystring: z.object({
+          search: z.string().trim().max(80).default(''),
+        }),
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) {
+        return reply.status(401).send({ error: 'unauthorized' });
+      }
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenant_required' });
+      }
+
+      try {
+        const catalog = await withTenantContext(
+          app.db,
+          request.auth.userId,
+          tenantId,
+          async (trx) => {
+            const current = await sql<{ id: string; source_url: string | null }>`
+              SELECT edition.id, edition.source_url
+              FROM official_catalog_editions AS edition
+              JOIN official_catalogs AS catalog ON catalog.id = edition.catalog_id
+              WHERE catalog.code = 'CNAE' AND edition.status = 'CURRENT'
+              ORDER BY edition.created_at DESC
+              LIMIT 1
+            `.execute(trx);
+            const edition = current.rows[0];
+            if (!edition) return null;
+
+            const search = request.query.search.trim();
+            const numeric = search.replace(/\\D/g, '');
+            const pattern = `%${search}%`;
+            const numericPattern = `%${numeric}%`;
+            const entries = await sql<{ official_code: string; description: string }>`
+              SELECT entry.official_code, entry.description
+              FROM official_catalog_entries AS entry
+              WHERE entry.catalog_edition_id = ${edition.id}::uuid
+                AND entry.metadata->>'level' = 'SUBCLASSE'
+                AND entry.metadata->>'assignable' = 'true'
+                AND (
+                  ${search} = ''
+                  OR entry.description ILIKE ${pattern}
+                  OR entry.official_code ILIKE ${pattern}
+                  OR (
+                    ${numeric} <> ''
+                    AND regexp_replace(entry.official_code, '[^0-9]', '', 'g')
+                        LIKE ${numericPattern}
+                  )
+                )
+              ORDER BY entry.official_code
+              LIMIT 40
+            `.execute(trx);
+
+            return {
+              source: edition.source_url,
+              items: entries.rows.map((row) => ({
+                code: row.official_code.replace(/\\D/g, ''),
+                description: row.description,
+              })),
+            };
+          },
+        );
+        if (!catalog) {
+          return reply.status(503).send({ error: 'cnae_catalog_unavailable' });
+        }
+        return reply.status(200).send(catalog);
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
   typed.get(
     '/api/v1/establishment-types',
     {
