@@ -360,7 +360,7 @@ SET search_path = pg_catalog, public, pg_temp AS $$
       SELECT id FROM terminal
       WHERE created_at=(SELECT max(created_at) FROM terminal)
     )
-    SELECT CASE WHEN count(*)=1 THEN max(id) ELSE NULL END FROM newest;
+    SELECT id FROM newest WHERE (SELECT count(*) FROM newest)=1 LIMIT 1;
 $$;
 
 -- PostgreSQL has no htmlparser2. Re-derive the legal DOM's text from the
