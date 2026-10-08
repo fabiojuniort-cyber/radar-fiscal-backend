@@ -97,104 +97,14 @@ export async function createOrReactivateManualEstablishment(
   if (!input.cnaes?.length) throw new ManualCnaeValidationError('invalid_cnae');
 
 
-  const preserve = <T>(
-    incoming: T | undefined,
-    current: T,
-  ): T =>
-    incoming === undefined
-      ? current
-      : incoming;
-
-  const stateRegistrationPatch = existing
-    ? input.stateRegistration === undefined
-      ? {
-          state_registration:
-            existing.state_registration,
-          state_registration_status:
-            existing.state_registration_status,
-          state_registration_source:
-            existing.state_registration_source,
-          state_registration_checked_at:
-            existing.state_registration_checked_at,
-          state_registration_lookup_status:
-            existing.state_registration_lookup_status,
-        }
-      : {
-          state_registration:
-            input.stateRegistration,
-          state_registration_status: null,
-          state_registration_source:
-            input.stateRegistration
-              ? 'MANUAL'
-              : null,
-          state_registration_checked_at: null,
-          state_registration_lookup_status: null,
-        }
-    : {
-        state_registration:
-          input.stateRegistration ?? null,
-        state_registration_status: null,
-        state_registration_source:
-          input.stateRegistration
-            ? 'MANUAL'
-            : null,
-        state_registration_checked_at: null,
-        state_registration_lookup_status: null,
-      };
-
-  const establishment = existing
-    ? await trx
-        .updateTable('establishments')
-        .set({
-          name: input.name,
-          establishment_type_code:
-            input.typeCode,
-          is_head_office: false,
-          uf: input.uf,
-          municipality_name: preserve(
-            input.municipalityName,
-            existing.municipality_name,
-          ),
-          municipality_ibge_code: preserve(
-            input.municipalityIbgeCode,
-            existing.municipality_ibge_code,
-          ),
-          postal_code: preserve(
-            input.postalCode,
-            existing.postal_code,
-          ),
-          street: preserve(
-            input.street,
-            existing.street,
-          ),
-          street_number: preserve(
-            input.streetNumber,
-            existing.street_number,
-          ),
-          complement: preserve(
-            input.complement,
-            existing.complement,
-          ),
-          district: preserve(
-            input.district,
-            existing.district,
-          ),
-          business_location_code:
-            input.businessLocationCode == null
-              ? existing.business_location_code
-              : input.businessLocationCode,
-          ...stateRegistrationPatch,
-          is_active: true,
-        })
-        .where('id', '=', existing.id)
-        .returning([
-          'id',
-          'business_location_code',
-          'state_registration',
-          'state_registration_source',
-        ])
-        .executeTakeFirstOrThrow()
-    : await trx
+  const stateRegistrationPatch = {
+    state_registration: input.stateRegistration ?? null,
+    state_registration_status: null,
+    state_registration_source: input.stateRegistration ? 'MANUAL' : null,
+    state_registration_checked_at: null,
+    state_registration_lookup_status: null,
+  };
+  const establishment = await trx
         .insertInto('establishments')
         .values({
           company_id: input.companyId,
