@@ -106,13 +106,6 @@ export async function loadClassificationConcepts(
   return concepts;
 }
 
-/** An unscoped stored body or relevant excerpt is not proof of vigência.
- * Fail closed: do not manufacture current-text assertions from missing,
- * oversized or ambiguous presentation HTML. */
-function classificationText(row: PendingVersion): string | null {
-  return currentWordingText(row.presentation_html) ?? null;
-}
-
 async function selectPending(
   db: Kysely<DB>,
   releaseId: string,
