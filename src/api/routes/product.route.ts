@@ -30,7 +30,7 @@ import {
   loadTaxonomyCodeCompatibility,
   type TaxonomyCodeCompatibility,
 } from '../../modules/taxonomy/taxonomy-code-compatibility.js';
-import { currentWordingText, sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
+import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
 import { unavailablePublicLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.public-projection.js';
 import {
   CnpjRegistryError,
