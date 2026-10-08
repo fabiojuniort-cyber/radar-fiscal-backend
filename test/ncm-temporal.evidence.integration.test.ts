@@ -219,6 +219,17 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     await assert.rejects(admin.query(
       `DELETE FROM publication_ncm_scan_evidence_codes WHERE scan_evidence_id=$1::uuid`,
       [immutable.rows[0]!.id]), /TAX13_NCM_SCAN_APPEND_ONLY/);
+    const oldEntry = await admin.query<{ id: string }>(`
+      SELECT c.catalog_entry_id AS id FROM publication_ncm_scan_evidence_codes c
+      JOIN publication_ncm_scan_evidence e ON e.id=c.scan_evidence_id
+      WHERE e.publication_version_id=$1::uuid LIMIT 1`, [versionId]);
+    await assert.rejects(admin.query(`
+      INSERT INTO publication_ncm_scan_evidence_codes(
+        scan_evidence_id,ncm_code,catalog_entry_id,fragment_index,excerpt)
+      VALUES ($1::uuid,'10063011',$2::uuid,7,'post-commit forged positive')`,
+      [immutable.rows[0]!.id, oldEntry.rows[0]!.id]
+    ), /TAX13_NCM_SCAN_CODES_SEALED/,
+    'a worker must not add new findings to a committed successful scan');
 
     // FORCE RLS and explicit privilege denial to app / curator / public roles.
     const grants = await admin.query<{
