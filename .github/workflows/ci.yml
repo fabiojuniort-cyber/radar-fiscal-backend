@@ -298,6 +298,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Build PG18 migration runner
+        run: npm run build
       - name: Migrate and verify PostgreSQL 18 runtime roles
         run: npm run db:prepare
       - name: Seed NCM edition fixture
