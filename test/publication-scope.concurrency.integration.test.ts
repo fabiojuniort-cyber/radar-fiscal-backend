@@ -6,6 +6,7 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { Pool, type PoolClient } from 'pg';
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { classifySinglePublication } from '../src/modules/taxonomy/classification/classification.worker.js';
+import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
 import { classifyPublicationVersionLexically } from '../src/modules/taxonomy/classification/classification.repository.js';
 import { matchPublicationByTaxonomy } from '../src/modules/taxonomy/matching/taxonomy-matching.service.js';
 import { persistSuccessfulScan, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
