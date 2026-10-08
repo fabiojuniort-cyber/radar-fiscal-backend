@@ -152,16 +152,16 @@ export function validateLegalScopeEvidence(
   let lastEnd = 0;
   for (const segment of evidence.segments) {
     if (!segment || typeof segment !== 'object') return fail('INVALID_SEGMENT');
-    // COMPLETE means every normative/non-empty text region was reviewed,
-    // including historical/editorial/UNVERIFIED fragments; otherwise clients
-    // could mistake partial legal coverage for exhaustive legal certainty.
-    if (evidence.coverage === 'COMPLETE' &&
-        text.slice(lastEnd, segment.start).trim() !== '') {
-      return fail('INCOMPLETE_SCOPE_COVERAGE');
-    }
     if (!Number.isSafeInteger(segment.start) || !Number.isSafeInteger(segment.end) ||
         segment.start < lastEnd || segment.end <= segment.start || segment.end > text.length) {
       return fail('INVALID_SEGMENT_BOUNDS');
+    }
+    // COMPLETE means every non-whitespace text region was reviewed, including
+    // historical/editorial/UNVERIFIED fragments. A partial manifest must
+    // never assert exhaustive normative coverage.
+    if (evidence.coverage === 'COMPLETE' &&
+        text.slice(lastEnd, segment.start).trim() !== '') {
+      return fail('INCOMPLETE_SCOPE_COVERAGE');
     }
     lastEnd = segment.end;
     if (!DIGEST.test(segment.textSha256) ||
