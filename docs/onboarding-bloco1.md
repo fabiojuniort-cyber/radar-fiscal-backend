@@ -26,3 +26,14 @@ PRs coordenados: backend #190, frontend radar-fiscal-web#83. **Não mergear ou p
 5. Falha de provedor abre fluxo manual; edição CURRENT oficial fornece CNAEs, um principal.
 6. Catálogo ausente deve informar falha (não simular lista); validação de tenant/RLS com usuário alheio.
 7. PRs são acoplados: disponibilizar backend (incluindo migration 042 + catálogo) antes de ativar novo frontend, somente após gates.
+
+## Correções exigidas pela revisão independente — B1–B6
+
+**Status: BLOCK até novo parecer R3, independentemente da conclusão do CI.**
+
+- **B1 — referência CNAE:** todo CNAE enviado em operação manual passa por validação server-side contra a edição `CNAE` CURRENT do catálogo oficial, `level=SUBCLASSE` e `assignable=true`, na mesma transação que grava empresa/estabelecimento. Código fictício, repetido ou com quantidade de principais incorreta é rejeitado; descrição enviada pelo navegador é ignorada. A tabela global `cnaes` recebe apenas inserções ausentes usando descrição oficial (`ON CONFLICT DO NOTHING`), nunca `UPDATE` a partir do formulário. Novas matrizes e filiais manuais exigem ao menos um CNAE. A edição legítima das rotas antigas pode limpar associações fornecendo `[]`, sem aceitar códigos arbitrários.
+- **B2 — vínculo empresarial:** validação de raiz (8 dígitos) em serviço e trigger de banco da migration 043. Entrada de nova empresa requer CNPJ matriz (sufixo /0001 na ausência de evidência explícita do provedor). Uma filial não pode ser ligada a outra raiz nem se registrar como nova matriz. Trigger é aditivo: não reescreve automaticamente cadastros legados.
+- **B3 — duplicidade/reativação:** inclusão sobre empresa/filial ativa responde conflito, sem atualizar nome, IE, localização, perfil ou CNAEs. Inativa responde `reactivation_required` até `reactivateInactive: true` explicitamente confirmado pelo usuário; a reativação preserva atributos e vínculos existentes, ajustando apenas `is_active`.
+- **B4 — PG18:** job dedicado `onb01-pg18` aplica migrations completas (042 + 043) em PostgreSQL 18 descartável, verifica esquema e trigger e executa teste de signup/consentimento/autenticação/RLS, mais teste adversarial de CNAE, tenants, filiais, duplicidade e reativação. Nenhuma execução corresponde ao banco de produção.
+- **B5 — integração:** `test/onboarding-integrity.integration.test.ts` e fixture sintética `test/onboarding-cnae-fixture.ts` exercitam tentativas hostis; `test/onboarding-identity.unit.test.ts` verifica guardas. A tela exige confirmação separada para reativação. As suites históricas de empresa/filial foram ajustadas para mesma raiz e reativação explícita.
+- **B6 — fechamento:** verificar integralmente GitHub Actions dos SHAs finais de ambos PRs, testes E2E de browser, revalidar diffs independentes e não mergear sem novo PASS formal.
