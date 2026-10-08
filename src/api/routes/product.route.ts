@@ -1,3 +1,4 @@
+import { readCompanyRegistration, readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
   FastifyReply,
@@ -706,7 +707,7 @@ export async function productRoutes(
               return null;
             }
 
-            return createCompanyFromRegistry(
+            const registered = await createCompanyFromRegistry(
               trx,
               tenantId,
               registry,
@@ -714,6 +715,7 @@ export async function productRoutes(
               request.body.businessLocationCode,
               request.body.reactivateInactive,
             );
+            return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
           },
         );
 
@@ -722,49 +724,7 @@ export async function productRoutes(
         }
 
         return reply.status(201).send({
-          company: {
-            id: created.companyId,
-            legalName: registry.legalName,
-            tradeName: registry.tradeName,
-            cnpj: registry.cnpj,
-            businessLocationCode:
-              request.body.businessLocationCode ?? null,
-          },
-          establishment: {
-            id: created.establishmentId,
-            cnpj: registry.cnpj,
-            name:
-              registry.tradeName ??
-              registry.legalName,
-            typeCode: 'HEAD_OFFICE',
-            isHeadOffice: true,
-            uf: registry.uf,
-            municipalityName:
-              registry.municipalityName,
-            municipalityIbgeCode:
-              registry.municipalityIbgeCode,
-            postalCode:
-              registry.postalCode,
-            street: registry.street,
-            streetNumber:
-              registry.streetNumber,
-            complement:
-              registry.complement,
-            district: registry.district,
-            businessLocationCode:
-              request.body.businessLocationCode ?? null,
-            stateRegistration:
-              stateRegistration.registration,
-            stateRegistrationStatus:
-              stateRegistration.registrationStatus,
-            stateRegistrationLookupStatus:
-              stateRegistration.lookupStatus,
-            stateRegistrationSource:
-              stateRegistration.source,
-            stateRegistrationCheckedAt:
-              stateRegistration.checkedAt,
-            cnaes: registry.cnaes,
-          },
+          ...created,
           registry: {
             source: registry.source,
             consultedAt:
@@ -1476,7 +1436,7 @@ export async function productRoutes(
                 request.body.reactivateInactive,
               );
 
-            return { establishmentId };
+            return readRegistrationEstablishment(trx, establishmentId);
           },
         );
 
@@ -1493,35 +1453,7 @@ export async function productRoutes(
         }
 
         return reply.status(201).send({
-          establishment: {
-            id: result.establishmentId,
-            companyId: request.params.companyId,
-            cnpj: registry.cnpj,
-            name: registry.tradeName ?? registry.legalName,
-            typeCode: request.body.typeCode,
-            isHeadOffice: false,
-            uf: registry.uf,
-            municipalityName: registry.municipalityName,
-            municipalityIbgeCode: registry.municipalityIbgeCode,
-            postalCode: registry.postalCode,
-            street: registry.street,
-            streetNumber: registry.streetNumber,
-            complement: registry.complement,
-            district: registry.district,
-            businessLocationCode:
-              request.body.businessLocationCode ?? null,
-            stateRegistration:
-              stateRegistration.registration,
-            stateRegistrationStatus:
-              stateRegistration.registrationStatus,
-            stateRegistrationLookupStatus:
-              stateRegistration.lookupStatus,
-            stateRegistrationSource:
-              stateRegistration.source,
-            stateRegistrationCheckedAt:
-              stateRegistration.checkedAt,
-            cnaes: registry.cnaes,
-          },
+          establishment: result,
           registry: {
             source: registry.source,
             consultedAt: registry.consultedAt,

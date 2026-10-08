@@ -812,6 +812,23 @@ test(
           201,
         );
 
+        const assertRegistryReadback = async (response: { establishment: Record<string, unknown> }) => {
+          const est = response.establishment;
+          const sql = await admin.query('SELECT company_id, name, uf, business_location_code FROM establishments WHERE id = $1', [est.id]);
+          assert.equal(est.name, sql.rows[0].name);
+          assert.equal(est.uf, sql.rows[0].uf);
+          assert.equal(est.businessLocationCode, sql.rows[0].business_location_code);
+          const get = await app.inject({ method: 'GET',
+            url: '/api/v1/companies/' + sql.rows[0].company_id + '/establishments', headers: firstHeaders });
+          assert.equal(get.statusCode, 200, get.body);
+          const stored = get.json<{ items: Array<Record<string, unknown>> }>().items.find((item) => item.id === est.id);
+          assert.ok(stored);
+          for (const [key, value] of Object.entries(est)) assert.deepEqual(value, stored[key], 'POST/GET mismatch: ' + key);
+          const cnaes = await admin.query('SELECT c.code, c.description, ec.is_primary FROM establishment_cnaes ec JOIN cnaes c ON c.code = ec.cnae_code WHERE ec.establishment_id = $1 ORDER BY ec.is_primary DESC, c.code', [est.id]);
+          assert.deepEqual(est.cnaes, cnaes.rows.map((row) => ({ code: row.code, description: row.description, isPrimary: row.is_primary })));
+        };
+        await assertRegistryReadback(registryCreate.json());
+
         const registryBody =
           registryCreate.json<{
             company: {
@@ -951,6 +968,7 @@ test(
           201,
         );
 
+        await assertRegistryReadback(branchRegistryCreate.json());
         const branchBody =
           branchRegistryCreate.json<{
             establishment: {
@@ -992,6 +1010,18 @@ test(
             .sort((a, b) => a.code.localeCompare(b.code)),
           'New automatic branch must never rewrite global CNAE descriptions',
         );
+
+        const branchId = branchRegistryCreate.json().establishment.id;
+        const deletedBranch = await app.inject({ method: 'DELETE', url: '/api/v1/establishments/' + branchId, headers: firstHeaders });
+        assert.equal(deletedBranch.statusCode, 204, deletedBranch.body);
+        const reactivatedBranch = await app.inject({ method: 'POST',
+          url: '/api/v1/companies/' + registryBody.company.id + '/establishments/from-cnpj',
+          headers: firstHeaders, payload: { cnpj: branchRegistryCnpj, typeCode: 'OTHER',
+            businessLocationCode: 'NÃO-REESCREVER', reactivateInactive: true } });
+        assert.equal(reactivatedBranch.statusCode, 201, reactivatedBranch.body);
+        assert.equal(reactivatedBranch.json().establishment.id, branchId);
+        assert.equal(reactivatedBranch.json().establishment.businessLocationCode, 'FILIAL-003');
+        await assertRegistryReadback(reactivatedBranch.json());
 
         const deleteRegistryCompany =
           await app.inject({
@@ -1035,6 +1065,11 @@ test(
           201,
         );
 
+        await assertRegistryReadback(registryRecreate.json());
+        assert.equal(registryRecreate.json().company.businessLocationCode, 'MATRIZ-001');
+        const sqlCompany = await admin.query('SELECT legal_name, trade_name FROM companies WHERE id = $1', [registryBody.company.id]);
+        assert.equal(registryRecreate.json().company.legalName, sqlCompany.rows[0].legal_name);
+        assert.equal(registryRecreate.json().company.tradeName, sqlCompany.rows[0].trade_name);
         const recreatedBody =
           registryRecreate.json<{
             company: {

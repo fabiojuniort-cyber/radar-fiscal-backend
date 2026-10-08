@@ -89,10 +89,29 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
     assert.equal(created.statusCode, 201, created.body);
     const companyId = created.json<{ company: { id: string } }>().company.id;
 
+    const assertReadback = async (response: { establishment: Record<string, unknown> }) => {
+      const read = await app.inject({ method: 'GET',
+        url: '/api/v1/companies/' + companyId + '/establishments', headers: a.headers });
+      assert.equal(read.statusCode, 200, read.body);
+      const stored = read.json<{ items: Array<Record<string, unknown>> }>().items
+        .find((item) => item.id === response.establishment.id);
+      assert.ok(stored);
+      for (const [key, value] of Object.entries(response.establishment)) {
+        assert.deepEqual(value, stored[key], 'POST/GET mismatch for ' + key);
+      }
+      const sql = await admin.query('SELECT name, uf, establishment_type_code FROM establishments WHERE id = $1',
+        [response.establishment.id]);
+      assert.equal(response.establishment.name, sql.rows[0].name);
+      assert.equal(response.establishment.uf, sql.rows[0].uf);
+      assert.equal(response.establishment.typeCode, sql.rows[0].establishment_type_code);
+    };
+    await assertReadback(created.json());
+
     const afterCnae = await admin.query<{ description: string }>(
       "SELECT description FROM cnaes WHERE code = '6201501'"
     );
     assert.equal(afterCnae.rowCount, 1);
+    assert.equal(created.json().establishment.cnaes[0].description, afterCnae.rows[0]?.description);
     assert.notEqual(afterCnae.rows[0]?.description, primary[0]?.description);
     if (originalCnae.rows[0]) {
       assert.equal(afterCnae.rows[0]?.description, originalCnae.rows[0].description);
@@ -160,12 +179,31 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
         uf: 'GO', typeCode: 'OTHER', reactivateInactive: true },
     });
     assert.equal(reactivation.statusCode, 201, reactivation.body);
+    await assertReadback(reactivation.json());
+    assert.equal(reactivation.json().establishment.name, 'Filial autorizada');
     assert.equal(reactivation.json<{ establishment: { id: string } }>().establishment.id, branchId);
     const afterReactivation = await admin.query<{ name: string; is_active: boolean }>(
       'SELECT name, is_active FROM establishments WHERE id = $1', [branchId]
     );
     assert.equal(afterReactivation.rows[0]?.name, 'Filial autorizada');
     assert.equal(afterReactivation.rows[0]?.is_active, true);
+
+    const deleteCompany = await app.inject({ method: 'DELETE',
+      url: '/api/v1/companies/' + companyId, headers: a.headers });
+    assert.equal(deleteCompany.statusCode, 204, deleteCompany.body);
+    const reactivateCompany = await app.inject({ method: 'POST', url: '/api/v1/companies/manual',
+      headers: a.headers, payload: { cnpj: headCnpj, legalName: 'Não substituir razão social',
+        establishmentName: 'Não substituir matriz', uf: 'SP', municipalityName: 'Não substituir endereço',
+        cnaes: [{ code: '9999999', description: 'Não substituir CNAE', isPrimary: true }],
+        reactivateInactive: true } });
+    assert.equal(reactivateCompany.statusCode, 201, reactivateCompany.body);
+    await assertReadback(reactivateCompany.json());
+    assert.equal(reactivateCompany.json().company.legalName, persisted.rows[0]?.legal_name);
+    assert.equal(reactivateCompany.json().establishment.cnaes[0].description, afterCnae.rows[0]?.description);
+    const companySql = await admin.query('SELECT legal_name, trade_name, head_office_cnpj FROM companies WHERE id = $1', [companyId]);
+    assert.equal(reactivateCompany.json().company.legalName, companySql.rows[0].legal_name);
+    assert.equal(reactivateCompany.json().company.tradeName, companySql.rows[0].trade_name);
+    assert.equal(reactivateCompany.json().company.cnpj, companySql.rows[0].head_office_cnpj);
   } finally {
     await app.close();
     if (users.length) await admin.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);

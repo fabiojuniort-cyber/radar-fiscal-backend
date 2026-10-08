@@ -1,3 +1,4 @@
+import { readCompanyRegistration } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
   FastifyRequest,
@@ -226,11 +227,12 @@ export async function companyManualRoutes(
                 return null;
               }
 
-              return createManualCompanyRegistration(
+              const registered = await createManualCompanyRegistration(
                 trx,
                 tenantId,
                 request.body,
               );
+              return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
             },
           );
 
@@ -240,53 +242,8 @@ export async function companyManualRoutes(
           });
         }
 
-        const cnaes =
-          request.body.cnaes ?? [];
-
         return reply.status(201).send({
-          company: {
-            id: created.companyId,
-            legalName:
-              request.body.legalName,
-            tradeName: null,
-            cnpj: request.body.cnpj,
-            businessLocationCode:
-              created.businessLocationCode,
-          },
-          establishment: {
-            id: created.establishmentId,
-            companyId: created.companyId,
-            cnpj: request.body.cnpj,
-            name:
-              created.establishmentName,
-            typeCode: 'HEAD_OFFICE',
-            isHeadOffice: true,
-            uf: request.body.uf,
-            municipalityName:
-              request.body.municipalityName ?? null,
-            municipalityIbgeCode:
-              request.body.municipalityIbgeCode ?? null,
-            postalCode:
-              request.body.postalCode ?? null,
-            street:
-              request.body.street ?? null,
-            streetNumber:
-              request.body.streetNumber ?? null,
-            complement:
-              request.body.complement ?? null,
-            district:
-              request.body.district ?? null,
-            businessLocationCode:
-              created.businessLocationCode,
-            stateRegistration:
-              created.stateRegistration,
-            stateRegistrationStatus: null,
-            stateRegistrationLookupStatus: null,
-            stateRegistrationSource:
-              created.stateRegistrationSource,
-            stateRegistrationCheckedAt: null,
-            cnaes,
-          },
+          ...created,
           registry: {
             source: 'MANUAL',
             consultedAt:

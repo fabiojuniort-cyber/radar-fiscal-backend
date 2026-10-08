@@ -1,3 +1,4 @@
+import { readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
   FastifyRequest,
@@ -259,10 +260,11 @@ export async function establishmentManualRoutes(
               return 'TYPE_NOT_FOUND' as const;
             }
 
-            return createOrReactivateManualEstablishment(
+            const registered = await createOrReactivateManualEstablishment(
               trx,
               request.body,
             );
+            return readRegistrationEstablishment(trx, registered.establishmentId);
           },
         );
 
@@ -285,21 +287,7 @@ export async function establishmentManualRoutes(
         }
 
         return reply.status(201).send({
-          establishment: {
-            id: result.establishmentId,
-            companyId: request.body.companyId,
-            cnpj: request.body.cnpj,
-            name: request.body.name,
-            typeCode: request.body.typeCode,
-            isHeadOffice: false,
-            uf: request.body.uf,
-            businessLocationCode:
-              result.businessLocationCode,
-            stateRegistration:
-              result.stateRegistration,
-            stateRegistrationSource:
-              result.stateRegistrationSource,
-          },
+          establishment: result,
         });
       } catch (error) {
         if (error instanceof CompanyIdentityError) {
