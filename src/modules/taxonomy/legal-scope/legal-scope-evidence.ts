@@ -97,7 +97,7 @@ function validDate(text: string): boolean {
 function checkedHttps(value: string): URL | null {
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password || !url.hostname) return null;
+    if (url.protocol !== 'https:' || url.port || url.username || url.password || !url.hostname) return null;
     return url;
   } catch {
     return null;
