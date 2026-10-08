@@ -11,30 +11,6 @@ import type {
 import { validateAndEnsureOfficialCnaes } from './manual-cnae-validation.service.js';
 import { CompanyIdentityError, ensureHeadOfficeCnpj, ensureSameCompanyRoot } from './company-identity.guard.js';
 
-async function upsertCnaes(
-  trx: Transaction<DB>,
-  cnaes: CnpjRegistryCnae[],
-): Promise<void> {
-  for (const cnae of cnaes) {
-    await trx
-      .insertInto('cnaes')
-      .values({
-        code: cnae.code,
-        description: cnae.description,
-        is_active: true,
-      })
-      .onConflict((conflict) =>
-        conflict
-          .column('code')
-          .doUpdateSet({
-            description: cnae.description,
-            is_active: true,
-          }),
-      )
-      .execute();
-  }
-}
-
 async function replaceEstablishmentCnaes(
   trx: Transaction<DB>,
   establishmentId: string,
@@ -162,7 +138,9 @@ export async function createCompanyFromRegistry(
     await rebuildCompanyCnaes(trx, existingCompany.id);
     return { companyId: existingCompany.id, establishmentId: headOffice.id };
   }
-  await upsertCnaes(trx, record.cnaes);
+  // Registry providers are data sources, not authorities for the shared CNAE catalog.
+  // Resolve all identifiers and descriptions against the CURRENT official edition.
+  const officialCnaes = await validateAndEnsureOfficialCnaes(trx, record.cnaes);
 
   const company = await trx
         .insertInto('companies')
@@ -218,7 +196,7 @@ export async function createCompanyFromRegistry(
   await replaceEstablishmentCnaes(
     trx,
     establishment.id,
-    record.cnaes,
+    officialCnaes,
   );
 
   await rebuildCompanyCnaes(
@@ -271,7 +249,9 @@ export async function createEstablishmentFromRegistry(
     await rebuildCompanyCnaes(trx, companyId);
     return existingEstablishment.id;
   }
-  await upsertCnaes(trx, record.cnaes);
+  // Registry providers are data sources, not authorities for the shared CNAE catalog.
+  // Resolve all identifiers and descriptions against the CURRENT official edition.
+  const officialCnaes = await validateAndEnsureOfficialCnaes(trx, record.cnaes);
 
   const establishment = await trx
         .insertInto('establishments')
@@ -315,7 +295,7 @@ export async function createEstablishmentFromRegistry(
   await replaceEstablishmentCnaes(
     trx,
     establishment.id,
-    record.cnaes,
+    officialCnaes,
   );
 
   await rebuildCompanyCnaes(
