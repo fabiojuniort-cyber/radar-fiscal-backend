@@ -121,15 +121,15 @@ const NON_NORMATIVE_CLASSES = new Set([
   'A6-1Subtitulo', 'RedaoAnt', 'A8-3RedacaoAnt',
   'RemissoAnt', 'A8-2RemissaoAnt',
 ]);
-const HISTORICAL_TABLE_CLASS = /^(?:A\\d+-\\d+)?Tabela[A-Za-z]*verde$/;
-const ANNEX_HEADING = /^anexo\\s+(?:único|unico|[ivxlcdm]+|\\d+)(?=\\s*$|\\s*[-–—:.(])/iu;
-const HISTORICAL_ANNEX = /\\b(?:revogad[oa]s?|redação\\s+(?:anterior|original)|texto\\s+anterior|substitu[íi]d[oa]s?|sem\\s+(?:efeito|vigência))\\b/iu;
-const ACT_IDENTIFIER = /^(?:convênio(?:\\s+icms)?|ajuste\\s+sinief|ato\\s+cotepe(?:\\/icms)?|protocolo\\s+icms|lei(?:\\s+complementar)?|decreto|portaria|resolução)\\s+(?:n[ºo°.]?\\s*)?\\d+(?:[./-]\\d+)*(?:\\s*,?\\s+de\\s+\\d{1,2}\\s+de\\s+[\\p{L}]+\\s+de\\s+\\d{4})?\\.?$/iu;
-const EDITORIAL_REFERENCE = /^(?:publicad[oa]s?\\s+(?:no|na|em)|ratificad[oa]s?\\s+(?:no|na|pel[oa]s?)|alterad[oa]s?\\s+(?:pel[oa]s?|por)|prorrogad[oa]s?\\s+at[eé]|vide\\s+(?:o|a|os|as|cl[áa]usula|art)|redação\\s+anterior\\b|texto\\s+anterior\\b|nova\\s+redação\\s+dada\\s+pel[oa])/iu;
-const REVOKED_PLACEHOLDER = /^(?:(?:cl[áa]usula|art(?:igo)?\\.?|par[áa]grafo|inciso|al[íi]nea|item)\\s+[\\p{L}\\p{N}º°ª.-]+|§\\s*\\d+[º°ª]?|[ivxlcdm]+|[a-z]|\\d+[º°ª]?)\\s*(?:[-–—:]\\s*)?revogad[oa]s?\\.?$/iu;
+const HISTORICAL_TABLE_CLASS = /^(?:A\d+-\d+)?Tabela[A-Za-z]*verde$/;
+const ANNEX_HEADING = /^anexo\s+(?:único|unico|[ivxlcdm]+|\d+)(?=\s*$|\s*[-–—:.(])/iu;
+const HISTORICAL_ANNEX = /\b(?:revogad[oa]s?|redação\s+(?:anterior|original)|texto\s+anterior|substitu[íi]d[oa]s?|sem\s+(?:efeito|vigência))\b/iu;
+const ACT_IDENTIFIER = /^(?:convênio(?:\s+icms)?|ajuste\s+sinief|ato\s+cotepe(?:\/icms)?|protocolo\s+icms|lei(?:\s+complementar)?|decreto|portaria|resolução)\s+(?:n[ºo°.]?\s*)?\d+(?:[./-]\d+)*(?:\s*,?\s+de\s+\d{1,2}\s+de\s+[\p{L}]+\s+de\s+\d{4})?\.?$/iu;
+const EDITORIAL_REFERENCE = /^(?:publicad[oa]s?\s+(?:no|na|em)|ratificad[oa]s?\s+(?:no|na|pel[oa]s?)|alterad[oa]s?\s+(?:pel[oa]s?|por)|prorrogad[oa]s?\s+at[eé]|vide\s+(?:o|a|os|as|cl[áa]usula|art)|redação\s+anterior\b|texto\s+anterior\b|nova\s+redação\s+dada\s+pel[oa])/iu;
+const REVOKED_PLACEHOLDER = /^(?:(?:cl[áa]usula|art(?:igo)?\.?|par[áa]grafo|inciso|al[íi]nea|item)\s+[\p{L}\p{N}º°ª.-]+|§\s*\d+[º°ª]?|[ivxlcdm]+|[a-z]|\d+[º°ª]?)\s*(?:[-–—:]\s*)?revogad[oa]s?\.?$/iu;
 
 function standaloneNonNormative(value: string): boolean {
-  const line = value.replace(/\\s+/g, ' ').trim();
+  const line = value.replace(/\s+/g, ' ').trim();
   return ANNEX_HEADING.test(line) || ACT_IDENTIFIER.test(line) ||
     EDITORIAL_REFERENCE.test(line) || REVOKED_PLACEHOLDER.test(line);
 }
@@ -139,7 +139,7 @@ function excludedTag(name: string, attrs: Record<string, string>): boolean {
   if (status !== undefined && status !== 'current') return true;
   if (/^h[1-6]$/.test(name) || name === 'title' || name === 'script' ||
       name === 'style' || name === 'noscript') return true;
-  return (attrs.class ?? '').split(/\\s+/).some((token) =>
+  return (attrs.class ?? '').split(/\s+/).some((token) =>
     NON_NORMATIVE_CLASSES.has(token) || HISTORICAL_TABLE_CLASS.test(token));
 }
 
@@ -171,7 +171,7 @@ function parsedLegalText(html: string): { text: string; spans: LegalTextSpan[] }
     },
     ontext(value) {
       if (!value) return;
-      const line = value.replace(/\\s+/g, ' ').trim();
+      const line = value.replace(/\s+/g, ' ').trim();
       const annexHeading = ANNEX_HEADING.test(line);
       if (annexHeading) historicalAnnex = HISTORICAL_ANNEX.test(line);
       const start = text.length;
