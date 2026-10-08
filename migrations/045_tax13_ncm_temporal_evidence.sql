@@ -513,6 +513,14 @@ BEGIN
         IF coalesce(segment->>'method','') NOT IN ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT')
           OR jsonb_typeof(segment->'evidenceUrls') IS DISTINCT FROM 'array'
           OR jsonb_array_length(segment->'evidenceUrls')=0
+          -- A CURRENT assertion must be contained in ONE verified text node;
+          -- a title, prior wording, revoked annex or cross-node span fails.
+          OR NOT EXISTS (
+            SELECT 1 FROM jsonb_array_elements(node_ranges) AS n(node)
+            WHERE (n.node->>'start')::integer<=start_at
+              AND (n.node->>'end')::integer>=end_at
+              AND n.node->>'excluded'='false'
+          )
         THEN RETURN NULL;
         END IF;
         fragments := fragments || jsonb_build_array(piece);
