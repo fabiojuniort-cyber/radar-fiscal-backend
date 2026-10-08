@@ -500,6 +500,8 @@ export async function classifySinglePublication(
     WHERE publication_version_id = ${row.publication_version_id}::uuid
       AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
       AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
+      AND status = 'SUCCESS'
+      AND (scanned_at AT TIME ZONE 'America/Sao_Paulo')::date = ${asOf}::date
     LIMIT 1
   `.execute(db);
   const ncmScanned = ncmScan.rows[0]?.status === 'SUCCESS';
