@@ -262,6 +262,24 @@ test('publication NCM enrichment stores only CURRENT catalog matches and marks z
       [zeroMatch.versionId],
     );
     assert.equal(visible.rows[0]?.count, 0);
+    // B2 regression: legacy text-only documents remain unverified, even
+    // if their raw text contains NCM candidates from current catalogs.
+    const unscoped = await createPublicationFixture(admin, {
+      title: 'Unverified raw legal content fixture',
+      publishedOn: '9999-12-29',
+      text: 'Histórico não verificado 1006.30.11 e 10062099.',
+      scoped: false,
+    });
+    fixtures.push(unscoped);
+    const rawResult = await processPublicationNcmEnrichmentBatch(db, { limit: 1 });
+    assert.equal(rawResult.selected, 1);
+    assert.equal(rawResult.candidates, 0);
+    assert.equal(rawResult.matches, 0);
+    const rawScan = await admin.query<{ source_field: string }>(
+      'SELECT source_field FROM publication_ncm_scans WHERE publication_version_id=$1::uuid AND detector_version=$2',
+      [unscoped.versionId, PUBLICATION_NCM_DETECTOR_VERSION],
+    );
+    assert.equal(rawScan.rows[0]?.source_field, 'NONE');
   } finally {
     await db.destroy();
 
