@@ -4,6 +4,7 @@ import type { DB } from '../../../infrastructure/database/database.types.js';
 import { currentWordingText } from '../../collection/legal-presentation.js';
 import { brazilLegalReferenceDate } from '../legal-scope/legal-scope-evidence.js';
 import { readVerifiedLegalScope } from '../legal-scope/legal-scope.repository.js';
+import { currentNcmEdition, persistTemporalNcmScan, type NcmEditionSnapshot } from './ncm-temporal.evidence.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
@@ -370,6 +371,7 @@ async function selectBatch(
   db: Kysely<DB>,
   limit: number,
   asOf: string,
+  edition: NcmEditionSnapshot,
 ): Promise<VersionForNcmScan[]> {
   const result = await sql<VersionForNcmScan>`
     SELECT
@@ -384,10 +386,6 @@ async function selectBatch(
     JOIN publication_versions pv
       ON pv.publication_id = p.id
      AND pv.is_current = true
-    LEFT JOIN publication_ncm_scans pns
-      ON pns.publication_version_id = pv.id
-     AND pns.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
-     AND pns.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
     WHERE public.publication_scope_is_in_scope(p.id)
       -- Without an audited provenance manifest the new version must NOT
       -- create a SUCCESS scan and supersede older NCM findings.
@@ -399,12 +397,25 @@ async function selectBatch(
           AND a.recheck_on > ${asOf}::date
           AND a.coverage = 'COMPLETE'
       )
-      AND (
-        pns.id IS NULL
-        OR (
-          pns.status = 'FAILED'
-          AND pns.scanned_at <= now() - ${FAILED_RETRY_INTERVAL}::interval
-        )
+      -- A SUCCESS on a different attestation, day or NCM edition is never
+      -- evidence of completion. Legacy 028 statuses do not gate this path.
+      AND NOT EXISTS (
+        SELECT 1 FROM public.publication_ncm_scan_evidence e
+        WHERE e.publication_version_id = pv.id
+          AND e.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
+          AND e.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
+          AND e.legal_as_of = ${asOf}::date
+          AND e.recheck_on > ${asOf}::date
+          AND e.catalog_edition_id = ${edition.id}::uuid
+          AND e.catalog_sha256 = ${edition.checksum}
+          AND e.legal_scope_attestation_id = (
+            SELECT latest.id
+            FROM public.publication_legal_scope_attestations latest
+            WHERE latest.publication_version_id = pv.id
+              AND latest.valid_as_of = ${asOf}::date
+            ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
+          )
+          AND e.outcome = 'SUCCESS'
       )
     ORDER BY
       p.published_on DESC NULLS LAST,
@@ -424,7 +435,8 @@ export async function processPublicationNcmEnrichmentBatch(
   await assertCurrentNcmCatalog(db);
 
   const asOf = brazilLegalReferenceDate();
-  const rows = await selectBatch(db, limit, asOf);
+  const edition = await currentNcmEdition(db, asOf);
+  const rows = await selectBatch(db, limit, asOf, edition);
   const result: PublicationNcmBatchResult = {
     selected: rows.length,
     succeeded: 0,
@@ -458,18 +470,24 @@ export async function processPublicationNcmEnrichmentBatch(
     result.candidates += candidates.length;
 
     try {
-      const insertedMatches = await db.transaction().execute((trx) =>
-        persistSuccessfulScan(
-          trx,
-          row,
-          sourceField,
-          candidates,
-          currentWordingOnly,
-        ),
-      );
+      const stored = await db.transaction().execute(async (trx) => {
+        const temporal = await persistTemporalNcmScan(trx, {
+          publicationVersionId: row.publication_version_id,
+          sanitizedHtml: row.presentation_html ?? '',
+          asOf,
+        });
+        // Keep the legacy catalog-only indexes populated for historical
+        // search. They NEVER authorize CURRENT or taxonomy classification.
+        if (temporal.inserted) {
+          await persistSuccessfulScan(trx, row, sourceField, candidates, currentWordingOnly);
+        }
+        return temporal;
+      });
 
-      result.succeeded += 1;
-      result.matches += insertedMatches;
+      if (stored.inserted) {
+        result.succeeded += 1;
+        result.matches += stored.matches;
+      }
     } catch (error) {
       if (isPublicationOutOfScopeError(error)) {
         continue;
