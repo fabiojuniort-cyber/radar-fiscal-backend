@@ -2324,21 +2324,24 @@ export async function productRoutes(
           ...company.manualProducts.map((term) => ({ term, kind: 'product' as const })),
           ...(REGIME_LABELS[company.profile?.tax_regime ?? ''] ?? []).map((term) => ({ term, kind: 'regime' as const })),
         ];
-        let actText: string | null = null;
+        let actFragments: string[] = [];
         if (profileTerms.length > 0) {
-          const current = await sql<{ attested_text: string | null }>`
-            SELECT public.tax13_public_current_legal_text(pv.id) AS attested_text
+          const current = await sql<{ attested_fragments: string[] | null }>`
+            SELECT public.tax13_public_current_legal_fragments(pv.id) AS attested_fragments
             FROM publication_versions pv
             WHERE pv.publication_id = ${request.params.publicationId}::uuid
               AND pv.is_current = TRUE
           `.execute(app.db);
-          actText = current.rows[0]?.attested_text ?? null;
+          const candidate = current.rows[0]?.attested_fragments;
+          actFragments = Array.isArray(candidate)
+            ? candidate.filter((text): text is string => typeof text === 'string')
+            : [];
         }
 
         const affinity = computePublicationAffinity({
           view,
           profileTerms,
-          actText,
+          actFragments,
           // Any parameter (saved profile, product or CNAE) starts the comparison.
           hasProfile: Boolean(company.profile) || company.productCount > 0 || company.cnaeSuggestions.length > 0,
           profileCodes,
