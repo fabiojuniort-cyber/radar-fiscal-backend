@@ -98,9 +98,10 @@ export async function checkWorkerConcurrency(
     // No lexical rice label: the resulting product.rice tag must come from NCM.
     const content = 'Operação com NCM 1006.30.11. Repete 1006.30.11.';
     const version = await admin.query<{ id: string }>(
-      `INSERT INTO publication_versions (publication_id, version_no, content_hash, content_text, is_current)
-       VALUES ($1, 1, $2, $3, true) RETURNING id`,
-      [fixture.rows[0]!.id, createHash('sha256').update(content).digest('hex'), content],
+      `INSERT INTO publication_versions (publication_id, version_no, content_hash, content_text, source_metadata, is_current)
+       VALUES ($1, 1, $2, $3, $4::jsonb, true) RETURNING id`,
+      [fixture.rows[0]!.id, createHash('sha256').update(content).digest('hex'), content,
+       JSON.stringify({presentation: {html: '<p data-legal-status="current">' + content + '</p>'}})],
     );
     const versionId = version.rows[0]!.id;
     const probes = [new WorkerProbe(), new WorkerProbe()];
