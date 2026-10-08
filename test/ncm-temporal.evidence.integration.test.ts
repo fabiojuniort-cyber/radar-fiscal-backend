@@ -143,7 +143,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
           html_sha256,current_fragments_sha256,catalog_edition_id,catalog_sha256,
           run_fingerprint,source_field,candidate_count,match_count,outcome
         ) VALUES (
-          ${versionId}::uuid,'tribusca.taxonomy.ncm','1.3.0',
+          ${versionId}::uuid,'ncm.catalog.regex','1.3.0',
           ${firstProof.attestationId}::uuid,${d0}::date,${firstProof.recheckOn}::date,
           'COMPLETE',${h(html)},${h(JSON.stringify(firstProof.currentFragments))},
           ${edition0.id}::uuid,${edition0.checksum},${fingerprint0},
