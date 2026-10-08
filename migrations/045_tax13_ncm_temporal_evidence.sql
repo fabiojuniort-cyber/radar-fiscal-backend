@@ -525,6 +525,37 @@ BEGIN
        OR record_.match_count <> expected_matches
        OR found_codes <> expected_matches
     THEN RETURN FALSE; END IF;
+    -- A distinct-count check alone would accept omitted occurrences when the
+    -- same valid NCM appears in two separate CURRENT fragments. Compare the
+    -- exact set of (fragment_index, NCM) pairs, not only unique codes.
+    IF EXISTS (
+      WITH expected_pairs AS (
+        SELECT DISTINCT (f.ordinality - 1)::integer AS fragment_index,
+          extracted.code AS ncm_code
+        FROM jsonb_array_elements_text(fragments) WITH ORDINALITY AS
+          f(fragment, ordinality)
+        CROSS JOIN LATERAL public.tax13_ncm_detect_codes(f.fragment) extracted
+        WHERE EXISTS (
+          SELECT 1 FROM public.official_catalog_entries e
+          WHERE e.catalog_edition_id=record_.catalog_edition_id
+            AND regexp_replace(e.official_code,'[^0-9]','','g')=extracted.code
+            AND coalesce(e.metadata->>'assignable','false')='true'
+            AND (nullif(e.metadata->>'normalizedValidFrom','') IS NULL
+              OR (e.metadata->>'normalizedValidFrom')::date<=record_.legal_as_of)
+            AND (nullif(e.metadata->>'normalizedValidTo','') IS NULL
+              OR (e.metadata->>'normalizedValidTo')::date>=record_.legal_as_of)
+        )
+      ), stored_pairs AS (
+        SELECT DISTINCT fragment_index, ncm_code::text AS ncm_code
+        FROM public.publication_ncm_scan_evidence_codes
+        WHERE scan_evidence_id=p_scan
+      )
+      SELECT 1
+      FROM expected_pairs e
+      FULL OUTER JOIN stored_pairs s
+        ON s.fragment_index=e.fragment_index AND s.ncm_code=e.ncm_code
+      WHERE e.ncm_code IS NULL OR s.ncm_code IS NULL
+    ) THEN RETURN FALSE; END IF;
     FOR item IN SELECT * FROM public.publication_ncm_scan_evidence_codes
                 WHERE scan_evidence_id=p_scan
     LOOP
