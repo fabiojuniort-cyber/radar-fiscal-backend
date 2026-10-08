@@ -5,12 +5,16 @@
 -- app, curator or worker can fabricate/modify a legal status in SQL.
 CREATE TABLE public.publication_legal_scope_attestations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    publication_version_id UUID NOT NULL
-        REFERENCES public.publication_versions(id) ON DELETE RESTRICT,
+    -- Deliberately no physical FK from this immutable derived audit history
+    -- to publication_versions or publication_origins. The DOE-SP guarded
+    -- rebuild may delete/recreate canonical versions/origins, and explicitly
+    -- aborts when previously unknown canonical FKs appear. The INSERT trigger
+    -- verifies the references against both canonical tables instead; the
+    -- worker's RLS/reader joins prevent accepting a deleted/stale version.
+    publication_version_id UUID NOT NULL,
     source_id UUID NOT NULL
         REFERENCES public.sources(id) ON DELETE RESTRICT,
-    publication_origin_id UUID NOT NULL
-        REFERENCES public.publication_origins(id) ON DELETE RESTRICT,
+    publication_origin_id UUID NOT NULL,
     official_url TEXT NOT NULL
         CHECK (official_url ~ '^https://[^[:space:]]+$'),
     html_sha256 CHAR(64) NOT NULL
