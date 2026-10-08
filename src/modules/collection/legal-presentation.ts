@@ -166,6 +166,21 @@ function isRevokedPlaceholder(text: string): boolean {
 }
 
 /**
+ * Standalone act identifiers and editorial references occur in portals that
+ * do not expose the CONFAZ-specific CSS classes. This does NOT establish that
+ * any other segment is in force; positive vigência still needs source evidence.
+ */
+const ACT_IDENTIFIER_HEADING =
+  /^(?:lei(?:\s+complementar)?|decreto(?:-lei)?|portaria|instrução\s+normativa(?:\s+[A-Z]{2,8})?|resolução(?:\s+[A-Z]{2,8})?|convênio(?:\s+icms)?|ajuste\s+sinief|ato\s+cotepe(?:\/icms)?|medida\s+provisória)\s+(?:n[ºo°.]?\s*)?\d+(?:[./-]\d+)*(?:\s*,?\s+de\s+\d{1,2}\s+de\s+[\p{L}]+\s+de\s+\d{4})?\.?$/iu;
+const EDITORIAL_REFERENCE_LINE =
+  /^(?:publicad[oa]s?\s+(?:no|na|em)|ratificad[oa]s?\s+(?:no|na|pel[oa]s?)|alterad[oa]s?\s+(?:pel[oa]s?|por)|prorrogad[oa]s?\s+at[eé]|vide\s+(?:o|a|os|as|cl[áa]usula|art)|redação\s+anterior\b|texto\s+anterior\b|nova\s+redação\s+dada\s+pel[oa])/iu;
+
+function isNonNormativeStandaloneLine(text: string): boolean {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  return ACT_IDENTIFIER_HEADING.test(clean) || EDITORIAL_REFERENCE_LINE.test(clean);
+}
+
+/**
  * Annex headings are metadata, not a taxonomy hit. A revoked or historical
  * annex suppresses its contents until the next annex heading, including rows
  * whose HTML class is indistinguishable from the current version. An active
@@ -435,7 +450,7 @@ export function currentWordingText(html: string | null | undefined): string | un
         const row = [...frames].reverse().find((frame) => frame.tag === 'tr');
         if (previous && row) row.excluded = true;
 
-        if (tag === 'tr' || tag === 'p' || excluded || status !== undefined) {
+        if (tag === 'tr' || tag === 'p' || /^h[1-6]$/.test(tag) || excluded || status !== undefined) {
           // A source adapter can exclude a single cell/item using its own
           // status. CONFAZ previous-wording table styles remain row-scoped.
           frames.push({ tag, text: '', excluded, historical });
@@ -454,13 +469,15 @@ export function currentWordingText(html: string | null | undefined): string | un
           return;
         }
         const frame = frames.pop()!;
-        if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
+        const standalone = frame.tag === 'p' || /^h[1-6]$/.test(frame.tag);
+        const editorial = standalone && isNonNormativeStandaloneLine(frame.text);
+        if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text)) && !editorial) {
           append(frame.text + separator);
         } else if (frame.historical && ANNEX_HEADING.test(frame.text.trim())) {
           // Preserve an excluded annex heading only as a boundary signal.
           // excludeHistoricalAnnexes consumes it before evidence is returned.
           append(frame.text + ' — redação anterior\n');
-        } else if (frame.tag === 'p' && isRevokedPlaceholder(frame.text)) {
+        } else if (editorial || (frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
           filtered = true;
         }
       },
@@ -470,11 +487,13 @@ export function currentWordingText(html: string | null | undefined): string | un
   parser.end(html);
   while (frames.length > 0) {
     const frame = frames.pop()!;
-    if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
+    const standalone = frame.tag === 'p' || /^h[1-6]$/.test(frame.tag);
+    const editorial = standalone && isNonNormativeStandaloneLine(frame.text);
+    if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text)) && !editorial) {
       append(frame.text);
     } else if (frame.historical && ANNEX_HEADING.test(frame.text.trim())) {
       append(frame.text + ' — redação anterior\n');
-    } else if (frame.tag === 'p' && isRevokedPlaceholder(frame.text)) {
+    } else if (editorial || (frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
       filtered = true;
     }
   }
