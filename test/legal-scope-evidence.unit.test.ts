@@ -421,3 +421,55 @@ test('TAX13 preserves legal revocation language when it is operative normative t
   assert.equal(result.valid, true);
   assert.deepEqual(result.currentFragments, [phrase]);
 });
+
+test('TAX13 R2 BLOCK-03 propagates revoked TH attributes beyond the heading and nested P', () => {
+  const cases = [
+    '<table><tr><th data-legal-status="revoked"><p>ANEXO II</p></th></tr>' +
+      '<tr><td><p>NCM 8451.21.00</p></td></tr></table>',
+    '<table><tr><td data-legal-status="previous"><p>ANEXO II</p></td></tr>' +
+      '<tr><td>NCM 8451.21.00</td></tr></table>',
+    '<table><tr><th data-legal-status="unverified"><strong>ANEXO</strong> II</th></tr>' +
+      '<tr><td>NCM 8451.21.00</td></tr></table>',
+  ];
+  for (const legalHtml of cases) {
+    const plain = renderedLegalText(legalHtml);
+    const phrase = 'NCM 8451.21.00';
+    const start = plain.indexOf(phrase);
+    assert.ok(start >= 0, legalHtml);
+    const row = manifest();
+    row.htmlSha256 = digest(legalHtml);
+    row.segments = [{
+      start, end: start + phrase.length,
+      textSha256: digest(phrase), status: 'CURRENT',
+      method: 'OFFICIAL_CONSOLIDATION', evidenceUrls: [ctx.officialUrl],
+    }];
+    const checked = validateLegalScopeEvidence(row, {
+      ...ctx, sanitizedHtml: legalHtml,
+    });
+    assert.equal(checked.reason, 'CURRENT_IN_NON_NORMATIVE_SCOPE', legalHtml);
+    assert.deepEqual(checked.currentFragments, [], legalHtml);
+  }
+});
+
+test('TAX13 R2 BLOCK-03 resets exclusion on a new independently identified annex', () => {
+  const legalHtml = [
+    '<table><tr><th data-legal-status="revoked"><p>ANEXO II</p></th></tr>',
+    '<tr><td>8451.21.00</td></tr></table>',
+    '<p><strong>ANEXO</strong> III</p>',
+    '<table><tr><td>3102.10.90</td></tr></table>',
+  ].join('');
+  const phrase = '3102.10.90';
+  const start = renderedLegalText(legalHtml).indexOf(phrase);
+  const row = manifest();
+  row.htmlSha256 = digest(legalHtml);
+  row.segments = [{
+    start, end: start + phrase.length,
+    textSha256: digest(phrase), status: 'CURRENT',
+    method: 'OFFICIAL_CONSOLIDATION', evidenceUrls: [ctx.officialUrl],
+  }];
+  const checked = validateLegalScopeEvidence(row, {
+    ...ctx, sanitizedHtml: legalHtml,
+  });
+  assert.equal(checked.valid, true);
+  assert.deepEqual(checked.currentFragments, [phrase]);
+});
