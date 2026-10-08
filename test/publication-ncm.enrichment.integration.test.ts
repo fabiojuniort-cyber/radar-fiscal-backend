@@ -31,7 +31,7 @@ function runtimeUrl(databaseUrl: string, password: string): string {
 
 async function createPublicationFixture(
   admin: Pool,
-  input: { title: string; publishedOn: string; text: string },
+  input: { title: string; publishedOn: string; text: string; scoped?: boolean },
 ): Promise<{ publicationId: string; versionId: string }> {
   const publication = await admin.query<{ id: string }>(
     `INSERT INTO publications (
@@ -49,13 +49,15 @@ async function createPublicationFixture(
 
   const version = await admin.query<{ id: string }>(
     `INSERT INTO publication_versions (
-       publication_id, version_no, content_hash, content_text, is_current
-     ) VALUES ($1::uuid, 1, $2, $3, TRUE)
+       publication_id, version_no, content_hash, content_text, source_metadata, is_current
+     ) VALUES ($1::uuid, 1, $2, $3, $4::jsonb, TRUE)
      RETURNING id`,
     [
       publicationId,
       createHash('sha256').update(input.text).digest('hex'),
       input.text,
+      JSON.stringify({presentation: {html: input.scoped === false ? null :
+        '<p class="TituloAcordo">CONVÊNIO ICMS — fixture</p><p class="TextoAcordo">' + input.text + '</p>'}}),
     ],
   );
 
