@@ -502,6 +502,20 @@ export async function classifySinglePublication(
       AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
       AND status = 'SUCCESS'
       AND (scanned_at AT TIME ZONE 'America/Sao_Paulo')::date = ${asOf}::date
+      AND scanned_at >= (
+        SELECT MAX(a.created_at)
+        FROM public.publication_legal_scope_attestations a
+        WHERE a.publication_version_id = ${row.publication_version_id}::uuid
+          AND a.valid_as_of = ${asOf}::date
+          AND a.recheck_on > ${asOf}::date
+          AND a.coverage = 'COMPLETE'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.publication_legal_scope_attestations newer
+        WHERE newer.publication_version_id = ${row.publication_version_id}::uuid
+          AND newer.valid_as_of = ${asOf}::date
+          AND newer.created_at > scanned_at
+      )
     LIMIT 1
   `.execute(db);
   const ncmScanned = ncmScan.rows[0]?.status === 'SUCCESS';
