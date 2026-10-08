@@ -92,7 +92,7 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.equal(byCode.get('product.rice')!.matchedTerm, '10063011');
   assert.equal(byCode.get('treatment.rate_reduction')!.reasonCode, 'OFFICIAL_CODE_CCLASSTRIB');
   assert.equal(byCode.get('treatment.rate_reduction')!.matchedTerm, '200034');
-  assert.equal(plan.engineVersion, '2.2.0');
+  assert.equal(plan.engineVersion, '2.3.0');
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
 });
 
