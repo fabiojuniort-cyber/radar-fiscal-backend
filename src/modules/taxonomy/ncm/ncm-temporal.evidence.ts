@@ -97,6 +97,15 @@ export async function readCurrentNcmEvidence(
       evidence.recheckOn <= evidence.asOf || evidence.currentSegments === 0) {
     return null;
   }
+  // A caller may hold a proof object from before a same-day supersession.
+  // Never trust that cached object: newest legal event wins at read time.
+  const latest = await sql<{ id: string }>`
+    SELECT a.id FROM public.publication_legal_scope_attestations a
+    WHERE a.publication_version_id=${publicationVersionId}::uuid
+      AND a.valid_as_of=${evidence.asOf}::date
+    ORDER BY a.created_at DESC, a.id DESC LIMIT 1
+  `.execute(db);
+  if (latest.rows[0]?.id !== evidence.attestationId) return null;
   const edition = await currentNcmEdition(db, evidence.asOf);
   const fingerprint = ncmTemporalFingerprint(publicationVersionId, evidence, edition);
   const run = await sql<{ id: string }>`
