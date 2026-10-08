@@ -346,15 +346,21 @@ CREATE FUNCTION public.tax13_effective_attestation_id(
     p_version UUID, p_as_of DATE
 ) RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp AS $$
-    SELECT CASE WHEN count(*) = 1 THEN max(a.id) ELSE NULL END
-    FROM public.publication_legal_scope_attestations a
-    WHERE a.publication_version_id=p_version AND a.valid_as_of=p_as_of
-      AND NOT EXISTS (
-        SELECT 1 FROM public.publication_legal_scope_attestations child
-        WHERE child.supersedes_attestation_id=a.id
-          AND child.publication_version_id=a.publication_version_id
-          AND child.valid_as_of=a.valid_as_of
-      );
+    WITH terminal AS (
+      SELECT a.id,a.created_at
+      FROM public.publication_legal_scope_attestations a
+      WHERE a.publication_version_id=p_version AND a.valid_as_of=p_as_of
+        AND NOT EXISTS (
+          SELECT 1 FROM public.publication_legal_scope_attestations child
+          WHERE child.supersedes_attestation_id=a.id
+            AND child.publication_version_id=a.publication_version_id
+            AND child.valid_as_of=a.valid_as_of
+        )
+    ), newest AS (
+      SELECT id FROM terminal
+      WHERE created_at=(SELECT max(created_at) FROM terminal)
+    )
+    SELECT CASE WHEN count(*)=1 THEN max(id) ELSE NULL END FROM newest;
 $$;
 
 -- PostgreSQL has no htmlparser2. Re-derive the legal DOM's text from the
