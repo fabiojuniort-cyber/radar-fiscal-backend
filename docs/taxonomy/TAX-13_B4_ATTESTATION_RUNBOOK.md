@@ -28,7 +28,7 @@ node dist/infrastructure/database/tax13-attest-legal-scope-one.js \
   --reason=<governance-issue-and-review-evidence>
 ```
 
-Sem `--confirm`, apenas consulta e verifica, não escreve. Para gravar, exige **autorização operacional separada**, conexão `DATABASE_ADMIN_URL` e a configuração deliberada `TAX13_B4_ATTESTATION_WRITES_APPROVED=true`. Não permitir que Worker/API ou usuário de tenant acessem essa credencial. `--confirm` grava atestação e `audit_log` atomicamente, sem modificar eventos anteriores.
+Sem `--confirm`, apenas consulta e verifica, não escreve. No diagnóstico NCM direcionado, **`inForceCount` só reflete trechos com atestação válida**; candidatos heurísticos de HTML não verificado aparecem exclusivamente em `unverifiedHeuristicPreview`, jamais como vigentes. Para gravar, exige **autorização operacional separada**, conexão `DATABASE_ADMIN_URL` e a configuração deliberada `TAX13_B4_ATTESTATION_WRITES_APPROVED=true`. Não permitir que Worker/API ou usuário de tenant acessem essa credencial. `--confirm` grava atestação e `audit_log` atomicamente, sem modificar eventos anteriores.
 
 Na implantação, exigir dois revisores ou aprovação formal auditada (o CLI por si só **não** verifica independência do revisor). Registrar URLs oficiais verificadas, hash e dispositivo/ato alterador; anexos não conferidos devem receber `UNVERIFIED` e não produzir NCM/tag. Retirar autorização operacional ao concluir.
 
