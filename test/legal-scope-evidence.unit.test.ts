@@ -115,3 +115,11 @@ test('TAX13 B4 allows recorded UNVERIFIED fragment but never promotes it to curr
   assert.equal(result.currentText,'');
   assert.equal(result.currentSegments,0);
 });
+
+test('TAX13 B4 fails closed on malformed persisted evidence JSON', () => {
+  const invalid = manifest() as unknown as { segments: unknown };
+  invalid.segments = null;
+  assert.equal(validateLegalScopeEvidence(invalid as unknown as LegalScopeEvidenceV1, ctx).reason, 'INVALID_SEGMENTS');
+  invalid.segments = [null];
+  assert.equal(validateLegalScopeEvidence(invalid as unknown as LegalScopeEvidenceV1, ctx).reason, 'INVALID_SEGMENT');
+});
