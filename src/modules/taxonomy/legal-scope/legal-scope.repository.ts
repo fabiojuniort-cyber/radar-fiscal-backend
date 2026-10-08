@@ -93,28 +93,10 @@ export async function readVerifiedLegalScope(
     WHERE a.publication_version_id = ${input.publicationVersionId}::uuid
       AND a.valid_as_of = ${input.asOf}::date
       AND public.publication_scope_is_in_scope(pv.publication_id)
-      -- An explicit supersession outranks UUID/timestamp ordering, even
-      -- when both events were committed with the same transaction timestamp.
-      AND NOT EXISTS (
-        SELECT 1 FROM public.publication_legal_scope_attestations successor
-        WHERE successor.supersedes_attestation_id = a.id
-          AND successor.publication_version_id = a.publication_version_id
-          AND successor.valid_as_of = a.valid_as_of
+      AND a.id = public.tax13_effective_attestation_id(
+        ${input.publicationVersionId}::uuid, ${input.asOf}::date
       )
-      -- Competing terminal branches are ambiguous: fail closed rather than
-      -- selecting an arbitrary "latest" UUID as a legal authority.
-      AND (
-        SELECT count(*) FROM public.publication_legal_scope_attestations terminal
-        WHERE terminal.publication_version_id = a.publication_version_id
-          AND terminal.valid_as_of = a.valid_as_of
-          AND NOT EXISTS (
-            SELECT 1 FROM public.publication_legal_scope_attestations child
-            WHERE child.supersedes_attestation_id = terminal.id
-              AND child.publication_version_id = terminal.publication_version_id
-              AND child.valid_as_of = terminal.valid_as_of
-          )
-      ) = 1
-    LIMIT 1
+        LIMIT 1
   `.execute(db);
 
   return verifyPersistedLegalScopeRow(result.rows[0], input);
