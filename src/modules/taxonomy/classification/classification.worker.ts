@@ -399,7 +399,8 @@ export async function processPublicationTaxonomyBatch(
       const plan = planCuratedClassification({
         publicationVersionId: row.publication_version_id,
         taxonomyReleaseId: release.id,
-        title: row.title,
+        // Editorial titles are not independently attested CURRENT evidence.
+        title: '',
         contentText: verified.currentText,
         ncmCodes: await ncmCodesFor(db, row.publication_version_id),
         concepts,
@@ -487,7 +488,8 @@ export async function classifySinglePublication(
   const plan = planCuratedClassification({
     publicationVersionId: row.publication_version_id,
     taxonomyReleaseId: input.releaseId,
-    title: row.title,
+    // Editorial titles are not independently attested CURRENT evidence.
+        title: '',
     contentText: scopeCurrent ? verified.currentText : null,
     ncmCodes: scopeCurrent ? await ncmCodesFor(db, row.publication_version_id) : [],
     concepts,
