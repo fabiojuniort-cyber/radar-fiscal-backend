@@ -209,6 +209,55 @@ test('historical annex alone does not fall back to full legal text', () => {
   assert.equal(selected.text, '');
 });
 
+test('source-verified segment statuses preserve valid cells and suppress historical cells in a mixed annex', () => {
+  const html = sanitizeLegalPresentationHtml([
+    '<p class="TituloAcordo">LEI COMPLEMENTAR 214/2025</p>',
+    '<p data-legal-status="editorial">Historico fiscal, NCM 8701.90.00.</p>',
+    '<p data-legal-status="current">Art. 1º Aplica-se a fertilizantes 3102.10.90.</p>',
+    '<p>ANEXO I</p>',
+    '<table><tr>',
+    '<td data-legal-status="previous">Produto antigo 1006.30.11</td>',
+    '<td data-legal-status="current">Produto vigente 3925.10.00</td>',
+    '</tr></table>',
+    '<p data-legal-status="unverified">Vigência pendente: 7612.90.19.</p>',
+  ].join(''))!;
+  assert.match(html, /data-legal-status="previous"/);
+  assert.match(html, /data-legal-status="current"/);
+  const extracted = currentWordingText(html)!;
+  assert.match(extracted, /3102\.10\.90|3925\.10\.00/);
+  assert.doesNotMatch(extracted, /8701\.90\.00|1006\.30\.11|7612\.90\.19|LEI COMPLEMENTAR|ANEXO I/);
+  assert.deepEqual(
+    extractNcmCandidates(extracted).map((item) => item.code),
+    ['31021090', '39251000'],
+  );
+});
+
+test('an excluded source-verified annex heading suppresses following unstyled rows until the next annex', () => {
+  const html = [
+    '<p data-legal-status="previous">ANEXO II</p>',
+    '<table><tr><td>Histórico 8701.90.00</td></tr></table>',
+    '<p>ANEXO III</p>',
+    '<table><tr><td>Operativo 3102.10.90</td></tr></table>',
+  ].join('');
+  const selected = currentWordingText(html)!;
+  assert.match(selected, /Operativo 3102\.10\.90/);
+  assert.doesNotMatch(selected, /Histórico 8701\.90\.00|ANEXO II|ANEXO III/);
+});
+
+test('unknown or uncertain legal status cannot become affirmative evidence', () => {
+  const html = sanitizeLegalPresentationHtml(
+    '<p data-legal-status="unverified">NCM 8701.90.00</p>' +
+    '<p data-legal-status="current">Produtos vigentes 3102.10.90</p>',
+  )!;
+  const text = currentWordingText(html)!;
+  assert.match(text, /3102\.10\.90/);
+  assert.doesNotMatch(text, /8701\.90\.00/);
+  assert.deepEqual(
+    extractNcmCandidates(text).map((item) => item.code),
+    ['31021090'],
+  );
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
