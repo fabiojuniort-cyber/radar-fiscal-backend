@@ -160,6 +160,12 @@ export async function persistTemporalNcmScan(
       FROM public.official_catalog_entries e
       WHERE e.catalog_edition_id=${edition.id}::uuid
         AND coalesce(e.metadata ->> 'assignable', 'false')='true'
+        -- An entry may be revoked within a still CURRENT catalog edition.
+        -- The portal importer persists normalized validity as ISO dates.
+        AND (nullif(e.metadata ->> 'normalizedValidFrom', '') IS NULL
+          OR (e.metadata ->> 'normalizedValidFrom')::date <= ${input.asOf}::date)
+        AND (nullif(e.metadata ->> 'normalizedValidTo', '') IS NULL
+          OR (e.metadata ->> 'normalizedValidTo')::date >= ${input.asOf}::date)
         AND regexp_replace(e.official_code, '[^0-9]', '', 'g')=ANY(${uniqueCandidates}::text[])
     `.execute(trx);
   const byCode = new Map(found.rows.map((row) => [row.code, row.id]));
