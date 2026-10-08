@@ -17,6 +17,7 @@ import {
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
+  extractNcmCandidates,
 } from '../ncm/publication-ncm.detector.js';
 import {
   CURATED_ENGINE_KEY,
@@ -174,6 +175,11 @@ async function ncmCodesFor(
   publicationVersionId: string,
   verifiedCurrentFragments: readonly string[],
 ): Promise<string[]> {
+  // Scope CURRENT is recalculated for the actual reference date.
+  // Stored legacy mentions cannot act as affirmative evidence on another day.
+  const codes = new Set(verifiedCurrentFragments.flatMap((fragment) =>
+    extractNcmCandidates(fragment).map((candidate) => candidate.code)));
+  if (codes.size === 0) return [];
   const result = await sql<{ ncm_code: string }>`
     SELECT DISTINCT ncm_code
     FROM publication_ncm_mentions
@@ -182,7 +188,8 @@ async function ncmCodesFor(
       AND detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
       AND detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
   `.execute(db);
-  return result.rows.map((row) => row.ncm_code);
+  return result.rows.map((row) => row.ncm_code)
+    .filter((code) => codes.has(code));
 }
 
 async function persistSuccess(
