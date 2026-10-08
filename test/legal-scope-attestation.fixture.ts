@@ -38,7 +38,9 @@ export async function seedTestLegalScopeAttestation(
   const origin=await admin.query<{id:string}>(`
     INSERT INTO public.publication_origins(publication_id,source_id,official_url)
     VALUES ($1::uuid,$2::uuid,$3)
-    ON CONFLICT (source_id,official_url) DO UPDATE SET last_seen_at=now()
+    ON CONFLICT (source_id,official_url)
+    WHERE metadata->>'officialUrlGranularity' IS DISTINCT FROM 'PAGE'
+    DO UPDATE SET last_seen_at=now()
     RETURNING id
   `,[row.publication_id,sourceId,url]);
 
