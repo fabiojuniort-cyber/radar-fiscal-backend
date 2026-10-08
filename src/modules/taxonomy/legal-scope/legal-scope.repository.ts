@@ -12,7 +12,7 @@ import {
  * remote HTML, source_metadata or a tenant-editable table.
  * Enable additional portals only with their own source adapter/evidence tests.
  */
-const OFFICIAL_EVIDENCE_HOSTS: Readonly<Record<string, readonly string[]>> = {
+export const OFFICIAL_EVIDENCE_HOSTS: Readonly<Record<string, readonly string[]>> = {
   confaz: ['www.confaz.fazenda.gov.br'],
 };
 
