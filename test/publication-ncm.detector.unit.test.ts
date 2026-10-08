@@ -69,10 +69,11 @@ test('selectText reads only the wording in force when the page marks previous wo
     extractNcmCandidates(selected.text).map((candidate) => candidate.code),
     ['39173290', '39251000'],
   );
-  // Without previous-wording marks the stored content text is kept.
+  // Without verified legal scope, raw stored text is not classification evidence.
   const plain = selectText({ ...row, presentation_html: '<p class="TextoAcordo">8701.90.00</p>' });
   assert.equal(plain.currentWordingOnly, false);
-  assert.equal(plain.text, row.content_text);
+  assert.equal(plain.text, '');
+  assert.equal(plain.sourceField, 'NONE');
 });
 
 test('selectText excludes CONFAZ title, ementa, history and editorial notes', () => {
@@ -319,8 +320,8 @@ test('R2 B1 mixed CONFAZ historical paragraph cannot suppress current sibling NC
     '</tr></table>',
   ].join('');
   const text = currentWordingText(html) ?? '';
-  assert.match(text, /7307\\.19\\.20/);
-  assert.doesNotMatch(text, /8450\\.11\\.00/);
+  assert.ok(text.includes('7307.19.20'));
+  assert.ok(!text.includes('8450.11.00'));
   assert.deepEqual(extractNcmCandidates(text).map(item => item.code), ['73071920']);
 });
 
@@ -331,8 +332,8 @@ test('R2 B3 revoked annex in TH excludes following rows until next TH annex', ()
     '<tr><th>ANEXO III</th></tr><tr><td>7307.19.20</td></tr></table>',
   ].join('');
   const text = currentWordingText(html) ?? '';
-  assert.match(text, /7307\\.19\\.20/);
-  assert.doesNotMatch(text, /8450\\.11\\.00|ANEXO II|ANEXO III/);
+  assert.ok(text.includes('7307.19.20'));
+  assert.ok(!text.includes('8450.11.00') && !text.includes('ANEXO II') && !text.includes('ANEXO III'));
 });
 
 test('R2 B2 NCM detector fails closed on missing, raw, oversized, or unmarked HTML', () => {
