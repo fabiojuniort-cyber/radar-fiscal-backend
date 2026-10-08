@@ -310,6 +310,43 @@ test('an unverified annex heading prevents classification of all following unmar
   assert.deepEqual(extractNcmCandidates(text).map(row => row.code), ['31021090', '39251000']);
 });
 
+test('R2 B1 mixed CONFAZ historical paragraph cannot suppress current sibling NCM', () => {
+  const html = [
+    '<p class="TituloAcordo">CONVÊNIO ICMS 52/91</p>',
+    '<table><tr>',
+    '<td><p class="A9-2Tabelajustificadoverde">8450.11.00</p></td>',
+    '<td data-legal-status="current">7307.19.20 — produto atual</td>',
+    '</tr></table>',
+  ].join('');
+  const text = currentWordingText(html) ?? '';
+  assert.match(text, /7307\\.19\\.20/);
+  assert.doesNotMatch(text, /8450\\.11\\.00/);
+  assert.deepEqual(extractNcmCandidates(text).map(item => item.code), ['73071920']);
+});
+
+test('R2 B3 revoked annex in TH excludes following rows until next TH annex', () => {
+  const html = [
+    '<table><tr><th data-legal-status="revoked">ANEXO II</th></tr>',
+    '<tr><td>8450.11.00</td></tr>',
+    '<tr><th>ANEXO III</th></tr><tr><td>7307.19.20</td></tr></table>',
+  ].join('');
+  const text = currentWordingText(html) ?? '';
+  assert.match(text, /7307\\.19\\.20/);
+  assert.doesNotMatch(text, /8450\\.11\\.00|ANEXO II|ANEXO III/);
+});
+
+test('R2 B2 NCM detector fails closed on missing, raw, oversized, or unmarked HTML', () => {
+  const row = {publication_version_id: 'r2', content_text: 'historical 8450.11.00', relevant_excerpt: 'past 8701.90.00', presentation_html: null as string | null};
+  for (const presentation_html of [null, '<p>8450.11.00</p>', '<p data-legal-status="invalid">8450.11.00</p>']) {
+    const result = selectText({ ...row, presentation_html });
+    assert.equal(result.text, '');
+    assert.equal(result.sourceField, 'NONE');
+    assert.deepEqual(extractNcmCandidates(result.text), []);
+  }
+  const excerptOnly = selectText({ ...row, content_text: null, presentation_html: null });
+  assert.equal(excerptOnly.sourceField, 'NONE');
+});
+
 test('saved official Convênios 100/97 and 52/91 preserve current body and ignore historical annex NCM', () => {
   const conv100 = readFileSync('ops/confaz/acts/CV100_97.html', 'utf8');
   const conv52 = readFileSync('ops/confaz/acts/CV052_91.html', 'utf8');
