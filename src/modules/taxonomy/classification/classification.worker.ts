@@ -1,7 +1,8 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
-import { currentWordingText } from '../../collection/legal-presentation.js';
+import { brazilLegalReferenceDate } from '../legal-scope/legal-scope-evidence.js';
+import { readVerifiedLegalScope } from '../legal-scope/legal-scope.repository.js';
 import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
@@ -390,13 +391,23 @@ export async function processPublicationTaxonomyBatch(
   );
   result.selected = pending.length;
 
+  const asOf = brazilLegalReferenceDate();
   for (const row of pending) {
     try {
+      const verified = await readVerifiedLegalScope(db, {
+        publicationVersionId: row.publication_version_id,
+        sanitizedHtml: row.presentation_html ?? '',
+        asOf,
+      });
+      // Never seal zero assertions or reclassify the archive from an
+      // unverified headline, revoked wording, or stale attestation.
+      // The publication remains pending, preserving previous releases.
+      if (!verified.valid || verified.currentSegments === 0) continue;
       const plan = planCuratedClassification({
         publicationVersionId: row.publication_version_id,
         taxonomyReleaseId: release.id,
         title: row.title,
-        contentText: classificationText(row),
+        contentText: verified.currentText,
         ncmCodes: await ncmCodesFor(db, row.publication_version_id),
         concepts,
         codeGitSha: options.codeGitSha ?? null,
@@ -468,13 +479,24 @@ export async function classifySinglePublication(
   const ncmScanned = ncmScan.rows[0]?.status === 'SUCCESS';
   if (input.persist && !ncmScanned) throw new Error('NCM_SCAN_NOT_SUCCESS');
 
+  const verified = await readVerifiedLegalScope(db, {
+    publicationVersionId: row.publication_version_id,
+    sanitizedHtml: row.presentation_html ?? '',
+    asOf: brazilLegalReferenceDate(),
+  });
+  const scopeCurrent = verified.valid && verified.currentSegments > 0;
+  if (input.persist && !scopeCurrent) {
+    throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
+      (verified.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
+  }
+
   const concepts = await loadClassificationConcepts(db, input.releaseId);
   const plan = planCuratedClassification({
     publicationVersionId: row.publication_version_id,
     taxonomyReleaseId: input.releaseId,
     title: row.title,
-    contentText: classificationText(row),
-    ncmCodes: await ncmCodesFor(db, row.publication_version_id),
+    contentText: scopeCurrent ? verified.currentText : null,
+    ncmCodes: scopeCurrent ? await ncmCodesFor(db, row.publication_version_id) : [],
     concepts,
     codeGitSha: input.codeGitSha ?? null,
   });
