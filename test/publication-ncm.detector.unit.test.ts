@@ -294,6 +294,20 @@ test('a revoked cell in a mixed annex row is not classification evidence', () =>
   );
 });
 
+test('an unverified annex heading prevents classification of all following unmarked rows', () => {
+  const html = [
+    '<p>Art. 1º: sementes com NCM 3102.10.90.</p>',
+    '<p data-legal-status="unverified">ANEXO II</p>',
+    '<table><tr><td>Vigência não confirmada: 8701.90.00</td></tr></table>',
+    '<p>ANEXO III</p>',
+    '<table><tr><td>Produto da nova seção: 3925.10.00</td></tr></table>',
+  ].join('');
+  const text = currentWordingText(html) ?? '';
+  assert.doesNotMatch(text, /8701\.90\.00|ANEXO II|ANEXO III/);
+  assert.match(text, /3102\.10\.90|3925\.10\.00/);
+  assert.deepEqual(extractNcmCandidates(text).map(row => row.code), ['31021090', '39251000']);
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
