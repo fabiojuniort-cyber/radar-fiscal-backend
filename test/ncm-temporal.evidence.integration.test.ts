@@ -131,6 +131,14 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     assert.equal(first.matches, 1);
     assert.deepEqual((await readCurrentNcmEvidence(worker, versionId, firstProof))?.codes,
       ['10063011']);
+    // Read-only bridge serves the exact same vetted current scan, without
+    // granting radar_app direct SELECT on the legal or NCM evidence tables.
+    const bridge0 = await admin.query<{ fingerprint: string | null; code: string }>(`
+      SELECT public.tax13_current_ncm_scan_fingerprint($1::uuid) AS fingerprint,
+        (SELECT ncm_code FROM public.tax13_public_current_ncm_codes($1::uuid) LIMIT 1) AS code`,
+      [versionId]);
+    assert.match(bridge0.rows[0]!.fingerprint!, /^[a-f0-9]{64}$/);
+    assert.equal(bridge0.rows[0]?.code, '10063011');
     assert.equal((await rescan(d0)).inserted, false, 'same fingerprint is idempotent');
 
     // Same document/version, different legal reference date; a D0 result is
@@ -138,6 +146,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     const a1 = await attest(d1, ['EDITORIAL','REVOKED','CURRENT','REVOKED'], 'COMPLETE', a0);
     const tomorrowProof = await readProof(d1);
     assert.equal(tomorrowProof.valid, true, tomorrowProof.reason ?? undefined);
+    assert.equal(tomorrowProof.attestationId, a1);
     assert.equal(await readCurrentNcmEvidence(worker, versionId, tomorrowProof), null);
     const [race1, race2] = await Promise.all([rescan(d1), rescan(d1)]);
     assert.equal([race1.inserted, race2.inserted].filter(Boolean).length, 1,
@@ -172,6 +181,34 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     assert.equal(partial.coverage, 'PARTIAL');
     assert.equal(await readCurrentNcmEvidence(worker, versionId, partial), null);
     await assert.rejects(rescan(d0), /TAX13_NCM_COMPLETE_CURRENT_PROOF_REQUIRED/);
+    const bridgeStale = await admin.query<{ fingerprint: string | null }>(`
+      SELECT public.tax13_current_ncm_scan_fingerprint($1::uuid) AS fingerprint`, [versionId]);
+    assert.equal(bridgeStale.rows[0]!.fingerprint, null, 'same-day PARTIAL invalidates API projection');
+    const hashDrift = await readVerifiedLegalScope(worker, {
+      publicationVersionId: versionId, sanitizedHtml: '<p>drift</p>', asOf: d0,
+    });
+    assert.equal(hashDrift.valid, false, 'HTML drift must fail closed');
+
+    // Real scope state transition hides even immutable historical scan rows
+    // from the worker. RESTORE re-exposes history without forging CURRENT.
+    const transition = `SELECT * FROM public.apply_publication_scope_transition(
+      $1::uuid,$2,$3::uuid,$4::uuid,'CONCURRENCY_TEST','CONTROLLED_RACE','test-v1',$5,NULL,'CI')`;
+    const suppressed = await admin.query<{ event_id: string }>(transition,
+      [publicationId, 'SUPPRESS', randomUUID(), null, h(publicationId)]);
+    const invisible = await worker.transaction().execute(async (trx) =>
+      trx.selectFrom('publication_versions').select('id')
+        .where('id', '=', versionId).execute());
+    assert.ok(invisible.length === 1, 'canonical versions may remain stored');
+    const workerRows = await worker.transaction().execute(async (trx) => {
+      const { sql } = await import('kysely');
+      return sql<{ count: number }>`SELECT count(*)::int AS count
+        FROM public.publication_ncm_scan_evidence
+        WHERE publication_version_id=${versionId}::uuid`.execute(trx);
+    });
+    assert.equal(workerRows.rows[0]!.count, 0);
+    await assert.rejects(rescan(d0), /PUBLICATION_OUT_OF_SCOPE/);
+    await admin.query(transition,
+      [publicationId, 'RESTORE', randomUUID(), suppressed.rows[0]!.event_id, h(publicationId)]);
 
     const immutable = await admin.query<{ id: string }>(`
       SELECT id FROM publication_ncm_scan_evidence
