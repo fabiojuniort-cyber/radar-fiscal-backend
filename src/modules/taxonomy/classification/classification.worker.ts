@@ -414,7 +414,7 @@ export async function processPublicationTaxonomyBatch(
         title: '',
         contentText: verified.currentText,
         verifiedCurrentFragments: verified.currentFragments,
-        ncmCodes: await ncmCodesFor(db, row.publication_version_id),
+        ncmCodes: await ncmCodesFor(db, row.publication_version_id, verified.currentFragments),
         concepts,
         codeGitSha: options.codeGitSha ?? null,
       });
