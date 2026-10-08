@@ -519,8 +519,6 @@ export async function classifySinglePublication(
     LIMIT 1
   `.execute(db);
   const ncmScanned = ncmScan.rows[0]?.status === 'SUCCESS';
-  if (input.persist && !ncmScanned) throw new Error('NCM_SCAN_NOT_SUCCESS');
-
   const verified = await readVerifiedLegalScope(db, {
     publicationVersionId: row.publication_version_id,
     sanitizedHtml: row.presentation_html ?? '',
@@ -538,6 +536,10 @@ export async function classifySinglePublication(
     throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
       (verified.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
   }
+
+  // Report a missing legal proof before the derivative NCM seal. A scan
+  // stamp never substitutes for an official scope attestation.
+  if (input.persist && !ncmScanned) throw new Error('NCM_SCAN_NOT_SUCCESS');
 
   const concepts = await loadClassificationConcepts(db, input.releaseId);
   const plan = planCuratedClassification({
