@@ -32,6 +32,7 @@ import {
 } from '../../modules/taxonomy/taxonomy-code-compatibility.js';
 import { notSupersededNcmMention } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
 import { currentWordingText, sanitizeLegalPresentationHtml } from '../../modules/collection/legal-presentation.js';
+import { unavailablePublicLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.public-projection.js';
 import {
   CnpjRegistryError,
   lookupCnpjRegistry,
@@ -2693,6 +2694,10 @@ export async function productRoutes(
                 ),
             }
           : null,
+        // Fail-closed public contract. The app role cannot read the audited
+        // legal-scope ledger (migration 044 grants SELECT only to radar_worker).
+        // No source_metadata/CSS/title/NCM/history can authorize a highlight.
+        legalScope: unavailablePublicLegalScope(row.version_id),
         origins: origins.map((origin) => ({
           sourceCode: origin.source_code,
           sourceName: origin.source_name,

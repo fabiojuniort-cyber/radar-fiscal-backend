@@ -558,7 +558,17 @@ test(
               amendedBy: string | null;
             } | null;
           };
+          legalScope: {
+            schemaVersion: number;
+            status: string;
+            reason: string;
+            referenceDate: string;
+            publicationVersionId: string | null;
+            highlightsAuthorized: boolean;
+            currentSegments: unknown[];
+          };
           version: {
+            id: string;
             contentText: string | null;
             presentation: {
               format: string;
@@ -572,6 +582,16 @@ test(
         detailBody.publication.id,
         archivePublicationId,
       );
+      assert.deepEqual(detailBody.legalScope, {
+        schemaVersion: 1,
+        status: 'UNVERIFIED',
+        reason: 'NO_AUTHORIZED_PUBLIC_ATTESTATION',
+        referenceDate: detailBody.legalScope.referenceDate,
+        publicationVersionId: detailBody.version?.id ?? null,
+        highlightsAuthorized: false,
+        currentSegments: [],
+      });
+      assert.match(detailBody.legalScope.referenceDate, /^\\d{4}-\\d{2}-\\d{2}$/);
       assert.equal(
         detailBody.publication.officialUrl,
         'https://example.test/ato-oficial',
