@@ -450,7 +450,7 @@ export function currentWordingText(html: string | null | undefined): string | un
         const row = [...frames].reverse().find((frame) => frame.tag === 'tr');
         if (previous && row) row.excluded = true;
 
-        if (tag === 'tr' || tag === 'p' || /^h[1-6]$/.test(tag) || excluded || status !== undefined) {
+        if (tag === 'tr' || tag === 'p' || tag === 'td' || tag === 'th' || /^h[1-6]$/.test(tag) || excluded || status !== undefined) {
           // A source adapter can exclude a single cell/item using its own
           // status. CONFAZ previous-wording table styles remain row-scoped.
           frames.push({ tag, text: '', excluded, historical });
@@ -471,13 +471,15 @@ export function currentWordingText(html: string | null | undefined): string | un
         const frame = frames.pop()!;
         const standalone = frame.tag === 'p' || /^h[1-6]$/.test(frame.tag);
         const editorial = standalone && isNonNormativeStandaloneLine(frame.text);
-        if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text)) && !editorial) {
+        const revokedCell = (frame.tag === 'p' || frame.tag === 'td' || frame.tag === 'th')
+          && isRevokedPlaceholder(frame.text);
+        if (!frame.excluded && !revokedCell && !editorial) {
           append(frame.text + separator);
         } else if (frame.historical && ANNEX_HEADING.test(frame.text.trim())) {
           // Preserve an excluded annex heading only as a boundary signal.
           // excludeHistoricalAnnexes consumes it before evidence is returned.
           append(frame.text + ' — redação anterior\n');
-        } else if (editorial || (frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
+        } else if (editorial || revokedCell) {
           filtered = true;
         }
       },
@@ -489,11 +491,13 @@ export function currentWordingText(html: string | null | undefined): string | un
     const frame = frames.pop()!;
     const standalone = frame.tag === 'p' || /^h[1-6]$/.test(frame.tag);
     const editorial = standalone && isNonNormativeStandaloneLine(frame.text);
-    if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text)) && !editorial) {
+    const revokedCell = (frame.tag === 'p' || frame.tag === 'td' || frame.tag === 'th')
+      && isRevokedPlaceholder(frame.text);
+    if (!frame.excluded && !revokedCell && !editorial) {
       append(frame.text);
     } else if (frame.historical && ANNEX_HEADING.test(frame.text.trim())) {
       append(frame.text + ' — redação anterior\n');
-    } else if (editorial || (frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
+    } else if (editorial || revokedCell) {
       filtered = true;
     }
   }
