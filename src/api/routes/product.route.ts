@@ -13,7 +13,7 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
-import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
+import { CompanyIdentityError, ensureHeadOfficeCnpj } from '../../modules/company/company-identity.guard.js';
 import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import { computePublicationAffinity, type ProfileTerm } from '../../modules/taxonomy/affinity/publication-affinity.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
@@ -598,6 +598,7 @@ export async function productRoutes(
       }
 
       try {
+        ensureHeadOfficeCnpj(request.body.cnpj);
         const company = await withTenantContext(
           app.db,
           request.auth.userId,
@@ -646,6 +647,9 @@ export async function productRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
 
