@@ -17,6 +17,7 @@ import {
 import {
   PUBLICATION_NCM_DETECTOR_KEY,
   PUBLICATION_NCM_DETECTOR_VERSION,
+  extractNcmCandidates,
 } from '../ncm/publication-ncm.detector.js';
 import {
   CURATED_ENGINE_KEY,
