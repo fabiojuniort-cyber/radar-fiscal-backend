@@ -139,6 +139,73 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
       [versionId]);
     assert.match(bridge0.rows[0]!.fingerprint!, /^[a-f0-9]{64}$/);
     assert.equal(bridge0.rows[0]?.code, '10063011');
+
+    // Tenant matching reads the effective-assertions view (020), bypassing
+    // the taxonomy detail endpoint. Prove an old curated SUCCESS cannot flow
+    // through that view after its legal-scope attestation is replaced.
+    const dimId = randomUUID(), dimRevId = randomUUID();
+    const conceptId = randomUUID(), conceptRevId = randomUUID();
+    const releaseId = randomUUID(), releaseConceptId = randomUUID(), runId = randomUUID();
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
+    await admin.query(`INSERT INTO taxonomy_dimensions(id,code)
+      VALUES ($1,$2)`, [dimId, 'temp_' + suffix]);
+    await admin.query(`INSERT INTO taxonomy_dimension_revisions
+      (id,dimension_id,revision_no,name) VALUES ($1,$2,1,'Temporal proof gate')`,
+      [dimRevId, dimId]);
+    await admin.query(`INSERT INTO taxonomy_concepts(id,code,dimension_id)
+      VALUES ($1,$2,$3)`, [conceptId, 'temp_' + suffix + '.ncm', dimId]);
+    await admin.query(`INSERT INTO taxonomy_concept_revisions
+      (id,concept_id,revision_no,label,definition) VALUES ($1,$2,1,'Arroz','NCM fixture')`,
+      [conceptRevId, conceptId]);
+    await admin.query(`INSERT INTO taxonomy_releases
+      (id,version_major,version_minor,version_patch,created_by_actor)
+      VALUES ($1,$2,0,0,'TAX13-R2-CI')`,
+      [releaseId, Number.parseInt(suffix.slice(0,7),16)]);
+    await admin.query(`INSERT INTO taxonomy_release_dimensions
+      (release_id,dimension_id,dimension_revision_id) VALUES ($1,$2,$3)`,
+      [releaseId, dimId, dimRevId]);
+    await admin.query(`INSERT INTO taxonomy_release_concepts
+      (id,release_id,concept_id,concept_revision_id) VALUES ($1,$2,$3,$4)`,
+      [releaseConceptId, releaseId, conceptId, conceptRevId]);
+    await admin.query(`UPDATE taxonomy_releases
+      SET status='PUBLISHED',approved_at=now(),published_at=now(),
+        artifact_repository='ci/temporal',artifact_path='proof.json',
+        artifact_git_sha=$2,artifact_sha256=$3
+      WHERE id=$1`, [releaseId, 'a'.repeat(40), h(releaseId)]);
+    await admin.query(`
+      INSERT INTO publication_taxonomy_runs (
+        id,publication_version_id,taxonomy_release_id,method_type,
+        engine_key,engine_version,config_snapshot,config_sha256,
+        input_sha256,run_fingerprint,status,started_at
+      ) VALUES (
+        $1,$2,$3,'RULE','tribusca.taxonomy.curated','2.4.0',
+        $4::jsonb,$5,$6,$7,'RUNNING',now()
+      )`, [runId, versionId, releaseId,
+      JSON.stringify({legalScopeFingerprint: bridge0.rows[0]!.fingerprint}),
+      h('tax13-config-' + id),h('tax13-input-' + id),h('tax13-run-' + id)]);
+    await admin.query(`
+      INSERT INTO publication_taxonomy_assertions(
+        run_id,taxonomy_release_id,release_concept_id,assertion_status,
+        confidence,decision_origin,reason_code
+      ) VALUES ($1,$2,$3,'CONFIRMED',1.0,'RULE_ENGINE','OFFICIAL_CODE_NCM')`,
+      [runId,releaseId,releaseConceptId]);
+    await admin.query(`UPDATE publication_taxonomy_runs
+      SET status='SUCCESS',finished_at=now() WHERE id=$1`, [runId]);
+    await admin.query(`
+      INSERT INTO publication_taxonomy_scans(
+        publication_version_id,taxonomy_release_id,engine_key,engine_version,
+        status,run_id,assertion_count,attempt_count,scanned_at
+      ) VALUES ($1,$2,'tribusca.taxonomy.curated','2.4.0',
+        'SUCCESS',$3,1,1,now())`,
+      [versionId,releaseId,runId]);
+    const effective = () => admin.query<{ count: number }>(`
+      SELECT count(*)::int AS count
+      FROM v_publication_taxonomy_effective_assertions
+      WHERE publication_version_id=$1 AND taxonomy_release_id=$2`,
+      [versionId, releaseId]);
+    assert.equal((await effective()).rows[0]?.count, 1,
+      'valid proof permits curated assertions in tenant matching view');
+
     assert.equal((await rescan(d0)).inserted, false, 'same fingerprint is idempotent');
 
     // Same document/version, different legal reference date; a D0 result is
@@ -184,6 +251,8 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     const bridgeStale = await admin.query<{ fingerprint: string | null }>(`
       SELECT public.tax13_current_ncm_scan_fingerprint($1::uuid) AS fingerprint`, [versionId]);
     assert.equal(bridgeStale.rows[0]!.fingerprint, null, 'same-day PARTIAL invalidates API projection');
+    assert.equal((await effective()).rows[0]?.count, 0,
+      'historical curated SUCCESS must not match tenant profiles after PARTIAL');
     const hashDrift = await readVerifiedLegalScope(worker, {
       publicationVersionId: versionId, sanitizedHtml: '<p>drift</p>', asOf: d0,
     });
