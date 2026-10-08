@@ -24,6 +24,19 @@ test('public signup validation accepts the required contract and normalizes CNPJ
   assert.equal(parsed.cnpj, '12345678000195');
 });
 
+test('ONB-01 accepts initial account without any company or CNPJ', () => {
+  const parsed = publicSignupBodySchema.parse({
+    name: 'Pessoa Teste',
+    email: 'pessoa@example.test',
+    password: strongPassword,
+    confirmPassword: strongPassword,
+    acceptedTerms: true,
+  });
+  assert.equal(parsed.name, 'Pessoa Teste');
+  assert.equal(parsed.company, undefined);
+  assert.equal(parsed.cnpj, null);
+});
+
 test('public signup validation rejects weak/mismatched passwords and missing consent', () => {
   for (const input of [
     {
