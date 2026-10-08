@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     branches:
       - main
+      # TAX13 stacked review: validate PR #192 directly against the unmerged
+      # TAX13-R2 phase-2 base (#186). This does not authorize a main merge.
+      - fix/taxonomy-valid-legal-text
   push:
     branches:
       - main
