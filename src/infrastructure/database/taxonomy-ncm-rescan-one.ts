@@ -79,10 +79,15 @@ try {
     throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
       (evidence.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
   }
-  const { text, sourceField, currentWordingOnly } = confirm
-    ? { text: evidence.currentText, sourceField: 'CONTENT_TEXT' as const, currentWordingOnly: true }
-    : selectText(row);
+  // No "in force" assertion, even in a dry-run, without audited evidence.
+  const trusted = evidence.valid && evidence.currentSegments > 0;
+  const text = trusted ? evidence.currentText : '';
+  const sourceField = trusted ? 'CONTENT_TEXT' as const : 'NONE' as const;
+  const currentWordingOnly = trusted;
   const candidates = extractNcmCandidates(text);
+  const heuristicPreview = !trusted
+    ? extractNcmCandidates(selectText(row).text)
+    : [];
   const everywhere = extractNcmCandidates(row.content_text ?? '');
   const inForce = new Set(candidates.map((candidate) => candidate.code));
   const matched = await db.transaction().execute(async (trx) => {
@@ -100,6 +105,7 @@ try {
         legalScopeVerified: evidence.valid,
         legalScopeReason: evidence.reason,
         legalScopeAttestationId: evidence.attestationId,
+        unverifiedHeuristicPreview: sorted(heuristicPreview.map((item) => item.code)),
         currentWordingOnly,
         persisted: confirm,
         inForceCount: inForce.size,
