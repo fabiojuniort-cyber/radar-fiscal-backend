@@ -112,6 +112,7 @@ async function selectPending(
   releaseId: string,
   excludedSources: readonly string[],
   limit: number,
+  asOf: string,
 ): Promise<PendingVersion[]> {
   const result = await sql<PendingVersion>`
     SELECT
