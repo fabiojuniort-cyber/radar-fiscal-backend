@@ -6,14 +6,15 @@ import type { FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
 
 import { buildApp } from '../src/app.js';
+import { ensureCnaeFixture } from './onboarding-cnae-fixture.js';
 
 const PASSWORD = 'Manual-Seguro-2026!';
 
-function cnpjFromSeed(seed: string): string {
+function cnpjFromSeed(seed: string, suffix = '0001'): string {
   const digits = seed
     .replace(/\D/g, '')
-    .padEnd(12, '7')
-    .slice(0, 12);
+    .padEnd(8, '7')
+    .slice(0, 8) + suffix;
 
   const calculate = (
     value: string,
@@ -110,6 +111,7 @@ test(
 
     try {
       await app.ready();
+      await ensureCnaeFixture(admin);
 
       const owner = await registerAndLogin(
         app,
@@ -293,6 +295,7 @@ test(
           cnpj,
           legalName:
             'Empresa Manual Reativada Ltda.',
+          reactivateInactive: true,
           uf: 'GO',
           municipalityName: 'Goiânia',
         },
