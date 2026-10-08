@@ -10,6 +10,7 @@ import {
   persistSuccessfulScan,
   selectText,
 } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
+import { brazilLegalReferenceDate } from '../../modules/taxonomy/legal-scope/legal-scope-evidence.js';
 import { readVerifiedLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.repository.js';
 import type { DB } from './database.types.js';
 
@@ -64,7 +65,7 @@ try {
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
-  const asOf = arg('as-of') ?? new Date().toISOString().slice(0, 10);
+  const asOf = arg('as-of') ?? brazilLegalReferenceDate();
   const evidence = await readVerifiedLegalScope(db, {
     publicationVersionId: row.publication_version_id,
     sanitizedHtml: row.presentation_html ?? '',
