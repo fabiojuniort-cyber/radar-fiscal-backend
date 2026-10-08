@@ -10,9 +10,10 @@ import {
 } from '../../publication-scope/publication-scope.guard.js';
 
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
-// 1.2.0: taxonomy evidence only from in-scope operative legal body and
-// source-verified current annex fragments; supersedes prior NCM findings.
-export const PUBLICATION_NCM_DETECTOR_VERSION = '1.2.0';
+// 1.3.0: candidate extraction exclusively from an audited, date-bound
+// legal-scope attestation, never merely from CSS or remote status attributes.
+// Prior 1.2.0 SUCCESS scans remain historical and are NOT accepted as proof.
+export const PUBLICATION_NCM_DETECTOR_VERSION = '1.3.0';
 
 export type PublicationNcmSourceField =
   | 'CONTENT_TEXT'
