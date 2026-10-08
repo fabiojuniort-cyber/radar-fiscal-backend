@@ -7,6 +7,7 @@ import {
   assertCurrentNcmCatalog,
   catalogMatches,
   extractNcmCandidates,
+  codesOutsideAttestedCurrent,
   persistSuccessfulScan,
   selectText,
 } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
@@ -16,15 +17,15 @@ import type { DB } from './database.types.js';
 
 /**
  * Re-detects the NCMs of ONE publication (its current version) and reports
- * them against the wording in force:
+ * them against only explicitly attested CURRENT fragments:
  *
  *   node dist/infrastructure/database/taxonomy-ncm-rescan-one.js \
  *     --publication=<uuid> [--confirm]
  *
- * Prints the codes of the wording in force found in the current NCM
- * catalog, those missing from the catalog and those that appear only in
- * previous wordings (ignored). With --confirm the scan is saved and replaces
- * what older detector versions found for this version.
+ * Prints the NCMs in the attested CURRENT fragments separately from the
+ * unverified candidates elsewhere in raw content (not presumed PREVIOUS).
+ * --confirm requires legal proof and writes detector 1.3.0 without erasing
+ * historical scans or overwriting previous classifications.
  */
 
 const arg = (name: string) =>
@@ -73,7 +74,7 @@ try {
   });
   // A dry-run may explain historical vs. current candidates, but only
   // content actually backed by the audited official-scope ledger can
-  // be saved as the 1.2.0 detector SUCCESS seal. Never let an unverified
+  // be saved as the 1.3.0 detector SUCCESS seal. Never let an unverified
   // HTML style or a curator CLI flag supersede earlier NCM evidence.
   if (confirm && (!evidence.valid || evidence.currentSegments === 0)) {
     throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
@@ -88,7 +89,6 @@ try {
   const heuristicPreview = !trusted
     ? extractNcmCandidates(selectText(row).text)
     : [];
-  const everywhere = extractNcmCandidates(row.content_text ?? '');
   const inForce = new Set(candidates.map((candidate) => candidate.code));
   const matched = await db.transaction().execute(async (trx) => {
     const found = await catalogMatches(trx, [...inForce]);
@@ -112,8 +112,9 @@ try {
         matchedCount: matched.size,
         matched: sorted(matched.keys()),
         notInCurrentCatalog: sorted([...inForce].filter((code) => !matched.has(code))),
-        previousWordingOnly: sorted(
-          new Set(everywhere.map((candidate) => candidate.code).filter((code) => !inForce.has(code))),
+        // These are NOT automatically "previous wording": provenance unknown.
+        outsideAttestedCurrentUnverified: sorted(
+          codesOutsideAttestedCurrent(row.content_text, text),
         ),
       }),
   );

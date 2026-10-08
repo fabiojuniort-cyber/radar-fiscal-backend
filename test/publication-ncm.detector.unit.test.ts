@@ -9,6 +9,7 @@ import {
 } from '../src/modules/collection/legal-presentation.js';
 import {
   extractNcmCandidates,
+  codesOutsideAttestedCurrent,
   selectText,
 } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
 
@@ -45,6 +46,21 @@ test('extractNcmCandidates accepts the "8417.8020" typing of official annexes bu
     'Fornos para fusão de vidro 8417.8020. Ninhos metálicos 7326.90.9999. Motocultores 8701.10.',
   ).map((candidate) => candidate.code);
   assert.deepEqual(codes, ['84178020']);
+});
+
+test('codes outside attested CURRENT are unverified, never inferred previous wording', () => {
+  const raw = 'Histórico editorial 8701.90.00 e fertilizante 3102.10.90; 8701.90.00 repetido.';
+  assert.deepEqual(
+    codesOutsideAttestedCurrent(raw, 'Fertilizantes atestados 3102.10.90.'),
+    ['87019000'],
+  );
+  // Without legal attestation, every raw candidate is only an unverified
+  // diagnostic hint; zero CURRENT matches is NOT proof of previous wording.
+  assert.deepEqual(
+    codesOutsideAttestedCurrent(raw, null),
+    ['31021090', '87019000'],
+  );
+  assert.deepEqual(codesOutsideAttestedCurrent(null, '3102.10.90'), []);
 });
 
 test('selectText reads only the wording in force when the page marks previous wordings', () => {

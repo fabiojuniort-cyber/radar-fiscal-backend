@@ -115,6 +115,25 @@ export function extractNcmCandidates(text: string): NcmCandidate[] {
   return [...byCode.values()];
 }
 
+/**
+ * Diagnostic only: codes found in unscoped raw content but absent from the
+ * date-bound, attested CURRENT fragments. Their legal status is UNKNOWN:
+ * they could be editorial citations, revoked wording, uncovered annexes or
+ * text not stored in the certified presentation. Never label them PREVIOUS
+ * or feed them into a persisted CURRENT classification.
+ */
+export function codesOutsideAttestedCurrent(
+  rawContentText: string | null | undefined,
+  attestedCurrentText: string | null | undefined,
+): string[] {
+  const current = new Set(
+    extractNcmCandidates(attestedCurrentText ?? '').map((item) => item.code),
+  );
+  return [...new Set(
+    extractNcmCandidates(rawContentText ?? '').map((item) => item.code),
+  )].filter((code) => !current.has(code)).sort();
+}
+
 export function selectText(row: VersionForNcmScan): {
   text: string;
   sourceField: PublicationNcmSourceField;
