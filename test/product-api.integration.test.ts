@@ -591,7 +591,7 @@ test(
         highlightsAuthorized: false,
         currentSegments: [],
       });
-      assert.match(detailBody.legalScope.referenceDate, /^\\d{4}-\\d{2}-\\d{2}$/);
+      assert.match(detailBody.legalScope.referenceDate, /^\d{4}-\d{2}-\d{2}$/);
       assert.equal(
         detailBody.publication.officialUrl,
         'https://example.test/ato-oficial',
