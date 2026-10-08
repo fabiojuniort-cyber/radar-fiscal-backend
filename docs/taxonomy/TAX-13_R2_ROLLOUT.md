@@ -40,3 +40,19 @@ Contagens de scans por versão são históricos globais, **não** a diferença d
 - Deltas B1/B2/B3 e rebase frontend exigem CI verde e parecer R2/delta sobre os novos SHAs.
 
 Este plano é evidencia de inventário e definição de gates; **não equivale a B4/B5 resolvidos**.
+
+## R2 independente — cinco bloqueios adicionais (08/10/2026)
+
+HEAD adversarial: `a512f648dc5a269025cd4430002ed9b95857d222`; comentários #101/6065248177 e #97/6065256858. **O parecer segue BLOCK/CHANGES_REQUESTED até nova revisão independente em HEAD novo.** O CI verde antigo não cobre os cinco negativos.
+
+Proposta corretiva **somente na branch de desenvolvimento, sem rollout**:
+
+- **B01, supersession:** `tax13_effective_attestation_id(version,asOf)` remove eventos substituídos antes de escolher o terminal mais recente. Se houver empate de terminais não relacionados, retorna NULL; o leitor worker e a projeção app compartilham a seleção. Os eventos continuam append-only.
+- **B02, proveniência:** a função SQL passa a verificar origem, fonte CONFAZ permitida, URL HTTPS, manifesto/colunas, hash do HTML, segmentos e validade antes de expor qualquer fingerprint. Mudança de `publication_origins.official_url` resulta em NULL. Não interpretar hash isolado como atestado jurídico suficiente.
+- **B03, fragmentos:** `tax13_legal_current_fragments` reconstitui conservadoramente apenas o texto assinado de segmentos CURRENT; HTML cujo texto não possa ser reconstituído com integridade de hash é **UNVERIFIED**, não fallback. O trigger rejeita índices de fragmentos inexistentes, código não encontrado em CURRENT ou excerpt fabricado. A verificação não concede novos privilégios ao worker.
+- **B04, selagem:** `DEFERRABLE INITIALLY DEFERRED` confere no commit a cardinalidade declarada e a correspondência com candidatos do texto vigente. O mesmo predicado é invocado por leituras worker/app: falha/integridade desconhecida não se converte em `SUCCESS(0)`. A prova e os códigos continuam imutáveis.
+- **B05, clientes e API:** matching de NCM usa exclusivamente `tax13_public_current_ncm_codes`. A afinidade lexical usa `tax13_public_current_legal_text`, sem `content_text`/HTML histórico como fallback; endpoint divide `items` e `attestedCurrentNcmCodes` (correntes) de `historicalCatalogMentions` (históricos, nunca evidência positiva).
+
+**Contrato de compatibilidade:** `items` de `/api/v1/publications/:id/ncms` deixa de conter catálogo histórico sem atestação. Consumidores que precisam de histórico devem migrar explicitamente para `historicalCatalogMentions` e rotular esses registros como não comprovados vigentes. Qualquer frontend que ainda usa `items` como catálogo deve passar por revisão própria antes de habilitar recursos.
+
+**Operação/rollback:** migration 045 ainda **NÃO aplicada em produção**. Antes de qualquer implantação, confirmar sequenciamento com 042/043/044, EXPLAIN e latência em acervo representativo, plano de reversão via migration adicional *fail closed* da projeção sem apagar o ledger, logs de atestações ambíguas e canários CV52/91 e CV100/97. Não usar DROP/DELETE/UPDATE em audit trail como rollback. Proibir merge, deploy, rescan global e selos verdes enquanto #97/#101 estiverem BLOCK. A projeção conservadora pode recusar provas quando a reconstituição de HTML difere do parser Node; isso exige adapter juridicamente validado, nunca flexibilização silenciosa.
