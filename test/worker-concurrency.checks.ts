@@ -102,7 +102,7 @@ export async function checkWorkerConcurrency(
       `INSERT INTO publication_versions (publication_id, version_no, content_hash, content_text, source_metadata, is_current)
        VALUES ($1, 1, $2, $3, $4::jsonb, true) RETURNING id`,
       [fixture.rows[0]!.id, createHash('sha256').update(content).digest('hex'), content,
-       JSON.stringify({presentation: {html: '<p data-legal-status="current">' + content + '</p>'}})],
+       JSON.stringify({presentation: {format: 'SANITIZED_HTML', html: '<p data-legal-status="current">' + content + '</p>'}})],
     );
     const versionId = version.rows[0]!.id;
     await seedTestLegalScopeAttestation(admin, versionId);
