@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { Pool } from 'pg';
 
+import { sanitizeLegalPresentationHtml } from '../src/modules/collection/legal-presentation.js';
+
 import {
   brazilLegalReferenceDate,
   renderedLegalText,
@@ -45,6 +47,10 @@ export async function seedTestLegalScopeAttestation(
   `,[row.publication_id,sourceId,url]);
 
   const html=row.presentation_html;
+  // A synthetic attestation must bind the exact public API HTML, too.
+  if (sanitizeLegalPresentationHtml(html) !== html) {
+    throw new Error('TEST_LEGAL_HTML_NOT_CANONICAL');
+  }
   const text=renderedLegalText(html);
   if (!text) throw new Error('TEST_LEGAL_BODY_REQUIRED');
 

@@ -299,3 +299,53 @@ test('TAX13 refuses malformed or excessive supportingActs and URL arrays', () =>
   assert.equal(validateLegalScopeEvidence(excessiveUrls, ctx).reason,
     'INVALID_EVIDENCE_URLS');
 });
+
+test('TAX13 refuses a valid raw hash for HTML that the public API would sanitize differently', () => {
+  const variants = [
+    // Removed attributes and hidden elements change the actual public body.
+    '<p onclick="fakeCurrent()">NCM 7307.19.20 vigente</p>',
+    '<p>NCM 7307.19.20 vigente</p><script>Revogado 8451.21.00</script>',
+    // Legitimate attributes but different serialization order is still a
+    // different HTML byte stream from the one shown by the product API.
+    '<p data-legal-status="current" class="TextoAcordo">NCM 7307.19.20 vigente</p>',
+  ];
+  for (const raw of variants) {
+    const row = manifest();
+    row.htmlSha256 = digest(raw);
+    const body = renderedLegalText(raw);
+    const scoped = 'NCM 7307.19.20 vigente';
+    const scopedStart = body.indexOf(scoped);
+    row.segments = [{
+      start: scopedStart,
+      end: scopedStart + scoped.length,
+      textSha256: digest(scoped),
+      status: 'CURRENT',
+      method: 'OFFICIAL_CONSOLIDATION',
+      evidenceUrls: [ctx.officialUrl],
+    }];
+    const result = validateLegalScopeEvidence(row, {
+      ...ctx, sanitizedHtml: raw,
+    });
+    assert.equal(result.reason, 'LEGAL_SCOPE_HTML_NOT_CANONICAL', raw);
+    assert.equal(result.currentSegments, 0);
+    assert.deepEqual(result.currentFragments, []);
+  }
+});
+
+test('TAX13 accepts canonical sanitized legal HTML with unchanged bytes', () => {
+  const html = '<p class="TextoAcordo" data-legal-status="current">NCM 7307.19.20 vigente</p>';
+  const row = manifest();
+  const scoped = renderedLegalText(html);
+  row.htmlSha256 = digest(html);
+  row.segments = [{
+    start: 0,
+    end: scoped.length,
+    textSha256: digest(scoped),
+    status: 'CURRENT',
+    method: 'OFFICIAL_CONSOLIDATION',
+    evidenceUrls: [ctx.officialUrl],
+  }];
+  const result = validateLegalScopeEvidence(row, {...ctx, sanitizedHtml: html});
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.currentFragments, [scoped]);
+});

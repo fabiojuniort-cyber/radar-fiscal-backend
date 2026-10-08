@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { Parser } from 'htmlparser2';
 
+import { sanitizeLegalPresentationHtml } from '../../collection/legal-presentation.js';
+
 /**
  * TAX13/B4: content-addressed evidence, NOT an automatic vigência oracle.
  * Only the server's registered source adapter / reviewer may attest these
@@ -165,6 +167,16 @@ export function validateLegalScopeEvidence(
   const verifiedAt = new Date(evidence.verifiedAt);
   if (Number.isNaN(verifiedAt.getTime()) || verifiedAt.toISOString() !== evidence.verifiedAt ||
       verifiedAt.getTime() > Date.now()) return fail('INVALID_VERIFICATION_TIME');
+  // The public detail API sanitizes source_metadata.presentation.html at
+  // read time. Hashing a different, raw HTML would let an audit refer to
+  // hidden/removed text or to offsets that are not the content on screen.
+  // Require identical canonical persisted bytes BEFORE validating any
+  // positive legal fragments; a difference must be re-ingested/re-reviewed,
+  // never normalized silently or used as a fallback.
+  const canonicalHtml = sanitizeLegalPresentationHtml(ctx.sanitizedHtml);
+  if (!canonicalHtml || canonicalHtml !== ctx.sanitizedHtml) {
+    return fail('LEGAL_SCOPE_HTML_NOT_CANONICAL');
+  }
   if (!DIGEST.test(evidence.htmlSha256) ||
       evidence.htmlSha256 !== sha256(ctx.sanitizedHtml)) return fail('HTML_HASH_MISMATCH');
   if (!['COMPLETE', 'PARTIAL', 'UNVERIFIED'].includes(evidence.coverage)) return fail('INVALID_COVERAGE');
