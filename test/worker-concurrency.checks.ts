@@ -211,7 +211,9 @@ export async function checkWorkerConcurrency(
       assert.equal(seals.length, 1);
       assert.equal(seals[0]?.status, 'SUCCESS');
       assert.equal(seals[0]?.error_message, null);
-      assert.equal(seals[0]?.attempt_count, stage === 'ncm' || order === 'success-first' ? 1 : 2);
+      assert.equal(seals[0]?.attempt_count,
+        stage === 'ncm' || order !== 'failure-first' ? 1 : 2,
+        'same temporal fingerprint is one logical attempt even with two successful workers');
       const artifacts = await admin.query(
         `SELECT r.id, c.code, a.reason_code, count(s.id)::int AS spans
          FROM publication_taxonomy_runs r
