@@ -494,6 +494,23 @@ test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method at
       html: '<p>\tANEXO II - REVOGADO</p><p>NCM 1006.30.11</p>',
       parts: ['\tANEXO II - REVOGADO', 'NCM 1006.30.11'],
       statuses: ['REVOKED', 'CURRENT'] },
+    // R6: SQL must refuse Unicode whose ECMAScript case folding or UTF-16
+    // offset semantics are not implemented in the conservative SQL subset.
+    { name: 'R6 Unicode casefold long s', html: '<p>Re\u017folução 10063011</p>',
+      parts: ['Re\u017folução 10063011'], statuses: ['CURRENT'] },
+    { name: 'R6 Unicode casefold SINIEF', html: '<p>Aju\u017fte \u017fINIEF 10063011</p>',
+      parts: ['Aju\u017fte \u017fINIEF 10063011'], statuses: ['CURRENT'] },
+    { name: 'R6 forged UTF16 offsets', html: '<p>Histórico 😀</p><p>NCM 1006.30.11</p>',
+      parts: ['Histórico 😀', 'NCM 1006.30.11'],
+      statuses: ['EDITORIAL','CURRENT'], shiftedAstralOffsets: true },
+    { name: 'R6 oversize HTML ASCII',
+      html: '<p>NCM 1006.30.11 ' + 'a'.repeat(2*1024*1024) + '</p>',
+      parts: ['NCM 1006.30.11 ' + 'a'.repeat(2*1024*1024)],
+      statuses: ['CURRENT'] },
+    { name: 'R6 oversize HTML UTF8',
+      html: '<p>NCM 1006.30.11 ' + 'á'.repeat(1024*1024) + '</p>',
+      parts: ['NCM 1006.30.11 ' + 'á'.repeat(1024*1024)],
+      statuses: ['CURRENT'] },
     // R5 F02: JS trim() rejects references composed of Unicode whitespace.
     ...([0x2003, 0x2007, 0x202f, 0xfeff] as const).map((code) => ({
       name: 'R5 whitespace-only supporting act ' + code.toString(16),
@@ -535,6 +552,13 @@ test('R3 F01/F02 SQL must reject non-normative, cross-node and missing-method at
           method: 'OFFICIAL_AMENDMENT', evidenceUrls: [officialUrl] };
       });
       if ('missingMethod' in sample && sample.missingMethod) delete segments[0]!.method;
+      if ('shiftedAstralOffsets' in sample && sample.shiftedAstralOffsets) {
+        // Deliberately forge code-point offsets where Node expects UTF-16.
+        // Keep the per-piece SHA-256 intact to exercise SQL's positive bridge.
+        segments[0]!.end = Number(segments[0]!.end) - 1;
+        segments[1]!.start = Number(segments[1]!.start) - 1;
+        segments[1]!.end = Number(segments[1]!.end) - 1;
+      }
       if ('stringStart' in sample && sample.stringStart) segments[0]!.start = '0';
       if ('stringEnd' in sample && sample.stringEnd) segments[0]!.end = String(sample.parts[0]!.length);
       if ('supportingActs' in sample) segments[0]!.supportingActs = sample.supportingActs;
