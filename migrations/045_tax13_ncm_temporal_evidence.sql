@@ -296,9 +296,10 @@ WITH assertion_state AS (
     JOIN public.publication_taxonomy_runs r ON r.id = a.run_id
     WHERE r.status IN ('SUCCESS', 'PARTIAL')
       AND (
-        r.engine_key <> 'tribusca.taxonomy.curated'
+        r.engine_key NOT LIKE 'tribusca.taxonomy.%'
         OR (
-          r.engine_version = '2.4.0'
+          r.engine_key = 'tribusca.taxonomy.curated'
+          AND r.engine_version = '2.4.0'
           AND r.config_snapshot ->> 'legalScopeFingerprint' =
              public.tax13_current_ncm_scan_fingerprint(r.publication_version_id)
           AND EXISTS (
