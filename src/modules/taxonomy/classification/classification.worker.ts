@@ -536,7 +536,14 @@ export async function classifySinglePublication(
 
   // Report a missing legal proof before the derivative NCM seal. A scan
   // stamp never substitutes for an official scope attestation.
-  if (input.persist && !ncmScanned) throw new Error('NCM_SCAN_NOT_SUCCESS');
+  if (input.persist && !ncmScanned) {
+    // Preserve SUPPRESS/RESTORE serialization even when a legacy 028 stamp
+    // cannot authorize a new temporal classification. A pending SUPPRESS
+    // must win the canonical lock before we report missing derivative proof.
+    await db.transaction().execute((trx) =>
+      lockPublicationVersionInScope(trx, row.publication_version_id));
+    throw new Error('NCM_SCAN_NOT_SUCCESS');
+  }
 
   const concepts = await loadClassificationConcepts(db, input.releaseId);
   const plan = planCuratedClassification({
