@@ -34,7 +34,7 @@ Na implantação, exigir dois revisores ou aprovação formal auditada (o CLI po
 
 ## 4. Pendências antes do R2 e do deploy
 
-1. Conectar **também o batch global NCM, o classificador curado e a API/frontend** ao ledger; `selectText()` e `classificationText()` ainda mantêm a análise heurística HTML e não são prova oficial.
+1. **Backend lote/individual já conectado ao ledger** para NCM e classificador curado nesta branch (ainda sujeito a CI e R2): sem atestação atual não deve gerar novo scan SUCCESS ou tags. O leitor da API e os destaques do frontend ainda precisam consumir a mesma semântica de fragmento/verificação, sem confiar em atributos remotos. A integração não equivale a provar vigência de fontes reais.
 2. Garantir que ausência de atestação ou `UNVERIFIED` **não marque um scan novo `SUCCESS` com zero tags**, pois isso ocultaria achados de motores anteriores.
 3. Desenvolver verificações próprias dos conectores DOU/CONFAZ/UF/municípios, inclusive atos posteriores e anexo PDF/XLS; não inferir vigência de `data-legal-status` remoto.
 4. RLS e testes adversariais com documentos oficiais versionados, concorrência, reconstrução DOE-SP e rollout de tags históricas.
