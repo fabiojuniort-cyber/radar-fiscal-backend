@@ -111,6 +111,36 @@ function checkedHttps(value: string): URL | null {
 interface LegalTextSpan {
   start: number;
   end: number;
+  /** Classification of the source DOM context, never trusted as proof of CURRENT. */
+  excluded: boolean;
+}
+
+const NON_NORMATIVE_CLASSES = new Set([
+  'TituloAcordo', 'AcordoTipo', 'Ementa', 'DataPublicao',
+  'A2DataPublicacao', 'Remisso', 'A8-1Remissao', 'Subtitulo',
+  'A6-1Subtitulo', 'RedaoAnt', 'A8-3RedacaoAnt',
+  'RemissoAnt', 'A8-2RemissaoAnt',
+]);
+const HISTORICAL_TABLE_CLASS = /^(?:A\\d+-\\d+)?Tabela[A-Za-z]*verde$/;
+const ANNEX_HEADING = /^anexo\\s+(?:único|unico|[ivxlcdm]+|\\d+)(?=\\s*$|\\s*[-–—:.(])/iu;
+const HISTORICAL_ANNEX = /\\b(?:revogad[oa]s?|redação\\s+(?:anterior|original)|texto\\s+anterior|substitu[íi]d[oa]s?|sem\\s+(?:efeito|vigência))\\b/iu;
+const ACT_IDENTIFIER = /^(?:convênio(?:\\s+icms)?|ajuste\\s+sinief|ato\\s+cotepe(?:\\/icms)?|protocolo\\s+icms|lei(?:\\s+complementar)?|decreto|portaria|resolução)\\s+(?:n[ºo°.]?\\s*)?\\d+(?:[./-]\\d+)*(?:\\s*,?\\s+de\\s+\\d{1,2}\\s+de\\s+[\\p{L}]+\\s+de\\s+\\d{4})?\\.?$/iu;
+const EDITORIAL_REFERENCE = /^(?:publicad[oa]s?\\s+(?:no|na|em)|ratificad[oa]s?\\s+(?:no|na|pel[oa]s?)|alterad[oa]s?\\s+(?:pel[oa]s?|por)|prorrogad[oa]s?\\s+at[eé]|vide\\s+(?:o|a|os|as|cl[áa]usula|art)|redação\\s+anterior\\b|texto\\s+anterior\\b|nova\\s+redação\\s+dada\\s+pel[oa])/iu;
+const REVOKED_PLACEHOLDER = /^(?:(?:cl[áa]usula|art(?:igo)?\\.?|par[áa]grafo|inciso|al[íi]nea|item)\\s+[\\p{L}\\p{N}º°ª.-]+|§\\s*\\d+[º°ª]?|[ivxlcdm]+|[a-z]|\\d+[º°ª]?)\\s*(?:[-–—:]\\s*)?revogad[oa]s?\\.?$/iu;
+
+function standaloneNonNormative(value: string): boolean {
+  const line = value.replace(/\\s+/g, ' ').trim();
+  return ANNEX_HEADING.test(line) || ACT_IDENTIFIER.test(line) ||
+    EDITORIAL_REFERENCE.test(line) || REVOKED_PLACEHOLDER.test(line);
+}
+
+function excludedTag(name: string, attrs: Record<string, string>): boolean {
+  const status = attrs['data-legal-status'];
+  if (status !== undefined && status !== 'current') return true;
+  if (/^h[1-6]$/.test(name) || name === 'title' || name === 'script' ||
+      name === 'style' || name === 'noscript') return true;
+  return (attrs.class ?? '').split(/\\s+/).some((token) =>
+    NON_NORMATIVE_CLASSES.has(token) || HISTORICAL_TABLE_CLASS.test(token));
 }
 
 /**
@@ -124,12 +154,34 @@ interface LegalTextSpan {
 function parsedLegalText(html: string): { text: string; spans: LegalTextSpan[] } {
   let text = '';
   const spans: LegalTextSpan[] = [];
+  // Capture DOM ancestry in the *same* parser that defines UTF-16 offsets.
+  // Never infer CURRENT from these classes: they are exclusion-only signals.
+  const stack: Array<{ name: string; excluded: boolean }> = [];
+  let historicalAnnex = false;
   const parser = new Parser({
+    onopentag(name, attrs) {
+      stack.push({
+        name,
+        excluded: (stack.at(-1)?.excluded ?? false) || excludedTag(name, attrs),
+      });
+    },
+    onclosetag(name) {
+      const index = stack.findLastIndex((item) => item.name === name);
+      if (index >= 0) stack.length = index;
+    },
     ontext(value) {
       if (!value) return;
+      const line = value.replace(/\\s+/g, ' ').trim();
+      const annexHeading = ANNEX_HEADING.test(line);
+      if (annexHeading) historicalAnnex = HISTORICAL_ANNEX.test(line);
       const start = text.length;
       text += value;
-      spans.push({ start, end: text.length });
+      spans.push({
+        start,
+        end: text.length,
+        excluded: (stack.at(-1)?.excluded ?? false) ||
+          historicalAnnex || standaloneNonNormative(value),
+      });
     },
   }, { decodeEntities: true, lowerCaseTags: true });
   parser.end(html);
@@ -238,6 +290,7 @@ export function validateLegalScopeEvidence(
       if (!node || segment.start < node.start || segment.end > node.end) {
         return fail('CURRENT_SPANS_DISTINCT_TEXT_NODES');
       }
+      if (node.excluded) return fail('CURRENT_IN_NON_NORMATIVE_SCOPE');
       // Original publication alone cannot prove no subsequent amendment.
       if (!['OFFICIAL_CONSOLIDATION', 'OFFICIAL_AMENDMENT'].includes(segment.method) ||
           segment.evidenceUrls.length === 0 || evidence.coverage === 'UNVERIFIED') {

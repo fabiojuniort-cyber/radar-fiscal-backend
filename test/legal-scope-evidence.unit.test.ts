@@ -349,3 +349,75 @@ test('TAX13 accepts canonical sanitized legal HTML with unchanged bytes', () => 
   assert.equal(result.valid, true);
   assert.deepEqual(result.currentFragments, [scoped]);
 });
+
+test('TAX13 refuses CURRENT in legal titles, ementas, previous wording and explicit revoked cells', () => {
+  const cases = [
+    '<p class="TituloAcordo">CONVÊNIO ICMS 100/97</p>',
+    '<p class="Ementa">Crédito presumido para grãos</p>',
+    '<p class="RedaoAnt"><strong>NCM 8451.21.00</strong></p>',
+    '<table><tr><td class="A8-3TabelaTextoverde">8451.21.00</td></tr></table>',
+    '<p data-legal-status="previous">Crédito presumido para grãos</p>',
+    '<h2>Crédito presumido para grãos</h2>',
+    '<p>Publicado no Diário Oficial da União em 2026.</p>',
+    '<p>Cláusula terceira REVOGADA</p>',
+  ];
+  for (const legalHtml of cases) {
+    const phrase = legalHtml.includes('<strong>')
+      ? 'NCM 8451.21.00'
+      : renderedLegalText(legalHtml);
+    const decoded = renderedLegalText(legalHtml);
+    const start = decoded.indexOf(phrase);
+    const row = manifest();
+    row.htmlSha256 = digest(legalHtml);
+    row.segments = [{
+      start, end: start + phrase.length,
+      textSha256: digest(phrase),
+      status: 'CURRENT', method: 'OFFICIAL_CONSOLIDATION',
+      evidenceUrls: [ctx.officialUrl],
+    }];
+    const result = validateLegalScopeEvidence(row, {...ctx, sanitizedHtml: legalHtml});
+    assert.equal(result.reason, 'CURRENT_IN_NON_NORMATIVE_SCOPE', legalHtml);
+    assert.deepEqual(result.currentFragments, [], legalHtml);
+  }
+});
+
+test('TAX13 propagates explicitly revoked annex context until a later annex heading', () => {
+  const html = [
+    '<p>ANEXO II - REVOGADO</p>',
+    '<table><tr><td>8451.21.00</td></tr></table>',
+    '<p>ANEXO III</p>',
+    '<table><tr><td>3102.10.90</td></tr></table>',
+  ].join('');
+  const plain = renderedLegalText(html);
+  for (const [fragment, expected] of [
+    ['8451.21.00', 'CURRENT_IN_NON_NORMATIVE_SCOPE'],
+    ['3102.10.90', null],
+  ] as const) {
+    const row = manifest();
+    row.htmlSha256 = digest(html);
+    const start = plain.indexOf(fragment);
+    row.segments = [{
+      start, end: start + fragment.length,
+      textSha256: digest(fragment), status: 'CURRENT',
+      method: 'OFFICIAL_CONSOLIDATION', evidenceUrls: [ctx.officialUrl],
+    }];
+    const result = validateLegalScopeEvidence(row, {...ctx, sanitizedHtml: html});
+    assert.equal(result.reason, expected, fragment);
+    assert.deepEqual(result.currentFragments, expected ? [] : [fragment], fragment);
+  }
+});
+
+test('TAX13 preserves legal revocation language when it is operative normative text', () => {
+  const html = '<p class="TextoAcordo">Ficam revogadas as disposições em contrário.</p>';
+  const phrase = renderedLegalText(html);
+  const row = manifest();
+  row.htmlSha256 = digest(html);
+  row.segments = [{
+    start: 0, end: phrase.length, textSha256: digest(phrase),
+    status: 'CURRENT', method: 'OFFICIAL_CONSOLIDATION',
+    evidenceUrls: [ctx.officialUrl],
+  }];
+  const result = validateLegalScopeEvidence(row, {...ctx, sanitizedHtml: html});
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.currentFragments, [phrase]);
+});
