@@ -169,6 +169,46 @@ test('currentWordingText mirrors the real CV100/97 and CV52/91 editorial classes
   );
 });
 
+test('classification includes active annex rows and excludes completely revoked annexes', () => {
+  const html = [
+    '<p class="TituloAcordo">CONVÊNIO ICMS 100/97</p>',
+    '<p class="TextoAcordo">Cláusula primeira: sementes.</p>',
+    '<p>ANEXO I</p>',
+    '<table><tr><td>Fertilizantes vigentes</td><td>3102.10.90</td></tr></table>',
+    '<p>ANEXO II - REVOGADO</p>',
+    '<table><tr><td>Máquinas históricas</td><td>8701.90.00</td></tr></table>',
+    '<p>ANEXO III</p>',
+    '<table><tr><td>Grãos vigentes</td><td>1006.30.11</td></tr>',
+    '<tr><td class="TabelaSubtituloverde">Antiga redação</td><td>8450.11.00</td></tr></table>',
+  ].join('');
+  const text = currentWordingText(html) ?? '';
+  assert.match(text, /Fertilizantes vigentes|3102\.10\.90/);
+  assert.match(text, /Grãos vigentes|1006\.30\.11/);
+  assert.doesNotMatch(text, /ANEXO I|ANEXO II|ANEXO III|8701\.90\.00|8450\.11\.00|Máquinas históricas/);
+  const selection = selectText({
+    publication_version_id: 'annex-one',
+    content_text: '8701.90.00 3102.10.90 1006.30.11 8450.11.00',
+    relevant_excerpt: null,
+    presentation_html: html,
+  });
+  assert.deepEqual(
+    extractNcmCandidates(selection.text).map((candidate) => candidate.code),
+    ['31021090', '10063011'],
+  );
+});
+
+test('historical annex alone does not fall back to full legal text', () => {
+  const html = '<p>ANEXO ÚNICO — Redação anterior</p><table><tr><td>8701.90.00</td></tr></table>';
+  assert.equal(currentWordingText(html), '');
+  const selected = selectText({
+    publication_version_id: 'annex-old',
+    content_text: 'ANEXO ÚNICO 8701.90.00',
+    relevant_excerpt: null,
+    presentation_html: html,
+  });
+  assert.equal(selected.text, '');
+});
+
 test('the sanitized CONFAZ presentation keeps the green previous-wording table styles', () => {
   const html = sanitizeLegalPresentationHtml(
     '<table><tr><td><p class="A7-2Tabelajustificado">Silos</p></td><td><p class="A9-2Tabelajustificadoverde">7612.90.19</p></td></tr></table>',
