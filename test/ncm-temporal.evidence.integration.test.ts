@@ -206,6 +206,31 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     assert.equal((await effective()).rows[0]?.count, 1,
       'valid proof permits curated assertions in tenant matching view');
 
+    // A historic lexical engine cannot produce new tenant matches simply
+    // because its old run still says SUCCESS. Keep its audit row intact.
+    const legacyRun = randomUUID();
+    await admin.query(`
+      INSERT INTO publication_taxonomy_runs(
+        id,publication_version_id,taxonomy_release_id,method_type,
+        engine_key,engine_version,config_snapshot,config_sha256,
+        input_sha256,run_fingerprint,status,started_at
+      ) VALUES (
+        $1,$2,$3,'RULE','tribusca.taxonomy.lexical','1',
+        '{}'::jsonb,$4,$5,$6,'RUNNING',now()
+      )`, [legacyRun,versionId,releaseId,
+      h('tax13-legacy-config-' + id),h('tax13-legacy-input-' + id),
+      h('tax13-legacy-run-' + id)]);
+    await admin.query(`
+      INSERT INTO publication_taxonomy_assertions(
+        run_id,taxonomy_release_id,release_concept_id,assertion_status,
+        confidence,decision_origin,reason_code
+      ) VALUES ($1,$2,$3,'CONFIRMED',1,'RULE_ENGINE','CANONICAL_LABEL')`,
+      [legacyRun,releaseId,releaseConceptId]);
+    await admin.query(`UPDATE publication_taxonomy_runs SET
+      status='SUCCESS',finished_at=now() WHERE id=$1`, [legacyRun]);
+    assert.equal((await effective()).rows[0]?.count, 1,
+      'legacy lexical assertions remain historical, not new positive matches');
+
     assert.equal((await rescan(d0)).inserted, false, 'same fingerprint is idempotent');
 
     // Same document/version, different legal reference date; a D0 result is
