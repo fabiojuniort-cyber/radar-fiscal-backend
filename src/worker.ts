@@ -33,6 +33,10 @@ let stopping = false;
 // A separately reviewed, explicit opt-in is required to resume GLOBAL NCM.
 const GLOBAL_NCM_RESCAN_ALLOWED =
   process.env.TAX13_GLOBAL_NCM_RESCAN_APPROVED === 'true';
+/** The current classifier 2.3.0 still uses heuristics until B4 evidence is
+ * consumed end-to-end. Runtime taxonomy toggle alone must never bypass R2. */
+const GLOBAL_TAXONOMY_CLASSIFICATION_ALLOWED =
+  process.env.TAX13_GLOBAL_CLASSIFICATION_APPROVED === 'true';
 const NCM_IDLE_BATCH_SIZE = 10;
 const NCM_AFTER_COLLECTION_BATCH_SIZE = 5;
 // TAX-11: classification runs only while the curator keeps it enabled.
@@ -248,6 +252,7 @@ async function classifyPublications(
   db: ReturnType<typeof createStandaloneDatabase>,
   limit: number,
 ): Promise<void> {
+  if (!GLOBAL_TAXONOMY_CLASSIFICATION_ALLOWED) return;
   try {
     const result = await processPublicationTaxonomyBatch(db, {
       limit,
@@ -320,7 +325,9 @@ async function run(): Promise<void> {
         ncmEnrichmentEnabled:
           env.PUBLICATION_NCM_ENRICHMENT_ENABLED && GLOBAL_NCM_RESCAN_ALLOWED,
         ncmGlobalRescanGuard:
-          GLOBAL_NCM_RESCAN_ALLOWED ? 'approved_or_previous_engine' : 'TAX13_NOT_APPROVED',
+          GLOBAL_NCM_RESCAN_ALLOWED ? 'EXPLICITLY_APPROVED' : 'TAX13_NOT_APPROVED',
+        taxonomyGlobalClassificationGuard:
+          GLOBAL_TAXONOMY_CLASSIFICATION_ALLOWED ? 'EXPLICITLY_APPROVED' : 'TAX13_NOT_APPROVED',
         ncmIdleBatchSize: NCM_IDLE_BATCH_SIZE,
         ncmAfterCollectionBatchSize:
           NCM_AFTER_COLLECTION_BATCH_SIZE,
