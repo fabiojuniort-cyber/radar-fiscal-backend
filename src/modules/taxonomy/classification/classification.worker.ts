@@ -513,7 +513,7 @@ export async function classifySinglePublication(
         title: '',
     contentText: scopeCurrent ? verified.currentText : null,
     verifiedCurrentFragments: scopeCurrent ? verified.currentFragments : [],
-    ncmCodes: scopeCurrent ? await ncmCodesFor(db, row.publication_version_id) : [],
+    ncmCodes: scopeCurrent ? await ncmCodesFor(db, row.publication_version_id, verified.currentFragments) : [],
     concepts,
     codeGitSha: input.codeGitSha ?? null,
   });
