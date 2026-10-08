@@ -147,6 +147,17 @@ function isNonNormativePresentationClass(token: string): boolean {
   return NON_NORMATIVE_PRESENTATION_CLASSES.has(token) || isPreviousWordingClass(token);
 }
 
+/**
+ * Normalized legal segment status, produced by a source-aware adapter using
+ * evidence from the official act. This is independent of portal CSS classes.
+ * A missing status is NOT evidence that a segment is currently in force.
+ */
+const LEGAL_SEGMENT_STATUSES = new Set(['current', 'previous', 'revoked', 'editorial', 'unverified']);
+
+function legalSegmentStatus(value: string | undefined): string | undefined {
+  return value && LEGAL_SEGMENT_STATUSES.has(value) ? value : undefined;
+}
+
 const REVOKED_PLACEHOLDER =
   /^(?:(?:cl[áa]usula|art(?:igo)?\.?|par[áa]grafo|inciso|al[íi]nea|item)\s+[\p{L}\p{N}º°ª.-]+|§\s*\d+[º°ª]?|[ivxlcdm]+|[a-z]|\d+[º°ª]?)\s*(?:[-–—:]\s*)?revogad[oa]s?\.?$/iu;
 
@@ -204,6 +215,9 @@ function allowedAttributes(
   if (classes) {
     output.push(`class="${escapeAttribute(classes)}"`);
   }
+
+  const legalStatus = legalSegmentStatus(attributes['data-legal-status']);
+  if (legalStatus) output.push(`data-legal-status="${legalStatus}"`);
 
   if (name === 'a') {
     const href = safeHref(
@@ -396,7 +410,7 @@ const BLOCK_TAGS = new Set(['p', 'div', 'li', 'tr', 'br', 'h1', 'h2', 'h3', 'h4'
 export function currentWordingText(html: string | null | undefined): string | undefined {
   if (!html) return undefined;
 
-  type Frame = { tag: string; text: string; excluded: boolean };
+  type Frame = { tag: string; text: string; excluded: boolean; historical: boolean };
   const frames: Frame[] = [];
   let output = '';
   let filtered = false;
@@ -413,16 +427,18 @@ export function currentWordingText(html: string | null | undefined): string | un
         const tag = name.toLowerCase();
         const classes = (attributes.class ?? '').split(/\s+/).filter(Boolean);
         const previous = classes.some(isPreviousWordingClass);
-        const excluded = classes.some(isNonNormativePresentationClass);
-        if (excluded) filtered = true;
+        const status = legalSegmentStatus(attributes['data-legal-status']);
+        const historical = previous || status === 'previous' || status === 'revoked';
+        const excluded = classes.some(isNonNormativePresentationClass) || (status !== undefined && status !== 'current');
+        if (excluded || status !== undefined) filtered = true;
 
         const row = [...frames].reverse().find((frame) => frame.tag === 'tr');
         if (previous && row) row.excluded = true;
 
-        if (tag === 'tr' || tag === 'p' || excluded) {
-          // Editorial notes are excluded even when nested in a current table
-          // row. Only previous-wording markers poison the whole row.
-          frames.push({ tag, text: '', excluded });
+        if (tag === 'tr' || tag === 'p' || excluded || status !== undefined) {
+          // A source adapter can exclude a single cell/item using its own
+          // status. CONFAZ previous-wording table styles remain row-scoped.
+          frames.push({ tag, text: '', excluded, historical });
         }
         if (tag === 'br') append('\n');
       },
@@ -440,6 +456,10 @@ export function currentWordingText(html: string | null | undefined): string | un
         const frame = frames.pop()!;
         if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
           append(frame.text + separator);
+        } else if (frame.historical && ANNEX_HEADING.test(frame.text.trim())) {
+          // Preserve an excluded annex heading only as a boundary signal.
+          // excludeHistoricalAnnexes consumes it before evidence is returned.
+          append(frame.text + ' — redação anterior\n');
         } else if (frame.tag === 'p' && isRevokedPlaceholder(frame.text)) {
           filtered = true;
         }
@@ -452,6 +472,8 @@ export function currentWordingText(html: string | null | undefined): string | un
     const frame = frames.pop()!;
     if (!frame.excluded && !(frame.tag === 'p' && isRevokedPlaceholder(frame.text))) {
       append(frame.text);
+    } else if (frame.historical && ANNEX_HEADING.test(frame.text.trim())) {
+      append(frame.text + ' — redação anterior\n');
     } else if (frame.tag === 'p' && isRevokedPlaceholder(frame.text)) {
       filtered = true;
     }
