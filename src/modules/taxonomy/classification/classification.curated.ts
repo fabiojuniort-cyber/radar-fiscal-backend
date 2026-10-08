@@ -9,9 +9,9 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-// 2.3.0 changes legal text scope: titles, editorial/old wording and revoked
-// annex fragments are not automatic taxonomy evidence.
-export const CURATED_ENGINE_VERSION = '2.3.0';
+// 2.4.0 only consumes audited legal-scope CURRENT fragments. This must
+// never reuse SUCCESS seals from 2.3.0's pre-attestation heuristics.
+export const CURATED_ENGINE_VERSION = '2.4.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
