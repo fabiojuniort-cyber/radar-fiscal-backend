@@ -252,7 +252,7 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
                     '2099-01-01','UNVERIFIED','{"version":1,"segments":[]}'::jsonb,
                     'HUMAN_REVIEW','tax13-b4-ci')
           `, [version.rows[0]!.id, source.rows[0]!.id, originUrl, hash]),
-          /violates foreign key constraint/,
+          /TAX13_LEGAL_SCOPE_SOURCE_VERSION_MISMATCH/,
         );
         await client.query('ROLLBACK TO SAVEPOINT evidence_provenance');
       } finally {
