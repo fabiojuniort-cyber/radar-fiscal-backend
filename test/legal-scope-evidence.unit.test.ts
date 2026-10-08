@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 
 import {
+  brazilLegalReferenceDate,
   renderedLegalText,
   validateLegalScopeEvidence,
   type LegalScopeEvidenceV1,
@@ -152,4 +153,9 @@ test('TAX13 B4 verified ledger row is the only trusted source of active fragment
   assert.equal(verifyPersistedLegalScopeRow({...row,html_sha256:digest('other')},input).reason,'ATTESTATION_RECORD_MISMATCH');
   assert.equal(verifyPersistedLegalScopeRow({...row,origin_url:'https://attacker.example'},input).reason,'ATTESTATION_RECORD_MISMATCH');
   assert.equal(verifyPersistedLegalScopeRow({...row,attestor_kind:'REMOTE_METADATA'},input).reason,'ATTESTATION_RECORD_MISMATCH');
+});
+
+test('TAX13 B4 normative date is Brazil-local at UTC midnight boundary', () => {
+  assert.equal(brazilLegalReferenceDate(new Date('2026-10-08T01:59:59.000Z')), '2026-10-07');
+  assert.equal(brazilLegalReferenceDate(new Date('2026-10-08T03:00:00.000Z')), '2026-10-08');
 });
