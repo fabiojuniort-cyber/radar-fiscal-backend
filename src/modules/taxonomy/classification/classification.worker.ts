@@ -172,6 +172,7 @@ async function selectPending(
 async function ncmCodesFor(
   db: Kysely<DB>,
   publicationVersionId: string,
+  verifiedCurrentFragments: readonly string[],
 ): Promise<string[]> {
   const result = await sql<{ ncm_code: string }>`
     SELECT DISTINCT ncm_code
