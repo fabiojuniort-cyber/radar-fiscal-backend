@@ -451,7 +451,7 @@ BEGIN
     -- Never normalize the bytes used by hashes, fragments or offsets.
     IF html IS NULL
       OR octet_length(html) > 2097152
-      OR html ~ U&'[^\0009-\000D\0020-\00FF\1680\2000-\200A\2010-\201F\2028\2029\202F\205F\20AC\2122\3000\FEFF]'
+      OR html COLLATE "C" ~ U&'[^\0009-\000D\0020-\00FF\1680\2000-\200A\2010-\201F\2028\2029\202F\205F\20AC\2122\3000\FEFF]'
       OR record_.html_sha256 IS DISTINCT FROM
          encode(sha256(convert_to(html,'UTF8')),'hex')
     THEN RETURN NULL;
