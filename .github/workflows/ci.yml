@@ -297,6 +297,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run build
       - name: Apply complete migrations including ONB-01 042 and 043
         run: npm run db:prepare
       - name: Verify onboarding migration on PostgreSQL 18
