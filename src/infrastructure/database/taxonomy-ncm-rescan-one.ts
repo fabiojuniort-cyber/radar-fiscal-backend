@@ -10,6 +10,7 @@ import {
   persistSuccessfulScan,
   selectText,
 } from '../../modules/taxonomy/ncm/publication-ncm.detector.js';
+import { readVerifiedLegalScope } from '../../modules/taxonomy/legal-scope/legal-scope.repository.js';
 import type { DB } from './database.types.js';
 
 /**
@@ -63,7 +64,23 @@ try {
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
-  const { text, sourceField, currentWordingOnly } = selectText(row);
+  const asOf = arg('as-of') ?? new Date().toISOString().slice(0, 10);
+  const evidence = await readVerifiedLegalScope(db, {
+    publicationVersionId: row.publication_version_id,
+    sanitizedHtml: row.presentation_html ?? '',
+    asOf,
+  });
+  // A dry-run may explain historical vs. current candidates, but only
+  // content actually backed by the audited official-scope ledger can
+  // be saved as the 1.2.0 detector SUCCESS seal. Never let an unverified
+  // HTML style or a curator CLI flag supersede earlier NCM evidence.
+  if (confirm && (!evidence.valid || evidence.currentSegments === 0)) {
+    throw new Error('TAX13_OFFICIAL_LEGAL_SCOPE_REQUIRED: ' +
+      (evidence.reason ?? 'NO_ATTESTED_CURRENT_FRAGMENT'));
+  }
+  const { text, sourceField, currentWordingOnly } = confirm
+    ? { text: evidence.currentText, sourceField: 'CONTENT_TEXT' as const, currentWordingOnly: true }
+    : selectText(row);
   const candidates = extractNcmCandidates(text);
   const everywhere = extractNcmCandidates(row.content_text ?? '');
   const inForce = new Set(candidates.map((candidate) => candidate.code));
@@ -78,6 +95,10 @@ try {
     'TAXONOMY_NCM_RESCAN_ONE=' +
       JSON.stringify({
         publicationVersionId: row.publication_version_id,
+        asOf,
+        legalScopeVerified: evidence.valid,
+        legalScopeReason: evidence.reason,
+        legalScopeAttestationId: evidence.attestationId,
         currentWordingOnly,
         persisted: confirm,
         inForceCount: inForce.size,
