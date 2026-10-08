@@ -90,7 +90,7 @@ export const publicSignupBodySchema = z
   .object({
     name: z.string().trim().min(2).max(160),
     email: z.string().trim().email().max(320),
-    company: z.string().trim().min(2).max(200),
+    company: z.string().trim().min(2).max(200).optional(),
     cnpj: optionalCnpjSchema,
     password: z
       .string()
@@ -278,11 +278,11 @@ export async function registerPublicAccount(
           from public.auth_public_signup_create_account(
             ${input.name},
             ${email},
-            ${input.company},
-            ${input.cnpj},
+            ${input.company ?? null},
+            ${input.cnpj ?? null},
             ${passwordHash},
             ${input.acceptedTerms},
-            ${tenantSlug(input.company)},
+            ${tenantSlug(input.company ?? input.name)},
             ${PUBLIC_SIGNUP_CONSENT_VERSION}
           )
         `.execute(trx);
@@ -306,7 +306,7 @@ export async function registerPublicAccount(
       },
       tenant: {
         id: created.tenant_id,
-        name: input.company,
+        name: input.company ?? `Conta de ${input.name}`,
         slug: created.tenant_slug,
       },
       membership: {
