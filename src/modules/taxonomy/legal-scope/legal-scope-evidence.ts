@@ -68,6 +68,20 @@ export interface LegalScopeValidation {
   currentSegments: number;
 }
 
+/** Legal reference date in Brazil, not the worker host's UTC date. */
+export function brazilLegalReferenceDate(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric',
+    month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const field = (key: string) => parts.find((part) => part.type === key)?.value;
+  const yyyy = field('year');
+  const mm = field('month');
+  const dd = field('day');
+  if (!yyyy || !mm || !dd) throw new Error('BRAZIL_REFERENCE_DATE_UNAVAILABLE');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
 const sha256 = (text: string): string =>
   createHash('sha256').update(text, 'utf8').digest('hex');
 
