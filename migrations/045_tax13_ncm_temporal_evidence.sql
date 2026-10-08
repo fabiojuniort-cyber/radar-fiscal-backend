@@ -517,6 +517,25 @@ BEGIN
          encode(sha256(convert_to(serialized,'UTF8')),'hex')
     THEN RETURN FALSE; END IF;
 
+
+    -- The worker and SQL positive bridge must agree on the EXACT run identity.
+    -- All properties use the canonical JSON.stringify key order from
+    -- ncmTemporalFingerprint(); to_json(text)::text quotes scalar values.
+    IF record_.run_fingerprint IS DISTINCT FROM encode(sha256(convert_to(
+      '{"contract":"TAX13_NCM_TEMPORAL_V1","publicationVersionId":' ||
+      to_json(record_.publication_version_id::text)::text ||
+      ',"detectorKey":' || to_json(record_.detector_key)::text ||
+      ',"detectorVersion":' || to_json(record_.detector_version)::text ||
+      ',"attestationId":' || to_json(record_.legal_scope_attestation_id::text)::text ||
+      ',"validAsOf":' || to_json(record_.legal_as_of::text)::text ||
+      ',"recheckOn":' || to_json(record_.recheck_on::text)::text ||
+      ',"coverage":' || to_json(record_.coverage)::text ||
+      ',"htmlSha256":' || to_json(btrim(record_.html_sha256))::text ||
+      ',"fragmentsSha256":' || to_json(btrim(record_.current_fragments_sha256))::text ||
+      ',"catalogEditionId":' || to_json(record_.catalog_edition_id::text)::text ||
+      ',"catalogSha256":' || to_json(btrim(record_.catalog_sha256))::text ||
+      '}', 'UTF8')),'hex')
+    THEN RETURN FALSE; END IF;
     WITH extracted AS (
       SELECT DISTINCT d.code
       FROM jsonb_array_elements_text(fragments) AS f(value)
