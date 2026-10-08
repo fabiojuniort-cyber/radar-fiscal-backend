@@ -154,6 +154,7 @@ async function selectPending(
           AND n.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
           AND n.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
           AND n.status = 'SUCCESS'
+          AND (n.scanned_at AT TIME ZONE 'America/Sao_Paulo')::date = ${asOf}::date
       )
       AND NOT EXISTS (
         SELECT 1
