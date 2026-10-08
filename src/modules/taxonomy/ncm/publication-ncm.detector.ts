@@ -490,10 +490,10 @@ export async function processPublicationNcmEnrichmentBatch(
         return temporal;
       });
 
-      if (stored.inserted) {
-        result.succeeded += 1;
-        result.matches += stored.matches;
-      }
+      // Both workers completed a valid scan when the fingerprint already
+      // exists; only the first committed physical scan adds matched rows.
+      result.succeeded += 1;
+      if (stored.inserted) result.matches += stored.matches;
     } catch (error) {
       if (isPublicationOutOfScopeError(error)) {
         continue;
