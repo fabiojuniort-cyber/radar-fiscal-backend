@@ -47,6 +47,19 @@ export async function seedTestLegalScopeAttestation(
   const html=row.presentation_html;
   const text=renderedLegalText(html);
   if (!text) throw new Error('TEST_LEGAL_BODY_REQUIRED');
+
+  // CI-only proof, not a portal adapter. The NCM fixture deliberately has
+  // two DOM text nodes: a purely EDITORIAL title and the CURRENT legal body.
+  // Neither a positive attestation nor a classifier may span both nodes.
+  const fixtureTitleHtml = '<p class="TituloAcordo">CONVÊNIO ICMS — fixture</p>';
+  const fixtureTitle = 'CONVÊNIO ICMS — fixture';
+  const withTitle = html.startsWith(fixtureTitleHtml);
+  if (withTitle && (!text.startsWith(fixtureTitle) ||
+      !html.slice(fixtureTitleHtml.length).startsWith('<p class="TextoAcordo">'))) {
+    throw new Error('TEST_UNSUPPORTED_TITLE_LAYOUT');
+  }
+  const bodyStart = withTitle ? fixtureTitle.length : 0;
+  if (!text.slice(bodyStart)) throw new Error('TEST_LEGAL_BODY_REQUIRED');
   const h=(v:string)=>createHash('sha256').update(v,'utf8').digest('hex');
   const validAsOf=brazilLegalReferenceDate();
   const recheck=new Date(validAsOf+'T12:00:00.000Z');
@@ -58,11 +71,21 @@ export async function seedTestLegalScopeAttestation(
     verifiedAt:new Date(Date.now()-60_000).toISOString(),
     recheckOn:recheck.toISOString().slice(0,10),
     coverage:'COMPLETE',
-    segments:[{
-      start:0,end:text.length,textSha256:h(text),status:'CURRENT',
-      method:'OFFICIAL_CONSOLIDATION',
-      evidenceUrls:[url],
-    }],
+    segments:[
+      ...(withTitle ? [{
+        start:0,end:bodyStart,textSha256:h(fixtureTitle),
+        status:'EDITORIAL' as const,
+        method:'ORIGINAL_PUBLICATION' as const,
+        evidenceUrls:[],
+      }] : []),
+      {
+        start:bodyStart,end:text.length,
+        textSha256:h(text.slice(bodyStart)),
+        status:'CURRENT' as const,
+        method:'OFFICIAL_CONSOLIDATION' as const,
+        evidenceUrls:[url],
+      },
+    ],
   };
   const inserted=await admin.query<{id:string}>(`
     INSERT INTO public.publication_legal_scope_attestations
