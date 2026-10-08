@@ -459,8 +459,8 @@ BEGIN
         coalesce(node_.capture[1],'') || '>' || node_.capture[3] || '</p>';
       node_start := char_length(legal_text);
       legal_text := legal_text || node_.capture[3];
-      node_excluded := coalesce(node_.capture[2],'') IN
-        ('TituloAcordo','RedaoAnt');
+      node_excluded := coalesce(node_.capture[1],'') IN
+        (' class="TituloAcordo"',' class="RedaoAnt"');
       IF btrim(node_.capture[3]) ~* '^ANEXO[[:space:]]+(UNICO|ÚNICO|[IVXLCDM]+|[0-9]+)([[:space:]]*$|[[:space:]]*[-–—:.(])' THEN
         historical_annex := node_.capture[3] ~* '(REVOGAD|REDAÇÃO[[:space:]]+ANTERIOR|TEXTO[[:space:]]+ANTERIOR|SEM[[:space:]]+VIGÊNCIA|SUBSTITUÍD)';
         node_excluded := TRUE;
