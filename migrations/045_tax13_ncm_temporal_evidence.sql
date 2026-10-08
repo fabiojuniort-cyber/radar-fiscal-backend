@@ -457,68 +457,7 @@ BEGIN
       END IF;
       node_excluded := node_excluded OR historical_annex
         OR btrim(node_.capture[3]) ~* '^(PUBLICAD[OA]|RATIFICAD[OA]|ALTERAD[OA]|PRORROGAD[OA]|VIDE[[:space:]]|REDAÇÃO[[:space:]]+ANTERIOR|TEXTO[[:space:]]+ANTERIOR|NOVA[[:space:]]+REDAÇÃO)'
-        OR btrim(node_.capture[3]) ~* '^(CONVÊNIO([[:space:]]+ICMS)?|AJUSTE[[:space:]]+SINIEF|ATO[[:space:]]+COTEPE|PROTOCOLO[[:space:]]+ICMS|LEI|DECRETO|PORTARIA|RESOLUÇÃO)[[:space:]]+(N[ºO]?[.]?[[:space:]]*)?[0-9]+([./-][0-9]+)*[.]?
-    FOR segment IN SELECT value FROM jsonb_array_elements(record_.manifest->'segments')
-    LOOP
-      IF coalesce(segment->>'start','') !~ '^[0-9]+$' OR coalesce(segment->>'end','') !~ '^[0-9]+$'
-        OR coalesce(segment->>'textSha256','') !~ '^[a-f0-9]{64}$'
-      THEN RETURN NULL;
-      END IF;
-      start_at := (segment->>'start')::integer;
-      end_at := (segment->>'end')::integer;
-      IF start_at < preceding OR end_at <= start_at OR end_at > char_length(legal_text)
-        OR btrim(substr(legal_text,preceding+1,start_at-preceding)) <> ''
-      THEN RETURN NULL;
-      END IF;
-      piece := substr(legal_text,start_at+1,end_at-start_at);
-      IF encode(sha256(convert_to(piece,'UTF8')),'hex') IS DISTINCT FROM
-           segment->>'textSha256'
-        OR coalesce(segment->>'method','') NOT IN
-           ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT','ORIGINAL_PUBLICATION','HUMAN_REVIEW')
-        OR coalesce(segment->>'status','') NOT IN
-           ('CURRENT','PREVIOUS','REVOKED','EDITORIAL','UNVERIFIED')
-      THEN RETURN NULL;
-      END IF;
-      -- The worker checks URLs for every status, not only CURRENT.
-      -- Source-admin evidence cannot authorize a foreign or non-HTTPS host.
-      IF jsonb_typeof(segment->'evidenceUrls') IS DISTINCT FROM 'array'
-        OR jsonb_array_length(segment->'evidenceUrls')>25
-        OR (segment ? 'supportingActs' AND
-          (jsonb_typeof(segment->'supportingActs') IS DISTINCT FROM 'array'
-           OR jsonb_array_length(segment->'supportingActs')>25))
-      THEN RETURN NULL; END IF;
-      FOR evidence_url IN SELECT value
-        FROM jsonb_array_elements_text(segment->'evidenceUrls') AS e(value)
-      LOOP
-        IF coalesce(evidence_url,'') !~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
-        THEN RETURN NULL; END IF;
-      END LOOP;
-      IF segment->>'status'='CURRENT' THEN
-        IF coalesce(segment->>'method','') NOT IN ('OFFICIAL_CONSOLIDATION','OFFICIAL_AMENDMENT')
-          OR jsonb_typeof(segment->'evidenceUrls') IS DISTINCT FROM 'array'
-          OR jsonb_array_length(segment->'evidenceUrls')=0
-          OR NOT EXISTS (
-            SELECT 1 FROM jsonb_array_elements(node_ranges) AS n(node)
-            WHERE (n.node->>'start')::integer <= start_at
-              AND (n.node->>'end')::integer >= end_at
-              AND (n.node->>'excluded') = 'false'
-          )
-        THEN RETURN NULL;
-        END IF;
-        fragments := fragments || jsonb_build_array(piece);
-      END IF;
-      preceding := end_at;
-      count_segments := count_segments+1;
-      IF count_segments>50000 THEN RETURN NULL; END IF;
-    END LOOP;
-    IF btrim(substr(legal_text,preceding+1)) <> '' THEN RETURN NULL; END IF;
-    RETURN fragments;
-EXCEPTION WHEN data_exception OR invalid_text_representation OR numeric_value_out_of_range THEN
-    RETURN NULL;
-END;
-$$;
-
-;
+        OR btrim(node_.capture[3]) ~* '^(CONVÊNIO([[:space:]]+ICMS)?|AJUSTE[[:space:]]+SINIEF|ATO[[:space:]]+COTEPE|PROTOCOLO[[:space:]]+ICMS|LEI|DECRETO|PORTARIA|RESOLUÇÃO)[[:space:]]+(N[ºO]?[.]?[[:space:]]*)?[0-9]+([./-][0-9]+)*[.]?$';
       node_ranges := node_ranges || jsonb_build_array(
         jsonb_build_object('start',node_start,
           'end',char_length(legal_text),'excluded',node_excluded));
