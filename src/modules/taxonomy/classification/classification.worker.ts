@@ -513,6 +513,14 @@ export async function classifySinglePublication(
   const row = current.rows[0];
   if (!row) throw new Error('PUBLICATION_NOT_FOUND');
 
+  // Acquire the SUPPRESS/RESTORE serialization barrier before ANY derivative
+  // catalog / attestation lookup. A catalog may be absent; that must never
+  // skip a pending SUPPRESS lock or return an unrelated error in its place.
+  // persistSuccess obtains the barrier again in its write transaction.
+  if (input.persist) {
+    await db.transaction().execute((trx) =>
+      lockPublicationVersionInScope(trx, row.publication_version_id));
+  }
   const asOf = brazilLegalReferenceDate();
   const verified = await readVerifiedLegalScope(db, {
     publicationVersionId: row.publication_version_id,
