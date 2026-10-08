@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { Pool, type PoolClient } from 'pg';
@@ -171,6 +171,80 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
         'trg_tax13_legal_scope_append_only',
         'trg_tax13_legal_scope_provenance',
       ]);
+    });
+
+    await t.test('TAX13 legal evidence is append-only and bound to a real source origin', async () => {
+      await client.query('BEGIN');
+      try {
+        const seed = randomUUID();
+        const hash = createHash('sha256').update(seed).digest('hex');
+        const source = await client.query<{ id: string }>(`
+          INSERT INTO public.sources
+            (code, name, jurisdiction_level, base_url, connector_key)
+          VALUES ($1, 'B4 test source', 'FEDERAL', 'https://www.confaz.fazenda.gov.br', $2)
+          RETURNING id
+        `, ['tax13_b4_' + seed, 'tax13_b4_' + seed]);
+        const publication = await client.query<{ id: string }>(`
+          INSERT INTO public.publications
+            (identity_hash, identity_strength, identity_basis, jurisdiction_level, title)
+          VALUES ($1, 'STRONG', '{}'::jsonb, 'FEDERAL', 'B4 audited fixture')
+          RETURNING id
+        `, [hash]);
+        const version = await client.query<{ id: string }>(`
+          INSERT INTO public.publication_versions
+            (publication_id, version_no, content_hash, content_text, is_current)
+          VALUES ($1::uuid, 1, $2, 'Texto legal não verificado', TRUE)
+          RETURNING id
+        `, [publication.rows[0]!.id, hash]);
+        const originUrl = 'https://www.confaz.fazenda.gov.br/legislacao/convenios/1991/CV052_91';
+        const origin = await client.query<{ id: string }>(`
+          INSERT INTO public.publication_origins
+            (publication_id, source_id, official_url)
+          VALUES ($1::uuid, $2::uuid, $3) RETURNING id
+        `, [publication.rows[0]!.id, source.rows[0]!.id, originUrl]);
+        const attestation = await client.query<{ id: string }>(`
+          INSERT INTO public.publication_legal_scope_attestations
+            (publication_version_id, source_id, publication_origin_id,
+             official_url, html_sha256, valid_as_of, verified_at,
+             recheck_on, coverage, manifest, attestor_kind, attestor_ref)
+          VALUES
+            ($1::uuid,$2::uuid,$3::uuid,$4,$5,'2026-10-08',
+             now()-interval '1 minute','2099-01-01','UNVERIFIED',
+             '{"version":1,"segments":[]}'::jsonb,'HUMAN_REVIEW','tax13-b4-ci')
+          RETURNING id
+        `, [version.rows[0]!.id, source.rows[0]!.id, origin.rows[0]!.id, originUrl, hash]);
+        assert.ok(attestation.rows[0]?.id);
+
+        for (const [label, command] of [
+          ['update', 'UPDATE public.publication_legal_scope_attestations SET coverage=\'PARTIAL\' WHERE id=$1::uuid'],
+          ['delete', 'DELETE FROM public.publication_legal_scope_attestations WHERE id=$1::uuid'],
+        ] as const) {
+          await client.query('SAVEPOINT evidence_immutable');
+          await assert.rejects(
+            client.query(command, [attestation.rows[0]!.id]),
+            /TAX13_LEGAL_SCOPE_APPEND_ONLY/,
+            label,
+          );
+          await client.query('ROLLBACK TO SAVEPOINT evidence_immutable');
+        }
+        await client.query('SAVEPOINT evidence_provenance');
+        await assert.rejects(
+          client.query(`
+            INSERT INTO public.publication_legal_scope_attestations
+              (publication_version_id, source_id, publication_origin_id,
+               official_url, html_sha256, valid_as_of, verified_at,
+               recheck_on, coverage, manifest, attestor_kind, attestor_ref)
+            VALUES ($1::uuid, $2::uuid, gen_random_uuid(),
+                    $3, $4, '2026-10-08', now()-interval '1 minute',
+                    '2099-01-01','UNVERIFIED','{"version":1,"segments":[]}'::jsonb,
+                    'HUMAN_REVIEW','tax13-b4-ci')
+          `, [version.rows[0]!.id, source.rows[0]!.id, originUrl, hash]),
+          /violates foreign key constraint/,
+        );
+        await client.query('ROLLBACK TO SAVEPOINT evidence_provenance');
+      } finally {
+        await client.query('ROLLBACK');
+      }
     });
 
     await t.test('app runtime is taxonomy read-only', async () => {
