@@ -98,8 +98,9 @@ CREATE TRIGGER trg_tax13_scan_seal_v2_no_mutation
 CREATE FUNCTION public.tax13_validate_v2_proof_admission()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE a public.publication_legal_scope_attestations%ROWTYPE;
-DECLARE expected_digest TEXT;
+DECLARE
+  a public.publication_legal_scope_attestations%ROWTYPE;
+  expected_digest TEXT;
 BEGIN
   SELECT * INTO a FROM public.publication_legal_scope_attestations WHERE id=NEW.attestation_id;
   IF NOT FOUND OR a.publication_version_id IS DISTINCT FROM NEW.publication_version_id
@@ -107,8 +108,10 @@ BEGIN
     OR a.valid_as_of IS DISTINCT FROM NEW.valid_as_of
     OR a.recheck_on IS DISTINCT FROM NEW.recheck_on
     OR a.coverage <> 'COMPLETE'
-    OR NEW.current_fragments_sha256 IS DISTINCT FROM encode(
-      sha256(convert_to(NEW.current_fragments::text,'UTF8')),'hex')
+    OR NEW.current_fragments_sha256 IS DISTINCT FROM encode(sha256(convert_to(
+      '[' || coalesce((SELECT string_agg(to_json(value)::text,',' ORDER BY ordinality)
+      FROM jsonb_array_elements_text(NEW.current_fragments)
+      WITH ORDINALITY AS t(value,ordinality)),'') || ']', 'UTF8')),'hex')
   THEN RAISE EXCEPTION 'TAX13_V2_ADMISSION_EVIDENCE_MISMATCH';
   END IF;
   -- The issuer independently validates canonical_payload and the signature.
@@ -141,8 +144,9 @@ CREATE TRIGGER trg_tax13_v2_admission
 CREATE FUNCTION public.tax13_validate_v2_scan_seal()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE scan_ public.publication_ncm_scan_evidence%ROWTYPE;
-DECLARE proof_ public.tax13_legal_proofs_v2%ROWTYPE;
+DECLARE
+  scan_ public.publication_ncm_scan_evidence%ROWTYPE;
+  proof_ public.tax13_legal_proofs_v2%ROWTYPE;
 BEGIN
   SELECT * INTO scan_ FROM public.publication_ncm_scan_evidence
     WHERE id=NEW.scan_evidence_id;
