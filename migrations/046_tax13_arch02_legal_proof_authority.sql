@@ -597,3 +597,28 @@ REVOKE ALL ON FUNCTION public.tax13_v2_worker_proof_ready(UUID,DATE)
  FROM PUBLIC,radar_app,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer;
 GRANT EXECUTE ON FUNCTION public.tax13_v2_worker_proof_ready(UUID,DATE)
  TO radar_worker;
+
+-- An unrelated terminal attestation must NEVER win by timestamp/UUID.
+-- Supersession preserves the old immutable history; competing terminals fail
+-- closed even when one was written a minute later.
+CREATE OR REPLACE FUNCTION public.tax13_effective_attestation_id(
+  p_version UUID,p_as_of DATE
+) RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+ WITH terminal AS (
+   SELECT a.id
+   FROM public.publication_legal_scope_attestations a
+   WHERE a.publication_version_id=p_version AND a.valid_as_of=p_as_of
+     AND NOT EXISTS(
+       SELECT 1 FROM public.publication_legal_scope_attestations child
+       WHERE child.supersedes_attestation_id=a.id
+         AND child.publication_version_id=a.publication_version_id
+         AND child.valid_as_of=a.valid_as_of
+     )
+ )
+ SELECT id FROM terminal WHERE (SELECT count(*) FROM terminal)=1 LIMIT 1
+$$;
+REVOKE ALL ON FUNCTION public.tax13_effective_attestation_id(UUID,DATE)
+ FROM PUBLIC,radar_app,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer;
+GRANT EXECUTE ON FUNCTION public.tax13_effective_attestation_id(UUID,DATE)
+ TO radar_worker;
