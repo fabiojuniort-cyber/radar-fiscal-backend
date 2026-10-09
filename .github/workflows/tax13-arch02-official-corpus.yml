@@ -1,0 +1,49 @@
+name: TAX13-ARCH-02 read-only CONFAZ HTML compatibility
+
+on:
+  pull_request:
+    branches:
+      - fix/tax13-r2-ncm-temporal
+    paths:
+      - 'test/tax13-arch02.confaz-corpus-readonly.test.ts'
+      - '.github/workflows/tax13-arch02-official-corpus.yml'
+      - 'src/modules/collection/confaz.connector.ts'
+      - 'src/modules/collection/legal-presentation.ts'
+      - 'src/modules/taxonomy/legal-scope/legal-scope-evidence.ts'
+      - 'src/modules/taxonomy/legal-scope/legal-proof-v2.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tax13-arch02-confaz-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  official-html-compatibility:
+    name: CONFAZ 20 official HTML read-only (not legal current proof)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      TAX13_ARCH02_OFFICIAL_CORPUS_READONLY: 'true'
+    steps:
+      - name: Checkout exact PR SHA
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Structural audit - NO legal CURRENT assertion
+        run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-corpus-readonly.test.ts
+      - name: Upload exact raw HTML bytes and SHA256 manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tax13-arch02-official-confaz-html-20
+          path: audit-artifacts/tax13-confaz-20/
+          if-no-files-found: warn
+          retention-days: 14
