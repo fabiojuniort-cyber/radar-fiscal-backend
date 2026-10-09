@@ -28,7 +28,9 @@ jobs:
         pg: ['16-bookworm', '18-bookworm']
     services:
       postgres:
-        image: postgres:${{ matrix.pg }}
+        # Docker Official postgres distribution in AWS Public ECR, avoiding Docker Hub unauthenticated pull throttling.
+        # Keep PostgreSQL major and Debian base unchanged; security gates remain mandatory.
+        image: public.ecr.aws/docker/library/postgres:${{ matrix.pg }}
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
