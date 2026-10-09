@@ -52,7 +52,7 @@ jobs:
       DB_LEGAL_ISSUER_RUNTIME_PASSWORD: ci-tax13-issuer-password-with-32-chars-A
       DB_NCM_SEALER_RUNTIME_PASSWORD: ci-tax13-sealer-password-with-32-chars-B
       JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
-      R4_TEST_ACCOUNT_PASSWORD: ci-r7-test-account-password-with-at-least-32-characters
+      R4_TEST_ACCOUNT_PASSWORD: Ci-R7-adversarial-test-password-2026!
       AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
       PUBLIC_API_ALLOWED_ORIGINS: https://public.example
       DB_POOL_MAX: 3
