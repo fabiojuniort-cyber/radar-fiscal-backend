@@ -71,6 +71,20 @@ test('R802 DOU missing parent, false source, fabricated archive and foreign page
  assert.equal(inp(forged).status,'UNVERIFIED');
  forged=copy(child);(forged.metadata!.dou as any).parentMatterExternalId='bogus';
  assert.equal(inp(forged).status,'UNVERIFIED');
+ // A truncated child is still an exact substring of the parent dispatch but
+ // loses normative text: reject by fully re-deriving act boundaries.
+ forged=copy(child);forged.content=forged.content!.slice(0,-5);
+ assert.equal(inp(forged).status,'UNVERIFIED');
+ forged=copy(child);forged.content=forged.content!.split('\\n')[0]!;
+ assert.equal(inp(forged).status,'UNVERIFIED');
+ forged=copy(child);(forged.metadata!.dou as any).embeddedIndex=2;
+ assert.equal(inp(forged).status,'UNVERIFIED');
+ forged=copy(parent);(forged.metadata!.dou as any).parts[0].filename='515_20260918_123456789.xml';
+ assert.equal(inp(child,forged).status,'UNVERIFIED');
+ forged=copy(parent);(forged.metadata!.dou as any).parts[0].attributes.pdfPage='https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&jornal=515&pagina=99';
+ assert.equal(inp(child,forged).status,'UNVERIFIED');
+ forged=copy(parent);(forged.metadata!.dou as any).parts[0].attributes.editionNumber='181';
+ assert.equal(inp(child,forged).status,'UNVERIFIED');
 });
 test('R802 DOU user supplied hash alone is NEVER authenticity; no evidence means no green',()=>{
  const [parent,child]=syntheticPublications();assert.ok(parent&&child);
