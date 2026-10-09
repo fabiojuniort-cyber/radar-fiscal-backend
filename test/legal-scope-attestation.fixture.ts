@@ -19,6 +19,7 @@ export async function seedTestLegalScopeAttestation(
   admin: Pool,
   publicationVersionId: string,
   coverage: 'COMPLETE' | 'PARTIAL' = 'COMPLETE',
+  issueV2 = true,
 ): Promise<string> {
   const version = await admin.query<{
     publication_id: string;
@@ -112,6 +113,6 @@ export async function seedTestLegalScopeAttestation(
     validAsOf,m.verifiedAt,m.recheckOn,JSON.stringify(m),coverage]);
   const attestationId = inserted.rows[0]!.id;
   // Only a genuinely Node-valid COMPLETE synthetic proof is admitted.
-  if (coverage === 'COMPLETE') await seedTestV2LegalProof(admin, attestationId);
+  if (coverage === 'COMPLETE' && issueV2) await seedTestV2LegalProof(admin, attestationId);
   return attestationId;
 }
