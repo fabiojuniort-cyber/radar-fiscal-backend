@@ -175,7 +175,7 @@ test('Trifaros R802: contemporaneous PDF bytes are SHA-bound only, NEVER officia
  const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
- const pdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
  const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?captchafield=firstAccess&data=18%2F09%2F2026&jornal=515&pagina=1';
  const result=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
  assert.equal(result.status,'DOU_PDF_BYTES_BOUND_ONLY');
@@ -196,7 +196,7 @@ test('Trifaros R802: wrong edition/page/host, forgery and extra query fail close
  const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
- const pdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
  const base='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
  const attacks=[
   base.replace('pesquisa.in.gov.br','pesquisa.in.gov.br.evil.example'),
@@ -222,7 +222,7 @@ test('Trifaros R802: wrong edition/page/host, forgery and extra query fail close
   pdfBytes:Buffer.from('<html>not a real PDF</html>')});
  assert.equal(noPdf.reason,'DOU_PDF_FORMAT_UNVERIFIED');
  const bogus=preflightContemporaryDouPdfBytes({trace,pdfUrl:base,
-  pdfBytes:Buffer.from('%PDF-1.7\\n/ByteRange [0 1 2 3] but no EOF')});
+  pdfBytes:Buffer.from('%PDF-1.7\n/ByteRange [0 1 2 3] but no EOF')});
  assert.equal(bogus.status,'UNVERIFIED',
    'a claimed embedded signature marker does not qualify');
  const large=preflightContemporaryDouPdfBytes({trace,pdfUrl:base,
