@@ -31,7 +31,7 @@ END $$;
 -- source provenance and HTTP bytes separately; no data = NO positive CURRENT.
 CREATE TABLE public.tax13_v2_original_http_artifacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  publication_version_id UUID NOT NULL REFERENCES public.publication_versions(id) ON DELETE RESTRICT,
+  publication_version_id UUID NOT NULL,
   official_url TEXT NOT NULL CHECK (official_url ~ '^https://www[.]confaz[.]fazenda[.]gov[.]br/'),
   http_status INTEGER NOT NULL CHECK (http_status=200),
   raw_http_bytes BYTEA NOT NULL CHECK (octet_length(raw_http_bytes) BETWEEN 1 AND 16777216),
@@ -43,6 +43,35 @@ CREATE TABLE public.tax13_v2_original_http_artifacts (
   UNIQUE(publication_version_id,official_url,raw_sha256),
   CHECK(raw_sha256=encode(sha256(raw_http_bytes),'hex'))
 );
+-- No direct FK from the separate source-capture ledger to publication_versions:
+-- DOE-SP protected reconstruction must not gain an undeclared FK edge.
+-- A constraint trigger checks the binding instead, without letting rebuild
+-- cascade through this independent append-only external evidence ledger.
+CREATE FUNCTION public.tax13_v2_original_http_identity_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ IF NOT EXISTS(
+   SELECT 1 FROM public.publication_versions pv
+   JOIN public.publication_origins po ON po.publication_id=pv.publication_id
+     AND po.official_url=NEW.official_url
+   JOIN public.sources src ON src.id=po.source_id AND src.code='confaz'
+   WHERE pv.id=NEW.publication_version_id
+     AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
+     AND NEW.sanitized_html_sha256=encode(sha256(convert_to(
+       pv.source_metadata->'presentation'->>'html','UTF8')),'hex')
+ ) THEN
+   RAISE EXCEPTION 'TAX13_R8_ORIGINAL_HTTP_IDENTITY_MISMATCH';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER trg_tax13_original_http_identity_guard
+ BEFORE INSERT ON public.tax13_v2_original_http_artifacts
+ FOR EACH ROW EXECUTE FUNCTION public.tax13_v2_original_http_identity_guard();
+REVOKE ALL ON FUNCTION public.tax13_v2_original_http_identity_guard()
+ FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,
+ radar_legal_issuer,radar_scan_sealer,radar_proof_verifier;
+
 CREATE TRIGGER trg_tax13_original_http_immutable
  BEFORE UPDATE OR DELETE ON public.tax13_v2_original_http_artifacts
  FOR EACH ROW EXECUTE FUNCTION public.tax13_arch02_append_only();
