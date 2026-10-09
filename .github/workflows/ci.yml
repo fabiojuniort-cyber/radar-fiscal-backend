@@ -8,9 +8,13 @@ on:
       # TAX13 stacked review: validate PR #192 directly against the unmerged
       # TAX13-R2 phase-2 base (#186). This does not authorize a main merge.
       - fix/taxonomy-valid-legal-text
+      # TAX13-ARCH-02 #193 is stacked directly on PR #192.
+      - fix/tax13-r2-ncm-temporal
   push:
     branches:
       - main
+      # Temporary isolated validation until R8. This is not a deploy trigger.
+      - fix/tax13-arch-02-single-proof-authority
 
 # Replace only older runs of the same PR. Non-PR runs have independent groups.
 concurrency:
