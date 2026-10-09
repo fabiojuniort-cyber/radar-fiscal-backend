@@ -155,6 +155,31 @@ REVOKE ALL ON FUNCTION public.tax13_v2_capture_verified(UUID)
  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,
  radar_legal_issuer,radar_scan_sealer,radar_proof_verifier,radar_http_collector;
 
+-- Collector may only fetch a URL already registered against this exact
+-- current CONFAZ publication/version. No generic SQL, foreign host or input
+-- controlled raw payload is supplied to the collector process.
+CREATE FUNCTION public.tax13_r802_capture_target(p_version UUID,p_url TEXT)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $
+ SELECT jsonb_build_object('publicationVersionId',pv.id,
+  'officialUrl',po.official_url,'sanitizedHtml',
+    pv.source_metadata->'presentation'->>'html')
+ FROM public.publication_versions pv
+ JOIN public.publication_origins po ON po.publication_id=pv.publication_id
+ JOIN public.sources src ON src.id=po.source_id AND src.code='confaz'
+ WHERE pv.id=p_version AND pv.is_current
+   AND public.publication_scope_is_in_scope(pv.publication_id)
+   AND po.official_url=p_url
+   AND po.official_url ~ '^https://www[.]confaz[.]fazenda[.]gov[.]br/legislacao/'
+   AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
+   AND length(pv.source_metadata->'presentation'->>'html')>0
+ LIMIT 1 $;
+REVOKE ALL ON FUNCTION public.tax13_r802_capture_target(UUID,TEXT)
+ FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,
+ radar_legal_issuer,radar_scan_sealer,radar_proof_verifier;
+GRANT EXECUTE ON FUNCTION public.tax13_r802_capture_target(UUID,TEXT)
+ TO radar_http_collector;
+
 -- Even a verified Ed25519 signature or a previously issued MAC cannot
 -- promote a fixture without an independent live collector receipt.
 CREATE OR REPLACE FUNCTION public.tax13_v2_original_exists_for_issuer(p_attestation UUID,p_raw_sha TEXT)
