@@ -1,0 +1,98 @@
+import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto';
+import type { Pool } from 'pg';
+import {
+  buildLegalProofV2, canonicalLegalProofJson, signLegalProofV2,
+  verifySignedLegalProofV2,
+} from '../src/modules/taxonomy/legal-scope/legal-proof-v2.js';
+import type { LegalScopeEvidenceV1 } from '../src/modules/taxonomy/legal-scope/legal-scope-evidence.js';
+import { OFFICIAL_EVIDENCE_HOSTS } from '../src/modules/taxonomy/legal-scope/legal-scope.repository.js';
+
+/**
+ * Disposable CI database ONLY. Admin bypass models a correctly authorized
+ * independent issuer/sealer; it is not a production issuance workflow.
+ * Production must use the isolated runtime identity and key registry.
+ */
+const hash = (t: string) => createHash('sha256').update(t, 'utf8').digest('hex');
+
+export async function seedTestV2LegalProof(admin: Pool, attestationId: string): Promise<string> {
+  const rows = await admin.query<{
+    id: string; source_id: string; source_code: string; official_url: string;
+    publication_version_id: string; sanitized_html: string;
+    manifest: LegalScopeEvidenceV1; attestor_ref: string;
+  }>(`
+    SELECT a.id,a.source_id,s.code AS source_code,a.official_url,
+      a.publication_version_id,
+      pv.source_metadata->'presentation'->>'html' AS sanitized_html,
+      a.manifest,a.attestor_ref
+    FROM public.publication_legal_scope_attestations a
+    JOIN public.publication_versions pv ON pv.id=a.publication_version_id
+    JOIN public.sources s ON s.id=a.source_id
+    WHERE a.id=$1::uuid
+  `,[attestationId]);
+  const a=rows.rows[0];
+  if (!a) throw new Error('TAX13_CI_ATTESTATION_MISSING');
+  const hosts=OFFICIAL_EVIDENCE_HOSTS[a.source_code];
+  if (!hosts) throw new Error('TAX13_CI_UNSUPPORTED_OFFICIAL_SOURCE');
+  const proof=buildLegalProofV2(a.manifest,{
+    publicationVersionId:a.publication_version_id,sourceId:a.source_id,
+    officialUrl:a.official_url,sanitizedHtml:a.sanitized_html,
+    validAsOf:a.manifest.validAsOf,trustedAttestor:true,
+    trustedEvidenceHosts:hosts,
+  },{
+    proofId:randomUUID(),attestationId:a.id,
+    rawArtifactSha256:hash(a.sanitized_html), // synthetic source only
+    presentationArtifactSha256:hash(a.sanitized_html),
+    parserBuildDigest:hash('CI-only-deterministic-parser-build'),
+    parserVersion:'ci-node-24-htmlparser2',sanitizerVersion:'ci-sanitizer',
+    legalPolicyVersion:'ci-proof-v2',
+    issuerId:'ci-isolated-issuer',reviewDecisionId:a.attestor_ref,
+  });
+  const keys=generateKeyPairSync('ed25519');
+  const keyId='tax13-ci-'+randomUUID();
+  const pub=keys.publicKey.export({format:'pem',type:'spki'}).toString();
+  const signed=signLegalProofV2(proof,keys.privateKey,keyId);
+  if (!verifySignedLegalProofV2(signed,keys.publicKey,keyId)) {
+    throw new Error('TAX13_CI_SIGNATURE_BAD');
+  }
+  await admin.query(`
+    INSERT INTO public.tax13_v2_authorized_keys(
+      key_id,public_key_pem,active_from,registered_by
+    ) VALUES ($1,$2,statement_timestamp()-interval '1 minute','CI-ONLY')
+  `,[keyId,pub]);
+  await admin.query(`
+    INSERT INTO public.tax13_legal_proofs_v2 (
+      id,attestation_id,publication_version_id,html_sha256,valid_as_of,
+      recheck_on,current_fragments,current_fragments_sha256,
+      canonical_payload,payload_sha256,signature_base64,signature_key_id,
+      issuer_id,parser_version,sanitizer_version,policy_version
+    ) VALUES (
+      $1::uuid,$2::uuid,$3::uuid,$4,$5::date,$6::date,$7::jsonb,$8,
+      $9,$10,$11,$12,$13,$14,$15,$16
+    )
+  `,[
+    proof.proofId,proof.attestationId,proof.publicationVersionId,
+    proof.sanitizedHtmlSha256,proof.validAsOf,proof.recheckOn,
+    JSON.stringify(proof.currentFragments),proof.currentFragmentsSha256,
+    canonicalLegalProofJson(proof),signed.payloadSha256,signed.signatureBase64,
+    signed.signatureKeyId,proof.issuerId,proof.parserVersion,
+    proof.sanitizerVersion,proof.legalPolicyVersion,
+  ]);
+  return proof.proofId;
+}
+
+export async function seedTestV2NcmSeals(
+  admin: Pool, publicationVersionId: string, asOf: string,
+): Promise<void> {
+  await admin.query(`
+    INSERT INTO public.tax13_ncm_seals_v2(
+      scan_evidence_id,legal_proof_id,scan_fingerprint,sealer_id)
+    SELECT scan.id,proof.id,scan.run_fingerprint,'CI-ONLY-TEST-SEALER'
+    FROM public.publication_ncm_scan_evidence scan
+    JOIN public.tax13_legal_proofs_v2 proof
+      ON proof.attestation_id=scan.legal_scope_attestation_id
+     AND proof.publication_version_id=scan.publication_version_id
+     AND proof.current_fragments_sha256=scan.current_fragments_sha256
+    WHERE scan.publication_version_id=$1::uuid AND scan.legal_as_of=$2::date
+    ON CONFLICT(scan_evidence_id) DO NOTHING
+  `,[publicationVersionId,asOf]);
+}
