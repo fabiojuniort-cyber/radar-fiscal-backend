@@ -71,6 +71,10 @@ REVOKE ALL ON public.tax13_v2_official_capture_receipts
 GRANT SELECT,INSERT ON public.tax13_v2_official_capture_receipts TO radar_http_collector;
 CREATE POLICY tax13_r802_collector_receipt ON public.tax13_v2_official_capture_receipts
  FOR ALL TO radar_http_collector USING(true) WITH CHECK(true);
+-- Owner SECURITY DEFINER readers still need a SELECT policy with FORCE RLS;
+-- this does NOT grant table SELECT to PUBLIC.
+CREATE POLICY tax13_r802_owner_read ON public.tax13_v2_official_capture_receipts
+ FOR SELECT TO PUBLIC USING(true);
 
 -- Immutable original table existed before 048. No artificial admin fixture
 -- becomes official unless a separately authenticated capture receipt exists.
@@ -79,9 +83,10 @@ GRANT SELECT,INSERT ON public.tax13_v2_original_http_artifacts TO radar_http_col
 CREATE FUNCTION public.tax13_r802_capture_guard()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE a public.tax13_v2_original_http_artifacts%ROWTYPE;
-DECLARE secret_ BYTEA;
-DECLARE payload TEXT;
+DECLARE
+ a public.tax13_v2_original_http_artifacts%ROWTYPE;
+ secret_ BYTEA;
+ payload TEXT;
 BEGIN
  SELECT * INTO a FROM public.tax13_v2_original_http_artifacts WHERE id=NEW.artifact_id;
  SELECT key_bytes INTO secret_ FROM public.tax13_v2_capture_mac_keys WHERE key_id=NEW.capture_key_id;
@@ -95,15 +100,25 @@ BEGIN
    OR NEW.started_at > NEW.captured_at OR NEW.started_at < NEW.captured_at - INTERVAL '60 seconds'
    OR NEW.final_url !~ '^https://www[.]confaz[.]fazenda[.]gov[.]br/legislacao/'
    OR NEW.collector_identity !~ '^[a-zA-Z0-9][a-zA-Z0-9_.:-]{7,127}$'
-   OR array_length(NEW.redirect_urls,1) NOT BETWEEN 1 AND 5
+   OR coalesce(array_length(NEW.redirect_urls,1),0) NOT BETWEEN 1 AND 5
    OR NEW.redirect_urls[1] IS DISTINCT FROM a.official_url
    OR NEW.redirect_urls[array_length(NEW.redirect_urls,1)] IS DISTINCT FROM NEW.final_url
    OR EXISTS(SELECT 1 FROM unnest(NEW.redirect_urls) u
      WHERE u !~ '^https://www[.]confaz[.]fazenda[.]gov[.]br/legislacao/')
+   OR NEW.remote_ipv4 << inet '0.0.0.0/8'
    OR NEW.remote_ipv4 << inet '10.0.0.0/8'
    OR NEW.remote_ipv4 << inet '127.0.0.0/8'
    OR NEW.remote_ipv4 << inet '172.16.0.0/12'
    OR NEW.remote_ipv4 << inet '192.168.0.0/16'
+   OR NEW.remote_ipv4 << inet '169.254.0.0/16'
+   OR NEW.remote_ipv4 << inet '100.64.0.0/10'
+   OR NEW.remote_ipv4 << inet '192.0.0.0/24'
+   OR NEW.remote_ipv4 << inet '192.0.2.0/24'
+   OR NEW.remote_ipv4 << inet '198.18.0.0/15'
+   OR NEW.remote_ipv4 << inet '198.51.100.0/24'
+   OR NEW.remote_ipv4 << inet '203.0.113.0/24'
+   OR NEW.remote_ipv4 << inet '224.0.0.0/4'
+   OR NEW.remote_ipv4 << inet '240.0.0.0/4'
    OR family(NEW.remote_ipv4) <> 4
  THEN RAISE EXCEPTION 'TAX13_R802_CAPTURE_NOT_AUTHENTICATED'; END IF;
  payload := concat_ws(chr(10),
