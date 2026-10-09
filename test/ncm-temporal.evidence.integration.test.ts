@@ -13,6 +13,7 @@ import {
   type LegalScopeEvidenceV1,
 } from '../src/modules/taxonomy/legal-scope/legal-scope-evidence.js';
 import { sanitizeLegalPresentationHtml } from '../src/modules/collection/legal-presentation.js';
+import { seedTestV2LegalProof, seedTestV2NcmSeals } from './tax13-arch02.signed-fixture.js';
 import { readVerifiedLegalScope } from '../src/modules/taxonomy/legal-scope/legal-scope.repository.js';
 import {
   persistTemporalNcmScan, readCurrentNcmEvidence,
@@ -120,13 +121,24 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
           date, manifest.verifiedAt, manifest.recheckOn, coverage,
           JSON.stringify(manifest), supersedes, options?.id ?? null],
       );
-      return row.rows[0]!.id;
+      const id = row.rows[0]!.id;
+      if (coverage === 'COMPLETE' && !options?.client) {
+        await seedTestV2LegalProof(admin, id);
+      }
+      return id;
     };
     const readProof = (date: string) => readVerifiedLegalScope(worker, {
       publicationVersionId: versionId, sanitizedHtml: html, asOf: date,
     });
-    const rescan = (date: string) => worker.transaction().execute((trx) =>
-      persistTemporalNcmScan(trx, { publicationVersionId: versionId, sanitizedHtml: html, asOf: date }));
+    const rescan = async (date: string) => {
+      const result = await worker.transaction().execute((trx) =>
+        persistTemporalNcmScan(trx, {
+          publicationVersionId: versionId, sanitizedHtml: html, asOf: date,
+        }));
+      // Only after worker commit: a separate authorized CI sealer role/event.
+      await seedTestV2NcmSeals(admin, versionId, date);
+      return result;
+    };
 
     const a0 = await attest(d0, ['EDITORIAL','CURRENT','REVOKED','REVOKED']);
     const firstProof = await readProof(d0);
@@ -338,6 +350,8 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
       const successorId = await attest(tieDate, ['EDITORIAL','REVOKED','CURRENT','REVOKED'],
         'COMPLETE', priorId, { client: connection, id: '00000000-0000-4000-8000-000000000001' });
       await connection.query('COMMIT');
+      // The superseding terminal is the ONLY legal proof admitted after commit.
+      await seedTestV2LegalProof(admin, successorId);
       const selected = await readProof(tieDate);
       assert.equal(selected.attestationId,successorId,'R2-01 supersession wins UUID tie');
       await rescan(tieDate);
