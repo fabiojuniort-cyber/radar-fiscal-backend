@@ -70,7 +70,7 @@ const input:HistoricalDouIntakeInput={
  section:requireArg('section') as HistoricalDouIntakeInput['section'],
  ...(pageArg?{page:Number(pageArg)}:{}),
  ...(sourceUrl?{sourceUrl}:{}),
- ...(documentBytes?{fileBytes:documentBytes,originalFilename:documentFile?.split(/[\\/]/).at(-1)}:{}),
+ ...(documentBytes?{fileBytes:documentBytes,originalFilename:documentFile!.split(/[\\/]/).at(-1) ?? 'staged-document'}:{}),
  ...(transcription?{transcription}:{})
 };
 const result=preflightHistoricalDouIntake(input);
