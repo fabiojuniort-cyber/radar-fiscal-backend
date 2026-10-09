@@ -49,6 +49,8 @@ jobs:
       DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
       DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
       DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      DB_LEGAL_ISSUER_RUNTIME_PASSWORD: ci-tax13-issuer-password-with-32-chars-A
+      DB_NCM_SEALER_RUNTIME_PASSWORD: ci-tax13-sealer-password-with-32-chars-B
       JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
       AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
       PUBLIC_API_ALLOWED_ORIGINS: https://public.example
@@ -300,6 +302,8 @@ jobs:
       DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
       DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
       DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      DB_LEGAL_ISSUER_RUNTIME_PASSWORD: ci-tax13-issuer-password-with-32-chars-A
+      DB_NCM_SEALER_RUNTIME_PASSWORD: ci-tax13-sealer-password-with-32-chars-B
       JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
       AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
       PUBLIC_API_ALLOWED_ORIGINS: https://public.example
