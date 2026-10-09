@@ -505,6 +505,10 @@ SET search_path=pg_catalog,public,pg_temp AS $$
    'signatureBase64', proof.signature_base64,
    'signatureKeyId', proof.signature_key_id,
    'signingPublicKeyPem', key_.public_key_pem,
+   'legalManifest', a.manifest,
+   'sanitizedHtml', pv.source_metadata->'presentation'->>'html',
+   'sourceId', a.source_id,
+   'officialUrl', a.official_url,
    'codes',coalesce((
      SELECT jsonb_agg(jsonb_build_object(
        'code',c.ncm_code,
@@ -522,6 +526,10 @@ SET search_path=pg_catalog,public,pg_temp AS $$
    AND proof.current_fragments_sha256=scan.current_fragments_sha256
  JOIN public.tax13_v2_authorized_keys key_
    ON key_.key_id=proof.signature_key_id
+ JOIN public.publication_legal_scope_attestations a
+   ON a.id=scan.legal_scope_attestation_id
+ JOIN public.publication_versions pv
+   ON pv.id=scan.publication_version_id
  WHERE scan.id=p_scan AND scan.outcome='SUCCESS'
    AND scan.coverage='COMPLETE'
    AND key_.active_from<=proof.created_at
