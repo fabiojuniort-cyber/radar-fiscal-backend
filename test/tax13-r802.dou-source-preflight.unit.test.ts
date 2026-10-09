@@ -155,7 +155,10 @@ test('R802 signed independent DOU review assertion is only a claim; forged/revok
  assert.equal(verifyIndependentDouReview(trace,forged,trust,now).reviewSignatureAuthenticated,false);
  // A signed reviewer statement must also match the ACTUAL supplied PDF
  // bytes. Even successful matching is NEVER certificate validity or CURRENT.
- const pdfBytes=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const pdfBytes=Buffer.from(`%PDF-1.7
+1 0 obj << /Type /Catalog >> endobj
+%%EOF
+`);
  const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
  const byteCandidate=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes});
  assert.equal(byteCandidate.status,'DOU_PDF_BYTES_BOUND_ONLY');
@@ -169,7 +172,10 @@ test('R802 signed independent DOU review assertion is only a claim; forged/revok
  assert.equal(bound.status,'DOU_SIGNED_REVIEW_BYTES_MATCH_ONLY');
  assert.equal(bound.authenticatedOfficialPublication,false);
  assert.equal(bound.grantsLegalCurrent,false);
- const tamperedPdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Pages >> endobj\\n%%EOF\\n');
+ const tamperedPdf=Buffer.from(`%PDF-1.7
+1 0 obj << /Type /Pages >> endobj
+%%EOF
+`);
  const differentBytes=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:tamperedPdf});
  assert.equal(bindContemporaryDouPdfToIndependentReview({
   trace,pdf:differentBytes,review:byteReview,keyring:trust,now}).status,'UNVERIFIED');
