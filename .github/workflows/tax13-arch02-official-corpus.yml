@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - fix/tax13-r2-ncm-temporal
+      - fix/tax13-arch-02-single-proof-authority
     paths:
       - 'test/tax13-arch02.confaz-corpus-readonly.test.ts'
       - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
@@ -11,6 +12,7 @@ on:
       - 'test/fixtures/tax13-confaz-offline-20.zip'
       - 'test/fixtures/tax13-confaz-stratified-300.zip'
       - '.github/workflows/tax13-arch02-official-corpus.yml'
+      - 'src/modules/taxonomy/legal-scope/confaz-official-capture.ts'
       - 'src/modules/collection/confaz.connector.ts'
       - 'src/modules/collection/legal-presentation.ts'
       - 'src/modules/taxonomy/legal-scope/legal-scope-evidence.ts'
