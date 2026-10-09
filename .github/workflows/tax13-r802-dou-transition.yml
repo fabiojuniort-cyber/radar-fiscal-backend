@@ -7,6 +7,7 @@ on:
     paths:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-certified-review-signature.ts'
+      - 'src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts'
       - 'test/tax13-r802.dou-source-preflight.unit.test.ts'
       - '.github/workflows/tax13-r802-dou-transition.yml'
 
