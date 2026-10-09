@@ -478,3 +478,61 @@ WHERE proof.attestation_id=p_attestation
 LIMIT 1 $$;
 REVOKE ALL ON FUNCTION public.tax13_v2_admitted_current_fragments(UUID)
   FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_scan_sealer;
+
+-- Narrow SECURITY DEFINER read boundary for a separate NCM sealer process.
+-- No direct SELECT on immutable scan or private certificate given to app.
+CREATE FUNCTION public.tax13_v2_sealer_bundle(p_scan UUID)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT jsonb_build_object(
+   'scanId', scan.id,
+   'runFingerprint', scan.run_fingerprint,
+   'attestationId', scan.legal_scope_attestation_id,
+   'publicationVersionId', scan.publication_version_id,
+   'detectorKey', scan.detector_key,
+   'detectorVersion', scan.detector_version,
+   'legalAsOf', scan.legal_as_of,
+   'recheckOn', scan.recheck_on,
+   'htmlSha256', scan.html_sha256,
+   'fragmentsSha256', scan.current_fragments_sha256,
+   'catalogEditionId', scan.catalog_edition_id,
+   'catalogSha256', scan.catalog_sha256,
+   'candidateCount', scan.candidate_count,
+   'matchCount', scan.match_count,
+   'proofId', proof.id,
+   'payloadCanonical', proof.canonical_payload,
+   'payloadSha256', proof.payload_sha256,
+   'signatureBase64', proof.signature_base64,
+   'signatureKeyId', proof.signature_key_id,
+   'signingPublicKeyPem', key_.public_key_pem,
+   'codes',coalesce((
+     SELECT jsonb_agg(jsonb_build_object(
+       'code',c.ncm_code,
+       'fragmentIndex',c.fragment_index,
+       'catalogEntryId',c.catalog_entry_id,
+       'excerpt',c.excerpt)
+       ORDER BY c.fragment_index,c.ncm_code)
+     FROM public.publication_ncm_scan_evidence_codes c
+     WHERE c.scan_evidence_id=scan.id
+   ),'[]'::jsonb))
+ FROM public.publication_ncm_scan_evidence scan
+ JOIN public.tax13_legal_proofs_v2 proof
+   ON proof.attestation_id=scan.legal_scope_attestation_id
+   AND proof.publication_version_id=scan.publication_version_id
+   AND proof.current_fragments_sha256=scan.current_fragments_sha256
+ JOIN public.tax13_v2_authorized_keys key_
+   ON key_.key_id=proof.signature_key_id
+ WHERE scan.id=p_scan AND scan.outcome='SUCCESS'
+   AND scan.coverage='COMPLETE'
+   AND key_.active_from<=proof.created_at
+   AND NOT EXISTS(SELECT 1 FROM public.tax13_v2_key_revocations r
+     WHERE r.key_id=key_.key_id)
+   AND NOT EXISTS(SELECT 1 FROM public.tax13_legal_proof_revocations_v2 r
+     WHERE r.proof_id=proof.id)
+   AND public.tax13_v2_admitted_current_fragments(scan.legal_scope_attestation_id) IS NOT NULL
+   AND public.tax13_ncm_scan_consistent(scan.id)
+ LIMIT 1
+$$;
+REVOKE ALL ON FUNCTION public.tax13_v2_sealer_bundle(UUID)
+  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_legal_issuer;
+GRANT EXECUTE ON FUNCTION public.tax13_v2_sealer_bundle(UUID) TO radar_scan_sealer;
