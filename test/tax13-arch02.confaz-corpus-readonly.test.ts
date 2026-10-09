@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -40,16 +41,41 @@ test('TAX13 R8-prep: 20 official CONFAZ HTML samples preserve raw bytes and are 
       const url = 'https://www.confaz.fazenda.gov.br/legislacao/convenios/' + year + '/' + name;
       const entry: Record<string, unknown> = { name, url, requestedAt: new Date().toISOString() };
       try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-        entry.httpStatus = response.status;
-        assert.equal(response.status, 200, 'official response required: ' + name);
-        const rawBytes = Buffer.from(await response.arrayBuffer());
+        let rawBytes: Buffer;
+        try {
+          const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+          entry.httpStatus = response.status;
+          assert.equal(response.status, 200, 'official response required: ' + name);
+          rawBytes = Buffer.from(await response.arrayBuffer());
+          entry.transport = 'NODE_FETCH';
+          entry.contentType = response.headers.get('content-type');
+        } catch (nodeError) {
+          // node-fetch/undici and curl use different TLS/proxy stacks on the
+          // hosted runner. Do not count either error as an HTML parser failure.
+          const nodeReason = nodeError instanceof Error
+            ? String(nodeError.cause ?? nodeError.message).slice(0, 400)
+            : String(nodeError).slice(0, 400);
+          entry.nodeTransportError = nodeReason;
+          try {
+            rawBytes = execFileSync('curl', [
+              '--fail', '--location', '--silent', '--show-error',
+              '--proto', '=https', '--proto-redir', '=https',
+              '--connect-timeout', '12', '--max-time', '35',
+              '--retry', '1', '--retry-delay', '1', '--url', url,
+            ], { maxBuffer: 16 * 1024 * 1024, timeout: 40_000 });
+            entry.transport = 'CURL_HTTPS_FALLBACK';
+          } catch (curlError) {
+            const curlReason = curlError instanceof Error ? curlError.message.slice(0, 400)
+              : String(curlError).slice(0, 400);
+            throw new Error('OFFICIAL_SOURCE_UNAVAILABLE node=' + nodeReason +
+              ' curl=' + curlReason);
+          }
+        }
         const raw = new TextDecoder('utf-8', { fatal: true }).decode(rawBytes);
         assert.ok(raw.includes('CONVÊNIO') || raw.includes('CONV&Ecirc;NIO'), name + ': unexpected body');
         await writeFile(join(output, name + '.html'), rawBytes);
         entry.rawBytes = rawBytes.length;
         entry.rawSha256 = sha(rawBytes);
-        entry.contentType = response.headers.get('content-type');
         const body = extractActBodyHtml(raw);
         assert.ok(body, name + ': legal body missing');
         const sanitized = sanitizeLegalPresentationHtml(body);
