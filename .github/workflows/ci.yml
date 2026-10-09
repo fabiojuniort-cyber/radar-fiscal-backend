@@ -221,6 +221,9 @@ jobs:
       - name: TAX13 ARCH02 isolation and provenance PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-arch02.privileges.integration.test.ts
+      - name: TAX13 ARCH02 R7 false CURRENT regression PG16
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
 
       # Scope events are append-only: the executor fixtures cannot be cleaned
       # up, so this runs after every other database test of the job.
@@ -316,3 +319,5 @@ jobs:
         run: npx tsx --test test/ncm-temporal.evidence.integration.test.ts
       - name: TAX13 ARCH02 issuer and sealer privileges PG18
         run: npx tsx --test test/tax13-arch02.privileges.integration.test.ts
+      - name: TAX13 ARCH02 R7 false CURRENT regression PG18
+        run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
