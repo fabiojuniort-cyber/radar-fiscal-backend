@@ -105,6 +105,9 @@ export function preflightDouConfazTrace(input:{
  }
  const date=str(pd.publicationDate),section=str(pd.section),
   edition=str(pd.edition),matter=str(pd.officialMatterId);
+ // INLABS XML/PDF series start in 2020; historic originals of 1991/1997
+ // need a separately authenticated Imprensa Nacional archive adapter.
+ if(date<'2020-01-01')return deny('INLABS_XML_HISTORICAL_PERIOD_NOT_SUPPORTED');
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||
    Number.isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date||
    !sections.has(section)||!/^\d+$/.test(edition)||!/^\d+$/.test(matter)||
