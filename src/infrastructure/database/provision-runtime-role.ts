@@ -14,6 +14,8 @@ const provisionEnvSchema = z.object({
   DB_RUNTIME_PASSWORD: z.string().min(32),
   DB_WORKER_RUNTIME_PASSWORD: z.string().min(32).optional(),
   DB_CURATOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DB_LEGAL_ISSUER_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DB_NCM_SEALER_RUNTIME_PASSWORD: z.string().min(32).optional(),
 });
 
 const parsed = provisionEnvSchema.safeParse(
@@ -53,12 +55,33 @@ if (
   process.exit(1);
 }
 
+
+const DB_LEGAL_ISSUER_RUNTIME_PASSWORD = parsed.data.DB_LEGAL_ISSUER_RUNTIME_PASSWORD;
+const DB_NCM_SEALER_RUNTIME_PASSWORD = parsed.data.DB_NCM_SEALER_RUNTIME_PASSWORD;
+if (Boolean(DB_LEGAL_ISSUER_RUNTIME_PASSWORD) !== Boolean(DB_NCM_SEALER_RUNTIME_PASSWORD)) {
+  throw new Error('TAX13_ISOLATED_RUNTIME_PASSWORD_PAIR_REQUIRED');
+}
+if (DB_LEGAL_ISSUER_RUNTIME_PASSWORD && DB_NCM_SEALER_RUNTIME_PASSWORD) {
+  const values = [DB_RUNTIME_PASSWORD, DB_WORKER_RUNTIME_PASSWORD,
+    DB_CURATOR_RUNTIME_PASSWORD, DB_LEGAL_ISSUER_RUNTIME_PASSWORD,
+    DB_NCM_SEALER_RUNTIME_PASSWORD].filter((item): item is string => Boolean(item));
+  if (new Set([DB_LEGAL_ISSUER_RUNTIME_PASSWORD, DB_NCM_SEALER_RUNTIME_PASSWORD]).size !== 2 ||
+      [DB_RUNTIME_PASSWORD, DB_WORKER_RUNTIME_PASSWORD, DB_CURATOR_RUNTIME_PASSWORD]
+        .some((other) => other === DB_LEGAL_ISSUER_RUNTIME_PASSWORD ||
+          other === DB_NCM_SEALER_RUNTIME_PASSWORD)) {
+    throw new Error('TAX13_ISOLATED_RUNTIME_PASSWORDS_MUST_BE_DISTINCT');
+  }
+  void values; // Never log or expose any secrets.
+}
+
 async function setPassword(
   client: PoolClient,
   roleName:
     | 'radar_app_runtime'
     | 'radar_worker_runtime'
-    | 'radar_taxonomy_curator_runtime',
+    | 'radar_taxonomy_curator_runtime'
+    | 'radar_legal_issuer_runtime'
+    | 'radar_scan_sealer_runtime',
   password: string,
 ): Promise<void> {
   const formatted = await client.query<{
@@ -243,6 +266,44 @@ async function run(): Promise<void> {
       await client.query(
         "ALTER ROLE radar_taxonomy_curator_runtime SET timezone = 'UTC'",
       );
+    }
+
+
+    if (DB_LEGAL_ISSUER_RUNTIME_PASSWORD && DB_NCM_SEALER_RUNTIME_PASSWORD) {
+      // Production does not provision optional TAX13 accounts until both
+      // independent secrets are explicitly configured. The emitter and
+      // sealer never receive app/worker/curator memberships.
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='radar_legal_issuer_runtime') THEN
+            CREATE ROLE radar_legal_issuer_runtime LOGIN INHERIT NOSUPERUSER
+              NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          END IF;
+          IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='radar_scan_sealer_runtime') THEN
+            CREATE ROLE radar_scan_sealer_runtime LOGIN INHERIT NOSUPERUSER
+              NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          END IF;
+        END $$;
+      `);
+      await client.query(`
+        ALTER ROLE radar_legal_issuer_runtime LOGIN INHERIT NOSUPERUSER
+          NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+      `);
+      await client.query(`
+        ALTER ROLE radar_scan_sealer_runtime LOGIN INHERIT NOSUPERUSER
+          NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+      `);
+      await setPassword(client,'radar_legal_issuer_runtime',DB_LEGAL_ISSUER_RUNTIME_PASSWORD);
+      await setPassword(client,'radar_scan_sealer_runtime',DB_NCM_SEALER_RUNTIME_PASSWORD);
+      await client.query('GRANT radar_legal_issuer TO radar_legal_issuer_runtime');
+      await client.query('GRANT radar_scan_sealer TO radar_scan_sealer_runtime');
+      for (const sqlCommand of [
+        'REVOKE radar_app,radar_worker,radar_taxonomy_curator,radar_scan_sealer FROM radar_legal_issuer_runtime',
+        'REVOKE radar_app,radar_worker,radar_taxonomy_curator,radar_legal_issuer FROM radar_scan_sealer_runtime',
+        "ALTER ROLE radar_legal_issuer_runtime SET timezone = 'UTC'",
+        "ALTER ROLE radar_scan_sealer_runtime SET timezone = 'UTC'",
+      ]) await client.query(sqlCommand);
     }
 
     await client.query('COMMIT');
