@@ -31,8 +31,10 @@ jobs:
 
     services:
       postgres:
+        # Pull the same Docker Official postgres image via Public ECR to avoid
+        # Docker Hub anonymous pull throttling. An empty image skips draft service.
         # An empty image disables the service for draft fast checks.
-        image: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft != true) && 'postgres:16' || '' }}
+        image: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft != true) && 'public.ecr.aws/docker/library/postgres:16' || '' }}
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
@@ -287,7 +289,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ripgrep jq
-          docker pull postgres:18-bookworm
+          docker pull public.ecr.aws/docker/library/postgres:18-bookworm
 
       - name: Recovery barrier and privilege integration (synthetic fixtures only)
         shell: bash
@@ -301,7 +303,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:18-bookworm
+        image: public.ecr.aws/docker/library/postgres:18-bookworm
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
