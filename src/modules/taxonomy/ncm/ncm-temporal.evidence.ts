@@ -118,6 +118,7 @@ export async function readCurrentNcmEvidence(
       AND scan.run_fingerprint=${fingerprint}
       AND scan.outcome='SUCCESS' AND scan.coverage='COMPLETE'
       AND public.tax13_ncm_scan_consistent(scan.id)
+      AND public.tax13_v2_is_scan_sealed(scan.id)
     LIMIT 1
   `.execute(db);
   if (!run.rows[0]) return null;
