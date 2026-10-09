@@ -42,3 +42,26 @@ Reuse DOU publication version and origin. Save one content-addressed reference/a
 R8-02 old CONFAZ HTTPS path remains fail-closed; no DOU source has been promoted. No merges on #186/#192/#193/#194. No Railway deployment, production migrations, scans, global reprocessing or green legal tags. Independent R9 not performed.
 
 Governance: https://github.com/fabiojuniort-cyber/tribusca-control/issues/101
+
+
+## 2026-10-09 — Historical acervo ingest staging (no decision about who downloads)
+
+The official historical collection is https://incombeta.in.gov.br/diario-oficial-da-uniao (Biblioteca Machado de Assis, 1808–2001). The Imprensa Nacional expressly warns that historical scans may contain illegible or faulty images and gives biblioteca@in.gov.br as contact. A folder/index link establishes ONLY an archive lookup target, not an authenticated exact page.
+
+User has neither readable 1991/1997 source scans nor a final decision whether to download them personally. The import architecture must support BOTH paths without changing the source trust determination. Do not force a bulk PDF download or direct DBA insert merely to continue engineering.
+
+### Implemented prototype
+
+- src/modules/taxonomy/legal-scope/dou-historical-intake.ts is a pure, non-persistent intake preflight shared by acquisitionChannel AUTO and MANUAL; its input is historical text, a source candidate URL or bounded file bytes.
+- The accepted media types are PDF, PNG, JPEG scans and plain/HTML transcriptions. The parser checks simple format magic, bounded file size (16 MiB) and transcription length (200,000 UTF-16 code units), official archive URL host/scheme shape, original filename traversal, date, period, section, act type and canonical two-digit years. It computes SHA-256 over supplied bytes/text.
+- The preflight NEVER stores or returns source bytes/transcription, only compact metadata and hashes. It NEVER claims certified publication or legal CURRENT. A validated official-domain URL is a pointer, not cryptographic source custody. An acervo index URL is explicitly INDEX_ONLY.
+- The caller must keep user uploads and automated source downloads in a temporary short-lived staging store (not implemented here); delete or quarantine them after independent review and retention decisions. No new PostgreSQL table or migration was created. No upload API, admin UI, remote downloader, persistent object storage or legal provenance authorization was implemented.
+- Synthetic adversarial tests in test/tax13-r802.dou-historical-intake.unit.test.ts exercise both acquisition channels, sample 52/91 and 100/97 metadata, spoofed URLs, invalid dates, PDF headers, oversized input, path traversal and no evidence. Dedicated DOU CI now checks these alongside the previous R802 source trace tests.
+
+### Requisite future production design (BLOCK)
+
+1. Govern an admin-only ingestion UI or bounded CLI, antivirus/file-type validation, upload size quotas, operator attribution and durable audited revision history. Upload must not be SQL superuser access.
+2. Store ONE content-addressed source snapshot per original DOU edition when explicitly approved for retention, outside PostgreSQL; reference SHA/location/tenant-neutral identity inside PG. No JPG copies or per-tenant duplicates.
+3. Isolated independent archive verifier must fetch or authenticate actual page and confirm it is legible and corresponds to source matter/date/edition/page; for older scanned material do NOT infer contemporary ICP-Brasil signatures on 1991/1997 originals.
+4. DOU original trace + authentic publication + official amendment/revocation chain are separate flags. The text already available in CONFAZ archives remains an unverified source transcription until matched to the historical page.
+5. Add a versioned DB staging/attestation migration only after assigning ownership and reviewing schema collisions, RLS/privilege and archival retention decisions. Keep migration 048 legal gates fail-closed; no automatic promotion to CURRENT. Independent R9 remains mandatory.
