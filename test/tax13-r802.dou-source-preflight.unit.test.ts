@@ -75,7 +75,7 @@ test('R802 DOU missing parent, false source, fabricated archive and foreign page
  // loses normative text: reject by fully re-deriving act boundaries.
  forged=copy(child);forged.content=forged.content!.slice(0,-5);
  assert.equal(inp(forged).status,'UNVERIFIED');
- forged=copy(child);forged.content=forged.content!.split('\\n')[0]!;
+ forged=copy(child);forged.content=forged.content!.split('\n')[0]!;
  assert.equal(inp(forged).status,'UNVERIFIED');
  forged=copy(child);(forged.metadata!.dou as any).embeddedIndex=2;
  assert.equal(inp(forged).status,'UNVERIFIED');
