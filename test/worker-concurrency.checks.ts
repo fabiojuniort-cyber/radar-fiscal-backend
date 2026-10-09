@@ -13,6 +13,8 @@ import {
 } from '../src/modules/taxonomy/classification/classification.worker.js';
 import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
 import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
+import { brazilLegalReferenceDate } from '../src/modules/taxonomy/legal-scope/legal-scope-evidence.js';
+import { seedTestV2NcmSeals } from './tax13-arch02.signed-fixture.js';
 
 function signal() {
   let resolve!: () => void;
@@ -140,6 +142,7 @@ export async function checkWorkerConcurrency(
       if (stage === 'taxonomy') {
         const enriched = await processPublicationNcmEnrichmentBatch(workers[0]!, { limit: 1 });
         assert.equal(enriched.succeeded, 1);
+        await seedTestV2NcmSeals(admin, versionId, brazilLegalReferenceDate());
       }
       probes.forEach((probe) => { probe.stage = stage; });
       probes[1]!.fail = order !== 'both-success';
