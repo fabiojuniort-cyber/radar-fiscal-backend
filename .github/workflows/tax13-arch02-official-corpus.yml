@@ -5,7 +5,7 @@ on:
     branches:
       - fix/tax13-r2-ncm-temporal
     paths:
-      - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
+      - 'test/tax13-arch02.confaz-corpus-readonly.test.ts'
       - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
       - 'test/fixtures/tax13-confaz-offline-20.zip'
       - '.github/workflows/tax13-arch02-official-corpus.yml'
@@ -40,7 +40,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Require pinned offline fixture and run structural audit - NO legal CURRENT assertion
-        run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-corpus-readonly.test.ts
+        run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-offline-corpus.test.ts
       - name: Upload offline parser diagnostics and SHA256 manifest
         if: always()
         uses: actions/upload-artifact@v4
