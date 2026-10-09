@@ -228,6 +228,9 @@ jobs:
       - name: TAX13 ARCH02 R7 false CURRENT regression PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 ARCH02 V2 signer key revocation PG16
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/tax13-arch02.key-revocation.integration.test.ts
 
       # Scope events are append-only: the executor fixtures cannot be cleaned
       # up, so this runs after every other database test of the job.
@@ -327,3 +330,5 @@ jobs:
         run: npx tsx --test test/tax13-arch02.privileges.integration.test.ts
       - name: TAX13 ARCH02 R7 false CURRENT regression PG18
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 ARCH02 V2 signer key revocation PG18
+        run: npx tsx --test test/tax13-arch02.key-revocation.integration.test.ts

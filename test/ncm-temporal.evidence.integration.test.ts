@@ -382,7 +382,7 @@ test('TAX13 temporal ledger: D0→D1, revoked code, same-day supersession, zero 
     // must resolve to UNVERIFIED, not "newest-wins" PARTIAL or CURRENT.
     assert.equal(partial.valid, false);
     assert.equal(partial.coverage, 'UNVERIFIED');
-    assert.equal(partial.reason, 'ATTESTATION_MISSING');
+    assert.equal(partial.reason, 'ATTESTATION_AMBIGUOUS');
     assert.equal(await readCurrentNcmEvidence(worker, versionId, partial), null);
     await assert.rejects(rescan(d0), /TAX13_NCM_COMPLETE_CURRENT_PROOF_REQUIRED/);
     const bridgeStale = await admin.query<{ fingerprint: string | null }>(`
