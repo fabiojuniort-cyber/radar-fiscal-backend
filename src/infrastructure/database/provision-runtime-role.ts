@@ -17,6 +17,7 @@ const provisionEnvSchema = z.object({
   DB_LEGAL_ISSUER_RUNTIME_PASSWORD: z.string().min(32).optional(),
   DB_NCM_SEALER_RUNTIME_PASSWORD: z.string().min(32).optional(),
   DB_PROOF_VERIFIER_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DB_HTTP_COLLECTOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
 });
 
 const parsed = provisionEnvSchema.safeParse(
@@ -60,12 +61,21 @@ if (
 const DB_LEGAL_ISSUER_RUNTIME_PASSWORD = parsed.data.DB_LEGAL_ISSUER_RUNTIME_PASSWORD;
 const DB_NCM_SEALER_RUNTIME_PASSWORD = parsed.data.DB_NCM_SEALER_RUNTIME_PASSWORD;
 const DB_PROOF_VERIFIER_RUNTIME_PASSWORD = parsed.data.DB_PROOF_VERIFIER_RUNTIME_PASSWORD;
+const DB_HTTP_COLLECTOR_RUNTIME_PASSWORD = parsed.data.DB_HTTP_COLLECTOR_RUNTIME_PASSWORD;
 if (Boolean(DB_LEGAL_ISSUER_RUNTIME_PASSWORD) !== Boolean(DB_NCM_SEALER_RUNTIME_PASSWORD)) {
   throw new Error('TAX13_ISOLATED_RUNTIME_PASSWORD_PAIR_REQUIRED');
 }
 if (DB_PROOF_VERIFIER_RUNTIME_PASSWORD &&
     (!DB_LEGAL_ISSUER_RUNTIME_PASSWORD || !DB_NCM_SEALER_RUNTIME_PASSWORD)) {
   throw new Error('TAX13_R8_VERIFIER_REQUIRES_SEPARATE_ISSUER_AND_SEALER');
+}
+if (DB_HTTP_COLLECTOR_RUNTIME_PASSWORD) {
+  const others = [DB_RUNTIME_PASSWORD,DB_WORKER_RUNTIME_PASSWORD,
+    DB_CURATOR_RUNTIME_PASSWORD,DB_LEGAL_ISSUER_RUNTIME_PASSWORD,
+    DB_NCM_SEALER_RUNTIME_PASSWORD,DB_PROOF_VERIFIER_RUNTIME_PASSWORD];
+  if (others.includes(DB_HTTP_COLLECTOR_RUNTIME_PASSWORD)) {
+    throw new Error('TAX13_R802_COLLECTOR_SECRET_NOT_ISOLATED');
+  }
 }
 if (DB_LEGAL_ISSUER_RUNTIME_PASSWORD && DB_NCM_SEALER_RUNTIME_PASSWORD) {
   const values = [DB_RUNTIME_PASSWORD, DB_WORKER_RUNTIME_PASSWORD,
@@ -94,7 +104,8 @@ async function setPassword(
     | 'radar_taxonomy_curator_runtime'
     | 'radar_legal_issuer_runtime'
     | 'radar_scan_sealer_runtime'
-    | 'radar_proof_verifier_runtime',
+    | 'radar_proof_verifier_runtime'
+    | 'radar_http_collector_runtime',
   password: string,
 ): Promise<void> {
   const formatted = await client.query<{
@@ -350,6 +361,26 @@ async function run(): Promise<void> {
         }
       }
       await client.query("ALTER ROLE radar_proof_verifier_runtime SET timezone='UTC'");
+    }
+    if (DB_HTTP_COLLECTOR_RUNTIME_PASSWORD) {
+      await client.query(`
+        DO $
+        BEGIN
+          IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='radar_http_collector_runtime') THEN
+            CREATE ROLE radar_http_collector_runtime LOGIN INHERIT NOSUPERUSER
+              NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+          END IF;
+        END $;
+      `);
+      await client.query(`
+        ALTER ROLE radar_http_collector_runtime LOGIN INHERIT NOSUPERUSER
+          NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+      `);
+      await setPassword(client,'radar_http_collector_runtime',DB_HTTP_COLLECTOR_RUNTIME_PASSWORD);
+      await client.query('GRANT radar_http_collector TO radar_http_collector_runtime');
+      await client.query(
+        'REVOKE radar_app,radar_worker,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer,radar_proof_verifier FROM radar_http_collector_runtime');
+      await client.query("ALTER ROLE radar_http_collector_runtime SET timezone='UTC'");
     }
     await client.query('COMMIT');
 
