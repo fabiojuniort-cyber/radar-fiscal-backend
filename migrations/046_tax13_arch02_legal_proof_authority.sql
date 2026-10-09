@@ -207,7 +207,6 @@ CREATE POLICY tax13_v2_sealer_scans ON public.tax13_ncm_seals_v2
 CREATE FUNCTION public.tax13_v2_admitted_current_fragments(p_attestation UUID)
 RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp AS $$
-WITH d AS (SELECT (current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date day)
 SELECT proof.current_fragments
 FROM public.tax13_legal_proofs_v2 proof
 JOIN public.publication_legal_scope_attestations a ON a.id=proof.attestation_id
@@ -340,7 +339,7 @@ SET search_path=pg_catalog,public,pg_temp AS $$
   WITH raw AS (
     SELECT public.tax13_unsealed_ncm_scan_fingerprint(p_version) AS fingerprint
   ), active_date AS (
-    SELECT (current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date AS day
+    SELECT (current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date AS reference_day
   )
   SELECT raw.fingerprint
   FROM raw
@@ -356,8 +355,8 @@ SET search_path=pg_catalog,public,pg_temp AS $$
   CROSS JOIN active_date d
   WHERE raw.fingerprint IS NOT NULL
     AND scan.publication_version_id=p_version
-    AND scan.legal_as_of=d.day
-    AND proof.valid_as_of=d.day AND proof.recheck_on>d.day
+    AND scan.legal_as_of=d.reference_day
+    AND proof.valid_as_of=d.reference_day AND proof.recheck_on>d.reference_day
     AND NOT EXISTS (SELECT 1 FROM public.tax13_legal_proof_revocations_v2 r
       WHERE r.proof_id=proof.id)
   LIMIT 1
