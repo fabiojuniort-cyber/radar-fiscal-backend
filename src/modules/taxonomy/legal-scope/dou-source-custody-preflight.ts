@@ -6,6 +6,7 @@
  */
 import {createHash} from 'node:crypto';
 import type {ConnectorPublication} from '../../collection/connector.contract.js';
+import {extractEmbeddedConfazPublications} from '../../collection/dou.parser.js';
 
 const hex=/^[a-f0-9]{64}$/;
 const sections=new Set(['DO1','DO1E','DO3','DO3E']);
@@ -89,6 +90,19 @@ export function preflightDouConfazTrace(input:{
    p.externalId!==parent.externalId+':embedded:'+p.actType+':'+p.actNumber||
    !parent.content.includes(p.content)||!p.content.startsWith(p.title)
  )) return deny('DOU_PARENT_CHILD_MISMATCH');
+ // Do not trust a caller's hand-cut child span, even if it is a substring of
+ // the official-looking dispatch. Reparse the complete parent under the same
+ // deterministic rules as ingestion and compare *every* boundary and field.
+ if(embedded){
+  const derived=extractEmbeddedConfazPublications(parent).find(item=>
+   item.externalId===p.externalId);
+  const dm=obj(derived?.metadata),dd=obj(dm?.dou);
+  if(!derived||derived.title!==p.title||derived.content!==p.content||
+    derived.actNumber!==p.actNumber||derived.actType!==p.actType||
+    derived.publishedAt?.toISOString()!==p.publishedAt?.toISOString()||
+    dd?.embeddedIndex!==d.embeddedIndex||dd?.parentMatterExternalId!==d.parentMatterExternalId)
+   return deny('DOU_EMBEDDED_EXACT_REPARSE_MISMATCH');
+ }
  const date=str(pd.publicationDate),section=str(pd.section),
   edition=str(pd.edition),matter=str(pd.officialMatterId);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||
@@ -121,8 +135,30 @@ export function preflightDouConfazTrace(input:{
   if(!entry||!attrs||!hex.test(str(entry.rawSha256))||
     !Number.isSafeInteger(entry.sizeBytes)||Number(entry.sizeBytes)<1||
     !/^\d+_\d{8}_\d+(?:-\d+)?\.xml$/.test(name)||
-    !name.includes(date.replaceAll('-','')+'_'+matter)||
-    seen.has(name)||attrs.idMateria!==matter||attrs.pubName!==section)
+    !new RegExp('^[0-9]+_'+date.replaceAll('-','')+'_'+matter+'(?:-[0-9]+)?\\.xml
+    return deny('DOU_XML_PART_IDENTITY_INVALID');
+  seen.add(name);digests.push(str(entry.rawSha256));
+ }
+ return {
+  status:'DOU_XML_TRACE_ONLY',authenticatedOfficialPublication:false,
+  grantsLegalCurrent:false,sourceCode:'dou',publicationDate:date,
+  section,edition,officialMatterId:matter,
+  certifiedPageUrl:parent.officialUrl,archiveUrl:str(archive.officialUrl),
+  archiveSha256:str(archive.rawSha256),xmlPartSha256:digests,
+  embedded,parentExternalId:parent.externalId,
+  parentTextSha256:createHash('sha256').update(parent.content,'utf8').digest('hex'),
+  outstandingGates:[
+   'INDEPENDENT_CERTIFIED_DOU_PUBLICATION_VALIDATION',
+   'AUTHENTICATED_XML_TO_CERTIFIED_TEXT_CORRESPONDENCE',
+   'INDEPENDENT_LEGAL_EFFECTIVITY_ATTESTATION'
+  ]
+ };
+}
+).test(name)||
+    seen.has(name)||attrs.idMateria!==matter||attrs.pubName!==section||
+    attrs.pubDate!==date.split('-').reverse().join('/')||
+    attrs.editionNumber!==edition||!pages.includes(attrs.pdfPage)||
+    new URL(attrs.pdfPage).searchParams.get('jornal')!==name.split('_')[0])
     return deny('DOU_XML_PART_IDENTITY_INVALID');
   seen.add(name);digests.push(str(entry.rawSha256));
  }
