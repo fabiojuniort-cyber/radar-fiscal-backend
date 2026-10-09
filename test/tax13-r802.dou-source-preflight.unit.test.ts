@@ -51,7 +51,7 @@ test('R802 DOU missing parent, false source, fabricated archive and foreign page
  const [parent,child]=syntheticPublications();assert.ok(parent&&child);
  const inp=(p:ConnectorPublication,base:ConnectorPublication|undefined=parent,sourceCode='dou')=>
   preflightDouConfazTrace({sourceCode,publication:p,...(base?{parent:base}:{})});
- assert.equal(inp(child,undefined).status,'UNVERIFIED');
+ assert.equal(preflightDouConfazTrace({sourceCode:'dou',publication:child}).status,'UNVERIFIED');
  assert.equal(inp(child,parent,'confaz').status,'UNVERIFIED');
  let forged=copy(child);
  (forged.metadata!.dou as any).archive.rawSha256='0'.repeat(64);
