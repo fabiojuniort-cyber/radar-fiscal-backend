@@ -207,6 +207,8 @@ export async function checkWorkerConcurrency(
       if (stage === 'ncm') {
         assert.equal(results.reduce((sum, result) => sum + ('matches' in result ? result.matches : 0), 0), 1,
           'only one physical mention inserted, even with duplicate successful work');
+        // Separate authorized test sealer runs only after both NCM workers end.
+        await seedTestV2NcmSeals(admin, versionId, brazilLegalReferenceDate());
         const classified = await processPublicationTaxonomyBatch(workers[0]!, { limit: 1 });
         assert.equal(classified.succeeded, 1, 'classification resumes after real NCM recovery');
       }
