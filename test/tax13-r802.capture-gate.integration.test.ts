@@ -98,6 +98,39 @@ test('R802 synthetic bytes + fake collector cannot establish verified capture or
     /TAX13_R802_COLLECTOR_SESSION_REQUIRED/,
     'admin fixture with a matching MAC is not an authenticated official collector');
 
+  // Recapture of the same bytes is a separate event, not a reusable
+  // receipt. A captured MAC signed for the first UUID cannot be replayed.
+  const replayArtifact=(await db.query<{id:string}>(`
+    INSERT INTO tax13_v2_original_http_artifacts(publication_version_id,official_url,http_status,
+      raw_http_bytes,raw_sha256,sanitized_html_sha256,collected_at,collector_identity)
+    VALUES($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,statement_timestamp(),
+      'CI-SYNTHETIC-NOT-TRUSTED') RETURNING id`,
+    [version,shapedUrl,raw,h(raw),h(html)])).rows[0]!.id;
+  assert.notEqual(replayArtifact,forgedArtifact);
+  await assert.rejects(db.query(`
+    INSERT INTO tax13_v2_official_capture_receipts
+    (artifact_id,capture_key_id,final_url,redirect_urls,remote_ipv4,tls_peer_cert_sha256,
+     collector_identity,started_at,captured_at,receipt_mac)
+    SELECT id,$2,official_url,ARRAY[official_url],'8.8.8.8',$3,$4,
+      collected_at,collected_at,$5
+    FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid`,
+    [replayArtifact,keyId,cert,identity,validMac]),
+    /TAX13_R802_CAPTURE_MAC_INVALID/,'capture MAC must bind the unique event UUID');
+  await db.query(
+    'INSERT INTO tax13_v2_capture_key_revocations(key_id,reason) VALUES($1,$2)',
+    [keyId,'CI_ONLY_COMPROMISED_COLLECTOR']);
+  await assert.rejects(db.query(`
+    INSERT INTO tax13_v2_official_capture_receipts
+    (artifact_id,capture_key_id,final_url,redirect_urls,remote_ipv4,tls_peer_cert_sha256,
+     collector_identity,started_at,captured_at,receipt_mac)
+    SELECT id,$2,official_url,ARRAY[official_url],'8.8.8.8',$3,$4,
+      collected_at,collected_at,$5
+    FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid`,
+    [forgedArtifact,keyId,cert,identity,validMac]),
+    /TAX13_R802_CAPTURE_NOT_AUTHENTICATED/,'revoked capture key cannot issue receipts');
+  await assert.rejects(
+    db.query('DELETE FROM tax13_v2_capture_key_revocations WHERE key_id=$1',[keyId]),
+    /TAX13_ARCH02_APPEND_ONLY/,'capture key revocation cannot be deleted');
   const after=await db.query<{verified:boolean;fingerprint:string|null}>(`
    SELECT public.tax13_v2_capture_verified($1::uuid) AS verified,
     public.tax13_current_ncm_scan_fingerprint($2::uuid) AS fingerprint`,
