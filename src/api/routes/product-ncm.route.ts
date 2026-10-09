@@ -115,6 +115,8 @@ interface PublicationNcmRow {
   detector_version: string;
   confidence: string | number | null;
   excerpt: string | null;
+  catalog_edition_id?: string | null;
+  catalog_entry_id?: string | null;
 }
 
 function tenantIdFromRequest(request: FastifyRequest): string | null {
@@ -808,20 +810,17 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
       // Historical catalog detections remain available, but they are not
       // CURRENT legal evidence and must never populate the positive items list.
       const current = await sql<PublicationNcmRow>`
-        SELECT DISTINCT ON (nc.ncm_code)
-          nc.ncm_code, e.description,
+        SELECT nc.ncm_code, nc.description,
           'CURRENT_ATTESTED'::text AS verification_status,
           'LEGAL_SCOPE_ATTESTED'::text AS method_type,
-          'tribusca.taxonomy.ncm'::text AS detector_key,
-          '1.3.0'::text AS detector_version,
-          NULL::numeric AS confidence, NULL::text AS excerpt
+          nc.detector_key, nc.detector_version,
+          NULL::numeric AS confidence, nc.excerpt,
+          nc.catalog_edition_id, nc.catalog_entry_id
         FROM publication_versions pv
-        CROSS JOIN LATERAL public.tax13_public_current_ncm_codes(pv.id) nc
-        LEFT JOIN official_catalog_entries e
-          ON regexp_replace(e.official_code,'[^0-9]','','g')=nc.ncm_code
+        CROSS JOIN LATERAL public.tax13_public_current_ncm_details(pv.id) nc
         WHERE pv.publication_id = ${request.params.publicationId}::uuid
           AND pv.is_current = TRUE
-        ORDER BY nc.ncm_code, e.description NULLS LAST
+        ORDER BY nc.ncm_code
       `.execute(app.db);
       const serialize = (row: PublicationNcmRow) => ({
         code: row.ncm_code,
@@ -831,6 +830,8 @@ export async function productNcmRoutes(app: FastifyInstance): Promise<void> {
           type: row.method_type,
           detectorKey: row.detector_key,
           detectorVersion: row.detector_version,
+          catalogEditionId: row.catalog_edition_id ?? null,
+          catalogEntryId: row.catalog_entry_id ?? null,
         },
         confidence: row.confidence === null ? null : Number(row.confidence),
         excerpt: row.excerpt,
