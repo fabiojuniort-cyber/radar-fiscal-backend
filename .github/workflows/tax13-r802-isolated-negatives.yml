@@ -11,6 +11,7 @@ on:
       - 'src/infrastructure/database/tax13-verify-proof-v2.ts'
       - 'test/tax13-r802.capture.unit.test.ts'
       - 'test/tax13-r802.capture-gate.integration.test.ts'
+      - 'test/tax13-r802.live-diagnostic.ts'
       - '.github/workflows/tax13-r802-isolated-negatives.yml'
 
 permissions:
@@ -67,3 +68,22 @@ jobs:
         run: npx tsx --test test/tax13-r802.capture.unit.test.ts
       - name: R802 forged official HTTP fails closed
         run: npx tsx --test test/tax13-r802.capture-gate.integration.test.ts
+
+  r802-disposable-live-network-diagnostic:
+    name: R802 CONFAZ HTTPS diagnostic (NOT PROOF)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      GITHUB_ACTIONS: 'true'
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Probe two canonical CONFAZ endpoints; no database, credentials, or artifacts
+        run: npx tsx test/tax13-r802.live-diagnostic.ts
