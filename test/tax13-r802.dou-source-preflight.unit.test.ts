@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import test from 'node:test';
 import {parseDouEntries} from '../src/modules/collection/dou.parser.js';
 import {preflightDouConfazTrace} from '../src/modules/taxonomy/legal-scope/dou-source-custody-preflight.js';
+import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
 
@@ -166,4 +168,64 @@ test('R802 DOU 1991 and 1997 cannot be misrepresented as INLABS XML captures',()
   if(result.status==='UNVERIFIED')
    assert.equal(result.reason,'INLABS_XML_HISTORICAL_PERIOD_NOT_SUPPORTED');
  }
+});
+
+test('Trifaros R802: contemporaneous PDF bytes are SHA-bound only, NEVER official proof',()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const pdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?captchafield=firstAccess&data=18%2F09%2F2026&jornal=515&pagina=1';
+ const result=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
+ assert.equal(result.status,'DOU_PDF_BYTES_BOUND_ONLY');
+ assert.equal(result.authenticatedOfficialPublication,false);
+ assert.equal(result.grantsLegalCurrent,false);
+ assert.equal(result.legalEffectivity,'UNVERIFIED');
+ assert.equal(result.candidate?.pdfSha256,createHash('sha256').update(pdf).digest('hex'));
+ assert.equal(result.candidate?.journal,'515');
+ assert.equal(result.candidate?.page,'1');
+ assert.equal(result.candidate?.referenceDate,'2026-09-18');
+ assert.equal(result.candidate?.officialMatterId,'12345678');
+ assert.ok(result.candidate?.outstandingGates.includes('INDEPENDENT_SIGNED_OFFICIAL_PDF_CUSTODY'));
+ assert.equal(JSON.stringify(result).includes('1 0 obj'),false,
+   'do not return raw PDF bytes/text in lightweight evidence');
+});
+test('Trifaros R802: wrong edition/page/host, forgery and extra query fail closed',()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const pdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const base='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
+ const attacks=[
+  base.replace('pesquisa.in.gov.br','pesquisa.in.gov.br.evil.example'),
+  base.replace('https:','http:'),
+  base.replace('jornal=515','jornal=530'),
+  base.replace('pagina=1','pagina=2'),
+  base.replace('18%2F09%2F2026','19%2F09%2F2026'),
+  base+'&pagina=1',
+  base+'&redirect=https://evil.example',
+  base+'#malicious',
+  base.replace('INPDFViewer','visualiza'),
+  base.replace('https://','https://any@'),
+  base.replace('2026','1997'),
+  base.replace('2026','2027'),
+ ];
+ for(const pdfUrl of attacks){
+  const result=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
+  assert.equal(result.status,'UNVERIFIED',pdfUrl);
+  assert.equal(result.authenticatedOfficialPublication,false);
+  assert.equal(result.grantsLegalCurrent,false);
+ }
+ const noPdf=preflightContemporaryDouPdfBytes({trace,pdfUrl:base,
+  pdfBytes:Buffer.from('<html>not a real PDF</html>')});
+ assert.equal(noPdf.reason,'DOU_PDF_FORMAT_UNVERIFIED');
+ const bogus=preflightContemporaryDouPdfBytes({trace,pdfUrl:base,
+  pdfBytes:Buffer.from('%PDF-1.7\\n/ByteRange [0 1 2 3] but no EOF')});
+ assert.equal(bogus.status,'UNVERIFIED',
+   'a claimed embedded signature marker does not qualify');
+ const large=preflightContemporaryDouPdfBytes({trace,pdfUrl:base,
+  pdfBytes:Buffer.alloc(20*1024*1024+1)});
+ assert.equal(large.reason,'DOU_PDF_BYTES_SIZE_INVALID');
 });
