@@ -321,13 +321,13 @@ async function run(): Promise<void> {
 
     if (DB_PROOF_VERIFIER_RUNTIME_PASSWORD) {
       await client.query(`
-        DO $
+        DO $$
         BEGIN
           IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='radar_proof_verifier_runtime') THEN
             CREATE ROLE radar_proof_verifier_runtime LOGIN INHERIT NOSUPERUSER
               NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
           END IF;
-        END $;
+        END $$;
       `);
       await client.query(`
         ALTER ROLE radar_proof_verifier_runtime LOGIN INHERIT NOSUPERUSER
