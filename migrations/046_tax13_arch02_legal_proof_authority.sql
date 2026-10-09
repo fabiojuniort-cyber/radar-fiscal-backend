@@ -358,3 +358,123 @@ REVOKE ALL ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID)
   FROM PUBLIC,radar_legal_issuer,radar_scan_sealer,radar_taxonomy_curator;
 GRANT EXECUTE ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID)
   TO radar_app,radar_worker;
+
+-- Issuer key trust anchor: admin registration is separate from runtime
+-- legal issuance. Key revocation is append-only and instantly kills V2 reads.
+CREATE TABLE public.tax13_v2_authorized_keys (
+  key_id TEXT PRIMARY KEY CHECK (length(key_id) BETWEEN 1 AND 128),
+  public_key_pem TEXT NOT NULL CHECK (length(public_key_pem) BETWEEN 80 AND 2000),
+  active_from TIMESTAMPTZ NOT NULL,
+  registered_by TEXT NOT NULL CHECK (length(registered_by) BETWEEN 1 AND 256),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp()
+);
+CREATE TABLE public.tax13_v2_key_revocations (
+  key_id TEXT PRIMARY KEY REFERENCES public.tax13_v2_authorized_keys(key_id)
+    ON DELETE RESTRICT,
+  reason_code TEXT NOT NULL CHECK (length(reason_code) BETWEEN 5 AND 100),
+  revoked_at TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp()
+);
+CREATE TRIGGER trg_tax13_v2_key_no_mutation
+  BEFORE UPDATE OR DELETE ON public.tax13_v2_authorized_keys
+  FOR EACH ROW EXECUTE FUNCTION public.tax13_arch02_append_only();
+CREATE TRIGGER trg_tax13_v2_key_revocation_no_mutation
+  BEFORE UPDATE OR DELETE ON public.tax13_v2_key_revocations
+  FOR EACH ROW EXECUTE FUNCTION public.tax13_arch02_append_only();
+ALTER TABLE public.tax13_v2_authorized_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tax13_v2_authorized_keys FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.tax13_v2_key_revocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tax13_v2_key_revocations FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON public.tax13_v2_authorized_keys, public.tax13_v2_key_revocations
+  FROM PUBLIC, radar_app,radar_worker,radar_taxonomy_curator,
+       radar_legal_issuer,radar_scan_sealer;
+
+CREATE FUNCTION public.tax13_v2_issuer_key(p_key_id TEXT)
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT k.public_key_pem FROM public.tax13_v2_authorized_keys k
+ WHERE k.key_id=p_key_id AND k.active_from<=statement_timestamp()
+   AND NOT EXISTS(SELECT 1 FROM public.tax13_v2_key_revocations revoked
+     WHERE revoked.key_id=k.key_id)
+ LIMIT 1
+$$;
+REVOKE ALL ON FUNCTION public.tax13_v2_issuer_key(TEXT)
+  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_scan_sealer;
+GRANT EXECUTE ON FUNCTION public.tax13_v2_issuer_key(TEXT) TO radar_legal_issuer;
+
+CREATE FUNCTION public.tax13_v2_issuer_input(p_attestation UUID)
+RETURNS TABLE(
+  attestation_id UUID, publication_version_id UUID,
+  source_id UUID, official_url TEXT,
+  sanitized_html TEXT, manifest JSONB,
+  attestor_ref TEXT, attestor_kind TEXT
+) LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT a.id, a.publication_version_id, a.source_id, a.official_url,
+   pv.source_metadata->'presentation'->>'html', a.manifest,
+   a.attestor_ref, a.attestor_kind
+ FROM public.publication_legal_scope_attestations a
+ JOIN public.publication_versions pv ON pv.id=a.publication_version_id
+ JOIN public.publication_origins po ON po.id=a.publication_origin_id
+ JOIN public.sources src ON src.id=a.source_id
+ WHERE a.id=p_attestation
+   AND pv.is_current AND public.publication_scope_is_in_scope(pv.publication_id)
+   AND pv.publication_id=po.publication_id
+   AND po.source_id=a.source_id AND po.official_url=a.official_url
+   AND src.code='confaz'
+   AND a.official_url ~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
+   AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
+   AND a.coverage='COMPLETE'
+   AND a.id=public.tax13_effective_attestation_id(pv.id,a.valid_as_of)
+$$;
+REVOKE ALL ON FUNCTION public.tax13_v2_issuer_input(UUID)
+  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_scan_sealer;
+GRANT EXECUTE ON FUNCTION public.tax13_v2_issuer_input(UUID) TO radar_legal_issuer;
+
+CREATE FUNCTION public.tax13_v2_key_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+  IF NOT EXISTS(
+    SELECT 1 FROM public.tax13_v2_authorized_keys k
+    WHERE k.key_id=NEW.signature_key_id AND k.active_from<=statement_timestamp()
+      AND NOT EXISTS(SELECT 1 FROM public.tax13_v2_key_revocations r
+        WHERE r.key_id=k.key_id)
+  ) THEN
+    RAISE EXCEPTION 'TAX13_V2_SIGNING_KEY_NOT_AUTHORIZED';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_tax13_v2_key_guard
+  BEFORE INSERT ON public.tax13_legal_proofs_v2
+  FOR EACH ROW EXECUTE FUNCTION public.tax13_v2_key_guard();
+REVOKE ALL ON FUNCTION public.tax13_v2_key_guard() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION public.tax13_v2_admitted_current_fragments(p_attestation UUID)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+SELECT proof.current_fragments
+FROM public.tax13_legal_proofs_v2 proof
+JOIN public.publication_legal_scope_attestations a ON a.id=proof.attestation_id
+JOIN public.publication_versions pv ON pv.id=proof.publication_version_id
+JOIN public.publication_origins po ON po.id=a.publication_origin_id
+JOIN public.sources src ON src.id=a.source_id
+WHERE proof.attestation_id=p_attestation
+ AND proof.valid_as_of=a.valid_as_of AND proof.recheck_on>proof.valid_as_of
+ AND a.coverage='COMPLETE' AND src.code='confaz'
+ AND a.official_url ~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
+ AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
+ AND a.official_url=po.official_url
+ AND a.source_id=po.source_id AND po.publication_id=pv.publication_id
+ AND a.html_sha256=encode(sha256(convert_to(
+   pv.source_metadata->'presentation'->>'html','UTF8')),'hex')
+ AND pv.is_current AND public.publication_scope_is_in_scope(pv.publication_id)
+ AND a.id=public.tax13_effective_attestation_id(pv.id,proof.valid_as_of)
+ AND EXISTS(SELECT 1 FROM public.tax13_v2_authorized_keys k
+   WHERE k.key_id=proof.signature_key_id AND k.active_from<=proof.created_at
+     AND NOT EXISTS(SELECT 1 FROM public.tax13_v2_key_revocations r
+       WHERE r.key_id=k.key_id))
+ AND NOT EXISTS(SELECT 1 FROM public.tax13_legal_proof_revocations_v2 revoked
+   WHERE revoked.proof_id=proof.id)
+LIMIT 1 $$;
+REVOKE ALL ON FUNCTION public.tax13_v2_admitted_current_fragments(UUID)
+  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_scan_sealer;
