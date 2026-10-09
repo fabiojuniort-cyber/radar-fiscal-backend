@@ -38,14 +38,23 @@ export async function seedTestV2LegalProof(admin: Pool, attestationId: string): 
   // production; admin-only CI seeding models an already verified source.
   const sourceRaw='<div id="parent-fieldname-text">'+a.sanitized_html+'</div>';
   const rawSha=hash(sourceRaw);
-  const artifact=await admin.query<{id:string}>(`
+  // Only one immutable original per version/URL/hash; another CI attestation
+  // reuses that exact captured artifact instead of rewriting the ledger.
+  await admin.query(`
     INSERT INTO public.tax13_v2_original_http_artifacts(
       publication_version_id,official_url,http_status,raw_http_bytes,
       raw_sha256,sanitized_html_sha256,collected_at,collector_identity
     ) VALUES ($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,
       statement_timestamp(),'CI-SYNTHETIC-RAW-BYTES')
-    RETURNING id
+    ON CONFLICT (publication_version_id,official_url,raw_sha256) DO NOTHING
   `,[a.publication_version_id,a.official_url,sourceRaw,rawSha,hash(a.sanitized_html)]);
+  const artifact=await admin.query<{id:string}>(`
+    SELECT id FROM public.tax13_v2_original_http_artifacts
+    WHERE publication_version_id=$1::uuid
+      AND official_url=$2 AND raw_sha256=$3
+      AND sanitized_html_sha256=$4
+  `,[a.publication_version_id,a.official_url,rawSha,hash(a.sanitized_html)]);
+  if (!artifact.rows[0]?.id) throw new Error('TAX13_CI_ORIGINAL_ARTIFACT_MISSING');
   const proof=buildLegalProofV2(a.manifest,{
     publicationVersionId:a.publication_version_id,sourceId:a.source_id,
     officialUrl:a.official_url,sanitizedHtml:a.sanitized_html,
