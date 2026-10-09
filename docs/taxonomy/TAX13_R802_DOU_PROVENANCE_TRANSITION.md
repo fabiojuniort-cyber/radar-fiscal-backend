@@ -4,7 +4,7 @@
 
 ## Owner decision and authoritative evidence
 
-CONFAZ direct HTTPS is not reachable from the tested cloud egress. TriBusca already ingests CONFAZ acts through INLABS/DOU. The owner approves reviewing a DOU-based publication source instead of repeated CONFAZ HTTP probes.
+CONFAZ direct HTTPS is not reachable from the tested cloud egress. Trifaros already ingests CONFAZ acts through INLABS/DOU. The owner approves reviewing a DOU-based publication source instead of repeated CONFAZ HTTP probes.
 
 The Imprensa Nacional explicitly warns that INLABS XML **does not replace certified DOU publication** (https://inlabs.in.gov.br/acessar.php). Decree 9215/2017 art. 4 requires authenticity/integrity of electronic DOU publication (https://www2.camara.leg.br/legin/fed/decret/2017/decreto-9215-29-novembro-2017-785835-normaatualizada-pe.html). XML alone, hashes alone, hostnames and fabricated fixture receipts never authorize legal CURRENT.
 
@@ -48,6 +48,19 @@ Governance: https://github.com/fabiojuniort-cyber/tribusca-control/issues/101
 
 The owner directed that historic DOU data and document recovery/import work be **removed from the active TAX13-R8-02 scope**. Do not download digitized 1991/1997 editions, create a manual importer, activate the historical intake CLI, or allocate database/object storage for archival scans at this stage. The previous prototype and rationale remain in Git commit history and the governance issue; they are not active deployables.
 
-This scope adjustment does **not** delete, overwrite, reclassify, or reprocess any historical documents already existing in TriBusca. Existing legal claims lacking positive authenticated evidence remain UNVERIFIED/BLOCK. The existing defensive guard which refuses to misrepresent pre-2020 publications as INLABS XML is retained as an input validation rule, not a historical extraction project.
+This scope adjustment does **not** delete, overwrite, reclassify, or reprocess any historical documents already existing in Trifaros. Existing legal claims lacking positive authenticated evidence remain UNVERIFIED/BLOCK. The existing defensive guard which refuses to misrepresent pre-2020 publications as INLABS XML is retained as an input validation rule, not a historical extraction project.
 
 **Current target:** contemporary DOU INLABS transport/certified publication provenance, exact CONFAZ dispatch-to-act integrity, independently managed legal verification, PostgreSQL 16/18 security negatives, and R7/main CI without weakening 048. No merge, no production deployment, no green CURRENT without genuine external official evidence and independent R9 review.
+
+
+## Contemporary certified PDF byte preflight — 2026-10-09 (R9 BLOCK)
+
+The independent PDF-byte preflight in `src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts` is an **additional untrusted, read-only stage**, not official certification. It accepts bounded bytes (max 20 MiB) from a separately controlled HTTPS fetch, checks only basic PDF framing and the direct `pesquisa.in.gov.br/imprensa/servlet/INPDFViewer` URL's exact edition date, journal and page against the pre-existing INLABS matter trace, and calculates SHA-256. It deliberately returns `authenticatedOfficialPublication=false` and `grantsLegalCurrent=false` for **every outcome**. It never downloads files, validates certificate chains, persists PDF content, or authorizes the SQL worker.
+
+Independent review statements can also be cross-checked against the actual supplied PDF's SHA-256, but even a successful reviewer signature/hash match proves only consistency with the signed assertion, not that the independently trusted Imprensa Nacional certified that PDF. A separate certificate-chain/official authenticity verifier, independent key root, exact PDF text-to-dispatch span comparison, corrections, vigency and R9 are still required.
+
+**Official contemporary publication reference only:** Imprensa Nacional's certified-edition PDF URL `https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?captchafield=firstAccess&data=25%2F04%2F2024&jornal=601&pagina=1` identifies 25 April 2024 extraordinary issue no. 80-B, page 1, `DESPACHO Nº 16`, which contains `CONVÊNIO ICMS Nº 15/2024`. The search index exposes text, but PDF byte download from this tool context failed. No PDF hash or ICP-Brasil validation is claimed; no INLABS/XML custody or legal effectivity linkage is established by merely identifying this source.
+
+**Requirement for continuation:** access to actual certified PDF bytes from the official primary source and an independently administered official verification method. Never substitute a search snippet, third-party mirror, unverified reader's PDF, hash-only attestation or the reviewer's signature. Keep the historical 1991/1997 work paused.
+
+**Naming:** Product name is Trifaros. Historical code identifiers, immutable proof signature domain separators, repository names and URLs retain legacy strings until a separately versioned compatible migration; do not silently replace cryptographic message bytes.
