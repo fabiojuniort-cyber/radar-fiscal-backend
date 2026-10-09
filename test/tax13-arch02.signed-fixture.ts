@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto';
+import { createHash, createHmac, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
   buildLegalProofV2, canonicalLegalProofJson, signLegalProofV2,
@@ -33,6 +33,19 @@ export async function seedTestV2LegalProof(admin: Pool, attestationId: string): 
   if (!a) throw new Error('TAX13_CI_ATTESTATION_MISSING');
   const hosts=OFFICIAL_EVIDENCE_HOSTS[a.source_code];
   if (!hosts) throw new Error('TAX13_CI_UNSUPPORTED_OFFICIAL_SOURCE');
+  // Synthetic disposable HTTP fixture. NOT real CONFAZ network provenance.
+  // The independent verifier will require actual captured HTTP bytes in
+  // production; admin-only CI seeding models an already verified source.
+  const sourceRaw='<div id="parent-fieldname-text">'+a.sanitized_html+'</div>';
+  const rawSha=hash(sourceRaw);
+  const artifact=await admin.query<{id:string}>(`
+    INSERT INTO public.tax13_v2_original_http_artifacts(
+      publication_version_id,official_url,http_status,raw_http_bytes,
+      raw_sha256,sanitized_html_sha256,collected_at,collector_identity
+    ) VALUES ($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,
+      statement_timestamp(),'CI-SYNTHETIC-RAW-BYTES')
+    RETURNING id
+  `,[a.publication_version_id,a.official_url,sourceRaw,rawSha,hash(a.sanitized_html)]);
   const proof=buildLegalProofV2(a.manifest,{
     publicationVersionId:a.publication_version_id,sourceId:a.source_id,
     officialUrl:a.official_url,sanitizedHtml:a.sanitized_html,
@@ -40,7 +53,7 @@ export async function seedTestV2LegalProof(admin: Pool, attestationId: string): 
     trustedEvidenceHosts:hosts,
   },{
     proofId:randomUUID(),attestationId:a.id,
-    rawArtifactSha256:hash(a.sanitized_html), // synthetic source only
+    rawArtifactSha256:rawSha, // synthetic CI wrapper, not real HTTP
     presentationArtifactSha256:hash(a.sanitized_html),
     parserBuildDigest:hash('CI-only-deterministic-parser-build'),
     parserVersion:'ci-node-24-htmlparser2',sanitizerVersion:'ci-sanitizer',
@@ -77,6 +90,20 @@ export async function seedTestV2LegalProof(admin: Pool, attestationId: string): 
     signed.signatureKeyId,proof.issuerId,proof.parserVersion,
     proof.sanitizerVersion,proof.legalPolicyVersion,
   ]);
+  const verifierSecret=randomBytes(32);
+  const verifierKeyId='CI-VERIFIER-'+randomUUID();
+  await admin.query(`
+    INSERT INTO public.tax13_v2_verifier_mac_keys(key_id,key_bytes)
+    VALUES ($1,$2::bytea)
+  `,[verifierKeyId,verifierSecret]);
+  const macMaterial='TRIBUSCA:TAX13:R8:PROOF_VERIFIED:1\n'+
+    proof.proofId+':'+signed.payloadSha256+':'+signed.signatureBase64+':'+rawSha;
+  const mac=createHmac('sha256',verifierSecret).update(macMaterial,'utf8').digest('hex');
+  await admin.query(`
+    INSERT INTO public.tax13_v2_verified_proofs(
+      proof_id,artifact_id,payload_sha256,verifier_key_id,verifier_mac,verifier_identity
+    ) VALUES ($1::uuid,$2::uuid,$3,$4,$5,'CI-SYNTHETIC-TEST-VERIFIER')
+  `,[proof.proofId,artifact.rows[0]!.id,signed.payloadSha256,verifierKeyId,mac]);
   return proof.proofId;
 }
 
