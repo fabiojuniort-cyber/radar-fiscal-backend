@@ -81,6 +81,13 @@ try {
   `, [attestationId]);
   const row = data.rows[0];
   if (!row) throw new Error('TAX13_V2_OFFICIAL_ATTESTATION_NOT_ELIGIBLE');
+  const original = await db.query<{ok:boolean}>(`
+    SELECT public.tax13_v2_original_exists_for_issuer(
+      $1::uuid,$2::text) AS ok
+  `, [attestationId,rawDigest]);
+  if (!original.rows[0]?.ok) {
+    throw new Error('TAX13_R8_ORIGINAL_HTTP_NOT_REGISTERED_OR_HASH_MISMATCH');
+  }
   const host = new URL(row.official_url).hostname.toLowerCase();
   const hosts = OFFICIAL_EVIDENCE_HOSTS.confaz;
   if (!hosts || !hosts.includes(host) || !row.attestor_ref) {
