@@ -236,3 +236,48 @@ SET search_path=pg_catalog,public,pg_temp AS $$
 $$;
 -- Revoke any accidental inherited access to the verifier ledger.
 REVOKE ALL ON public.tax13_v2_verified_proofs FROM radar_legal_issuer,radar_scan_sealer;
+
+-- Independent raw-source identity is mandatory EVEN before signing V2.
+-- Only the issuer role may probe existence; no raw bytes are disclosed.
+CREATE FUNCTION public.tax13_v2_original_exists_for_issuer(p_attestation UUID,p_raw_sha TEXT)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+SELECT EXISTS (
+ SELECT 1 FROM public.publication_legal_scope_attestations att
+ JOIN public.publication_versions pv ON pv.id=att.publication_version_id
+ JOIN public.tax13_v2_original_http_artifacts a ON a.publication_version_id=pv.id
+   AND a.official_url=att.official_url
+ WHERE att.id=p_attestation
+   AND pv.is_current
+   AND att.coverage='COMPLETE'
+   AND a.raw_sha256=p_raw_sha
+   AND a.sanitized_html_sha256=att.html_sha256
+   AND a.sanitized_html_sha256=encode(sha256(
+     convert_to(pv.source_metadata->'presentation'->>'html','UTF8')),'hex')
+   AND a.collected_at<=statement_timestamp()
+)
+$$;
+REVOKE ALL ON FUNCTION public.tax13_v2_original_exists_for_issuer(UUID,TEXT)
+ FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_scan_sealer,
+ radar_proof_verifier;
+GRANT EXECUTE ON FUNCTION public.tax13_v2_original_exists_for_issuer(UUID,TEXT)
+ TO radar_legal_issuer;
+
+-- Direct issuer INSERT with a merely well-formed but unrelated raw digest
+-- must fail; authorized source evidence is a hard DB precondition.
+CREATE FUNCTION public.tax13_v2_proof_original_guard()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ IF NOT public.tax13_v2_original_exists_for_issuer(
+   NEW.attestation_id,NEW.canonical_payload::jsonb->>'rawArtifactSha256') THEN
+   RAISE EXCEPTION 'TAX13_R8_ORIGINAL_HTTP_UNVERIFIED';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER trg_tax13_v2_original_guard
+ BEFORE INSERT ON public.tax13_legal_proofs_v2
+ FOR EACH ROW EXECUTE FUNCTION public.tax13_v2_proof_original_guard();
+REVOKE ALL ON FUNCTION public.tax13_v2_proof_original_guard()
+ FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,
+ radar_legal_issuer,radar_scan_sealer,radar_proof_verifier;
