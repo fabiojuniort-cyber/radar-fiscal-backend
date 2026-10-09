@@ -103,7 +103,11 @@ export function preflightHistoricalDouIntake(input:HistoricalDouIntakeInput):His
   const m=/^([1-9]\d{0,5})\/(\d{2}|\d{4})$/.exec(input.actNumber);
   if(!m)return fail('HISTORICAL_INTAKE_ACT_NUMBER_INVALID');
   const yearText=m[2]!;
-  const year=yearText.length===2?1900+Number(yearText):Number(yearText);
+  const publishedYear=Number(String(input.douPublishedOn).slice(0,4));
+  const resolvedTwoDigitYear=Math.floor(publishedYear/100)*100+Number(yearText);
+  const year=yearText.length===2
+    ? resolvedTwoDigitYear>publishedYear?resolvedTwoDigitYear-100:resolvedTwoDigitYear
+    : Number(yearText);
   if(year<1808||year>2001||!validDate(input.douPublishedOn)||
     input.douPublishedOn<'1808-01-01'||input.douPublishedOn>'2001-12-31'||
     year>Number(input.douPublishedOn.slice(0,4)))
