@@ -13,8 +13,6 @@ on:
   push:
     branches:
       - main
-      # Temporary isolated validation until R8. This is not a deploy trigger.
-      - fix/tax13-arch-02-single-proof-authority
 
 # Replace only older runs of the same PR. Non-PR runs have independent groups.
 concurrency:
