@@ -221,3 +221,33 @@ REVOKE ALL ON FUNCTION public.tax13_arch02_append_only(),
  public.tax13_validate_v2_proof_admission(), public.tax13_validate_v2_scan_seal(),
  public.tax13_v2_admitted_current_fragments(UUID) FROM PUBLIC;
 -- No GRANT to radar_app or radar_worker until reviewed and proven in R8.
+
+-- P2-B: bind public labels and detector identity to the exact selected scan,
+-- not to an unrelated catalog edition which happens to share an NCM code.
+-- This remains constrained by the old fail-closed fingerprint gate until V2
+-- emission/scan sealing replaces it in the final integration.
+CREATE FUNCTION public.tax13_public_current_ncm_details(p_version UUID)
+RETURNS TABLE (
+  ncm_code TEXT, description TEXT, detector_key TEXT,
+  detector_version TEXT, catalog_edition_id UUID,
+  catalog_entry_id UUID, excerpt TEXT
+) LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+  SELECT DISTINCT ON (code.ncm_code)
+    code.ncm_code::text,e.description::text,scan.detector_key,
+    scan.detector_version,scan.catalog_edition_id,code.catalog_entry_id,
+    code.excerpt
+  FROM public.publication_ncm_scan_evidence scan
+  JOIN public.publication_ncm_scan_evidence_codes code
+    ON code.scan_evidence_id=scan.id
+  JOIN public.official_catalog_entries e
+    ON e.id=code.catalog_entry_id
+   AND e.catalog_edition_id=scan.catalog_edition_id
+  WHERE scan.publication_version_id=p_version
+    AND scan.run_fingerprint::text=public.tax13_current_ncm_scan_fingerprint(p_version)
+  ORDER BY code.ncm_code,code.fragment_index,code.id
+$$;
+REVOKE ALL ON FUNCTION public.tax13_public_current_ncm_details(UUID)
+  FROM PUBLIC,radar_worker,radar_taxonomy_curator,radar_app;
+GRANT EXECUTE ON FUNCTION public.tax13_public_current_ncm_details(UUID)
+  TO radar_app;
