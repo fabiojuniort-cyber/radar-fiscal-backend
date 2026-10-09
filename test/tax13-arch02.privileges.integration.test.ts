@@ -14,26 +14,29 @@ test('TAX13 V2 proof authority: RLS FORCE, distinct issuer/sealer, zero runtime 
       rolname: string; rolcanlogin: boolean; rolbypassrls: boolean;
     }>(`
       SELECT rolname, rolcanlogin, rolbypassrls FROM pg_roles
-      WHERE rolname IN ('radar_legal_issuer','radar_scan_sealer')
+      WHERE rolname IN ('radar_legal_issuer','radar_scan_sealer','radar_proof_verifier')
       ORDER BY rolname
     `);
     assert.deepEqual(roles.rows.map((r) => r.rolname),
-      ['radar_legal_issuer', 'radar_scan_sealer']);
+      ['radar_legal_issuer', 'radar_proof_verifier', 'radar_scan_sealer']);
     assert.ok(roles.rows.every((r) => !r.rolcanlogin && !r.rolbypassrls));
     const policies = await pool.query<{
       relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean;
     }>(`
       SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c
       WHERE c.relname IN ('tax13_legal_proofs_v2',
-        'tax13_legal_proof_revocations_v2','tax13_ncm_seals_v2')
+        'tax13_legal_proof_revocations_v2','tax13_ncm_seals_v2',
+        'tax13_v2_verified_proofs')
       ORDER BY c.relname
     `);
-    assert.equal(policies.rows.length,3);
+    assert.equal(policies.rows.length,4);
     assert.ok(policies.rows.every((p) => p.relrowsecurity && p.relforcerowsecurity));
     const priv = await pool.query<{
       worker_write: boolean; app_read: boolean; curator_write: boolean;
       issuer_write: boolean; sealer_write: boolean;
       app_details: boolean; worker_v2_projection: boolean;
+      issuer_verified_insert:boolean; sealer_verified_insert:boolean;
+      verifier_verified_insert:boolean;
     }>(`
       SELECT
        has_table_privilege('radar_worker','public.tax13_legal_proofs_v2','INSERT') AS worker_write,
@@ -41,6 +44,9 @@ test('TAX13 V2 proof authority: RLS FORCE, distinct issuer/sealer, zero runtime 
        has_table_privilege('radar_taxonomy_curator','public.tax13_legal_proofs_v2','INSERT') AS curator_write,
        has_table_privilege('radar_legal_issuer','public.tax13_legal_proofs_v2','INSERT') AS issuer_write,
        has_table_privilege('radar_scan_sealer','public.tax13_ncm_seals_v2','INSERT') AS sealer_write,
+       has_table_privilege('radar_legal_issuer','public.tax13_v2_verified_proofs','INSERT') AS issuer_verified_insert,
+       has_table_privilege('radar_scan_sealer','public.tax13_v2_verified_proofs','INSERT') AS sealer_verified_insert,
+       has_table_privilege('radar_proof_verifier','public.tax13_v2_verified_proofs','INSERT') AS verifier_verified_insert,
        has_function_privilege('radar_app','public.tax13_public_current_ncm_details(uuid)','EXECUTE') AS app_details,
        has_function_privilege('radar_worker','public.tax13_v2_admitted_current_fragments(uuid)','EXECUTE') AS worker_v2_projection
     `);
@@ -48,12 +54,16 @@ test('TAX13 V2 proof authority: RLS FORCE, distinct issuer/sealer, zero runtime 
       worker_write: false, app_read: false, curator_write: false,
       issuer_write: true, sealer_write: true,
       app_details: true, worker_v2_projection: false,
+      issuer_verified_insert:false,sealer_verified_insert:false,
+      verifier_verified_insert:true,
     });
     const membership = await pool.query<{x: boolean}>(`
       SELECT pg_has_role('radar_worker_runtime','radar_legal_issuer','MEMBER') OR
              pg_has_role('radar_app_runtime','radar_legal_issuer','MEMBER') OR
              pg_has_role('radar_worker_runtime','radar_scan_sealer','MEMBER') OR
-             pg_has_role('radar_app_runtime','radar_scan_sealer','MEMBER') AS x
+             pg_has_role('radar_app_runtime','radar_scan_sealer','MEMBER') OR
+             pg_has_role('radar_legal_issuer_runtime','radar_proof_verifier','MEMBER') OR
+             pg_has_role('radar_scan_sealer_runtime','radar_proof_verifier','MEMBER') AS x
     `);
     assert.equal(membership.rows[0]?.x,false);
 
@@ -62,6 +72,8 @@ test('TAX13 V2 proof authority: RLS FORCE, distinct issuer/sealer, zero runtime 
        'tax13_v2_issuer_input', 'tax13_ncm_seals_v2'],
       ['radar_scan_sealer_runtime','DB_NCM_SEALER_RUNTIME_PASSWORD','radar_scan_sealer',
        'tax13_v2_sealer_bundle','tax13_legal_proofs_v2'],
+      ['radar_proof_verifier_runtime','DB_PROOF_VERIFIER_RUNTIME_PASSWORD','radar_proof_verifier',
+       'tax13_v2_verifier_bundle','tax13_legal_proofs_v2'],
     ] as const) {
       const password = process.env[passwordEnv];
       if (!password) throw new Error('TAX13_CI_ISOLATED_LOGIN_PASSWORD_MISSING');
