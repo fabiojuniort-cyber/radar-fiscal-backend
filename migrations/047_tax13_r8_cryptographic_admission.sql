@@ -13,8 +13,18 @@ BEGIN
 END $$;
 ALTER ROLE radar_proof_verifier NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO radar_proof_verifier;
-REVOKE radar_proof_verifier FROM radar_app_runtime,radar_worker_runtime,
- radar_legal_issuer_runtime,radar_scan_sealer_runtime,radar_taxonomy_curator_runtime;
+DO $
+DECLARE role_name TEXT;
+BEGIN
+ FOREACH role_name IN ARRAY ARRAY['radar_app_runtime','radar_worker_runtime',
+  'radar_legal_issuer_runtime','radar_scan_sealer_runtime',
+  'radar_taxonomy_curator_runtime']
+ LOOP
+   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN
+     EXECUTE format('REVOKE radar_proof_verifier FROM %I',role_name);
+   END IF;
+ END LOOP;
+END $;
 
 -- Raw original HTTP payload is stored intact, cannot be inferred from the
 -- user-provided CONFAZ XML body HTML. Collector must supply authenticated
