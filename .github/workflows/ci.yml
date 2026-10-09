@@ -10,6 +10,8 @@ on:
       - fix/taxonomy-valid-legal-text
       # TAX13-ARCH-02 #193 is stacked directly on PR #192.
       - fix/tax13-r2-ncm-temporal
+      # TAX13 R8-02 incremental PR (stacked on unmerged #193).
+      - fix/tax13-arch-02-single-proof-authority
   push:
     branches:
       - main
@@ -125,6 +127,8 @@ jobs:
 
       - name: Unit tests
         run: npm test
+      - name: TAX13 R802 HTTPS adversarial pure unit tests
+        run: npx tsx --test test/tax13-r802.capture.unit.test.ts
 
       - name: RFB news unit tests
         run: npx tsx --test test/rfb-news.parser.unit.test.ts test/rfb-news.filter.unit.test.ts test/rfb-news.connector.unit.test.ts
@@ -229,6 +233,9 @@ jobs:
       - name: TAX13 ARCH02 R7 false CURRENT regression PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 R802 official-capture anti-fixture SQL PG16
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/tax13-r802.capture-gate.integration.test.ts
       - name: TAX13 R8 direct issuer/sealer SQL forgery negative PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-r8.sql-admission.integration.test.ts
@@ -338,6 +345,8 @@ jobs:
         run: npx tsx --test test/tax13-arch02.privileges.integration.test.ts
       - name: TAX13 ARCH02 R7 false CURRENT regression PG18
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 R802 official-capture anti-fixture SQL PG18
+        run: npx tsx --test test/tax13-r802.capture-gate.integration.test.ts
       - name: TAX13 R8 direct issuer/sealer SQL forgery negative PG18
         run: npx tsx --test test/tax13-r8.sql-admission.integration.test.ts
       - name: TAX13 R8 positive isolated issuer-verifier-sealer pipeline PG18
