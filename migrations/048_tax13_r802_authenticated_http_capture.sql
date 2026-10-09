@@ -155,6 +155,11 @@ BEGIN
  IF NEW.receipt_mac IS DISTINCT FROM encode(
     public.hmac(convert_to(payload,'UTF8'),secret_,'sha256'),'hex')
  THEN RAISE EXCEPTION 'TAX13_R802_CAPTURE_MAC_INVALID'; END IF;
+ -- The DB administrator/fixture is not an official network collector,
+ -- even when it can compute a valid MAC in a disposable database.
+ IF session_user IS DISTINCT FROM 'radar_http_collector_runtime' THEN
+   RAISE EXCEPTION 'TAX13_R802_COLLECTOR_SESSION_REQUIRED';
+ END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER trg_tax13_r802_capture_guard
