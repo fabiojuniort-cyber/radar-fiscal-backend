@@ -98,3 +98,56 @@ test('R802 DOU user supplied hash alone is NEVER authenticity; no evidence means
  assert.equal(c.status,'UNVERIFIED');
  assert.equal(c.grantsLegalCurrent,false);
 });
+
+test('R802 signed independent DOU review assertion is only a claim; forged/revoked/replayed proof fails',async()=>{
+ const crypto=await import('node:crypto');
+ const {
+  canonicalDouReviewStatement,verifyIndependentDouReview
+ }=await import('../src/modules/taxonomy/legal-scope/dou-certified-review-signature.js');
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const keys=crypto.generateKeyPairSync('ed25519');
+ const trustedKeys=new Map([['approved-independent-review-key',keys.publicKey.export({type:'spki',format:'pem'}).toString()]]);
+ const goodPolicy='icpbr-policy-2026-v1';
+ const trust={publicKeysById:trustedKeys,revokedKeyIds:new Set<string>(),
+  approvedCertificatePolicies:new Set([goodPolicy])};
+ const statement={
+  schema:'TRIBUSCA:DOU:CERTIFIED_REVIEW:1' as const,
+  reviewId:crypto.randomUUID(),verifierIdentity:'independent-reviewer-01',
+  verifiedAt:'2026-10-09T12:00:00.000Z',
+  certificatePolicyVersion:goodPolicy,
+  certificateFingerprintSha256:'a'.repeat(64),
+  certifiedPdfSha256:'b'.repeat(64),
+  sourceCode:'dou' as const,publicationDate:trace.publicationDate,
+  section:trace.section,edition:trace.edition,
+  officialMatterId:trace.officialMatterId,certifiedPageUrl:trace.certifiedPageUrl,
+  archiveSha256:trace.archiveSha256,xmlPartSha256:[...trace.xmlPartSha256],
+  parentExternalId:trace.parentExternalId,parentTextSha256:trace.parentTextSha256,
+  certifiedExtractedTextSha256:trace.parentTextSha256
+ };
+ const signed={
+  keyId:'approved-independent-review-key',
+  statement,
+  signatureBase64:crypto.sign(null,Buffer.from(canonicalDouReviewStatement(statement),'utf8'),
+   keys.privateKey).toString('base64')
+ };
+ const now=new Date('2026-10-10T00:00:00.000Z');
+ const candidate=verifyIndependentDouReview(trace,signed,trust,now);
+ assert.equal(candidate.reviewSignatureAuthenticated,true,
+  'only independent signed review assertion is authenticated');
+ assert.equal(candidate.authenticatedOfficialPublication,false,
+  'still no PDF certificate chain actually inspected');
+ assert.equal(candidate.grantsLegalCurrent,false);
+ assert.equal(verifyIndependentDouReview(trace,{...signed,signatureBase64:'AAAA'},trust,now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,{...signed,keyId:'operator-chosen-keyid'},trust,now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,{...signed,statement:{...statement,archiveSha256:'0'.repeat(64)}},trust,now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,{...signed,statement:{...statement,parentTextSha256:'0'.repeat(64)}},trust,now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,{...signed,statement:{...statement,certifiedPdfSha256:'0'.repeat(64)}},trust,now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,signed,{...trust,revokedKeyIds:new Set([signed.keyId])},now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,signed,{...trust,approvedCertificatePolicies:new Set()},now).reviewSignatureAuthenticated,false);
+ assert.equal(verifyIndependentDouReview(trace,signed,trust,new Date('2026-01-01T00:00:00Z')).reviewSignatureAuthenticated,false);
+ const forged={...signed,statement:{...statement,grantsLegalCurrent:true}} as any;
+ assert.equal(verifyIndependentDouReview(trace,forged,trust,now).reviewSignatureAuthenticated,false);
+});
