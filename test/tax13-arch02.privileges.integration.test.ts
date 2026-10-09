@@ -56,6 +56,37 @@ test('TAX13 V2 proof authority: RLS FORCE, distinct issuer/sealer, zero runtime 
              pg_has_role('radar_app_runtime','radar_scan_sealer','MEMBER') AS x
     `);
     assert.equal(membership.rows[0]?.x,false);
+
+    for (const [user, passwordEnv, group, allowedFn, deniedTable] of [
+      ['radar_legal_issuer_runtime','DB_LEGAL_ISSUER_RUNTIME_PASSWORD','radar_legal_issuer',
+       'tax13_v2_issuer_input', 'tax13_ncm_seals_v2'],
+      ['radar_scan_sealer_runtime','DB_NCM_SEALER_RUNTIME_PASSWORD','radar_scan_sealer',
+       'tax13_v2_sealer_bundle','tax13_legal_proofs_v2'],
+    ] as const) {
+      const password = process.env[passwordEnv];
+      if (!password) throw new Error('TAX13_CI_ISOLATED_LOGIN_PASSWORD_MISSING');
+      const connection = new URL(url);
+      connection.username=user;
+      connection.password=password;
+      const separate = new Pool({connectionString:connection.toString(),max:1});
+      try {
+        const identity=await separate.query<{who:string;member:boolean;isadmin:boolean}>(`
+          SELECT current_user AS who, pg_has_role(current_user,$1,'MEMBER') AS member,
+            (r.rolsuper OR r.rolbypassrls) AS isadmin
+          FROM pg_roles r WHERE r.rolname=current_user
+        `,[group]);
+        assert.deepEqual(identity.rows[0],{who:user,member:true,isadmin:false});
+        const dummy = await separate.query(
+          `SELECT public.${allowedFn}($1::uuid)`,[randomUUID()]);
+        assert.equal(dummy.rowCount,1);
+        await assert.rejects(separate.query(
+          `INSERT INTO public.${deniedTable} DEFAULT VALUES`),
+          /permission denied/);
+      } finally {
+        await separate.end();
+      }
+    }
+
     const noProof = await pool.query<{value: unknown}>(
       'SELECT public.tax13_v2_admitted_current_fragments($1::uuid) AS value', [randomUUID()]);
     assert.equal(noProof.rows[0]?.value,null);
