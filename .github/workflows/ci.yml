@@ -229,6 +229,9 @@ jobs:
       - name: TAX13 ARCH02 R7 false CURRENT regression PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 R8 direct issuer/sealer SQL forgery negative PG16
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/tax13-r8.sql-admission.integration.test.ts
       - name: TAX13 ARCH02 V2 signer key revocation PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-arch02.key-revocation.integration.test.ts
@@ -332,5 +335,7 @@ jobs:
         run: npx tsx --test test/tax13-arch02.privileges.integration.test.ts
       - name: TAX13 ARCH02 R7 false CURRENT regression PG18
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 R8 direct issuer/sealer SQL forgery negative PG18
+        run: npx tsx --test test/tax13-r8.sql-admission.integration.test.ts
       - name: TAX13 ARCH02 V2 signer key revocation PG18
         run: npx tsx --test test/tax13-arch02.key-revocation.integration.test.ts
