@@ -7,7 +7,9 @@ on:
     paths:
       - 'test/tax13-arch02.confaz-corpus-readonly.test.ts'
       - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
+      - 'test/tax13-arch02.confaz-stratified-300.test.ts'
       - 'test/fixtures/tax13-confaz-offline-20.zip'
+      - 'test/fixtures/tax13-confaz-stratified-300.zip'
       - '.github/workflows/tax13-arch02-official-corpus.yml'
       - 'src/modules/collection/confaz.connector.ts'
       - 'src/modules/collection/legal-presentation.ts'
@@ -41,11 +43,13 @@ jobs:
         run: npm ci
       - name: Require pinned offline fixture and run structural audit - NO legal CURRENT assertion
         run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-offline-corpus.test.ts
-      - name: Upload offline parser diagnostics and SHA256 manifest
+      - name: Stratified 300 official HTML bodies - structural only
+        run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-stratified-300.test.ts
+      - name: Upload offline parser diagnostics and SHA256 manifests
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tax13-arch02-official-confaz-html-20
-          path: audit-artifacts/tax13-confaz-offline-20/
+          path: audit-artifacts/tax13-confaz-offline-*/
           if-no-files-found: warn
           retention-days: 14
