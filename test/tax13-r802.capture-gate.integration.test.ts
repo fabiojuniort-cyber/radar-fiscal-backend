@@ -40,6 +40,19 @@ test('R802 synthetic bytes + fake collector cannot establish verified capture or
    [artifact,att,h(raw),version]);
   assert.deepEqual(status.rows[0],{verified:false,issuer:false,fingerprint:null});
 
+  // Add an additional official-SHAPED origin to exercise MAC verification
+  // while retaining a totally synthetic payload. NEVER an official receipt.
+  const shapedUrl='https://www.confaz.fazenda.gov.br/legislacao/r802-ci-only/'+version;
+  await db.query(`
+   INSERT INTO publication_origins(publication_id,source_id,official_url)
+   SELECT $1::uuid,id,$2 FROM sources WHERE code='confaz'`,
+   [pub,shapedUrl]);
+  const forgedArtifact=(await db.query<{id:string}>(`
+    INSERT INTO tax13_v2_original_http_artifacts(publication_version_id,official_url,http_status,
+      raw_http_bytes,raw_sha256,sanitized_html_sha256,collected_at,collector_identity)
+    VALUES($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,statement_timestamp(),
+      'CI-SYNTHETIC-NOT-TRUSTED') RETURNING id`,
+    [version,shapedUrl,raw,h(raw),h(html)])).rows[0]!.id;
   const keyId='r802-ci-neg-'+randomUUID();
   await db.query(`INSERT INTO tax13_v2_capture_mac_keys(key_id,key_bytes)
     VALUES($1,decode($2,'hex'))`,[keyId,randomBytes(32).toString('hex')]);
@@ -50,7 +63,7 @@ test('R802 synthetic bytes + fake collector cannot establish verified capture or
     SELECT id,$2,official_url,ARRAY[official_url],'8.8.8.8',repeat('a',64),
       'CI-SYNTHETIC-NOT-TRUSTED',collected_at,collected_at,repeat('0',64)
     FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid`,
-    [artifact,keyId]),/TAX13_R802_CAPTURE_MAC_INVALID/);
+    [forgedArtifact,keyId]),/TAX13_R802_CAPTURE_MAC_INVALID/);
   await assert.rejects(db.query(`
     INSERT INTO tax13_v2_official_capture_receipts
     (artifact_id,capture_key_id,final_url,redirect_urls,remote_ipv4,tls_peer_cert_sha256,
@@ -58,7 +71,7 @@ test('R802 synthetic bytes + fake collector cannot establish verified capture or
     SELECT id,$2,official_url,ARRAY[official_url],'127.0.0.1',repeat('a',64),
       'CI-SYNTHETIC-NOT-TRUSTED',collected_at,collected_at,repeat('0',64)
     FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid`,
-    [artifact,keyId]),/TAX13_R802_CAPTURE_NOT_AUTHENTICATED/);
+    [forgedArtifact,keyId]),/TAX13_R802_CAPTURE_NOT_AUTHENTICATED/);
   const after=await db.query<{verified:boolean;fingerprint:string|null}>(`
    SELECT public.tax13_v2_capture_verified($1::uuid) AS verified,
     public.tax13_current_ncm_scan_fingerprint($2::uuid) AS fingerprint`,
