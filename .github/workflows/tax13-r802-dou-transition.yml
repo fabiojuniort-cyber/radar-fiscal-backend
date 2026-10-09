@@ -8,6 +8,7 @@ on:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-certified-review-signature.ts'
       - 'src/modules/taxonomy/legal-scope/dou-historical-intake.ts'
+      - 'src/tools/tax13-dou-historical-intake-cli.ts'
       - 'test/tax13-r802.dou-source-preflight.unit.test.ts'
       - 'test/tax13-r802.dou-historical-intake.unit.test.ts'
       - '.github/workflows/tax13-r802-dou-transition.yml'
