@@ -106,7 +106,7 @@ export function assertCaptureResponseHeaders(
 
 interface Hop {
   status: number;
-  location?: string;
+  location: string | undefined;
   rawBytes: Buffer;
   remoteIpv4: string;
   tlsPeerCertificateSha256: string;
@@ -116,7 +116,7 @@ async function singleHop(url: URL): Promise<Hop> {
   const ip = await resolvePinnedPublicIpv4(url.hostname);
   return new Promise<Hop>((resolve, reject) => {
     const req = request(url, {
-      method: 'GET', agent: false, family: 4, autoSelectFamily: false,
+      method: 'GET', agent: false, family: 4,
       servername: url.hostname, rejectUnauthorized: true, timeout: HTTPS_TIMEOUT_MS,
       lookup: (_host, _opts, cb) => cb(null, ip, 4),
       headers: {
