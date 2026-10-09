@@ -33,7 +33,9 @@ jobs:
         pg: ['16-bookworm', '18-bookworm']
     services:
       postgres:
-        image: postgres:${{ matrix.pg }}
+        # Verified Docker Official postgres distribution via AWS Public ECR.
+        # Preserve PG16/PG18 Bookworm locale/security tests unchanged.
+        image: public.ecr.aws/docker/library/postgres:${{ matrix.pg }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
