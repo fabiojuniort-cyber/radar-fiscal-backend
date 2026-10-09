@@ -132,30 +132,11 @@ export function preflightDouConfazTrace(input:{
  for(const part of parts){
   const entry=obj(part),attrs=obj(entry?.attributes);
   const name=str(entry?.filename);
+  const strictFilename=new RegExp('^[0-9]+_'+date.replaceAll('-','')+'_'+matter+'(?:-[0-9]+)?\\.xml$');
   if(!entry||!attrs||!hex.test(str(entry.rawSha256))||
     !Number.isSafeInteger(entry.sizeBytes)||Number(entry.sizeBytes)<1||
-    !/^\d+_\d{8}_\d+(?:-\d+)?\.xml$/.test(name)||
-    !new RegExp('^[0-9]+_'+date.replaceAll('-','')+'_'+matter+'(?:-[0-9]+)?\\.xml
-    return deny('DOU_XML_PART_IDENTITY_INVALID');
-  seen.add(name);digests.push(str(entry.rawSha256));
- }
- return {
-  status:'DOU_XML_TRACE_ONLY',authenticatedOfficialPublication:false,
-  grantsLegalCurrent:false,sourceCode:'dou',publicationDate:date,
-  section,edition,officialMatterId:matter,
-  certifiedPageUrl:parent.officialUrl,archiveUrl:str(archive.officialUrl),
-  archiveSha256:str(archive.rawSha256),xmlPartSha256:digests,
-  embedded,parentExternalId:parent.externalId,
-  parentTextSha256:createHash('sha256').update(parent.content,'utf8').digest('hex'),
-  outstandingGates:[
-   'INDEPENDENT_CERTIFIED_DOU_PUBLICATION_VALIDATION',
-   'AUTHENTICATED_XML_TO_CERTIFIED_TEXT_CORRESPONDENCE',
-   'INDEPENDENT_LEGAL_EFFECTIVITY_ATTESTATION'
-  ]
- };
-}
-).test(name)||
-    seen.has(name)||attrs.idMateria!==matter||attrs.pubName!==section||
+    !strictFilename.test(name)||seen.has(name)||
+    attrs.idMateria!==matter||attrs.pubName!==section||
     attrs.pubDate!==date.split('-').reverse().join('/')||
     attrs.editionNumber!==edition||!pages.includes(attrs.pdfPage)||
     new URL(str(attrs.pdfPage)).searchParams.get('jornal')!==name.split('_')[0])
