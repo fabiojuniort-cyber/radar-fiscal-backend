@@ -81,6 +81,29 @@ async function resolvePinnedPublicIpv4(hostname: string): Promise<string> {
   return addresses[0]!.address;
 }
 
+export function assertCaptureSize(bytes: number): void {
+  if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > CONFAZ_CAPTURE_MAX_BYTES) {
+    throw new Error('TAX13_R802_SIZE_LIMIT');
+  }
+}
+
+export function assertCaptureResponseHeaders(
+  status: number, contentType: string, encoding: string | undefined, length: number
+): void {
+  if (encoding && encoding.toLowerCase() !== 'identity') {
+    throw new Error('TAX13_R802_ENCODED_BODY_DENIED');
+  }
+  if (status === 200) {
+    if (!/^(text\/html|application\/xhtml\+xml)(?:\s*;|\s*$)/i.test(contentType) ||
+      /charset\s*=\s*(?!["']?utf-8["']?\s*(?:;|$))/i.test(contentType)) {
+      throw new Error('TAX13_R802_UNSUPPORTED_CONTENT_TYPE');
+    }
+  } else if (![301,302,303,307,308].includes(status)) {
+    throw new Error('TAX13_R802_SOURCE_UNAVAILABLE_' + status);
+  }
+  assertCaptureSize(length);
+}
+
 interface Hop {
   status: number;
   location?: string;
@@ -109,33 +132,19 @@ async function singleHop(url: URL): Promise<Hop> {
             !peer.getPeerCertificate(true)?.raw) {
           throw new Error('TAX13_R802_TLS_PEER_UNVERIFIED');
         }
-        if (res.headers['content-encoding'] &&
-            res.headers['content-encoding'] !== 'identity') {
-          throw new Error('TAX13_R802_ENCODED_BODY_DENIED');
-        }
-        if (status === 200) {
-          const contentType = String(res.headers['content-type'] ?? '').toLowerCase();
-          if (!/^text\/html(?:\s*;|\s*$)|^application\/xhtml\+xml(?:\s*;|\s*$)/.test(contentType) ||
-              /charset\s*=\s*(?!["']?utf-8["']?\s*(?:;|$))/i.test(contentType)) {
-            throw new Error('TAX13_R802_UNSUPPORTED_CONTENT_TYPE');
-          }
-        } else if (![301,302,303,307,308].includes(status)) {
-          throw new Error('TAX13_R802_SOURCE_UNAVAILABLE_' + status);
-        }
         const declared = Number(res.headers['content-length'] ?? 0);
-        if (!Number.isSafeInteger(declared) || declared < 0 ||
-            declared > CONFAZ_CAPTURE_MAX_BYTES) {
-          throw new Error('TAX13_R802_SIZE_LIMIT');
-        }
+        assertCaptureResponseHeaders(status,
+          String(res.headers['content-type'] ?? '').toLowerCase(),
+          typeof res.headers['content-encoding'] === 'string'
+            ? res.headers['content-encoding'] : undefined,
+          declared);
         const parts: Buffer[] = [];
         let size = 0;
         for await (const part of res) {
           const piece = Buffer.isBuffer(part) ? part : Buffer.from(part);
           size += piece.byteLength;
-          if (size > CONFAZ_CAPTURE_MAX_BYTES) {
-            res.destroy();
-            throw new Error('TAX13_R802_SIZE_LIMIT');
-          }
+          try { assertCaptureSize(size); }
+          catch (error) { res.destroy(); throw error; }
           parts.push(piece);
         }
         if (declared && declared !== size) throw new Error('TAX13_R802_TRUNCATED_BODY');
