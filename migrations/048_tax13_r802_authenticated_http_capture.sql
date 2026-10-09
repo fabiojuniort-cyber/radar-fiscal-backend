@@ -24,6 +24,30 @@ BEGIN
  END LOOP;
 END $$;
 
+-- 047 disallows repeated capture of unchanged source bytes. 048 must
+-- preserve *every distinct network event* and collector receipt, even if
+-- publicationVersionId and SHA remain identical across verified rechecks.
+-- Replace only the specific 047 uniqueness constraint with a lookup index.
+DO $$
+DECLARE constraint_name text;
+BEGIN
+ SELECT c.conname INTO constraint_name FROM pg_constraint c
+ WHERE c.conrelid='public.tax13_v2_original_http_artifacts'::regclass
+  AND c.contype='u'
+  AND (SELECT array_agg(a.attname ORDER BY a.attname)
+       FROM unnest(c.conkey) k(attnum)
+       JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum)
+    = ARRAY['official_url','publication_version_id','raw_sha256']
+ LIMIT 1;
+ IF constraint_name IS NULL THEN
+   RAISE EXCEPTION 'TAX13_R802_EXPECTED_047_CAPTURE_UNIQUE_NOT_FOUND';
+ END IF;
+ EXECUTE format('ALTER TABLE public.tax13_v2_original_http_artifacts DROP CONSTRAINT %I',constraint_name);
+END $$;
+CREATE INDEX ix_tax13_r802_original_capture_version_sha
+ ON public.tax13_v2_original_http_artifacts
+ (publication_version_id,official_url,raw_sha256,collected_at DESC);
+
 CREATE TABLE public.tax13_v2_capture_mac_keys (
  key_id TEXT PRIMARY KEY,
  key_bytes BYTEA NOT NULL CHECK(octet_length(key_bytes)>=32),
