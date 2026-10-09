@@ -158,7 +158,7 @@ export function preflightDouConfazTrace(input:{
     seen.has(name)||attrs.idMateria!==matter||attrs.pubName!==section||
     attrs.pubDate!==date.split('-').reverse().join('/')||
     attrs.editionNumber!==edition||!pages.includes(attrs.pdfPage)||
-    new URL(attrs.pdfPage).searchParams.get('jornal')!==name.split('_')[0])
+    new URL(str(attrs.pdfPage)).searchParams.get('jornal')!==name.split('_')[0])
     return deny('DOU_XML_PART_IDENTITY_INVALID');
   seen.add(name);digests.push(str(entry.rawSha256));
  }
