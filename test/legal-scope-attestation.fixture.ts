@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 
 import { sanitizeLegalPresentationHtml } from '../src/modules/collection/legal-presentation.js';
+import { seedTestV2LegalProof } from './tax13-arch02.signed-fixture.js';
 
 import {
   brazilLegalReferenceDate,
@@ -109,5 +110,8 @@ export async function seedTestLegalScopeAttestation(
     RETURNING id
   `,[publicationVersionId,sourceId,origin.rows[0]!.id,url,h(html),
     validAsOf,m.verifiedAt,m.recheckOn,JSON.stringify(m),coverage]);
-  return inserted.rows[0]!.id;
+  const attestationId = inserted.rows[0]!.id;
+  // Only a genuinely Node-valid COMPLETE synthetic proof is admitted.
+  if (coverage === 'COMPLETE') await seedTestV2LegalProof(admin, attestationId);
+  return attestationId;
 }
