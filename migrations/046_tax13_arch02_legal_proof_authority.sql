@@ -205,15 +205,18 @@ FROM public.tax13_legal_proofs_v2 proof
 JOIN public.publication_legal_scope_attestations a ON a.id=proof.attestation_id
 JOIN public.publication_versions pv ON pv.id=proof.publication_version_id
 JOIN public.publication_origins po ON po.id=a.publication_origin_id
-CROSS JOIN d
+JOIN public.sources src ON src.id=a.source_id
 WHERE proof.attestation_id=p_attestation
- AND proof.valid_as_of=d.day AND proof.recheck_on>d.day
- AND a.coverage='COMPLETE' AND a.official_url=po.official_url
+ AND proof.valid_as_of=a.valid_as_of AND proof.recheck_on>proof.valid_as_of
+ AND a.coverage='COMPLETE' AND src.code='confaz'
+ AND a.official_url ~ '^https://www[.]confaz[.]fazenda[.]gov[.]br($|[/?#])'
+ AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
+ AND a.official_url=po.official_url
  AND a.source_id=po.source_id AND po.publication_id=pv.publication_id
  AND a.html_sha256=encode(sha256(convert_to(
    pv.source_metadata->'presentation'->>'html','UTF8')),'hex')
  AND pv.is_current AND public.publication_scope_is_in_scope(pv.publication_id)
- AND a.id=public.tax13_effective_attestation_id(pv.id,d.day)
+ AND a.id=public.tax13_effective_attestation_id(pv.id,proof.valid_as_of)
  AND NOT EXISTS(SELECT 1 FROM public.tax13_legal_proof_revocations_v2 revoked
    WHERE revoked.proof_id=proof.id)
 LIMIT 1 $$;
@@ -251,3 +254,107 @@ REVOKE ALL ON FUNCTION public.tax13_public_current_ncm_details(UUID)
   FROM PUBLIC,radar_worker,radar_taxonomy_curator,radar_app;
 GRANT EXECUTE ON FUNCTION public.tax13_public_current_ncm_details(UUID)
   TO radar_app;
+
+-- P1/C locale gate: drop the duplicated PostgreSQL legal parser completely
+-- from active projections. The old function name and its OID remain, but its
+-- body now reads Node-issued immutable fragments only. No V2 admission =>
+-- NULL => no positive scan or tenant affinity. This is not just another regex.
+CREATE OR REPLACE FUNCTION public.tax13_legal_current_fragments(p_attestation UUID)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+  SELECT public.tax13_v2_admitted_current_fragments(p_attestation)
+$$;
+REVOKE ALL ON FUNCTION public.tax13_legal_current_fragments(UUID)
+  FROM PUBLIC,radar_app,radar_taxonomy_curator,radar_worker;
+
+-- Preserve old structural consistency and catalog/temporal joins privately,
+-- but require an independently issued V2 proof AND a separate scan sealer
+-- before any existing API can return a positive fingerprint.
+CREATE FUNCTION public.tax13_unsealed_ncm_scan_fingerprint(p_version UUID)
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp AS $$
+WITH reference_day AS (
+  SELECT (current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date d
+), current_version AS (
+  SELECT pv.id,pv.source_metadata->'presentation'->>'html' AS html
+  FROM public.publication_versions pv
+  WHERE pv.id=p_version AND pv.is_current
+    AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
+    AND public.publication_scope_is_in_scope(pv.publication_id)
+), effective_proof AS (
+  SELECT a.* FROM public.publication_legal_scope_attestations a
+  CROSS JOIN reference_day r
+  WHERE a.id=public.tax13_effective_attestation_id(p_version,r.d)
+), ncm_catalog_current AS (
+  SELECT ed.id,
+    encode(sha256(convert_to(
+      concat_ws(':',ed.edition_code,ed.source_sha256,
+        coalesce((SELECT string_agg(
+          e.id::text || ':' || e.official_code || ':' || e.description || ':' || e.metadata::text,
+          ';' ORDER BY e.id)
+        FROM public.official_catalog_entries e
+        WHERE e.catalog_edition_id=ed.id),'')), 'UTF8')),'hex') checksum
+  FROM public.official_catalog_editions ed
+  JOIN public.official_catalogs c ON c.id=ed.catalog_id
+  CROSS JOIN reference_day r
+  WHERE c.code='NCM'
+    AND (ed.valid_from IS NULL OR ed.valid_from<=r.d)
+    AND (ed.valid_to IS NULL OR ed.valid_to>=r.d)
+    AND ed.status<>'WITHDRAWN'
+  ORDER BY ed.valid_from DESC NULLS LAST,ed.created_at DESC,ed.id DESC LIMIT 1
+)
+SELECT scan.run_fingerprint::text
+FROM current_version pv
+CROSS JOIN reference_day r
+JOIN effective_proof a ON a.publication_version_id=pv.id
+JOIN ncm_catalog_current cat ON TRUE
+JOIN public.publication_ncm_scan_evidence scan
+  ON scan.publication_version_id=pv.id
+  AND scan.legal_scope_attestation_id=a.id
+  AND scan.detector_key='ncm.catalog.regex'
+  AND scan.detector_version='1.3.0'
+  AND scan.source_field='CONTENT_TEXT'
+  AND scan.legal_as_of=r.d
+  AND scan.recheck_on=a.recheck_on
+  AND scan.html_sha256=a.html_sha256
+  AND scan.coverage='COMPLETE' AND scan.outcome='SUCCESS'
+  AND scan.catalog_edition_id=cat.id AND scan.catalog_sha256=cat.checksum
+WHERE a.coverage='COMPLETE' AND a.recheck_on>r.d
+  AND a.html_sha256=encode(sha256(convert_to(pv.html,'UTF8')),'hex')
+  AND public.tax13_ncm_scan_consistent(scan.id)
+LIMIT 1;
+$$;
+REVOKE ALL ON FUNCTION public.tax13_unsealed_ncm_scan_fingerprint(UUID)
+  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer;
+CREATE OR REPLACE FUNCTION public.tax13_current_ncm_scan_fingerprint(p_version UUID)
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+  WITH raw AS (
+    SELECT public.tax13_unsealed_ncm_scan_fingerprint(p_version) AS fingerprint
+  ), active_date AS (
+    SELECT (current_timestamp AT TIME ZONE 'America/Sao_Paulo')::date AS day
+  )
+  SELECT raw.fingerprint
+  FROM raw
+  JOIN public.publication_ncm_scan_evidence scan
+    ON scan.run_fingerprint::text=raw.fingerprint
+  JOIN public.tax13_ncm_seals_v2 seal
+    ON seal.scan_evidence_id=scan.id
+   AND seal.scan_fingerprint=scan.run_fingerprint
+  JOIN public.tax13_legal_proofs_v2 proof
+    ON proof.id=seal.legal_proof_id
+   AND proof.attestation_id=scan.legal_scope_attestation_id
+   AND proof.current_fragments_sha256=scan.current_fragments_sha256
+  CROSS JOIN active_date d
+  WHERE raw.fingerprint IS NOT NULL
+    AND scan.publication_version_id=p_version
+    AND scan.legal_as_of=d.day
+    AND proof.valid_as_of=d.day AND proof.recheck_on>d.day
+    AND NOT EXISTS (SELECT 1 FROM public.tax13_legal_proof_revocations_v2 r
+      WHERE r.proof_id=proof.id)
+  LIMIT 1
+$$;
+REVOKE ALL ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID)
+  FROM PUBLIC,radar_legal_issuer,radar_scan_sealer,radar_taxonomy_curator;
+GRANT EXECUTE ON FUNCTION public.tax13_current_ncm_scan_fingerprint(UUID)
+  TO radar_app,radar_worker;
