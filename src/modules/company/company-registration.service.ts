@@ -8,30 +8,8 @@ import type {
 import type {
   StateRegistrationLookup,
 } from './state-registration.service.js';
-
-async function upsertCnaes(
-  trx: Transaction<DB>,
-  cnaes: CnpjRegistryCnae[],
-): Promise<void> {
-  for (const cnae of cnaes) {
-    await trx
-      .insertInto('cnaes')
-      .values({
-        code: cnae.code,
-        description: cnae.description,
-        is_active: true,
-      })
-      .onConflict((conflict) =>
-        conflict
-          .column('code')
-          .doUpdateSet({
-            description: cnae.description,
-            is_active: true,
-          }),
-      )
-      .execute();
-  }
-}
+import { validateAndEnsureOfficialCnaes } from './manual-cnae-validation.service.js';
+import { CompanyIdentityError, ensureHeadOfficeCnpj, ensureSameCompanyRoot } from './company-identity.guard.js';
 
 async function replaceEstablishmentCnaes(
   trx: Transaction<DB>,
@@ -127,31 +105,44 @@ export async function createCompanyFromRegistry(
   record: CnpjRegistryRecord,
   stateRegistration?: StateRegistrationLookup,
   businessLocationCode?: string | null,
+  reactivateInactive = false,
 ): Promise<{
   companyId: string;
   establishmentId: string;
 }> {
-  await upsertCnaes(trx, record.cnaes);
-
+  ensureHeadOfficeCnpj(record.cnpj, record.isHeadOffice);
   const existingCompany = await trx
     .selectFrom('companies')
     .select(['id', 'is_active'])
     .where('tenant_id', '=', tenantId)
     .where('head_office_cnpj', '=', record.cnpj)
+    .forUpdate()
     .executeTakeFirst();
 
-  const company = existingCompany
-    ? await trx
-        .updateTable('companies')
-        .set({
-          legal_name: record.legalName,
-          trade_name: record.tradeName,
-          is_active: true,
-        })
-        .where('id', '=', existingCompany.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  if (existingCompany?.is_active) {
+    throw new CompanyIdentityError('company_cnpj_exists');
+  }
+  if (existingCompany) {
+    if (!reactivateInactive) throw new CompanyIdentityError('reactivation_required');
+    await trx.updateTable('companies')
+      .set({ is_active: true })
+      .where('id', '=', existingCompany.id).execute();
+    await trx.updateTable('establishments')
+      .set({ is_active: true })
+      .where('company_id', '=', existingCompany.id)
+      .where('is_head_office', '=', true).execute();
+    const headOffice = await trx.selectFrom('establishments')
+      .select('id').where('company_id', '=', existingCompany.id)
+      .where('is_head_office', '=', true).executeTakeFirst();
+    if (!headOffice) throw new CompanyIdentityError('head_office_conflict');
+    await rebuildCompanyCnaes(trx, existingCompany.id);
+    return { companyId: existingCompany.id, establishmentId: headOffice.id };
+  }
+  // Registry providers are data sources, not authorities for the shared CNAE catalog.
+  // Resolve all identifiers and descriptions against the CURRENT official edition.
+  const officialCnaes = await validateAndEnsureOfficialCnaes(trx, record.cnaes);
+
+  const company = await trx
         .insertInto('companies')
         .values({
           tenant_id: tenantId,
@@ -163,58 +154,7 @@ export async function createCompanyFromRegistry(
         .returning('id')
         .executeTakeFirstOrThrow();
 
-  const existingEstablishment = await trx
-    .selectFrom('establishments')
-    .select([
-      'id',
-      'is_head_office',
-      'business_location_code',
-    ])
-    .where('company_id', '=', company.id)
-    .where('cnpj', '=', record.cnpj)
-    .executeTakeFirst();
-
-  const establishment = existingEstablishment
-    ? await trx
-        .updateTable('establishments')
-        .set({
-          name:
-            record.tradeName ??
-            record.legalName,
-          establishment_type_code:
-            'HEAD_OFFICE',
-          is_head_office: true,
-          uf: record.uf,
-          municipality_name:
-            record.municipalityName,
-          municipality_ibge_code:
-            record.municipalityIbgeCode,
-          postal_code: record.postalCode,
-          street: record.street,
-          street_number:
-            record.streetNumber,
-          complement: record.complement,
-          district: record.district,
-          business_location_code:
-            businessLocationCode === undefined
-              ? existingEstablishment.business_location_code
-              : businessLocationCode,
-          state_registration:
-            stateRegistration?.registration ?? null,
-          state_registration_status:
-            stateRegistration?.registrationStatus ?? null,
-          state_registration_source:
-            stateRegistration?.source ?? null,
-          state_registration_checked_at:
-            stateRegistration?.checkedAt ?? null,
-          state_registration_lookup_status:
-            stateRegistration?.lookupStatus ?? null,
-          is_active: true,
-        })
-        .where('id', '=', existingEstablishment.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  const establishment = await trx
         .insertInto('establishments')
         .values({
           company_id: company.id,
@@ -256,7 +196,7 @@ export async function createCompanyFromRegistry(
   await replaceEstablishmentCnaes(
     trx,
     establishment.id,
-    record.cnaes,
+    officialCnaes,
   );
 
   await rebuildCompanyCnaes(
@@ -278,8 +218,13 @@ export async function createEstablishmentFromRegistry(
   typeCode: string,
   stateRegistration?: StateRegistrationLookup,
   businessLocationCode?: string | null,
+  reactivateInactive = false,
 ): Promise<string> {
-  await upsertCnaes(trx, record.cnaes);
+  const company = await trx.selectFrom('companies')
+    .select('head_office_cnpj').where('id', '=', companyId)
+    .where('is_active', '=', true).forUpdate().executeTakeFirst();
+  if (!company) throw new CompanyIdentityError('establishment_cnpj_root_mismatch');
+  ensureSameCompanyRoot(company.head_office_cnpj, record.cnpj);
 
   const existingEstablishment = await trx
     .selectFrom('establishments')
@@ -287,55 +232,28 @@ export async function createEstablishmentFromRegistry(
       'id',
       'is_head_office',
       'business_location_code',
+      'is_active',
     ])
     .where('company_id', '=', companyId)
     .where('cnpj', '=', record.cnpj)
+    .forUpdate()
     .executeTakeFirst();
 
-  const establishment = existingEstablishment
-    ? await trx
-        .updateTable('establishments')
-        .set({
-          name:
-            record.tradeName ??
-            record.legalName,
-          establishment_type_code:
-            existingEstablishment.is_head_office
-              ? 'HEAD_OFFICE'
-              : typeCode,
-          is_head_office:
-            existingEstablishment.is_head_office,
-          uf: record.uf,
-          municipality_name:
-            record.municipalityName,
-          municipality_ibge_code:
-            record.municipalityIbgeCode,
-          postal_code: record.postalCode,
-          street: record.street,
-          street_number:
-            record.streetNumber,
-          complement: record.complement,
-          district: record.district,
-          business_location_code:
-            businessLocationCode === undefined
-              ? existingEstablishment.business_location_code
-              : businessLocationCode,
-          state_registration:
-            stateRegistration?.registration ?? null,
-          state_registration_status:
-            stateRegistration?.registrationStatus ?? null,
-          state_registration_source:
-            stateRegistration?.source ?? null,
-          state_registration_checked_at:
-            stateRegistration?.checkedAt ?? null,
-          state_registration_lookup_status:
-            stateRegistration?.lookupStatus ?? null,
-          is_active: true,
-        })
-        .where('id', '=', existingEstablishment.id)
-        .returning('id')
-        .executeTakeFirstOrThrow()
-    : await trx
+  if (existingEstablishment?.is_active) {
+    throw new CompanyIdentityError('establishment_conflict');
+  }
+  if (existingEstablishment) {
+    if (!reactivateInactive) throw new CompanyIdentityError('reactivation_required');
+    await trx.updateTable('establishments')
+      .set({ is_active: true }).where('id', '=', existingEstablishment.id).execute();
+    await rebuildCompanyCnaes(trx, companyId);
+    return existingEstablishment.id;
+  }
+  // Registry providers are data sources, not authorities for the shared CNAE catalog.
+  // Resolve all identifiers and descriptions against the CURRENT official edition.
+  const officialCnaes = await validateAndEnsureOfficialCnaes(trx, record.cnaes);
+
+  const establishment = await trx
         .insertInto('establishments')
         .values({
           company_id: companyId,
@@ -377,7 +295,7 @@ export async function createEstablishmentFromRegistry(
   await replaceEstablishmentCnaes(
     trx,
     establishment.id,
-    record.cnaes,
+    officialCnaes,
   );
 
   await rebuildCompanyCnaes(
@@ -393,12 +311,13 @@ export async function replaceManualEstablishmentCnaes(
   companyId: string,
   establishmentId: string,
   cnaes: CnpjRegistryCnae[],
+  allowEmpty = false,
 ): Promise<void> {
-  await upsertCnaes(trx, cnaes);
+  const canonicalCnaes = await validateAndEnsureOfficialCnaes(trx, cnaes, allowEmpty);
   await replaceEstablishmentCnaes(
     trx,
     establishmentId,
-    cnaes,
+    canonicalCnaes,
   );
   await rebuildCompanyCnaes(
     trx,

@@ -13,6 +13,7 @@ export type CnpjRegistrySource =
 
 export type CnpjRegistryRecord = {
   cnpj: string;
+  isHeadOffice?: boolean | null;
   legalName: string;
   tradeName: string | null;
   uf: string;
@@ -264,6 +265,13 @@ export function parseBrasilApiCnpj(
 
   return {
     cnpj,
+    isHeadOffice:
+      String(row.identificador_matriz_filial ?? row.matriz_filial ?? '').toUpperCase() === '1' ||
+      String(row.identificador_matriz_filial ?? row.matriz_filial ?? '').toUpperCase() === 'MATRIZ'
+        ? true
+        : String(row.identificador_matriz_filial ?? row.matriz_filial ?? '').toUpperCase() === '2' ||
+          String(row.identificador_matriz_filial ?? row.matriz_filial ?? '').toUpperCase() === 'FILIAL'
+          ? false : null,
     legalName,
     tradeName: textValue(
       row.nome_fantasia,

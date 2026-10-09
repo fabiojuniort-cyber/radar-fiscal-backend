@@ -771,7 +771,7 @@ export interface TaxonomyReleases {
 
 export interface TenantOnboardingProfiles {
   cnpj: string | null;
-  company_name: string;
+  company_name: string | null;
   consent_version: string;
   created_at: Generated<Timestamp>;
   privacy_policy_accepted_at: Timestamp;

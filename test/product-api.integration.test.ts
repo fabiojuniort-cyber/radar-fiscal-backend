@@ -9,6 +9,7 @@ import type { FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
 
 import { buildApp } from '../src/app.js';
+import { ensureCnaeFixture } from './onboarding-cnae-fixture.js';
 
 const PASSWORD = 'Launch-Seguro-2026!';
 
@@ -119,6 +120,7 @@ test(
 
     try {
       await app.ready();
+      await ensureCnaeFixture(admin);
 
       const first = await registerAndLogin(
         app,
@@ -661,6 +663,7 @@ test(
         cnpjFromSeed('887760000001');
       const branchRegistryCnpj =
         cnpjFromSeed('887760000002');
+      const invalidRegistryCnpj = cnpjFromSeed('776650000001');
       const originalFetch =
         globalThis.fetch;
 
@@ -686,8 +689,8 @@ test(
                   logradouro: 'Avenida das Empresas',
                   numero: '100',
                   bairro: 'Centro',
-                  cnae_fiscal: 4683400,
-                  cnae_fiscal_descricao: 'Comércio atacadista de defensivos agrícolas',
+                  cnae_fiscal: requestedCnpj === invalidRegistryCnpj ? 9999999 : 4683400,
+                  cnae_fiscal_descricao: 'DESCRIÇÃO FALSA DO PROVEDOR — NÃO PROPAGAR',
                   cnaes_secundarios: [
                     {
                       codigo: 4623108,
@@ -742,6 +745,57 @@ test(
             return new Response('unexpected request', { status: 500 });
           };
 
+        // An invalid registry CNAE must not create a company or poison global cnaes.
+        const rejectedRegistry = await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies/from-cnpj',
+          headers: firstHeaders,
+          payload: { cnpj: invalidRegistryCnpj },
+        });
+        assert.equal(rejectedRegistry.statusCode, 400, rejectedRegistry.body);
+        assert.equal(rejectedRegistry.json<{ error: string }>().error, 'invalid_cnae');
+        const fakeRegistryCnae = await admin.query(
+          "SELECT code FROM cnaes WHERE code = '9999999'",
+        );
+        assert.equal(fakeRegistryCnae.rowCount, 0);
+        const rolledBackCompany = await admin.query(
+          'SELECT id FROM companies WHERE head_office_cnpj = $1',
+          [invalidRegistryCnpj],
+        );
+        assert.equal(rolledBackCompany.rowCount, 0);
+
+        // Integrated recovery: after the provider's bad CNAE is rejected,
+        // the same authorized user can select a CURRENT official CNAE and
+        // create the matrix through the real API with PostgreSQL persistence.
+        const officialOptions = await app.inject({
+          method: 'GET',
+          url: '/api/v1/cnae-catalog?search=6201501',
+          headers: firstHeaders,
+        });
+        assert.equal(officialOptions.statusCode, 200, officialOptions.body);
+        const available = officialOptions.json<{ items: Array<{ code: string; description: string }> }>().items;
+        const selected = available.find((item) => item.code === '6201501');
+        assert.ok(selected, 'Official fallback options should include eligible CNAE');
+
+        const recoveredManually = await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies/manual',
+          headers: firstHeaders,
+          payload: {
+            cnpj: invalidRegistryCnpj,
+            legalName: 'Matriz recuperada com CNAE oficial',
+            uf: 'GO',
+            cnaes: [{ ...selected, isPrimary: true }],
+          },
+        });
+        assert.equal(recoveredManually.statusCode, 201, recoveredManually.body);
+        const manuallyCreatedId = recoveredManually.json<{ company: { id: string } }>().company.id;
+        const recoveredFromDb = await admin.query<{ head_office_cnpj: string }>(
+          'SELECT head_office_cnpj FROM companies WHERE id = $1',
+          [manuallyCreatedId],
+        );
+        assert.equal(recoveredFromDb.rows[0]?.head_office_cnpj, invalidRegistryCnpj);
+
         const registryCreate =
           await app.inject({
             method: 'POST',
@@ -757,6 +811,23 @@ test(
           registryCreate.statusCode,
           201,
         );
+
+        const assertRegistryReadback = async (response: { establishment: Record<string, unknown> }) => {
+          const est = response.establishment;
+          const sql = await admin.query('SELECT company_id, name, uf, business_location_code FROM establishments WHERE id = $1', [est.id]);
+          assert.equal(est.name, sql.rows[0].name);
+          assert.equal(est.uf, sql.rows[0].uf);
+          assert.equal(est.businessLocationCode, sql.rows[0].business_location_code);
+          const get = await app.inject({ method: 'GET',
+            url: '/api/v1/companies/' + sql.rows[0].company_id + '/establishments', headers: firstHeaders });
+          assert.equal(get.statusCode, 200, get.body);
+          const stored = get.json<{ items: Array<Record<string, unknown>> }>().items.find((item) => item.id === est.id);
+          assert.ok(stored);
+          for (const [key, value] of Object.entries(est)) assert.deepEqual(value, stored[key], 'POST/GET mismatch: ' + key);
+          const cnaes = await admin.query('SELECT c.code, c.description, ec.is_primary FROM establishment_cnaes ec JOIN cnaes c ON c.code = ec.cnae_code WHERE ec.establishment_id = $1 ORDER BY ec.is_primary DESC, c.code', [est.id]);
+          assert.deepEqual(est.cnaes, cnaes.rows.map((row) => ({ code: row.code, description: row.description, isPrimary: row.is_primary })));
+        };
+        await assertRegistryReadback(registryCreate.json());
 
         const registryBody =
           registryCreate.json<{
@@ -862,6 +933,21 @@ test(
           3,
         );
 
+
+        const canonicalCnaes = await admin.query<{ code: string; description: string; official_description: string }>(`
+          SELECT c.code, c.description, entry.description AS official_description
+          FROM cnaes c
+          JOIN official_catalogs cat ON cat.code = 'CNAE'
+          JOIN official_catalog_editions ed ON ed.catalog_id = cat.id AND ed.status = 'CURRENT'
+          JOIN official_catalog_entries entry ON entry.catalog_edition_id = ed.id
+            AND regexp_replace(entry.official_code, '[^0-9]', '', 'g') = c.code
+          WHERE c.code IN ('4683400', '4623108', '4632001')
+        `);
+        assert.equal(canonicalCnaes.rowCount, 3);
+        for (const row of canonicalCnaes.rows) {
+          assert.equal(row.description, row.official_description);
+        }
+
         const branchRegistryCreate =
           await app.inject({
             method: 'POST',
@@ -882,6 +968,7 @@ test(
           201,
         );
 
+        await assertRegistryReadback(branchRegistryCreate.json());
         const branchBody =
           branchRegistryCreate.json<{
             establishment: {
@@ -914,6 +1001,28 @@ test(
           3,
         );
 
+        const afterAutomaticBranch = await admin.query<{ code: string; description: string }>(
+          "SELECT code, description FROM cnaes WHERE code IN ('4683400', '4623108', '4632001') ORDER BY code",
+        );
+        assert.deepEqual(
+          afterAutomaticBranch.rows,
+          canonicalCnaes.rows.map(({ code, description }) => ({ code, description }))
+            .sort((a, b) => a.code.localeCompare(b.code)),
+          'New automatic branch must never rewrite global CNAE descriptions',
+        );
+
+        const branchId = branchRegistryCreate.json().establishment.id;
+        const deletedBranch = await app.inject({ method: 'DELETE', url: '/api/v1/establishments/' + branchId, headers: firstHeaders });
+        assert.equal(deletedBranch.statusCode, 204, deletedBranch.body);
+        const reactivatedBranch = await app.inject({ method: 'POST',
+          url: '/api/v1/companies/' + registryBody.company.id + '/establishments/from-cnpj',
+          headers: firstHeaders, payload: { cnpj: branchRegistryCnpj, typeCode: 'OTHER',
+            businessLocationCode: 'NÃO-REESCREVER', reactivateInactive: true } });
+        assert.equal(reactivatedBranch.statusCode, 201, reactivatedBranch.body);
+        assert.equal(reactivatedBranch.json().establishment.id, branchId);
+        assert.equal(reactivatedBranch.json().establishment.businessLocationCode, 'FILIAL-003');
+        await assertRegistryReadback(reactivatedBranch.json());
+
         const deleteRegistryCompany =
           await app.inject({
             method: 'DELETE',
@@ -928,6 +1037,18 @@ test(
           204,
         );
 
+        const withoutConsent = await app.inject({
+          method: 'POST',
+          url: '/api/v1/companies/from-cnpj',
+          headers: firstHeaders,
+          payload: { cnpj: registryCnpj },
+        });
+        assert.equal(withoutConsent.statusCode, 409);
+        assert.equal(
+          withoutConsent.json<{ error: string }>().error,
+          'reactivation_required',
+        );
+
         const registryRecreate =
           await app.inject({
             method: 'POST',
@@ -935,6 +1056,7 @@ test(
             headers: firstHeaders,
             payload: {
               cnpj: registryCnpj,
+              reactivateInactive: true,
             },
           });
 
@@ -943,6 +1065,11 @@ test(
           201,
         );
 
+        await assertRegistryReadback(registryRecreate.json());
+        assert.equal(registryRecreate.json().company.businessLocationCode, 'MATRIZ-001');
+        const sqlCompany = await admin.query('SELECT legal_name, trade_name FROM companies WHERE id = $1', [registryBody.company.id]);
+        assert.equal(registryRecreate.json().company.legalName, sqlCompany.rows[0].legal_name);
+        assert.equal(registryRecreate.json().company.tradeName, sqlCompany.rows[0].trade_name);
         const recreatedBody =
           registryRecreate.json<{
             company: {

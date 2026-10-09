@@ -1,3 +1,4 @@
+import { readCompanyRegistration } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
   FastifyRequest,
@@ -12,6 +13,8 @@ import {
   withTenantContext,
 } from '../../infrastructure/database/tenant-context.js';
 import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
+import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
+import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import { createManualCompanyRegistration } from '../../modules/company/manual-company-registration.service.js';
 
 const cnpjValueSchema = z
@@ -124,6 +127,7 @@ const manualCompanyBodySchema = z.object({
   stateRegistration: nullableText(30),
   businessLocationCode: nullableText(80),
   cnaes: cnaesSchema,
+  reactivateInactive: z.boolean().default(false),
 });
 
 function tenantIdFromRequest(
@@ -223,11 +227,12 @@ export async function companyManualRoutes(
                 return null;
               }
 
-              return createManualCompanyRegistration(
+              const registered = await createManualCompanyRegistration(
                 trx,
                 tenantId,
                 request.body,
               );
+              return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
             },
           );
 
@@ -237,53 +242,8 @@ export async function companyManualRoutes(
           });
         }
 
-        const cnaes =
-          request.body.cnaes ?? [];
-
         return reply.status(201).send({
-          company: {
-            id: created.companyId,
-            legalName:
-              request.body.legalName,
-            tradeName: null,
-            cnpj: request.body.cnpj,
-            businessLocationCode:
-              created.businessLocationCode,
-          },
-          establishment: {
-            id: created.establishmentId,
-            companyId: created.companyId,
-            cnpj: request.body.cnpj,
-            name:
-              created.establishmentName,
-            typeCode: 'HEAD_OFFICE',
-            isHeadOffice: true,
-            uf: request.body.uf,
-            municipalityName:
-              request.body.municipalityName ?? null,
-            municipalityIbgeCode:
-              request.body.municipalityIbgeCode ?? null,
-            postalCode:
-              request.body.postalCode ?? null,
-            street:
-              request.body.street ?? null,
-            streetNumber:
-              request.body.streetNumber ?? null,
-            complement:
-              request.body.complement ?? null,
-            district:
-              request.body.district ?? null,
-            businessLocationCode:
-              created.businessLocationCode,
-            stateRegistration:
-              created.stateRegistration,
-            stateRegistrationStatus: null,
-            stateRegistrationLookupStatus: null,
-            stateRegistrationSource:
-              created.stateRegistrationSource,
-            stateRegistrationCheckedAt: null,
-            cnaes,
-          },
+          ...created,
           registry: {
             source: 'MANUAL',
             consultedAt:
@@ -293,6 +253,13 @@ export async function companyManualRoutes(
           },
         });
       } catch (error) {
+        if (error instanceof CompanyIdentityError) {
+          return reply.status(409).send({ error: error.code });
+        }
+        if (error instanceof ManualCnaeValidationError) {
+          return reply.status(error.code === 'cnae_catalog_unavailable' ? 503 : 400)
+            .send({ error: error.code });
+        }
         if (
           error instanceof
           TenantAccessDeniedError
