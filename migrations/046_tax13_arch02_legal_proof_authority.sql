@@ -544,3 +544,30 @@ $$;
 REVOKE ALL ON FUNCTION public.tax13_v2_sealer_bundle(UUID)
   FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,radar_legal_issuer;
 GRANT EXECUTE ON FUNCTION public.tax13_v2_sealer_bundle(UUID) TO radar_scan_sealer;
+
+-- Worker may test an exact scan's independent seal, but cannot read/write
+-- the private seal table or turn an unsupported 044 event into CURRENT.
+CREATE FUNCTION public.tax13_v2_is_scan_sealed(p_scan UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.publication_ncm_scan_evidence scan
+    JOIN public.tax13_ncm_seals_v2 seal ON seal.scan_evidence_id=scan.id
+      AND seal.scan_fingerprint=scan.run_fingerprint
+    JOIN public.tax13_legal_proofs_v2 proof ON proof.id=seal.legal_proof_id
+      AND proof.attestation_id=scan.legal_scope_attestation_id
+      AND proof.publication_version_id=scan.publication_version_id
+      AND proof.current_fragments_sha256=scan.current_fragments_sha256
+    JOIN public.tax13_v2_authorized_keys k ON k.key_id=proof.signature_key_id
+    WHERE scan.id=p_scan
+      AND scan.outcome='SUCCESS' AND scan.coverage='COMPLETE'
+      AND proof.valid_as_of=scan.legal_as_of AND proof.recheck_on=scan.recheck_on
+      AND k.active_from<=proof.created_at
+      AND public.tax13_v2_admitted_current_fragments(proof.attestation_id) IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM public.tax13_v2_key_revocations r WHERE r.key_id=k.key_id)
+      AND NOT EXISTS(SELECT 1 FROM public.tax13_legal_proof_revocations_v2 r WHERE r.proof_id=proof.id)
+  )
+$$;
+REVOKE ALL ON FUNCTION public.tax13_v2_is_scan_sealed(UUID)
+ FROM PUBLIC,radar_app,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer;
+GRANT EXECUTE ON FUNCTION public.tax13_v2_is_scan_sealed(UUID) TO radar_worker;
