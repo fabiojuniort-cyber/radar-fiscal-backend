@@ -149,7 +149,7 @@ BEGIN
  'TRIBUSCA:TAX13:R802:HTTPS_CAPTURE:1',
  NEW.artifact_id::text, btrim(a.raw_sha256), a.publication_version_id::text,
  a.official_url, NEW.final_url, array_to_string(NEW.redirect_urls,chr(10)),
- NEW.remote_ipv4::text, btrim(NEW.tls_peer_cert_sha256), NEW.collector_identity,
+ host(NEW.remote_ipv4), btrim(NEW.tls_peer_cert_sha256), NEW.collector_identity,
  to_char(NEW.started_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
  to_char(NEW.captured_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
  IF NEW.receipt_mac IS DISTINCT FROM encode(
