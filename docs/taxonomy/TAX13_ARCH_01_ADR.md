@@ -35,5 +35,12 @@ Node htmlparser2/Unicode/UTF-16 DOM semantic validation rejects non-normative id
 8. Independent R8 on frozen SHA. No claim of APPROVED for CI alone.
 9. Separate explicit gates for merge, production migrations, deploy and canaries.
 
-## Current staged implementation
-LegalProof V2 typed/deterministic and signed emission primitive plus fail-closed unit tests. This does not yet enable public projections; R7 BLOCK remains until all gates above pass.
+## Current staged implementation (2026-10-08, UNVERIFIED)
+- LegalProof V2 typed/byte-committed Ed25519 emission contract, issuer-only standalone CLI, separate scan sealer CLI.
+- 046 creates immutable proof/revocation/scan-seal ledgers; NOLOGIN issuer/sealer roles; issuer-only key lookup and bundle; admin-only signing trust anchors with append-only key revocation.
+- Old tax13_legal_current_fragments() SQL normativity parser is REPLACED in the unmerged branch by the admitted Node-proof fragment projection. No V2 cert => NULL, independent of locale.
+- Old public fingerprint is wrapped and requires V2 proof plus independently inserted scan seal; worker read also checks V2 seal. App never receives direct ledger SELECT. Green legal highlights remain OFF.
+- R7 forged CURRENT negative reproduction added to PG16 and PG18 CI, plus role/signature tests; D0/D1 synthetic fixtures now create explicit proof and scan seals.
+- P2: catalog details follow selected scan's catalog edition/entry and detector; collection fixture removes runSequence timestamp collision.
+
+**This is candidate code, not APPROVED.** No GitHub Actions run has yet been observed for this branch's commits. No local PostgreSQL/Node24 test run was performed in this session. More P0 work: verify SQL/TS/CI on SHA, provision issuer/sealer logins with independent secrets in disposable CI only, exercise real CLI admission and signing-key rotation/revocation, test native HTML CONFAZ and multi-locale R2-R7 in full, add detailed operational diagnostics/reanalysis and benchmark. Only after those can the PR be handed to an independent R8 reviewer. Never deploy 046 to production from this branch as-is.
