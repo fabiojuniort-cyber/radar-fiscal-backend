@@ -1,0 +1,55 @@
+name: TAX13-ARCH-02 offline CONFAZ XML body HTML compatibility
+
+on:
+  pull_request:
+    branches:
+      - fix/tax13-r2-ncm-temporal
+    paths:
+      - 'test/tax13-arch02.confaz-corpus-readonly.test.ts'
+      - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
+      - 'test/tax13-arch02.confaz-stratified-300.test.ts'
+      - 'test/fixtures/tax13-confaz-offline-20.zip'
+      - 'test/fixtures/tax13-confaz-stratified-300.zip'
+      - '.github/workflows/tax13-arch02-official-corpus.yml'
+      - 'src/modules/collection/confaz.connector.ts'
+      - 'src/modules/collection/legal-presentation.ts'
+      - 'src/modules/taxonomy/legal-scope/legal-scope-evidence.ts'
+      - 'src/modules/taxonomy/legal-scope/legal-proof-v2.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tax13-arch02-confaz-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  official-html-compatibility:
+    name: CONFAZ 20 archived body HTML offline (not legal current proof)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      TAX13_ARCH02_OFFICIAL_CORPUS_READONLY: 'true'
+    steps:
+      - name: Checkout exact PR SHA
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Require pinned offline fixture and run structural audit - NO legal CURRENT assertion
+        run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-offline-corpus.test.ts
+      - name: Stratified 300 official HTML bodies - structural only
+        run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-stratified-300.test.ts
+      - name: Upload offline parser diagnostics and SHA256 manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tax13-arch02-official-confaz-html-20
+          path: audit-artifacts/tax13-confaz-offline-*/
+          if-no-files-found: warn
+          retention-days: 14

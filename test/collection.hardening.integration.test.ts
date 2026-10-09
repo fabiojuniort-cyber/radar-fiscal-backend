@@ -58,7 +58,16 @@ async function createSource(db: Kysely<DB>, connectorKey: string): Promise<strin
   return id;
 }
 
-let runSequence = 0;
+const usedFixtureSchedules = new Set<number>();
+function nextUniqueFixtureSchedule(finishedAt: Date): Date {
+  // Deterministic collision-free schedule in this fixture, even when the
+  // caller's timestamps advance by 1 ms. Never weaken production uniqueness.
+  let timestamp = finishedAt.getTime() - 60_000;
+  while (usedFixtureSchedules.has(timestamp)) timestamp -= 1;
+  usedFixtureSchedules.add(timestamp);
+  return new Date(timestamp);
+}
+
 
 async function createFinishedRun(
   db: Kysely<DB>,
@@ -71,7 +80,7 @@ async function createFinishedRun(
   await db.insertInto('collection_runs').values({
     id: runId,
     source_id: sourceId,
-    scheduled_for: new Date(finishedAt.getTime() - 60_000 - runSequence++),
+    scheduled_for: nextUniqueFixtureSchedule(finishedAt),
     trigger_type: 'MANUAL',
     status,
     started_at: new Date(finishedAt.getTime() - 30_000),

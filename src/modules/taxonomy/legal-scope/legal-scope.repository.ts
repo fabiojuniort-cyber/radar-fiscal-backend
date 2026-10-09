@@ -99,7 +99,25 @@ export async function readVerifiedLegalScope(
         LIMIT 1
   `.execute(db);
 
-  return verifyPersistedLegalScopeRow(result.rows[0], input);
+  if (result.rows[0]) return verifyPersistedLegalScopeRow(result.rows[0], input);
+
+  // Distinguish no evidence from multiple unrelated terminal assertions.
+  // Both are fail-closed, but ambiguity needs explicit reanalysis diagnostics.
+  const terminal = await sql<{ terminal_count: number }>`
+    SELECT count(*)::int AS terminal_count
+    FROM public.publication_legal_scope_attestations a
+    WHERE a.publication_version_id = ${input.publicationVersionId}::uuid
+      AND a.valid_as_of = ${input.asOf}::date
+      AND NOT EXISTS (
+        SELECT 1 FROM public.publication_legal_scope_attestations child
+        WHERE child.supersedes_attestation_id = a.id
+          AND child.publication_version_id = a.publication_version_id
+          AND child.valid_as_of = a.valid_as_of
+      )
+  `.execute(db);
+  const count = terminal.rows[0]?.terminal_count ?? 0;
+  return unverified(input.asOf, count > 1 ? 'ATTESTATION_AMBIGUOUS'
+    : count === 1 ? 'ATTESTATION_NOT_EFFECTIVE' : 'ATTESTATION_MISSING');
 }
 
 /** Pure boundary: DB ledger fields must match the manifest before trust. */

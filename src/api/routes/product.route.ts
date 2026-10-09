@@ -2287,16 +2287,13 @@ export async function productRoutes(
         const publicationNcms = profileNcms.length
           ? (
               await sql<{ code: string; description: string | null }>`
-                SELECT DISTINCT ON (nc.ncm_code) nc.ncm_code AS code,
-                  e.description
+                SELECT nc.ncm_code AS code, nc.description
                 FROM publication_versions pv
-                CROSS JOIN LATERAL public.tax13_public_current_ncm_codes(pv.id) nc
-                LEFT JOIN official_catalog_entries e
-                  ON regexp_replace(e.official_code, '[^0-9]', '', 'g')=nc.ncm_code
+                CROSS JOIN LATERAL public.tax13_public_current_ncm_details(pv.id) nc
                 WHERE pv.publication_id = ${request.params.publicationId}::uuid
                   AND pv.is_current = TRUE
                   AND nc.ncm_code = ANY(${profileNcms}::text[])
-                ORDER BY nc.ncm_code, e.description NULLS LAST
+                ORDER BY nc.ncm_code
               `.execute(app.db)
             ).rows
           : [];

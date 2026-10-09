@@ -1,0 +1,96 @@
+name: TAX13-ARCH-02 independent R7 locale C
+
+on:
+  pull_request:
+    branches:
+      - fix/tax13-r2-ncm-temporal
+    paths:
+      - 'migrations/046_tax13_arch02_legal_proof_authority.sql'
+      - 'src/modules/taxonomy/legal-scope/**'
+      - 'src/modules/taxonomy/ncm/**'
+      - 'test/tax13-r7.locale.test.ts'
+      - 'test/tax13-r7.locale-differential.test.ts'
+      - 'test/tax13-r7.locale-additional.test.ts'
+      - '.github/workflows/tax13-arch02-r7.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tax13-arch02-r7-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  locale-c:
+    name: R7 locale C / PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ['16-bookworm', '18-bookworm']
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: radar_fiscal_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      GITHUB_ACTIONS: 'true'
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/tax13_arch02_locale_c
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/tax13_arch02_locale_c
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      DB_LEGAL_ISSUER_RUNTIME_PASSWORD: ci-tax13-issuer-password-with-32-chars-A
+      DB_NCM_SEALER_RUNTIME_PASSWORD: ci-tax13-sealer-password-with-32-chars-B
+      DB_PROOF_VERIFIER_RUNTIME_PASSWORD: ci-tax13-verifier-password-with-32-chars-C
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      R4_TEST_ACCOUNT_PASSWORD: Ci-R7-adversarial-test-password-2026!
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: 3
+    steps:
+      - name: Checkout exact PR SHA
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Dependencies
+        run: npm ci
+      - name: Create disposable locale C database
+        env:
+          SEED_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+        run: |
+          node --input-type=module <<'NODE'
+          import { Client } from 'pg';
+          const c = new Client({ connectionString: process.env.SEED_DATABASE_URL });
+          await c.connect();
+          try {
+            await c.query("CREATE DATABASE tax13_arch02_locale_c TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'");
+          } finally {
+            await c.end();
+          }
+          NODE
+      - name: TypeScript and migrations (disposable only)
+        run: |
+          npm run build
+          npm run db:prepare
+      - name: Seed NCM catalog (disposable only)
+        run: node --import tsx --test test/ncm-catalog.import.integration.test.ts
+      - name: R7 locale C HTTP minimal attack and positive V2 control
+        run: node --import tsx --test --test-concurrency=1 test/tax13-r7.locale.test.ts
+      - name: R7 706 differential cases locale C
+        run: node --import tsx --test --test-concurrency=1 test/tax13-r7.locale-differential.test.ts
+      - name: R7 365 complementary differential cases locale C
+        run: node --import tsx --test --test-concurrency=1 test/tax13-r7.locale-additional.test.ts
