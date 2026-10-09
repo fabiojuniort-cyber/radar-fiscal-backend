@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import test from 'node:test';
 import {parseDouEntries} from '../src/modules/collection/dou.parser.js';
 import {preflightDouConfazTrace} from '../src/modules/taxonomy/legal-scope/dou-source-custody-preflight.js';
-import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
+import {preflightContemporaryDouPdfBytes,bindContemporaryDouPdfToIndependentReview} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
 
@@ -151,7 +151,31 @@ test('R802 signed independent DOU review assertion is only a claim; forged/revok
  assert.equal(verifyIndependentDouReview(trace,signed,{...trust,approvedCertificatePolicies:new Set()},now).reviewSignatureAuthenticated,false);
  assert.equal(verifyIndependentDouReview(trace,signed,trust,new Date('2026-01-01T00:00:00Z')).reviewSignatureAuthenticated,false);
  const forged={...signed,statement:{...statement,grantsLegalCurrent:true}} as any;
+
  assert.equal(verifyIndependentDouReview(trace,forged,trust,now).reviewSignatureAuthenticated,false);
+ // A signed reviewer statement must also match the ACTUAL supplied PDF
+ // bytes. Even successful matching is NEVER certificate validity or CURRENT.
+ const pdfBytes=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
+ const byteCandidate=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes});
+ assert.equal(byteCandidate.status,'DOU_PDF_BYTES_BOUND_ONLY');
+ const byteBoundStatement={...statement,certifiedPdfSha256:crypto.createHash('sha256').update(pdfBytes).digest('hex')};
+ const byteReview={...signed,statement:byteBoundStatement,
+  signatureBase64:crypto.sign(null,
+   Buffer.from(canonicalDouReviewStatement(byteBoundStatement),'utf8'),
+   keys.privateKey).toString('base64')};
+ const bound=bindContemporaryDouPdfToIndependentReview({
+  trace,pdf:byteCandidate,review:byteReview,keyring:trust,now});
+ assert.equal(bound.status,'DOU_SIGNED_REVIEW_BYTES_MATCH_ONLY');
+ assert.equal(bound.authenticatedOfficialPublication,false);
+ assert.equal(bound.grantsLegalCurrent,false);
+ const tamperedPdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Pages >> endobj\\n%%EOF\\n');
+ const differentBytes=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:tamperedPdf});
+ assert.equal(bindContemporaryDouPdfToIndependentReview({
+  trace,pdf:differentBytes,review:byteReview,keyring:trust,now}).status,'UNVERIFIED');
+ assert.equal(bindContemporaryDouPdfToIndependentReview({
+  trace,pdf:byteCandidate,review:byteReview,
+  keyring:{...trust,revokedKeyIds:new Set([signed.keyId])},now}).status,'UNVERIFIED');
 });
 
 test('R802 DOU 1991 and 1997 cannot be misrepresented as INLABS XML captures',()=>{
