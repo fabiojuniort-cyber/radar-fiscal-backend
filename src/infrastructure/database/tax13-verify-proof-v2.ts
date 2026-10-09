@@ -12,6 +12,7 @@ import { sanitizeLegalPresentationHtml } from '../../modules/collection/legal-pr
 import { validateLegalScopeEvidence, type LegalScopeEvidenceV1 } from '../../modules/taxonomy/legal-scope/legal-scope-evidence.js';
 import { OFFICIAL_EVIDENCE_HOSTS } from '../../modules/taxonomy/legal-scope/legal-scope.repository.js';
 import { canonicalLegalProofJson, verifySignedLegalProofV2, type LegalProofV2Payload } from '../../modules/taxonomy/legal-scope/legal-proof-v2.js';
+import {captureOfficialConfazHttps} from '../../modules/taxonomy/legal-scope/confaz-official-capture.js';
 
 interface VerifyBundle {
   proofId:string; attestationId:string; publicationVersionId:string;
@@ -94,6 +95,28 @@ try {
       proof.parserBuildDigest!==build || proof.parserVersion!==parser ||
       proof.sanitizerVersion!==sanitizer || proof.legalPolicyVersion!==policy)
     throw new Error('TAX13_R8_SIGNED_SCOPE_OR_BUILD_INVALID');
+  // R8-02: an original-HTML fixture may satisfy SHA, URL and sanitization.
+  // Admission also requires an authenticated independent collector receipt,
+  // then a fresh TLS replay by THIS separate verifier, not caller-supplied bytes.
+  const custody=await db.query<{capture:{
+    artifactId:string;rawSha256:string;requestUrl:string;
+    finalUrl:string;redirectChain:string[];collectorIdentity:string;
+  }|null}>(
+    'SELECT public.tax13_r802_verifier_capture_bundle($1::uuid) AS capture',
+    [b.rawArtifactId]);
+  const receipt=custody.rows[0]?.capture;
+  if(!receipt || receipt.artifactId!==b.rawArtifactId ||
+     receipt.rawSha256!==b.rawSha256 || receipt.requestUrl!==b.officialUrl ||
+     !Array.isArray(receipt.redirectChain) ||
+     receipt.redirectChain.at(-1)!==receipt.finalUrl)
+    throw new Error('TAX13_R802_AUTHENTICATED_LIVE_CAPTURE_REQUIRED');
+  if(process.env.TAX13_R802_INDEPENDENT_REPLAY_APPROVED!=='true' ||
+     process.env.GITHUB_ACTIONS==='true')
+    throw new Error('TAX13_R802_INDEPENDENT_LIVE_REPLAY_NOT_APPROVED');
+  const replay=await captureOfficialConfazHttps(b.officialUrl,'TAX13-R802-PROOF-VERIFIER');
+  if(replay.rawSha256!==b.rawSha256 || replay.finalUrl!==receipt.finalUrl ||
+    replay.redirectChain.join('\n')!==receipt.redirectChain.join('\n'))
+    throw new Error('TAX13_R802_INDEPENDENT_HTTPS_REPLAY_MISMATCH');
   const macInput='TRIBUSCA:TAX13:R8:PROOF_VERIFIED:1\n'+
     b.proofId+':'+b.payloadSha256+':'+b.signatureBase64+':'+b.rawSha256;
   const mac=createHmac('sha256',Buffer.from(macSecret!,'hex'))
