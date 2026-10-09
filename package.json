@@ -90,7 +90,8 @@
     "platform:grant-admin": "node dist/infrastructure/database/grant-platform-admin.js",
     "test:collection-filter": "tsx --test test/collection-filter.engine.unit.test.ts test/collection-filter.initial-policy.unit.test.ts test/collection-filter.runtime.unit.test.ts",
     "collection-filter:seed-initial": "node dist/infrastructure/database/seed-collection-filter.js",
-    "tax13:legal-issue-v2": "node dist/infrastructure/database/tax13-issue-legal-proof-v2.js"
+    "tax13:legal-issue-v2": "node dist/infrastructure/database/tax13-issue-legal-proof-v2.js",
+    "tax13:ncm-seal-v2": "node dist/infrastructure/database/tax13-seal-ncm-v2.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
