@@ -1,11 +1,13 @@
-name: TAX13-ARCH-02 read-only CONFAZ HTML compatibility
+name: TAX13-ARCH-02 offline CONFAZ XML body HTML compatibility
 
 on:
   pull_request:
     branches:
       - fix/tax13-r2-ncm-temporal
     paths:
-      - 'test/tax13-arch02.confaz-corpus-readonly.test.ts'
+      - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
+      - 'test/tax13-arch02.confaz-offline-corpus.test.ts'
+      - 'test/fixtures/tax13-confaz-offline-20.zip'
       - '.github/workflows/tax13-arch02-official-corpus.yml'
       - 'src/modules/collection/confaz.connector.ts'
       - 'src/modules/collection/legal-presentation.ts'
@@ -21,7 +23,7 @@ concurrency:
 
 jobs:
   official-html-compatibility:
-    name: CONFAZ 20 official HTML read-only (not legal current proof)
+    name: CONFAZ 20 archived body HTML offline (not legal current proof)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -37,13 +39,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Structural audit - NO legal CURRENT assertion
+      - name: Require pinned offline fixture and run structural audit - NO legal CURRENT assertion
         run: node --import tsx --test --test-concurrency=1 test/tax13-arch02.confaz-corpus-readonly.test.ts
-      - name: Upload exact raw HTML bytes and SHA256 manifest
+      - name: Upload offline parser diagnostics and SHA256 manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tax13-arch02-official-confaz-html-20
-          path: audit-artifacts/tax13-confaz-20/
+          path: audit-artifacts/tax13-confaz-offline-20/
           if-no-files-found: warn
           retention-days: 14
