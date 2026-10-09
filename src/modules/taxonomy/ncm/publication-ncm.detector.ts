@@ -398,6 +398,9 @@ async function selectBatch(
           AND a.coverage = 'COMPLETE'
           AND a.id = public.tax13_effective_attestation_id(pv.id, ${asOf}::date)
       )
+      -- Only an admitted Node-V2 proof allows scheduled derived work.
+      -- A complete scan awaiting its independent seal is NOT a new work item.
+      AND public.tax13_v2_worker_proof_ready(pv.id, ${asOf}::date)
       -- A SUCCESS on a different attestation, day or NCM edition is never
       -- evidence of completion. Legacy 028 statuses do not gate this path.
       AND NOT EXISTS (
@@ -412,7 +415,8 @@ async function selectBatch(
           AND e.legal_scope_attestation_id = public.tax13_effective_attestation_id(pv.id, ${asOf}::date)
           AND e.outcome = 'SUCCESS'
           AND public.tax13_ncm_scan_consistent(e.id)
-          AND e.run_fingerprint = public.tax13_current_ncm_scan_fingerprint(pv.id)
+          -- Never require the public SEAL here: the separate sealer has not
+          -- run yet. Only public projections/affinity require that seal.
       )
     ORDER BY
       p.published_on DESC NULLS LAST,
