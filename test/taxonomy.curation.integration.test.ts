@@ -15,6 +15,8 @@ import {
 import { processPublicationNcmEnrichmentBatch } from '../src/modules/taxonomy/ncm/publication-ncm.detector.js';
 import { checkWorkerConcurrency } from './worker-concurrency.checks.js';
 import { seedTestLegalScopeAttestation } from './legal-scope-attestation.fixture.js';
+import { brazilLegalReferenceDate } from '../src/modules/taxonomy/legal-scope/legal-scope-evidence.js';
+import { seedTestV2NcmSeals } from './tax13-arch02.signed-fixture.js';
 import {
   loadProductSheet,
   parseProductSheet,
@@ -775,12 +777,13 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     );
 
     // Classification is disabled by default: the Worker does nothing.
-    const { publicationId } = await createPublication(
+    const { publicationId, versionId } = await createPublication(
       admin,
       'Portaria concede crédito presumido',
       'Fica concedido crédito presumido nas saídas de ureia e de arroz NCM 1006.30.11. Lei 1. adjuvante.',
     );
     await processPublicationNcmEnrichmentBatch(worker, { limit: 50 });
+    await seedTestV2NcmSeals(admin, versionId, brazilLegalReferenceDate());
     resetClassificationConceptCache();
     const disabled = await processPublicationTaxonomyBatch(worker, { limit: 50 });
     assert.equal(disabled.skipped, 'DISABLED');
@@ -812,6 +815,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
 
       const other = await createPublication(admin, 'Convênio sobre ureia', 'Reduz a base de cálculo nas saídas de ureia.');
       await processPublicationNcmEnrichmentBatch(worker, { limit: 50 });
+      await seedTestV2NcmSeals(admin, other.versionId, brazilLegalReferenceDate());
       const saved = await classifySinglePublication(worker, {
         publicationId: other.publicationId,
         releaseId,
