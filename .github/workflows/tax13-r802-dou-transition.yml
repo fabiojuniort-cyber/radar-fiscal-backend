@@ -6,6 +6,7 @@ on:
       - fix/tax13-arch-02-single-proof-authority
     paths:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
+      - 'src/modules/taxonomy/legal-scope/dou-certified-review-signature.ts'
       - 'test/tax13-r802.dou-source-preflight.unit.test.ts'
       - '.github/workflows/tax13-r802-dou-transition.yml'
 
