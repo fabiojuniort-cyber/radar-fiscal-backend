@@ -1,6 +1,6 @@
 /** TAX13-R8-02: fixtures may NOT pass as official HTTP, PG16/18 disposable only. */
 import assert from 'node:assert/strict';
-import {createHash,randomBytes,randomUUID} from 'node:crypto';
+import {createHash,createHmac,randomBytes,randomUUID} from 'node:crypto';
 import test from 'node:test';
 import {Pool} from 'pg';
 import {seedTestLegalScopeAttestation} from './legal-scope-attestation.fixture.js';
@@ -54,8 +54,9 @@ test('R802 synthetic bytes + fake collector cannot establish verified capture or
       'CI-SYNTHETIC-NOT-TRUSTED') RETURNING id`,
     [version,shapedUrl,raw,h(raw),h(html)])).rows[0]!.id;
   const keyId='r802-ci-neg-'+randomUUID();
+  const keyBytes=randomBytes(32);
   await db.query(`INSERT INTO tax13_v2_capture_mac_keys(key_id,key_bytes)
-    VALUES($1,decode($2,'hex'))`,[keyId,randomBytes(32).toString('hex')]);
+    VALUES($1,decode($2,'hex'))`,[keyId,keyBytes.toString('hex')]);
   await assert.rejects(db.query(`
     INSERT INTO tax13_v2_official_capture_receipts
     (artifact_id,capture_key_id,final_url,redirect_urls,remote_ipv4,tls_peer_cert_sha256,
@@ -72,6 +73,31 @@ test('R802 synthetic bytes + fake collector cannot establish verified capture or
       'CI-SYNTHETIC-NOT-TRUSTED',collected_at,collected_at,repeat('0',64)
     FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid`,
     [forgedArtifact,keyId]),/TAX13_R802_CAPTURE_NOT_AUTHENTICATED/);
+  // An admin fixture can know the synthetic key and compute a perfectly
+  // matching receipt MAC, but the SECURITY DEFINER trigger must still reject
+  // the SQL session because it did not authenticate as the HTTPS collector.
+  const date=(await db.query<{collected_at:Date}>(
+    'SELECT collected_at FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid',
+    [forgedArtifact])).rows[0]!.collected_at.toISOString();
+  const identity='CI-SYNTHETIC-NOT-TRUSTED';
+  const cert='a'.repeat(64);
+  const material=[
+    'TRIBUSCA:TAX13:R802:HTTPS_CAPTURE:1',forgedArtifact,h(raw),
+    version,shapedUrl,shapedUrl,shapedUrl,
+    '8.8.8.8',cert,identity,date,date,
+  ].join('\n');
+  const validMac=createHmac('sha256',keyBytes).update(material).digest('hex');
+  await assert.rejects(db.query(`
+    INSERT INTO tax13_v2_official_capture_receipts
+    (artifact_id,capture_key_id,final_url,redirect_urls,remote_ipv4,tls_peer_cert_sha256,
+     collector_identity,started_at,captured_at,receipt_mac)
+    SELECT id,$2,official_url,ARRAY[official_url],'8.8.8.8',$3,$4,
+      collected_at,collected_at,$5
+    FROM tax13_v2_original_http_artifacts WHERE id=$1::uuid`,
+    [forgedArtifact,keyId,cert,identity,validMac]),
+    /TAX13_R802_COLLECTOR_SESSION_REQUIRED/,
+    'admin fixture with a matching MAC is not an authenticated official collector');
+
   const after=await db.query<{verified:boolean;fingerprint:string|null}>(`
    SELECT public.tax13_v2_capture_verified($1::uuid) AS verified,
     public.tax13_current_ncm_scan_fingerprint($2::uuid) AS fingerprint`,
