@@ -60,6 +60,19 @@ test('R8 real isolated logins issue, verify, scan, seal and publish one syntheti
     const info=(await admin.query<{official_url:string}>(
       'SELECT official_url FROM public.publication_legal_scope_attestations WHERE id=$1::uuid',
       [attestation])).rows[0]!;
+    // R8-02 boundary: syntactically plausible metadata is insufficient.
+    // SQL refuses bytes that do not match the declared digest and artifacts
+    // whose URL is not an origin of this exact publication. Synthetic only.
+    await assert.rejects(admin.query(
+      "INSERT INTO public.tax13_v2_original_http_artifacts(publication_version_id,official_url,http_status,raw_http_bytes,raw_sha256,sanitized_html_sha256,collected_at,collector_identity) VALUES ($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,statement_timestamp(),'CI-ONLY-SYNTHETIC-COLLECTOR')",
+      [version,info.official_url,raw,'0'.repeat(64),sha(html)]),
+    (error:unknown)=>(error as {code?:string}).code==='23514',
+    'R8 raw bytes must match SHA-256 at database admission');
+    await assert.rejects(admin.query(
+      "INSERT INTO public.tax13_v2_original_http_artifacts(publication_version_id,official_url,http_status,raw_http_bytes,raw_sha256,sanitized_html_sha256,collected_at,collector_identity) VALUES ($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,statement_timestamp(),'CI-ONLY-SYNTHETIC-COLLECTOR')",
+      [version,'https://www.confaz.fazenda.gov.br/r8-foreign-version/'+randomUUID(),raw,rawHash,sha(html)]),
+    /TAX13_R8_ORIGINAL_HTTP_IDENTITY_MISMATCH/,
+    'R8 raw artifact must match the official URL registered for this version');
     await admin.query(
       "INSERT INTO public.tax13_v2_original_http_artifacts(publication_version_id,official_url,http_status,raw_http_bytes,raw_sha256,sanitized_html_sha256,collected_at,collector_identity) VALUES ($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,statement_timestamp(),'CI-ONLY-SYNTHETIC-COLLECTOR')",
       [version,info.official_url,raw,rawHash,sha(html)]);
@@ -161,6 +174,32 @@ test('R8 real isolated logins issue, verify, scan, seal and publish one syntheti
       assert.equal(response.statusCode,200,response.body);
       assert.deepEqual(response.json().attestedCurrentNcmCodes,['10063011']);
       assert.equal(response.json().items[0]?.verificationStatus,'CURRENT_ATTESTED');
+      // The verifier's trust anchor is a live gate, not a one-time issuance.
+      // Revocation must invalidate a previously accepted proof and NCM
+      // projection immediately, without deleting the immutable ledger.
+      await admin.query(
+        "INSERT INTO public.tax13_v2_verifier_key_revocations(verifier_key_id,reason) VALUES ($1,$2)",
+        [verifierKeyId,'R8_SYNTHETIC_TEST_REVOKE']);
+      const afterRevocation=(await admin.query<{
+        fragments:string[]|null; fingerprint:string|null; codes:string[];
+      }>(
+        'SELECT public.tax13_v2_admitted_current_fragments($1::uuid) AS fragments, public.tax13_current_ncm_scan_fingerprint($2::uuid) AS fingerprint, ARRAY(SELECT ncm_code FROM public.tax13_public_current_ncm_codes($2::uuid)) AS codes',
+        [attestation,version])).rows[0]!;
+      assert.equal(afterRevocation.fragments,null,
+        'revoked verifier must erase CURRENT from read projection');
+      assert.equal(afterRevocation.fingerprint,null);
+      assert.deepEqual(afterRevocation.codes,[]);
+      const httpAfterRevocation=await app.inject({
+        method:'GET',url:'/api/v1/publications/'+publication+'/ncms',headers:{
+          authorization:'Bearer '+login.json().accessToken,
+          'x-tenant-id':register.json().tenant.id,
+        },
+      });
+      assert.equal(httpAfterRevocation.statusCode,200,httpAfterRevocation.body);
+      assert.deepEqual(httpAfterRevocation.json().attestedCurrentNcmCodes,[]);
+      assert.deepEqual(httpAfterRevocation.json().items,[],
+        'revoked verifier MAC key cannot continue exposing positive CURRENT');
+
     } finally {await app.close();}
   } finally {await worker.destroy();await admin.end();}
 });
