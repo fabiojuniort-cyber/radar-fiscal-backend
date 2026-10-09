@@ -221,7 +221,14 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.tax12.integration.test.ts
 
-      # TAX-11 commits a high-numbered curated release; keep it the last gate.
+      # TAX13 R8-02: operational administration must remain testable while
+      # official legal-CURRENT proof is BLOCKED. No synthetic proof bypass.
+      - name: TAX-11 operational curator authorization (no legal proof)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/taxonomy.curation.operational.integration.test.ts
+
+      # TAX-11 legal-positive curation regression remains a hard gate.
+      # It must not be skipped or silently treated as PASS while R8 is BLOCK.
       - name: TAX-11 curation end-to-end integration
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.curation.integration.test.ts
