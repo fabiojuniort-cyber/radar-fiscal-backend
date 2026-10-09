@@ -578,3 +578,22 @@ $$;
 REVOKE ALL ON FUNCTION public.tax13_v2_is_scan_sealed(UUID)
  FROM PUBLIC,radar_app,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer;
 GRANT EXECUTE ON FUNCTION public.tax13_v2_is_scan_sealed(UUID) TO radar_worker;
+
+-- Worker scheduling is distinct from POSITIVE publication. A completed scan
+-- awaits a separate seal; it must not be scheduled endlessly while unsealed.
+-- This guarded query discloses only a boolean, not legal fragments or signature.
+CREATE FUNCTION public.tax13_v2_worker_proof_ready(p_version UUID,p_as_of DATE)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT EXISTS(
+   SELECT 1 FROM public.publication_legal_scope_attestations a
+   WHERE a.publication_version_id=p_version AND a.valid_as_of=p_as_of
+     AND a.coverage='COMPLETE'
+     AND a.id=public.tax13_effective_attestation_id(p_version,p_as_of)
+     AND public.tax13_v2_admitted_current_fragments(a.id) IS NOT NULL
+ )
+$$;
+REVOKE ALL ON FUNCTION public.tax13_v2_worker_proof_ready(UUID,DATE)
+ FROM PUBLIC,radar_app,radar_taxonomy_curator,radar_legal_issuer,radar_scan_sealer;
+GRANT EXECUTE ON FUNCTION public.tax13_v2_worker_proof_ready(UUID,DATE)
+ TO radar_worker;
