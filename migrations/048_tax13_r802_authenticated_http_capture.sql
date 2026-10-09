@@ -34,7 +34,7 @@ BEGIN
  SELECT c.conname INTO constraint_name FROM pg_constraint c
  WHERE c.conrelid='public.tax13_v2_original_http_artifacts'::regclass
   AND c.contype='u'
-  AND (SELECT array_agg(a.attname ORDER BY a.attname)
+  AND (SELECT array_agg(a.attname::text ORDER BY a.attname)
        FROM unnest(c.conkey) k(attnum)
        JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum)
     = ARRAY['official_url','publication_version_id','raw_sha256']
