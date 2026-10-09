@@ -38,15 +38,17 @@ export async function seedTestV2LegalProof(admin: Pool, attestationId: string): 
   // production; admin-only CI seeding models an already verified source.
   const sourceRaw='<div id="parent-fieldname-text">'+a.sanitized_html+'</div>';
   const rawSha=hash(sourceRaw);
-  // Only one immutable original per version/URL/hash; another CI attestation
-  // reuses that exact captured artifact instead of rewriting the ledger.
+  // Disposable, synthetic-only fixture. Migration 048 intentionally removed
+  // tuple uniqueness so genuinely distinct HTTPS capture events can coexist.
+  // Do not rely on a uniqueness inference that no longer exists, or treat this
+  // artifact as authenticated official provenance. The 048 gate still rejects it.
   await admin.query(`
     INSERT INTO public.tax13_v2_original_http_artifacts(
       publication_version_id,official_url,http_status,raw_http_bytes,
       raw_sha256,sanitized_html_sha256,collected_at,collector_identity
     ) VALUES ($1::uuid,$2,200,convert_to($3,'UTF8'),$4,$5,
       statement_timestamp(),'CI-SYNTHETIC-RAW-BYTES')
-    ON CONFLICT (publication_version_id,official_url,raw_sha256) DO NOTHING
+    ON CONFLICT DO NOTHING
   `,[a.publication_version_id,a.official_url,sourceRaw,rawSha,hash(a.sanitized_html)]);
   const artifact=await admin.query<{id:string}>(`
     SELECT id FROM public.tax13_v2_original_http_artifacts
