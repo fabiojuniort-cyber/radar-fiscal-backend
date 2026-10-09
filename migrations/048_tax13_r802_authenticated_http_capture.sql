@@ -160,7 +160,7 @@ REVOKE ALL ON FUNCTION public.tax13_v2_capture_verified(UUID)
 -- controlled raw payload is supplied to the collector process.
 CREATE FUNCTION public.tax13_r802_capture_target(p_version UUID,p_url TEXT)
 RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path=pg_catalog,public,pg_temp AS $
+SET search_path=pg_catalog,public,pg_temp AS $$
  SELECT jsonb_build_object('publicationVersionId',pv.id,
   'officialUrl',po.official_url,'sanitizedHtml',
     pv.source_metadata->'presentation'->>'html')
@@ -173,7 +173,7 @@ SET search_path=pg_catalog,public,pg_temp AS $
    AND po.official_url ~ '^https://www[.]confaz[.]fazenda[.]gov[.]br/legislacao/'
    AND pv.source_metadata->'presentation'->>'format'='SANITIZED_HTML'
    AND length(pv.source_metadata->'presentation'->>'html')>0
- LIMIT 1 $;
+ LIMIT 1 $$;
 REVOKE ALL ON FUNCTION public.tax13_r802_capture_target(UUID,TEXT)
  FROM PUBLIC,radar_app,radar_worker,radar_taxonomy_curator,
  radar_legal_issuer,radar_scan_sealer,radar_proof_verifier;
