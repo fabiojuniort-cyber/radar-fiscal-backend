@@ -151,3 +151,19 @@ test('R802 signed independent DOU review assertion is only a claim; forged/revok
  const forged={...signed,statement:{...statement,grantsLegalCurrent:true}} as any;
  assert.equal(verifyIndependentDouReview(trace,forged,trust,now).reviewSignatureAuthenticated,false);
 });
+
+test('R802 DOU 1991 and 1997 cannot be misrepresented as INLABS XML captures',()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ for(const year of ['1991','1997']){
+  const historical=copy(parent);
+  (historical.metadata!.dou as any).publicationDate=year+'-09-30';
+  const result=preflightDouConfazTrace({
+   sourceCode:'dou',publication:child,parent:historical
+  });
+  assert.equal(result.status,'UNVERIFIED');
+  assert.equal(result.authenticatedOfficialPublication,false);
+  assert.equal(result.grantsLegalCurrent,false);
+  if(result.status==='UNVERIFIED')
+   assert.equal(result.reason,'INLABS_XML_HISTORICAL_PERIOD_NOT_SUPPORTED');
+ }
+});
