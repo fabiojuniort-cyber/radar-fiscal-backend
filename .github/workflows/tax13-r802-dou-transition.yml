@@ -1,0 +1,31 @@
+name: TAX13-R8-02 DOU provenance read-only preflight
+
+on:
+  pull_request:
+    branches:
+      - fix/tax13-arch-02-single-proof-authority
+    paths:
+      - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
+      - 'test/tax13-r802.dou-source-preflight.unit.test.ts'
+      - '.github/workflows/tax13-r802-dou-transition.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dou-trace-negative:
+    name: DOU XML is NOT a certified legal-current proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      NODE_ENV: test
+      GITHUB_ACTIONS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx tsx --test test/tax13-r802.dou-source-preflight.unit.test.ts
