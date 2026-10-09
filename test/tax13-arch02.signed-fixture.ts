@@ -93,6 +93,9 @@ export async function seedTestV2NcmSeals(
      AND proof.publication_version_id=scan.publication_version_id
      AND proof.current_fragments_sha256=scan.current_fragments_sha256
     WHERE scan.publication_version_id=$1::uuid AND scan.legal_as_of=$2::date
+      AND public.tax13_ncm_scan_consistent(scan.id)
+      AND NOT EXISTS (SELECT 1 FROM public.tax13_ncm_seals_v2 prior
+        WHERE prior.scan_evidence_id=scan.id)
     ON CONFLICT(scan_evidence_id) DO NOTHING
   `,[publicationVersionId,asOf]);
 }
