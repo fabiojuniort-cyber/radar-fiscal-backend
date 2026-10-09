@@ -180,6 +180,25 @@ REVOKE ALL ON FUNCTION public.tax13_r802_capture_target(UUID,TEXT)
 GRANT EXECUTE ON FUNCTION public.tax13_r802_capture_target(UUID,TEXT)
  TO radar_http_collector;
 
+-- Independent proof verifier reads only the immutable metadata needed
+-- to replay the official HTTPS URL; it never receives the collector MAC key.
+CREATE FUNCTION public.tax13_r802_verifier_capture_bundle(p_artifact UUID)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT jsonb_build_object(
+   'artifactId',a.id,'rawSha256',a.raw_sha256,'requestUrl',a.official_url,
+   'finalUrl',r.final_url,'redirectChain',r.redirect_urls,
+   'collectorIdentity',r.collector_identity,'remoteIpv4',host(r.remote_ipv4),
+   'tlsPeerCertificateSha256',r.tls_peer_cert_sha256,'collectedAt',r.captured_at)
+ FROM public.tax13_v2_original_http_artifacts a
+ JOIN public.tax13_v2_official_capture_receipts r ON r.artifact_id=a.id
+ WHERE a.id=p_artifact AND public.tax13_v2_capture_verified(a.id)
+ LIMIT 1 $$;
+REVOKE ALL ON FUNCTION public.tax13_r802_verifier_capture_bundle(UUID)
+ FROM PUBLIC,radar_app,radar_worker,radar_legal_issuer,
+ radar_scan_sealer,radar_taxonomy_curator,radar_http_collector;
+GRANT EXECUTE ON FUNCTION public.tax13_r802_verifier_capture_bundle(UUID) TO radar_proof_verifier;
+
 -- Even a verified Ed25519 signature or a previously issued MAC cannot
 -- promote a fixture without an independent live collector receipt.
 CREATE OR REPLACE FUNCTION public.tax13_v2_original_exists_for_issuer(p_attestation UUID,p_raw_sha TEXT)
