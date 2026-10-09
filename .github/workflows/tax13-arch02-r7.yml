@@ -10,6 +10,7 @@ on:
       - 'src/modules/taxonomy/ncm/**'
       - 'test/tax13-r7.locale.test.ts'
       - 'test/tax13-r7.locale-differential.test.ts'
+      - 'test/tax13-r7.locale-additional.test.ts'
       - '.github/workflows/tax13-arch02-r7.yml'
 
 permissions:
@@ -90,3 +91,5 @@ jobs:
         run: node --import tsx --test --test-concurrency=1 test/tax13-r7.locale.test.ts
       - name: R7 706 differential cases locale C
         run: node --import tsx --test --test-concurrency=1 test/tax13-r7.locale-differential.test.ts
+      - name: R7 365 complementary differential cases locale C
+        run: node --import tsx --test --test-concurrency=1 test/tax13-r7.locale-additional.test.ts
