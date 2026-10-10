@@ -4,13 +4,18 @@ import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
 
 export const MIB = 1024 * 1024;
-export const DOU_DEFAULT_LIMITS = Object.freeze({
+export interface DouDownloadLimits {
+  pdfMiB: number;
+  zipMiB: number;
+  expandedZipMiB: number;
+  xmlEntryMiB: number;
+}
+export const DOU_DEFAULT_LIMITS: Readonly<DouDownloadLimits> = Object.freeze({
   pdfMiB: 20,
   zipMiB: 64,
   expandedZipMiB: 128,
   xmlEntryMiB: 8,
 });
-export type DouDownloadLimits = typeof DOU_DEFAULT_LIMITS;
 
 export const douLimitsSchema = z.object({
   pdfMiB: z.number().int().min(1).max(20),
