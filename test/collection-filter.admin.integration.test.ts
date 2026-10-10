@@ -113,9 +113,45 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       "VALUES($1,'Cliente protegido',$2) RETURNING id",
       [owner.tenantId,'12'+Math.floor(Math.random()*1e12).toString().padStart(12,'0')],
     );
-    await admin.query(
-      "INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)",
+    const linked=await admin.query<{id:string}>(
+      "INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2) RETURNING id",
       [company.rows[0]!.id,protectedId],
+    );
+    const profile=await admin.query<{id:string}>(
+      "INSERT INTO monitoring_profiles(company_id,name) VALUES($1,'L11 proteção') RETURNING id",
+      [company.rows[0]!.id],
+    );
+    await admin.query(
+      "INSERT INTO publication_matches(company_publication_id,monitoring_profile_id,profile_version,rule_engine_version) VALUES($1,$2,1,'l11-test')",
+      [linked.rows[0]!.id,profile.rows[0]!.id],
+    );
+
+    // A single publication can also be known to other official sources.
+    // DOU-specific filtering must not destroy these non-DOU origins.
+    const otherCode='l11-'+randomUUID().slice(0,9);
+    const other=await admin.query<{id:string}>(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "VALUES($1,'L11 Outra Fonte','FEDERAL','https://other.example.test',$1) RETURNING id",[otherCode],
+    );
+    const sharedHash=createHash('sha256').update(randomUUID()).digest('hex');
+    const shared=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [sharedHash,canonicalType,'Ato DOU compartilhado','https://example.test/'+sharedHash],
+    );
+    const sharedId=shared.rows[0]!.id;
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Aviso administrativo neutro',true,$3::jsonb)",
+      [sharedId,createHash('sha256').update('shared '+sharedId).digest('hex'),
+        JSON.stringify({dou:{section:'DO1'}})],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) VALUES "+
+      "($1,$2,$4,$5::jsonb),($1,$3,$6,'{}'::jsonb)",
+      [sharedId,sourceId,other.rows[0]!.id,
+       'https://example.test/'+sharedHash,JSON.stringify({dou:{section:'DO1'}}),
+       'https://other.example.test/'+sharedHash],
     );
 
     const payload={sourceCode:'dou',section:'DO1',canonicalType,mode:'EXCLUDE_ALWAYS'};
@@ -127,9 +163,10 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       url:'/api/v1/admin/collection-filter/direct-rule/preview',
       headers:owner.headers,payload});
     assert.equal(preview.statusCode,200,preview.body);
-    const count=preview.json<{count:number;blockedCompany:number;token:string}>();
+    const count=preview.json<{count:number;blockedCompany:number;blockedOtherSource:number;token:string}>();
     assert.equal(count.count,1);
     assert.equal(count.blockedCompany,1);
+    assert.equal(count.blockedOtherSource,1);
     assert.match(count.token,/^[a-f0-9]{64}$/);
 
     // The archive changed after preview: no deletion or rule update may occur
@@ -189,6 +226,12 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       "SELECT id FROM publications WHERE id=$1",[protectedId],
     );
     assert.equal(protectedRow.rowCount,1,'customer-linked act must be kept');
+    assert.equal((await admin.query("SELECT 1 FROM publication_matches WHERE company_publication_id=$1",
+      [linked.rows[0]!.id])).rowCount,1,'client matches must remain');
+    assert.equal((await admin.query("SELECT 1 FROM publications WHERE id=$1",
+      [sharedId])).rowCount,1,'cross-source publication must remain');
+    assert.equal((await admin.query("SELECT 1 FROM publication_origins WHERE publication_id=$1",
+      [sharedId])).rowCount,2,'both official origins must remain');
     const audit=await admin.query<{after_data:{deletedIds:string[];deletedCount:number}}>(
       "SELECT after_data FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
       "AND after_data->'deletedIds' @> $1::jsonb ORDER BY occurred_at DESC LIMIT 1",
