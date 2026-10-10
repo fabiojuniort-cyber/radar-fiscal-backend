@@ -290,3 +290,42 @@ Convênio ICMS 15/24: publicized 2024-04-25; exceptional deadline 2024-04-25; ra
 | P2 D08 temporal | independent per-clause events and dates | ratification/deadline not CURRENT |
 
 **Required final gates**: independent R9-DESIGN-R2 **APPROVED for design alone**; then approved additive migration implementation, adversarial PG16/18, actual official capture and original INLABS match with legitimate credentials, R7/TAX11 positive tests, full CI and final R9 with SHA pinned; separate explicit owner approval before any merge/production/extra Railway services. Failure of any gate = BLOCK.
+
+## 10. Additional DDL controls — design only, NOT executable migration
+
+The draft function in section 4 intentionally raises DOU_R9_DESIGN_ONLY_NOT_EXECUTABLE. It is not working proof of HTTPS origin and must never be deployed. Every table must be owned by the NOLOGIN ledger owner, deny ordinary DML to app and tenants, enforce FORCE RLS, and be protected by an append-only trigger. Proposed per-table template:
+
+~~~sql
+CREATE FUNCTION public.tax13_dou_immutable_guard()
+RETURNS trigger LANGUAGE plpgsql
+SET search_path=pg_catalog,public AS $$
+BEGIN
+  RAISE EXCEPTION 'TAX13_DOU_APPEND_ONLY' USING ERRCODE='42501';
+END $$;
+REVOKE ALL ON FUNCTION public.tax13_dou_immutable_guard() FROM PUBLIC;
+
+DO $design$
+DECLARE tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'tax13_dou_collector_runs','tax13_dou_http_fetch_events',
+    'tax13_dou_archive_manifest','tax13_dou_edition_bindings',
+    'tax13_dou_act_correlations','tax13_dou_temporal_review_events'
+  ] LOOP
+    EXECUTE format('ALTER TABLE public.%I OWNER TO radar_dou_ledger_owner',tbl);
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',tbl);
+    EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY',tbl);
+    EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC',tbl);
+    EXECUTE format('CREATE POLICY dou_ledger_owner_only ON public.%I FOR ALL TO radar_dou_ledger_owner USING (true) WITH CHECK (true)',tbl);
+    EXECUTE format('CREATE TRIGGER dou_immutable BEFORE UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.tax13_dou_immutable_guard()',tbl);
+  END LOOP;
+END $design$;
+~~~
+
+Production migration must additionally revoke all inherited permissions from actual app/worker/curator/issuer/sealer login/group roles; audit memberships via pg_auth_members, policies in pg_policy, grants in information_schema.role_table_grants, SECURITY DEFINER ownership in pg_proc, and triggers in pg_trigger. Execute grants only on purpose-specific, session-user restricted functions. No generic INSERT to any tenant, no broad PUBLIC SELECT policy. The writer owner is NOLOGIN and unavailable via SET ROLE to runtime actors. Consider direct table owners, schema CREATE privileges, default privileges and function public EXECUTE before claiming isolation.
+
+**Canonical fingerprint:** SHA256 of UTF-8 bytes of a domain-separated, length-prefixed vector, domain TRIFAROS/DOU/BINDING/1. Include, in fixed order: ISO publication date, section, official journal ID, exact printed edition and type, page, matter ID, original ZIP SHA, lexicographically filename-sorted XML part SHA manifest with per-part filenames and sizes, parent dispatch ID, child act ID, independently captured index response SHA and original PDF bytes SHA. Each field encodes eight uppercase hexadecimal characters of its UTF-8 byte length, a colon and the exact original bytes; null uses an unambiguous dedicated marker. Reject noncanonical dates, duplicate XML filenames and malformed identifiers before hashing. Change algorithm version when normalization changes. Never trust an externally furnished digest as the only commitment.
+
+**Credential revocation:** an additional append-only event table is necessary to express revoked collector epochs: event_id UUID primary key, collector_identity TEXT, credential_epoch BIGINT, revoked_at TIMESTAMPTZ, reason TEXT, approved_by TEXT, recorded_at TIMESTAMPTZ; unique (collector_identity,credential_epoch). A revoked epoch can never be reinstated; use a new credential epoch. All positive source projections must recheck revocations and fail UNVERIFIED, preserving original historical fetch rows. Credential secrets stay outside SQL, under separate authorization and rotation. Concurrent revocation and admission must be transactionally serialized or conservatively rejected. R9-DESIGN-R2 must review this table and race protocol before any migration 049+ implementation.
+
+**Residual trust risk:** SQL cannot authenticate a network exchange from a client-provided URL, digest or HMAC. Only dedicated protected runtime identity performing real HTTPS, with independent source evidence and a separate trusted correlator, can produce admitted observations. Any full-system compromise of collector and database remains out of scope and must be acknowledged; no software-only proof is equivalent to a notarized external record.
