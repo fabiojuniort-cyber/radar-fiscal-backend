@@ -116,13 +116,51 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     assert.equal(count.blockedCompany,1);
     assert.match(count.token,/^[a-f0-9]{64}$/);
 
-    const confirm=await app.inject({method:'POST',
+    // The archive changed after preview: no deletion or rule update may occur
+    // until PLATFORM_ADMIN explicitly confirms the newly calculated count.
+    const addedHash=createHash('sha256').update(randomUUID()).digest('hex');
+    const added=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [addedHash,canonicalType,'Segundo ato descartável','https://example.test/'+addedHash],
+    );
+    const addedId=added.rows[0]!.id;
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Novo documento administrativo sem tema tributário',true,$3::jsonb)",
+      [addedId,createHash('sha256').update('body '+addedId).digest('hex'),
+       JSON.stringify({dou:{section:'DO1'}})],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,$4::jsonb)",
+      [addedId,sourceId,'https://example.test/'+addedHash,JSON.stringify({dou:{section:'DO1'}})],
+    );
+
+    const stale=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',
       headers:owner.headers,payload:{...payload,expectedCount:count.count,previewToken:count.token}});
+    assert.equal(stale.statusCode,200,stale.body);
+    assert.equal(stale.json<{changed:boolean;count:number;deletedCount:number}>().changed,true);
+    assert.equal(stale.json<{count:number}>().count,2);
+    assert.equal(stale.json<{deletedCount:number}>().deletedCount,0);
+    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[pubId])).rowCount,1);
+
+    const fresh=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers:owner.headers,payload});
+    assert.equal(fresh.statusCode,200,fresh.body);
+    const approved=fresh.json<{count:number;token:string}>();
+    assert.equal(approved.count,2);
+
+    const confirm=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers:owner.headers,payload:{...payload,expectedCount:approved.count,previewToken:approved.token}});
     assert.equal(confirm.statusCode,200,confirm.body);
-    assert.equal(confirm.json<{deletedCount:number}>().deletedCount,1);
+    assert.equal(confirm.json<{deletedCount:number}>().deletedCount,2);
     const actual=await admin.query("SELECT id FROM publications WHERE id=$1",[pubId]);
     assert.equal(actual.rowCount,0,'document must be physically gone');
+    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[addedId])).rowCount,0);
     const protectedRow=await admin.query(
       "SELECT id FROM publications WHERE id=$1",[protectedId],
     );
@@ -132,8 +170,8 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       "AND after_data->'deletedIds' @> $1::jsonb ORDER BY occurred_at DESC LIMIT 1",
       [JSON.stringify([pubId])],
     );
-    assert.equal(audit.rows[0]?.after_data.deletedCount,1);
-    assert.deepEqual(audit.rows[0]?.after_data.deletedIds,[pubId]);
+    assert.equal(audit.rows[0]?.after_data.deletedCount,2);
+    assert.deepEqual(new Set(audit.rows[0]?.after_data.deletedIds),new Set([pubId,addedId]));
 
     const removed=await admin.query<{sim: string|null; fn:string|null}>(
       "SELECT to_regclass('public.collection_filter_simulation_items')::text AS sim,"+
