@@ -18,6 +18,7 @@
 - `dou-source-custody-preflight.ts` validates INLABS XML/ZIP, page URL, edition, source matter and exact parent → embedded CONFAZ act boundaries. Output remains `DOU_XML_TRACE_ONLY`, not legal CURRENT.
 - `dou-pdf-byte-preflight.ts` validates official-host page URL and date/journal/page match, basic PDF envelope, max 20 MiB and SHA-256. It does **not** inspect digital signatures or certificate fields. For page PDFs under a controlled source fetch, it produces bounded metadata without bytes/text in return.
 - `dou-official-http-pdf-capture.ts` performs a bounded single-page request on the official Imprensa Nacional HTTPS host derived from the INLABS page trace, refuses redirects, oversized and non-PDF response, and returns source-capture metadata. It is read-only and does not mint legal proof.
+- `dou-official-text-correspondence.ts` offers a **pure candidate-only** comparison of the PDF page's full extracted text against the XML original dispatch + the entire re-derived embedded act, with strict edition/section markers. Altered act language, missing dispatcher, wrong edition or a partial text extract returns UNVERIFIED. **Caller-supplied `pdfExtractedText` is not bound cryptographically or by call-graph to the fetched bytes in this module; the only safe future use is through a same-buffer deterministic extractor invoked by the controlled official fetch.** The matcher grants no legal CURRENT and has no SQL write path.
 - Deleted the unused optional Ed25519/PDF certificate-review module and its positive reviewer-signature tests in favor of the owner's simpler source policy. Earlier commits remain auditable but are superseded.
 - The DOU provenance unit/negative suites distinguish source identity from effectivity and never create a synthetic CURRENT.
 
@@ -45,3 +46,11 @@ CONFAZ official source: https://www.confaz.fazenda.gov.br/legislacao/convenios/2
 4. CI/R7/TAX11 synthetic positive failures cannot be resolved by weakening legal guards. Prepare legitimate test evidence and review amendments/effectivity first.
 
 **Historical identifier compatibility:** Product is Trifaros; old repository names, immutable SQL function names and signed historical ledgers retain legacy identifiers until controlled migrations.
+
+
+## Continuation checkpoint — 2026-10-10: simulated HTTPS + full legal text matching
+
+- Automated tests now cover an accepted official URL **via a mocked HTTP response only**, MIME/HTML masquerade, redirects, wrong host/query, oversized responses, and transport exceptions. These mocks are not real official-server receipts.
+- Synthetic XML/act fixtures exercise the full normalized act span (not a mere title or citation); one altered phrase, missing parent dispatch, or wrong printed edition returns UNVERIFIED. No certificate/ICP parsing is used.
+- The archived real **Extra 80-B one-page PDF** remains the correct documentary sample: Despacho nº 16/2024 and Convênio ICMS nº 15/2024. The real upstream INLABS ZIP + controlled HTTPS fetch of this exact edition have **not** been demonstrated in CI or this conversation; do not claim official automated capture or current legal proof.
+- **Next engineering gate:** unify same-buffer official fetch + one-page PDF native-text extraction + precise XML source binding, then design a separate additive SQL source-admission path preserving migration 048, with PG16/PG18 and R9 independent review. For real effectivity also require ratification and future amendments/revocations by device. No historical 1991/1997 acquisition.
