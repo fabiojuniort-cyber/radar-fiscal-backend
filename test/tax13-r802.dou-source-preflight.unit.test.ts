@@ -4,6 +4,8 @@ import test from 'node:test';
 import {parseDouEntries} from '../src/modules/collection/dou.parser.js';
 import {preflightDouConfazTrace} from '../src/modules/taxonomy/legal-scope/dou-source-custody-preflight.js';
 import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
+import {correlateOfficialDouPdfActText} from '../src/modules/taxonomy/legal-scope/dou-official-text-correspondence.js';
+import {douHtmlText} from '../src/modules/collection/dou.parser.js';
 import {fetchOfficialDouPdfPage} from '../src/modules/taxonomy/legal-scope/dou-official-http-pdf-capture.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
@@ -13,7 +15,7 @@ function syntheticPublications():ConnectorPublication[]{
  const body=[
   '<p>Publica os convênios firmados.</p>',
   '<p>CONVÊNIO ICMS Nº 63, DE 17 DE SETEMBRO DE 2026</p>',
-  '<p>Altera o Convênio ICMS anterior e define condições.</p>',
+  '<p>Altera o Convênio ICMS anterior e define condições específicas para as operações tributárias indicadas em cada cláusula, com os respectivos limites de aplicação.</p>',
   '<p>CONVÊNIO ICMS Nº 64, DE 17 DE SETEMBRO DE 2026</p>',
   '<p>Autoriza os estados conforme especificado.</p>'
  ].join('');
@@ -203,4 +205,43 @@ test('R802 official fetch rejects invalid trace without network and never grants
  const result=await fetchOfficialDouPdfPage(altered);
  assert.equal(result.status,'UNVERIFIED');
  assert.equal(result.grantsLegalCurrent,false);
+});
+
+test('R802 text correspondence: whole synthetic act matches PDF and dispatch, never legal CURRENT',()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
+ const preflight=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
+ assert.equal(preflight.status,'DOU_PDF_BYTES_BOUND_ONLY');
+ const capture={
+  status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED' as const,
+  grantsLegalCurrent:false as const,preflight,
+  fetchedAt:'2026-10-10T00:00:00.000Z',requestUrl:pdfUrl,
+  httpStatus:200 as const,contentType:'application/pdf',
+ };
+ const pdfExtractedText='DIÁRIO OFICIAL DA UNIÃO Nº 180 Brasília, 18 de setembro de 2026 '+
+  parent.title+' '+douHtmlText(child.content!);
+ const good=correlateOfficialDouPdfActText({
+  trace,sourceCapture:capture,parent,act:child,pdfExtractedText,printedEdition:'180',
+ });
+ assert.equal(good.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',JSON.stringify(good));
+ assert.equal(good.grantsLegalCurrent,false);
+ if(good.status==='DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY')
+  assert.equal(good.legalEffectivity,'UNVERIFIED');
+ for(const [variant,reason] of [
+  [pdfExtractedText.replace('Nº 180','Nº 181'),'DOU_WRONG_PRINTED_EDITION'],
+  [pdfExtractedText.replace(parent.title,'ANOTHER DESPACHO'),'DOU_DISPATCH_OR_ACT_HEADING_MISSING'],
+  [pdfExtractedText.replace('condições específicas','condições outras'),'DOU_WHOLE_ACT_TEXT_MISMATCH'],
+  [pdfExtractedText.slice(0,90),'DOU_PDF_TEXT_OR_EDITION_INVALID'],
+ ] as const){
+  const rejected=correlateOfficialDouPdfActText({
+   trace,sourceCapture:capture,parent,act:child,
+   pdfExtractedText:variant,printedEdition:'180',
+  });
+  assert.equal(rejected.status,'UNVERIFIED',reason);
+  if(rejected.status==='UNVERIFIED')assert.equal(rejected.reason,reason);
+ }
 });
