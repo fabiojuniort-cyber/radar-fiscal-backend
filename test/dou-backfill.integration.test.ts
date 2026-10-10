@@ -319,7 +319,8 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
   const db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 4 }) }) });
   const runtimeDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: process.env.DATABASE_URL, max: 4 }) }) });
   const sourceId = randomUUID();
-  const policyId = randomUUID();
+  let policyId = randomUUID();
+  let borrowedApprovedPolicy = false;
   const fetch = await fixtureFetch();
   const base = { sourceId, credentials, fetch, now, timeoutMs: 10_000, sleep: async () => undefined };
   try {
@@ -328,25 +329,33 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
       .select('id')
       .where('status', '=', 'APPROVED')
       .executeTakeFirst();
-    assert.equal(existingApproved, undefined, 'fixture requires no pre-existing approved filter policy');
-
-    const maxVersion = await db
-      .selectFrom('collection_filter_policies')
-      .select(({ fn }) => fn.max<number>('version').as('version'))
-      .executeTakeFirst();
-    await db.insertInto('collection_filter_policies').values({
-      id: policyId,
-      version: Number(maxVersion?.version ?? 0) + 1,
-      revision: 1,
-      status: 'APPROVED',
-      context_window_words: 12,
-      weak_score_threshold: 3,
-      title_weight: 3,
-      summary_weight: 2,
-      body_weight: 1,
-      change_notes: 'DOU backfill integration permissive fixture',
-      approved_at: new Date(),
-    }).execute();
+    if (existingApproved) {
+      // Migration 051 provisions a deliberately empty APPROVED policy on fresh
+      // installations; test against that real runtime invariant, not its absence.
+      const existingRule = await db.selectFrom('collection_filter_type_rules')
+        .select('id').where('policy_id', '=', existingApproved.id).executeTakeFirst();
+      assert.equal(existingRule, undefined, 'fixture needs an empty approved policy');
+      policyId = existingApproved.id;
+      borrowedApprovedPolicy = true;
+    } else {
+      const maxVersion = await db
+        .selectFrom('collection_filter_policies')
+        .select(({ fn }) => fn.max<number>('version').as('version'))
+        .executeTakeFirst();
+      await db.insertInto('collection_filter_policies').values({
+        id: policyId,
+        version: Number(maxVersion?.version ?? 0) + 1,
+        revision: 1,
+        status: 'APPROVED',
+        context_window_words: 12,
+        weak_score_threshold: 3,
+        title_weight: 3,
+        summary_weight: 2,
+        body_weight: 1,
+        change_notes: 'DOU backfill integration permissive fixture',
+        approved_at: new Date(),
+      }).execute();
+    }
 
     const fixtureTypes = [
       'RETIFICACAO',
@@ -506,7 +515,11 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
     await db.deleteFrom('publication_origins').where('source_id', '=', sourceId).execute();
     if (ids.length) await db.deleteFrom('publications').where('id', 'in', ids).execute();
     await db.deleteFrom('sources').where('id', '=', sourceId).execute();
-    await db.deleteFrom('collection_filter_policies').where('id', '=', policyId).execute();
+    if (borrowedApprovedPolicy) {
+      await db.deleteFrom('collection_filter_type_rules').where('policy_id', '=', policyId).execute();
+    } else {
+      await db.deleteFrom('collection_filter_policies').where('id', '=', policyId).execute();
+    }
     await Promise.all([runtimeDb.destroy(), db.destroy()]);
   }
 });
