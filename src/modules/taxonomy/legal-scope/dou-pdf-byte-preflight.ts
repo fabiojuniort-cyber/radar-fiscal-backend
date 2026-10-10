@@ -1,17 +1,12 @@
 /**
- * Trifaros TAX13-R8-02: BYTE-BOUND preflight for a contemporary official DOU
- * PDF page. A URL, apparent PDF file header, SHA256 and TLS hostname are
- * NOT official publication authenticity and NEVER prove legal CURRENT.
- *
- * Only the external independently administered certificate/trust-chain
- * verifier can assess actual official certification. This pure read-only
- * function does not fetch, persist, parse legal text, or approve proof.
- * Caller must download the PDF independently of user-submitted URLs and
- * enforce origin/redirect/network controls BEFORE passing the actual bytes.
+ * Trifaros TAX13-R8-02: lightweight DOU PDF source-document checks.
+ * Policy: PDF fetched by our connector over HTTPS from a government host is
+ * sufficient as publication SOURCE (no digital-certificate/ICP checking).
+ * Hash is for traceability/deduplication, never itself proof of origin.
+ * Content and legal effectivity remain independent decisions. READ ONLY.
  */
 import {createHash} from 'node:crypto';
 import type {DouConfazTrace} from './dou-source-custody-preflight.js';
-import {verifyIndependentDouReview, type SignedDouCertifiedReview, type IndependentDouReviewKeyring} from './dou-certified-review-signature.js';
 
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
 const JOURNAL_RE=/^\d{1,4}$/;
@@ -124,7 +119,7 @@ export function preflightContemporaryDouPdfBytes(input:{
   status:'DOU_PDF_BYTES_BOUND_ONLY',
   authenticatedOfficialPublication:false,grantsLegalCurrent:false,
   legalEffectivity:'UNVERIFIED',
-  reason:'DOU_PDF_BYTES_WITHOUT_INDEPENDENT_OFFICIAL_CERTIFICATION',
+  reason:'DOU_PDF_BYTES_PENDING_OFFICIAL_SOURCE_FETCH',
   candidate:{
    pdfSha256:sha,byteLength:bytes.length,sourceUrl:page.canonicalUrl,
    referenceDate:page.date,journal:page.journal,page:page.page,
@@ -132,56 +127,12 @@ export function preflightContemporaryDouPdfBytes(input:{
    officialMatterId:trace.officialMatterId,
    archiveSha256:trace.archiveSha256,
    outstandingGates:[
-    'INDEPENDENT_SIGNED_OFFICIAL_PDF_CUSTODY',
-    'INDEPENDENT_ICP_BRASIL_SIGNATURE_CERT_CHAIN_AND_REVOCATION',
-    'BOUNDED_EXACT_PDF_TEXT_TO_INLABS_XML_AND_CONF_AZ_ACT_MATCH',
-    'OFFICIAL_AMENDMENTS_AND_EFFECTIVITY_BY_SEGMENT',
+    'DIRECT_OFFICIAL_HTTPS_SOURCE_FETCH',
+    'EXACT_EDITION_PAGE_AND_ACT_CONTENT_MATCH',
+    'DOU_XML_DISPATCH_ACT_TEXT_CORRESPONDENCE',
+    'RATIFICATION_AND_LEGAL_EFFECTIVITY_BY_SEGMENT',
     'INDEPENDENT_R9_REVIEW',
    ],
   }
- };
-}
-
-/**
- * Bind actual (still untrusted) fetched PDF bytes to a signed independent
- * review assertion. This is NOT certificate validation or legal effectivity.
- * It proves at most consistency of a chosen byte string and an independently
- * signed claim. A dishonest reviewer or forged PDF will NOT be detected by
- * the digest equality itself.
- */
-export function bindContemporaryDouPdfToIndependentReview(input:{
- trace:DouConfazTrace;
- pdf:ContemporaryDouPdfBytePreflight;
- review:SignedDouCertifiedReview;
- keyring:IndependentDouReviewKeyring;
- now:Date;
-}):{
- readonly status:'DOU_SIGNED_REVIEW_BYTES_MATCH_ONLY'|'UNVERIFIED';
- readonly authenticatedOfficialPublication:false;
- readonly grantsLegalCurrent:false;
- readonly reason:string;
-}{
- const reject=(reason:string)=>({
-  status:'UNVERIFIED' as const,authenticatedOfficialPublication:false as const,
-  grantsLegalCurrent:false as const,reason,
- });
- if(!input||input.pdf?.status!=='DOU_PDF_BYTES_BOUND_ONLY'||
-    !input.pdf.candidate||!input.trace||input.trace.status!=='DOU_XML_TRACE_ONLY')
-  return reject('DOU_PDF_REVIEW_BYTES_NOT_BOUND');
- const reviewResult=verifyIndependentDouReview(
-  input.trace,input.review,input.keyring,input.now);
- if(!reviewResult.reviewSignatureAuthenticated)
-  return reject('DOU_INDEPENDENT_REVIEW_NOT_AUTHENTICATED');
- const c=input.pdf.candidate;
- if(input.review.statement.certifiedPdfSha256!==c.pdfSha256||
-    input.review.statement.publicationDate!==c.referenceDate||
-    input.review.statement.parentExternalId!==c.parentExternalId||
-    input.review.statement.officialMatterId!==c.officialMatterId||
-    input.review.statement.archiveSha256!==c.archiveSha256)
-  return reject('DOU_REVIEW_ACTUAL_PDF_BYTES_MISMATCH');
- return {
-  status:'DOU_SIGNED_REVIEW_BYTES_MATCH_ONLY',
-  authenticatedOfficialPublication:false,grantsLegalCurrent:false,
-  reason:'SIGNED_BYTES_MATCH_ONLY_CERTIFICATE_CHAIN_TEXT_AND_VIGENCY_PENDING',
  };
 }
