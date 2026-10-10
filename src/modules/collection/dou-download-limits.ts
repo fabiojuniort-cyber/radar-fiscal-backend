@@ -1,7 +1,9 @@
 import { sql, type Kysely } from 'kysely';
+import { createHmac, randomUUID } from 'node:crypto';
+import type { Pool } from 'pg';
+import { env } from '../../config/env.js';
 import { z } from 'zod';
 import type { DB } from '../../infrastructure/database/database.types.js';
-import { withUserContext } from '../../infrastructure/database/tenant-context.js';
 
 export const MIB = 1024 * 1024;
 export interface DouDownloadLimits {
@@ -44,7 +46,7 @@ export async function readWorkerDouLimits(db: Kysely<DB>, sourceId: string): Pro
   return limitsFromSource(row.connector_config).limits;
 }
 
-export async function readAdminDouLimits(db: Kysely<DB>): Promise<{
+export async function readAdminDouLimits(db: Kysely<DB>, gatewayConfigured = false): Promise<{
   limits: DouDownloadLimits; configured: boolean; editable: boolean;
   updatedAt: Date | null; limitsNotice: string;
 }> {
@@ -53,17 +55,21 @@ export async function readAdminDouLimits(db: Kysely<DB>): Promise<{
     .where('code', '=', 'dou').where('connector_key', '=', 'dou').executeTakeFirst();
   const result = row ? limitsFromSource(row.connector_config)
     : { limits: { ...DOU_DEFAULT_LIMITS }, configured: false };
-  const functionStatus = await sql<{ ready: boolean }>`
-    SELECT COALESCE(
-      pg_catalog.has_function_privilege(
-        current_user,
-        pg_catalog.to_regprocedure('public.platform_admin_set_dou_limits(jsonb)'),
-        'EXECUTE'
-      ),
-      false
-    ) AS ready
-  `.execute(db);
-  const editable = Boolean(row && functionStatus.rows[0]?.ready);
+  // The general app role is forbidden to call the write gateway.
+  // Only report capability after the isolated SQL role AND signing key exist.
+  let editable=false;
+  if (row && gatewayConfigured) {
+    const present=await sql<{ registered: boolean }>`
+      SELECT pg_catalog.to_regprocedure(
+        'public.platform_dou_limits_ready()') IS NOT NULL AS registered
+    `.execute(db);
+    if (present.rows[0]?.registered) {
+      const status=await sql<{ ready: boolean }>`
+        SELECT public.platform_dou_limits_ready() AS ready
+      `.execute(db);
+      editable=Boolean(status.rows[0]?.ready);
+    }
+  }
   return {
     ...result,
     editable,
@@ -76,15 +82,28 @@ export async function readAdminDouLimits(db: Kysely<DB>): Promise<{
   };
 }
 
-/** Deliberately fail-closed until the independently authorized DB function exists. */
+/** Only the JWT-authenticated API constructs these signed operation claims.
+ * A generic app SQL credential cannot call the privileged gateway.
+ * Never log the payload MAC, shared secret, or isolated DB URL. */
 export async function saveAdminDouLimits(
-  db: Kysely<DB>, userId: string, incoming: unknown,
-) {
-  const limits = douLimitsSchema.parse(incoming);
-  await withUserContext(db, userId, async trx => {
-    await sql`
-      SELECT public.platform_admin_set_dou_limits(${JSON.stringify(limits)}::jsonb)
-    `.execute(trx);
-  });
-  return readAdminDouLimits(db);
+  pool: Pool, userId: string, incoming: unknown,
+): Promise<DouDownloadLimits> {
+  const limits=douLimitsSchema.parse(incoming);
+  const secret=env.DOU_LIMITS_SIGNING_SECRET;
+  if (!secret || !env.DATABASE_DOU_LIMITS_URL) throw new Error('dou_limits_store_not_ready');
+  const issuedAt=Math.floor(Date.now()/1000);
+  const nonce=randomUUID();
+  const statement=[
+    'OPS-DL-01/v1',userId,String(issuedAt),nonce,
+    String(limits.pdfMiB),String(limits.zipMiB),
+    String(limits.expandedZipMiB),String(limits.xmlEntryMiB),
+  ].join('|');
+  const signature=createHmac('sha256',Buffer.from(secret,'hex'))
+    .update(statement,'utf8').digest('hex');
+  const result=await pool.query<{ limits: DouDownloadLimits }>(
+    'SELECT public.platform_admin_set_dou_limits($1::uuid,$2::jsonb,$3::bigint,$4::uuid,$5::text) AS limits',
+    [userId,JSON.stringify(limits),issuedAt,nonce,signature],
+  );
+  if (!result.rows[0]?.limits) throw new Error('DOU_LIMITS_WRITE_NOT_CONFIRMED');
+  return douLimitsSchema.parse(result.rows[0].limits);
 }
