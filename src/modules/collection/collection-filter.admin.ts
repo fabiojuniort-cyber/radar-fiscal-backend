@@ -122,28 +122,6 @@ export function serializeCollectionFilterDraft(input: CollectionFilterDraftInput
   };
 }
 
-export async function saveCollectionFilterDraft(
-  db: Kysely<DB>,
-  userId: string,
-  input: CollectionFilterDraftInput,
-) {
-  const document = serializeCollectionFilterDraft(input);
-  return withUserContext(db, userId, async (trx) => {
-    const result = await sql<{
-      policy_id: string;
-      policy_version: number;
-      policy_revision: number;
-    }>`SELECT * FROM collection_filter_save_draft(${JSON.stringify(document)}::jsonb)`.execute(trx);
-    const row = result.rows[0];
-    if (!row) throw new Error('collection_filter_draft_save_failed');
-    return {
-      policyId: row.policy_id,
-      version: Number(row.policy_version),
-      revision: Number(row.policy_revision),
-    };
-  });
-}
-
 export async function readCollectionFilterAdminState(
   db: Kysely<DB>,
   userId: string,
@@ -168,8 +146,8 @@ export async function readCollectionFilterAdminState(
              title_weight, summary_weight, body_weight,
              change_notes, created_at, approved_at
       FROM collection_filter_policies
-      WHERE status IN ('DRAFT','APPROVED')
-      ORDER BY CASE status WHEN 'DRAFT' THEN 0 ELSE 1 END, version DESC
+      WHERE status='APPROVED'
+      ORDER BY version DESC
     `.execute(trx);
 
     const policyIds = policies.rows.map((row) => row.id);
@@ -177,12 +155,11 @@ export async function readCollectionFilterAdminState(
       return {
         policies: [],
         documents: {},
-        simulations: [],
         newTypesOpen: 0,
       };
     }
 
-    const [rules, aliases, terms, simulations, newTypes] = await Promise.all([
+    const [rules, aliases, terms, newTypes] = await Promise.all([
       sql<any>`SELECT policy_id,source_code,section,canonical_type,mode,help_text
         FROM collection_filter_type_rules
         WHERE policy_id = ANY(${policyIds}::uuid[])
@@ -195,10 +172,6 @@ export async function readCollectionFilterAdminState(
         FROM collection_filter_terms
         WHERE policy_id = ANY(${policyIds}::uuid[])
         ORDER BY strength,normalized_term`.execute(trx),
-      sql<any>`SELECT id,policy_id,policy_revision,status,scope,review_mode,metrics,error_code,created_at,completed_at
-        FROM collection_filter_simulations
-        WHERE policy_id = ANY(${policyIds}::uuid[])
-        ORDER BY created_at DESC LIMIT 20`.execute(trx),
       sql<{ count: string }>`SELECT count(*)::text AS count
         FROM collection_filter_new_types WHERE status='OPEN'`.execute(trx),
     ]);
@@ -259,7 +232,6 @@ export async function readCollectionFilterAdminState(
         status: row.status,
       })),
       documents,
-      simulations: simulations.rows,
       newTypesOpen: Number(newTypes.rows[0]?.count ?? 0),
     };
   });
@@ -397,171 +369,12 @@ export async function resolveCollectionFilterNewType(
 }
 
 
-export async function requestCollectionFilterSimulation(
-  db: Kysely<DB>,
-  userId: string,
-  policyId: string,
-  scope: 'FULL_ARCHIVE' | 'RECENT',
-  reviewMode: 'ALL' | 'SAMPLE' | 'NONE',
-) {
-  return withUserContext(db, userId, async (trx) => {
-    const result = await sql<{
-      simulation_id: string;
-      policy_revision: number;
-      action: string;
-    }>`
-      SELECT * FROM collection_filter_request_simulation(
-        ${policyId}::uuid,
-        ${scope},
-        ${reviewMode}
-      )
-    `.execute(trx);
-    const row = result.rows[0];
-    if (!row) throw new Error('collection_filter_simulation_request_failed');
-    return {
-      simulationId: row.simulation_id,
-      policyRevision: Number(row.policy_revision),
-      action: row.action,
-    };
-  });
-}
-
-export async function listCollectionFilterSimulationItems(
-  db: Kysely<DB>,
-  userId: string,
-  simulationId: string,
-  options: {
-    decision?: 'KEEP' | 'DISCARD' | undefined;
-    sampleOnly?: boolean | undefined;
-    limit?: number | undefined;
-    offset?: number | undefined;
-  } = {},
-) {
-  return withUserContext(db, userId, async (trx) => {
-    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
-    const offset = Math.max(options.offset ?? 0, 0);
-    const decision = options.decision ?? null;
-    const sampleOnly = options.sampleOnly ?? false;
-    const result = await sql<any>`
-      SELECT
-        i.simulation_id,
-        i.publication_id,
-        i.source_code,
-        i.section,
-        i.raw_type,
-        i.canonical_type,
-        i.decision,
-        i.reason_code,
-        i.decisive_term,
-        i.excerpt,
-        i.title,
-        i.published_on,
-        i.official_url,
-        i.review_sample,
-        f.marked_error,
-        f.expected_decision,
-        f.note
-      FROM collection_filter_simulation_items i
-      LEFT JOIN collection_filter_simulation_feedback f
-        ON f.simulation_id=i.simulation_id
-       AND f.publication_id=i.publication_id
-      WHERE i.simulation_id=${simulationId}::uuid
-        AND (${decision}::text IS NULL OR i.decision=${decision})
-        AND (NOT ${sampleOnly}::boolean OR i.review_sample)
-      ORDER BY i.review_sample DESC, i.published_on DESC NULLS LAST, i.publication_id
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `.execute(trx);
-    return result.rows;
-  });
-}
-
-export async function saveCollectionFilterSimulationFeedback(
-  db: Kysely<DB>,
-  userId: string,
-  input: {
-    simulationId: string;
-    publicationId: string;
-    markedError: boolean;
-    expectedDecision?: 'KEEP' | 'DISCARD' | null | undefined;
-    note?: string | null | undefined;
-  },
-) {
-  return withUserContext(db, userId, async (trx) => {
-    const result = await sql<{
-      simulation_id: string;
-      publication_id: string;
-      marked_error: boolean;
-      expected_decision: string | null;
-      note: string | null;
-    }>`
-      INSERT INTO collection_filter_simulation_feedback(
-        simulation_id,
-        publication_id,
-        marked_error,
-        expected_decision,
-        note,
-        created_by
-      )
-      VALUES(
-        ${input.simulationId}::uuid,
-        ${input.publicationId}::uuid,
-        ${input.markedError},
-        ${input.expectedDecision ?? null},
-        ${input.note ?? null},
-        app_current_user_id()
-      )
-      ON CONFLICT (simulation_id,publication_id)
-      DO UPDATE SET
-        marked_error=EXCLUDED.marked_error,
-        expected_decision=EXCLUDED.expected_decision,
-        note=EXCLUDED.note,
-        updated_at=now()
-      RETURNING simulation_id,publication_id,marked_error,expected_decision,note
-    `.execute(trx);
-    const row = result.rows[0];
-    if (!row) throw new Error('collection_filter_feedback_save_failed');
-    return row;
-  });
-}
-
-export async function approveCollectionFilterDraft(
-  db: Kysely<DB>,
-  userId: string,
-  policyId: string,
-) {
-  return withUserContext(db, userId, async (trx) => {
-    const result = await sql<{
-      policy_id: string;
-      policy_version: number;
-      policy_revision: number;
-      simulation_id: string;
-    }>`
-      SELECT * FROM collection_filter_approve_draft(${policyId}::uuid)
-    `.execute(trx);
-    const row = result.rows[0];
-    if (!row) throw new Error('collection_filter_approval_failed');
-    return {
-      policyId: row.policy_id,
-      version: Number(row.policy_version),
-      revision: Number(row.policy_revision),
-      simulationId: row.simulation_id,
-    };
-  });
-}
-
 export function collectionFilterAdminErrorCode(
   error: unknown,
 ): string | null {
   if (!(error instanceof Error)) return null;
   const known = new Set([
     'platform_admin_required',
-    'collection_filter_draft_not_found',
-    'collection_filter_fresh_simulation_required',
-    'collection_filter_full_archive_simulation_required',
-    'collection_filter_simulation_has_errors',
-    'invalid_simulation_scope',
-    'invalid_simulation_review_mode',
     'new_type_not_found',
     'invalid_new_type_status',
   ]);
