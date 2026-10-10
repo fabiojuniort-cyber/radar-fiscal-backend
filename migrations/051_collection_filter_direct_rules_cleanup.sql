@@ -80,9 +80,21 @@ BEGIN
     END IF;
   END IF;
 
+  INSERT INTO public.audit_log(
+    tenant_id,actor_type,actor_id,action,entity_type,entity_id,
+    after_data,correlation_id
+  ) VALUES(
+    NULL,'ADMIN',v_actor::text,'COLLECTION_FILTER_DIRECT_RULE_CHANGED',
+    'collection_filter_type_rule',upper(btrim(p_canonical_type)),
+    pg_catalog.jsonb_build_object(
+      'sourceCode',lower(btrim(p_source)),'section',upper(btrim(p_section)),
+      'canonicalType',upper(btrim(p_canonical_type)),'mode',p_mode,
+      'policyRevision',v_revision
+    ),pg_catalog.gen_random_uuid()
+  );
   RETURN QUERY SELECT v_policy_id,v_revision;
 END;
-$$;
+$;
 REVOKE ALL ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEXT,TEXT,UUID)
   FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEXT,TEXT,UUID)
