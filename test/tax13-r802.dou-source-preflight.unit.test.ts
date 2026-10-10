@@ -18,7 +18,7 @@ function syntheticPublications():ConnectorPublication[]{
   '<p>CONVÊNIO ICMS Nº 63, DE 17 DE SETEMBRO DE 2026</p>',
   '<p>Altera o Convênio ICMS anterior e define condições específicas para as operações tributárias indicadas em cada cláusula, com os respectivos limites de aplicação.</p>',
   '<p>CONVÊNIO ICMS Nº 64, DE 17 DE SETEMBRO DE 2026</p>',
-  '<p>Autoriza os estados conforme especificado.</p>'
+  '<p>Autoriza os estados conforme especificado, estabelecendo critérios objetivos de aplicação, condições de enquadramento, prazos e limites definidos em cada dispositivo legal do convênio.</p>'
  ].join('');
  const xml='<xml><article id="123456781" idMateria="12345678" '+
   'pubDate="18/09/2026" pubName="DO1" editionNumber="180" '+
