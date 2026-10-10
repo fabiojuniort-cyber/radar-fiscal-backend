@@ -150,19 +150,6 @@ export async function confirmDirectFilterRule(
         ${rule.canonicalType},${rule.mode},${operationId}::uuid
       )`.execute(trx);
     }
-    if (!ruleIds.length) {
-      await sql`INSERT INTO audit_log (
-        tenant_id,actor_type,actor_id,action,entity_type,entity_id,
-        after_data,correlation_id
-      ) VALUES (
-        NULL,'ADMIN',${userId},'COLLECTION_FILTER_DIRECT_RULE',
-        'collection_filter_type_rule',${rule.canonicalType},
-        jsonb_build_object('sourceCode',${rule.sourceCode},
-          'section',${rule.section},'mode',${rule.mode},
-          'deletedCount',0,'deletedIds','[]'::jsonb),
-        ${operationId}::uuid
-      )`.execute(trx);
-    }
     return {changed:false,deletedCount:ruleIds.length,
       revision:Number(result.rows[0]?.policy_revision)};
   });
