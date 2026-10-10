@@ -43,7 +43,8 @@ CREATE TABLE public.tax13_dou_xml_act_anchors (
  embedded_index integer CHECK(embedded_index IS NULL OR embedded_index>=1),
  act_version_key_v4 char(64) NOT NULL UNIQUE CHECK(act_version_key_v4 ~ '^[a-f0-9]{64}$'),
  created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
- UNIQUE(id,xml_matter_id), UNIQUE(xml_matter_id,child_publication_version_id)
+ UNIQUE(id,xml_matter_id), UNIQUE(id,child_publication_version_id),
+ UNIQUE(xml_matter_id,child_publication_version_id)
 );
 
 CREATE TABLE public.tax13_dou_runtime_credentials (
@@ -79,7 +80,8 @@ CREATE TABLE public.tax13_dou_collection_jobs (
   (target_fingerprint_v3 ~ '^[a-f0-9]{64}$'),
  planned_at timestamptz NOT NULL,
  scheduler_version text NOT NULL,
- created_at timestamptz NOT NULL DEFAULT statement_timestamp()
+ created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
+ UNIQUE(id,xml_matter_id)
 );
 CREATE INDEX dou_r4_job_lookup ON public.tax13_dou_collection_jobs
  (publication_date,section_code,official_journal_id,page_number);
@@ -139,6 +141,8 @@ CREATE TABLE public.tax13_dou_archive_manifest (
  parser_version text NOT NULL, created_at timestamptz NOT NULL,
  UNIQUE(id,job_id), UNIQUE(id,xml_matter_id),
  UNIQUE(job_id,xml_matter_id,zip_sha256,manifest_sha256),
+ FOREIGN KEY(job_id,xml_matter_id)
+  REFERENCES public.tax13_dou_collection_jobs(id,xml_matter_id),
  FOREIGN KEY (collector_zip_event_id,job_id,collector_actor,zip_purpose)
   REFERENCES public.tax13_dou_http_fetch_events(id,job_id,actor,purpose),
  FOREIGN KEY (verifier_zip_event_id,job_id,verifier_actor,zip_purpose)
@@ -227,6 +231,10 @@ CREATE TABLE public.tax13_dou_act_correlations (
  correlated_at timestamptz NOT NULL,
  UNIQUE(id,xml_act_anchor_id), UNIQUE(verification_event_id,xml_act_anchor_id),
  FOREIGN KEY(xml_act_anchor_id,xml_matter_id) REFERENCES public.tax13_dou_xml_act_anchors(id,xml_matter_id),
+ FOREIGN KEY(xml_act_anchor_id,child_act_version_id)
+  REFERENCES public.tax13_dou_xml_act_anchors(id,child_publication_version_id),
+ FOREIGN KEY(xml_matter_id,parent_dispatch_version_id)
+  REFERENCES public.tax13_dou_xml_matters(id,parent_publication_version_id),
  FOREIGN KEY(verification_event_id,xml_matter_id) REFERENCES public.tax13_dou_verification_events(id,xml_matter_id),
  FOREIGN KEY(verification_event_id,binding_id)
   REFERENCES public.tax13_dou_verification_events(id,binding_id)
@@ -257,6 +265,9 @@ CREATE TABLE public.tax13_dou_xml_temporal_review_events (
  created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
  FOREIGN KEY(optional_documentary_correlation_id,xml_act_anchor_id)
   REFERENCES public.tax13_dou_act_correlations(id,xml_act_anchor_id) ON DELETE RESTRICT,
+ UNIQUE(id,xml_act_anchor_id),
+ FOREIGN KEY(supersedes_event_id,xml_act_anchor_id)
+  REFERENCES public.tax13_dou_xml_temporal_review_events(id,xml_act_anchor_id),
  CHECK(effect_until IS NULL OR effect_from IS NOT NULL),
  CHECK(effect_until IS NULL OR effect_until>=effect_from),
  CHECK(supersedes_event_id IS NULL OR supersedes_event_id<>id)
