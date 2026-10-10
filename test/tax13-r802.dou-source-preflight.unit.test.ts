@@ -230,10 +230,19 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
  });
  assert.equal(good.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',JSON.stringify(good));
  assert.equal(good.grantsLegalCurrent,false);
+ const numericDate=correlateOfficialDouPdfActText({
+  trace,sourceCapture:capture,parent,act:child,
+  pdfExtractedText:pdfExtractedText.replace('18 de setembro de 2026','18/09/2026'),
+  printedEdition:'180',
+ });
+ assert.equal(numericDate.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY');
  if(good.status==='DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY')
   assert.equal(good.legalEffectivity,'UNVERIFIED');
  for(const [variant,reason] of [
   [pdfExtractedText.replace('Nº 180','Nº 181'),'DOU_WRONG_PRINTED_EDITION'],
+  [pdfExtractedText.replace('18 de setembro de 2026','17 de setembro de 2026'),'DOU_WRONG_PRINTED_DATE'],
+  [pdfExtractedText.replace('Brasília, 18 de setembro de 2026','Brasília, 17 de setembro de 2026')+
+   ' (menção posterior: Brasília, 18 de setembro de 2026)', 'DOU_WRONG_PRINTED_DATE'],
   [pdfExtractedText.replace(parent.title,'ANOTHER DESPACHO'),'DOU_DISPATCH_OR_ACT_HEADING_MISSING'],
   [pdfExtractedText.replace('condições específicas','condições outras'),'DOU_WHOLE_ACT_TEXT_MISMATCH'],
   [pdfExtractedText.slice(0,90),'DOU_PDF_TEXT_OR_EDITION_INVALID'],
@@ -252,7 +261,7 @@ test('R802 one same-buffer official PDF download and text extraction: synthetic 
  const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
- const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 '+
+ const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 Brasília, 18 de setembro de 2026 '+
   parent.title+' '+douHtmlText(child.content!);
  const bytes=syntheticWrappedOnePagePdf(pdfText);
  t.mock.method(globalThis,'fetch',async()=>new Response(bytes,{
