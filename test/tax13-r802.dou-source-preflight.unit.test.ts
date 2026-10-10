@@ -6,7 +6,8 @@ import {preflightDouConfazTrace} from '../src/modules/taxonomy/legal-scope/dou-s
 import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
 import {correlateOfficialDouPdfActText} from '../src/modules/taxonomy/legal-scope/dou-official-text-correspondence.js';
 import {douHtmlText} from '../src/modules/collection/dou.parser.js';
-import {fetchOfficialDouPdfPage} from '../src/modules/taxonomy/legal-scope/dou-official-http-pdf-capture.js';
+import {fetchOfficialDouPdfPage,fetchAndMatchOfficialDouPdfAct} from '../src/modules/taxonomy/legal-scope/dou-official-http-pdf-capture.js';
+import {legacyPdfFixture} from './doe-sp-legacy.pdf-fixtures.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
 
@@ -244,4 +245,22 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
   assert.equal(rejected.status,'UNVERIFIED',reason);
   if(rejected.status==='UNVERIFIED')assert.equal(rejected.reason,reason);
  }
+});
+
+test('R802 one same-buffer official PDF download and text extraction: synthetic complete act only',async t=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 '+
+  parent.title+' '+douHtmlText(child.content!);
+ const bytes=legacyPdfFixture({text:pdfText,pages:1});
+ t.mock.method(globalThis,'fetch',async()=>new Response(bytes,{
+  status:200,headers:{'content-type':'application/pdf'}
+ }));
+ const result=await fetchAndMatchOfficialDouPdfAct({
+  trace,parent,act:child,printedEdition:'180',
+ });
+ assert.equal(result.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',JSON.stringify(result));
+ assert.equal(result.grantsLegalCurrent,false);
 });
