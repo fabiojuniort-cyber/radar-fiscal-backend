@@ -50,9 +50,10 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
         id,identity_hash,identity_strength,identity_basis,jurisdiction_level,
         act_type,title,primary_official_url
       ) SELECT id,md5(id::text)||md5('l11'||id::text),'STRONG','{}'::jsonb,'FEDERAL',
-        $1,'Documento administrativo de teste de desempenho',
+        CASE WHEN rn % 10 = 0 THEN $1 ELSE 'OUTRO TIPO DOU' END,
+        'Documento administrativo de teste de desempenho',
         'https://bench.example.test/'||id::text
-      FROM l11_benchmark_ids`,
+      FROM (SELECT id,ROW_NUMBER() OVER (ORDER BY id) AS rn FROM l11_benchmark_ids) base`,
       [canonicalType],
     );
     await admin.query(
@@ -71,6 +72,8 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
     );
     const count=await admin.query<{count:string}>('SELECT count(*)::text AS count FROM l11_benchmark_ids');
     assert.equal(Number(count.rows[0]?.count),ROWS);
+    const subset=await admin.query<{count:string}>("SELECT count(*)::text AS count FROM publications WHERE act_type=$1",[canonicalType]);
+    assert.equal(Number(subset.rows[0]?.count),ROWS/10);
     const seedMs=Math.round(performance.now()-t0);
 
     const rule={sourceCode:'dou',section:'DO1',canonicalType,mode:'KEEP_ALWAYS'};
@@ -94,7 +97,7 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
     // Timings include scanning 120k acts for both operations, but not physical
     // deletion of 120k rows (deliberately not exercised by KEEP_ALWAYS).
     console.log('L11_PERFORMANCE='+JSON.stringify({
-      publications:ROWS,synthetic:true,mode:'KEEP_ALWAYS',
+      publications:ROWS,matching:ROWS/10,matchingPercent:10,synthetic:true,mode:'KEEP_ALWAYS',
       seedMs,previewMs,confirmMs,limitMs:60000,
       previewOver60s:previewMs>60000,
       confirmOver60s:confirmMs>60000,
