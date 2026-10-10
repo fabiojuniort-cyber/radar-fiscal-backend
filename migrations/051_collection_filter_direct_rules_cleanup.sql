@@ -17,8 +17,39 @@ DROP TABLE IF EXISTS public.collection_filter_simulation_feedback;
 DROP TABLE IF EXISTS public.collection_filter_simulation_items;
 DROP TABLE IF EXISTS public.collection_filter_simulations;
 
--- The published filter is never removed: only abandoned drafts are discarded.
-DELETE FROM public.collection_filter_policies WHERE status='DRAFT';
+-- L-11: never silently destroy configured draft filters during migration.
+-- Fail the entire migration (migrate.ts transaction) if any DRAFT has content.
+DO $
+DECLARE
+  v_draft RECORD;
+BEGIN
+  SELECT p.id,p.version,
+    (SELECT count(*) FROM public.collection_filter_type_rules r WHERE r.policy_id=p.id) AS rule_count,
+    (SELECT count(*) FROM public.collection_filter_type_aliases a WHERE a.policy_id=p.id) AS alias_count,
+    (SELECT count(*) FROM public.collection_filter_terms t WHERE t.policy_id=p.id) AS term_count
+  INTO v_draft
+  FROM public.collection_filter_policies p
+  WHERE p.status='DRAFT'
+    AND (EXISTS (SELECT 1 FROM public.collection_filter_type_rules r WHERE r.policy_id=p.id)
+      OR EXISTS (SELECT 1 FROM public.collection_filter_type_aliases a WHERE a.policy_id=p.id)
+      OR EXISTS (SELECT 1 FROM public.collection_filter_terms t WHERE t.policy_id=p.id))
+  ORDER BY p.version LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION USING
+      ERRCODE='P0001',
+      MESSAGE='L11_MIGRATION_BLOCKED_CONFIGURED_DRAFT',
+      DETAIL=format('draft policy version=%s id=%s rules=%s aliases=%s terms=%s',
+        v_draft.version,v_draft.id,v_draft.rule_count,v_draft.alias_count,v_draft.term_count),
+      HINT='Preserve the configured draft and reconcile it through an approved migration before retrying 051';
+  END IF;
+END;
+$;
+-- Empty drafts have no rules, aliases or terms to lose and can be retired.
+DELETE FROM public.collection_filter_policies p
+WHERE p.status='DRAFT'
+  AND NOT EXISTS (SELECT 1 FROM public.collection_filter_type_rules r WHERE r.policy_id=p.id)
+  AND NOT EXISTS (SELECT 1 FROM public.collection_filter_type_aliases a WHERE a.policy_id=p.id)
+  AND NOT EXISTS (SELECT 1 FROM public.collection_filter_terms t WHERE t.policy_id=p.id);
 DROP INDEX IF EXISTS public.uq_collection_filter_one_draft;
 
 -- A fresh installation without an APPROVED policy must still collect DOU.
