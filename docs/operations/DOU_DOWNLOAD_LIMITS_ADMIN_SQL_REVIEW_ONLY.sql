@@ -1,0 +1,11 @@
+-- OPS-DL-01 — HISTORICAL SQL REVIEW DRAFT (SUPERSEDED)
+-- Do not execute this file. It has been replaced by the single canonical
+-- audited implementation at migrations/050_ops_dou_download_limits.sql.
+-- The migration adds the necessary platform-admin role-revocation transaction
+-- lock BEFORE permission checks, the source row-count guard and scoped grants.
+-- It is a separate operational change, not TAX13 R9 documentary attestation.
+-- For review/test requirements consult:
+--   .github/workflows/ops-dou-limits-pg-gate.yml
+--   test/platform-admin.integration.test.ts
+--   docs/operations/OPS_DL_01_SECURITY_HANDOFF.md
+-- Mainline activation and production remain subject to the release gates.

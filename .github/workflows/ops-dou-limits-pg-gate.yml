@@ -1,0 +1,77 @@
+name: OPS-DL-01 DOU limits PostgreSQL 16/18 security
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'migrations/050_ops_dou_download_limits.sql'
+      - 'src/modules/collection/dou-download-limits.ts'
+      - 'src/modules/collection/dou.connector.ts'
+      - 'src/modules/collection/dou.parser.ts'
+      - 'src/modules/collection/inlabs.client.ts'
+      - 'src/api/routes/platform-admin.route.ts'
+      - 'test/dou-limits-admin.integration.test.ts'
+      - 'src/infrastructure/database/provision-runtime-role.ts'
+      - 'src/config/env.ts'
+      - 'test/dou-download-limits.unit.test.ts'
+      - '.github/workflows/ops-dou-limits-pg-gate.yml'
+permissions:
+  contents: read
+jobs:
+  source-limits-auth-sql:
+    name: Isolated PG ${{ matrix.pg }} / API, RLS, audit, revocation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ['16-bookworm', '18-bookworm']
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Prepare ephemeral signed gateway test environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$(openssl rand -hex 32)"
+          pass="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          echo "::add-mask::$pass"
+          echo "DOU_LIMITS_SIGNING_SECRET=$key" >> "$GITHUB_ENV"
+          echo "DB_DOU_LIMITS_PASSWORD=$pass" >> "$GITHUB_ENV"
+          echo "DATABASE_DOU_LIMITS_URL=postgresql://radar_dou_limits_runtime:$pass@localhost:5432/radar_fiscal_test" >> "$GITHUB_ENV"
+      - name: Provision isolated schema/runtime/RLS
+        run: npm run db:prepare
+      - name: Signed R3 adversarial SQL, HMAC, replay, ACL and revocation PG16/18
+        run: npx tsx --test test/dou-limits-admin.integration.test.ts
+      - name: Check ZIP/XML bounds and fail-closed behavior
+        run: npx tsx --test test/dou-download-limits.unit.test.ts

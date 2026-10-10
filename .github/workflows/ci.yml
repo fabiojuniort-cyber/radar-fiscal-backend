@@ -127,6 +127,18 @@ jobs:
       - name: Publication NCM detector unit tests
         run: npx tsx --test test/publication-ncm.detector.unit.test.ts
 
+      - name: Prepare ephemeral DOU signed SQL test gateway
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$(openssl rand -hex 32)"
+          pass="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          echo "::add-mask::$pass"
+          echo "DOU_LIMITS_SIGNING_SECRET=$key" >> "$GITHUB_ENV"
+          echo "DB_DOU_LIMITS_PASSWORD=$pass" >> "$GITHUB_ENV"
+          echo "DATABASE_DOU_LIMITS_URL=postgresql://radar_dou_limits_runtime:$pass@localhost:5432/radar_fiscal_test" >> "$GITHUB_ENV"
       - name: Prepare PostgreSQL test database
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run db:prepare
@@ -153,6 +165,21 @@ jobs:
       - name: Authentication and RLS integration tests
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run test:integration
+
+      - name: OPS-DL-01 isolated signed gateway and SQL spoof regression
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No writes to the shared CI source catalog: make a SECOND database
+          # after all general integration suites have completed.
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE radar_dou_limits_test"
+          export DATABASE_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/radar_dou_limits_test
+          export DATABASE_URL="postgresql://radar_app_runtime:${DB_RUNTIME_PASSWORD}@localhost:5432/radar_dou_limits_test"
+          export DATABASE_DOU_LIMITS_URL="postgresql://radar_dou_limits_runtime:${DB_DOU_LIMITS_PASSWORD}@localhost:5432/radar_dou_limits_test"
+          npm run db:prepare
+          npx tsx --test test/dou-limits-admin.integration.test.ts
 
       - name: ONB-01 adversarial tenant/CNAE/company integration
         if: steps.ci-plan.outputs.full_regression == 'true'

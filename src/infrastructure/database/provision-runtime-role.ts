@@ -14,6 +14,8 @@ const provisionEnvSchema = z.object({
   DB_RUNTIME_PASSWORD: z.string().min(32),
   DB_WORKER_RUNTIME_PASSWORD: z.string().min(32).optional(),
   DB_CURATOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DB_DOU_LIMITS_PASSWORD: z.string().min(32).optional(),
+  DOU_LIMITS_SIGNING_SECRET: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 });
 
 const parsed = provisionEnvSchema.safeParse(
@@ -41,6 +43,8 @@ const DB_WORKER_RUNTIME_PASSWORD =
 // app/worker passwords; skipped entirely when the secret is not configured.
 const DB_CURATOR_RUNTIME_PASSWORD =
   parsed.data.DB_CURATOR_RUNTIME_PASSWORD;
+const DB_DOU_LIMITS_PASSWORD = parsed.data.DB_DOU_LIMITS_PASSWORD;
+const DOU_LIMITS_SIGNING_SECRET = parsed.data.DOU_LIMITS_SIGNING_SECRET;
 
 if (
   DB_CURATOR_RUNTIME_PASSWORD &&
@@ -58,7 +62,8 @@ async function setPassword(
   roleName:
     | 'radar_app_runtime'
     | 'radar_worker_runtime'
-    | 'radar_taxonomy_curator_runtime',
+    | 'radar_taxonomy_curator_runtime'
+    | 'radar_dou_limits_runtime',
   password: string,
 ): Promise<void> {
   const formatted = await client.query<{
@@ -245,6 +250,20 @@ async function run(): Promise<void> {
       );
     }
 
+    if (DB_DOU_LIMITS_PASSWORD || DOU_LIMITS_SIGNING_SECRET) {
+      const password=DB_DOU_LIMITS_PASSWORD;
+      const key=DOU_LIMITS_SIGNING_SECRET;
+      if (!password || !key) throw new Error('Both DOU gateway secrets are required');
+      if ([DB_RUNTIME_PASSWORD,DB_WORKER_RUNTIME_PASSWORD,DB_CURATOR_RUNTIME_PASSWORD].includes(password))
+        throw new Error('DOU gateway password must differ from other runtimes');
+      await client.query(`ALTER ROLE radar_dou_limits_runtime LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
+      await setPassword(client, 'radar_dou_limits_runtime', password);
+      await client.query(`REVOKE radar_app,radar_worker FROM radar_dou_limits_runtime`);
+      await client.query(`INSERT INTO public.ops_dou_limits_signing_keys(key_id,key_bytes) VALUES('v1',decode($1,'hex')) ON CONFLICT(key_id) DO NOTHING`,[key]);
+      const check=await client.query<{ ok: boolean }>(`SELECT key_bytes=decode($1,'hex') AS ok FROM public.ops_dou_limits_signing_keys WHERE key_id='v1'`,[key]);
+      if (!check.rows[0]?.ok) throw new Error('DOU signing key does not match provisioned value');
+      await client.query(`ALTER ROLE radar_dou_limits_runtime SET timezone = 'UTC'`);
+    }
     await client.query('COMMIT');
 
     console.log(

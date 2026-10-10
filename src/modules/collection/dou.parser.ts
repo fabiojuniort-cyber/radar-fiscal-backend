@@ -455,13 +455,23 @@ export function parseDouEntries(entries: DouXmlEntry[], context: DouArchiveConte
   return { publications: [...assembledPublications(state, context)], partialFailures: state.partialFailures };
 }
 
+export interface DouZipSafetyLimits {
+  maxCompressedBytes?: number;
+  maxExpandedBytes?: number;
+  maxXmlEntryBytes?: number;
+}
+
 /** Read one XML entry at a time without copying the compressed archive. */
 async function visitDouZip(
   bytes: Uint8Array,
   signal: AbortSignal,
   onEntry: (entry: DouXmlEntry) => void,
+  limits: DouZipSafetyLimits = {},
 ): Promise<{ xmlCount: number; mediaCount: number }> {
-  if (bytes.byteLength > 64 * 1024 * 1024) throw error('DOU_ARCHIVE_TOO_LARGE');
+  const maxCompressed = Math.min(limits.maxCompressedBytes ?? 64 * 1024 * 1024, 64 * 1024 * 1024);
+  const maxExpanded = Math.min(limits.maxExpandedBytes ?? 128 * 1024 * 1024, 128 * 1024 * 1024);
+  const maxEntry = Math.min(limits.maxXmlEntryBytes ?? 8 * 1024 * 1024, 8 * 1024 * 1024);
+  if (bytes.byteLength > maxCompressed) throw error('DOU_ARCHIVE_TOO_LARGE');
   signal.throwIfAborted();
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.fromBuffer(buffer,
@@ -487,7 +497,7 @@ async function visitDouZip(
       if (done) return;
       if (signal.aborted) { abort(); return; }
       total += entry.uncompressedSize;
-      if (names.has(entry.fileName) || names.size >= 5000 || entry.uncompressedSize > 8 * 1024 * 1024 || total > 128 * 1024 * 1024 || entry.isEncrypted()) {
+      if (names.has(entry.fileName) || names.size >= 5000 || entry.uncompressedSize > maxEntry || total > maxExpanded || entry.isEncrypted()) {
         fail(error('DOU_UNSAFE_ZIP')); return;
       }
       names.add(entry.fileName);
@@ -503,7 +513,7 @@ async function visitDouZip(
         stream = input; entryBytes = Buffer.allocUnsafe(entry.uncompressedSize); let size = 0;
         input.on('data', (chunk: Buffer) => {
           if (done) return;
-          if (size + chunk.length > entry.uncompressedSize || size + chunk.length > 8 * 1024 * 1024) { fail(error('DOU_ZIP_SIZE_MISMATCH')); return; }
+          if (size + chunk.length > entry.uncompressedSize || size + chunk.length > maxEntry) { fail(error('DOU_ZIP_SIZE_MISMATCH')); return; }
           chunk.copy(entryBytes!, size);
           size += chunk.length;
         });
@@ -543,10 +553,11 @@ export async function parseDouZip(
   context: DouArchiveContext,
   signal: AbortSignal,
   onPublication: (publication: ConnectorPublication) => void | Promise<void>,
+  limits: DouZipSafetyLimits = {},
 ): Promise<{ partialFailures: ConnectorPartialFailure[]; xmlCount: number; mediaCount: number }> {
   const state: DouGroups = { groups: new Map(), invalid: new Set(), partialFailures: [] };
   try {
-    const counts = await visitDouZip(bytes, signal, entry => addDouEntry(state, entry));
+    const counts = await visitDouZip(bytes, signal, entry => addDouEntry(state, entry), limits);
     for (const publication of assembledPublications(state, context)) {
       signal.throwIfAborted();
       await onPublication(publication);
