@@ -5,6 +5,7 @@ on:
     branches:
       - fix/tax13-arch-02-single-proof-authority
       - fix/tax13-r8-02-official-capture
+      - fix/tax13-r9-design-remediation-r2
     paths:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts'

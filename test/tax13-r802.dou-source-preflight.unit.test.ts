@@ -18,7 +18,7 @@ function syntheticPublications():ConnectorPublication[]{
   '<p>CONVÊNIO ICMS Nº 63, DE 17 DE SETEMBRO DE 2026</p>',
   '<p>Altera o Convênio ICMS anterior e define condições específicas para as operações tributárias indicadas em cada cláusula, com os respectivos limites de aplicação.</p>',
   '<p>CONVÊNIO ICMS Nº 64, DE 17 DE SETEMBRO DE 2026</p>',
-  '<p>Autoriza os estados conforme especificado.</p>'
+  '<p>Autoriza os estados conforme especificado, estabelecendo critérios objetivos de aplicação, condições de enquadramento, prazos e limites definidos em cada dispositivo legal do convênio.</p>'
  ].join('');
  const xml='<xml><article id="123456781" idMateria="12345678" '+
   'pubDate="18/09/2026" pubName="DO1" editionNumber="180" '+
@@ -224,7 +224,7 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
   httpStatus:200 as const,contentType:'application/pdf',
  };
  const pdfExtractedText='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 '+
-  parent.title+' '+douHtmlText(child.content!);
+  parent.title+' '+douHtmlText(parent.content!);
  const good=correlateOfficialDouPdfActText({
   trace,sourceCapture:capture,parent,act:child,pdfExtractedText,printedEdition:'180',
  });
@@ -256,7 +256,11 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
   [pdfExtractedText.replace('Brasília, 18 de setembro de 2026','Brasília, 17 de setembro de 2026')+
    ' (menção posterior: Brasília, 18 de setembro de 2026)', 'DOU_WRONG_PRINTED_DATE'],
   [pdfExtractedText.replace(parent.title,'ANOTHER DESPACHO'),'DOU_DISPATCH_OR_ACT_HEADING_MISSING'],
-  [pdfExtractedText.replace('condições específicas','condições outras'),'DOU_WHOLE_ACT_TEXT_MISMATCH'],
+  [pdfExtractedText.replace('condições específicas','condições outras'),'DOU_WHOLE_DISPATCH_CONTEXT_MISMATCH'],
+  [pdfExtractedText.replace(parent.title,parent.title+' PARÁGRAFO NOVO SEM BASE NO XML'),
+   'DOU_WHOLE_DISPATCH_CONTEXT_MISMATCH'],
+  [pdfExtractedText.replace('Publica os convênios firmados.','Publica TODOS os convênios firmados.'),
+   'DOU_WHOLE_DISPATCH_CONTEXT_MISMATCH'],
   [pdfExtractedText.slice(0,90),'DOU_PDF_TEXT_OR_EDITION_INVALID'],
  ] as const){
   const rejected=correlateOfficialDouPdfActText({
@@ -268,13 +272,40 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
  }
 });
 
+test('R9-R2-D03 synthetic: altered preceding sibling cannot be hidden by matching later act',()=>{
+ const [parent,first,second]=syntheticPublications();assert.ok(parent&&first&&second);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:second,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
+ const preflight=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
+ const capture={status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED' as const,
+  grantsLegalCurrent:false as const,preflight,fetchedAt:'2026-10-10T00:00:00.000Z',
+  requestUrl:pdfUrl,httpStatus:200 as const,contentType:'application/pdf'};
+ const masthead='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 ';
+ const full=masthead+parent.title+' '+douHtmlText(parent.content!);
+ const good=correlateOfficialDouPdfActText({trace,sourceCapture:capture,parent,act:second,
+  pdfExtractedText:full,printedEdition:'180'});
+ assert.equal(good.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',JSON.stringify(good));
+ for(const attack of [
+  full.replace('condições específicas','condições fraudadas'),
+  full.replace('Publica os convênios firmados.','Publica novas condições tributárias.'),
+  full.replace(first.title,first.title+' CLÁUSULA EXTRA'),
+ ]){
+  const found=correlateOfficialDouPdfActText({trace,sourceCapture:capture,parent,act:second,
+   pdfExtractedText:attack,printedEdition:'180'});
+  assert.equal(found.status,'UNVERIFIED',JSON.stringify(found));
+  if(found.status==='UNVERIFIED')assert.equal(found.reason,'DOU_WHOLE_DISPATCH_CONTEXT_MISMATCH');
+ }
+});
+
 test('R802 one same-buffer official PDF download and text extraction: synthetic complete act only',async t=>{
  const [parent,child]=syntheticPublications();assert.ok(parent&&child);
  const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
  const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 '+
-  parent.title+' '+douHtmlText(child.content!);
+  parent.title+' '+douHtmlText(parent.content!);
  const bytes=syntheticWrappedOnePagePdf(pdfText);
  t.mock.method(globalThis,'fetch',async()=>new Response(bytes,{
   status:200,headers:{'content-type':'application/pdf'}
@@ -301,7 +332,7 @@ test('R802 negative: edition number citation in the act cannot override the PDF 
   httpStatus:200 as const,contentType:'application/pdf',
  };
  const page='DIÁRIO OFICIAL DA UNIÃO Nº 179 PUBLICAÇÃO REFERENTE À EDIÇÃO Nº 180 '+
-   parent.title+' '+douHtmlText(child.content!);
+   parent.title+' '+douHtmlText(parent.content!);
  const wrongHeader=correlateOfficialDouPdfActText({
   trace,sourceCapture,parent,act:child,pdfExtractedText:page,printedEdition:'180',
  });

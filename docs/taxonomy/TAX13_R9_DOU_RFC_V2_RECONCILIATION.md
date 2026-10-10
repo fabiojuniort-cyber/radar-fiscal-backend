@@ -1,3 +1,5 @@
+> **SUPERSEDED — HISTÓRICO R9-DESIGN-R2 / NÃO NORMATIVO PARA MIGRAÇÃO 049+.** Este documento preserva a proposta original e suas divergências para auditoria. A decisão arquitetural única proposta para revisão R9-DESIGN-R3 está em [TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md](TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md). Não executar DDL/snippets deste RFC R2; não tratar como segunda opção para produção. R9-DESIGN-R3 ainda NÃO está aprovado.
+
 # TAX13-R9-REMEDIATION — reconciliação de duas RFCs SQL v2 (10/10/2026)
 
 **IMPORTANTE: NÃO EXISTE DECISÃO DE MIGRATION 049+.** PR draft [#195](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/195) tem **duas propostas de esquema**, ambas design-only, produzidas em atividade concorrente. Preservamos ambas para não perder trabalho; **não** são duas migrations que se devam executar ou aplicar em sequência. O desenho unificado depende de R9-DESIGN-R2 independente.

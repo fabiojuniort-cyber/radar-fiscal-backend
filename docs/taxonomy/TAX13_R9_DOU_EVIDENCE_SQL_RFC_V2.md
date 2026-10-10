@@ -1,3 +1,5 @@
+> **SUPERSEDED — HISTÓRICO R9-DESIGN-R2 / NÃO NORMATIVO PARA MIGRAÇÃO 049+.** Este documento preserva a proposta original e suas divergências para auditoria. A decisão arquitetural única proposta para revisão R9-DESIGN-R3 está em [TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md](TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md). Não executar DDL/snippets deste RFC R2; não tratar como segunda opção para produção. R9-DESIGN-R3 ainda NÃO está aprovado.
+
 # Trifaros / TAX13-R9 — RFC v2: custódia DOU, identidade documental e evidência temporal
 
 **Status: DESIGN-ONLY / R9-DESIGN-R2 PENDING. Este arquivo NÃO é uma migration, não é um script aprovado para execução, não cria tabelas nem libera SOURCE_ADMITTED/CURRENT.** Referência congelada R9-DESIGN: backend PR #194 @ `e21334fa1b34f6af21c83d661a705fbd6ce58dfb`; BLOCK em https://github.com/fabiojuniort-cyber/tribusca-control/issues/101#issuecomment-6093945807. Remediação isolada no PR #195. Preservar **integralmente** a migration 048, a cadeia de PRs #186/#192/#193/#194 e o bloqueio jurídico. Sem ICP-Brasil, assinatura digital documental, ITI, OCSP ou CRL.

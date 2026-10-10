@@ -133,6 +133,26 @@ export function correlateOfficialDouPdfActText(input:{
  const actAt=text.indexOf(actHeading,parentAt<0?0:parentAt+parentHeading.length);
  if(parentAt<0||actAt<parentAt+parentHeading.length)
   return reject('DOU_DISPATCH_OR_ACT_HEADING_MISSING');
+ // R9-R2-D03: the parent DESPACHO is the canonical envelope, including
+ // introductory normative material AND every sibling before/after this act.
+ // Reject modifications between the dispatch title and the target act.
+ // An isolated matched child is not proof of a fully matched dispatch.
+ const legalEnvelope=parent.content?normalized(legalText(parent.content)):'';
+ // Some INLABS payloads store the DESPACHO heading in Identifica and only
+ // body/children in Texto. Always rebuild the complete printed envelope.
+ const dispatchContent=legalEnvelope.startsWith(parentHeading)?legalEnvelope:
+  parentHeading+' '+legalEnvelope;
+ if(trace.embedded){
+  if(!dispatchContent.startsWith(parentHeading)||
+     dispatchContent.length>MAX_PDF_TEXT_CHARS||
+     !text.startsWith(dispatchContent,parentAt))
+   return reject('DOU_WHOLE_DISPATCH_CONTEXT_MISMATCH');
+  const position=dispatchContent.indexOf(actContent);
+  if(position<=parentHeading.length||
+     dispatchContent.indexOf(actContent,position+actContent.length)!==-1||
+     actAt!==parentAt+position)
+   return reject('DOU_DISPATCH_ACT_BOUNDARIES_MISMATCH');
+ }
  // Inclusion elsewhere on the page is insufficient: anchor the COMPLETE
  // normalized act at its heading and reject unexpected normative material
  // immediately after it. This is still a non-persistible comparison candidate.
