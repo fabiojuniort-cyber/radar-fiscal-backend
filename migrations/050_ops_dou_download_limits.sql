@@ -62,7 +62,7 @@ BEGIN
  END IF;
  IF p_actor IS NULL OR p_nonce IS NULL OR p_issued_at IS NULL
     OR p_mac IS NULL OR p_mac !~ '^[a-f0-9]{64}$'
-    OR pg_catalog.abs(pg_catalog.extract(epoch FROM pg_catalog.clock_timestamp())
+    OR pg_catalog.abs(pg_catalog.date_part('epoch',pg_catalog.clock_timestamp())
       -p_issued_at)>90 THEN
    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='dou_limits_signature_invalid';
  END IF;
