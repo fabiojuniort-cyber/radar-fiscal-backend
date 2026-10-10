@@ -13,7 +13,6 @@ import {
   listCollectionFilterDiscards,
   listCollectionFilterNewTypes,
   readCollectionFilterAdminState,
-  resolveCollectionFilterNewType,
 } from '../../modules/collection/collection-filter.admin.js';
 
 const mode = z.enum([
@@ -118,29 +117,6 @@ export async function collectionFilterAdminRoutes(
       }),
   );
 
-  typed.post(
-    '/api/v1/admin/collection-filter/new-types/:id/resolve',
-    {
-      preHandler: requirePlatformAdmin,
-      schema: {
-        params: z.object({ id: z.string().uuid() }),
-        body: z.object({
-          status: z.enum(['RESOLVED', 'MERGED']),
-          canonicalType: z.string().trim().min(1).max(300),
-        }),
-      },
-    },
-    async (request, reply) =>
-      reply.send(
-        await resolveCollectionFilterNewType(
-          app.db,
-          request.auth!.userId,
-          request.params.id,
-          request.body.status,
-          request.body.canonicalType,
-        ),
-      ),
-  );
   // L-11: strict admin-only preview and revision-safe confirm.
   const directBody = z.object({
     sourceCode: z.literal('dou'),
