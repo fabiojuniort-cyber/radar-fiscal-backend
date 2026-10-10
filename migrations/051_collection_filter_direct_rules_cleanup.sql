@@ -88,4 +88,71 @@ REVOKE ALL ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEXT,T
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEXT,TEXT,UUID)
   TO radar_app;
 
+
+-- Admin-only paging over official DOU records, independent of scope RLS.
+-- The application performs the decision with its existing TS filter engine.
+CREATE OR REPLACE FUNCTION public.collection_filter_direct_candidates(
+  p_after UUID DEFAULT NULL,
+  p_limit INTEGER DEFAULT 500
+)
+RETURNS TABLE (
+  publication_id UUID,
+  title TEXT,
+  act_type TEXT,
+  section TEXT,
+  content_text TEXT,
+  relevant_excerpt TEXT,
+  source_act_type TEXT,
+  has_material BOOLEAN,
+  has_company BOOLEAN,
+  content_hash TEXT
+)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+BEGIN
+  IF public.app_current_user_id() IS NULL
+     OR NOT public.app_user_is_platform_admin() THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='platform_admin_required';
+  END IF;
+  IF p_limit < 1 OR p_limit > 500 THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='invalid_direct_page_limit';
+  END IF;
+
+  RETURN QUERY
+  SELECT p.id,p.title,p.act_type,
+         COALESCE(v.source_metadata->'dou'->>'section',o.metadata->'dou'->>'section',''),
+         v.content_text,v.relevant_excerpt,
+         COALESCE(v.source_metadata->'dou'->>'sourceActType',o.metadata->'dou'->>'sourceActType'),
+         EXISTS (
+           SELECT 1 FROM public.publication_files pf
+           WHERE pf.publication_version_id=v.id
+             AND (pf.metadata->>'kind')='ATTACHMENT'
+         ),
+         EXISTS (
+           SELECT 1 FROM public.company_publications cp
+           WHERE cp.publication_id=p.id
+         ),
+         v.content_hash::text
+  FROM public.publications p
+  JOIN LATERAL (
+    SELECT po.metadata
+    FROM public.publication_origins po
+    JOIN public.sources so ON so.id=po.source_id
+    WHERE po.publication_id=p.id AND so.code='dou'
+    ORDER BY po.id LIMIT 1
+  ) o ON true
+  LEFT JOIN LATERAL (
+    SELECT pv.id,pv.source_metadata,pv.content_text,pv.relevant_excerpt,pv.content_hash
+    FROM public.publication_versions pv
+    WHERE pv.publication_id=p.id AND pv.is_current
+    LIMIT 1
+  ) v ON true
+  WHERE (p_after IS NULL OR p.id > p_after)
+  ORDER BY p.id LIMIT p_limit;
+END;
+$;
+REVOKE ALL ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
+  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
+  TO radar_app;
+
 COMMIT;
