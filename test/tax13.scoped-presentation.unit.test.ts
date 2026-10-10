@@ -1,3 +1,6 @@
+// L-16 (AGUARDANDO OK): temporariamente FORA da suíte npm test até corrigir
+// as duas falhas TAX13 de histórico editorial e anexo revogado NCM 8450.11.00.
+// Não alterar as asserções ou remover este arquivo; voltar ao CI após L-16.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
