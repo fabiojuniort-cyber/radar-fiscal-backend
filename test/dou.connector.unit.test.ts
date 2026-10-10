@@ -50,6 +50,36 @@ test('collector never requests DO2/DO2E and exposes the four-section policy lite
   assert.deepEqual((result.metadata!.dou as any).sections, ['DO1', 'DO1E', 'DO3', 'DO3E']);
 });
 
+test('XML-first policy: routine DOU ingestion processes ZIP/XML with PDF endpoint unavailable and never fetches PDFs', async () => {
+  // SYNTHETIC/NON_OFFICIAL: verifies the architecture boundary, NOT documentary attestation.
+  const base = await fixtureFetch();
+  const requestedArchives: string[] = [];
+  const pdfRequests: string[] = [];
+  const fetch = (async (input, init) => {
+    const url = new URL(String(input));
+    const file = url.searchParams.get('dl');
+    if (/\.pdf$/i.test(file ?? '') || /INPDFViewer|\/visualiza\//i.test(url.pathname)) {
+      pdfRequests.push(url.toString());
+      return new Response('PDF evidence unavailable', { status: 503 });
+    }
+    if (file) requestedArchives.push(file);
+    return base(input, init);
+  }) as typeof globalThis.fetch;
+
+  const result = await new DouConnector({
+    credentials, now: () => new Date('2026-09-21T12:00:00Z'),
+    fetch, dates: ['2026-09-18'],
+  }).collect(context());
+
+  assert.deepEqual(pdfRequests, [], 'routine XML processing must never request PDF evidence');
+  assert.deepEqual(requestedArchives, DOU_XML_SECTIONS.map(section => `2026-09-18-${section}.zip`));
+  assert.equal(result.publications.length, 10, 'XML-derived publications remain available without PDFs');
+  assert.ok(result.publications.some(pub => typeof pub.content === 'string' && pub.content.length > 0),
+    'legal content originates from XML without an independent PDF text pipeline');
+  assert.deepEqual(result.partialFailures, [], 'absence of PDF evidence is not an XML collection error');
+  assert.equal((result.metadata!.dou as any).xmlCount, 12);
+});
+
 test('assembled contract excerpts preserve relevant body, abstract and continuation signals before filtering', async () => {
   const routine = 'Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.';
   const title = 'EXTRATO DE CONTRATO Nº 7/2026';
