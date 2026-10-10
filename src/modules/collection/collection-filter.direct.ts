@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
@@ -133,15 +133,37 @@ export async function confirmDirectFilterRule(
     if (plan.count!==expectedCount || plan.token!==previewToken)
       return {changed:true,count:plan.count,blockedCompany:plan.blockedCompany,
         token:plan.token,deletedCount:0};
-    // Fail closed until the privileged purge routine passes FK/append-only tests.
-    // Do not activate a rule while any historical deletion remains outstanding.
-    if (plan.count>0) throw new Error('direct_filter_purge_not_ready');
+    // The rule and all purge batches share a single transaction. Any FK, RLS,
+    // append-only or audit failure rolls back both the rule and deletions.
     const rule=validated(input);
     const result=await sql<{policy_revision:number}>`
        SELECT * FROM collection_filter_direct_set_rule(
          ${rule.sourceCode},${rule.section},${rule.canonicalType},
          ${rule.mode},${rule.newTypeId??null}::uuid)
     `.execute(trx);
-    return {changed:false,deletedCount:0,revision:Number(result.rows[0]?.policy_revision)};
+    const operationId=randomUUID();
+    const ruleIds=plan.ids;
+    for (let i=0;i<ruleIds.length;i+=100) {
+      const batch=ruleIds.slice(i,i+100);
+      await sql`SELECT collection_filter_direct_purge_batch(
+        ${batch}::uuid[],${rule.sourceCode},${rule.section},
+        ${rule.canonicalType},${rule.mode},${operationId}::uuid
+      )`.execute(trx);
+    }
+    if (!ruleIds.length) {
+      await sql`INSERT INTO audit_log (
+        tenant_id,actor_type,actor_id,action,entity_type,entity_id,
+        after_data,correlation_id
+      ) VALUES (
+        NULL,'ADMIN',${userId},'COLLECTION_FILTER_DIRECT_RULE',
+        'collection_filter_type_rule',${rule.canonicalType},
+        jsonb_build_object('sourceCode',${rule.sourceCode},
+          'section',${rule.section},'mode',${rule.mode},
+          'deletedCount',0,'deletedIds','[]'::jsonb),
+        ${operationId}::uuid
+      )`.execute(trx);
+    }
+    return {changed:false,deletedCount:ruleIds.length,
+      revision:Number(result.rows[0]?.policy_revision)};
   });
 }
