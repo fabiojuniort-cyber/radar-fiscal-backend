@@ -32,12 +32,12 @@ function checkedIsoDate(value:string):boolean{
  const n=Date.parse(value+'T00:00:00Z');
  return Number.isFinite(n)&&new Date(n).toISOString().slice(0,10)===value;
 }
-function source(url:string,part:'convenios'|'atos-declaratorios'):boolean{
+function source(url:string,part:'convenios'|'atos-declaratorios',year:string):boolean{
  try{
   const u=new URL(url);
   return u.protocol==='https:'&&u.hostname==='www.confaz.fazenda.gov.br'&&
    !u.username&&!u.password&&!u.port&&!u.hash&&!u.search&&
-   u.pathname.startsWith('/legislacao/'+part+'/2024/')&&
+   u.pathname.startsWith('/legislacao/'+part+'/'+year+'/')&&
    !u.pathname.includes('/../');
  }catch{return false;}
 }
@@ -56,8 +56,11 @@ export function assessDouConfazTemporalCandidate(input:{
   !Array.isArray(input.ratificationReferences)||
   !input.ratificationReferences.includes(input.actReference))
   return fail('DOU_RATIFICATION_IDENTITY_NOT_CORRELATED');
- if(!source(input.originalActOfficialUrl,'convenios')||
-  !source(input.ratificationActOfficialUrl,'atos-declaratorios'))
+ const [,number,year]=input.actReference.split(':');
+ const expectedActPath='/legislacao/convenios/'+year+'/CV'+number!.padStart(3,'0')+'_'+year!.slice(2);
+ if(!source(input.originalActOfficialUrl,'convenios',year!)||
+  new URL(input.originalActOfficialUrl).pathname.toUpperCase()!==expectedActPath.toUpperCase()||
+  !source(input.ratificationActOfficialUrl,'atos-declaratorios',year!))
   return fail('DOU_RATIFICATION_OFFICIAL_REFERENCE_INVALID');
  for(const date of [input.originalPublishedOn,input.ratificationPublishedOn,
   input.declaredEffectsFrom,input.referenceDate,input.exceptionalDeadline].filter(
