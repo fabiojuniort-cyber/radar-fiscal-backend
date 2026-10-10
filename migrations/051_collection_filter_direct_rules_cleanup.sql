@@ -5,6 +5,7 @@
 
 DROP FUNCTION IF EXISTS public.collection_filter_approve_draft(UUID);
 DROP FUNCTION IF EXISTS public.collection_filter_save_draft(JSONB);
+DROP FUNCTION IF EXISTS public.collection_filter_resolve_new_type(UUID,TEXT,TEXT);
 DROP FUNCTION IF EXISTS public.collection_filter_request_simulation(UUID,TEXT,TEXT);
 DROP FUNCTION IF EXISTS public.collection_filter_claim_simulation(TEXT);
 DROP FUNCTION IF EXISTS public.collection_filter_simulation_batch(UUID,TEXT,UUID,INTEGER);
