@@ -20,7 +20,7 @@ interface Candidate {
   publication_id: string; title: string; act_type: string | null;
   section: string; content_text: string | null; relevant_excerpt: string | null;
   source_act_type: string | null; has_material: boolean;
-  has_company: boolean; content_hash: string | null;
+  has_company: boolean; has_other_source:boolean; content_hash: string | null;
 }
 
 function validated(input: DirectRuleInput): DirectRuleInput {
@@ -81,6 +81,7 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const engine=compileCollectionFilterPolicy(document);
   const ids:string[]=[];
   let blockedCompany=0;
+  let blockedOtherSource=0;
   let cursor:string|null=null;
   let pages=0;
   const hash=createHash('sha256').update(JSON.stringify([rule,approved.id,approved.revision]));
@@ -105,19 +106,20 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
           decision.section!==normalizeCollectionFilterType(rule.section)) continue;
       hash.update(item.publication_id).update(item.content_hash??'');
       if (item.has_company) blockedCompany++;
+      else if (item.has_other_source) blockedOtherSource++;
       else ids.push(item.publication_id);
     }
     cursor=page.rows[page.rows.length-1]!.publication_id;
     if (page.rows.length<500) break;
   }
-  hash.update(String(blockedCompany));
-  return {ids,count:ids.length,blockedCompany,token:hash.digest('hex')};
+  hash.update(String(blockedCompany)).update(String(blockedOtherSource));
+  return {ids,count:ids.length,blockedCompany,blockedOtherSource,token:hash.digest('hex')};
 }
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
-    const {count,blockedCompany,token}=await candidates(trx,input);
-    return {count,blockedCompany,token};
+    const {count,blockedCompany,blockedOtherSource,token}=await candidates(trx,input);
+    return {count,blockedCompany,blockedOtherSource,token};
   });
 }
 
@@ -132,7 +134,7 @@ export async function confirmDirectFilterRule(
     const plan=await candidates(trx,input);
     if (plan.count!==expectedCount || plan.token!==previewToken)
       return {changed:true,count:plan.count,blockedCompany:plan.blockedCompany,
-        token:plan.token,deletedCount:0};
+        blockedOtherSource:plan.blockedOtherSource,token:plan.token,deletedCount:0};
     // The rule and all purge batches share a single transaction. Any FK, RLS,
     // append-only or audit failure rolls back both the rule and deletions.
     const rule=validated(input);
