@@ -163,10 +163,9 @@ SET search_path=pg_catalog,public AS $$
     '[^A-Za-z0-9]+',' ','g')));
 $$;
 REVOKE ALL ON FUNCTION public.collection_filter_l11_normalize(TEXT) FROM PUBLIC;
--- Selective predicate avoids scanning/decoding JSON for all other types.
-CREATE INDEX IF NOT EXISTS ix_l11_publications_normalized_act_type
-ON public.publications(public.collection_filter_l11_normalize(act_type))
-WHERE act_type IS NOT NULL;
+-- No expression index here: invoking the private normalizer from an index
+-- would require granting EXECUTE to every operational INSERT/UPDATE role.
+-- Query-time SQL prefilter remains inside the privileged read-only candidate function.
 
 -- Admin-only paging over official DOU records, independent of scope RLS.
 -- The application performs the decision with its existing TS filter engine.
