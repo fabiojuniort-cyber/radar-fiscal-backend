@@ -4,7 +4,7 @@ import test from 'node:test';
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler, type CompiledQuery, type QueryResult } from 'kysely';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
-import { DOU_BACKFILL_SECTIONS, assertDouBackfillAvailable, douBackfillBatches, isDouBackfillCoverageComplete, planDouBackfillDates, readDouBackfillCoverage, runDouBackfillTick, createDouBackfillConnector } from '../src/modules/collection/dou-backfill.js';
+import { DOU_BACKFILL_SECTIONS, assertDouBackfillAvailable, douBackfillBatches, isDouBackfillCoverageComplete, planDouBackfillDates, readDouBackfillCoverage, runDouBackfillTick } from '../src/modules/collection/dou-backfill.js';
 import { DOU_XML_SECTIONS, DouConnector } from '../src/modules/collection/dou.connector.js';
 
 test('plan walks back one day at a time, skipping covered dates and the monitoring window', () => {
