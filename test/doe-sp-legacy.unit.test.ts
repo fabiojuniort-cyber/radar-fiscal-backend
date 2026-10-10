@@ -31,7 +31,9 @@ import {
 import {
   DOE_SP_LEGACY_SEARCH_TERMS,
   DOE_SP_LEGACY_TAX_VOCABULARY,
+  DOE_SP_LEGACY_OCR_WEAK_TERMS,
   DOE_SP_LEGACY_TERM_SINCE,
+  doeSpLegacyKeepsPage,
   doeSpLegacyTaxTerms,
   isDoeSpLegacyNewsPage,
 } from '../src/modules/collection/doe-sp-legacy.rules.js';
@@ -44,7 +46,7 @@ import {
 import { extractDoeSpLegacyPdfText } from '../src/modules/collection/doe-sp-legacy.text.js';
 import { runDoeSpLegacyPilot } from '../src/modules/collection/doe-sp-legacy.pilot.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
-import { legacyPortal, scanPdf, textPdf, type LegacyPage, type LegacyPortalOptions } from './doe-sp-legacy.portal.js';
+import { legacyPortal, ocrPdf, scanPdf, textPdf, type LegacyPage, type LegacyPortalOptions } from './doe-sp-legacy.portal.js';
 
 const SOURCE_ID = '11111111-1111-4111-8111-111111111111';
 const context = (budget?: ConnectorTimeBudget) => ({
@@ -175,7 +177,10 @@ test('rules: tax vocabulary of the current connector plus legacy terms; ambiguou
 });
 
 test('rules: CT-e, IBS and CBS count only from 2007, 2019 and 2020 (P1: the acronym alone is another word on older pages)', () => {
-  assert.deepEqual(DOE_SP_LEGACY_TERM_SINCE, { CTE: '2007-01-01', IBS: '2019-01-01', CBS: '2020-01-01' });
+  assert.deepEqual(DOE_SP_LEGACY_TERM_SINCE, {
+    NFE: '2006-01-01', SPED: '2007-01-01', EFD: '2007-01-01', CTE: '2007-01-01',
+    MDFE: '2010-01-01', NFCE: '2013-01-01', IBS: '2019-01-01', CBS: '2020-01-01',
+  });
   const text = 'Cte. da Polícia Militar; CBS e IBS (siglas); CT-e';
   assert.deepEqual(doeSpLegacyTaxTerms(text, '1995-09-06'), []);
   assert.deepEqual(doeSpLegacyTaxTerms(text, '2006-12-31'), []);
@@ -185,6 +190,29 @@ test('rules: CT-e, IBS and CBS count only from 2007, 2019 and 2020 (P1: the acro
   assert.deepEqual(doeSpLegacyTaxTerms(text, '2020-01-01'), ['CTE', 'CBS', 'IBS', 'CT-E']);
   // Another term still keeps an older page; undated acronyms (IPI, ICMS) are unchanged.
   assert.deepEqual(doeSpLegacyTaxTerms('CBS — recolhimento do IPI e do ICM', '1988-03-02'), ['IPI', 'ICM']);
+});
+
+test('rules (DOE-SP-LEGACY-14): electronic documents count only from NF-e 2006, SPED/EFD 2007, MDF-e 2010, NFC-e 2013', () => {
+  const text = 'NF-e; NFE; SPED; EFD; MDF-e; NFC-e';
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '1988-01-05'), []);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2005-12-31'), []);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2006-01-01'), ['NF-E', 'NFE']);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2007-01-01'), ['NF-E', 'NFE', 'SPED', 'EFD']);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2012-12-31'), ['NF-E', 'NFE', 'SPED', 'EFD', 'MDF-E']);
+  assert.deepEqual(doeSpLegacyTaxTerms(text, '2013-01-01'), ['NF-E', 'NFE', 'SPED', 'EFD', 'MDF-E', 'NFC-E']);
+});
+
+test('rules (DOE-SP-LEGACY-14): on a scanned page a short acronym alone does not keep it; ICM/ICMS/IPVA and native pages unchanged', () => {
+  assert.deepEqual([...DOE_SP_LEGACY_OCR_WEAK_TERMS].sort(), ['CBS', 'CTE', 'EFD', 'IBS', 'IPI', 'NFE']);
+  // P2: three 1988 scanned pages kept only by "IPI" were OCR noise.
+  assert.equal(doeSpLegacyKeepsPage(['IPI'], true), false);
+  assert.equal(doeSpLegacyKeepsPage(['IPI', 'CT-E', 'NFE'], true), false);
+  assert.equal(doeSpLegacyKeepsPage(['IPI', 'ICM'], true), true);
+  for (const strong of ['ICM', 'ICMS', 'IPVA', 'TRIBUTARIA', 'PORTARIA CAT']) assert.equal(doeSpLegacyKeepsPage([strong], true), true, strong);
+  // Native text: any term keeps the page, as before.
+  assert.equal(doeSpLegacyKeepsPage(['IPI'], false), true);
+  assert.equal(doeSpLegacyKeepsPage([], false), false);
+  assert.equal(doeSpLegacyKeepsPage([], true), false);
 });
 
 /** Top-level alternatives of `\b(?:A|B|C)\b`. */
@@ -454,6 +482,26 @@ test('browse (B3): the time budget between the two cadernos of a date resumes on
   assert.equal(api.requests.filter((r) => r.includes('GetCadernos')).length, 0);
   assert.deepEqual(api.requests.filter((r) => r.includes('BuscaDO2001Resultado_11_3.aspx?')).map((r) => new URL('https://x' + r.slice(4)).searchParams.get('filtrocadernos')), ['Executivo II']);
   assert.deepEqual(second.publications.map((p) => p.externalId).sort(), [exI[0]!.link, exII[0]!.link].sort());
+});
+
+test('browse (DOE-SP-LEGACY-14): a scanned 1988 page with only "IPI" (OCR noise) is not kept; a scanned page with ICM is', async () => {
+  const date = '1988-01-05';
+  const noise = { ...page(date, 22, []), pdf: ocrPdf(['101D1.10 IPI * - IOGA DA', 'Atos diversos']) };
+  const icm = { ...page(date, 47, []), pdf: ocrPdf(['Recolhimento do ICM']) };
+  const nfe = { ...page(date, 44, []), pdf: ocrPdf(['NFE 1988 — sigla sem sentido fiscal']) };
+  const { instance } = connector({ cadernos: { [date]: EX1 }, editions: { [`${date}|Executivo I`]: [noise, nfe, icm] } }, stateAt(date));
+  const result = await instance.collect(context());
+  assert.deepEqual(result.publications.map((p) => p.externalId), [icm.link]);
+  assert.equal(result.publications[0]!.metadata?.textExtraction, 'PDF_EMBEDDED_OCR');
+  const counters = (result.metadata?.doeSpLegacy as { counters: Record<string, number> }).counters;
+  assert.equal(counters.pagesOnlyWeakOcrTerms, 1); // "IPI"; "NFE" in 1988 is not even a term
+  assert.equal(counters.pagesWithoutTaxTerms, 2);
+  assert.equal(parseDoeSpLegacySourceState(result.checkpoint!.state).totals.pagesWithoutTaxTerms, 2);
+
+  // The same "IPI" on a native page (2012) still keeps it.
+  const native = page('2012-06-13', 302, ['Lei complementar — IPI']);
+  const later = await connector({ cadernos: { '2012-06-13': EX1 }, editions: { '2012-06-13|Executivo I': [native] } }, stateAt('2012-06-13', '2012-07-01')).instance.collect(context());
+  assert.deepEqual(later.publications.map((p) => p.externalId), [native.link]);
 });
 
 test('browse and search advance together: the search month runs when the browse cursor reaches it', async () => {
@@ -728,13 +776,13 @@ test('pilot: classifies every page of a browse day and reports kept pages the ke
   ];
   const recent = '2010-03-03';
   const kept = page(recent, 1, ['Portaria CAT 10 — ICMS']);
-  const keptOnlyByNfce = page(recent, 2, ['Emissão de NFC-e pelos contribuintes']);
+  const keptOnlyByDoc = page(recent, 2, ['Emissão de documento fiscal pelos contribuintes']);
   const other = page(recent, 3, ['Concurso público: taxa de inscrição']);
   const news = page(recent, 4, ['Notícia do ICMS'], { link: '/2010/executivo secao i/marco/03/pagnot_0004_N.pdf' });
   const api = legacyPortal({
     cadernos: { [old]: EX1, [recent]: EX1 },
-    editions: { [`${old}|Executivo I`]: oldPages, [`${recent}|Executivo I`]: [kept, keptOnlyByNfce, other, news] },
-    // The index answers ICMS but (in this fixture) not NFC-e: the pilot must flag the miss.
+    editions: { [`${old}|Executivo I`]: oldPages, [`${recent}|Executivo I`]: [kept, keptOnlyByDoc, other, news] },
+    // The index answers ICMS but (in this fixture) not "documento fiscal": the pilot must flag the miss.
     search: { 'ICMS|Executivo I': [kept, page('2010-03-04', 9, ['ICMS'])] },
   });
   const seen: string[] = [];
@@ -756,7 +804,7 @@ test('pilot: classifies every page of a browse day and reports kept pages the ke
     queries: DOE_SP_LEGACY_SEARCH_TERMS.length,
     hits: 1, // the off-day hit is ignored
     keptFoundBySearch: 1,
-    missedBySearch: [keptOnlyByNfce.link],
+    missedBySearch: [keptOnlyByDoc.link],
   });
   assert.equal(report.totals.missedBySearch, 1);
   assert.equal(seen.length, 7);
@@ -785,6 +833,16 @@ test('pilot: --cadernos measures Executivo II/III (browse and compare in the sam
   assert.deepEqual([...new Set(queried)].sort(), ['Executivo II', 'Executivo III']);
   await assert.rejects(() => runDoeSpLegacyPilot({ browseDates: [date], compareDates: [], cadernos: ['ex4'] }), RangeError);
   await assert.rejects(() => runDoeSpLegacyPilot({ browseDates: [date], compareDates: [], cadernos: ['ex2', 'ex2'] }), RangeError);
+});
+
+test('pilot (DOE-SP-LEGACY-14): a scanned page with only weak acronyms is NO_TAX_TERMS and its terms are reported', async () => {
+  const date = '1988-01-05';
+  const noise = { ...page(date, 22, []), pdf: ocrPdf(['IPI * - IOGA']) };
+  const api = legacyPortal({ cadernos: { [date]: EX1 }, editions: { [`${date}|Executivo I`]: [noise] } });
+  const report = await runDoeSpLegacyPilot({ browseDates: [date], compareDates: [], fetch: api.fetch, client: { timeoutMs: 5_000 } });
+  assert.equal(report.days[0]!.pages[0]!.outcome, 'NO_TAX_TERMS');
+  assert.deepEqual(report.days[0]!.pages[0]!.matchedTaxTerms, ['IPI']);
+  assert.equal(report.days[0]!.pages[0]!.scanned, true);
 });
 
 test('pilot: compare dates must be in the keyword-index era', async () => {

@@ -48,20 +48,40 @@ export const DOE_SP_LEGACY_TAX_VOCABULARY: readonly string[] = [
 ];
 
 /** Bumped whenever the vocabulary or its rules change (restarts an unfinished listing). */
-export const DOE_SP_LEGACY_VOCABULARY_VERSION = 3;
+export const DOE_SP_LEGACY_VOCABULARY_VERSION = 4;
 
 /**
- * Acronyms that only name a tax from a given date (decision of the owner after
- * the dry pilot P1, DOE-SP-LEGACY-09): CT-e from 2007, IBS from 2019, CBS from
- * 2020. On an older page the acronym alone is another word ("Cte.", an
- * unrelated body or company) and does not keep the page; any other term still
- * does. Keys are the matched term without spaces/hyphens (ASCII upper).
+ * Acronyms that only name a tax or a document from a given date (decisions of
+ * the owner after the dry pilot P1, DOE-SP-LEGACY-09, and the engine pilot P2,
+ * DOE-SP-LEGACY-14): NF-e from 2006, SPED/EFD and CT-e from 2007, MDF-e from
+ * 2010, NFC-e from 2013, IBS from 2019, CBS from 2020. On an older page the
+ * acronym is another word ("Cte.", OCR noise, an unrelated body) and is
+ * ignored; any other term still keeps the page. Keys are the matched term
+ * without spaces/hyphens (ASCII upper).
  */
 export const DOE_SP_LEGACY_TERM_SINCE: Readonly<Record<string, string>> = {
+  NFE: '2006-01-01',
+  SPED: '2007-01-01',
+  EFD: '2007-01-01',
   CTE: '2007-01-01',
+  MDFE: '2010-01-01',
+  NFCE: '2013-01-01',
   IBS: '2019-01-01',
   CBS: '2020-01-01',
 };
+
+/**
+ * Short acronyms that the OCR layer of scanned pages produces by chance (P2,
+ * DOE-SP-LEGACY-14: three 1988 pages kept only by "IPI" were OCR noise). On a
+ * scanned page they do not keep the page alone: at least one other term is
+ * needed. ICM, ICMS and IPVA (the state taxes of the period) are not here.
+ * Pages with native text are not affected. Same keys as above.
+ */
+export const DOE_SP_LEGACY_OCR_WEAK_TERMS: ReadonlySet<string> = new Set(['IPI', 'NFE', 'CTE', 'EFD', 'IBS', 'CBS']);
+
+function termKey(term: string): string {
+  return term.replace(/[\s-]/g, '');
+}
 
 function stripAccents(value: string): string {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -114,12 +134,21 @@ export function doeSpLegacyTaxTerms(text: string, date: string): string[] {
   const found = new Set<string>();
   for (const match of upper.matchAll(new RegExp(DOE_SP_LEGACY_TAX_PATTERN))) {
     const term = match[0].replace(/\s+/g, ' ');
-    const since = DOE_SP_LEGACY_TERM_SINCE[term.replace(/[\s-]/g, '')];
+    const since = DOE_SP_LEGACY_TERM_SINCE[termKey(term)];
     if (since !== undefined && date < since) continue;
     found.add(term);
     if (found.size >= MAX_MATCHED_TERMS) break;
   }
   return [...found];
+}
+
+/**
+ * Whether the tax terms of a page keep it. A native page is kept by any term;
+ * a scanned page (OCR layer) needs a term outside DOE_SP_LEGACY_OCR_WEAK_TERMS.
+ */
+export function doeSpLegacyKeepsPage(terms: readonly string[], scanned: boolean): boolean {
+  if (!terms.length) return false;
+  return !scanned || terms.some((term) => !DOE_SP_LEGACY_OCR_WEAK_TERMS.has(termKey(term)));
 }
 
 /**

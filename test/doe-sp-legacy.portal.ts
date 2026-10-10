@@ -67,6 +67,27 @@ export function scanPdf(): Uint8Array {
   ]);
 }
 
+/** One-page scan with an OCR text layer (full-page raster + text), like the 1988–2001 archive. */
+export function ocrPdf(lines: string[]): Uint8Array {
+  const width = 2000;
+  const height = 1500;
+  const raster = deflateSync(Buffer.alloc((width / 8) * height, 0xff));
+  const content = Buffer.from(['q 595 0 0 842 0 0 cm /Im1 Do Q', 'BT', '/F1 10 Tf', '12 TL', '40 800 Td',
+    ...lines.map((line) => `(${escapePdf(line)}) Tj T*`), 'ET'].join('\n'), 'latin1');
+  return pdfFromObjects([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im1 4 0 R >> /Font << /F1 6 0 R >> >> /Contents 5 0 R >>',
+    Buffer.concat([
+      Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /FlateDecode /Length ${raster.length} >>\nstream\n`, 'latin1'),
+      raster,
+      Buffer.from('\nendstream', 'latin1'),
+    ]),
+    Buffer.concat([Buffer.from(`<< /Length ${content.length} >>\nstream\n`, 'latin1'), content, Buffer.from('\nendstream', 'latin1')]),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ]);
+}
+
 export interface LegacyPage {
   /** Canonical archive path. */
   link: string;

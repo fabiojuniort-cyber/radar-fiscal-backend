@@ -23,6 +23,7 @@ import {
 import {
   DOE_SP_LEGACY_SEARCH_TERMS,
   DOE_SP_LEGACY_VOCABULARY_VERSION,
+  doeSpLegacyKeepsPage,
   doeSpLegacyTaxTerms,
   isDoeSpLegacyNewsPage,
 } from './doe-sp-legacy.rules.js';
@@ -118,10 +119,10 @@ export interface DoeSpLegacyListing {
 export interface DoeSpLegacySourceState {
   coverageFrom: string;
   coverageTo: string;
-  /** Next date to browse (Executivo I). null = every date was browsed. */
+  /** Next date to browse (Executivo I and II). null = every date was browsed. */
   cursor: string | null;
   /**
-   * Start of the next month to search (Executivo II and III, from 2003): the
+   * Start of the next month to search (Executivo III, from 2003): the
    * first day of a month, or the coverage start inside its first month.
    * null = every month was searched.
    */
@@ -324,7 +325,7 @@ export class DoeSpLegacyConnector implements CollectionConnector {
     const partialFailures: ConnectorPartialFailure[] = [];
     const counters = {
       periodsListed: 0, listScreens: 0, cadernoLookups: 0, pagesRead: 0, pagesKept: 0,
-      pagesWithoutTaxTerms: 0, newsPagesSkipped: 0, pagesNeedingOcr: 0, pagesFailed: 0, pagesAbandoned: 0,
+      pagesWithoutTaxTerms: 0, pagesOnlyWeakOcrTerms: 0, newsPagesSkipped: 0, pagesNeedingOcr: 0, pagesFailed: 0, pagesAbandoned: 0,
       scannedPages: 0, nativeTextPages: 0,
     };
     const periods: Array<{ mode: string; from: string; to: string; listed: number }> = [];
@@ -360,7 +361,8 @@ export class DoeSpLegacyConnector implements CollectionConnector {
           return 'DONE';
         }
         const terms = doeSpLegacyTaxTerms(extracted.text, page.date);
-        if (!terms.length) {
+        if (!doeSpLegacyKeepsPage(terms, extracted.scanned)) {
+          if (terms.length) counters.pagesOnlyWeakOcrTerms += 1;
           counters.pagesWithoutTaxTerms += 1;
           state.totals.pagesWithoutTaxTerms += 1;
           return 'DONE';

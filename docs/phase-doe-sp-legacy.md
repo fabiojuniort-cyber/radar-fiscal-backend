@@ -1,6 +1,6 @@
 # Fase DOE-SP (acervo legado): Diário Oficial de São Paulo, 1988 – 30/06/2023
 
-Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da revisão DOE-SP-LEGACY-04 em DOE-SP-LEGACY-05; piloto seco P1 em DOE-SP-LEGACY-08; ajustes pós-P1 em DOE-SP-LEGACY-09; piloto P1b do Executivo II e III em DOE-SP-LEGACY-10; Executivo II navegado em DOE-SP-LEGACY-11). Este conector é **separado** do `doe-sp`. O `doe-sp` cobre a plataforma atual (doe.sp.gov.br, a partir de 01/07/2023) e não é alterado aqui. A arquitetura é a do Motor de Coleta, sem componente novo. O acervo é **finito**: quando o backfill termina e é comprovado, a fonte é desativada.
+Governança: tribusca-control Issue #20 (DOE-SP-LEGACY-01/02/03; correção da revisão DOE-SP-LEGACY-04 em DOE-SP-LEGACY-05; piloto seco P1 em DOE-SP-LEGACY-08; ajustes pós-P1 em DOE-SP-LEGACY-09; piloto P1b do Executivo II e III em DOE-SP-LEGACY-10; Executivo II navegado em DOE-SP-LEGACY-11; P2 em DOE-SP-LEGACY-13; siglas eletrônicas e siglas fracas de OCR em DOE-SP-LEGACY-14). Este conector é **separado** do `doe-sp`. O `doe-sp` cobre a plataforma atual (doe.sp.gov.br, a partir de 01/07/2023) e não é alterado aqui. A arquitetura é a do Motor de Coleta, sem componente novo. O acervo é **finito**: quando o backfill termina e é comprovado, a fonte é desativada.
 
 ## 1. Decisões do responsável (2026-09-29)
 
@@ -69,17 +69,35 @@ Palavras ambíguas sozinhas **não** tornam a página fiscal: um "taxa" isolado 
 
 O mesmo filtro vale para as páginas do BROWSE.
 
-### Siglas com data mínima (DOE-SP-LEGACY-09)
+### Siglas com data mínima (DOE-SP-LEGACY-09 e 14)
 
-No P1, 19 das 158 páginas mantidas vieram só de uma sigla curta, e várias eram de antes de o tributo ou documento existir (por exemplo "Cte." em 1995, "CBS" em 1988). Por decisão do responsável, a sigla sozinha só conta a partir da data em que passa a nomear o tributo ou documento (`DOE_SP_LEGACY_TERM_SINCE`):
+No P1, 19 das 158 páginas mantidas vieram só de uma sigla curta, e várias eram de antes de o tributo ou documento existir (por exemplo "Cte." em 1995, "CBS" em 1988). Na P2, uma página de 1988 foi mantida só por "NFE". Por decisão do responsável, a sigla só conta a partir da data em que passa a nomear o tributo ou documento (`DOE_SP_LEGACY_TERM_SINCE`):
 
 | Sigla | Conta a partir de |
 |---|---|
+| `NF-e` / `NFe` | 2006-01-01 |
+| `SPED`, `EFD` | 2007-01-01 |
 | `CT-e` / `CTe` | 2007-01-01 |
+| `MDF-e` / `MDFe` | 2010-01-01 |
+| `NFC-e` / `NFCe` | 2013-01-01 |
 | `IBS` | 2019-01-01 |
 | `CBS` | 2020-01-01 |
 
-Antes da data, a sigla é ignorada naquela página, mas qualquer outro termo continua mantendo a página. A data comparada é a da edição (`doeSpLegacyTaxTerms(texto, data)`). As demais siglas (IPI, ICMS etc.) não mudam. `DOE_SP_LEGACY_VOCABULARY_VERSION` passou a 3.
+Antes da data, a sigla é ignorada naquela página, mas qualquer outro termo continua mantendo a página. A data comparada é a da edição (`doeSpLegacyTaxTerms(texto, data)`). As demais siglas (IPI, ICMS etc.) não têm data.
+
+### Siglas fracas em páginas escaneadas (DOE-SP-LEGACY-14)
+
+Na P2, 3 das 12 páginas gravadas (1988) foram mantidas só por "IPI", e o "IPI" era ruído do OCR, no meio de caracteres sem sentido. Por decisão do responsável, numa **página escaneada** (`scanned`, com camada OCR) uma sigla curta de `DOE_SP_LEGACY_OCR_WEAK_TERMS` sozinha não mantém a página. É preciso pelo menos um termo fora dessa lista (`doeSpLegacyKeepsPage(termos, scanned)`):
+
+- siglas fracas: `IPI`, `NF-e`, `CT-e`, `EFD`, `IBS`, `CBS`;
+- `ICM`, `ICMS` e `IPVA`, os impostos estaduais da época, continuam valendo sozinhos;
+- páginas com texto nativo (de ~2002 em diante) não mudam: qualquer termo mantém a página.
+
+A página escaneada só com siglas fracas conta em `pagesWithoutTaxTerms` e também em `counters.pagesOnlyWeakOcrTerms`. No piloto seco, ela sai como `NO_TAX_TERMS`, com os termos listados para a auditoria.
+
+Fica aceito o caso raro de uma palavra do vocabulário usada em outro sentido (P2: "tributo" como homenagem). Endurecer a regra para pegá-lo faria perder páginas fiscais.
+
+`DOE_SP_LEGACY_VOCABULARY_VERSION` passou a 4.
 
 **Medido nos pilotos:** o índice achou 117 de 118 páginas mantidas no Executivo I (P1) e 21 de 21 no Executivo II (P1b). Os dois agora são lidos inteiros; só o Executivo III depende do índice.
 
@@ -170,7 +188,7 @@ Além disso vale o time budget do executor, com parada segura entre páginas e e
   - `periods`;
   - `listing` (período, consulta atual/total, tela, páginas achadas, tentativas);
   - `pendingPages`, `needsOcr`, `ocrGate`, `totals`;
-  - `counters` (requisições, bytes, telas, páginas lidas, mantidas, sem termos, escaneadas, nativas);
+  - `counters` (requisições, bytes, telas, páginas lidas, mantidas, sem termos, só com siglas fracas de OCR, escaneadas, nativas);
   - `sourceLimits`.
 - **Fim:** com `cursor = null` e `searchCursor = null`, sem `listing` e sem pendências, o run fica completo e sem publicações. Depois da validação do backfill, a fonte é desativada. O conector e a fonte podem ser removidos em PR posterior.
 
@@ -223,5 +241,12 @@ O piloto tem duas etapas. Cada uma exige autorização própria do responsável 
    - toda página com `officialUrl`;
    - amostra conferida;
    - as páginas aparecem no site com o link preservado.
+
+**Resultado (DOE-SP-LEGACY-13, run `dae3fb2a`, commit `297252f`):**
+- 5 datas (01 a 05/01/1988); só 05/01 teve edição, com 104 páginas dos Executivos I e II;
+- **12** páginas gravadas, todas `PDF_EMBEDDED_OCR`; 0 erros;
+- `storedFiles = 0` e `withoutOfficialUrl = 0`; checkpoint em `1988-01-06`; fonte inativa de novo.
+
+Na conferência humana (10 de 12), 6 páginas eram fiscais e 4 eram falsos positivos: 3 por "IPI" de OCR e 1 por "tributo" no sentido de homenagem. Disso vieram as regras de DOE-SP-LEGACY-14 (§3).
 
 As páginas do piloto são publicações reais e ficam. O backfill continua de onde o piloto parou. `DOE_SP_LEGACY_MAX_PERIODS_PER_RUN` volta a `0` (ou é removida) e a fonte passa a `--hourly` só com uma nova autorização.
