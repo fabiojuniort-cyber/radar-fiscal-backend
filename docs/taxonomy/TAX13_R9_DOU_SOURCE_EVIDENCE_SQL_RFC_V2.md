@@ -1,3 +1,5 @@
+> **SUPERSEDED — HISTÓRICO R9-DESIGN-R2 / NÃO NORMATIVO PARA MIGRAÇÃO 049+.** Este documento preserva a proposta original e suas divergências para auditoria. A decisão arquitetural única proposta para revisão R9-DESIGN-R3 está em [TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md](TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md). Não executar DDL/snippets deste RFC R2; não tratar como segunda opção para produção. R9-DESIGN-R3 ainda NÃO está aprovado.
+
 # Trifaros / TAX13-R9 — DOU source-evidence persistence RFC v2 (R9-DESIGN-R2)
 
 **STATUS: DESIGN ONLY — NOT A MIGRATION, NOT APPROVED, NOT EXECUTED.** Branch `fix/tax13-r9-design-remediation-r2` builds on frozen R9-DESIGN BLOCK at backend SHA `e21334fa1b34f6af21c83d661a705fbd6ce58dfb`; decision and deficiencies in [governance #101](https://github.com/fabiojuniort-cyber/tribusca-control/issues/101#issuecomment-6093945807). All DDL below is an **illustrative review contract**, must be revised and separately authorized before an additive migration 049+. No existing table or migration 048 may be weakened. R9-DESIGN-R2 is **not yet APPROVED**.
