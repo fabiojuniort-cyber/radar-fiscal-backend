@@ -28,8 +28,10 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
   const app=await buildApp();
   let pubId:string|null=null;
   let canonicalType:string|null=null;
+  let ownerId:string|null=null;
   try {
     const owner=await account(app,'owner');
+    ownerId=owner.id;
     const ordinary=await account(app,'ordinary');
     await admin.query(
       "INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','l11-integration')",
@@ -315,6 +317,15 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
   } finally {
     if (canonicalType) {
       await admin.query("DELETE FROM collection_filter_type_rules WHERE canonical_type=$1",[canonicalType]);
+    }
+    if (ownerId) {
+      // Avoid contaminating later last-PLATFORM_ADMIN authorization tests.
+      await admin.query(
+        "UPDATE platform_user_roles SET revoked_at=COALESCE(revoked_at,now()), "+
+        "revoked_by=COALESCE(revoked_by,'l11-integration-cleanup') "+
+        "WHERE user_id=$1 AND revoked_at IS NULL",
+        [ownerId],
+      );
     }
     await app.close();
     await admin.end();
