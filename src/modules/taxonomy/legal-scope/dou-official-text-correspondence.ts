@@ -7,7 +7,7 @@
  * Even complete identity match NEVER proves legal vigency or CURRENT.
  */
 import type {ConnectorPublication} from '../../collection/connector.contract.js';
-import {douHtmlText} from '../../collection/dou.parser.js';
+import {douHtmlText,extractEmbeddedConfazPublications} from '../../collection/dou.parser.js';
 import {preflightDouConfazTrace,type DouConfazTrace} from './dou-source-custody-preflight.js';
 import type {OfficialDouPdfSourceCapture} from './dou-official-http-pdf-capture.js';
 
@@ -18,6 +18,8 @@ export type DouPdfActTextCorrelation=Rejected|{
  readonly status:'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY';
  readonly grantsLegalCurrent:false;
  readonly legalEffectivity:'UNVERIFIED';
+ readonly sqlSourceAdmissionAllowed:false;
+ readonly normalizationVersion:'DOU_PDF_TEXT_BOUNDARIES_V2';
  readonly actType:string;
  readonly actNumber:string;
  readonly parentExternalId:string;
@@ -114,22 +116,42 @@ export function correlateOfficialDouPdfActText(input:{
   '\\s*[/.-]\\s*'+year+'\\b');
  if(!longDate.test(masthead)&&!numericDate.test(masthead))
   return reject('DOU_WRONG_PRINTED_DATE');
+ // Compare the on-page printed section, not merely the INLABS section.
+ // A missing/ambiguous printed label remains UNVERIFIED, not an inferred DO1.
+ const printedSection=section.startsWith('DO3')?'3':'1';
+ if(!new RegExp('(?:SEÇÃO|SECAO)\\\\s+'+printedSection+'\\\\b').test(masthead))
+  return reject('DOU_WRONG_OR_MISSING_PRINTED_SECTION');
  const parentHeading=normalized(parent.title);
  const actHeading=normalized(act.title);
  const actContent=act.content?normalized(legalText(act.content)):'';
  if(!parentHeading||!actHeading||actContent.length<120||
     actContent.length>MAX_ACT_TEXT_CHARS||
-    !actContent.includes(actHeading))
+    !actContent.startsWith(actHeading))
   return reject('DOU_NORMATIVE_ACT_TEXT_INCOMPLETE');
  const parentAt=text.indexOf(parentHeading);
  const actAt=text.indexOf(actHeading,parentAt<0?0:parentAt+parentHeading.length);
  if(parentAt<0||actAt<parentAt+parentHeading.length)
   return reject('DOU_DISPATCH_OR_ACT_HEADING_MISSING');
- if(!text.includes(actContent,actAt))
+ // Inclusion elsewhere on the page is insufficient: anchor the COMPLETE
+ // normalized act at its heading and reject unexpected normative material
+ // immediately after it. This is still a non-persistible comparison candidate.
+ if(!text.startsWith(actContent,actAt))
   return reject('DOU_WHOLE_ACT_TEXT_MISMATCH');
+ const remainder=text.slice(actAt+actContent.length).trim();
+ if(remainder){
+  const siblings=extractEmbeddedConfazPublications(parent);
+  const following=siblings.findIndex(sibling=>sibling.externalId===act.externalId);
+  const later=following<0?[]:siblings.slice(following+1).map(sibling=>normalized(sibling.title));
+  const nextHeading=later.some(heading=>heading.length>10&&remainder.startsWith(heading));
+  const knownFooter=/^(?:ESTE DOCUMENTO PODE SER VERIFICADO|DOCUMENTO ASSINADO DIGITALMENTE|VERIFICAÇÃO DE AUTENTICIDADE|ISSN\\\\s+[0-9X-]+)/.test(remainder);
+  if(!nextHeading&&!knownFooter)
+   return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+ }
  return {
   status:'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',grantsLegalCurrent:false,
-  legalEffectivity:'UNVERIFIED',actType:act.actType??'',actNumber:act.actNumber??'',
+  legalEffectivity:'UNVERIFIED',sqlSourceAdmissionAllowed:false,
+  normalizationVersion:'DOU_PDF_TEXT_BOUNDARIES_V2',
+  actType:act.actType??'',actNumber:act.actNumber??'',
   parentExternalId:trace.parentExternalId,editionPrinted:printedEdition,
   officialMatterId:trace.officialMatterId,originalPdfSha256:cand.pdfSha256,
  };
