@@ -13,7 +13,7 @@ export interface DirectRuleInput {
   section: string;
   canonicalType: string;
   mode: CollectionFilterMode;
-  newTypeId?: string;
+  newTypeId?: string | undefined;
 }
 
 interface Candidate {
