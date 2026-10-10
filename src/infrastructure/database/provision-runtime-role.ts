@@ -14,6 +14,8 @@ const provisionEnvSchema = z.object({
   DB_RUNTIME_PASSWORD: z.string().min(32),
   DB_WORKER_RUNTIME_PASSWORD: z.string().min(32).optional(),
   DB_CURATOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DB_DOU_LIMITS_PASSWORD: z.string().min(32).optional(),
+  DOU_LIMITS_SIGNING_SECRET: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 });
 
 const parsed = provisionEnvSchema.safeParse(
@@ -58,7 +60,8 @@ async function setPassword(
   roleName:
     | 'radar_app_runtime'
     | 'radar_worker_runtime'
-    | 'radar_taxonomy_curator_runtime',
+    | 'radar_taxonomy_curator_runtime'
+    | 'radar_dou_limits_runtime',
   password: string,
 ): Promise<void> {
   const formatted = await client.query<{
