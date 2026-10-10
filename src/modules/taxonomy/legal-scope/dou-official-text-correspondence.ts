@@ -137,15 +137,23 @@ export function correlateOfficialDouPdfActText(input:{
  // immediately after it. This is still a non-persistible comparison candidate.
  if(!text.startsWith(actContent,actAt))
   return reject('DOU_WHOLE_ACT_TEXT_MISMATCH');
- const remainder=text.slice(actAt+actContent.length).trim();
+ // A following act is accepted only when the remaining page tail is
+ // fully accounted for by the INLABS-derived subsequent acts. A heading
+ // prefix by itself is not enough to hide contradictory appended clauses.
+ let remainder=text.slice(actAt+actContent.length).trim();
  if(remainder){
   const siblings=extractEmbeddedConfazPublications(parent);
-  const following=siblings.findIndex(sibling=>sibling.externalId===act.externalId);
-  const later=following<0?[]:siblings.slice(following+1).map(sibling=>normalized(sibling.title));
-  const nextHeading=later.some(heading=>heading.length>10&&remainder.startsWith(heading));
-  const knownFooter=/^(?:ESTE DOCUMENTO PODE SER VERIFICADO|DOCUMENTO ASSINADO DIGITALMENTE|VERIFICAÇÃO DE AUTENTICIDADE|ISSN\\s+[0-9X-]+)/.test(remainder);
-  if(!nextHeading&&!knownFooter)
-   return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+  const position=siblings.findIndex(sibling=>sibling.externalId===act.externalId);
+  if(position<0)return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+  for(const sibling of siblings.slice(position+1)){
+   const body=normalized(legalText(sibling.content??''));
+   if(!body||!remainder.startsWith(body))
+    return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+   remainder=remainder.slice(body.length).trim();
+  }
+  // No generic "official footer starts with ..." exception: it would let
+  // an attacker append conflicting legal text after a benign footer prefix.
+  if(remainder)return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
  }
  return {
   status:'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',grantsLegalCurrent:false,
