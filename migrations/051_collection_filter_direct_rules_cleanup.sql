@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION public.collection_filter_direct_set_rule(
   p_new_type_id UUID DEFAULT NULL
 )
 RETURNS TABLE (policy_id UUID, policy_revision INTEGER)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 #variable_conflict use_column
 DECLARE
   v_actor UUID := public.app_current_user_id();
