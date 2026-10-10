@@ -9,6 +9,7 @@ import {
 import { finishCollectionRun, heartbeatCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
 import { ConnectorRegistry } from './connector.registry.js';
 import { DOU_XML_SECTIONS, DouConnector } from './dou.connector.js';
+import { readWorkerDouLimits } from './dou-download-limits.js';
 import type { InlabsCredentials } from './inlabs.client.js';
 
 /**
@@ -337,6 +338,7 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
     // without editions is final, not pending availability.
     allowEmptyBatch: true,
     readState: async () => ({ archives: receipts }),
+    readLimits: (sourceId: string) => readWorkerDouLimits(db, sourceId),
     ...(options.fetch ? { fetch: options.fetch } : {}),
   }));
 
