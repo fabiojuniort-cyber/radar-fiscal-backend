@@ -248,6 +248,20 @@ async function run(): Promise<void> {
       );
     }
 
+    if (parsed.data.DB_DOU_LIMITS_PASSWORD || parsed.data.DOU_LIMITS_SIGNING_SECRET) {
+      const password=parsed.data.DB_DOU_LIMITS_PASSWORD;
+      const key=parsed.data.DOU_LIMITS_SIGNING_SECRET;
+      if (!password || !key) throw new Error('Both DOU gateway secrets are required');
+      if ([DB_RUNTIME_PASSWORD,DB_WORKER_RUNTIME_PASSWORD,DB_CURATOR_RUNTIME_PASSWORD].includes(password))
+        throw new Error('DOU gateway password must differ from other runtimes');
+      await client.query(`ALTER ROLE radar_dou_limits_runtime LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
+      await setPassword(client, 'radar_dou_limits_runtime', password);
+      await client.query(`REVOKE radar_app,radar_worker FROM radar_dou_limits_runtime`);
+      await client.query(`INSERT INTO public.ops_dou_limits_signing_keys(key_id,key_bytes) VALUES('v1',decode($1,'hex')) ON CONFLICT(key_id) DO NOTHING`,[key]);
+      const check=await client.query<{ ok: boolean }>(`SELECT key_bytes=decode($1,'hex') AS ok FROM public.ops_dou_limits_signing_keys WHERE key_id='v1'`,[key]);
+      if (!check.rows[0]?.ok) throw new Error('DOU signing key does not match provisioned value');
+      await client.query(`ALTER ROLE radar_dou_limits_runtime SET timezone = 'UTC'`);
+    }
     await client.query('COMMIT');
 
     console.log(
