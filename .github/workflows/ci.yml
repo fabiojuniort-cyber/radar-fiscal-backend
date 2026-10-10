@@ -10,6 +10,8 @@ on:
       - fix/taxonomy-valid-legal-text
       # TAX13-ARCH-02 #193 is stacked directly on PR #192.
       - fix/tax13-r2-ncm-temporal
+      # TAX13 R8-02 incremental PR (stacked on unmerged #193).
+      - fix/tax13-arch-02-single-proof-authority
   push:
     branches:
       - main
@@ -29,8 +31,10 @@ jobs:
 
     services:
       postgres:
+        # Pull the same Docker Official postgres image via Public ECR to avoid
+        # Docker Hub anonymous pull throttling. An empty image skips draft service.
         # An empty image disables the service for draft fast checks.
-        image: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft != true) && 'postgres:16' || '' }}
+        image: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft != true) && 'public.ecr.aws/docker/library/postgres:16' || '' }}
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
@@ -125,6 +129,8 @@ jobs:
 
       - name: Unit tests
         run: npm test
+      - name: TAX13 R802 HTTPS adversarial pure unit tests
+        run: npx tsx --test test/tax13-r802.capture.unit.test.ts
 
       - name: RFB news unit tests
         run: npx tsx --test test/rfb-news.parser.unit.test.ts test/rfb-news.filter.unit.test.ts test/rfb-news.connector.unit.test.ts
@@ -215,7 +221,14 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.tax12.integration.test.ts
 
-      # TAX-11 commits a high-numbered curated release; keep it the last gate.
+      # TAX13 R8-02: operational administration must remain testable while
+      # official legal-CURRENT proof is BLOCKED. No synthetic proof bypass.
+      - name: TAX-11 operational curator authorization (no legal proof)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/taxonomy.curation.operational.integration.test.ts
+
+      # TAX-11 legal-positive curation regression remains a hard gate.
+      # It must not be skipped or silently treated as PASS while R8 is BLOCK.
       - name: TAX-11 curation end-to-end integration
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/taxonomy.curation.integration.test.ts
@@ -229,6 +242,9 @@ jobs:
       - name: TAX13 ARCH02 R7 false CURRENT regression PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 R802 official-capture anti-fixture SQL PG16
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/tax13-r802.capture-gate.integration.test.ts
       - name: TAX13 R8 direct issuer/sealer SQL forgery negative PG16
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/tax13-r8.sql-admission.integration.test.ts
@@ -280,7 +296,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ripgrep jq
-          docker pull postgres:18-bookworm
+          docker pull public.ecr.aws/docker/library/postgres:18-bookworm
 
       - name: Recovery barrier and privilege integration (synthetic fixtures only)
         shell: bash
@@ -294,7 +310,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:18-bookworm
+        image: public.ecr.aws/docker/library/postgres:18-bookworm
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
@@ -338,6 +354,8 @@ jobs:
         run: npx tsx --test test/tax13-arch02.privileges.integration.test.ts
       - name: TAX13 ARCH02 R7 false CURRENT regression PG18
         run: npx tsx --test test/tax13-arch02.r7-negative.integration.test.ts
+      - name: TAX13 R802 official-capture anti-fixture SQL PG18
+        run: npx tsx --test test/tax13-r802.capture-gate.integration.test.ts
       - name: TAX13 R8 direct issuer/sealer SQL forgery negative PG18
         run: npx tsx --test test/tax13-r8.sql-admission.integration.test.ts
       - name: TAX13 R8 positive isolated issuer-verifier-sealer pipeline PG18

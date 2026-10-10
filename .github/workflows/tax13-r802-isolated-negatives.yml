@@ -1,0 +1,73 @@
+name: TAX13-R8-02 isolated provenance negatives
+
+on:
+  pull_request:
+    branches:
+      - fix/tax13-arch-02-single-proof-authority
+    paths:
+      - 'migrations/048_tax13_r802_authenticated_http_capture.sql'
+      - 'src/modules/taxonomy/legal-scope/confaz-official-capture.ts'
+      - 'src/infrastructure/database/tax13-capture-official-http.ts'
+      - 'src/infrastructure/database/tax13-verify-proof-v2.ts'
+      - 'test/tax13-r802.capture.unit.test.ts'
+      - 'test/tax13-r802.capture-gate.integration.test.ts'
+      - 'test/tax13-r802.live-diagnostic.ts'
+      - '.github/workflows/tax13-r802-isolated-negatives.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  r802-negative-gates:
+    name: R802 negative PG${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ['16-bookworm', '18-bookworm']
+    services:
+      postgres:
+        # Docker Official postgres distribution in AWS Public ECR, avoiding Docker Hub unauthenticated pull throttling.
+        # Keep PostgreSQL major and Debian base unchanged; security gates remain mandatory.
+        image: public.ecr.aws/docker/library/postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      GITHUB_ACTIONS: 'true'
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      DB_LEGAL_ISSUER_RUNTIME_PASSWORD: ci-tax13-issuer-password-with-32-chars-A
+      DB_NCM_SEALER_RUNTIME_PASSWORD: ci-tax13-sealer-password-with-32-chars-B
+      DB_PROOF_VERIFIER_RUNTIME_PASSWORD: ci-tax13-verifier-password-with-32-chars-C
+      DB_HTTP_COLLECTOR_RUNTIME_PASSWORD: ci-tax13-http-collector-password-32-chars-D
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck and build
+        run: npm run typecheck && npm run build
+      - name: Apply 001-048 only to ephemeral PG${{ matrix.pg }}
+        run: npm run db:prepare
+      - name: R802 offline SSRF and format attacks (no network)
+        run: npx tsx --test test/tax13-r802.capture.unit.test.ts
+      - name: R802 forged official HTTP fails closed
+        run: npx tsx --test test/tax13-r802.capture-gate.integration.test.ts
+

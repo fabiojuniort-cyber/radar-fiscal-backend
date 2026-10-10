@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - fix/tax13-r2-ncm-temporal
+      - fix/tax13-arch-02-single-proof-authority
     paths:
       - 'migrations/046_tax13_arch02_legal_proof_authority.sql'
       - 'src/modules/taxonomy/legal-scope/**'
@@ -12,6 +13,7 @@ on:
       - 'test/tax13-r7.locale-differential.test.ts'
       - 'test/tax13-r7.locale-additional.test.ts'
       - '.github/workflows/tax13-arch02-r7.yml'
+      - 'migrations/048_tax13_r802_authenticated_http_capture.sql'
 
 permissions:
   contents: read
@@ -31,7 +33,9 @@ jobs:
         pg: ['16-bookworm', '18-bookworm']
     services:
       postgres:
-        image: postgres:${{ matrix.pg }}
+        # Verified Docker Official postgres distribution via AWS Public ECR.
+        # Preserve PG16/PG18 Bookworm locale/security tests unchanged.
+        image: public.ecr.aws/docker/library/postgres:${{ matrix.pg }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

@@ -49,7 +49,10 @@ test('SUPPRESS races real NCM, classification, matching and curator commit paths
       VALUES($1,$2,'SOURCE_SCOPED','{}','FEDERAL','scope concurrency fixture')`, [pub, hash(suffix)]);
     await admin.query(`INSERT INTO publication_versions(id,publication_id,version_no,content_hash,content_text,source_metadata)
       VALUES($1,$2,1,$3,'controlled race', $4::jsonb)`, [ver, pub, hash(ver), JSON.stringify({presentation: {format: 'SANITIZED_HTML', html: '<p class="TextoAcordo">controlled race</p>'}})]);
-    await seedTestLegalScopeAttestation(admin, ver);
+    // Publication scope races do not require a legally admitted CURRENT proof.
+    // R8-02 rejects synthetic positive proofs even from CI administrators;
+    // retain only the append-only scope ledger for concurrent locking tests.
+    await seedTestLegalScopeAttestation(admin, ver, 'COMPLETE', false);
     await admin.query(`INSERT INTO publication_ncm_scans(publication_version_id,detector_key,detector_version,status,source_field)
       VALUES($1,$2,$3,'SUCCESS','CONTENT_TEXT')`, [ver, PUBLICATION_NCM_DETECTOR_KEY, PUBLICATION_NCM_DETECTOR_VERSION]);
     await admin.query(`INSERT INTO taxonomy_releases(id,version_major,version_minor,version_patch,status,

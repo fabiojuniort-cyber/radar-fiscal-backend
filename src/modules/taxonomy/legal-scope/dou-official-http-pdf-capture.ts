@@ -1,0 +1,151 @@
+/**
+ * Trifaros: direct, bounded official DOU PDF page fetch.
+ * No signing certificate / ICP-Brasil / OCSP checks by product policy.
+ * A successful HTTPS government-source download is a source-of-publication
+ * receipt, NOT a conclusion about legal effectivity or CURRENT status.
+ * The received data never goes into PostgreSQL or tenant-specific copies.
+ */
+import type {ConnectorPublication} from '../../collection/connector.contract.js';
+import type {DouConfazTrace} from './dou-source-custody-preflight.js';
+import {extractDouOnePageNativePdfText} from './dou-native-pdf-text.js';
+import {correlateOfficialDouPdfActText,type DouPdfActTextCorrelation} from './dou-official-text-correspondence.js';
+import {preflightContemporaryDouPdfBytes, type ContemporaryDouPdfBytePreflight}
+ from './dou-pdf-byte-preflight.js';
+
+const MAX_PDF_BYTES=20*1024*1024;
+type Denied={readonly status:'UNVERIFIED';readonly reason:string;
+ readonly grantsLegalCurrent:false};
+export type OfficialDouPdfSourceCapture=Denied|{
+ readonly status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED';
+ readonly grantsLegalCurrent:false;
+ readonly fetchedAt:string;
+ readonly requestUrl:string;
+ readonly httpStatus:200;
+ readonly contentType:string;
+ readonly preflight:ContemporaryDouPdfBytePreflight;
+};
+const deny=(reason:string):Denied=>({status:'UNVERIFIED',reason,grantsLegalCurrent:false});
+
+/**
+ * Construct the PDF request from our already parsed DOU XML trace rather than
+ * accepting an arbitrary user-entered URL. No third-party redirects or HTML
+ * responses are accepted as PDF evidence.
+ */
+type CapturedPdf=Extract<OfficialDouPdfSourceCapture,{status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED'}>;
+type InternalPdfCapture=Denied|{readonly status:'RAW_PDF_CAPTURED';readonly capture:CapturedPdf;readonly bytes:Buffer};
+async function collectOfficialDouPdfBytes(
+ trace:DouConfazTrace,
+):Promise<InternalPdfCapture>{
+ if(!trace||trace.status!=='DOU_XML_TRACE_ONLY')return deny('DOU_VALID_XML_TRACE_REQUIRED');
+ let pdfUrl:string;
+ try{
+  const ref=new URL(trace.certifiedPageUrl);
+  if(ref.protocol!=='https:'||ref.hostname!=='pesquisa.in.gov.br'||
+    ref.port||ref.username||ref.password||ref.hash||
+    ref.pathname!=='/imprensa/jsp/visualiza/index.jsp')return deny('DOU_VIEWER_REFERENCE_INVALID');
+  const fields=[...ref.searchParams.keys()];
+  if(fields.length!==3||new Set(fields).size!==3||
+   fields.some(k=>!['data','jornal','pagina'].includes(k)))return deny('DOU_VIEWER_QUERY_INVALID');
+  const date=ref.searchParams.get('data');
+  const journal=ref.searchParams.get('jornal');
+  const page=ref.searchParams.get('pagina');
+  if(date!==trace.publicationDate.split('-').reverse().join('/')||
+    !journal||!/^[0-9]{1,4}$/.test(journal)||
+    !page||!/^[1-9][0-9]{0,6}$/.test(page))return deny('DOU_VIEWER_EDITION_INVALID');
+  const url=new URL('https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer');
+  // Fixed firstAccess switch: exactly the government URL that returned
+  // a PDF in the authorized one-shot Railway network probe. Never copied
+  // from caller input and never treated as a bypass of authentication.
+  url.searchParams.set('captchafield','firstAccess');
+  url.searchParams.set('data',date);
+  url.searchParams.set('jornal',journal);
+  url.searchParams.set('pagina',page);
+  pdfUrl=url.toString();
+ }catch{return deny('DOU_VIEWER_REFERENCE_INVALID');}
+ try{
+  const resp=await fetch(pdfUrl,{
+   method:'GET',redirect:'error',signal:AbortSignal.timeout(20_000),
+   headers:{Accept:'application/pdf'},
+  });
+  if(resp.status!==200)return deny('DOU_OFFICIAL_SOURCE_HTTP_NON_200');
+  const mime=(resp.headers.get('content-type')??'').split(';')[0]!.trim().toLowerCase();
+  if(!['application/pdf','application/octet-stream'].includes(mime))
+   return deny('DOU_OFFICIAL_SOURCE_NOT_PDF');
+  if(resp.headers.has('content-encoding')&&
+    !['identity',''].includes((resp.headers.get('content-encoding')??'').trim().toLowerCase()))
+   return deny('DOU_OFFICIAL_SOURCE_ENCODING_UNSUPPORTED');
+  if(resp.url && resp.url!==pdfUrl)
+   return deny('DOU_OFFICIAL_SOURCE_FINAL_URL_CHANGED');
+  const len=resp.headers.get('content-length');
+  if(len!==null&&(!/^[0-9]+$/.test(len)||Number(len)>MAX_PDF_BYTES))
+   return deny('DOU_OFFICIAL_SOURCE_TOO_LARGE');
+  if(!resp.body)return deny('DOU_OFFICIAL_SOURCE_EMPTY');
+  const parts:Uint8Array[]=[];let total=0;
+  const reader=resp.body.getReader();
+  try{
+   for(;;){
+    const {done,value}=await reader.read();
+    if(done)break;
+    total+=value.byteLength;
+    if(total>MAX_PDF_BYTES){
+     await reader.cancel('DOU_OFFICIAL_SOURCE_TOO_LARGE');
+     return deny('DOU_OFFICIAL_SOURCE_TOO_LARGE');
+    }
+    parts.push(value);
+   }
+  }finally{
+   reader.releaseLock();
+  }
+  if(len!==null && Number(len)!==total)
+   return deny('DOU_OFFICIAL_SOURCE_LENGTH_MISMATCH');
+  const bytes=Buffer.concat(parts,total);
+  const preflight=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:bytes});
+  if(preflight.status!=='DOU_PDF_BYTES_BOUND_ONLY')
+   return deny('DOU_OFFICIAL_PDF_PREFLIGHT_REJECTED');
+  return {
+   status:'RAW_PDF_CAPTURED',bytes,
+   capture:{
+    status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED',grantsLegalCurrent:false,
+    fetchedAt:new Date().toISOString(),requestUrl:pdfUrl,
+    httpStatus:200,contentType:mime,preflight,
+   },
+  };
+ }catch{
+  return deny('DOU_OFFICIAL_SOURCE_FETCH_FAILED');
+ }
+}
+
+/**
+ * Metadata-only official PDF fetch; any temporary downloaded bytes are GC-able
+ * and NOT returned or stored. Independent of certificate/ICP validation.
+ */
+export async function fetchOfficialDouPdfPage(
+ trace:DouConfazTrace,
+):Promise<OfficialDouPdfSourceCapture>{
+ const collected=await collectOfficialDouPdfBytes(trace);
+ return collected.status==='RAW_PDF_CAPTURED'?collected.capture:collected;
+}
+
+/**
+ * Same-buffer extraction: PDF native text comes from the exact downloaded
+ * bytes whose hash was captured. No second independent text parameter.
+ * Result remains TRACE/MATCH ONLY and NEVER issues legal CURRENT.
+ */
+export async function fetchAndMatchOfficialDouPdfAct(input:{
+ trace:DouConfazTrace;
+ parent:ConnectorPublication;
+ act:ConnectorPublication;
+ printedEdition:string;
+}):Promise<DouPdfActTextCorrelation>{
+ const collected=await collectOfficialDouPdfBytes(input.trace);
+ if(collected.status!=='RAW_PDF_CAPTURED')
+  return {status:'UNVERIFIED',reason:collected.reason,grantsLegalCurrent:false};
+ const parsed=await extractDouOnePageNativePdfText(collected.bytes);
+ if(parsed.status!=='PDF_NATIVE_TEXT_EXTRACTED'||!parsed.text)
+  return {status:'UNVERIFIED',reason:parsed.reason,grantsLegalCurrent:false};
+ return correlateOfficialDouPdfActText({
+  trace:input.trace,sourceCapture:collected.capture,
+  parent:input.parent,act:input.act,
+  pdfExtractedText:parsed.text,printedEdition:input.printedEdition,
+ });
+}
