@@ -119,7 +119,7 @@ export function correlateOfficialDouPdfActText(input:{
  // Compare the on-page printed section, not merely the INLABS section.
  // A missing/ambiguous printed label remains UNVERIFIED, not an inferred DO1.
  const printedSection=section.startsWith('DO3')?'3':'1';
- if(!new RegExp('(?:SEÇÃO|SECAO)\\\\s+'+printedSection+'\\\\b').test(masthead))
+ if(!new RegExp('(?:SEÇÃO|SECAO)\\s+'+printedSection+'\\b').test(masthead))
   return reject('DOU_WRONG_OR_MISSING_PRINTED_SECTION');
  const parentHeading=normalized(parent.title);
  const actHeading=normalized(act.title);
@@ -143,7 +143,7 @@ export function correlateOfficialDouPdfActText(input:{
   const following=siblings.findIndex(sibling=>sibling.externalId===act.externalId);
   const later=following<0?[]:siblings.slice(following+1).map(sibling=>normalized(sibling.title));
   const nextHeading=later.some(heading=>heading.length>10&&remainder.startsWith(heading));
-  const knownFooter=/^(?:ESTE DOCUMENTO PODE SER VERIFICADO|DOCUMENTO ASSINADO DIGITALMENTE|VERIFICAÇÃO DE AUTENTICIDADE|ISSN\\\\s+[0-9X-]+)/.test(remainder);
+  const knownFooter=/^(?:ESTE DOCUMENTO PODE SER VERIFICADO|DOCUMENTO ASSINADO DIGITALMENTE|VERIFICAÇÃO DE AUTENTICIDADE|ISSN\\s+[0-9X-]+)/.test(remainder);
   if(!nextHeading&&!knownFooter)
    return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
  }
