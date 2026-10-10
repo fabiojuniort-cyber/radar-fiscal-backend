@@ -97,3 +97,29 @@ test('TAX13 DOU synthetic fetch: network unavailable is an ERROR not empty publi
  if(result.status==='UNVERIFIED')assert.equal(result.reason,'DOU_OFFICIAL_SOURCE_FETCH_FAILED');
  assert.equal(result.grantsLegalCurrent,false);
 });
+
+test('TAX13 DOU synthetic fetch: misleading Content-Length and compressed body are rejected',async t=>{
+ let response=new Response(pdf,{status:200,
+  headers:{'content-type':'application/pdf','content-length':String(pdf.length+8)}});
+ t.mock.method(globalThis,'fetch',async()=>response);
+ const wrongLength=await fetchOfficialDouPdfPage(trace);
+ assert.equal(wrongLength.status,'UNVERIFIED');
+ if(wrongLength.status==='UNVERIFIED')assert.equal(wrongLength.reason,'DOU_OFFICIAL_SOURCE_LENGTH_MISMATCH');
+ response=new Response(pdf,{status:200,
+  headers:{'content-type':'application/pdf','content-encoding':'gzip'}});
+ const compressed=await fetchOfficialDouPdfPage(trace);
+ assert.equal(compressed.status,'UNVERIFIED');
+ if(compressed.status==='UNVERIFIED')assert.equal(compressed.reason,'DOU_OFFICIAL_SOURCE_ENCODING_UNSUPPORTED');
+});
+
+test('TAX13 DOU synthetic fetch: streaming overflow cancels the response body',async t=>{
+ let cancelled=false;
+ t.mock.method(globalThis,'fetch',async()=>new Response(new ReadableStream<Uint8Array>({
+  start(controller){controller.enqueue(new Uint8Array(20*1024*1024+1));},
+  cancel(){cancelled=true;}
+ }),{status:200,headers:{'content-type':'application/pdf'}}));
+ const result=await fetchOfficialDouPdfPage(trace);
+ assert.equal(result.status,'UNVERIFIED');
+ if(result.status==='UNVERIFIED')assert.equal(result.reason,'DOU_OFFICIAL_SOURCE_TOO_LARGE');
+ assert.equal(cancelled,true);
+});
