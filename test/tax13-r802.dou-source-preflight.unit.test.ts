@@ -244,6 +244,7 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
  for(const [variant,reason] of [
   [pdfExtractedText.replace('Nº 180','Nº 181'),'DOU_WRONG_PRINTED_EDITION'],
   [pdfExtractedText.replace('SEÇÃO 1','SEÇÃO 3'),'DOU_WRONG_OR_MISSING_PRINTED_SECTION'],
+  [pdfExtractedText.replace('SEÇÃO 1','SEÇÃO 3 SEÇÃO 1'),'DOU_WRONG_OR_MISSING_PRINTED_SECTION'],
   [pdfExtractedText.replace('SEÇÃO 1',''),'DOU_WRONG_OR_MISSING_PRINTED_SECTION'],
   [pdfExtractedText+' CLÁUSULA QUINTA - Benefício fiscal ampliado.',
    'DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED'],
