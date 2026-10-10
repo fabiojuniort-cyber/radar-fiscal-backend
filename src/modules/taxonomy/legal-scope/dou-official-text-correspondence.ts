@@ -137,7 +137,11 @@ export function correlateOfficialDouPdfActText(input:{
  // introductory normative material AND every sibling before/after this act.
  // Reject modifications between the dispatch title and the target act.
  // An isolated matched child is not proof of a fully matched dispatch.
- const dispatchContent=parent.content?normalized(legalText(parent.content)):'';
+ const legalEnvelope=parent.content?normalized(legalText(parent.content)):'';
+ // Some INLABS payloads store the DESPACHO heading in Identifica and only
+ // body/children in Texto. Always rebuild the complete printed envelope.
+ const dispatchContent=legalEnvelope.startsWith(parentHeading)?legalEnvelope:
+  parentHeading+' '+legalEnvelope;
  if(trace.embedded){
   if(!dispatchContent.startsWith(parentHeading)||
      dispatchContent.length>MAX_PDF_TEXT_CHARS||
