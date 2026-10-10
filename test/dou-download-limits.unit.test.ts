@@ -38,7 +38,7 @@ test('DOU worker consults injected limits and refuses oversize without treating 
       });
     }
     return new Response('<html>INLABS Index</html>');
-  }) as typeof fetch;
+  }) as typeof globalThis.fetch;
 
   const readLimitsIds: string[] = [];
   const connector = new DouConnector({
