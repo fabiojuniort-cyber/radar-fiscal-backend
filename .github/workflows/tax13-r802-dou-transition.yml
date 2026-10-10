@@ -6,6 +6,7 @@ on:
       - fix/tax13-arch-02-single-proof-authority
       - fix/tax13-r8-02-official-capture
       - fix/tax13-r9-design-remediation-r2
+      - fix/tax13-r9-design-r3-single-contract
     paths:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts'
@@ -18,6 +19,9 @@ on:
       - 'test/tax13-r802.native-pdf-text.unit.test.ts'
       - 'test/tax13-r9.pdf-layout-boundaries.unit.test.ts'
       - 'test/tax13-r802.confaz-temporal-candidate.unit.test.ts'
+      - 'test/dou.connector.unit.test.ts'
+      - 'docs/taxonomy/TAX13_DOU_XML_FIRST_OWNER_DECISION_20261010.md'
+      - 'docs/taxonomy/TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md'
       - '.github/workflows/tax13-r802-dou-transition.yml'
 
 permissions:
@@ -25,7 +29,7 @@ permissions:
 
 jobs:
   dou-trace-negative:
-    name: DOU source trace and PDF transport do NOT grant legal CURRENT
+    name: DOU XML-first collection and PDF source preflight do NOT grant legal CURRENT
     runs-on: ubuntu-latest
     timeout-minutes: 7
     env:
@@ -39,4 +43,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npx tsx --test test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts test/tax13-r802.native-pdf-text.unit.test.ts test/tax13-r9.pdf-layout-boundaries.unit.test.ts test/tax13-r802.confaz-temporal-candidate.unit.test.ts
+      - run: npx tsx --test test/dou.connector.unit.test.ts test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts test/tax13-r802.native-pdf-text.unit.test.ts test/tax13-r9.pdf-layout-boundaries.unit.test.ts test/tax13-r802.confaz-temporal-candidate.unit.test.ts
