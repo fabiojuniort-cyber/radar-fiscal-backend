@@ -2,6 +2,7 @@ import type { CollectionConnector, ConnectorExecutionContext, ConnectorPartialFa
 import { ConnectorError } from './connector.error.js';
 import { InlabsClient, type InlabsCredentials, type InlabsXmlSection } from './inlabs.client.js';
 import { parseDouZip, type DouArchiveContext } from './dou.parser.js';
+import { MIB, DOU_DEFAULT_LIMITS, type DouDownloadLimits, douLimitsSchema } from './dou-download-limits.js';
 import { classifyDouContractExcerpt, DOU_SCOPE_RULE_VERSION } from './dou-scope.rules.js';
 
 export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO3', 'DO3E'];
@@ -15,6 +16,7 @@ export interface DouOptions {
   fetch?: typeof fetch;
   now?: () => Date;
   readState?: (sourceId: string, runId: string) => Promise<DouState>;
+  readLimits?: (sourceId: string) => Promise<DouDownloadLimits>;
   // A bounded, explicit date range for controlled validation/backfill. Runtime registry
   // never supplies these dates and does not mutate shared source configuration.
   dates?: string[];
@@ -63,7 +65,12 @@ export class DouConnector implements CollectionConnector {
     const state = await this.#options.readState?.(context.sourceId, context.runId) ?? { archives: {} };
     // Do not silently discard a gap that exceeds the bounded reconciliation window.
     if (!this.#options.dates && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
-    const client = new InlabsClient({ credentials: this.#options.credentials, ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}) });
+    const limits = douLimitsSchema.parse(await this.#options.readLimits?.(context.sourceId) ?? DOU_DEFAULT_LIMITS);
+    const client = new InlabsClient({
+      credentials: this.#options.credentials,
+      maxArchiveBytes: limits.zipMiB * MIB,
+      ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
+    });
     const partialFailures: ConnectorPartialFailure[] = [];
     const receipts: Record<string, string> = { ...state.archives };
     const archives: Array<Record<string, unknown>> = []; let available = 0; let xmlCount = 0; let mediaCount = 0;
@@ -138,6 +145,10 @@ export class DouConnector implements CollectionConnector {
             publicationCount++; archivePublicationCount++;
             if (data.embeddedAct === true) { embeddedActCount++; archiveEmbeddedActCount++; }
             if (publication.agency === 'CONFAZ') confazMatterCount++;
+          }, {
+            maxCompressedBytes: limits.zipMiB * MIB,
+            maxExpandedBytes: limits.expandedZipMiB * MIB,
+            maxXmlEntryBytes: limits.xmlEntryMiB * MIB,
           });
           if (!parsed.xmlCount) throw failure('DOU_ARCHIVE_HAS_NO_XML', true);
           assembledMatterCount += sourceMatterCount;
