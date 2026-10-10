@@ -240,67 +240,27 @@ async function run(): Promise<void> {
       );
     }
 
+    // L-11: simulation tables/functions are gone; runtime worker must not
+    // receive the new admin-only direct edit/purge privileges.
     const collectionFilterPrivileges = await pool.query<{
-      can_update_simulation: boolean;
-      can_insert_item: boolean;
-      can_claim: boolean;
-      can_batch: boolean;
-      can_record: boolean;
-      can_finish: boolean;
-      can_fail: boolean;
+      sim_table: string | null;
+      sim_function: string | null;
+      worker_can_edit: boolean;
+      worker_can_purge: boolean;
     }>(`
       SELECT
-        has_table_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_simulations',
-          'UPDATE'
-        ) AS can_update_simulation,
-        has_table_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_simulation_items',
-          'INSERT'
-        ) AS can_insert_item,
-        has_function_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_claim_simulation(text)',
-          'EXECUTE'
-        ) AS can_claim,
-        has_function_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_simulation_batch(uuid,text,uuid,integer)',
-          'EXECUTE'
-        ) AS can_batch,
-        has_function_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_record_simulation_batch(uuid,text,uuid,jsonb,jsonb)',
-          'EXECUTE'
-        ) AS can_record,
-        has_function_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_finish_simulation(uuid,text,jsonb)',
-          'EXECUTE'
-        ) AS can_finish,
-        has_function_privilege(
-          'radar_worker_runtime',
-          'public.collection_filter_fail_simulation(uuid,text,text)',
-          'EXECUTE'
-        ) AS can_fail
+        to_regclass('public.collection_filter_simulations')::text AS sim_table,
+        to_regprocedure('public.collection_filter_claim_simulation(text)')::text AS sim_function,
+        has_function_privilege('radar_worker_runtime',
+          'public.collection_filter_direct_set_rule(text,text,text,text,uuid)', 'EXECUTE') AS worker_can_edit,
+        has_function_privilege('radar_worker_runtime',
+          'public.collection_filter_direct_purge_batch(uuid[],text,text,text,text,uuid)', 'EXECUTE') AS worker_can_purge
     `);
-
     const filterPrivilege = collectionFilterPrivileges.rows[0];
-    if (
-      !filterPrivilege ||
-      filterPrivilege.can_update_simulation ||
-      filterPrivilege.can_insert_item ||
-      !filterPrivilege.can_claim ||
-      !filterPrivilege.can_batch ||
-      !filterPrivilege.can_record ||
-      !filterPrivilege.can_finish ||
-      !filterPrivilege.can_fail
-    ) {
-      throw new Error(
-        'Worker collection-filter simulation privileges do not match least-privilege policy.',
-      );
+    if (!filterPrivilege || filterPrivilege.sim_table !== null ||
+        filterPrivilege.sim_function !== null ||
+        filterPrivilege.worker_can_edit || filterPrivilege.worker_can_purge) {
+      throw new Error('Worker direct filter privileges or retired simulation objects are invalid.');
     }
 
     const taxonomyPrivileges = await pool.query<{

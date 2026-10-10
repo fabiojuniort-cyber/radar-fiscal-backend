@@ -1,544 +1,333 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import test from 'node:test';
-
-import type { FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
-
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 
-const adminUrl = process.env.DATABASE_ADMIN_URL;
-if (!adminUrl) throw new Error('DATABASE_ADMIN_URL is required');
+const url=process.env.DATABASE_ADMIN_URL;
+if (!url) throw new Error('DATABASE_ADMIN_URL is required');
+const PASSWORD='Collection-Filter-Seguro-2026!';
 
-const PASSWORD = 'Collection-Filter-Seguro-2026!';
-
-async function registerAndLogin(
-  app: FastifyInstance,
-  label: string,
-) {
-  const email =
-    `filter-${label}-${randomUUID().slice(0, 8)}@example.test`;
-  const register = await app.inject({
-    method: 'POST',
-    url: '/auth/register',
-    payload: {
-      name: `Filter ${label}`,
-      email,
-      company: `Filter ${label}`,
-      password: PASSWORD,
-      confirmPassword: PASSWORD,
-      acceptedTerms: true,
-    },
-  });
-  assert.equal(register.statusCode, 201, register.body);
-  const registered = register.json<{
-    tenant: { id: string };
-    user: { id: string };
-  }>();
-
-  const login = await app.inject({
-    method: 'POST',
-    url: '/auth/login',
-    payload: { email, password: PASSWORD },
-  });
-  assert.equal(login.statusCode, 200, login.body);
-  const { accessToken } =
-    login.json<{ accessToken: string }>();
-
-  return {
-    userId: registered.user.id,
-    email,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      'x-tenant-id': registered.tenant.id,
-    },
-  };
+async function account(app:FastifyInstance, prefix:string) {
+  const email='l11-'+prefix+'-'+randomUUID().slice(0,8)+'@example.test';
+  const reg=await app.inject({method:'POST',url:'/auth/register',payload:{
+    name:'Filter '+prefix,email,company:'Filter '+prefix,
+    password:PASSWORD,confirmPassword:PASSWORD,acceptedTerms:true,
+  }});
+  assert.equal(reg.statusCode,201,reg.body);
+  const data=reg.json<{user:{id:string};tenant:{id:string}}>();
+  const login=await app.inject({method:'POST',url:'/auth/login',payload:{email,password:PASSWORD}});
+  assert.equal(login.statusCode,200,login.body);
+  const token=login.json<{accessToken:string}>().accessToken;
+  return {id:data.user.id,tenantId:data.tenant.id,headers:{authorization:'Bearer '+token,'x-tenant-id':data.tenant.id}};
 }
 
-test(
-  'ACT-SCOPE-02 Stage 4: PLATFORM_ADMIN manages draft and new types safely',
-  async () => {
-    const admin = new Pool({
-      connectionString: adminUrl,
-      max: 1,
-    });
-    const app = await buildApp();
-
-    const createdUserIds: string[] = [];
-    try {
+test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act with audit',async()=>{
+  const admin=new Pool({connectionString:url,max:1});
+  const app=await buildApp();
+  let pubId:string|null=null;
+  let canonicalType:string|null=null;
+  let ownerId:string|null=null;
+  try {
+    const owner=await account(app,'owner');
+    ownerId=owner.id;
+    const ordinary=await account(app,'ordinary');
+    await admin.query(
+      "INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','l11-integration')",
+      [owner.id],
+    );
+    const existing=await admin.query<{id:string}>(
+      "SELECT id FROM collection_filter_policies WHERE status='APPROVED' LIMIT 1"
+    );
+    if (!existing.rows.length) {
       await admin.query(
-        `TRUNCATE collection_filter_simulations,
-                  collection_filter_new_types,
-                  collection_filter_terms,
-                  collection_filter_type_aliases,
-                  collection_filter_type_rules,
-                  collection_filter_policies
-         CASCADE`,
+        "INSERT INTO collection_filter_policies(version,status,approved_at,approved_by) "+
+        "SELECT COALESCE(max(version),0)+1,'APPROVED',now(),$1 FROM collection_filter_policies",
+        [owner.id],
       );
-
-      const platformAdmin = await registerAndLogin(app, 'admin');
-      const ordinary = await registerAndLogin(app, 'ordinary');
-      createdUserIds.push(
-        platformAdmin.userId,
-        ordinary.userId,
-      );
-
-      await admin.query(
-        `INSERT INTO platform_user_roles (
-           user_id, role, granted_by
-         ) VALUES ($1, 'PLATFORM_ADMIN', 'act-scope-02-stage4-test')`,
-        [platformAdmin.userId],
-      );
-
-      const denied = await app.inject({
-        method: 'GET',
-        url: '/api/v1/admin/collection-filter/state',
-        headers: ordinary.headers,
-      });
-      assert.equal(denied.statusCode, 403, denied.body);
-
-      const draft = {
-        contextWindowWords: 7,
-        weakScoreThreshold: 3,
-        locationWeights: {
-          title: 3,
-          summary: 2,
-          body: 1,
-        },
-        changeNotes: 'Rascunho inicial',
-        rules: [
-          {
-            sourceCode: 'dou',
-            section: 'DO1',
-            canonicalType: 'PORTARIA',
-            mode: 'KEEP_IF_TAX_TERM',
-            helpText: 'Portarias dependem de relevância tributária.',
-          },
-          {
-            sourceCode: 'confaz',
-            section: '',
-            canonicalType: 'CONVENIO ICMS',
-            mode: 'KEEP_ALWAYS',
-          },
-        ],
-        aliases: [
-          {
-            sourceCode: 'confaz',
-            section: '',
-            alias: 'Convênio ICMS',
-            canonicalType: 'CONVENIO ICMS',
-          },
-        ],
-        terms: [
-          {
-            text: 'ICMS',
-            strength: 'STRONG',
-          },
-          {
-            text: 'tributário',
-            strength: 'WEAK',
-            locationScope: 'ANY',
-          },
-          {
-            text: 'regularidade fiscal',
-            strength: 'NEGATIVE',
-            locationScope: 'BODY',
-          },
-        ],
-      };
-
-      const saved = await app.inject({
-        method: 'PUT',
-        url: '/api/v1/admin/collection-filter/draft',
-        headers: platformAdmin.headers,
-        payload: draft,
-      });
-      assert.equal(saved.statusCode, 200, saved.body);
-      assert.equal(saved.json().version, 1);
-      assert.equal(saved.json().revision, 1);
-
-      const state = await app.inject({
-        method: 'GET',
-        url: '/api/v1/admin/collection-filter/state',
-        headers: platformAdmin.headers,
-      });
-      assert.equal(state.statusCode, 200, state.body);
-      const stateJson = state.json<{
-        policies: Array<{
-          id: string;
-          status: string;
-          revision: number;
-        }>;
-        documents: Record<
-          string,
-          {
-            rules: unknown[];
-            aliases: unknown[];
-            terms: unknown[];
-          }
-        >;
-      }>();
-      assert.equal(stateJson.policies.length, 1);
-      assert.equal(stateJson.policies[0]!.status, 'DRAFT');
-      const policyId = stateJson.policies[0]!.id;
-      assert.equal(
-        stateJson.documents[policyId]!.rules.length,
-        2,
-      );
-      assert.equal(
-        stateJson.documents[policyId]!.aliases.length,
-        1,
-      );
-      assert.equal(
-        stateJson.documents[policyId]!.terms.length,
-        3,
-      );
-
-      const updated = await app.inject({
-        method: 'PUT',
-        url: '/api/v1/admin/collection-filter/draft',
-        headers: platformAdmin.headers,
-        payload: {
-          ...draft,
-          changeNotes: 'Segunda revisão',
-        },
-      });
-      assert.equal(updated.statusCode, 200, updated.body);
-      assert.equal(updated.json().version, 1);
-      assert.equal(updated.json().revision, 2);
-
-      const unsafe = await app.inject({
-        method: 'PUT',
-        url: '/api/v1/admin/collection-filter/draft',
-        headers: platformAdmin.headers,
-        payload: {
-          ...draft,
-          terms: [
-            {
-              text: 'CNPJ',
-              strength: 'STRONG',
-            },
-          ],
-        },
-      });
-      assert.equal(unsafe.statusCode, 400, unsafe.body);
-      assert.equal(
-        unsafe.json().error,
-        'invalid_collection_filter_draft',
-      );
-
-      const doeRejected = await app.inject({
-        method: 'PUT',
-        url: '/api/v1/admin/collection-filter/draft',
-        headers: platformAdmin.headers,
-        payload: {
-          ...draft,
-          rules: [
-            {
-              sourceCode: 'doe-sp',
-              section: '',
-              canonicalType: 'PORTARIA',
-              mode: 'KEEP_ALWAYS',
-            },
-          ],
-        },
-      });
-      assert.equal(doeRejected.statusCode, 400, doeRejected.body);
-      assert.equal(
-        doeRejected.json().error,
-        'invalid_collection_filter_draft',
-      );
-
-      const recentOnly = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
-        headers: platformAdmin.headers,
-        payload: {
-          scope: 'RECENT',
-          reviewMode: 'NONE',
-        },
-      });
-      assert.equal(recentOnly.statusCode, 202, recentOnly.body);
-      await admin.query(
-        `UPDATE collection_filter_simulations
-            SET status='COMPLETED',
-                metrics='{"inspected":1,"keep":1,"discard":0}'::jsonb,
-                completed_at=now()
-          WHERE id=$1::uuid`,
-        [recentOnly.json().simulationId],
-      );
-
-      const firstRecentBlocked = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
-        headers: platformAdmin.headers,
-      });
-      assert.equal(
-        firstRecentBlocked.statusCode,
-        409,
-        firstRecentBlocked.body,
-      );
-      assert.equal(
-        firstRecentBlocked.json().error,
-        'collection_filter_full_archive_simulation_required',
-      );
-
-      const requested = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
-        headers: platformAdmin.headers,
-        payload: {
-          scope: 'FULL_ARCHIVE',
-          reviewMode: 'SAMPLE',
-        },
-      });
-      assert.equal(requested.statusCode, 202, requested.body);
-      const requestedJson = requested.json<{
-        simulationId: string;
-        policyRevision: number;
-        action: string;
-      }>();
-      assert.equal(requestedJson.policyRevision, 2);
-      assert.equal(requestedJson.action, 'CREATED');
-
-      const repeated = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
-        headers: platformAdmin.headers,
-        payload: {
-          scope: 'FULL_ARCHIVE',
-          reviewMode: 'SAMPLE',
-        },
-      });
-      assert.equal(repeated.statusCode, 200, repeated.body);
-      assert.equal(
-        repeated.json().simulationId,
-        requestedJson.simulationId,
-      );
-      assert.equal(repeated.json().action, 'EXISTING');
-
-      const prematureApproval = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
-        headers: platformAdmin.headers,
-      });
-      assert.equal(
-        prematureApproval.statusCode,
-        409,
-        prematureApproval.body,
-      );
-      assert.equal(
-        prematureApproval.json().error,
-        'collection_filter_full_archive_simulation_required',
-      );
-
-      const simulatedPublicationId = randomUUID();
-      await admin.query(
-        `UPDATE collection_filter_simulations
-            SET status='COMPLETED',
-                metrics='{"inspected":1,"keep":0,"discard":1}'::jsonb,
-                completed_at=now()
-          WHERE id=$1::uuid`,
-        [requestedJson.simulationId],
-      );
-      await admin.query(
-        `INSERT INTO collection_filter_simulation_items(
-           simulation_id,publication_id,source_code,section,
-           raw_type,canonical_type,decision,reason_code,
-           decisive_term,excerpt,title,published_on,official_url,review_sample
-         ) VALUES(
-           $1::uuid,$2::uuid,'dou','DO1',
-           'PORTARIA','PORTARIA','DISCARD','weak_score_below_threshold',
-           NULL,'trecho','Portaria de teste','2026-10-06',
-           'https://example.test/ato',true
-         )`,
-        [requestedJson.simulationId, simulatedPublicationId],
-      );
-
-      const sample = await app.inject({
-        method: 'GET',
-        url:
-          `/api/v1/admin/collection-filter/simulations/${requestedJson.simulationId}/items?sampleOnly=true`,
-        headers: platformAdmin.headers,
-      });
-      assert.equal(sample.statusCode, 200, sample.body);
-      assert.equal(sample.json().items.length, 1);
-
-      const markedError = await app.inject({
-        method: 'PUT',
-        url:
-          `/api/v1/admin/collection-filter/simulations/${requestedJson.simulationId}/items/${simulatedPublicationId}/feedback`,
-        headers: platformAdmin.headers,
-        payload: {
-          markedError: true,
-          expectedDecision: 'KEEP',
-          note: 'Falso descarte no teste.',
-        },
-      });
-      assert.equal(markedError.statusCode, 200, markedError.body);
-
-      const blockedByError = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
-        headers: platformAdmin.headers,
-      });
-      assert.equal(blockedByError.statusCode, 409, blockedByError.body);
-      assert.equal(
-        blockedByError.json().error,
-        'collection_filter_simulation_has_errors',
-      );
-
-      const clearedError = await app.inject({
-        method: 'PUT',
-        url:
-          `/api/v1/admin/collection-filter/simulations/${requestedJson.simulationId}/items/${simulatedPublicationId}/feedback`,
-        headers: platformAdmin.headers,
-        payload: {
-          markedError: false,
-          expectedDecision: 'KEEP',
-          note: 'Revisado para continuar o teste de stale simulation.',
-        },
-      });
-      assert.equal(clearedError.statusCode, 200, clearedError.body);
-
-      const editedAfterSimulation = await app.inject({
-        method: 'PUT',
-        url: '/api/v1/admin/collection-filter/draft',
-        headers: platformAdmin.headers,
-        payload: {
-          ...draft,
-          changeNotes: 'Terceira revisão após simulação',
-        },
-      });
-      assert.equal(
-        editedAfterSimulation.statusCode,
-        200,
-        editedAfterSimulation.body,
-      );
-      assert.equal(editedAfterSimulation.json().revision, 3);
-
-      const staleSimulation = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
-        headers: platformAdmin.headers,
-      });
-      assert.equal(staleSimulation.statusCode, 409, staleSimulation.body);
-      assert.equal(
-        staleSimulation.json().error,
-        'collection_filter_fresh_simulation_required',
-      );
-
-      const freshRequested = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/simulations`,
-        headers: platformAdmin.headers,
-        payload: {
-          scope: 'FULL_ARCHIVE',
-          reviewMode: 'NONE',
-        },
-      });
-      assert.equal(freshRequested.statusCode, 202, freshRequested.body);
-      assert.equal(freshRequested.json().policyRevision, 3);
-
-      await admin.query(
-        `UPDATE collection_filter_simulations
-            SET status='COMPLETED',
-                metrics='{"inspected":1,"keep":1,"discard":0}'::jsonb,
-                completed_at=now()
-          WHERE id=$1::uuid`,
-        [freshRequested.json().simulationId],
-      );
-
-      const approved = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/drafts/${policyId}/approve`,
-        headers: platformAdmin.headers,
-      });
-      assert.equal(approved.statusCode, 200, approved.body);
-      assert.equal(approved.json().version, 1);
-      assert.equal(approved.json().revision, 3);
-      assert.equal(
-        approved.json().simulationId,
-        freshRequested.json().simulationId,
-      );
-
-      const newTypeId = randomUUID();
-      await admin.query(
-        `INSERT INTO collection_filter_new_types (
-           id,source_code,section,normalized_type,
-           sample_raw_type,occurrence_count,sample_publication_ids
-         ) VALUES (
-           $1,'dou','DO1','ATO DESCONHECIDO',
-           'Ato desconhecido',4,'{}'
-         )`,
-        [newTypeId],
-      );
-
-      const inbox = await app.inject({
-        method: 'GET',
-        url: '/api/v1/admin/collection-filter/new-types',
-        headers: platformAdmin.headers,
-      });
-      assert.equal(inbox.statusCode, 200, inbox.body);
-      assert.equal(inbox.json().items.length, 1);
-      assert.equal(
-        inbox.json().items[0].normalized_type,
-        'ATO DESCONHECIDO',
-      );
-
-      const resolved = await app.inject({
-        method: 'POST',
-        url:
-          `/api/v1/admin/collection-filter/new-types/${newTypeId}/resolve`,
-        headers: platformAdmin.headers,
-        payload: { status: 'RESOLVED', canonicalType: 'ATO DESCONHECIDO' },
-      });
-      assert.equal(resolved.statusCode, 200, resolved.body);
-      assert.equal(resolved.json().status, 'RESOLVED');
-
-      const openAfter = await app.inject({
-        method: 'GET',
-        url: '/api/v1/admin/collection-filter/new-types',
-        headers: platformAdmin.headers,
-      });
-      assert.equal(openAfter.statusCode, 200, openAfter.body);
-      assert.equal(openAfter.json().items.length, 0);
-    } finally {
-      await admin.query(
-        `TRUNCATE collection_filter_simulations,
-                  collection_filter_new_types,
-                  collection_filter_terms,
-                  collection_filter_type_aliases,
-                  collection_filter_type_rules,
-                  collection_filter_policies
-         CASCADE`,
-      ).catch(() => undefined);
-
-      if (createdUserIds.length > 0) {
-        await admin.query(
-          `UPDATE platform_user_roles
-           SET revoked_at = COALESCE(revoked_at, now()),
-               revoked_by = COALESCE(
-                 revoked_by,
-                 'act-scope-02-stage4-test-cleanup'
-               )
-           WHERE user_id = ANY($1::uuid[])
-             AND revoked_at IS NULL`,
-          [createdUserIds],
-        ).catch(() => undefined);
-      }
-
-      await app.close();
-      await admin.end();
     }
-  },
-);
+    const source=await admin.query<{id:string}>(
+      "SELECT id FROM sources WHERE code='dou' LIMIT 1"
+    );
+    const sourceId=source.rows[0]?.id ??
+      (await admin.query<{id:string}>(
+        "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+        "VALUES('dou','Diário Oficial','FEDERAL','https://in.gov.br','dou') RETURNING id"
+      )).rows[0]!.id;
+    canonicalType='AVISO L11 '+randomUUID().slice(0,8).toUpperCase();
+    const identifier=createHash('sha256').update(randomUUID()).digest('hex');
+    const inserted=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [identifier,canonicalType,'Publicação descartável teste L11','https://example.test/'+identifier],
+    );
+    pubId=inserted.rows[0]!.id;
+    const version=await admin.query<{id:string}>(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Documento administrativo não tributário',true,$3::jsonb) RETURNING id",
+      [pubId,createHash('sha256').update('body '+pubId).digest('hex'),JSON.stringify({dou:{section:'DO1'}})],
+    );
+    const versionId=version.rows[0]!.id;
+    const mention=await admin.query<{id:string}>(
+      "INSERT INTO publication_ncm_mentions(publication_version_id,ncm_code,method_type,detector_key,detector_version) "+
+      "VALUES($1,'00000000','RULE','l11-integration','1') RETURNING id",
+      [versionId],
+    );
+    // TAX07/TAX08 append-only evidence attached only to this publication.
+    const release=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_releases(version_major,version_minor,version_patch,status,approved_at,"+
+      "published_at,artifact_repository,artifact_path,artifact_git_sha,artifact_sha256,created_by_actor) "+
+      "VALUES($1,0,0,'PUBLISHED',now(),now(),'l11-test','l11-fixture',$2,$3,'l11-test') RETURNING id",
+      [Math.floor(Math.random()*1000000)+1000,'a'.repeat(40),'b'.repeat(64)],
+    );
+    const fingerprint=createHash('sha256').update(randomUUID()).digest('hex');
+    const taxRun=await admin.query<{id:string}>(
+      "INSERT INTO publication_taxonomy_runs(publication_version_id,taxonomy_release_id,method_type,"+
+      "engine_key,engine_version,config_sha256,input_sha256,run_fingerprint) "+
+      "VALUES($1,$2,'RULE','l11-test','1',$3,$4,$5) RETURNING id",
+      [versionId,release.rows[0]!.id,'a'.repeat(64),'b'.repeat(64),fingerprint],
+    );
+    const unmapped=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_unmapped_occurrences(run_id,raw_term,normalized_term,"+
+      "extractor_key,extractor_version,occurrence_fingerprint) "+
+      "VALUES($1,'conceito exclusivo','CONCEITO EXCLUSIVO','l11','1',$2) RETURNING id",
+      [taxRun.rows[0]!.id,createHash('sha256').update(randomUUID()).digest('hex')],
+    );
+    const candidate=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_candidates(preferred_term,normalized_key,context_signature,candidate_fingerprint) "+
+      "VALUES('Conceito L11','CONCEITO L11',$1,$2) RETURNING id",
+      [createHash('sha256').update(randomUUID()).digest('hex'),
+       createHash('sha256').update(randomUUID()).digest('hex')],
+    );
+    const link=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_candidate_occurrence_links(candidate_id,occurrence_id) "+
+      "VALUES($1,$2) RETURNING id",
+      [candidate.rows[0]!.id,unmapped.rows[0]!.id],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,$4::jsonb)",
+      [pubId,sourceId,'https://example.test/'+identifier,JSON.stringify({dou:{section:'DO1'}})],
+    );
+
+    // Suppressed scope history is append-only and RESTRICT-bound. The L-11
+    // purge must remove this publication-owned event, not weaken other FKs.
+    const scopeEvent=await admin.query<{id:string}>(
+      "INSERT INTO publication_scope_events(publication_id,operation_id,action,"+
+      "previous_scope,new_scope,policy_key,reason_code,rule_version,"+
+      "evidence_sha256,actor_ref) "+
+      "VALUES($1,$2,'SUPPRESS','IN_SCOPE','OUT_OF_SCOPE','L11_TEST',"+
+      "'EXCLUDED_DOU','1',$3,'l11-test') RETURNING id",
+      [pubId,randomUUID(),createHash('sha256').update('scope '+pubId).digest('hex')],
+    );
+    await admin.query(
+      "INSERT INTO publication_scope_state(publication_id,scope,current_event_id,"+
+      "policy_key,evidence_sha256) VALUES($1,'OUT_OF_SCOPE',$2,'L11_TEST',$3)",
+      [pubId,scopeEvent.rows[0]!.id,createHash('sha256').update('scope '+pubId).digest('hex')],
+    );
+
+    // A publication already linked to a customer must stay intact, including
+    // its match history. It is counted separately from physical deletions.
+    const secondHash=createHash('sha256').update(randomUUID()).digest('hex');
+    const protectedPublication=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [secondHash,canonicalType,'Publicação vinculada a cliente','https://example.test/'+secondHash],
+    );
+    const protectedId=protectedPublication.rows[0]!.id;
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Documento administrativo neutro',true,$3::jsonb)",
+      [protectedId,createHash('sha256').update('protected '+protectedId).digest('hex'),
+       JSON.stringify({dou:{section:'DO1'}})],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,$4::jsonb)",
+      [protectedId,sourceId,'https://example.test/'+secondHash,JSON.stringify({dou:{section:'DO1'}})],
+    );
+    const company=await admin.query<{id:string}>(
+      "INSERT INTO companies(tenant_id,legal_name,head_office_cnpj) "+
+      "VALUES($1,'Cliente protegido',$2) RETURNING id",
+      [owner.tenantId,'12'+Math.floor(Math.random()*1e12).toString().padStart(12,'0')],
+    );
+    const linked=await admin.query<{id:string}>(
+      "INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2) RETURNING id",
+      [company.rows[0]!.id,protectedId],
+    );
+    const profile=await admin.query<{id:string}>(
+      "INSERT INTO monitoring_profiles(company_id,name) VALUES($1,'L11 proteção') RETURNING id",
+      [company.rows[0]!.id],
+    );
+    await admin.query(
+      "INSERT INTO publication_matches(company_publication_id,monitoring_profile_id,profile_version,rule_engine_version) VALUES($1,$2,1,'l11-test')",
+      [linked.rows[0]!.id,profile.rows[0]!.id],
+    );
+
+    // A single publication can also be known to other official sources.
+    // DOU-specific filtering must not destroy these non-DOU origins.
+    const otherCode='l11-'+randomUUID().slice(0,9);
+    const other=await admin.query<{id:string}>(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "VALUES($1,'L11 Outra Fonte','FEDERAL','https://other.example.test',$1) RETURNING id",[otherCode],
+    );
+    const sharedHash=createHash('sha256').update(randomUUID()).digest('hex');
+    const shared=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [sharedHash,canonicalType,'Ato DOU compartilhado','https://example.test/'+sharedHash],
+    );
+    const sharedId=shared.rows[0]!.id;
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Aviso administrativo neutro',true,$3::jsonb)",
+      [sharedId,createHash('sha256').update('shared '+sharedId).digest('hex'),
+        JSON.stringify({dou:{section:'DO1'}})],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) VALUES "+
+      "($1,$2,$4,$5::jsonb),($1,$3,$6,'{}'::jsonb)",
+      [sharedId,sourceId,other.rows[0]!.id,
+       'https://example.test/'+sharedHash,JSON.stringify({dou:{section:'DO1'}}),
+       'https://other.example.test/'+sharedHash],
+    );
+
+    const payload={sourceCode:'dou',section:'DO1',canonicalType,mode:'EXCLUDE_ALWAYS'};
+    const denied=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers:ordinary.headers,payload});
+    assert.equal(denied.statusCode,403,denied.body);
+    const preview=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers:owner.headers,payload});
+    assert.equal(preview.statusCode,200,preview.body);
+    const count=preview.json<{count:number;blockedCompany:number;blockedOtherSource:number;token:string}>();
+    assert.equal(count.count,1);
+    assert.equal(count.blockedCompany,1);
+    assert.equal(count.blockedOtherSource,1);
+    assert.match(count.token,/^[a-f0-9]{64}$/);
+
+    // The archive changed after preview: no deletion or rule update may occur
+    // until PLATFORM_ADMIN explicitly confirms the newly calculated count.
+    const addedHash=createHash('sha256').update(randomUUID()).digest('hex');
+    const added=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [addedHash,canonicalType,'Segundo ato descartável','https://example.test/'+addedHash],
+    );
+    const addedId=added.rows[0]!.id;
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Novo documento administrativo sem tema tributário',true,$3::jsonb)",
+      [addedId,createHash('sha256').update('body '+addedId).digest('hex'),
+       JSON.stringify({dou:{section:'DO1'}})],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,$4::jsonb)",
+      [addedId,sourceId,'https://example.test/'+addedHash,JSON.stringify({dou:{section:'DO1'}})],
+    );
+
+    const stale=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers:owner.headers,payload:{...payload,expectedCount:count.count,previewToken:count.token}});
+    assert.equal(stale.statusCode,200,stale.body);
+    assert.equal(stale.json<{changed:boolean;count:number;deletedCount:number}>().changed,true);
+    assert.equal(stale.json<{count:number}>().count,2);
+    assert.equal(stale.json<{deletedCount:number}>().deletedCount,0);
+    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[pubId])).rowCount,1);
+
+    const fresh=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers:owner.headers,payload});
+    assert.equal(fresh.statusCode,200,fresh.body);
+    const approved=fresh.json<{count:number;token:string}>();
+    assert.equal(approved.count,2);
+
+    const confirm=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers:owner.headers,payload:{...payload,expectedCount:approved.count,previewToken:approved.token}});
+    assert.equal(confirm.statusCode,200,confirm.body);
+    assert.equal(confirm.json<{deletedCount:number}>().deletedCount,2);
+    const actual=await admin.query("SELECT id FROM publications WHERE id=$1",[pubId]);
+    assert.equal(actual.rowCount,0,'document must be physically gone');
+
+    for(const table of ['publication_scope_state','publication_scope_events',
+      'publication_versions','publication_origins']){
+      assert.equal((await admin.query(
+        'SELECT 1 FROM '+table+' WHERE publication_id=$1',[pubId],
+      )).rowCount,0,table+' must be removed with discarded publication');
+    }
+
+    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[addedId])).rowCount,0);
+    for(const [table,id] of [
+      ['publication_ncm_mentions',mention.rows[0]!.id],
+      ['publication_taxonomy_runs',taxRun.rows[0]!.id],
+      ['taxonomy_unmapped_occurrences',unmapped.rows[0]!.id],
+      ['taxonomy_candidate_occurrence_links',link.rows[0]!.id],
+    ]) {
+      assert.equal((await admin.query('SELECT 1 FROM '+table+' WHERE id=$1',[id])).rowCount,0,
+        'exclusive taxonomy/NCM evidence should be deleted: '+table);
+    }
+
+    const protectedRow=await admin.query(
+      "SELECT id FROM publications WHERE id=$1",[protectedId],
+    );
+    assert.equal(protectedRow.rowCount,1,'customer-linked act must be kept');
+    assert.equal((await admin.query("SELECT 1 FROM publication_matches WHERE company_publication_id=$1",
+      [linked.rows[0]!.id])).rowCount,1,'client matches must remain');
+    assert.equal((await admin.query("SELECT 1 FROM publications WHERE id=$1",
+      [sharedId])).rowCount,1,'cross-source publication must remain');
+    assert.equal((await admin.query("SELECT 1 FROM publication_origins WHERE publication_id=$1",
+      [sharedId])).rowCount,2,'both official origins must remain');
+    const audit=await admin.query<{after_data:{deletedIds:string[];deletedCount:number}}>(
+      "SELECT after_data FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
+      "AND after_data->'deletedIds' @> $1::jsonb ORDER BY occurred_at DESC LIMIT 1",
+      [JSON.stringify([pubId])],
+    );
+    assert.equal(audit.rows[0]?.after_data.deletedCount,2);
+    assert.deepEqual(new Set(audit.rows[0]?.after_data.deletedIds),new Set([pubId,addedId]));
+
+    const noDeleteRule={...payload,mode:'KEEP_ALWAYS'};
+    const noDeletePreview=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers:owner.headers,payload:noDeleteRule});
+    assert.equal(noDeletePreview.statusCode,200,noDeletePreview.body);
+    const zero=noDeletePreview.json<{count:number;token:string}>();
+    assert.equal(zero.count,0);
+    const noDeleteConfirm=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers:owner.headers,
+      payload:{...noDeleteRule,expectedCount:zero.count,previewToken:zero.token}});
+    assert.equal(noDeleteConfirm.statusCode,200,noDeleteConfirm.body);
+    assert.equal(noDeleteConfirm.json<{deletedCount:number}>().deletedCount,0);
+    const zeroAudit=await admin.query<{after_data:{deletedIds:string[];deletedCount:number}}>(
+      "SELECT after_data FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
+      "AND after_data->>'canonicalType'=$1 AND after_data->>'deletedCount'='0' "+
+      "ORDER BY occurred_at DESC LIMIT 1",[canonicalType]);
+    assert.equal(zeroAudit.rows[0]?.after_data.deletedCount,0);
+    assert.deepEqual(zeroAudit.rows[0]?.after_data.deletedIds,[]);
+    const removed=await admin.query<{sim: string|null; fn:string|null}>(
+      "SELECT to_regclass('public.collection_filter_simulation_items')::text AS sim,"+
+      "to_regprocedure('public.collection_filter_approve_draft(uuid)')::text AS fn"
+    );
+    assert.equal(removed.rows[0]?.sim,null);
+    assert.equal(removed.rows[0]?.fn,null);
+  } finally {
+    if (canonicalType) {
+      await admin.query("DELETE FROM collection_filter_type_rules WHERE canonical_type=$1",[canonicalType]);
+    }
+    if (ownerId) {
+      // Avoid contaminating later last-PLATFORM_ADMIN authorization tests.
+      await admin.query(
+        "UPDATE platform_user_roles SET revoked_at=COALESCE(revoked_at,now()), "+
+        "revoked_by=COALESCE(revoked_by,'l11-integration-cleanup') "+
+        "WHERE user_id=$1 AND revoked_at IS NULL",
+        [ownerId],
+      );
+    }
+    await app.close();
+    await admin.end();
+  }
+});

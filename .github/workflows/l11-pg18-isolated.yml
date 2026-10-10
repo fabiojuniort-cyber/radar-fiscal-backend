@@ -1,0 +1,75 @@
+name: L11 Isolated PG18 Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths:
+      - 'migrations/051_collection_filter_direct_rules_cleanup.sql'
+      - 'src/modules/collection/collection-filter.direct.ts'
+      - 'src/api/routes/collection-filter-admin.route.ts'
+      - 'test/collection-filter.admin.integration.test.ts'
+      - 'test/collection-filter.l11-performance.integration.test.ts'
+      - 'scripts/test-l11-configured-draft-guard.sh'
+      - '.github/workflows/l11-pg18-isolated.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  l11-pg18:
+    name: L11 migration 051 and direct DOU purge on isolated PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Apply complete schema with migration 051 and verify runtime roles
+        run: npm run db:prepare
+      - name: 'L11 integration: preview, drift, purge, customer protections, audit'
+        run: npx tsx --test test/collection-filter.admin.integration.test.ts
+      - name: L11 configured DRAFT blocks migration 051 without data loss
+        run: bash scripts/test-l11-configured-draft-guard.sh
+      - name: Measure preview and confirmation over 120k synthetic DOU acts
+        timeout-minutes: 19
+        run: npx tsx --test test/collection-filter.l11-performance.integration.test.ts
+      - name: Verify migration 051 recorded and simulation objects absent
+        shell: bash
+        run: |
+          result=$(PGPASSWORD=postgres psql -h localhost -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 -Atc "
+            SELECT CASE WHEN
+              EXISTS (SELECT 1 FROM schema_migrations WHERE filename='051_collection_filter_direct_rules_cleanup.sql')
+              AND to_regclass('public.collection_filter_simulation_items') IS NULL
+              AND to_regprocedure('public.collection_filter_approve_draft(uuid)') IS NULL
+            THEN 'PASS' ELSE 'FAIL' END;
+          ") 
+          test "$result" = PASS

@@ -17,9 +17,6 @@ import {
   processPublicationTaxonomyBatch,
 } from './modules/taxonomy/classification/classification.worker.js';
 import {
-  processCollectionFilterSimulationBatch,
-} from './modules/collection/collection-filter.simulation.js';
-import {
   assertStandaloneDatabaseConnection,
   assertWorkerRuntimeConnection,
   createStandaloneDatabase,
@@ -149,58 +146,6 @@ async function backfillDou(
   }
 }
 
-
-async function simulateCollectionFilter(
-  db: ReturnType<typeof createStandaloneDatabase>,
-): Promise<void> {
-  try {
-    const result = await processCollectionFilterSimulationBatch(
-      db,
-      {
-        workerId: env.COLLECTION_WORKER_ID,
-        batchSize: 500,
-      },
-    );
-
-    if (result.state === 'BATCH') {
-      processLogger.info(
-        {
-          simulationId: result.simulationId,
-          inspected: result.inspected,
-          processed: result.processed,
-        },
-        'Collection filter simulation batch completed',
-      );
-    } else if (result.state === 'COMPLETED') {
-      processLogger.info(
-        {
-          simulationId: result.simulationId,
-          processed: result.processed,
-          metrics: result.metrics,
-        },
-        'Collection filter simulation completed',
-      );
-    } else if (result.state === 'FAILED') {
-      processLogger.error(
-        {
-          simulationId: result.simulationId,
-          errorCode: result.errorCode,
-        },
-        'Collection filter simulation failed',
-      );
-    }
-  } catch (error) {
-    processLogger.warn(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unknown collection filter simulation error',
-      },
-      'Collection filter simulation tick failed',
-    );
-  }
-}
 
 async function enrichPublicationNcms(
   db: ReturnType<typeof createStandaloneDatabase>,
@@ -337,7 +282,6 @@ async function run(): Promise<void> {
           );
 
         if (!acquired) {
-          await simulateCollectionFilter(db);
           await backfillDou(db);
           await enrichPublicationNcms(
             db,
