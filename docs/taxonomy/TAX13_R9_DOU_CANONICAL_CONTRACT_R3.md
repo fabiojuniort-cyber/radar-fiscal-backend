@@ -110,7 +110,8 @@ CREATE TABLE public.tax13_dou_archive_manifest (
   CHECK(zip_purpose='INLABS_ZIP'),
  zip_sha256 char(64) NOT NULL CHECK(zip_sha256 ~ '^[a-f0-9]{64}$'),
  parts jsonb NOT NULL CHECK(jsonb_typeof(parts)='array' AND
-  jsonb_array_length(parts) BETWEEN 1 AND 48),
+  jsonb_array_length(parts) BETWEEN 1 AND 48 AND
+  pg_column_size(parts) <= 16384),
  manifest_sha256 char(64) NOT NULL CHECK(manifest_sha256 ~ '^[a-f0-9]{64}$'),
  parser_version text NOT NULL, created_at timestamptz NOT NULL,
  UNIQUE(id,job_id),
@@ -190,6 +191,7 @@ CREATE TABLE public.tax13_dou_act_correlations (
  parent_end integer NOT NULL CHECK(parent_end>parent_start),
  child_start integer NOT NULL CHECK(child_start>=parent_start),
  child_end integer NOT NULL CHECK(child_end>child_start),
+ CHECK(child_end<=parent_end),
  norm_version text NOT NULL,
  comparison_sha256 char(64) NOT NULL UNIQUE
   CHECK(comparison_sha256 ~ '^[a-f0-9]{64}$'),
@@ -285,6 +287,21 @@ CREATE TRIGGER no_dou_http_update_delete BEFORE UPDATE OR DELETE
 **Funções de negócio não são stubs que "RAISE sempre"; estão especificadas por pré-condições/postcondições de §§1–4.** A assinatura SQL compilável de cada gateway é parte da FUTURA 049+, somente após revisão independente R3. Não criar ficção de função SQL que acredita em um boolean verified passado pelo chamador. Revisores devem distinguir aprovação do contrato de implementação verificável do binário confiável.
 
 Revogação/concorrência: locks por credential_id obtidos em ordem crescente nos gateways, revocation e projector; funções de escrita fazem check após lock e antes de COMMIT, transaction READ COMMITTED com retry de serialização quando necessário. Projeção é não persistida e reavalia revogação em cada SELECT (concorrência com revogação requer linearização transacional). Se status muda depois da consulta, não manter cache positivo persistente.
+
+### 4.1. Condições de segurança fechadas em chamadas transacionais
+
+O futuro gateway de captura opera com a combinação de credencial de sessão, alvo planejado e função de papel único. Nenhum registro de `CAPTURED` gravado por `radar_dou_collector_runtime` é, isoladamente, credencial de admissão: `read_documentary_status` deve retornar `UNVERIFIED` até serem inseridos *separadamente* os três eventos do verificador, e estes precisam ter o mesmo conteúdo HTTP original (hash para cada alvo) efetivamente reobtido. Os registros positivos usam a **mesma identidade de job**, mas não o mesmo segredo nem o mesmo processo.
+
+**Pré-condições precisas de `admit_documentary_chain`:** sessão do verificador exata; transação read committed com lock exclusivo no `job_id`; status das seis capturas CAPTURED e roles/propósitos coerentes; lookup de `job.pdf_url / index_url / zip_url` idêntico a `requested_url / final_url` em cada par; SHA256 idêntico dentro de cada par; atestação de integridade TLS dos GETs feita pelo próprio serviço em egress segregado; certificado TLS normal do transporte válido na hora (sem certificação de assinatura do PDF); registro do índice rederivado, ZIP e partes/XML rederivados na memória do verificador; edição impressa data/seção/número/sufixo vinculados ao índice; referências INLABS/Despacho/ato compatíveis; correspondência textual integral; credentials collector/verifier/scheduler não revogadas, check temporal e audit fingerprint. Apenas após isso o gateway insere manifestação, binding, verificação e correlação na **mesma transação**. O SQL não extrai novamente bytes PDF: exige integridade dos dois processos como parte explícita do trust model. Se qualquer requisito falhar, a transação positiva não grava *nenhum* dos quatro eventos e fica UNVERIFIED.
+
+**Projeção read-only:** ao receber correlation_id, o projetor localiza seus quatro níveis de FK, localiza seis eventos por referência *tipada*, reexige status=CAPTURED, compara SHA dos pares, URLs versus job, checa report=CORRESPONDS, key revocations para scheduler/collector/verifier e eventuais correlatos conflitantes que partilhem (data, seção, journal, edição sufixada, página, matter). Se faltar campo, chave, igualdade ou revalidação temporal → UNVERIFIED. Não há operação que transforme isso automaticamente em atestação jurídica CURRENT. Nenhum parâmetro pode ignorar a checagem por `skipVerification`, `issuer`, `admin`, `force` ou `sourceCapture.status`.
+
+**Races e idempotência:** geradores de job usam UUIDs e targets fechados. Cada role faz `pg_advisory_xact_lock` para (job_id,actor,purpose); credenciais e revogações seguem ordem determinística (sorted credential_id) em todos os gateways. `ON CONFLICT` não muda resultado: se chave e fingerprint iguais, replay é identificado como mesma tentativa; se diferentes, erro `DOU_R3_REPLAY_CONFLICT`. Toda falha de transporte deixa evento próprio, nunca `NO_RELEVANT_PUBLICATIONS`. Para assegurar atomicidade com revogação, o tratamento deve ser linearizável nos gates de escrita e projeção, inclusive quando duas transações ocorrem durante a rotação; testes adversariais com duas sessões PG16 e PG18 serão obrigatórios na 049+ **após gate R3**.
+
+**Acesso por tenant:** a informação canônica é global, mas o projetor somente devolve estado documental associado a um identificador de publicação que já tenha sido autorizado pela camada de relevância tenant. O gateway `radar_dou_read_runtime` não pode expor SELECT genérico de todas as publicações a uma API de cliente sem autorização tenant. Testes A/B devem demonstrar que associação do tenant A não pode ser lida por B.
+
+**Risco formal declarado:** hash coincidente de respostas de dois GETs não demonstra autenticidade absoluta sob colusão de processos; integridade do release assinado, segregação de rede/segredos, rotação e revogação de credenciais compõem o limite de confiança. Não mascarar isso com HMAC de DTO, TypeScript readonly ou coluna de status SQL.
+
 
 ## 5. Texto, timeline, retenção e critérios de aceite
 
