@@ -1,3 +1,5 @@
+> **POLÍTICA ATUAL (10/10/2026, Trifaros):** A análise de certificados/ICP/OCSP documentada abaixo é apenas registro técnico histórico, NÃO um requisito de publicação, admissibilidade ou próximos passos. O proprietário adotou PDF de fonte oficial confiável + URL/identidade/texto/hash. Ver `TAX13_R802_DOU_PROVENANCE_TRANSITION.md`. Não solicitar VALIDAR/ITI.
+
 # Trifaros TAX13-R8-02 — DOU 25 April 2024: signed regular edition is NOT the certified extraordinary issue
 
 **Checked:** 2026-10-09. **Security judgment: BLOCK legal CURRENT.** Technical verification only, no real-data import/merge/deploy and no historical 1991/1997 work.
