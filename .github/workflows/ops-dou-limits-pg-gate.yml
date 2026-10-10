@@ -10,7 +10,7 @@ on:
       - 'src/modules/collection/dou.parser.ts'
       - 'src/modules/collection/inlabs.client.ts'
       - 'src/api/routes/platform-admin.route.ts'
-      - 'test/platform-admin.integration.test.ts'
+      - 'test/dou-limits-admin.integration.test.ts'
       - 'test/dou-download-limits.unit.test.ts'
       - '.github/workflows/ops-dou-limits-pg-gate.yml'
 permissions:
