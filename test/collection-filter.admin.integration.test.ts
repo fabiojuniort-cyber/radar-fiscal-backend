@@ -20,7 +20,7 @@ async function account(app:FastifyInstance, prefix:string) {
   const login=await app.inject({method:'POST',url:'/auth/login',payload:{email,password:PASSWORD}});
   assert.equal(login.statusCode,200,login.body);
   const token=login.json<{accessToken:string}>().accessToken;
-  return {id:data.user.id,headers:{authorization:'Bearer '+token,'x-tenant-id':data.tenant.id}};
+  return {id:data.user.id,tenantId:data.tenant.id,headers:{authorization:'Bearer '+token,'x-tenant-id':data.tenant.id}};
 }
 
 test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act with audit',async()=>{
@@ -72,6 +72,36 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       [pubId,sourceId,'https://example.test/'+identifier,JSON.stringify({dou:{section:'DO1'}})],
     );
 
+    // A publication already linked to a customer must stay intact, including
+    // its match history. It is counted separately from physical deletions.
+    const secondHash=createHash('sha256').update(randomUUID()).digest('hex');
+    const protectedPublication=await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
+      [secondHash,canonicalType,'Publicação vinculada a cliente','https://example.test/'+secondHash],
+    );
+    const protectedId=protectedPublication.rows[0]!.id;
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+      "VALUES($1,1,$2,'Documento administrativo neutro',true,$3::jsonb)",
+      [protectedId,createHash('sha256').update('protected '+protectedId).digest('hex'),
+       JSON.stringify({dou:{section:'DO1'}})],
+    );
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,$4::jsonb)",
+      [protectedId,sourceId,'https://example.test/'+secondHash,JSON.stringify({dou:{section:'DO1'}})],
+    );
+    const company=await admin.query<{id:string}>(
+      "INSERT INTO companies(tenant_id,legal_name,head_office_cnpj) "+
+      "VALUES($1,'Cliente protegido',$2) RETURNING id",
+      [owner.tenantId,'12'+Math.floor(Math.random()*1e12).toString().padStart(12,'0')],
+    );
+    await admin.query(
+      "INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)",
+      [company.rows[0]!.id,protectedId],
+    );
+
     const payload={sourceCode:'dou',section:'DO1',canonicalType,mode:'EXCLUDE_ALWAYS'};
     const denied=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/preview',
@@ -83,7 +113,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     assert.equal(preview.statusCode,200,preview.body);
     const count=preview.json<{count:number;blockedCompany:number;token:string}>();
     assert.equal(count.count,1);
-    assert.equal(count.blockedCompany,0);
+    assert.equal(count.blockedCompany,1);
     assert.match(count.token,/^[a-f0-9]{64}$/);
 
     const confirm=await app.inject({method:'POST',
@@ -93,6 +123,10 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     assert.equal(confirm.json<{deletedCount:number}>().deletedCount,1);
     const actual=await admin.query("SELECT id FROM publications WHERE id=$1",[pubId]);
     assert.equal(actual.rowCount,0,'document must be physically gone');
+    const protectedRow=await admin.query(
+      "SELECT id FROM publications WHERE id=$1",[protectedId],
+    );
+    assert.equal(protectedRow.rowCount,1,'customer-linked act must be kept');
     const audit=await admin.query<{after_data:{deletedIds:string[];deletedCount:number}}>(
       "SELECT after_data FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
       "AND after_data->'deletedIds' @> $1::jsonb ORDER BY occurred_at DESC LIMIT 1",
