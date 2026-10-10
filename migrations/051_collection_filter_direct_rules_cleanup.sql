@@ -20,6 +20,24 @@ DROP TABLE IF EXISTS public.collection_filter_simulations;
 DELETE FROM public.collection_filter_policies WHERE status='DRAFT';
 DROP INDEX IF EXISTS public.uq_collection_filter_one_draft;
 
+-- A fresh installation without an APPROVED policy must still collect DOU.
+-- Empty rules are fail-open (unknown type -> KEEP until PLATFORM_ADMIN classifies).
+INSERT INTO public.collection_filter_policies(
+  version,status,approved_at,change_notes
+)
+SELECT
+  COALESCE((SELECT max(version) FROM public.collection_filter_policies),0)+1,
+  'APPROVED',now(),'L-11 initial fail-open policy'
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.collection_filter_policies WHERE status='APPROVED'
+);
+
+ALTER TABLE public.collection_filter_policies
+  DROP CONSTRAINT IF EXISTS collection_filter_policies_status_check;
+ALTER TABLE public.collection_filter_policies
+  ADD CONSTRAINT collection_filter_policies_status_check
+  CHECK (status IN ('APPROVED','SUPERSEDED'));
+
 CREATE OR REPLACE FUNCTION public.collection_filter_direct_set_rule(
   p_source TEXT,
   p_section TEXT,
