@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {extractDouOnePageNativePdfText} from '../src/modules/taxonomy/legal-scope/dou-native-pdf-text.js';
 import {legacyPdfFixture} from './doe-sp-legacy.pdf-fixtures.js';
+import {syntheticWrappedOnePagePdf} from './dou-one-page.pdf-fixtures.js';
 
 test('TAX13 DOU: native PDF extractor consumes one page without changing original bytes',async()=>{
  const content='DIARIO OFICIAL DA UNIAO N 80-B DESPACHO N 16 CONVENIO ICMS N 15 '+
   'CLAUSULA PRIMEIRA REGRAS FISCAIS DE MARCO DE 2024 '+
   'CLAUSULA SEGUNDA PRAZO DE PAGAMENTO CLAUSULA TERCEIRA MULTAS E ACRESCIMOS '+
   'CLAUSULA QUARTA RATIFICACAO NACIONAL E VIGENCIA';
- const bytes=legacyPdfFixture({text:content,pages:1});
+ const bytes=syntheticWrappedOnePagePdf(content);
  const original=new Uint8Array(bytes);
  const result=await extractDouOnePageNativePdfText(bytes);
  assert.equal(result.status,'PDF_NATIVE_TEXT_EXTRACTED',JSON.stringify(result));
