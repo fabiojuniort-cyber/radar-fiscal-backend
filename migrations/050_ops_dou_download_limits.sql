@@ -20,6 +20,11 @@ DECLARE
   v_xml int;
   v_updated int;
 BEGIN
+  -- Only the established API runtime may invoke this privileged write gate.
+  -- In SECURITY DEFINER, current_user is the owner; session_user is the caller.
+  IF session_user <> 'radar_app_runtime' THEN
+    RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='platform_admin_required';
+  END IF;
   -- Serialize with platform-admin role changes BEFORE authorizing the actor.
   -- The role-revocation gateway (migration 036) takes the same lock.
   PERFORM pg_catalog.pg_advisory_xact_lock(
