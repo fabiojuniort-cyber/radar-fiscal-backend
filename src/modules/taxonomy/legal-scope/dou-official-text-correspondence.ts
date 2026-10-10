@@ -96,10 +96,24 @@ export function correlateOfficialDouPdfActText(input:{
  // second edition cited later in the dispatch or legal body.
  const mastheadAt=text.indexOf('DIÁRIO OFICIAL')>=0?
   text.indexOf('DIÁRIO OFICIAL'):text.indexOf('DIARIO OFICIAL');
- const masthead=text.slice(mastheadAt,mastheadAt+260);
+ const parentHeadingInPdf=text.indexOf(normalized(parent.title),mastheadAt);
+ const masthead=text.slice(mastheadAt,Math.min(
+  mastheadAt+450,parentHeadingInPdf>=0?parentHeadingInPdf:mastheadAt+450,
+ ));
  const firstEdition=masthead.match(/\bN\s+([0-9]{1,4}(?:-[A-Z])?)\b/);
  if(!firstEdition||firstEdition[1]!==printedEdition)
   return reject('DOU_WRONG_PRINTED_EDITION');
+ // Edition date must be printed near the actual masthead, not cited inside
+ // a later legal provision. INLABS date alone is not a PDF-content check.
+ const [year,month,day]=trace.publicationDate.split('-');
+ const monthNames=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO',
+  'JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+ const longDate=new RegExp('\\b'+String(Number(day))+'\\s+DE\\s+'+
+  monthNames[Number(month)-1]+'\\s+DE\\s+'+year+'\\b');
+ const numericDate=new RegExp('\\b'+day+'\\s*[/.-]\\s*'+month+
+  '\\s*[/.-]\\s*'+year+'\\b');
+ if(!longDate.test(masthead)&&!numericDate.test(masthead))
+  return reject('DOU_WRONG_PRINTED_DATE');
  const parentHeading=normalized(parent.title);
  const actHeading=normalized(act.title);
  const actContent=act.content?normalized(legalText(act.content)):'';
