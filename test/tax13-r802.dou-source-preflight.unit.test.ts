@@ -186,7 +186,7 @@ test('R802 policy: PDF metadata and hash never require signature validation or i
  const url='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
  // No /ByteRange, cryptographic signature, certificate policy, ICP or OCSP
  // metadata: a source document can still be traced and hashed.
- const plainPdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const plainPdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
  const result=preflightContemporaryDouPdfBytes({trace,pdfUrl:url,pdfBytes:plainPdf});
  assert.equal(result.status,'DOU_PDF_BYTES_BOUND_ONLY');
  assert.equal(result.candidate?.outstandingGates.includes('DIRECT_OFFICIAL_HTTPS_SOURCE_FETCH'),true);
