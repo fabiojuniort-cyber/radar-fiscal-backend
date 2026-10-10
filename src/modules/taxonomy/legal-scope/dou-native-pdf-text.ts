@@ -29,7 +29,7 @@ export async function extractDouOnePageNativePdfText(
   // buffer used to compute SHA256 for the original government download.
   task=getDocument({
    data:new Uint8Array(bytes),disableFontFace:true,useSystemFonts:false,
-   stopAtErrors:true,verbosity:0,isEvalSupported:false,
+   stopAtErrors:true,verbosity:0,
   });
   const doc=await task.promise;
   if(doc.numPages!==1)return fail('DOU_PDF_TEXT_ONE_PAGE_REQUIRED');
