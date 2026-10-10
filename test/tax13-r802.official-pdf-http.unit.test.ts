@@ -27,7 +27,7 @@ const trace:DouConfazTrace={
  outstandingGates:['OFFICIAL_HTTPS_PDF_SOURCE_CAPTURE'],
 };
 const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
-const official='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=25%2F04%2F2024&jornal=601&pagina=1';
+const official='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?captchafield=firstAccess&data=25%2F04%2F2024&jornal=601&pagina=1';
 
 test('TAX13 DOU synthetic fetch: official URL derived from trace, PDF bytes hashed, no CURRENT',async t=>{
  const seen:string[]=[];
