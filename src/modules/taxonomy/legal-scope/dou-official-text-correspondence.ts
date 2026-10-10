@@ -119,7 +119,8 @@ export function correlateOfficialDouPdfActText(input:{
  // Compare the on-page printed section, not merely the INLABS section.
  // A missing/ambiguous printed label remains UNVERIFIED, not an inferred DO1.
  const printedSection=section.startsWith('DO3')?'3':'1';
- if(!new RegExp('(?:SEÇÃO|SECAO)\\s+'+printedSection+'\\b').test(masthead))
+ const sectionLabels=[...masthead.matchAll(/(?:SEÇÃO|SECAO)\s+([13])\b/g)];
+ if(sectionLabels.length!==1||sectionLabels[0]?.[1]!==printedSection)
   return reject('DOU_WRONG_OR_MISSING_PRINTED_SECTION');
  const parentHeading=normalized(parent.title);
  const actHeading=normalized(act.title);
