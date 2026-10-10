@@ -325,6 +325,88 @@ CREATE TRIGGER trg_dou_http_immutable BEFORE UPDATE OR DELETE
 
 **Read path:** serviço comum recebe apenas `source_publication_status = VERIFIED / UNVERIFIED / PENDING` de função projetora invocada via `radar_dou_read_runtime` com SELECT restrito a metadados globais. Não expor registro de credenciais nem recargos HMAC, não permitir o usuário selecionar/outro tenant manipular identidades. Se tabelas de afinidade por tenant apontarem para `child_act_version_id`, isolamento no join desse módulo é obrigatório e avaliado separadamente.
 
+### 4.3. Contrato de funções de admissão (minuta SQL para revisão)
+
+A política de inserção é somente de **radar_dou_evidence_owner**. Nem coletor nem verificador recebe INSERT direto. A função SECURITY DEFINER é de propriedade do owner NOLOGIN; session_user continua sendo o login de conexão real (não muda com SET ROLE). Os alvos têm de ser cadastrados pelo scheduler: a URL escolhida não pode ser parâmetro independente do coletor.
+
+**Extensão proposta da tabela jobs:** planned_pdf_url, planned_index_url e planned_archive_url, cada um com CHECK rigoroso de host/caminho/query por finalidade e NOT NULL na versão migratória. A função abaixo mostra a exigência de que a tentativa esteja vinculada ao alvo. Não é prova criptográfica de rede: sem um processo coletor confiável, qualquer hash do corpo declarado pode ser falso.
+
+~~~sql
+-- DESIGN ONLY, NÃO EXECUTAR EM PRODUÇÃO.
+ALTER TABLE public.tax13_dou_collection_jobs
+ ADD COLUMN planned_pdf_url text,
+ ADD COLUMN planned_index_url text,
+ ADD COLUMN planned_archive_url text;
+
+CREATE FUNCTION public.tax13_dou_record_capture(
+ p_job uuid, p_attempt integer, p_purpose text, p_url text,
+ p_http_status integer, p_content_type text, p_len bigint,
+ p_sha char(64), p_started timestamptz, p_finished timestamptz,
+ p_credential uuid, p_collector_version text,
+ p_error text, p_fingerprint char(64)
+) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public,pg_temp AS $
+DECLARE
+ j public.tax13_dou_collection_jobs%ROWTYPE;
+ c public.tax13_dou_runtime_credentials%ROWTYPE;
+ expected_url text; outcome text;
+ new_id uuid := gen_random_uuid();
+BEGIN
+ IF session_user IS DISTINCT FROM 'radar_dou_collector_runtime' THEN
+  RAISE EXCEPTION 'DOU_COLLECTOR_SESSION_REQUIRED';
+ END IF;
+ SELECT * INTO j FROM public.tax13_dou_collection_jobs WHERE id=p_job;
+ SELECT * INTO c FROM public.tax13_dou_runtime_credentials WHERE id=p_credential;
+ IF j.id IS NULL OR c.id IS NULL OR c.principal<>'COLLECTOR'
+    OR p_started<c.active_from OR p_finished>=c.expires_at
+    OR EXISTS(SELECT 1 FROM public.tax13_dou_credential_revocations r
+              WHERE r.credential_id=c.id)
+    OR p_finished<p_started
+    OR p_finished>statement_timestamp()+interval '30 seconds'
+    OR p_finished<statement_timestamp()-interval '120 seconds' THEN
+   RAISE EXCEPTION 'DOU_CAPTURE_IDENTITY_INVALID';
+ END IF;
+ expected_url:=CASE p_purpose
+  WHEN 'DOU_PDF' THEN j.planned_pdf_url
+  WHEN 'DOU_INDEX' THEN j.planned_index_url
+  WHEN 'INLABS_ARCHIVE' THEN j.planned_archive_url ELSE NULL END;
+ IF expected_url IS NULL OR p_url IS DISTINCT FROM expected_url THEN
+   RAISE EXCEPTION 'DOU_CAPTURE_TARGET_INVALID';
+ END IF;
+ -- O banco NÃO vê os bytes TLS: é o código de coleta isolado que origina
+ -- os parâmetros. Verificação independente é obrigatória depois.
+ outcome:=CASE WHEN p_error IS NOT NULL THEN 'ERROR'
+  WHEN p_http_status=200 THEN 'CAPTURED' ELSE 'REJECTED' END;
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_job::text||':'||p_purpose,0));
+ INSERT INTO public.tax13_dou_http_fetch_events(
+   id,job_id,attempt_number,source_identity_id,purpose,outcome,
+   requested_url,final_url,http_status,content_type,byte_count,document_sha256,
+   started_at,finished_at,collector_credential_id,collector_version,
+   sanitized_error_code,event_fingerprint
+ ) VALUES (
+   new_id,p_job,p_attempt,j.source_identity_id,p_purpose,outcome,
+   p_url,CASE WHEN outcome='CAPTURED' THEN p_url ELSE NULL END,
+   p_http_status,p_content_type,p_len,
+   CASE WHEN outcome='CAPTURED' THEN p_sha ELSE NULL END,
+   p_started,p_finished,p_credential,p_collector_version,
+   CASE WHEN outcome='CAPTURED' THEN NULL ELSE COALESCE(p_error,'HTTP_NOT_ACCEPTED') END,
+   p_fingerprint
+ );
+ RETURN new_id;
+END $;
+REVOKE ALL ON FUNCTION public.tax13_dou_record_capture(
+ uuid,integer,text,text,integer,text,bigint,char(64),
+ timestamptz,timestamptz,uuid,text,text,char(64)) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.tax13_dou_record_capture(
+ uuid,integer,text,text,integer,text,bigint,char(64),
+ timestamptz,timestamptz,uuid,text,text,char(64))
+ TO radar_dou_collector_runtime;
+~~~
+
+**Verificador segregado:** função de admissão, com session_user obrigatório **radar_dou_verifier_runtime** e pertencente ao owner, recebe apenas referências a eventos que já existam e digests de comparação. Valida internamente, em transação serializada: três fetches CAPTURED, purpose PDF/INDEX/INLABS correspondentes, mesmo job + identity, IDs não iguais, URLs estritas, credenciais não expiradas/não revogadas, hash da resposta PDF coincidente com bytes vistos no verificador, índice → journal/sufixo/documento, digest real de ZIP/partes XML, despacho/ato e delimitação textual. Faz INSERT de verification + correlation na mesma transação ou rollback. Nenhum parâmetro verified=true nem DTO externo constitui validação. A verificação do conteúdo da rede/XML acontece em processo confiável separado; SQL não pode reexecutar parser PDF apenas a partir de hashes.
+
+**Lacuna residual explícita:** a segunda função completa não é fornecida como função SQL executável nesta RFC, porque modelá-la como aceitação de um boolean validado pelo próprio chamador criaria a falha R9-D01. O futuro código de integração precisa ser projetado e testado conjuntamente. O R9-DESIGN-R2 deverá julgar se o contrato e a separação proposta são suficientes como desenho; não se deve declarar aprovado um verificador cujo código ainda não existe.
+
 ## 5. Conteúdo e extração — R9-D03 / R9-D07
 
 `correlateOfficialDouPdfActText` é função unitária de comparação, construível a partir de objetos manuais; só retorna **candidato não admissível** (`sqlSourceAdmissionAllowed=false`). O status textual sozinho nunca alimenta `tax13_dou_act_correlations` positivo. O algoritmo de admissão (futuro) deve exigir capturas verificador + coletor + bytes originais correlacionados.
