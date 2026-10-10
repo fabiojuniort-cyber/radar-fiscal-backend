@@ -54,3 +54,20 @@ CONFAZ official source: https://www.confaz.fazenda.gov.br/legislacao/convenios/2
 - Synthetic XML/act fixtures exercise the full normalized act span (not a mere title or citation); one altered phrase, missing parent dispatch, or wrong printed edition returns UNVERIFIED. No certificate/ICP parsing is used.
 - The archived real **Extra 80-B one-page PDF** remains the correct documentary sample: Despacho nº 16/2024 and Convênio ICMS nº 15/2024. The real upstream INLABS ZIP + controlled HTTPS fetch of this exact edition have **not** been demonstrated in CI or this conversation; do not claim official automated capture or current legal proof.
 - **Next engineering gate:** unify same-buffer official fetch + one-page PDF native-text extraction + precise XML source binding, then design a separate additive SQL source-admission path preserving migration 048, with PG16/PG18 and R9 independent review. For real effectivity also require ratification and future amendments/revocations by device. No historical 1991/1997 acquisition.
+
+## Same-byte integration completed in branch — 2026-10-10
+
+The read-only **one-page** call `fetchAndMatchOfficialDouPdfAct` in `dou-official-http-pdf-capture.ts` now:
+1. Fetches once from the official DOU viewer URL derived from INLABS trace, with HTTPS, no redirects, bounded 20 MiB original bytes, content-length and identity-encoding guards.
+2. Hashes these same bytes and applies the original edition/date/journal/page PDF preflight.
+3. Lazily extracts native text from a **copy of those same bytes** using `pdfjs-dist`, refuses multi-page or empty/incomplete text, and preserves the original hash buffer.
+4. Compares the native text against the entire parser-rederived CONFAZ act (not a title-only citation), original dispatch heading and printed edition marker.
+5. Returns `DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY` or `UNVERIFIED`, always `grantsLegalCurrent=false`. **No PDF digital certificate, ICP, OCSP, CRL or ITI verification** is required.
+
+The original PDF binary and extracted text exist **only in bounded process memory** during the operation; no automatic PostgreSQL write or file storage is implemented.
+
+CI uses generated **synthetic** single-page PDFs with line-wrapped text and mocked HTTP responses. On the validated commit `b4a0a124ff6a1aa7a052e346d20fd615bb4a0793`, the dedicated DOU suite [#38020668847](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/actions/runs/38020668847) passed **19/19 tests**, including a complete same-byte read/extract/correlate scenario. These tests do **not** establish a successful real government request or actual INLABS metadata for Convênio 15/24. The extra #80-B upload remains a correct text-reference sample, not a logged HTTP source response.
+
+**Known bounded-extraction limitation:** PDF native text may not be available or appear in inconsistent column order; a mismatch produces UNVERIFIED rather than inventing text or legal effectivity. Full signed editions larger than 20 MiB and historical archive imports remain out of scope. Do not convert a full edition into a purported original signed page.
+
+**Next gate:** obtain a real official-server single-page capture with genuine matching INLABS archive context; design separate additive SQL provenance mapping, prove legal effectivity (ratification/amendments), run PG16/18 and R7 positive cases without forged trust, then independent R9. Do not modify/disable migration 048.
