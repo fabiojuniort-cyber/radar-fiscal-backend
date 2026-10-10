@@ -2,7 +2,7 @@
  * TAX13-R8-02. DOU/INLABS XML provenance preflight, READ ONLY.
  * These metadata hashes can be fabricated. This module MUST NEVER attest
  * official authenticity, legal vigency, produce receipts, or admit CURRENT.
- * Certified Imprensa Nacional publication + independent custody are pending.
+ * Official HTTPS PDF-source capture and exact legal-text correspondence are pending.
  */
 import {createHash} from 'node:crypto';
 import type {ConnectorPublication} from '../../collection/connector.contract.js';
@@ -155,7 +155,7 @@ export function preflightDouConfazTrace(input:{
   embedded,parentExternalId:parent.externalId,
   parentTextSha256:createHash('sha256').update(parent.content,'utf8').digest('hex'),
   outstandingGates:[
-   'INDEPENDENT_CERTIFIED_DOU_PUBLICATION_VALIDATION',
+   'OFFICIAL_HTTPS_PDF_SOURCE_CAPTURE',
    'AUTHENTICATED_XML_TO_CERTIFIED_TEXT_CORRESPONDENCE',
    'INDEPENDENT_LEGAL_EFFECTIVITY_ATTESTATION'
   ]
