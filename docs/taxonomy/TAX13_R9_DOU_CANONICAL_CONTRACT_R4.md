@@ -32,27 +32,23 @@ A captura Railway PDF anterior SHA 9cbfa79d35db5a63320c78620543a69f99e05c49f69e7
 ZIP INLABS autenticado → XMLs por matéria → publicação canônica global e publication_versions → validação de identidade/metadados → taxonomia/IA/filtros/busca → fatos jurídicos por dispositivo ligados a versão XML → relevância por tenant sob RLS. Falha em PDF não é falha desta cadeia.
 
 **Atestação documental (SELEÇÃO EXPLÍCITA):**
-â ncora XML → scheduler restrito → GETs oficiais independentes COLLECTOR/VERIFIER para PDF, índice reconhecido e ZIP INLABS (3 alvos, 6 eventos **somente por job selecionado**) → manifesto arquivo + partes desta matéria → identidade seção/jornal/edição sufixada/página → cotejo integral do despacho com texto XML → verification_event de matéria → 0..N act_correlations → projeção documental sob rechecagem de revogação.
+âncora XML → scheduler restrito → GETs oficiais independentes COLLECTOR/VERIFIER para PDF, índice reconhecido e ZIP INLABS (3 alvos, 6 eventos **somente por job selecionado**) → manifesto arquivo + partes desta matéria → identidade seção/jornal/edição sufixada/página → cotejo integral do despacho com texto XML → verification_event de matéria → 0..N act_correlations → projeção documental sob rechecagem de revogação.
 
 Não exigir agendar atestação para toda publicação XML. Seleção e orçamento devem ser auditáveis. Um XML pode ser PARSED/CLASSIFIED/TEMPORAL_FACTS_REVIEWED enquanto documental=NOT_REQUESTED/PENDING/UNAVAILABLE/REJECTED, sem criar SOURCE_ATTESTED nem CURRENT.
 
 ## 3. Identidade canônica: versão XML, parte e ato
 
-### 3.1 Âncora XML global, NÃO aprovação documental
+### 3.1. Duas identidades XML: matéria e ato — nenhuma depende de PDF
 
-Uma âncora corresponde a uma **versão de um ato** derivado de matéria INLABS; para um despacho com dois Convênios, duas âncoras de child act podem apontar à mesma versão pai e à mesma matéria/ZIP.
+**XML matter (uma por versão da matéria original)**: tax13_dou_xml_matters liga source_origin_id ao publication_versions do DESPACHO/ato pai, com parent_publication_id, parent_version_no, parent_content_hash do banco, date, section, numeric_edition, journal_id do nome da parte XML, page, matter_id, parent_external_id, original_archive_url/sha256, XML matter parts digest e matter_content_key_v4. Guarda uma identidade candidata XML **sem inventar sufixo A/B**. O gateway de ancoragem confere publication_origins.publication_id/source_id/external_id, publication_versions.publication_id/version_no/content_hash e source_metadata.dou.parts/archive a partir do parser; nenhuma FK simples entre tabelas garante essa consistência sozinha.
 
-Campos mínimos obrigatórios:
-- anchor_id uuid imutável; child_publication_version_id UUID FK public.publication_versions(id); child_publication_id UUID FK public.publications(id).
-- parent_publication_version_id UUID FK public.publication_versions(id); parent_publication_id UUID FK public.publications(id); source_origin_id UUID FK public.publication_origins(id).
-- child_version_no, parent_version_no e child_content_hash, parent_content_hash capturados do DB e verificados **em transação** contra os registros originais.
-- source_code literal 'dou', original external_id da matéria, publication_date, section, numeric_edition, matter_id, journal_id obtido do **nome do XML original**, page_number derivada de pdfPage de cada parte; certified_page_url original; original_zip_url e zip_sha256, matter_xml_parts_manifest_sha256 e parent_dispatch_external_id, child_act_external_id, embedded_child_index / ato normal.
-- XML matter candidate key versionada: SHA256 de domain 'DOU:MATTER:4' + publication_date + section + journal_id + numeric_edition + matter_id + parent dispatch external_id + original source origin id. Não inferir 80-A/80-B do número 80 isolado. Versão de conteúdo id + SHA texto + SHA XML por parte compõe o **content_version_key**, sem sobrescrever histórico.
-- String/hash recebidos da aplicação não bastam: gateway compara publication_versions.publication_id/content_hash/version_no, publication_origins.publication_id/source_id/external_id e source_metadata.dou.archive/parts rederivados com o parser, inclusive ZIP da coleta original. Se origem metadata carecer de prova suficiente, âncora=UNVERIFIED e não sustenta atestação. A integridade de bytes de captura original depende de seu conector confiável, não de JSON autoatribuído.
+**XML act anchor (um por versão de cada ato filho, 1:N por matéria)**: tax13_dou_xml_act_anchors liga xml_matter_id à child_publication_version_id, child_publication_id, child_version_no, child_content_hash, child_external_id, embedded_index e act_version_key_v4. Na ausência de ato filho, uma âncora pode representar o próprio ato pai. O gateway exige derivação do mesmo despacho/INLABS, e verifica com banco e XML; não aceita identificação fornecida por outra matéria.
 
-Invariantes DB: FK composta (child_publication_version_id,child_publication_id), (parent_publication_version_id,parent_publication_id), (source_origin_id,parent_publication_id) exigem respectivas UNIQUE(id,publication_id) nas tabelas existentes **se não existirem**; não adicionar sem inspeção de migrations/carga e gate DBA. Alternativa robusta caso migração das UNIQUE originais seja inviável: apenas FKs simples + verificação EXPLÍCITA sob locks no writer e no leitor para todas as três igualdades. **Não declarar cross-table garantido por FK simples.**
+**Dedupe/versionamento:** UNIQUE(matter_content_key_v4) para versão da matéria, UNIQUE(xml_matter_id, child_publication_version_id) para ato; novos rechecks PDF produzem novos jobs, não novas versões XML. Se mesma chave lógica produzir dois payloads distintos, manter versões e marcar CONFLICT_PENDING em vez de último-write-wins. Nenhuma âncora depende de correlation_id de PDF. O documento final atestado tem document_identity_key_v4 (inclui seção, jornal, sufixo impresso, página, matéria, digest XML e PDF); numérico 80+DO1E nunca prova 80-A ou 80-B.
 
-UNIQUE(child_publication_version_id,source_origin_id,content_version_key); dois jobs de atestação para essa âncora são permitidos, porém o registro canônico não é duplicado por job/tenant. Correção de XML cria nova publication_version e âncora nova, preservando a anterior; se duas publicações canônicas reivindicarem mesmo matter-key com payload conflitante, suspender resultado positivo para ambas (CONFLICT_PENDING) e enviar auditoria, sem merge silencioso. O veredito certificado inclui sufixo impresso da edição após cotejo oficial, formando **document_identity_key** (data+seção+journal+sufixo+página+matéria+versão XML + conteúdo/ato).
+**Textos e hashes diferentes:** publication_versions.content_hash representa texto de banco, NÃO o SHA raw de ZIP/partes XML. Ambas as evidências ficam registradas e comparadas pelo gateway em transação com vínculos tipados. publication_versions.is_current indica a versão editorial corrente no catálogo e não prova vigência legal.
+
+**Cardinalidade e independência:** 1 XML matter → N act anchors → N revisões temporais independentes de PDF. 1 job seletivo por matéria pode comprovar N atos usando o MESMO PDF/índice/ZIP, com N correlações apontando para N âncoras. Cada cliente vê a relevância apenas por seus próprios critérios, com RLS de tenant fora das tabelas canônicas.
 
 ### 3.2 CSV/JSON/ZIP não são XMLs externos admitidos
 
@@ -74,131 +70,25 @@ Os metadados do XML incluem editionNumber numérico; DO1E é extra mas **não de
 
 A camada de evidência é global, sem tenant_id. As FKs para publication_versions/publication_origins são parte da integração existente e devem usar exatamente os nomes e tipos reais após inspeção DBA. **Toda role escrita é NOINHERIT/NOBYPASSRLS; owner NOLOGIN, sem acesso indireto por app.**
 
-### 4.1 Tipos/colunas/constraints essenciais
+### 4.1. DDL de referência completo das tabelas, ainda não executado
 
-~~~sql
--- DESIGN REFERENCE ONLY — NOT migration 049+, DO NOT RUN IN PRODUCTION.
-CREATE TYPE public.dou_r4_actor AS ENUM ('COLLECTOR','VERIFIER');
-CREATE TYPE public.dou_r4_target AS ENUM ('PDF','OFFICIAL_INDEX','INLABS_ZIP');
-CREATE TYPE public.dou_r4_outcome AS ENUM ('CAPTURED','UNAVAILABLE','ERROR','REJECTED');
-CREATE TYPE public.dou_r4_documentary_status AS ENUM
- ('NOT_REQUESTED','PENDING','VERIFIED','MISMATCH','UNAVAILABLE','REVOKED','CONFLICT');
+O arquivo [TAX13_R9_DOU_R4_FULL_DDL_REVIEW.sql](TAX13_R9_DOU_R4_FULL_DDL_REVIEW.sql) contém **as 11 definições de tabelas e índices** de referência, na ordem das dependências: xml_matters, xml_act_anchors, runtime_credentials, credential_revocations, collection_jobs, http_fetch_events, archive_manifest, edition_bindings, verification_events, act_correlations e xml_temporal_review_events.
 
-CREATE TABLE public.tax13_dou_xml_anchors (
- id uuid PRIMARY KEY,
- source_origin_id uuid NOT NULL REFERENCES public.publication_origins(id),
- parent_publication_id uuid NOT NULL REFERENCES public.publications(id),
- parent_publication_version_id uuid NOT NULL REFERENCES public.publication_versions(id),
- child_publication_id uuid NOT NULL REFERENCES public.publications(id),
- child_publication_version_id uuid NOT NULL REFERENCES public.publication_versions(id),
- parent_version_no integer NOT NULL CHECK(parent_version_no>0),
- child_version_no integer NOT NULL CHECK(child_version_no>0),
- parent_content_hash text NOT NULL, child_content_hash text NOT NULL,
- publication_date date NOT NULL,
- section_code text NOT NULL CHECK(section_code IN ('DO1','DO1E','DO3','DO3E')),
- numeric_edition integer NOT NULL CHECK(numeric_edition>0),
- journal_id text NOT NULL CHECK(journal_id ~ '^[0-9]+$'),
- page_number integer NOT NULL CHECK(page_number>0),
- matter_id text NOT NULL CHECK(matter_id ~ '^[0-9]+$'),
- parent_external_id text NOT NULL,
- child_external_id text NOT NULL,
- archive_url text NOT NULL, archive_sha256 char(64) NOT NULL
-   CHECK(archive_sha256 ~ '^[a-f0-9]{64}$'),
- xml_parts_sha256 char(64) NOT NULL CHECK(xml_parts_sha256 ~ '^[a-f0-9]{64}$'),
- matter_key_v4 char(64) NOT NULL CHECK(matter_key_v4 ~ '^[a-f0-9]{64}$'),
- content_version_key_v4 char(64) NOT NULL CHECK(content_version_key_v4 ~ '^[a-f0-9]{64}$'),
- created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
- UNIQUE(child_publication_version_id,source_origin_id,content_version_key_v4),
- UNIQUE(id,child_publication_version_id),
- UNIQUE(id,matter_key_v4),
- UNIQUE(id,archive_sha256)
-);
--- Purpose-specific limit, NOT a single 20MiB constraint:
-CREATE TABLE public.tax13_dou_http_fetch_events (
- id uuid PRIMARY KEY,
- job_id uuid NOT NULL REFERENCES public.tax13_dou_collection_jobs(id),
- actor public.dou_r4_actor NOT NULL,
- purpose public.dou_r4_target NOT NULL,
- attempt_no integer NOT NULL CHECK(attempt_no BETWEEN 1 AND 1000),
- credential_id uuid NOT NULL REFERENCES public.tax13_dou_runtime_credentials(id),
- outcome public.dou_r4_outcome NOT NULL,
- requested_url text NOT NULL, final_url text,
- http_status integer CHECK(http_status BETWEEN 100 AND 599),
- mime_type text,
- byte_count bigint,
- sha256 char(64) CHECK(sha256 ~ '^[a-f0-9]{64}$'),
- started_at timestamptz NOT NULL,
- finished_at timestamptz NOT NULL CHECK(finished_at>=started_at),
- runtime_version text NOT NULL,
- error_code text,
- event_fingerprint_v4 char(64) NOT NULL UNIQUE CHECK(event_fingerprint_v4 ~ '^[a-f0-9]{64}$'),
- created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
- UNIQUE(job_id,actor,purpose,attempt_no),
- UNIQUE(id,job_id,actor,purpose),
- CHECK(
-   (outcome='CAPTURED' AND http_status=200 AND requested_url=final_url
-     AND byte_count>0 AND sha256 IS NOT NULL AND error_code IS NULL)
-   OR (outcome<>'CAPTURED' AND sha256 IS NULL AND error_code IS NOT NULL)
- ),
- CHECK(outcome<>'CAPTURED' OR
-  (purpose='PDF' AND byte_count BETWEEN 1 AND 20971520)
-  OR (purpose='OFFICIAL_INDEX' AND byte_count BETWEEN 1 AND 2097152)
-  OR (purpose='INLABS_ZIP' AND byte_count BETWEEN 1 AND 67108864))
-);
--- The final CREATE TABLE order must create jobs/credentials first (see section 4.2).
--- Example manifest has one row PER MATTER (not a global 48-file ZIP inventory):
-CREATE TABLE public.tax13_dou_archive_manifest (
- id uuid PRIMARY KEY,
- job_id uuid NOT NULL REFERENCES public.tax13_dou_collection_jobs(id),
- matter_id text NOT NULL,
- zip_sha256 char(64) NOT NULL CHECK(zip_sha256 ~ '^[a-f0-9]{64}$'),
- zip_inventory_sha256 char(64) NOT NULL CHECK(zip_inventory_sha256 ~ '^[a-f0-9]{64}$'),
- zip_total_entries integer NOT NULL CHECK(zip_total_entries BETWEEN 1 AND 5000),
- zip_total_uncompressed_bytes bigint NOT NULL CHECK(zip_total_uncompressed_bytes BETWEEN 0 AND 134217728),
- matter_parts jsonb NOT NULL CHECK(jsonb_typeof(matter_parts)='array'
-   AND jsonb_array_length(matter_parts) BETWEEN 1 AND 48
-   AND pg_column_size(matter_parts)<=16384),
- matter_parts_sha256 char(64) NOT NULL CHECK(matter_parts_sha256 ~ '^[a-f0-9]{64}$'),
- parser_version text NOT NULL,
- created_at timestamptz NOT NULL,
- UNIQUE(id,job_id),
- UNIQUE(job_id,matter_id,zip_sha256,matter_parts_sha256)
-);
--- Temporal facts attach to XML anchor, regardless of PDF:
-CREATE TABLE public.tax13_dou_xml_temporal_review_events (
- id uuid PRIMARY KEY,
- xml_anchor_id uuid NOT NULL REFERENCES public.tax13_dou_xml_anchors(id) ON DELETE RESTRICT,
- device_ref text NOT NULL CHECK(length(device_ref) BETWEEN 1 AND 240),
- event_kind text NOT NULL CHECK(event_kind IN
- ('PUBLICATION','RATIFICATION','RETROACTIVE_EFFECT','DEADLINE',
- 'REFERENCE_PERIOD','CORRECTION','AMENDMENT','REVOCATION','SUPERSESSION',
- 'REVIEW_PENDING','REVIEW_UNVERIFIED')),
- legal_as_of date NOT NULL,
- event_date date,
- effect_from date, effect_until date,
- official_evidence_url text NOT NULL,
- evidence_sha256 char(64) CHECK(evidence_sha256 ~ '^[a-f0-9]{64}$'),
- optional_documentary_correlation_id uuid NULL,
- reviewer_credential_id uuid NOT NULL
-   REFERENCES public.tax13_dou_runtime_credentials(id),
- supersedes_event_id uuid REFERENCES public.tax13_dou_xml_temporal_review_events(id),
- review_status text NOT NULL CHECK(review_status IN ('PENDING','UNVERIFIED','FACTS_ONLY')),
- event_sha256 char(64) NOT NULL UNIQUE CHECK(event_sha256 ~ '^[a-f0-9]{64}$'),
- created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
- CHECK(effect_until IS NULL OR effect_from IS NOT NULL),
- CHECK(effect_until IS NULL OR effect_until>=effect_from)
-);
--- In the FINAL migration, add FK (optional_documentary_correlation_id,xml_anchor_id)
--- to UNIQUE(id,xml_anchor_id) on act_correlations. NULL allows XML-only review.
-~~~
+Alterações objetivas verificáveis nele:
+- **Purpose limits**: PDF<=20 MiB, OFFICIAL_INDEX<=2 MiB e INLABS_ZIP<=64 MiB, condicionados a CAPTURED; parse ZIP cumulativo<=128 MiB, uma entry<=8 MiB e no máximo 5000 entradas são invariantes do parser.
+- **ZIP inventory versus XML matter:** zip_inventory_sha256 e zip_total_entries representam TODO arquivo ZIP; matter_parts representa apenas 1..48 partes da matéria alvo. Um ZIP diário com 100 arquivos e uma matéria de 2 partes **não** viola o limite 48.
+- **Cross-table:** FKs compostas em manifest/binding/verification/act correlation ligam job, matter, actors e purpose, mas os hashes/conteúdos são rederivados e comparados pelo gateway protegido; FKs formais isoladas não provam a captura.
+- **Temporal:** xml_temporal_review_events.xml_act_anchor_id NOT NULL, optional_documentary_correlation_id NULL permitido e FK composta ao mesmo ato somente quando a prova for associada. Registrar fatos do XML sem PDF é funcionalmente necessário.
+- **Despacho 1:N:** verification_event_id **não é UNIQUE** em act_correlations; UNIQUE(verification_event_id,xml_act_anchor_id) permite N atos comprovados por uma verificação do despacho.
 
-**DDL reference, not executable as a whole**: the excerpt above intentionally isolates the changed columns; a production-ready additive migration must include the unchanged R3 jobs, credentials, revocations, binding and verification definitions **normalized into a single chronological CREATE script**, and must not leave the cross-table checks as merely comments. In particular the CREATE TABLE order above is illustrative, not deployable. Do not claim schema compiled or PG integration passed at this point.
+**Status explícito do arquivo:** apenas DDL de referência para revisão; não foi compilado nem executado em PG16/18, não inclui ainda a implementação das funções SECURITY DEFINER, provisionamento/grants/RLS final ou o parser de índice oficial aprovado. Não é a migration 049+ nem autoriza construí-la. A especificação comportamental e a matriz de controle das funções está na seção 5; a revisão independente deve recusar qualquer lacuna ainda considerada P1.
 
 ### 4.2 DDL complementar fixado por contrato, para evitar decisões implícitas na 049+
 
-Tabela / vínculo / constraint obrigatórios:
+Tabela / vínculo / constraint obrigatórios (conforme DDL de referência):
+- xml_matters e xml_act_anchors formam a identidade canônica de matéria e ato, separada da atestação; campos e FKs no arquivo SQL da seção 4.1.
 - runtime_credentials (id PK, role_name exact scheduler/collector/verifier/temporal, epoch monotonic UNIQUE(role,epoch), valid_from/until, secret_ref no plaintext) e credential_revocations (credential_id PK FK, timestamp/reason; apenas INSERT).
-- collection_jobs (id PK, xml_anchor_id FK, credential scheduler FK, data/seção/journal/página/matéria herdadas por seleção autenticada da âncora, pdf_url/index_url/zip_url fixadas por adapters internos; unique(job_id,xml_anchor_id), selected_reason/selected_at; target_fingerprint_v4 **NOT unique** por permitir recaptura) com FK (xml_anchor_id, archive_sha256 se materializado) referencial quando aplicável. **Não** aceitar URL do cliente/curador.
+- collection_jobs (id PK, xml_matter_id FK, credential scheduler FK, data/seção/journal/página/matéria herdadas por seleção autenticada da âncora, pdf_url/index_url/zip_url fixadas por adapters internos; unique(job_id,xml_anchor_id), selected_reason/selected_at; target_fingerprint_v4 **NOT unique** por permitir recaptura) com FK (xml_anchor_id, archive_sha256 se materializado) referencial quando aplicável. **Não** aceitar URL do cliente/curador.
 - http_fetch_events com FK tripla/quadrupla typada (id,job_id,actor,purpose); registrar cada tentativa imutável, inclusive erros e retries. Collector/Verifier não compartilham LOGIN/secret nem processo/egress. Atestação exige pares de SHA iguais, job e URLs coincidentes; evento ERROR/UNAVAILABLE não equivale a zero publicações.
 - archive_manifest **por matéria**, referenciando par de eventos COLLECTOR/VERIFIER INLABS_ZIP com FKs compostas; comparar ambos SHA da resposta ao zip_sha256 e zip original da âncora. Se o archive original já arquivado tiver bytes divergentes, bloquear atestação em vez de mudar hash silently.
 - edition_bindings (id PK, job_id FK, archive_manifest_id/job_id FK, quatro FKs tipadas PDF/INDEX dos dois atores, printed_edition incluindo A/B, publication_date, section, journal, page, matter, pdf_sha256, index_sha256, document_identity_key_v4 UNIQUE versionada; identidade = função dos bytes verificados + âncora).
@@ -208,7 +98,7 @@ Tabela / vínculo / constraint obrigatórios:
 - todas as FKs referem-se a objetos globalmente canônicos; NEVER tenant_id nas tabelas de origem. Sem duplicação de PDF por child/empresa.
 - recomendação de único cadastro de estados de coleta existente: usar collection_runs/collection_attempts para diagnósticos XML sem criar mais uma tabela de "nenhum documento", e derivar NO_RELEVANT_PUBLICATIONS por tenant somente com consultas completas.
 
-Cardinalidade: 1 job → 3 alvos x 2 actors → 1 manifesto por matéria → 1 binding por edição/página/matéria/versão → 1 verification_event por despacho → N act_correlations de atos do despacho; N âncoras XML compartilham o mesmo manifesto e verification_event, e um evento temporal refere-se a 1 anchor independente de PDF.
+Cardinalidade: 1 job por XML matter → 3 alvos x 2 actors → 1 manifesto por matéria → 1 binding por edição/página/matéria/versão → 1 verification_event por despacho → N act_correlations de atos do despacho; N âncoras XML compartilham o mesmo manifesto e verification_event, e um evento temporal refere-se a 1 anchor independente de PDF.
 
 ## 5. Contrato definitivo de gateways e controles SQL
 
@@ -233,11 +123,11 @@ Runtimes LOGIN sem BYPASSRLS, sem SUPERUSER, sem CREATEROLE/CREATEDB, NOINHERIT.
 
 Abaixo são **interfaces de design** para gerar futura SQL e testes PG após aprovação; não são funções criadas neste PR. Qualquer implementação que exponha boolean verified, raw body, SQL user URL arbitrária, ou contorne papéis invalida o contrato.
 
-1. schedule_evidence_job(p_xml_anchor_id uuid, p_reason_code text, p_request_fingerprint char(64)) RETURNS uuid, EXECUTE exclusivamente scheduler; compara âncora ao banco, motivo em allowlist e política de custo; rederiva URL ZIP de arquivo origin e URL PDF de certifiedPageUrl; escolhe index adapter somente se fonte oficial aprovada; congela job por identidade de versão XML, sem confundir job com publicação; LOCK anchor; idempotência por request_fingerprint para pedidos iguais, permitindo rechecks explícitos distintos.
+1. schedule_evidence_job(p_xml_matter_id uuid, p_reason_code text, p_request_fingerprint char(64)) RETURNS uuid, EXECUTE exclusivamente scheduler; compara âncora ao banco, motivo em allowlist e política de custo; rederiva URL ZIP de arquivo origin e URL PDF de certifiedPageUrl; escolhe index adapter somente se fonte oficial aprovada; congela job por identidade de versão XML, sem confundir job com publicação; LOCK anchor; idempotência por request_fingerprint para pedidos iguais, permitindo rechecks explícitos distintos.
 2. record_collector_fetch(p_job_id uuid,p_purpose dou_r4_target,p_attempt_no int,p_observation struct_capture_v4) RETURNS uuid, EXECUTE exclusivamente collector, com session_user exatamente collector e credencial vigente; observation nasce do client HTTPS interno, sem endpoint externo com acesso ao login; valida job/purpose/URL planejada, host, TLS, no redirect, response MIME e byte_count propósito, SHA real dos bytes, timestamps, locked credential epoch, fingerprint v4; grava CAPTURED ou ERROR/UNAVAILABLE/REJECTED, nunca "ausência publicada".
 3. record_verifier_fetch(p_job_id uuid,p_purpose dou_r4_target,p_attempt_no int,p_observation struct_capture_v4) RETURNS uuid, EXECUTE exclusivamente verifier, exige GET HTTPS **novo e independente** com chave e rede separadas; as mesmas validações; não reutiliza hashes declarados pelo collector; emit em ledger imutável.
 4. admit_documentary_chain(p_job_id uuid,p_pdf_collector uuid,p_pdf_verifier uuid,p_index_collector uuid,p_index_verifier uuid,p_zip_collector uuid,p_zip_verifier uuid,p_manifest_report_v4 jsonb,p_edition_report_v4 jsonb,p_dispatch_report_v4 jsonb) RETURNS uuid, EXECUTE verifier; não aceita verified=true nem status client. Valida, sob locks no job e credenciais, os seis eventos por FK typada e mesmo job/target/URL/hash, fonte índice oficial independently parsed, ZIP inventory+partes rederivados dos mesmos bytes do verifier, SHA contra âncora original e parent/child DB versions, PDF whole-dispatch completo e sufixo da edição; verifica assinatura de artefato de parser/version dentro da mesma sessão confiável e commit manifest+binding+verification+N act correlations atomicamente. **Relatórios JSON são dados a validar, não declarações de autenticidade**. Sem memória/processo confiável com bytes correspondentes, retornar UNVERIFIED/erro e não gravar positivo.
-5. append_xml_temporal_fact(p_xml_anchor_id uuid,p_device_ref text,p_event_kind text,p_as_of date,p_fact_payload_v4 jsonb,p_optional_correlation_id uuid DEFAULT NULL) RETURNS uuid, EXECUTE temporal; nunca agenda PDF, exige âncora XML válida e fatos com fonte oficial (URL/hash se disponível), data e fragmento, nunca aceita set_CURRENT, checa se correlação opcional aponta à mesma âncora, grava append-only PENDING/FACTS_ONLY/UNVERIFIED.
+5. append_xml_temporal_fact(p_xml_act_anchor_id uuid,p_device_ref text,p_event_kind text,p_as_of date,p_fact_payload_v4 jsonb,p_optional_correlation_id uuid DEFAULT NULL) RETURNS uuid, EXECUTE temporal; nunca agenda PDF, exige âncora XML válida e fatos com fonte oficial (URL/hash se disponível), data e fragmento, nunca aceita set_CURRENT, checa se correlação opcional aponta à mesma âncora, grava append-only PENDING/FACTS_ONLY/UNVERIFIED.
 6. read_global_documentary_status_by_version(p_child_version_id uuid) RETURNS (status dou_r4_documentary_status,evidence_id uuid,observed_at timestamptz) com somente **status público global** da norma, sem tenant/relevância/IDs privados. Antes de VERIFIED exige FK/roles/URLs/hashes pares/reports/fingerprint/document_key, ausência de conflitos entre jobs, credenciais não revogadas em transação com mesmo conjunto de locks do revoker. Leitura de relevância para cliente ocorre **fora desta função**, em associação com RLS e tenant auth efetiva. Não confiar em p_tenant_id do cliente ou GUC arbitrária. Se nenhum job: NOT_REQUESTED; se incompleto: PENDING; divergência: MISMATCH; interrupção: UNAVAILABLE; revogado: REVOKED; claims positivos contraditórios: CONFLICT.
 7. add_credential(p_role,p_epoch,p_key_ref,p_valid_from,p_valid_until) e revoke_credential(p_credential_id,p_reason) somente credential_admin; lock na credencial e registro de revogação irreversível, processar ordem de locks consistente com escrita/projeção. Credencial revogada retroativamente invalida positividade de projeção, preserva histórico.
 8. read_xml_temporal_facts(p_child_version_id uuid) é projeção **independente da função documentary** e somente disponibiliza fatos para avaliação tributária; nunca retorna CURRENT derivado. Proteção tenant no consumidor de relevância, revisão de fragmentos/corpus legal específica.
