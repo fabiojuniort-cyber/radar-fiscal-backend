@@ -9,6 +9,7 @@ on:
       - 'src/modules/collection/collection-filter.direct.ts'
       - 'src/api/routes/collection-filter-admin.route.ts'
       - 'test/collection-filter.admin.integration.test.ts'
+      - 'test/collection-filter.l11-performance.integration.test.ts'
       - '.github/workflows/l11-pg18-isolated.yml'
 
 permissions:
@@ -18,7 +19,7 @@ jobs:
   l11-pg18:
     name: L11 migration 051 and direct DOU purge on isolated PostgreSQL 18
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:18-bookworm
@@ -55,6 +56,9 @@ jobs:
         run: npm run db:prepare
       - name: 'L11 integration: preview, drift, purge, customer protections, audit'
         run: npx tsx --test test/collection-filter.admin.integration.test.ts
+      - name: Measure preview and confirmation over 120k synthetic DOU acts
+        timeout-minutes: 19
+        run: npx tsx --test test/collection-filter.l11-performance.integration.test.ts
       - name: Verify migration 051 recorded and simulation objects absent
         shell: bash
         run: |
