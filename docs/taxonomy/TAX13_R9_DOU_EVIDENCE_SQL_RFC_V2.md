@@ -1,16 +1,16 @@
 # Trifaros / TAX13-R9 — RFC v2: custódia DOU, identidade documental e evidência temporal
 
-**Status: DESIGN-ONLY / R9-DESIGN-R2 PENDING. Este arquivo NÃO é uma migration, não é um script aprovado para execução, não cria tabelas nem libera SOURCE_ADMITTED/CURRENT.** Referência congelada R9-DESIGN: backend PR #194 @ \`e21334fa1b34f6af21c83d661a705fbd6ce58dfb\`; BLOCK em https://github.com/fabiojuniort-cyber/tribusca-control/issues/101#issuecomment-6093945807. Remediação isolada no PR #195. Preservar **integralmente** a migration 048, a cadeia de PRs #186/#192/#193/#194 e o bloqueio jurídico. Sem ICP-Brasil, assinatura digital documental, ITI, OCSP ou CRL.
+**Status: DESIGN-ONLY / R9-DESIGN-R2 PENDING. Este arquivo NÃO é uma migration, não é um script aprovado para execução, não cria tabelas nem libera SOURCE_ADMITTED/CURRENT.** Referência congelada R9-DESIGN: backend PR #194 @ `e21334fa1b34f6af21c83d661a705fbd6ce58dfb`; BLOCK em https://github.com/fabiojuniort-cyber/tribusca-control/issues/101#issuecomment-6093945807. Remediação isolada no PR #195. Preservar **integralmente** a migration 048, a cadeia de PRs #186/#192/#193/#194 e o bloqueio jurídico. Sem ICP-Brasil, assinatura digital documental, ITI, OCSP ou CRL.
 
 ## 1. Posição arquitetural
 
-O PDF original obtido de HTTPS governamental controlado basta para **comprovar a existência de uma publicação**, após correlacionar a identidade e o texto jurídico. Não é evidência de vigência de cada dispositivo. SHA-256 comprova integridade/deduplicação dos bytes vistos, **não sua procedência**. Uma string URL, um objeto \`sourceCapture\`, um HMAC sobre dados declarados por operador, uma fixture, ou um administrador que preenche metadados NÃO pode ser admitido como uma coleta real.
+O PDF original obtido de HTTPS governamental controlado basta para **comprovar a existência de uma publicação**, após correlacionar a identidade e o texto jurídico. Não é evidência de vigência de cada dispositivo. SHA-256 comprova integridade/deduplicação dos bytes vistos, **não sua procedência**. Uma string URL, um objeto `sourceCapture`, um HMAC sobre dados declarados por operador, uma fixture, ou um administrador que preenche metadados NÃO pode ser admitido como uma coleta real.
 
-O DOU é **um documento canônico global**: um evento de captura deve ser compartilhado logicamente entre clientes; mapeamentos de relevância por tenant permanecem nos módulos e tabelas separados, protegidos por RLS de cliente. Não colocar \`tenant_id\` nas tabelas de captura canônica. Não armazenar arquivos originais PDF/JPG/ZIP nem texto volumoso no PostgreSQL.
+O DOU é **um documento canônico global**: um evento de captura deve ser compartilhado logicamente entre clientes; mapeamentos de relevância por tenant permanecem nos módulos e tabelas separados, protegidos por RLS de cliente. Não colocar `tenant_id` nas tabelas de captura canônica. Não armazenar arquivos originais PDF/JPG/ZIP nem texto volumoso no PostgreSQL.
 
 ### Camadas e estados NÃO equivalentes
 
-\`\`\`text
+```text
 PLANNED_SOURCE ─┬─> FETCH_ATTEMPT ─> UNAVAILABLE | ERROR | REJECTED
                 └─> FETCH_ATTEMPT ─> HTTP_CAPTURED
                                          │ (somente collector de rede)
@@ -23,37 +23,37 @@ PLANNED_SOURCE ─┬─> FETCH_ATTEMPT ─> UNAVAILABLE | ERROR | REJECTED
                       revisão jurídica POR DISPOSITIVO/DATA
                                          v
                      PENDING/UNVERIFIED (nunca CURRENT implícito)
-\`\`\`
+```
 
-- \`HTTP_CAPTURED\` é **fato técnico observado** por um processo de captura segregado; não afirma correspondência normativa.
-- \`DOCUMENTARY_SOURCE_CORRESPONDS\` requer **duas identidades de runtime**, uma coleta real e correlação por verificador segregado, que lê os **mesmos bytes efêmeros** do GET e o XML/ZIP realmente obtido; valida identidade de edição oficial, despacho, ato e limites de conteúdo. Os metadados posteriores fazem somente auditoria de um resultado ocorrido; não substituem os bytes.
-- \`SOURCE_ADMITTED\`, se algum dia criado como função SQL de leitura, somente pode ser resultado **calculado a cada consulta** a partir de recibos de origem, correlação e credenciais não revogadas. Não é flag arbitrária gravável.
-- Nenhuma das tabelas abaixo concede \`CURRENT\`, cria \`tax13_legal_proofs_v2\` ou altera \`tax13_v2_original_exists_for_issuer\`. A migration 048 continua limitada a HTML CONFAZ, sob controles próprios.
-- \`NO_RELEVANT_PUBLICATIONS\` é resultado **de uma consulta integralmente concluída e sem matches de filtro**, NÃO status de download individual. \`UNAVAILABLE/ERROR\` jamais viram \`SUCCESS(0)\`.
+- `HTTP_CAPTURED` é **fato técnico observado** por um processo de captura segregado; não afirma correspondência normativa.
+- `DOCUMENTARY_SOURCE_CORRESPONDS` requer **duas identidades de runtime**, uma coleta real e correlação por verificador segregado, que lê os **mesmos bytes efêmeros** do GET e o XML/ZIP realmente obtido; valida identidade de edição oficial, despacho, ato e limites de conteúdo. Os metadados posteriores fazem somente auditoria de um resultado ocorrido; não substituem os bytes.
+- `SOURCE_ADMITTED`, se algum dia criado como função SQL de leitura, somente pode ser resultado **calculado a cada consulta** a partir de recibos de origem, correlação e credenciais não revogadas. Não é flag arbitrária gravável.
+- Nenhuma das tabelas abaixo concede `CURRENT`, cria `tax13_legal_proofs_v2` ou altera `tax13_v2_original_exists_for_issuer`. A migration 048 continua limitada a HTML CONFAZ, sob controles próprios.
+- `NO_RELEVANT_PUBLICATIONS` é resultado **de uma consulta integralmente concluída e sem matches de filtro**, NÃO status de download individual. `UNAVAILABLE/ERROR` jamais viram `SUCCESS(0)`.
 
 ## 2. Fronteira de confiança — R9-D01
 
-**Credenciais e processos separados.** Scheduler gera alvos internos com provenance INLABS e controla o job; \`radar_dou_collector_runtime\` é LOGIN exclusivo de workload que cria um único pedido HTTPS a \`pesquisa.in.gov.br\` e, quando necessário, \`inlabs.in.gov.br\` (hosts/caminhos allowlisted por **tipo**). O coletor gera a URL, abre conexão HTTPS normal validada pela plataforma, registra status, cabeçalhos relevantes, SHA do buffer obtido, horário e código de execução; nenhuma API recebe corpo/headers/status forjados para registrar positivo. DNS/rebinding, redirects, limite de 20 MiB, timeout, comprimento e MIME devem ser controlados com regras iguais ou mais fortes às já aplicadas em \`dou-official-http-pdf-capture.ts\`; redirects inesperados são rejeitados. Proteger egress de máquina sem proxy controlado por usuário.
+**Credenciais e processos separados.** Scheduler gera alvos internos com provenance INLABS e controla o job; `radar_dou_collector_runtime` é LOGIN exclusivo de workload que cria um único pedido HTTPS a `pesquisa.in.gov.br` e, quando necessário, `inlabs.in.gov.br` (hosts/caminhos allowlisted por **tipo**). O coletor gera a URL, abre conexão HTTPS normal validada pela plataforma, registra status, cabeçalhos relevantes, SHA do buffer obtido, horário e código de execução; nenhuma API recebe corpo/headers/status forjados para registrar positivo. DNS/rebinding, redirects, limite de 20 MiB, timeout, comprimento e MIME devem ser controlados com regras iguais ou mais fortes às já aplicadas em `dou-official-http-pdf-capture.ts`; redirects inesperados são rejeitados. Proteger egress de máquina sem proxy controlado por usuário.
 
-\`radar_dou_verifier_runtime\` é outra conta LOGIN e outro processo, com segredos e deployment isolados do coletor, sem acesso ao login/segredo de coleta. Recebe **pelo canal autenticado interno apenas o job e os bytes efêmeros da mesma captura**, obtém sua própria confirmação de índice governamental e arquivo INLABS, extrai texto nativo novamente ou verifica o digest da extração junto ao SHA dos mesmos bytes, e liga deterministicamente uma matéria, despacho e ato. Não pode aceitar \`PDF_ACT_TEXT_CORRESPONDS_ONLY\` emitido por API/DTO como permissão de escrita. Se o verificador não puder obter e confrontar material independente, marca PENDING/REJECTED.
+`radar_dou_verifier_runtime` é outra conta LOGIN e outro processo, com segredos e deployment isolados do coletor, sem acesso ao login/segredo de coleta. Recebe **pelo canal autenticado interno apenas o job e os bytes efêmeros da mesma captura**, obtém sua própria confirmação de índice governamental e arquivo INLABS, extrai texto nativo novamente ou verifica o digest da extração junto ao SHA dos mesmos bytes, e liga deterministicamente uma matéria, despacho e ato. Não pode aceitar `PDF_ACT_TEXT_CORRESPONDS_ONLY` emitido por API/DTO como permissão de escrita. Se o verificador não puder obter e confrontar material independente, marca PENDING/REJECTED.
 
 O PostgreSQL não observa pacotes TLS nem consegue provar que a função Node fez GET. Sua função de inserção **somente autoriza credenciais de sessão de workloads distintos, verifica referências e encadeamento, e armazena trilha imutável**. A autenticidade operacional está no código isolado, provisionamento secreto, rede real e no processo verificador. Não mascarar a limitação com HMAC da própria aplicação. Se o verificador e collector forem comprometidos simultaneamente ou o superuser de DB for hostil, o modelo não oferece prova independente irrefutável. Logs imutáveis externos / KMS/HSM opcionais exigem autorização separada.
 
-Credenciais com ID, data de início, data de fim e revogação *append-only*. Cada evento liga ID de credencial; o veredicto derivado é invalidado dinamicamente se uma delas for revogada. Rotação nunca altera eventos passados. Proteção anti-replay: identificador \`job_id\`, ordinal por tentativa e IDs de eventos imutáveis; fingerprint canônico de execução com \`schema_version\`, \`collector_version\`, \`target_sha256\`, resposta e tempos; verificador independente compara evento e evidência recebida; replay de \`job_id+attempt_number\`/correlação gera conflito, nunca novo sucesso.
+Credenciais com ID, data de início, data de fim e revogação *append-only*. Cada evento liga ID de credencial; o veredicto derivado é invalidado dinamicamente se uma delas for revogada. Rotação nunca altera eventos passados. Proteção anti-replay: identificador `job_id`, ordinal por tentativa e IDs de eventos imutáveis; fingerprint canônico de execução com `schema_version`, `collector_version`, `target_sha256`, resposta e tempos; verificador independente compara evento e evidência recebida; replay de `job_id+attempt_number`/correlação gera conflito, nunca novo sucesso.
 
 ## 3. Identidade exata do DOU — R9-D02
 
-**Chave documental candidata completa:** publicação (data), seção \`DO1/DO1E/DO3/DO3E\`, \`journal_id\` da URL governamental, \`printed_edition\` com sufixo, página, \`matter_id\`, ZIP INLABS \`archive_sha256\`, manifesto ordenado das partes XML \`xml_parts_digest\`, despacho pai e versão do ato filho. O pacote pode declarar \`editionNumber=80\`/\`DO1E\`: isso **não resolve** 80-A x 80-B.
+**Chave documental candidata completa:** publicação (data), seção `DO1/DO1E/DO3/DO3E`, `journal_id` da URL governamental, `printed_edition` com sufixo, página, `matter_id`, ZIP INLABS `archive_sha256`, manifesto ordenado das partes XML `xml_parts_digest`, despacho pai e versão do ato filho. O pacote pode declarar `editionNumber=80`/`DO1E`: isso **não resolve** 80-A x 80-B.
 
-A associação oficial \`journal_id=601 ↔ Nº 80-B ↔ 25/04/2024/Seção 1/página 1\` precisa vir de índice/cabeçalho obtido **em uma execução** da fonte Imprensa Nacional, com URL oficial, SHA, bytes e comparação independente, vinculada ao registro XML/ZIP INLABS real. Dados digitados no campo \`printedEdition\`, índice de buscador ou uma URL isolada só geram **candidato**, não evento \`INDEX_LINKED\`. Índices ausentes, conflitantes ou com sufixo não comprovado impedem correlação positiva. DOU 80, 80-A, 80-B são identidades diferentes mesmo que data/número sem sufixo coincidam.
+A associação oficial `journal_id=601 ↔ Nº 80-B ↔ 25/04/2024/Seção 1/página 1` precisa vir de índice/cabeçalho obtido **em uma execução** da fonte Imprensa Nacional, com URL oficial, SHA, bytes e comparação independente, vinculada ao registro XML/ZIP INLABS real. Dados digitados no campo `printedEdition`, índice de buscador ou uma URL isolada só geram **candidato**, não evento `INDEX_LINKED`. Índices ausentes, conflitantes ou com sufixo não comprovado impedem correlação positiva. DOU 80, 80-A, 80-B são identidades diferentes mesmo que data/número sem sufixo coincidam.
 
-Não afirmar equivalência dos PDFs conhecidos: GET Railway (descartado, \`9cbfa79d35db5a63320c78620543a69f99e05c49f69e7c5f05de6bd32b814e44\`) e upload 80-B (\`e5cc4ad9512e748bd9c720dc78579e2e66ea1979d6fc1cca3061ecd1dd8ce201\`) **têm hashes distintos**; não há bytes históricos para confrontar texto. Campo futuro \`documentary_comparison = PENDING\`. Nenhum serviço Railway novo está autorizado.
+Não afirmar equivalência dos PDFs conhecidos: GET Railway (descartado, `9cbfa79d35db5a63320c78620543a69f99e05c49f69e7c5f05de6bd32b814e44`) e upload 80-B (`e5cc4ad9512e748bd9c720dc78579e2e66ea1979d6fc1cca3061ecd1dd8ce201`) **têm hashes distintos**; não há bytes históricos para confrontar texto. Campo futuro `documentary_comparison = PENDING`. Nenhum serviço Railway novo está autorizado.
 
 ## 4. Contrato relacional proposto — R9-D04
 
-**Abaixo há DDL de referência para crítica, NÃO executável como migration, SEM autorização para aplicar.** Nomes novos intencionalmente não conflitam com 048. Revisão por DBA de compatibilidade com schemas 044–048, privilégios existentes, locks, migration order, performance e rollback é obrigatória. Identificadores FK de \`publication_versions\` refletem modelo já existente; checar constraint exata no HEAD de implementação antes de escrever 049+.
+**Abaixo há DDL de referência para crítica, NÃO executável como migration, SEM autorização para aplicar.** Nomes novos intencionalmente não conflitam com 048. Revisão por DBA de compatibilidade com schemas 044–048, privilégios existentes, locks, migration order, performance e rollback é obrigatória. Identificadores FK de `publication_versions` refletem modelo já existente; checar constraint exata no HEAD de implementação antes de escrever 049+.
 
-\`\`\`sql
+```sql
 -- R9-DESIGN ONLY, NOT A MIGRATION. Requires explicit role provisioning
 -- independently from app/worker/curator/issuer/sealer. No passwords here.
 CREATE ROLE radar_dou_evidence_owner NOLOGIN;
@@ -249,23 +249,23 @@ CREATE TABLE public.tax13_dou_temporal_review_events (
 );
 CREATE INDEX ix_tax13_dou_temporal_by_device
  ON public.tax13_dou_temporal_review_events(correlation_id,device_ref,as_of DESC);
-\`\`\`
+```
 
-**Regras adicionais para aceitação da futura migration:** \`tax13_dou_collection_jobs\` só pode ser criado pelo scheduler interno, com role própria ou operação de provisionamento isolada; a DDL acima é **rascunho de contrato**, não decisão de manter scheduler no mesmo esquema. O revisor R9-DESIGN-R2 deve avaliar necessidade de manter entidade \`jobs\` e \`runtime_credentials\` versus reutilizar entidades existentes. Todos os registros são globais, imutáveis, e nenhuma tabela aceita \`tenant_id\` ou PDF \`BYTEA\`.
+**Regras adicionais para aceitação da futura migration:** `tax13_dou_collection_jobs` só pode ser criado pelo scheduler interno, com role própria ou operação de provisionamento isolada; a DDL acima é **rascunho de contrato**, não decisão de manter scheduler no mesmo esquema. O revisor R9-DESIGN-R2 deve avaliar necessidade de manter entidade `jobs` e `runtime_credentials` versus reutilizar entidades existentes. Todos os registros são globais, imutáveis, e nenhuma tabela aceita `tenant_id` ou PDF `BYTEA`.
 
 ### 4.1. Canonicalização, fingerprint, idempotência, transações
 
-\`identity_fingerprint = SHA256(UTF8(canonical_JSON_V2))\`, gerado pela aplicação fechada e **recalculado pelo verificador**, com serialização canônica (chaves ordenadas, UTF-8/NFC, datas ISO, URLs canonizadas por parser allowlisted, tipos explícitos, números como strings normalizadas, partes XML em ordem fixada por \`filename\`). Não concatene campos sem delimitador; rejeite duplicatas de chave e arrays em ordem inesperada. \`event_fingerprint\` usa \`domain='TRIFAROS:DOU:FETCH:2'\` + job UUID + attempt ordinal + purpose + URL reconstruída + \`outcome\` + digest de corpo quando CAPTURED + horários efetivos + versão de coletor. O fingerprint **não autentica a rede**; previne colidir/deduplicar outro evento por engano.
+`identity_fingerprint = SHA256(UTF8(canonical_JSON_V2))`, gerado pela aplicação fechada e **recalculado pelo verificador**, com serialização canônica (chaves ordenadas, UTF-8/NFC, datas ISO, URLs canonizadas por parser allowlisted, tipos explícitos, números como strings normalizadas, partes XML em ordem fixada por `filename`). Não concatene campos sem delimitador; rejeite duplicatas de chave e arrays em ordem inesperada. `event_fingerprint` usa `domain='TRIFAROS:DOU:FETCH:2'` + job UUID + attempt ordinal + purpose + URL reconstruída + `outcome` + digest de corpo quando CAPTURED + horários efetivos + versão de coletor. O fingerprint **não autentica a rede**; previne colidir/deduplicar outro evento por engano.
 
-Criação do job: \`UNIQUE internal_target_sha256+scheduled_for\` **não** é segura contra retentativa operacional deliberada; permitir rechecks cronológicos sob IDs de jobs distintos, com tentativas por job serializadas/advisory lock e contador monotônico. \`UNIQUE(job_id, attempt_number, purpose)\` rejeita replays conflitantes; retries novos têm ordinal crescente e resultado distinto, sem sobrescrever erro anterior. Sem \`UPDATE\` em nenhum evento.
+Criação do job: `UNIQUE internal_target_sha256+scheduled_for` **não** é segura contra retentativa operacional deliberada; permitir rechecks cronológicos sob IDs de jobs distintos, com tentativas por job serializadas/advisory lock e contador monotônico. `UNIQUE(job_id, attempt_number, purpose)` rejeita replays conflitantes; retries novos têm ordinal crescente e resultado distinto, sem sobrescrever erro anterior. Sem `UPDATE` em nenhum evento.
 
-O trabalho real de rede nunca ocorre dentro de transação SQL. Após captura, em transação curta \`BEGIN ... COMMIT\`, insert em \`fetch_events\` com credencial collector, e depois verificador independente faz outra transação curta para \`verification_events + act_correlations\`, com FK,锁 serializado por \`source_identity_id\`, conflitos positivos vedados. Uma verificação positiva precisa dos três fetches observados com propósito certo, \`outcome=CAPTURED\`, URLs autorizadas, mesmos \`job_id\` e \`source_identity_id\` e hashes consistentes. Essas condições não são apenas CHECK declarativos: são validadores nas funções SECURITY DEFINER de admissão. Inserção conflitante é REJECTED com evento histórico, nunca overwrite.
+O trabalho real de rede nunca ocorre dentro de transação SQL. Após captura, em transação curta `BEGIN ... COMMIT`, insert em `fetch_events` com credencial collector, e depois verificador independente faz outra transação curta para `verification_events + act_correlations`, com FK,锁 serializado por `source_identity_id`, conflitos positivos vedados. Uma verificação positiva precisa dos três fetches observados com propósito certo, `outcome=CAPTURED`, URLs autorizadas, mesmos `job_id` e `source_identity_id` e hashes consistentes. Essas condições não são apenas CHECK declarativos: são validadores nas funções SECURITY DEFINER de admissão. Inserção conflitante é REJECTED com evento histórico, nunca overwrite.
 
-**Condição futura de exclusividade:** índice parcial pode bloquear dois \`TEXT_CORRESPONDS\` simultâneos por \`source_identity_id\`, mas esse índice proibiria re-verificações válidas ao longo do tempo. Preferir \`pg_advisory_xact_lock(hashtextextended(source_identity_id::text,0))\`, projetar estado efetivo com \`ORDER BY checked_at DESC, id\` e detectar dois positivos incompatíveis na mesma data/artefato. Re-fetch do mesmo SHA tem evento novo e reavalia status corrente; não reusa captura antiga como nova rede. Rever performance do lock e transações no R9-R2.
+**Condição futura de exclusividade:** índice parcial pode bloquear dois `TEXT_CORRESPONDS` simultâneos por `source_identity_id`, mas esse índice proibiria re-verificações válidas ao longo do tempo. Preferir `pg_advisory_xact_lock(hashtextextended(source_identity_id::text,0))`, projetar estado efetivo com `ORDER BY checked_at DESC, id` e detectar dois positivos incompatíveis na mesma data/artefato. Re-fetch do mesmo SHA tem evento novo e reavalia status corrente; não reusa captura antiga como nova rede. Rever performance do lock e transações no R9-R2.
 
 ### 4.2. ACL, RLS, funções e TRIGGER: minuta de contrato
 
-\`\`\`sql
+```sql
 -- DESIGN ONLY. Aplicar bloco de política individual por tabela da seção 4
 -- com o owner NOLOGIN (inclusive tabelas jobs/credential_revocations).
 -- Nenhuma concessão de SELECT/INSERT de tabela para app/worker/tenant.
@@ -275,15 +275,13 @@ ALTER TABLE public.tax13_dou_http_fetch_events FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON public.tax13_dou_http_fetch_events FROM PUBLIC;
 -- Políticas SELECT e INSERT são distintas: somente collector pode inserir,
 -- owner NOLOGIN pode ler sob FORCE RLS e nenhum tenant tem SELECT.
-CREATE POLICY dou_http_collector_insert ON public.tax13_dou_http_fetch_events
- FOR INSERT TO radar_dou_collector_runtime WITH CHECK (true);
+CREATE POLICY dou_http_owner_insert ON public.tax13_dou_http_fetch_events
+ FOR INSERT TO radar_dou_evidence_owner WITH CHECK (true);
 CREATE POLICY dou_http_owner_read ON public.tax13_dou_http_fetch_events
  FOR SELECT TO radar_dou_evidence_owner USING (true);
-GRANT INSERT ON public.tax13_dou_http_fetch_events TO radar_dou_collector_runtime;
--- Em produção, o INSERT direto acima deve ser REVOGADO e substituído
--- exclusivamente por EXECUTE de função com verificação de session_user
--- e parâmetros normalizados. Não abrir janela com grants de tabela.
-REVOKE INSERT ON public.tax13_dou_http_fetch_events FROM radar_dou_collector_runtime;
+-- NÃO conceder INSERT direto à role collector. Somente a função
+-- SECURITY DEFINER, de propriedade do owner NOLOGIN, faz a gravação.
+-- O owner possui política WITH CHECK; o session_user é o login real.
 
 -- Usar trigger imutável que não pode ser invocado como ação de DML externa;
 -- aplicar A TODAS as tabelas R9 e proibir TRUNCATE por ACL.
@@ -321,27 +319,27 @@ CREATE TRIGGER trg_dou_http_immutable BEFORE UPDATE OR DELETE
 --   FROM PUBLIC;
 -- GRANT EXECUTE ON FUNCTION public.tax13_dou_record_verified_capture(...)
 --   TO radar_dou_collector_runtime;
-\`\`\`
+```
 
-**Aprovação SQL condicionada:** o SQL ilustrativo ainda contém **função de admissão intencionalmente não implementada** e policies demonstrativas. Revisão R9-DESIGN-R2 deve aprovar *contrato, papéis e DDL*, não a executoriedade do snippet. Na migration real, (a) todas as tabelas RLS/FORCE antes dos grants, (b) triggers imutáveis e owner restrito, (c) funções com \`session_user\` conferido + target recomputado + propósito/resposta/credencial verificadas, (d) \`REVOKE ALL ON FUNCTION ... FROM PUBLIC\` incluindo default EXECUTE, (e) audit \`search_path\`/schema, (f) SECURITY DEFINER para leitura apenas sobre as tabelas estritas e (g) migrator não vira role de runtime. Nenhum SQL genérico é parte do protocolo da API.
+**Aprovação SQL condicionada:** o SQL ilustrativo ainda contém **função de admissão intencionalmente não implementada** e policies demonstrativas. Revisão R9-DESIGN-R2 deve aprovar *contrato, papéis e DDL*, não a executoriedade do snippet. Na migration real, (a) todas as tabelas RLS/FORCE antes dos grants, (b) triggers imutáveis e owner restrito, (c) funções com `session_user` conferido + target recomputado + propósito/resposta/credencial verificadas, (d) `REVOKE ALL ON FUNCTION ... FROM PUBLIC` incluindo default EXECUTE, (e) audit `search_path`/schema, (f) SECURITY DEFINER para leitura apenas sobre as tabelas estritas e (g) migrator não vira role de runtime. Nenhum SQL genérico é parte do protocolo da API.
 
-**Read path:** serviço comum recebe apenas \`source_publication_status = VERIFIED / UNVERIFIED / PENDING\` de função projetora invocada via \`radar_dou_read_runtime\` com SELECT restrito a metadados globais. Não expor registro de credenciais nem recargos HMAC, não permitir o usuário selecionar/outro tenant manipular identidades. Se tabelas de afinidade por tenant apontarem para \`child_act_version_id\`, isolamento no join desse módulo é obrigatório e avaliado separadamente.
+**Read path:** serviço comum recebe apenas `source_publication_status = VERIFIED / UNVERIFIED / PENDING` de função projetora invocada via `radar_dou_read_runtime` com SELECT restrito a metadados globais. Não expor registro de credenciais nem recargos HMAC, não permitir o usuário selecionar/outro tenant manipular identidades. Se tabelas de afinidade por tenant apontarem para `child_act_version_id`, isolamento no join desse módulo é obrigatório e avaliado separadamente.
 
 ## 5. Conteúdo e extração — R9-D03 / R9-D07
 
-\`correlateOfficialDouPdfActText\` é função unitária de comparação, construível a partir de objetos manuais; só retorna **candidato não admissível** (\`sqlSourceAdmissionAllowed=false\`). O status textual sozinho nunca alimenta \`tax13_dou_act_correlations\` positivo. O algoritmo de admissão (futuro) deve exigir capturas verificador + coletor + bytes originais correlacionados.
+`correlateOfficialDouPdfActText` é função unitária de comparação, construível a partir de objetos manuais; só retorna **candidato não admissível** (`sqlSourceAdmissionAllowed=false`). O status textual sozinho nunca alimenta `tax13_dou_act_correlations` positivo. O algoritmo de admissão (futuro) deve exigir capturas verificador + coletor + bytes originais correlacionados.
 
-Normalização versionada: \`DOU_PDF_TEXT_BOUNDARIES_V2\` usa NFKC, normalização de espaço e símbolos tipográficos específicos, **preserva acentos, dígitos, pontuação material, números, ordem e cláusulas**. Guarda SHA do texto normalizado e \`act_boundary_start/end\`. Exigir no cabeçalho: rótulo DIÁRIO OFICIAL, Seção 1/3, edição 80 vs 80-A vs 80-B, data; cabeçalho não pode ser inferido do corpo. Identificar despacho pai, título do ato filho e posição exata do início, texto integral cláusula a cláusula e limites de término. Texto excedente/confuso exige REJECTED/UNVERIFIED; outro ato correto na página é permitido apenas quando os limites e ordem forem conhecidos. Captura de fragmentos separados precisa preservar geometria e origem (parser e versão). Uma comparação \`includes\` ou remoção indiscriminada de pontuação não é admissível por si.
+Normalização versionada: `DOU_PDF_TEXT_BOUNDARIES_V2` usa NFKC, normalização de espaço e símbolos tipográficos específicos, **preserva acentos, dígitos, pontuação material, números, ordem e cláusulas**. Guarda SHA do texto normalizado e `act_boundary_start/end`. Exigir no cabeçalho: rótulo DIÁRIO OFICIAL, Seção 1/3, edição 80 vs 80-A vs 80-B, data; cabeçalho não pode ser inferido do corpo. Identificar despacho pai, título do ato filho e posição exata do início, texto integral cláusula a cláusula e limites de término. Texto excedente/confuso exige REJECTED/UNVERIFIED; outro ato correto na página é permitido apenas quando os limites e ordem forem conhecidos. Captura de fragmentos separados precisa preservar geometria e origem (parser e versão). Uma comparação `includes` ou remoção indiscriminada de pontuação não é admissível por si.
 
-\`PDFJS_NATIVE_SPATIAL_V2\` prepara espaçamento por coordenadas/hasEOL e falha fechado para ordem ascendente/movimentação lateral ambígua. Esse algoritmo **não foi calibrado** com PDF oficial 80-B da resposta Railway, cujos bytes foram descartados. Testes sintéticos não substituem corpus real multi-bloco/multi-coluna de páginas únicas. Qualquer extração inconsistente é \`UNVERIFIED\`, nunca CURRENT.
+`PDFJS_NATIVE_SPATIAL_V2` prepara espaçamento por coordenadas/hasEOL e falha fechado para ordem ascendente/movimentação lateral ambígua. Esse algoritmo **não foi calibrado** com PDF oficial 80-B da resposta Railway, cujos bytes foram descartados. Testes sintéticos não substituem corpus real multi-bloco/multi-coluna de páginas únicas. Qualquer extração inconsistente é `UNVERIFIED`, nunca CURRENT.
 
 ## 6. Cronologia por dispositivo — R9-D08
 
-\`tax13_dou_temporal_review_events\` registra eventos distintos com \`device_ref\`/cláusula, \`as_of\`, evidence URL/digest, períodos, revisão, fonte, versão e supersession. Reunião factual não gera CURRENT. O Convênio ICMS 15/24 possui publicação original em 25/04/2024, prazo excepcional em 25/04, ratificação em 02/05, efeitos declarados em 01/04 e período referenciado março/2024. Uma deadline transcorrida **não** demonstra revogação ou ausência de vigência; ratificação **não** implica efeito operacional geral atual. Revisões de alterações, retificações, dispositivos afetados e aplicabilidade em data de referência continuam PENDING, e qualquer alteração posterior exige novo evento append-only (sem reescrever histórico). Não reaproveitar \`CURRENT\` do CONFAZ/048 para DOU.
+`tax13_dou_temporal_review_events` registra eventos distintos com `device_ref`/cláusula, `as_of`, evidence URL/digest, períodos, revisão, fonte, versão e supersession. Reunião factual não gera CURRENT. O Convênio ICMS 15/24 possui publicação original em 25/04/2024, prazo excepcional em 25/04, ratificação em 02/05, efeitos declarados em 01/04 e período referenciado março/2024. Uma deadline transcorrida **não** demonstra revogação ou ausência de vigência; ratificação **não** implica efeito operacional geral atual. Revisões de alterações, retificações, dispositivos afetados e aplicabilidade em data de referência continuam PENDING, e qualquer alteração posterior exige novo evento append-only (sem reescrever histórico). Não reaproveitar `CURRENT` do CONFAZ/048 para DOU.
 
 ## 7. Falha, consulta e retenção — R9-D05/D06
 
-Fluxo de estados por coleta: \`PLANNED\` → \`FETCH_ATTEMPT\` → \`CAPTURED\` ou \`UNAVAILABLE/ERROR/REJECTED\`. Consultas completas sem matches podem gerar um **evento de resultado de run** \`NO_RELEVANT_PUBLICATIONS\` somente se TODAS as fontes/partições previstas do run tiveram término verificado. Nenhum erro parcial pode ser transformado em resultado negativo de publicação. A ausência de fonte/XML/índice gera status de evidência \`PENDING/UNVERIFIED\`.
+Fluxo de estados por coleta: `PLANNED` → `FETCH_ATTEMPT` → `CAPTURED` ou `UNAVAILABLE/ERROR/REJECTED`. Consultas completas sem matches podem gerar um **evento de resultado de run** `NO_RELEVANT_PUBLICATIONS` somente se TODAS as fontes/partições previstas do run tiveram término verificado. Nenhum erro parcial pode ser transformado em resultado negativo de publicação. A ausência de fonte/XML/índice gera status de evidência `PENDING/UNVERIFIED`.
 
 Retenção mínima: manter metadados, SHA, URLs oficiais exatas, latência/status, código de erro sanitizado, referências de edição, job, versões e eventos imutáveis. Não armazenar corpo PDF/JPG/ZIP, raw HTTP nem imagens no PostgreSQL. **Limitação explícita:** sem os bytes, não se pode repetir extração, provar equivalência textual retrospectiva ou reconstruir a antiga resposta se a origem mudar. Re-fetch futuro é **novo evento** potencialmente com novo SHA; jamais equivale à captura anterior automaticamente. Objeto original único, imutável e com lifecycle fora do banco, referenciado por hash, é opção futura a dimensionar/autorização específica (não implementada aqui). Retenção desses metadados jurídicos necessita política de prazo e proteção LGPD/operacional aprovada na implantação; nunca apagar trilha de auditoria enquanto vinculada a prova ativa.
 
@@ -349,22 +347,22 @@ Retenção mínima: manter metadados, SHA, URLs oficiais exatas, latência/statu
 
 | Caso de ataque/erro | Resultado requerido e verificação |
 | --- | --- |
-| DTO \`sourceCapture\` criado manualmente | UNIT pode correlacionar candidato; banco **não** admite, pois falta IDs/roles/bytes/verificação |
-| Seção impressa 3 com trace DO1 | \`UNVERIFIED\` |
+| DTO `sourceCapture` criado manualmente | UNIT pode correlacionar candidato; banco **não** admite, pois falta IDs/roles/bytes/verificação |
+| Seção impressa 3 com trace DO1 | `UNVERIFIED` |
 | Regular 80/Extra 80-A/Extra 80-B | Mesmo base 80 nunca basta, exige índice oficial + sufixo |
-| Jornal ID/matéria/ZIP/XML errados | \`UNVERIFIED\` com mismatch, nenhum \`TEXT_CORRESPONDS\` persistível |
-| Despacho certo, cláusula truncada/trocada | \`UNVERIFIED\` |
-| Corpo jurídico adicional conflitando | \`UNVERIFIED\`; não confiar só em \`includes\` |
-| PDF malformado, tamanho, redirecionamento | \`REJECTED\`/ERROR de coleta, jamais sucessso |
-| HTTPS indisponível | \`UNAVAILABLE/ERROR\` + retry, jamais \`NO_RELEVANT_PUBLICATIONS\` |
+| Jornal ID/matéria/ZIP/XML errados | `UNVERIFIED` com mismatch, nenhum `TEXT_CORRESPONDS` persistível |
+| Despacho certo, cláusula truncada/trocada | `UNVERIFIED` |
+| Corpo jurídico adicional conflitando | `UNVERIFIED`; não confiar só em `includes` |
+| PDF malformado, tamanho, redirecionamento | `REJECTED`/ERROR de coleta, jamais sucesso |
+| HTTPS indisponível | `UNAVAILABLE/ERROR` + retry, jamais `NO_RELEVANT_PUBLICATIONS` |
 | Concorrência de dois coletores | 2 tentativas históricas separadas, 1 posição efetiva consistente |
-| HMAC arbitrário/role de app/worker/curator/issuer/sealer | Nenhum \`CAPTURED\`/\`VERIFIED\`; chaves fora do banco |
+| HMAC arbitrário/role de app/worker/curator/issuer/sealer | Nenhum `CAPTURED`/`VERIFIED`; chaves fora do banco |
 | UPDATE/DELETE/TRUNCATE ou RLS bypass | Negados em PG16 e PG18; triggers + ACL/FORCE RLS |
 | Tenant A/B | Apenas relatório de relevância individual isolado; fonte global read-only |
-| Revogação da credential de qualquer etapa | Veredicto efetivo volta para \`UNVERIFIED\` sem apagar eventos |
+| Revogação da credential de qualquer etapa | Veredicto efetivo volta para `UNVERIFIED` sem apagar eventos |
 | Repetição de job/ordinal ou evento forjado | Conflito imutável; um retry legítimo usa próximo ordinal |
-| Prova documental + ratificação sem emendas revisadas | \`LEGAL_CURRENT=PENDING\`; 048 intocada |
-| CI positivo sintético antigo | Falha 048 \`TAX13_R8_ORIGINAL_HTTP_UNVERIFIED\` permanece esperada |
+| Prova documental + ratificação sem emendas revisadas | `LEGAL_CURRENT=PENDING`; 048 intocada |
+| CI positivo sintético antigo | Falha 048 `TAX13_R8_ORIGINAL_HTTP_UNVERIFIED` permanece esperada |
 | Captura real 80-B + XML + índice com mesmos bytes | **PENDENTE**, sem autorização para serviço Railway novo |
 
 Executar TypeScript, unit DOU de layout e negativas com mocks sem origem oficial; PG16/18 de 049+ **somente após R9-DESIGN-R2 APPROVED e implementação aditiva autorizada**. Não desabilitar R7/TAX11, não criar recibos de fixture, não retomar DOU 1991/1997, sem merge/deploy/produção.
@@ -372,8 +370,8 @@ Executar TypeScript, unit DOU de layout e negativas com mocks sem origem oficial
 ## 9. Questões explícitas ao revisor independente R9-DESIGN-R2
 
 1. A autorização em duas sessões coletor/verificador, com verificações efetivamente independentes de índice e INLABS, é suficiente para o threat model definido, considerando que PostgreSQL não observa o TLS?
-2. A composição de tabelas é mínima? Reutilizar \`collection_runs\` e registros de fontes existentes em vez da nova tabela jobs traz risco de integridade histórica? É necessário evento específico para resultados \`NO_RELEVANT_PUBLICATIONS\`?
-3. A chave de identidade \`journal_id + printed_edition + ZIP/XML + despacho/ato\` é completa? Como atestar o índice governamental sem depender de parâmetro do cliente?
+2. A composição de tabelas é mínima? Reutilizar `collection_runs` e registros de fontes existentes em vez da nova tabela jobs traz risco de integridade histórica? É necessário evento específico para resultados `NO_RELEVANT_PUBLICATIONS`?
+3. A chave de identidade `journal_id + printed_edition + ZIP/XML + despacho/ato` é completa? Como atestar o índice governamental sem depender de parâmetro do cliente?
 4. Os controles de RLS/FORCE RLS, ACL, session_user, transações atômicas e revogação descritos bastam como desenho, ou falta DDL de funções para aprovação?
 5. A abordagem de delimitação do texto e a extração espacial sintética sustentam o *desenho*, enquanto a coleta real pendente sustenta futuro teste operacional?
 6. A projeção SOURCE sem CURRENT, revogação, retenção sem bytes e multi-tenant mantém os gates da migration 048 sem risco de promoção automática?
