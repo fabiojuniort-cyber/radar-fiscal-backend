@@ -173,7 +173,13 @@ GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGE
 CREATE OR REPLACE FUNCTION public.collection_filter_l11_purge_guard()
 RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
   SELECT current_setting('app.collection_filter_l11_purge',true)='authorized'
-    AND current_user <> 'radar_app' AND current_user <> 'radar_worker'
+    AND current_user=(
+      SELECT pg_catalog.pg_get_userbyid(proowner)
+      FROM pg_catalog.pg_proc
+      WHERE oid=pg_catalog.to_regprocedure(
+        'public.collection_filter_direct_purge_batch(uuid[],text,text,text,text,uuid)'
+      )
+    )
 $;
 REVOKE ALL ON FUNCTION public.collection_filter_l11_purge_guard() FROM PUBLIC;
 
