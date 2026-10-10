@@ -62,6 +62,11 @@ export async function fetchOfficialDouPdfPage(
   const mime=(resp.headers.get('content-type')??'').split(';')[0]!.trim().toLowerCase();
   if(!['application/pdf','application/octet-stream'].includes(mime))
    return deny('DOU_OFFICIAL_SOURCE_NOT_PDF');
+  if(resp.headers.has('content-encoding')&&
+    !['identity',''].includes((resp.headers.get('content-encoding')??'').trim().toLowerCase()))
+   return deny('DOU_OFFICIAL_SOURCE_ENCODING_UNSUPPORTED');
+  if(resp.url && resp.url!==pdfUrl)
+   return deny('DOU_OFFICIAL_SOURCE_FINAL_URL_CHANGED');
   const len=resp.headers.get('content-length');
   if(len!==null&&(!/^[0-9]+$/.test(len)||Number(len)>MAX_PDF_BYTES))
    return deny('DOU_OFFICIAL_SOURCE_TOO_LARGE');
@@ -73,12 +78,17 @@ export async function fetchOfficialDouPdfPage(
     const {done,value}=await reader.read();
     if(done)break;
     total+=value.byteLength;
-    if(total>MAX_PDF_BYTES)return deny('DOU_OFFICIAL_SOURCE_TOO_LARGE');
+    if(total>MAX_PDF_BYTES){
+     await reader.cancel('DOU_OFFICIAL_SOURCE_TOO_LARGE');
+     return deny('DOU_OFFICIAL_SOURCE_TOO_LARGE');
+    }
     parts.push(value);
    }
   }finally{
    reader.releaseLock();
   }
+  if(len!==null && Number(len)!==total)
+   return deny('DOU_OFFICIAL_SOURCE_LENGTH_MISMATCH');
   const bytes=Buffer.concat(parts,total);
   const preflight=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:bytes});
   if(preflight.status!=='DOU_PDF_BYTES_BOUND_ONLY')
