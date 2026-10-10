@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - fix/tax13-arch-02-single-proof-authority
+      - fix/tax13-r8-02-official-capture
     paths:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts'
@@ -14,6 +15,7 @@ on:
       - 'test/tax13-r802.dou-source-preflight.unit.test.ts'
       - 'test/tax13-r802.official-pdf-http.unit.test.ts'
       - 'test/tax13-r802.native-pdf-text.unit.test.ts'
+      - 'test/tax13-r9.pdf-layout-boundaries.unit.test.ts'
       - 'test/tax13-r802.confaz-temporal-candidate.unit.test.ts'
       - '.github/workflows/tax13-r802-dou-transition.yml'
 
@@ -36,4 +38,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npx tsx --test test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts test/tax13-r802.native-pdf-text.unit.test.ts test/tax13-r802.confaz-temporal-candidate.unit.test.ts
+      - run: npx tsx --test test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts test/tax13-r802.native-pdf-text.unit.test.ts test/tax13-r9.pdf-layout-boundaries.unit.test.ts test/tax13-r802.confaz-temporal-candidate.unit.test.ts

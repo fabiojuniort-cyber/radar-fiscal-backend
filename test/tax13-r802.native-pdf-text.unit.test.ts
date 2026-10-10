@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {extractDouOnePageNativePdfText} from '../src/modules/taxonomy/legal-scope/dou-native-pdf-text.js';
+import {extractDouOnePageNativePdfText,assembleDouPdfTextItems} from '../src/modules/taxonomy/legal-scope/dou-native-pdf-text.js';
 import {legacyPdfFixture} from './doe-sp-legacy.pdf-fixtures.js';
 import {syntheticWrappedOnePagePdf} from './dou-one-page.pdf-fixtures.js';
 
@@ -32,4 +32,24 @@ test('TAX13 DOU: malformed or oversized PDF cannot enter the native extractor',a
   assert.equal(result.status,'UNVERIFIED');
   assert.equal(result.reason,'DOU_PDF_TEXT_INPUT_BOUNDS');
  }
+});
+
+test('TAX13 R9 D07: synthetic PDF fragments preserve spacing, newlines and reading order',()=>{
+ const words=assembleDouPdfTextItems([
+  {str:'CONVENIO',width:50,transform:[1,0,0,1,10,700]},
+  {str:'ICMS',width:30,transform:[1,0,0,1,65,700]},
+  {str:'15/2024',width:35,transform:[1,0,0,1,100,700],hasEOL:true},
+  {str:'CLAUSULA PRIMEIRA',width:95,transform:[1,0,0,1,10,680]},
+ ]);
+ assert.deepEqual(words,{status:'TEXT_ASSEMBLED',text:'CONVENIO ICMS 15/2024\nCLAUSULA PRIMEIRA'});
+ const reversed=assembleDouPdfTextItems([
+  {str:'CLAUSULA TERCEIRA',width:100,transform:[1,0,0,1,10,600]},
+  {str:'CLAUSULA PRIMEIRA',width:100,transform:[1,0,0,1,10,700]},
+ ]);
+ assert.deepEqual(reversed,{status:'UNVERIFIED',reason:'DOU_PDF_TEXT_ORDER_AMBIGUOUS'});
+ const overlapping=assembleDouPdfTextItems([
+  {str:'REVOGADO',width:100,transform:[1,0,0,1,110,600]},
+  {str:'VIGENTE',width:100,transform:[1,0,0,1,40,600]},
+ ]);
+ assert.equal(overlapping.status,'UNVERIFIED','overlapping/different columns must fail closed');
 });

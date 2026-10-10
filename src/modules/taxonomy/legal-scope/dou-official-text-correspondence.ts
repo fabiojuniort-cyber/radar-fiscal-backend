@@ -7,7 +7,7 @@
  * Even complete identity match NEVER proves legal vigency or CURRENT.
  */
 import type {ConnectorPublication} from '../../collection/connector.contract.js';
-import {douHtmlText} from '../../collection/dou.parser.js';
+import {douHtmlText,extractEmbeddedConfazPublications} from '../../collection/dou.parser.js';
 import {preflightDouConfazTrace,type DouConfazTrace} from './dou-source-custody-preflight.js';
 import type {OfficialDouPdfSourceCapture} from './dou-official-http-pdf-capture.js';
 
@@ -18,6 +18,8 @@ export type DouPdfActTextCorrelation=Rejected|{
  readonly status:'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY';
  readonly grantsLegalCurrent:false;
  readonly legalEffectivity:'UNVERIFIED';
+ readonly sqlSourceAdmissionAllowed:false;
+ readonly normalizationVersion:'DOU_PDF_TEXT_BOUNDARIES_V2';
  readonly actType:string;
  readonly actNumber:string;
  readonly parentExternalId:string;
@@ -114,22 +116,51 @@ export function correlateOfficialDouPdfActText(input:{
   '\\s*[/.-]\\s*'+year+'\\b');
  if(!longDate.test(masthead)&&!numericDate.test(masthead))
   return reject('DOU_WRONG_PRINTED_DATE');
+ // Compare the on-page printed section, not merely the INLABS section.
+ // A missing/ambiguous printed label remains UNVERIFIED, not an inferred DO1.
+ const printedSection=section.startsWith('DO3')?'3':'1';
+ const sectionLabels=[...masthead.matchAll(/(?:SEÇÃO|SECAO)\s+([13])\b/g)];
+ if(sectionLabels.length!==1||sectionLabels[0]?.[1]!==printedSection)
+  return reject('DOU_WRONG_OR_MISSING_PRINTED_SECTION');
  const parentHeading=normalized(parent.title);
  const actHeading=normalized(act.title);
  const actContent=act.content?normalized(legalText(act.content)):'';
  if(!parentHeading||!actHeading||actContent.length<120||
     actContent.length>MAX_ACT_TEXT_CHARS||
-    !actContent.includes(actHeading))
+    !actContent.startsWith(actHeading))
   return reject('DOU_NORMATIVE_ACT_TEXT_INCOMPLETE');
  const parentAt=text.indexOf(parentHeading);
  const actAt=text.indexOf(actHeading,parentAt<0?0:parentAt+parentHeading.length);
  if(parentAt<0||actAt<parentAt+parentHeading.length)
   return reject('DOU_DISPATCH_OR_ACT_HEADING_MISSING');
- if(!text.includes(actContent,actAt))
+ // Inclusion elsewhere on the page is insufficient: anchor the COMPLETE
+ // normalized act at its heading and reject unexpected normative material
+ // immediately after it. This is still a non-persistible comparison candidate.
+ if(!text.startsWith(actContent,actAt))
   return reject('DOU_WHOLE_ACT_TEXT_MISMATCH');
+ // A following act is accepted only when the remaining page tail is
+ // fully accounted for by the INLABS-derived subsequent acts. A heading
+ // prefix by itself is not enough to hide contradictory appended clauses.
+ let remainder=text.slice(actAt+actContent.length).trim();
+ if(remainder){
+  const siblings=extractEmbeddedConfazPublications(parent);
+  const position=siblings.findIndex(sibling=>sibling.externalId===act.externalId);
+  if(position<0)return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+  for(const sibling of siblings.slice(position+1)){
+   const body=normalized(legalText(sibling.content??''));
+   if(!body||!remainder.startsWith(body))
+    return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+   remainder=remainder.slice(body.length).trim();
+  }
+  // No generic "official footer starts with ..." exception: it would let
+  // an attacker append conflicting legal text after a benign footer prefix.
+  if(remainder)return reject('DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED');
+ }
  return {
   status:'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',grantsLegalCurrent:false,
-  legalEffectivity:'UNVERIFIED',actType:act.actType??'',actNumber:act.actNumber??'',
+  legalEffectivity:'UNVERIFIED',sqlSourceAdmissionAllowed:false,
+  normalizationVersion:'DOU_PDF_TEXT_BOUNDARIES_V2',
+  actType:act.actType??'',actNumber:act.actNumber??'',
   parentExternalId:trace.parentExternalId,editionPrinted:printedEdition,
   officialMatterId:trace.officialMatterId,originalPdfSha256:cand.pdfSha256,
  };
