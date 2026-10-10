@@ -68,11 +68,26 @@ test(
     const createdUserIds: string[] = [];
     let originalDouConfig: unknown;
     let sourceFound = false;
+    let seededDouSource = false;
     try {
+      // db:prepare provisions schema/roles but does not seed the source catalog.
+      // The integration fixture creates only the missing DOU source in CI.
+      const existing = await admin.query<{ connector_config: unknown }>(
+        "SELECT connector_config FROM public.sources WHERE code='dou' AND connector_key='dou'",
+      );
+      if (existing.rows.length === 0) {
+        await admin.query(
+          `INSERT INTO public.sources
+             (code, name, jurisdiction_level, base_url, connector_key, connector_config)
+           VALUES ('dou', 'DOU fixture', 'FEDERAL', 'https://inlabs.in.gov.br',
+                   'dou', '{}'::jsonb)`,
+        );
+        seededDouSource = true;
+      }
       const source = await admin.query<{ connector_config: unknown }>(
         "SELECT connector_config FROM public.sources WHERE code='dou' AND connector_key='dou'",
       );
-      assert.equal(source.rows.length, 1, 'seeded DOU source required');
+      assert.equal(source.rows.length, 1, 'DOU source required');
       originalDouConfig = source.rows[0]!.connector_config;
       sourceFound = true;
       const first = await registerAndLogin(app, 'first');
@@ -323,6 +338,11 @@ test(
         await admin.query(
           "UPDATE public.sources SET connector_config=$1::jsonb WHERE code='dou' AND connector_key='dou'",
           [JSON.stringify(originalDouConfig)],
+        );
+      }
+      if (seededDouSource) {
+        await admin.query(
+          "DELETE FROM public.sources WHERE code='dou' AND connector_key='dou'",
         );
       }
       if (createdUserIds.length > 0) {
