@@ -62,7 +62,7 @@ export async function pruneCollectionItems(
     let cursorAt: Date | null = null;
     let cursorId: string | null = null;
     for (let i=0;i<maxBatches;i++) {
-      const rows=await sql<{id:string;created_at:Date}>`
+      const rows: {rows:Array<{id:string;created_at:Date}>}=await sql<{id:string;created_at:Date}>`
         SELECT id,created_at FROM collection_items
         WHERE created_at < ${cutoff}
           AND (${cursorAt}::timestamptz IS NULL
