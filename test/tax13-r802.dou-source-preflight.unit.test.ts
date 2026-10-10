@@ -223,7 +223,7 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
   fetchedAt:'2026-10-10T00:00:00.000Z',requestUrl:pdfUrl,
   httpStatus:200 as const,contentType:'application/pdf',
  };
- const pdfExtractedText='DIÁRIO OFICIAL DA UNIÃO Nº 180 Brasília, 18 de setembro de 2026 '+
+ const pdfExtractedText='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 '+
   parent.title+' '+douHtmlText(child.content!);
  const good=correlateOfficialDouPdfActText({
   trace,sourceCapture:capture,parent,act:child,pdfExtractedText,printedEdition:'180',
@@ -236,10 +236,19 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
   printedEdition:'180',
  });
  assert.equal(numericDate.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY');
- if(good.status==='DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY')
+ if(good.status==='DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY'){
   assert.equal(good.legalEffectivity,'UNVERIFIED');
+  assert.equal(good.sqlSourceAdmissionAllowed,false,'synthetic DTO cannot authorize SQL provenance');
+  assert.equal(good.normalizationVersion,'DOU_PDF_TEXT_BOUNDARIES_V2');
+ }
  for(const [variant,reason] of [
   [pdfExtractedText.replace('Nº 180','Nº 181'),'DOU_WRONG_PRINTED_EDITION'],
+  [pdfExtractedText.replace('SEÇÃO 1','SEÇÃO 3'),'DOU_WRONG_OR_MISSING_PRINTED_SECTION'],
+  [pdfExtractedText.replace('SEÇÃO 1',''),'DOU_WRONG_OR_MISSING_PRINTED_SECTION'],
+  [pdfExtractedText+' CLÁUSULA QUINTA - Benefício fiscal ampliado.',
+   'DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED'],
+  [pdfExtractedText+' A norma agora se aplica a todos os contribuintes.',
+   'DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED'],
   [pdfExtractedText.replace('18 de setembro de 2026','17 de setembro de 2026'),'DOU_WRONG_PRINTED_DATE'],
   [pdfExtractedText.replace('Brasília, 18 de setembro de 2026','Brasília, 17 de setembro de 2026')+
    ' (menção posterior: Brasília, 18 de setembro de 2026)', 'DOU_WRONG_PRINTED_DATE'],
@@ -261,7 +270,7 @@ test('R802 one same-buffer official PDF download and text extraction: synthetic 
  const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
- const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 Brasília, 18 de setembro de 2026 '+
+ const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 '+
   parent.title+' '+douHtmlText(child.content!);
  const bytes=syntheticWrappedOnePagePdf(pdfText);
  t.mock.method(globalThis,'fetch',async()=>new Response(bytes,{
