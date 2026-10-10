@@ -7,6 +7,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
+import {previewDirectFilterRule,confirmDirectFilterRule} from '../../modules/collection/collection-filter.direct.js';
 import {
   approveCollectionFilterDraft,
   collectionFilterAdminErrorCode,
@@ -340,5 +341,46 @@ export async function collectionFilterAdminRoutes(
       }
     },
   );
+
+
+  // L-11: strict admin-only preview and revision-safe confirm.
+  const directBody = z.object({
+    sourceCode: z.literal('dou'),
+    section: z.string().trim().min(1).max(50),
+    canonicalType: z.string().trim().min(1).max(300),
+    mode,
+    newTypeId: z.string().uuid().optional(),
+  });
+  typed.post('/api/v1/admin/collection-filter/direct-rule/preview', {
+    preHandler: requirePlatformAdmin,
+    schema:{body:directBody},
+  }, async (request,reply)=>{
+    try {
+      return reply.send(await previewDirectFilterRule(app.db,request.auth!.userId,request.body));
+    } catch (error) {
+      if (error instanceof RangeError) return reply.status(400).send({error:error.message});
+      throw error;
+    }
+  });
+
+  typed.post('/api/v1/admin/collection-filter/direct-rule/confirm', {
+    preHandler: requirePlatformAdmin,
+    schema:{body:directBody.extend({
+      expectedCount:z.number().int().nonnegative(),
+      previewToken:z.string().regex(/^[a-f0-9]{64}$/),
+    })},
+  }, async (request,reply)=>{
+    const {expectedCount,previewToken,...rule}=request.body;
+    try {
+      const result=await confirmDirectFilterRule(
+        app.db,request.auth!.userId,rule,expectedCount,previewToken);
+      return reply.send(result);
+    } catch (error) {
+      if (error instanceof Error && error.message==='direct_filter_purge_not_ready')
+        return reply.status(409).send({error:'direct_filter_purge_not_ready'});
+      if (error instanceof RangeError) return reply.status(400).send({error:error.message});
+      throw error;
+    }
+  });
 
 }
