@@ -224,7 +224,7 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
   httpStatus:200 as const,contentType:'application/pdf',
  };
  const pdfExtractedText='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 '+
-  douHtmlText(parent.content!);
+  parent.title+' '+douHtmlText(parent.content!);
  const good=correlateOfficialDouPdfActText({
   trace,sourceCapture:capture,parent,act:child,pdfExtractedText,printedEdition:'180',
  });
@@ -277,13 +277,13 @@ test('R9-R2-D03 synthetic: altered preceding sibling cannot be hidden by matchin
  const trace=preflightDouConfazTrace({sourceCode:'dou',publication:second,parent});
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');if(trace.status!=='DOU_XML_TRACE_ONLY')return;
  const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
- const pdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
  const preflight=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
  const capture={status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED' as const,
   grantsLegalCurrent:false as const,preflight,fetchedAt:'2026-10-10T00:00:00.000Z',
   requestUrl:pdfUrl,httpStatus:200 as const,contentType:'application/pdf'};
  const masthead='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 ';
- const full=masthead+douHtmlText(parent.content!);
+ const full=masthead+parent.title+' '+douHtmlText(parent.content!);
  const good=correlateOfficialDouPdfActText({trace,sourceCapture:capture,parent,act:second,
   pdfExtractedText:full,printedEdition:'180'});
  assert.equal(good.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',JSON.stringify(good));
@@ -305,7 +305,7 @@ test('R802 one same-buffer official PDF download and text extraction: synthetic 
  assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
  const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 SEÇÃO 1 Brasília, 18 de setembro de 2026 '+
-  douHtmlText(parent.content!);
+  parent.title+' '+douHtmlText(parent.content!);
  const bytes=syntheticWrappedOnePagePdf(pdfText);
  t.mock.method(globalThis,'fetch',async()=>new Response(bytes,{
   status:200,headers:{'content-type':'application/pdf'}
@@ -332,7 +332,7 @@ test('R802 negative: edition number citation in the act cannot override the PDF 
   httpStatus:200 as const,contentType:'application/pdf',
  };
  const page='DIÁRIO OFICIAL DA UNIÃO Nº 179 PUBLICAÇÃO REFERENTE À EDIÇÃO Nº 180 '+
-   douHtmlText(parent.content!);
+   parent.title+' '+douHtmlText(parent.content!);
  const wrongHeader=correlateOfficialDouPdfActText({
   trace,sourceCapture,parent,act:child,pdfExtractedText:page,printedEdition:'180',
  });
