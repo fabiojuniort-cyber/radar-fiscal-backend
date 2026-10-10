@@ -1,3 +1,5 @@
+> **POLÍTICA ATUAL (10/10/2026, Trifaros):** A análise de certificados/ICP/OCSP documentada abaixo é apenas registro técnico histórico, NÃO um requisito de publicação, admissibilidade ou próximos passos. O proprietário adotou PDF de fonte oficial confiável + URL/identidade/texto/hash. Ver `TAX13_R802_DOU_PROVENANCE_TRANSITION.md`. Não solicitar VALIDAR/ITI.
+
 # Trifaros / TAX13-R8-02 — User-provided DOU PDFs, local forensic checkpoint
 
 **Date:** 2026-10-09. **State:** external-origin and revocation BLOCKED. No changes to production, NCM seals, migrations, or legal CURRENT. This is an investigation record, NOT legal authenticity attestation.
