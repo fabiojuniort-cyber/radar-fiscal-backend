@@ -155,4 +155,226 @@ REVOKE ALL ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
   TO radar_app;
 
+
+-- Only a verified SECURITY DEFINER transaction may prune immutable evidence.
+-- Never disable global triggers or change existing RESTRICT foreign keys.
+CREATE OR REPLACE FUNCTION public.collection_filter_l11_purge_guard()
+RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
+  SELECT current_setting('app.collection_filter_l11_purge',true)='authorized'
+    AND current_user <> 'radar_app' AND current_user <> 'radar_worker'
+$;
+REVOKE ALL ON FUNCTION public.collection_filter_l11_purge_guard() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION public.publication_scope_event_append_only()
+RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,public,pg_temp AS $
+BEGIN
+  IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
+  RAISE EXCEPTION 'PUBLICATION_SCOPE_EVENT_APPEND_ONLY';
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.taxonomy_classification_append_only_record()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
+  RAISE EXCEPTION '% rows are append-only', TG_TABLE_NAME;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.taxonomy_classification_assertion_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
+  RAISE EXCEPTION 'publication taxonomy assertions are append-only';
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.taxonomy_unmapped_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
+  RAISE EXCEPTION '% rows are append-only', TG_TABLE_NAME;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.taxonomy_candidate_link_guard()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF TG_OP='DELETE' THEN
+    IF public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'taxonomy candidate links are historical and cannot be deleted';
+  END IF;
+  IF OLD.link_status='SUPERSEDED' THEN
+    RAISE EXCEPTION 'superseded taxonomy candidate link is immutable';
+  END IF;
+  IF NEW.candidate_id IS DISTINCT FROM OLD.candidate_id
+     OR NEW.occurrence_id IS DISTINCT FROM OLD.occurrence_id
+     OR NEW.linked_at IS DISTINCT FROM OLD.linked_at
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'taxonomy candidate link identity is immutable';
+  END IF;
+  IF OLD.link_status='ACTIVE' AND NEW.link_status <> 'SUPERSEDED' THEN
+    RAISE EXCEPTION 'active taxonomy candidate link only allows supersession';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+-- One guarded batch. Any unexpected dependent FK or permission failure aborts
+-- the whole outer transaction, including the active rule change.
+CREATE OR REPLACE FUNCTION public.collection_filter_direct_purge_batch(
+  p_ids UUID[],p_source TEXT,p_section TEXT,p_type TEXT,p_mode TEXT,
+  p_operation UUID
+)
+RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public AS $
+DECLARE
+  v_actor UUID := public.app_current_user_id();
+  v_count INTEGER;
+  v_item UUID;
+BEGIN
+  IF v_actor IS NULL OR NOT public.app_user_is_platform_admin() THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='platform_admin_required';
+  END IF;
+  v_count := cardinality(p_ids);
+  IF v_count=0 THEN RETURN 0; END IF;
+  IF v_count>100 OR v_count<>(SELECT count(DISTINCT id) FROM unnest(p_ids) id)
+     OR EXISTS(SELECT 1 FROM unnest(p_ids) id WHERE id IS NULL) THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='invalid_purge_batch';
+  END IF;
+  IF lower(btrim(p_source))<>'dou' THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='only_dou_direct_filter_supported';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.company_publications cp
+            WHERE cp.publication_id=ANY(p_ids)) THEN
+    RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='company_publication_protected';
+  END IF;
+  -- Lock parents; a concurrent tenant match must not be created during purge.
+  PERFORM 1 FROM public.publications p WHERE p.id=ANY(p_ids) FOR UPDATE;
+  IF (SELECT count(*) FROM public.publications WHERE id=ANY(p_ids))<>v_count
+     OR EXISTS(
+       SELECT 1 FROM public.publications p
+       WHERE p.id=ANY(p_ids) AND NOT EXISTS (
+         SELECT 1 FROM public.publication_origins po
+         JOIN public.sources s ON s.id=po.source_id
+         WHERE po.publication_id=p.id AND s.code='dou'
+       )
+     ) THEN
+    RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='direct_purge_targets_changed';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.company_publications cp
+            WHERE cp.publication_id=ANY(p_ids)) THEN
+    RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='company_publication_protected';
+  END IF;
+
+  PERFORM pg_catalog.set_config('app.collection_filter_l11_purge','authorized',true);
+
+  -- Shared operational run history is retained, but pointers to removed acts
+  -- are cleared rather than dangling. Run-publication links are act-owned.
+  UPDATE public.collection_items SET publication_id=NULL
+   WHERE publication_id=ANY(p_ids);
+  DELETE FROM public.collection_run_publications WHERE publication_id=ANY(p_ids);
+  DELETE FROM public.publication_scope_state WHERE publication_id=ANY(p_ids);
+  DELETE FROM public.publication_scope_events WHERE publication_id=ANY(p_ids);
+
+  DELETE FROM public.publication_taxonomy_curator_tags
+   WHERE publication_version_id IN (
+     SELECT pv.id FROM public.publication_versions pv WHERE pv.publication_id=ANY(p_ids));
+  DELETE FROM public.publication_taxonomy_scans
+   WHERE publication_version_id IN (
+     SELECT pv.id FROM public.publication_versions pv WHERE pv.publication_id=ANY(p_ids));
+  DELETE FROM public.publication_ncm_mentions
+   WHERE publication_version_id IN (
+     SELECT pv.id FROM public.publication_versions pv WHERE pv.publication_id=ANY(p_ids));
+
+  DELETE FROM public.taxonomy_candidate_occurrence_links l
+   WHERE EXISTS(SELECT 1 FROM public.taxonomy_unmapped_occurrences u
+     JOIN public.publication_taxonomy_runs r ON r.id=u.run_id
+     JOIN public.publication_versions pv ON pv.id=r.publication_version_id
+     WHERE l.occurrence_id=u.id AND pv.publication_id=ANY(p_ids));
+  DELETE FROM public.taxonomy_unmapped_occurrences u
+   WHERE EXISTS(SELECT 1 FROM public.publication_taxonomy_runs r
+     JOIN public.publication_versions pv ON pv.id=r.publication_version_id
+     WHERE u.run_id=r.id AND pv.publication_id=ANY(p_ids));
+
+  DELETE FROM public.publication_taxonomy_reviews r
+   WHERE EXISTS(SELECT 1 FROM public.publication_taxonomy_assertions a
+     JOIN public.publication_taxonomy_runs t ON t.id=a.run_id
+     JOIN public.publication_versions pv ON pv.id=t.publication_version_id
+     WHERE r.assertion_id=a.id AND pv.publication_id=ANY(p_ids));
+  DELETE FROM public.publication_taxonomy_spans s
+   WHERE EXISTS(SELECT 1 FROM public.publication_taxonomy_assertions a
+     JOIN public.publication_taxonomy_runs t ON t.id=a.run_id
+     JOIN public.publication_versions pv ON pv.id=t.publication_version_id
+     WHERE s.assertion_id=a.id AND pv.publication_id=ANY(p_ids));
+
+  -- RESTRICT supersession chains: delete youngest dependents first.
+  FOR v_item IN
+    WITH RECURSIVE selected AS (
+      SELECT a.id,a.supersedes_assertion_id
+      FROM public.publication_taxonomy_assertions a
+      JOIN public.publication_taxonomy_runs r ON r.id=a.run_id
+      JOIN public.publication_versions pv ON pv.id=r.publication_version_id
+      WHERE pv.publication_id=ANY(p_ids)
+    ), ordered AS (
+      SELECT a.id,a.supersedes_assertion_id,0 AS depth FROM selected a
+      WHERE NOT EXISTS(SELECT 1 FROM selected newer
+                       WHERE newer.supersedes_assertion_id=a.id)
+      UNION ALL
+      SELECT parent.id,parent.supersedes_assertion_id,ordered.depth+1
+      FROM selected parent JOIN ordered ON ordered.supersedes_assertion_id=parent.id
+    )
+    SELECT id FROM ordered ORDER BY depth,id
+  LOOP
+    DELETE FROM public.publication_taxonomy_assertions WHERE id=v_item;
+  END LOOP;
+
+  FOR v_item IN
+    WITH RECURSIVE selected AS (
+      SELECT r.id,r.supersedes_run_id
+      FROM public.publication_taxonomy_runs r
+      JOIN public.publication_versions pv ON pv.id=r.publication_version_id
+      WHERE pv.publication_id=ANY(p_ids)
+    ), ordered AS (
+      SELECT r.id,r.supersedes_run_id,0 AS depth FROM selected r
+      WHERE NOT EXISTS(SELECT 1 FROM selected newer WHERE newer.supersedes_run_id=r.id)
+      UNION ALL
+      SELECT parent.id,parent.supersedes_run_id,ordered.depth+1
+      FROM selected parent JOIN ordered ON ordered.supersedes_run_id=parent.id
+    )
+    SELECT id FROM ordered ORDER BY depth,id
+  LOOP
+    DELETE FROM public.publication_taxonomy_runs WHERE id=v_item;
+  END LOOP;
+
+  UPDATE public.collection_filter_new_types n
+    SET sample_publication_ids=ARRAY(
+      SELECT id FROM unnest(n.sample_publication_ids) id
+      WHERE id<>ALL(p_ids))
+    WHERE n.sample_publication_ids && p_ids;
+
+  DELETE FROM public.publications p WHERE p.id=ANY(p_ids);
+  PERFORM pg_catalog.set_config('app.collection_filter_l11_purge','',true);
+
+  INSERT INTO public.audit_log(
+    tenant_id,actor_type,actor_id,action,entity_type,entity_id,
+    after_data,correlation_id
+  ) VALUES (
+    NULL,'ADMIN',v_actor::text,'COLLECTION_FILTER_DIRECT_PURGE',
+    'collection_filter_type_rule',upper(btrim(p_type)),
+    pg_catalog.jsonb_build_object(
+      'sourceCode',lower(btrim(p_source)),
+      'section',upper(btrim(p_section)),
+      'canonicalType',upper(btrim(p_type)),
+      'mode',p_mode,'deletedCount',v_count,'deletedIds',p_ids
+    ),p_operation
+  );
+  RETURN v_count;
+END;
+$;
+REVOKE ALL ON FUNCTION public.collection_filter_direct_purge_batch(
+  UUID[],TEXT,TEXT,TEXT,TEXT,UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.collection_filter_direct_purge_batch(
+  UUID[],TEXT,TEXT,TEXT,TEXT,UUID) TO radar_app;
+
 COMMIT;
