@@ -1,7 +1,7 @@
 -- L-11: retire draft/simulation flows and enable direct, admin-only DOU type rules.
 -- DRAFT ONLY. Never apply to production without a reviewed purge implementation and gate.
 -- Pre-existing migrations 039/040 are intentionally not modified.
-BEGIN;
+-- migrate.ts owns BEGIN/COMMIT and records the schema_migrations checksum atomically.
 
 DROP FUNCTION IF EXISTS public.collection_filter_approve_draft(UUID);
 DROP FUNCTION IF EXISTS public.collection_filter_save_draft(JSONB);
@@ -395,4 +395,3 @@ REVOKE ALL ON FUNCTION public.collection_filter_direct_purge_batch(
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_purge_batch(
   UUID[],TEXT,TEXT,TEXT,TEXT,UUID) TO radar_app;
 
-COMMIT;
