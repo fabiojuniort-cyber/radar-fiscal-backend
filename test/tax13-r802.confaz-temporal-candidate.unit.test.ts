@@ -44,6 +44,7 @@ test('CONFAZ timing inputs reject spoofed official host, false ratification or i
  const invalid=[
   {...case15,ratificationReferences:['CONVENIO_ICMS:16:2024']},
   {...case15,originalActOfficialUrl:'https://www.confaz.fazenda.gov.br.evil.example/legislacao/convenios/2024/CV015_24'},
+  {...case15,originalActOfficialUrl:'https://www.confaz.fazenda.gov.br/legislacao/convenios/2024/CV016_24'},
   {...case15,ratificationActOfficialUrl:'http://www.confaz.fazenda.gov.br/legislacao/atos-declaratorios/2024/ad010_24'},
   {...case15,originalPublishedOn:'2024-02-31'},
   {...case15,ratificationPublishedOn:'2024-04-20'},
