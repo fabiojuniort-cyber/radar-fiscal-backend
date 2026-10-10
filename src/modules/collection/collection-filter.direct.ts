@@ -42,7 +42,7 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
     title_weight:number; summary_weight:number; body_weight:number;
   }>`SELECT id,version,revision,context_window_words,weak_score_threshold,
        title_weight,summary_weight,body_weight FROM collection_filter_policies
-       WHERE status='APPROVED' FOR UPDATE`.execute(trx);
+       WHERE status='APPROVED'`.execute(trx);
   const approved=policies.rows[0];
   if (!approved) throw new Error('approved_collection_filter_required');
   const [rawRules,rawAliases,rawTerms] = await Promise.all([
