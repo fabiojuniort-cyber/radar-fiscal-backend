@@ -249,6 +249,8 @@ test('R802 text correspondence: whole synthetic act matches PDF and dispatch, ne
    'DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED'],
   [pdfExtractedText+' A norma agora se aplica a todos os contribuintes.',
    'DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED'],
+  [pdfExtractedText+' DOCUMENTO ASSINADO DIGITALMENTE CLÁUSULA QUINTA - Isenção geral.',
+   'DOU_ACT_BOUNDARY_OR_EXTRA_CONTENT_UNVERIFIED'],
   [pdfExtractedText.replace('18 de setembro de 2026','17 de setembro de 2026'),'DOU_WRONG_PRINTED_DATE'],
   [pdfExtractedText.replace('Brasília, 18 de setembro de 2026','Brasília, 17 de setembro de 2026')+
    ' (menção posterior: Brasília, 18 de setembro de 2026)', 'DOU_WRONG_PRINTED_DATE'],
