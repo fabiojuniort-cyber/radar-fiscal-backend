@@ -4,6 +4,7 @@ import test from 'node:test';
 import {parseDouEntries} from '../src/modules/collection/dou.parser.js';
 import {preflightDouConfazTrace} from '../src/modules/taxonomy/legal-scope/dou-source-custody-preflight.js';
 import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
+import {fetchOfficialDouPdfPage} from '../src/modules/taxonomy/legal-scope/dou-official-http-pdf-capture.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
 
@@ -190,5 +191,16 @@ test('R802 policy: PDF metadata and hash never require signature validation or i
  assert.equal(result.status,'DOU_PDF_BYTES_BOUND_ONLY');
  assert.equal(result.candidate?.outstandingGates.includes('DIRECT_OFFICIAL_HTTPS_SOURCE_FETCH'),true);
  assert.equal(result.candidate?.outstandingGates.some(g=>/CERTIFICATE|ICP|OCSP|REVOCATION/.test(g)),false);
+ assert.equal(result.grantsLegalCurrent,false);
+});
+
+test('R802 official fetch rejects invalid trace without network and never grants legal CURRENT',async()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const t=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(t.status,'DOU_XML_TRACE_ONLY');
+ if(t.status!=='DOU_XML_TRACE_ONLY')return;
+ const altered={...t,certifiedPageUrl:'https://example.invalid/'};
+ const result=await fetchOfficialDouPdfPage(altered);
+ assert.equal(result.status,'UNVERIFIED');
  assert.equal(result.grantsLegalCurrent,false);
 });
