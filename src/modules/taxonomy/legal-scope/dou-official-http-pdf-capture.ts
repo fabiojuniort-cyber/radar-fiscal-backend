@@ -53,6 +53,10 @@ async function collectOfficialDouPdfBytes(
     !journal||!/^[0-9]{1,4}$/.test(journal)||
     !page||!/^[1-9][0-9]{0,6}$/.test(page))return deny('DOU_VIEWER_EDITION_INVALID');
   const url=new URL('https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer');
+  // Fixed firstAccess switch: exactly the government URL that returned
+  // a PDF in the authorized one-shot Railway network probe. Never copied
+  // from caller input and never treated as a bypass of authentication.
+  url.searchParams.set('captchafield','firstAccess');
   url.searchParams.set('data',date);
   url.searchParams.set('jornal',journal);
   url.searchParams.set('pagina',page);
