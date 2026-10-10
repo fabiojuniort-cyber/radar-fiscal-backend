@@ -125,7 +125,7 @@ BEGIN
          EXISTS (
            SELECT 1 FROM public.publication_files pf
            WHERE pf.publication_version_id=v.id
-             AND (pf.metadata->>'kind')='ATTACHMENT'
+             AND COALESCE(lower(pf.mime_type),'') NOT IN ('text/html','application/xml','text/xml')
          ),
          EXISTS (
            SELECT 1 FROM public.company_publications cp
