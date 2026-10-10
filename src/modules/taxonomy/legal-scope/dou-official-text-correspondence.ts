@@ -27,7 +27,8 @@ export type DouPdfActTextCorrelation=Rejected|{
 };
 const reject=(reason:string):Rejected=>({status:'UNVERIFIED',reason,grantsLegalCurrent:false});
 function normalized(input:string):string{
- return input.normalize('NFKC')
+ return input.replace(/N[º°o]\\.?\\s*(?=\\d)/gi,'N ')
+  .normalize('NFKC')
   .replace(/\u00a0/g,' ')
   .replace(/N[º°]\.?\s*/gi,'N ')
   .replace(/[‐‑‒–—]/g,'-')
