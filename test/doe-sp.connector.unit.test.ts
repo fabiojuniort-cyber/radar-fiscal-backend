@@ -245,50 +245,21 @@ test('complete official HTML skips redundant authenticated PDF and completes the
   );
 });
 
-test('missing official HTML downloads authenticated PDF as material fallback', async () => {
-  const overridden = {
-    ...details[ID.sre43]!,
-    content: '',
-  };
-  const api = portal({
-    days: { '2026-09-04': DAY_0904 },
-    details: { [ID.sre43]: overridden },
+test('L-05: missing official HTML fails without fetching authenticated PDF',async()=>{
+  const overridden={...details[ID.sre43]!,content:''};
+  const api=portal({
+    days:{'2026-09-04':DAY_0904},
+    details:{[ID.sre43]:overridden},
   });
-  const result = await new DoeSpConnector({
-    fetch: api.fetch,
-    now: () => NOW,
-    readState: async () => EMPTY_DOE_SP_STATE,
-    lookbackDays: 1,
-    forceReprocess: false,
+  const result=await new DoeSpConnector({
+    fetch:api.fetch,now:()=>NOW,
+    readState:async()=>EMPTY_DOE_SP_STATE,
+    lookbackDays:1,forceReprocess:false,
   }).collect(context());
-
-  assert.equal(result.partialFailures, undefined);
-  assert.equal(result.publications.length, 1);
-  const publication = result.publications[0]!;
-  assert.equal(publication.content, undefined);
-  assert.equal(publication.contentHashPolicy, undefined);
-  assert.equal(
-    publication.metadata?.officialContentCompleteness,
-    'PARTIAL_OFFICIAL_CONTENT',
-  );
-  assert.equal(
-    publication.originMetadata?.authenticatedPdf,
-    'CAPTURED_MATERIAL',
-  );
-  assert.equal(
-    publication.originMetadata?.contentRepresentation,
-    'OFFICIAL_PDF',
-  );
-  assert.equal(publication.files?.length, 1);
-  assert.equal(
-    publication.files?.[0]?.metadata?.kind,
-    'AUTHENTICATED_PUBLICATION_PDF',
-  );
-  assert.equal(
-    publication.files?.[0]?.versionRole,
-    'MATERIAL_CONTENT',
-  );
-  assert.equal(api.count('/v2/authentication/download/'), 1);
+  assert.equal(api.count('/v2/authentication/download/'),0);
+  assert.ok(!result.publications.some(item=>item.externalId===ID.sre43));
+  assert.ok(result.partialFailures?.some(error=>
+    error.code==='DOE_SP_OFFICIAL_CONTENT_UNAVAILABLE'));
 });
 
 test('malformed list items are isolated as partial failures', async () => {
