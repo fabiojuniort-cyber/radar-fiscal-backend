@@ -6,6 +6,8 @@ import type {
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { douLimitsSchema, readAdminDouLimits, saveAdminDouLimits } from '../../modules/collection/dou-download-limits.js';
+
 import {
   changePlatformAdministrator,
   isPlatformAdmin,
@@ -109,6 +111,35 @@ export async function platformAdminRoutes(
                 ? 404
                 : 409;
           return reply.status(status).send({ error: code });
+        }
+        throw error;
+      }
+    },
+  );
+
+  typed.get(
+    '/api/v1/admin/platform/dou-download-limits',
+    { preHandler: requirePlatformAdmin },
+    async (_request, reply) => reply.send(await readAdminDouLimits(app.db)),
+  );
+
+  typed.put(
+    '/api/v1/admin/platform/dou-download-limits',
+    {
+      preHandler: requirePlatformAdmin,
+      schema: { body: douLimitsSchema },
+    },
+    async (request, reply) => {
+      try {
+        return reply.send(await saveAdminDouLimits(app.db, request.auth!.userId, request.body));
+      } catch (error) {
+        // No privileged source UPDATE and no silent in-memory-only settings.
+        // The DB write gate intentionally requires a separately reviewed SQL change.
+        if (error instanceof Error && 'code' in error && error.code === '42883') {
+          return reply.status(503).send({ error: 'dou_limits_store_not_ready' });
+        }
+        if (error instanceof Error && error.message === 'DOU_SOURCE_NOT_FOUND') {
+          return reply.status(409).send({ error: 'dou_source_not_found' });
         }
         throw error;
       }
