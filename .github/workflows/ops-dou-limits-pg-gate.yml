@@ -56,6 +56,17 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Prepare ephemeral signed gateway test environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$(openssl rand -hex 32)"
+          pass="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          echo "::add-mask::$pass"
+          echo "DOU_LIMITS_SIGNING_SECRET=$key" >> "$GITHUB_ENV"
+          echo "DB_DOU_LIMITS_PASSWORD=$pass" >> "$GITHUB_ENV"
+          echo "DATABASE_DOU_LIMITS_URL=postgresql://radar_dou_limits_runtime:$pass@localhost:5432/radar_fiscal_test" >> "$GITHUB_ENV"
       - name: Provision isolated schema/runtime/RLS
         run: npm run db:prepare
       - name: Test admin writes, audit, revocation and deny direct source UPDATE
