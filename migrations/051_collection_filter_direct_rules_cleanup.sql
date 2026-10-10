@@ -157,11 +157,11 @@ GRANT EXECUTE ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEX
 -- The TypeScript engine still makes every final KEEP/DISCARD decision.
 CREATE OR REPLACE FUNCTION public.collection_filter_l11_normalize(p_value TEXT)
 RETURNS TEXT LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
-SET search_path=pg_catalog,public AS $
+SET search_path=pg_catalog,public AS $$
   SELECT upper(btrim(regexp_replace(
     regexp_replace(normalize(p_value,NFKD),'[̀-ͯ]','','g'),
     '[^A-Za-z0-9]+',' ','g')));
-$;
+$$;
 REVOKE ALL ON FUNCTION public.collection_filter_l11_normalize(TEXT) FROM PUBLIC;
 -- Selective predicate avoids scanning/decoding JSON for all other types.
 CREATE INDEX IF NOT EXISTS ix_l11_publications_normalized_act_type
