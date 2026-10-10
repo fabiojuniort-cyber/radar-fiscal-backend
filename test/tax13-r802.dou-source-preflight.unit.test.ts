@@ -7,7 +7,7 @@ import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-sc
 import {correlateOfficialDouPdfActText} from '../src/modules/taxonomy/legal-scope/dou-official-text-correspondence.js';
 import {douHtmlText} from '../src/modules/collection/dou.parser.js';
 import {fetchOfficialDouPdfPage,fetchAndMatchOfficialDouPdfAct} from '../src/modules/taxonomy/legal-scope/dou-official-http-pdf-capture.js';
-import {legacyPdfFixture} from './doe-sp-legacy.pdf-fixtures.js';
+import {syntheticWrappedOnePagePdf} from './dou-one-page.pdf-fixtures.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
 
@@ -254,7 +254,7 @@ test('R802 one same-buffer official PDF download and text extraction: synthetic 
  if(trace.status!=='DOU_XML_TRACE_ONLY')return;
  const pdfText='DIÁRIO OFICIAL DA UNIÃO Nº 180 '+
   parent.title+' '+douHtmlText(child.content!);
- const bytes=legacyPdfFixture({text:pdfText,pages:1});
+ const bytes=syntheticWrappedOnePagePdf(pdfText);
  t.mock.method(globalThis,'fetch',async()=>new Response(bytes,{
   status:200,headers:{'content-type':'application/pdf'}
  }));
