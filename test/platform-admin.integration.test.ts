@@ -76,13 +76,17 @@ test(
         "SELECT connector_config FROM public.sources WHERE code='dou' AND connector_key='dou'",
       );
       if (existing.rows.length === 0) {
-        await admin.query(
+        // Other integration suites seed the same DOU source concurrently.
+        // Do not fail with duplicate code or delete a fixture they own.
+        const seeded = await admin.query(
           `INSERT INTO public.sources
              (code, name, jurisdiction_level, base_url, connector_key, connector_config)
            VALUES ('dou', 'DOU fixture', 'FEDERAL', 'https://inlabs.in.gov.br',
-                   'dou', '{}'::jsonb)`,
+                   'dou', '{}'::jsonb)
+           ON CONFLICT (code) DO NOTHING
+           RETURNING id`,
         );
-        seededDouSource = true;
+        seededDouSource = seeded.rowCount === 1;
       }
       const source = await admin.query<{ connector_config: unknown }>(
         "SELECT connector_config FROM public.sources WHERE code='dou' AND connector_key='dou'",
