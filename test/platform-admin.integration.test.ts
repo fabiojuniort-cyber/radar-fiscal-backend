@@ -176,6 +176,46 @@ test(
       assert.equal(noOpAudit.rows.length, 1,
         'no-op must not emit a misleading modification event');
 
+      // Two independent runtime SQL sessions exercise the advisory-lock gate.
+      // Every distinct accepted write must be serial, audited and persistent.
+      const contenders = new Pool({
+        connectionString: process.env.DATABASE_URL, max: 2,
+      });
+      const competing = [16, 24] as const;
+      try {
+        await Promise.all(competing.map(async zipMiB => {
+          const connection = await contenders.connect();
+          try {
+            await connection.query('BEGIN');
+            await connection.query(
+              "SELECT set_config('app.user_id', $1, true)",
+              [first.userId],
+            );
+            await connection.query(
+              'SELECT public.platform_admin_set_dou_limits($1::jsonb)',
+              [JSON.stringify({ ...modified, zipMiB })],
+            );
+            await connection.query('COMMIT');
+          } catch (error) {
+            await connection.query('ROLLBACK');
+            throw error;
+          } finally { connection.release(); }
+        }));
+      } finally { await contenders.end(); }
+      const postRace = await app.inject({
+        method: 'GET', url: limitsPath, headers: first.headers,
+      });
+      assert.equal(postRace.statusCode, 200, postRace.body);
+      assert.ok(competing.includes(postRace.json().limits.zipMiB),
+        'serialized last-write-wins must preserve a complete valid setting');
+      const allUpdates = await admin.query<{ id: string }>(
+        `SELECT id FROM public.audit_log
+          WHERE action='DOU_DOWNLOAD_LIMITS_UPDATED' AND actor_id=$1`,
+        [first.userId],
+      );
+      assert.equal(allUpdates.rows.length, 3,
+        'two distinct concurrent commits must each leave an audit event');
+
       const invalidLimits = await app.inject({
         method: 'PUT', url: limitsPath, headers: first.headers,
         payload: { ...modified, zipMiB: 65 },
