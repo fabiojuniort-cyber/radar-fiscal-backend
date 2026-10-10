@@ -152,6 +152,12 @@ export async function confirmDirectFilterRule(
         ${rule.canonicalType},${rule.mode},${operationId}::uuid
       )`.execute(trx);
     }
+    if (ruleIds.length===0) {
+      await sql`SELECT collection_filter_direct_purge_batch(
+        ARRAY[]::uuid[],${rule.sourceCode},${rule.section},
+        ${rule.canonicalType},${rule.mode},${operationId}::uuid
+      )`.execute(trx);
+    }
     return {changed:false,deletedCount:ruleIds.length,
       revision:Number(result.rows[0]?.policy_revision)};
   });
