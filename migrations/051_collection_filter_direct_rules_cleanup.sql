@@ -19,7 +19,7 @@ DROP TABLE IF EXISTS public.collection_filter_simulations;
 
 -- L-11: never silently destroy configured draft filters during migration.
 -- Fail the entire migration (migrate.ts transaction) if any DRAFT has content.
-DO $
+DO $$
 DECLARE
   v_draft RECORD;
 BEGIN
@@ -43,7 +43,7 @@ BEGIN
       HINT='Preserve the configured draft and reconcile it through an approved migration before retrying 051';
   END IF;
 END;
-$;
+$$;
 -- Empty drafts have no rules, aliases or terms to lose and can be retired.
 DELETE FROM public.collection_filter_policies p
 WHERE p.status='DRAFT'
