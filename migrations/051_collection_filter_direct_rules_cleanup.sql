@@ -137,6 +137,7 @@ RETURNS TABLE (
   source_act_type TEXT,
   has_material BOOLEAN,
   has_company BOOLEAN,
+  has_other_source BOOLEAN,
   content_hash TEXT
 )
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
@@ -162,6 +163,11 @@ BEGIN
          EXISTS (
            SELECT 1 FROM public.company_publications cp
            WHERE cp.publication_id=p.id
+         ),
+         EXISTS (
+           SELECT 1 FROM public.publication_origins po2
+           JOIN public.sources so2 ON so2.id=po2.source_id
+           WHERE po2.publication_id=p.id AND so2.code<>'dou'
          ),
          v.content_hash::text
   FROM public.publications p
@@ -286,6 +292,14 @@ BEGIN
   IF EXISTS(SELECT 1 FROM public.company_publications cp
             WHERE cp.publication_id=ANY(p_ids)) THEN
     RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='company_publication_protected';
+  END IF;
+  -- A DOU-only filter must not destroy another official source's provenance.
+  IF EXISTS(
+    SELECT 1 FROM public.publication_origins po
+    JOIN public.sources s ON s.id=po.source_id
+    WHERE po.publication_id=ANY(p_ids) AND s.code<>'dou'
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='cross_source_publication_protected';
   END IF;
   -- Lock parents; a concurrent tenant match must not be created during purge.
   PERFORM 1 FROM public.publications p WHERE p.id=ANY(p_ids) FOR UPDATE;
