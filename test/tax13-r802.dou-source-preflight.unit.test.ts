@@ -264,3 +264,55 @@ test('R802 one same-buffer official PDF download and text extraction: synthetic 
  assert.equal(result.status,'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',JSON.stringify(result));
  assert.equal(result.grantsLegalCurrent,false);
 });
+
+test('R802 negative: edition number citation in the act cannot override the PDF masthead',()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n');
+ const preflight=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:pdf});
+ const sourceCapture={
+  status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED' as const,
+  grantsLegalCurrent:false as const,preflight,
+  fetchedAt:'2026-10-10T00:00:00.000Z',requestUrl:pdfUrl,
+  httpStatus:200 as const,contentType:'application/pdf',
+ };
+ const page='DIÁRIO OFICIAL DA UNIÃO Nº 179 PUBLICAÇÃO REFERENTE À EDIÇÃO Nº 180 '+
+   parent.title+' '+douHtmlText(child.content!);
+ const wrongHeader=correlateOfficialDouPdfActText({
+  trace,sourceCapture,parent,act:child,pdfExtractedText:page,printedEdition:'180',
+ });
+ assert.equal(wrongHeader.status,'UNVERIFIED');
+ if(wrongHeader.status==='UNVERIFIED')assert.equal(wrongHeader.reason,'DOU_WRONG_PRINTED_EDITION');
+
+ const dishonestTrace={...trace,section:'DO1E'};
+ const forgedSection=correlateOfficialDouPdfActText({
+  trace:dishonestTrace,sourceCapture,parent,act:child,
+  pdfExtractedText:page.replace('Nº 179','Nº 180')+' EDIÇÃO EXTRA',
+  printedEdition:'180-B',
+ });
+ assert.equal(forgedSection.status,'UNVERIFIED');
+ if(forgedSection.status==='UNVERIFIED')
+  assert.equal(forgedSection.reason,'DOU_PARENT_ACT_TRACE_MISMATCH');
+
+ const extraLabelOnRegular=correlateOfficialDouPdfActText({
+  trace,sourceCapture,parent,act:child,
+  pdfExtractedText:page.replace('Nº 179','Nº 180-B'),
+  printedEdition:'180-B',
+ });
+ assert.equal(extraLabelOnRegular.status,'UNVERIFIED');
+ if(extraLabelOnRegular.status==='UNVERIFIED')
+  assert.equal(extraLabelOnRegular.reason,'DOU_PRINTED_EDITION_DIFFERS_FROM_INLABS');
+
+ const wrongXmlPart={...trace,xmlPartSha256:['a'.repeat(64)]};
+ const forgedXml=correlateOfficialDouPdfActText({
+  trace:wrongXmlPart,sourceCapture,parent,act:child,
+  pdfExtractedText:page.replace('Nº 179','Nº 180'),
+  printedEdition:'180',
+ });
+ assert.equal(forgedXml.status,'UNVERIFIED');
+ if(forgedXml.status==='UNVERIFIED')
+  assert.equal(forgedXml.reason,'DOU_PARENT_ACT_TRACE_MISMATCH');
+});
