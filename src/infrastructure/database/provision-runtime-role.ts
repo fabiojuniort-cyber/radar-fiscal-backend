@@ -43,6 +43,8 @@ const DB_WORKER_RUNTIME_PASSWORD =
 // app/worker passwords; skipped entirely when the secret is not configured.
 const DB_CURATOR_RUNTIME_PASSWORD =
   parsed.data.DB_CURATOR_RUNTIME_PASSWORD;
+const DB_DOU_LIMITS_PASSWORD = parsed.data.DB_DOU_LIMITS_PASSWORD;
+const DOU_LIMITS_SIGNING_SECRET = parsed.data.DOU_LIMITS_SIGNING_SECRET;
 
 if (
   DB_CURATOR_RUNTIME_PASSWORD &&
@@ -248,9 +250,9 @@ async function run(): Promise<void> {
       );
     }
 
-    if (parsed.data.DB_DOU_LIMITS_PASSWORD || parsed.data.DOU_LIMITS_SIGNING_SECRET) {
-      const password=parsed.data.DB_DOU_LIMITS_PASSWORD;
-      const key=parsed.data.DOU_LIMITS_SIGNING_SECRET;
+    if (DB_DOU_LIMITS_PASSWORD || DOU_LIMITS_SIGNING_SECRET) {
+      const password=DB_DOU_LIMITS_PASSWORD;
+      const key=DOU_LIMITS_SIGNING_SECRET;
       if (!password || !key) throw new Error('Both DOU gateway secrets are required');
       if ([DB_RUNTIME_PASSWORD,DB_WORKER_RUNTIME_PASSWORD,DB_CURATOR_RUNTIME_PASSWORD].includes(password))
         throw new Error('DOU gateway password must differ from other runtimes');
