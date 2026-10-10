@@ -152,11 +152,29 @@ GRANT EXECUTE ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEX
   TO radar_app;
 
 
+-- SQL *prefilter only*, not an alternative classification engine. NFKD +
+-- diacritic stripping and ASCII token spaces mirror normalizeCollectionFilterType.
+-- The TypeScript engine still makes every final KEEP/DISCARD decision.
+CREATE OR REPLACE FUNCTION public.collection_filter_l11_normalize(p_value TEXT)
+RETURNS TEXT LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+SET search_path=pg_catalog,public AS $
+  SELECT upper(btrim(regexp_replace(
+    regexp_replace(normalize(p_value,NFKD),'[̀-ͯ]','','g'),
+    '[^A-Za-z0-9]+',' ','g')));
+$;
+REVOKE ALL ON FUNCTION public.collection_filter_l11_normalize(TEXT) FROM PUBLIC;
+-- Selective predicate avoids scanning/decoding JSON for all other types.
+CREATE INDEX IF NOT EXISTS ix_l11_publications_normalized_act_type
+ON public.publications(public.collection_filter_l11_normalize(act_type))
+WHERE act_type IS NOT NULL;
+
 -- Admin-only paging over official DOU records, independent of scope RLS.
 -- The application performs the decision with its existing TS filter engine.
 CREATE OR REPLACE FUNCTION public.collection_filter_direct_candidates(
-  p_after UUID DEFAULT NULL,
-  p_limit INTEGER DEFAULT 500
+  p_after UUID,
+  p_limit INTEGER,
+  p_section TEXT,
+  p_type_keys TEXT[]
 )
 RETURNS TABLE (
   publication_id UUID,
@@ -181,6 +199,10 @@ BEGIN
   END IF;
   IF p_limit < 1 OR p_limit > 500 THEN
     RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='invalid_direct_page_limit';
+  END IF;
+  IF COALESCE(btrim(p_section),'')='' OR cardinality(p_type_keys) IS NULL
+     OR cardinality(p_type_keys)<1 OR cardinality(p_type_keys)>1000 THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='invalid_direct_prefilter';
   END IF;
 
   RETURN QUERY
@@ -246,13 +268,17 @@ BEGIN
     LIMIT 1
   ) v ON true
   WHERE (p_after IS NULL OR p.id > p_after)
+    AND p.act_type IS NOT NULL
+    AND public.collection_filter_l11_normalize(p.act_type)=ANY(p_type_keys)
+    AND public.collection_filter_l11_normalize(COALESCE(NULLIF(o.metadata->'dou'->>'section',''),
+      v.source_metadata->'dou'->>'section','')) = p_section
   ORDER BY p.id LIMIT p_limit;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
+REVOKE ALL ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER,TEXT,TEXT[])
   FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
+GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER,TEXT,TEXT[])
   TO radar_app;
 
 
