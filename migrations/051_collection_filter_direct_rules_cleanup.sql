@@ -312,7 +312,22 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='platform_admin_required';
   END IF;
   v_count := cardinality(p_ids);
-  IF v_count=0 THEN RETURN 0; END IF;
+  IF v_count=0 THEN
+    INSERT INTO public.audit_log(
+      tenant_id,actor_type,actor_id,action,entity_type,entity_id,
+      after_data,correlation_id
+    ) VALUES (
+      NULL,'ADMIN',v_actor::text,'COLLECTION_FILTER_DIRECT_PURGE',
+      'collection_filter_type_rule',upper(btrim(p_type)),
+      pg_catalog.jsonb_build_object(
+        'sourceCode',lower(btrim(p_source)),
+        'section',upper(btrim(p_section)),
+        'canonicalType',upper(btrim(p_type)),
+        'mode',p_mode,'deletedCount',0,'deletedIds','[]'::jsonb
+      ),p_operation
+    );
+    RETURN 0;
+  END IF;
   IF v_count>100 OR v_count<>(SELECT count(DISTINCT id) FROM unnest(p_ids) id)
      OR EXISTS(SELECT 1 FROM unnest(p_ids) id WHERE id IS NULL) THEN
     RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='invalid_purge_batch';
