@@ -58,10 +58,11 @@ jobs:
       - name: Verify migration 051 recorded and simulation objects absent
         shell: bash
         run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 -Atc "
+          result=$(PGPASSWORD=postgres psql -h localhost -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 -Atc "
             SELECT CASE WHEN
               EXISTS (SELECT 1 FROM schema_migrations WHERE filename='051_collection_filter_direct_rules_cleanup.sql')
               AND to_regclass('public.collection_filter_simulation_items') IS NULL
               AND to_regprocedure('public.collection_filter_approve_draft(uuid)') IS NULL
-            THEN 'PASS' ELSE 1/0::text END;
-          "
+            THEN 'PASS' ELSE 'FAIL' END;
+          ") 
+          test "$result" = PASS
