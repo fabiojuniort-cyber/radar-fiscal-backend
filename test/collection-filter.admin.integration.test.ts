@@ -61,10 +61,47 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       [identifier,canonicalType,'Publicação descartável teste L11','https://example.test/'+identifier],
     );
     pubId=inserted.rows[0]!.id;
-    await admin.query(
+    const version=await admin.query<{id:string}>(
       "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
-      "VALUES($1,1,$2,'Documento administrativo não tributário',true,$3::jsonb)",
+      "VALUES($1,1,$2,'Documento administrativo não tributário',true,$3::jsonb) RETURNING id",
       [pubId,createHash('sha256').update('body '+pubId).digest('hex'),JSON.stringify({dou:{section:'DO1'}})],
+    );
+    const versionId=version.rows[0]!.id;
+    const mention=await admin.query<{id:string}>(
+      "INSERT INTO publication_ncm_mentions(publication_version_id,ncm_code,method_type,detector_key,detector_version) "+
+      "VALUES($1,'00000000','RULE','l11-integration','1') RETURNING id",
+      [versionId],
+    );
+    // TAX07/TAX08 append-only evidence attached only to this publication.
+    const release=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_releases(version_major,version_minor,version_patch,status,approved_at,"+
+      "published_at,artifact_repository,artifact_path,artifact_git_sha,artifact_sha256,created_by_actor) "+
+      "VALUES($1,0,0,'PUBLISHED',now(),now(),'l11-test','l11-fixture',$2,$3,'l11-test') RETURNING id",
+      [Math.floor(Math.random()*1000000)+1000,'a'.repeat(40),'b'.repeat(64)],
+    );
+    const fingerprint=createHash('sha256').update(randomUUID()).digest('hex');
+    const taxRun=await admin.query<{id:string}>(
+      "INSERT INTO publication_taxonomy_runs(publication_version_id,taxonomy_release_id,method_type,"+
+      "engine_key,engine_version,config_sha256,input_sha256,run_fingerprint) "+
+      "VALUES($1,$2,'RULE','l11-test','1',$3,$4,$5) RETURNING id",
+      [versionId,release.rows[0]!.id,'a'.repeat(64),'b'.repeat(64),fingerprint],
+    );
+    const unmapped=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_unmapped_occurrences(run_id,raw_term,normalized_term,"+
+      "extractor_key,extractor_version,occurrence_fingerprint) "+
+      "VALUES($1,'conceito exclusivo','CONCEITO EXCLUSIVO','l11','1',$2) RETURNING id",
+      [taxRun.rows[0]!.id,createHash('sha256').update(randomUUID()).digest('hex')],
+    );
+    const candidate=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_candidates(preferred_term,normalized_key,context_signature,candidate_fingerprint) "+
+      "VALUES('Conceito L11','CONCEITO L11',$1,$2) RETURNING id",
+      [createHash('sha256').update(randomUUID()).digest('hex'),
+       createHash('sha256').update(randomUUID()).digest('hex')],
+    );
+    const link=await admin.query<{id:string}>(
+      "INSERT INTO taxonomy_candidate_occurrence_links(candidate_id,occurrence_id) "+
+      "VALUES($1,$2) RETURNING id",
+      [candidate.rows[0]!.id,unmapped.rows[0]!.id],
     );
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
@@ -222,6 +259,16 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     }
 
     assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[addedId])).rowCount,0);
+    for(const [table,id] of [
+      ['publication_ncm_mentions',mention.rows[0]!.id],
+      ['publication_taxonomy_runs',taxRun.rows[0]!.id],
+      ['taxonomy_unmapped_occurrences',unmapped.rows[0]!.id],
+      ['taxonomy_candidate_occurrence_links',link.rows[0]!.id],
+    ]) {
+      assert.equal((await admin.query('SELECT 1 FROM '+table+' WHERE id=$1',[id])).rowCount,0,
+        'exclusive taxonomy/NCM evidence should be deleted: '+table);
+    }
+
     const protectedRow=await admin.query(
       "SELECT id FROM publications WHERE id=$1",[protectedId],
     );
