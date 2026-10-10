@@ -287,6 +287,25 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     assert.equal(audit.rows[0]?.after_data.deletedCount,2);
     assert.deepEqual(new Set(audit.rows[0]?.after_data.deletedIds),new Set([pubId,addedId]));
 
+    const noDeleteRule={...payload,mode:'KEEP_ALWAYS'};
+    const noDeletePreview=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers:owner.headers,payload:noDeleteRule});
+    assert.equal(noDeletePreview.statusCode,200,noDeletePreview.body);
+    const zero=noDeletePreview.json<{count:number;token:string}>();
+    assert.equal(zero.count,0);
+    const noDeleteConfirm=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers:owner.headers,
+      payload:{...noDeleteRule,expectedCount:zero.count,previewToken:zero.token}});
+    assert.equal(noDeleteConfirm.statusCode,200,noDeleteConfirm.body);
+    assert.equal(noDeleteConfirm.json<{deletedCount:number}>().deletedCount,0);
+    const zeroAudit=await admin.query<{after_data:{deletedIds:string[];deletedCount:number}}>(
+      "SELECT after_data FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
+      "AND after_data->>'canonicalType'=$1 AND after_data->>'deletedCount'='0' "+
+      "ORDER BY occurred_at DESC LIMIT 1",[canonicalType]);
+    assert.equal(zeroAudit.rows[0]?.after_data.deletedCount,0);
+    assert.deepEqual(zeroAudit.rows[0]?.after_data.deletedIds,[]);
     const removed=await admin.query<{sim: string|null; fn:string|null}>(
       "SELECT to_regclass('public.collection_filter_simulation_items')::text AS sim,"+
       "to_regprocedure('public.collection_filter_approve_draft(uuid)')::text AS fn"
