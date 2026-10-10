@@ -83,7 +83,9 @@ export function correlateOfficialDouPdfActText(input:{
  // Require an explicit printed extra suffix; the index-to-suffix binding
  // remains a separate SOURCE gate, not inferred from the bare edition.
  const isExtra=trace.section.endsWith('E');
- if(isExtra ? !new RegExp('^'+trace.edition+'-[A-Z]
+ if(isExtra ? !new RegExp('^'+trace.edition+'-[A-Z]$').test(printedEdition)
+   : printedEdition!==trace.edition)
+  return reject('DOU_PRINTED_EDITION_DIFFERS_FROM_INLABS');
  const text=normalized(pdfExtractedText);
  const section=trace.section;
  if(!text.includes('DIARIO OFICIAL')&&!text.includes('DIÁRIO OFICIAL'))
