@@ -68,6 +68,9 @@ export function correlateOfficialDouPdfActText(input:{
     derived.parentExternalId!==trace.parentExternalId||
     derived.parentTextSha256!==trace.parentTextSha256||
     derived.archiveSha256!==trace.archiveSha256||
+    derived.section!==trace.section||derived.edition!==trace.edition||
+    derived.publicationDate!==trace.publicationDate||
+    derived.xmlPartSha256.join(',')!==trace.xmlPartSha256.join(',')||
     derived.officialMatterId!==trace.officialMatterId||
     derived.certifiedPageUrl!==trace.certifiedPageUrl)
   return reject('DOU_PARENT_ACT_TRACE_MISMATCH');
@@ -76,8 +79,47 @@ export function correlateOfficialDouPdfActText(input:{
     typeof printedEdition!=='string'||
     !/^[0-9]{1,4}(?:-[A-Z])?$/.test(printedEdition))
   return reject('DOU_PDF_TEXT_OR_EDITION_INVALID');
- if(!printedEdition.startsWith(trace.edition)||
-    !new RegExp('^'+trace.edition+'(?:-[A-Z])?$').test(printedEdition))
+ // Numeric INLABS edition alone cannot distinguish regular from Extra A/B.
+ // Require an explicit printed extra suffix; the index-to-suffix binding
+ // remains a separate SOURCE gate, not inferred from the bare edition.
+ const isExtra=trace.section.endsWith('E');
+ if(isExtra ? !new RegExp('^'+trace.edition+'-[A-Z]
+ const text=normalized(pdfExtractedText);
+ const section=trace.section;
+ if(!text.includes('DIARIO OFICIAL')&&!text.includes('DIÁRIO OFICIAL'))
+  return reject('DOU_PDF_MASTHEAD_MISSING');
+ if(section.endsWith('E')&&!text.includes('EDIÇÃO EXTRA'))
+  return reject('DOU_EXTRA_EDITION_MARKER_MISSING');
+ // Read the *first* printed edition after the actual masthead, not a
+ // second edition cited later in the dispatch or legal body.
+ const mastheadAt=text.indexOf('DIÁRIO OFICIAL')>=0?
+  text.indexOf('DIÁRIO OFICIAL'):text.indexOf('DIARIO OFICIAL');
+ const masthead=text.slice(mastheadAt,mastheadAt+260);
+ const firstEdition=masthead.match(/\bN\s+([0-9]{1,4}(?:-[A-Z])?)\b/);
+ if(!firstEdition||firstEdition[1]!==printedEdition)
+  return reject('DOU_WRONG_PRINTED_EDITION');
+ const parentHeading=normalized(parent.title);
+ const actHeading=normalized(act.title);
+ const actContent=act.content?normalized(legalText(act.content)):'';
+ if(!parentHeading||!actHeading||actContent.length<120||
+    actContent.length>MAX_ACT_TEXT_CHARS||
+    !actContent.includes(actHeading))
+  return reject('DOU_NORMATIVE_ACT_TEXT_INCOMPLETE');
+ const parentAt=text.indexOf(parentHeading);
+ const actAt=text.indexOf(actHeading,parentAt<0?0:parentAt+parentHeading.length);
+ if(parentAt<0||actAt<parentAt+parentHeading.length)
+  return reject('DOU_DISPATCH_OR_ACT_HEADING_MISSING');
+ if(!text.includes(actContent,actAt))
+  return reject('DOU_WHOLE_ACT_TEXT_MISMATCH');
+ return {
+  status:'DOU_PDF_ACT_TEXT_CORRESPONDS_ONLY',grantsLegalCurrent:false,
+  legalEffectivity:'UNVERIFIED',actType:act.actType??'',actNumber:act.actNumber??'',
+  parentExternalId:trace.parentExternalId,editionPrinted:printedEdition,
+  officialMatterId:trace.officialMatterId,originalPdfSha256:cand.pdfSha256,
+ };
+}
+).test(printedEdition)
+   : printedEdition!==trace.edition)
   return reject('DOU_PRINTED_EDITION_DIFFERS_FROM_INLABS');
  const text=normalized(pdfExtractedText);
  const section=trace.section;
