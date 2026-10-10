@@ -134,8 +134,10 @@ RETURNS TABLE (
   section TEXT,
   content_text TEXT,
   relevant_excerpt TEXT,
-  source_act_type TEXT,
+  evidence_complete BOOLEAN,
   has_material BOOLEAN,
+  type_conflict BOOLEAN,
+  provenance_conflict BOOLEAN,
   has_company BOOLEAN,
   has_other_source BOOLEAN,
   content_hash TEXT
@@ -152,24 +154,52 @@ BEGIN
 
   RETURN QUERY
   SELECT p.id,p.title,p.act_type,
-         COALESCE(v.source_metadata->'dou'->>'section',o.metadata->'dou'->>'section',''),
-         v.content_text,v.relevant_excerpt,
-         COALESCE(v.source_metadata->'dou'->>'sourceActType',o.metadata->'dou'->>'sourceActType'),
-         EXISTS (
-           SELECT 1 FROM public.publication_files pf
-           WHERE pf.publication_version_id=v.id
-             AND COALESCE(lower(pf.mime_type),'') NOT IN ('text/html','application/xml','text/xml')
-         ),
-         EXISTS (
-           SELECT 1 FROM public.company_publications cp
-           WHERE cp.publication_id=p.id
-         ),
-         EXISTS (
-           SELECT 1 FROM public.publication_origins po2
-           JOIN public.sources so2 ON so2.id=po2.source_id
-           WHERE po2.publication_id=p.id AND so2.code<>'dou'
-         ),
-         v.content_hash::text
+    COALESCE(NULLIF(o.metadata->'dou'->>'section',''),
+      v.source_metadata->'dou'->>'section',''),
+    v.content_text,v.relevant_excerpt,
+    (
+      COALESCE(btrim(v.content_text),'')<>''
+      AND NOT COALESCE(o.metadata->'dou'->>'scopeStructureIncomplete'='true',false)
+      AND NOT COALESCE(v.source_metadata->'dou'->>'scopeStructureIncomplete'='true',false)
+      AND NOT (COALESCE(o.metadata->'dou','{}'::jsonb) ? 'titleFallback')
+      AND NOT (COALESCE(v.source_metadata->'dou','{}'::jsonb) ? 'titleFallback')
+    ),
+    (
+      EXISTS (SELECT 1 FROM public.publication_files pf WHERE pf.publication_version_id=v.id)
+      OR EXISTS (SELECT 1 FROM jsonb_array_elements(
+        COALESCE(o.metadata->'files','[]'::jsonb)) f WHERE f->'metadata'->>'kind'='ATTACHMENT')
+      OR EXISTS (SELECT 1 FROM jsonb_array_elements(
+        COALESCE(o.metadata->'dou'->'parts','[]'::jsonb)) part
+        WHERE part->>'hasHighlightImage'='true')
+      OR EXISTS (SELECT 1 FROM jsonb_array_elements(
+        COALESCE(v.source_metadata->'files','[]'::jsonb)) f WHERE f->'metadata'->>'kind'='ATTACHMENT')
+      OR EXISTS (SELECT 1 FROM jsonb_array_elements(
+        COALESCE(v.source_metadata->'dou'->'parts','[]'::jsonb)) part
+        WHERE part->>'hasHighlightImage'='true')
+    ),
+    (
+      (NULLIF(btrim(o.metadata->'dou'->>'sourceActType'),'') IS NOT NULL
+        AND lower(btrim(o.metadata->'dou'->>'sourceActType'))
+          IS DISTINCT FROM lower(btrim(COALESCE(p.act_type,''))))
+      OR (NULLIF(btrim(v.source_metadata->'dou'->>'sourceActType'),'') IS NOT NULL
+        AND lower(btrim(v.source_metadata->'dou'->>'sourceActType'))
+          IS DISTINCT FROM lower(btrim(COALESCE(p.act_type,''))))
+    ),
+    (
+      SELECT count(DISTINCT COALESCE(po3.metadata->'dou'->>'section',''))>1
+      FROM public.publication_origins po3
+      JOIN public.sources src3 ON src3.id=po3.source_id
+      WHERE po3.publication_id=p.id AND src3.code='dou'
+    ),
+    EXISTS (
+      SELECT 1 FROM public.company_publications cp WHERE cp.publication_id=p.id
+    ),
+    EXISTS (
+      SELECT 1 FROM public.publication_origins po2
+      JOIN public.sources so2 ON so2.id=po2.source_id
+      WHERE po2.publication_id=p.id AND so2.code<>'dou'
+    ),
+    v.content_hash::text
   FROM public.publications p
   JOIN LATERAL (
     SELECT po.metadata
@@ -188,6 +218,7 @@ BEGIN
   ORDER BY p.id LIMIT p_limit;
 END;
 $$;
+
 REVOKE ALL ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
   FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
