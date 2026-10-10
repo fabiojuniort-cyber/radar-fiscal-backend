@@ -318,6 +318,21 @@ export interface DouBackfillBatchResult {
   retryLimitReached?: true;
 }
 
+/** Pure connector factory: used by paused backfill and offline safety tests.
+ * Never start a BACKFILL run or make any HTTP request in this function. */
+export function createDouBackfillConnector(
+  db: Kysely<DB>, options: DouBackfillBatchOptions, receipts: Record<string,string> = {},
+): DouConnector {
+  return new DouConnector({
+    credentials: options.credentials,
+    dates: options.dates,
+    allowEmptyBatch: true,
+    readState: async () => ({ archives: receipts }),
+    readLimits: (sourceId: string) => readWorkerDouLimits(db, sourceId),
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+}
+
 export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBatchOptions): Promise<DouBackfillBatchResult> {
   if (!options.dates.length || options.dates.length > DOU_BACKFILL_MAX_DATES_PER_RUN || !options.dates.every(validDate)) {
     throw new RangeError(`A DOU backfill batch needs 1 to ${DOU_BACKFILL_MAX_DATES_PER_RUN} valid dates.`);
@@ -331,16 +346,7 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
   const receipts = options.receipts ?? {};
 
   const registry = new ConnectorRegistry();
-  registry.register(new DouConnector({
-    credentials: options.credentials,
-    dates: options.dates,
-    // Only past dates are planned (never the monitoring window), so a batch
-    // without editions is final, not pending availability.
-    allowEmptyBatch: true,
-    readState: async () => ({ archives: receipts }),
-    readLimits: (sourceId: string) => readWorkerDouLimits(db, sourceId),
-    ...(options.fetch ? { fetch: options.fetch } : {}),
-  }));
+  registry.register(createDouBackfillConnector(db, options, receipts));
 
   const run = await createOwnedBackfillRun(db, options.sourceId, options.workerId, options.minIntervalMs);
   let attempts = 0;
