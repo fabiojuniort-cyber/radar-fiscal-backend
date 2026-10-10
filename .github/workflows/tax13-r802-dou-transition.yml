@@ -9,6 +9,7 @@ on:
       - 'src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-official-http-pdf-capture.ts'
       - 'test/tax13-r802.dou-source-preflight.unit.test.ts'
+      - 'test/tax13-r802.official-pdf-http.unit.test.ts'
       - '.github/workflows/tax13-r802-dou-transition.yml'
 
 permissions:
@@ -16,7 +17,7 @@ permissions:
 
 jobs:
   dou-trace-negative:
-    name: DOU XML is NOT a certified legal-current proof
+    name: DOU source trace and PDF transport do NOT grant legal CURRENT
     runs-on: ubuntu-latest
     timeout-minutes: 7
     env:
@@ -30,4 +31,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npx tsx --test test/tax13-r802.dou-source-preflight.unit.test.ts
+      - run: npx tsx --test test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts
