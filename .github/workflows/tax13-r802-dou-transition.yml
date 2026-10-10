@@ -7,6 +7,7 @@ on:
       - fix/tax13-r8-02-official-capture
       - fix/tax13-r9-design-remediation-r2
       - fix/tax13-r9-design-r3-single-contract
+      - docs/tax13-dou-xml-first-owner-policy-20261010
     paths:
       - 'src/modules/taxonomy/legal-scope/dou-source-custody-preflight.ts'
       - 'src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.ts'
@@ -20,6 +21,9 @@ on:
       - 'test/tax13-r9.pdf-layout-boundaries.unit.test.ts'
       - 'test/tax13-r802.confaz-temporal-candidate.unit.test.ts'
       - 'test/dou.connector.unit.test.ts'
+      - 'test/tax13-r9.r4-xml-first-contract.unit.test.ts'
+      - 'docs/taxonomy/TAX13_R9_DOU_CANONICAL_CONTRACT_R4.md'
+      - 'docs/taxonomy/TAX13_R9_DOU_R4_FULL_DDL_REVIEW.sql'
       - 'docs/taxonomy/TAX13_DOU_XML_FIRST_OWNER_DECISION_20261010.md'
       - 'docs/taxonomy/TAX13_R9_DOU_CANONICAL_CONTRACT_R3.md'
       - '.github/workflows/tax13-r802-dou-transition.yml'
@@ -43,4 +47,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npx tsx --test test/dou.connector.unit.test.ts test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts test/tax13-r802.native-pdf-text.unit.test.ts test/tax13-r9.pdf-layout-boundaries.unit.test.ts test/tax13-r802.confaz-temporal-candidate.unit.test.ts
+      - run: npx tsx --test test/tax13-r9.r4-xml-first-contract.unit.test.ts test/dou.connector.unit.test.ts test/tax13-r802.dou-source-preflight.unit.test.ts test/tax13-r802.official-pdf-http.unit.test.ts test/tax13-r802.native-pdf-text.unit.test.ts test/tax13-r9.pdf-layout-boundaries.unit.test.ts test/tax13-r802.confaz-temporal-candidate.unit.test.ts
