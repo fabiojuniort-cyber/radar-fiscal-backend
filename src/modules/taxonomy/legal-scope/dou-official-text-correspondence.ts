@@ -118,4 +118,5 @@ export function correlateOfficialDouPdfActText(input:{
   legalEffectivity:'UNVERIFIED',actType:act.actType??'',actNumber:act.actNumber??'',
   parentExternalId:trace.parentExternalId,editionPrinted:printedEdition,
   officialMatterId:trace.officialMatterId,originalPdfSha256:cand.pdfSha256,
- }
+ };
+}
