@@ -12,6 +12,7 @@ import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.j
 import { readCgibsSourceState } from './cgibs-source-state.repository.js';
 import { ConfazConnector } from './confaz.connector.js';
 import { DouConnector } from './dou.connector.js';
+import { readWorkerDouLimits } from './dou-download-limits.js';
 import { readDouSourceState } from './dou-source-state.repository.js';
 import {
   readConfazSourceState,
@@ -41,6 +42,7 @@ export function buildConnectorRegistry(
       credentials: () => process.env.INLABS_EMAIL && process.env.INLABS_PASSWORD
         ? { email: process.env.INLABS_EMAIL, password: process.env.INLABS_PASSWORD } : undefined,
       ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId) } : {}),
+      ...(options.db ? { readLimits: (sourceId: string) => readWorkerDouLimits(options.db!, sourceId) } : {}),
     }));
   }
 
