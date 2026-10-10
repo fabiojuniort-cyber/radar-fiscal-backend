@@ -53,7 +53,7 @@ jobs:
       - run: npm run build
       - name: Apply complete schema with migration 051 and verify runtime roles
         run: npm run db:prepare
-      - name: L11 integration: preview, drift, purge, customer protections, audit
+      - name: 'L11 integration: preview, drift, purge, customer protections, audit'
         run: npx tsx --test test/collection-filter.admin.integration.test.ts
       - name: Verify migration 051 recorded and simulation objects absent
         shell: bash
