@@ -94,7 +94,7 @@ BEGIN
   );
   RETURN QUERY SELECT v_policy_id,v_revision;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEXT,TEXT,UUID)
   FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_set_rule(TEXT,TEXT,TEXT,TEXT,UUID)
@@ -119,7 +119,7 @@ RETURNS TABLE (
   has_company BOOLEAN,
   content_hash TEXT
 )
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 BEGIN
   IF public.app_current_user_id() IS NULL
      OR NOT public.app_user_is_platform_admin() THEN
@@ -161,7 +161,7 @@ BEGIN
   WHERE (p_after IS NULL OR p.id > p_after)
   ORDER BY p.id LIMIT p_limit;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
   FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGER)
@@ -171,7 +171,7 @@ GRANT EXECUTE ON FUNCTION public.collection_filter_direct_candidates(UUID,INTEGE
 -- Only a verified SECURITY DEFINER transaction may prune immutable evidence.
 -- Never disable global triggers or change existing RESTRICT foreign keys.
 CREATE OR REPLACE FUNCTION public.collection_filter_l11_purge_guard()
-RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
+RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $$
   SELECT current_setting('app.collection_filter_l11_purge',true)='authorized'
     AND current_user=(
       SELECT pg_catalog.pg_get_userbyid(proowner)
@@ -180,43 +180,43 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path=pg_catalog,public AS $
         'public.collection_filter_direct_purge_batch(uuid[],text,text,text,text,uuid)'
       )
     )
-$;
+$$;
 REVOKE ALL ON FUNCTION public.collection_filter_l11_purge_guard() FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION public.publication_scope_event_append_only()
-RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,public,pg_temp AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
   IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
   RAISE EXCEPTION 'PUBLICATION_SCOPE_EVENT_APPEND_ONLY';
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.taxonomy_classification_append_only_record()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
   RAISE EXCEPTION '% rows are append-only', TG_TABLE_NAME;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.taxonomy_classification_assertion_append_only()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
   RAISE EXCEPTION 'publication taxonomy assertions are append-only';
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.taxonomy_unmapped_append_only()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP='DELETE' AND public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
   RAISE EXCEPTION '% rows are append-only', TG_TABLE_NAME;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.taxonomy_candidate_link_guard()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP='DELETE' THEN
     IF public.collection_filter_l11_purge_guard() THEN RETURN OLD; END IF;
@@ -236,7 +236,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 -- One guarded batch. Any unexpected dependent FK or permission failure aborts
 -- the whole outer transaction, including the active rule change.
@@ -245,7 +245,7 @@ CREATE OR REPLACE FUNCTION public.collection_filter_direct_purge_batch(
   p_operation UUID
 )
 RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=pg_catalog,public AS $
+SET search_path=pg_catalog,public AS $$
 DECLARE
   v_actor UUID := public.app_current_user_id();
   v_count INTEGER;
@@ -389,7 +389,7 @@ BEGIN
   );
   RETURN v_count;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.collection_filter_direct_purge_batch(
   UUID[],TEXT,TEXT,TEXT,TEXT,UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.collection_filter_direct_purge_batch(
