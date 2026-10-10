@@ -5,7 +5,10 @@
  * receipt, NOT a conclusion about legal effectivity or CURRENT status.
  * The received data never goes into PostgreSQL or tenant-specific copies.
  */
+import type {ConnectorPublication} from '../../collection/connector.contract.js';
 import type {DouConfazTrace} from './dou-source-custody-preflight.js';
+import {extractDouOnePageNativePdfText} from './dou-native-pdf-text.js';
+import {correlateOfficialDouPdfActText,type DouPdfActTextCorrelation} from './dou-official-text-correspondence.js';
 import {preflightContemporaryDouPdfBytes, type ContemporaryDouPdfBytePreflight}
  from './dou-pdf-byte-preflight.js';
 
@@ -28,9 +31,11 @@ const deny=(reason:string):Denied=>({status:'UNVERIFIED',reason,grantsLegalCurre
  * accepting an arbitrary user-entered URL. No third-party redirects or HTML
  * responses are accepted as PDF evidence.
  */
-export async function fetchOfficialDouPdfPage(
+type CapturedPdf=Extract<OfficialDouPdfSourceCapture,{status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED'}>;
+type InternalPdfCapture=Denied|{readonly status:'RAW_PDF_CAPTURED';readonly capture:CapturedPdf;readonly bytes:Buffer};
+async function collectOfficialDouPdfBytes(
  trace:DouConfazTrace,
-):Promise<OfficialDouPdfSourceCapture>{
+):Promise<InternalPdfCapture>{
  if(!trace||trace.status!=='DOU_XML_TRACE_ONLY')return deny('DOU_VALID_XML_TRACE_REQUIRED');
  let pdfUrl:string;
  try{
@@ -94,11 +99,49 @@ export async function fetchOfficialDouPdfPage(
   if(preflight.status!=='DOU_PDF_BYTES_BOUND_ONLY')
    return deny('DOU_OFFICIAL_PDF_PREFLIGHT_REJECTED');
   return {
-   status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED',grantsLegalCurrent:false,
-   fetchedAt:new Date().toISOString(),requestUrl:pdfUrl,
-   httpStatus:200,contentType:mime,preflight,
+   status:'RAW_PDF_CAPTURED',bytes,
+   capture:{
+    status:'OFFICIAL_DOU_PDF_SOURCE_CAPTURED',grantsLegalCurrent:false,
+    fetchedAt:new Date().toISOString(),requestUrl:pdfUrl,
+    httpStatus:200,contentType:mime,preflight,
+   },
   };
  }catch{
   return deny('DOU_OFFICIAL_SOURCE_FETCH_FAILED');
  }
+}
+
+/**
+ * Metadata-only official PDF fetch; any temporary downloaded bytes are GC-able
+ * and NOT returned or stored. Independent of certificate/ICP validation.
+ */
+export async function fetchOfficialDouPdfPage(
+ trace:DouConfazTrace,
+):Promise<OfficialDouPdfSourceCapture>{
+ const collected=await collectOfficialDouPdfBytes(trace);
+ return collected.status==='RAW_PDF_CAPTURED'?collected.capture:collected;
+}
+
+/**
+ * Same-buffer extraction: PDF native text comes from the exact downloaded
+ * bytes whose hash was captured. No second independent text parameter.
+ * Result remains TRACE/MATCH ONLY and NEVER issues legal CURRENT.
+ */
+export async function fetchAndMatchOfficialDouPdfAct(input:{
+ trace:DouConfazTrace;
+ parent:ConnectorPublication;
+ act:ConnectorPublication;
+ printedEdition:string;
+}):Promise<DouPdfActTextCorrelation>{
+ const collected=await collectOfficialDouPdfBytes(input.trace);
+ if(collected.status!=='RAW_PDF_CAPTURED')
+  return {status:'UNVERIFIED',reason:collected.reason,grantsLegalCurrent:false};
+ const parsed=await extractDouOnePageNativePdfText(collected.bytes);
+ if(parsed.status!=='PDF_NATIVE_TEXT_EXTRACTED'||!parsed.text)
+  return {status:'UNVERIFIED',reason:parsed.reason,grantsLegalCurrent:false};
+ return correlateOfficialDouPdfActText({
+  trace:input.trace,sourceCapture:collected.capture,
+  parent:input.parent,act:input.act,
+  pdfExtractedText:parsed.text,printedEdition:input.printedEdition,
+ });
 }
