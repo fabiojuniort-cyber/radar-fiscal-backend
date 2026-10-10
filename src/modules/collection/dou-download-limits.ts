@@ -54,7 +54,14 @@ export async function readAdminDouLimits(db: Kysely<DB>): Promise<{
   const result = row ? limitsFromSource(row.connector_config)
     : { limits: { ...DOU_DEFAULT_LIMITS }, configured: false };
   const functionStatus = await sql<{ ready: boolean }>`
-    SELECT to_regprocedure('public.platform_admin_set_dou_limits(jsonb)') IS NOT NULL AS ready
+    SELECT COALESCE(
+      pg_catalog.has_function_privilege(
+        current_user,
+        pg_catalog.to_regprocedure('public.platform_admin_set_dou_limits(jsonb)'),
+        'EXECUTE'
+      ),
+      false
+    ) AS ready
   `.execute(db);
   const editable = Boolean(row && functionStatus.rows[0]?.ready);
   return {
