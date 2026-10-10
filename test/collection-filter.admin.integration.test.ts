@@ -72,6 +72,22 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       [pubId,sourceId,'https://example.test/'+identifier,JSON.stringify({dou:{section:'DO1'}})],
     );
 
+    // Suppressed scope history is append-only and RESTRICT-bound. The L-11
+    // purge must remove this publication-owned event, not weaken other FKs.
+    const scopeEvent=await admin.query<{id:string}>(
+      "INSERT INTO publication_scope_events(publication_id,operation_id,action,"+
+      "previous_scope,new_scope,policy_key,reason_code,rule_version,"+
+      "evidence_sha256,actor_ref) "+
+      "VALUES($1,$2,'SUPPRESS','IN_SCOPE','OUT_OF_SCOPE','L11_TEST',"+
+      "'EXCLUDED_DOU','1',$3,'l11-test') RETURNING id",
+      [pubId,randomUUID(),createHash('sha256').update('scope '+pubId).digest('hex')],
+    );
+    await admin.query(
+      "INSERT INTO publication_scope_state(publication_id,scope,current_event_id,"+
+      "policy_key,evidence_sha256) VALUES($1,'OUT_OF_SCOPE',$2,'L11_TEST',$3)",
+      [pubId,scopeEvent.rows[0]!.id,createHash('sha256').update('scope '+pubId).digest('hex')],
+    );
+
     // A publication already linked to a customer must stay intact, including
     // its match history. It is counted separately from physical deletions.
     const secondHash=createHash('sha256').update(randomUUID()).digest('hex');
@@ -160,6 +176,14 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     assert.equal(confirm.json<{deletedCount:number}>().deletedCount,2);
     const actual=await admin.query("SELECT id FROM publications WHERE id=$1",[pubId]);
     assert.equal(actual.rowCount,0,'document must be physically gone');
+
+    for(const table of ['publication_scope_state','publication_scope_events',
+      'publication_versions','publication_origins']){
+      assert.equal((await admin.query(
+        'SELECT 1 FROM '+table+' WHERE publication_id=$1',[pubId],
+      )).rowCount,0,table+' must be removed with discarded publication');
+    }
+
     assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[addedId])).rowCount,0);
     const protectedRow=await admin.query(
       "SELECT id FROM publications WHERE id=$1",[protectedId],
