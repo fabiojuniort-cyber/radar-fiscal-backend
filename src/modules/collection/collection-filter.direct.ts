@@ -80,6 +80,16 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
       locationScope:t.location_scope})),
   };
   const engine=compileCollectionFilterPolicy(document);
+  // Push down source/section/normalized raw type (including aliases) before
+  // fetching full text. The existing TS engine still owns final classification.
+  const typeKeys=[...new Set([
+    rule.canonicalType,
+    ...rawAliases.rows.filter(a =>
+      normalizeCollectionFilterType(a.source_code)===normalizeCollectionFilterType(rule.sourceCode)
+      && normalizeCollectionFilterType(a.section)===normalizeCollectionFilterType(rule.section)
+      && normalizeCollectionFilterType(a.canonical_type)===rule.canonicalType,
+    ).map(a=>normalizeCollectionFilterType(a.normalized_alias)),
+  ])];
   const ids:string[]=[];
   let blockedCompany=0;
   let blockedOtherSource=0;
@@ -89,7 +99,7 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   while (true) {
     if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
     const page=await sql<Candidate>`
-      SELECT * FROM collection_filter_direct_candidates(${cursor}::uuid,500)
+      SELECT * FROM collection_filter_direct_candidates(${cursor}::uuid,500,${normalizeCollectionFilterType(rule.section)},${typeKeys}::text[])
     `.execute(trx);
     if (!page.rows.length) break;
     for (const item of page.rows) {
