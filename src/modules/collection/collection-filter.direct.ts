@@ -19,8 +19,9 @@ export interface DirectRuleInput {
 interface Candidate {
   publication_id: string; title: string; act_type: string | null;
   section: string; content_text: string | null; relevant_excerpt: string | null;
-  source_act_type: string | null; has_material: boolean;
-  has_company: boolean; has_other_source:boolean; content_hash: string | null;
+  evidence_complete:boolean; has_material:boolean;
+  type_conflict:boolean; provenance_conflict:boolean;
+  has_company:boolean; has_other_source:boolean; content_hash: string | null;
 }
 
 function validated(input: DirectRuleInput): DirectRuleInput {
@@ -96,11 +97,10 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
         sourceCode:rule.sourceCode, section:item.section,
         actType:item.act_type,title:item.title,
         body:item.content_text,summary:item.relevant_excerpt,
-        evidenceComplete:Boolean(item.content_text?.trim()),
+        evidenceComplete:item.evidence_complete,
         materialAttachmentsUnexamined:item.has_material,
-        typeConflict:!!item.source_act_type && normalizeCollectionFilterType(item.source_act_type)
-          !==normalizeCollectionFilterType(item.act_type??''),
-        provenanceConflict:false,
+        typeConflict:item.type_conflict,
+        provenanceConflict:item.provenance_conflict,
       });
       if (decision.decision!=='DISCARD' || decision.canonicalType!==rule.canonicalType ||
           decision.section!==normalizeCollectionFilterType(rule.section)) continue;
