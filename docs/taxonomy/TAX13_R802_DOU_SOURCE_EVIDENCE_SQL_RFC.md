@@ -53,3 +53,11 @@ Append-only review facts from official URLs: original publication, ratification,
 4. Revalidate public-source ratification, later amendments and applicable dates by **device**, then legitimate legal-positive tests and independent R9. CI green and production gates still required.
 
 **This file is technical preparation, not a verified source-admission claim.**
+
+## Adversarial edition-identity note — 2026-10-10
+
+This branch now enforces the **first printed issue number in the PDF masthead**, rather than accepting a later textual citation to an edition. It also re-derives and compares the full INLABS section, edition, publication date, XML-part SHA list, page, source archive and dispatch/act identity. The DOU negative test suite (23/23 PASS at HEAD `ddb40d203ee6b63e825c48f01fb389b32e408062`) includes deliberate forged INLABS section, wrong PDF header, wrong edition suffix on a regular journal and altered XML part digest.
+
+**Residual gap:** INLABS `editionNumber` is numeric (`80`) and `DO1E` identifies only the extraordinary section, **not necessarily its suffix A or B**. The user-provided 25/04/2024 samples conclusively demonstrate Extra 80-A and Extra 80-B are different legal publications, even on one date. A PDF's printed `80-B` is insufficient by itself to prove that official journal ID `601` points to Extra 80-B for the specific DOU archive/matter. The reviewer must require an independently sourced **official index/journal-to-printed-suffix correspondence**, not a caller-supplied `printedEdition='80-B'` string or an incidental textual citation. Until that authoritative binding and the real source HTTP byte-to-INLABS match are proven, **no DOU PDF source admission to legal CURRENT is permissible**, regardless of test success.
+
+This is a documentary-index check, **not** validation of digital signatures, certificates or ICP. It must be designed as a required field/constraint in any future additive SQL migration rather than inferred from a URL-only receipt or synthetic fixture.
