@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import test from 'node:test';
 import {parseDouEntries} from '../src/modules/collection/dou.parser.js';
 import {preflightDouConfazTrace} from '../src/modules/taxonomy/legal-scope/dou-source-custody-preflight.js';
-import {preflightContemporaryDouPdfBytes,bindContemporaryDouPdfToIndependentReview} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
+import {preflightContemporaryDouPdfBytes} from '../src/modules/taxonomy/legal-scope/dou-pdf-byte-preflight.js';
 import type {ConnectorPublication} from '../src/modules/collection/connector.contract.js';
 import {archiveContext} from './dou.fixtures.js';
 
@@ -45,7 +45,7 @@ test('R802 DOU synthetic XML creates TRACE ONLY, never an authenticated source o
    assert.equal(c.officialMatterId,'12345678');
    assert.match(c.archiveSha256,/^[a-f0-9]{64}$/);
    assert.equal(c.xmlPartSha256.length,1);
-   assert.ok(c.outstandingGates.includes('INDEPENDENT_CERTIFIED_DOU_PUBLICATION_VALIDATION'));
+   assert.ok(c.outstandingGates.includes('OFFICIAL_HTTPS_PDF_SOURCE_CAPTURE'));
   }
  }
 });
@@ -101,89 +101,6 @@ test('R802 DOU user supplied hash alone is NEVER authenticity; no evidence means
  assert.equal(c.grantsLegalCurrent,false);
 });
 
-test('R802 signed independent DOU review assertion is only a claim; forged/revoked/replayed proof fails',async()=>{
- const crypto=await import('node:crypto');
- const {
-  canonicalDouReviewStatement,verifyIndependentDouReview
- }=await import('../src/modules/taxonomy/legal-scope/dou-certified-review-signature.js');
- const [parent,child]=syntheticPublications();assert.ok(parent&&child);
- const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
- assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
- if(trace.status!=='DOU_XML_TRACE_ONLY')return;
- const keys=crypto.generateKeyPairSync('ed25519');
- const trustedKeys=new Map([['approved-independent-review-key',keys.publicKey.export({type:'spki',format:'pem'}).toString()]]);
- const goodPolicy='icpbr-policy-2026-v1';
- const trust={publicKeysById:trustedKeys,revokedKeyIds:new Set<string>(),
-  approvedCertificatePolicies:new Set([goodPolicy])};
- const statement={
-  schema:'TRIBUSCA:DOU:CERTIFIED_REVIEW:1' as const,
-  reviewId:crypto.randomUUID(),verifierIdentity:'independent-reviewer-01',
-  verifiedAt:'2026-10-09T12:00:00.000Z',
-  certificatePolicyVersion:goodPolicy,
-  certificateFingerprintSha256:'a'.repeat(64),
-  certifiedPdfSha256:'b'.repeat(64),
-  sourceCode:'dou' as const,publicationDate:trace.publicationDate,
-  section:trace.section,edition:trace.edition,
-  officialMatterId:trace.officialMatterId,certifiedPageUrl:trace.certifiedPageUrl,
-  archiveSha256:trace.archiveSha256,xmlPartSha256:[...trace.xmlPartSha256],
-  parentExternalId:trace.parentExternalId,parentTextSha256:trace.parentTextSha256,
-  certifiedExtractedTextSha256:trace.parentTextSha256
- };
- const signed={
-  keyId:'approved-independent-review-key',
-  statement,
-  signatureBase64:crypto.sign(null,Buffer.from(canonicalDouReviewStatement(statement),'utf8'),
-   keys.privateKey).toString('base64')
- };
- const now=new Date('2026-10-10T00:00:00.000Z');
- const candidate=verifyIndependentDouReview(trace,signed,trust,now);
- assert.equal(candidate.reviewSignatureAuthenticated,true,
-  'only independent signed review assertion is authenticated');
- assert.equal(candidate.authenticatedOfficialPublication,false,
-  'still no PDF certificate chain actually inspected');
- assert.equal(candidate.grantsLegalCurrent,false);
- assert.equal(verifyIndependentDouReview(trace,{...signed,signatureBase64:'AAAA'},trust,now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,{...signed,keyId:'operator-chosen-keyid'},trust,now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,{...signed,statement:{...statement,archiveSha256:'0'.repeat(64)}},trust,now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,{...signed,statement:{...statement,parentTextSha256:'0'.repeat(64)}},trust,now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,{...signed,statement:{...statement,certifiedPdfSha256:'0'.repeat(64)}},trust,now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,signed,{...trust,revokedKeyIds:new Set([signed.keyId])},now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,signed,{...trust,approvedCertificatePolicies:new Set()},now).reviewSignatureAuthenticated,false);
- assert.equal(verifyIndependentDouReview(trace,signed,trust,new Date('2026-01-01T00:00:00Z')).reviewSignatureAuthenticated,false);
- const forged={...signed,statement:{...statement,grantsLegalCurrent:true}} as any;
-
- assert.equal(verifyIndependentDouReview(trace,forged,trust,now).reviewSignatureAuthenticated,false);
- // A signed reviewer statement must also match the ACTUAL supplied PDF
- // bytes. Even successful matching is NEVER certificate validity or CURRENT.
- const pdfBytes=Buffer.from(`%PDF-1.7
-1 0 obj << /Type /Catalog >> endobj
-%%EOF
-`);
- const pdfUrl='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
- const byteCandidate=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes});
- assert.equal(byteCandidate.status,'DOU_PDF_BYTES_BOUND_ONLY');
- const byteBoundStatement={...statement,certifiedPdfSha256:crypto.createHash('sha256').update(pdfBytes).digest('hex')};
- const byteReview={...signed,statement:byteBoundStatement,
-  signatureBase64:crypto.sign(null,
-   Buffer.from(canonicalDouReviewStatement(byteBoundStatement),'utf8'),
-   keys.privateKey).toString('base64')};
- const bound=bindContemporaryDouPdfToIndependentReview({
-  trace,pdf:byteCandidate,review:byteReview,keyring:trust,now});
- assert.equal(bound.status,'DOU_SIGNED_REVIEW_BYTES_MATCH_ONLY');
- assert.equal(bound.authenticatedOfficialPublication,false);
- assert.equal(bound.grantsLegalCurrent,false);
- const tamperedPdf=Buffer.from(`%PDF-1.7
-1 0 obj << /Type /Pages >> endobj
-%%EOF
-`);
- const differentBytes=preflightContemporaryDouPdfBytes({trace,pdfUrl,pdfBytes:tamperedPdf});
- assert.equal(bindContemporaryDouPdfToIndependentReview({
-  trace,pdf:differentBytes,review:byteReview,keyring:trust,now}).status,'UNVERIFIED');
- assert.equal(bindContemporaryDouPdfToIndependentReview({
-  trace,pdf:byteCandidate,review:byteReview,
-  keyring:{...trust,revokedKeyIds:new Set([signed.keyId])},now}).status,'UNVERIFIED');
-});
-
 test('R802 DOU 1991 and 1997 cannot be misrepresented as INLABS XML captures',()=>{
  const [parent,child]=syntheticPublications();assert.ok(parent&&child);
  for(const year of ['1991','1997']){
@@ -217,7 +134,7 @@ test('Trifaros R802: contemporaneous PDF bytes are SHA-bound only, NEVER officia
  assert.equal(result.candidate?.page,'1');
  assert.equal(result.candidate?.referenceDate,'2026-09-18');
  assert.equal(result.candidate?.officialMatterId,'12345678');
- assert.ok(result.candidate?.outstandingGates.includes('INDEPENDENT_SIGNED_OFFICIAL_PDF_CUSTODY'));
+ assert.ok(result.candidate?.outstandingGates.includes('DIRECT_OFFICIAL_HTTPS_SOURCE_FETCH'));
  assert.equal(JSON.stringify(result).includes('1 0 obj'),false,
    'do not return raw PDF bytes/text in lightweight evidence');
 });
@@ -258,4 +175,20 @@ test('Trifaros R802: wrong edition/page/host, forgery and extra query fail close
  const large=preflightContemporaryDouPdfBytes({trace,pdfUrl:base,
   pdfBytes:Buffer.alloc(20*1024*1024+1)});
  assert.equal(large.reason,'DOU_PDF_BYTES_SIZE_INVALID');
+});
+
+test('R802 policy: PDF metadata and hash never require signature validation or issue legal CURRENT',()=>{
+ const [parent,child]=syntheticPublications();assert.ok(parent&&child);
+ const trace=preflightDouConfazTrace({sourceCode:'dou',publication:child,parent});
+ assert.equal(trace.status,'DOU_XML_TRACE_ONLY');
+ if(trace.status!=='DOU_XML_TRACE_ONLY')return;
+ const url='https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?data=18%2F09%2F2026&jornal=515&pagina=1';
+ // No /ByteRange, cryptographic signature, certificate policy, ICP or OCSP
+ // metadata: a source document can still be traced and hashed.
+ const plainPdf=Buffer.from('%PDF-1.7\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF\\n');
+ const result=preflightContemporaryDouPdfBytes({trace,pdfUrl:url,pdfBytes:plainPdf});
+ assert.equal(result.status,'DOU_PDF_BYTES_BOUND_ONLY');
+ assert.equal(result.candidate?.outstandingGates.includes('DIRECT_OFFICIAL_HTTPS_SOURCE_FETCH'),true);
+ assert.equal(result.candidate?.outstandingGates.some(g=>/CERTIFICATE|ICP|OCSP|REVOCATION/.test(g)),false);
+ assert.equal(result.grantsLegalCurrent,false);
 });
