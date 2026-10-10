@@ -407,6 +407,32 @@ GRANT EXECUTE ON FUNCTION public.tax13_dou_record_capture(
 
 **Lacuna residual explícita:** a segunda função completa não é fornecida como função SQL executável nesta RFC, porque modelá-la como aceitação de um boolean validado pelo próprio chamador criaria a falha R9-D01. O futuro código de integração precisa ser projetado e testado conjuntamente. O R9-DESIGN-R2 deverá julgar se o contrato e a separação proposta são suficientes como desenho; não se deve declarar aprovado um verificador cujo código ainda não existe.
 
+### 4.4. Matriz mandatória de propriedade e políticas
+
+| Tabela | Escrita autorizada | Leitura autorizada | Tenant direto |
+| --- | --- | --- | --- |
+| `source_identities` | owner NOLOGIN via scheduler interno | owner via reader especializado | NÃO |
+| `collection_jobs` | owner via scheduler (identidade própria) | owner/collector via job-target restrito | NÃO |
+| `runtime_credentials` | owner via credencial de administração separada | owner para validação | NÃO |
+| `credential_revocations` | owner via administrador de segurança segregado | owner + projetor de veredito | NÃO |
+| `http_fetch_events` | owner via função executável só por collector | owner via funções de auditoria | NÃO |
+| `verification_events` | owner via função executável só por verifier | owner via reader restrito | NÃO |
+| `act_correlations` | owner via função executável só por verifier | owner via reader restrito | NÃO |
+| `temporal_review_events` | owner via revisor temporal autorizado (NÃO collector/issuer) | owner via leitor de fatos | NÃO |
+
+O contrato final deve criar roles específicas `radar_dou_scheduler_runtime`, `radar_dou_credential_admin_runtime` e `radar_dou_temporal_reviewer_runtime` (LOGIN segregados) ou demonstrar equivalência segura com roles existentes, sem herança de app/worker/issuer/sealer. Aplicar em **todas** as tabelas: OWNER = owner NOLOGIN, FORCE RLS, policy SELECT para owner, policy INSERT para owner quando houver função de gateway, REVOKE ALL FROM PUBLIC, proibir DML direto para qualquer LOGIN, trigger UPDATE/DELETE, sem TRUNCATE, e REVOKE EXECUTE FROM PUBLIC em funções. Nenhuma tabela canônica concede SELECT ao cliente. Mesmo serviço administrativo precisa usar função de auditoria com views específicas; superuser fica explicitamente fora do threat model de integridade absoluta.
+
+### 4.5. `NO_RELEVANT_PUBLICATIONS` sem falsa negativa global
+
+Esse estado pertence ao **resultado de busca/afinidade por cliente e período**, não à resposta HTTP de um PDF. Projeção determinística:
+
+- Coleta com **qualquer** fonte requerida em ERROR/UNAVAILABLE/REJECTED/UNFINISHED ⇒ resultado `COLLECTION_INCOMPLETE` ou `UNVERIFIED`, nunca `NO_RELEVANT_PUBLICATIONS`.
+- Todas as fontes previstas efetivamente consultadas, zero publicações capturadas ⇒ `NO_NEW_PUBLICATIONS` (situação factual de coleta).
+- Todas as fontes previstas efetivamente consultadas, documentos capturados, **zero matches** no filtro da empresa ⇒ `NO_RELEVANT_PUBLICATIONS` **somente para aquele tenant**, naquele filtro/data de referência.
+- Todas as fontes previstas efetivamente consultadas, matches existentes ⇒ `RELEVANT_PUBLICATIONS_FOUND`.
+
+Reutilizar rastreamento de consultas da plataforma, sem criar uma tabela global de "ausência tributária". Qualquer materialização para relatórios por tenant deverá residir fora das tabelas canônicas e ter FORCE RLS por `tenant_id`, observando a composição de runs/execuções e filtros versionados. Uma fonte fora de escopo por política explícita deve constar `NOT_SCHEDULED/OUT_OF_SCOPE`, não ser contada como consultada com sucesso.
+
 ## 5. Conteúdo e extração — R9-D03 / R9-D07
 
 `correlateOfficialDouPdfActText` é função unitária de comparação, construível a partir de objetos manuais; só retorna **candidato não admissível** (`sqlSourceAdmissionAllowed=false`). O status textual sozinho nunca alimenta `tax13_dou_act_correlations` positivo. O algoritmo de admissão (futuro) deve exigir capturas verificador + coletor + bytes originais correlacionados.
