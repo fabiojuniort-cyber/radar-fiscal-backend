@@ -11,7 +11,7 @@ import {
 
 /**
  * L-10: npm run db:prune-collection-items -- [--apply]
- *   [--older-than-days=30] [--batch-size=100] [--max-batches=10]
+ *   [--older-than-days=7] [--batch-size=100] [--max-batches=10]
  * Default DRY_RUN: SELECT only; does not delete any database row.
  * APPLY is explicit; requires DATABASE_ADMIN_URL and must be approved
  * independently before running against production. This script never
