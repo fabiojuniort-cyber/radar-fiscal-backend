@@ -7,7 +7,7 @@ import {Pool} from 'pg';
 import type {DB} from '../src/infrastructure/database/database.types.js';
 import {pruneCollectionItems} from '../src/modules/operations/collection-items-retention.js';
 
-test('L-10: dry-run, 29/30/31-day cutoff, bounded batches, FK safety and idempotence',async()=>{
+test('L-10: dry-run, 6/7/8-day cutoff, bounded batches, FK safety and idempotence',async()=>{
   const url=process.env.DATABASE_ADMIN_URL;
   assert.ok(url,'DATABASE_ADMIN_URL required: use isolated PostgreSQL test database');
   const db=new Kysely<DB>({dialect:new PostgresDialect({pool:new Pool({connectionString:url,max:1})})});
@@ -31,13 +31,13 @@ test('L-10: dry-run, 29/30/31-day cutoff, bounded batches, FK safety and idempot
     }).execute();
     await db.insertInto('collection_items').values([
       {id:ids[0]!,collection_run_id:runId,first_attempt_id:attemptId,
-        source_item_key:'older-31',status:'PROCESSED_EXISTING',created_at:days(31)},
+        source_item_key:'older-8',status:'PROCESSED_EXISTING',created_at:days(8)},
       {id:ids[1]!,collection_run_id:runId,first_attempt_id:attemptId,
-        source_item_key:'exact-30',status:'PROCESSED_NEW',created_at:days(30)},
+        source_item_key:'exact-7',status:'PROCESSED_NEW',created_at:days(7)},
       {id:ids[2]!,collection_run_id:runId,first_attempt_id:attemptId,
-        source_item_key:'newer-29',status:'DISCOVERED',created_at:days(29)},
+        source_item_key:'newer-6',status:'DISCOVERED',created_at:days(6)},
       {id:ids[3]!,collection_run_id:runId,first_attempt_id:attemptId,
-        source_item_key:'older-32',status:'FAILED',created_at:days(32)},
+        source_item_key:'older-9',status:'FAILED',created_at:days(9)},
     ]).execute();
 
     const dry=await pruneCollectionItems(db,{now,batchSize:1,maxBatches:1});

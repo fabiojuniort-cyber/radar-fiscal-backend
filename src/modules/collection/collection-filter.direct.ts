@@ -133,42 +133,89 @@ export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:
   });
 }
 
+/**
+ * One user-confirmed step. The rule is persisted once, then at most 500 DOU
+ * publications are removed. Each subsequent step must re-count and provide a
+ * fresh preview token, and can only continue an already-active identical rule.
+ * Never accept client-supplied publication IDs.
+ */
 export async function confirmDirectFilterRule(
-  db:Kysely<DB>,userId:string,input:DirectRuleInput,
-  expectedCount:number,previewToken:string,
+  db: Kysely<DB>, userId: string, input: DirectRuleInput,
+  expectedCount: number, previewToken: string, resume = false,
 ) {
-  return withUserContext(db,userId,async trx=>{
+  const started = Date.now();
+  return withUserContext(db, userId, async trx => {
+    // Transactional, bounded work: a slow SQL statement rolls back this step,
+    // leaving earlier committed steps and their audit evidence intact.
+    await sql`SET LOCAL statement_timeout = '11000ms'`.execute(trx);
+    await sql`SET LOCAL lock_timeout = '2500ms'`.execute(trx);
     await sql`SELECT pg_advisory_xact_lock(
       hashtextextended('collection-filter-direct-rule',0)
     )`.execute(trx);
-    const plan=await candidates(trx,input);
-    if (plan.count!==expectedCount || plan.token!==previewToken)
+    const rule = validated(input);
+    const plan = await candidates(trx,rule);
+    if (plan.count !== expectedCount || plan.token !== previewToken) {
       return {changed:true,count:plan.count,blockedCompany:plan.blockedCompany,
-        blockedOtherSource:plan.blockedOtherSource,token:plan.token,deletedCount:0};
-    // The rule and all purge batches share a single transaction. Any FK, RLS,
-    // append-only or audit failure rolls back both the rule and deletions.
-    const rule=validated(input);
-    const result=await sql<{policy_revision:number}>`
-       SELECT * FROM collection_filter_direct_set_rule(
-         ${rule.sourceCode},${rule.section},${rule.canonicalType},
-         ${rule.mode},${rule.newTypeId??null}::uuid)
-    `.execute(trx);
-    const operationId=randomUUID();
-    const ruleIds=plan.ids;
-    for (let i=0;i<ruleIds.length;i+=100) {
-      const batch=ruleIds.slice(i,i+100);
-      await sql`SELECT collection_filter_direct_purge_batch(
-        ${batch}::uuid[],${rule.sourceCode},${rule.section},
-        ${rule.canonicalType},${rule.mode},${operationId}::uuid
-      )`.execute(trx);
+        blockedOtherSource:plan.blockedOtherSource,token:plan.token,
+        apagadas:0,restantes:plan.count,deletedCount:0};
     }
-    if (ruleIds.length===0) {
+
+    let revision: number;
+    if (resume) {
+      // Never re-save the rule on subsequent steps: a different admin may
+      // have changed it. The caller must explicitly confirm any new rule.
+      const active = await sql<{revision:number}>`
+        SELECT p.revision FROM collection_filter_policies p
+        JOIN collection_filter_type_rules r ON r.policy_id=p.id
+        WHERE p.status='APPROVED'
+          AND r.source_code=${rule.sourceCode}
+          AND r.section=${rule.section}
+          AND r.canonical_type=${rule.canonicalType}
+          AND r.mode=${rule.mode}
+        LIMIT 1
+      `.execute(trx);
+      if (!active.rows[0]) throw new RangeError('confirmed_rule_not_active');
+      revision=Number(active.rows[0].revision);
+    } else {
+      const updated=await sql<{policy_revision:number}>`
+        SELECT * FROM collection_filter_direct_set_rule(
+          ${rule.sourceCode},${rule.section},${rule.canonicalType},
+          ${rule.mode},${rule.newTypeId??null}::uuid)
+      `.execute(trx);
+      revision=Number(updated.rows[0]?.policy_revision);
+    }
+
+    const MAX_DELETES_PER_CONFIRM=500;
+    const SQL_PURGE_CHUNK=100; // SQL 051 rejects arrays above 100.
+    let apagadas=0;
+    const operationId=randomUUID();
+    for (let offset=0;offset<Math.min(MAX_DELETES_PER_CONFIRM,plan.ids.length);offset+=SQL_PURGE_CHUNK) {
+      // Return the committed partial step before reverse-proxy timeout.
+      if (Date.now()-started>16000) break;
+      const batch=plan.ids.slice(offset,offset+SQL_PURGE_CHUNK);
+      const purged=await sql<{count:number}>`
+        SELECT collection_filter_direct_purge_batch(
+          ${batch}::uuid[],${rule.sourceCode},${rule.section},
+          ${rule.canonicalType},${rule.mode},${operationId}::uuid
+        ) AS count
+      `.execute(trx);
+      const actual=Number(purged.rows[0]?.count);
+      if (actual!==batch.length) throw new Error('direct_purge_count_mismatch');
+      apagadas+=actual;
+    }
+    if (plan.count===0 || (plan.count>0 && apagadas===0)) {
+      // Audit also a no-op step. A client treats zero progress as stopped,
+      // never retries automatically.
       await sql`SELECT collection_filter_direct_purge_batch(
         ARRAY[]::uuid[],${rule.sourceCode},${rule.section},
         ${rule.canonicalType},${rule.mode},${operationId}::uuid
       )`.execute(trx);
     }
-    return {changed:false,deletedCount:ruleIds.length,
-      revision:Number(result.rows[0]?.policy_revision)};
+    // Re-evaluate the actual surviving archive inside this transaction.
+    // Concurrent recapture and protected records must not leave a stale
+    // "remaining = initial - deleted" estimate in the API response.
+    const current=await candidates(trx,rule);
+    return {changed:false,apagadas,restantes:current.count,
+      deletedCount:apagadas,revision,elapsedMs:Date.now()-started};
   });
 }

@@ -142,12 +142,13 @@ export async function collectionFilterAdminRoutes(
     schema:{body:directBody.extend({
       expectedCount:z.number().int().nonnegative(),
       previewToken:z.string().regex(/^[a-f0-9]{64}$/),
+      resume:z.boolean().optional(),
     })},
   }, async (request,reply)=>{
-    const {expectedCount,previewToken,...rule}=request.body;
+    const {expectedCount,previewToken,resume,...rule}=request.body;
     try {
       const result=await confirmDirectFilterRule(
-        app.db,request.auth!.userId,rule,expectedCount,previewToken);
+        app.db,request.auth!.userId,rule,expectedCount,previewToken,resume===true);
       return reply.send(result);
     } catch (error) {
       if (error instanceof RangeError) return reply.status(400).send({error:error.message});

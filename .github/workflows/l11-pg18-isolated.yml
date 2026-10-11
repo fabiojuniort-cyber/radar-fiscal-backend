@@ -9,6 +9,7 @@ on:
       - 'src/modules/collection/collection-filter.direct.ts'
       - 'src/api/routes/collection-filter-admin.route.ts'
       - 'test/collection-filter.admin.integration.test.ts'
+      - 'test/collection-filter.l11-staged.integration.test.ts'
       - 'test/collection-filter.l11-performance.integration.test.ts'
       - 'scripts/test-l11-configured-draft-guard.sh'
       - '.github/workflows/l11-pg18-isolated.yml'
@@ -57,6 +58,8 @@ jobs:
         run: npm run db:prepare
       - name: 'L11 integration: preview, drift, purge, customer protections, audit'
         run: npx tsx --test test/collection-filter.admin.integration.test.ts
+      - name: L11 staged 500-cap, drift, resume and per-step timings (isolated only)
+        run: npx tsx --test test/collection-filter.l11-staged.integration.test.ts
       - name: L11 configured DRAFT blocks migration 051 without data loss
         run: bash scripts/test-l11-configured-draft-guard.sh
       - name: Measure preview and confirmation over 120k synthetic DOU acts
