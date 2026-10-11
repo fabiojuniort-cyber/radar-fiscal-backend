@@ -66,6 +66,10 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
         "VALUES($1,$2,$3,'{\"dou\":{\"section\":\"DO3\"}}'::jsonb)",
         [id,douId,'https://l15.example.test/origin/'+id],
       );
+      if(kind==='other')await db.query(
+        "INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)",
+        [id,otherId,'https://l15-other.example.test/'+id],
+      );
       const event=(await db.query<{id:string}>(
         "INSERT INTO publication_scope_events(publication_id,operation_id,action,"+
         "previous_scope,new_scope,policy_key,reason_code,rule_version,evidence_sha256,actor_ref) "+
@@ -76,10 +80,6 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
         "INSERT INTO publication_scope_state(publication_id,scope,current_event_id,policy_key,evidence_sha256) "+
         "VALUES($1,'OUT_OF_SCOPE',$2,'L15_TEST',$3)",
         [id,event,sha('scope'+id)],
-      );
-      if(kind==='other')await db.query(
-        "INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)",
-        [id,otherId,'https://l15-other.example.test/'+id],
       );
       if(kind==='company') {
         const company=(await db.query<{id:string}>(
