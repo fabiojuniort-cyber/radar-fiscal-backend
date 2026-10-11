@@ -47,7 +47,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE='42501',
       MESSAGE='archive_discard_requires_guarded_purge';
   END IF;
-  SELECT so,po INTO v_source,v_origin
+  SELECT po.* INTO v_origin
   FROM public.publication_origins po
   JOIN public.sources so ON so.id=po.source_id
   WHERE po.publication_id=OLD.id AND so.code='dou'
@@ -55,6 +55,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='archive_discard_missing_dou_origin';
   END IF;
+  SELECT so.* INTO STRICT v_source FROM public.sources so WHERE so.id=v_origin.source_id;
   v_section:=COALESCE(v_origin.metadata->'dou'->>'section','');
   v_url:=COALESCE(NULLIF(OLD.primary_official_url,''),NULLIF(v_origin.official_url,''));
   IF v_url IS NULL OR btrim(v_url)='' THEN
