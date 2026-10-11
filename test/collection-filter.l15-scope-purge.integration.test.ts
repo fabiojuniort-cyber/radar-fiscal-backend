@@ -375,3 +375,97 @@ test('L17: DO1E RESOLUÇÃO CIT-SNC/MINC matches historical purge and runtime de
     await app.close();await db.end();
   }
 });
+
+test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Resolução provenance and writes archive audit',async()=>{
+  const admin=new Pool({connectionString:url,max:1});
+  const workerUrl=new URL(url);
+  workerUrl.username='radar_worker_runtime';
+  workerUrl.password=process.env.DB_WORKER_RUNTIME_PASSWORD??'';
+  const worker=new Pool({connectionString:workerUrl.toString(),max:1});
+  const tag=randomUUID().slice(0,10);
+  try{
+    const policy=(await admin.query<{id:string;revision:number}>(
+      "SELECT id,revision FROM collection_filter_policies WHERE status='APPROVED' LIMIT 1")).rows[0]!;
+    assert.ok(policy,'approved policy required');
+    await admin.query(
+      "INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) "+
+      "VALUES($1,'dou','DO1E','RESOLUCAO CIT SNC MINC','EXCLUDE_ALWAYS') "+
+      "ON CONFLICT(policy_id,source_code,section,canonical_type) DO UPDATE SET mode=EXCLUDED.mode",
+      [policy.id],
+    );
+    const source=(await admin.query<{id:string}>("SELECT id FROM sources WHERE code='dou'")).rows[0]!.id;
+    const id=(await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,published_on,primary_official_url) "+
+      "VALUES($1,'STRONG','{}'::jsonb,'FEDERAL','RESOLUÇÃO CIT-SNC/MINC',"+
+      "'Resolução CIT-SNC/MINC 09/10','2026-10-09',$2) RETURNING id",
+      [sha('worker-l17-'+tag),'https://www.in.gov.br/l17-worker-'+tag],
+    )).rows[0]!.id;
+    const bodyHash=sha('worker-body-'+tag);
+    await admin.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,'{\"dou\":{\"section\":\"DO1E\",\"sourceActType\":\"Resolução\"}}'::jsonb)",
+      [id,source,'https://www.in.gov.br/l17-worker-'+tag],
+    );
+    await admin.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current) "+
+      "VALUES($1,1,$2,'Aprova deliberação administrativa.',true)",
+      [id,bodyHash],
+    );
+    const client=await worker.connect();
+    try{
+      await client.query('BEGIN');
+      const candidates=await client.query<{
+        publication_id:string;title:string;act_type:string;section:string;
+        content_text:string|null;relevant_excerpt:string|null;content_hash:string;
+        evidence_complete:boolean;has_material:boolean;type_conflict:boolean;
+        provenance_conflict:boolean;has_company:boolean;has_other_source:boolean;
+      }>(
+        "SELECT * FROM public.collection_filter_direct_candidates(NULL,500,'DO1E',"+
+        "ARRAY['RESOLUCAO CIT SNC MINC']::text[])");
+      const row=candidates.rows.find(x=>x.publication_id===id);
+      assert.ok(row,'worker can select canonical specific act type');
+      assert.equal(row.type_conflict,false,'generic Resolução is compatible with specific act');
+      assert.equal(row.evidence_complete,true);
+      const {compileCollectionFilterPolicy,evaluateCollectionFilter}=
+        await import('../src/modules/collection/collection-filter.engine.js');
+      const engine=compileCollectionFilterPolicy({
+        version:1,contextWindowWords:12,weakScoreThreshold:3,
+        locationWeights:{title:3,summary:2,body:1},terms:[],aliases:[],
+        rules:[{sourceCode:'dou',section:'DO1E',
+          canonicalType:'RESOLUCAO CIT SNC MINC',mode:'EXCLUDE_ALWAYS'}],
+      });
+      const decision=evaluateCollectionFilter(engine,{
+        sourceCode:'dou',section:row.section,actType:row.act_type,title:row.title,
+        body:row.content_text,summary:row.relevant_excerpt,
+        evidenceComplete:row.evidence_complete,
+        materialAttachmentsUnexamined:row.has_material,
+        typeConflict:row.type_conflict,
+        provenanceConflict:row.provenance_conflict,
+      });
+      assert.equal(decision.decision,'DISCARD');
+      assert.equal(decision.reasonCode,'EXCLUDE_ALWAYS');
+      await client.query('SELECT public.l17_lock_worker_always_targets($1::uuid[])',[[id]]);
+      const result=await client.query<{deleted:number}>(
+        'SELECT public.l17_prune_always_batch($1::uuid[],$2::text[],$3::uuid,$4,$5,$6) AS deleted',
+        [[id],[bodyHash],policy.id,policy.revision,'DO1E','RESOLUCAO CIT SNC MINC'],
+      );
+      assert.equal(result.rows[0]?.deleted,1);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}
+    finally{client.release();}
+    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[id])).rowCount,0);
+    const archived=await admin.query<{reason_code:string;discard_origin:string}>(
+      "SELECT reason_code,discard_origin FROM collection_filter_discards "+
+      "WHERE archive_publication_id=$1",[id],
+    );
+    assert.equal(archived.rowCount,1);
+    assert.equal(archived.rows[0]?.reason_code,'ARCHIVE_PURGE');
+    assert.equal(archived.rows[0]?.discard_origin,'ARCHIVE');
+    const audit=await admin.query<{n:string}>(
+      "SELECT count(*)::text AS n FROM audit_log WHERE action='L17_RULE_PURGE' "+
+      "AND after_data->'deletedIds' ? $1",[id],
+    );
+    assert.equal(Number(audit.rows[0]?.n),1);
+  }finally{await worker.end();await admin.end();}
+});
