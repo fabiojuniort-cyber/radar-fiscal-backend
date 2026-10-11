@@ -74,8 +74,13 @@ async function scopeCandidates(trx: Transaction<DB>) {
     const add=(id:string,blocked?:'COMPANY'|'OTHER')=>{
       const previous=seen.get(id);
       if(previous){
-        // Fresh protection evidence always wins over stale eligibility.
-        if(blocked)seen.set(id,{...previous,protected:blocked});
+        // OUT_OF_SCOPE has priority, then explicit filter decision,
+        // then the legacy migration-029 hidden flag. Each act counts once.
+        const next:Match=previous.bucket==='HIDDEN'
+          ?{bucket:'RULE',rule,...(previous.protected?{protected:previous.protected}:{})}
+          :{...previous};
+        if(blocked)next.protected=blocked;
+        seen.set(id,next);
       }else {
         seen.set(id,{bucket:'RULE',rule,...(blocked?{protected:blocked}:{})});
       }
