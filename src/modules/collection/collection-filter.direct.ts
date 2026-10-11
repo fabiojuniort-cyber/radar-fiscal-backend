@@ -211,7 +211,11 @@ export async function confirmDirectFilterRule(
         ${rule.canonicalType},${rule.mode},${operationId}::uuid
       )`.execute(trx);
     }
-    return {changed:false,apagadas,restantes:Math.max(0,plan.count-apagadas),
+    // Re-evaluate the actual surviving archive inside this transaction.
+    // Concurrent recapture and protected records must not leave a stale
+    // "remaining = initial - deleted" estimate in the API response.
+    const current=await candidates(trx,rule);
+    return {changed:false,apagadas,restantes:current.count,
       deletedCount:apagadas,revision,elapsedMs:Date.now()-started};
   });
 }
