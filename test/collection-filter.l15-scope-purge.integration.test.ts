@@ -191,23 +191,28 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.deepEqual(new Set(hiddenRemaining.rows.map(x=>x.id)),new Set([
       hiddenIds['hidden-company'],hiddenIds['hidden-other'],hiddenIds['hidden-non-dou'],
     ]));
-    const audit=await db.query<{count:string}>(
-      "SELECT count(*)::text AS count FROM audit_log "+
-      "WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
-      "AND entity_id='OUT_OF_SCOPE' AND after_data->>'deletedCount'='3'",
+    const removedIds=[ids[0]!,hiddenIds.hidden!,hiddenIds['hidden-scope']!];
+    const audit=await db.query<{deleted:string}>(
+      "SELECT COALESCE(sum((after_data->>'deletedCount')::integer),0)::text AS deleted "+
+      "FROM audit_log a WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
+      "AND EXISTS(SELECT 1 FROM jsonb_array_elements_text(a.after_data->'deletedIds') d(id) "+
+      "WHERE d.id::uuid=ANY($1::uuid[]))",
+      [removedIds],
     );
-    assert.ok(Number(audit.rows[0]!.count)>=1,'051 append-only audit required');
+    assert.equal(Number(audit.rows[0]?.deleted),3,'051 append-only audit per committed sub-batch');
     const archived=await db.query<{id:string;discard_origin:string;archive_publication_id:string;
       reason_code:string;official_url:string;collection_run_id:string|null}>(
       "SELECT id,discard_origin,archive_publication_id,reason_code,official_url,collection_run_id "+
       "FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])",
-      [ids],
+      [removedIds],
     );
-    assert.equal(archived.rowCount,1,'every physically purged publication gets one archive discard');
-    assert.equal(archived.rows[0]?.discard_origin,'ARCHIVE');
-    assert.equal(archived.rows[0]?.reason_code,'ARCHIVE_PURGE');
-    assert.equal(archived.rows[0]?.collection_run_id,null);
-    assert.ok(archived.rows[0]?.official_url,'official source URL must be preserved');
+    assert.equal(archived.rowCount,3,'every physically purged publication gets one archive discard');
+    for(const row of archived.rows){
+      assert.equal(row.discard_origin,'ARCHIVE');
+      assert.equal(row.reason_code,'ARCHIVE_PURGE');
+      assert.equal(row.collection_run_id,null);
+      assert.ok(row.official_url,'official source URL must be preserved');
+    }
   } finally {
     await app.close();
     await db.end();
