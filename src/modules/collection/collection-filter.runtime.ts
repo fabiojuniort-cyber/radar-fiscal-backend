@@ -103,6 +103,7 @@ function decisiveHit(
 export async function loadApprovedCollectionFilterRuntime(
   db: Kysely<DB>,
   sourceId: string,
+  options: { readOnly?: boolean } = {},
 ): Promise<ApprovedCollectionFilterRuntime | null> {
   const source = await db
     .selectFrom('sources')
@@ -177,7 +178,9 @@ export async function loadApprovedCollectionFilterRuntime(
     throw new Error('approved_collection_filter_required');
   }
 
-  await sql`SELECT collection_filter_cleanup_discards()`.execute(db);
+  if (!options.readOnly) {
+    await sql`SELECT collection_filter_cleanup_discards()`.execute(db);
+  }
 
   return {
     policyId: row.policy_id,

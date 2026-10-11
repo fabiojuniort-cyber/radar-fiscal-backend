@@ -1,3 +1,4 @@
+import './l17-rule-cap.pg18.test.js';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import test from 'node:test';

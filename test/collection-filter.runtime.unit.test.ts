@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {selectL17AutomaticRules} from '../src/modules/collection/l17-daily-always.js';
+import {partitionL17AutomaticRules,selectL17AutomaticRules} from '../src/modules/collection/l17-daily-always.js';
 import test from 'node:test';
 
 import {
@@ -165,4 +165,22 @@ test('L17 scheduler selects only normalized DOU EXCLUDE_ALWAYS, never conditiona
   });
   assert.deepEqual(selectL17AutomaticRules(policy).map(r=>r.canonicalType),
     ['RESOLUCAO CIT SNC MINC']);
+});
+
+test('L17 hotfix: 3200 active EXCLUDE_ALWAYS rules are all partitioned without silent drops',()=>{
+  const compiled=compileCollectionFilterPolicy({
+    version:1,contextWindowWords:12,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},
+    rules:Array.from({length:3200},(_,i)=>({
+      sourceCode:'dou',section:'DO1E',canonicalType:'PERF TYPE '+i,
+      mode:'EXCLUDE_ALWAYS' as const,
+    })),
+    aliases:[],terms:[],
+  });
+  const groups=partitionL17AutomaticRules(compiled);
+  assert.equal(groups.rules.length,3200);
+  assert.ok(groups.partitions.length>1);
+  assert.ok(groups.partitions.every(x=>x.types.length<=160));
+  const distinct=new Set(groups.partitions.flatMap(g=>g.types));
+  assert.equal(distinct.size,3200);
 });
