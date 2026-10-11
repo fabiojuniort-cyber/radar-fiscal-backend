@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {selectL17AutomaticRules} from '../src/modules/collection/l17-daily-always.js';
 import test from 'node:test';
 
 import {
@@ -147,4 +148,21 @@ test('L17: generic DOU sourceActType Resolução is compatible with specific CIT
   }));
   assert.equal(unrelated.decision.decision, 'KEEP');
   assert.equal(unrelated.decision.reasonCode, 'TYPE_CONFLICT');
+});
+
+
+test('L17 scheduler selects only normalized DOU EXCLUDE_ALWAYS, never conditional or CONFAZ',()=>{
+  const policy=compileCollectionFilterPolicy({
+    version:1,contextWindowWords:12,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},
+    rules:[
+      {sourceCode:'dou',section:'DO1E',canonicalType:'RESOLUCAO CIT SNC MINC',mode:'EXCLUDE_ALWAYS'},
+      {sourceCode:'dou',section:'DO1',canonicalType:'PORTARIA',mode:'EXCLUDE_UNLESS_STRONG'},
+      {sourceCode:'confaz',section:'DO1',canonicalType:'PORTARIA',mode:'EXCLUDE_ALWAYS'},
+      {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE LICITACAO',mode:'KEEP_IF_TAX_TERM'},
+    ],
+    aliases:[],terms:[],
+  });
+  assert.deepEqual(selectL17AutomaticRules(policy).map(r=>r.canonicalType),
+    ['RESOLUCAO CIT SNC MINC']);
 });

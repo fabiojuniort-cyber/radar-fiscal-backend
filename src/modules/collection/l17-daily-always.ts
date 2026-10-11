@@ -3,7 +3,7 @@ import type { DB } from '../../infrastructure/database/database.types.js';
 import { loadApprovedCollectionFilterRuntime } from './collection-filter.runtime.js';
 import {
   evaluateCollectionFilter, normalizeCollectionFilterType,
-  normalizeCollectionFilterText,
+  normalizeCollectionFilterText, type CompiledCollectionFilterPolicy,
 } from './collection-filter.engine.js';
 
 interface Candidate {
@@ -24,6 +24,14 @@ interface Candidate {
 const MAX_DELETES=200, MAX_BATCHES=10, MAX_TIME_MS=15000;
 const PAGE_LIMIT=100;
 
+/** The compiled policy normalizes sourceCode to DOU (uppercase).
+ * Never compare its source code to the raw database value 'dou'.
+ */
+export function selectL17AutomaticRules(policy:CompiledCollectionFilterPolicy){
+  return [...policy.rules.values()].filter(r=>
+    r.sourceCode===normalizeCollectionFilterText('dou') && r.mode==='EXCLUDE_ALWAYS');
+}
+
 export async function runL17ExcludeAlways(
   db:Kysely<DB>,logger:{
     info:(data:Record<string,unknown>,message:string)=>void;
@@ -43,8 +51,7 @@ export async function runL17ExcludeAlways(
     if(!source.rows[0])throw new Error('l17_dou_source_missing');
     const runtime=await loadApprovedCollectionFilterRuntime(db,source.rows[0].id);
     if(!runtime)throw new Error('l17_filter_runtime_missing');
-    const rules=[...runtime.policy.rules.values()].filter(r=>
-      r.sourceCode==='dou' && r.mode==='EXCLUDE_ALWAYS');
+    const rules=selectL17AutomaticRules(runtime.policy);
     for(const rule of rules){
       if(batches>=MAX_BATCHES||Date.now()-began>=MAX_TIME_MS)break;
       let cursor:string|null=null,visitedPages=0;
