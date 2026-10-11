@@ -74,7 +74,7 @@ export async function runL17RuleCapStress():Promise<void>{
     assert.equal(plan.byRule.filter(r=>(r as {canonicalType:string}).canonicalType.startsWith('L17 PERF TYPE '))
       .reduce((sum,r)=>sum+r.count,0),records);
     assert.match(plan.token,/^[a-f0-9]{64}$/);
-    console.log('L17_PG18_3000_RULE_PREVIEW_MS='+elapsed);
+    console.log('L17_PG18_3000_RULE_PREVIEW_MS='+elapsed+' ACTIVE_RULES=3000 MATCHED_DOCUMENTS='+records);
     assert.ok(elapsed<30000,'preview exceeded 30 s: '+elapsed+' ms');
   }finally{await app.close();await admin.end();}
 }

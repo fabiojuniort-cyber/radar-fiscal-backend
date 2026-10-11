@@ -500,4 +500,4 @@ test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Re
   }finally{await worker.end();await admin.end();}
 });
 
-test('L17 hotfix PG18: 3000 rules and 1200 archive records, preview <30s',runL17RuleCapStress);
+test('L17 hotfix PG18: 3000 rules and 12000 archive records, preview <30s',runL17RuleCapStress);
