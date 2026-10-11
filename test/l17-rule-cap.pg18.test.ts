@@ -26,7 +26,7 @@ test('L17 hotfix: 3000 active rules and realistic archive preview under 30s',asy
     await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','l17-perf')",[user.user.id]);
     await admin.query(
       "INSERT INTO collection_filter_policies(version,status,approved_at) "+
-      "SELECT COALESCE(max(version),0)+1,'APPROVED',now() FROM collection_filter_policies "+
+      "SELECT COALESCE((SELECT max(version) FROM collection_filter_policies),0)+1,'APPROVED',now() "+
       "WHERE NOT EXISTS(SELECT 1 FROM collection_filter_policies WHERE status='APPROVED')"
     );
     const policy=(await admin.query<{id:string}>(
