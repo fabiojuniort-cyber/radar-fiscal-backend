@@ -48,12 +48,12 @@ export async function runL17ExcludeAlways(
     for(const rule of rules){
       if(batches>=MAX_BATCHES||Date.now()-began>=MAX_TIME_MS)break;
       let cursor:string|null=null,visitedPages=0;
-      const section=normalizeCollectionFilterType(rule.section);
+      const section=normalizeCollectionFilterType(rule.section??'');
       const canonical=normalizeCollectionFilterType(rule.canonicalType);
       const aliasKeys=[...runtime.policy.aliases.entries()]
         .filter(([key,target])=>{
           const [src,sec]=key.split('\0');
-          return src===normalizeCollectionFilterText('dou') && sec===normalizeCollectionFilterText(rule.section)
+          return src===normalizeCollectionFilterText('dou') && sec===normalizeCollectionFilterText(rule.section??'')
             && target===canonical;
         }).map(([key])=>key.split('\0')[2]!).filter(Boolean);
       const typeKeys=[...new Set([canonical,...aliasKeys])];
@@ -128,7 +128,7 @@ export async function runL17ExcludeAlways(
             SELECT public.l17_prune_always_batch(
               ${safeIds}::uuid[],${hashes}::text[],
               ${runtime.policyId}::uuid,${runtime.policyRevision},
-              ${rule.section},${rule.canonicalType}
+              ${rule.section??''},${rule.canonicalType}
             ) AS deleted
           `.execute(trx);
           const deleted=Number(purge.rows[0]?.deleted??-1);
