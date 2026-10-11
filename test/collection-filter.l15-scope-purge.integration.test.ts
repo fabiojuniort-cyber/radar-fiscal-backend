@@ -282,3 +282,60 @@ test('L17: worker-only hidden cleanup protects tenant/cross-source and audits sy
     await admin.end();
   }
 });
+
+test('L17: DO1E RESOLUÇÃO CIT-SNC/MINC matches historical purge and runtime despite generic sourceActType',async()=>{
+  const db=new Pool({connectionString:url,max:1});
+  const app=await buildApp();
+  const tag=randomUUID().slice(0,8);
+  try {
+    const email='l17-specific-'+tag+'@example.test';
+    const registration=await app.inject({method:'POST',url:'/auth/register',payload:{
+      name:'L17 specific type tester',email,company:'L17 test organization',
+      password,confirmPassword:password,acceptedTerms:true,
+    }});
+    assert.equal(registration.statusCode,201,registration.body);
+    const registered=registration.json<{user:{id:string};tenant:{id:string}}>();
+    const login=await app.inject({method:'POST',url:'/auth/login',payload:{email,password}});
+    assert.equal(login.statusCode,200,login.body);
+    const headers={authorization:'Bearer '+login.json<{accessToken:string}>().accessToken,
+      'x-tenant-id':registered.tenant.id};
+    await db.query(
+      "INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','L17_SPECIFIC')",
+      [registered.user.id],
+    );
+    if(!(await db.query("SELECT id FROM collection_filter_policies WHERE status='APPROVED'")).rowCount){
+      await db.query(
+        "INSERT INTO collection_filter_policies(version,status,approved_at,approved_by) "+
+        "VALUES(777,'APPROVED',now(),$1)",[registered.user.id],
+      );
+    }
+    const dou=(await db.query<{id:string}>("SELECT id FROM sources WHERE code='dou' LIMIT 1")).rows[0]!.id;
+    for(let i=0;i<3;i++){
+      const id=(await db.query<{id:string}>(
+        "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,act_type,title,published_on) "+
+        "VALUES($1,'STRONG','{}'::jsonb,'FEDERAL','RESOLUÇÃO CIT-SNC/MINC',$2,'2026-10-09') RETURNING id",
+        [sha(tag+String(i)),'RESOLUÇÃO CIT-SNC/MINC '+i],
+      )).rows[0]!.id;
+      await db.query(
+        "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+        "VALUES($1,$2,$3,'{\"dou\":{\"section\":\"DO1E\",\"sourceActType\":\"Resolução\"}}'::jsonb)",
+        [id,dou,'https://in.gov.br/l17-specific/'+id],
+      );
+      await db.query(
+        "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
+        "VALUES($1,1,$2,'Aprova deliberação administrativa da comissão.',true,'{}'::jsonb)",
+        [id,sha('content'+id)],
+      );
+    }
+    const preview=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers,payload:{sourceCode:'dou',section:'DO1E',
+        canonicalType:'RESOLUCAO CIT SNC MINC',mode:'EXCLUDE_ALWAYS'},
+    });
+    assert.equal(preview.statusCode,200,preview.body);
+    assert.equal(preview.json<{count:number}>().count,3,
+      'canonical specific type must match the three DO1E publications');
+  }finally{
+    await app.close();await db.end();
+  }
+});
