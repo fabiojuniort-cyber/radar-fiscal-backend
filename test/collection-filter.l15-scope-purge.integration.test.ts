@@ -42,6 +42,14 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       [user.user.id],
     );
 
+    // Archive audit capture requires an approved policy; never invent a run.
+    if(!(await db.query("SELECT id FROM collection_filter_policies WHERE status='APPROVED'")).rowCount) {
+      await db.query(
+        "INSERT INTO collection_filter_policies(version,status,approved_at,approved_by) "+
+        "SELECT COALESCE(max(version),0)+1,'APPROVED',now(),$1 FROM collection_filter_policies",
+        [user.user.id],
+      );
+    }
     const src=await db.query<{id:string}>("SELECT id FROM sources WHERE code='dou' LIMIT 1");
     const douId=src.rows[0]?.id??(await db.query<{id:string}>(
       "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
@@ -189,6 +197,17 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       "AND entity_id='OUT_OF_SCOPE' AND after_data->>'deletedCount'='3'",
     );
     assert.ok(Number(audit.rows[0]!.count)>=1,'051 append-only audit required');
+    const archived=await db.query<{id:string;discard_origin:string;archive_publication_id:string;
+      reason_code:string;official_url:string;collection_run_id:string|null}>(
+      "SELECT id,discard_origin,archive_publication_id,reason_code,official_url,collection_run_id "+
+      "FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])",
+      [ids],
+    );
+    assert.equal(archived.rowCount,1,'every physically purged publication gets one archive discard');
+    assert.equal(archived.rows[0]?.discard_origin,'ARCHIVE');
+    assert.equal(archived.rows[0]?.reason_code,'ARCHIVE_PURGE');
+    assert.equal(archived.rows[0]?.collection_run_id,null);
+    assert.ok(archived.rows[0]?.official_url,'official source URL must be preserved');
   } finally {
     await app.close();
     await db.end();
@@ -239,6 +258,12 @@ test('L17: worker-only hidden cleanup protects tenant/cross-source and audits sy
     );
     assert.equal(permission.rows[0]?.app,false);
     assert.equal(permission.rows[0]?.worker,true);
+    if(!(await admin.query("SELECT id FROM collection_filter_policies WHERE status='APPROVED'")).rowCount) {
+      await admin.query(
+        "INSERT INTO collection_filter_policies(version,status,approved_at) "+
+        "SELECT COALESCE(max(version),0)+1,'APPROVED',now() FROM collection_filter_policies"
+      );
+    }
     const dou=(await admin.query<{id:string}>("SELECT id FROM sources WHERE code='dou' LIMIT 1")).rows[0]!.id;
     const other=(await admin.query<{id:string}>(
       "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
@@ -275,6 +300,12 @@ test('L17: worker-only hidden cleanup protects tenant/cross-source and audits sy
       "AND after_data->'deletedIds' ? $1",[safe],
     );
     assert.ok(Number(logged.rows[0]?.count)>=1,'worker purge audit required');
+    const archive=await admin.query<{reason_code:string;discard_origin:string;collection_run_id:string|null}>(
+      'SELECT reason_code,discard_origin,collection_run_id FROM collection_filter_discards WHERE archive_publication_id=$1',
+      [safe],
+    );
+    assert.equal(archive.rowCount,1,'scheduled physical purge must preserve the archive discard');
+    assert.deepEqual(archive.rows[0],{reason_code:'ARCHIVE_PURGE',discard_origin:'ARCHIVE',collection_run_id:null});
     assert.equal((await worker.query<{claimed:boolean}>(
       'SELECT public.l17_claim_hidden_day() AS claimed')).rows[0]?.claimed,false);
   }finally {
