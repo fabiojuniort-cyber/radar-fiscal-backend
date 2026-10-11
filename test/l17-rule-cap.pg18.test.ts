@@ -24,6 +24,11 @@ test('L17 hotfix: 3000 active rules and realistic archive preview under 30s',asy
     const headers={authorization:'Bearer '+login.json<{accessToken:string}>().accessToken,
       'x-tenant-id':user.tenant.id};
     await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','l17-perf')",[user.user.id]);
+    await admin.query(
+      "INSERT INTO collection_filter_policies(version,status,approved_at) "+
+      "SELECT COALESCE(max(version),0)+1,'APPROVED',now() FROM collection_filter_policies "+
+      "WHERE NOT EXISTS(SELECT 1 FROM collection_filter_policies WHERE status='APPROVED')"
+    );
     const policy=(await admin.query<{id:string}>(
       "SELECT id FROM collection_filter_policies WHERE status='APPROVED' LIMIT 1"
     )).rows[0]!.id;
@@ -42,6 +47,11 @@ test('L17 hotfix: 3000 active rules and realistic archive preview under 30s',asy
       "$2||lpad(i::text,4,'0'),'https://l17-benchmark.example.test/'||$1||'/'||i::text "+
       "FROM generate_series(1,$3::integer) i",
       [label,'L17_perf_'+label+'_',records]);
+    await admin.query(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "SELECT 'dou','Diário Oficial','FEDERAL','https://in.gov.br','dou' "+
+      "WHERE NOT EXISTS(SELECT 1 FROM sources WHERE code='dou')"
+    );
     const source=(await admin.query<{id:string}>(
       "SELECT id FROM sources WHERE code='dou' LIMIT 1")).rows[0]!.id;
     await admin.query(
