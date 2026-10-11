@@ -158,23 +158,23 @@ export async function listCollectionFilterNewTypes(
 }
 
 export interface CollectionFilterDiscardReportFilters {
-  sourceCode?: string;
-  origin?: 'COLLECTION' | 'ARCHIVE';
-  section?: string;
-  type?: string;
-  title?: string;
-  actNumber?: string;
-  publishedOn?: string;
-  ruleMode?: string;
-  reasonCode?: string;
-  decisiveTerm?: string;
-  officialUrl?: string;
-  discardedOn?: string;
+  sourceCode?: string | undefined;
+  origin?: 'COLLECTION' | 'ARCHIVE' | undefined;
+  section?: string | undefined;
+  type?: string | undefined;
+  title?: string | undefined;
+  actNumber?: string | undefined;
+  publishedOn?: string | undefined;
+  ruleMode?: string | undefined;
+  reasonCode?: string | undefined;
+  decisiveTerm?: string | undefined;
+  officialUrl?: string | undefined;
+  discardedOn?: string | undefined;
   sortBy?: 'discardedAt'|'origin'|'source'|'section'|'type'|'title'
-    |'actNumber'|'publishedOn'|'ruleMode'|'reasonCode'|'decisiveTerm'|'officialUrl';
-  sortDir?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
+    |'actNumber'|'publishedOn'|'ruleMode'|'reasonCode'|'decisiveTerm'|'officialUrl' | undefined;
+  sortDir?: 'asc' | 'desc' | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 }
 
 export async function listCollectionFilterDiscards(
