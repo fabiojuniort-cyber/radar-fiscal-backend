@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
-import test from 'node:test';
 import {Pool} from 'pg';
 import {buildApp} from '../src/app.js';
 
@@ -8,7 +7,7 @@ const url=process.env.DATABASE_ADMIN_URL;
 if(!url)throw new Error('DATABASE_ADMIN_URL required for PG18');
 const password='L17-Pg18-Stress-Security!';
 
-test('L17 hotfix: 3000 active rules and realistic archive preview under 30s',async()=>{
+export async function runL17RuleCapStress():Promise<void>{
   const admin=new Pool({connectionString:url,max:1});
   const app=await buildApp();
   const label=randomUUID().slice(0,10);
@@ -78,4 +77,4 @@ test('L17 hotfix: 3000 active rules and realistic archive preview under 30s',asy
     console.log('L17_PG18_3000_RULE_PREVIEW_MS='+elapsed);
     assert.ok(elapsed<30000,'preview exceeded 30 s: '+elapsed+' ms');
   }finally{await app.close();await admin.end();}
-});
+}
