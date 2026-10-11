@@ -166,7 +166,7 @@ export async function collectionFilterAdminRoutes(
         'RULE_KEEP','RULE_DELETE','TERM_PUT','TERM_DELETE',
         'ALIAS_PUT','ALIAS_DELETE','NEWTYPE_MERGE','NEWTYPE_KEEP',
       ]),
-      payload:z.record(z.unknown()),
+      payload:z.record(z.string(),z.unknown()),
     })},
   },async(request,reply)=>{
     try {
