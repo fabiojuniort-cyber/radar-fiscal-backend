@@ -275,6 +275,18 @@ BEGIN
 
   DELETE FROM public.publications p WHERE p.id=ANY(p_ids);
   PERFORM pg_catalog.set_config('app.collection_filter_l11_purge','',true);
+ INSERT INTO public.audit_log(
+   tenant_id,actor_type,actor_id,action,entity_type,entity_id,
+   after_data,correlation_id
+ ) VALUES(
+   NULL,'SYSTEM','l17:scheduler','L17_RULE_PURGE','publications',p_type,
+   pg_catalog.jsonb_build_object(
+     'sourceCode','dou','section',p_section,
+     'canonicalType',p_type,'mode','EXCLUDE_ALWAYS',
+     'policyId',p_policy,'policyRevision',p_revision,
+     'deletedCount',v_count,'deletedIds',p_ids
+   ),p_operation
+ );
  RETURN v_count;
 END;
 $$;
