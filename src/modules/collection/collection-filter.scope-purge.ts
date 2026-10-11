@@ -8,49 +8,62 @@ interface ScopeRow {
   scope_updated_at: Date;
   has_company: boolean;
   has_other_source: boolean;
+  out_of_scope: boolean;
+  hidden_legacy: boolean;
 }
 
 export interface OutOfScopePreview {
   count: number;
+  outOfScope: number;
+  hiddenLegacy: number;
   blockedCompany: number;
   blockedOtherSource: number;
   token: string;
 }
 
 async function scopeCandidates(trx: Transaction<DB>) {
-  const hash = createHash('sha256').update('L15:DOU:OUT_OF_SCOPE:v1');
+  const hash = createHash('sha256').update('L17:DOU:SCOPE_OR_HIDDEN:v1');
   const ids: string[] = [];
   let cursor: string | null = null, blockedCompany = 0, blockedOtherSource = 0;
+  let outOfScope=0, hiddenLegacy=0;
   let pageNo = 0;
   while (true) {
     if (++pageNo > 10000) throw new Error('l15_paging_cap');
     const page = await sql<ScopeRow>`
-      SELECT * FROM public.l15_out_of_scope_candidates(${cursor}::uuid,500)
+      SELECT * FROM public.l17_cleanup_candidates(${cursor}::uuid,500)
     `.execute(trx);
     if (!page.rows.length) break;
     for (const row of page.rows) {
       hash.update(row.publication_id)
         .update(new Date(row.scope_updated_at).toISOString())
+        .update(row.out_of_scope ? 'S' : '-')
+        .update(row.hidden_legacy ? 'H' : '-')
         .update(row.has_company ? 'C' : '-')
         .update(row.has_other_source ? 'O' : '-');
       if (row.has_company) blockedCompany++;
       else if (row.has_other_source) blockedOtherSource++;
-      else ids.push(row.publication_id);
+      else {
+        ids.push(row.publication_id);
+        if(row.out_of_scope) outOfScope++;
+        else if(row.hidden_legacy) hiddenLegacy++;
+        else throw new Error('l17_missing_cleanup_reason');
+      }
     }
     cursor = page.rows[page.rows.length - 1]!.publication_id;
     if (page.rows.length < 500) break;
   }
-  hash.update(String(blockedCompany)).update(String(blockedOtherSource));
+  hash.update(String(blockedCompany)).update(String(blockedOtherSource))
+    .update(String(outOfScope)).update(String(hiddenLegacy));
   return { ids, blockedCompany, blockedOtherSource,
-    count: ids.length, token: hash.digest('hex') };
+    count: ids.length, outOfScope, hiddenLegacy, token: hash.digest('hex') };
 }
 
 export async function previewOutOfScopePurge(db: Kysely<DB>, actor: string):
   Promise<OutOfScopePreview> {
   return withUserContext(db, actor, async trx => {
-    const { count, blockedCompany, blockedOtherSource, token } =
+    const { count, outOfScope, hiddenLegacy, blockedCompany, blockedOtherSource, token } =
       await scopeCandidates(trx);
-    return { count, blockedCompany, blockedOtherSource, token };
+    return { count, outOfScope, hiddenLegacy, blockedCompany, blockedOtherSource, token };
   });
 }
 
@@ -76,6 +89,7 @@ export async function confirmOutOfScopePurge(
     const plan = await scopeCandidates(trx);
     if (plan.count !== expectedCount || plan.token !== previewToken) {
       return { changed: true, count: plan.count,
+        outOfScope: plan.outOfScope, hiddenLegacy: plan.hiddenLegacy,
         blockedCompany: plan.blockedCompany,
         blockedOtherSource: plan.blockedOtherSource,
         token: plan.token, apagadas: 0, restantes: plan.count, deletedCount: 0 };
@@ -85,7 +99,7 @@ export async function confirmOutOfScopePurge(
     for (let offset = 0; offset < Math.min(500, plan.ids.length); offset += 100) {
       const batch = plan.ids.slice(offset, offset + 100);
       const result = await sql<{ count: number }>`
-        SELECT public.l15_out_of_scope_purge_batch(${batch}::uuid[],${operation}::uuid)
+        SELECT public.l17_cleanup_admin_batch(${batch}::uuid[],${operation}::uuid)
           AS count
       `.execute(trx);
       if (Number(result.rows[0]?.count) !== batch.length) {
@@ -96,6 +110,7 @@ export async function confirmOutOfScopePurge(
     // If 0 candidates, never invoke the purge function with an empty batch.
     const current = await scopeCandidates(trx);
     return { changed: false, apagadas, restantes: current.count,
+      outOfScope: current.outOfScope, hiddenLegacy: current.hiddenLegacy,
       deletedCount: apagadas, blockedCompany: current.blockedCompany,
       blockedOtherSource: current.blockedOtherSource };
   });

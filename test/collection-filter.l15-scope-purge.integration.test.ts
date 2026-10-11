@@ -93,6 +93,53 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       }
     }
 
+    // L-17: legacy-hidden fixture variants (synthetic isolated PostgreSQL).
+    // Every origin is seeded before SUPPRESS, preserving migration 033 RESTORE.
+    const hiddenKinds=['hidden','hidden-company','hidden-other','hidden-scope','hidden-non-dou'];
+    const hiddenIds:Record<string,string>={};
+    for(const kind of hiddenKinds) {
+      const id=(await db.query<{id:string}>(
+        "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+        "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',"+
+        "'AVISO DE LICITAÇÃO',$2,$3) RETURNING id",
+        [sha(label+kind),'Aviso de licitação '+kind,'https://l17.example.test/'+kind+'/'+label],
+      )).rows[0]!.id;
+      hiddenIds[kind]=id;
+      if(kind!=='hidden-non-dou')await db.query(
+        'INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)',
+        [id,douId,'https://l17-dou.example.test/'+id],
+      );
+      if(kind==='hidden-other'||kind==='hidden-non-dou')await db.query(
+        'INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)',
+        [id,otherId,'https://l17-other.example.test/'+id],
+      );
+      if(kind==='hidden-scope') {
+        const event=(await db.query<{id:string}>(
+          "INSERT INTO publication_scope_events(publication_id,operation_id,action,previous_scope,"+
+          "new_scope,policy_key,reason_code,rule_version,evidence_sha256,actor_ref) "+
+          "VALUES($1,$2,'SUPPRESS','IN_SCOPE','OUT_OF_SCOPE','L17_TEST','TEST','1',$3,'l17') RETURNING id",
+          [id,randomUUID(),sha('hiddenScope'+id)],
+        )).rows[0]!.id;
+        await db.query(
+          "INSERT INTO publication_scope_state(publication_id,scope,current_event_id,policy_key,evidence_sha256) "+
+          "VALUES($1,'OUT_OF_SCOPE',$2,'L17_TEST',$3)",
+          [id,event,sha('hiddenScope'+id)],
+        );
+      }
+      if(kind==='hidden-company') {
+        const company=(await db.query<{id:string}>(
+          "INSERT INTO companies(tenant_id,legal_name,head_office_cnpj) VALUES($1,$2,$3) RETURNING id",
+          [user.tenant.id,'Protected hidden '+label,'13'+String(Math.floor(Math.random()*1e12)).padStart(12,'0')],
+        )).rows[0]!.id;
+        await db.query(
+          'INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)',[company,id],
+        );
+      }
+    }
+    const hiddenFlag=await db.query<{is_hidden:boolean}>(
+      'SELECT is_hidden FROM publications WHERE id=$1',[hiddenIds.hidden]);
+    assert.equal(hiddenFlag.rows[0]?.is_hidden,true,'migration 029 generated legacy flag preserved');
+
     // Diagnostic assertions: independently verify the fixture before using
     // the authenticated API. These identify missing state versus missing DOU
     // provenance, without changing the preview implementation.
@@ -105,11 +152,13 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(stateRows.rows.find(r=>r.publication_id===ids[0])?.scope,'OUT_OF_SCOPE','eligible scope');
         const preview=await app.inject({method:'POST',url:previewRoute,headers});
     assert.equal(preview.statusCode,200,preview.body);
-    const plan=preview.json<{count:number;blockedCompany:number;
+    const plan=preview.json<{count:number;outOfScope:number;hiddenLegacy:number;blockedCompany:number;
       blockedOtherSource:number;token:string}>();
-    assert.equal(plan.count,1);
-    assert.equal(plan.blockedCompany,1);
-    assert.equal(plan.blockedOtherSource,1);
+    assert.equal(plan.count,3);
+    assert.equal(plan.outOfScope,2);
+    assert.equal(plan.hiddenLegacy,1);
+    assert.equal(plan.blockedCompany,2);
+    assert.equal(plan.blockedOtherSource,2);
     assert.match(plan.token,/^[a-f0-9]{64}$/);
 
     const rejected=await app.inject({method:'POST',url:confirmRoute,headers,
@@ -119,18 +168,25 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(rejected.json<{changed:boolean;apagadas:number}>().apagadas,0);
 
     const applied=await app.inject({method:'POST',url:confirmRoute,headers,
-      payload:{expectedCount:1,previewToken:plan.token}});
+      payload:{expectedCount:3,previewToken:plan.token}});
     assert.equal(applied.statusCode,200,applied.body);
-    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,1);
+    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,3);
     assert.equal(applied.json<{apagadas:number;restantes:number}>().restantes,0);
     const present=await db.query<{id:string}>(
       'SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids],
     );
     assert.deepEqual(new Set(present.rows.map(x=>x.id)),new Set(ids.slice(1)));
+    const hiddenRemaining=await db.query<{id:string}>(
+      'SELECT id FROM publications WHERE id=ANY($1::uuid[])',
+      [Object.values(hiddenIds)],
+    );
+    assert.deepEqual(new Set(hiddenRemaining.rows.map(x=>x.id)),new Set([
+      hiddenIds['hidden-company'],hiddenIds['hidden-other'],hiddenIds['hidden-non-dou'],
+    ]));
     const audit=await db.query<{count:string}>(
       "SELECT count(*)::text AS count FROM audit_log "+
       "WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
-      "AND entity_id='OUT_OF_SCOPE' AND after_data->>'deletedCount'='1'",
+      "AND entity_id='OUT_OF_SCOPE' AND after_data->>'deletedCount'='3'",
     );
     assert.ok(Number(audit.rows[0]!.count)>=1,'051 append-only audit required');
   } finally {
