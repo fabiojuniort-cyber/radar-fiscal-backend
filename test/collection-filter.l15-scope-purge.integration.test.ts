@@ -144,6 +144,33 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
         );
       }
     }
+    // A hidden publication with complete legal evidence and an explicit
+    // EXCLUDE_ALWAYS rule belongs to RULE, not also to LEGACY_HIDDEN.
+    const approved=(await db.query<{id:string}>(
+      "SELECT id FROM collection_filter_policies WHERE status='APPROVED' LIMIT 1")).rows[0]!.id;
+    await db.query(
+      "INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) "+
+      "VALUES($1,'dou','DO3','AVISO DE LICITACAO','EXCLUDE_ALWAYS') "+
+      "ON CONFLICT (policy_id,source_code,section,canonical_type) DO UPDATE SET mode=EXCLUDED.mode",
+      [approved],
+    );
+    const hiddenRuleId=(await db.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',"+
+      "'AVISO DE LICITAÇÃO','Aviso de licitação regra explícita',$2) RETURNING id",
+      [sha(label+'hidden-rule'),'https://l17-dou.example.test/rule/'+label],
+    )).rows[0]!.id;
+    hiddenIds['hidden-rule']=hiddenRuleId;
+    await db.query(
+      "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+      "VALUES($1,$2,$3,'{\"dou\":{\"section\":\"DO3\"}}'::jsonb)",
+      [hiddenRuleId,douId,'https://l17-dou.example.test/rule/'+hiddenRuleId],
+    );
+    await db.query(
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current) "+
+      "VALUES($1,1,$2,'Objeto meramente administrativo sem tributos.',true)",
+      [hiddenRuleId,sha('hidden-rule-body'+hiddenRuleId)],
+    );
     const hiddenFlag=await db.query<{is_hidden:boolean}>(
       'SELECT is_hidden FROM publications WHERE id=$1',[hiddenIds.hidden]);
     assert.equal(hiddenFlag.rows[0]?.is_hidden,true,'migration 029 generated legacy flag preserved');
@@ -160,10 +187,12 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(stateRows.rows.find(r=>r.publication_id===ids[0])?.scope,'OUT_OF_SCOPE','eligible scope');
         const preview=await app.inject({method:'POST',url:previewRoute,headers});
     assert.equal(preview.statusCode,200,preview.body);
-    const plan=preview.json<{count:number;outOfScope:number;hiddenLegacy:number;blockedCompany:number;
+    const plan=preview.json<{count:number;outOfScope:number;ruleDiscards:number;byRule:Array<{count:number}>;hiddenLegacy:number;blockedCompany:number;
       blockedOtherSource:number;token:string}>();
-    assert.equal(plan.count,3);
+    assert.equal(plan.count,4);
     assert.equal(plan.outOfScope,2);
+    assert.equal(plan.ruleDiscards,1);
+    assert.equal(plan.byRule.reduce((n,r)=>n+r.count,0),1);
     assert.equal(plan.hiddenLegacy,1);
     assert.equal(plan.blockedCompany,2);
     assert.equal(plan.blockedOtherSource,3);
@@ -176,9 +205,9 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(rejected.json<{changed:boolean;apagadas:number}>().apagadas,0);
 
     const applied=await app.inject({method:'POST',url:confirmRoute,headers,
-      payload:{expectedCount:3,previewToken:plan.token}});
+      payload:{expectedCount:4,previewToken:plan.token}});
     assert.equal(applied.statusCode,200,applied.body);
-    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,3);
+    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,4);
     assert.equal(applied.json<{apagadas:number;restantes:number}>().restantes,0);
     const present=await db.query<{id:string}>(
       'SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids],
@@ -191,7 +220,7 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.deepEqual(new Set(hiddenRemaining.rows.map(x=>x.id)),new Set([
       hiddenIds['hidden-company'],hiddenIds['hidden-other'],hiddenIds['hidden-non-dou'],
     ]));
-    const removedIds=[ids[0]!,hiddenIds.hidden!,hiddenIds['hidden-scope']!];
+    const removedIds=[ids[0]!,hiddenIds.hidden!,hiddenIds['hidden-scope']!,hiddenRuleId];
     const audit=await db.query<{deleted:string}>(
       "SELECT COALESCE(sum((after_data->>'deletedCount')::integer),0)::text AS deleted "+
       "FROM audit_log a WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
@@ -199,14 +228,14 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       "WHERE d.id::uuid=ANY($1::uuid[]))",
       [removedIds],
     );
-    assert.equal(Number(audit.rows[0]?.deleted),3,'051 append-only audit per committed sub-batch');
+    assert.equal(Number(audit.rows[0]?.deleted),4,'051 append-only audit per committed sub-batch');
     const archived=await db.query<{id:string;discard_origin:string;archive_publication_id:string;
       reason_code:string;official_url:string;collection_run_id:string|null}>(
       "SELECT id,discard_origin,archive_publication_id,reason_code,official_url,collection_run_id "+
       "FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])",
       [removedIds],
     );
-    assert.equal(archived.rowCount,3,'every physically purged publication gets one archive discard');
+    assert.equal(archived.rowCount,4,'every physically purged publication gets one archive discard');
     for(const row of archived.rows){
       assert.equal(row.discard_origin,'ARCHIVE');
       assert.equal(row.reason_code,'ARCHIVE_PURGE');
