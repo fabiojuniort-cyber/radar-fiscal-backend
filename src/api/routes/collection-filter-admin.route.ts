@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
 import {previewDirectFilterRule,confirmDirectFilterRule} from '../../modules/collection/collection-filter.direct.js';
 import {editActiveCollectionFilter} from '../../modules/collection/collection-filter.direct-admin.js';
+import { previewOutOfScopePurge, confirmOutOfScopePurge } from '../../modules/collection/collection-filter.scope-purge.js';
 import {
   listCollectionFilterDiscardAlerts,
   listCollectionFilterDiscards,
@@ -153,6 +154,36 @@ export async function collectionFilterAdminRoutes(
       return reply.send(result);
     } catch (error) {
       if (error instanceof RangeError) return reply.status(400).send({error:error.message});
+      throw error;
+    }
+  });
+
+
+  // L-15: global admin only, DOU OUT_OF_SCOPE only. Preview has a token
+  // bound to all current candidate IDs, updated scopes and protections.
+  typed.post('/api/v1/admin/collection-filter/out-of-scope/preview', {
+    preHandler: requirePlatformAdmin,
+  }, async (request, reply) => reply.send(
+    await previewOutOfScopePurge(app.db, request.auth!.userId)
+  ));
+
+  typed.post('/api/v1/admin/collection-filter/out-of-scope/confirm', {
+    preHandler: requirePlatformAdmin,
+    schema: { body: z.object({
+      expectedCount: z.number().int().nonnegative(),
+      previewToken: z.string().regex(/^[a-f0-9]{64}$/),
+    }) },
+  }, async (request, reply) => {
+    try {
+      return reply.send(await confirmOutOfScopePurge(
+        app.db, request.auth!.userId,
+        request.body.expectedCount, request.body.previewToken,
+      ));
+    } catch (error) {
+      if (error instanceof RangeError) return reply.status(400).send({error:error.message});
+      const code = (error as {code?:string}).code;
+      if (code==='42501') return reply.status(403).send({error:'platform_admin_required'});
+      if (code==='P0001') return reply.status(409).send({error:'l15_candidates_changed'});
       throw error;
     }
   });
