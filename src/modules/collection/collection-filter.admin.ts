@@ -157,44 +157,93 @@ export async function listCollectionFilterNewTypes(
   });
 }
 
+export interface CollectionFilterDiscardReportFilters {
+  sourceCode?: string | undefined;
+  origin?: 'COLLECTION' | 'ARCHIVE' | undefined;
+  section?: string | undefined;
+  type?: string | undefined;
+  title?: string | undefined;
+  actNumber?: string | undefined;
+  publishedOn?: string | undefined;
+  ruleMode?: string | undefined;
+  reasonCode?: string | undefined;
+  decisiveTerm?: string | undefined;
+  officialUrl?: string | undefined;
+  discardedOn?: string | undefined;
+  sortBy?: 'discardedAt'|'origin'|'source'|'section'|'type'|'title'
+    |'actNumber'|'publishedOn'|'ruleMode'|'reasonCode'|'decisiveTerm'|'officialUrl' | undefined;
+  sortDir?: 'asc' | 'desc' | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+}
+
 export async function listCollectionFilterDiscards(
   db: Kysely<DB>,
   userId: string,
-  options: {
-    sourceCode?: string | undefined;
-    limit?: number | undefined;
-    offset?: number | undefined;
-  } = {},
+  options: CollectionFilterDiscardReportFilters = {},
 ) {
   return withUserContext(db, userId, async (trx) => {
     const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
     const offset = Math.max(options.offset ?? 0, 0);
-    const sourceCode = options.sourceCode?.trim().toLowerCase() || null;
-    const result = await sql<any>`
-      SELECT
-        d.id,
-        d.source_code,
-        d.connector_key,
-        d.section,
-        d.raw_type,
-        d.canonical_type,
-        d.title,
-        d.act_number,
-        d.published_on,
-        d.official_url,
-        d.reason_code,
-        d.decisive_term,
-        d.policy_version,
-        d.policy_revision,
-        d.discarded_at,
-        d.expires_at
-      FROM collection_filter_discards d
-      WHERE (${sourceCode}::text IS NULL OR d.source_code=${sourceCode})
-      ORDER BY d.discarded_at DESC,d.id DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `.execute(trx);
-    return result.rows;
+    const like = (value: string | undefined) =>
+      value?.trim() ? '%' + value.trim() + '%' : null;
+    const sourceCode = like(options.sourceCode);
+    const origin = options.origin ?? null;
+    const section = like(options.section);
+    const type = like(options.type);
+    const title = like(options.title);
+    const actNumber = like(options.actNumber);
+    const publishedOn = options.publishedOn || null;
+    const ruleMode = like(options.ruleMode);
+    const reasonCode = like(options.reasonCode);
+    const decisiveTerm = like(options.decisiveTerm);
+    const officialUrl = like(options.officialUrl);
+    const discardedOn = options.discardedOn || null;
+
+    const criteria = sql`
+      WHERE (${sourceCode}::text IS NULL OR d.source_code ILIKE ${sourceCode})
+        AND (${origin}::text IS NULL OR d.discard_origin=${origin})
+        AND (${section}::text IS NULL OR d.section ILIKE ${section})
+        AND (${type}::text IS NULL OR COALESCE(d.canonical_type,d.raw_type,'') ILIKE ${type})
+        AND (${title}::text IS NULL OR d.title ILIKE ${title})
+        AND (${actNumber}::text IS NULL OR d.act_number ILIKE ${actNumber})
+        AND (${publishedOn}::text IS NULL OR d.published_on=${publishedOn}::date)
+        AND (${ruleMode}::text IS NULL OR
+          COALESCE(d.rule_mode,d.archive_policy_rule,'') ILIKE ${ruleMode})
+        AND (${reasonCode}::text IS NULL OR d.reason_code ILIKE ${reasonCode})
+        AND (${decisiveTerm}::text IS NULL OR d.decisive_term ILIKE ${decisiveTerm})
+        AND (${officialUrl}::text IS NULL OR d.official_url ILIKE ${officialUrl})
+        AND (${discardedOn}::text IS NULL OR
+          (d.discarded_at AT TIME ZONE 'America/Sao_Paulo')::date=${discardedOn}::date)
+    `;
+    const orderColumns: Record<NonNullable<CollectionFilterDiscardReportFilters['sortBy']>,string> = {
+      discardedAt:'d.discarded_at',origin:'d.discard_origin',
+      source:'d.source_code',section:'d.section',
+      type:'d.canonical_type',title:'d.title',actNumber:'d.act_number',
+      publishedOn:'d.published_on',ruleMode:'d.rule_mode',
+      reasonCode:'d.reason_code',decisiveTerm:'d.decisive_term',
+      officialUrl:'d.official_url',
+    };
+    const order = sql.raw(orderColumns[options.sortBy ?? 'discardedAt']);
+    const direction = sql.raw(options.sortDir === 'asc' ? 'ASC' : 'DESC');
+    const [count, rows] = await Promise.all([
+      sql<{total:string}>`
+        SELECT count(*)::text AS total FROM public.collection_filter_discards d
+        ${criteria}`.execute(trx),
+      sql<Record<string,unknown>>`
+        SELECT d.id,d.source_code,d.connector_key,d.section,
+          d.raw_type,d.canonical_type,d.title,d.act_number,d.published_on,
+          d.official_url,d.reason_code,d.decisive_term,d.policy_id,
+          d.policy_version,d.policy_revision,d.discarded_at,d.expires_at,
+          d.discard_origin,d.archive_publication_id,d.rule_mode,
+          d.archive_policy_rule,d.collection_run_id
+        FROM public.collection_filter_discards d
+        ${criteria}
+        ORDER BY ${order} ${direction} NULLS LAST,d.id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `.execute(trx),
+    ]);
+    return { items: rows.rows, total: Number(count.rows[0]?.total ?? 0) };
   });
 }
 

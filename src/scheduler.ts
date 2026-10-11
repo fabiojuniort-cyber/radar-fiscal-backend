@@ -7,6 +7,7 @@ import {
 import { Pool } from 'pg';
 import { sql } from 'kysely';
 import { pruneCollectionItems } from './modules/operations/collection-items-retention.js';
+import { runL17ExcludeAlways } from './modules/collection/l17-daily-always.js';
 
 import { processLogger } from './infrastructure/logging/process-logger.js';
 import { runCapacitySnapshotIfDue } from './modules/operations/db-capacity.js';
@@ -86,6 +87,53 @@ async function runRetentionIfDue(
       deletedItems,batches,
       error: error instanceof Error ? error.message : 'unknown',
     }, 'L10 collection_items retention failed');
+  }
+}
+
+// L-17: independent daily claim and very short batches. Run before L-10
+// so the collection_items backlog cannot starve new hidden publications.
+// Reuse L-10 activation flag; no additional on/off toggle.
+const HIDDEN_BATCH_SIZE=20;
+const HIDDEN_MAX_BATCHES=10;
+const HIDDEN_MAX_ELAPSED_MS=15_000;
+
+async function runHiddenIfDue(
+  db: ReturnType<typeof createStandaloneDatabase>,now:Date,
+):Promise<void> {
+  if(!retentionEnabled||!isCronDue(RETENTION_CRON,now,RETENTION_ZONE))return;
+  const claim=await sql<{claimed:boolean}>`
+    SELECT public.l17_claim_hidden_day() AS claimed
+  `.execute(db);
+  if(!claim.rows[0]?.claimed)return;
+  const began=Date.now();
+  let deletedPublications=0,batches=0;
+  try {
+    while(batches<HIDDEN_MAX_BATCHES && Date.now()-began<HIDDEN_MAX_ELAPSED_MS) {
+      const result=await sql<{deleted:number}>`
+        SELECT public.l17_prune_hidden_batch(${HIDDEN_BATCH_SIZE}) AS deleted
+      `.execute(db);
+      const deleted=Number(result.rows[0]?.deleted??0);
+      if(!Number.isSafeInteger(deleted)||deleted<0||deleted>HIDDEN_BATCH_SIZE) {
+        throw new Error('l17_invalid_deleted_count');
+      }
+      if(deleted===0)break;
+      deletedPublications+=deleted;batches++;
+    }
+    await sql`SELECT public.l17_finish_hidden_day(
+      ${deletedPublications},${batches},true
+    )`.execute(db);
+    processLogger.info({
+      deletedPublications,batches,maxPerBatch:HIDDEN_BATCH_SIZE,
+      maxBatches:HIDDEN_MAX_BATCHES,elapsedMs:Date.now()-began,
+    },'L17 daily hidden publications cleanup completed');
+  }catch(error){
+    await sql`SELECT public.l17_finish_hidden_day(
+      ${deletedPublications},${batches},false
+    )`.execute(db).catch(()=>{});
+    processLogger.error({
+      deletedPublications,batches,
+      error:error instanceof Error?error.message:'unknown',
+    },'L17 daily hidden publications cleanup failed');
   }
 }
 
@@ -200,6 +248,10 @@ async function run(): Promise<void> {
         }
 
         try {
+          if(retentionEnabled && isCronDue(RETENTION_CRON,now,RETENTION_ZONE)) {
+            await runL17ExcludeAlways(db,processLogger);
+          }
+          await runHiddenIfDue(db, now);
           await runRetentionIfDue(db, now);
         } catch (error) {
           processLogger.error({

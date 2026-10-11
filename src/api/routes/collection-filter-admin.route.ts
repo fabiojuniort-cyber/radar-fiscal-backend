@@ -62,20 +62,31 @@ export async function collectionFilterAdminRoutes(
       preHandler: requirePlatformAdmin,
       schema: {
         querystring: z.object({
-          sourceCode: z.string().trim().min(1).max(100).optional(),
+          sourceCode: z.string().trim().max(100).optional(),
+          origin: z.enum(['COLLECTION','ARCHIVE']).optional(),
+          section: z.string().max(100).optional(),
+          type: z.string().max(150).optional(),
+          title: z.string().max(250).optional(),
+          actNumber: z.string().max(100).optional(),
+          publishedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          ruleMode: z.string().max(100).optional(),
+          reasonCode: z.string().max(100).optional(),
+          decisiveTerm: z.string().max(100).optional(),
+          officialUrl: z.string().max(250).optional(),
+          discardedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          sortBy: z.enum(['discardedAt','origin','source','section','type','title',
+            'actNumber','publishedOn','ruleMode','reasonCode','decisiveTerm','officialUrl'])
+            .default('discardedAt'),
+          sortDir: z.enum(['asc','desc']).default('desc'),
           limit: z.coerce.number().int().min(1).max(500).default(100),
           offset: z.coerce.number().int().min(0).default(0),
         }),
       },
     },
     async (request, reply) =>
-      reply.send({
-        items: await listCollectionFilterDiscards(
-          app.db,
-          request.auth!.userId,
-          request.query,
-        ),
-      }),
+      reply.send(await listCollectionFilterDiscards(
+        app.db,request.auth!.userId,request.query,
+      )),
   );
 
   typed.get(
