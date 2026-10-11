@@ -224,3 +224,61 @@ test('L10: index-backed dry-run and least-privilege batch without manual deletio
     assert.equal(ledger.rows[0]!.exists,true);
   } finally { await db.end(); }
 });
+
+test('L17: worker-only hidden cleanup protects tenant/cross-source and audits synthetic batch',async()=>{
+  const admin=new Pool({connectionString:url,max:1});
+  const workerUrl=new URL(url);
+  workerUrl.username='radar_worker_runtime';
+  workerUrl.password=process.env.DB_WORKER_RUNTIME_PASSWORD??'';
+  const worker=new Pool({connectionString:workerUrl.toString(),max:1});
+  const label=randomUUID().slice(0,10);
+  try {
+    const permission=await admin.query<{app:boolean;worker:boolean}>(
+      "SELECT has_function_privilege('radar_app','public.l17_prune_hidden_batch(integer)','EXECUTE') AS app,"+
+      "has_function_privilege('radar_worker','public.l17_prune_hidden_batch(integer)','EXECUTE') AS worker"
+    );
+    assert.equal(permission.rows[0]?.app,false);
+    assert.equal(permission.rows[0]?.worker,true);
+    const dou=(await admin.query<{id:string}>("SELECT id FROM sources WHERE code='dou' LIMIT 1")).rows[0]!.id;
+    const other=(await admin.query<{id:string}>(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "VALUES($1,'L17 other','FEDERAL','https://other.example.test',$1) RETURNING id",
+      ['l17-auto-'+label],
+    )).rows[0]!.id;
+    const safe=(await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL','AVISO DE LICITAÇÃO','Synthetic worker eligible') RETURNING id",
+      [sha(label+'safe')],
+    )).rows[0]!.id;
+    const cross=(await admin.query<{id:string}>(
+      "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+      "act_type,title) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL','AVISO DE LICITAÇÃO','Synthetic worker cross-source') RETURNING id",
+      [sha(label+'cross')],
+    )).rows[0]!.id;
+    for(const id of [safe,cross])await admin.query(
+      'INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)',
+      [id,dou,'https://l17-auto.example.test/'+id],
+    );
+    await admin.query(
+      'INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)',
+      [cross,other,'https://l17-cross.example.test/'+cross],
+    );
+    const removed=await worker.query<{deleted:number}>(
+      'SELECT public.l17_prune_hidden_batch(20) AS deleted');
+    assert.equal(removed.rows[0]?.deleted,1);
+    const still=await admin.query<{id:string}>(
+      'SELECT id FROM publications WHERE id=ANY($1::uuid[])',[[safe,cross]]);
+    assert.deepEqual(still.rows.map(r=>r.id),[cross]);
+    const logged=await admin.query<{count:string}>(
+      "SELECT count(*)::text AS count FROM audit_log WHERE action='L17_HIDDEN_PURGE' "+
+      "AND actor_type='SYSTEM' AND after_data->>'deletedCount'='1' "+
+      "AND after_data->'deletedIds' ? $1",[safe],
+    );
+    assert.ok(Number(logged.rows[0]?.count)>=1,'worker purge audit required');
+    assert.equal((await worker.query<{claimed:boolean}>(
+      'SELECT public.l17_claim_hidden_day() AS claimed')).rows[0]?.claimed,false);
+  }finally {
+    await worker.end();
+    await admin.end();
+  }
+});
