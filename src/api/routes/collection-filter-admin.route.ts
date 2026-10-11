@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
 import {previewDirectFilterRule,confirmDirectFilterRule} from '../../modules/collection/collection-filter.direct.js';
+import {editActiveCollectionFilter} from '../../modules/collection/collection-filter.direct-admin.js';
 import {
   listCollectionFilterDiscardAlerts,
   listCollectionFilterDiscards,
@@ -152,6 +153,32 @@ export async function collectionFilterAdminRoutes(
       return reply.send(result);
     } catch (error) {
       if (error instanceof RangeError) return reply.status(400).send({error:error.message});
+      throw error;
+    }
+  });
+
+  // Non-destructive direct edits. Discarding type/mode changes MUST use
+  // /direct-rule/preview and /direct-rule/confirm instead.
+  typed.post('/api/v1/admin/collection-filter/direct-admin-edit', {
+    preHandler: requirePlatformAdmin,
+    schema:{body:z.object({
+      action:z.enum([
+        'RULE_KEEP','RULE_DELETE','TERM_PUT','TERM_DELETE',
+        'ALIAS_PUT','ALIAS_DELETE','NEWTYPE_MERGE','NEWTYPE_KEEP',
+      ]),
+      payload:z.record(z.string(),z.unknown()),
+    })},
+  },async(request,reply)=>{
+    try {
+      return reply.send(await editActiveCollectionFilter(
+        app.db,request.auth!.userId,request.body.action,request.body.payload
+      ));
+    } catch(error) {
+      const code=(error as {code?:string}).code;
+      if(code==='22023')return reply.status(400).send({error:'invalid_direct_admin_edit'});
+      if(code==='P0001'||code==='23505')
+        return reply.status(409).send({error:'direct_admin_edit_conflict'});
+      if(code==='42501')return reply.status(403).send({error:'platform_admin_required'});
       throw error;
     }
   });
