@@ -7,6 +7,7 @@ import {
 import { Pool } from 'pg';
 import { sql } from 'kysely';
 import { pruneCollectionItems } from './modules/operations/collection-items-retention.js';
+import { runL17ExcludeAlways } from './modules/collection/l17-daily-always.js';
 
 import { processLogger } from './infrastructure/logging/process-logger.js';
 import { runCapacitySnapshotIfDue } from './modules/operations/db-capacity.js';
@@ -247,6 +248,9 @@ async function run(): Promise<void> {
         }
 
         try {
+          if(retentionEnabled && isCronDue(RETENTION_CRON,now,RETENTION_ZONE)) {
+            await runL17ExcludeAlways(db,processLogger);
+          }
           await runHiddenIfDue(db, now);
           await runRetentionIfDue(db, now);
         } catch (error) {
