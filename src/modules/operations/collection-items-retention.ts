@@ -1,7 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 
-export const COLLECTION_ITEM_RETENTION_DAYS = 30;
+export const COLLECTION_ITEM_RETENTION_DAYS = 7;
 export const COLLECTION_ITEM_PRUNE_BATCH_SIZE = 100;
 export const COLLECTION_ITEM_PRUNE_MAX_BATCHES = 10;
 
