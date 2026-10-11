@@ -1,3 +1,4 @@
+import {runL17RuleCapStress} from './l17-rule-cap.pg18.test.js';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import test from 'node:test';
@@ -498,3 +499,5 @@ test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Re
     assert.equal(Number(audit.rows[0]?.n),1);
   }finally{await worker.end();await admin.end();}
 });
+
+test('L17 hotfix PG18: 3000 rules and 12000 archive records, preview <30s',runL17RuleCapStress);

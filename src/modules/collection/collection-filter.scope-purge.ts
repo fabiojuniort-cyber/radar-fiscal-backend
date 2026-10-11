@@ -2,7 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
-import { candidates, type DirectRuleInput } from './collection-filter.direct.js';
+import { type DirectRuleInput } from './collection-filter.direct.js';
+import { loadApprovedCollectionFilterRuntime } from './collection-filter.runtime.js';
+import { evaluateCollectionFilter, normalizeCollectionFilterType, normalizeCollectionFilterText } from './collection-filter.engine.js';
 
 interface ScopeRow {
   publication_id: string;
@@ -33,18 +35,52 @@ const ORDER:Record<Bucket,number>={OUT_OF_SCOPE:0,RULE:1,HIDDEN:2};
 // One published decision policy: direct historical candidate selection reuses
 // EXACTLY the compiled TypeScript filter engine (including strong/weak terms).
 // Scope wins over rule, rule wins over legacy hidden; count each ID once.
+/** Enumerate the entire active DOU policy once per preview. Never impose
+ * a rule-count cap. The SQL evidence adapter is paginated by section and by
+ * <=200 type keys (its own safety limit is 1000 keys); the SAME compiled
+ * runtime engine makes every conditional KEEP/DISCARD decision.
+ *
+ * The pagination cap is on archive size, NOT configured policy size, and
+ * fails loudly rather than silently truncating results.
+ */
 async function scopeCandidates(trx: Transaction<DB>) {
-  const hash=createHash('sha256').update('L17:DOU:ALL_DECISIONS:v2');
-  const seen=new Map<string,Match>();
-  const rules=await sql<RuleRow>`
-    SELECT r.source_code,r.section,r.canonical_type,r.mode
-    FROM public.collection_filter_type_rules r
-    JOIN public.collection_filter_policies p ON p.id=r.policy_id
-    WHERE p.status='APPROVED' AND r.source_code='dou'
-      AND r.mode IN ('EXCLUDE_ALWAYS','EXCLUDE_UNLESS_STRONG','KEEP_IF_TAX_TERM')
-    ORDER BY r.section,r.canonical_type
+  const source=await sql<{id:string}>`
+    SELECT id FROM public.sources WHERE code='dou' LIMIT 1
   `.execute(trx);
-  if(rules.rows.length>1000)throw new Error('l17_rule_cap');
+  if(!source.rows[0])throw new Error('l17_dou_source_missing');
+  const runtime=await loadApprovedCollectionFilterRuntime(
+    trx,source.rows[0].id,{readOnly:true});
+  if(!runtime)throw new Error('l17_runtime_missing');
+  const compiled=runtime.policy;
+  const hash=createHash('sha256').update('L17:DOU:ALL_DECISIONS:v3')
+    .update(runtime.policyId).update(String(runtime.policyRevision));
+  const seen=new Map<string,Match>();
+  const active=new Map<string,RuleRow>();
+  const typeKeysBySection=new Map<string,Set<string>>();
+  const dou=normalizeCollectionFilterText('dou');
+  for(const rule of compiled.rules.values()){
+    if(rule.sourceCode!==dou||rule.mode==='KEEP_ALWAYS')continue;
+    const section=normalizeCollectionFilterType(rule.section??'');
+    const canonical=normalizeCollectionFilterType(rule.canonicalType);
+    const key=section+'\0'+canonical;
+    active.set(key,{source_code:'dou',section:rule.section??'',
+      canonical_type:rule.canonicalType,mode:rule.mode});
+    const keys=typeKeysBySection.get(section)??new Set<string>();
+    keys.add(canonical);typeKeysBySection.set(section,keys);
+  }
+  // Aliases must travel with the canonical type's section. Ignore aliases
+  // targeting KEEP rules while preserving ALL active discard policies.
+  for(const [key,target] of compiled.aliases.entries()){
+    const [src,section,alias]=key.split('\0');
+    if(src!==dou||!section||!alias||!active.has(section+'\0'+target))continue;
+    typeKeysBySection.get(section)?.add(alias);
+  }
+  // The token changes when the active policy/rules/aliases/terms change.
+  // Revision is the transactional policy mutation sequence; content hashes
+  // below catch material archive updates without requiring a second rules load.
+  hash.update(JSON.stringify([...active.entries()].sort((a,b)=>a[0].localeCompare(b[0]))))
+    .update(JSON.stringify([...compiled.aliases.entries()].sort((a,b)=>a[0].localeCompare(b[0]))));
+
   let cursor:string|null=null,pages=0;
   while(true){
     if(++pages>10000)throw new Error('l17_scope_paging_cap');
@@ -59,35 +95,64 @@ async function scopeCandidates(trx: Transaction<DB>) {
         ...(blocked?{protected:blocked}:{})
       });
       hash.update(row.publication_id).update(new Date(row.scope_updated_at).toISOString())
-        .update(row.out_of_scope?'S':'H')
-        .update(blocked??'-');
+        .update(row.out_of_scope?'S':'H').update(blocked??'-');
     }
     cursor=page.rows[page.rows.length-1]!.publication_id;
     if(page.rows.length<500)break;
   }
-  for(const rule of rules.rows){
-    const result=await candidates(trx,{
-      sourceCode:'dou',section:rule.section,
-      canonicalType:rule.canonical_type,mode:rule.mode,
-    });
-    hash.update(JSON.stringify(rule)).update(result.token);
-    const add=(id:string,blocked?:'COMPANY'|'OTHER')=>{
-      const previous=seen.get(id);
-      if(previous){
-        // OUT_OF_SCOPE has priority, then explicit filter decision,
-        // then the legacy migration-029 hidden flag. Each act counts once.
-        const next:Match=previous.bucket==='HIDDEN'
-          ?{bucket:'RULE',rule,...(previous.protected?{protected:previous.protected}:{})}
-          :{...previous};
-        if(blocked)next.protected=blocked;
-        seen.set(id,next);
-      }else {
-        seen.set(id,{bucket:'RULE',rule,...(blocked?{protected:blocked}:{})});
+  interface Evidence {
+    publication_id:string; title:string; act_type:string|null;
+    section:string; content_text:string|null; relevant_excerpt:string|null;
+    evidence_complete:boolean;has_material:boolean;type_conflict:boolean;
+    provenance_conflict:boolean;has_company:boolean;has_other_source:boolean;
+    content_hash:string|null;
+  }
+  const add=(id:string,rule:RuleRow,blocked?:'COMPANY'|'OTHER')=>{
+    const previous=seen.get(id);
+    if(previous){
+      const next:Match=previous.bucket==='HIDDEN'
+        ?{bucket:'RULE',rule,...(previous.protected?{protected:previous.protected}:{})}
+        :{...previous};
+      if(blocked)next.protected=blocked;
+      seen.set(id,next);
+    }else seen.set(id,{bucket:'RULE',rule,...(blocked?{protected:blocked}:{})});
+  };
+  const TYPE_CHUNK=200;
+  for(const [section,keys] of [...typeKeysBySection.entries()].sort((a,b)=>a[0].localeCompare(b[0]))){
+    const types=[...keys].sort();
+    for(let offset=0;offset<types.length;offset+=TYPE_CHUNK){
+      const chunk=types.slice(offset,offset+TYPE_CHUNK);
+      let after:string|null=null,visited=0;
+      while(true){
+        if(++visited>10000)throw new Error('l17_archive_paging_cap');
+        const page=await sql<Evidence>`
+          SELECT * FROM public.collection_filter_direct_candidates(
+            ${after}::uuid,500,${section},${chunk}::text[])
+        `.execute(trx);
+        if(!page.rows.length)break;
+        for(const item of page.rows){
+          const decision=evaluateCollectionFilter(compiled,{
+            sourceCode:'dou',section:item.section,actType:item.act_type,
+            title:item.title,body:item.content_text,summary:item.relevant_excerpt,
+            evidenceComplete:item.evidence_complete,
+            materialAttachmentsUnexamined:item.has_material,
+            typeConflict:item.type_conflict,
+            provenanceConflict:item.provenance_conflict,
+          });
+          // The final classification is authoritative, never the SQL prefilter.
+          if(decision.decision!=='DISCARD'||!decision.canonicalType)continue;
+          const rule=active.get(decision.section+'\0'+decision.canonicalType);
+          if(!rule||decision.mode!==rule.mode)continue;
+          hash.update(item.publication_id).update(item.content_hash??'')
+            .update(decision.reasonCode).update(decision.canonicalType)
+            .update(item.has_company?'C':'-').update(item.has_other_source?'O':'-');
+          add(item.publication_id,rule,item.has_company?'COMPANY':
+            item.has_other_source?'OTHER':undefined);
+        }
+        after=page.rows[page.rows.length-1]!.publication_id;
+        if(page.rows.length<500)break;
       }
-    };
-    for(const id of result.ids)add(id);
-    for(const id of result.blockedCompanyIds)add(id,'COMPANY');
-    for(const id of result.blockedOtherSourceIds)add(id,'OTHER');
+    }
   }
   const ids:string[]=[];
   const kinds=new Map<string,Match>();
