@@ -155,13 +155,7 @@ export async function confirmOutOfScopePurge(
     // If anything changed during waiting, return a new preview, no deletion.
     const selection=plan.ids.slice(0,500);
     if(selection.length){
-      await sql`SELECT p.id FROM public.publications p
-        WHERE p.id=ANY(${selection}::uuid[]) ORDER BY p.id FOR UPDATE
-      `.execute(trx);
-      await sql`SELECT s.publication_id FROM public.publication_scope_state s
-        WHERE s.publication_id=ANY(${selection}::uuid[])
-        ORDER BY s.publication_id FOR UPDATE
-      `.execute(trx);
+      await sql`SELECT public.l17_lock_confirmation_targets(${selection}::uuid[])`.execute(trx);
       const locked=await scopeCandidates(trx);
       if(locked.count!==plan.count||locked.token!==plan.token){
         return{changed:true,count:locked.count,token:locked.token,
