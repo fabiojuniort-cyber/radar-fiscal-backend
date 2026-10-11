@@ -144,6 +144,20 @@ export function normalizeCollectionFilterType(value: string): string {
   return normalizeCollectionFilterText(value);
 }
 
+/**
+ * Source-provided DOU type is often a generic family (e.g. "Resolução")
+ * while the canonical parser emits a specific act type. Treat a proper
+ * normalized prefix as compatible, never an unrelated classification.
+ * The final KEEP/DISCARD decision remains in evaluateCollectionFilter.
+ */
+export function collectionFilterTypeConflict(sourceActType: string | null | undefined,
+  canonicalActType: string | null | undefined): boolean {
+  const source = normalizeCollectionFilterType(sourceActType ?? '');
+  if (!source) return false;
+  const canonical = normalizeCollectionFilterType(canonicalActType ?? '');
+  return source !== canonical && !canonical.startsWith(source + ' ');
+}
+
 function normalizedSection(value: string | null | undefined): string {
   return normalizeCollectionFilterText(value ?? '');
 }

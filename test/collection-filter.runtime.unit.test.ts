@@ -115,3 +115,36 @@ test('runtime DOU adapter fails open when evidence is incomplete', () => {
   assert.equal(result.decision.decision, 'KEEP');
   assert.equal(result.decision.reasonCode, 'INCOMPLETE_EVIDENCE');
 });
+
+test('L17: generic DOU sourceActType Resolução is compatible with specific CIT-SNC/MINC', () => {
+  const runtimeWithSpecificRule: ApprovedCollectionFilterRuntime = {
+    ...runtime,
+    policy: compileCollectionFilterPolicy({
+      version: 1,
+      contextWindowWords: 12,
+      weakScoreThreshold: 3,
+      locationWeights: { title: 3, summary: 2, body: 1 },
+      rules: [{ sourceCode: 'dou', section: 'DO1E',
+        canonicalType: 'RESOLUCAO CIT SNC MINC', mode: 'EXCLUDE_ALWAYS' }],
+      terms: [],
+    }),
+  };
+  const realShape = publication({
+    actType: 'RESOLUÇÃO CIT-SNC/MINC',
+    title: 'Resolução CIT-SNC/MINC nº 1, de 9 de outubro de 2026',
+    publishedOn: '2026-10-09',
+    contentText: 'Aprova deliberação da comissão intergestores.',
+    originMetadata: { dou: { section: 'DO1E', sourceActType: 'Resolução' } },
+  });
+  const result = evaluateRuntimeCollectionFilter(runtimeWithSpecificRule, realShape);
+  assert.equal(result.decision.canonicalType, 'RESOLUCAO CIT SNC MINC');
+  assert.equal(result.decision.decision, 'DISCARD');
+  assert.equal(result.decision.reasonCode, 'EXCLUDE_ALWAYS');
+
+  const unrelated = evaluateRuntimeCollectionFilter(runtimeWithSpecificRule, publication({
+    ...realShape,
+    originMetadata: { dou: { section: 'DO1E', sourceActType: 'Portaria' } },
+  }));
+  assert.equal(unrelated.decision.decision, 'KEEP');
+  assert.equal(unrelated.decision.reasonCode, 'TYPE_CONFLICT');
+});

@@ -5,6 +5,7 @@ import {
   compileCollectionFilterPolicy,
   evaluateCollectionFilter,
   normalizeCollectionFilterType,
+  collectionFilterTypeConflict,
   type CollectionFilterDecision,
   type CollectionFilterPolicyInput,
   type CollectionFilterTermHit,
@@ -83,10 +84,10 @@ function materialAttachmentsUnexamined(
 }
 
 function typeConflict(publication: NormalizedPublication): boolean {
-  const sourceActType = text(douMetadata(publication).sourceActType);
-  if (!sourceActType) return false;
-  return normalizeCollectionFilterType(sourceActType) !==
-    normalizeCollectionFilterType(publication.actType ?? '');
+  return collectionFilterTypeConflict(
+    text(douMetadata(publication).sourceActType),
+    publication.actType ?? '',
+  );
 }
 
 function decisiveHit(
