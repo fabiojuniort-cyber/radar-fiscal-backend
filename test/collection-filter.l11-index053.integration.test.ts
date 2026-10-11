@@ -177,6 +177,9 @@ test('053: index-backed actual first 500-item purge with 535k collection_items (
       'ix_publication_taxonomy_runs_version_release',
       'ix_publication_taxonomy_assertions_run', 'ix_publication_taxonomy_spans_assertion',
       'ix_publication_taxonomy_reviews_assertion_created',
+      'ix_company_publications_publication_id',
+      'ix_collection_run_publications_version_id',
+      'ix_publication_scope_state_event_id',
     ];
     const lookup = await admin.query<{ indexname: string }>(
       "SELECT indexname FROM pg_indexes WHERE schemaname='public'",
