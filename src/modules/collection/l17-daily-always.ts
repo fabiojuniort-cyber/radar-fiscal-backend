@@ -67,6 +67,10 @@ export async function runL17ExcludeAlways(
       while(batches<MAX_BATCHES && Date.now()-began<MAX_TIME_MS && visitedPages<30){
         visitedPages++;
         const txResult=await db.transaction().execute(async trx=>{
+          // Do not wait behind collection writers: fail this daily subtask
+          // without holding the scheduler or collector indefinitely.
+          await sql`SET LOCAL lock_timeout = '750ms'`.execute(trx);
+          await sql`SET LOCAL statement_timeout = '10000ms'`.execute(trx);
           const page=await sql<Candidate>`
             SELECT * FROM public.collection_filter_direct_candidates(
               ${cursor}::uuid,${PAGE_LIMIT},${section},${typeKeys}::text[]
