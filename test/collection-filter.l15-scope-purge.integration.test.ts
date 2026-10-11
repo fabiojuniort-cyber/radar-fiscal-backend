@@ -93,7 +93,17 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       }
     }
 
-    const preview=await app.inject({method:'POST',url:previewRoute,headers});
+    // Diagnostic assertions: independently verify the fixture before using
+    // the authenticated API. These identify missing state versus missing DOU
+    // provenance, without changing the preview implementation.
+    const stateRows=await db.query<{publication_id:string;scope:string}>(
+      'SELECT publication_id,scope FROM publication_scope_state WHERE publication_id=ANY($1::uuid[])',[ids]);
+    assert.equal(stateRows.rowCount,3,'all synthetic scope rows must exist');
+    const originRows=await db.query<{publication_id:string;code:string}>(
+      'SELECT po.publication_id,s.code FROM publication_origins po JOIN sources s ON s.id=po.source_id WHERE po.publication_id=ANY($1::uuid[])',[ids]);
+    assert.ok(originRows.rows.some(r=>r.publication_id===ids[0]&&r.code==='dou'),'eligible has DOU origin');
+    assert.equal(stateRows.rows.find(r=>r.publication_id===ids[0])?.scope,'OUT_OF_SCOPE','eligible scope');
+        const preview=await app.inject({method:'POST',url:previewRoute,headers});
     assert.equal(preview.statusCode,200,preview.body);
     const plan=preview.json<{count:number;blockedCompany:number;
       blockedOtherSource:number;token:string}>();
