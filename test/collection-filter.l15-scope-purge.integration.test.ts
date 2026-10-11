@@ -158,7 +158,7 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(plan.outOfScope,2);
     assert.equal(plan.hiddenLegacy,1);
     assert.equal(plan.blockedCompany,2);
-    assert.equal(plan.blockedOtherSource,2);
+    assert.equal(plan.blockedOtherSource,3);
     assert.match(plan.token,/^[a-f0-9]{64}$/);
 
     const rejected=await app.inject({method:'POST',url:confirmRoute,headers,
