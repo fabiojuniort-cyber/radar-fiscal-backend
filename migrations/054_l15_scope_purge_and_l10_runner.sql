@@ -104,3 +104,62 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.l10_prune_collection_items_batch(INTEGER) FROM PUBLIC,radar_app;
 GRANT EXECUTE ON FUNCTION public.l10_prune_collection_items_batch(INTEGER) TO radar_worker;
+
+-- Once-per-Brazilian-calendar-day durable execution ledger. No publication
+-- deletions, no write during migration; only scheduler claims at 03:30 local.
+CREATE TABLE IF NOT EXISTS public.collection_items_retention_daily (
+  local_day DATE PRIMARY KEY,
+  status TEXT NOT NULL CHECK(status IN ('STARTED','COMPLETED','FAILED')),
+  deleted_items INTEGER NOT NULL DEFAULT 0 CHECK(deleted_items>=0),
+  remaining_eligible BIGINT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at TIMESTAMPTZ
+);
+REVOKE ALL ON public.collection_items_retention_daily FROM PUBLIC,radar_app,radar_worker;
+
+CREATE OR REPLACE FUNCTION public.l10_claim_retention_day()
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public AS $$
+DECLARE v_local TIMESTAMP;
+BEGIN
+  IF NOT pg_catalog.pg_has_role(session_user,'radar_worker','MEMBER') THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='worker_role_required';
+  END IF;
+  v_local:=now() AT TIME ZONE 'America/Sao_Paulo';
+  IF v_local::time < TIME '03:30' OR v_local::time >= TIME '03:31' THEN
+    RETURN FALSE;
+  END IF;
+  INSERT INTO public.collection_items_retention_daily(local_day,status)
+    VALUES(v_local::date,'STARTED') ON CONFLICT DO NOTHING;
+  RETURN FOUND;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.l10_claim_retention_day() FROM PUBLIC,radar_app;
+GRANT EXECUTE ON FUNCTION public.l10_claim_retention_day() TO radar_worker;
+
+CREATE OR REPLACE FUNCTION public.l10_finish_retention_day(
+  p_deleted INTEGER,p_remaining BIGINT,p_success BOOLEAN
+)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public AS $$
+BEGIN
+  IF NOT pg_catalog.pg_has_role(session_user,'radar_worker','MEMBER') THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='worker_role_required';
+  END IF;
+  IF p_deleted<0 OR p_remaining<0 THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='invalid_l10_report';
+  END IF;
+  UPDATE public.collection_items_retention_daily
+    SET status=CASE WHEN p_success THEN 'COMPLETED' ELSE 'FAILED' END,
+      deleted_items=p_deleted,remaining_eligible=p_remaining,finished_at=now()
+    WHERE local_day=(now() AT TIME ZONE 'America/Sao_Paulo')::date
+      AND status='STARTED';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='l10_claim_missing';
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.l10_finish_retention_day(INTEGER,BIGINT,BOOLEAN)
+  FROM PUBLIC,radar_app;
+GRANT EXECUTE ON FUNCTION public.l10_finish_retention_day(INTEGER,BIGINT,BOOLEAN)
+  TO radar_worker;
