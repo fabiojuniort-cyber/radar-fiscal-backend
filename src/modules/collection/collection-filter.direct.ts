@@ -35,7 +35,7 @@ function validated(input: DirectRuleInput): DirectRuleInput {
   return {...input,sourceCode,section,canonicalType};
 }
 
-async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
+export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const rule = validated(input);
   const policies = await sql<{
     id:string; version:number; revision:number;
@@ -93,6 +93,8 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const ids:string[]=[];
   let blockedCompany=0;
   let blockedOtherSource=0;
+  const blockedCompanyIds:string[]=[];
+  const blockedOtherSourceIds:string[]=[];
   let cursor:string|null=null;
   let pages=0;
   const hash=createHash('sha256').update(JSON.stringify([rule,approved.id,approved.revision]));
@@ -115,15 +117,16 @@ async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
       if (decision.decision!=='DISCARD' || decision.canonicalType!==rule.canonicalType ||
           decision.section!==normalizeCollectionFilterType(rule.section)) continue;
       hash.update(item.publication_id).update(item.content_hash??'');
-      if (item.has_company) blockedCompany++;
-      else if (item.has_other_source) blockedOtherSource++;
+      if (item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
+      else if (item.has_other_source){blockedOtherSource++;blockedOtherSourceIds.push(item.publication_id);}
       else ids.push(item.publication_id);
     }
     cursor=page.rows[page.rows.length-1]!.publication_id;
     if (page.rows.length<500) break;
   }
   hash.update(String(blockedCompany)).update(String(blockedOtherSource));
-  return {ids,count:ids.length,blockedCompany,blockedOtherSource,token:hash.digest('hex')};
+  return {ids,count:ids.length,blockedCompany,blockedOtherSource,
+    blockedCompanyIds,blockedOtherSourceIds,token:hash.digest('hex')};
 }
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
