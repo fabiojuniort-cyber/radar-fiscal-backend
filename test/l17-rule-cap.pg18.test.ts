@@ -38,11 +38,11 @@ export async function runL17RuleCapStress():Promise<void>{
       "FROM generate_series(1,$2::integer) i "+
       "ON CONFLICT(policy_id,source_code,section,canonical_type) DO UPDATE SET mode=EXCLUDED.mode",
       [policy,n]);
-    const records=1200;
+    const records=12000;
     await admin.query(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,act_type,title,primary_official_url) "+
       "SELECT encode(digest($1||i::text,'sha256'),'hex'),'STRONG','{}'::jsonb,'FEDERAL',"+
-      "'L17 PERF TYPE '||lpad(i::text,4,'0'),"+
+      "'L17 PERF TYPE '||lpad((((i-1)%3000)+1)::text,4,'0'),"+
       "$2||lpad(i::text,4,'0'),'https://l17-benchmark.example.test/'||$1||'/'||i::text "+
       "FROM generate_series(1,$3::integer) i",
       [label,'L17_perf_'+label+'_',records]);
