@@ -65,7 +65,8 @@ class WorkerProbe implements KyselyPlugin {
       await bounded(this.proceed.promise);
     }
     const work = this.stage === 'ncm'
-      ? query.includes('FROM official_catalog_entries oce')
+      ? (query.includes('FROM official_catalog_entries oce') ||
+         query.includes('JOIN official_catalog_entries oce'))
       : this.stage === 'taxonomy' && query.includes('SELECT DISTINCT ncm_code');
     if (work) {
       this.workReads += 1;
