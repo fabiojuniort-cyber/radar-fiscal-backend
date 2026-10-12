@@ -190,6 +190,7 @@ export function planImport(segmentRows, productRows) {
   const activities = new Map();
   const segments = new Map();
   const products = [];
+  const originRows = [];
 
   for (let i = 0; i < segmentRows.length; i++) {
     const row = segmentRows[i];
@@ -206,6 +207,7 @@ export function planImport(segmentRows, productRows) {
     if (!segments.has(key)) segments.set(key, { segmento: s, subsegmento: sub, display: segmentSubsegmentLabel(s, sub) });
     if (!activities.has(act)) activities.set(act, { label: act, code: null, synonyms: [], cnaes: [] });
     activities.get(act).cnaes.push(cnae);
+    originRows.push({ sourceLine: line, cnaeCode: cnae, atuacaoLabel: act });
     if (!sourceCnae || !code) warnings.push('Segmento linha ' + line + ': origem sem código TriFaros');
     if (splitMulti(suggestedProducts).length !== splitMulti(suggestedNcms).length && suggestedProducts && suggestedNcms) {
       // Not necessarily 1:1; preserve two independent suggestion sets.
@@ -258,6 +260,7 @@ export function planImport(segmentRows, productRows) {
       warnings: warnings.length,
     },
     actuationSeed: [...activities.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')),
+    actuationOrigins: originRows,
     segmentSubsegments: [...segments.values()],
     products,
     issues: { errors, warnings },
