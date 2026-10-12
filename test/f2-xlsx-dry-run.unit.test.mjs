@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 
 import {
   F2_SOURCE,
   planImport,
+  parseApprovedWorkbook,
   segmentSubsegmentLabel,
   sha256,
 } from '../ops/taxonomy/f2-xlsx-dry-run.mjs';
@@ -70,4 +75,27 @@ test('T03 records malformed product source rows as errors, not guessed assignmen
   const result = planImport(segments, products);
   assert.ok(result.issues.errors.some(error => error.includes('segmento/grupo/item')));
   assert.equal(result.mode, 'DRY_RUN_ONLY');
+});
+
+test('T03 refuses a workbook when its bytes do not match the signed manifest', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'f2-dryrun-'));
+  const file = join(dir, 'forged.xlsx');
+  try {
+    await writeFile(file, 'not the approved workbook');
+    await assert.rejects(
+      parseApprovedWorkbook(file, 'segmento'),
+      /hash divergente/,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('T03 CLI refuses --confirm before touching inputs, even when invoked accidentally', () => {
+  const run = spawnSync(process.execPath, [
+    new URL('../ops/taxonomy/f2-xlsx-dry-run.mjs', import.meta.url).pathname,
+    '--confirm',
+  ], { encoding: 'utf8', timeout: 10_000 });
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /Carga produtiva proibida/);
 });
