@@ -1,4 +1,6 @@
 import type { PublicationTaxonomyView } from '../curation/curation.tags.js';
+import { formatOfficialCode } from '../curation/curation.constants.js';
+import { ncmMatchesEitherPrefix, normalizeNcmPrefix } from '../ncm/ncm-prefix.js';
 
 /**
  * Affinity between a legislation and a company's tax profile, from the
@@ -91,7 +93,7 @@ export function computePublicationAffinity(input: {
   hasProfile?: boolean;
   /** Product concept code -> its group code, for the profile's products. */
   profileProductGroups: ReadonlyMap<string, string>;
-  /** NCMs of the company (8 digits): profile, CNAEs and products. */
+  /** NCMs of the company (2/4/6/8 digits): profile, CNAEs and products. */
   profileNcms?: readonly string[];
   /** NCMs mentioned in the act, with their catalog description. */
   publicationNcms?: ReadonlyArray<{ code: string; description: string | null }>;
@@ -101,7 +103,9 @@ export function computePublicationAffinity(input: {
   actText?: string | null;
 }): PublicationAffinity {
   const profile = new Set(input.profileCodes);
-  const companyNcms = new Set(input.profileNcms ?? []);
+  const companyNcms = new Set((input.profileNcms ?? [])
+    .map(normalizeNcmPrefix)
+    .filter((code): code is string => code !== null));
   if (profile.size === 0 && companyNcms.size === 0 && !input.hasProfile) {
     return { status: 'NO_PROFILE', level: null, score: 0, matches: [] };
   }
@@ -109,10 +113,13 @@ export function computePublicationAffinity(input: {
   const matches = new Map<string, AffinityMatch>();
   // NCMs do not depend on the taxonomy classification of the act.
   for (const ncm of input.publicationNcms ?? []) {
-    if (!companyNcms.has(ncm.code) || matches.has(`ncm:${ncm.code}`)) continue;
-    const formatted = `${ncm.code.slice(0, 4)}.${ncm.code.slice(4, 6)}.${ncm.code.slice(6)}`;
-    matches.set(`ncm:${ncm.code}`, {
-      code: ncm.code,
+    const officialCode = normalizeNcmPrefix(ncm.code);
+    if (!officialCode ||
+        ![...companyNcms].some((code) => ncmMatchesEitherPrefix(code, officialCode)) ||
+        matches.has(`ncm:${officialCode}`)) continue;
+    const formatted = formatOfficialCode('NCM', officialCode);
+    matches.set(`ncm:${officialCode}`, {
+      code: officialCode,
       label: ncm.description ? `${formatted} · ${ncm.description}` : formatted,
       dimensionCode: 'ncm',
       weight: NCM_WEIGHT,
