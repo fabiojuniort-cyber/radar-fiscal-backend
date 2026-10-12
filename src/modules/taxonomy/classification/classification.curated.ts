@@ -1,4 +1,5 @@
 import { sha256Hex } from '../baseline/baseline.canonical-json.js';
+import { ncmMatchesEitherPrefix, normalizeNcmPrefix } from '../ncm/ncm-prefix.js';
 import {
   buildClassificationFingerprint,
   type ClassificationFingerprint,
@@ -9,7 +10,7 @@ import {
  * records the term or official code that produced it plus a raw excerpt.
  */
 export const CURATED_ENGINE_KEY = 'tribusca.taxonomy.curated';
-export const CURATED_ENGINE_VERSION = '2.2.0';
+export const CURATED_ENGINE_VERSION = '2.3.0';
 
 export type CuratedReasonCode =
   | 'CANONICAL_LABEL'
@@ -177,7 +178,7 @@ export function planCuratedClassification(
     .filter(Boolean)
     .join('\n');
   const normalized = normalizeWithIndex(raw);
-  const ncmCodes = [...new Set(input.ncmCodes)].sort();
+  const ncmCodes = [...new Set(input.ncmCodes.map((code) => normalizeNcmPrefix(code)).filter((code): code is string => code !== null))].sort();
   const cclasstrib = extractCclasstribCodes(raw);
 
   const found = new Map<string, CuratedAssertion>();
@@ -222,7 +223,7 @@ export function planCuratedClassification(
     }
 
     for (const prefix of concept.ncmPrefixes) {
-      const hit = ncmCodes.find((code) => code.startsWith(prefix));
+      const hit = ncmCodes.find((code) => ncmMatchesEitherPrefix(code, prefix));
       if (!hit) continue;
       keep({
         releaseConceptId: concept.releaseConceptId,
@@ -251,11 +252,11 @@ export function planCuratedClassification(
   }
 
   const configSnapshot = {
-    policyVersion: 2,
+    policyVersion: 3,
     engine: CURATED_ENGINE_KEY,
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
     autoAliasTypes: 'ALL',
-    officialCodes: ['NCM_PREFIX_ON_DETECTED_MENTIONS', 'CCLASSTRIB_CITED'],
+    officialCodes: ['NCM_BIDIRECTIONAL_PREFIX_2_4_6_8_ON_DETECTED_MENTIONS', 'CCLASSTRIB_CITED'],
     normalization: 'NFD_LOWER_ALNUM_TOKENS',
     conceptConfigSha256: sha256Hex(
       JSON.stringify(
