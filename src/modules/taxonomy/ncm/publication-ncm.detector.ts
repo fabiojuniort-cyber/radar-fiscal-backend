@@ -10,7 +10,7 @@ import {
 export const PUBLICATION_NCM_DETECTOR_KEY = 'ncm.catalog.regex';
 // 1.1.0: reads only the wording in force (previous wordings of CONFAZ acts
 // are skipped) and accepts the "8417.8020" typing found in official annexes.
-export const PUBLICATION_NCM_DETECTOR_VERSION = '1.1.0';
+export const PUBLICATION_NCM_DETECTOR_VERSION = '1.2.0';
 
 export type PublicationNcmSourceField =
   | 'CONTENT_TEXT'
@@ -66,6 +66,7 @@ interface CatalogMatch {
 }
 
 const CANDIDATE_RE = /(?<![\d.])(\d{8}|\d{4}\.\d{2}\.\d{2}|\d{4}\.\d{4})(?![\d]|\.\d)/g;
+const SHORT_CONTEXT_RE = /(?<![\p{L}\d])(NCM|TIPI|posi[cç][aã]o|subposi[cç][aã]o|cap[ií]tulo|c[oó]digo)(?![\p{L}])\s*(?:da\s+NCM\s*)?(?:n[º°o]\s*)?[:#-]?\s*(\d{2}(?:\.?\d{2}){0,2})(?![\d.]|\s*\/\s*\d)/giu;
 const EXCERPT_RADIUS = 120;
 const FAILED_RETRY_INTERVAL = '15 minutes';
 
@@ -109,6 +110,22 @@ export function extractNcmCandidates(text: string): NcmCandidate[] {
     });
   }
 
+  for (const match of text.matchAll(SHORT_CONTEXT_RE)) {
+    const raw = match[2]!;
+    const code = normalizeCandidate(raw);
+    if (![2, 4, 6].includes(code.length)) continue;
+    const marker = match[1]!.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (marker === 'capitulo' && code.length !== 2) continue;
+    if (marker === 'posicao' && code.length !== 4) continue;
+    if (marker === 'subposicao' && code.length !== 6) continue;
+    // An isolated 4-digit year after the generic word código is ambiguous.
+    if (marker === 'codigo' && code.length === 4 && Number(code) >= 1900 && Number(code) <= 2099) continue;
+    const start = (match.index ?? 0) + match[0].lastIndexOf(raw);
+    const current = byCode.get(code);
+    if (current) { current.occurrenceCount += 1; continue; }
+    byCode.set(code, { code, spanStart: start, spanEnd: start + raw.length,
+      excerpt: evidenceExcerpt(text, start, start + raw.length), occurrenceCount: 1 });
+  }
   return [...byCode.values()];
 }
 
