@@ -212,6 +212,7 @@ export function evaluateRuntimeCollectionFilter(
     materialAttachmentsUnexamined:
       materialAttachmentsUnexamined(publication),
     typeConflict: typeConflict(publication),
+    sourceActType: text(douMetadata(publication).sourceActType),
     provenanceConflict: false,
   });
   const hit = decisiveHit(decision.termHits);

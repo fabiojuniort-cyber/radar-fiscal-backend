@@ -61,6 +61,8 @@ export interface CollectionFilterPublication {
   evidenceComplete: boolean;
   materialAttachmentsUnexamined?: boolean;
   typeConflict?: boolean;
+  /** Raw type supplied by the official source (may disagree with parsed actType). */
+  sourceActType?: string | null;
   provenanceConflict?: boolean;
 }
 
@@ -81,6 +83,7 @@ export interface CollectionFilterDecision {
     | 'INCOMPLETE_EVIDENCE'
     | 'UNEXAMINED_MATERIAL'
     | 'TYPE_CONFLICT'
+    | 'TYPE_CONFLICT_BOTH_EXCLUDED'
     | 'PROVENANCE_CONFLICT'
     | 'KEEP_ALWAYS'
     | 'STRONG_TERM'
@@ -427,6 +430,21 @@ export function evaluateCollectionFilter(
     };
   }
   if (publication.typeConflict) {
+    // Only relax the fail-open rule when BOTH disagreeing types independently
+    // resolve to EXCLUDE_ALWAYS for this exact source and section. All other
+    // conflicts remain KEEP, including unknown/missing source types.
+    const sourceType = normalizeCollectionFilterType(publication.sourceActType ?? '');
+    const sourceCanonical = policy.aliases.get(key(sourceCode, section, sourceType)) ?? sourceType;
+    const sourceRule = sourceType ? policy.rules.get(key(sourceCode, section, sourceCanonical)) : undefined;
+    if (rule.mode === 'EXCLUDE_ALWAYS' &&
+        sourceRule?.mode === 'EXCLUDE_ALWAYS' &&
+        !publication.provenanceConflict) {
+      return {
+        ...safeBase,
+        decision: 'DISCARD',
+        reasonCode: 'TYPE_CONFLICT_BOTH_EXCLUDED',
+      };
+    }
     return {
       ...safeBase,
       decision: 'KEEP',

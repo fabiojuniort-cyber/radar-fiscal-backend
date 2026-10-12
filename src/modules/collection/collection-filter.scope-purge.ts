@@ -136,6 +136,41 @@ async function scopeCandidates(trx: Transaction<DB>) {
             ${after}::uuid,500,${section},${chunk}::text[])
         `.execute(trx);
         if(!page.rows.length)break;
+        // A read-only, bounded enrichment (<=500 IDs) supplies the same raw
+        // sourceActType passed by the live connector. The existing 060 SQL
+        // candidate function need not change (NO MIGRATION).
+        const conflictedIds=page.rows.filter(item=>item.type_conflict)
+          .map(item=>item.publication_id);
+        const sourceTypes=new Map<string,string>();
+        if(conflictedIds.length){
+          const sourceEvidence=await sql<{
+            publication_id:string; origin_type:string|null;version_type:string|null;
+          }>`
+            SELECT p.id AS publication_id,
+              NULLIF(btrim(o.metadata->'dou'->>'sourceActType'),'') AS origin_type,
+              NULLIF(btrim(v.source_metadata->'dou'->>'sourceActType'),'') AS version_type
+            FROM public.publications p
+            LEFT JOIN LATERAL (
+              SELECT po.metadata FROM public.publication_origins po
+              JOIN public.sources s ON s.id=po.source_id AND s.code='dou'
+              WHERE po.publication_id=p.id ORDER BY po.id LIMIT 1
+            ) o ON TRUE
+            LEFT JOIN LATERAL (
+              SELECT pv.source_metadata FROM public.publication_versions pv
+              WHERE pv.publication_id=p.id AND pv.is_current LIMIT 1
+            ) v ON TRUE
+            WHERE p.id=ANY(${conflictedIds}::uuid[])
+          `.execute(trx);
+          for(const evidence of sourceEvidence.rows){
+            const origin=evidence.origin_type?.trim();
+            const version=evidence.version_type?.trim();
+            // Conflicting origin/version themselves: fail open, do not guess.
+            if(origin && version &&
+               normalizeCollectionFilterType(origin)!==normalizeCollectionFilterType(version))continue;
+            const raw=origin??version;
+            if(raw)sourceTypes.set(evidence.publication_id,raw);
+          }
+        }
         for(const item of page.rows){
           const decision=evaluateCollectionFilter(compiled,{
             sourceCode:'dou',section:item.section,actType:item.act_type,
@@ -143,6 +178,7 @@ async function scopeCandidates(trx: Transaction<DB>) {
             evidenceComplete:item.evidence_complete,
             materialAttachmentsUnexamined:item.has_material,
             typeConflict:item.type_conflict,
+            sourceActType:sourceTypes.get(item.publication_id),
             provenanceConflict:item.provenance_conflict,
           });
           // The final classification is authoritative, never the SQL prefilter.
