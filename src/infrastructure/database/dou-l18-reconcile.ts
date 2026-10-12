@@ -25,14 +25,12 @@ export function l18TitleKey(input: string): string {
 }
 export function l18Reconcile(manifest: Manifest, items: Stored[]) {
   const candidates = new Map<string, Set<string>>();
-  const titleById = new Map<string, Stored>();
   for (const item of items) {
     if (item.is_hidden) continue;
     const key = item.published_on.slice(0, 10) + '|' + l18TitleKey(item.title);
     const ids = candidates.get(key) ?? new Set<string>();
     ids.add(item.publication_id);
     candidates.set(key, ids);
-    titleById.set(item.publication_id, item);
   }
   const matched = new Set<string>();
   const originals = manifest.items.map(row => {
