@@ -4,8 +4,8 @@
 
 ## O que já foi codificado
 
-- **T01 (preparação de contrato):** helper puro \`segmentSubsegmentLabel(segmento, subsegmento)\` que gera "Segmento – Subsegmento" para apresentação, **sem criar identidade nova**. **Falta integrar a grade existente no repositório radar-fiscal-web**.
-- **T02 (preparação da fonte inicial):** derivação das categorias de **Atuação** a partir da coluna "Atuação" da aba Segmento; frequência e origem CNAE preservadas; sinônimos \`[]\` por padrão, sem herdar aliases de Segmento; **ainda falta implementação da nova dimensão persistida de Atuação, curadoria, evidências e frontend**. O importador recusa fontes com nova categoria inesperada.
+- **T01 (preparação de contrato):** helper puro \`segmentSubsegmentLabel(segmento, subsegmento)\` que gera "Segmento – Subsegmento" para apresentação, **sem criar identidade nova**. **Interface integrada no [PR web #103](https://github.com/fabiojuniort-cyber/radar-fiscal-web/pull/103), ainda DRAFT e sem deploy.**
+- **T02 (preparação da fonte inicial):** derivação das categorias de **Atuação** a partir da coluna "Atuação" da aba Segmento; frequência e origem CNAE preservadas; sinônimos \`[]\` por padrão, sem herdar aliases de Segmento; **Nova dimensão persistente e os 7 conceitos iniciais no rascunho implementados em `curation.actuacao.ts` e rota admin; frontend de curadoria em PR web #103.** Ainda faltam a persistência das relações por CNAE (1.332 origens), integração e revisão de evidências/classificação antes de publicar. O importador recusa fontes com nova categoria inesperada.
 - **T03 (fase 1):** importador XLSX read-only \`ops/taxonomy/f2-xlsx-dry-run.mjs\` com hashes SHA-256 *exatos* do manifesto, cabeçalhos e contagens de linha congelados, prevenção de escrita/confirm, sem download de rede ou extração de arquivos ZIP. Produz um plano em JSON e lista anomalias. **Não faz carga no PostgreSQL**. Reaproveita \`yauzl\`, dependência já existente no backend. Testes em \`test/f2-xlsx-dry-run.unit.test.mjs\`.
 
 ## Comando para dry-run, sem banco
@@ -53,9 +53,9 @@ A cardinalidade distinta não é erro em si: sugestões independentes podem refe
 
 ## Acompanhamento e coordenação
 
-Este é o primeiro PR de **código do lote único**. Como os artefatos web e backend estão em repositórios diferentes, um único PR GitHub não consegue modificar os dois repositórios. Manter este PR como fonte de mudanças backend e **não abrir merge/deploy ou segundo PR sem decidir coordenação**. Divergência deverá ser explicitamente resolvida pelo CLAUDE-COORD; não inventar mecanismo de PR multirrepositório.
+Lote coordenado em dois PRs (um por repositório): backend **#216** e frontend **#103**, ambos DRAFT. **Ordem de merge futura autorizada: backend primeiro, frontend depois**, somente após OK de CLAUDE-COORD e gates de CI e revisão. Nenhum merge/deploy nesta execução.
 
-**Percentual atual T01–T03:** 35% (parsing/plano/guardas + inspeção das fontes; ainda não classificação e UI completas).
+**Percentual atual T01–T03:** aproximadamente **70%** (UI, dimensão Atuação em rascunho, importador read-only e testes; ainda falta persistência dos vínculos de CNAE, resolução das anomalias e validação integral).
 
 ## CI de 12/10/2026 no PR #216 (HEAD `38817d59ee4ee445a794defdb6073f9a7362ccbe`)
 
