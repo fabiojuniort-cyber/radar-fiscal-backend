@@ -178,3 +178,29 @@ test('a single free-text item of the profile is compared: same tag name, or writ
   });
   assert.equal(unclassified.status, 'OK');
 });
+
+test('F2-T03: profile affinity matches legal NCM by prefix in both directions, no guesswork', () => {
+  const pending = view([], 'PENDING');
+  const relevance = (profileNcm: string, legalNcm: string) =>
+    computePublicationAffinity({
+      view: pending,
+      profileCodes: [],
+      profileProductGroups: new Map(),
+      profileNcms: [profileNcm],
+      publicationNcms: [{ code: legalNcm, description: null }],
+    });
+
+  // Profile is broader than the legal code.
+  assert.equal(relevance('10.06', '1006.30.11').score, 3);
+  assert.equal(relevance('1006.30', '10063011').status, 'OK');
+
+  // Legal code is broader than the profile code.
+  assert.equal(relevance('10063011', '1006').score, 3);
+  assert.deepEqual(relevance('10063011', '10').matches.map(m => m.code), ['10']);
+
+  // Different NCM branches and malformed tokens cannot generate relevance.
+  assert.equal(relevance('1006', '1007').score, 0);
+  assert.equal(relevance('1006.30.11', '1006.31').score, 0);
+  assert.equal(relevance('1006/30', '10063011').score, 0);
+  assert.equal(relevance('10063011', '1006, 1007').score, 0);
+});
