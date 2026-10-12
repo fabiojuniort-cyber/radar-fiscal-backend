@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 
 import { createConcept, type CuratorActor, requireOpenDraft } from './curation.draft.js';
@@ -105,5 +106,140 @@ export async function initializeF2Actuacao(
     sourceSha256: F2_ACTUACAO_SOURCE_SHA256,
     sourceRows: F2_ACTUACAO_SEED.reduce((count, item) => count + item.count, 0),
     classificationPublished: false,
+  };
+}
+
+/** Canonical SHA256 of the signed Segmento 1.7.3 origins, one line each:
+ * `sourceLine|cnae7digits|AtuaçãoLabel\n`, preserving XLSX row order.
+ * This projection pin prevents a client from submitting forged associations
+ * while claiming the original XLSX file hash.
+ */
+export const F2_ACTUACAO_ORIGINS_PROJECTION_SHA256 =
+  '794360223330c0e45911f559f25e0082caa9437a50f18c8480cb01a317a9da65';
+
+export interface F2ActuacaoOriginInput {
+  sourceLine: number;
+  cnaeCode: string;
+  atuacaoLabel: string;
+}
+export interface F2ActuacaoOriginsResult {
+  releaseId: string;
+  sourceSha256: string;
+  projectionSha256: string;
+  originCount: number;
+  reusedExisting: boolean;
+  classificationPublished: false;
+}
+
+function originProjection(rows: readonly F2ActuacaoOriginInput[]): string {
+  return rows.map((row) => String(row.sourceLine) + '|' + row.cnaeCode + '|' + row.atuacaoLabel + '\n').join('');
+}
+
+export function validateF2ActuacaoOrigins(rows: readonly F2ActuacaoOriginInput[]): string {
+  if (rows.length !== 1332) throw new Error('F2_ORIGINS_ROW_COUNT_INVALID');
+  const counts = new Map<string, number>();
+  const known = new Map<string, number>(F2_ACTUACAO_SEED.map((item) => [item.label, item.count]));
+  const seen = new Set<string>();
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    if (row.sourceLine !== i + 2 || !/^[0-9]{7}$/.test(row.cnaeCode)) {
+      throw new Error('F2_ORIGINS_ROW_INVALID_' + (i + 2));
+    }
+    if (!known.has(row.atuacaoLabel)) throw new Error('F2_ORIGINS_LABEL_INVALID');
+    if (seen.has(row.cnaeCode)) throw new Error('F2_ORIGINS_CNAE_DUPLICATE');
+    seen.add(row.cnaeCode);
+    counts.set(row.atuacaoLabel, (counts.get(row.atuacaoLabel) ?? 0) + 1);
+  }
+  for (const [label, count] of known) {
+    if (counts.get(label) !== count) throw new Error('F2_ORIGINS_FREQUENCY_MISMATCH');
+  }
+  const digest = createHash('sha256').update(originProjection(rows), 'utf8').digest('hex');
+  if (digest !== F2_ACTUACAO_ORIGINS_PROJECTION_SHA256) {
+    throw new Error('F2_ORIGINS_PROJECTION_HASH_MISMATCH');
+  }
+  return digest;
+}
+
+/** Strict curator-only DRAFT write. It is not a T03 product/NCM import. */
+export async function persistF2ActuacaoCnaeOrigins(
+  client: PoolClient,
+  actor: CuratorActor,
+  rows: readonly F2ActuacaoOriginInput[],
+  sourceSha256: string,
+): Promise<F2ActuacaoOriginsResult> {
+  if (!actor.justification.trim()) throw new Error('JUSTIFICATION_REQUIRED');
+  if (sourceSha256 !== F2_ACTUACAO_SOURCE_SHA256) {
+    throw new Error('F2_ORIGINS_SOURCE_HASH_MISMATCH');
+  }
+  const projectionSha256 = validateF2ActuacaoOrigins(rows);
+  const draft = await requireOpenDraft(client);
+  const count = await client.query<{ count: number }>(
+    'SELECT count(*)::int AS count FROM taxonomy_release_actuacao_cnae_origins WHERE release_id = $1::uuid',
+    [draft.id],
+  );
+  if ((count.rows[0]?.count ?? 0) !== 0) {
+    const previous = await client.query<{ source_line: number; cnae_code: string; code: string; source_sha256: string }>(
+      'SELECT o.source_line, o.cnae_code, c.code, o.source_sha256 FROM taxonomy_release_actuacao_cnae_origins o JOIN taxonomy_release_concepts rc ON rc.id = o.release_concept_id JOIN taxonomy_concepts c ON c.id = rc.concept_id WHERE o.release_id = $1::uuid ORDER BY o.source_line',
+      [draft.id],
+    );
+    const labels = new Map(F2_ACTUACAO_SEED.map((item) => [item.code, item.label]));
+    const recovered: F2ActuacaoOriginInput[] = previous.rows.map((item) => ({
+      sourceLine: item.source_line,
+      cnaeCode: item.cnae_code,
+      atuacaoLabel: labels.get(item.code) ?? '',
+    }));
+    if (previous.rows.length !== 1332 ||
+        previous.rows.some((item) => item.source_sha256 !== sourceSha256) ||
+        originProjection(recovered) !== originProjection(rows)) {
+      throw new Error('F2_ORIGINS_EXISTING_ROWS_CONFLICT');
+    }
+    return {
+      releaseId: draft.id, sourceSha256, projectionSha256, originCount: rows.length,
+      reusedExisting: true, classificationPublished: false,
+    };
+  }
+
+  const byLabel = new Map(F2_ACTUACAO_SEED.map((item) => [item.label, item.code]));
+  const selected = await client.query<{ code: string; release_id: string }>(
+    'SELECT c.code, rc.release_id FROM taxonomy_release_concepts rc JOIN taxonomy_concepts c ON c.id = rc.concept_id WHERE rc.release_id = $1::uuid AND c.code LIKE $2',
+    [draft.id, 'actuacao.%'],
+  );
+  const present = new Set(selected.rows.map((row) => row.code));
+  if (present.size !== 7 || F2_ACTUACAO_SEED.some((item) => !present.has(item.code))) {
+    throw new Error('F2_ACTUACAO_NOT_INITIALIZED');
+  }
+
+  const payload = rows.map((row) => ({
+    source_line: row.sourceLine, cnae_code: row.cnaeCode,
+    concept_code: byLabel.get(row.atuacaoLabel),
+  }));
+  const inserted = await client.query<{ cnae_code: string }>(
+    `INSERT INTO taxonomy_release_actuacao_cnae_origins
+       (release_id, release_concept_id, cnae_code, source_line, source_sha256)
+     SELECT $1::uuid, rc.id, s.cnae_code, s.source_line, $3
+     FROM jsonb_to_recordset($2::jsonb)
+       AS s(source_line integer, cnae_code text, concept_code text)
+     JOIN taxonomy_concepts c ON c.code = s.concept_code
+     JOIN taxonomy_release_concepts rc
+       ON rc.concept_id = c.id AND rc.release_id = $1::uuid
+     RETURNING cnae_code`,
+    [draft.id, JSON.stringify(payload), sourceSha256],
+  );
+  if (inserted.rows.length !== rows.length) {
+    throw new Error('F2_ORIGINS_INSERT_READBACK_MISMATCH');
+  }
+  await client.query(
+    `INSERT INTO audit_log
+       (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
+     VALUES (NULL, 'ADMIN', $1, 'F2_T02_ACTUACAO_CNAE_ORIGINS_IMPORTED',
+             'taxonomy_curation', $2::uuid, $3::jsonb, $4::uuid)`,
+    [actor.userId, draft.id, JSON.stringify({
+      justification: actor.justification, sourceSha256, projectionSha256,
+      originCount: rows.length, publicationRequested: false,
+    }), randomUUID()],
+  );
+  return {
+    releaseId: draft.id, sourceSha256, projectionSha256, originCount: rows.length,
+    reusedExisting: false, classificationPublished: false,
   };
 }
