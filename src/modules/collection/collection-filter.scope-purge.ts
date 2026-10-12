@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
-import { type DirectRuleInput } from './collection-filter.direct.js';
+import { loadConflictingSourceActTypes, type DirectRuleInput } from './collection-filter.direct.js';
 import { loadApprovedCollectionFilterRuntime } from './collection-filter.runtime.js';
 import { evaluateCollectionFilter, normalizeCollectionFilterType, normalizeCollectionFilterText } from './collection-filter.engine.js';
 
@@ -136,6 +136,7 @@ async function scopeCandidates(trx: Transaction<DB>) {
             ${after}::uuid,500,${section},${chunk}::text[])
         `.execute(trx);
         if(!page.rows.length)break;
+        const sourceTypes=await loadConflictingSourceActTypes(trx,page.rows);
         for(const item of page.rows){
           const decision=evaluateCollectionFilter(compiled,{
             sourceCode:'dou',section:item.section,actType:item.act_type,
@@ -143,6 +144,7 @@ async function scopeCandidates(trx: Transaction<DB>) {
             evidenceComplete:item.evidence_complete,
             materialAttachmentsUnexamined:item.has_material,
             typeConflict:item.type_conflict,
+            sourceActType:sourceTypes.get(item.publication_id),
             provenanceConflict:item.provenance_conflict,
           });
           // The final classification is authoritative, never the SQL prefilter.

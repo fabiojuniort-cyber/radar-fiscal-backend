@@ -312,3 +312,39 @@ test('benchmark de referência supera 2 mil documentos/s', () => {
     `collection filter benchmark below reference: ${rate.toFixed(0)} docs/s`,
   );
 });
+
+
+test('L-20: both conflicting DO3 types EXCLUDE_ALWAYS -> DISCARD; any non-excluded secondary type stays KEEP', () => {
+  const policy=compileCollectionFilterPolicy({
+    version:1,contextWindowWords:12,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},
+    rules:[
+      {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE DISPENSA DE LICITACAO',mode:'EXCLUDE_ALWAYS'},
+      {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE ADJUDICACAO',mode:'EXCLUDE_ALWAYS'},
+      {sourceCode:'dou',section:'DO3',canonicalType:'PORTARIA',mode:'KEEP_ALWAYS'},
+      {sourceCode:'dou',section:'DO1',canonicalType:'AVISO DE ADJUDICACAO',mode:'KEEP_ALWAYS'},
+    ],
+    aliases:[],terms:[],
+  });
+  const base={
+    sourceCode:'dou',section:'DO3',actType:'AVISO DE DISPENSA DE LICITACAO',
+    title:'AVISO DE DISPENSA DE LICITAÇÃO 7/2026',
+    body:'Prefeitura de Douradoquara/MG; 09/10/2026',
+    evidenceComplete:true,materialAttachmentsUnexamined:false,
+    typeConflict:true,provenanceConflict:false,
+  };
+  const both=evaluateCollectionFilter(policy,{...base,sourceActType:'Aviso de Adjudicação'});
+  assert.deepEqual([both.decision,both.reasonCode],['DISCARD','TYPE_CONFLICT_BOTH_EXCLUDED']);
+  const kept=evaluateCollectionFilter(policy,{...base,sourceActType:'PORTARIA'});
+  assert.deepEqual([kept.decision,kept.reasonCode],['KEEP','TYPE_CONFLICT']);
+  const unknown=evaluateCollectionFilter(policy,{...base,sourceActType:'AVISO NÃO CADASTRADO'});
+  assert.deepEqual([unknown.decision,unknown.reasonCode],['KEEP','TYPE_CONFLICT']);
+  const missing=evaluateCollectionFilter(policy,{...base});
+  assert.deepEqual([missing.decision,missing.reasonCode],['KEEP','TYPE_CONFLICT']);
+  const otherSection=evaluateCollectionFilter(policy,{...base,section:'DO1',sourceActType:'Aviso de Adjudicação'});
+  assert.equal(otherSection.decision,'KEEP');
+  const incomplete=evaluateCollectionFilter(policy,{...base,sourceActType:'Aviso de Adjudicação',evidenceComplete:false});
+  assert.equal(incomplete.decision,'KEEP');
+  const originConflict=evaluateCollectionFilter(policy,{...base,sourceActType:'Aviso de Adjudicação',provenanceConflict:true});
+  assert.equal(originConflict.decision,'KEEP');
+});

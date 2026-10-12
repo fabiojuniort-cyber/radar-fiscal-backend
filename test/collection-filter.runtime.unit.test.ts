@@ -184,3 +184,40 @@ test('L17 hotfix: 3200 active EXCLUDE_ALWAYS rules are all partitioned without s
   const distinct=new Set(groups.partitions.flatMap(g=>g.types));
   assert.equal(distinct.size,3200);
 });
+
+
+test('L-20 f57e0b03 fixture: DOU/DO3 mismatch between Aviso de Dispensa and Aviso de Adjudicação',()=>{
+  const bothExcluded:ApprovedCollectionFilterRuntime={
+    ...runtime,
+    policy:compileCollectionFilterPolicy({
+      version:1,contextWindowWords:12,weakScoreThreshold:3,
+      locationWeights:{title:3,summary:2,body:1},
+      rules:[
+        {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE DISPENSA DE LICITACAO',mode:'EXCLUDE_ALWAYS'},
+        {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE ADJUDICACAO',mode:'EXCLUDE_ALWAYS'},
+      ],terms:[],
+    }),
+  };
+  const fixture=publication({
+    sourceItemKey:'f57e0b03',title:'AVISO DE DISPENSA DE LICITAÇÃO 7/2026',
+    agency:'Prefeitura de Douradoquara/MG',publishedOn:'2026-10-09',
+    actType:'AVISO DE DISPENSA DE LICITACAO',
+    originMetadata:{dou:{section:'DO3',sourceActType:'Aviso de Adjudicação'}},
+  });
+  const result=evaluateRuntimeCollectionFilter(bothExcluded,fixture);
+  assert.deepEqual([result.decision.decision,result.decision.reasonCode],
+    ['DISCARD','TYPE_CONFLICT_BOTH_EXCLUDED']);
+  const keepRuntime:ApprovedCollectionFilterRuntime={
+    ...bothExcluded,
+    policy:compileCollectionFilterPolicy({
+      version:1,contextWindowWords:12,weakScoreThreshold:3,
+      locationWeights:{title:3,summary:2,body:1},
+      rules:[
+        {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE DISPENSA DE LICITACAO',mode:'EXCLUDE_ALWAYS'},
+        {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE ADJUDICACAO',mode:'KEEP_ALWAYS'},
+      ],terms:[],
+    }),
+  };
+  const keep=evaluateRuntimeCollectionFilter(keepRuntime,fixture);
+  assert.deepEqual([keep.decision.decision,keep.decision.reasonCode],['KEEP','TYPE_CONFLICT']);
+});

@@ -24,6 +24,46 @@ interface Candidate {
   has_company:boolean; has_other_source:boolean; content_hash: string | null;
 }
 
+/**
+ * Read-only source-type evidence for conflicts. Both admin purge entry points
+ * use this identical resolution (origin or current version; never guess if
+ * their official raw types disagree). One query per candidate page (<=500).
+ */
+export async function loadConflictingSourceActTypes(
+  trx: Transaction<DB>, items: readonly {publication_id:string;type_conflict:boolean}[],
+): Promise<Map<string,string>> {
+  const conflictedIds=items.filter(item=>item.type_conflict).map(item=>item.publication_id);
+  const sourceTypes=new Map<string,string>();
+  if(!conflictedIds.length)return sourceTypes;
+  const sourceEvidence=await sql<{
+    publication_id:string; origin_type:string|null;version_type:string|null;
+  }>`
+    SELECT p.id AS publication_id,
+      NULLIF(btrim(o.metadata->'dou'->>'sourceActType'),'') AS origin_type,
+      NULLIF(btrim(v.source_metadata->'dou'->>'sourceActType'),'') AS version_type
+    FROM public.publications p
+    LEFT JOIN LATERAL (
+      SELECT po.metadata FROM public.publication_origins po
+      JOIN public.sources s ON s.id=po.source_id AND s.code='dou'
+      WHERE po.publication_id=p.id ORDER BY po.id LIMIT 1
+    ) o ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT pv.source_metadata FROM public.publication_versions pv
+      WHERE pv.publication_id=p.id AND pv.is_current LIMIT 1
+    ) v ON TRUE
+    WHERE p.id=ANY(${conflictedIds}::uuid[])
+  `.execute(trx);
+  for(const evidence of sourceEvidence.rows){
+    const origin=evidence.origin_type?.trim();
+    const version=evidence.version_type?.trim();
+    if(origin && version &&
+       normalizeCollectionFilterType(origin)!==normalizeCollectionFilterType(version))continue;
+    const raw=origin??version;
+    if(raw)sourceTypes.set(evidence.publication_id,raw);
+  }
+  return sourceTypes;
+}
+
 function validated(input: DirectRuleInput): DirectRuleInput {
   const sourceCode = input.sourceCode.trim().toLowerCase();
   const section = input.section.trim().toUpperCase();
@@ -104,6 +144,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
       SELECT * FROM collection_filter_direct_candidates(${cursor}::uuid,500,${normalizeCollectionFilterType(rule.section)},${typeKeys}::text[])
     `.execute(trx);
     if (!page.rows.length) break;
+    const sourceTypes=await loadConflictingSourceActTypes(trx,page.rows);
     for (const item of page.rows) {
       const decision=evaluateCollectionFilter(engine,{
         sourceCode:rule.sourceCode, section:item.section,
@@ -112,6 +153,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
         evidenceComplete:item.evidence_complete,
         materialAttachmentsUnexamined:item.has_material,
         typeConflict:item.type_conflict,
+        sourceActType:sourceTypes.get(item.publication_id),
         provenanceConflict:item.provenance_conflict,
       });
       if (decision.decision!=='DISCARD' || decision.canonicalType!==rule.canonicalType ||
