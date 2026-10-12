@@ -50,4 +50,4 @@ A regra pedida agora aceita **2/4/6/8 dígitos, com pontos opcionais**, e proíb
 
 **Segmento v1.7.3, coluna H:** 18 entradas igualmente contêm valores concatenados por vírgula, mas a coluna é explicitamente `NCMs (sugeridos)` e permanece **texto sugestivo sem conversão em vínculo NCM oficial no T03**. Essas sugestões só poderão virar carga estruturada após curadoria e validação separadas.
 
-**422? Não:** os alertas de cardinalidade seguem **442 = 368 + 74**, todos ESPERADOS e aceitos. Nenhum pareamento produto×NCM por posição.
+Os alertas de cardinalidade seguem **442 = 368 + 74**, todos **ESPERADOS** e aceitos. Nenhum pareamento produto×NCM por posição.
