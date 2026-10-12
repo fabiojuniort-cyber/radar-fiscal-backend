@@ -184,7 +184,7 @@ export class DouConnector implements CollectionConnector {
             ignoredReferences: scopeIgnoredReferences,
             ignoredReferenceLimit: 100,
           },
-          coverage: 'DOU_SECTIONS_1_3_NORMAL_AND_EXTRA', sections: [...DOU_XML_SECTIONS], supplementsVerified: false,
+          coverage: this.#options.sections ? 'DOU_BACKFILL_EXPLICIT_SECTIONS' : 'DOU_SECTIONS_1_3_NORMAL_AND_EXTRA', sections: [...sections], supplementsVerified: false,
           archivalStorage: 'NOT_CONFIGURED', xmlTimelinessGuaranteed: false },
         douArchives: receipts,
       } };
