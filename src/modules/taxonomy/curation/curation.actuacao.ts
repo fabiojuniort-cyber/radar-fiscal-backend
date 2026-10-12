@@ -182,7 +182,7 @@ export async function persistF2ActuacaoCnaeOrigins(
       'SELECT o.source_line, o.cnae_code, c.code, o.source_sha256 FROM taxonomy_release_actuacao_cnae_origins o JOIN taxonomy_release_concepts rc ON rc.id = o.release_concept_id JOIN taxonomy_concepts c ON c.id = rc.concept_id WHERE o.release_id = $1::uuid ORDER BY o.source_line',
       [draft.id],
     );
-    const labels = new Map(F2_ACTUACAO_SEED.map((item) => [item.code, item.label]));
+    const labels = new Map<string, string>(F2_ACTUACAO_SEED.map((item) => [item.code, item.label]));
     const recovered: F2ActuacaoOriginInput[] = previous.rows.map((item) => ({
       sourceLine: item.source_line,
       cnaeCode: item.cnae_code,
@@ -199,7 +199,7 @@ export async function persistF2ActuacaoCnaeOrigins(
     };
   }
 
-  const byLabel = new Map(F2_ACTUACAO_SEED.map((item) => [item.label, item.code]));
+  const byLabel = new Map<string, string>(F2_ACTUACAO_SEED.map((item) => [item.label, item.code]));
   const selected = await client.query<{ code: string; release_id: string }>(
     'SELECT c.code, rc.release_id FROM taxonomy_release_concepts rc JOIN taxonomy_concepts c ON c.id = rc.concept_id WHERE rc.release_id = $1::uuid AND c.code LIKE $2',
     [draft.id, 'actuacao.%'],
