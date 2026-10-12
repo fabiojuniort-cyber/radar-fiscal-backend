@@ -55,7 +55,7 @@ A cardinalidade distinta não é erro em si: sugestões independentes podem refe
 
 Lote coordenado em dois PRs (um por repositório): backend **#216** e frontend **#103**, ambos DRAFT. **Ordem de merge futura autorizada: backend primeiro, frontend depois**, somente após OK de CLAUDE-COORD e gates de CI e revisão. Nenhum merge/deploy nesta execução.
 
-**Percentual atual T01–T03:** aproximadamente **70%** (UI, dimensão Atuação em rascunho, importador read-only e testes; ainda falta persistência dos vínculos de CNAE, resolução das anomalias e validação integral).
+**Percentual do checkpoint anterior T01–T03:** aproximadamente **70%** (UI, dimensão Atuação em rascunho, importador read-only e testes; ainda falta persistência dos vínculos de CNAE, resolução das anomalias e validação integral).
 
 ## CI de 12/10/2026 no PR #216 (HEAD `38817d59ee4ee445a794defdb6073f9a7362ccbe`)
 
@@ -63,3 +63,19 @@ Lote coordenado em dois PRs (um por repositório): backend **#216** e frontend *
 - **LOTE-2 Isolated PostgreSQL 18: PASS.** Evidência: run [38317303703](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/actions/runs/38317303703).
 - **CI geral final: FAILURE PREVISTO POR POLÍTICA DE PR DRAFT**, step `Require full regression before merge`. Logs exibem `CI_DRAFT: true` e instrução para não interpretar quick checks como liberação. **Não retirar DRAFT sem gate de revisão/autorização.**
 - O HEAD documentado acima é anterior a esta atualização textual. O commit documental novo acionará checks próprios.
+
+## F2-T02 — Persistência de relações CNAE entregue no código (12/10/2026)
+
+- Migration **064**: `taxonomy_release_actuacao_cnae_origins` referencia os conceitos de Atuação da **mesma release**, preserva CNAE de sete dígitos, linha original, SHA-256 de fonte, unicidade e integridade referencial; trigger impede mutação em releases publicadas.
+- `src/modules/taxonomy/curation/curation.actuacao.ts`: importa **somente a projeção autenticada** dos 1.332 pares CNAE–Atuação da Segmento v1.7.3; exige SHA original `588a8987…d6440cd` e também o digest da projeção `79436022…9da65`, valida 7 categorias, frequências, CNAEs únicos e linhas na ordem original. Mesma importação é idempotente; regravação divergente é recusada.
+- `curation.draft.ts`: cópia dos vínculos de origem para um futuro rascunho da mesma taxonomia, com novo vínculo ao conceito da release destino.
+- `taxonomy-admin.route.ts`: endpoint admin **/drafts/current/actuacao/origins**, protegido por role e transação de curadoria. **Não publica**, não reclassifica nem altera Segmento.
+- **Frontend PR #103:** permite enviar o JSON do relatório de dry-run do importador; o servidor confirma o hash da projeção antes de persistir no rascunho. Não é carga produtiva T03 de produtos/NCM.
+- **Teste real PG18 isolado: PASS.** [Run 38319587922](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/actions/runs/38319587922): `test/taxonomy.actuacao.integration.test.ts` — persistência, unicidade, isolamento no rascunho, dados adulterados rejeitados e imutabilidade depois da publicação.
+- **Ainda pendente:** execução positiva de todos os **1.332 vínculos em conjunto** a partir dos binários finais recebidos no GitHub, revisão independente, regressão integral e gates para qualquer merge/deploy. O teste PG18 não realizou carga produtiva.
+
+## F2-T00/T03 — entrega dos novos XLSX ainda NÃO confirmada remotamente
+
+A verificação final da branch do PR de governança **#105** continua mostrando **apenas `docs/reference-data/f2/README.md`**. Não existe objeto XLSX para calcular o SHA remoto de Produto v1.7.1 ou Segmento v1.7.3. Os arquivos locais disponíveis nesta execução são **Produto v1.7.0** e **Segmento v1.7.3** anteriores. Portanto **não declarar dry-run v1.7.1 com zero erros**: é `NOT_RUN — SOURCE_MISSING`. Os 442 alertas de cardinalidade são **aceitos como ESPERADO** e não causam associação por índice. Atualizar manifesto e pins **somente após verificar arquivos novos**, sem contornar anomalias no importador.
+
+**Avanço estimado do lote T01–T03:** 80% (implementação T01/T02, testes PG18 + CI rápido; novo XLSX/dry-run e revisão final pendentes). Ambos os PRs continuam DRAFT.
