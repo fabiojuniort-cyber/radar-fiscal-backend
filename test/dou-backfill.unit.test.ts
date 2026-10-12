@@ -382,3 +382,29 @@ test('parser-only partial success resets the streak despite older failures and k
     await db.destroy();
   }
 });
+
+
+test('L18 read-only preview reconciles protected originals without inserts', async () => {
+  const { l18PreviewReconcile } = await import('../src/infrastructure/database/dou-l18-preview.js');
+  const make = (date: string, section: string, title: string, outcome: 'MAINTAIN' | 'DISCARD', identity: string) => ({
+    date, section, title, outcome, identity, key: date+'|'+section+'|'+title.toLowerCase(), reason: outcome === 'MAINTAIN' ? 'KEEP_ALWAYS' : 'EXCLUDE_ALWAYS',
+  });
+  const originals = [
+    { date: '2026-09-09', section: 'DO1', title: 'Ato A', actNumber: '1', officialUrl: 'https://in.gov.br/a' },
+    { date: '2026-09-09', section: 'DO1E', title: 'Ato B', actNumber: '2', officialUrl: 'https://in.gov.br/b' },
+    { date: '2026-09-09', section: 'DO3', title: 'Ato C', actNumber: '3', officialUrl: 'https://in.gov.br/c' },
+  ];
+  const result = l18PreviewReconcile({ version: 1, dates: ['2026-09-09'], sections: ['DO1', 'DO1E', 'DO3'], items: originals }, [
+    make('2026-09-09','DO1','Ato A','MAINTAIN','identity-1'),
+    make('2026-09-09','DO1','Ato A','MAINTAIN','identity-1'),
+    make('2026-09-09','DO1E','Ato B','DISCARD','identity-2'),
+    make('2026-09-09','DO3','Ato Diferente','MAINTAIN','identity-4'),
+  ],5);
+  assert.equal(result.recoverable,1);
+  assert.equal(result.originalFiltered,1);
+  assert.equal(result.notFound,1);
+  assert.equal(result.otherMaintained,1);
+  assert.equal(result.discardedByCollectionFilter,1);
+  assert.equal(result.discardedByConnectorScope,5);
+  assert.equal(result.totalDiscarded,6);
+});
