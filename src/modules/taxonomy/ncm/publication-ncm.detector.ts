@@ -66,7 +66,7 @@ interface CatalogMatch {
 }
 
 const CANDIDATE_RE = /(?<![\d.])(\d{8}|\d{4}\.\d{2}\.\d{2}|\d{4}\.\d{4})(?![\d]|\.\d)/g;
-const SHORT_CONTEXT_RE = /(?<![\p{L}\d])(NCM|TIPI|posi[cç][aã]o|subposi[cç][aã]o|cap[ií]tulo|c[oó]digo)(?![\p{L}])\s*(?:da\s+NCM\s*)?(?:n[º°o]\s*)?[:#-]?\s*(\d{2}(?:\.?\d{2}){0,2})(?![\d.]|\s*\/\s*\d)/giu;
+const SHORT_CONTEXT_RE = /(?<![\p{L}\d])(NCM|TIPI|posi[cç][aã]o|subposi[cç][aã]o|cap[ií]tulo|c[oó]digo)(?![\p{L}])\s*(?:da\s+NCM\s*)?(?:n[º°o]\s*)?[:#-]?\s*(\d{2}(?:\.?\d{2}){0,2})(?!\d|\.\d|\s*\/\s*\d)/giu;
 const EXCERPT_RADIUS = 120;
 const FAILED_RETRY_INTERVAL = '15 minutes';
 
