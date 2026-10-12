@@ -12,6 +12,7 @@ import {
   F2_SOURCE,
   planImport,
   parseApprovedWorkbook,
+  parseWorksheet,
   normalizeProductNcm,
   ncmMatchesEitherPrefix,
   segmentSubsegmentLabel,
@@ -145,4 +146,31 @@ test('T03 rejects each invalid Produto NCM token without guessing or stripping p
     const result = planImport(segments, make(ncm));
     assert.ok(!result.issues.errors.some(e => e.includes('NCM inválido')), ncm);
   }
+});
+
+test('F2-T03: self-closing empty XLSX cells cannot shift following columns', () => {
+  const xml = '<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<x:sheetData><x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>Segmento</x:t></x:is></x:c>' +
+    '<x:c r="B1" s="2"/>' +
+    '<x:c r="C1" t="inlineStr"><x:is><x:t>Atuação</x:t></x:is></x:c>' +
+    '<x:c r="D1" t="inlineStr"><x:is><x:t>Produtos;Sementes</x:t></x:is></x:c>' +
+    '</x:row></x:sheetData></x:worksheet>';
+  const rows = parseWorksheet(xml, []);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], ['Segmento', '', 'Atuação', 'Produtos;Sementes']);
+  assert.equal(rows[0][1], '', 'empty B1 remains at index 1 rather than consuming C1');
+});
+
+test('F2-T03: source cardinality warnings survive empty Sinônimos column', () => {
+  const segments = [[
+    'Agro', 'Grãos', 'Produção agropecuária', '0111-3/03', 'Trigo', '',
+    'Trigo em grão;Trigo preto', '1001.10.90;1001.90.90;1008.10.90',
+    'x', 'x', '1', 'sector.trigo',
+  ]];
+  const products = [[
+    'Agro', 'Grãos', 'Trigo', '1001.10.90', '', 'x', 'x', '1', 'product.trigo', 'Trigo',
+  ]];
+  const result = planImport(segments, products);
+  assert.equal(result.issues.warnings.filter(w => w.includes('cardinalidade')).length, 1);
+  assert.equal(result.summary.warnings, 1);
 });
