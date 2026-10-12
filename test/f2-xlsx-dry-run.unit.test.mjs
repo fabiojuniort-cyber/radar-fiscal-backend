@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 
+import { F2_ACTUACAO_SEED, F2_ACTUACAO_SOURCE_SHA256 } from '../src/modules/taxonomy/curation/curation.actuacao.js';
+
 import {
   F2_SOURCE,
   planImport,
@@ -98,4 +100,15 @@ test('T03 CLI refuses --confirm before touching inputs, even when invoked accide
   ], { encoding: 'utf8', timeout: 10_000 });
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /Carga produtiva proibida/);
+});
+
+test('T02 seeds exactly the seven workbook Atuação categories without inheriting Segmento aliases', () => {
+  assert.equal(F2_ACTUACAO_SOURCE_SHA256, F2_SOURCE.segmento.sha256);
+  assert.equal(F2_ACTUACAO_SEED.length, 7);
+  assert.equal(F2_ACTUACAO_SEED.reduce((sum, item) => sum + item.count, 0), 1332);
+  assert.deepEqual(F2_ACTUACAO_SEED.map(item => item.label), [
+    'Serviço', 'Indústria', 'Comércio atacadista', 'Produção agropecuária',
+    'Comércio varejista', 'Extração mineral', 'Representação comercial',
+  ]);
+  assert.ok(F2_ACTUACAO_SEED.every(item => item.code.startsWith('actuacao.')));
 });
