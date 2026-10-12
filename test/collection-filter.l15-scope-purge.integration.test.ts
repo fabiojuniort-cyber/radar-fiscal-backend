@@ -190,13 +190,13 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(preview.statusCode,200,preview.body);
     const plan=preview.json<{count:number;outOfScope:number;ruleDiscards:number;byRule:Array<{count:number}>;hiddenLegacy:number;blockedCompany:number;
       blockedOtherSource:number;token:string}>();
-    assert.equal(plan.count,4);
+    assert.equal(plan.count,5);
     assert.equal(plan.outOfScope,2);
     assert.equal(plan.ruleDiscards,1);
     assert.equal(plan.byRule.reduce((n,r)=>n+r.count,0),1);
-    assert.equal(plan.hiddenLegacy,1);
+    assert.equal(plan.hiddenLegacy,2);
     assert.equal(plan.blockedCompany,2);
-    assert.equal(plan.blockedOtherSource,3);
+    assert.equal(plan.blockedOtherSource,2);
     assert.match(plan.token,/^[a-f0-9]{64}$/);
 
     const rejected=await app.inject({method:'POST',url:confirmRoute,headers,
@@ -206,9 +206,9 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(rejected.json<{changed:boolean;apagadas:number}>().apagadas,0);
 
     const applied=await app.inject({method:'POST',url:confirmRoute,headers,
-      payload:{expectedCount:4,previewToken:plan.token}});
+      payload:{expectedCount:5,previewToken:plan.token}});
     assert.equal(applied.statusCode,200,applied.body);
-    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,4);
+    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,5);
     assert.equal(applied.json<{apagadas:number;restantes:number}>().restantes,0);
     const present=await db.query<{id:string}>(
       'SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids],
@@ -219,9 +219,9 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       [Object.values(hiddenIds)],
     );
     assert.deepEqual(new Set(hiddenRemaining.rows.map(x=>x.id)),new Set([
-      hiddenIds['hidden-company'],hiddenIds['hidden-other'],hiddenIds['hidden-non-dou'],
+      hiddenIds['hidden-company'],hiddenIds['hidden-other'],
     ]));
-    const removedIds=[ids[0]!,hiddenIds.hidden!,hiddenIds['hidden-scope']!,hiddenRuleId];
+    const removedIds=[ids[0]!,hiddenIds.hidden!,hiddenIds['hidden-scope']!,hiddenRuleId,hiddenIds['hidden-non-dou']!];
     const audit=await db.query<{deleted:string}>(
       "SELECT COALESCE(sum((after_data->>'deletedCount')::integer),0)::text AS deleted "+
       "FROM audit_log a WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
@@ -229,14 +229,14 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       "WHERE d.id::uuid=ANY($1::uuid[]))",
       [removedIds],
     );
-    assert.equal(Number(audit.rows[0]?.deleted),4,'051 append-only audit per committed sub-batch');
+    assert.equal(Number(audit.rows[0]?.deleted),5,'051 append-only audit per committed sub-batch');
     const archived=await db.query<{id:string;discard_origin:string;archive_publication_id:string;
       reason_code:string;official_url:string;collection_run_id:string|null}>(
       "SELECT id,discard_origin,archive_publication_id,reason_code,official_url,collection_run_id "+
       "FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])",
       [removedIds],
     );
-    assert.equal(archived.rowCount,4,'every physically purged publication gets one archive discard');
+    assert.equal(archived.rowCount,5,'every physically purged publication gets one archive discard');
     for(const row of archived.rows){
       assert.equal(row.discard_origin,'ARCHIVE');
       assert.equal(row.reason_code,'ARCHIVE_PURGE');
@@ -500,6 +500,115 @@ test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Re
   }finally{await worker.end();await admin.end();}
 });
 
+test('L18 PG18: cross-source 029 and DOE-SP type mismatch are distinct, guarded and archived',async()=>{
+  const admin=new Pool({connectionString:url,max:1});
+  const app=await buildApp();
+  const suffix=randomUUID().slice(0,8);
+  const ids:Record<string,string>={};
+  try {
+    await app.ready();
+    const email='l18-purge-'+suffix+'@example.test';
+    const reg=await app.inject({method:'POST',url:'/auth/register',payload:{
+      name:'L18 security',email,company:'L18 Test Tenant '+suffix,
+      password,confirmPassword:password,acceptedTerms:true,
+    }});
+    assert.equal(reg.statusCode,201,reg.body);
+    const user=reg.json<{user:{id:string};tenant:{id:string}}>();
+    const login=await app.inject({method:'POST',url:'/auth/login',payload:{email,password}});
+    assert.equal(login.statusCode,200,login.body);
+    const headers={authorization:'Bearer '+login.json<{accessToken:string}>().accessToken,
+      'x-tenant-id':user.tenant.id};
+    const previewRoute='/api/v1/admin/collection-filter/out-of-scope/preview';
+    const confirmRoute='/api/v1/admin/collection-filter/out-of-scope/confirm';
+    assert.equal((await app.inject({method:'POST',url:previewRoute,headers})).statusCode,403);
+    await admin.query(
+      "INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','l18-test')",
+      [user.user.id],
+    );
+    // L17 DOU runtime remains required by the same old preview, even when
+    // this isolated fixture exercises only non-DOU special candidates.
+    await admin.query(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "VALUES('dou','DOU','FEDERAL','https://example.test','dou') ON CONFLICT DO NOTHING",
+    );
+    const doe=(await admin.query<{id:string}>(
+      "SELECT id FROM sources WHERE code='doe-sp' LIMIT 1"
+    )).rows[0]?.id??(await admin.query<{id:string}>(
+      "INSERT INTO sources(code,name,jurisdiction_level,uf,base_url,connector_key) "+
+      "VALUES('doe-sp','DOE-SP','STATE','SP','https://doe.example.test','doe-sp') RETURNING id"
+    )).rows[0]!.id;
+    const other=(await admin.query<{id:string}>(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "VALUES($1,'Other L18','FEDERAL','https://other.example.test',$1) RETURNING id",
+      ['l18-other-'+suffix],
+    )).rows[0]!.id;
+    async function item(key:string,sourceId:string,type:string,title:string,otherOrigin=false){
+      const id=(await admin.query<{id:string}>(
+        "INSERT INTO publications(identity_hash,identity_strength,identity_basis,"+
+        "jurisdiction_level,uf,act_type,title,primary_official_url) "+
+        "VALUES($1,'STRONG','{}'::jsonb,'STATE','SP',$2,$3,$4) RETURNING id",
+        [sha('l18'+suffix+key),type,title,'https://l18.example.test/'+suffix+'/'+key]
+      )).rows[0]!.id;
+      ids[key]=id;
+      await admin.query(
+        "INSERT INTO publication_origins(publication_id,source_id,official_url) "+
+        "VALUES($1,$2,$3)",[id,sourceId,'https://l18.example.test/origin/'+id],
+      );
+      if(otherOrigin)await admin.query(
+        "INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)",
+        [id,other,'https://l18.example.test/second/'+id],
+      );
+      return id;
+    }
+    await item('legacyDoe',doe,'AVISO DE LICITAÇÃO','Aviso administrativo');
+    await item('legacyOther',other,'COMUNICADO DGFIN','Comunicado administrativo');
+    await item('doeMismatch',doe,'EMENDA CONSTITUCIONAL','PDs Pagas');
+    await item('doeCorrect',doe,'EMENDA CONSTITUCIONAL','Emenda Constitucional 9');
+    await item('otherMismatch',other,'EMENDA CONSTITUCIONAL','PDs outra origem');
+    await item('protectedOrigin',doe,'EMENDA CONSTITUCIONAL','PDs duas fontes',true);
+    await item('protectedCompany',doe,'AVISO DE LICITAÇÃO','Aviso empresa vinculada');
+    const company=(await admin.query<{id:string}>(
+      "INSERT INTO companies(tenant_id,legal_name,head_office_cnpj) "+
+      "VALUES($1,$2,$3) RETURNING id",
+      [user.tenant.id,'L18 Protected '+suffix,'14'+String(Math.floor(Math.random()*1e12)).padStart(12,'0')]
+    )).rows[0]!.id;
+    await admin.query("INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)",
+      [company,ids.protectedCompany]);
+
+    const pre=await app.inject({method:'POST',url:previewRoute,headers});
+    assert.equal(pre.statusCode,200,pre.body);
+    const plan=pre.json<{count:number;hiddenLegacy:number;suspectDoe:number;
+      blockedCompany:number;blockedOtherSource:number;token:string}>();
+    assert.ok(plan.hiddenLegacy>=2,'029 must include DOE-SP and the unrelated source');
+    assert.ok(plan.suspectDoe>=1,'DOE-SP title mismatch must be separate');
+    assert.ok(plan.blockedCompany>=1,'company link protected');
+    assert.ok(plan.blockedOtherSource>=1,'multiple official sources protected');
+    const confirmed=await app.inject({method:'POST',url:confirmRoute,headers,payload:{
+      expectedCount:plan.count,previewToken:plan.token,
+    }});
+    assert.equal(confirmed.statusCode,200,confirmed.body);
+    assert.equal(confirmed.json<{changed:boolean}>().changed,false);
+    for(const key of ['legacyDoe','legacyOther','doeMismatch']){
+      assert.equal((await admin.query('SELECT 1 FROM publications WHERE id=$1',[ids[key]])).rowCount,0,key+' should be purged');
+      const archived=await admin.query<{source_code:string;discard_origin:string}>(
+        "SELECT source_code,discard_origin FROM collection_filter_discards "+
+        "WHERE archive_publication_id=$1",[ids[key]]);
+      assert.equal(archived.rowCount,1,key+' must be stored in Desconsiderados');
+      assert.equal(archived.rows[0]?.discard_origin,'ARCHIVE');
+      assert.equal(archived.rows[0]?.source_code,key==='legacyOther'?'l18-other-'+suffix:'doe-sp');
+    }
+    for(const key of ['doeCorrect','otherMismatch','protectedOrigin','protectedCompany']){
+      assert.equal((await admin.query('SELECT 1 FROM publications WHERE id=$1',[ids[key]])).rowCount,1,key+' must be preserved');
+    }
+    const post=await app.inject({method:'POST',url:previewRoute,headers});
+    assert.equal(post.statusCode,200,post.body);
+    assert.equal(post.json<{suspectDoe:number}>().suspectDoe,0);
+  }finally{
+    await app.close();
+    await admin.end();
+  }
+});
+
 test('L17 hotfix PG18: 3000 rules and 12000 archive records, preview <30s',runL17RuleCapStress);
 
 test('L18: preservation policy migration adds seven global STRONG tax terms without changing unrelated rules', async () => {
@@ -533,3 +642,5 @@ test('L18: preservation policy migration adds seven global STRONG tax terms with
       [true,true,true,true,false,false]);
   } finally {await db.end();}
 });
+
+
