@@ -580,8 +580,8 @@ test('L18 PG18: cross-source 029 and DOE-SP type mismatch are distinct, guarded 
     async function item(key:string,sourceId:string,type:string,title:string,otherOrigin=false){
       const id=(await admin.query<{id:string}>(
         "INSERT INTO publications(identity_hash,identity_strength,identity_basis,"+
-        "jurisdiction_level,act_type,title,primary_official_url) "+
-        "VALUES($1,'STRONG','{}'::jsonb,'STATE',$2,$3,$4) RETURNING id",
+        "jurisdiction_level,uf,act_type,title,primary_official_url) "+
+        "VALUES($1,'STRONG','{}'::jsonb,'STATE','SP',$2,$3,$4) RETURNING id",
         [sha('l18'+suffix+key),type,title,'https://l18.example.test/'+suffix+'/'+key]
       )).rows[0]!.id;
       ids[key]=id;
