@@ -90,12 +90,28 @@ async function main() {
     const filters = await pool.query<{ discard_count: number }>(
       `SELECT discard_count FROM collection_filter_discard_run_stats
        WHERE collection_run_id=ANY($1::uuid[])`, [ids]);
+    const attempts = await pool.query<{ collection_run_id: string; attempt_no: number; metadata: unknown }>(
+      `SELECT collection_run_id, attempt_no, metadata FROM collection_attempts
+       WHERE collection_run_id=ANY($1::uuid[]) AND status='SUCCESS'
+       ORDER BY collection_run_id, attempt_no DESC`, [ids]);
+    let scopeIgnored = 0;
+    const seenAttempts = new Set<string>();
+    for (const attempt of attempts.rows) {
+      if (seenAttempts.has(attempt.collection_run_id)) continue;
+      seenAttempts.add(attempt.collection_run_id);
+      const meta = attempt.metadata as { dou?: { scope?: { ignoredCount?: number } } } | null;
+      scopeIgnored += Math.max(0, meta?.dou?.scope?.ignoredCount ?? 0);
+    }
+    const filterDiscards = filters.rows.reduce((n, r) => n + r.discard_count, 0);
     const result = l18Reconcile(manifest, data.rows);
     const report = {
       ...result, runIds: ids,
-      discardedByCollectionFilter: filters.rows.reduce((n, r) => n + r.discard_count, 0),
+      discardedByCollectionFilter: filterDiscards,
+      discardedByConnectorScope: scopeIgnored,
+      totalDiscarded: filterDiscards + scopeIgnored,
       runsMissingDiscardStats: ids.length - filters.rows.length,
-      note: 'Counts only distinct accepted publications associated with the supplied replay runs. Connector-level ignored items are separate from collection filter discards.',
+      runsMissingSuccessfulAttemptMetadata: ids.length - seenAttempts.size,
+      note: 'Scope ignored items and collection-filter discards are different stages. Totals are provisional when any run lacks telemetry.',
     };
     const out = getArg('out');
     if (out) writeFileSync(out, JSON.stringify(report, null, 2) + '\n');
