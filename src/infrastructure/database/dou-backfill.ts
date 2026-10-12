@@ -84,6 +84,8 @@ const previousMonthStart = new Date(Date.UTC(year, month - 2, 1)).toISOString().
 const from = arg('from') ?? previousMonthStart;
 const to = arg('to') ?? addDays(today, -3);
 const maxBatches = positiveInt('max-batches', 20, 500);
+const replayBatchNumber = arg('batch-number') !== undefined ? positiveInt('batch-number', 1, 7) : undefined;
+if (replayBatchNumber !== undefined && !forceCovered) throw new Error('--batch-number is only supported for explicit L18 replay.');
 const guardMinutes = positiveInt('guard-minutes', 20, 240);
 const timeoutMs = positiveInt('timeout-ms', Number(process.env.COLLECTION_TIMEOUT_MS ?? 900_000), 3_600_000);
 
@@ -126,17 +128,22 @@ try {
   if (forceCovered && dates.length !== 26) {
     throw new DouBackfillBlockedError('L18 replay requires exactly 26 distinct dates from the approved manifest.');
   }
-  const batches = douBackfillBatches(dates).slice(0, maxBatches);
-  if (forceCovered && batches.length !== douBackfillBatches(dates).length) {
+  const allBatches = douBackfillBatches(dates);
+  if (forceCovered && replayBatchNumber !== undefined && replayBatchNumber > allBatches.length) {
+    throw new DouBackfillBlockedError('L18 replay batch number does not exist.');
+  }
+  const batches = replayBatchNumber !== undefined
+    ? [allBatches[replayBatchNumber - 1]!] : allBatches.slice(0, maxBatches);
+  if (forceCovered && replayBatchNumber === undefined && batches.length !== allBatches.length) {
     throw new DouBackfillBlockedError('L18 replay must not silently truncate the 26 dates.');
   }
   console.log('DOU_BACKFILL_PLAN=' + JSON.stringify({
     mode: apply ? 'APPLY' : 'DRY_RUN',
     from, to, today,
-    ...(forceCovered ? { replayCoveredDates: true, sections: selectedSections } : {}),
+    ...(forceCovered ? { replayCoveredDates: true, sections: selectedSections, replayBatchNumber: replayBatchNumber ?? null } : {}),
     missingDates: dates,
     batches,
-    skippedBatches: Math.max(0, douBackfillBatches(dates).length - batches.length),
+    skippedBatches: Math.max(0, allBatches.length - batches.length),
   }));
 
   if (apply) {
