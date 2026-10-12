@@ -92,8 +92,35 @@ test('curated classifier tags by label, synonyms, NCM prefix and cClassTrib with
   assert.equal(byCode.get('product.rice')!.matchedTerm, '10063011');
   assert.equal(byCode.get('treatment.rate_reduction')!.reasonCode, 'OFFICIAL_CODE_CCLASSTRIB');
   assert.equal(byCode.get('treatment.rate_reduction')!.matchedTerm, '200034');
-  assert.equal(plan.engineVersion, '2.2.0');
+  assert.equal(plan.engineVersion, '2.3.0');
   assert.match(plan.fingerprint.runFingerprint, /^[a-f0-9]{64}$/);
+});
+
+
+test('F2-T03: curated classifier recognizes legal NCM by prefix in either direction', () => {
+  const base = {
+    publicationVersionId: '00000000-0000-4000-8000-000000000003',
+    taxonomyReleaseId: '00000000-0000-4000-8000-000000000004',
+    title: 'NCM citada sem descrição do produto',
+    contentText: '',
+    codeGitSha: 'f'.repeat(40),
+  };
+  const classify = (norm: string, conceptNcm: string) =>
+    planCuratedClassification({
+      ...base,
+      ncmCodes: [norm],
+      concepts: [concept('product.rice', 'Arroz', {
+        classifyByLabel: false,
+        ncmPrefixes: [conceptNcm],
+      })],
+    }).assertions.map(a => a.conceptCode);
+  assert.deepEqual(classify('10063011', '1006'), ['product.rice']);
+  assert.deepEqual(classify('1006', '10063011'), ['product.rice']);
+  assert.deepEqual(classify('10.06', '1006.30.11'), ['product.rice']);
+  assert.deepEqual(classify('1006.30.11', '10'), ['product.rice']);
+  assert.deepEqual(classify('1006', '1007'), []);
+  assert.deepEqual(classify('1006/30', '10063011'), []);
+  assert.deepEqual(classify('10063011', '1006-30'), []);
 });
 
 test('label matching respects token boundaries and maps excerpts back to raw text', () => {
