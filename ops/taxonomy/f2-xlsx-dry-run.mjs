@@ -17,7 +17,7 @@ export const F2_SOURCE = Object.freeze({
     columns: ['Segmento', 'Sub Segmento', 'Atuação', 'CNAE', 'Descrição do CNAE', 'Sinônimos', 'Produtos (sugeridos)', 'NCMs (sugeridos)', 'No perfil', 'Classificar pelo nome', 'Ordem', 'Código TriFaros'],
   }),
   produto: Object.freeze({
-    sha256: '35e886e711f0c1c793daaa6a5e61c5500f3ab235913b9bc8e026ea8d8fc0db49',
+    sha256: '45f2594ad53bb83408fbf198f51dec8bffdf3801a053c8ffcfe544542d51b2b8',
     rows: 3793,
     sheet: 'Produto',
     columns: ['Segmento', 'Grupo', 'Item', 'NCM', 'Sinônimos', 'No perfil', 'Classificar pelo nome', 'Ordem', 'Código TriFaros', 'Definição'],
@@ -77,6 +77,7 @@ function richText(xml) {
 
 function parseSharedStrings(xml) {
   if (!xml) return [];
+  xml = xml.replace(/<(\/?)x:(?=[A-Za-z])/g, '<$1');
   if (/<!(?:DOCTYPE|ENTITY)/i.test(xml)) fail('DOCTYPE/ENTITY não permitido');
   const result = [];
   for (const match of xml.matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g)) {
@@ -94,6 +95,7 @@ function columnIndex(reference) {
 }
 
 function parseWorksheet(xml, shared) {
+  xml = xml.replace(/<(\/?)x:(?=[A-Za-z])/g, '<$1');
   if (!/<worksheet\b/.test(xml) || /<!(?:DOCTYPE|ENTITY)/i.test(xml)) fail('Planilha XML inválida');
   if (/<f(?:\s|>)/.test(xml)) fail('Fórmulas não são permitidas nas fontes congeladas');
   const rows = [];
@@ -165,8 +167,7 @@ export async function parseApprovedWorkbook(path, kind) {
   const hash = sha256(bytes);
   if (hash !== spec.sha256) fail(kind + ': hash divergente: ' + hash);
   const xml = await unzipEntry(bytes, 'xl/worksheets/sheet1.xml');
-  let shared = [];
-  if (kind === 'segmento') shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml'));
+  const shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml'));
   const rows = parseWorksheet(xml, shared);
   if (rows.length !== spec.rows + 1) fail(kind + ': número de linhas divergente: ' + (rows.length - 1));
   if (JSON.stringify(rows[0]) !== JSON.stringify(spec.columns)) {
