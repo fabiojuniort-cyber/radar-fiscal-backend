@@ -32,3 +32,22 @@ Contagem a partir das colunas G `Produtos (sugeridos)` e H `NCMs (sugeridos)`, s
 - **Sem correção automática** no importador, sem conversões legais implícitas.
 - Nova planilha corrigida = **novo hash**; atualizar o manifesto `docs/reference-data/f2/README.md` e pins do importador **somente ao recebimento e verificação**.
 - Carga produtiva apenas com **dry-run integrado + backup verificado + OK expresso de Fábio**, seguido da autorização CLAUDE-COORD para qualquer merge/deploy.
+
+## Nova auditoria da regra NCM — fonte v1.7.0 (12/10/2026)
+
+A regra pedida agora aceita **2/4/6/8 dígitos, com pontos opcionais**, e proíbe caracteres além de dígitos e pontos **em cada token NCM do campo Produto**, dividido por `;`. Ao aplicar essa regra estrita offline à antiga Produto v1.7.0, foram detectadas **seis anomalias adicionais até então mascaradas pela normalização permissiva**. Nenhum dado foi corrigido automaticamente:
+
+| Linha | Coluna | Valor antigo | Problema |
+| ---: | --- | --- | --- |
+| 31 | D (NCM) | `0201, 0202` | Dois códigos separados por vírgula |
+| 34 | D (NCM) | `1601, 1602` | Dois códigos separados por vírgula |
+| 43 | D (NCM) | `61, 62` | Dois capítulos separados por vírgula |
+| 81 | D (NCM) | `8541, 8542` | Dois códigos separados por vírgula |
+| 166 | D (NCM) | `3003, 3004` | Dois códigos separados por vírgula |
+| 180 | D (NCM) | `2504, 3801` | Dois códigos separados por vírgula |
+
+**Correção sugerida:** Fábio confirmar a identidade de cada código e, se forem de fato dois NCMs válidos, separar com `;`, preservando 2 ou 4 dígitos quando aplicável. **Não contornar no importador.** As seis ocorrências são adicionais às cinco anteriormente identificadas, totalizando **11 ocorrências na versão v1.7.0 sob a validação nova**. Não afirmar que persistem na v1.7.1 sem acesso ao arquivo corrigido.
+
+**Segmento v1.7.3, coluna H:** 18 entradas igualmente contêm valores concatenados por vírgula, mas a coluna é explicitamente `NCMs (sugeridos)` e permanece **texto sugestivo sem conversão em vínculo NCM oficial no T03**. Essas sugestões só poderão virar carga estruturada após curadoria e validação separadas.
+
+**422? Não:** os alertas de cardinalidade seguem **442 = 368 + 74**, todos ESPERADOS e aceitos. Nenhum pareamento produto×NCM por posição.
