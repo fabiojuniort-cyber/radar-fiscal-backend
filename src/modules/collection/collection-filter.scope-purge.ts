@@ -14,11 +14,17 @@ interface ScopeRow {
   out_of_scope: boolean;
   hidden_legacy: boolean;
 }
+interface SpecialRow {
+  publication_id:string;updated_at:Date;source_code:string|null;
+  has_company:boolean;has_other_source:boolean;
+  hidden_legacy:boolean;suspect_doe:boolean;
+}
 
 export interface OutOfScopePreview {
   count: number;
   outOfScope: number;
   hiddenLegacy: number;
+  suspectDoe: number;
   ruleDiscards: number;
   byRule: Array<{section:string;canonicalType:string;mode:string;count:number}>;
   blockedCompany: number;
@@ -26,11 +32,11 @@ export interface OutOfScopePreview {
   token: string;
 }
 
-type Bucket='OUT_OF_SCOPE'|'HIDDEN'|'RULE';
+type Bucket='OUT_OF_SCOPE'|'HIDDEN'|'RULE'|'SUSPECT_DOE';
 type RuleRow={source_code:string;section:string;canonical_type:string;
   mode:DirectRuleInput['mode']};
-type Match={bucket:Bucket;rule?:RuleRow;protected?:'COMPANY'|'OTHER'};
-const ORDER:Record<Bucket,number>={OUT_OF_SCOPE:0,RULE:1,HIDDEN:2};
+type Match={bucket:Bucket;rule?:RuleRow;source?:string;protected?:'COMPANY'|'OTHER'};
+const ORDER:Record<Bucket,number>={OUT_OF_SCOPE:0,RULE:1,HIDDEN:2,SUSPECT_DOE:3};
 
 // One published decision policy: direct historical candidate selection reuses
 // EXACTLY the compiled TypeScript filter engine (including strong/weak terms).
@@ -154,9 +160,38 @@ async function scopeCandidates(trx: Transaction<DB>) {
       }
     }
   }
+  // L-18: read only non-DOU legacy 029 and visible DOE-SP mis-typed acts.
+  // The existing DOU policy/rule/scope selection remains authoritative.
+  let specialAfter:string|null=null, specialPages=0;
+  while(true){
+    if(++specialPages>10000)throw new Error('l18_special_paging_cap');
+    const page=await sql<SpecialRow>`
+      SELECT * FROM public.l18_special_cleanup_candidates(
+        ${specialAfter}::uuid,500
+      )
+    `.execute(trx);
+    if(!page.rows.length)break;
+    for(const row of page.rows){
+      const previous=seen.get(row.publication_id);
+      if(previous && previous.bucket!=='HIDDEN')continue;
+      const blocked=row.has_company?'COMPANY':row.has_other_source?'OTHER':undefined;
+      const bucket:Bucket=row.hidden_legacy?'HIDDEN':'SUSPECT_DOE';
+      // Legacy non-DOU used to be marked OTHER merely because DOU was absent.
+      // Re-evaluate the true cross-source count without overriding DOU guards.
+      seen.set(row.publication_id,{
+        bucket,...(row.source_code?{source:row.source_code}:{}),
+        ...(blocked?{protected:blocked}:{}),
+      });
+      hash.update('L18').update(row.publication_id)
+        .update(new Date(row.updated_at).toISOString())
+        .update(row.source_code??'-').update(bucket).update(blocked??'-');
+    }
+    specialAfter=page.rows[page.rows.length-1]!.publication_id;
+    if(page.rows.length<500)break;
+  }
   const ids:string[]=[];
   const kinds=new Map<string,Match>();
-  let outOfScope=0,ruleDiscards=0,hiddenLegacy=0;
+  let outOfScope=0,ruleDiscards=0,hiddenLegacy=0,suspectDoe=0;
   let blockedCompany=0,blockedOtherSource=0;
   const stats=new Map<string,{section:string;canonicalType:string;mode:string;count:number}>();
   const list=[...seen.entries()].sort((a,b)=>
@@ -167,6 +202,7 @@ async function scopeCandidates(trx: Transaction<DB>) {
     kinds.set(id,match);ids.push(id);
     if(match.bucket==='OUT_OF_SCOPE')outOfScope++;
     else if(match.bucket==='HIDDEN')hiddenLegacy++;
+    else if(match.bucket==='SUSPECT_DOE')suspectDoe++;
     else{
       ruleDiscards++;
       const rule=match.rule!;
@@ -177,18 +213,18 @@ async function scopeCandidates(trx: Transaction<DB>) {
     }
   }
   hash.update(JSON.stringify([...list].map(([id,m])=>
-    [id,m.bucket,m.protected??'-',m.rule?.canonical_type??'-'])));
+    [id,m.bucket,m.protected??'-',m.source??'-',m.rule?.canonical_type??'-'])));
   const byRule=[...stats.values()];
-  return{ids,kinds,count:ids.length,outOfScope,ruleDiscards,hiddenLegacy,
+  return{ids,kinds,count:ids.length,outOfScope,ruleDiscards,hiddenLegacy,suspectDoe,
     blockedCompany,blockedOtherSource,byRule,token:hash.digest('hex')};
 }
 
 export async function previewOutOfScopePurge(db: Kysely<DB>, actor: string):
   Promise<OutOfScopePreview> {
   return withUserContext(db, actor, async trx => {
-    const { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, blockedCompany, blockedOtherSource, token } =
+    const { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token } =
       await scopeCandidates(trx);
-    return { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, blockedCompany, blockedOtherSource, token };
+    return { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token };
   });
 }
 
@@ -215,7 +251,7 @@ export async function confirmOutOfScopePurge(
     if (plan.count !== expectedCount || plan.token !== previewToken) {
       return { changed: true, count: plan.count,
         outOfScope: plan.outOfScope, ruleDiscards:plan.ruleDiscards,byRule:plan.byRule,
-        hiddenLegacy: plan.hiddenLegacy,
+        hiddenLegacy: plan.hiddenLegacy,suspectDoe:plan.suspectDoe,
         blockedCompany: plan.blockedCompany,
         blockedOtherSource: plan.blockedOtherSource,
         token: plan.token, apagadas: 0, restantes: plan.count, deletedCount: 0 };
@@ -230,7 +266,7 @@ export async function confirmOutOfScopePurge(
       if(locked.count!==plan.count||locked.token!==plan.token){
         return{changed:true,count:locked.count,token:locked.token,
           outOfScope:locked.outOfScope,ruleDiscards:locked.ruleDiscards,
-          byRule:locked.byRule,hiddenLegacy:locked.hiddenLegacy,
+          byRule:locked.byRule,hiddenLegacy:locked.hiddenLegacy,suspectDoe:locked.suspectDoe,
           blockedCompany:locked.blockedCompany,
           blockedOtherSource:locked.blockedOtherSource,
           apagadas:0,restantes:locked.count,deletedCount:0};
@@ -240,15 +276,15 @@ export async function confirmOutOfScopePurge(
     const operation=randomUUID();
     for(let offset=0;offset<selection.length;offset+=100){
       const part=selection.slice(offset,offset+100);
-      const batches=new Map<string,{ids:string[];bucket:Bucket;rule?:RuleRow}>();
+      const batches=new Map<string,{ids:string[];bucket:Bucket;rule?:RuleRow;source?:string}>();
       for(const id of part){
         const meta=plan.kinds.get(id);
         if(!meta)throw new Error('l17_plan_identity_mismatch');
         const key=meta.bucket==='RULE'
           ?JSON.stringify([meta.bucket,meta.rule?.section,meta.rule?.canonical_type,meta.rule?.mode])
-          :meta.bucket;
+          :JSON.stringify([meta.bucket,meta.source??'dou']);
         const group=batches.get(key)??{ids:[],bucket:meta.bucket,
-          ...(meta.rule?{rule:meta.rule}:{})};
+          ...(meta.rule?{rule:meta.rule}:{}),...(meta.source?{source:meta.source}:{})};
         group.ids.push(id);batches.set(key,group);
       }
       for(const group of batches.values()){
@@ -258,10 +294,19 @@ export async function confirmOutOfScopePurge(
             SELECT public.l15_out_of_scope_purge_batch(
               ${group.ids}::uuid[],${operation}::uuid) AS count
           `.execute(trx);
-        }else if(group.bucket==='HIDDEN'){
+        }else if(group.bucket==='HIDDEN'&&!group.source){
           result=await sql<{count:number}>`
             SELECT public.l17_cleanup_admin_batch(
               ${group.ids}::uuid[],${operation}::uuid) AS count
+          `.execute(trx);
+        }else if(group.bucket==='HIDDEN'||group.bucket==='SUSPECT_DOE'){
+          if(!group.source)throw new Error('l18_special_source_missing');
+          const section=group.bucket==='HIDDEN'?'L18_LEGACY_029':'L18_TYPE_MISMATCH';
+          const type=group.bucket==='HIDDEN'?'HIDDEN_LEGACY':'EMENDA CONSTITUCIONAL';
+          result=await sql<{count:number}>`
+            SELECT public.collection_filter_direct_purge_batch(
+              ${group.ids}::uuid[],${group.source},${section},
+              ${type},'EXCLUDE_ALWAYS',${operation}::uuid) AS count
           `.execute(trx);
         }else{
           const rule=group.rule;
@@ -282,7 +327,7 @@ export async function confirmOutOfScopePurge(
     const current = await scopeCandidates(trx);
     return { changed: false, apagadas, restantes: current.count,
       outOfScope: current.outOfScope,ruleDiscards:current.ruleDiscards,byRule:current.byRule,
-      hiddenLegacy: current.hiddenLegacy,
+      hiddenLegacy: current.hiddenLegacy,suspectDoe:current.suspectDoe,
       deletedCount: apagadas, blockedCompany: current.blockedCompany,
       blockedOtherSource: current.blockedOtherSource };
   });
