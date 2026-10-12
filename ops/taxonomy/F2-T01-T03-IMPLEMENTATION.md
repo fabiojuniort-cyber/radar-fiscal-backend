@@ -91,3 +91,13 @@ A verificação final da branch do PR de governança **#105** continua mostrando
 - **Dry-run solicitado Produto v1.7.1:** **NOT_RUN / INPUT_NOT_AVAILABLE**, pois o único Produto XLSX acessível nesta execução é a versão **1.7.0**, cujo SHA-256 é `35e886e711f0c1c793daaa6a5e61c5500f3ab235913b9bc8e026ea8d8fc0db49`. Segmento 1.7.3 local: `588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd`. Não confundir com 0 erros comprovados.
 - **442 diferenças cardinalidade:** **ESPERADO / ACEITO**; listas de produto e NCM sugeridos são independentes, sem pareamento 1:1.
 - **Gates inalterados:** #216 e web #103 seguem DRAFT, nenhum merge/deploy; T03 produtiva requer dry-run positivo v1.7.1, backup verificado, OK explícito do Fábio e OK CLAUDE-COORD para código.
+
+## Limitação distinta — detector de NCM de normas (não resolvida por comparador)
+
+**Descoberta:** `src/modules/taxonomy/ncm/publication-ncm.detector.ts` extrai atualmente **apenas NCM de oito dígitos** e `migrations/026_company_product_ncm.sql` define `publication_ncm_mentions.ncm_code CHAR(8)` com restrição `^[0-9]{8}$`. O novo comparador **bidirecional** de classificação e afinidade passa a tratar com segurança os NCMs de 2/4/6/8 já fornecidos como entrada, mas **não faz a norma com NCM de 2/4/6 no texto ingressar automaticamente no ledger de menções**.
+
+**Risco R3:** estender regex para capturar números curtos em textos legais geraria falsos positivos (artigo, número da lei, alíquota) e exigiria redesign de proveniência, detector/catálogo, migrar restrição `CHAR(8)`, revisão TAX13 e testes de vigência por dispositivo. Esta frente **não amplia o detector/ledger sem gate e sem revisão independente**. Portanto **não declarar suporte ponta a ponta para menções textuais de 2/4/6 dígitos**, nem antecipar deploy.
+
+## Auditoria adicional da fonte antiga após regra estrita
+
+Validação offline com as fontes locais **Produto v1.7.0** e **Segmento v1.7.3** (não é v1.7.1): na coluna Produto.NCM, há seis valores com vírgula anteriormente não apontados pelo importador antigo (linhas **31, 34, 43, 81, 166 e 180**). Com a validação nova e mais as cinco anomalias conhecidas, a versão antiga apresenta **11 ocorrências**. Ver [quadro detalhado](F2-T03-ANOMALIAS-ALERTAS.md). **A versão v1.7.1 pode ter resolvido essas linhas, mas não foi recebida/validada neste ambiente; zero erros segue NÃO COMPROVADO.**
