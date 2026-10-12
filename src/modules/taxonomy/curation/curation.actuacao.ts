@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 
-import { createConcept, type CuratorActor, requireOpenDraft } from './curation.draft.js';
+import { createConcept, CurationError, type CuratorActor, requireOpenDraft } from './curation.draft.js';
 
 // F2-T02: seven exact values and frequencies derived from the signed-off
 // Segmento v1.7.3 XLSX, column Atuação. Synonyms are intentionally NOT
@@ -32,7 +32,7 @@ export async function initializeF2Actuacao(
   client: PoolClient,
   actor: CuratorActor,
 ): Promise<F2ActuacaoResult> {
-  if (!actor.justification.trim()) throw new Error('JUSTIFICATION_REQUIRED');
+  if (!actor.justification.trim()) throw new CurationError('JUSTIFICATION_REQUIRED');
   const draft = await requireOpenDraft(client);
 
   const current = await client.query<{ id: string }>(
@@ -136,26 +136,26 @@ function originProjection(rows: readonly F2ActuacaoOriginInput[]): string {
 }
 
 export function validateF2ActuacaoOrigins(rows: readonly F2ActuacaoOriginInput[]): string {
-  if (rows.length !== 1332) throw new Error('F2_ORIGINS_ROW_COUNT_INVALID');
+  if (rows.length !== 1332) throw new CurationError('F2_ORIGINS_ROW_COUNT_INVALID');
   const counts = new Map<string, number>();
   const known = new Map<string, number>(F2_ACTUACAO_SEED.map((item) => [item.label, item.count]));
   const seen = new Set<string>();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
     if (row.sourceLine !== i + 2 || !/^[0-9]{7}$/.test(row.cnaeCode)) {
-      throw new Error('F2_ORIGINS_ROW_INVALID_' + (i + 2));
+      throw new CurationError('F2_ORIGINS_ROW_INVALID_' + (i + 2));
     }
-    if (!known.has(row.atuacaoLabel)) throw new Error('F2_ORIGINS_LABEL_INVALID');
-    if (seen.has(row.cnaeCode)) throw new Error('F2_ORIGINS_CNAE_DUPLICATE');
+    if (!known.has(row.atuacaoLabel)) throw new CurationError('F2_ORIGINS_LABEL_INVALID');
+    if (seen.has(row.cnaeCode)) throw new CurationError('F2_ORIGINS_CNAE_DUPLICATE');
     seen.add(row.cnaeCode);
     counts.set(row.atuacaoLabel, (counts.get(row.atuacaoLabel) ?? 0) + 1);
   }
   for (const [label, count] of known) {
-    if (counts.get(label) !== count) throw new Error('F2_ORIGINS_FREQUENCY_MISMATCH');
+    if (counts.get(label) !== count) throw new CurationError('F2_ORIGINS_FREQUENCY_MISMATCH');
   }
   const digest = createHash('sha256').update(originProjection(rows), 'utf8').digest('hex');
   if (digest !== F2_ACTUACAO_ORIGINS_PROJECTION_SHA256) {
-    throw new Error('F2_ORIGINS_PROJECTION_HASH_MISMATCH');
+    throw new CurationError('F2_ORIGINS_PROJECTION_HASH_MISMATCH');
   }
   return digest;
 }
@@ -167,9 +167,9 @@ export async function persistF2ActuacaoCnaeOrigins(
   rows: readonly F2ActuacaoOriginInput[],
   sourceSha256: string,
 ): Promise<F2ActuacaoOriginsResult> {
-  if (!actor.justification.trim()) throw new Error('JUSTIFICATION_REQUIRED');
+  if (!actor.justification.trim()) throw new CurationError('JUSTIFICATION_REQUIRED');
   if (sourceSha256 !== F2_ACTUACAO_SOURCE_SHA256) {
-    throw new Error('F2_ORIGINS_SOURCE_HASH_MISMATCH');
+    throw new CurationError('F2_ORIGINS_SOURCE_HASH_MISMATCH');
   }
   const projectionSha256 = validateF2ActuacaoOrigins(rows);
   const draft = await requireOpenDraft(client);
@@ -191,7 +191,7 @@ export async function persistF2ActuacaoCnaeOrigins(
     if (previous.rows.length !== 1332 ||
         previous.rows.some((item) => item.source_sha256 !== sourceSha256) ||
         originProjection(recovered) !== originProjection(rows)) {
-      throw new Error('F2_ORIGINS_EXISTING_ROWS_CONFLICT');
+      throw new CurationError('F2_ORIGINS_EXISTING_ROWS_CONFLICT');
     }
     return {
       releaseId: draft.id, sourceSha256, projectionSha256, originCount: rows.length,
@@ -206,7 +206,7 @@ export async function persistF2ActuacaoCnaeOrigins(
   );
   const present = new Set(selected.rows.map((row) => row.code));
   if (present.size !== 7 || F2_ACTUACAO_SEED.some((item) => !present.has(item.code))) {
-    throw new Error('F2_ACTUACAO_NOT_INITIALIZED');
+    throw new CurationError('F2_ACTUACAO_NOT_INITIALIZED');
   }
 
   const payload = rows.map((row) => ({
@@ -226,7 +226,7 @@ export async function persistF2ActuacaoCnaeOrigins(
     [draft.id, JSON.stringify(payload), sourceSha256],
   );
   if (inserted.rows.length !== rows.length) {
-    throw new Error('F2_ORIGINS_INSERT_READBACK_MISMATCH');
+    throw new CurationError('F2_ORIGINS_INSERT_READBACK_MISMATCH');
   }
   await client.query(
     `INSERT INTO audit_log
