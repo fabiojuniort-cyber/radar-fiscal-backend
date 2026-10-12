@@ -43,7 +43,7 @@ Os arquivos XLSX enviados na conversa foram examinados com um leitor de planilha
 
 A cardinalidade distinta não é erro em si: sugestões independentes podem referir grupos com quantidades diferentes. Não construir \`Produto × NCM\` por índice da lista.
 
-> **Observação de evidência:** o *resultado de 5 erros* foi obtido por inspeção independente offline dos XLSX locais. O comando Node introduzido neste PR **não foi executado ainda em ambiente com dependências de backend instaladas**, nem houve ensaio contra uma base de testes. Portanto, não confundir a inspeção com teste de integração do importador.
+> **Observação de evidência:** o *resultado de 5 erros* foi obtido por inspeção independente offline dos XLSX locais. **Os seis testes unitários do novo importador foram executados e passaram no CI rápido do GitHub**, incluindo recusa de hash incorreto e flags de carga; a execução integral do comando Node contra os dois XLSX reais **ainda não foi comprovada**, nem houve ensaio contra uma base de testes. Portanto, não confundir a inspeção offline com teste integrado do importador.
 
 ## Gates de T00 e T03
 
@@ -56,3 +56,10 @@ A cardinalidade distinta não é erro em si: sugestões independentes podem refe
 Este é o primeiro PR de **código do lote único**. Como os artefatos web e backend estão em repositórios diferentes, um único PR GitHub não consegue modificar os dois repositórios. Manter este PR como fonte de mudanças backend e **não abrir merge/deploy ou segundo PR sem decidir coordenação**. Divergência deverá ser explicitamente resolvida pelo CLAUDE-COORD; não inventar mecanismo de PR multirrepositório.
 
 **Percentual atual T01–T03:** 35% (parsing/plano/guardas + inspeção das fontes; ainda não classificação e UI completas).
+
+## CI de 12/10/2026 no PR #216 (HEAD `38817d59ee4ee445a794defdb6073f9a7362ccbe`)
+
+- **Typecheck, build, testes unitários gerais, 6 testes do F2, RFB news e NCM parser/detector: PASS.** Evidência: CI run [38317303817](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/actions/runs/38317303817), job `verify` #115036925304.
+- **LOTE-2 Isolated PostgreSQL 18: PASS.** Evidência: run [38317303703](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/actions/runs/38317303703).
+- **CI geral final: FAILURE PREVISTO POR POLÍTICA DE PR DRAFT**, step `Require full regression before merge`. Logs exibem `CI_DRAFT: true` e instrução para não interpretar quick checks como liberação. **Não retirar DRAFT sem gate de revisão/autorização.**
+- O HEAD documentado acima é anterior a esta atualização textual. O commit documental novo acionará checks próprios.
