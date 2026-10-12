@@ -63,6 +63,7 @@ import {
   loadRuntimeSettings,
   pgRunner,
 } from '../../modules/taxonomy/curation/curation.read.js';
+import { initializeF2Actuacao } from '../../modules/taxonomy/curation/curation.actuacao.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import { PROTECTED_EXCLUDED_SOURCES } from '../../modules/taxonomy/curation/curation.constants.js';
 import { importNcmCatalog } from '../../modules/taxonomy/ncm/ncm-catalog.importer.js';
@@ -489,6 +490,20 @@ export async function taxonomyAdminRoutes(
         createDraft(client, actorFrom(request, request.body.justification)),
       );
       return reply.status(201).send(result);
+    },
+  );
+
+  // F2-T02: initialize seven curated Atuação labels in the open DRAFT only.
+  // Uses the existing platform-admin auth, dedicated curator role and lock.
+  // Does not publish, classify, alter sector aliases or write tenant profiles.
+  typed.post(
+    '/api/v1/admin/taxonomy/drafts/current/actuacao/initialize',
+    { preHandler: requirePlatformAdmin, schema: { body: justificationBody } },
+    async (request, reply) => {
+      const result = await withCuratorTransaction(curatorPool(), (client) =>
+        initializeF2Actuacao(client, actorFrom(request, request.body.justification)),
+      );
+      return reply.status(200).send(result);
     },
   );
 
