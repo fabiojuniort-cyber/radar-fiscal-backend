@@ -182,6 +182,26 @@ function digits(text) {
   return String(text ?? '').replace(/\D/g, '');
 }
 
+/**
+ * T03: official NCMs may be 2/4/6/8 digits, with or without dots.
+ * Accept ONLY digits and dots in one semicolon-delimited NCM cell token.
+ * Never silently discard an invalid character from Produto.NCM.
+ * Segmento.NCMs (sugeridos) is advisory text, not imported official codes.
+ */
+export function normalizeProductNcm(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || !/^[0-9.]+$/.test(raw)) return null;
+  const normalized = raw.replace(/\./g, '');
+  return /^(?:\d{2}|\d{4}|\d{6}|\d{8})$/.test(normalized) ? normalized : null;
+}
+
+/** Potential relevance only, not legal incidence or product/NCM assignment. */
+export function ncmMatchesEitherPrefix(left, right) {
+  const a = normalizeProductNcm(left);
+  const b = normalizeProductNcm(right);
+  return a !== null && b !== null && (a.startsWith(b) || b.startsWith(a));
+}
+
 export function planImport(segmentRows, productRows) {
   const errors = [];
   const warnings = [];
@@ -223,8 +243,13 @@ export function planImport(segmentRows, productRows) {
     if (!segment || !group || !name || !id) errors.push('Produto linha ' + line + ': segmento/grupo/item/código obrigatório');
     if (id && seenProductCode.has(id)) warnings.push('Código produto repetido: ' + id + ' (linha ' + line + ')');
     seenProductCode.add(id);
-    const ncms = splitMulti(ncm).map(x => ({ raw: x, digits: digits(x) }));
-    if (ncms.some(x => x.digits.length < 2 || x.digits.length > 8)) errors.push('Produto linha ' + line + ': NCM não reconhecível');
+    const ncms = splitMulti(ncm).map(raw => ({
+      raw,
+      digits: normalizeProductNcm(raw),
+    }));
+    if (ncms.some(value => value.digits === null)) {
+      errors.push('Produto linha ' + line + ': NCM inválido (somente dígitos e pontos; 2/4/6/8 dígitos)');
+    }
     products.push({
       segment: String(segment ?? '').trim(),
       group: String(group ?? '').trim(),
