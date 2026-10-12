@@ -17,6 +17,14 @@ on:
       - 'src/modules/taxonomy/curation/curation.actuacao.ts'
       - 'src/api/routes/taxonomy-admin.route.ts'
       - 'test/taxonomy.actuacao.integration.test.ts'
+      - 'src/modules/taxonomy/ncm/ncm-prefix.ts'
+      - 'src/modules/taxonomy/classification/classification.curated.ts'
+      - 'src/modules/taxonomy/affinity/publication-affinity.ts'
+      - 'ops/taxonomy/f2-xlsx-dry-run.mjs'
+      - 'test/f2-xlsx-dry-run.unit.test.mjs'
+      - 'test/taxonomy.ncm-prefix.unit.test.ts'
+      - 'test/taxonomy.curation.unit.test.ts'
+      - 'test/taxonomy.affinity.unit.test.ts'
       - '.github/workflows/lote2-pg18-isolated.yml'
 
 permissions:
@@ -61,6 +69,8 @@ jobs:
         run: npm run build
       - name: Unit regression L-05
         run: npx tsx --test test/doe-sp.connector.unit.test.ts test/doe-sp.auth-pdf.unit.test.ts
+      - name: F2-T03 NCM prefix and strict import unit regression
+        run: npx tsx --test test/taxonomy.ncm-prefix.unit.test.ts test/taxonomy.affinity.unit.test.ts test/taxonomy.curation.unit.test.ts test/f2-xlsx-dry-run.unit.test.mjs
       - name: Prepare isolated PostgreSQL 18
         run: npm run db:prepare
       - name: F2-T02 independent Atuação origin integration (isolated PG18)
