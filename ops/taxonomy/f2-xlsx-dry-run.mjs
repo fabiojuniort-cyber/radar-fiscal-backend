@@ -94,7 +94,7 @@ function columnIndex(reference) {
   return index - 1;
 }
 
-function parseWorksheet(xml, shared) {
+export function parseWorksheet(xml, shared) {
   xml = xml.replace(/<(\/?)x:(?=[A-Za-z])/g, '<$1');
   if (!/<worksheet\b/.test(xml) || /<!(?:DOCTYPE|ENTITY)/i.test(xml)) fail('Planilha XML inválida');
   if (/<f(?:\s|>)/.test(xml)) fail('Fórmulas não são permitidas nas fontes congeladas');
@@ -104,20 +104,20 @@ function parseWorksheet(xml, shared) {
     const index = Number(match[1]);
     if (index !== rows.length + 1) fail('Linhas XLSX fora de ordem ou ausentes');
     const values = [];
-    for (const cell of match[2].matchAll(/<c\b([^>]*?)>([\s\S]*?)<\/c>/g)) {
+    for (const cell of match[2].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const ref = /\br="([^"]+)"/.exec(cell[1])?.[1] ?? '';
       const col = columnIndex(ref);
       const type = /\bt="([^"]+)"/.exec(cell[1])?.[1] ?? '';
       if (col > 100) fail('Número de colunas excedido');
       if (type === 's') {
-        const raw = /<v>([0-9]+)<\/v>/.exec(cell[2])?.[1];
+        const raw = /<v>([0-9]+)<\/v>/.exec(cell[2] ?? '')?.[1];
         const text = raw === undefined ? undefined : shared[Number(raw)];
         if (text === undefined) fail('Índice sharedStrings inválido');
         values[col] = text;
       } else if (type === 'inlineStr') {
-        values[col] = richText(cell[2]);
+        values[col] = richText(cell[2] ?? '');
       } else {
-        values[col] = decodeXml(/<v>([\s\S]*?)<\/v>/.exec(cell[2])?.[1] ?? '');
+        values[col] = decodeXml(/<v>([\s\S]*?)<\/v>/.exec(cell[2] ?? '')?.[1] ?? '');
       }
     }
     rows.push(values);
