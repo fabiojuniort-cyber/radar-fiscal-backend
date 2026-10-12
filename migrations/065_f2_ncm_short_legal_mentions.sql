@@ -2,6 +2,10 @@
 -- 2/4/6-digit prefix evidence. Never reinterpret it as an assignable 8-digit NCM.
 -- All changes remain in DRAFT PR #216; no automatic deployment.
 
+-- PostgreSQL blocks ALTER TYPE while this trigger depends on ncm_code;
+-- migrations execute transactionally, then the revised guard is restored.
+DROP TRIGGER IF EXISTS trg_publication_ncm_catalog ON publication_ncm_mentions;
+
 ALTER TABLE publication_ncm_mentions
   ALTER COLUMN ncm_code TYPE VARCHAR(8)
   USING btrim(ncm_code::text);
@@ -52,6 +56,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+CREATE TRIGGER trg_publication_ncm_catalog
+BEFORE INSERT OR UPDATE OF ncm_code, official_catalog_entry_id
+ON publication_ncm_mentions
+FOR EACH ROW EXECUTE FUNCTION validate_publication_ncm_catalog_entry();
 
 -- Existing append-only evidence is untouched. New detector 1.2.0 stores
 -- prefix-vs-exact provenance in metadata.ncmPrefixScope, and historical
