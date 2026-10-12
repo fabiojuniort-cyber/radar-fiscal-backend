@@ -101,7 +101,7 @@ test('F2: never promotes years, articles, dates, IDs or bare headings to a short
     'A posição do artigo 1006 e subposição do artigo 311203 não são NCM.',
     'O código de 2026, o código nº 2026 e o Código Civil 1916 não são classificações fiscais.',
     'Uma tabela sem cabeçalho lista 10, 1006, 310210 e 2024.',
-    'A NCM 123456789 e TIPI 8703.8000 não devem recortar seis dígitos.',
+    'A NCM 123456789 e TIPI 8703.800000 não devem recortar seis dígitos.',
   ].join(' ');
   assert.deepEqual(extractNcmCandidates(text), []);
 });
