@@ -1,0 +1,606 @@
+{
+  "version": 1,
+  "sourceSpreadsheet": "conferir-apagadas-com-indicio-tributario.xlsx",
+  "dates": [
+    "2026-10-09",
+    "2026-10-07",
+    "2026-10-05",
+    "2026-10-02",
+    "2026-09-30",
+    "2026-09-29",
+    "2026-09-28",
+    "2026-09-25",
+    "2026-09-24",
+    "2026-09-23",
+    "2026-09-21",
+    "2026-09-18",
+    "2026-09-17",
+    "2026-09-16",
+    "2026-09-15",
+    "2026-09-14",
+    "2026-09-11",
+    "2026-09-08",
+    "2026-09-04",
+    "2026-09-03",
+    "2026-09-01",
+    "2026-08-31",
+    "2026-08-28",
+    "2026-08-25",
+    "2026-08-20",
+    "2026-08-17"
+  ],
+  "sections": [
+    "DO1",
+    "DO1E",
+    "DO3"
+  ],
+  "items": [
+    {
+      "date": "2026-09-17",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO EFI 1 - DRF VIT-ES/DEFIS/SRRF07/RFB Nº 26, DE 16 DE SETEMBRO DE 2026",
+      "actNumber": "26/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/09/2026&jornal=515&pagina=70"
+    },
+    {
+      "date": "2026-10-05",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 142, DE 2 DE OUTUBRO DE 2026",
+      "actNumber": "142/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=05/10/2026&jornal=515&pagina=51"
+    },
+    {
+      "date": "2026-09-16",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 115, DE 15 DE SETEMBRO DE 2026",
+      "actNumber": "115/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=16/09/2026&jornal=515&pagina=53"
+    },
+    {
+      "date": "2026-08-20",
+      "section": "DO1E",
+      "title": "PORTARIA RFB Nº 720, DE 18 DE AGOSTO DE 2026",
+      "actNumber": "720/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=20/08/2026&jornal=600&pagina=2"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 131, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "131/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=515&pagina=50"
+    },
+    {
+      "date": "2026-10-07",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 113, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "113/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=07/10/2026&jornal=515&pagina=67"
+    },
+    {
+      "date": "2026-09-03",
+      "section": "DO1",
+      "title": "Resolução GIPI nº 16, de 2 de SETEMBRO de 2026",
+      "actNumber": "16/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=03/09/2026&jornal=515&pagina=20"
+    },
+    {
+      "date": "2026-08-31",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 90, DE 28 DE AGOSTO DE 2026",
+      "actNumber": "90/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=31/08/2026&jornal=515&pagina=18"
+    },
+    {
+      "date": "2026-09-29",
+      "section": "DO1E",
+      "title": "RESOLUÇÃO CIIPIAS/MPO Nº 1, DE 24 DE SETEMBRO DE 2026",
+      "actNumber": "1/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=29/09/2026&jornal=602&pagina=9"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 81, DE 26 DE agosto DE 2026",
+      "actNumber": "81/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-08-20",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 75, DE 19 de agosto de 2026",
+      "actNumber": "75/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=20/08/2026&jornal=515&pagina=26"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 107, DE 17 DE setembro DE 2026",
+      "actNumber": "107/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=47"
+    },
+    {
+      "date": "2026-09-17",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 118, DE 16 DE SETEMBRO DE 2026",
+      "actNumber": "118/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/09/2026&jornal=515&pagina=63"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO REGESP/DEFIS/SRRF08/RFB Nº 1.488, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "1488/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=515&pagina=55"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 80, DE 26 DE agosto DE 2026",
+      "actNumber": "80/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=45"
+    },
+    {
+      "date": "2026-10-05",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 141, DE 2 DE OUTUBRO DE 2026",
+      "actNumber": "141/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=05/10/2026&jornal=515&pagina=51"
+    },
+    {
+      "date": "2026-09-24",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO REGESP/DEFIS/SRRF08/RFB Nº 1.474, DE 21 DE SETEMBRO DE 2026",
+      "actNumber": "1474/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=24/09/2026&jornal=515&pagina=208"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 91, DE 31 DE AGOSTO DE 2026",
+      "actNumber": "91/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=49"
+    },
+    {
+      "date": "2026-09-24",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO REGESP/DEFIS/SRRF08/RFB Nº 1.480, DE 23 DE SETEMBRO DE 2026",
+      "actNumber": "1480/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=24/09/2026&jornal=515&pagina=209"
+    },
+    {
+      "date": "2026-09-17",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO EFI 1 - DRF VIT-ES/DEFIS/SRRF07/RFB Nº 25, DE 16 DE SETEMBRO DE 2026",
+      "actNumber": "25/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/09/2026&jornal=515&pagina=70"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 83, DE 26 DE agosto DE 2026",
+      "actNumber": "83/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=48"
+    },
+    {
+      "date": "2026-09-21",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 122, DE 18 DE SETEMBRO DE 2026",
+      "actNumber": "122/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=21/09/2026&jornal=515&pagina=31"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 132, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "132/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=515&pagina=50"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 123, DE 22 DE SETEMBRO DE 2026",
+      "actNumber": "123/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=47"
+    },
+    {
+      "date": "2026-09-04",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO EFI 1 - DRF VIT-ES/DEFIS/SRRF07/RFB Nº 24, DE 3 DE SETEMBRO DE 2026",
+      "actNumber": "24/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=04/09/2026&jornal=515&pagina=157"
+    },
+    {
+      "date": "2026-09-15",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 114, DE 14 DE SETEMBRO DE 2026",
+      "actNumber": "114/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=15/09/2026&jornal=515&pagina=36"
+    },
+    {
+      "date": "2026-09-08",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 92, DE 2 DE SETEMBRO DE 2026",
+      "actNumber": "92/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/09/2026&jornal=515&pagina=65"
+    },
+    {
+      "date": "2026-09-14",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 100, DE 11 DE SETEMBRO DE 2026",
+      "actNumber": "100/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=14/09/2026&jornal=515&pagina=28"
+    },
+    {
+      "date": "2026-08-25",
+      "section": "DO3",
+      "title": "EXTRATO DE CONTRATO Nº 20/2026 - UASG 170010 - RFB-BRASILIA",
+      "actNumber": "—",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=25/08/2026&jornal=530&pagina=75"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 102, DE 17 DE setembro DE 2026",
+      "actNumber": "102/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-08-17",
+      "section": "DO1",
+      "title": "RESOLUÇÃO CGPISF Nº 7, DE 14 DE AGOSTO DE 2026",
+      "actNumber": "7/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/08/2026&jornal=515&pagina=54"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 84, DE 26 DE agosto DE 2026",
+      "actNumber": "84/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=49"
+    },
+    {
+      "date": "2026-09-18",
+      "section": "DO1E",
+      "title": "portaria RFB Nº 730, DE 15 DE SETEMBRO DE 2026",
+      "actNumber": "730/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&jornal=602&pagina=6"
+    },
+    {
+      "date": "2026-08-17",
+      "section": "DO1",
+      "title": "PORTARIA RFB Nº 716, DE 12 DE AGOSTO DE 2026",
+      "actNumber": "716/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/08/2026&jornal=515&pagina=35"
+    },
+    {
+      "date": "2026-09-08",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 97, DE 4 DE SETEMBRO DE 2026",
+      "actNumber": "97/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/09/2026&jornal=515&pagina=68"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 106, DE 17 DE setembro DE 2026",
+      "actNumber": "106/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=47"
+    },
+    {
+      "date": "2026-09-08",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 95, DE 2 DE SETEMBRO DE 2026",
+      "actNumber": "95/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/09/2026&jornal=515&pagina=67"
+    },
+    {
+      "date": "2026-09-11",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 98, DE 10 DE SETEMBRO DE 2026",
+      "actNumber": "98/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=11/09/2026&jornal=515&pagina=108"
+    },
+    {
+      "date": "2026-08-20",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 77, DE 19 DE AGOSTO DE 2026",
+      "actNumber": "77/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=20/08/2026&jornal=515&pagina=26"
+    },
+    {
+      "date": "2026-09-21",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 121, DE 18 DE SETEMBRO DE 2026",
+      "actNumber": "121/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=21/09/2026&jornal=515&pagina=31"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 78, DE 26 DE AGOSTO DE 2026",
+      "actNumber": "78/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=43"
+    },
+    {
+      "date": "2026-09-29",
+      "section": "DO1E",
+      "title": "RESOLUÇÃO CIIPIAS/MPO Nº 2, DE 24 DE SETEMBRO DE 2026",
+      "actNumber": "2/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=29/09/2026&jornal=602&pagina=9"
+    },
+    {
+      "date": "2026-10-07",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 109, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "109/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=07/10/2026&jornal=515&pagina=66"
+    },
+    {
+      "date": "2026-09-18",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 120, DE 17 DE SETEMBRO DE 2026",
+      "actNumber": "120/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-08-31",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 89, DE 28 DE AGOSTO DE 2026",
+      "actNumber": "89/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=31/08/2026&jornal=515&pagina=18"
+    },
+    {
+      "date": "2026-09-17",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 117, DE 16 DE SETEMBRO DE 2026",
+      "actNumber": "117/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/09/2026&jornal=515&pagina=63"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 103, DE 17 DE setembro DE 2026",
+      "actNumber": "103/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-09-25",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 129, DE 24 DE SETEMBRO DE 2026",
+      "actNumber": "129/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=25/09/2026&jornal=515&pagina=34"
+    },
+    {
+      "date": "2026-08-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 87, DE 27 DE AGOSTO DE 2026",
+      "actNumber": "87/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/08/2026&jornal=515&pagina=62"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 74, DE 19 DE agosto DE 2026",
+      "actNumber": "74/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=43"
+    },
+    {
+      "date": "2026-10-09",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO REGESP/DEFIS/SRRF08/RFB Nº 1.539, DE 7 DE OUTUBRO DE 2026",
+      "actNumber": "1539/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=09/10/2026&jornal=515&pagina=88"
+    },
+    {
+      "date": "2026-09-25",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 130, DE 24 DE SETEMBRO DE 2026",
+      "actNumber": "130/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=25/09/2026&jornal=515&pagina=34"
+    },
+    {
+      "date": "2026-09-30",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 136, DE 29 DE SETEMBRO DE 2026",
+      "actNumber": "136/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=30/09/2026&jornal=515&pagina=68"
+    },
+    {
+      "date": "2026-09-11",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 99, DE 10 DE SETEMBRO DE 2026",
+      "actNumber": "99/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=11/09/2026&jornal=515&pagina=108"
+    },
+    {
+      "date": "2026-10-07",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 110, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "110/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=07/10/2026&jornal=515&pagina=67"
+    },
+    {
+      "date": "2026-09-08",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 94, DE 2 DE SETEMBRO DE 2026",
+      "actNumber": "94/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/09/2026&jornal=515&pagina=67"
+    },
+    {
+      "date": "2026-09-14",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 101, DE 11 DE SETEMBRO DE 2026",
+      "actNumber": "101/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=14/09/2026&jornal=515&pagina=28"
+    },
+    {
+      "date": "2026-08-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 88, DE 27 DE AGOSTO DE 2026",
+      "actNumber": "88/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/08/2026&jornal=515&pagina=62"
+    },
+    {
+      "date": "2026-09-17",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 116, DE 16 DE SETEMBRO DE 2026",
+      "actNumber": "116/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=17/09/2026&jornal=515&pagina=63"
+    },
+    {
+      "date": "2026-09-08",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 96, DE 2 DE SETEMBRO DE 2026",
+      "actNumber": "96/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/09/2026&jornal=515&pagina=67"
+    },
+    {
+      "date": "2026-09-18",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 119, DE 17 DE SETEMBRO DE 2026",
+      "actNumber": "119/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=18/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO3",
+      "title": "COMUNICADO Nº 12/DPIS/SE, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "—",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=530&pagina=145"
+    },
+    {
+      "date": "2026-10-07",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 137, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "137/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=07/10/2026&jornal=515&pagina=68"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "portaria RFB Nº 732, DE 21 DE SETEMBRO DE 2026",
+      "actNumber": "732/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 79, DE 26 DE agosto DE 2026",
+      "actNumber": "79/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=45"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 135, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "135/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=515&pagina=51"
+    },
+    {
+      "date": "2026-10-07",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 112, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "112/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=07/10/2026&jornal=515&pagina=67"
+    },
+    {
+      "date": "2026-10-09",
+      "section": "DO1E",
+      "title": "RESOLUÇÃO CGPISF Nº 8, DE 8 DE OUTUBRO DE 2026",
+      "actNumber": "8/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=09/10/2026&jornal=602&pagina=6"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 104, DE 17 DE SETEMBRO DE 2026",
+      "actNumber": "104/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=46"
+    },
+    {
+      "date": "2026-10-02",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 139, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "139/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=02/10/2026&jornal=515&pagina=43"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 82, DE 26 DE agosto DE 2026",
+      "actNumber": "82/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=47"
+    },
+    {
+      "date": "2026-09-23",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 105, DE 17 DE setembro DE 2026",
+      "actNumber": "105/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=23/09/2026&jornal=515&pagina=47"
+    },
+    {
+      "date": "2026-08-20",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 76, DE 19 DE AGOSTO DE 2026",
+      "actNumber": "76/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=20/08/2026&jornal=515&pagina=26"
+    },
+    {
+      "date": "2026-09-11",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO REGESP/DEFIS/SRRF08/RFB Nº 1.429, DE 9 DE SETEMBRO DE 2026",
+      "actNumber": "1429/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=11/09/2026&jornal=515&pagina=117"
+    },
+    {
+      "date": "2026-10-02",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 140, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "140/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=02/10/2026&jornal=515&pagina=43"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 134, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "134/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=515&pagina=51"
+    },
+    {
+      "date": "2026-09-08",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA N° 93, DE 2 DE SETEMBRO DE 2026",
+      "actNumber": "93/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=08/09/2026&jornal=515&pagina=66"
+    },
+    {
+      "date": "2026-09-28",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 133, DE 25 DE SETEMBRO DE 2026",
+      "actNumber": "133/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=28/09/2026&jornal=515&pagina=51"
+    },
+    {
+      "date": "2026-09-04",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO EFI 1 - DRF VIT-ES/DEFIS/SRRF07/RFB Nº 24,",
+      "actNumber": "—",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=04/09/2026&jornal=515&pagina=157"
+    },
+    {
+      "date": "2026-09-01",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 85, DE 26 DE AGOSTO DE 2026",
+      "actNumber": "85/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=01/09/2026&jornal=515&pagina=49"
+    },
+    {
+      "date": "2026-10-07",
+      "section": "DO1",
+      "title": "ATO DECLARATÓRIO EXECUTIVO COANA Nº 138, DE 1º DE OUTUBRO DE 2026",
+      "actNumber": "138/2026",
+      "officialUrl": "http://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?data=07/10/2026&jornal=515&pagina=68"
+    }
+  ]
+}

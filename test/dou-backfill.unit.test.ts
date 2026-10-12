@@ -39,6 +39,32 @@ test('explicit L18 replay includes covered dates but rejects duplicates and the 
   assert.throws(() => planDouExplicitReplayDates({ dates: [], today: '2026-10-12' }), RangeError);
 });
 
+test('L18 manifest reconciliation is fail-closed for ambiguous titles', async () => {
+  const { l18Reconcile } = await import('../src/infrastructure/database/dou-l18-reconcile.js');
+  const manifest = { version: 1, dates: ['2026-09-01'], sections: ['DO1', 'DO1E', 'DO3'],
+    items: [
+      { date: '2026-09-01', section: 'DO1', title: 'RESOLUÇÃO Nº 13',
+        actNumber: '13/2026', officialUrl: 'https://source.test/a' },
+      { date: '2026-09-01', section: 'DO1', title: 'PORTARIA Nº 5',
+        actNumber: '5/2026', officialUrl: 'https://source.test/b' },
+    ],
+  };
+  const result = l18Reconcile(manifest, [
+    { publication_id: 'a', title: 'Resolução N° 13', published_on: '2026-09-01', is_hidden: false, official_url: 'https://source.test/a' },
+    { publication_id: 'b', title: 'Portaria nº 5', published_on: '2026-09-01', is_hidden: false, official_url: 'https://source.test/b' },
+    { publication_id: 'c', title: 'Outro ato', published_on: '2026-09-01', is_hidden: false, official_url: 'https://source.test/c' },
+  ]);
+  assert.equal(result.recovered, 2);
+  assert.equal(result.additionalRetained, 1);
+  assert.equal(result.missing, 0);
+  const ambiguous = l18Reconcile(manifest, [
+    { publication_id: 'a', title: 'RESOLUÇÃO Nº 13', published_on: '2026-09-01', is_hidden: false, official_url: null },
+    { publication_id: 'other-a', title: 'RESOLUÇÃO Nº 13', published_on: '2026-09-01', is_hidden: false, official_url: null },
+  ]);
+  assert.equal(ambiguous.recovered, 0);
+  assert.equal(ambiguous.ambiguous, 1);
+});
+
 test('batches never exceed the connector limit of four dates', () => {
   const dates = ['2026-09-09', '2026-09-08', '2026-09-07', '2026-09-06', '2026-09-05', '2026-09-04'];
   assert.deepEqual(douBackfillBatches(dates), [dates.slice(0, 4), dates.slice(4)]);

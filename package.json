@@ -43,6 +43,7 @@
     "taxonomy:publish-draft": "node dist/infrastructure/database/taxonomy-publish-draft.js",
     "db:ensure-dou-source": "node dist/infrastructure/database/ensure-dou-source.js",
     "db:dou-backfill": "node dist/infrastructure/database/dou-backfill.js",
+    "db:dou-l18-reconcile": "node dist/infrastructure/database/dou-l18-reconcile.js",
     "db:ensure-nfe-encat-source": "node dist/infrastructure/database/ensure-nfe-encat-source.js",
     "db:trigger-nfe-encat-run": "node dist/infrastructure/database/trigger-nfe-encat-run.js",
     "db:inspect-nfe-encat": "node dist/infrastructure/database/inspect-nfe-encat.js",
