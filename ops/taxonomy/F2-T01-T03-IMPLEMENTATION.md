@@ -101,3 +101,17 @@ A verificação final da branch do PR de governança **#105** continua mostrando
 ## Auditoria adicional da fonte antiga após regra estrita
 
 Validação offline com as fontes locais **Produto v1.7.0** e **Segmento v1.7.3** (não é v1.7.1): na coluna Produto.NCM, há seis valores com vírgula anteriormente não apontados pelo importador antigo (linhas **31, 34, 43, 81, 166 e 180**). Com a validação nova e mais as cinco anomalias conhecidas, a versão antiga apresenta **11 ocorrências**. Ver [quadro detalhado](F2-T03-ANOMALIAS-ALERTAS.md). **A versão v1.7.1 pode ter resolvido essas linhas, mas não foi recebida/validada neste ambiente; zero erros segue NÃO COMPROVADO.**
+
+## F2 12/10/2026 — Produto v1.7.1 produzida e verificada offline
+
+- **Novo XLSX local entregue:** `taxonomia-v1_7_1-produto.xlsx` (3.793 itens), SHA-256 `45f2594ad53bb83408fbf198f51dec8bffdf3801a053c8ffcfe544542d51b2b8`. Não é um blob ainda presente no PR #105; upload ficou para o fechamento da F2.
+- **Segmento v1.7.3** (1.332 CNAEs), SHA-256 `588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd` — inalterada.
+- O diff de conteúdo entre Produto v1.7.0 e v1.7.1 possui **14 células** alteradas e **zero linhas removidas**: NCMs separados por `;` nas linhas 31/34/43/81/166/180/333; `;Vazio` removido da 3788; em 340/341/342 preencheram-se apenas Segmento/Grupo segundo famílias de NCM já presentes na planilha.
+- **Linhas 340, 341, 342 não são continuações da 339 (Veículos elétricos)**: contêm itens e códigos TriFaros independentes. 340 → `Energia, petróleo, gás e combustíveis / Gás` (2711); 341 → `Energia, petróleo, gás e combustíveis / Petróleo e derivados` (2705); 342 → `Alimentos, bebidas e tabaco / Bebidas não alcoólicas` (2201).
+- **Dry-run OFFLINE independente (artifact_tool): PASS, 0 erros, 442 alertas ACEITOS COMO ESPERADOS** — 368 com mais NCMs e 74 com mais produtos sugeridos. Relatório/diff gerados para entrega ao usuário, sem alteração do DB. **Não se trata de execução completa do CLI Node ou de validação de hash remoto.**
+- **T00:** permanece **90%**, aguardando commit dos XLSX no PR #105 **no fechamento da F2**; não bloquear T01–T03 por isso. Manifesto de governança permanece inalterado até hashes remotos verificados.
+- **T03 importador:** pin SHA-256 atualizado para a versão local Produto 1.7.1; leitura OOXML compatível com prefixos de namespace; `normalizeProductNcm` exige somente dígitos/pontos e comprimento 2/4/6/8. Recusa vírgulas, espaços internos e sentinelas, sem correção automática.
+- **Detector NCM:** `publication-ncm.detector.ts` versão **1.2.0** extrai prefixos 2/4/6 apenas com contexto imediato (`NCM`, `TIPI`, `posição`, `subposição`, `capítulo`, `código`). Mantém 8 dígitos conforme detector anterior; catálogos atuais verificam o prefixo pelo descendente 8 dígitos. Migration **065** preserva integridade das menções de 8 dígitos e armazena evidências curtas em texto variável, sem transformar prefixo em código fiscal exato.
+- **Motor de relevância existente:** plano de classificação e afinidade empresarial alterados para prefixo bidirecional no backend #216; resultado indica potencial relevância, jamais impacto tributário certo. Testes cobrem anos/artigos/códigos inválidos. Todas as alterações permanecem DRAFT, sem merge/deploy.
+
+**Checkpoint de código: aproximadamente 92% F2-T01–T03.** Não aprovar produção sem CI integral, revisão independente, backup e OK explícito do Fábio para qualquer carga, e OK do CLAUDE-COORD para merge/deploy.
