@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import { randomUUID } from 'node:crypto';
 
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 
 import { isCronDue } from '../../modules/collection/cron.js';
@@ -174,10 +174,12 @@ try {
       summary.attemptedDates.push(...result.dates);
       summary.found += metrics.found;
       summary.processed += metrics.processed;
-      const filterStats = await db.selectFrom('collection_filter_discard_run_stats')
-        .select(['discard_count']).where('collection_run_id', '=', result.runId)
-        .executeTakeFirst();
-      if (filterStats) summary.discardedByFilter += filterStats.discard_count;
+      const filterStats = await sql<{ discard_count: number }>`
+        SELECT discard_count FROM public.collection_filter_discard_run_stats
+        WHERE collection_run_id = ${result.runId}::uuid
+      `.execute(db);
+      const discardCount = filterStats.rows[0]?.discard_count;
+      if (discardCount !== undefined) summary.discardedByFilter += discardCount;
       else summary.missingDiscardStatsRuns.push(result.runId);
       summary.newPublications += metrics.newPublications;
       summary.existingPublications += metrics.existingPublications;
@@ -185,7 +187,7 @@ try {
       summary.itemErrors += metrics.itemErrors;
       summary.partialFailures += metrics.connectorPartialFailures;
       console.log('DOU_BACKFILL_RUN=' + JSON.stringify({
-        discardedByFilter: filterStats?.discard_count ?? null,
+        discardedByFilter: discardCount ?? null,
         runId: result.runId,
         dates: result.dates,
         attempts: result.attempts,
