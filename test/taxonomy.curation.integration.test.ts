@@ -1304,3 +1304,106 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     await admin.end();
   }
 });
+
+test('F2-T02: Atuação curator draft, CNAE origin FK and unauthorized callers', async () => {
+  const admin = new Pool({ connectionString: adminUrl, max: 2 });
+  const app = await buildApp();
+  try {
+    assert.ok(app.curatorPool);
+    await insertFixtureRelease(admin);
+    const curator = await registerAndLogin(app, 'f2-curator');
+    const customer = await registerAndLogin(app, 'f2-customer');
+    await admin.query(
+      "INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ($1, 'TAXONOMY_CURATOR', 'f2-test'), ($1, 'PLATFORM_ADMIN', 'f2-test')",
+      [curator.userId],
+    );
+    const draft = await app.inject({
+      method: 'POST', url: '/api/v1/admin/taxonomy/drafts',
+      headers: curator.headers, payload: { justification: 'F2 teste integrado' },
+    });
+    assert.equal(draft.statusCode, 201, draft.body);
+    const draftId = draft.json().draft.id as string;
+
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/actuacao/initialize',
+      headers: customer.headers, payload: { justification: 'Não autorizado' },
+    });
+    assert.equal(denied.statusCode, 403);
+
+    const initialized = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/actuacao/initialize',
+      headers: curator.headers, payload: { justification: 'Atuação F2 origem CNAE' },
+    });
+    assert.equal(initialized.statusCode, 200, initialized.body);
+    assert.equal(initialized.json().seededCodes.length, 7);
+    assert.equal(initialized.json().sourceRows, 1332);
+    assert.equal(initialized.json().classificationPublished, false);
+
+    const repeated = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/actuacao/initialize',
+      headers: curator.headers, payload: { justification: 'Verificar idempotência' },
+    });
+    assert.equal(repeated.statusCode, 200, repeated.body);
+    assert.deepEqual(repeated.json().seededCodes, []);
+    const view = await app.inject({
+      method: 'GET', url: '/api/v1/admin/taxonomy/releases/' + draftId,
+      headers: curator.headers,
+    });
+    assert.equal(view.statusCode, 200, view.body);
+    const seeded = view.json().concepts.filter((concept: { code: string }) =>
+      concept.code.startsWith('actuacao.'));
+    assert.equal(seeded.length, 7);
+    for (const concept of seeded) {
+      assert.equal(concept.classifyByLabel, false);
+      assert.deepEqual(concept.aliases, []);
+    }
+
+    const forged = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/actuacao/origins',
+      headers: curator.headers,
+      payload: {
+        justification: 'Origem errada',
+        sourceSha256: '588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd',
+        rows: Array.from({ length: 1332 }, (_, index) => ({
+          sourceLine: index + 2,
+          cnaeCode: String(index).padStart(7, '0'),
+          atuacaoLabel: 'Serviço',
+        })),
+      },
+    });
+    assert.equal(forged.statusCode, 400, forged.body);
+    const noOrigins = await admin.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM taxonomy_release_actuacao_cnae_origins WHERE release_id = $1::uuid',
+      [draftId],
+    );
+    assert.equal(noOrigins.rows[0]?.n, 0, 'forged input must not write rows');
+
+    // Verify the real PostgreSQL FK/unique constraint under the dedicated
+    // curator session. This is an isolated PG test, never a production load.
+    await withCuratorTransaction(app.curatorPool!, async client => {
+      const concept = await client.query<{ id: string }>(
+        "SELECT rc.id FROM taxonomy_release_concepts rc JOIN taxonomy_concepts c ON c.id = rc.concept_id WHERE rc.release_id = $1::uuid AND c.code = 'actuacao.servico'",
+        [draftId],
+      );
+      assert.equal(concept.rows.length, 1);
+      const inserted = await client.query<{ cnae_code: string }>(
+        'INSERT INTO taxonomy_release_actuacao_cnae_origins (release_id, release_concept_id, cnae_code, source_line, source_sha256) VALUES ($1::uuid, $2::uuid, $3, 2, $4) RETURNING cnae_code',
+        [draftId, concept.rows[0]!.id, '0111301',
+         '588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd'],
+      );
+      assert.deepEqual(inserted.rows.map(row => row.cnae_code), ['0111301']);
+    });
+    const origins = await admin.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM taxonomy_release_actuacao_cnae_origins WHERE release_id = $1::uuid',
+      [draftId],
+    );
+    assert.equal(origins.rows[0]?.n, 1);
+  } finally {
+    await app.close();
+    await admin.end();
+  }
+});
