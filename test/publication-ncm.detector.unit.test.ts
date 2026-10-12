@@ -89,7 +89,7 @@ test('F2: extracts 2, 4 and 6-digit NCM only when supported by immediate officia
   ].join(' '));
   assert.deepEqual(
     [...new Set(candidates.map((candidate) => candidate.code))].sort(),
-    ['10', '1006', '100630', '10063011', '31', '3102', '8703'].sort(),
+    ['10', '1006', '100630', '10063011', '31', '3102', '310210', '8703'].sort(),
   );
   assert.ok(candidates.every((candidate) =>
     candidate.spanEnd > candidate.spanStart && candidate.excerpt.length > 0));
