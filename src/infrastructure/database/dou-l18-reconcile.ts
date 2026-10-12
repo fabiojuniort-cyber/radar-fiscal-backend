@@ -20,7 +20,7 @@ function getArg(name: string): string | undefined {
  * Never count ambiguous matches as restored: false positives are worse than missing ones.
  */
 export function l18TitleKey(input: string): string {
-  return input.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  return input.replace(/[º°]/g, '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 export function l18Reconcile(manifest: Manifest, items: Stored[]) {
