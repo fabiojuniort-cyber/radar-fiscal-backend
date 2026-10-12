@@ -501,3 +501,35 @@ test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Re
 });
 
 test('L17 hotfix PG18: 3000 rules and 12000 archive records, preview <30s',runL17RuleCapStress);
+
+test('L18: preservation policy migration adds seven global STRONG tax terms without changing unrelated rules', async () => {
+  const db=new Pool({connectionString:url,max:1});
+  try {
+    const terms=await db.query<{normalized_term:string}>(
+      "SELECT DISTINCT t.normalized_term FROM collection_filter_terms t "+
+      "JOIN collection_filter_policies p ON p.id=t.policy_id "+
+      "WHERE p.status='APPROVED' AND t.strength='STRONG' "+
+      "AND t.source_code IS NULL AND t.section IS NULL "+
+      "AND t.canonical_type IS NULL AND t.location_scope='ANY' "+
+      "AND t.normalized_term=ANY($1::text[])",
+      [['COANA','ADUANEIRO','RECEITA FEDERAL','RFB','RECOF','REPETRO','DRAWBACK']],
+    );
+    assert.deepEqual(new Set(terms.rows.map(r=>r.normalized_term)),
+      new Set(['COANA','ADUANEIRO','RECEITA FEDERAL','RFB','RECOF','REPETRO','DRAWBACK']));
+    const audit=await db.query<{count:string}>(
+      "SELECT count(*)::text AS count FROM audit_log WHERE action='L18_PRESERVATION_RULES'"
+    );
+    assert.ok(Number(audit.rows[0]?.count)>=1,'L18 policy change must be audited');
+    const unrelated=await db.query<{canon:string;eligible:boolean}>(
+      "SELECT text AS canon, (public.collection_filter_l11_normalize(text) "+
+      "~ '^ATO DECLARATORIO EXECUTIVO( |$)' AND "+
+      "public.collection_filter_l11_normalize(text) ~ '(^| )(COANA|RFB|SRRF|DRF)( |$)') "+
+      "AS eligible FROM unnest($1::text[]) AS text",
+      [['ATO DECLARATÓRIO EXECUTIVO COANA','ATO DECLARATÓRIO EXECUTIVO DRF',
+        'ATO DECLARATÓRIO EXECUTIVO SRRF', 'ATO DECLARATÓRIO EXECUTIVO RFB',
+        'ATO DECLARATÓRIO EXECUTIVO ANVISA','RESOLUÇÃO CIT-SNC/MINC']],
+    );
+    assert.deepEqual(unrelated.rows.map(r=>r.eligible),
+      [true,true,true,true,false,false]);
+  } finally {await db.end();}
+});
