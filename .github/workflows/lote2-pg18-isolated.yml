@@ -14,6 +14,9 @@ on:
       - 'test/doe-sp.collection.integration.test.ts'
       - 'package.json'
       - 'migrations/064_f2_actuacao_cnae_origins.sql'
+      - 'migrations/065_f2_ncm_short_legal_mentions.sql'
+      - 'src/modules/taxonomy/ncm/publication-ncm.detector.ts'
+      - 'test/publication-ncm-prefix.schema.integration.test.ts'
       - 'src/modules/taxonomy/curation/curation.actuacao.ts'
       - 'src/api/routes/taxonomy-admin.route.ts'
       - 'test/taxonomy.actuacao.integration.test.ts'
@@ -74,7 +77,7 @@ jobs:
       - name: Prepare isolated PostgreSQL 18
         run: npm run db:prepare
       - name: F2-T02 independent Atuação origin integration (isolated PG18)
-        run: npx tsx --test test/taxonomy.actuacao.integration.test.ts
+        run: npx tsx --test test/taxonomy.actuacao.integration.test.ts test/publication-ncm-prefix.schema.integration.test.ts
       - name: L-08 orphan integration and L-10 retention + L-05 collection
         run: npx tsx --test test/publication.presentation.integration.test.ts test/collection-items-retention.integration.test.ts test/doe-sp.collection.integration.test.ts
       - name: L-10 CLI default is dry-run
