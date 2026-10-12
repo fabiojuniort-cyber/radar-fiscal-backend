@@ -12,6 +12,8 @@ import {
   F2_SOURCE,
   planImport,
   parseApprovedWorkbook,
+  normalizeProductNcm,
+  ncmMatchesEitherPrefix,
   segmentSubsegmentLabel,
   sha256,
 } from '../ops/taxonomy/f2-xlsx-dry-run.mjs';
@@ -111,4 +113,36 @@ test('T02 seeds exactly the seven workbook Atuação categories without inheriti
     'Comércio varejista', 'Extração mineral', 'Representação comercial',
   ]);
   assert.ok(F2_ACTUACAO_SEED.every(item => item.code.startsWith('actuacao.')));
+});
+
+test('T03 reads unmasked 2/4/6/8 NCM and rejects non-digit/non-dot chars', () => {
+  const valid = [
+    ['10', '10'], ['1006', '1006'], ['1006.30', '100630'],
+    ['1006.30.11', '10063011'], ['10063011', '10063011'],
+  ];
+  for (const [input, expected] of valid) assert.equal(normalizeProductNcm(input), expected);
+  for (const bad of ['10063', '1006301', '10, 12', '1006/30', '10-06', 'Vazio', '...']) {
+    assert.equal(normalizeProductNcm(bad), null, bad);
+  }
+  assert.equal(ncmMatchesEitherPrefix('1006', '1006.30.11'), true);
+  assert.equal(ncmMatchesEitherPrefix('1006.30.11', '1006'), true);
+  assert.equal(ncmMatchesEitherPrefix('1006', '1007'), false);
+});
+
+test('T03 rejects each invalid Produto NCM token without guessing or stripping punctuation', () => {
+  const segments = [[
+    'A', 'B', 'Serviço', '6201-5/01', 'CNAE', '', '', '', '', '', '1', 'sector.test',
+  ]];
+  const make = (value) => [[
+    'A', 'B', 'Item', value, '', 'x', 'x', '1', 'product.test', 'Item',
+  ]];
+  const invalid = ['1006.30.11, 1006', '9001.10, 8544.70', '1006;Vazio', '1201-90'];
+  for (const ncm of invalid) {
+    const result = planImport(segments, make(ncm));
+    assert.ok(result.issues.errors.some(e => e.includes('NCM inválido')), ncm);
+  }
+  for (const ncm of ['10', '1006', '1006.30', '1006.30.11', '10063011', '1006;3102.10']) {
+    const result = planImport(segments, make(ncm));
+    assert.ok(!result.issues.errors.some(e => e.includes('NCM inválido')), ncm);
+  }
 });
