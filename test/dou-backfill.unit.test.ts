@@ -4,7 +4,7 @@ import test from 'node:test';
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler, type CompiledQuery, type QueryResult } from 'kysely';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
-import { DOU_BACKFILL_SECTIONS, assertDouBackfillAvailable, douBackfillBatches, isDouBackfillCoverageComplete, planDouBackfillDates, readDouBackfillCoverage, runDouBackfillTick } from '../src/modules/collection/dou-backfill.js';
+import { DOU_BACKFILL_SECTIONS, assertDouBackfillAvailable, douBackfillBatches, isDouBackfillCoverageComplete, planDouBackfillDates, planDouExplicitReplayDates, readDouBackfillCoverage, runDouBackfillTick } from '../src/modules/collection/dou-backfill.js';
 import { DOU_XML_SECTIONS, DouConnector } from '../src/modules/collection/dou.connector.js';
 
 test('plan walks back one day at a time, skipping covered dates and the monitoring window', () => {
@@ -25,6 +25,18 @@ test('plan is empty when everything is covered or the range is inside the monito
   assert.deepEqual(planDouBackfillDates({ from: '2026-10-02', to: '2026-10-04', today: '2026-10-04', covered: new Set() }), []);
   assert.deepEqual(planDouBackfillDates({ from: '2026-09-30', to: '2026-10-01', today: '2026-10-04', covered: new Set(['2026-09-30', '2026-10-01']) }), []);
   assert.throws(() => planDouBackfillDates({ from: '2026-02-30', to: '2026-10-01', today: '2026-10-04', covered: new Set() }), RangeError);
+});
+
+test('explicit L18 replay includes covered dates but rejects duplicates and the monitoring window', () => {
+  const dates = ['2026-09-28', '2026-09-14', '2026-10-09', '2026-08-17'];
+  assert.deepEqual(planDouExplicitReplayDates({ dates, today: '2026-10-12' }),
+    ['2026-10-09', '2026-09-28', '2026-09-14', '2026-08-17']);
+  assert.deepEqual(dates, ['2026-09-28', '2026-09-14', '2026-10-09', '2026-08-17'],
+    'planner must not mutate the source manifest');
+  assert.throws(() => planDouExplicitReplayDates({ dates: [...dates, '2026-09-14'], today: '2026-10-12' }), RangeError);
+  assert.throws(() => planDouExplicitReplayDates({ dates: ['2026-10-10'], today: '2026-10-12' }), RangeError);
+  assert.throws(() => planDouExplicitReplayDates({ dates: ['2026-02-30'], today: '2026-10-12' }), RangeError);
+  assert.throws(() => planDouExplicitReplayDates({ dates: [], today: '2026-10-12' }), RangeError);
 });
 
 test('batches never exceed the connector limit of four dates', () => {

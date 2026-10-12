@@ -9,7 +9,7 @@ import {
 import { finishCollectionRun, heartbeatCollectionRun, type AcquiredCollectionRun } from './collection-run.repository.js';
 import { ConnectorRegistry } from './connector.registry.js';
 import { DOU_XML_SECTIONS, DouConnector } from './dou.connector.js';
-import type { InlabsCredentials } from './inlabs.client.js';
+import type { InlabsCredentials, InlabsXmlSection } from './inlabs.client.js';
 
 /**
  * Administrative DOU backfill (docs/phase-5-dou-inlabs.md, D-056).
@@ -72,6 +72,19 @@ export function planDouBackfillDates(input: {
     if (!input.covered.has(date)) dates.push(date);
   }
   return dates;
+}
+
+/** Explicit restoration dates bypass only coverage planning, not date-window validation. */
+export function planDouExplicitReplayDates(input: {
+  dates: readonly string[]; today: string;
+}): string[] {
+  if (!input.dates.length || !validDate(input.today)) throw new RangeError('A replay needs explicit valid dates and today.');
+  const max = addDays(input.today, -3);
+  if (new Set(input.dates).size !== input.dates.length
+    || input.dates.some(date => !validDate(date) || date > max)) {
+    throw new RangeError('Replay dates must be unique, valid, and outside the last 3 monitoring days.');
+  }
+  return [...input.dates].sort().reverse();
 }
 
 export function douBackfillBatches(dates: readonly string[], size = DOU_BACKFILL_MAX_DATES_PER_RUN): string[][] {
@@ -295,6 +308,8 @@ export interface DouBackfillBatchOptions {
   workerId: string;
   credentials: () => InlabsCredentials | undefined;
   receipts?: Record<string, string>;
+  /** BACKFILL-only explicit section list. No change to monitoring default. */
+  sections?: readonly InlabsXmlSection[];
   /** Attempts per batch, including transient INLABS retries. */
   maxAttempts?: number;
   timeoutMs?: number;
@@ -333,6 +348,7 @@ export async function runDouBackfillBatch(db: Kysely<DB>, options: DouBackfillBa
   registry.register(new DouConnector({
     credentials: options.credentials,
     dates: options.dates,
+    ...(options.sections ? { sections: options.sections } : {}),
     // Only past dates are planned (never the monitoring window), so a batch
     // without editions is final, not pending availability.
     allowEmptyBatch: true,

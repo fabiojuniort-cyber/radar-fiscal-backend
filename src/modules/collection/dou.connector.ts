@@ -18,6 +18,8 @@ export interface DouOptions {
   // A bounded, explicit date range for controlled validation/backfill. Runtime registry
   // never supplies these dates and does not mutate shared source configuration.
   dates?: string[];
+  /** Explicit sections for controlled BACKFILL only; regular monitoring keeps all four. */
+  sections?: readonly InlabsXmlSection[];
   /**
    * Backfill of past dates only: a batch where every package is absent is a
    * consulted batch without editions (weekends, holidays), not a pending
@@ -59,6 +61,8 @@ export class DouConnector implements CollectionConnector {
   ): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
     const dates = this.#options.dates ?? douCollectionDates(now);
+    const sections = this.#options.sections ?? DOU_XML_SECTIONS;
+    if (!sections.length || new Set(sections).size !== sections.length || sections.some(s => !DOU_XML_SECTIONS.includes(s))) throw failure('DOU_INVALID_SECTION_SET');
     if (!dates.length || dates.length > 4 || new Set(dates).size !== dates.length || dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d) || !Number.isFinite(Date.parse(d)) || new Date(d).toISOString().slice(0, 10) !== d)) throw failure('DOU_INVALID_DATE_BATCH');
     const state = await this.#options.readState?.(context.sourceId, context.runId) ?? { archives: {} };
     // Do not silently discard a gap that exceeds the bounded reconciliation window.
@@ -75,7 +79,7 @@ export class DouConnector implements CollectionConnector {
     try {
       await client.login(context.signal);
       for (const date of dates) {
-        for (const section of DOU_XML_SECTIONS) {
+        for (const section of sections) {
           context.signal.throwIfAborted();
           const filename = `${date}-${section}.zip`;
           let download: Awaited<ReturnType<InlabsClient['downloadXml']>>;
