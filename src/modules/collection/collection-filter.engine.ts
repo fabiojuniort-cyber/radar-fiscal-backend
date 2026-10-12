@@ -62,7 +62,7 @@ export interface CollectionFilterPublication {
   materialAttachmentsUnexamined?: boolean;
   typeConflict?: boolean;
   /** Raw type supplied by the official source (may disagree with parsed actType). */
-  sourceActType?: string | null;
+  sourceActType?: string | null | undefined;
   provenanceConflict?: boolean;
 }
 
