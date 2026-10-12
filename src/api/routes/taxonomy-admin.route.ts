@@ -63,7 +63,7 @@ import {
   loadRuntimeSettings,
   pgRunner,
 } from '../../modules/taxonomy/curation/curation.read.js';
-import { initializeF2Actuacao } from '../../modules/taxonomy/curation/curation.actuacao.js';
+import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from '../../modules/taxonomy/curation/curation.actuacao.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import { PROTECTED_EXCLUDED_SOURCES } from '../../modules/taxonomy/curation/curation.constants.js';
 import { importNcmCatalog } from '../../modules/taxonomy/ncm/ncm-catalog.importer.js';
@@ -140,6 +140,16 @@ const conceptBody = z.object({
 });
 
 const justificationBody = z.object({ justification });
+const f2ActuacaoOriginsBody = z.object({
+  justification,
+  sourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  rows: z.array(z.object({
+    sourceLine: z.number().int().min(2).max(1333),
+    cnaeCode: z.string().regex(/^[0-9]{7}$/),
+    atuacaoLabel: z.string().trim().min(1).max(80),
+  }).strict()).length(1332),
+}).strict();
+
 
 class NotCuratorError extends Error {}
 
@@ -502,6 +512,24 @@ export async function taxonomyAdminRoutes(
     async (request, reply) => {
       const result = await withCuratorTransaction(curatorPool(), (client) =>
         initializeF2Actuacao(client, actorFrom(request, request.body.justification)),
+      );
+      return reply.status(200).send(result);
+    },
+  );
+
+  // F2-T02: load only the exact cryptographically pinned 1,332 CNAE
+  // origins from Segmento 1.7.3 into an open DRAFT; no publication or T03 load.
+  typed.post(
+    '/api/v1/admin/taxonomy/drafts/current/actuacao/origins',
+    { preHandler: requirePlatformAdmin, schema: { body: f2ActuacaoOriginsBody } },
+    async (request, reply) => {
+      const result = await withCuratorTransaction(curatorPool(), (client) =>
+        persistF2ActuacaoCnaeOrigins(
+          client,
+          actorFrom(request, request.body.justification),
+          request.body.rows,
+          request.body.sourceSha256,
+        ),
       );
       return reply.status(200).send(result);
     },
