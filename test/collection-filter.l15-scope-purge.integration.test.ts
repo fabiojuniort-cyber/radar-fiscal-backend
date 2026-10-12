@@ -13,6 +13,157 @@ function sha(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+test('L20 f57e0b03: direct purge and Apagar fora do escopo both delete when conflicting DOU/DO3 types are EXCLUDE_ALWAYS',async()=>{
+  const admin=new Pool({connectionString:url,max:1});
+  const app=await buildApp();
+  const suffix=randomUUID().slice(0,8);
+  const actType='AVISO DE DISPENSA DE LICITACAO';
+  const sourceType='AVISO DE ADJUDICACAO';
+  const previous=new Map<string,string>();
+  const insertedTypes:string[]=[];
+  let actorId:string|null=null;
+  let policyId:string|null=null;
+  try{
+    await app.ready();
+    const email='l20-'+suffix+'@example.test';
+    const reg=await app.inject({method:'POST',url:'/auth/register',payload:{
+      name:'L20 test',email,company:'L20 Test Tenant '+suffix,
+      password,confirmPassword:password,acceptedTerms:true,
+    }});
+    assert.equal(reg.statusCode,201,reg.body);
+    const account=reg.json<{user:{id:string};tenant:{id:string}}>();
+    actorId=account.user.id;
+    const login=await app.inject({method:'POST',url:'/auth/login',payload:{email,password}});
+    assert.equal(login.statusCode,200,login.body);
+    const headers={authorization:'Bearer '+login.json<{accessToken:string}>().accessToken,
+      'x-tenant-id':account.tenant.id};
+    await admin.query(
+      "INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN','L20_TEST')",
+      [account.user.id],
+    );
+    let p=(await admin.query<{id:string}>(
+      "SELECT id FROM collection_filter_policies WHERE status='APPROVED' LIMIT 1"
+    )).rows[0];
+    if(!p){
+      p=(await admin.query<{id:string}>(
+        "INSERT INTO collection_filter_policies(version,status,approved_at,approved_by) "+
+        "SELECT COALESCE(max(version),0)+1,'APPROVED',now(),$1 FROM collection_filter_policies RETURNING id",
+        [account.user.id],
+      )).rows[0]!;
+    }
+    policyId=p.id;
+    const dou=(await admin.query<{id:string}>(
+      "SELECT id FROM sources WHERE code='dou' LIMIT 1"
+    )).rows[0]?.id??(await admin.query<{id:string}>(
+      "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
+      "VALUES('dou','DOU','FEDERAL','https://in.gov.br','dou') RETURNING id"
+    )).rows[0]!.id;
+    for(const canonical of [actType,sourceType]){
+      const old=await admin.query<{mode:string}>(
+        "SELECT mode FROM collection_filter_type_rules "+
+        "WHERE policy_id=$1 AND source_code='dou' AND section='DO3' AND canonical_type=$2",
+        [policyId,canonical],
+      );
+      if(old.rows[0])previous.set(canonical,old.rows[0].mode);
+      else insertedTypes.push(canonical);
+      await admin.query(
+        "INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) "+
+        "VALUES($1,'dou','DO3',$2,'EXCLUDE_ALWAYS') "+
+        "ON CONFLICT(policy_id,source_code,section,canonical_type) "+
+        "DO UPDATE SET mode=EXCLUDED.mode",
+        [policyId,canonical],
+      );
+    }
+    // Two independent copies of the observed f57e0b03 shape so that each
+    // purge path must prove a real physical delete (not just a KEEP/DISCARD).
+    async function fixture(label:string) {
+      const url='https://www.in.gov.br/l20-f57e0b03-'+suffix+'-'+label;
+      const id=(await admin.query<{id:string}>(
+        "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
+        "act_type,title,published_on,primary_official_url) "+
+        "VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,"+
+        "'AVISO DE DISPENSA DE LICITAÇÃO 7/2026','2026-10-09',$3) RETURNING id",
+        [sha('f57e0b03-'+suffix+'-'+label),actType,url],
+      )).rows[0]!.id;
+      await admin.query(
+        "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
+        "VALUES($1,$2,$3,$4::jsonb)",
+        [id,dou,url,JSON.stringify({dou:{section:'DO3',sourceActType:'Aviso de Adjudicação'}})],
+      );
+      await admin.query(
+        "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,"+
+        "is_current,source_metadata) VALUES($1,1,$2,$3,true,$4::jsonb)",
+        [id,sha('body-'+id),
+         'Prefeitura de Douradoquara/MG. Contratação administrativa.',
+         JSON.stringify({dou:{section:'DO3',sourceActType:'Aviso de Adjudicação'}})],
+      );
+      return id;
+    }
+    const directId=await fixture('direct');
+    const directPayload={sourceCode:'dou',section:'DO3',canonicalType:actType,mode:'EXCLUDE_ALWAYS'};
+    const preview=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/preview',
+      headers,payload:directPayload});
+    assert.equal(preview.statusCode,200,preview.body);
+    const plan=preview.json<{count:number;token:string}>();
+    assert.ok(plan.count>=1,'TYPE_CONFLICT_BOTH_EXCLUDED must reach direct-rule preview');
+    const confirmed=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers,payload:{...directPayload,expectedCount:plan.count,previewToken:plan.token}});
+    assert.equal(confirmed.statusCode,200,confirmed.body);
+    assert.equal(confirmed.json<{changed:boolean}>().changed,false);
+    assert.ok(confirmed.json<{deletedCount:number}>().deletedCount>=1);
+    assert.equal((await admin.query('SELECT 1 FROM publications WHERE id=$1',[directId])).rowCount,0,
+      'direct purge must physically delete f57e0b03 fixture');
+    assert.equal((await admin.query(
+      "SELECT 1 FROM collection_filter_discards WHERE archive_publication_id=$1",[directId],
+    )).rowCount,1,'direct purge must preserve archived discard');
+
+    const globalId=await fixture('out-of-scope');
+    const globalPreview=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/out-of-scope/preview',headers});
+    assert.equal(globalPreview.statusCode,200,globalPreview.body);
+    const globalPlan=globalPreview.json<{count:number;ruleDiscards:number;token:string}>();
+    assert.ok(globalPlan.ruleDiscards>=1,
+      'TYPE_CONFLICT_BOTH_EXCLUDED must reach the global RULE bucket');
+    const globalConfirm=await app.inject({method:'POST',
+      url:'/api/v1/admin/collection-filter/out-of-scope/confirm',
+      headers,payload:{expectedCount:globalPlan.count,previewToken:globalPlan.token}});
+    assert.equal(globalConfirm.statusCode,200,globalConfirm.body);
+    assert.equal(globalConfirm.json<{changed:boolean}>().changed,false);
+    assert.ok(globalConfirm.json<{deletedCount:number}>().deletedCount>=1);
+    assert.equal((await admin.query('SELECT 1 FROM publications WHERE id=$1',[globalId])).rowCount,0,
+      'global Apagar fora do escopo must physically delete f57e0b03 fixture');
+    assert.equal((await admin.query(
+      "SELECT 1 FROM collection_filter_discards WHERE archive_publication_id=$1",[globalId],
+    )).rowCount,1,'global purge must preserve archived discard');
+  }finally{
+    if(policyId){
+      for(const canonical of insertedTypes){
+        await admin.query(
+          "DELETE FROM collection_filter_type_rules WHERE policy_id=$1 "+
+          "AND source_code='dou' AND section='DO3' AND canonical_type=$2",
+          [policyId,canonical],
+        );
+      }
+      for(const [canonical,mode] of previous){
+        await admin.query(
+          "UPDATE collection_filter_type_rules SET mode=$3 WHERE policy_id=$1 "+
+          "AND source_code='dou' AND section='DO3' AND canonical_type=$2",
+          [policyId,canonical,mode],
+        );
+      }
+    }
+    if(actorId)await admin.query(
+      "UPDATE platform_user_roles SET revoked_at=COALESCE(revoked_at,now()), "+
+      "revoked_by=COALESCE(revoked_by,'l20-test') WHERE user_id=$1 AND revoked_at IS NULL",
+      [actorId],
+    );
+    await app.close();
+    await admin.end();
+  }
+});
+
 test('L15: only admin, DOU scoped preview, cross-source/company protections and 051 audit', async () => {
   const db = new Pool({connectionString: url, max: 1});
   const app = await buildApp();
