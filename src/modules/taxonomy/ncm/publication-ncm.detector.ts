@@ -183,19 +183,19 @@ export async function catalogMatches(
     id: string;
     code: string;
   }>`
-    SELECT
-      oce.id,
-      regexp_replace(oce.official_code, '[^0-9]', '', 'g') AS code
-    FROM official_catalog_entries oce
-    JOIN official_catalog_editions oed
-      ON oed.id = oce.catalog_edition_id
-    JOIN official_catalogs oc
-      ON oc.id = oed.catalog_id
+    SELECT DISTINCT ON (requested.code)
+      oce.id, requested.code
+    FROM unnest(${codes}::text[]) AS requested(code)
+    JOIN official_catalog_entries oce
+      ON left(regexp_replace(oce.official_code, '[^0-9]', '', 'g'), length(requested.code))
+       = requested.code
+    JOIN official_catalog_editions oed ON oed.id = oce.catalog_edition_id
+    JOIN official_catalogs oc ON oc.id = oed.catalog_id
     WHERE oc.code = 'NCM'
       AND oed.status = 'CURRENT'
       AND COALESCE(oce.metadata ->> 'assignable', 'false') = 'true'
-      AND regexp_replace(oce.official_code, '[^0-9]', '', 'g')
-          = ANY(${codes}::text[])
+      AND requested.code ~ '^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$'
+    ORDER BY requested.code, oce.official_code
   `.execute(trx);
 
   return new Map(
@@ -231,6 +231,7 @@ export async function persistSuccessfulScan(
       sourceField,
       currentWordingOnly,
       interpretation: 'CATALOG_CODE_MENTION_ONLY',
+      ncmPrefixScope: candidate.code.length < 8 ? 'PREFIX_POTENTIAL_RELEVANCE' : 'EXACT_ITEM',
     });
 
     const inserted = await sql<{ id: string }>`
