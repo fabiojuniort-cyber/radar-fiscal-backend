@@ -912,6 +912,8 @@ export async function catalogMonitoringRoutes(
         duration_ms: number | null;
         attempt_count: number;
         found_items: number;
+        discarded_items: number;
+        retained_items: number;
         imported_documents: number;
       }>`
         SELECT
@@ -937,11 +939,14 @@ export async function catalogMonitoringRoutes(
             FROM collection_attempts ca
             WHERE ca.collection_run_id = cr.id
           ) AS attempt_count,
-          (
-            SELECT count(*)::int
-            FROM collection_items ci
-            WHERE ci.collection_run_id = cr.id
-          ) AS found_items,
+          -- Collection-item outcomes are unique per run/source item, so retries
+          -- do not double-count. A filtered item was processed, not retained.
+          GREATEST(ci_counts.found_items, coalesce(discard_stats.found_count, 0)) AS found_items,
+          CASE
+            WHEN ci_counts.found_items = 0 THEN coalesce(discard_stats.discard_count, 0)
+            ELSE ci_counts.discarded_items
+          END AS discarded_items,
+          ci_counts.retained_items,
           (
             SELECT count(*)::int
             FROM collection_run_publications crp
@@ -950,6 +955,20 @@ export async function catalogMonitoringRoutes(
           ) AS imported_documents
         FROM collection_runs cr
         JOIN sources s ON s.id = cr.source_id
+        CROSS JOIN LATERAL (
+          SELECT
+            count(*)::int AS found_items,
+            count(*) FILTER (WHERE ci.status = 'FILTERED_OUT')::int AS discarded_items,
+            count(*) FILTER (
+              WHERE ci.status IN ('PROCESSED_NEW', 'PROCESSED_EXISTING', 'NEW_VERSION')
+            )::int AS retained_items
+          FROM collection_items ci
+          WHERE ci.collection_run_id = cr.id
+        ) ci_counts
+        -- Historical discard telemetry survives item retention. RLS may hide
+        -- these stats for non-admin tenants; current item outcomes remain usable.
+        LEFT JOIN collection_filter_discard_run_stats discard_stats
+          ON discard_stats.collection_run_id = cr.id
         WHERE cr.scheduled_for >= now() - interval '24 hours'
         ORDER BY cr.scheduled_for DESC, cr.created_at DESC
         LIMIT 1000
@@ -976,6 +995,9 @@ export async function catalogMonitoringRoutes(
           durationMs: row.duration_ms,
           attemptCount: row.attempt_count,
           foundItems: row.found_items,
+          discardedItems: row.discarded_items,
+          retainedItems: row.retained_items,
+          processedItems: row.discarded_items + row.retained_items,
           importedDocuments: row.imported_documents,
         })),
       });
