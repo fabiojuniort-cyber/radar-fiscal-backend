@@ -84,6 +84,19 @@ The engine preserves enough information to distinguish:
 
 Derived monitoring includes last run, last attempt, last success, duration, found/processed/new/existing/new-version/error counts, attempt count, and retry count. These indicators are derived from collection tables; they are not duplicated into `sources`.
 
+### MON-01 — execução por fonte e indicadores de 24h
+
+A rota autenticada `GET /api/v1/monitoring/runs` mantém os campos existentes e expõe também `discardedItems`, `retainedItems` e `processedItems` por execução da janela de 24 horas:
+
+- **Encontradas** (`foundItems`): registros únicos do run em `collection_items`; para runs cujos itens foram retidos/limpos, o `found_count` de `collection_filter_discard_run_stats` pode preservar o mínimo conhecido;
+- **Descartadas** (`discardedItems`): itens `FILTERED_OUT`; quando não há mais `collection_items` do run, usar `discard_count` da estatística, se a política RLS permitir;
+- **Mantidas** (`retainedItems`): itens com status `PROCESSED_NEW`, `PROCESSED_EXISTING` e `NEW_VERSION` (não incluem falhas, itens descobertos mas pendentes ou descartados);
+- **Processadas** (`processedItems`): soma de descartadas e mantidas, sem contar `FAILED`;
+- **Importadas** (`importedDocuments`): apenas vínculos `collection_run_publications` com `NEW_PUBLICATION` ou `NEW_VERSION`, sem contar publicações já existentes.
+
+A contagem agrega por `collection_run_id`, evitando duplicações por retry. A tabela de estatísticas tem leitura restrita a administrador global; usuários comuns contam por `collection_items`. A interface agrega esses números nos cards de 24h e mostra cada execução por fonte. Nenhuma migration ou mutação de dados é necessária.
+
+
 ## Mandatory simulated scenarios
 
 Integration tests cover:
