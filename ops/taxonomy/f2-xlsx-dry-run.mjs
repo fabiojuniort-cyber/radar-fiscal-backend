@@ -176,6 +176,29 @@ export async function parseApprovedWorkbook(path, kind) {
   return { kind, hash, rows: rows.slice(1) };
 }
 
+/**
+ * CI-only ZIP/XML parser using the same hardened reader, but with synthetic
+ * workbook hashes. The production CLI still uses parseApprovedWorkbook with
+ * its pinned SHA256. Never enable this helper outside isolated PG18.
+ */
+export async function parseF2TestFixtureWorkbook(path, kind) {
+  if (process.env.NODE_ENV !== 'test' ||
+      process.env.F2_IMPORT_SCOPE !== 'ISOLATED_POSTGRES18_ONLY') {
+    fail('Fixture parsing unavailable outside isolated test');
+  }
+  const spec = F2_SOURCE[kind];
+  if (!spec) fail('Fixture kind inválido');
+  const bytes = await readFile(path);
+  if (bytes.length > MAX_XLSX_BYTES) fail('Fixture XLSX excede limite');
+  const xml = await unzipEntry(bytes, 'xl/worksheets/sheet1.xml');
+  const shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml'));
+  const rows = parseWorksheet(xml, shared);
+  if (rows.length !== spec.rows + 1 ||
+      JSON.stringify(rows[0]) !== JSON.stringify(spec.columns))
+    fail('Fixture headers/rows divergem do contrato F2');
+  return {kind, hash: sha256(bytes), rows: rows.slice(1)};
+}
+
 function splitMulti(text) {
   return String(text ?? '').split(';').map(x => x.trim()).filter(Boolean);
 }
