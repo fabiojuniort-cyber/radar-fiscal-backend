@@ -110,6 +110,14 @@ export interface ConceptView {
   classifyByLabel: boolean;
   officialCodes: string[];
   aliases: AliasView[];
+  /** Optional admin-only F2 staging suggestion, never a legal classification. */
+  f2Source?: {
+    atuacao: string;
+    suggestedProducts: string;
+    suggestedNcms: string;
+    sourceSha256: string;
+    sourceBatchId: string;
+  };
 }
 
 export interface ReleaseView {
