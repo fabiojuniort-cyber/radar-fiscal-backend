@@ -33,7 +33,7 @@ test('F2-T02 on isolated PostgreSQL 18: draft Atuação and source origins are d
 
     const first = await withCuratorTransaction(curator, client => initializeF2Actuacao(client, actor));
     assert.equal(first.sourceRows, 1332);
-    assert.equal(first.seededCodes.length, 7);
+    assert.equal(first.seededCodes.length, 12);
     assert.equal(first.classificationPublished, false);
     assert.equal(first.sourceSha256, F2_ACTUACAO_SOURCE_SHA256);
     const second = await withCuratorTransaction(curator, client => initializeF2Actuacao(client, actor));
