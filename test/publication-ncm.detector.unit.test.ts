@@ -81,3 +81,34 @@ test('the sanitized CONFAZ presentation keeps the green previous-wording table s
   assert.ok(!html?.includes('A7-2Tabelajustificado"'));
   assert.equal(currentWordingText(html), '');
 });
+
+test('F2: extracts 2, 4 and 6-digit NCM only when supported by immediate official context', () => {
+  const candidates = extractNcmCandidates([
+    'NCM 10; TIPI 1006; posição 87.03; subposição 1006.30.',
+    'Capítulo 31 e código 3102; NCM 3102.10; NCM 1006.30.11.',
+  ].join(' '));
+  assert.deepEqual(
+    [...new Set(candidates.map((candidate) => candidate.code))].sort(),
+    ['10', '1006', '100630', '10063011', '31', '3102', '310210', '8703'].sort(),
+  );
+  assert.ok(candidates.every((candidate) =>
+    candidate.spanEnd > candidate.spanStart && candidate.excerpt.length > 0));
+});
+
+test('F2: never promotes years, articles, dates, IDs or bare headings to a short NCM', () => {
+  const text = [
+    'Art. 12, artigo 1006, Lei 2026, exercício de 2025, capítulo orçamentário do ano 2026.',
+    'A posição do artigo 1006 e subposição do artigo 311203 não são NCM.',
+    'O código de 2026, o código nº 2026 e o Código Civil 1916 não são classificações fiscais.',
+    'Uma tabela sem cabeçalho lista 10, 1006, 310210 e 2024.',
+    'A NCM 123456789 e TIPI 8703.800000 não devem recortar seis dígitos.',
+  ].join(' ');
+  assert.deepEqual(extractNcmCandidates(text), []);
+});
+
+test('F2: short positions obey their own semantic width and ignore partial longer codes', () => {
+  const values = extractNcmCandidates(
+    'capítulo 1006; posição 100630; subposição 31; código 2201; NCM 2201.90.',
+  ).map((candidate) => candidate.code);
+  assert.deepEqual(values, ['2201', '220190']);
+});

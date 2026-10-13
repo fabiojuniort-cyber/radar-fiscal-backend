@@ -306,6 +306,26 @@ async function copyReleaseGraph(
     [sourceId, targetId],
   );
 
+  // F2-T02: carry verified Atuação–CNAE provenance into the next draft
+  // using the same immutable concept identity, not the old release row IDs.
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_actuacao_cnae_origins
+        (release_id, release_concept_id, cnae_code, source_line, source_sha256)
+      SELECT $2::uuid, target_concept.id, source.cnae_code,
+             source.source_line, source.source_sha256
+      FROM taxonomy_release_actuacao_cnae_origins source
+      JOIN taxonomy_release_concepts old_concept
+        ON old_concept.id = source.release_concept_id
+       AND old_concept.release_id = $1::uuid
+      JOIN taxonomy_release_concepts target_concept
+        ON target_concept.release_id = $2::uuid
+       AND target_concept.concept_id = old_concept.concept_id
+      WHERE source.release_id = $1::uuid
+    `,
+    [sourceId, targetId],
+  );
+
   await client.query(
     `
       INSERT INTO taxonomy_release_relation_rules (
