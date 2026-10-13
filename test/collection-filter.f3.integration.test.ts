@@ -73,7 +73,7 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       assert.equal(capture.decision.decision,'DISCARD');assert.equal(capture.decision.matchedTypeSource,'TITLE');
     }
     const conditionalRuntime=await loadApprovedCollectionFilterRuntime(inspection,dou,{readOnly:true});assert.ok(conditionalRuntime);
-    const conditionalHistory=(await owner.query<HistoricalCollectionCandidate>('SELECT * FROM collection_filter_f3_candidates(NULL,500,$1) WHERE publication_id=$2::uuid',['dou',conditional.id])).rows[0];assert.ok(conditionalHistory);
+    const conditionalHistory=(await owner.query<HistoricalCollectionCandidate>('SELECT * FROM collection_filter_f3_candidates((SELECT id FROM publications WHERE id<$2::uuid ORDER BY id DESC LIMIT 1),500,$1) WHERE publication_id=$2::uuid',['dou',conditional.id])).rows[0];assert.ok(conditionalHistory);
     assert.equal(conditionalHistory.has_material,false,'stored PROVENANCE role must override conservative legacy file fallback');
     const conditionalCapture=evaluateRuntimeCollectionFilter(conditionalRuntime,{title:conditional.title,contentText:'Contratacao administrativa de rotina.',metadata:conditional.metadata,originMetadata:conditional.metadata,files:provenanceFiles} as Parameters<typeof evaluateRuntimeCollectionFilter>[1]);
     assert.deepEqual(evaluateHistoricalCollectionCandidate(conditionalRuntime.policy,conditionalHistory),conditionalCapture.decision);
