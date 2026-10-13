@@ -8,7 +8,7 @@ export async function verifyF2StageReadback(client, batchId, payload) {
     'SELECT * FROM taxonomy_f2_import_product_rows WHERE batch_id=$1::uuid ORDER BY source_line',
     [batchId],
   );
-  if (a.rows.length !== 1332 || b.rows.length !== 3793)
+  if (a.rows.length !== payload.segments.length || b.rows.length !== payload.products.length)
     throw new Error('F2_STAGE_READBACK_COUNT_MISMATCH');
   for (let i = 0; i < a.rows.length; i++) {
     const got = a.rows[i], expected = payload.segments[i];

@@ -11,14 +11,14 @@ import yauzl from 'yauzl';
 
 export const F2_SOURCE = Object.freeze({
   segmento: Object.freeze({
-    sha256: '588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd',
+    sha256: '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67',
     rows: 1332,
     sheet: 'Segmento',
     columns: ['Segmento', 'Sub Segmento', 'Atuação', 'CNAE', 'Descrição do CNAE', 'Sinônimos', 'Produtos (sugeridos)', 'NCMs (sugeridos)', 'No perfil', 'Classificar pelo nome', 'Ordem', 'Código TriFaros'],
   }),
   produto: Object.freeze({
-    sha256: '45f2594ad53bb83408fbf198f51dec8bffdf3801a053c8ffcfe544542d51b2b8',
-    rows: 3793,
+    sha256: '261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a',
+    rows: 4225,
     sheet: 'Produto',
     columns: ['Segmento', 'Grupo', 'Item', 'NCM', 'Sinônimos', 'No perfil', 'Classificar pelo nome', 'Ordem', 'Código TriFaros', 'Definição'],
   }),
@@ -26,14 +26,13 @@ export const F2_SOURCE = Object.freeze({
 
 const MAX_XLSX_BYTES = 8 * 1024 * 1024;
 const MAX_UNZIPPED_ENTRY = 16 * 1024 * 1024;
-const EXPECTED_ACTUATIONS = new Map([
-  ['Serviço', 583],
-  ['Indústria', 380],
-  ['Comércio atacadista', 116],
-  ['Produção agropecuária', 108],
-  ['Comércio varejista', 89],
-  ['Extração mineral', 41],
-  ['Representação comercial', 15],
+// Approved F2-T02 catalogue. Counts are report-only, not a gate.
+// The v5.1 source now uses the 12 approved categories; no automatic remapping.
+export const APPROVED_ACTUATIONS = new Set([
+  'Serviço', 'Indústria', 'Comércio atacadista', 'Comércio varejista',
+  'Transportador', 'Extração mineral', 'Produtor rural',
+  'Locação e licenciamento', 'Institucional', 'Representação comercial',
+  'Energia e utilidades', 'Armazém',
 ]);
 
 function fail(message) {
@@ -126,13 +125,13 @@ export function parseWorksheet(xml, shared) {
 }
 
 /** Read exact ZIP paths; no filesystem extraction or network access. */
-function unzipEntry(bytes, target) {
+function unzipEntry(bytes, target, optional = false) {
   return new Promise((resolveEntry, reject) => {
     let found = false;
     yauzl.fromBuffer(bytes, { lazyEntries: true, autoClose: true, validateEntrySizes: true }, (error, zip) => {
       if (error || !zip) return reject(error ?? new Error('ZIP inválido'));
       zip.on('error', reject);
-      zip.on('end', () => { if (!found) reject(new Error('XLSX sem entrada ' + target)); });
+      zip.on('end', () => { if (!found) { if (optional) resolveEntry(''); else reject(new Error('XLSX sem entrada ' + target)); } });
       zip.on('entry', (entry) => {
         if (entry.fileName !== target) return zip.readEntry();
         if (found) return reject(new Error('Entrada ZIP duplicada: ' + target));
@@ -167,7 +166,7 @@ export async function parseApprovedWorkbook(path, kind) {
   const hash = sha256(bytes);
   if (hash !== spec.sha256) fail(kind + ': hash divergente: ' + hash);
   const xml = await unzipEntry(bytes, 'xl/worksheets/sheet1.xml');
-  const shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml'));
+  const shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml', true));
   const rows = parseWorksheet(xml, shared);
   if (rows.length !== spec.rows + 1) fail(kind + ': número de linhas divergente: ' + (rows.length - 1));
   if (JSON.stringify(rows[0]) !== JSON.stringify(spec.columns)) {
@@ -191,7 +190,7 @@ export async function parseF2TestFixtureWorkbook(path, kind) {
   const bytes = await readFile(path);
   if (bytes.length > MAX_XLSX_BYTES) fail('Fixture XLSX excede limite');
   const xml = await unzipEntry(bytes, 'xl/worksheets/sheet1.xml');
-  const shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml'));
+  const shared = parseSharedStrings(await unzipEntry(bytes, 'xl/sharedStrings.xml', true));
   const rows = parseWorksheet(xml, shared);
   if (rows.length !== spec.rows + 1 ||
       JSON.stringify(rows[0]) !== JSON.stringify(spec.columns))
@@ -207,7 +206,7 @@ function digits(text) {
 }
 
 /**
- * T03: official NCMs may be 2/4/6/8 digits, with or without dots.
+ * T03: source NCM prefixes may contain 2 through 8 digits, with or without dots.
  * Accept ONLY digits and dots in one semicolon-delimited NCM cell token.
  * Never silently discard an invalid character from Produto.NCM.
  * Segmento.NCMs (sugeridos) is advisory text, not imported official codes.
@@ -216,7 +215,7 @@ export function normalizeProductNcm(value) {
   const raw = String(value ?? '').trim();
   if (!raw || !/^[0-9.]+$/.test(raw)) return null;
   const normalized = raw.replace(/\./g, '');
-  return /^(?:\d{2}|\d{4}|\d{6}|\d{8})$/.test(normalized) ? normalized : null;
+  return /^\d{2,8}$/.test(normalized) ? normalized : null;
 }
 
 /** Potential relevance only, not legal incidence or product/NCM assignment. */
@@ -245,7 +244,7 @@ export function planImport(segmentRows, productRows) {
     const sub = String(subsegment ?? '').trim();
     const act = String(activity ?? '').trim();
     if (!s || !sub || !act || !cnae || cnae.length !== 7) errors.push('Segmento linha ' + line + ': segmento/subsegmento/atuação/CNAE inválido');
-    if (seenCnae.has(cnae)) warnings.push('CNAE repetido: ' + cnae + ' (linha ' + line + ')');
+    if (seenCnae.has(cnae)) errors.push('CNAE com mais de uma Atuação: ' + cnae + ' (linha ' + line + ')');
     seenCnae.add(cnae);
     const key = s + '\u0000' + sub;
     if (!segments.has(key)) segments.set(key, { segmento: s, subsegmento: sub, display: segmentSubsegmentLabel(s, sub) });
@@ -272,7 +271,7 @@ export function planImport(segmentRows, productRows) {
       digits: normalizeProductNcm(raw),
     }));
     if (ncms.some(value => value.digits === null)) {
-      errors.push('Produto linha ' + line + ': NCM inválido (somente dígitos e pontos; 2/4/6/8 dígitos)');
+      errors.push('Produto linha ' + line + ': NCM inválido (somente dígitos e pontos; 2 a 8 dígitos)');
     }
     products.push({
       segment: String(segment ?? '').trim(),
@@ -289,10 +288,14 @@ export function planImport(segmentRows, productRows) {
     });
   }
 
-  for (const [name, count] of EXPECTED_ACTUATIONS) {
-    if (activities.get(name)?.cnaes.length !== count) errors.push('Atuação ' + name + ': frequência inesperada');
+  // Exactly one registered Atuação per CNAE; no automatic category mapping.
+  // The approved catalogue is the T02 seed; the CLI itself has no DB access.
+  if (segmentRows.length !== F2_SOURCE.segmento.rows || seenCnae.size !== F2_SOURCE.segmento.rows) {
+    errors.push('Segmento: exigidos 1.332 CNAEs únicos com exatamente uma Atuação cada');
   }
-  for (const name of activities.keys()) if (!EXPECTED_ACTUATIONS.has(name)) errors.push('Atuação não homologada: ' + name);
+  for (const name of activities.keys()) {
+    if (!APPROVED_ACTUATIONS.has(name)) errors.push('Atuação não cadastrada na T02: ' + name);
+  }
 
   return {
     mode: 'DRY_RUN_ONLY',
@@ -304,6 +307,7 @@ export function planImport(segmentRows, productRows) {
       cnaeDistinct: seenCnae.size,
       segmentSubsegmentPairs: segments.size,
       actuationCategories: activities.size,
+      actuationCounts: Object.fromEntries([...activities].map(([label, item]) => [label, item.cnaes.length])),
       productCodesDistinct: seenProductCode.size,
       errors: errors.length,
       warnings: warnings.length,

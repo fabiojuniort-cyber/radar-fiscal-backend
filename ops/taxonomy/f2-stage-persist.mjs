@@ -30,21 +30,23 @@ export async function stageF2Payload(pool, payload) {
     if (existing.rows.length) {
       const row = existing.rows[0];
       if (row.content_sha256 !== payload.contentSha256 ||
-          row.segmento_rows !== 1332 || row.produto_rows !== 3793 ||
-          row.expected_warnings !== 442) throw new Error('F2_EXISTING_BATCH_CONFLICT');
+          row.segmento_rows !== payload.summary.segmentRows ||
+          row.produto_rows !== payload.summary.productRows ||
+          row.expected_warnings !== payload.summary.warnings) throw new Error('F2_EXISTING_BATCH_CONFLICT');
       await verifyF2StageReadback(client, row.id, payload);
       await client.query('COMMIT');
       begun = false;
       return { batchId: row.id, firstRun: false, insertedBatches: 0,
         insertedSegments: 0, insertedProducts: 0,
-        errors: 0, warnings: 442, liveTaxonomyChanges: 0 };
+        errors: 0, warnings: payload.summary.warnings, liveTaxonomyChanges: 0 };
     }
 
     const batch = await client.query(
       'INSERT INTO taxonomy_f2_import_batches ' +
       '(segmento_sha256,produto_sha256,content_sha256,segmento_rows,produto_rows,expected_warnings) ' +
-      'VALUES ($1,$2,$3,1332,3793,442) RETURNING id',
-      [payload.hashes.segmentoSha256,payload.hashes.produtoSha256,payload.contentSha256],
+      'VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+      [payload.hashes.segmentoSha256,payload.hashes.produtoSha256,payload.contentSha256,
+        payload.summary.segmentRows,payload.summary.productRows,payload.summary.warnings],
     );
     const batchId = batch.rows[0].id;
     const eachChunk = (values, size=150) =>
@@ -75,7 +77,7 @@ export async function stageF2Payload(pool, payload) {
       );
       insertedProducts += result.rowCount;
     }
-    if (insertedSegments !== 1332 || insertedProducts !== 3793)
+    if (insertedSegments !== payload.summary.segmentRows || insertedProducts !== payload.summary.productRows)
       throw new Error('F2_STAGE_INSERT_COUNT_MISMATCH');
 
     await verifyF2StageReadback(client, batchId, payload);
@@ -83,7 +85,7 @@ export async function stageF2Payload(pool, payload) {
     begun = false;
     return { batchId, firstRun: true, insertedBatches: 1,
       insertedSegments, insertedProducts,
-      errors: 0, warnings: 442, liveTaxonomyChanges: 0 };
+      errors: 0, warnings: payload.summary.warnings, liveTaxonomyChanges: 0 };
   } catch(error) {
     if (begun) await client.query('ROLLBACK');
     throw error;
