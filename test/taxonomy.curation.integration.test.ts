@@ -1337,7 +1337,7 @@ test('F2-T02: Atuação curator draft, CNAE origin FK and unauthorized callers',
       headers: curator.headers, payload: { justification: 'Atuação F2 origem CNAE' },
     });
     assert.equal(initialized.statusCode, 200, initialized.body);
-    assert.equal(initialized.json().seededCodes.length, 7);
+    assert.equal(initialized.json().seededCodes.length, 12);
     assert.equal(initialized.json().sourceRows, 1332);
     assert.equal(initialized.json().classificationPublished, false);
 
@@ -1355,10 +1355,29 @@ test('F2-T02: Atuação curator draft, CNAE origin FK and unauthorized callers',
     assert.equal(view.statusCode, 200, view.body);
     const seeded = view.json().concepts.filter((concept: { code: string }) =>
       concept.code.startsWith('actuacao.'));
-    assert.equal(seeded.length, 7);
+    assert.equal(seeded.length, 12);
+    const expectedEnergiaAliases = [
+      'geração de energia elétrica',
+      'transmissão de energia elétrica',
+      'distribuição de energia elétrica',
+      'comercialização de energia elétrica',
+      'produção de gás',
+      'distribuição de gás canalizado',
+      'produção e distribuição de vapor',
+      'produção e distribuição de água quente',
+    ];
     for (const concept of seeded) {
       assert.equal(concept.classifyByLabel, false);
-      assert.deepEqual(concept.aliases, []);
+      if (concept.code === 'actuacao.energia_e_utilidades') {
+        assert.deepEqual(
+          concept.aliases.map((alias: { text: string }) => alias.text),
+          expectedEnergiaAliases,
+        );
+        assert.ok(concept.aliases.every((alias: { aliasType: string }) =>
+          alias.aliasType === 'EXACT_LEXICAL'));
+      } else {
+        assert.deepEqual(concept.aliases, []);
+      }
     }
 
     const forged = await app.inject({
