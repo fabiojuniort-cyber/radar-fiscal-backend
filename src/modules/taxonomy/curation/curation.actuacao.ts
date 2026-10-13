@@ -3,20 +3,37 @@ import type { PoolClient } from 'pg';
 
 import { createConcept, CurationError, type CuratorActor, requireOpenDraft } from './curation.draft.js';
 
-// F2-T02: seven exact values and frequencies derived from the signed-off
-// Segmento v1.7.3 XLSX, column Atuação. Synonyms are intentionally NOT
-// inherited from Segmento and no classification is published here.
+// F2-T02: 12 approved categories from Segmento v5 (13th "Produção Agrícola"
+// is NOT approved). Frequencies are documentary, never import gates.
+// Only Energia e utilidades has approved synonyms; no inherited Segmento aliases.
 export const F2_ACTUACAO_SOURCE_SHA256 =
-  '588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd';
+  'd27368e821b3cf892400a8fe8fd9cd8b1b74f0f711541a203655acab041ce814';
 
 export const F2_ACTUACAO_SEED = [
-  { code: 'actuacao.servico', label: 'Serviço', count: 583 },
-  { code: 'actuacao.industria', label: 'Indústria', count: 380 },
-  { code: 'actuacao.comercio_atacadista', label: 'Comércio atacadista', count: 116 },
-  { code: 'actuacao.producao_agropecuaria', label: 'Produção agropecuária', count: 108 },
-  { code: 'actuacao.comercio_varejista', label: 'Comércio varejista', count: 89 },
-  { code: 'actuacao.extracao_mineral', label: 'Extração mineral', count: 41 },
+  { code: 'actuacao.servico', label: 'Serviço', count: 505 },
+  { code: 'actuacao.industria', label: 'Indústria', count: 370 },
+  { code: 'actuacao.comercio_atacadista', label: 'Comércio atacadista', count: 115 },
+  { code: 'actuacao.comercio_varejista', label: 'Comércio varejista', count: 86 },
+  { code: 'actuacao.transportador', label: 'Transportador', count: 44 },
+  { code: 'actuacao.extracao_mineral', label: 'Extração mineral', count: 40 },
+  { code: 'actuacao.produtor_rural', label: 'Produtor rural', count: 37 },
+  { code: 'actuacao.locacao_e_licenciamento', label: 'Locação e licenciamento', count: 20 },
+  { code: 'actuacao.institucional', label: 'Institucional', count: 19 },
   { code: 'actuacao.representacao_comercial', label: 'Representação comercial', count: 15 },
+  {
+    code: 'actuacao.energia_e_utilidades', label: 'Energia e utilidades', count: 8,
+    synonyms: [
+      'geração de energia elétrica',
+      'transmissão de energia elétrica',
+      'distribuição de energia elétrica',
+      'comercialização de energia elétrica',
+      'produção de gás',
+      'distribuição de gás canalizado',
+      'produção e distribuição de vapor',
+      'produção e distribuição de água quente',
+    ],
+  },
+  { code: 'actuacao.armazem', label: 'Armazém', count: 3 },
 ] as const;
 
 export interface F2ActuacaoResult {
@@ -83,11 +100,11 @@ export async function initializeF2Actuacao(
       definition: seed.label,
       governanceStatus: 'PROPOSED',
       evidenceStatus: 'NOT_ASSESSED',
-      notes: 'F2-T02: Atuação v1.7.3 (' + seed.count + ' CNAEs de origem); revisão obrigatória antes de publicar.',
+      notes: 'F2-T02: Atuação v5 (' + seed.count + ' CNAEs de origem); revisão obrigatória antes de publicar.',
       // Generic lexical matches like "Serviço" alone can cause false positives.
       classifyByLabel: false,
       profileVisible: false,
-      aliases: [],
+      aliases: 'synonyms' in seed ? seed.synonyms.map(text => ({ text, aliasType: 'EXACT_LEXICAL' as const })) : [],
     });
     seededCodes.push(seed.code);
   }
@@ -104,18 +121,18 @@ export async function initializeF2Actuacao(
     dimension: 'actuacao',
     seededCodes,
     sourceSha256: F2_ACTUACAO_SOURCE_SHA256,
-    sourceRows: F2_ACTUACAO_SEED.reduce((count, item) => count + item.count, 0),
+    sourceRows: 1332,
     classificationPublished: false,
   };
 }
 
-/** Canonical SHA256 of the signed Segmento 1.7.3 origins, one line each:
+/** Canonical SHA256 of Segmento v5 origins (including unapproved categories), one line each:
  * `sourceLine|cnae7digits|AtuaçãoLabel\n`, preserving XLSX row order.
  * This projection pin prevents a client from submitting forged associations
  * while claiming the original XLSX file hash.
  */
 export const F2_ACTUACAO_ORIGINS_PROJECTION_SHA256 =
-  '794360223330c0e45911f559f25e0082caa9437a50f18c8480cb01a317a9da65';
+  '009b3c495081114283c65c65001b0a198a8661dc52e4854670090664b58e59df';
 
 export interface F2ActuacaoOriginInput {
   sourceLine: number;
@@ -137,8 +154,7 @@ function originProjection(rows: readonly F2ActuacaoOriginInput[]): string {
 
 export function validateF2ActuacaoOrigins(rows: readonly F2ActuacaoOriginInput[]): string {
   if (rows.length !== 1332) throw new CurationError('F2_ORIGINS_ROW_COUNT_INVALID');
-  const counts = new Map<string, number>();
-  const known = new Map<string, number>(F2_ACTUACAO_SEED.map((item) => [item.label, item.count]));
+  const known = new Set(F2_ACTUACAO_SEED.map((item) => item.label));
   const seen = new Set<string>();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
@@ -148,10 +164,6 @@ export function validateF2ActuacaoOrigins(rows: readonly F2ActuacaoOriginInput[]
     if (!known.has(row.atuacaoLabel)) throw new CurationError('F2_ORIGINS_LABEL_INVALID');
     if (seen.has(row.cnaeCode)) throw new CurationError('F2_ORIGINS_CNAE_DUPLICATE');
     seen.add(row.cnaeCode);
-    counts.set(row.atuacaoLabel, (counts.get(row.atuacaoLabel) ?? 0) + 1);
-  }
-  for (const [label, count] of known) {
-    if (counts.get(label) !== count) throw new CurationError('F2_ORIGINS_FREQUENCY_MISMATCH');
   }
   const digest = createHash('sha256').update(originProjection(rows), 'utf8').digest('hex');
   if (digest !== F2_ACTUACAO_ORIGINS_PROJECTION_SHA256) {
@@ -205,7 +217,7 @@ export async function persistF2ActuacaoCnaeOrigins(
     [draft.id, 'actuacao.%'],
   );
   const present = new Set(selected.rows.map((row) => row.code));
-  if (present.size !== 7 || F2_ACTUACAO_SEED.some((item) => !present.has(item.code))) {
+  if (present.size !== F2_ACTUACAO_SEED.length || F2_ACTUACAO_SEED.some((item) => !present.has(item.code))) {
     throw new CurationError('F2_ACTUACAO_NOT_INITIALIZED');
   }
 
