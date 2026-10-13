@@ -333,6 +333,9 @@ export function compileCollectionFilterPolicy(
     const firstWord = pattern.split(' ')[0] ?? '';
     const bucketKey = key(rule.sourceCode, rule.section ?? '', firstWord);
     const bucket = patterns.get(bucketKey) ?? [];
+    if (bucket.some(existing=>existing.pattern===pattern && existing.rule.mode!==rule.mode)) {
+      throw new Error(`conflicting filter rule: ${bucketKey}`);
+    }
     bucket.push({ pattern, rule, words: pattern.split(' ').length });
     patterns.set(bucketKey, bucket);
   };

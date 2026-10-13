@@ -16,6 +16,19 @@ const item = {sourceCode:'dou',section:'DO3',sourceActType:'Aviso',
   title:'EXTRATO DE CONTRATO Nº 33/2026',evidenceComplete:false,
   materialAttachmentsUnexamined:true,body:'ICMS',provenanceConflict:false};
 
+test('aliases cannot activate opposing modes for one normalized prefix identity',()=>{
+  assert.throws(()=>compileCollectionFilterPolicy({version:1,contextWindowWords:5,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},terms:[],
+    rules:[rule('EXTRATO','EXCLUDE_ALWAYS'),rule('AVISO','KEEP_ALWAYS')],
+    aliases:[{sourceCode:'dou',section:'DO3',alias:'EXTRATO',canonicalType:'AVISO'}],
+  }),/conflicting filter rule/);
+});
+
+test('different saved extra/principal scopes remain valid and tied KEEP wins',()=>{
+  const policy=compile([rule('EXTRATO','EXCLUDE_ALWAYS','DO3'),rule('EXTRATO','KEEP_ALWAYS','DO3E')]);
+  assert.equal(evaluateCollectionFilter(policy,{...item,section:'DO3E'}).decision,'KEEP');
+});
+
 test('Pompeia: Aviso oficial × Extrato numerado, específico do título vence',()=>{
   const result=evaluateCollectionFilter(compile([
     rule('AVISO','KEEP_ALWAYS'),rule('EXTRATO DE CONTRATO','EXCLUDE_ALWAYS'),

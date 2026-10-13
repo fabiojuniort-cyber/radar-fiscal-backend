@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { setTimeout as paceLogs } from 'node:timers/promises';
 import { Client } from 'pg';
 import {
   compileCollectionFilterPolicy, evaluateCollectionFilter, collectionFilterTitleType,
@@ -188,8 +189,8 @@ export async function runF3TypeSimulation(client: Client, baseline: Baseline) {
               || Object.prototype.hasOwnProperty.call(meta,'titleFallback')),
           materialAttachmentsUnexamined:historicalMaterial(o,v,row.has_file),
           provenanceConflict:row.current_version_count !== 1
-            || Boolean(os && vs && normalizeCollectionFilterText(os)!==normalizeCollectionFilterText(vs))
-            || Boolean(ot && vt && normalizeCollectionFilterType(ot)!==normalizeCollectionFilterType(vt)),
+            || Boolean(os && vs && os.toUpperCase()!==vs.toUpperCase())
+            || Boolean(ot && vt && ot.toUpperCase()!==vt.toUpperCase()),
         };
         // Legacy runtime did not pass relevant_excerpt as summary.
         const legacyInput = {...publication,section:os||vs,summary:null,
@@ -232,13 +233,18 @@ export async function runF3TypeSimulation(client: Client, baseline: Baseline) {
       }
       after=page[page.length-1]!.id;
     }
+    const redundancies=listRuleRedundancies(input);
+    const redundancyPairs=redundancies.flatMap(group=>group.candidates);
     const report={formatVersion:1,snapshot,policy:{id:policyRow.id,version:policyRow.version,revision:policyRow.revision,createdAt:policyRow.created_at??null,
       sha256:sha256(JSON.stringify(input)),ruleCount:input.rules.length},
       ...summarizeSimulation(results),originsEvaluated:results.length,
       pompeia:{publicationId:POMPEIA_ID,found:pompeiaOrigins.length>0,origins:pompeiaOrigins},
       unknownTypesTop20:[...unknowns.values()].map(bucket=>({...bucket,publications:bucket.publications.size}))
         .sort((a,b)=>b.publications-a.publications||a.type.localeCompare(b.type,'en')).slice(0,20),
-      redundancies:listRuleRedundancies(input),
+      redundancySummary:{groups:redundancies.length,pairs:redundancyPairs.length,
+        normalizedCollisions:redundancyPairs.filter(pair=>pair.kind==='NORMALIZED_COLLISION').length,
+        prefixVariants:redundancyPairs.filter(pair=>pair.kind==='PREFIX_VARIANT').length},
+      redundancies,
       notes:['DOE-SP baseline KEEP: old policy was not enforced; connector-specific capture filters are not replayed.',
         'All extra origins conservatively protect the publication; no origin is removed.',
         'Existing archive only; records previously discarded or deleted cannot be reconstructed.',
@@ -277,7 +283,10 @@ export async function f3SimulationMain(args=process.argv.slice(2)) {
     }
     for (const item of unknownTypesTop20) console.log('F3_SIMULATION_UNKNOWN='+JSON.stringify(item));
     for (const {candidates,...pattern} of redundancies) {
-      for (const candidate of candidates) console.log('F3_SIMULATION_REDUNDANCY='+JSON.stringify({...pattern,candidate}));
+      for (const candidate of candidates) {
+        console.log('F3_SIMULATION_REDUNDANCY='+JSON.stringify({...pattern,candidate}));
+        await paceLogs(20); // Stay below Railway's 500 lines/s ingestion limit.
+      }
     }
     console.log('F3_SIMULATION_PASS; READ_ONLY; NO_WRITE; NO_DELETE');
   } finally {await client.end().catch(()=>undefined);}

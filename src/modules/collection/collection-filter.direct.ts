@@ -253,7 +253,9 @@ export async function confirmDirectFilterRule(
     const operationId=randomUUID();
     for (let offset=0;offset<Math.min(MAX_DELETES_PER_CONFIRM,plan.ids.length);offset+=SQL_PURGE_CHUNK) {
       // Return the committed partial step before reverse-proxy timeout.
-      if (Date.now()-started>16000) break;
+      // Eligibility/revalidation may consume the budget on a large archive.
+      // Once safely confirmed, execute one bounded batch so the step progresses.
+      if (offset>0 && Date.now()-started>16000) break;
       const batch=plan.ids.slice(offset,offset+SQL_PURGE_CHUNK);
       const purged=await sql<{count:number}>`
         SELECT collection_filter_direct_purge_batch(

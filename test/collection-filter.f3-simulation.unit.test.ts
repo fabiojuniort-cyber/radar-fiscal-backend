@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { Client } from 'pg';
 import { classifySimulationPublication, summarizeSimulation, listRuleRedundancies,
-  runF3TypeSimulation, type SimulationResultRow } from '../src/infrastructure/database/f3-type-simulation.js';
+  runF3TypeSimulation, historicalMaterial, type SimulationResultRow } from '../src/infrastructure/database/f3-type-simulation.js';
 import type { CollectionFilterPolicyInput } from '../src/modules/collection/collection-filter.engine.js';
 
 function row(id:string, overrides:Partial<SimulationResultRow>={}):SimulationResultRow {
@@ -21,6 +21,13 @@ const policy:CollectionFilterPolicyInput={version:1,contextWindowWords:5,weakSco
     {sourceCode:'dou',section:'DO3',canonicalType:'AVISO',mode:'KEEP_ALWAYS'},
     {sourceCode:'doe-sp',canonicalType:'PORTARIA',mode:'KEEP_ALWAYS'},
   ]};
+
+test('material uses stored role classification, legacy unclassified files remain conservative',()=>{
+  assert.equal(historicalMaterial({files:[{versionRole:'PROVENANCE'}]},{},true),false);
+  assert.equal(historicalMaterial({files:[{versionRole:'MATERIAL_CONTENT'}]},{},false),true);
+  assert.equal(historicalMaterial({},{},true),true);
+  assert.equal(historicalMaterial({dou:{parts:[]}}, {dou:{parts:[{hasHighlightImage:true}]}},false),false);
+});
 
 test('count each publication once, protect every extra origin and company match',()=>{
   const report=summarizeSimulation([row('a'),row('a',{originCount:2}),row('b',{hasCompany:true}),

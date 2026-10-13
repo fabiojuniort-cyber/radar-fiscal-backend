@@ -85,8 +85,7 @@ BEGIN
     v.id IS NULL OR (SELECT count(*) FROM public.publication_versions vv
       WHERE vv.publication_id=p.id AND vv.is_current)<>1
       OR (e.origin_type IS NOT NULL AND e.version_type IS NOT NULL
-      AND public.collection_filter_l11_normalize(e.origin_type)<>
-          public.collection_filter_l11_normalize(e.version_type))
+      AND upper(btrim(e.origin_type))<>upper(btrim(e.version_type)))
       OR (e.origin_section IS NOT NULL AND e.version_section IS NOT NULL
         AND upper(btrim(e.origin_section))<>upper(btrim(e.version_section))),
     EXISTS(SELECT 1 FROM public.company_publications cp WHERE cp.publication_id=p.id),

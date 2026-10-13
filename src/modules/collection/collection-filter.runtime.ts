@@ -4,8 +4,6 @@ import type { DB } from '../../infrastructure/database/database.types.js';
 import {
   compileCollectionFilterPolicy,
   evaluateCollectionFilter,
-  normalizeCollectionFilterType,
-  normalizeCollectionFilterText,
   type CollectionFilterDecision,
   type CollectionFilterPolicyInput,
   type CollectionFilterTermHit,
@@ -49,17 +47,16 @@ function douMetadata(publication: NormalizedPublication): Record<string, unknown
 
 function sectionOf(publication: NormalizedPublication, sourceCode: string): string {
   return sourceCode === 'dou'
-    ? text(douMetadata(publication).section) ?? ''
+    ? text(record(publication.originMetadata.dou)?.section) ?? text(record(publication.metadata.dou)?.section) ?? ''
     : text(publication.originMetadata.section) ?? text(publication.metadata.section) ?? '';
 }
 
 function evidenceComplete(publication: NormalizedPublication): boolean {
-  const dou = douMetadata(publication);
   const hasBody = Boolean(publication.contentText?.trim());
-  const incomplete =
+  const incomplete = [record(publication.originMetadata.dou)??{},record(publication.metadata.dou)??{}].some(dou=>
     dou.scopeStructureIncomplete === true ||
     dou.scopeStructureIncomplete === 'true' ||
-    Object.prototype.hasOwnProperty.call(dou, 'titleFallback');
+    Object.prototype.hasOwnProperty.call(dou, 'titleFallback'));
 
   return hasBody && !incomplete;
 }
@@ -191,16 +188,14 @@ export function evaluateRuntimeCollectionFilter(
   publication: NormalizedPublication,
 ): RuntimeCollectionFilterDecision {
   const section = sectionOf(publication, runtime.sourceCode);
-  const officialType = runtime.sourceCode === 'dou'
-    ? text(douMetadata(publication).sourceActType)
-    : text(publication.originMetadata.publicationType) ?? text(publication.metadata.publicationType);
   const origin = runtime.sourceCode === 'dou' ? record(publication.originMetadata.dou) : publication.originMetadata;
   const version = runtime.sourceCode === 'dou' ? record(publication.metadata.dou) : publication.metadata;
   const typeField = runtime.sourceCode === 'dou' ? 'sourceActType' : 'publicationType';
   const originType=text(origin?.[typeField]),versionType=text(version?.[typeField]);
+  const officialType=originType??versionType;
   const originSection=text(origin?.section),versionSection=text(version?.section);
-  const provenanceConflict=Boolean(originType && versionType && normalizeCollectionFilterType(originType)!==normalizeCollectionFilterType(versionType))
-    || Boolean(originSection && versionSection && normalizeCollectionFilterText(originSection)!==normalizeCollectionFilterText(versionSection));
+  const provenanceConflict=Boolean(originType && versionType && originType.toUpperCase()!==versionType.toUpperCase())
+    || Boolean(originSection && versionSection && originSection.toUpperCase()!==versionSection.toUpperCase());
   const decision = evaluateCollectionFilter(runtime.policy, {
     sourceCode: runtime.sourceCode,
     section,
@@ -272,8 +267,8 @@ export async function recordRuntimeUnknownType(
     SELECT collection_filter_record_unknown_type(
       ${input.runtime.sourceCode},
       ${input.decision.section},
-      ${input.decision.decision.rawType},
-      ${input.decision.decision.normalizedRawType},
+      ${input.decision.decision.rawType || 'TIPO NAO INFORMADO'},
+      ${input.decision.decision.normalizedRawType || 'TIPO NAO INFORMADO'},
       ${input.publicationId}::uuid
     )
   `.execute(db);
