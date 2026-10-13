@@ -6,7 +6,7 @@ on:
     paths:
       - 'migrations/054_l15_scope_purge_and_l10_runner.sql'
       - 'migrations/055_collection_items_created_at_index.sql'
-      - 'migrations/068_f3_unified_type_decision.sql'
+      - 'migrations/069_f3_unified_type_decision.sql'
       - 'src/modules/collection/collection-filter.*.ts'
       - 'src/modules/collection/collection.engine.ts'
       - 'src/api/routes/catalog-monitoring.route.ts'
