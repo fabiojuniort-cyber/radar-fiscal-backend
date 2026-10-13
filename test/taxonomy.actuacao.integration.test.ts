@@ -99,3 +99,17 @@ test('F2-T02 on isolated PostgreSQL 18: draft Atuação and source origins are d
     await admin.end();
   }
 });
+
+test('F2-T03: XLSX into isolated PG18 and second pass with zero changes', async () => {
+  if (new URL(adminUrl).pathname !== '/radar_fiscal_test') {
+    throw new Error('This integration test requires the isolated radar_fiscal_test database');
+  }
+  const previous = process.env.F2_IMPORT_SCOPE;
+  process.env.F2_IMPORT_SCOPE = 'ISOLATED_POSTGRES18_ONLY';
+  try {
+    await import('./f2-t03-xlsx-pg18-double.integration.mjs');
+  } finally {
+    if (previous === undefined) delete process.env.F2_IMPORT_SCOPE;
+    else process.env.F2_IMPORT_SCOPE = previous;
+  }
+});
