@@ -37,8 +37,12 @@ NODE
 node -e "if (require('yauzl')?.open === undefined) process.exit(1)" || fail NATIVE_YAUZL_MISSING
 [[ "$(pg_dump --version | grep -oE '[0-9]+' | head -1)" -ge 18 ]] || fail PG_CLIENT_TOO_OLD
 
-segmentB64='ops/f2-t03-proof/Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64'
-productB64='ops/f2-t03-proof/Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64'
+# Accept uploaded repository-root .b64 files or the original ops paths.
+# The decoded XLSX SHA-256 checks below remain mandatory.
+segmentB64='Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64'
+productB64='Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64'
+[[ -s "$segmentB64" ]] || segmentB64="ops/f2-t03-proof/$segmentB64"
+[[ -s "$productB64" ]] || productB64="ops/f2-t03-proof/$productB64"
 [[ -s "$segmentB64" && -s "$productB64" ]] || fail APPROVED_XLSX_B64_NOT_UPLOADED
 base64 -d "$segmentB64" > "$tmp/segmento.xlsx" || fail SEGMENTO_BASE64_CORRUPT
 base64 -d "$productB64" > "$tmp/produto.xlsx" || fail PRODUTO_BASE64_CORRUPT
