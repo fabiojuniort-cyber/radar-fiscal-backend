@@ -381,6 +381,8 @@ async function downloadNcm(): Promise<{
   }
 }
 
+import { attachF2SourceSuggestions } from '../../modules/taxonomy/curation/curation.f2-source.js';
+
 export async function taxonomyAdminRoutes(
   app: FastifyInstance,
 ): Promise<void> {
@@ -458,7 +460,10 @@ export async function taxonomyAdminRoutes(
         includeRetired: true,
       });
       if (!view) return reply.status(404).send({ error: 'release_not_found' });
-      return reply.send(view);
+      // Only this platform-admin route includes unpublished F2 source suggestions.
+      // Suggestions never enter runtime taxonomy classification or public endpoints.
+      const sourced = await attachF2SourceSuggestions(kyselyRunner(app.db), view);
+      return reply.send(sourced);
     },
   );
 
