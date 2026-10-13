@@ -23,11 +23,16 @@ trap cleanup EXIT
 [[ "${NODE_ENV:-}" == "test" ]] || fail NODE_ENV_NOT_TEST
 [[ "${F2_IMPORT_SCOPE:-}" == "ISOLATED_POSTGRES18_ONLY" ]] || fail F2_IMPORT_SCOPE_INVALID
 node --input-type=module - <<'NODE' || fail DATABASE_URL_ISOLATION_FAILED
-const a = new URL(process.env.SOURCE_PG_DUMP_URL);
-const b = new URL(process.env.DATABASE_ADMIN_URL);
-if (!/^postgres(?:ql)?:$/.test(a.protocol) || !/^postgres(?:ql)?:$/.test(b.protocol) ||
-    !a.hostname || !b.hostname || a.hostname === b.hostname ||
-    decodeURIComponent(b.pathname) !== '/radar_fiscal_test') process.exit(1);
+try {
+  const a = new URL(process.env.SOURCE_PG_DUMP_URL);
+  const b = new URL(process.env.DATABASE_ADMIN_URL);
+  if (!/^postgres(?:ql)?:$/.test(a.protocol) || !/^postgres(?:ql)?:$/.test(b.protocol) ||
+      !a.hostname || !b.hostname || a.hostname === b.hostname ||
+      decodeURIComponent(b.pathname) !== '/radar_fiscal_test') process.exit(1);
+} catch {
+  // Never log a malformed DSN (it may contain the production password).
+  process.exit(1);
+}
 NODE
 node -e "if (require('yauzl')?.open === undefined) process.exit(1)" || fail NATIVE_YAUZL_MISSING
 [[ "$(pg_dump --version | grep -oE '[0-9]+' | head -1)" -ge 18 ]] || fail PG_CLIENT_TOO_OLD
