@@ -111,7 +111,7 @@ test('T02 seeds only 12 approved v5 categories and eight explicit Energia e util
   assert.equal(F2_SOURCE.segmento.rows, 1332);
   assert.equal(F2_SOURCE.produto.rows, 4225);
   assert.equal(F2_ACTUACAO_SEED.length, 12);
-  assert.equal(F2_ACTUACAO_SEED.reduce((sum, item) => sum + item.count, 0), 1262);
+  assert.equal(F2_ACTUACAO_SEED.reduce((sum, item) => sum + item.count, 0), 1332);
   assert.deepEqual(new Set(F2_ACTUACAO_SEED.map(item => item.label)), APPROVED_ACTUATIONS);
   assert.ok(!APPROVED_ACTUATIONS.has('Produção Agrícola'));
   const energia = F2_ACTUACAO_SEED.find(item => item.label === 'Energia e utilidades');
@@ -189,7 +189,7 @@ test('F2-T03: source cardinality warnings survive empty Sinônimos column', () =
 });
 
 
-test('F2 v5: 1332 unique CNAEs, frequency report only, one consolidated unregistered category error', () => {
+test('F2 v5.1: 1332 unique CNAEs, frequencies are report-only and unknown category rejected', () => {
   const segments = Array.from({length: 1332}, (_, index) => [
     'A', 'B', index < 70 ? 'Produção Agrícola' : 'Serviço',
     String(index).padStart(7, '0'), 'CNAE', '', '', '', '', '', '1',
