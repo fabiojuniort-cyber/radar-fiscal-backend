@@ -1,0 +1,329 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { RfbNormasConnector, type RfbNormasSourceState } from '../src/modules/collection/rfb-normas.connector.js';
+import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
+import {
+  ADE_API_ORIGINAL,
+  IN_API_ORIGINAL,
+  RETIFICATION_API_ORIGINAL,
+  RETIFICATION_DUPLICATE_API_ORIGINAL,
+  RFB_RETIFICATION_SEARCH_FIXTURE,
+  SC_API_ORIGINAL,
+  representationPayload,
+  RFB_EMPTY_FIXTURE,
+  RFB_SEARCH_FIXTURE,
+  SC_ORIGINAL,
+  pdfBytes,
+} from './rfb-normas.fixtures.js';
+
+const CONTEXT = {
+  sourceId: '11111111-1111-4111-8111-111111111111',
+  runId: '22222222-2222-4222-8222-222222222222',
+  attemptId: '33333333-3333-4333-8333-333333333333',
+  signal: new AbortController().signal,
+};
+
+function portal(options: {
+  changedVigente?: boolean;
+  failAttachment?: boolean;
+  attachmentLabel?: string;
+} = {}) {
+  let fileDownloads = 0;
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = new URL(input.toString());
+    if (url.pathname.endsWith('/consulta.action')) {
+      return new Response(RFB_SEARCH_FIXTURE, { status: 200, headers: { 'content-type': 'text/html' } });
+    }
+    if (url.hostname === 'normasinternet2.receita.fazenda.gov.br' && /\/api\/consulta-externa\/ato\//.test(url.pathname)) {
+      const match = /\/ato\/(\d+)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+      const id = match?.[1];
+      const view = match?.[2] as 'original' | 'vigente' | 'multivigente' | 'relacional' | undefined;
+      if (!id || !view) return new Response('missing', { status: 404 });
+      if (view === 'relacional') return new Response(null, { status: 403 });
+
+      const base =
+        id === '150001' ? IN_API_ORIGINAL :
+        id === '150002' ? SC_API_ORIGINAL :
+        id === '150005' ? ADE_API_ORIGINAL :
+        undefined;
+      if (!base) return new Response('missing', { status: 404 });
+
+      const payload = representationPayload(
+        base,
+        view,
+        id === '150001' && view === 'vigente' && options.changedVigente
+          ? 'Texto vigente consolidado alterado.'
+          : view === 'vigente'
+            ? 'Texto vigente consolidado.'
+            : view === 'multivigente'
+              ? 'Histórico multivigente.'
+              : '',
+      );
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (url.pathname.endsWith('/anexoOutros.action')) {
+      fileDownloads += 1;
+      if (options.failAttachment) return new Response('temporary', { status: 503 });
+      return new Response(pdfBytes(options.attachmentLabel ?? 'SC 180'), {
+        status: 200,
+        headers: { 'content-type': 'application/pdf', etag: '"sc-180-v1"' },
+      });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  return { fetch: fetchImpl, fileDownloads: () => fileDownloads };
+}
+
+function incrementalState(files: RfbNormasSourceState['files'] = {}): RfbNormasSourceState {
+  return {
+    bootstrap: { complete: true, month: '2026-09', page: 1 },
+    files,
+  };
+}
+
+test('collects deterministic scope and reports discovered/included/excluded reasons', async () => {
+  const fake = portal();
+  const result = await new RfbNormasConnector({
+    fetch: fake.fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+    lookbackDays: 7,
+  }).collect(CONTEXT);
+
+  assert.equal(result.publications.length, 3);
+  const meta = (result.metadata as any).rfbNormas;
+  assert.equal(meta.filtering.discoveredCount, 5);
+  assert.equal(meta.filtering.includedCount, 3);
+  assert.equal(meta.filtering.excludedCount, 2);
+  assert.equal(meta.filtering.excludedByReason.PORTARIA_ADMINISTRATIVE, 1);
+  assert.equal(meta.filtering.excludedByReason.ADE_LOW_VALUE_CERTIFICATION, 1);
+  assert.equal(meta.lookbackDays, 7);
+
+  const instruction = result.publications.find(p => p.actType === 'INSTRUÇÃO NORMATIVA');
+  assert.ok(instruction);
+  assert.equal(instruction.agency, 'RFB');
+  assert.equal(instruction.actNumber, '2344/2026');
+  assert.equal(instruction.externalId, '150001');
+  assert.equal(instruction.metadata?.sourceRole, 'ENRICHMENT');
+  assert.equal((instruction.metadata?.rfbNormas as any).representations.original.normalizedHash.length, 64);
+
+  const sc = result.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA');
+  assert.ok(sc);
+  assert.equal(((sc.metadata?.rfbNormas as any).files ?? []).length, 1);
+  assert.equal(sc.files?.length, 1);
+  const normalizedSc = normalizePublication({
+    sourceId: CONTEXT.sourceId,
+    publication: sc,
+  });
+  assert.equal(normalizedSc.files.length, 1);
+  assert.match(normalizedSc.files[0]!.rawSha256 ?? '', /^[a-f0-9]{64}$/);
+  assert.equal((normalizedSc.metadata.files as unknown[]).length, 1);
+  assert.equal(fake.fileDownloads(), 1);
+});
+
+test('immediate replay reuses known attachments and creates no content hash change', async () => {
+  const firstPortal = portal();
+  const first = await new RfbNormasConnector({
+    fetch: firstPortal.fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+  }).collect(CONTEXT);
+
+  const state = first.checkpoint!.state as unknown as RfbNormasSourceState;
+  const replayPortal = portal({ changedVigente: true });
+  const replay = await new RfbNormasConnector({
+    fetch: replayPortal.fetch,
+    readState: async () => state,
+    now: () => new Date('2026-09-23T15:05:00Z'),
+  }).collect(CONTEXT);
+
+  assert.equal(replayPortal.fileDownloads(), 0);
+  assert.equal(replay.publications.length, first.publications.length);
+
+  const firstInstruction = first.publications.find(p => p.actType === 'INSTRUÇÃO NORMATIVA')!;
+  const replayInstruction = replay.publications.find(p => p.actType === 'INSTRUÇÃO NORMATIVA')!;
+  const firstNormalized = normalizePublication({ sourceId: CONTEXT.sourceId, publication: firstInstruction });
+  const replayNormalized = normalizePublication({ sourceId: CONTEXT.sourceId, publication: replayInstruction });
+  assert.equal(firstNormalized.contentHash, replayNormalized.contentHash, 'consolidated representation must not change publication content hash');
+
+  const firstVigente = ((firstInstruction.metadata?.rfbNormas as any).representations.vigente.normalizedHash);
+  const replayVigente = ((replayInstruction.metadata?.rfbNormas as any).representations.vigente.normalizedHash);
+  assert.notEqual(firstVigente, replayVigente, 'representation hash must detect consolidated change');
+  assert.equal(
+    ((replayInstruction.metadata?.rfbNormas as any).representations.relacional.available),
+    false,
+    '403 relation view is optional and must be tracked as unavailable',
+  );
+});
+
+test('attachment byte change creates a content hash change for the same publication', async () => {
+  const firstPortal = portal({ attachmentLabel: 'SC 180 v1' });
+  const first = await new RfbNormasConnector({
+    fetch: firstPortal.fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+  }).collect(CONTEXT);
+
+  const state = first.checkpoint!.state as unknown as RfbNormasSourceState;
+  const changedPortal = portal({ attachmentLabel: 'SC 180 v2' });
+  const changed = await new RfbNormasConnector({
+    fetch: changedPortal.fetch,
+    readState: async () => state,
+    now: () => new Date('2026-09-23T16:00:00Z'),
+    revisitAfterMs: 0,
+  }).collect(CONTEXT);
+
+  const firstSc = first.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
+  const changedSc = changed.publications.find(p => p.actType === 'SOLUÇÃO DE CONSULTA')!;
+  const n1 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: firstSc });
+  const n2 = normalizePublication({ sourceId: CONTEXT.sourceId, publication: changedSc });
+
+  assert.equal(n1.identityHash, n2.identityHash);
+  assert.notEqual(n1.contentHash, n2.contentHash);
+});
+
+test('captures substantive retification separately and deterministically excludes repeated publication reference', async () => {
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = new URL(input.toString());
+    if (url.pathname.endsWith('/consulta.action')) {
+      return new Response(RFB_RETIFICATION_SEARCH_FIXTURE, {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }
+    if (url.hostname === 'normasinternet2.receita.fazenda.gov.br') {
+      const match = /\/ato\/(\d+)\/visao\/(original|vigente|multivigente|relacional)$/.exec(url.pathname);
+      const id = match?.[1];
+      const view = match?.[2] as 'original' | 'vigente' | 'multivigente' | 'relacional' | undefined;
+      if (!id || !view) return new Response('missing', { status: 404 });
+      if (view === 'relacional') return new Response(null, { status: 403 });
+      const base =
+        id === '148881' ? RETIFICATION_API_ORIGINAL :
+        id === '148882' ? RETIFICATION_DUPLICATE_API_ORIGINAL :
+        undefined;
+      if (!base) return new Response('missing', { status: 404 });
+      const payload = representationPayload(base, view);
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  const result = await new RfbNormasConnector({
+    fetch: fetchImpl,
+    readState: async () => incrementalState(),
+    now: () => new Date('2025-12-06T15:00:00Z'),
+    lookbackDays: 7,
+  }).collect(CONTEXT);
+
+  assert.equal(result.publications.length, 1);
+  const retification = result.publications[0]!;
+  assert.equal(retification.actType, 'RETIFICAÇÃO');
+  assert.equal(retification.actNumber, undefined);
+  assert.equal(retification.externalId, '148881');
+  assert.match(retification.title, /^RETIFICAÇÃO — PORTARIA RFB Nº 619/);
+  assert.equal(
+    retification.identityKey,
+    'RFB_NORMAS|RETIFICATION|RFB|PORTARIA|619/2025|2025-12-05',
+  );
+  assert.equal((retification.metadata?.rfbNormas as any).revisionKind, 'RETIFICATION');
+  assert.deepEqual((retification.metadata?.rfbNormas as any).targetAct, {
+    agency: 'RFB',
+    actType: 'PORTARIA',
+    actNumber: '619/2025',
+  });
+
+  const filtering = (result.metadata as any).rfbNormas.filtering;
+  assert.equal(filtering.discoveredCount, 2);
+  assert.equal(filtering.includedCount, 1);
+  assert.equal(filtering.excludedCount, 1);
+  assert.equal(filtering.excludedByReason.DUPLICATE_PUBLICATION_REFERENCE, 1);
+  assert.equal(filtering.excludedItems[0].idAto, '148882');
+});
+
+test('successful empty search returns zero publications, unavailable source throws', async () => {
+  const empty = new RfbNormasConnector({
+    fetch: (async () => new Response(RFB_EMPTY_FIXTURE, {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    })) as typeof fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+  });
+  const result = await empty.collect(CONTEXT);
+  assert.equal(result.publications.length, 0);
+  assert.equal((result.metadata as any).rfbNormas.filtering.discoveredCount, 0);
+
+  const down = new RfbNormasConnector({
+    fetch: (async () => new Response('down', { status: 503 })) as typeof fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-23T15:00:00Z'),
+  });
+  await assert.rejects(down.collect(CONTEXT));
+});
+
+test('bootstrap retains month/page when an included publication fails', async () => {
+  const fake = portal({ failAttachment: true });
+  const connector = new RfbNormasConnector({
+    fetch: fake.fetch,
+    now: () => new Date('2025-01-10T15:00:00Z'),
+  });
+
+  const result = await connector.collect(CONTEXT);
+  assert.equal(result.completion?.complete, false);
+  assert.equal(result.completion?.reason, 'PARTIAL_FAILURE_RETRY_REQUIRED');
+  assert.equal(result.partialFailures?.length, 1);
+
+  const state = result.checkpoint!.state as unknown as RfbNormasSourceState;
+  assert.equal(state.bootstrap.complete, false);
+  assert.equal(state.bootstrap.month, '2025-01');
+  assert.equal(state.bootstrap.page, 1);
+});
+
+test('bootstrap starts in 2025 and can stop safely on time budget', async () => {
+  const seen: string[] = [];
+  const connector = new RfbNormasConnector({
+    fetch: (async (input) => {
+      const url = new URL(input.toString());
+      if (url.pathname.endsWith('/consulta.action')) {
+        seen.push(url.searchParams.get('dt_inicio') ?? '');
+        return new Response(RFB_EMPTY_FIXTURE, { status: 200, headers: { 'content-type': 'text/html' } });
+      }
+      return new Response('missing', { status: 404 });
+    }) as typeof fetch,
+    now: () => new Date('2025-02-10T15:00:00Z'),
+  });
+  const result = await connector.collect(CONTEXT);
+  assert.deepEqual(seen, ['01/01/2025', '01/02/2025']);
+  const state = result.checkpoint!.state as unknown as RfbNormasSourceState;
+  assert.equal(state.bootstrap.complete, true);
+});
+
+
+test('incremental lookback uses America/Sao_Paulo date at UTC midnight boundary', async () => {
+  const searches: URL[] = [];
+  const connector = new RfbNormasConnector({
+    fetch: (async (input) => {
+      const url = new URL(input.toString());
+      searches.push(url);
+      return new Response(RFB_EMPTY_FIXTURE, {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
+    }) as typeof fetch,
+    readState: async () => incrementalState(),
+    now: () => new Date('2026-09-24T00:08:45Z'),
+    lookbackDays: 7,
+  });
+  await connector.collect(CONTEXT);
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0]!.searchParams.get('dt_inicio'), '17/09/2026');
+  assert.equal(searches[0]!.searchParams.get('dt_fim'), '23/09/2026');
+});
