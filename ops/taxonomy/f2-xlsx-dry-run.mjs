@@ -11,7 +11,7 @@ import yauzl from 'yauzl';
 
 export const F2_SOURCE = Object.freeze({
   segmento: Object.freeze({
-    sha256: 'd27368e821b3cf892400a8fe8fd9cd8b1b74f0f711541a203655acab041ce814',
+    sha256: '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67',
     rows: 1332,
     sheet: 'Segmento',
     columns: ['Segmento', 'Sub Segmento', 'Atuação', 'CNAE', 'Descrição do CNAE', 'Sinônimos', 'Produtos (sugeridos)', 'NCMs (sugeridos)', 'No perfil', 'Classificar pelo nome', 'Ordem', 'Código TriFaros'],
@@ -27,7 +27,7 @@ export const F2_SOURCE = Object.freeze({
 const MAX_XLSX_BYTES = 8 * 1024 * 1024;
 const MAX_UNZIPPED_ENTRY = 16 * 1024 * 1024;
 // Approved F2-T02 catalogue. Counts are report-only, not a gate.
-// "Produção Agrícola" is deliberately NOT approved: fix the source XLSX.
+// The v5.1 source now uses the 12 approved categories; no automatic remapping.
 export const APPROVED_ACTUATIONS = new Set([
   'Serviço', 'Indústria', 'Comércio atacadista', 'Comércio varejista',
   'Transportador', 'Extração mineral', 'Produtor rural',
