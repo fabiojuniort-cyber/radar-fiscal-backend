@@ -51,11 +51,11 @@ test('L11: 520 DOU acts in bounded steps, drift, resume and per-step audit', asy
       await pool.query(
         "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
         "SELECT p.id,1,md5(p.id::text)||md5('content'||p.id::text),"+
-        "'Procedimento administrativo sem tributos',true,'{\"dou\":{\"section\":\"DO3\"}}'::jsonb "+
+        "'Procedimento administrativo sem tributos',true,jsonb_build_object('dou',jsonb_build_object('section','DO3','sourceActType',p.act_type)) "+
         "FROM publications p WHERE p.id=ANY($1::uuid[])",[newIds]);
       await pool.query(
         "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
-        "SELECT p.id,$2,'https://example.test/l11-staged/'||p.id::text,'{\"dou\":{\"section\":\"DO3\"}}'::jsonb "+
+        "SELECT p.id,$2,'https://example.test/l11-staged/'||p.id::text,jsonb_build_object('dou',jsonb_build_object('section','DO3','sourceActType',p.act_type)) "+
         "FROM publications p WHERE p.id=ANY($1::uuid[])",[newIds,sourceId]);
     };
     await insertActs(520);

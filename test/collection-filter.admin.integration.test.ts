@@ -66,7 +66,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     const version=await admin.query<{id:string}>(
       "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
       "VALUES($1,1,$2,'Documento administrativo não tributário',true,$3::jsonb) RETURNING id",
-      [pubId,createHash('sha256').update('body '+pubId).digest('hex'),JSON.stringify({dou:{section:'DO1'}})],
+      [pubId,createHash('sha256').update('body '+pubId).digest('hex'),JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
     const versionId=version.rows[0]!.id;
     const mention=await admin.query<{id:string}>(
@@ -108,7 +108,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
       "VALUES($1,$2,$3,$4::jsonb)",
-      [pubId,sourceId,'https://example.test/'+identifier,JSON.stringify({dou:{section:'DO1'}})],
+      [pubId,sourceId,'https://example.test/'+identifier,JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
 
     // Suppressed scope history is append-only and RESTRICT-bound. The L-11
@@ -140,12 +140,12 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
       "VALUES($1,1,$2,'Documento administrativo neutro',true,$3::jsonb)",
       [protectedId,createHash('sha256').update('protected '+protectedId).digest('hex'),
-       JSON.stringify({dou:{section:'DO1'}})],
+       JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
       "VALUES($1,$2,$3,$4::jsonb)",
-      [protectedId,sourceId,'https://example.test/'+secondHash,JSON.stringify({dou:{section:'DO1'}})],
+      [protectedId,sourceId,'https://example.test/'+secondHash,JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
     const company=await admin.query<{id:string}>(
       "INSERT INTO companies(tenant_id,legal_name,head_office_cnpj) "+
@@ -183,13 +183,13 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
       "VALUES($1,1,$2,'Aviso administrativo neutro',true,$3::jsonb)",
       [sharedId,createHash('sha256').update('shared '+sharedId).digest('hex'),
-        JSON.stringify({dou:{section:'DO1'}})],
+        JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) VALUES "+
       "($1,$2,$4,$5::jsonb),($1,$3,$6,'{}'::jsonb)",
       [sharedId,sourceId,other.rows[0]!.id,
-       'https://example.test/'+sharedHash,JSON.stringify({dou:{section:'DO1'}}),
+       'https://example.test/'+sharedHash,JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}}),
        'https://other.example.test/'+sharedHash],
     );
 
@@ -221,12 +221,12 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
       "VALUES($1,1,$2,'Novo documento administrativo sem tema tributário',true,$3::jsonb)",
       [addedId,createHash('sha256').update('body '+addedId).digest('hex'),
-       JSON.stringify({dou:{section:'DO1'}})],
+       JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
       "VALUES($1,$2,$3,$4::jsonb)",
-      [addedId,sourceId,'https://example.test/'+addedHash,JSON.stringify({dou:{section:'DO1'}})],
+      [addedId,sourceId,'https://example.test/'+addedHash,JSON.stringify({dou:{section:'DO1',sourceActType:canonicalType}})],
     );
 
     const stale=await app.inject({method:'POST',
