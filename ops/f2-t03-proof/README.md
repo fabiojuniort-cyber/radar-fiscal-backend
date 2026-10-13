@@ -12,14 +12,14 @@ Base da branch: merge backend #221 `1475eb10da081316f632b0ef1af7da252840cea4`. E
 
 ## XLSX originais exigidos (base64 puro, UTF-8 sem prefixo)
 
-Colocar estes **dois arquivos** no diretório deste README (o conector GitHub não consegue receber os binários locais; upload via GitHub web/terminal autorizado é permitido). **Não criar arquivos vazios, de teste ou reserializados**:
+Os **dois arquivos estão disponíveis na raiz da branch**, enviados pelo Fábio no commit `fbfe54e` e validados contra os hashes originais. O runner aceita os caminhos da **raiz** ou de `ops/f2-t03-proof/`; não substituir por arquivos reserializados:
 
 | Caminho | SHA-256 esperado após base64 -d |
 | --- | --- |
-| `Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64` | `695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67` |
-| `Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64` | `261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a` |
+| `Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64` (raiz) | `695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67` |
+| `Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64` (raiz) | `261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a` |
 
-Para gerar no computador autorizado: Python `base64.b64encode(Path("arquivo.xlsx").read_bytes()).decode("ascii")` e gravar `.b64` como texto sem alterações. O script verifica hashes e recusa se faltarem.
+Conferência após o upload: Git blob SHA-1 remoto idêntico ao blob local para os dois `.b64`; XLSX decodificados têm SHA-256 `PASS` (2/2). O script repetirá a decodificação e os hashes ao ser autorizado a executar.
 
 O JSON NCM **não** pertence ao runner: conferência independente já concluída 0 NCM ausentes (Produto 8.179 / Segmento 5.198). O CLI oficial recebe somente dois XLSX.
 
