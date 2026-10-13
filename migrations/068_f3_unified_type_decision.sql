@@ -1,5 +1,13 @@
 -- F3: evidence paging only. No type/section prefilter and no duplicate
 -- decision engine. DDL only; applying this migration purges no records.
+-- F3 survivors can have the old generated is_hidden flag. The old partial
+-- indexes cannot cover these rows; preserve title search and ordered browsing.
+CREATE INDEX IF NOT EXISTS ix_publications_f3_order ON public.publications(
+  published_on DESC NULLS LAST,first_collected_at DESC,id);
+CREATE INDEX IF NOT EXISTS ix_publications_f3_title_vector ON public.publications USING GIN(title_vector);
+CREATE INDEX IF NOT EXISTS ix_publication_source_feed_f3_order ON public.publication_source_feed(
+  source_code,published_on DESC NULLS LAST,first_collected_at DESC,publication_id);
+
 CREATE OR REPLACE FUNCTION public.collection_filter_confirm_policy_lock()
 RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 DECLARE v_revision INTEGER;
@@ -95,7 +103,7 @@ BEGIN
   JOIN LATERAL(
     SELECT po.metadata FROM public.publication_origins po
     JOIN public.sources so ON so.id=po.source_id
-    WHERE po.publication_id=p.id AND so.code=p_source ORDER BY po.id LIMIT 1
+    WHERE po.publication_id=p.id AND lower(so.code)=p_source ORDER BY po.id LIMIT 1
   ) o ON true
   LEFT JOIN LATERAL(
     SELECT pv.id,pv.source_metadata,pv.content_text,pv.relevant_excerpt,pv.content_hash
@@ -495,12 +503,8 @@ BEGIN
   -- matching here: audit must not report a different rule than the preview.
   v_rule:=NULLIF(current_setting('app.collection_filter_confirmed_pattern',true),'');
   v_mode:=NULLIF(current_setting('app.collection_filter_confirmed_mode',true),'');
-  IF v_source_code<>'dou' AND OLD.is_hidden THEN
+  IF v_rule IS NULL AND v_source_code NOT IN ('dou','doe-sp') AND OLD.is_hidden THEN
     v_rule:='L18_LEGACY_029';v_mode:='EXCLUDE_ALWAYS';
-  ELSIF v_source_code='doe-sp'
-    AND OLD.act_type='EMENDA CONSTITUCIONAL'
-    AND btrim(OLD.title) NOT ILIKE 'Emenda Constitucional%' THEN
-    v_rule:='L18_DOE_TYPE_MISMATCH';v_mode:='EXCLUDE_ALWAYS';
   END IF;
   INSERT INTO public.collection_filter_discards(
     source_id,collection_run_id,attempt_id,source_item_key,

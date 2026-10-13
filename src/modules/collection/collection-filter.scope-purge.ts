@@ -62,6 +62,8 @@ async function scopeCandidates(trx: Transaction<DB>) {
   const hash=createHash('sha256').update('L17:DOU:ALL_DECISIONS:v3')
     .update(runtime.policyId).update(String(runtime.policyRevision));
   const seen=new Map<string,Match>();
+  const legacyHiddenPublicationIds=new Set<string>();
+  const f3LegacyPublicationIds=new Set<string>();
   const active=new Map<string,RuleRow>();
   for(const rule of compiled.rules.values()){
     const src=rule.sourceCode.toLowerCase();
@@ -83,6 +85,11 @@ async function scopeCandidates(trx: Transaction<DB>) {
     `.execute(trx);
     if(!page.rows.length)break;
     for(const row of page.rows){
+      if(row.hidden_legacy)legacyHiddenPublicationIds.add(row.publication_id);
+      // Legacy generated type flags are not F3 policy decisions. Only the
+      // separately approved scope suppression enters this first stream;
+      // non-F3 legacy cleanup is enumerated below with its source identity.
+      if(!row.out_of_scope)continue;
       const blocked=row.has_company?'COMPANY':row.has_other_source?'OTHER':undefined;
       seen.set(row.publication_id,{
         bucket:row.out_of_scope?'OUT_OF_SCOPE':'HIDDEN',
@@ -114,6 +121,8 @@ async function scopeCandidates(trx: Transaction<DB>) {
       `.execute(trx);
       if(!page.rows.length)break;
       for(const item of page.rows){
+        if(legacyHiddenPublicationIds.has(item.publication_id))
+          f3LegacyPublicationIds.add(item.publication_id);
         const decision=evaluateHistoricalCollectionCandidate(compiled,item);
         if(decision.decision!=='DISCARD'||!decision.canonicalType)continue;
         const rule=active.get(sourceCode+'\0'+(decision.matchedSection??'')+'\0'+decision.canonicalType);
@@ -140,8 +149,9 @@ async function scopeCandidates(trx: Transaction<DB>) {
     `.execute(trx);
     if(!page.rows.length)break;
     for(const row of page.rows){
-      // DOE-SP type disagreement is evaluated above by the same F3 engine.
-      if(!row.hidden_legacy)continue;
+      // DOU/DOE-SP may enter the type purge only through the engine's RULE
+      // decision above, even when migration 029 marks them as hidden.
+      if(!row.hidden_legacy||f3LegacyPublicationIds.has(row.publication_id))continue;
       const previous=seen.get(row.publication_id);
       if(previous && previous.bucket!=='HIDDEN')continue;
       const blocked=row.has_company?'COMPANY':row.has_other_source?'OTHER':undefined;

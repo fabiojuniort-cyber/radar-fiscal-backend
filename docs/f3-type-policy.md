@@ -10,6 +10,8 @@ Physical deletion remains administrator-only, with count, samples, preview token
 
 Migration 068 replaces bounded evidence/administrative functions and revokes both unattended l17 deletion grants. It performs DDL only, never a retroactive purge. The scheduler's l17 rule and legacy hidden jobs now inspect only. L10 retention of transient collection items is separate and unchanged. Runtime material classification and historical stored file metadata use the same role/kind criteria; legacy archived files without classification conservatively gate conditional rules. That missing evidence cannot be reconstructed as a past capture verdict.
 
+The generated `is_hidden` flag from migration 029 is a legacy type filter, not a policy verdict. For DOU/DOE-SP it neither authorizes a purge nor hides surviving publications. Type-derived removal enters the RULE bucket only after the shared engine says DISCARD; KEEP/UNKNOWN survives. Catalog list/detail/facets/navigation/counts use one static source-boundary helper to ignore that old flag for F3 origins, without reading policy or adding a field. Non-F3 legacy cleanup and independently approved OUT_OF_SCOPE suppression remain separate. Three additive non-partial indexes preserve ordered browsing and title search for these survivors. Historical eligible acts remain in the archive until a separately confirmed physical purge.
+
 | Test case | Expected |
 | --- | --- |
 | Official Aviso; title EXTRATO DE CONTRATO Nº 33/2026; matching EXCLUDE | DISCARD, title wins |
@@ -28,6 +30,7 @@ Migration 068 replaces bounded evidence/administrative functions and revokes bot
 | Changed preview/protected target/revision | Confirmation invalid, zero deletion |
 | Normalized opposing identity edit | Transaction rolls back; policy still loads |
 | Daily l17 / legacy hidden | Preview; zero deletion |
+| Legacy hidden DOU/DOE-SP with KEEP/UNKNOWN | No type purge; visible physical survivor |
 
 Release order: backend DRAFT plus read-only simulation; Fábio reviews impact and redundant variants; independent review and full CI on final head; only then explicit merge authorization. Web follows to present samples/protected records and confirmations using these existing endpoints. Migration must precede upgraded worker/API execution. No retroactive exclusion is authorized by this PR or its simulation.
 

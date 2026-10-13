@@ -59,3 +59,5 @@ jobs:
         run: npx tsx --test test/collection-filter.l15-scope-purge.integration.test.ts
       - name: F3 shared decisions, preview confirmations and company/origin guards
         run: npx tsx --test test/collection-filter.f3.integration.test.ts
+      - name: F3 physical survivors across lists, detail, facets and public counters
+        run: npx tsx --test test/collection-filter.f3-catalog.integration.test.ts

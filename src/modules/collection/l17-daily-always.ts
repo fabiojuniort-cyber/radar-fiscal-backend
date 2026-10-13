@@ -64,7 +64,8 @@ export async function runL17ExcludeAlways(
   let examined=0,eligible=0,protectedCount=0;
   try{
     const sources=await sql<{id:string;code:string}>`
-      SELECT id,code FROM public.sources WHERE code IN ('dou','doe-sp') ORDER BY code
+      SELECT DISTINCT ON (lower(code)) id,lower(code) AS code FROM public.sources
+      WHERE lower(code) IN ('dou','doe-sp') ORDER BY lower(code),id
     `.execute(db);
     for(const source of sources.rows){
       const runtime=await loadApprovedCollectionFilterRuntime(db,source.id,{readOnly:true});
