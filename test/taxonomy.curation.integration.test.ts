@@ -1370,8 +1370,8 @@ test('F2-T02: Atuação curator draft, CNAE origin FK and unauthorized callers',
       assert.equal(concept.classifyByLabel, false);
       if (concept.code === 'actuacao.energia_e_utilidades') {
         assert.deepEqual(
-          concept.aliases.map((alias: { text: string }) => alias.text),
-          expectedEnergiaAliases,
+          concept.aliases.map((alias: { text: string }) => alias.text).sort(),
+          [...expectedEnergiaAliases].sort(),
         );
         assert.ok(concept.aliases.every((alias: { aliasType: string }) =>
           alias.aliasType === 'EXACT_LEXICAL'));
