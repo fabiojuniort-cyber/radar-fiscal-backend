@@ -5,7 +5,7 @@ import {
   compileCollectionFilterPolicy,
   evaluateCollectionFilter,
   normalizeCollectionFilterType,
-  collectionFilterTypeConflict,
+  normalizeCollectionFilterText,
   type CollectionFilterDecision,
   type CollectionFilterPolicyInput,
   type CollectionFilterTermHit,
@@ -13,8 +13,7 @@ import {
 } from './collection-filter.engine.js';
 import type { NormalizedPublication } from './publication.normalizer.js';
 
-const EXCLUDED_SOURCES = new Set(['doe-sp', 'doe-sp-legado']);
-const ENFORCED_SOURCES = new Set(['dou']);
+const ENFORCED_SOURCES = new Set(['dou', 'doe-sp']);
 
 export interface ApprovedCollectionFilterRuntime {
   policyId: string;
@@ -48,8 +47,10 @@ function douMetadata(publication: NormalizedPublication): Record<string, unknown
     {};
 }
 
-function sectionOf(publication: NormalizedPublication): string {
-  return (text(douMetadata(publication).section) ?? '').toUpperCase();
+function sectionOf(publication: NormalizedPublication, sourceCode: string): string {
+  return sourceCode === 'dou'
+    ? text(douMetadata(publication).section) ?? ''
+    : text(publication.originMetadata.section) ?? text(publication.metadata.section) ?? '';
 }
 
 function evidenceComplete(publication: NormalizedPublication): boolean {
@@ -83,13 +84,6 @@ function materialAttachmentsUnexamined(
   return highlightImage || attachment;
 }
 
-function typeConflict(publication: NormalizedPublication): boolean {
-  return collectionFilterTypeConflict(
-    text(douMetadata(publication).sourceActType),
-    publication.actType ?? '',
-  );
-}
-
 function decisiveHit(
   hits: readonly CollectionFilterTermHit[],
 ): CollectionFilterTermHit | undefined {
@@ -112,7 +106,6 @@ export async function loadApprovedCollectionFilterRuntime(
     .executeTakeFirstOrThrow();
 
   const sourceCode = source.code.trim().toLowerCase();
-  if (EXCLUDED_SOURCES.has(sourceCode)) return null;
   if (!ENFORCED_SOURCES.has(sourceCode)) return null;
 
   const result = await sql<{
@@ -197,13 +190,22 @@ export function evaluateRuntimeCollectionFilter(
   runtime: ApprovedCollectionFilterRuntime,
   publication: NormalizedPublication,
 ): RuntimeCollectionFilterDecision {
-  const section = sectionOf(publication);
+  const section = sectionOf(publication, runtime.sourceCode);
+  const officialType = runtime.sourceCode === 'dou'
+    ? text(douMetadata(publication).sourceActType)
+    : text(publication.originMetadata.publicationType) ?? text(publication.metadata.publicationType);
+  const origin = runtime.sourceCode === 'dou' ? record(publication.originMetadata.dou) : publication.originMetadata;
+  const version = runtime.sourceCode === 'dou' ? record(publication.metadata.dou) : publication.metadata;
+  const typeField = runtime.sourceCode === 'dou' ? 'sourceActType' : 'publicationType';
+  const originType=text(origin?.[typeField]),versionType=text(version?.[typeField]);
+  const originSection=text(origin?.section),versionSection=text(version?.section);
+  const provenanceConflict=Boolean(originType && versionType && normalizeCollectionFilterType(originType)!==normalizeCollectionFilterType(versionType))
+    || Boolean(originSection && versionSection && normalizeCollectionFilterText(originSection)!==normalizeCollectionFilterText(versionSection));
   const decision = evaluateCollectionFilter(runtime.policy, {
     sourceCode: runtime.sourceCode,
     section,
-    ...(publication.actType !== undefined
-      ? { actType: publication.actType }
-      : {}),
+    // actType is inferred by connectors. Never label that inference official.
+    ...(officialType ? { sourceActType: officialType } : {}),
     title: publication.title,
     ...(publication.contentText !== undefined
       ? { body: publication.contentText }
@@ -211,16 +213,14 @@ export function evaluateRuntimeCollectionFilter(
     evidenceComplete: evidenceComplete(publication),
     materialAttachmentsUnexamined:
       materialAttachmentsUnexamined(publication),
-    typeConflict: typeConflict(publication),
-    sourceActType: text(douMetadata(publication).sourceActType),
-    provenanceConflict: false,
+    provenanceConflict,
   });
   const hit = decisiveHit(decision.termHits);
 
   return {
     decision,
     decisiveTerm: hit?.text ?? null,
-    section,
+    section: decision.section,
   };
 }
 

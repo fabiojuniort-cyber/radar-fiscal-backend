@@ -4,6 +4,7 @@ import test from 'node:test';
 import { parseDoeSpList, parseDoeSpTypeCatalogue } from '../src/modules/collection/doe-sp.parser.js';
 import {
   decideDoeSpCapture,
+  doeSpAcquisitionCategory,
   doeSpActType,
   doeSpNormativeIdentity,
   doeSpTitleDate,
@@ -11,6 +12,19 @@ import {
 import { ID, filters, list0901, list0902, list0904 } from './doe-sp.fixtures.js';
 
 const types = parseDoeSpTypeCatalogue(filters);
+
+test('F3 acquisition preserves only journal/section scope and forwards every type/relevance exception', () => {
+  for (const item of parseDoeSpList(list0904).items) {
+    const typeName = item.publicationTypeId ? types.get(item.publicationTypeId) : undefined;
+    const candidate = { title: item.title, hierarchy: item.hierarchy, excerpt: item.excerpt, ...(typeName ? { typeName } : {}) };
+    assert.equal(doeSpAcquisitionCategory(candidate), item.id === ID.sre43 ? 'SEFAZ_TAX_ADMINISTRATION' : 'TYPE_POLICY_PENDING');
+  }
+  const candidate = { title: 'ATO DESCONHECIDO', hierarchy: ['Executivo', 'Atos Normativos', 'Outro orgao'], typeName: 'Tipo novo' };
+  assert.equal(doeSpAcquisitionCategory(candidate), 'TYPE_POLICY_PENDING');
+  assert.equal(doeSpAcquisitionCategory({ ...candidate, typeName: '' }), 'TYPE_POLICY_PENDING');
+  assert.equal(doeSpAcquisitionCategory({ ...candidate, hierarchy: ['Executivo', 'Atos de Pessoal', 'Outro orgao'] }), undefined);
+  assert.equal(doeSpAcquisitionCategory({ ...candidate, hierarchy: ['Legislativo', 'Atos Normativos', 'Outro orgao'] }), undefined);
+});
 
 function decisionFor(list: unknown, id: string) {
   const item = parseDoeSpList(list).items.find((entry) => entry.id === id)!;

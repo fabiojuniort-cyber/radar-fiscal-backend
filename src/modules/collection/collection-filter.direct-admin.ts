@@ -1,6 +1,14 @@
 import { sql, type Kysely } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
+import { loadApprovedCollectionFilterRuntime } from './collection-filter.runtime.js';
+
+/** Compile persisted identities before the editing transaction can commit. */
+export async function validateActiveCollectionFilter(db:Kysely<DB>):Promise<void> {
+  const source=await db.selectFrom('sources').select('id').where('code','in',['dou','doe-sp']).executeTakeFirst();
+  if(!source) throw new Error('collection_filter_source_required');
+  await loadApprovedCollectionFilterRuntime(db,source.id,{readOnly:true});
+}
 
 /**
  * Direct, serialised changes to the APPROVED policy only.
@@ -19,6 +27,7 @@ export async function editActiveCollectionFilter(
       SELECT * FROM public.collection_filter_direct_admin_edit(
         ${action},${JSON.stringify(payload)}::jsonb
       )`.execute(trx);
+    await validateActiveCollectionFilter(trx);
     return {revision:Number(result.rows[0]?.policy_revision)};
   });
 }

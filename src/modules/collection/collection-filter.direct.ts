@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
+import { validateActiveCollectionFilter } from './collection-filter.direct-admin.js';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
 import {
   compileCollectionFilterPolicy, evaluateCollectionFilter,
   normalizeCollectionFilterType, type CollectionFilterMode,
-  type CollectionFilterPolicyInput,
+  type CollectionFilterPolicyInput, type CompiledCollectionFilterPolicy,
 } from './collection-filter.engine.js';
 
 export interface DirectRuleInput {
@@ -16,12 +17,26 @@ export interface DirectRuleInput {
   newTypeId?: string | undefined;
 }
 
-interface Candidate {
+export interface HistoricalCollectionCandidate {
   publication_id: string; title: string; act_type: string | null;
+  source_act_type: string | null; source_code: string;
   section: string; content_text: string | null; relevant_excerpt: string | null;
   evidence_complete:boolean; has_material:boolean;
   type_conflict:boolean; provenance_conflict:boolean;
   has_company:boolean; has_other_source:boolean; content_hash: string | null;
+}
+
+export function evaluateHistoricalCollectionCandidate(
+  policy: CompiledCollectionFilterPolicy, item: HistoricalCollectionCandidate,
+) {
+  return evaluateCollectionFilter(policy, {
+    sourceCode:item.source_code, section:item.section,
+    sourceActType:item.source_act_type, title:item.title,
+    body:item.content_text,
+    evidenceComplete:item.evidence_complete,
+    materialAttachmentsUnexamined:item.has_material,
+    provenanceConflict:item.provenance_conflict,
+  });
 }
 
 /**
@@ -68,8 +83,8 @@ function validated(input: DirectRuleInput): DirectRuleInput {
   const sourceCode = input.sourceCode.trim().toLowerCase();
   const section = input.section.trim().toUpperCase();
   const canonicalType = normalizeCollectionFilterType(input.canonicalType);
-  if (sourceCode !== 'dou') throw new RangeError('only_dou_direct_filter_supported');
-  if (!section || !canonicalType ||
+  if (!['dou','doe-sp'].includes(sourceCode)) throw new RangeError('unsupported_direct_filter_source');
+  if (!canonicalType ||
       !['KEEP_ALWAYS','KEEP_IF_TAX_TERM','EXCLUDE_UNLESS_STRONG','EXCLUDE_ALWAYS'].includes(input.mode))
     throw new RangeError('invalid_direct_rule');
   return {...input,sourceCode,section,canonicalType};
@@ -120,45 +135,33 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
       locationScope:t.location_scope})),
   };
   const engine=compileCollectionFilterPolicy(document);
-  // Push down source/section/normalized raw type (including aliases) before
-  // fetching full text. The existing TS engine still owns final classification.
-  const typeKeys=[...new Set([
-    rule.canonicalType,
-    ...rawAliases.rows.filter(a =>
-      normalizeCollectionFilterType(a.source_code)===normalizeCollectionFilterType(rule.sourceCode)
-      && normalizeCollectionFilterType(a.section)===normalizeCollectionFilterType(rule.section)
-      && normalizeCollectionFilterType(a.canonical_type)===rule.canonicalType,
-    ).map(a=>normalizeCollectionFilterType(a.normalized_alias)),
-  ])];
   const ids:string[]=[];
   let blockedCompany=0;
   let blockedOtherSource=0;
   const blockedCompanyIds:string[]=[];
   const blockedOtherSourceIds:string[]=[];
+  const samples:Array<{id:string;title:string;sourceCode:string;section:string;
+    officialType:string|null;pattern:string;protection:string|null}>=[];
   let cursor:string|null=null;
   let pages=0;
   const hash=createHash('sha256').update(JSON.stringify([rule,approved.id,approved.revision]));
   while (true) {
     if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
-    const page=await sql<Candidate>`
-      SELECT * FROM collection_filter_direct_candidates(${cursor}::uuid,500,${normalizeCollectionFilterType(rule.section)},${typeKeys}::text[])
+    const page=await sql<HistoricalCollectionCandidate>`
+      SELECT * FROM collection_filter_f3_candidates(${cursor}::uuid,500,${rule.sourceCode})
     `.execute(trx);
     if (!page.rows.length) break;
-    const sourceTypes=await loadConflictingSourceActTypes(trx,page.rows);
     for (const item of page.rows) {
-      const decision=evaluateCollectionFilter(engine,{
-        sourceCode:rule.sourceCode, section:item.section,
-        actType:item.act_type,title:item.title,
-        body:item.content_text,summary:item.relevant_excerpt,
-        evidenceComplete:item.evidence_complete,
-        materialAttachmentsUnexamined:item.has_material,
-        typeConflict:item.type_conflict,
-        sourceActType:sourceTypes.get(item.publication_id),
-        provenanceConflict:item.provenance_conflict,
-      });
+      const decision=evaluateHistoricalCollectionCandidate(engine,item);
       if (decision.decision!=='DISCARD' || decision.canonicalType!==rule.canonicalType ||
-          decision.section!==normalizeCollectionFilterType(rule.section)) continue;
-      hash.update(item.publication_id).update(item.content_hash??'');
+          decision.mode!==rule.mode || decision.matchedSection!==normalizeCollectionFilterType(rule.section)) continue;
+      hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
+        item.source_act_type,item.section,item.provenance_conflict,
+        item.has_company,item.has_other_source,decision.reasonCode]));
+      if (samples.length<10) samples.push({id:item.publication_id,title:item.title,
+        sourceCode:item.source_code,section:item.section,officialType:item.source_act_type,
+        pattern:decision.matchedPattern??decision.canonicalType,
+        protection:item.has_company?'COMPANY':item.has_other_source?'OTHER_ORIGIN':null});
       if (item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
       else if (item.has_other_source){blockedOtherSource++;blockedOtherSourceIds.push(item.publication_id);}
       else ids.push(item.publication_id);
@@ -168,13 +171,13 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   }
   hash.update(String(blockedCompany)).update(String(blockedOtherSource));
   return {ids,count:ids.length,blockedCompany,blockedOtherSource,
-    blockedCompanyIds,blockedOtherSourceIds,token:hash.digest('hex')};
+    blockedCompanyIds,blockedOtherSourceIds,samples,token:hash.digest('hex')};
 }
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
-    const {count,blockedCompany,blockedOtherSource,token}=await candidates(trx,input);
-    return {count,blockedCompany,blockedOtherSource,token};
+    const {count,blockedCompany,blockedOtherSource,samples,token}=await candidates(trx,input);
+    return {count,blockedCompany,blockedOtherSource,samples,token};
   });
 }
 
@@ -205,6 +208,17 @@ export async function confirmDirectFilterRule(
         apagadas:0,restantes:plan.count,deletedCount:0};
     }
 
+    const selection = plan.ids.slice(0,500);
+    if (selection.length) {
+      await sql`SELECT public.l17_lock_confirmation_targets(${selection}::uuid[])`.execute(trx);
+      const locked = await candidates(trx,rule);
+      if (locked.count !== plan.count || locked.token !== plan.token) {
+        return {changed:true,count:locked.count,blockedCompany:locked.blockedCompany,
+          blockedOtherSource:locked.blockedOtherSource,token:locked.token,
+          apagadas:0,restantes:locked.count,deletedCount:0};
+      }
+    }
+
     let revision: number;
     if (resume) {
       // Never re-save the rule on subsequent steps: a different admin may
@@ -230,6 +244,9 @@ export async function confirmDirectFilterRule(
       revision=Number(updated.rows[0]?.policy_revision);
     }
 
+    await validateActiveCollectionFilter(trx);
+    const lockedPolicy=await sql<{revision:number}>`SELECT public.collection_filter_confirm_policy_lock() AS revision`.execute(trx);
+    if(Number(lockedPolicy.rows[0]?.revision)!==revision) throw new Error('collection_filter_policy_changed');
     const MAX_DELETES_PER_CONFIRM=500;
     const SQL_PURGE_CHUNK=100; // SQL 051 rejects arrays above 100.
     let apagadas=0;

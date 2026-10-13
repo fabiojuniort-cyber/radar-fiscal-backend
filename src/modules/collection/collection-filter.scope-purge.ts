@@ -2,9 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
-import { loadConflictingSourceActTypes, type DirectRuleInput } from './collection-filter.direct.js';
+import { evaluateHistoricalCollectionCandidate, type HistoricalCollectionCandidate, type DirectRuleInput } from './collection-filter.direct.js';
 import { loadApprovedCollectionFilterRuntime } from './collection-filter.runtime.js';
-import { evaluateCollectionFilter, normalizeCollectionFilterType, normalizeCollectionFilterText } from './collection-filter.engine.js';
+import { normalizeCollectionFilterType } from './collection-filter.engine.js';
 
 interface ScopeRow {
   publication_id: string;
@@ -30,6 +30,7 @@ export interface OutOfScopePreview {
   blockedCompany: number;
   blockedOtherSource: number;
   token: string;
+  samples: Array<{id:string;title:string;bucket:string}>;
 }
 
 type Bucket='OUT_OF_SCOPE'|'HIDDEN'|'RULE'|'SUSPECT_DOE';
@@ -62,28 +63,15 @@ async function scopeCandidates(trx: Transaction<DB>) {
     .update(runtime.policyId).update(String(runtime.policyRevision));
   const seen=new Map<string,Match>();
   const active=new Map<string,RuleRow>();
-  const typeKeysBySection=new Map<string,Set<string>>();
-  const dou=normalizeCollectionFilterText('dou');
   for(const rule of compiled.rules.values()){
-    if(rule.sourceCode!==dou||rule.mode==='KEEP_ALWAYS')continue;
+    const src=rule.sourceCode.toLowerCase();
+    if(!['dou','doe-sp'].includes(src)||rule.mode==='KEEP_ALWAYS')continue;
     const section=normalizeCollectionFilterType(rule.section??'');
     const canonical=normalizeCollectionFilterType(rule.canonicalType);
-    const key=section+'\0'+canonical;
-    active.set(key,{source_code:'dou',section:rule.section??'',
+    active.set(src+'\0'+section+'\0'+canonical,{
+      source_code:src,section:rule.section??'',
       canonical_type:rule.canonicalType,mode:rule.mode});
-    const keys=typeKeysBySection.get(section)??new Set<string>();
-    keys.add(canonical);typeKeysBySection.set(section,keys);
   }
-  // Aliases must travel with the canonical type's section. Ignore aliases
-  // targeting KEEP rules while preserving ALL active discard policies.
-  for(const [key,target] of compiled.aliases.entries()){
-    const [src,section,alias]=key.split('\0');
-    if(src!==dou||!section||!alias||!active.has(section+'\0'+target))continue;
-    typeKeysBySection.get(section)?.add(alias);
-  }
-  // The token changes when the active policy/rules/aliases/terms change.
-  // Revision is the transactional policy mutation sequence; content hashes
-  // below catch material archive updates without requiring a second rules load.
   hash.update(JSON.stringify([...active.entries()].sort((a,b)=>a[0].localeCompare(b[0]))))
     .update(JSON.stringify([...compiled.aliases.entries()].sort((a,b)=>a[0].localeCompare(b[0]))));
 
@@ -106,13 +94,6 @@ async function scopeCandidates(trx: Transaction<DB>) {
     cursor=page.rows[page.rows.length-1]!.publication_id;
     if(page.rows.length<500)break;
   }
-  interface Evidence {
-    publication_id:string; title:string; act_type:string|null;
-    section:string; content_text:string|null; relevant_excerpt:string|null;
-    evidence_complete:boolean;has_material:boolean;type_conflict:boolean;
-    provenance_conflict:boolean;has_company:boolean;has_other_source:boolean;
-    content_hash:string|null;
-  }
   const add=(id:string,rule:RuleRow,blocked?:'COMPANY'|'OTHER')=>{
     const previous=seen.get(id);
     if(previous){
@@ -123,43 +104,28 @@ async function scopeCandidates(trx: Transaction<DB>) {
       seen.set(id,next);
     }else seen.set(id,{bucket:'RULE',rule,...(blocked?{protected:blocked}:{})});
   };
-  const TYPE_CHUNK=200;
-  for(const [section,keys] of [...typeKeysBySection.entries()].sort((a,b)=>a[0].localeCompare(b[0]))){
-    const types=[...keys].sort();
-    for(let offset=0;offset<types.length;offset+=TYPE_CHUNK){
-      const chunk=types.slice(offset,offset+TYPE_CHUNK);
-      let after:string|null=null,visited=0;
-      while(true){
-        if(++visited>10000)throw new Error('l17_archive_paging_cap');
-        const page=await sql<Evidence>`
-          SELECT * FROM public.collection_filter_direct_candidates(
-            ${after}::uuid,500,${section},${chunk}::text[])
-        `.execute(trx);
-        if(!page.rows.length)break;
-        const sourceTypes=await loadConflictingSourceActTypes(trx,page.rows);
-        for(const item of page.rows){
-          const decision=evaluateCollectionFilter(compiled,{
-            sourceCode:'dou',section:item.section,actType:item.act_type,
-            title:item.title,body:item.content_text,summary:item.relevant_excerpt,
-            evidenceComplete:item.evidence_complete,
-            materialAttachmentsUnexamined:item.has_material,
-            typeConflict:item.type_conflict,
-            sourceActType:sourceTypes.get(item.publication_id),
-            provenanceConflict:item.provenance_conflict,
-          });
-          // The final classification is authoritative, never the SQL prefilter.
-          if(decision.decision!=='DISCARD'||!decision.canonicalType)continue;
-          const rule=active.get(decision.section+'\0'+decision.canonicalType);
-          if(!rule||decision.mode!==rule.mode)continue;
-          hash.update(item.publication_id).update(item.content_hash??'')
-            .update(decision.reasonCode).update(decision.canonicalType)
-            .update(item.has_company?'C':'-').update(item.has_other_source?'O':'-');
-          add(item.publication_id,rule,item.has_company?'COMPANY':
-            item.has_other_source?'OTHER':undefined);
-        }
-        after=page.rows[page.rows.length-1]!.publication_id;
-        if(page.rows.length<500)break;
+  for(const sourceCode of ['dou','doe-sp']){
+    let after:string|null=null,visited=0;
+    while(true){
+      if(++visited>10000)throw new Error('l17_archive_paging_cap');
+      const page=await sql<HistoricalCollectionCandidate>`
+        SELECT * FROM public.collection_filter_f3_candidates(
+          ${after}::uuid,500,${sourceCode})
+      `.execute(trx);
+      if(!page.rows.length)break;
+      for(const item of page.rows){
+        const decision=evaluateHistoricalCollectionCandidate(compiled,item);
+        if(decision.decision!=='DISCARD'||!decision.canonicalType)continue;
+        const rule=active.get(sourceCode+'\0'+(decision.matchedSection??'')+'\0'+decision.canonicalType);
+        if(!rule||decision.mode!==rule.mode)continue;
+        hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
+          item.source_act_type,item.section,item.provenance_conflict,
+          item.has_company,item.has_other_source,decision.reasonCode]));
+        add(item.publication_id,rule,item.has_company?'COMPANY':
+          item.has_other_source?'OTHER':undefined);
       }
+      after=page.rows[page.rows.length-1]!.publication_id;
+      if(page.rows.length<500)break;
     }
   }
   // L-18: read only non-DOU legacy 029 and visible DOE-SP mis-typed acts.
@@ -174,6 +140,8 @@ async function scopeCandidates(trx: Transaction<DB>) {
     `.execute(trx);
     if(!page.rows.length)break;
     for(const row of page.rows){
+      // DOE-SP type disagreement is evaluated above by the same F3 engine.
+      if(!row.hidden_legacy)continue;
       const previous=seen.get(row.publication_id);
       if(previous && previous.bucket!=='HIDDEN')continue;
       const blocked=row.has_company?'COMPANY':row.has_other_source?'OTHER':undefined;
@@ -224,9 +192,11 @@ async function scopeCandidates(trx: Transaction<DB>) {
 export async function previewOutOfScopePurge(db: Kysely<DB>, actor: string):
   Promise<OutOfScopePreview> {
   return withUserContext(db, actor, async trx => {
-    const { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token } =
+    const { ids, kinds, count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token } =
       await scopeCandidates(trx);
-    return { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token };
+    const samples=ids.length ? (await sql<{id:string;title:string}>`SELECT * FROM public.collection_filter_purge_samples(${ids.slice(0,10)}::uuid[])`
+      .execute(trx)).rows.map(row=>({...row,bucket:kinds.get(row.id)!.bucket})) : [];
+    return { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token, samples };
   });
 }
 
@@ -274,6 +244,7 @@ export async function confirmOutOfScopePurge(
           apagadas:0,restantes:locked.count,deletedCount:0};
       }
     }
+    await sql`SELECT public.collection_filter_confirm_policy_lock()`.execute(trx);
     let apagadas=0;
     const operation=randomUUID();
     for(let offset=0;offset<selection.length;offset+=100){
@@ -283,7 +254,7 @@ export async function confirmOutOfScopePurge(
         const meta=plan.kinds.get(id);
         if(!meta)throw new Error('l17_plan_identity_mismatch');
         const key=meta.bucket==='RULE'
-          ?JSON.stringify([meta.bucket,meta.rule?.section,meta.rule?.canonical_type,meta.rule?.mode])
+          ?JSON.stringify([meta.bucket,meta.rule?.source_code,meta.rule?.section,meta.rule?.canonical_type,meta.rule?.mode])
           :JSON.stringify([meta.bucket,meta.source??'dou']);
         const group=batches.get(key)??{ids:[],bucket:meta.bucket,
           ...(meta.rule?{rule:meta.rule}:{}),...(meta.source?{source:meta.source}:{})};
@@ -315,7 +286,7 @@ export async function confirmOutOfScopePurge(
           if(!rule)throw new Error('l17_rule_metadata_missing');
           result=await sql<{count:number}>`
             SELECT public.collection_filter_direct_purge_batch(
-              ${group.ids}::uuid[],'dou',${rule.section},
+              ${group.ids}::uuid[],${rule.source_code},${rule.section},
               ${rule.canonical_type},${rule.mode},${operation}::uuid) AS count
           `.execute(trx);
         }

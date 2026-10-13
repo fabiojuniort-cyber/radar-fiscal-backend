@@ -33,6 +33,7 @@ import {
 } from './doe-sp.parser.js';
 import {
   decideDoeSpCapture,
+  doeSpAcquisitionCategory,
   doeSpActType,
   doeSpNormativeIdentity,
   doeSpOrgan,
@@ -515,6 +516,11 @@ export class DoeSpConnector implements CollectionConnector {
           ...(identity?.designation ? { designation: identity.designation } : {}),
           ...(ementa ? { ementa } : {}),
           captureCategory: category,
+          capturePolicy: 'F3_SHARED_RUNTIME',
+          legacyCaptureDecision: decideDoeSpCapture({
+            title: item.title, hierarchy: item.hierarchy, excerpt: item.excerpt,
+            ...(typeName ? { typeName } : {}),
+          }),
           identityMode: identity ? 'NORMATIVE' : isRetification ? 'RETIFICATION' : 'DOE_PUBLICATION_ID',
           slug: detail.slug,
           editionHint: editionHint(item),
@@ -606,22 +612,22 @@ export class DoeSpConnector implements CollectionConnector {
 
       for (const item of list.items) {
         const typeName = item.publicationTypeId ? types.get(item.publicationTypeId) : undefined;
-        const decision = decideDoeSpCapture({
+        const category = doeSpAcquisitionCategory({
           title: item.title, hierarchy: item.hierarchy, excerpt: item.excerpt, ...(typeName ? { typeName } : {}),
         });
         filtering.discoveredCount += 1;
-        if (decision.included) {
+        if (category) {
           outcome.included += 1;
           filtering.includedCount += 1;
-          filtering.includedByCategory[decision.category] = (filtering.includedByCategory[decision.category] ?? 0) + 1;
-          if (!known.has(item.id)) toProcess.push({ item, category: decision.category, ...(typeName ? { typeName } : {}) });
+          filtering.includedByCategory[category] = (filtering.includedByCategory[category] ?? 0) + 1;
+          if (!known.has(item.id)) toProcess.push({ item, category, ...(typeName ? { typeName } : {}) });
         } else {
           outcome.excluded += 1;
           filtering.excludedCount += 1;
-          filtering.excludedByReason[decision.reason] = (filtering.excludedByReason[decision.reason] ?? 0) + 1;
+          filtering.excludedByReason.OUT_OF_SCOPE_SECTION = (filtering.excludedByReason.OUT_OF_SCOPE_SECTION ?? 0) + 1;
           // Only ids/organs: excluded titles can identify taxpayers.
           if (filtering.excludedSamples.length < MAX_EXCLUDED_SAMPLES) {
-            filtering.excludedSamples.push({ date, id: item.id, organ: doeSpOrgan(item.hierarchy), reason: decision.reason });
+            filtering.excludedSamples.push({ date, id: item.id, organ: doeSpOrgan(item.hierarchy), reason: 'OUT_OF_SCOPE_SECTION' });
           } else {
             filtering.excludedSamplesTruncated += 1;
           }

@@ -85,6 +85,7 @@ export interface CollectionFilterDecision {
     | 'TYPE_CONFLICT'
     | 'TYPE_CONFLICT_BOTH_EXCLUDED'
     | 'PROVENANCE_CONFLICT'
+    | 'PROTECTED_PUBLICATION'
     | 'KEEP_ALWAYS'
     | 'STRONG_TERM'
     | 'WEAK_TERM_THRESHOLD'
@@ -100,6 +101,9 @@ export interface CollectionFilterDecision {
   requiresNewTypeReview: boolean;
   weakScore: number;
   termHits: CollectionFilterTermHit[];
+  matchedPattern?: string;
+  matchedSection?: string;
+  matchedTypeSource?: 'OFFICIAL' | 'TITLE';
 }
 
 interface CompiledTerm {
@@ -120,6 +124,13 @@ export interface CompiledCollectionFilterPolicy {
   rules: ReadonlyMap<string, CollectionFilterTypeRule>;
   aliases: ReadonlyMap<string, string>;
   terms: readonly CompiledTerm[];
+  patterns: ReadonlyMap<string, readonly CompiledTypePattern[]>;
+}
+
+interface CompiledTypePattern {
+  pattern: string;
+  rule: CollectionFilterTypeRule;
+  words: number;
 }
 
 const NON_PRESERVING_POSITIVE_TERMS = new Set([
@@ -144,7 +155,18 @@ export function normalizeCollectionFilterText(value: string): string {
 }
 
 export function normalizeCollectionFilterType(value: string): string {
-  return normalizeCollectionFilterText(value);
+  const withoutNumber = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLocaleUpperCase('pt-BR')
+    .replace(/\b(?:N[º°]|N(?:O|UMERO)?\.?)[ \t]*\d+(?:[ \t]*[./-][ \t]*\d+)*/g, ' ')
+    .replace(/\b\d+(?:[ \t]*\/[ \t]*\d+)\b/g, ' ')
+    .replace(/\bN[º°](?=\s|$)/g, ' ');
+  return normalizeCollectionFilterText(withoutNumber);
+}
+
+/** Only the first title line, before an act identifier, can provide a type. */
+export function collectionFilterTitleType(title: string): string {
+  const line = title.split(/[\r\n]/, 1)[0] ?? '';
+  return line.split(/\s+N(?:[º°]|[oO]\.?|[úu]mero|\.)\s*\d/i, 1)[0]?.trim() ?? '';
 }
 
 /**
@@ -161,6 +183,11 @@ export function collectionFilterTypeConflict(sourceActType: string | null | unde
   return source !== canonical && !canonical.startsWith(source + ' ');
 }
 
+export function normalizeCollectionFilterSection(value: string | null | undefined): string {
+  return normalizeCollectionFilterText(value ?? '').replace(/^(DO[123])E$/, '$1');
+}
+// Saved extra-section rules remain distinct; editions inherit the principal
+// scope during matching instead of silently merging rule identities.
 function normalizedSection(value: string | null | undefined): string {
   return normalizeCollectionFilterText(value ?? '');
 }
@@ -214,8 +241,11 @@ export function compileCollectionFilterPolicy(
       throw new Error('filter rule source/type must not be blank');
     }
     const ruleKey = key(sourceCode, section, canonicalType);
-    if (rules.has(ruleKey)) {
-      throw new Error(`duplicate filter rule: ${ruleKey}`);
+    const existingRule = rules.get(ruleKey);
+    if (existingRule) {
+      if (existingRule.mode !== rule.mode) throw new Error(`conflicting filter rule: ${ruleKey}`);
+      // Normalize redundant identities in memory only; never edit saved rules.
+      continue;
     }
     rules.set(ruleKey, {
       ...rule,
@@ -298,6 +328,22 @@ export function compileCollectionFilterPolicy(
     termScopes.set(scopeKey, term.original.strength);
   }
 
+  const patterns = new Map<string, CompiledTypePattern[]>();
+  const addPattern = (pattern: string, rule: CollectionFilterTypeRule) => {
+    const firstWord = pattern.split(' ')[0] ?? '';
+    const bucketKey = key(rule.sourceCode, rule.section ?? '', firstWord);
+    const bucket = patterns.get(bucketKey) ?? [];
+    bucket.push({ pattern, rule, words: pattern.split(' ').length });
+    patterns.set(bucketKey, bucket);
+  };
+  for (const rule of rules.values()) addPattern(rule.canonicalType, rule);
+  for (const [aliasKey, canonical] of aliases) {
+    const [source, section, alias] = aliasKey.split('\u0000');
+    if (!source || section === undefined || !alias) continue;
+    const rule = rules.get(key(source, section, canonical));
+    if (rule) addPattern(alias, rule);
+  }
+
   return {
     version: input.version,
     contextWindowWords: input.contextWindowWords,
@@ -310,6 +356,7 @@ export function compileCollectionFilterPolicy(
     rules,
     aliases,
     terms,
+    patterns,
   };
 }
 
@@ -369,8 +416,49 @@ export function evaluateCollectionFilter(
   publication: CollectionFilterPublication,
 ): CollectionFilterDecision {
   const sourceCode = normalizedSource(publication.sourceCode);
+  const rawSection = normalizedSection(publication.section);
+  const section = normalizeCollectionFilterSection(publication.section);
+  const official = publication.sourceActType ?? publication.actType ?? '';
+  const inputs = [
+    { raw: official.trim(), from: 'OFFICIAL' as const },
+    { raw: collectionFilterTitleType(publication.title), from: 'TITLE' as const },
+  ];
+  const matches: Array<{ item: CompiledTypePattern; raw: string; from: 'OFFICIAL'|'TITLE' }> = [];
+  for (const input of inputs) {
+    const type = normalizeCollectionFilterType(input.raw);
+    if (!type) continue;
+    const first = type.split(' ')[0] ?? '';
+    for (const ruleSection of new Set([rawSection, section, ''])) {
+      for (const item of policy.patterns.get(key(sourceCode, ruleSection, first)) ?? []) {
+        if (type === item.pattern || type.startsWith(item.pattern + ' ')) {
+          matches.push({ item, raw: input.raw, from: input.from });
+        }
+      }
+    }
+  }
+  const maximumWords = Math.max(0, ...matches.map(match => match.item.words));
+  const top = matches.filter(match => match.item.words === maximumWords);
+  if (!top.length) {
+    const rawType = official.trim() || inputs[1]!.raw;
+    return { policyVersion: policy.version, sourceCode, section, rawType,
+      normalizedRawType: normalizeCollectionFilterType(rawType), decision: 'KEEP',
+      reasonCode: 'UNKNOWN_TYPE', requiresNewTypeReview: true, weakScore: 0, termHits: [] };
+  }
+  const decisions = top.map(match => ({ match, decision: evaluateMatchedRule(policy,
+    publication, match.item.rule, match.raw, match.from, match.item.pattern) }));
+  // Mode-specific term gates are evaluated before tie-breaking: any KEEP wins.
+  decisions.sort((a, b) => Number(b.decision.decision === 'KEEP') - Number(a.decision.decision === 'KEEP')
+    || Number(Boolean(b.match.item.rule.section)) - Number(Boolean(a.match.item.rule.section))
+    || a.match.item.pattern.localeCompare(b.match.item.pattern, 'en')
+    || a.match.from.localeCompare(b.match.from, 'en'));
+  return decisions[0]!.decision;
+}
+
+function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
+  publication: CollectionFilterPublication, rule: CollectionFilterTypeRule,
+  rawType: string, matchedTypeSource: 'OFFICIAL'|'TITLE', matchedPattern: string): CollectionFilterDecision {
+  const sourceCode = normalizedSource(publication.sourceCode);
   const section = normalizedSection(publication.section);
-  const rawType = publication.actType?.trim() ?? '';
   const normalizedRawType = normalizeCollectionFilterType(rawType);
 
   const base = {
@@ -384,36 +472,23 @@ export function evaluateCollectionFilter(
     termHits: [] as CollectionFilterTermHit[],
   };
 
-  if (!normalizedRawType) {
-    return {
-      ...base,
-      decision: 'KEEP',
-      reasonCode: 'UNKNOWN_TYPE',
-      requiresNewTypeReview: true,
-    };
-  }
-
-  const canonicalType =
-    policy.aliases.get(key(sourceCode, section, normalizedRawType)) ??
-    normalizedRawType;
-  const rule =
-    policy.rules.get(key(sourceCode, section, canonicalType));
-
-  if (!rule) {
-    return {
-      ...base,
-      canonicalType,
-      decision: 'KEEP',
-      reasonCode: 'UNKNOWN_TYPE',
-      requiresNewTypeReview: true,
-    };
-  }
+  const canonicalType = rule.canonicalType;
 
   const safeBase = {
     ...base,
     canonicalType,
     mode: rule.mode,
+    matchedPattern,
+    matchedSection: rule.section ?? '',
+    matchedTypeSource,
   };
+
+  if (publication.provenanceConflict || !sourceCode) {
+    return { ...safeBase, decision: 'KEEP', reasonCode: 'PROVENANCE_CONFLICT' };
+  }
+  if (rule.mode === 'EXCLUDE_ALWAYS') {
+    return { ...safeBase, decision: 'DISCARD', reasonCode: 'EXCLUDE_ALWAYS' };
+  }
 
   if (!publication.evidenceComplete) {
     return {
@@ -427,28 +502,6 @@ export function evaluateCollectionFilter(
       ...safeBase,
       decision: 'KEEP',
       reasonCode: 'UNEXAMINED_MATERIAL',
-    };
-  }
-  if (publication.typeConflict) {
-    // Only relax the fail-open rule when BOTH disagreeing types independently
-    // resolve to EXCLUDE_ALWAYS for this exact source and section. All other
-    // conflicts remain KEEP, including unknown/missing source types.
-    const sourceType = normalizeCollectionFilterType(publication.sourceActType ?? '');
-    const sourceCanonical = policy.aliases.get(key(sourceCode, section, sourceType)) ?? sourceType;
-    const sourceRule = sourceType ? policy.rules.get(key(sourceCode, section, sourceCanonical)) : undefined;
-    if (rule.mode === 'EXCLUDE_ALWAYS' &&
-        sourceRule?.mode === 'EXCLUDE_ALWAYS' &&
-        !publication.provenanceConflict) {
-      return {
-        ...safeBase,
-        decision: 'DISCARD',
-        reasonCode: 'TYPE_CONFLICT_BOTH_EXCLUDED',
-      };
-    }
-    return {
-      ...safeBase,
-      decision: 'KEEP',
-      reasonCode: 'TYPE_CONFLICT',
     };
   }
   if (publication.provenanceConflict) {
@@ -546,14 +599,6 @@ export function evaluateCollectionFilter(
     weakScore,
     termHits,
   };
-
-  if (rule.mode === 'EXCLUDE_ALWAYS') {
-    return {
-      ...evaluatedBase,
-      decision: 'DISCARD',
-      reasonCode: 'EXCLUDE_ALWAYS',
-    };
-  }
 
   if (strong) {
     return {
