@@ -1,5 +1,0 @@
-# Smoke de uma data não coberta
-
-A coleta natural17UTC terminouSUCCESS_NO_RESULTS e não provaEtapa6. Dry-run oficial doCLIac818 em07/10/2026 confirmou15/07/2026 não coberto. smoke-backfill.mjs chama exclusivamente runDouBackfillBatch existente com exatamente15/07/2026, maxAttempts1, aquisição timeout900000ms (sem alegar teto total de persistência). O helper cria runowned e usa processAcquiredCollectionRun/motorcentral; não alimenta monitoringcheckpoint. O start exige>90min atépróximociclo, fonteDOUativa/croncongelado, nenhumasource runaberta, política efetivamaiorAPPROVED1r5. Rotina read-only default; --apply explícito somenteapósreviewexata/dryrun/health/lease. Não kill externo, não resetarcheckpoint, não alterarfontes/DOE-SP, não reaprovarpolítica, não apagarpublications.
-
-Pin do runner seráeste artefato. node ops/act-scope-02/smoke-backfill.mjs semflag→DRY_RUN; comando com--apply apósreview. DATABASE_URL/INLABSreferências existentes permanecemRailway. Seoperaçãofalhar/max1tentativa, mantertrilhaobservável e diagnosticar; nãoexecutarStage7 semsmokeverde. O efeito deKEEPlegítimonormaléimportaçãorealversionada; backupStage7independente jáemrestoreisolado.

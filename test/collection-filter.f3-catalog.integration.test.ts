@@ -111,9 +111,12 @@ test('F3 physical policy: surviving DOU/DOE-SP acts ignore legacy hidden classif
     await t.test('public v2 stats/source counts agree with the catalog physical survivors', async () => {
       const stats=await app.inject({method:'GET',url:'/public/v2/stats'});
       assert.equal(stats.statusCode,200,stats.body);
+      // The administrator bypasses RLS; account for the independent legal-scope
+      // suppression that still applies to catalog readers and public statistics.
       const expected=await admin.query<{count:number}>(`SELECT count(*)::int AS count FROM publications p
-        WHERE NOT p.is_hidden OR EXISTS (SELECT 1 FROM publication_origins po JOIN sources s ON s.id=po.source_id
-          WHERE po.publication_id=p.id AND s.code IN ('dou','doe-sp'))`);
+        WHERE public.publication_scope_is_in_scope(p.id)
+          AND (NOT p.is_hidden OR EXISTS (SELECT 1 FROM publication_origins po JOIN sources s ON s.id=po.source_id
+            WHERE po.publication_id=p.id AND lower(s.code) IN ('dou','doe-sp')))`);
       assert.equal(stats.json<{totalPublications:number}>().totalPublications,expected.rows[0]!.count);
       const response=await app.inject({method:'GET',url:'/public/v2/sources'});
       assert.equal(response.statusCode,200,response.body);
