@@ -3,11 +3,10 @@ import type { PoolClient } from 'pg';
 
 import { createConcept, CurationError, type CuratorActor, requireOpenDraft } from './curation.draft.js';
 
-// F2-T02: 12 approved categories from Segmento v5 (13th "Produção Agrícola"
-// is NOT approved). Frequencies are documentary, never import gates.
+// F2-T02: 12 approved categories from Segmento v5.1. Frequencies are documentary, never import gates.
 // Only Energia e utilidades has approved synonyms; no inherited Segmento aliases.
 export const F2_ACTUACAO_SOURCE_SHA256 =
-  'd27368e821b3cf892400a8fe8fd9cd8b1b74f0f711541a203655acab041ce814';
+  '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67';
 
 export const F2_ACTUACAO_SEED = [
   { code: 'actuacao.servico', label: 'Serviço', count: 505 },
@@ -16,7 +15,7 @@ export const F2_ACTUACAO_SEED = [
   { code: 'actuacao.comercio_varejista', label: 'Comércio varejista', count: 86 },
   { code: 'actuacao.transportador', label: 'Transportador', count: 44 },
   { code: 'actuacao.extracao_mineral', label: 'Extração mineral', count: 40 },
-  { code: 'actuacao.produtor_rural', label: 'Produtor rural', count: 37 },
+  { code: 'actuacao.produtor_rural', label: 'Produtor rural', count: 107 },
   { code: 'actuacao.locacao_e_licenciamento', label: 'Locação e licenciamento', count: 20 },
   { code: 'actuacao.institucional', label: 'Institucional', count: 19 },
   { code: 'actuacao.representacao_comercial', label: 'Representação comercial', count: 15 },
@@ -100,7 +99,7 @@ export async function initializeF2Actuacao(
       definition: seed.label,
       governanceStatus: 'PROPOSED',
       evidenceStatus: 'NOT_ASSESSED',
-      notes: 'F2-T02: Atuação v5 (' + seed.count + ' CNAEs de origem); revisão obrigatória antes de publicar.',
+      notes: 'F2-T02: Atuação v5.1 (' + seed.count + ' CNAEs de origem); revisão obrigatória antes de publicar.',
       // Generic lexical matches like "Serviço" alone can cause false positives.
       classifyByLabel: false,
       profileVisible: false,
@@ -126,13 +125,13 @@ export async function initializeF2Actuacao(
   };
 }
 
-/** Canonical SHA256 of Segmento v5 origins (including unapproved categories), one line each:
+/** Canonical SHA256 of Segmento v5.1 origins (all 12 approved categories), one line each:
  * `sourceLine|cnae7digits|AtuaçãoLabel\n`, preserving XLSX row order.
  * This projection pin prevents a client from submitting forged associations
  * while claiming the original XLSX file hash.
  */
 export const F2_ACTUACAO_ORIGINS_PROJECTION_SHA256 =
-  '009b3c495081114283c65c65001b0a198a8661dc52e4854670090664b58e59df';
+  '5df9d8a3a7842cfd0efcd6321811fbf739187e37e128263a78615ca5e3f28a92';
 
 export interface F2ActuacaoOriginInput {
   sourceLine: number;
