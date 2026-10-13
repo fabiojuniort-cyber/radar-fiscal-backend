@@ -1,3 +1,41 @@
+import {
+  readAuthorizedMgWeeklyCadastro,
+  lookupMgWeeklyCadastro,
+  type MgWeeklySnapshot,
+} from './mg-weekly-cadastro.js';
+
+let mgSnapshotCache: {
+  filePath: string;
+  checkedAt: string;
+  expiresAt: number;
+  data: MgWeeklySnapshot;
+} | null = null;
+
+async function lookupMgApprovedWeeklyFile(cnpj: string): Promise<StateRegistrationLookup> {
+  const checkedAt = new Date().toISOString();
+  const filePath = process.env.T06_MG_WEEKLY_FILE_PATH;
+  const fileCheckedAt = process.env.T06_MG_WEEKLY_FILE_CHECKED_AT;
+  if (!filePath || !fileCheckedAt) {
+    return { registration: null, registrationStatus: null,
+      lookupStatus: 'UNAVAILABLE', source: 'SEF_MG_WEEKLY_CADASTRO', checkedAt };
+  }
+  try {
+    let snapshot = mgSnapshotCache?.filePath === filePath &&
+      mgSnapshotCache.checkedAt === fileCheckedAt &&
+      mgSnapshotCache.expiresAt > Date.now()
+      ? mgSnapshotCache.data : null;
+    if (!snapshot) {
+      snapshot = await readAuthorizedMgWeeklyCadastro(filePath, fileCheckedAt);
+      mgSnapshotCache = { filePath, checkedAt: fileCheckedAt,
+        expiresAt: Date.now() + 300_000, data: snapshot };
+    }
+    return lookupMgWeeklyCadastro(snapshot, cnpj);
+  } catch {
+    return { registration: null, registrationStatus: null,
+      lookupStatus: 'UNAVAILABLE', source: 'SEF_MG_WEEKLY_CADASTRO', checkedAt };
+  }
+}
+
 export type StateRegistrationLookupStatus =
   | 'SUCCESS'
   | 'NOT_FOUND'
@@ -279,6 +317,13 @@ export async function lookupStateRegistration(
   if (normalizedUf === 'GO') {
     return lookupGoSintegra(cnpj, fetcher);
   }
+  if (normalizedUf === 'MG' &&
+      process.env.T06_MG_WEEKLY_REUSE_APPROVED === 'true') {
+    return lookupMgApprovedWeeklyFile(cnpj);
+  }
+  // All non-GO UFs (including MG without reviewed reuse terms) use the
+  // existing manual IE form; never scrape CAPTCHA-protected SINTEGRA.
+
 
   return {
     registration: null,
