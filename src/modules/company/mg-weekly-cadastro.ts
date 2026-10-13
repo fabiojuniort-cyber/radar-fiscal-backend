@@ -132,7 +132,7 @@ export function lookupMgWeeklyCadastro(
     // Multiple IEs and omitted producers make both absence and ambiguity unsafe
     // to interpret as definitive NOT_FOUND.
     return { registration: null, registrationStatus: null,
-      lookupStatus: matches.length ? 'UNAVAILABLE' : 'NOT_FOUND',
+      lookupStatus: 'UNAVAILABLE',
       source: 'SEF_MG_WEEKLY_CADASTRO', checkedAt: snapshot.checkedAt };
   }
   return { registration: matches[0]!.registration,
@@ -155,5 +155,6 @@ export async function readAuthorizedMgWeeklyCadastro(
   const bytes = await readFile(filePath);
   // SEF/MG weekly TXT can be LATIN-1; callers must supply the intended encoding.
   const text = new TextDecoder('windows-1252', { fatal: true }).decode(bytes);
-  return parseMgWeeklyCadastro(text, checkedAt);
+  const snapshot = parseMgWeeklyCadastro(text, checkedAt);
+  return { ...snapshot, fileSha256: createHash('sha256').update(bytes).digest('hex') };
 }
