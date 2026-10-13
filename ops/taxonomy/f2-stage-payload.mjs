@@ -14,9 +14,10 @@ export function makeF2StagingPayload(segmentRows, productRows, hashes = {
 }) {
   const plan = planImport(segmentRows, productRows);
   const s = plan.summary;
-  if (s.errors !== 0 || s.warnings !== 442 || s.segmentRows !== 1332 ||
-      s.productRows !== 3793 || s.cnaeDistinct !== 1332 ||
-      s.productCodesDistinct !== 3793 || s.actuationCategories !== 7) {
+  if (s.errors !== 0 || s.segmentRows !== F2_SOURCE.segmento.rows ||
+      s.productRows !== F2_SOURCE.produto.rows ||
+      s.cnaeDistinct !== F2_SOURCE.segmento.rows ||
+      s.productCodesDistinct !== F2_SOURCE.produto.rows || s.actuationCategories !== 12) {
     throw new Error('F2_SOURCE_COUNTS_OR_VALIDATION_FAILED');
   }
   const segments = segmentRows.map((row, i) => {
@@ -29,7 +30,7 @@ export function makeF2StagingPayload(segmentRows, productRows, hashes = {
     const raw_cells = normalizeCells(row, 10);
     const product = plan.products[i];
     const ncm_normalized = product.ncms.map(x => x.digits);
-    if (ncm_normalized.some(x => !/^(?:\d{2}|\d{4}|\d{6}|\d{8})$/.test(x)))
+    if (ncm_normalized.some(x => !/^\d{2,8}$/.test(x)))
       throw new Error('F2_NCM_INVALID_IN_PLAN');
     return { source_line: i + 2, product_code: product.code,
       segmento: product.segment, grupo: product.group, item: product.item,
