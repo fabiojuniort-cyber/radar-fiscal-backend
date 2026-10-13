@@ -13,9 +13,10 @@ import { makeF2StagingPayload } from '../ops/taxonomy/f2-stage-payload.mjs';
 import { stageF2Payload } from '../ops/taxonomy/f2-stage-persist.mjs';
 
 const labels = [
-  ['Serviço',583], ['Indústria',380], ['Comércio atacadista',116],
-  ['Produção agropecuária',108], ['Comércio varejista',89],
-  ['Extração mineral',41], ['Representação comercial',15],
+  ['Serviço',505], ['Indústria',370], ['Comércio atacadista',115],
+  ['Produtor rural',107], ['Comércio varejista',86], ['Transportador',44],
+  ['Extração mineral',40], ['Locação e licenciamento',20], ['Institucional',19],
+  ['Representação comercial',15], ['Energia e utilidades',8], ['Armazém',3],
 ];
 
 function makeRows() {
@@ -23,14 +24,14 @@ function makeRows() {
   let j = 0;
   for (const [label, count] of labels) {
     for (let k = 0; k < count; k++, j++) {
-      const moreNcm = j < 368, moreProduct = j >= 368 && j < 442;
+      const moreNcm = j < 198, moreProduct = j >= 198 && j < 448;
       const candidates = moreProduct ? 'Prod A;Prod B;Prod C' : moreNcm ? 'Prod A;Prod B' : 'Prod A';
       const ncms = moreNcm ? '1001;1002;1003' : moreProduct ? '1001;1002' : '1001';
       segmentos.push(['Agro', 'Grãos',label,String(1000000+j), 'CNAE sintético '+j,'',
         candidates,ncms,'x','x',String(j),'sector.fixture_'+j]);
     }
   }
-  for (let i = 0; i < 3793; i++) {
+  for (let i = 0; i < F2_SOURCE.produto.rows; i++) {
     produtos.push(['Agro','Grãos','Produto sintético '+i,
       '1001;1001.90;1001.90.00','Sinônimo '+i,'x','x',String(i),
       'product.fixture_'+i,'Definição sintética '+i]);
@@ -86,10 +87,10 @@ try {
   });
   const first = await stageF2Payload(pool,payload);
   assert.equal(first.errors,0);
-  assert.equal(first.warnings,442);
+  assert.equal(first.warnings,448);
   assert.equal(first.insertedBatches,1);
   assert.equal(first.insertedSegments,1332);
-  assert.equal(first.insertedProducts,3793);
+  assert.equal(first.insertedProducts,4225);
   assert.equal(first.liveTaxonomyChanges,0);
 
   const second = await stageF2Payload(pool,payload);
@@ -105,14 +106,14 @@ try {
     'SELECT (SELECT count(*)::int FROM taxonomy_f2_import_batches) AS batches,'+
     '(SELECT count(*)::int FROM taxonomy_f2_import_segment_rows) AS segmento,'+
     '(SELECT count(*)::int FROM taxonomy_f2_import_product_rows) AS produtos');
-  assert.deepEqual(check.rows[0],{batches:1,segmento:1332,produtos:3793});
+  assert.deepEqual(check.rows[0],{batches:1,segmento:1332,produtos:4225});
 
   const modified = rows.produtos.map(r=>r.slice());
   modified[0][9]='DEFINIÇÃO NÃO AUTORIZADA';
   const forged = makeF2StagingPayload(rows.segmentos,modified,payload.hashes);
   await assert.rejects(stageF2Payload(pool,forged),/EXISTING_BATCH_CONFLICT/);
   const after = await pool.query('SELECT count(*)::int AS n FROM taxonomy_f2_import_product_rows');
-  assert.equal(after.rows[0].n,3793);
+  assert.equal(after.rows[0].n,4225);
 
   const summary={source:'SYNTHETIC_XLSX_CI_NOT_APPROVED_SOURCE',first,second,
     sourceHashes:payload.hashes,readback:check.rows[0]};
@@ -120,7 +121,7 @@ try {
   if (process.env.GITHUB_STEP_SUMMARY)
     await writeFile(process.env.GITHUB_STEP_SUMMARY,
       '\n### F2 T03 PostgreSQL 18 synthetic-XLSX idempotency\n'+
-      '- First: 0 errors, 442 warnings; 1332+3793 rows inserted\n'+
+      '- First: 0 errors, 448 fixture warnings; 1332+4225 rows inserted\n'+
       '- Second: 0 inserted/updated/deleted rows, full readback PASS\n'+
       '- **Only synthetic XLSX in CI; official source binary remains pending T00 upload.**\n',
       {flag:'a'});
