@@ -154,7 +154,7 @@ function originProjection(rows: readonly F2ActuacaoOriginInput[]): string {
 
 export function validateF2ActuacaoOrigins(rows: readonly F2ActuacaoOriginInput[]): string {
   if (rows.length !== 1332) throw new CurationError('F2_ORIGINS_ROW_COUNT_INVALID');
-  const known = new Set(F2_ACTUACAO_SEED.map((item) => item.label));
+  const known = new Set<string>(F2_ACTUACAO_SEED.map((item) => item.label));
   const seen = new Set<string>();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
