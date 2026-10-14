@@ -62,6 +62,10 @@ function checkedUrl(value,host,db){
 }
 async function main(){
   assertTableNames();
+  if(process.argv[2]==='inspect'){
+    console.log('F2_LOAD09_INERT_READY_FOR_MANUAL_START');
+    return;
+  }
   const raw=await readFile(PENDING,'utf8');
   const pending=JSON.parse(raw);
   const found=countsInPending(pending);
