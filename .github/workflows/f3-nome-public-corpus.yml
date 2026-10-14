@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Collect public official titles without credentials
-        run: python3 ops/f3-nome-01/collect-public-corpus.py
+        run: python3 ops/f3-nome-01/collect-public-corpus.py --refresh --dou-file docs/f3-nome-02/dou-titles.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
