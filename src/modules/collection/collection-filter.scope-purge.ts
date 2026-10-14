@@ -29,7 +29,7 @@ type Match={bucket:'RULE';rule:RuleRow;protected?:'COMPANY'|'OTHER'};
  * Hash the approved revision and all discarded evidence/protections; confirm
  * recomputes the plan under the policy and target locks before deleting.
  */
-async function scopeCandidates(trx: Transaction<DB>) {
+export async function loadF3ArchivePlan(trx: Transaction<DB>) {
   const source=await sql<{id:string}>`
     SELECT id FROM public.sources WHERE code='dou' LIMIT 1
   `.execute(trx);
@@ -94,7 +94,7 @@ export async function previewOutOfScopePurge(db: Kysely<DB>, actor: string):
   Promise<OutOfScopePreview> {
   return withUserContext(db, actor, async trx => {
     const { ids, kinds, count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token, policyRevision } =
-      await scopeCandidates(trx);
+      await loadF3ArchivePlan(trx);
     const samples=ids.length ? (await sql<{id:string;title:string}>`SELECT * FROM public.collection_filter_purge_samples(${ids.slice(0,10)}::uuid[])`
       .execute(trx)).rows.map(row=>{const match=kinds.get(row.id)!;return {...row,bucket:match.bucket,sourceCode:match.rule.source_code,section:match.rule.section,canonicalType:match.rule.canonical_type};}) : [];
     return { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token, policyRevision, samples };
@@ -120,7 +120,7 @@ export async function confirmOutOfScopePurge(
     await sql`SELECT pg_advisory_xact_lock(
       hashtextextended('collection-filter-direct-rule',0)
     )`.execute(trx);
-    const plan = await scopeCandidates(trx);
+    const plan = await loadF3ArchivePlan(trx);
     if (plan.count !== expectedCount || plan.token !== previewToken) {
       return { changed: true, count: plan.count,
         outOfScope: plan.outOfScope, ruleDiscards:plan.ruleDiscards,byRule:plan.byRule,
@@ -135,7 +135,7 @@ export async function confirmOutOfScopePurge(
     const selection=plan.ids.slice(0,500);
     if(selection.length){
       await sql`SELECT public.l17_lock_confirmation_targets(${selection}::uuid[])`.execute(trx);
-      const locked=await scopeCandidates(trx);
+      const locked=await loadF3ArchivePlan(trx);
       if(locked.count!==plan.count||locked.token!==plan.token){
         return{changed:true,count:locked.count,token:locked.token,
           outOfScope:locked.outOfScope,ruleDiscards:locked.ruleDiscards,
@@ -173,7 +173,7 @@ export async function confirmOutOfScopePurge(
       }
     }
     // If 0 candidates, never invoke the purge function with an empty batch.
-    const current = await scopeCandidates(trx);
+    const current = await loadF3ArchivePlan(trx);
     return { changed: false, apagadas, restantes: current.count,
       outOfScope: current.outOfScope,ruleDiscards:current.ruleDiscards,byRule:current.byRule,
       hiddenLegacy: current.hiddenLegacy,suspectDoe:current.suspectDoe,

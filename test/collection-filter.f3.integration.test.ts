@@ -7,6 +7,8 @@ import { buildApp } from '../src/app.js';
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { loadApprovedCollectionFilterRuntime, evaluateRuntimeCollectionFilter } from '../src/modules/collection/collection-filter.runtime.js';
 import { evaluateHistoricalCollectionCandidate, type HistoricalCollectionCandidate } from '../src/modules/collection/collection-filter.direct.js';
+import { withUserContext } from '../src/infrastructure/database/tenant-context.js';
+import { loadF3ArchivePlan } from '../src/modules/collection/collection-filter.scope-purge.js';
 import { runL17ExcludeAlways } from '../src/modules/collection/l17-daily-always.js';
 
 const adminUrl=process.env.DATABASE_ADMIN_URL;
@@ -134,9 +136,11 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       while(true){
         const page=await owner.query<HistoricalCollectionCandidate>('SELECT * FROM collection_filter_f3_candidates($1::uuid,500,$2)',[after,code]);
         if(!page.rows.length)break;
+        const storedRows=(await owner.query<{id:string;title:string;act_type:string;content_text:string;source_metadata:Record<string,unknown>;metadata:Record<string,unknown>}>(
+          'SELECT DISTINCT ON (p.id) p.id,p.title,p.act_type,v.content_text,v.source_metadata,o.metadata FROM publications p JOIN publication_versions v ON v.publication_id=p.id AND v.is_current JOIN publication_origins o ON o.publication_id=p.id JOIN sources so ON so.id=o.source_id WHERE p.id=ANY($1::uuid[]) AND so.code=$2 ORDER BY p.id,o.id',[page.rows.map(row=>row.publication_id),code])).rows;
+        const storedById=new Map(storedRows.map(row=>[row.id,row]));
         for(const history of page.rows){
-          const stored=(await owner.query<{title:string;act_type:string;content_text:string;source_metadata:Record<string,unknown>;metadata:Record<string,unknown>}>(
-            'SELECT p.title,p.act_type,v.content_text,v.source_metadata,o.metadata FROM publications p JOIN publication_versions v ON v.publication_id=p.id AND v.is_current JOIN publication_origins o ON o.publication_id=p.id JOIN sources so ON so.id=o.source_id WHERE p.id=$1 AND so.code=$2 ORDER BY o.id LIMIT 1',[history.publication_id,code])).rows[0];
+          const stored=storedById.get(history.publication_id);
           if(!stored){
             assert.equal(evaluateHistoricalCollectionCandidate(runtime.policy,history).decision,'KEEP','incomplete archive evidence must be preserved');
             continue;
@@ -159,8 +163,9 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     assert.equal(archivePlan.count,expectedEligible.size,'button count equals capture DISCARD minus protections');
     assert.equal(archivePlan.blockedCompany,expectedCompany.size);
     assert.equal(archivePlan.blockedOtherSource,expectedOrigin.size);
-    assert.ok(expectedEligible.size<=10,'fixture fits full sample readback');
-    assert.deepEqual(new Set(archivePlan.samples.map(row=>row.id)),expectedEligible,'button selects exactly the capture engine IDs');
+    const exactPlan=await withUserContext(inspection,account.user.id,trx=>loadF3ArchivePlan(trx));
+    assert.deepEqual(new Set(exactPlan.ids),expectedEligible,'button selects exactly the capture engine IDs across every page');
+    assert.ok(archivePlan.samples.every(row=>expectedEligible.has(row.id)),'all displayed samples belong to the capture DISCARD set');
     assert.deepEqual([archivePlan.outOfScope,archivePlan.hiddenLegacy,archivePlan.suspectDoe],[0,0,0]);
     await owner.query('UPDATE collection_filter_policies SET revision=revision+1 WHERE id=$1',[policy.id]);
     const staleArchive=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/confirm',headers,payload:{expectedCount:archivePlan.count,previewToken:archivePlan.token}});
