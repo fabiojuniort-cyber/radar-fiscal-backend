@@ -84,7 +84,8 @@
     "db:prune-collection-items": "node dist/infrastructure/database/prune-collection-items.js",
     "db:f3-type-simulation": "node dist/infrastructure/database/f3-type-simulation.js",
     "test:f3-type-simulation": "tsx --test test/collection-filter.f3-simulation.unit.test.ts",
-    "taxonomy:f2-production-load": "node ops/taxonomy/f2-production-load.mjs"
+    "taxonomy:f2-production-load": "node ops/taxonomy/f2-production-load.mjs",
+    "f2:load-all": "node ops/f2-load-runner/f2-load-all.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
