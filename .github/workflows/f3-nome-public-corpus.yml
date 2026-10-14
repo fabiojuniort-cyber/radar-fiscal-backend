@@ -1,0 +1,21 @@
+name: F3 Nome public corpus (read only)
+on:
+  pull_request:
+    paths:
+      - ops/f3-nome-01/collect-public-corpus.py
+      - .github/workflows/f3-nome-public-corpus.yml
+permissions:
+  contents: read
+jobs:
+  public-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect public official titles without credentials
+        run: python3 ops/f3-nome-01/collect-public-corpus.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: f3-nome-public-corpus
+          path: docs/f3-nome-02/public-corpus.json
