@@ -187,7 +187,7 @@ export async function currentDraftPlan(client:PoolClient):Promise<{
   if(ledger.rows.length && ledger.rows[0]!.source_content_sha256!==plan.contentSha256)
     bad('F2_DRAFT_LEDGER_CONFLICT');
   const view=await loadReleaseView(pgRunner(client),draft.id,{includeRetired:true});
-  if(!view)bad('F2_DRAFT_RELEASE_UNAVAILABLE');
+  if(!view)throw new Error('F2_DRAFT_RELEASE_UNAVAILABLE');
   for(const dimension of ['sector','product']){
     if(!view.dimensions.some(d=>d.code===dimension))bad('F2_DRAFT_DIMENSION_MISSING');
   }
@@ -201,7 +201,7 @@ export async function currentDraftPlan(client:PoolClient):Promise<{
 async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'sector'|'product',
   concepts:DraftImportConcept[],draftId:string):Promise<{created:number;updated:number;groupsCreated:number}> {
   const view=await loadReleaseView(pgRunner(client),draftId,{includeRetired:true});
-  if(!view)bad('F2_DRAFT_RELEASE_UNAVAILABLE');
+  if(!view)throw new Error('F2_DRAFT_RELEASE_UNAVAILABLE');
   const byCode=new Map(view.concepts.filter(c=>c.dimensionCode===dimension).map(c=>[c.code,c]));
   const byGroup=new Map(view.groups.filter(g=>g.dimensionCode===dimension)
     .map(g=>[normalizeAliasText(g.label),g.id]));
@@ -237,7 +237,7 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
 }
 async function verifyDraftReadback(client:PoolClient,draftId:string,plan:F2DraftPlan):Promise<void>{
   const view=await loadReleaseView(pgRunner(client),draftId);
-  if(!view)bad('F2_DRAFT_READBACK_RELEASE_MISSING');
+  if(!view)throw new Error('F2_DRAFT_READBACK_RELEASE_MISSING');
   const map=new Map(view.concepts.map(c=>[c.code,c]));
   for(const row of [...plan.sector,...plan.product]){
     const got=map.get(row.code);
