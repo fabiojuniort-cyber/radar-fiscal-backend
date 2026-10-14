@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { Pool } from 'pg';
+import {performance} from 'node:perf_hooks';
+import {setTimeout as delay} from 'node:timers/promises';
 import { Kysely, PostgresDialect } from 'kysely';
 import { buildApp } from '../src/app.js';
 import type { DB } from '../src/infrastructure/database/database.types.js';
@@ -57,6 +59,39 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       if(extraOrigin) await owner.query('INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) VALUES($1,$2,$3,$4::jsonb)',[id,sourceId,officialUrl+'/second',JSON.stringify(metadata)]);
       return {id,sourceId,metadata,title,officialUrl,identityHash:sha(id)};
     };
+    // F3-NOME-01: reconstruct full counts from archive titles, never the <=3 legacy samples.
+    for(const code of ['dou','doe-sp']){
+      for(let n=0;n<3;n++)await fixture('name-generic-'+code+'-'+n,code,tag+' COMUNICADO');
+      for(let n=0;n<12;n++)await fixture('name-opening-'+code+'-'+n,code,tag+' COMUNICADO DE ABERTURA');
+    }
+    const ruleBefore=(await owner.query("SELECT md5(jsonb_agg(to_jsonb(r) ORDER BY r.id)::text) AS hash FROM collection_filter_type_rules r WHERE policy_id=$1",[policy.id])).rows[0].hash;
+    const queueBefore=(await owner.query('SELECT count(*)::int AS count FROM collection_filter_new_types')).rows[0].count;
+    const started=performance.now();
+    let namesResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    assert.ok(performance.now()-started<3000,'cold inventory response must not wait for archive rebuild');
+    for(let attempt=0;attempt<100&&namesResponse.json().inventory?.status!=='READY';attempt++){
+      await delay(100);
+      namesResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    }
+    assert.equal(namesResponse.json().inventory?.status,'READY',namesResponse.body);
+    const warmStart=performance.now();
+    await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    assert.ok(performance.now()-warmStart<3000,'warm inventory response must stay below three seconds');
+    assert.equal(namesResponse.statusCode,200,namesResponse.body);
+    const nameItems=namesResponse.json<{items:Array<{id:string;source_code:string;normalized_type:string;act_name:string;occurrence_count:number;queue_basis:string;examples:unknown[]}>}>().items;
+    for(const code of ['dou','doe-sp']){
+      const generic=nameItems.find(x=>x.source_code===code&&x.normalized_type===tag+' COMUNICADO');
+      const opening=nameItems.find(x=>x.source_code===code&&x.normalized_type===tag+' COMUNICADO DE ABERTURA');
+      assert.ok(generic);assert.ok(opening);
+      assert.equal(generic.occurrence_count,3);assert.equal(opening.occurrence_count,12);
+      assert.equal(opening.examples.length,3);assert.equal(opening.queue_basis,'ARCHIVE_ACT_NAME');
+      assert.notEqual(generic.id,opening.id);
+    }
+    const stateResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/state',headers});
+    assert.equal(stateResponse.statusCode,200,stateResponse.body);
+    assert.equal(stateResponse.json<{newTypesOpen:number}>().newTypesOpen,nameItems.length);
+    assert.equal((await owner.query("SELECT md5(jsonb_agg(to_jsonb(r) ORDER BY r.id)::text) AS hash FROM collection_filter_type_rules r WHERE policy_id=$1",[policy.id])).rows[0].hash,ruleBefore);
+    assert.equal((await owner.query('SELECT count(*)::int AS count FROM collection_filter_new_types')).rows[0].count,queueBefore);
     const ordinary=await fixture('ordinary'); const companyProtected=await fixture('company'); const originProtected=await fixture('another-origin','dou',type,true); const doeItem=await fixture('doe','doe-sp',doeType);
     const conditional=await fixture('provenance-file','dou',conditionalType);
     const provenanceFiles=[{versionRole:'PROVENANCE',metadata:{kind:'ATTACHMENT'}}];
@@ -96,6 +131,9 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     }
     for(const fixtureItem of [ordinary,doeItem]){
       const runtime=await loadApprovedCollectionFilterRuntime(inspection,fixtureItem.sourceId,{readOnly:true});assert.ok(runtime);
+      const douRuntime=await loadApprovedCollectionFilterRuntime(inspection,dou,{readOnly:true});
+      assert.ok(douRuntime);
+      assert.deepEqual(evaluateHistoricalCollectionCandidate(douRuntime.policy, {publication_id:fixtureItem.id,title:fixtureItem.title,source_code:fixtureItem.sourceId===dou?'dou':'doe-sp',section:fixtureItem.sourceId===dou?'DO3E':'ATOS NORMATIVOS',source_act_type:'Aviso',content_text:'Contratacao administrativa de rotina.',evidence_complete:true,has_material:false,provenance_conflict:false} as HistoricalCollectionCandidate), evaluateHistoricalCollectionCandidate(runtime.policy,{publication_id:fixtureItem.id,title:fixtureItem.title,source_code:fixtureItem.sourceId===dou?'dou':'doe-sp',section:fixtureItem.sourceId===dou?'DO3E':'ATOS NORMATIVOS',source_act_type:'Aviso',content_text:'Contratacao administrativa de rotina.',evidence_complete:true,has_material:false,provenance_conflict:false} as HistoricalCollectionCandidate),'source used to load global policy must not affect a decision');
       const publication={title:fixtureItem.title,actType:'AVISO',contentText:'Contratacao administrativa de rotina.',metadata:fixtureItem.metadata,originMetadata:fixtureItem.metadata,files:[]};
       const capture=evaluateRuntimeCollectionFilter(runtime,publication as Parameters<typeof evaluateRuntimeCollectionFilter>[1]);
       const history=(await owner.query<HistoricalCollectionCandidate>('SELECT * FROM collection_filter_f3_candidates((SELECT id FROM publications WHERE id<$2::uuid ORDER BY id DESC LIMIT 1),500,$1) WHERE publication_id=$2::uuid',[runtime.sourceCode,fixtureItem.id])).rows[0];
@@ -213,10 +251,8 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     // opposite direct-rule edit whose hypothetical preview removed both rows.
     await owner.query('INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) VALUES($1,$2,$3,$4,$5)',[policy.id,'dou','DO3',type+' Nº 77/2026','EXCLUDE_ALWAYS']);
     const keepRule={...rule,mode:'KEEP_ALWAYS'};
-    const keepPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:keepRule});assert.equal(keepPreview.statusCode,200,keepPreview.body);
-    const kp=keepPreview.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
-    const rejected=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...keepRule,expectedCount:kp.count,previewToken:kp.token,confirmationToken:kp.confirmationToken,policyRevision:kp.policyRevision}});
-    assert.ok(rejected.statusCode>=400,'direct confirmation must validate persisted identities');
+    const keepPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:keepRule});
+    assert.ok(keepPreview.statusCode>=400,'preview must retain the other saved identity and reject the conflict before any write');
     assert.equal((await owner.query<{mode:string}>('SELECT mode FROM collection_filter_type_rules WHERE policy_id=$1 AND canonical_type=$2',[policy.id,type])).rows[0]!.mode,'EXCLUDE_ALWAYS');
     assert.equal((await owner.query<{revision:number}>('SELECT revision FROM collection_filter_policies WHERE id=$1',[policy.id])).rows[0]!.revision,before);
     const finalPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/preview',headers});assert.equal(finalPreview.statusCode,200,finalPreview.body);

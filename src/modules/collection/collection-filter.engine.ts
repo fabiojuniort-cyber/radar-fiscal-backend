@@ -1,3 +1,6 @@
+import { collectionFilterActName } from './collection-filter.act-name.js';
+export { collectionFilterActName } from './collection-filter.act-name.js';
+
 export type CollectionFilterMode =
   | 'KEEP_ALWAYS'
   | 'KEEP_IF_TAX_TERM'
@@ -15,6 +18,7 @@ export type CollectionFilterLocation =
   | 'BODY';
 
 export interface CollectionFilterTypeRule {
+  actName?: string;
   sourceCode: string;
   section?: string;
   canonicalType: string;
@@ -102,6 +106,7 @@ export interface CollectionFilterDecision {
   weakScore: number;
   termHits: CollectionFilterTermHit[];
   matchedPattern?: string;
+  matchedRuleName?: string;
   matchedSection?: string;
   matchedTypeSource?: 'OFFICIAL' | 'TITLE';
 }
@@ -165,8 +170,7 @@ export function normalizeCollectionFilterType(value: string): string {
 
 /** Only the first title line, before an act identifier, can provide a type. */
 export function collectionFilterTitleType(title: string): string {
-  const line = title.split(/[\r\n]/, 1)[0] ?? '';
-  return line.split(/\s+N(?:[º°]|[oO]\.?|[úu]mero|\.)\s*\d/i, 1)[0]?.trim() ?? '';
+  return collectionFilterActName(title);
 }
 
 /**
@@ -252,6 +256,7 @@ export function compileCollectionFilterPolicy(
       sourceCode,
       section,
       canonicalType,
+      actName: canonicalType,
     });
   }
 
@@ -298,9 +303,7 @@ export function compileCollectionFilterPolicy(
         : {}),
       ...(term.canonicalType
         ? {
-            canonicalType: normalizeCollectionFilterType(
-              term.canonicalType,
-            ),
+            canonicalType: normalizeCollectionFilterType(term.canonicalType),
           }
         : {}),
       locationScope: term.locationScope ?? 'ANY',
@@ -329,22 +332,34 @@ export function compileCollectionFilterPolicy(
   }
 
   const patterns = new Map<string, CompiledTypePattern[]>();
-  const addPattern = (pattern: string, rule: CollectionFilterTypeRule) => {
+  const addPattern = (pattern: string, rule: CollectionFilterTypeRule, isAlias=false, identityPattern=pattern) => {
+    const originalPattern=identityPattern;
+    pattern=normalizeCollectionFilterType(pattern);
+    if(!pattern)return;
     const firstWord = pattern.split(' ')[0] ?? '';
     const bucketKey = key(rule.sourceCode, rule.section ?? '', firstWord);
     const bucket = patterns.get(bucketKey) ?? [];
-    if (bucket.some(existing=>existing.pattern===pattern && existing.rule.mode!==rule.mode)) {
+    if (isAlias && normalizeCollectionFilterType(originalPattern)===pattern
+      && bucket.some(existing=>existing.pattern===pattern && existing.rule.mode!==rule.mode
+      && existing.rule.canonicalType===pattern)) {
       throw new Error(`conflicting filter rule: ${bucketKey}`);
+    }
+    // Deduplicate only identical normalized saved patterns and targets.
+    const same=bucket.find(existing=>existing.pattern===pattern&&existing.rule.mode===rule.mode
+      && existing.rule.actName===rule.actName);
+    if(same){
+      if(rule.canonicalType.localeCompare(same.rule.canonicalType,'en')<0)same.rule=rule;
+      return;
     }
     bucket.push({ pattern, rule, words: pattern.split(' ').length });
     patterns.set(bucketKey, bucket);
   };
-  for (const rule of rules.values()) addPattern(rule.canonicalType, rule);
+  for (const rule of rules.values()) addPattern(rule.actName??rule.canonicalType, rule);
   for (const [aliasKey, canonical] of aliases) {
     const [source, section, alias] = aliasKey.split('\u0000');
     if (!source || section === undefined || !alias) continue;
     const rule = rules.get(key(source, section, canonical));
-    if (rule) addPattern(alias, rule);
+    if (rule) addPattern(alias, rule, true, alias);
   }
 
   return {
@@ -421,10 +436,8 @@ export function evaluateCollectionFilter(
   const sourceCode = normalizedSource(publication.sourceCode);
   const rawSection = normalizedSection(publication.section);
   const section = normalizeCollectionFilterSection(publication.section);
-  const official = publication.sourceActType ?? publication.actType ?? '';
   const inputs = [
-    { raw: official.trim(), from: 'OFFICIAL' as const },
-    { raw: collectionFilterTitleType(publication.title), from: 'TITLE' as const },
+    { raw: collectionFilterActName(publication.title), from: 'TITLE' as const },
   ];
   const matches: Array<{ item: CompiledTypePattern; raw: string; from: 'OFFICIAL'|'TITLE' }> = [];
   for (const input of inputs) {
@@ -442,7 +455,7 @@ export function evaluateCollectionFilter(
   const maximumWords = Math.max(0, ...matches.map(match => match.item.words));
   const top = matches.filter(match => match.item.words === maximumWords);
   if (!top.length) {
-    const rawType = official.trim() || inputs[1]!.raw;
+    const rawType = inputs[0]!.raw;
     return { policyVersion: policy.version, sourceCode, section, rawType,
       normalizedRawType: normalizeCollectionFilterType(rawType), decision: 'KEEP',
       reasonCode: 'UNKNOWN_TYPE', requiresNewTypeReview: true, weakScore: 0, termHits: [] };
@@ -482,6 +495,7 @@ function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
     canonicalType,
     mode: rule.mode,
     matchedPattern,
+    matchedRuleName: canonicalType,
     matchedSection: rule.section ?? '',
     matchedTypeSource,
   };
@@ -541,7 +555,7 @@ function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
           term,
           sourceCode,
           section,
-          canonicalType,
+          normalizeCollectionFilterType(canonicalType),
           location.location,
         )
       ) {

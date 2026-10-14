@@ -1,3 +1,4 @@
+import {closeCollectionFilterActNameInventory} from './modules/collection/collection-filter.act-name-inventory.js';
 import Fastify, {
   type FastifyInstance,
 } from 'fastify';
@@ -40,6 +41,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.decorate('curatorPool', curatorPool);
 
   app.addHook('onClose', async () => {
+    await closeCollectionFilterActNameInventory(db);
     await db.destroy();
     await curatorPool?.end();
   });
@@ -62,3 +64,4 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   return app;
 }
+

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
+import {setTimeout as delay} from 'node:timers/promises';
 import test from 'node:test';
 import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
@@ -51,7 +52,7 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
         act_type,title,primary_official_url
       ) SELECT id,md5(id::text)||md5('l11'||id::text),'STRONG','{}'::jsonb,'FEDERAL',
         CASE WHEN rn % 10 = 0 THEN $1 ELSE 'OUTRO TIPO DOU' END,
-        'Documento administrativo de teste de desempenho',
+        CASE WHEN rn % 10 = 0 THEN $1 ELSE 'OUTRO TIPO DOU' END||' - Documento administrativo de teste de desempenho',
         'https://bench.example.test/'||id::text
       FROM (SELECT id,ROW_NUMBER() OVER (ORDER BY id) AS rn FROM l11_benchmark_ids) base`,
       [canonicalType],
@@ -93,6 +94,22 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
     confirmMs=Math.round(performance.now()-startedConfirm);
     assert.equal(confirm.statusCode,200,confirm.body.slice(0,1500));
     assert.equal(confirm.json<{deletedCount:number}>().deletedCount,0);
+
+    const inventoryStart=performance.now();
+    let inventory=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    const coldInventoryMs=Math.round(performance.now()-inventoryStart);
+    assert.equal(inventory.statusCode,200,inventory.body);assert.ok(coldInventoryMs<3000);
+    for(let attempt=0;attempt<360&&inventory.json().inventory?.status!=='READY';attempt++){
+      await delay(500);
+      inventory=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+      if(inventory.json().inventory?.status==='FAILED')assert.fail('background inventory failed');
+    }
+    assert.equal(inventory.json().inventory?.status,'READY','background inventory must complete');
+    const warmInventoryStart=performance.now();
+    const warmInventory=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    const warmInventoryMs=Math.round(performance.now()-warmInventoryStart);
+    assert.equal(warmInventory.statusCode,200,warmInventory.body);assert.ok(warmInventoryMs<3000);
+    console.log('F3_NOME_INVENTORY_PERFORMANCE='+JSON.stringify({publications:ROWS,coldInventoryMs,warmInventoryMs,limitMs:3000}));
 
     // Timings include scanning 120k acts for both operations, but not physical
     // deletion of 120k rows (deliberately not exercised by KEEP_ALWAYS).

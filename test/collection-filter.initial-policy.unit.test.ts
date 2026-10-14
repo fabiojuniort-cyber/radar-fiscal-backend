@@ -117,7 +117,7 @@ test('sinais tributários inequívocos preservam tipo DOU genérico mesmo no cor
 
 test('regressão: Resolução SUFRAMA com benefícios fiscais no plural é preservada', () => {
   const decision = evaluateCollectionFilter(
-    policyFor('DO1', 'RESOLUCAO'),
+    policyFor('DO1', 'RESOLUCOES'),
     {
       sourceCode: 'dou',
       section: 'DO1',
@@ -139,7 +139,7 @@ test('regressão: Resolução SUFRAMA com benefícios fiscais no plural é prese
 
 test('regressão: retificação EQBEN de habilitação REIDI é preservada', () => {
   const decision = evaluateCollectionFilter(
-    policyFor('DO1', 'ATO DECLARATORIO'),
+    policyFor('DO1', 'RETIFICACAO'),
     {
       sourceCode: 'dou',
       section: 'DO1',
@@ -177,7 +177,7 @@ test('regressão: incidência de TFAC é preservada sem tornar taxa genérica fo
       section: 'DO3',
       actType: 'EDITAL',
       title: 'Edital de concurso',
-      body: 'Prevê isenção da taxa de inscrição para candidatos elegíveis.',
+      body: 'Prevê cobrança da taxa de inscrição para candidatos elegíveis.',
       ...complete,
     },
   );
@@ -186,7 +186,7 @@ test('regressão: incidência de TFAC é preservada sem tornar taxa genérica fo
 
 test('regressão: retificação CORAT de ADE sobre devedor contumaz é preservada', () => {
   const decision = evaluateCollectionFilter(
-    policyFor('DO1', 'ATO DECLARATORIO'),
+    policyFor('DO1', 'RETIFICACAO'),
     {
       sourceCode: 'dou',
       section: 'DO1',

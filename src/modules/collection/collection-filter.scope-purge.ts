@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import {collectionFilterActName} from './collection-filter.act-name.js';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
@@ -13,16 +14,16 @@ export interface OutOfScopePreview {
   suspectDoe: 0;
   ruleDiscards: number;
   policyRevision: number;
-  byRule: Array<{sourceCode:string;section:string;canonicalType:string;mode:string;count:number}>;
+  byRule: Array<{sourceCode:string;section:string;canonicalType:string;actName:string;mode:string;count:number}>;
   blockedCompany: number;
   blockedOtherSource: number;
   token: string;
-  samples: Array<{id:string;title:string;bucket:'RULE';sourceCode:string;section:string;canonicalType:string}>;
+  samples: Array<{id:string;title:string;bucket:'RULE';sourceCode:string;section:string;canonicalType:string;actName:string}>;
 }
 
 type RuleRow={source_code:string;section:string;canonical_type:string;
   mode:DirectRuleInput['mode']};
-type Match={bucket:'RULE';rule:RuleRow;protected?:'COMPANY'|'OTHER'};
+type Match={bucket:'RULE';rule:RuleRow;actName:string;protected?:'COMPANY'|'OTHER'};
 
 /** Every archive verdict comes from the same F3 engine used at capture.
  * Legacy scope/029/type-mismatch flags never add an ID or override KEEP.
@@ -38,7 +39,7 @@ export async function loadF3ArchivePlan(trx: Transaction<DB>) {
     trx,source.rows[0].id,{readOnly:true});
   if(!runtime)throw new Error('l17_runtime_missing');
   const compiled=runtime.policy;
-  const hash=createHash('sha256').update('F3:ARCHIVE:ONLY:v1')
+  const hash=createHash('sha256').update('F3:ARCHIVE:ACT-NAME:v3')
     .update(runtime.policyId).update(String(runtime.policyRevision));
   const seen=new Map<string,Match>();
   for(const sourceCode of ['dou','doe-sp']){
@@ -62,6 +63,7 @@ export async function loadF3ArchivePlan(trx: Transaction<DB>) {
         const previous=seen.get(item.publication_id);
         const protection=previous?.protected??blocked;
         seen.set(item.publication_id,{bucket:'RULE',rule:previous?.rule??rule,
+          actName:collectionFilterActName(item.title),
           ...(protection?{protected:protection}:{})});
       }
       after=page.rows[page.rows.length-1]!.publication_id;
@@ -71,16 +73,16 @@ export async function loadF3ArchivePlan(trx: Transaction<DB>) {
   const ids:string[]=[];
   const kinds=new Map<string,Match>();
   let blockedCompany=0,blockedOtherSource=0;
-  const stats=new Map<string,{sourceCode:string;section:string;canonicalType:string;mode:string;count:number}>();
+  const stats=new Map<string,{sourceCode:string;section:string;canonicalType:string;actName:string;mode:string;count:number}>();
   const list=[...seen.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
   for(const [id,match] of list){
     if(match.protected==='COMPANY'){blockedCompany++;continue;}
     if(match.protected==='OTHER'){blockedOtherSource++;continue;}
     kinds.set(id,match);ids.push(id);
     const rule=match.rule;
-    const key=JSON.stringify([rule.source_code,rule.section,rule.canonical_type,rule.mode]);
+    const key=JSON.stringify([rule.source_code,rule.section,rule.canonical_type,rule.mode,match.actName]);
     const row=stats.get(key)??{sourceCode:rule.source_code,section:rule.section,
-      canonicalType:rule.canonical_type,mode:rule.mode,count:0};
+      canonicalType:rule.canonical_type,actName:match.actName,mode:rule.mode,count:0};
     row.count++;stats.set(key,row);
   }
   hash.update(JSON.stringify(list));
@@ -96,7 +98,7 @@ export async function previewOutOfScopePurge(db: Kysely<DB>, actor: string):
     const { ids, kinds, count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token, policyRevision } =
       await loadF3ArchivePlan(trx);
     const samples=ids.length ? (await sql<{id:string;title:string}>`SELECT * FROM public.collection_filter_purge_samples(${ids.slice(0,10)}::uuid[])`
-      .execute(trx)).rows.map(row=>{const match=kinds.get(row.id)!;return {...row,bucket:match.bucket,sourceCode:match.rule.source_code,section:match.rule.section,canonicalType:match.rule.canonical_type};}) : [];
+      .execute(trx)).rows.map(row=>{const match=kinds.get(row.id)!;return {...row,bucket:match.bucket,sourceCode:match.rule.source_code,section:match.rule.section,canonicalType:match.rule.canonical_type,actName:match.actName};}) : [];
     return { count, outOfScope, ruleDiscards, byRule, hiddenLegacy, suspectDoe, blockedCompany, blockedOtherSource, token, policyRevision, samples };
   });
 }

@@ -55,7 +55,7 @@ test('normalização remove identificadores do ato, não 5G/P2 nem todos os núm
   for(const marker of ['Nº 33/2026','N°33/2026','N. 33/2026','NÚMERO 33/2026'])
     assert.equal(normalizeCollectionFilterType('PORTARIA '+marker),'PORTARIA');
   assert.equal(normalizeCollectionFilterType('PADRAO P2 5G'),'PADRAO P2 5G');
-  assert.equal(collectionFilterTitleType('PORTARIA Nº10\nEXTRATO DE CONTRATO'),'PORTARIA');
+  assert.equal(collectionFilterTitleType('PORTARIA Nº10\nEXTRATO DE CONTRATO'),'Portaria');
 });
 test('seções extras herdam somente sua principal e ausente só regra geral',()=>{
   for(const section of ['DO1','DO2','DO3']) {

@@ -45,7 +45,7 @@ test('L11: 520 DOU acts in bounded steps, drift, resume and per-step audit', asy
       const rows=await pool.query<{id:string}>(
         "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,act_type,title,primary_official_url) "+
         "SELECT md5(gen_random_uuid()::text)||md5(gen_random_uuid()::text),'STRONG','{}'::jsonb,'FEDERAL',$1,"+
-        "'Aviso de licitação administrativo','https://example.test/l11-staged/'||gen_random_uuid()::text "+
+        "$1||' - Aviso de licitação administrativo','https://example.test/l11-staged/'||gen_random_uuid()::text "+
         "FROM generate_series(1,$2) RETURNING id",[type,amount]);
       const newIds=rows.rows.map(r=>r.id);ids.push(...newIds);
       await pool.query(

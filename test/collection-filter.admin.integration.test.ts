@@ -60,7 +60,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     const inserted=await admin.query<{id:string}>(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
       "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
-      [identifier,canonicalType,'Publicação descartável teste L11','https://example.test/'+identifier],
+      [identifier,canonicalType,canonicalType+' — Publicação descartável teste L11','https://example.test/'+identifier],
     );
     pubId=inserted.rows[0]!.id;
     const version=await admin.query<{id:string}>(
@@ -133,7 +133,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     const protectedPublication=await admin.query<{id:string}>(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
       "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
-      [secondHash,canonicalType,'Publicação vinculada a cliente','https://example.test/'+secondHash],
+      [secondHash,canonicalType,canonicalType+' — Publicação vinculada a cliente','https://example.test/'+secondHash],
     );
     const protectedId=protectedPublication.rows[0]!.id;
     await admin.query(
@@ -176,7 +176,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     const shared=await admin.query<{id:string}>(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
       "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
-      [sharedHash,canonicalType,'Ato DOU compartilhado','https://example.test/'+sharedHash],
+      [sharedHash,canonicalType,canonicalType+' — Ato DOU compartilhado','https://example.test/'+sharedHash],
     );
     const sharedId=shared.rows[0]!.id;
     await admin.query(
@@ -214,7 +214,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     const added=await admin.query<{id:string}>(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
       "act_type,title,primary_official_url) VALUES($1,'STRONG','{}'::jsonb,'FEDERAL',$2,$3,$4) RETURNING id",
-      [addedHash,canonicalType,'Segundo ato descartável','https://example.test/'+addedHash],
+      [addedHash,canonicalType,canonicalType+' — Segundo ato descartável','https://example.test/'+addedHash],
     );
     const addedId=added.rows[0]!.id;
     await admin.query(

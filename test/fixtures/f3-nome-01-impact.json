@@ -1,0 +1,28 @@
+{
+  "provenance": "Synthetic CI fixtures, not a production policy snapshot",
+  "policy": {
+    "version": 1, "contextWindowWords": 5, "weakScoreThreshold": 3,
+    "locationWeights": {"title":3,"summary":2,"body":1}, "terms":[],
+    "rules": [
+      {"sourceCode":"dou","section":"DO3","canonicalType":"EXTRATO DE CONTRATO","mode":"EXCLUDE_ALWAYS"},
+      {"sourceCode":"dou","section":"DO3","canonicalType":"AVISO DE ABERTURA","mode":"KEEP_ALWAYS"},
+      {"sourceCode":"dou","section":"DO3","canonicalType":"COMUNICADO","mode":"EXCLUDE_ALWAYS"},
+      {"sourceCode":"dou","section":"DO3","canonicalType":"COMUNICADO DE ABERTURA","mode":"KEEP_ALWAYS"},
+      {"sourceCode":"dou","section":"DO3","canonicalType":"DESPACHO","mode":"EXCLUDE_ALWAYS"},
+      {"sourceCode":"dou","section":"DO3","canonicalType":"DESPACHO DO SECRETARIO","mode":"KEEP_ALWAYS"},
+      {"sourceCode":"doe-sp","section":"ATOS NORMATIVOS","canonicalType":"COMUNICADO DE ABERTURA PGE-SP","mode":"EXCLUDE_ALWAYS"}
+    ]
+  },
+  "publications": [
+    {"sourceCode":"dou","section":"DO3","sourceActType":"EXTRATO DE CONTRATO","title":"NOTÍCIA ADMINISTRATIVA","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"AVISO DE ABERTURA","title":"COMUNICADO Nº 1/2026","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"EXTRATO DE CONTRATO","title":"Comunicado de abertura PGE-SP","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"EXTRATO DE CONTRATO","title":"DESPACHO DO SECRETÁRIO, DE 13 DE OUTUBRO DE 2026","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"AVISO DE ABERTURA","title":"Despacho do Chefe de Departamento - Substituto - DE 13/10/2026","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"AVISO DE ABERTURA","title":"DESPACHO Nº 238/630/2026, DE 13…","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"COMUNICADO DE ABERTURA","title":"COMUNICADO (INTERNO)","evidenceComplete":true},
+    {"sourceCode":"doe-sp","section":"ATOS NORMATIVOS","sourceActType":"Comunicado","title":"Comunicado de abertura PGE-MG","evidenceComplete":true},
+    {"sourceCode":"doe-sp","section":"ATOS NORMATIVOS","sourceActType":"Comunicado","title":"Comunicado de abertura PGE-SP","evidenceComplete":true},
+    {"sourceCode":"dou","section":"DO3","sourceActType":"EXTRATO DE CONTRATO","title":"Comunicados novos","evidenceComplete":true}
+  ]
+}
