@@ -165,7 +165,7 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
         method: 'GET', url: '/api/v2/archive/facets?' + params, headers,
       });
       const filteredSearch = await app.inject({
-        method: 'GET', url: '/api/v2/archive?limit=100&' + params, headers,
+        method: 'GET', url: '/api/v2/archive?limit=50&' + params, headers,
       });
       assert.equal(filteredFacets.statusCode, 200, filteredFacets.body);
       assert.equal(filteredSearch.statusCode, 200, filteredSearch.body);
