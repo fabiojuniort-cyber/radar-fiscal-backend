@@ -22,6 +22,11 @@ RUN install -d -m 0700 /app/f2-inputs && \
     echo "695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67  /app/f2-inputs/segmento.xlsx" | sha256sum -c - && \
     echo "261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a  /app/f2-inputs/produto.xlsx" | sha256sum -c -
 
+# Safe offline gates at image build: no production database is contacted.
+RUN node --check ops/f2-load-runner/f2-load-all.mjs && \
+    node --check ops/f2-load-runner/f2-load08-verify.mjs && \
+    node --test test/f2-load09-guard.test.mjs
+
 ENV NODE_ENV=test \
     F2_PROOF_ENABLED=false \
     F2_IMPORT_SCOPE=ISOLATED_POSTGRES18_ONLY
