@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {collectionFilterActName,compileCollectionFilterPolicy,evaluateCollectionFilter} from '../src/modules/collection/collection-filter.engine.js';
 import {groupCollectionFilterActNames} from '../src/modules/collection/collection-filter.act-name-inventory.js';
+import {resolveDirectActNameRule} from '../src/modules/collection/collection-filter.direct.js';
 
 const examples=[
   ['DESPACHO DO SECRETÁRIO, DE 13 DE OUTUBRO DE 2026','Despacho do Secretário'],
@@ -69,4 +70,11 @@ test('thousands of legacy numeric spellings collapse in memory without dropping 
   assert.equal(p.rules.size,3000);
   assert.equal([...p.patterns.values()].flat().length,1);
   assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 10',evidenceComplete:true}).decision,'DISCARD');
+});
+
+test('direct preview resolves the same name before punctuation is normalized, preserving a saved row key',()=>{
+  const input={sourceCode:'dou',section:'DO1',canonicalType:'DESPACHO - SUBSTITUTO',mode:'EXCLUDE_ALWAYS' as const};
+  assert.equal(resolveDirectActNameRule(input,[]).canonicalType,'DESPACHO');
+  assert.equal(resolveDirectActNameRule(input,[{source_code:'dou',section:'DO1',canonical_type:input.canonicalType}]).canonicalType,input.canonicalType);
+  assert.equal(resolveDirectActNameRule({...input,canonicalType:'Comunicado de abertura PGE-SP'},[]).canonicalType,'COMUNICADO DE ABERTURA');
 });

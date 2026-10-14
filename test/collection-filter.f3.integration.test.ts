@@ -236,10 +236,8 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     // opposite direct-rule edit whose hypothetical preview removed both rows.
     await owner.query('INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) VALUES($1,$2,$3,$4,$5)',[policy.id,'dou','DO3',type+' Nº 77/2026','EXCLUDE_ALWAYS']);
     const keepRule={...rule,mode:'KEEP_ALWAYS'};
-    const keepPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:keepRule});assert.equal(keepPreview.statusCode,200,keepPreview.body);
-    const kp=keepPreview.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
-    const rejected=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...keepRule,expectedCount:kp.count,previewToken:kp.token,confirmationToken:kp.confirmationToken,policyRevision:kp.policyRevision}});
-    assert.ok(rejected.statusCode>=400,'direct confirmation must validate persisted identities');
+    const keepPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:keepRule});
+    assert.ok(keepPreview.statusCode>=400,'preview must retain the other saved identity and reject the conflict before any write');
     assert.equal((await owner.query<{mode:string}>('SELECT mode FROM collection_filter_type_rules WHERE policy_id=$1 AND canonical_type=$2',[policy.id,type])).rows[0]!.mode,'EXCLUDE_ALWAYS');
     assert.equal((await owner.query<{revision:number}>('SELECT revision FROM collection_filter_policies WHERE id=$1',[policy.id])).rows[0]!.revision,before);
     const finalPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/preview',headers});assert.equal(finalPreview.statusCode,200,finalPreview.body);

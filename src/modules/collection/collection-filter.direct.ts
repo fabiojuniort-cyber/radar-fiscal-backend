@@ -83,7 +83,7 @@ export async function loadConflictingSourceActTypes(
 function validated(input: DirectRuleInput): DirectRuleInput {
   const sourceCode = input.sourceCode.trim().toLowerCase();
   const section = input.section.trim().toUpperCase();
-  const canonicalType = normalizeCollectionFilterType(input.canonicalType);
+  const canonicalType = input.canonicalType.trim().toLocaleUpperCase('pt-BR');
   if (!['dou','doe-sp'].includes(sourceCode)) throw new RangeError('unsupported_direct_filter_source');
   if (!canonicalType ||
       !['KEEP_ALWAYS','KEEP_IF_TAX_TERM','EXCLUDE_UNLESS_STRONG','EXCLUDE_ALWAYS'].includes(input.mode))
@@ -91,8 +91,20 @@ function validated(input: DirectRuleInput): DirectRuleInput {
   return {...input,sourceCode,section,canonicalType};
 }
 
+/** Preserve the selected saved identity; normalize a new input before any preview or write. */
+export function resolveDirectActNameRule(input:DirectRuleInput,saved:ReadonlyArray<{
+  source_code:string;section:string;canonical_type:string;
+}>):DirectRuleInput {
+  const rule=validated(input);
+  const existing=saved.find(r=>r.source_code===rule.sourceCode&&r.section===rule.section
+    &&r.canonical_type.toLocaleUpperCase('pt-BR')===rule.canonicalType);
+  const canonicalType=existing?.canonical_type??normalizeCollectionFilterType(collectionFilterActName(rule.canonicalType));
+  if(!canonicalType)throw new RangeError('invalid_direct_rule_name');
+  return {...rule,canonicalType};
+}
+
 export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
-  const rule = validated(input);
+  let rule = validated(input);
   const policies = await sql<{
     id:string; version:number; revision:number;
     context_window_words:number; weak_score_threshold:number;
@@ -114,6 +126,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
        SELECT term_text,strength,source_code,section,canonical_type,location_scope
        FROM collection_filter_terms WHERE policy_id=${approved.id}::uuid`.execute(trx),
   ]);
+  rule=resolveDirectActNameRule(rule,rawRules.rows);
   const document: CollectionFilterPolicyInput = {
     version:Number(approved.version),
     contextWindowWords:Number(approved.context_window_words),
@@ -122,7 +135,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
       summary:Number(approved.summary_weight),body:Number(approved.body_weight)},
     rules:[...rawRules.rows.filter(r =>
        !(r.source_code===rule.sourceCode && r.section===rule.section &&
-         normalizeCollectionFilterType(r.canonical_type)===rule.canonicalType))
+         r.canonical_type===rule.canonicalType))
        .map(r=>({sourceCode:r.source_code,section:r.section,
          canonicalType:r.canonical_type,mode:r.mode})),
        {sourceCode:rule.sourceCode,section:rule.section,
@@ -155,7 +168,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
     for (const item of page.rows) {
       const decision=evaluateHistoricalCollectionCandidate(engine,item);
       if (decision.decision!=='DISCARD' || !decision.canonicalType ||
-          normalizeCollectionFilterType(collectionFilterActName(decision.canonicalType??''))!==
+          normalizeCollectionFilterType(decision.matchedRuleName??'')!==
             normalizeCollectionFilterType(collectionFilterActName(rule.canonicalType)) ||
           decision.mode!==rule.mode || decision.matchedSection!==normalizeCollectionFilterType(rule.section)) continue;
       hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
@@ -179,7 +192,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const confirmationToken=createHash('sha256').update(JSON.stringify([
     'F3-NOME-01-HISTORICAL-PURGE-V3',rule,policyRevision,token,ids.length,
   ])).digest('hex');
-  return {actName:collectionFilterActName(input.canonicalType),ids,count:ids.length,blockedCompany,blockedOtherSource,
+  return {rule,actName:collectionFilterActName(input.canonicalType),ids,count:ids.length,blockedCompany,blockedOtherSource,
     blockedCompanyIds,blockedOtherSourceIds,samples,token,confirmationToken,policyRevision};
 }
 
@@ -212,8 +225,8 @@ export async function confirmDirectFilterRule(
     await sql`SELECT pg_advisory_xact_lock(
       hashtextextended('collection-filter-direct-rule',0)
     )`.execute(trx);
-    const rule = validated(input);
-    const plan = await candidates(trx,rule);
+    const plan = await candidates(trx,input);
+    const rule = plan.rule;
     if(plan.policyRevision!==policyRevision ||
        plan.confirmationToken!==confirmationToken)
       throw new RangeError('f3_confirmation_token_stale_or_policy_revision_changed');
@@ -315,8 +328,8 @@ export async function saveDirectFilterRule(
     await sql`SET LOCAL statement_timeout = '11000ms'`.execute(trx);
     await sql`SET LOCAL lock_timeout = '2500ms'`.execute(trx);
     await sql`SELECT pg_advisory_xact_lock(hashtextextended('collection-filter-direct-rule',0))`.execute(trx);
-    const rule=validated(input);
-    const plan=await candidates(trx,rule);
+    const plan=await candidates(trx,input);
+    const rule=plan.rule;
     if(plan.policyRevision!==policyRevision ||
        plan.confirmationToken!==confirmationToken ||
        plan.count!==expectedCount || plan.token!==previewToken)

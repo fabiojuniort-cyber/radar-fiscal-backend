@@ -106,6 +106,7 @@ export interface CollectionFilterDecision {
   weakScore: number;
   termHits: CollectionFilterTermHit[];
   matchedPattern?: string;
+  matchedRuleName?: string;
   matchedSection?: string;
   matchedTypeSource?: 'OFFICIAL' | 'TITLE';
 }
@@ -497,6 +498,7 @@ function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
     canonicalType,
     mode: rule.mode,
     matchedPattern,
+    matchedRuleName: rule.actName??collectionFilterActName(canonicalType),
     matchedSection: rule.section ?? '',
     matchedTypeSource,
   };
