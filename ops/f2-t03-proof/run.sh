@@ -53,7 +53,7 @@ echo 'F2_T03_SOURCE_HASHES=PASS'
 dumpStart='2026-10-14T00:42:39Z'
 dumpSha='69d8cfe2ae01f81a8684b6ba844df8d32b7b3bc85fdbe04df841b849f8fa95b3'
 dumpKey="f2-t03-backup-$dumpSha.dump"
-[[ "$(date -u +%s)" -lt "$(date -u -d "$dumpStart +24 hours" +%s)" ]] || fail DUMP_EXPIRED
+[[ "$(date -u +%s)" -lt "$(( $(date -u -d "$dumpStart" +%s) + 86400 ))" ]] || fail DUMP_EXPIRED
 aws --endpoint-url="$BACKUP_BUCKET_ENDPOINT" s3 cp --no-progress \
  "s3://$BACKUP_BUCKET_NAME/$dumpKey" "$tmp/official.dump" || fail BACKUP_BUCKET_RETRIEVAL_FAILED
 [[ "$(sha256sum "$tmp/official.dump" | awk '{print $1}')" == "$dumpSha" ]] || fail BACKUP_BUCKET_HASH_MISMATCH
