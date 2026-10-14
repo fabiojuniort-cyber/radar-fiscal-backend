@@ -136,7 +136,11 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
         if(!page.rows.length)break;
         for(const history of page.rows){
           const stored=(await owner.query<{title:string;act_type:string;content_text:string;source_metadata:Record<string,unknown>;metadata:Record<string,unknown>}>(
-            'SELECT p.title,p.act_type,v.content_text,v.source_metadata,o.metadata FROM publications p JOIN publication_versions v ON v.publication_id=p.id AND v.is_current JOIN publication_origins o ON o.publication_id=p.id JOIN sources so ON so.id=o.source_id WHERE p.id=$1 AND so.code=$2 ORDER BY o.id LIMIT 1',[history.publication_id,code])).rows[0]!;
+            'SELECT p.title,p.act_type,v.content_text,v.source_metadata,o.metadata FROM publications p JOIN publication_versions v ON v.publication_id=p.id AND v.is_current JOIN publication_origins o ON o.publication_id=p.id JOIN sources so ON so.id=o.source_id WHERE p.id=$1 AND so.code=$2 ORDER BY o.id LIMIT 1',[history.publication_id,code])).rows[0];
+          if(!stored){
+            assert.equal(evaluateHistoricalCollectionCandidate(runtime.policy,history).decision,'KEEP','incomplete archive evidence must be preserved');
+            continue;
+          }
           const files=(stored.metadata.files??stored.source_metadata.files??[]) as Parameters<typeof evaluateRuntimeCollectionFilter>[1]['files'];
           const capture=evaluateRuntimeCollectionFilter(runtime,{title:stored.title,actType:stored.act_type,contentText:stored.content_text,metadata:stored.source_metadata,originMetadata:stored.metadata,files} as Parameters<typeof evaluateRuntimeCollectionFilter>[1]);
           assert.equal(evaluateHistoricalCollectionCandidate(runtime.policy,history).decision,capture.decision.decision,'archive/capture equivalence for '+history.publication_id);
