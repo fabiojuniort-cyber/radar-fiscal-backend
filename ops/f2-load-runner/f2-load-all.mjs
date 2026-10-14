@@ -107,7 +107,7 @@ export async function main(){
   try{
     // This gate is intentionally first: staging is not a DRAFT. Do not perform
     // partial productive changes until an independently-reviewed DRAFT import exists.
-    if(process.env.F2_DRAFT_IMPORT_CONTRACT!=='REVIEWED')fail('F2_DRAFT_IMPORT_CONTRACT_MISSING');
+    fail('F2_DRAFT_IMPORT_CONTRACT_MISSING');
     adminUrl=dbUrl(process.env.F2_ADMIN_DATABASE_URL,'postgres.railway.internal','railway');
     dbUrl(process.env.F2_RESTORE_DATABASE_URL,'f2-restore-pg.railway.internal','railway');
     const loaderUrl=dbUrl(process.env.F2_LOAD_DATABASE_URL,'postgres.railway.internal','railway',ROLE);
