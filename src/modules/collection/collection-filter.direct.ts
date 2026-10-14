@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import {collectionFilterActName} from './collection-filter.act-name.js';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import { validateActiveCollectionFilter } from './collection-filter.direct-admin.js';
 import type { DB } from '../../infrastructure/database/database.types.js';
@@ -141,10 +142,10 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const blockedCompanyIds:string[]=[];
   const blockedOtherSourceIds:string[]=[];
   const samples:Array<{id:string;title:string;sourceCode:string;section:string;
-    officialType:string|null;pattern:string;protection:string|null}>=[];
+    officialType:string|null;actName:string;pattern:string;protection:string|null}>=[];
   let cursor:string|null=null;
   let pages=0;
-  const hash=createHash('sha256').update(JSON.stringify([rule,approved.id,approved.revision]));
+  const hash=createHash('sha256').update(JSON.stringify(['F3-NOME-01',rule,approved.id,approved.revision]));
   while (true) {
     if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
     const page=await sql<HistoricalCollectionCandidate>`
@@ -160,6 +161,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
         item.has_company,item.has_other_source,decision.reasonCode]));
       if (samples.length<10) samples.push({id:item.publication_id,title:item.title,
         sourceCode:item.source_code,section:item.section,officialType:item.source_act_type,
+        actName:collectionFilterActName(item.title),
         pattern:decision.matchedPattern??decision.canonicalType,
         protection:item.has_company?'COMPANY':item.has_other_source?'OTHER_ORIGIN':null});
       if (item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
@@ -173,17 +175,17 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const token=hash.digest('hex');
   const policyRevision=Number(approved.revision);
   const confirmationToken=createHash('sha256').update(JSON.stringify([
-    'F3-INC-01-HISTORICAL-PURGE-V2',rule,policyRevision,token,ids.length,
+    'F3-NOME-01-HISTORICAL-PURGE-V3',rule,policyRevision,token,ids.length,
   ])).digest('hex');
-  return {ids,count:ids.length,blockedCompany,blockedOtherSource,
+  return {actName:collectionFilterActName(input.canonicalType),ids,count:ids.length,blockedCompany,blockedOtherSource,
     blockedCompanyIds,blockedOtherSourceIds,samples,token,confirmationToken,policyRevision};
 }
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
-    const {count,blockedCompany,blockedOtherSource,samples,token,
+    const {actName,count,blockedCompany,blockedOtherSource,samples,token,
       policyRevision,confirmationToken}=await candidates(trx,input);
-    return {count,blockedCompany,blockedOtherSource,samples,token,
+    return {actName,count,blockedCompany,blockedOtherSource,samples,token,
       policyRevision,confirmationToken};
   });
 }

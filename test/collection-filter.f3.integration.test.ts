@@ -57,6 +57,29 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       if(extraOrigin) await owner.query('INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) VALUES($1,$2,$3,$4::jsonb)',[id,sourceId,officialUrl+'/second',JSON.stringify(metadata)]);
       return {id,sourceId,metadata,title,officialUrl,identityHash:sha(id)};
     };
+    // F3-NOME-01: reconstruct full counts from archive titles, never the <=3 legacy samples.
+    for(const code of ['dou','doe-sp']){
+      for(let n=0;n<3;n++)await fixture('name-generic-'+code+'-'+n,code,tag+' COMUNICADO');
+      for(let n=0;n<12;n++)await fixture('name-opening-'+code+'-'+n,code,tag+' COMUNICADO DE ABERTURA');
+    }
+    const ruleBefore=(await owner.query("SELECT md5(jsonb_agg(to_jsonb(r) ORDER BY r.id)::text) AS hash FROM collection_filter_type_rules r WHERE policy_id=$1",[policy.id])).rows[0].hash;
+    const queueBefore=(await owner.query('SELECT count(*)::int AS count FROM collection_filter_new_types')).rows[0].count;
+    const namesResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    assert.equal(namesResponse.statusCode,200,namesResponse.body);
+    const nameItems=namesResponse.json<{items:Array<{id:string;source_code:string;normalized_type:string;act_name:string;occurrence_count:number;queue_basis:string;examples:unknown[]}>}>().items;
+    for(const code of ['dou','doe-sp']){
+      const generic=nameItems.find(x=>x.source_code===code&&x.normalized_type===tag+' COMUNICADO');
+      const opening=nameItems.find(x=>x.source_code===code&&x.normalized_type===tag+' COMUNICADO DE ABERTURA');
+      assert.ok(generic);assert.ok(opening);
+      assert.equal(generic.occurrence_count,3);assert.equal(opening.occurrence_count,12);
+      assert.equal(opening.examples.length,3);assert.equal(opening.queue_basis,'ARCHIVE_ACT_NAME');
+      assert.notEqual(generic.id,opening.id);
+    }
+    const stateResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/state',headers});
+    assert.equal(stateResponse.statusCode,200,stateResponse.body);
+    assert.equal(stateResponse.json<{newTypesOpen:number}>().newTypesOpen,nameItems.length);
+    assert.equal((await owner.query("SELECT md5(jsonb_agg(to_jsonb(r) ORDER BY r.id)::text) AS hash FROM collection_filter_type_rules r WHERE policy_id=$1",[policy.id])).rows[0].hash,ruleBefore);
+    assert.equal((await owner.query('SELECT count(*)::int AS count FROM collection_filter_new_types')).rows[0].count,queueBefore);
     const ordinary=await fixture('ordinary'); const companyProtected=await fixture('company'); const originProtected=await fixture('another-origin','dou',type,true); const doeItem=await fixture('doe','doe-sp',doeType);
     const conditional=await fixture('provenance-file','dou',conditionalType);
     const provenanceFiles=[{versionRole:'PROVENANCE',metadata:{kind:'ATTACHMENT'}}];

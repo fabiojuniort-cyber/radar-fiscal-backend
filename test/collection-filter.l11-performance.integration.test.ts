@@ -51,7 +51,7 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
         act_type,title,primary_official_url
       ) SELECT id,md5(id::text)||md5('l11'||id::text),'STRONG','{}'::jsonb,'FEDERAL',
         CASE WHEN rn % 10 = 0 THEN $1 ELSE 'OUTRO TIPO DOU' END,
-        'Documento administrativo de teste de desempenho',
+        CASE WHEN rn % 10 = 0 THEN $1 ELSE 'OUTRO TIPO DOU' END||' - Documento administrativo de teste de desempenho',
         'https://bench.example.test/'||id::text
       FROM (SELECT id,ROW_NUMBER() OVER (ORDER BY id) AS rn FROM l11_benchmark_ids) base`,
       [canonicalType],
