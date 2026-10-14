@@ -99,16 +99,16 @@ test('053: index-backed actual first 500-item purge with 535k collection_items (
       "content_text,is_current,source_metadata) " +
       "SELECT id,1,md5('053'||id::text)||md5('body'||id::text)," +
       "'Aviso de procedimento administrativo sem conteúdo fiscal',true," +
-      "'{\"dou\":{\"section\":\"DO3\"}}'::jsonb " +
+      "jsonb_build_object('dou',jsonb_build_object('section','DO3','sourceActType',$2::text)) " +
       "FROM publications WHERE id=ANY($1::uuid[])",
-      [ids],
+      [ids,canonicalType],
     );
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) " +
       "SELECT id,$2,'https://example.test/l11-index053/origin/'||id::text," +
-      "'{\"dou\":{\"section\":\"DO3\"}}'::jsonb " +
+      "jsonb_build_object('dou',jsonb_build_object('section','DO3','sourceActType',$3::text)) " +
       "FROM publications WHERE id=ANY($1::uuid[])",
-      [ids, sourceId],
+      [ids,sourceId,canonicalType],
     );
 
     // Bulk synthetic data, valid FKs. No production DB credentials in CI.
