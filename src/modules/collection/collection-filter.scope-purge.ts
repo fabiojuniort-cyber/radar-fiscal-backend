@@ -60,8 +60,9 @@ async function scopeCandidates(trx: Transaction<DB>) {
         const blocked=item.has_company?'COMPANY':item.has_other_source?'OTHER':undefined;
         // Multiple official origins are protected; each publication is counted once.
         const previous=seen.get(item.publication_id);
+        const protection=previous?.protected??blocked;
         seen.set(item.publication_id,{bucket:'RULE',rule:previous?.rule??rule,
-          ...((previous?.protected??blocked)?{protected:previous?.protected??blocked}:{})});
+          ...(protection?{protected:protection}:{})});
       }
       after=page.rows[page.rows.length-1]!.publication_id;
       if(page.rows.length<500)break;
