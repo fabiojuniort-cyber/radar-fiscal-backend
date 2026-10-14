@@ -117,8 +117,54 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     await runL17ExcludeAlways(inspection,{info:data=>{logRows.push(data);},error:data=>{throw new Error(String(data.error));}});
     assert.ok(logRows.some(row=>row.deletedPublications===0&&row.confirmationRequired===true));
     assert.equal((await owner.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids])).rowCount,ids.length,'daily inspection must preserve every fixture');
+    // Give surviving KEEP/UNKNOWN fixtures old OUT_OF_SCOPE state as well.
+    // The new button must still agree with capture, regardless of all legacy flags.
+    for(const id of legacyKept){
+      const event=(await owner.query<{id:string}>(
+        "INSERT INTO publication_scope_events(publication_id,operation_id,action,previous_scope,new_scope,policy_key,reason_code,rule_version,evidence_sha256,actor_ref) VALUES($1,$2,'SUPPRESS','IN_SCOPE','OUT_OF_SCOPE','F3_SIMPL_TEST','TEST','1',$3,'f3-simpl') RETURNING id",
+        [id,randomUUID(),sha('scope'+id)])).rows[0]!.id;
+      await owner.query("INSERT INTO publication_scope_state(publication_id,scope,current_event_id,policy_key,evidence_sha256) VALUES($1,'OUT_OF_SCOPE',$2,'F3_SIMPL_TEST',$3)",[id,event,sha('scope'+id)]);
+    }
+    const expectedEligible=new Set<string>();
+    const expectedCompany=new Set<string>();
+    const expectedOrigin=new Set<string>();
+    for(const code of ['dou','doe-sp']){
+      const runtime=await loadApprovedCollectionFilterRuntime(inspection,code==='dou'?dou:doe,{readOnly:true});assert.ok(runtime);
+      let after:string|null=null;
+      while(true){
+        const page=await owner.query<HistoricalCollectionCandidate>('SELECT * FROM collection_filter_f3_candidates($1::uuid,500,$2)',[after,code]);
+        if(!page.rows.length)break;
+        for(const history of page.rows){
+          const stored=(await owner.query<{title:string;act_type:string;content_text:string;source_metadata:Record<string,unknown>;metadata:Record<string,unknown>}>(
+            'SELECT p.title,p.act_type,v.content_text,v.source_metadata,o.metadata FROM publications p JOIN publication_versions v ON v.publication_id=p.id AND v.is_current JOIN publication_origins o ON o.publication_id=p.id JOIN sources so ON so.id=o.source_id WHERE p.id=$1 AND so.code=$2 ORDER BY o.id LIMIT 1',[history.publication_id,code])).rows[0]!;
+          const files=(stored.metadata.files??stored.source_metadata.files??[]) as Parameters<typeof evaluateRuntimeCollectionFilter>[1]['files'];
+          const capture=evaluateRuntimeCollectionFilter(runtime,{title:stored.title,actType:stored.act_type,contentText:stored.content_text,metadata:stored.source_metadata,originMetadata:stored.metadata,files} as Parameters<typeof evaluateRuntimeCollectionFilter>[1]);
+          assert.equal(evaluateHistoricalCollectionCandidate(runtime.policy,history).decision,capture.decision.decision,'archive/capture equivalence for '+history.publication_id);
+          if(capture.decision.decision!=='DISCARD')continue;
+          if(history.has_company)expectedCompany.add(history.publication_id);
+          else if(history.has_other_source)expectedOrigin.add(history.publication_id);
+          else expectedEligible.add(history.publication_id);
+        }
+        after=page.rows[page.rows.length-1]!.publication_id;
+        if(page.rows.length<500)break;
+      }
+    }
     const globalPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/preview',headers});
     assert.equal(globalPreview.statusCode,200,globalPreview.body);
+    const archivePlan=globalPreview.json<{count:number;blockedCompany:number;blockedOtherSource:number;samples:Array<{id:string}>;outOfScope:number;hiddenLegacy:number;suspectDoe:number;token:string}>();
+    assert.equal(archivePlan.count,expectedEligible.size,'button count equals capture DISCARD minus protections');
+    assert.equal(archivePlan.blockedCompany,expectedCompany.size);
+    assert.equal(archivePlan.blockedOtherSource,expectedOrigin.size);
+    assert.ok(expectedEligible.size<=10,'fixture fits full sample readback');
+    assert.deepEqual(new Set(archivePlan.samples.map(row=>row.id)),expectedEligible,'button selects exactly the capture engine IDs');
+    assert.deepEqual([archivePlan.outOfScope,archivePlan.hiddenLegacy,archivePlan.suspectDoe],[0,0,0]);
+    await owner.query('UPDATE collection_filter_policies SET revision=revision+1 WHERE id=$1',[policy.id]);
+    const staleArchive=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/confirm',headers,payload:{expectedCount:archivePlan.count,previewToken:archivePlan.token}});
+    assert.equal(staleArchive.statusCode,200,staleArchive.body);
+    assert.equal(staleArchive.json<{changed:boolean}>().changed,true,'unchanged IDs with a new policy revision require a new preview');
+    assert.equal(staleArchive.json<{deletedCount:number}>().deletedCount,0);
+    assert.equal((await owner.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids])).rowCount,ids.length);
+
     assert.ok(globalPreview.json<{byRule:Array<{canonicalType:string}>}>().byRule.some(row=>row.canonicalType===type));
     const rule={sourceCode:'dou',section:'DO3',canonicalType:type,mode:'EXCLUDE_ALWAYS'};
     const preview=async()=>{
@@ -172,3 +218,4 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     assert.equal((await owner.query('SELECT 1 FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])',[legacyKept])).rowCount,0);
   } finally {await app.close();await inspection.destroy();await owner.end();}
 });
+
