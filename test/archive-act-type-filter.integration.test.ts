@@ -128,6 +128,10 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
       authorization: `Bearer ${login.json<{ accessToken: string }>().accessToken}`,
     };
 
+    const emptyType = `Tipo sem documento ${marker}`;
+    await admin.query(
+      'INSERT INTO publication_act_type_catalog (act_type) VALUES ($1)', [emptyType],
+    );
     const facets = await app.inject({
       method: 'GET',
       url: '/api/v2/archive/facets',
@@ -135,6 +139,7 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
     });
     assert.equal(facets.statusCode, 200, facets.body);
     const facetBody = facets.json<FacetsBody>();
+    assert.ok(!facetBody.actTypes.includes(emptyType));
     assert.ok(facetBody.actTypes.includes('Lei Complementar'));
     assert.ok(facetBody.actTypes.includes('Decreto'));
     assert.ok(!facetBody.actTypes.includes('Aviso de Licitação'));
@@ -143,6 +148,31 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
       facetBody.actTypes.length,
       'act type facet must not contain duplicates',
     );
+
+    const today = new Date().toISOString().slice(0, 10);
+    const cases: Array<Record<string, string>> = [
+      { source: 'cat01-dou' },
+      { q: marker },
+      { q: marker, source: 'cat01-dou', publishedOn: today },
+      { q: marker, jurisdiction: 'STATE' },
+      { q: marker, publishedTo: '2000-01-01' },
+      { q: marker, actType: 'Decreto' },
+      { q: 'de' },
+    ];
+    for (const filters of cases) {
+      const params = new URLSearchParams(filters);
+      const filteredFacets = await app.inject({
+        method: 'GET', url: '/api/v2/archive/facets?' + params, headers,
+      });
+      const filteredSearch = await app.inject({
+        method: 'GET', url: '/api/v2/archive?limit=100&' + params, headers,
+      });
+      assert.equal(filteredFacets.statusCode, 200, filteredFacets.body);
+      assert.equal(filteredSearch.statusCode, 200, filteredSearch.body);
+      const expected = [...new Set(filteredSearch.json<ArchiveBody>().items
+        .map((item) => item.actType).filter((value): value is string => Boolean(value)))].sort();
+      assert.deepEqual(filteredFacets.json<FacetsBody>().actTypes, expected);
+    }
 
     const response = await app.inject({
       method: 'GET',

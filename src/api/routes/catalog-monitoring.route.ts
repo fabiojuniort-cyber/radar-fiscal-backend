@@ -566,7 +566,7 @@ export async function catalogMonitoringRoutes(
     ...cacheOptions,
     maxEntries: 500,
   });
-  const facetsCache = new TtlCache<ArchiveFacets>(cacheOptions);
+  const facetsCache = new TtlCache<Omit<ArchiveFacets, 'actTypes'>>(cacheOptions);
   const navigationCache = new TtlCache<ArchiveNavigationResponse>({
     ...cacheOptions,
     maxEntries: 1000,
@@ -689,7 +689,7 @@ export async function catalogMonitoringRoutes(
     };
   }
 
-  async function loadFacets(): Promise<ArchiveFacets> {
+  async function loadFacets(): Promise<Omit<ArchiveFacets, 'actTypes'>> {
     // One indexed probe per UF / source / act type instead of scanning the
     // growing publications table. The small act-type candidate catalog is
     // maintained by migration 030 and stale candidates are filtered here.
@@ -736,31 +736,30 @@ export async function catalogMonitoringRoutes(
       ORDER BY 2
     `.execute(app.db);
 
-    // Exact collected values only. publication_act_type_catalog is tiny and
-    // each candidate is validated through ix_publications_act_type_visible_order,
-    // so the facet cost stays independent of the historical corpus size.
-    const actTypes = await sql<{ act_type: string }>`
+    return {
+      ufs: ufs.rows.map((row) => row.uf),
+      sources: sources.rows,
+    };
+  }
+
+  async function loadActTypes(input: ArchiveQuery): Promise<string[]> {
+    const tsquery = input.q ? buildSearchTsquery(input.q) : null;
+    if (input.q && !tsquery) return [];
+    // Share search visibility and filters; pagination does not affect facets.
+    const plan = buildArchivePlan(input, input.source?.toLowerCase() ?? null, tsquery);
+    const result = await sql<{ act_type: string }>`
       SELECT c.act_type
       FROM publication_act_type_catalog c
       CROSS JOIN LATERAL (
         SELECT 1
         FROM publications p
-        WHERE p.act_type = c.act_type
-          AND ${collectionFilterCatalogVisibility('p')}
-        ORDER BY
-          p.published_on DESC NULLS LAST,
-          p.first_collected_at DESC,
-          p.id
+        ${plan.feedJoin}
+        WHERE p.act_type = c.act_type AND ${plan.where}
         LIMIT 1
       ) hit
       ORDER BY c.act_type
     `.execute(app.db);
-
-    return {
-      ufs: ufs.rows.map((row) => row.uf),
-      sources: sources.rows,
-      actTypes: actTypes.rows.map((row) => row.act_type),
-    };
+    return result.rows.map((row) => row.act_type);
   }
 
   async function loadArchiveNavigation(
@@ -1227,7 +1226,7 @@ export async function catalogMonitoringRoutes(
 
   typed.get(
     '/api/v2/archive/facets',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, schema: { querystring: archiveQuerySchema } },
     async (request, reply) => {
       if (!request.auth) {
         return reply.status(401).send({ error: 'unauthorized' });
@@ -1235,7 +1234,10 @@ export async function catalogMonitoringRoutes(
 
       return reply
         .status(200)
-        .send(await facetsCache.get('facets', loadFacets));
+        .send({
+          ...await facetsCache.get('facets', loadFacets),
+          actTypes: await loadActTypes(request.query),
+        });
     },
   );
 
