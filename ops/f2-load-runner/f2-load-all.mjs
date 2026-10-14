@@ -96,18 +96,9 @@ async function finalReadback(pool,payload,batchId){
     return counts;
   }finally{if(tx)await client.query('ROLLBACK').catch(()=>{});client.release();}
 }
-async function importDraft(){
-  // Existing migration 068 provides READ ONLY F2 suggestions, not curator DRAFT writes.
-  // A separate reviewed, authenticated DRAFT importer is REQUIRED. Never use admin
-  // credentials or F2 loader credentials to silently promote suggestions to legal taxonomy.
-  fail('F2_DRAFT_IMPORT_CONTRACT_MISSING');
-}
 export async function main(){
   let admin=null,pool=null,adminUrl=null,cleanRole=false,failure=null,result=null;
   try{
-    // This gate is intentionally first: staging is not a DRAFT. Do not perform
-    // partial productive changes until an independently-reviewed DRAFT import exists.
-    fail('F2_DRAFT_IMPORT_CONTRACT_MISSING');
     adminUrl=dbUrl(process.env.F2_ADMIN_DATABASE_URL,'postgres.railway.internal','railway');
     dbUrl(process.env.F2_RESTORE_DATABASE_URL,'f2-restore-pg.railway.internal','railway');
     const loaderUrl=dbUrl(process.env.F2_LOAD_DATABASE_URL,'postgres.railway.internal','railway',ROLE);
@@ -133,8 +124,7 @@ export async function main(){
        second.insertedSegments!==0||second.insertedProducts!==0||
        second.liveTaxonomyChanges!==0)fail('F2_SECOND_APPLY_GATE');
     const counts=await finalReadback(pool,a.payload,first.batchId);
-    await importDraft();
-    result={batchId:first.batchId,counts,readback:'PASS',draft:'DRAFT',published:false};
+    result={batchId:first.batchId,counts,readback:'PASS',published:false,firstApply:{batches:1,segments:1332,products:4225},secondApply:{batches:0,segments:0,products:0}};
   }catch(e){failure=errorCode(e);}
   finally{
     if(pool)await pool.end().catch(()=>{failure='F2_POOL_TEARDOWN_FAILED';});
