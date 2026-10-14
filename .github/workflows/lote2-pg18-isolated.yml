@@ -23,6 +23,8 @@ on:
       - 'src/modules/taxonomy/ncm/ncm-prefix.ts'
       - 'src/modules/taxonomy/classification/classification.curated.ts'
       - 'src/modules/taxonomy/affinity/publication-affinity.ts'
+      - 'ops/taxonomy/f2*.mjs'
+      - 'test/f2-production-load*'
       - 'ops/taxonomy/f2-xlsx-dry-run.mjs'
       - 'test/f2-xlsx-dry-run.unit.test.mjs'
       - 'test/taxonomy.ncm-prefix.unit.test.ts'
@@ -82,3 +84,6 @@ jobs:
         run: npx tsx --test test/publication.presentation.integration.test.ts test/collection-items-retention.integration.test.ts test/doe-sp.collection.integration.test.ts
       - name: L-10 CLI default is dry-run
         run: npm run db:prune-collection-items
+
+      - name: F2-LOAD-01 transactional rollback and idempotency on isolated PG18
+        run: node --test test/f2-production-load.pg18.integration.mjs
