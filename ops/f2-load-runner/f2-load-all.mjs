@@ -10,7 +10,15 @@ const ROLE='f2_loader';
 const TABLES=['taxonomy_f2_import_batches','taxonomy_f2_import_segment_rows','taxonomy_f2_import_product_rows'];
 const fail=code=>{throw new Error(code);};
 const errorCode=e=>(e instanceof Error&&/^F2_[A-Z0-9_]+$/.test(e.message))?e.message:
-  e?.code==='42501'?'F2_PERMISSION_DENIED':'F2_LOAD_ALL_UNEXPECTED';
+  e?.code==='42501'?'F2_PERMISSION_DENIED':
+  /^[0-9A-Z]{5}$/.test(e?.code||'')?'F2_SQLSTATE_'+e.code:
+  'F2_LOAD_ALL_UNEXPECTED';
+function validPassword(password){
+  // Never log or print the secret, its length, or its URL.
+  if(typeof password!=='string'||password.length<16||password.length>128||
+    /[\u0000-\u001f\u007f]/.test(password))fail('F2_LOADER_PASSWORD_INVALID');
+  return password;
+}
 function dbUrl(raw,host,db,username){
   let u;try{u=new URL(raw||'');}catch{fail('F2_DATABASE_URL_MISSING');}
   if(!['postgres:','postgresql:'].includes(u.protocol)||u.hostname!==host||
@@ -50,12 +58,26 @@ async function roleGate(admin){
   const p=(await admin.query("SELECT has_table_privilege($1,'public.publications','SELECT') AS sel,has_table_privilege($1,'public.publications','INSERT') AS ins",[ROLE])).rows[0];
   if(p.sel||p.ins)fail('F2_ROLE_SCOPE_INVALID');
 }
-async function createRole(admin,password){
-  if(!/^[a-zA-Z0-9]{24,128}$/.test(password||''))fail('F2_LOADER_PASSWORD_INVALID');
+async function prepareRole(admin,password,alreadyExists){
+  const secret=validPassword(password);
+  if(alreadyExists){
+    const x=(await admin.query(
+      "SELECT rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolreplication,rolbypassrls,rolinherit FROM pg_roles WHERE rolname=$1",[ROLE])).rows[0];
+    if(!x?.rolcanlogin||x.rolsuper||x.rolcreaterole||x.rolcreatedb||
+      x.rolreplication||x.rolbypassrls||x.rolinherit)fail('F2_ROLE_PREEXISTING_UNSAFE');
+  }
   await admin.query('BEGIN');
   try{
-    await admin.query("SELECT set_config('f2.temp_password',$1,true)",[password]);
-    await admin.query("DO $ddl$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='f2_loader') THEN RAISE EXCEPTION 'role exists'; END IF; EXECUTE format('CREATE ROLE f2_loader LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L',current_setting('f2.temp_password',true)); END $ddl$;");
+    // Password is a bind parameter; only the static DDL is sent separately.
+    // The SET LOCAL value is rolled back/cleared at COMMIT; never printed.
+    await admin.query("SELECT set_config('f2.temp_password',$1,true)",[secret]);
+    await admin.query(
+      "DO $ddl$ BEGIN "+
+      "IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='f2_loader') THEN "+
+      "EXECUTE format('ALTER ROLE f2_loader WITH LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L',current_setting('f2.temp_password',true)); "+
+      "ELSE "+
+      "EXECUTE format('CREATE ROLE f2_loader LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L',current_setting('f2.temp_password',true)); "+
+      "END IF; END $ddl$;");
     await admin.query('GRANT CONNECT ON DATABASE railway TO f2_loader');
     await admin.query('GRANT USAGE ON SCHEMA public TO f2_loader');
     await admin.query('GRANT SELECT,INSERT ON public.taxonomy_f2_import_batches,public.taxonomy_f2_import_segment_rows,public.taxonomy_f2_import_product_rows TO f2_loader');
@@ -63,7 +85,7 @@ async function createRole(admin,password){
     await admin.query('COMMIT');
   }catch(e){await admin.query('ROLLBACK').catch(()=>{});throw e;}
   await roleGate(admin);
-  console.log('F2_LOAD_ALL_ROLE=PASS');
+  console.log('F2_LOAD_ALL_ROLE=PASS '+(alreadyExists?'EXISTING_PASSWORD_UPDATED':'CREATED'));
 }
 async function removeRole(url){
   const c=new pg.Client({connectionString:url.toString(),connectionTimeoutMillis:10000});
@@ -71,15 +93,19 @@ async function removeRole(url){
     await c.connect();await databaseGate(c);
     await c.query('BEGIN');
     try{
-      await c.query('REVOKE ALL ON public.taxonomy_f2_import_batches,public.taxonomy_f2_import_segment_rows,public.taxonomy_f2_import_product_rows FROM f2_loader');
-      await c.query('REVOKE USAGE ON SCHEMA public FROM f2_loader');
-      await c.query('REVOKE CONNECT ON DATABASE railway FROM f2_loader');
-      await c.query('DROP ROLE f2_loader');
+      const exists=(await c.query("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1) AS found",[ROLE])).rows[0].found;
+      if(exists){
+        // Exact authorised teardown; never DROP OWNED.
+        await c.query('REVOKE ALL ON public.taxonomy_f2_import_batches,public.taxonomy_f2_import_segment_rows,public.taxonomy_f2_import_product_rows FROM f2_loader');
+        await c.query('REVOKE USAGE ON SCHEMA public FROM f2_loader');
+        await c.query('REVOKE CONNECT ON DATABASE railway FROM f2_loader');
+        await c.query('DROP ROLE f2_loader');
+      }
       await c.query('COMMIT');
+      if((await c.query("SELECT count(*)::int AS n FROM pg_roles WHERE rolname=$1",[ROLE])).rows[0].n!==0)
+        fail('F2_ROLE_REMOVAL_NOT_VERIFIED');
+      console.log('F2_LOAD_ALL_ROLE_REMOVED=true '+(exists?'DROP_VERIFIED':'ALREADY_ABSENT'));
     }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}
-    if((await c.query("SELECT count(*)::int AS n FROM pg_roles WHERE rolname='f2_loader'")).rows[0].n!==0)
-      fail('F2_ROLE_REMOVAL_NOT_VERIFIED');
-    console.log('F2_LOAD_ALL_ROLE_REMOVED=true');
   }finally{await c.end().catch(()=>{});}
 }
 async function finalReadback(pool,payload,batchId){
@@ -102,6 +128,9 @@ export async function main(){
     adminUrl=dbUrl(process.env.F2_ADMIN_DATABASE_URL,'postgres.railway.internal','railway');
     dbUrl(process.env.F2_RESTORE_DATABASE_URL,'f2-restore-pg.railway.internal','railway');
     const loaderUrl=dbUrl(process.env.F2_LOAD_DATABASE_URL,'postgres.railway.internal','railway',ROLE);
+    // URL password encoding in Railway references may be incomplete.
+    // Use the approved current secret via URL's own percent-encoding setter.
+    loaderUrl.password=validPassword(process.env.F2_LOADER_PASSWORD);
     await restoreGate();
     const p=await preflightFiles(args('plan'));
     if(p.payload.summary.segmentRows!==1332||p.payload.summary.productRows!==4225||
@@ -109,9 +138,16 @@ export async function main(){
     console.log('F2_LOAD_ALL_PLAN=1332/4225/0/448');
     admin=new pg.Client({connectionString:adminUrl.toString(),connectionTimeoutMillis:10000});
     await admin.connect();await databaseGate(admin);
-    if((await admin.query("SELECT count(*)::int AS n FROM pg_roles WHERE rolname='f2_loader'")).rows[0].n!==0)
-      fail('F2_ROLE_PREEXISTING');
-    cleanRole=true;await createRole(admin,process.env.F2_LOADER_PASSWORD);
+    const before=(await admin.query(
+      'SELECT (SELECT count(*)::int FROM public.taxonomy_f2_import_batches) AS batches,'+
+      '(SELECT count(*)::int FROM public.taxonomy_f2_import_segment_rows) AS segments,'+
+      '(SELECT count(*)::int FROM public.taxonomy_f2_import_product_rows) AS products')).rows[0];
+    const existed=(await admin.query("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1) AS found",[ROLE])).rows[0].found;
+    console.log('F2_LOAD_ALL_INSPECT='+JSON.stringify({roleExists:existed,counts:before}));
+    if(before.batches!==0||before.segments!==0||before.products!==0)
+      fail('F2_PRODUCTION_STAGING_NOT_EMPTY');
+    validPassword(process.env.F2_LOADER_PASSWORD);
+    cleanRole=true;await prepareRole(admin,process.env.F2_LOADER_PASSWORD,existed);
     await admin.end();admin=null;
     // Owner's explicit one-click command is the ONLY process-scoped apply enablement.
     const a=await preflightFiles(args('apply'),{...process.env,F2_LOAD_ENABLED:'true'});
@@ -125,12 +161,32 @@ export async function main(){
        second.liveTaxonomyChanges!==0)fail('F2_SECOND_APPLY_GATE');
     const counts=await finalReadback(pool,a.payload,first.batchId);
     result={batchId:first.batchId,counts,readback:'PASS',published:false,firstApply:{batches:1,segments:1332,products:4225},secondApply:{batches:0,segments:0,products:0}};
-  }catch(e){failure=errorCode(e);}
+  }catch(e){
+    failure=errorCode(e);
+    // Printed immediately: cleanup failures must never hide the original gate.
+    console.error('F2_LOAD_ALL_ORIGINAL_BLOCK='+failure);
+  }
   finally{
-    if(pool)await pool.end().catch(()=>{failure='F2_POOL_TEARDOWN_FAILED';});
-    if(admin)await admin.end().catch(()=>{failure='F2_ADMIN_TEARDOWN_FAILED';});
-    if(cleanRole){try{await removeRole(adminUrl);}catch{failure='F2_ROLE_REMOVAL_FAILED';}}
-    if(failure){console.error('F2_LOAD_ALL_BLOCK='+failure);process.exitCode=1;}
+    if(!failure)console.log('F2_LOAD_ALL_ORIGINAL_BLOCK=NONE');
+    let cleanupFailure=null;
+    if(pool){
+      try{await pool.end();}catch{cleanupFailure='F2_POOL_TEARDOWN_FAILED';}
+    }
+    if(admin){
+      try{await admin.end();}catch{cleanupFailure='F2_ADMIN_TEARDOWN_FAILED';}
+    }
+    if(cleanRole){
+      try{await removeRole(adminUrl);}
+      catch(e){
+        cleanupFailure='F2_ROLE_REMOVAL_FAILED';
+        const code=errorCode(e);
+        console.error('F2_LOAD_ALL_CLEANUP_BLOCK='+cleanupFailure+' ORIGINAL_CLEANUP_CODE='+code);
+      }
+    }
+    if(failure||cleanupFailure){
+      console.error('F2_LOAD_ALL_BLOCK='+(failure||cleanupFailure));
+      process.exitCode=1;
+    }
     else if(result)console.log('F2_LOAD_ALL_RESULT='+JSON.stringify({...result,roleRemoved:true}));
     else{console.error('F2_LOAD_ALL_BLOCK=F2_RESULT_NOT_CERTIFIED');process.exitCode=1;}
   }
