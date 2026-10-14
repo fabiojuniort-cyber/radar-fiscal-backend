@@ -123,15 +123,28 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     const rule={sourceCode:'dou',section:'DO3',canonicalType:type,mode:'EXCLUDE_ALWAYS'};
     const preview=async()=>{
       const result=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:rule});assert.equal(result.statusCode,200,result.body);
-      return result.json<{count:number;token:string;blockedCompany:number;blockedOtherSource:number}>();
+      return result.json<{count:number;token:string;confirmationToken:string;policyRevision:number;blockedCompany:number;blockedOtherSource:number;confirmationToken:string;policyRevision:number}>();
     };
     const first=await preview();assert.equal(first.count,1);assert.equal(first.blockedCompany,1);assert.equal(first.blockedOtherSource,1);
+    const legacy=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...rule,expectedCount:first.count,previewToken:first.token}});
+    assert.equal(legacy.statusCode,409,legacy.body);
+    assert.equal(legacy.json<{error:string}>().error,'f3_confirmation_token_required');
+    assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'legacy client may not delete');
+    const forgedRevision=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{
+      ...rule,expectedCount:first.count,previewToken:first.token,
+      confirmationToken:first.confirmationToken,policyRevision:first.policyRevision+1}});
+    assert.equal(forgedRevision.statusCode,409,forgedRevision.body);
+    assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'wrong policy revision may not delete');
+    const safeSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
+      ...rule,expectedCount:first.count,previewToken:first.token,
+      confirmationToken:first.confirmationToken,policyRevision:first.policyRevision}});
+    assert.equal(safeSave.statusCode,200,safeSave.body);
+    assert.equal(safeSave.json<{deletedCount:number}>().deletedCount,0);
+    assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'save is never a purge');
     const additional=await fixture('new-after-preview');
-    const stale=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...rule,expectedCount:first.count,previewToken:first.token}});
-    assert.equal(stale.statusCode,200,stale.body);assert.equal(stale.json<{changed:boolean;deletedCount:number}>().changed,true);assert.equal(stale.json<{deletedCount:number}>().deletedCount,0);
-    assert.equal((await owner.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[[ordinary.id,additional.id]])).rowCount,2);
+    assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=ANY($1::uuid[])',[[ordinary.id,additional.id]])).rowCount,2);
     const refreshed=await preview();assert.equal(refreshed.count,2);
-    const confirmation=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...rule,expectedCount:refreshed.count,previewToken:refreshed.token}});
+    const confirmation=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...rule,expectedCount:refreshed.count,previewToken:refreshed.token,confirmationToken:refreshed.confirmationToken,policyRevision:refreshed.policyRevision,resume:true}});
     assert.equal(confirmation.statusCode,200,confirmation.body);assert.equal(confirmation.json<{deletedCount:number}>().deletedCount,2);
     assert.equal((await owner.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[[companyProtected.id,originProtected.id,doeItem.id]])).rowCount,3);
     const archived=(await owner.query<{archive_policy_rule:string;rule_mode:string}>('SELECT archive_policy_rule,rule_mode FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])',[[ordinary.id,additional.id]])).rows;
@@ -146,13 +159,13 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     await owner.query('INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) VALUES($1,$2,$3,$4,$5)',[policy.id,'dou','DO3',type+' Nº 77/2026','EXCLUDE_ALWAYS']);
     const keepRule={...rule,mode:'KEEP_ALWAYS'};
     const keepPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:keepRule});assert.equal(keepPreview.statusCode,200,keepPreview.body);
-    const kp=keepPreview.json<{count:number;token:string}>();
-    const rejected=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...keepRule,expectedCount:kp.count,previewToken:kp.token}});
+    const kp=keepPreview.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
+    const rejected=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...keepRule,expectedCount:kp.count,previewToken:kp.token,confirmationToken:kp.confirmationToken,policyRevision:kp.policyRevision}});
     assert.ok(rejected.statusCode>=400,'direct confirmation must validate persisted identities');
     assert.equal((await owner.query<{mode:string}>('SELECT mode FROM collection_filter_type_rules WHERE policy_id=$1 AND canonical_type=$2',[policy.id,type])).rows[0]!.mode,'EXCLUDE_ALWAYS');
     assert.equal((await owner.query<{revision:number}>('SELECT revision FROM collection_filter_policies WHERE id=$1',[policy.id])).rows[0]!.revision,before);
     const finalPreview=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/preview',headers});assert.equal(finalPreview.statusCode,200,finalPreview.body);
-    const finalPlan=finalPreview.json<{count:number;token:string}>();
+    const finalPlan=finalPreview.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
     const finalConfirm=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/out-of-scope/confirm',headers,payload:{expectedCount:finalPlan.count,previewToken:finalPlan.token}});
     assert.equal(finalConfirm.statusCode,200,finalConfirm.body);assert.equal(finalConfirm.json<{changed:boolean}>().changed,false);
     assert.equal((await owner.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[legacyKept])).rowCount,legacyKept.length,'unknown and more-specific KEEP survive confirmed screen purge for both F3 sources');

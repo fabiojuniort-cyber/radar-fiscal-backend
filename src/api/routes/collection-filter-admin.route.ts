@@ -7,7 +7,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
-import {previewDirectFilterRule,confirmDirectFilterRule} from '../../modules/collection/collection-filter.direct.js';
+import {previewDirectFilterRule,confirmDirectFilterRule,saveDirectFilterRule} from '../../modules/collection/collection-filter.direct.js';
 import {editActiveCollectionFilter} from '../../modules/collection/collection-filter.direct-admin.js';
 import { previewOutOfScopePurge, confirmOutOfScopePurge } from '../../modules/collection/collection-filter.scope-purge.js';
 import {
@@ -150,25 +150,50 @@ export async function collectionFilterAdminRoutes(
     }
   });
 
+
+  // The old web sends only previewToken. It must be rejected *before* a
+  // policy write or archive deletion, even with valid admin authorization.
+  const confirmationBody=directBody.extend({
+    expectedCount:z.number().int().nonnegative(),
+    previewToken:z.string().regex(/^[a-f0-9]{64}$/),
+    confirmationToken:z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    policyRevision:z.number().int().nonnegative().optional(),
+  });
   typed.post('/api/v1/admin/collection-filter/direct-rule/confirm', {
-    preHandler: requirePlatformAdmin,
-    schema:{body:directBody.extend({
-      expectedCount:z.number().int().nonnegative(),
-      previewToken:z.string().regex(/^[a-f0-9]{64}$/),
-      resume:z.boolean().optional(),
-    })},
-  }, async (request,reply)=>{
-    const {expectedCount,previewToken,resume,...rule}=request.body;
+    preHandler:requirePlatformAdmin,
+    schema:{body:confirmationBody.extend({resume:z.boolean().optional()})},
+  }, async(request,reply)=>{
+    const {expectedCount,previewToken,confirmationToken,policyRevision,resume,...rule}=request.body;
+    if(!confirmationToken || policyRevision===undefined)
+      return reply.status(409).send({error:'f3_confirmation_token_required'});
     try {
-      const result=await confirmDirectFilterRule(
-        app.db,request.auth!.userId,rule,expectedCount,previewToken,resume===true);
-      return reply.send(result);
-    } catch (error) {
-      if (error instanceof RangeError) return reply.status(400).send({error:error.message});
+      return reply.send(await confirmDirectFilterRule(app.db,request.auth!.userId,
+        rule,expectedCount,previewToken,policyRevision,confirmationToken,resume===true));
+    } catch(error) {
+      if(error instanceof RangeError)
+        return reply.status(409).send({error:error.message});
       throw error;
     }
   });
 
+  // Separate, non-destructive endpoint for *saving* the configured type.
+  // No call to collection_filter_direct_purge_batch anywhere on this path.
+  typed.post('/api/v1/admin/collection-filter/direct-rule/save', {
+    preHandler:requirePlatformAdmin,
+    schema:{body:confirmationBody},
+  }, async(request,reply)=>{
+    const {expectedCount,previewToken,confirmationToken,policyRevision,...rule}=request.body;
+    if(!confirmationToken || policyRevision===undefined)
+      return reply.status(409).send({error:'f3_confirmation_token_required'});
+    try {
+      return reply.send(await saveDirectFilterRule(app.db,request.auth!.userId,
+        rule,expectedCount,previewToken,policyRevision,confirmationToken));
+    } catch(error) {
+      if(error instanceof RangeError)
+        return reply.status(409).send({error:error.message});
+      throw error;
+    }
+  });
 
   // L-15: global admin only, DOU OUT_OF_SCOPE only. Preview has a token
   // bound to all current candidate IDs, updated scopes and protections.

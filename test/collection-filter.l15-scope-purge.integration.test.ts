@@ -105,11 +105,11 @@ test('L20 f57e0b03: direct purge and Apagar fora do escopo both delete when conf
       url:'/api/v1/admin/collection-filter/direct-rule/preview',
       headers,payload:directPayload});
     assert.equal(preview.statusCode,200,preview.body);
-    const plan=preview.json<{count:number;token:string}>();
+    const plan=preview.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
     assert.ok(plan.count>=1,'TYPE_CONFLICT_BOTH_EXCLUDED must reach direct-rule preview');
     const confirmed=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',
-      headers,payload:{...directPayload,expectedCount:plan.count,previewToken:plan.token}});
+      headers,payload:{...directPayload,expectedCount:plan.count,previewToken:plan.token,confirmationToken:plan.confirmationToken,policyRevision:plan.policyRevision}});
     assert.equal(confirmed.statusCode,200,confirmed.body);
     assert.equal(confirmed.json<{changed:boolean}>().changed,false);
     assert.ok(confirmed.json<{deletedCount:number}>().deletedCount>=1);

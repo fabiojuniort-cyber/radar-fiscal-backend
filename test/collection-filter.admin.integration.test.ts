@@ -202,7 +202,7 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       url:'/api/v1/admin/collection-filter/direct-rule/preview',
       headers:owner.headers,payload});
     assert.equal(preview.statusCode,200,preview.body);
-    const count=preview.json<{count:number;blockedCompany:number;blockedOtherSource:number;token:string}>();
+    const count=preview.json<{count:number;blockedCompany:number;blockedOtherSource:number;token:string;confirmationToken:string;policyRevision:number}>();
     assert.equal(count.count,1);
     assert.equal(count.blockedCompany,1);
     assert.equal(count.blockedOtherSource,1);
@@ -231,23 +231,22 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
 
     const stale=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',
-      headers:owner.headers,payload:{...payload,expectedCount:count.count,previewToken:count.token}});
-    assert.equal(stale.statusCode,200,stale.body);
-    assert.equal(stale.json<{changed:boolean;count:number;deletedCount:number}>().changed,true);
-    assert.equal(stale.json<{count:number}>().count,2);
-    assert.equal(stale.json<{deletedCount:number}>().deletedCount,0);
+      headers:owner.headers,payload:{...payload,expectedCount:count.count,previewToken:count.token,confirmationToken:count.confirmationToken,policyRevision:count.policyRevision}});
+    assert.equal(stale.statusCode,409,stale.body);
+    assert.equal(stale.json<{error:string}>().error,'f3_confirmation_token_stale_or_policy_revision_changed');
+    // Candidate drift invalidates the revision-bound v2 capability. No deletion.
     assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[pubId])).rowCount,1);
 
     const fresh=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/preview',
       headers:owner.headers,payload});
     assert.equal(fresh.statusCode,200,fresh.body);
-    const approved=fresh.json<{count:number;token:string}>();
+    const approved=fresh.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
     assert.equal(approved.count,2);
 
     const confirm=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',
-      headers:owner.headers,payload:{...payload,expectedCount:approved.count,previewToken:approved.token}});
+      headers:owner.headers,payload:{...payload,expectedCount:approved.count,previewToken:approved.token,confirmationToken:approved.confirmationToken,policyRevision:approved.policyRevision}});
     assert.equal(confirm.statusCode,200,confirm.body);
     assert.equal(confirm.json<{deletedCount:number}>().deletedCount,2);
     const actual=await admin.query("SELECT id FROM publications WHERE id=$1",[pubId]);
@@ -294,12 +293,12 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
       url:'/api/v1/admin/collection-filter/direct-rule/preview',
       headers:owner.headers,payload:noDeleteRule});
     assert.equal(noDeletePreview.statusCode,200,noDeletePreview.body);
-    const zero=noDeletePreview.json<{count:number;token:string}>();
+    const zero=noDeletePreview.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
     assert.equal(zero.count,0);
     const noDeleteConfirm=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',
       headers:owner.headers,
-      payload:{...noDeleteRule,expectedCount:zero.count,previewToken:zero.token}});
+      payload:{...noDeleteRule,expectedCount:zero.count,previewToken:zero.token,confirmationToken:zero.confirmationToken,policyRevision:zero.policyRevision}});
     assert.equal(noDeleteConfirm.statusCode,200,noDeleteConfirm.body);
     assert.equal(noDeleteConfirm.json<{deletedCount:number}>().deletedCount,0);
     const zeroAudit=await admin.query<{after_data:{deletedIds:string[];deletedCount:number}}>(

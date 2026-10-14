@@ -82,14 +82,14 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
       url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:rule});
     previewMs=Math.round(performance.now()-startedPreview);
     assert.equal(preview.statusCode,200,preview.body.slice(0,1500));
-    const info=preview.json<{count:number;blockedCompany:number;blockedOtherSource:number;token:string}>();
+    const info=preview.json<{count:number;blockedCompany:number;blockedOtherSource:number;token:string;confirmationToken:string;policyRevision:number}>();
     assert.equal(info.count,0,'KEEP_ALWAYS must not physically purge benchmark acts');
     assert.match(info.token,/^[a-f0-9]{64}$/);
 
     const startedConfirm=performance.now();
     const confirm=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,
-      payload:{...rule,expectedCount:info.count,previewToken:info.token}});
+      payload:{...rule,expectedCount:info.count,previewToken:info.token,confirmationToken:info.confirmationToken,policyRevision:info.policyRevision}});
     confirmMs=Math.round(performance.now()-startedConfirm);
     assert.equal(confirm.statusCode,200,confirm.body.slice(0,1500));
     assert.equal(confirm.json<{deletedCount:number}>().deletedCount,0);

@@ -170,14 +170,21 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
     if (page.rows.length<500) break;
   }
   hash.update(String(blockedCompany)).update(String(blockedOtherSource));
+  const token=hash.digest('hex');
+  const policyRevision=Number(approved.revision);
+  const confirmationToken=createHash('sha256').update(JSON.stringify([
+    'F3-INC-01-HISTORICAL-PURGE-V2',rule,policyRevision,token,ids.length,
+  ])).digest('hex');
   return {ids,count:ids.length,blockedCompany,blockedOtherSource,
-    blockedCompanyIds,blockedOtherSourceIds,samples,token:hash.digest('hex')};
+    blockedCompanyIds,blockedOtherSourceIds,samples,token,confirmationToken,policyRevision};
 }
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
-    const {count,blockedCompany,blockedOtherSource,samples,token}=await candidates(trx,input);
-    return {count,blockedCompany,blockedOtherSource,samples,token};
+    const {count,blockedCompany,blockedOtherSource,samples,token,
+      policyRevision,confirmationToken}=await candidates(trx,input);
+    return {count,blockedCompany,blockedOtherSource,samples,token,
+      policyRevision,confirmationToken};
   });
 }
 
@@ -189,7 +196,8 @@ export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:
  */
 export async function confirmDirectFilterRule(
   db: Kysely<DB>, userId: string, input: DirectRuleInput,
-  expectedCount: number, previewToken: string, resume = false,
+  expectedCount: number, previewToken: string,
+  policyRevision: number, confirmationToken: string, resume = false,
 ) {
   const started = Date.now();
   return withUserContext(db, userId, async trx => {
@@ -202,6 +210,9 @@ export async function confirmDirectFilterRule(
     )`.execute(trx);
     const rule = validated(input);
     const plan = await candidates(trx,rule);
+    if(plan.policyRevision!==policyRevision ||
+       plan.confirmationToken!==confirmationToken)
+      throw new RangeError('f3_confirmation_token_stale_or_policy_revision_changed');
     if (plan.count !== expectedCount || plan.token !== previewToken) {
       return {changed:true,count:plan.count,blockedCompany:plan.blockedCompany,
         blockedOtherSource:plan.blockedOtherSource,token:plan.token,
@@ -212,7 +223,10 @@ export async function confirmDirectFilterRule(
     if (selection.length) {
       await sql`SELECT public.l17_lock_confirmation_targets(${selection}::uuid[])`.execute(trx);
       const locked = await candidates(trx,rule);
-      if (locked.count !== plan.count || locked.token !== plan.token) {
+      if (locked.policyRevision!==policyRevision ||
+           locked.confirmationToken!==confirmationToken)
+         throw new RangeError('f3_confirmation_token_stale_or_policy_revision_changed');
+       if (locked.count !== plan.count || locked.token !== plan.token) {
         return {changed:true,count:locked.count,blockedCompany:locked.blockedCompany,
           blockedOtherSource:locked.blockedOtherSource,token:locked.token,
           apagadas:0,restantes:locked.count,deletedCount:0};
@@ -281,5 +295,35 @@ export async function confirmDirectFilterRule(
     const current=await candidates(trx,rule);
     return {changed:false,apagadas,restantes:current.count,
       deletedCount:apagadas,revision,elapsedMs:Date.now()-started};
+  });
+}
+
+/**
+ * Non-destructive classification. Saving a rule can never delete a publication;
+ * historical purge requires a separate fresh revision-bound capability.
+ */
+export async function saveDirectFilterRule(
+  db: Kysely<DB>, userId: string, input: DirectRuleInput,
+  expectedCount: number, previewToken: string,
+  policyRevision: number, confirmationToken: string,
+):Promise<{revision:number;deletedCount:0;historicalPurgeRequired:true}> {
+  return withUserContext(db,userId,async trx=>{
+    await sql`SET LOCAL statement_timeout = '11000ms'`.execute(trx);
+    await sql`SET LOCAL lock_timeout = '2500ms'`.execute(trx);
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended('collection-filter-direct-rule',0))`.execute(trx);
+    const rule=validated(input);
+    const plan=await candidates(trx,rule);
+    if(plan.policyRevision!==policyRevision ||
+       plan.confirmationToken!==confirmationToken ||
+       plan.count!==expectedCount || plan.token!==previewToken)
+      throw new RangeError('f3_preview_expired_or_policy_revision_changed');
+    const result=await sql<{policy_revision:number}>`
+      SELECT * FROM collection_filter_direct_set_rule(
+        ${rule.sourceCode},${rule.section},${rule.canonicalType},
+        ${rule.mode},${rule.newTypeId??null}::uuid)
+    `.execute(trx);
+    await validateActiveCollectionFilter(trx);
+    return {revision:Number(result.rows[0]?.policy_revision),
+      deletedCount:0 as const,historicalPurgeRequired:true as const};
   });
 }

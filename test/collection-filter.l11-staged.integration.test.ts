@@ -64,12 +64,12 @@ test('L11: 520 DOU acts in bounded steps, drift, resume and per-step audit', asy
       const res=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',
         headers,payload:rule});
       assert.equal(res.statusCode,200,res.body);
-      return res.json<{count:number;token:string}>();
+      return res.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
     };
-    const confirm=async(p:{count:number;token:string},resume:boolean)=>{
+    const confirm=async(p:{count:number;token:string;confirmationToken:string;policyRevision:number},resume:boolean)=>{
       const start=performance.now();
       const res=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',
-        headers,payload:{...rule,expectedCount:p.count,previewToken:p.token,resume}});
+        headers,payload:{...rule,expectedCount:p.count,previewToken:p.token,confirmationToken:p.confirmationToken,policyRevision:p.policyRevision,resume}});
       const ms=performance.now()-start;
       assert.equal(res.statusCode,200,res.body);
       assert.ok(ms<30000,'each step must respond below 30s, measured '+ms);
@@ -87,10 +87,15 @@ test('L11: 520 DOU acts in bounded steps, drift, resume and per-step audit', asy
     let total=first.result.apagadas;
     await insertActs(1);
     // The old preview count/token must be rejected without further deletion.
-    const stale=await confirm(count,true);
-    assert.equal(stale.result.changed,true);
-    assert.equal(stale.result.apagadas,0);
-    assert.equal(stale.result.count,521-total);
+    const stale=await app.inject({
+      method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',
+      headers,payload:{...rule,expectedCount:count.count,
+        previewToken:count.token,confirmationToken:count.confirmationToken,
+        policyRevision:count.policyRevision,resume:true},
+    });
+    assert.equal(stale.statusCode,409,stale.body);
+    assert.equal(stale.json<{error:string}>().error,'f3_confirmation_token_stale_or_policy_revision_changed');
+    assert.equal((await preview()).count,521-total);
     while (true) {
       count=await preview();
       if(count.count===0)break;
