@@ -232,10 +232,9 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
     const stale=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/direct-rule/confirm',
       headers:owner.headers,payload:{...payload,expectedCount:count.count,previewToken:count.token,confirmationToken:count.confirmationToken,policyRevision:count.policyRevision}});
-    assert.equal(stale.statusCode,200,stale.body);
-    assert.equal(stale.json<{changed:boolean;count:number;deletedCount:number}>().changed,true);
-    assert.equal(stale.json<{count:number}>().count,2);
-    assert.equal(stale.json<{deletedCount:number}>().deletedCount,0);
+    assert.equal(stale.statusCode,409,stale.body);
+    assert.equal(stale.json<{error:string}>().error,'f3_confirmation_token_stale_or_policy_revision_changed');
+    // Candidate drift invalidates the revision-bound v2 capability. No deletion.
     assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[pubId])).rowCount,1);
 
     const fresh=await app.inject({method:'POST',
