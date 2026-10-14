@@ -64,12 +64,12 @@ test('L11: 520 DOU acts in bounded steps, drift, resume and per-step audit', asy
       const res=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',
         headers,payload:rule});
       assert.equal(res.statusCode,200,res.body);
-      return res.json<{count:number;token:string}>();
+      return res.json<{count:number;token:string;confirmationToken:string;policyRevision:number}>();
     };
-    const confirm=async(p:{count:number;token:string},resume:boolean)=>{
+    const confirm=async(p:{count:number;token:string;confirmationToken:string;policyRevision:number},resume:boolean)=>{
       const start=performance.now();
       const res=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',
-        headers,payload:{...rule,expectedCount:p.count,previewToken:p.token,resume}});
+        headers,payload:{...rule,expectedCount:p.count,previewToken:p.token,confirmationToken:p.confirmationToken,policyRevision:p.policyRevision,resume}});
       const ms=performance.now()-start;
       assert.equal(res.statusCode,200,res.body);
       assert.ok(ms<30000,'each step must respond below 30s, measured '+ms);
