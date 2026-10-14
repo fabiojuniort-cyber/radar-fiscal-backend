@@ -260,6 +260,7 @@ export function compileCollectionFilterPolicy(
   }
 
   const aliases = new Map<string, string>();
+  const aliasNames = new Map<string, string>();
   for (const alias of input.aliases ?? []) {
     const sourceCode = normalizedSource(alias.sourceCode);
     const section = normalizedSection(alias.section);
@@ -276,6 +277,7 @@ export function compileCollectionFilterPolicy(
       throw new Error(`conflicting filter alias: ${aliasKey}`);
     }
     aliases.set(aliasKey, canonicalType);
+    aliasNames.set(aliasKey, collectionFilterActName(alias.alias));
   }
 
   const terms: CompiledTerm[] = input.terms.map((term) => {
@@ -302,9 +304,7 @@ export function compileCollectionFilterPolicy(
         : {}),
       ...(term.canonicalType
         ? {
-            canonicalType: normalizeCollectionFilterType(
-              term.canonicalType,
-            ),
+            canonicalType: normalizeCollectionFilterType(collectionFilterActName(term.canonicalType)),
           }
         : {}),
       locationScope: term.locationScope ?? 'ANY',
@@ -333,8 +333,8 @@ export function compileCollectionFilterPolicy(
   }
 
   const patterns = new Map<string, CompiledTypePattern[]>();
-  const addPattern = (pattern: string, rule: CollectionFilterTypeRule, isAlias=false) => {
-    const originalPattern=pattern;
+  const addPattern = (pattern: string, rule: CollectionFilterTypeRule, isAlias=false, identityPattern=pattern) => {
+    const originalPattern=identityPattern;
     pattern=normalizeCollectionFilterType(collectionFilterActName(pattern));
     if(!pattern)return;
     const firstWord = pattern.split(' ')[0] ?? '';
@@ -345,6 +345,14 @@ export function compileCollectionFilterPolicy(
       && existing.rule.canonicalType===pattern)) {
       throw new Error(`conflicting filter rule: ${bucketKey}`);
     }
+    // Saved spellings may collapse to one Name. Keep identities in rules,
+    // but do not evaluate thousands of identical term gates for every title.
+    const same=bucket.find(existing=>existing.pattern===pattern&&existing.rule.mode===rule.mode
+      && existing.rule.actName===rule.actName);
+    if(same){
+      if(rule.canonicalType.localeCompare(same.rule.canonicalType,'en')<0)same.rule=rule;
+      return;
+    }
     bucket.push({ pattern, rule, words: pattern.split(' ').length });
     patterns.set(bucketKey, bucket);
   };
@@ -353,7 +361,7 @@ export function compileCollectionFilterPolicy(
     const [source, section, alias] = aliasKey.split('\u0000');
     if (!source || section === undefined || !alias) continue;
     const rule = rules.get(key(source, section, canonical));
-    if (rule) addPattern(alias, rule, true);
+    if (rule) addPattern(aliasNames.get(aliasKey)??alias, rule, true, alias);
   }
 
   return {
@@ -548,7 +556,7 @@ function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
           term,
           sourceCode,
           section,
-          canonicalType,
+          normalizeCollectionFilterType(rule.actName??collectionFilterActName(canonicalType)),
           location.location,
         )
       ) {

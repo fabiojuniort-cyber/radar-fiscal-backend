@@ -50,3 +50,23 @@ test('existing saved identities and modes are never rewritten; normalization col
   assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 1',evidenceComplete:true}).decision,'KEEP');
   assert.equal(JSON.stringify(rules),before);
 });
+
+test('rules, aliases and term scopes share the same name before punctuation is lost in identity keys',()=>{
+  const p=compileCollectionFilterPolicy({version:1,contextWindowWords:5,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},
+    rules:[{sourceCode:'dou',section:'DO1',canonicalType:'DESPACHO - SUBSTITUTO',mode:'KEEP_IF_TAX_TERM'}],
+    aliases:[{sourceCode:'dou',section:'DO1',alias:'COMUNICADO (INTERNO)',canonicalType:'DESPACHO - SUBSTITUTO'}],
+    terms:[{text:'ICMS',strength:'STRONG',canonicalType:'DESPACHO (INTERNO)'}]});
+  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Despacho Nº 10',body:'ICMS',evidenceComplete:true}).reasonCode,'STRONG_TERM');
+  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 10',body:'ICMS',evidenceComplete:true}).reasonCode,'STRONG_TERM');
+});
+
+test('thousands of legacy numeric spellings collapse in memory without dropping saved identities',()=>{
+  const rules=Array.from({length:3000},(_,n)=>({sourceCode:'dou',section:'DO1',
+    canonicalType:'COMUNICADO '+n,mode:'EXCLUDE_ALWAYS' as const}));
+  const p=compileCollectionFilterPolicy({version:1,contextWindowWords:5,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},rules,terms:[]});
+  assert.equal(p.rules.size,3000);
+  assert.equal([...p.patterns.values()].flat().length,1);
+  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 10',evidenceComplete:true}).decision,'DISCARD');
+});

@@ -154,7 +154,9 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
     if (!page.rows.length) break;
     for (const item of page.rows) {
       const decision=evaluateHistoricalCollectionCandidate(engine,item);
-      if (decision.decision!=='DISCARD' || decision.canonicalType!==rule.canonicalType ||
+      if (decision.decision!=='DISCARD' || !decision.canonicalType ||
+          normalizeCollectionFilterType(collectionFilterActName(decision.canonicalType??''))!==
+            normalizeCollectionFilterType(collectionFilterActName(rule.canonicalType)) ||
           decision.mode!==rule.mode || decision.matchedSection!==normalizeCollectionFilterType(rule.section)) continue;
       hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
         item.source_act_type,item.section,item.provenance_conflict,

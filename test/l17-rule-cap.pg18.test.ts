@@ -34,7 +34,7 @@ export async function runL17RuleCapStress():Promise<void>{
     const n=3000;
     await admin.query(
       "INSERT INTO collection_filter_type_rules(policy_id,source_code,section,canonical_type,mode) "+
-      "SELECT $1,'dou','DO1E','L17 PERF TYPE '||lpad(i::text,4,'0'),'EXCLUDE_ALWAYS' "+
+      "SELECT $1,'dou','DO1E','L17 PERF TYPE T'||lpad(i::text,4,'0'),'EXCLUDE_ALWAYS' "+
       "FROM generate_series(1,$2::integer) i "+
       "ON CONFLICT(policy_id,source_code,section,canonical_type) DO UPDATE SET mode=EXCLUDED.mode",
       [policy,n]);
@@ -42,8 +42,8 @@ export async function runL17RuleCapStress():Promise<void>{
     await admin.query(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,act_type,title,primary_official_url) "+
       "SELECT encode(digest($1||i::text,'sha256'),'hex'),'STRONG','{}'::jsonb,'FEDERAL',"+
-      "'L17 PERF TYPE '||lpad((((i-1)%3000)+1)::text,4,'0'),"+
-      "$2||lpad(i::text,4,'0'),'https://l17-benchmark.example.test/'||$1||'/'||i::text "+
+      "'L17 PERF TYPE T'||lpad((((i-1)%3000)+1)::text,4,'0'),"+
+      "'L17 PERF TYPE T'||lpad((((i-1)%3000)+1)::text,4,'0')||' - '||$2||lpad(i::text,4,'0'),'https://l17-benchmark.example.test/'||$1||'/'||i::text "+
       "FROM generate_series(1,$3::integer) i",
       [label,'L17_perf_'+label+'_',records]);
     await admin.query(
@@ -56,14 +56,14 @@ export async function runL17RuleCapStress():Promise<void>{
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
       "SELECT p.id,$1,p.primary_official_url,jsonb_build_object('dou',jsonb_build_object('section','DO1E','sourceActType',p.act_type)) "+
-      "FROM publications p WHERE p.title LIKE $2",
-      [source,'L17_perf_'+label+'_%']);
+      "FROM publications p WHERE p.primary_official_url LIKE $2",
+      [source,'https://l17-benchmark.example.test/'+label+'/%']);
     await admin.query(
       "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
       "SELECT p.id,1,encode(digest('body'||p.id::text,'sha256'),'hex'),"+
       "'Texto administrativo sem termos fiscais.',true,jsonb_build_object('dou',jsonb_build_object('section','DO1E','sourceActType',p.act_type)) "+
-      "FROM publications p WHERE p.title LIKE $1",
-      ['L17_perf_'+label+'_%']);
+      "FROM publications p WHERE p.primary_official_url LIKE $1",
+      ['https://l17-benchmark.example.test/'+label+'/%']);
     const started=performance.now();
     const res=await app.inject({method:'POST',
       url:'/api/v1/admin/collection-filter/out-of-scope/preview',headers});
