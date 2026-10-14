@@ -181,8 +181,10 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
-    const {count,blockedCompany,blockedOtherSource,samples,token}=await candidates(trx,input);
-    return {count,blockedCompany,blockedOtherSource,samples,token};
+    const {count,blockedCompany,blockedOtherSource,samples,token,
+      policyRevision,confirmationToken}=await candidates(trx,input);
+    return {count,blockedCompany,blockedOtherSource,samples,token,
+      policyRevision,confirmationToken};
   });
 }
 
