@@ -55,3 +55,21 @@ test('strict explicit arguments: no defaults, unknown and duplicate flags reject
  assert.throws(()=>parseOptions(['--mode=apply','--mode=plan']),/INVALID_ARGUMENT/);
  assert.throws(()=>parseOptions(['--force=true']),/INVALID_ARGUMENT/);
 });
+
+test('CLI main catch prints strict F2 codes and redacts unexpected errors, DSNs and input paths',async()=>{
+ const {spawnSync}=await import('node:child_process');
+ const {fileURLToPath}=await import('node:url');
+ const cli=fileURLToPath(new URL('../ops/taxonomy/f2-production-load.mjs',import.meta.url));
+ const run=args=>spawnSync(process.execPath,[cli,...args],{encoding:'utf8'});
+ const expected=run([]);
+ assert.equal(expected.status,1);
+ assert.equal(expected.stdout,'');
+ assert.equal(expected.stderr.trim(),'F2_REQUIRED_ARGUMENT');
+ const privateInput='postgresql://private-user:private-password@prod.internal/secret?payload=private';
+ const unexpected=run(['--mode=plan','--segmento='+privateInput,
+  '--produto=missing.xlsx','--backup=missing.dump','--backup-manifest=missing.json']);
+ assert.equal(unexpected.status,1);
+ assert.equal(unexpected.stdout,'');
+ assert.equal(unexpected.stderr.trim(),'F2_LOAD_BLOCK: preflight or transaction failed; no automatic retry. See runbook.');
+ assert.doesNotMatch(unexpected.stderr,/private-user|private-password|prod\.internal|payload|ENOENT|stack/i);
+});
