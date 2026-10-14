@@ -199,7 +199,7 @@ test('053: index-backed actual first 500-item purge with 535k collection_items (
     previewMs = Math.round(performance.now() - p0);
     assert.equal(preview.statusCode, 200, preview.body);
     const p = preview.json<{ count: number; token: string; blockedCompany: number;
-      blockedOtherSource: number }>();
+      blockedOtherSource: number;confirmationToken:string;policyRevision:number }>();
     assert.equal(p.count, PURGE_TARGETS);
     assert.equal(p.blockedCompany, 0);
     assert.equal(p.blockedOtherSource, 0);
@@ -208,7 +208,7 @@ test('053: index-backed actual first 500-item purge with 535k collection_items (
     const confirm = await app.inject({
       method: 'POST', url: '/api/v1/admin/collection-filter/direct-rule/confirm',
       headers,
-      payload: { ...rule, expectedCount: p.count, previewToken: p.token },
+      payload: { ...rule, expectedCount: p.count, previewToken: p.token,confirmationToken:p.confirmationToken,policyRevision:p.policyRevision },
     });
     purgeMs = Math.round(performance.now() - t0);
     assert.equal(confirm.statusCode, 200, confirm.body);
