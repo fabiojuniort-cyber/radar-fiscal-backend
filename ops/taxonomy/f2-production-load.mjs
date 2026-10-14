@@ -117,5 +117,5 @@ export async function main(args=process.argv.slice(2)) {
  finally {await pool.end();}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
- main().catch(()=>{console.error('F2_LOAD_BLOCK: preflight or transaction failed; no automatic retry. See runbook.');process.exitCode=1;});
+ main().catch(error=>{const code=error instanceof Error&&/^F2_[A-Z_]+$/.test(error.message)?error.message:null;console.error(code??'F2_LOAD_BLOCK: preflight or transaction failed; no automatic retry. See runbook.');process.exitCode=1;});
 }
