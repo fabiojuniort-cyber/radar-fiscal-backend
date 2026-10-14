@@ -17,7 +17,6 @@ const CODE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/;
 const NCM = /^\d{2}(?:\d{2}){0,3}$/;
 const CNAE = /^\d{7}$/;
 const LENGTH = { sector: 1332, product: 4225 } as const;
-const HIDE_GENERIC_MATCHES = false;
 
 interface Batch {
   id: string;
