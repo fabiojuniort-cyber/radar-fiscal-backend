@@ -147,7 +147,24 @@ async function main(){
     target:{projectId:PROJECT,host:prodUrl.hostname,database:decodeURIComponent(prodUrl.pathname).slice(1)}
   };
   // One private local attestation file only, after all 8/8 checks.
-  await writeFile(VERIFIED,JSON.stringify(manifest)+'\n',{mode:0o600,flag:'wx'});
+  try{
+    await writeFile(VERIFIED,JSON.stringify(manifest)+'\n',{mode:0o600,flag:'wx'});
+  }catch(e){
+    // The previous click already wrote the verified manifest. Never fail
+    // a fresh 8/8 read-only comparison simply because the file exists.
+    if(e?.code!=='EEXIST')throw e;
+    const recorded=JSON.parse(await readFile(VERIFIED,'utf8'));
+    if(recorded?.sha256!==BACKUP_SHA||
+       recorded?.restoreVerifiedSha256!==BACKUP_SHA||
+       recorded?.startedAt!==STARTED||
+       !Number.isFinite(Date.parse(recorded?.restoreVerifiedAt??''))||
+       Date.parse(recorded.restoreVerifiedAt)<startedMs||
+       Date.parse(recorded.restoreVerifiedAt)>Date.now()||
+       recorded?.target?.projectId!==PROJECT||
+       recorded?.target?.host!==prodUrl.hostname||
+       recorded?.target?.database!==decodeURIComponent(prodUrl.pathname).slice(1))
+      fail('F2_RESTORE_MANIFEST_ALREADY_EXISTS_MISMATCH');
+  }
   console.log('F2_LOAD08_VALIDATOR_TEST=PASS taxonomy_f2_import_batches');
   console.log('F2_LOAD08_RESTORE_COUNTS=PASS 8/8 '+NAMES.map(n=>n+'='+actual[n]).join(' '));
   console.log('F2_LOAD08_BACKUP=PASS SHA256='+BACKUP_SHA+' RESTORE_VERIFIED=true');
