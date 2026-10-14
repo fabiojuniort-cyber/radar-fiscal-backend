@@ -10,8 +10,12 @@ test('production entrypoint transaction on isolated PG18: rollback, two jobs and
  try{
   const identity=(await pool.query("SELECT current_database() AS db,current_setting('server_version_num')::int AS version")).rows[0];
   assert.equal(identity.db,'radar_fiscal_test');assert.ok(identity.version>=180000);
-  const empty=await pool.query('SELECT count(*)::int AS n FROM taxonomy_f2_import_batches');
-  assert.equal(empty.rows[0].n,0,'dedicated fresh CI PG18 required');
+  const baseline=(await pool.query('SELECT (SELECT count(*)::int FROM taxonomy_f2_import_batches) AS batches,'+
+   '(SELECT count(*)::int FROM taxonomy_f2_import_segment_rows) AS segments,'+
+   '(SELECT count(*)::int FROM taxonomy_f2_import_product_rows) AS products')).rows[0];
+  const cohort=await pool.query('SELECT count(*)::int AS n FROM taxonomy_f2_import_batches WHERE segmento_sha256=$1 AND produto_sha256=$2',
+   [F2_SOURCE.segmento.sha256,F2_SOURCE.produto.sha256]);
+  assert.equal(cohort.rows[0].n,0,'approved cohort must not already exist in this isolated test');
   const labels=[['Serviço',505],['Indústria',370],['Comércio atacadista',115],['Produtor rural',107],
    ['Comércio varejista',86],['Transportador',44],['Extração mineral',40],['Locação e licenciamento',20],
    ['Institucional',19],['Representação comercial',15],['Energia e utilidades',8],['Armazém',3]];
@@ -37,9 +41,9 @@ test('production entrypoint transaction on isolated PG18: rollback, two jobs and
   const rolled=(await pool.query('SELECT (SELECT count(*)::int FROM taxonomy_f2_import_batches) AS batches,'+
    '(SELECT count(*)::int FROM taxonomy_f2_import_segment_rows) AS segments,'+
    '(SELECT count(*)::int FROM taxonomy_f2_import_product_rows) AS products')).rows[0];
-  assert.deepEqual(rolled,{batches:0,segments:0,products:0});
+  assert.deepEqual(rolled,baseline);
   const first=await executeF2Load(pool,payload,gate);
-  assert.deepEqual(first.before,rolled);assert.deepEqual(first.after,{batches:1,segments:1332,products:4225});
+  assert.deepEqual(first.before,rolled);assert.deepEqual(first.after,{batches:baseline.batches+1,segments:baseline.segments+1332,products:baseline.products+4225});
   assert.equal(first.readback,'PASS');assert.equal(first.liveTaxonomyChanges,0);
   const second=await executeF2Load(pool,payload,gate);
   assert.equal(second.batchId,first.batchId);
@@ -48,6 +52,6 @@ test('production entrypoint transaction on isolated PG18: rollback, two jobs and
   // Altered source cells with the same source identifiers must not overwrite.
   const forged=structuredClone(payload);forged.contentSha256='b'.repeat(64);
   await assert.rejects(executeF2Load(pool,forged,gate),/EXISTING_BATCH_CONFLICT/);
-  assert.equal((await pool.query('SELECT count(*)::int AS n FROM taxonomy_f2_import_batches')).rows[0].n,1);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM taxonomy_f2_import_batches')).rows[0].n,baseline.batches+1);
  }finally{await pool.end();}
 });
