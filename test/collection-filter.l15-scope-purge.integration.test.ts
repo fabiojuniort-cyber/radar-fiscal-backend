@@ -341,13 +341,13 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(preview.statusCode,200,preview.body);
     const plan=preview.json<{count:number;outOfScope:number;ruleDiscards:number;byRule:Array<{count:number}>;hiddenLegacy:number;blockedCompany:number;
       blockedOtherSource:number;token:string}>();
-    assert.equal(plan.count,5);
+    assert.equal(plan.count,4);
     assert.equal(plan.outOfScope,2);
     assert.equal(plan.ruleDiscards,1);
     assert.equal(plan.byRule.reduce((n,r)=>n+r.count,0),1);
-    assert.equal(plan.hiddenLegacy,2);
-    assert.equal(plan.blockedCompany,2);
-    assert.equal(plan.blockedOtherSource,2);
+    assert.equal(plan.hiddenLegacy,1);
+    assert.equal(plan.blockedCompany,1);
+    assert.equal(plan.blockedOtherSource,1);
     assert.match(plan.token,/^[a-f0-9]{64}$/);
 
     const rejected=await app.inject({method:'POST',url:confirmRoute,headers,
@@ -357,9 +357,9 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
     assert.equal(rejected.json<{changed:boolean;apagadas:number}>().apagadas,0);
 
     const applied=await app.inject({method:'POST',url:confirmRoute,headers,
-      payload:{expectedCount:5,previewToken:plan.token}});
+      payload:{expectedCount:4,previewToken:plan.token}});
     assert.equal(applied.statusCode,200,applied.body);
-    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,5);
+    assert.equal(applied.json<{apagadas:number;restantes:number}>().apagadas,4);
     assert.equal(applied.json<{apagadas:number;restantes:number}>().restantes,0);
     const present=await db.query<{id:string}>(
       'SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids],
@@ -370,9 +370,9 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       [Object.values(hiddenIds)],
     );
     assert.deepEqual(new Set(hiddenRemaining.rows.map(x=>x.id)),new Set([
-      hiddenIds['hidden-company'],hiddenIds['hidden-other'],
+      hiddenIds.hidden,hiddenIds['hidden-company'],hiddenIds['hidden-other'],
     ]));
-    const removedIds=[ids[0]!,hiddenIds.hidden!,hiddenIds['hidden-scope']!,hiddenRuleId,hiddenIds['hidden-non-dou']!];
+    const removedIds=[ids[0]!,hiddenIds['hidden-scope']!,hiddenRuleId,hiddenIds['hidden-non-dou']!];
     const audit=await db.query<{deleted:string}>(
       "SELECT COALESCE(sum((after_data->>'deletedCount')::integer),0)::text AS deleted "+
       "FROM audit_log a WHERE action='COLLECTION_FILTER_DIRECT_PURGE' "+
@@ -380,14 +380,14 @@ test('L15: only admin, DOU scoped preview, cross-source/company protections and 
       "WHERE d.id::uuid=ANY($1::uuid[]))",
       [removedIds],
     );
-    assert.equal(Number(audit.rows[0]?.deleted),5,'051 append-only audit per committed sub-batch');
+    assert.equal(Number(audit.rows[0]?.deleted),4,'051 append-only audit per committed sub-batch');
     const archived=await db.query<{id:string;discard_origin:string;archive_publication_id:string;
       reason_code:string;official_url:string;collection_run_id:string|null}>(
       "SELECT id,discard_origin,archive_publication_id,reason_code,official_url,collection_run_id "+
       "FROM collection_filter_discards WHERE archive_publication_id=ANY($1::uuid[])",
       [removedIds],
     );
-    assert.equal(archived.rowCount,5,'every physically purged publication gets one archive discard');
+    assert.equal(archived.rowCount,4,'every physically purged publication gets one archive discard');
     for(const row of archived.rows){
       assert.equal(row.discard_origin,'ARCHIVE');
       assert.equal(row.reason_code,'ARCHIVE_PURGE');
@@ -430,7 +430,7 @@ test('L10: index-backed dry-run and least-privilege batch without manual deletio
   } finally { await db.end(); }
 });
 
-test('L17: worker-only hidden cleanup protects tenant/cross-source and audits synthetic batch',async()=>{
+test('L17: F3 revokes unattended hidden cleanup and preserves every synthetic publication',async()=>{
   const admin=new Pool({connectionString:url,max:1});
   const workerUrl=new URL(url);
   workerUrl.username='radar_worker_runtime';
@@ -443,7 +443,7 @@ test('L17: worker-only hidden cleanup protects tenant/cross-source and audits sy
       "has_function_privilege('radar_worker','public.l17_prune_hidden_batch(integer)','EXECUTE') AS worker"
     );
     assert.equal(permission.rows[0]?.app,false);
-    assert.equal(permission.rows[0]?.worker,true);
+    assert.equal(permission.rows[0]?.worker,false);
     if(!(await admin.query("SELECT id FROM collection_filter_policies WHERE status='APPROVED'")).rowCount) {
       await admin.query(
         "INSERT INTO collection_filter_policies(version,status,approved_at) "+
@@ -474,26 +474,11 @@ test('L17: worker-only hidden cleanup protects tenant/cross-source and audits sy
       'INSERT INTO publication_origins(publication_id,source_id,official_url) VALUES($1,$2,$3)',
       [cross,other,'https://l17-cross.example.test/'+cross],
     );
-    const removed=await worker.query<{deleted:number}>(
-      'SELECT public.l17_prune_hidden_batch(20) AS deleted');
-    assert.equal(removed.rows[0]?.deleted,1);
-    const still=await admin.query<{id:string}>(
-      'SELECT id FROM publications WHERE id=ANY($1::uuid[])',[[safe,cross]]);
-    assert.deepEqual(still.rows.map(r=>r.id),[cross]);
-    const logged=await admin.query<{count:string}>(
-      "SELECT count(*)::text AS count FROM audit_log WHERE action='L17_HIDDEN_PURGE' "+
-      "AND actor_type='SYSTEM' AND after_data->>'deletedCount'='1' "+
-      "AND after_data->'deletedIds' ? $1",[safe],
-    );
-    assert.ok(Number(logged.rows[0]?.count)>=1,'worker purge audit required');
-    const archive=await admin.query<{reason_code:string;discard_origin:string;collection_run_id:string|null}>(
-      'SELECT reason_code,discard_origin,collection_run_id FROM collection_filter_discards WHERE archive_publication_id=$1',
-      [safe],
-    );
-    assert.equal(archive.rowCount,1,'scheduled physical purge must preserve the archive discard');
-    assert.deepEqual(archive.rows[0],{reason_code:'ARCHIVE_PURGE',discard_origin:'ARCHIVE',collection_run_id:null});
-    assert.equal((await worker.query<{claimed:boolean}>(
-      'SELECT public.l17_claim_hidden_day() AS claimed')).rows[0]?.claimed,false);
+    await assert.rejects(worker.query('SELECT public.l17_prune_hidden_batch(20)'),{code:'42501'});
+    const still=await admin.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[[safe,cross]]);
+    assert.equal(still.rowCount,2);
+    assert.equal((await admin.query('SELECT 1 FROM collection_filter_discards WHERE archive_publication_id=$1',[safe])).rowCount,0);
+
   }finally {
     await worker.end();
     await admin.end();
@@ -557,7 +542,7 @@ test('L17: DO1E RESOLUÇÃO CIT-SNC/MINC matches historical purge and runtime de
   }
 });
 
-test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Resolução provenance and writes archive audit',async()=>{
+test('L17: worker PG18 evaluates EXCLUDE_ALWAYS but cannot run unattended deletion',async()=>{
   const admin=new Pool({connectionString:url,max:1});
   const workerUrl=new URL(url);
   workerUrl.username='radar_worker_runtime';
@@ -627,27 +612,14 @@ test('L17: worker PG18 EXCLUDE_ALWAYS reuses shared engine, preserves generic Re
       assert.equal(decision.decision,'DISCARD');
       assert.equal(decision.reasonCode,'EXCLUDE_ALWAYS');
       await client.query('SELECT public.l17_lock_worker_always_targets($1::uuid[])',[[id]]);
-      const result=await client.query<{deleted:number}>(
-        'SELECT public.l17_prune_always_batch($1::uuid[],$2::text[],$3::uuid,$4,$5,$6) AS deleted',
-        [[id],[bodyHash],policy.id,policy.revision,'DO1E','RESOLUCAO CIT SNC MINC'],
-      );
-      assert.equal(result.rows[0]?.deleted,1);
-      await client.query('COMMIT');
+      await assert.rejects(client.query(
+        'SELECT public.l17_prune_always_batch($1::uuid[],$2::text[],$3::uuid,$4,$5,$6)',
+        [[id],[bodyHash],policy.id,policy.revision,'DO1E','RESOLUCAO CIT SNC MINC']),{code:'42501'});
+      await client.query('ROLLBACK');
     }catch(error){await client.query('ROLLBACK');throw error;}
     finally{client.release();}
-    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[id])).rowCount,0);
-    const archived=await admin.query<{reason_code:string;discard_origin:string}>(
-      "SELECT reason_code,discard_origin FROM collection_filter_discards "+
-      "WHERE archive_publication_id=$1",[id],
-    );
-    assert.equal(archived.rowCount,1);
-    assert.equal(archived.rows[0]?.reason_code,'ARCHIVE_PURGE');
-    assert.equal(archived.rows[0]?.discard_origin,'ARCHIVE');
-    const audit=await admin.query<{n:string}>(
-      "SELECT count(*)::text AS n FROM audit_log WHERE action='L17_RULE_PURGE' "+
-      "AND after_data->'deletedIds' ? $1",[id],
-    );
-    assert.equal(Number(audit.rows[0]?.n),1);
+    assert.equal((await admin.query('SELECT id FROM publications WHERE id=$1',[id])).rowCount,1);
+    assert.equal((await admin.query('SELECT 1 FROM collection_filter_discards WHERE archive_publication_id=$1',[id])).rowCount,0);
   }finally{await worker.end();await admin.end();}
 });
 
@@ -730,16 +702,15 @@ test('L18 PG18: cross-source 029 and DOE-SP type mismatch are distinct, guarded 
     assert.equal(pre.statusCode,200,pre.body);
     const plan=pre.json<{count:number;hiddenLegacy:number;suspectDoe:number;
       blockedCompany:number;blockedOtherSource:number;token:string}>();
-    assert.ok(plan.hiddenLegacy>=2,'029 must include DOE-SP and the unrelated source');
-    assert.ok(plan.suspectDoe>=1,'DOE-SP title mismatch must be separate');
-    assert.ok(plan.blockedCompany>=1,'company link protected');
-    assert.ok(plan.blockedOtherSource>=1,'multiple official sources protected');
+    assert.ok(plan.hiddenLegacy>=1,'unrelated-source legacy cleanup remains available');
+    assert.equal(plan.suspectDoe,0,'DOE-SP mismatch alone is not a deletion policy');
+    // F3 KEEP/UNKNOWN rows do not enter deletion or protection counters.
     const confirmed=await app.inject({method:'POST',url:confirmRoute,headers,payload:{
       expectedCount:plan.count,previewToken:plan.token,
     }});
     assert.equal(confirmed.statusCode,200,confirmed.body);
     assert.equal(confirmed.json<{changed:boolean}>().changed,false);
-    for(const key of ['legacyDoe','legacyOther','doeMismatch']){
+    for(const key of ['legacyOther']){
       assert.equal((await admin.query('SELECT 1 FROM publications WHERE id=$1',[ids[key]])).rowCount,0,key+' should be purged');
       const archived=await admin.query<{source_code:string;discard_origin:string}>(
         "SELECT source_code,discard_origin FROM collection_filter_discards "+
@@ -748,7 +719,7 @@ test('L18 PG18: cross-source 029 and DOE-SP type mismatch are distinct, guarded 
       assert.equal(archived.rows[0]?.discard_origin,'ARCHIVE');
       assert.equal(archived.rows[0]?.source_code,key==='legacyOther'?'l18-other-'+suffix:'doe-sp');
     }
-    for(const key of ['doeCorrect','otherMismatch','protectedOrigin','protectedCompany']){
+    for(const key of ['legacyDoe','doeMismatch','doeCorrect','otherMismatch','protectedOrigin','protectedCompany']){
       assert.equal((await admin.query('SELECT 1 FROM publications WHERE id=$1',[ids[key]])).rowCount,1,key+' must be preserved');
     }
     const post=await app.inject({method:'POST',url:previewRoute,headers});

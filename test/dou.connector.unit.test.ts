@@ -50,7 +50,7 @@ test('collector never requests DO2/DO2E and exposes the four-section policy lite
   assert.deepEqual((result.metadata!.dou as any).sections, ['DO1', 'DO1E', 'DO3', 'DO3E']);
 });
 
-test('assembled contract excerpts preserve relevant body, abstract and continuation signals before filtering', async () => {
+test('F3 forwards routine contracts and relevant/uncertain excerpts to the shared type policy', async () => {
   const routine = 'Contratante: União. Contratada: Alfa Ltda. CNPJ: 12.345.678/0001-90. Pregão Eletrônico nº 7/2026. Objeto: aquisição de papel A4. Valor Global: R$ 1.000. Vigência: 12 meses.';
   const title = 'EXTRATO DE CONTRATO Nº 7/2026';
   const entry = (id: string, content: string, abstract = '', heading = title, part?: number) => ({
@@ -82,20 +82,27 @@ test('assembled contract excerpts preserve relevant body, abstract and continuat
 
   assert.deepEqual(result.partialFailures, []);
   assert.deepEqual(result.publications.map(publication => [publication.externalId, publication.metadata?.douScope]), [
+    ['111', 'CONTRATACAO_ADMINISTRATIVA_ROTINEIRA', 'IGNORE', ['procurement_structure_confirmed', 'routine_object_office_supplies']],
     ['112', 'EMPRESARIAL_RELEVANTE', 'KEEP', ['corporate_reorganization', 'corporate_succession']],
     ['113', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
     ['114', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
     ['115', 'EMPRESARIAL_RELEVANTE', 'KEEP', ['corporate_reorganization']],
     ['116', 'AMBIGUO', 'REVIEW', ['possible_tax_relevance']],
+    ['117', 'CONTRATACAO_ADMINISTRATIVA_ROTINEIRA', 'IGNORE', ['procurement_structure_confirmed', 'routine_object_office_supplies']],
     ['118', 'TRIBUTARIO_FISCAL', 'KEEP', ['tax_exemption_reduction_or_suspension']],
     ['119', 'AMBIGUO', 'REVIEW', ['incomplete_text_structure']],
-  ].map(([id, category, decision, reasonCodes]) => [`2026-09-18:DO3:180:${id}`, { ruleVersion: 'dou-scope-v4', category, decision, reasonCodes }]));
+  ].map(([id, category, decision, reasonCodes]) => [`2026-09-18:DO3:180:${id}`, { ruleVersion: 'dou-scope-v4', category, decision, reasonCodes, informationalOnly: true }]));
   assert.ok(result.publications.every(publication => publication.title === title && publication.actType === 'EXTRATO DE CONTRATO'));
   const metadata = result.metadata!.dou as any;
   assert.equal(metadata.assembledMatterCount, 9);
-  assert.equal(metadata.publicationCount, 7);
-  assert.equal(metadata.scope.ignoredCount, 2);
-  assert.equal(metadata.scope.ignoredByCategory.CONTRATACAO_ADMINISTRATIVA_ROTINEIRA, 2);
+  assert.equal(metadata.publicationCount, 9);
+  assert.equal(metadata.scope.ignoredCount, 0);
+  assert.deepEqual(metadata.scope.ignoredByCategory, {});
+  assert.deepEqual(metadata.scope.ignoredReferences, []);
+  assert.equal(metadata.scope.informationalOnly, true);
+  assert.equal(metadata.scope.legacyIgnoreCount, 2);
+  assert.equal(metadata.scope.legacyIgnoreByCategory.CONTRATACAO_ADMINISTRATIVA_ROTINEIRA, 2);
+  assert.equal(metadata.scope.legacyIgnoreReferences.length, 2);
 });
 
 test('changed package is parsed again without treating whole archive hash as publication content',async()=>{

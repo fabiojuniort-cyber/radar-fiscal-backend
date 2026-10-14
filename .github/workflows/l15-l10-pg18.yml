@@ -6,10 +6,15 @@ on:
     paths:
       - 'migrations/054_l15_scope_purge_and_l10_runner.sql'
       - 'migrations/055_collection_items_created_at_index.sql'
+      - 'migrations/069_f3_unified_type_decision.sql'
+      - 'src/modules/collection/collection-filter.*.ts'
+      - 'src/modules/collection/collection.engine.ts'
+      - 'src/api/routes/catalog-monitoring.route.ts'
       - 'src/modules/collection/collection-filter.scope-purge.ts'
       - 'src/scheduler.ts'
       - 'src/api/routes/collection-filter-admin.route.ts'
       - 'test/collection-filter.l15-scope-purge.integration.test.ts'
+      - 'test/collection-filter.f3*.test.ts'
       - '.github/workflows/l15-l10-pg18.yml'
 
 permissions:
@@ -57,3 +62,7 @@ jobs:
         run: npm run db:prepare
       - name: Guarded L15 preview/confirm and L10 privileges on PG18
         run: npx tsx --test test/collection-filter.l15-scope-purge.integration.test.ts
+      - name: F3 shared decisions, preview confirmations and company/origin guards
+        run: npx tsx --test test/collection-filter.f3.integration.test.ts
+      - name: F3 physical survivors across lists, detail, facets and public counters
+        run: npx tsx --test test/collection-filter.f3-catalog.integration.test.ts

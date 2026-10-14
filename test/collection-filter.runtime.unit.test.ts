@@ -94,7 +94,7 @@ test('runtime DOU adapter keeps strong tax signal', () => {
 test('runtime DOU adapter keeps unknown type for New Types review', () => {
   const result = evaluateRuntimeCollectionFilter(
     runtime,
-    publication({ actType: 'TIPO AINDA NAO MAPEADO' }),
+    publication({ actType: 'TIPO AINDA NAO MAPEADO', title: 'TIPO AINDA NAO MAPEADO' }),
   );
   assert.equal(result.decision.decision, 'KEEP');
   assert.equal(result.decision.reasonCode, 'UNKNOWN_TYPE');
@@ -146,8 +146,8 @@ test('L17: generic DOU sourceActType Resolução is compatible with specific CIT
     ...realShape,
     originMetadata: { dou: { section: 'DO1E', sourceActType: 'Portaria' } },
   }));
-  assert.equal(unrelated.decision.decision, 'KEEP');
-  assert.equal(unrelated.decision.reasonCode, 'TYPE_CONFLICT');
+  assert.equal(unrelated.decision.decision, 'DISCARD');
+  assert.equal(unrelated.decision.reasonCode, 'EXCLUDE_ALWAYS');
 });
 
 
@@ -206,7 +206,7 @@ test('L-20 f57e0b03 fixture: DOU/DO3 mismatch between Aviso de Dispensa and Avis
   });
   const result=evaluateRuntimeCollectionFilter(bothExcluded,fixture);
   assert.deepEqual([result.decision.decision,result.decision.reasonCode],
-    ['DISCARD','TYPE_CONFLICT_BOTH_EXCLUDED']);
+    ['DISCARD','EXCLUDE_ALWAYS']);
   const keepRuntime:ApprovedCollectionFilterRuntime={
     ...bothExcluded,
     policy:compileCollectionFilterPolicy({
@@ -219,5 +219,5 @@ test('L-20 f57e0b03 fixture: DOU/DO3 mismatch between Aviso de Dispensa and Avis
     }),
   };
   const keep=evaluateRuntimeCollectionFilter(keepRuntime,fixture);
-  assert.deepEqual([keep.decision.decision,keep.decision.reasonCode],['KEEP','TYPE_CONFLICT']);
+  assert.deepEqual([keep.decision.decision,keep.decision.reasonCode],['DISCARD','EXCLUDE_ALWAYS']);
 });

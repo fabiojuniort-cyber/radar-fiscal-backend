@@ -67,10 +67,10 @@ export class DouConnector implements CollectionConnector {
     const partialFailures: ConnectorPartialFailure[] = [];
     const receipts: Record<string, string> = { ...state.archives };
     const archives: Array<Record<string, unknown>> = []; let available = 0; let xmlCount = 0; let mediaCount = 0;
-    let assembledMatterCount = 0; let scopeIgnoredCount = 0;
+    let assembledMatterCount = 0; let legacyIgnoreCount = 0;
     let publicationCount = 0; let embeddedActCount = 0; let confazMatterCount = 0;
-    const scopeIgnoredByCategory: Record<string, number> = {};
-    const scopeIgnoredReferences: Array<Record<string, unknown>> = [];
+    const legacyIgnoreByCategory: Record<string, number> = {};
+    const legacyIgnoreReferences: Array<Record<string, unknown>> = [];
     const editions = new Set<string>();
     try {
       await client.login(context.signal);
@@ -108,18 +108,18 @@ export class DouConnector implements CollectionConnector {
           }
           const archive: DouArchiveContext = { filename, date, section, officialUrl: download.officialUrl, rawSha256: download.rawSha256 };
           let sourceMatterCount = 0; let archivePublicationCount = 0; let archiveEmbeddedActCount = 0;
-          let archiveIgnoredCount = 0;
+          let archiveLegacyIgnoreCount = 0;
           const parsed = await parseDouZip(download.bytes, archive, context.signal, async publication => {
             const data = publication.metadata?.dou as { edition: string; embeddedAct?: boolean };
             editions.add(`${date}:${data.edition}`);
             if (data.embeddedAct !== true) sourceMatterCount++;
             const classification = classifyDouContractExcerpt(publication);
             if (classification?.decision === 'IGNORE') {
-              scopeIgnoredCount += 1;
-              archiveIgnoredCount += 1;
-              scopeIgnoredByCategory[classification.category] = (scopeIgnoredByCategory[classification.category] ?? 0) + 1;
-              if (scopeIgnoredReferences.length < 100) {
-                scopeIgnoredReferences.push({
+              legacyIgnoreCount += 1;
+              archiveLegacyIgnoreCount += 1;
+              legacyIgnoreByCategory[classification.category] = (legacyIgnoreByCategory[classification.category] ?? 0) + 1;
+              if (legacyIgnoreReferences.length < 100) {
+                legacyIgnoreReferences.push({
                   externalId: publication.externalId ?? null,
                   officialUrl: publication.officialUrl,
                   actType: publication.actType ?? null,
@@ -127,13 +127,14 @@ export class DouConnector implements CollectionConnector {
                   reasonCodes: classification.reasonCodes,
                 });
               }
-              return;
             }
+            // F3: legacy scope classification is diagnostic only. Every act in
+            // the configured editions reaches the shared type-policy runtime.
             // The sink controls backpressure. No whole-run publications array
             // exists in the engine path, and multipart matters are already whole.
             await emit(classification ? {
               ...publication,
-              metadata: { ...publication.metadata, douScope: classification },
+              metadata: { ...publication.metadata, douScope: { ...classification, informationalOnly: true } },
             } : publication);
             publicationCount++; archivePublicationCount++;
             if (data.embeddedAct === true) { embeddedActCount++; archiveEmbeddedActCount++; }
@@ -152,7 +153,8 @@ export class DouConnector implements CollectionConnector {
             matterCount: sourceMatterCount,
             publicationCount: archivePublicationCount,
             embeddedActCount: archiveEmbeddedActCount,
-            scopeIgnoredCount: archiveIgnoredCount,
+            scopeIgnoredCount: 0,
+            legacyIgnoreCount: archiveLegacyIgnoreCount,
             mediaCount: parsed.mediaCount,
           });
         }
@@ -175,10 +177,14 @@ export class DouConnector implements CollectionConnector {
           confazMatterCount,
           scope: {
             ruleVersion: DOU_SCOPE_RULE_VERSION,
-            ignoredCount: scopeIgnoredCount,
-            ignoredByCategory: scopeIgnoredByCategory,
-            ignoredReferences: scopeIgnoredReferences,
+            informationalOnly: true,
+            ignoredCount: 0,
+            ignoredByCategory: {},
+            ignoredReferences: [],
             ignoredReferenceLimit: 100,
+            legacyIgnoreCount,
+            legacyIgnoreByCategory,
+            legacyIgnoreReferences,
           },
           coverage: 'DOU_SECTIONS_1_3_NORMAL_AND_EXTRA', sections: [...DOU_XML_SECTIONS], supplementsVerified: false,
           archivalStorage: 'NOT_CONFIGURED', xmlTimelinessGuaranteed: false },

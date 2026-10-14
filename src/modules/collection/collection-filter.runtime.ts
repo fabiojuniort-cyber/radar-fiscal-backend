@@ -4,8 +4,6 @@ import type { DB } from '../../infrastructure/database/database.types.js';
 import {
   compileCollectionFilterPolicy,
   evaluateCollectionFilter,
-  normalizeCollectionFilterType,
-  collectionFilterTypeConflict,
   type CollectionFilterDecision,
   type CollectionFilterPolicyInput,
   type CollectionFilterTermHit,
@@ -13,8 +11,7 @@ import {
 } from './collection-filter.engine.js';
 import type { NormalizedPublication } from './publication.normalizer.js';
 
-const EXCLUDED_SOURCES = new Set(['doe-sp', 'doe-sp-legado']);
-const ENFORCED_SOURCES = new Set(['dou']);
+const ENFORCED_SOURCES = new Set(['dou', 'doe-sp']);
 
 export interface ApprovedCollectionFilterRuntime {
   policyId: string;
@@ -48,17 +45,18 @@ function douMetadata(publication: NormalizedPublication): Record<string, unknown
     {};
 }
 
-function sectionOf(publication: NormalizedPublication): string {
-  return (text(douMetadata(publication).section) ?? '').toUpperCase();
+function sectionOf(publication: NormalizedPublication, sourceCode: string): string {
+  return sourceCode === 'dou'
+    ? text(record(publication.originMetadata.dou)?.section) ?? text(record(publication.metadata.dou)?.section) ?? ''
+    : text(publication.originMetadata.section) ?? text(publication.metadata.section) ?? '';
 }
 
 function evidenceComplete(publication: NormalizedPublication): boolean {
-  const dou = douMetadata(publication);
   const hasBody = Boolean(publication.contentText?.trim());
-  const incomplete =
+  const incomplete = [record(publication.originMetadata.dou)??{},record(publication.metadata.dou)??{}].some(dou=>
     dou.scopeStructureIncomplete === true ||
     dou.scopeStructureIncomplete === 'true' ||
-    Object.prototype.hasOwnProperty.call(dou, 'titleFallback');
+    Object.prototype.hasOwnProperty.call(dou, 'titleFallback'));
 
   return hasBody && !incomplete;
 }
@@ -83,13 +81,6 @@ function materialAttachmentsUnexamined(
   return highlightImage || attachment;
 }
 
-function typeConflict(publication: NormalizedPublication): boolean {
-  return collectionFilterTypeConflict(
-    text(douMetadata(publication).sourceActType),
-    publication.actType ?? '',
-  );
-}
-
 function decisiveHit(
   hits: readonly CollectionFilterTermHit[],
 ): CollectionFilterTermHit | undefined {
@@ -112,7 +103,6 @@ export async function loadApprovedCollectionFilterRuntime(
     .executeTakeFirstOrThrow();
 
   const sourceCode = source.code.trim().toLowerCase();
-  if (EXCLUDED_SOURCES.has(sourceCode)) return null;
   if (!ENFORCED_SOURCES.has(sourceCode)) return null;
 
   const result = await sql<{
@@ -197,13 +187,20 @@ export function evaluateRuntimeCollectionFilter(
   runtime: ApprovedCollectionFilterRuntime,
   publication: NormalizedPublication,
 ): RuntimeCollectionFilterDecision {
-  const section = sectionOf(publication);
+  const section = sectionOf(publication, runtime.sourceCode);
+  const origin = runtime.sourceCode === 'dou' ? record(publication.originMetadata.dou) : publication.originMetadata;
+  const version = runtime.sourceCode === 'dou' ? record(publication.metadata.dou) : publication.metadata;
+  const typeField = runtime.sourceCode === 'dou' ? 'sourceActType' : 'publicationType';
+  const originType=text(origin?.[typeField]),versionType=text(version?.[typeField]);
+  const officialType=originType??versionType;
+  const originSection=text(origin?.section),versionSection=text(version?.section);
+  const provenanceConflict=Boolean(originType && versionType && originType.toUpperCase()!==versionType.toUpperCase())
+    || Boolean(originSection && versionSection && originSection.toUpperCase()!==versionSection.toUpperCase());
   const decision = evaluateCollectionFilter(runtime.policy, {
     sourceCode: runtime.sourceCode,
     section,
-    ...(publication.actType !== undefined
-      ? { actType: publication.actType }
-      : {}),
+    // actType is inferred by connectors. Never label that inference official.
+    ...(officialType ? { sourceActType: officialType } : {}),
     title: publication.title,
     ...(publication.contentText !== undefined
       ? { body: publication.contentText }
@@ -211,16 +208,14 @@ export function evaluateRuntimeCollectionFilter(
     evidenceComplete: evidenceComplete(publication),
     materialAttachmentsUnexamined:
       materialAttachmentsUnexamined(publication),
-    typeConflict: typeConflict(publication),
-    sourceActType: text(douMetadata(publication).sourceActType),
-    provenanceConflict: false,
+    provenanceConflict,
   });
   const hit = decisiveHit(decision.termHits);
 
   return {
     decision,
     decisiveTerm: hit?.text ?? null,
-    section,
+    section: decision.section,
   };
 }
 
@@ -272,8 +267,8 @@ export async function recordRuntimeUnknownType(
     SELECT collection_filter_record_unknown_type(
       ${input.runtime.sourceCode},
       ${input.decision.section},
-      ${input.decision.decision.rawType},
-      ${input.decision.decision.normalizedRawType},
+      ${input.decision.decision.rawType || 'TIPO NAO INFORMADO'},
+      ${input.decision.decision.normalizedRawType || 'TIPO NAO INFORMADO'},
       ${input.publicationId}::uuid
     )
   `.execute(db);

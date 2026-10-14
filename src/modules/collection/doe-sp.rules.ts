@@ -1,9 +1,9 @@
 import { asciiUpper } from './doe-sp.parser.js';
 
 /*
- * Deterministic capture rules and normative identity for DOE-SP
- * (Executivo > Atos Normativos). No AI, no fuzzy matching: every decision is
- * explained by a category (included) or a reason (excluded).
+ * Legacy capture diagnostics and normative identity for DOE-SP. F3 acquisition
+ * enforces only Executivo > Atos Normativos through doeSpAcquisitionCategory;
+ * the shared runtime owns type/relevance inclusion and exclusion.
  */
 
 export interface DoeSpCandidate {
@@ -15,6 +15,7 @@ export interface DoeSpCandidate {
 }
 
 export type DoeSpInclusionCategory =
+  | 'TYPE_POLICY_PENDING'
   | 'LEGISLATION'
   | 'NUMBERED_DECREE'
   | 'DECREES_SECTION'
@@ -172,6 +173,13 @@ export function decideDoeSpCapture(candidate: DoeSpCandidate): DoeSpDecision {
   return hasTaxTerms(candidate)
     ? { included: true, category: 'OTHER_ORGAN_TAX_TERMS' }
     : { included: false, reason: 'OTHER_ORGAN_WITHOUT_TAX_TERMS' };
+}
+
+/** Acquisition boundary only; type/relevance decisions belong to F3 runtime. */
+export function doeSpAcquisitionCategory(candidate: DoeSpCandidate): DoeSpInclusionCategory | undefined {
+  const legacy = decideDoeSpCapture(candidate);
+  if (legacy.included) return legacy.category;
+  return legacy.reason === 'OUT_OF_SCOPE_SECTION' ? undefined : 'TYPE_POLICY_PENDING';
 }
 
 // ---------------------------------------------------------------- identity

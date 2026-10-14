@@ -91,12 +91,12 @@ test('tipo desconhecido sempre KEEP e entra em Novos tipos', () => {
   assert.equal(decision.requiresNewTypeReview, true);
 });
 
-test('evidência incompleta e material não examinado impedem descarte', () => {
+test('evidência incompleta e material não examinado preservam modos condicionais', () => {
   const policy = basePolicy();
   const incomplete = evaluateCollectionFilter(policy, {
     sourceCode: 'dou',
     section: 'DO3',
-    actType: 'AVISO DE LICITAÇÃO',
+    actType: 'EXTRATO DE CONTRATO',
     title: 'Aviso',
     body: 'Compra de cadeiras',
     ...complete,
@@ -110,7 +110,7 @@ test('evidência incompleta e material não examinado impedem descarte', () => {
   const attachment = evaluateCollectionFilter(policy, {
     sourceCode: 'dou',
     section: 'DO3',
-    actType: 'AVISO DE LICITAÇÃO',
+    actType: 'EXTRATO DE CONTRATO',
     title: 'Aviso',
     body: 'Compra de cadeiras',
     ...complete,
@@ -122,7 +122,7 @@ test('evidência incompleta e material não examinado impedem descarte', () => {
   );
 });
 
-test('conflito de tipo ou proveniência falha aberto', () => {
+test('conflito interpretado não veta regra; proveniência conflitante preserva', () => {
   const policy = basePolicy();
   for (const conflict of ['typeConflict', 'provenanceConflict'] as const) {
     const decision = evaluateCollectionFilter(policy, {
@@ -134,11 +134,11 @@ test('conflito de tipo ou proveniência falha aberto', () => {
       ...complete,
       [conflict]: true,
     });
-    assert.equal(decision.decision, 'KEEP');
+    assert.equal(decision.decision, conflict === 'typeConflict' ? 'DISCARD' : 'KEEP');
     assert.equal(
       decision.reasonCode,
       conflict === 'typeConflict'
-        ? 'TYPE_CONFLICT'
+        ? 'EXCLUDE_ALWAYS'
         : 'PROVENANCE_CONFLICT',
     );
   }
@@ -273,14 +273,14 @@ test('KEEP_ALWAYS preserva sem executar heurística de descarte', () => {
   assert.equal(decision.termHits.length, 0);
 });
 
-test('EXCLUDE_ALWAYS só descarta com evidência completa e tipo conhecido', () => {
+test('EXCLUDE_ALWAYS prevalece sobre material e relevância com tipo conhecido', () => {
   const decision = evaluateCollectionFilter(basePolicy(), {
     sourceCode: 'dou',
     section: 'DO3',
     actType: 'AVISO DE LICITAÇÃO',
     title: 'Aviso ICMS',
     body: 'Compra de material.',
-    ...complete,
+    ...complete, evidenceComplete: false, materialAttachmentsUnexamined: true,
   });
   assert.equal(decision.decision, 'DISCARD');
   assert.equal(decision.reasonCode, 'EXCLUDE_ALWAYS');
@@ -314,7 +314,7 @@ test('benchmark de referência supera 2 mil documentos/s', () => {
 });
 
 
-test('L-20: both conflicting DO3 types EXCLUDE_ALWAYS -> DISCARD; any non-excluded secondary type stays KEEP', () => {
+test('F3 substitui L20: tipo do título mais específico vence tipo oficial genérico', () => {
   const policy=compileCollectionFilterPolicy({
     version:1,contextWindowWords:12,weakScoreThreshold:3,
     locationWeights:{title:3,summary:2,body:1},
@@ -334,17 +334,17 @@ test('L-20: both conflicting DO3 types EXCLUDE_ALWAYS -> DISCARD; any non-exclud
     typeConflict:true,provenanceConflict:false,
   };
   const both=evaluateCollectionFilter(policy,{...base,sourceActType:'Aviso de Adjudicação'});
-  assert.deepEqual([both.decision,both.reasonCode],['DISCARD','TYPE_CONFLICT_BOTH_EXCLUDED']);
+  assert.deepEqual([both.decision,both.reasonCode],['DISCARD','EXCLUDE_ALWAYS']);
   const kept=evaluateCollectionFilter(policy,{...base,sourceActType:'PORTARIA'});
-  assert.deepEqual([kept.decision,kept.reasonCode],['KEEP','TYPE_CONFLICT']);
+  assert.deepEqual([kept.decision,kept.reasonCode],['DISCARD','EXCLUDE_ALWAYS']);
   const unknown=evaluateCollectionFilter(policy,{...base,sourceActType:'AVISO NÃO CADASTRADO'});
-  assert.deepEqual([unknown.decision,unknown.reasonCode],['KEEP','TYPE_CONFLICT']);
+  assert.deepEqual([unknown.decision,unknown.reasonCode],['DISCARD','EXCLUDE_ALWAYS']);
   const missing=evaluateCollectionFilter(policy,{...base});
-  assert.deepEqual([missing.decision,missing.reasonCode],['KEEP','TYPE_CONFLICT']);
+  assert.deepEqual([missing.decision,missing.reasonCode],['DISCARD','EXCLUDE_ALWAYS']);
   const otherSection=evaluateCollectionFilter(policy,{...base,section:'DO1',sourceActType:'Aviso de Adjudicação'});
   assert.equal(otherSection.decision,'KEEP');
   const incomplete=evaluateCollectionFilter(policy,{...base,sourceActType:'Aviso de Adjudicação',evidenceComplete:false});
-  assert.equal(incomplete.decision,'KEEP');
+  assert.equal(incomplete.decision,'DISCARD');
   const originConflict=evaluateCollectionFilter(policy,{...base,sourceActType:'Aviso de Adjudicação',provenanceConflict:true});
   assert.equal(originConflict.decision,'KEEP');
 });

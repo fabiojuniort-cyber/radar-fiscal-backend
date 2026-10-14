@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import {
@@ -533,12 +533,22 @@ export async function processAcquiredCollectionRun(
           }
         }
 
-        const runtimeDecision = filterRuntime
+        let runtimeDecision = filterRuntime
           ? evaluateRuntimeCollectionFilter(
               filterRuntime,
               normalized,
             )
           : null;
+
+        if (runtimeDecision?.decision.decision === 'DISCARD') {
+          const protection = await sql<{protected:boolean}>`SELECT public.collection_filter_capture_protected(
+            ${normalized.identityHash},${run.sourceId}::uuid,${normalized.officialUrl}) AS protected`.execute(db);
+          if (protection.rows[0]?.protected) {
+            runtimeDecision = {...runtimeDecision,decision:{...runtimeDecision.decision,
+              decision:'KEEP',reasonCode:'PROTECTED_PUBLICATION'}};
+            logger.info({sourceId:run.sourceId,runId:run.id},'F3 publication retained for company/origin review');
+          }
+        }
 
         if (runtimeDecision) {
           filterEvaluated += 1;

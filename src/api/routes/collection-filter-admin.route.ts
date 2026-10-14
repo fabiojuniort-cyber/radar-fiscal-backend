@@ -132,8 +132,8 @@ export async function collectionFilterAdminRoutes(
 
   // L-11: strict admin-only preview and revision-safe confirm.
   const directBody = z.object({
-    sourceCode: z.literal('dou'),
-    section: z.string().trim().min(1).max(50),
+    sourceCode: z.enum(['dou', 'doe-sp']),
+    section: z.string().trim().max(50),
     canonicalType: z.string().trim().min(1).max(300),
     mode,
     newTypeId: z.string().uuid().optional(),

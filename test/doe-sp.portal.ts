@@ -6,6 +6,7 @@ import {
   editionUrl0904,
   filters,
   journals,
+  list0904,
   pdfBytes,
   sections,
   status0904,
@@ -38,7 +39,16 @@ function json(body: unknown, status = 200): Response {
 /** In-memory DOE-SP API backed by the real fixtures. */
 export function portal(options: PortalOptions): Portal {
   const requests: string[] = [];
-  const allDetails = { ...details, ...(options.details ?? {}) };
+  // F3 fetches items previously rejected from the listing. These eight detail
+  // responses are synthetic test evidence, not captured official full texts.
+  // Real captured detail fixtures and explicit overrides retain precedence.
+  const syntheticDetails = Object.fromEntries(list0904.publications.map(item => [item.id, {
+    id: item.id, title: item.title, slug: item.slug, date: item.date.slice(0, 10),
+    journal: 'Executivo', firstLevelSectionName: 'Atos Normativos',
+    publicationType: filters.publicationTypes.find(type => type.id === item.publicationTypeId)?.name,
+    content: `<p>${item.excerpt}</p>`, attachments: [],
+  }]));
+  const allDetails = { ...syntheticDetails, ...details, ...(options.details ?? {}) };
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(input.toString());
     const key = url.origin + url.pathname + url.search;

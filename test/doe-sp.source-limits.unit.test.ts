@@ -104,7 +104,7 @@ test('connector: byte budget stops between backfill days, always advancing at le
   }
   assert.deepEqual(pendingPerRun, [2, 1, 0], 'pending days decrease by one per run until the bootstrap ends');
   assert.deepEqual(state.pendingRanges, []);
-  assert.deepEqual([...captured].sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
+  assert.deepEqual([...captured].sort(), [...list0904.publications.map(item => item.id), ID.dicar59, ID.retification].sort());
 });
 
 test('connector: without a byte budget the bootstrap completes in one run (unchanged behaviour)', async () => {

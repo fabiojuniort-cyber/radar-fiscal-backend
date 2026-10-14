@@ -54,6 +54,7 @@ function ranges(value: unknown): DoeSpDateRange[] {
 }
 
 const CATEGORIES = new Set<string>([
+  'TYPE_POLICY_PENDING',
   'LEGISLATION', 'NUMBERED_DECREE', 'DECREES_SECTION', 'GOVERNOR_ACT_TAX_TERMS', 'VETO_TAX_TERMS',
   'SEFAZ_TAX_ADMINISTRATION', 'SEFAZ_CABINET', 'SEFAZ_OTHER_TAX_TERMS', 'PGE_TAX', 'OTHER_ORGAN_TAX_TERMS',
 ] satisfies DoeSpInclusionCategory[]);

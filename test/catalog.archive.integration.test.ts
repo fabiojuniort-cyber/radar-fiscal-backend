@@ -119,15 +119,15 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
     const ids = (body: ArchiveBody) => body.items.map((item) => item.id).sort();
     const q = (text: string) => `q=${encodeURIComponent(text)}`;
 
-    await t.test('title search excludes hidden families', async () => {
+    await t.test('title search includes surviving DOU acts despite legacy hidden families', async () => {
       const body = await archive(q(marker));
       assert.deepEqual(
         ids(body),
-        [convenio, portaria1216, portaria12160, confazOrigin, contentOnly].sort(),
+        [convenio, portaria1216, portaria12160, hidden, confazOrigin, contentOnly].sort(),
       );
-      assert.equal(body.totalItems, 5);
+      assert.equal(body.totalItems, 6);
       assert.equal(body.totalIsCapped, false);
-      assert.ok(!ids(body).includes(hidden));
+      assert.ok(ids(body).includes(hidden));
     });
 
     await t.test('numbers match exactly: 1216 does not find 12160', async () => {
@@ -147,7 +147,7 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
     await t.test('source filter keeps the CONFAZ/DOU rule and second origins', async () => {
       assert.deepEqual(
         ids(await archive(`${q(marker)}&source=dou`)),
-        [portaria1216, contentOnly].sort(),
+        [portaria1216, contentOnly, hidden].sort(),
       );
       assert.deepEqual(
         ids(await archive(`${q(marker)}&source=confaz`)),
@@ -189,7 +189,7 @@ test('Acervo search, source filter and source feed maintenance', async (t) => {
 
       assert.deepEqual(
         ids(await archive(`${q(marker)}&source=dou&page=1`)),
-        [convenio, portaria1216, contentOnly].sort(),
+        [convenio, portaria1216, contentOnly, hidden].sort(),
       );
       assert.deepEqual(
         ids(await archive(`${q(marker)}&source=confaz&page=1`)),

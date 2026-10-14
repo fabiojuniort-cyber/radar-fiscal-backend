@@ -1,3 +1,4 @@
+import { collectionFilterCatalogVisibility } from '../../modules/collection/collection-filter.catalog-visibility.js';
 import type {
   FastifyInstance,
   FastifyRequest,
@@ -161,7 +162,7 @@ type ArchiveNavigationQuery = z.infer<typeof archiveNavigationQuerySchema>;
 function buildArchiveNavigationWhere(
   input: ArchiveNavigationQuery,
 ): RawBuilder<boolean> {
-  const conditions: RawBuilder<boolean>[] = [sql<boolean>`NOT p.is_hidden`];
+  const conditions: RawBuilder<boolean>[] = [sql<boolean>`${collectionFilterCatalogVisibility('p')}`];
 
   if (input.jurisdiction) {
     conditions.push(sql<boolean>`p.jurisdiction_level = ${input.jurisdiction}`);
@@ -177,7 +178,7 @@ function buildArchiveNavigationWhere(
         FROM publication_source_feed sf
         WHERE sf.source_code = ${sourceCode}
           AND sf.publication_id = p.id
-          AND NOT sf.is_hidden
+          AND ${collectionFilterCatalogVisibility('sf',true)}
       )
     `);
   }
@@ -240,14 +241,14 @@ function buildArchivePlan(
     // act-type index and probe source membership by the feed primary key.
     // This avoids scanning a very large source feed to find a selective type.
     feedJoin = sql``;
-    conditions.push(sql<boolean>`NOT p.is_hidden`);
+    conditions.push(sql<boolean>`${collectionFilterCatalogVisibility('p')}`);
     conditions.push(sql<boolean>`
       EXISTS (
         SELECT 1
         FROM publication_source_feed sf
         WHERE sf.source_code = ${sourceCode}
           AND sf.publication_id = p.id
-          AND NOT sf.is_hidden
+          AND ${collectionFilterCatalogVisibility('sf',true)}
       )
     `);
     order = sql`p.published_on DESC NULLS LAST, p.first_collected_at DESC, p.id`;
@@ -256,11 +257,11 @@ function buildArchivePlan(
     // even when sources.code has case variants; "confaz" needs no sources row.
     feedJoin = sql`JOIN publication_source_feed f ON f.publication_id = p.id`;
     conditions.push(sql<boolean>`f.source_code = ${sourceCode}`);
-    conditions.push(sql<boolean>`NOT f.is_hidden`);
+    conditions.push(sql<boolean>`${collectionFilterCatalogVisibility('f',true)}`);
     order = sql`f.published_on DESC NULLS LAST, f.first_collected_at DESC, f.publication_id`;
   } else {
     feedJoin = sql``;
-    conditions.push(sql<boolean>`NOT p.is_hidden`);
+    conditions.push(sql<boolean>`${collectionFilterCatalogVisibility('p')}`);
     order = sql`p.published_on DESC NULLS LAST, p.first_collected_at DESC, p.id`;
   }
 
@@ -441,7 +442,7 @@ function buildArchivePlan(
       searchIds = sql`
         SELECT t.id AS publication_id
         FROM publications t
-        WHERE NOT t.is_hidden
+        WHERE ${collectionFilterCatalogVisibility('t')}
           AND t.title_vector @@ ${query}
         UNION
         SELECT pv.publication_id
@@ -454,7 +455,7 @@ function buildArchivePlan(
       searchIds = sql`
         SELECT t.id AS publication_id
         FROM publications t
-        WHERE NOT t.is_hidden
+        WHERE ${collectionFilterCatalogVisibility('t')}
           AND t.title_vector @@ ${query}
       `;
     }
@@ -579,7 +580,7 @@ export async function catalogMonitoringRoutes(
     const result = await sql<{ source_code: string; total: number }>`
       SELECT f.source_code, count(*)::int AS total
       FROM publication_source_feed f
-      WHERE NOT f.is_hidden
+      WHERE ${collectionFilterCatalogVisibility('f',true)}
       GROUP BY f.source_code
     `.execute(app.db);
 
@@ -615,7 +616,7 @@ export async function catalogMonitoringRoutes(
               AND p.first_collected_at < ${startOfTomorrowSql}
           )::int AS imported_today
         FROM publications p
-        WHERE NOT p.is_hidden
+        WHERE ${collectionFilterCatalogVisibility('p')}
       ) visible
     `.execute(app.db);
 
@@ -700,7 +701,7 @@ export async function catalogMonitoringRoutes(
         FROM publications p
         WHERE p.jurisdiction_level = 'STATE'
           AND p.uf = u.uf
-          AND NOT p.is_hidden
+          AND ${collectionFilterCatalogVisibility('p')}
         LIMIT 1
       ) hit
       ORDER BY u.uf
@@ -728,7 +729,7 @@ export async function catalogMonitoringRoutes(
         SELECT 1
         FROM publication_source_feed f
         WHERE f.source_code = c.code
-          AND NOT f.is_hidden
+          AND ${collectionFilterCatalogVisibility('f',true)}
         ORDER BY f.published_on DESC NULLS LAST, f.first_collected_at DESC
         LIMIT 1
       ) hit
@@ -745,7 +746,7 @@ export async function catalogMonitoringRoutes(
         SELECT 1
         FROM publications p
         WHERE p.act_type = c.act_type
-          AND NOT p.is_hidden
+          AND ${collectionFilterCatalogVisibility('p')}
         ORDER BY
           p.published_on DESC NULLS LAST,
           p.first_collected_at DESC,
@@ -810,7 +811,7 @@ export async function catalogMonitoringRoutes(
             count(*)::int AS count
           FROM publication_source_feed f
           JOIN publications p ON p.id = f.publication_id
-          WHERE ${where} AND NOT f.is_hidden
+          WHERE ${where} AND ${collectionFilterCatalogVisibility('f',true)}
           GROUP BY f.source_code
           ORDER BY label
         `.execute(app.db);

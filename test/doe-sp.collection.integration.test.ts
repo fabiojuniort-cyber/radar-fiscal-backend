@@ -78,15 +78,15 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
 
     const first = await run();
     assert.equal(first.status, 'SUCCESS');
-    assert.equal(first.metrics.newPublications, 3);
+    assert.equal(first.metrics.newPublications, 11);
     assert.equal(first.metrics.newVersions, 0);
 
     const origins = await db.selectFrom('publication_origins')
       .select(['publication_id', 'external_id', 'official_url', 'metadata'])
       .where('source_id', '=', sourceId)
       .execute();
-    assert.equal(origins.length, 3);
-    assert.deepEqual(origins.map((origin) => origin.external_id).sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
+    assert.equal(origins.length, 11);
+    assert.deepEqual(origins.map((origin) => origin.external_id).sort(), Object.values(ID).sort());
     assert.ok(origins.every((origin) => origin.official_url.startsWith('https://doe.sp.gov.br/executivo/')));
     const originFiles = origins.flatMap((origin) =>
       (((origin.metadata as Record<string, unknown>).files as Array<Record<string, unknown>>) ?? []),
@@ -121,7 +121,7 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
     assert.equal(sre?.identity_strength, 'STRONG');
     assert.equal(sre?.uf, 'SP');
     assert.equal(sre?.jurisdiction_level, 'STATE');
-    assert.equal(publications.filter((row) => row.identity_strength === 'SOURCE_SCOPED').length, 1);
+    assert.equal(publications.filter((row) => row.identity_strength === 'SOURCE_SCOPED').length, 9);
 
     const versions = await db.selectFrom('publication_versions as v')
       .innerJoin('publication_origins as po', 'po.publication_id', 'v.publication_id')
@@ -146,15 +146,15 @@ test('DOE-SP through the collection engine: persistence, checkpoint reuse and fo
     assert.equal(forced.status, 'SUCCESS');
     assert.equal(forced.metrics.newPublications, 0);
     assert.equal(forced.metrics.newVersions, 0);
-    assert.equal(forced.metrics.existingPublications, 1); // window (2 days) re-read; backfill is not repeated
+    assert.equal(forced.metrics.existingPublications, 9); // window (2 days) re-read; backfill is not repeated
 
     const counts = await db.selectFrom('publication_origins as po')
       .innerJoin('publication_versions as v', 'v.publication_id', 'po.publication_id')
       .select((eb) => [eb.fn.countAll<string>().as('versions'), eb.fn.count<string>('po.id').distinct().as('origins')])
       .where('po.source_id', '=', sourceId)
       .executeTakeFirstOrThrow();
-    assert.equal(Number(counts.versions), 3);
-    assert.equal(Number(counts.origins), 3);
+    assert.equal(Number(counts.versions), 11);
+    assert.equal(Number(counts.origins), 11);
 
     const state = await readDoeSpSourceState(db, sourceId);
     assert.deepEqual(state.pendingRanges, []);

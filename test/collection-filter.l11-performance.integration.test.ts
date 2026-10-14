@@ -59,16 +59,16 @@ test('L-11: measure preview and confirm across 120k synthetic DOU publications i
     await admin.query(
       `INSERT INTO publication_versions(
         publication_id,version_no,content_hash,content_text,is_current,source_metadata
-      ) SELECT id,1,md5('content'||id::text)||md5('hash'||id::text),
+      ) SELECT p.id,1,md5('content'||p.id::text)||md5('hash'||p.id::text),
         'Aviso administrativo genérico sem matéria tributária',
-        true,'{"dou":{"section":"DO1"}}'::jsonb
-      FROM l11_benchmark_ids`,
+        true,jsonb_build_object('dou',jsonb_build_object('section','DO1','sourceActType',p.act_type))
+      FROM l11_benchmark_ids b JOIN publications p ON p.id=b.id`,
     );
     await admin.query(
       `INSERT INTO publication_origins(publication_id,source_id,official_url,metadata)
-      SELECT id,$1,'https://bench.example.test/'||id::text,
-        '{"dou":{"section":"DO1"}}'::jsonb
-      FROM l11_benchmark_ids`,[sourceId],
+      SELECT p.id,$1,'https://bench.example.test/'||p.id::text,
+        jsonb_build_object('dou',jsonb_build_object('section','DO1','sourceActType',p.act_type))
+      FROM l11_benchmark_ids b JOIN publications p ON p.id=b.id`,[sourceId],
     );
     const count=await admin.query<{count:string}>('SELECT count(*)::text AS count FROM l11_benchmark_ids');
     assert.equal(Number(count.rows[0]?.count),ROWS);

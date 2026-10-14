@@ -66,11 +66,11 @@ test('dates: São Paulo calendar day and arithmetic', () => {
   assert.equal(addDays('2026-09-01', -1), '2026-08-31');
 });
 
-test('first run: collects only included acts, as individual publications with files and evidence', async () => {
+test('F3: forwards all in-scope acts to runtime, retaining legacy classification as evidence', async () => {
   const { api, instance } = connector({});
   const result = await instance.collect(context());
 
-  assert.deepEqual(result.publications.map((item) => item.externalId), [ID.sre43]);
+  assert.deepEqual(result.publications.map((item) => item.externalId), list0904.publications.map(item => item.id));
   assert.equal(result.partialFailures, undefined);
   assert.equal(result.completion, undefined);
 
@@ -97,22 +97,22 @@ test('first run: collects only included acts, as individual publications with fi
 
   const meta = result.metadata?.doeSp as Record<string, any>;
   assert.equal(meta.filtering.discoveredCount, 9);
-  assert.equal(meta.filtering.includedCount, 1);
-  assert.equal(meta.filtering.excludedCount, 8);
-  assert.deepEqual(meta.filtering.excludedByReason, {
-    GOVERNOR_ACT_WITHOUT_TAX_TERMS: 2,
-    PGE_WITHOUT_TAX_TERMS: 1,
-    OTHER_ORGAN_WITHOUT_TAX_TERMS: 2,
-    INDIVIDUAL_TAX_ADMINISTRATIVE_ACT: 2,
-    NUMBERED_DECREE_WITHOUT_TAX_TERMS: 1,
-  });
+  assert.equal(meta.filtering.includedCount, 9);
+  assert.equal(meta.filtering.excludedCount, 0);
+  assert.deepEqual(meta.filtering.excludedByReason, {});
+  assert.equal(meta.filtering.includedByCategory.TYPE_POLICY_PENDING, 8);
+  for (const publication of result.publications.filter(item => item.externalId !== ID.sre43)) {
+    assert.equal(publication.metadata?.captureCategory, 'TYPE_POLICY_PENDING');
+    assert.equal(publication.metadata?.capturePolicy, 'F3_SHARED_RUNTIME');
+    assert.equal((publication.metadata?.legacyCaptureDecision as { included: boolean }).included, false);
+  }
   // Excluded samples carry no title (they may identify taxpayers).
   assert.ok(meta.filtering.excludedSamples.every((sample: Record<string, unknown>) => !('title' in sample)));
-  // Details only for included acts.
-  assert.equal(api.count('/v2/publications/'), 1);
+  // Every acquired act reaches runtime with its official body.
+  assert.equal(api.count('/v2/publications/'), 9);
 
   const state = checkpointState(result);
-  assert.deepEqual(state.days['2026-09-04']?.included, [ID.sre43]);
+  assert.deepEqual(state.days['2026-09-04']?.included, list0904.publications.map(item => item.id).sort());
   assert.match(state.days['2026-09-04']?.idsHash ?? '', /^[a-f0-9]{64}$/);
   assert.equal(state.windowEnd, '2026-09-04');
   assert.deepEqual(state.pendingRanges, []);
@@ -132,6 +132,27 @@ test('replay reuses the checkpoint: no list, no detail, no download, no publicat
   assert.deepEqual(checkpointState(replay).days['2026-09-04']?.included, checkpointState(first).days['2026-09-04']?.included);
 });
 
+test('F3: connector still rejects other sections/journals while fetching an unknown in-scope type', async () => {
+  const inScope = list0904.publications.find(item => item.id === ID.pgeSession)!;
+  const outOfScope = list0904.publications.find(item => item.id === ID.sre43)!;
+  const { api, instance } = connector({ days: { '2026-09-04': {
+    structured: structured0904,
+    list: { ...list0904, publications: [
+      { ...inScope, publicationTypeId: 'unknown-type', excerpt: 'Assunto meramente administrativo.' },
+      { ...outOfScope, hierarchy: 'Executivo > Atos de Pessoal > Secretaria da Fazenda' },
+      { ...outOfScope, id: ID.decree70843, hierarchy: 'Legislativo > Atos Normativos > Decretos' },
+    ] },
+  } } });
+  const result = await instance.collect(context());
+  assert.deepEqual(result.publications.map(item => item.externalId), [ID.pgeSession]);
+  assert.equal(result.publications[0]?.metadata?.captureCategory, 'TYPE_POLICY_PENDING');
+  assert.equal(api.count('/v2/publications/'), 1);
+  const filtering = (result.metadata?.doeSp as Record<string, any>).filtering;
+  assert.equal(filtering.includedCount, 1);
+  assert.equal(filtering.excludedCount, 2);
+  assert.deepEqual(filtering.excludedByReason, { OUT_OF_SCOPE_SECTION: 2 });
+});
+
 test('forced replay produces byte-identical identity and content hashes (0 artificial versions)', async () => {
   const first = await connector({}).instance.collect(context());
   const forced = await connector({ state: checkpointState(first), forceReprocess: true }).instance.collect(context());
@@ -141,7 +162,8 @@ test('forced replay produces byte-identical identity and content hashes (0 artif
     .sort();
   assert.deepEqual(hashes(forced), hashes(first));
   const normalized = first.publications.map((publication) => normalizePublication({ sourceId: SOURCE_ID, publication }));
-  assert.ok(normalized.every((item) => item.identityStrength === 'STRONG'));
+  assert.equal(normalized.find(item => item.externalId === ID.sre43)?.identityStrength, 'STRONG');
+  assert.ok(normalized.some(item => item.identityStrength === 'SOURCE_SCOPED'));
 });
 
 test('a new act in the day (supplement) is picked up alone', async () => {
@@ -174,7 +196,7 @@ test('a new act in the day (supplement) is picked up alone', async () => {
   assert.deepEqual(result.publications.map((item) => item.externalId), [extraId]);
   assert.equal(result.publications[0]!.metadata?.editionHint, 'SUPPLEMENTARY_OR_EXTRA');
   assert.equal(api.count('/v2/publications/'), 1);
-  assert.equal(checkpointState(result).days['2026-09-04']?.included.length, 2);
+  assert.equal(checkpointState(result).days['2026-09-04']?.included.length, 10);
 });
 
 test('an empty day is a legitimate zero-result consultation', async () => {
@@ -208,10 +230,10 @@ test('complete official HTML skips redundant authenticated PDF and completes the
 
   assert.deepEqual(
     result.publications.map((item) => item.externalId),
-    [ID.sre43],
+    list0904.publications.map(item => item.id),
   );
   assert.equal(result.partialFailures, undefined);
-  const publication = result.publications[0]!;
+  const publication = result.publications.find(item => item.externalId === ID.sre43)!;
   assert.equal(
     publication.originMetadata?.authenticatedPdf,
     'NOT_REQUESTED_REDUNDANT',
@@ -229,7 +251,7 @@ test('complete official HTML skips redundant authenticated PDF and completes the
   const state = checkpointState(result);
   assert.deepEqual(
     state.days['2026-09-04']?.included,
-    [ID.sre43],
+    list0904.publications.map(item => item.id).sort(),
   );
   assert.ok(
     (state.days['2026-09-04']?.idsHash ?? '').length > 0,
@@ -269,7 +291,7 @@ test('malformed list items are isolated as partial failures', async () => {
   };
   const { instance } = connector({ days: { '2026-09-04': broken } });
   const result = await instance.collect(context());
-  assert.equal(result.publications.length, 1);
+  assert.equal(result.publications.length, 9);
   assert.equal(result.partialFailures?.[0]?.code, 'DOE_SP_MALFORMED_LIST_ITEM');
   assert.equal(checkpointState(result).days['2026-09-04']?.idsHash, '');
 });
@@ -282,7 +304,7 @@ test('bootstrap walks back days once, with retifications isolated and attachment
   };
   const { api, instance } = connector({ days, bootstrapStartDate: '2026-09-01' });
   const result = await instance.collect(context());
-  assert.deepEqual(result.publications.map((item) => item.externalId).sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
+  assert.deepEqual(result.publications.map((item) => item.externalId).sort(), [...list0904.publications.map(item => item.id), ID.dicar59, ID.retification].sort());
   const state = checkpointState(result);
   assert.deepEqual(state.pendingRanges, []);
   assert.equal(state.coverageFrom, '2026-09-01');
@@ -353,7 +375,7 @@ test('time budget stops at a safe point and resumes from the checkpoint', async 
   assert.equal(resumed.completion, undefined);
   assert.deepEqual(checkpointState(resumed).pendingRanges, []);
   const all = new Set([...partial.publications, ...resumed.publications].map((item) => item.externalId));
-  assert.deepEqual([...all].sort(), [ID.sre43, ID.dicar59, ID.retification].sort());
+  assert.deepEqual([...all].sort(), [...list0904.publications.map(item => item.id), ID.dicar59, ID.retification].sort());
 });
 
 test('downtime longer than the window is queued as a gap', async () => {

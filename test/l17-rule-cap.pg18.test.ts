@@ -55,13 +55,13 @@ export async function runL17RuleCapStress():Promise<void>{
       "SELECT id FROM sources WHERE code='dou' LIMIT 1")).rows[0]!.id;
     await admin.query(
       "INSERT INTO publication_origins(publication_id,source_id,official_url,metadata) "+
-      "SELECT p.id,$1,p.primary_official_url,jsonb_build_object('dou',jsonb_build_object('section','DO1E')) "+
+      "SELECT p.id,$1,p.primary_official_url,jsonb_build_object('dou',jsonb_build_object('section','DO1E','sourceActType',p.act_type)) "+
       "FROM publications p WHERE p.title LIKE $2",
       [source,'L17_perf_'+label+'_%']);
     await admin.query(
-      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current) "+
+      "INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text,is_current,source_metadata) "+
       "SELECT p.id,1,encode(digest('body'||p.id::text,'sha256'),'hex'),"+
-      "'Texto administrativo sem termos fiscais.',true "+
+      "'Texto administrativo sem termos fiscais.',true,jsonb_build_object('dou',jsonb_build_object('section','DO1E','sourceActType',p.act_type)) "+
       "FROM publications p WHERE p.title LIKE $1",
       ['L17_perf_'+label+'_%']);
     const started=performance.now();
