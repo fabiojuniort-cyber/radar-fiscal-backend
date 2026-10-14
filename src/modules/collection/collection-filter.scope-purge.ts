@@ -39,7 +39,7 @@ export async function loadF3ArchivePlan(trx: Transaction<DB>) {
     trx,source.rows[0].id,{readOnly:true});
   if(!runtime)throw new Error('l17_runtime_missing');
   const compiled=runtime.policy;
-  const hash=createHash('sha256').update('F3:ARCHIVE:ACT-NAME:v2')
+  const hash=createHash('sha256').update('F3:ARCHIVE:ACT-NAME:v3')
     .update(runtime.policyId).update(String(runtime.policyRevision));
   const seen=new Map<string,Match>();
   for(const sourceCode of ['dou','doe-sp']){

@@ -256,12 +256,11 @@ export function compileCollectionFilterPolicy(
       sourceCode,
       section,
       canonicalType,
-      actName: collectionFilterActName(rule.canonicalType),
+      actName: canonicalType,
     });
   }
 
   const aliases = new Map<string, string>();
-  const aliasNames = new Map<string, string>();
   for (const alias of input.aliases ?? []) {
     const sourceCode = normalizedSource(alias.sourceCode);
     const section = normalizedSection(alias.section);
@@ -278,7 +277,6 @@ export function compileCollectionFilterPolicy(
       throw new Error(`conflicting filter alias: ${aliasKey}`);
     }
     aliases.set(aliasKey, canonicalType);
-    aliasNames.set(aliasKey, collectionFilterActName(alias.alias));
   }
 
   const terms: CompiledTerm[] = input.terms.map((term) => {
@@ -305,7 +303,7 @@ export function compileCollectionFilterPolicy(
         : {}),
       ...(term.canonicalType
         ? {
-            canonicalType: normalizeCollectionFilterType(collectionFilterActName(term.canonicalType)),
+            canonicalType: normalizeCollectionFilterType(term.canonicalType),
           }
         : {}),
       locationScope: term.locationScope ?? 'ANY',
@@ -336,7 +334,7 @@ export function compileCollectionFilterPolicy(
   const patterns = new Map<string, CompiledTypePattern[]>();
   const addPattern = (pattern: string, rule: CollectionFilterTypeRule, isAlias=false, identityPattern=pattern) => {
     const originalPattern=identityPattern;
-    pattern=normalizeCollectionFilterType(collectionFilterActName(pattern));
+    pattern=normalizeCollectionFilterType(pattern);
     if(!pattern)return;
     const firstWord = pattern.split(' ')[0] ?? '';
     const bucketKey = key(rule.sourceCode, rule.section ?? '', firstWord);
@@ -346,8 +344,7 @@ export function compileCollectionFilterPolicy(
       && existing.rule.canonicalType===pattern)) {
       throw new Error(`conflicting filter rule: ${bucketKey}`);
     }
-    // Saved spellings may collapse to one Name. Keep identities in rules,
-    // but do not evaluate thousands of identical term gates for every title.
+    // Deduplicate only identical normalized saved patterns and targets.
     const same=bucket.find(existing=>existing.pattern===pattern&&existing.rule.mode===rule.mode
       && existing.rule.actName===rule.actName);
     if(same){
@@ -362,7 +359,7 @@ export function compileCollectionFilterPolicy(
     const [source, section, alias] = aliasKey.split('\u0000');
     if (!source || section === undefined || !alias) continue;
     const rule = rules.get(key(source, section, canonical));
-    if (rule) addPattern(aliasNames.get(aliasKey)??alias, rule, true, alias);
+    if (rule) addPattern(alias, rule, true, alias);
   }
 
   return {
@@ -498,7 +495,7 @@ function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
     canonicalType,
     mode: rule.mode,
     matchedPattern,
-    matchedRuleName: rule.actName??collectionFilterActName(canonicalType),
+    matchedRuleName: canonicalType,
     matchedSection: rule.section ?? '',
     matchedTypeSource,
   };
@@ -558,7 +555,7 @@ function evaluateMatchedRule(policy: CompiledCollectionFilterPolicy,
           term,
           sourceCode,
           section,
-          normalizeCollectionFilterType(rule.actName??collectionFilterActName(canonicalType)),
+          normalizeCollectionFilterType(canonicalType),
           location.location,
         )
       ) {

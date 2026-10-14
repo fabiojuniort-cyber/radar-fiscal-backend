@@ -1,5 +1,7 @@
 import {createHash} from 'node:crypto';
-import {sql,type Transaction} from 'kysely';
+import {sql,type Transaction,type Kysely} from 'kysely';
+import {withUserContext} from '../../infrastructure/database/tenant-context.js';
+import {InventoryCache} from './collection-filter.inventory-cache.js';
 import type {DB} from '../../infrastructure/database/database.types.js';
 import {collectionFilterActName,evaluateCollectionFilter,normalizeCollectionFilterType,
   type CompiledCollectionFilterPolicy} from './collection-filter.engine.js';
@@ -60,7 +62,7 @@ export function groupCollectionFilterActNames(items:Iterable<ActNameEvidence>,po
 /** Read projection, not a migration/repair: the legacy queue and saved rules remain untouched. */
 export async function loadCollectionFilterActNameInventory(trx:Transaction<DB>) {
   const source=await trx.selectFrom('sources').select('id')
-    .where('code','in',['dou','doe-sp']).orderBy('code').executeTakeFirst();
+    .where('code','=','dou').executeTakeFirst();
   if(!source)return [];
   const runtime=await loadApprovedCollectionFilterRuntime(trx,source.id,{readOnly:true});
   if(!runtime)return [];
@@ -82,4 +84,42 @@ export async function loadCollectionFilterActNameInventory(trx:Transaction<DB>) 
     }
   }
   return groupCollectionFilterActNames(rows,runtime.policy);
+}
+
+export type ActNameInventoryItem=ReturnType<typeof groupCollectionFilterActNames>[number];
+const caches=new WeakMap<Kysely<DB>,{cache:InventoryCache<ActNameInventoryItem>;timer:ReturnType<typeof setInterval>}>();
+
+/** No archive SQL on the HTTP path. Background transactions retain the requesting admin context. */
+export function readCollectionFilterActNameInventory(db:Kysely<DB>,userId:string) {
+  let entry=caches.get(db);
+  if(!entry){
+    const key=()=>withUserContext(db,userId,async trx=>{
+      await sql`SET LOCAL statement_timeout='2000ms'`.execute(trx);
+      const result=await sql<{key:string}>`
+        SELECT jsonb_build_array(
+          (SELECT jsonb_build_array(id,revision) FROM collection_filter_policies
+            WHERE status='APPROVED' ORDER BY version DESC LIMIT 1),
+          (SELECT jsonb_agg(jsonb_build_array(s.code,r.id,r.updated_at) ORDER BY s.code)
+            FROM sources s LEFT JOIN LATERAL (
+              SELECT id,updated_at FROM collection_runs WHERE source_id=s.id
+              ORDER BY updated_at DESC,id DESC LIMIT 1
+            ) r ON true WHERE s.code IN ('dou','doe-sp')),
+          public.publication_scope_epoch()
+        )::text AS key`.execute(trx);
+      return result.rows[0]!.key;
+    });
+    const cache=new InventoryCache(key,()=>db.transaction().setIsolationLevel('repeatable read').execute(async trx=>{
+      await sql`SET TRANSACTION READ ONLY`.execute(trx);
+      await sql`SELECT set_config('app.user_id',${userId},true)`.execute(trx);
+      await sql`SET LOCAL statement_timeout='120000ms'`.execute(trx);
+      return loadCollectionFilterActNameInventory(trx);
+    }));
+    const timer=setInterval(()=>cache.read(),15_000);timer.unref();
+    entry={cache,timer};caches.set(db,entry);
+  }
+  return entry.cache.read();
+}
+export async function closeCollectionFilterActNameInventory(db:Kysely<DB>) {
+  const entry=caches.get(db);if(!entry)return;
+  clearInterval(entry.timer);await entry.cache.close();caches.delete(db);
 }

@@ -42,39 +42,42 @@ test('real archive groups are distinct, stable, deduplicated and not extrapolate
   assert.deepEqual(groups.map(x=>x.id),groupCollectionFilterActNames(rows,p).map(x=>x.id));
   assert.equal(JSON.stringify(rows),before);
 });
-test('existing saved identities and modes are never rewritten; normalization collisions keep the tied KEEP',()=>{
-  const rules=[{sourceCode:'dou',section:'DO1',canonicalType:'COMUNICADO PGE-SP',mode:'EXCLUDE_ALWAYS' as const},
-    {sourceCode:'dou',section:'DO1',canonicalType:'COMUNICADO, DE 2026',mode:'KEEP_ALWAYS' as const}];
-  const before=JSON.stringify(rules);
-  const p=compileCollectionFilterPolicy({version:1,contextWindowWords:5,weakScoreThreshold:3,
-    locationWeights:{title:3,summary:2,body:1},rules,terms:[]});
-  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 1',evidenceComplete:true}).decision,'KEEP');
-  assert.equal(JSON.stringify(rules),before);
-});
 
-test('rules, aliases and term scopes share the same name before punctuation is lost in identity keys',()=>{
-  const p=compileCollectionFilterPolicy({version:1,contextWindowWords:5,weakScoreThreshold:3,
+test('F3-NOME-02: saved rules, aliases and scoped terms retain all words and numbers',()=>{
+  const input={version:1,contextWindowWords:5,weakScoreThreshold:3,
     locationWeights:{title:3,summary:2,body:1},
-    rules:[{sourceCode:'dou',section:'DO1',canonicalType:'DESPACHO - SUBSTITUTO',mode:'KEEP_IF_TAX_TERM'}],
-    aliases:[{sourceCode:'dou',section:'DO1',alias:'COMUNICADO (INTERNO)',canonicalType:'DESPACHO - SUBSTITUTO'}],
-    terms:[{text:'ICMS',strength:'STRONG',canonicalType:'DESPACHO (INTERNO)'}]});
-  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Despacho Nº 10',body:'ICMS',evidenceComplete:true}).reasonCode,'STRONG_TERM');
-  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 10',body:'ICMS',evidenceComplete:true}).reasonCode,'STRONG_TERM');
+    rules:[{sourceCode:'dou',section:'DO3',canonicalType:'EXTRATO DO 4 TERMO ADITIVO',mode:'EXCLUDE_ALWAYS' as const},
+      {sourceCode:'dou',section:'DO3',canonicalType:'AVISO DE DISPENSA ELETRONICA UASG 988675',mode:'EXCLUDE_ALWAYS' as const},
+      {sourceCode:'dou',section:'DO3',canonicalType:'DESPACHO - SUBSTITUTO',mode:'KEEP_IF_TAX_TERM' as const}],
+    aliases:[{sourceCode:'dou',section:'DO3',alias:'COMUNICADO (INTERNO)',canonicalType:'DESPACHO - SUBSTITUTO'}],
+    terms:[{text:'ICMS',strength:'STRONG' as const,canonicalType:'DESPACHO (INTERNO)'}]};
+  const original=JSON.stringify(input);const p=compileCollectionFilterPolicy(input);
+  const patterns=[...p.patterns.values()].flat().map(x=>x.pattern);
+  for(const name of ['EXTRATO DO 4 TERMO ADITIVO','AVISO DE DISPENSA ELETRONICA UASG 988675','DESPACHO SUBSTITUTO','COMUNICADO INTERNO'])
+    assert.ok(patterns.includes(name),name);
+  assert.equal(p.terms[0]?.canonicalType,'DESPACHO INTERNO');
+  for(const title of ['Extrato do Convênio nº 5','Aviso de Dispensa Eletronica UASG 123456','Despacho Nº 10','Comunicado Nº 10']){
+    const d=evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO3',title,body:'ICMS',evidenceComplete:true});
+    assert.equal(d.reasonCode,'UNKNOWN_TYPE',title);assert.equal(d.decision,'KEEP');
+  }
+  // No shorter prefix was invented from any saved rule or alias.
+  assert.equal(patterns.includes('EXTRATO DO'),false);
+  assert.equal(patterns.includes('AVISO DE DISPENSA ELETRONICA UASG'),false);
+  assert.equal(JSON.stringify(input),original);
 });
 
-test('thousands of legacy numeric spellings collapse in memory without dropping saved identities',()=>{
+test('numeric saved variants remain distinct, without implicit broader exclusions',()=>{
   const rules=Array.from({length:3000},(_,n)=>({sourceCode:'dou',section:'DO1',
     canonicalType:'COMUNICADO '+n,mode:'EXCLUDE_ALWAYS' as const}));
   const p=compileCollectionFilterPolicy({version:1,contextWindowWords:5,weakScoreThreshold:3,
     locationWeights:{title:3,summary:2,body:1},rules,terms:[]});
-  assert.equal(p.rules.size,3000);
-  assert.equal([...p.patterns.values()].flat().length,1);
-  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 10',evidenceComplete:true}).decision,'DISCARD');
+  assert.equal(p.rules.size,3000);assert.equal([...p.patterns.values()].flat().length,3000);
+  assert.equal(evaluateCollectionFilter(p,{sourceCode:'dou',section:'DO1',title:'Comunicado Nº 10',evidenceComplete:true}).decision,'KEEP');
 });
 
-test('direct preview resolves the same name before punctuation is normalized, preserving a saved row key',()=>{
+test('direct preview preserves saved identity and only lexically normalizes user rule input',()=>{
   const input={sourceCode:'dou',section:'DO1',canonicalType:'DESPACHO - SUBSTITUTO',mode:'EXCLUDE_ALWAYS' as const};
-  assert.equal(resolveDirectActNameRule(input,[]).canonicalType,'DESPACHO');
+  assert.equal(resolveDirectActNameRule(input,[]).canonicalType,'DESPACHO SUBSTITUTO');
   assert.equal(resolveDirectActNameRule(input,[{source_code:'dou',section:'DO1',canonical_type:input.canonicalType}]).canonicalType,input.canonicalType);
-  assert.equal(resolveDirectActNameRule({...input,canonicalType:'Comunicado de abertura PGE-SP'},[]).canonicalType,'COMUNICADO DE ABERTURA');
+  assert.equal(resolveDirectActNameRule({...input,canonicalType:'EXTRATO DO 4 TERMO ADITIVO'},[]).canonicalType,'EXTRATO DO 4 TERMO ADITIVO');
 });

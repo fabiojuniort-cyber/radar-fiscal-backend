@@ -1,3 +1,4 @@
+import {readCollectionFilterActNameInventory,closeCollectionFilterActNameInventory} from '../../modules/collection/collection-filter.act-name-inventory.js';
 import type {
   FastifyInstance,
   FastifyReply,
@@ -27,6 +28,7 @@ export async function collectionFilterAdminRoutes(
   app: FastifyInstance,
 ): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>();
+  app.addHook('onClose',()=>closeCollectionFilterActNameInventory(app.db));
 
   const requirePlatformAdmin = async (
     request: FastifyRequest,
@@ -122,6 +124,7 @@ export async function collectionFilterAdminRoutes(
     },
     async (request, reply) =>
       reply.send({
+        ...(request.query.status==='OPEN'?{inventory:readCollectionFilterActNameInventory(app.db,request.auth!.userId).inventory}:{}),
         items: await listCollectionFilterNewTypes(
           app.db,
           request.auth!.userId,
@@ -251,3 +254,4 @@ export async function collectionFilterAdminRoutes(
   });
 
 }
+

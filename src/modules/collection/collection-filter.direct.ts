@@ -98,7 +98,7 @@ export function resolveDirectActNameRule(input:DirectRuleInput,saved:ReadonlyArr
   const rule=validated(input);
   const existing=saved.find(r=>r.source_code===rule.sourceCode&&r.section===rule.section
     &&r.canonical_type.toLocaleUpperCase('pt-BR')===rule.canonicalType);
-  const canonicalType=existing?.canonical_type??normalizeCollectionFilterType(collectionFilterActName(rule.canonicalType));
+  const canonicalType=existing?.canonical_type??normalizeCollectionFilterType(rule.canonicalType);
   if(!canonicalType)throw new RangeError('invalid_direct_rule_name');
   return {...rule,canonicalType};
 }
@@ -158,7 +158,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
     officialType:string|null;actName:string;pattern:string;protection:string|null}>=[];
   let cursor:string|null=null;
   let pages=0;
-  const hash=createHash('sha256').update(JSON.stringify(['F3-NOME-01',rule,approved.id,approved.revision]));
+  const hash=createHash('sha256').update(JSON.stringify(['F3-NOME-02',rule,approved.id,approved.revision]));
   while (true) {
     if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
     const page=await sql<HistoricalCollectionCandidate>`
@@ -169,7 +169,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
       const decision=evaluateHistoricalCollectionCandidate(engine,item);
       if (decision.decision!=='DISCARD' || !decision.canonicalType ||
           normalizeCollectionFilterType(decision.matchedRuleName??'')!==
-            normalizeCollectionFilterType(collectionFilterActName(rule.canonicalType)) ||
+            normalizeCollectionFilterType(rule.canonicalType) ||
           decision.mode!==rule.mode || decision.matchedSection!==normalizeCollectionFilterType(rule.section)) continue;
       hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
         item.source_act_type,item.section,item.provenance_conflict,
@@ -190,9 +190,9 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   const token=hash.digest('hex');
   const policyRevision=Number(approved.revision);
   const confirmationToken=createHash('sha256').update(JSON.stringify([
-    'F3-NOME-01-HISTORICAL-PURGE-V3',rule,policyRevision,token,ids.length,
+    'F3-NOME-02-HISTORICAL-PURGE-V4',rule,policyRevision,token,ids.length,
   ])).digest('hex');
-  return {rule,actName:collectionFilterActName(input.canonicalType),ids,count:ids.length,blockedCompany,blockedOtherSource,
+  return {rule,actName:normalizeCollectionFilterType(input.canonicalType),ids,count:ids.length,blockedCompany,blockedOtherSource,
     blockedCompanyIds,blockedOtherSourceIds,samples,token,confirmationToken,policyRevision};
 }
 

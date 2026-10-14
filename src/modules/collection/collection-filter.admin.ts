@@ -2,8 +2,8 @@ import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
-import {collectionFilterActName} from './collection-filter.act-name.js';
-import {loadCollectionFilterActNameInventory} from './collection-filter.act-name-inventory.js';
+import {normalizeCollectionFilterType} from './collection-filter.engine.js';
+import {readCollectionFilterActNameInventory} from './collection-filter.act-name-inventory.js';
 export async function readCollectionFilterAdminState(
   db: Kysely<DB>,
   userId: string,
@@ -79,7 +79,7 @@ export async function readCollectionFilterAdminState(
             sourceCode: row.source_code,
             section: row.section,
             canonicalType: row.canonical_type,
-            actName: collectionFilterActName(row.canonical_type),
+            actName: normalizeCollectionFilterType(row.canonical_type),
             mode: row.mode,
             helpText: row.help_text,
           })),
@@ -89,8 +89,8 @@ export async function readCollectionFilterAdminState(
             sourceCode: row.source_code,
             section: row.section,
             alias: row.normalized_alias,
-            actName: collectionFilterActName(row.normalized_alias),
-            targetActName: collectionFilterActName(row.canonical_type),
+            actName: normalizeCollectionFilterType(row.normalized_alias),
+            targetActName: normalizeCollectionFilterType(row.canonical_type),
             canonicalType: row.canonical_type,
           })),
         terms: terms.rows
@@ -102,14 +102,16 @@ export async function readCollectionFilterAdminState(
             sourceCode: row.source_code,
             section: row.section,
             canonicalType: row.canonical_type,
-            actName: row.canonical_type?collectionFilterActName(row.canonical_type):null,
+            actName: row.canonical_type?normalizeCollectionFilterType(row.canonical_type):null,
             locationScope: row.location_scope,
           })),
       };
     }
 
-    const inventory=await loadCollectionFilterActNameInventory(trx);
+    const cached=readCollectionFilterActNameInventory(db,userId);
+    const inventory=cached.items;
     return {
+      inventory:cached.inventory,
       actNames:inventory.map(item=>({name:item.act_name,sourceCode:item.source_code,section:item.section,count:item.occurrence_count})),
       policies: policies.rows.map((row) => ({
         id: row.id,
@@ -129,7 +131,7 @@ export async function listCollectionFilterNewTypes(
   status: 'OPEN' | 'RESOLVED' | 'MERGED' = 'OPEN',
 ) {
   return withUserContext(db, userId, async (trx) => {
-    if(status==='OPEN')return (await loadCollectionFilterActNameInventory(trx))
+    if(status==='OPEN')return readCollectionFilterActNameInventory(db,userId).items
       .filter(item=>item.requires_review);
     const result = await sql<any>`
       SELECT

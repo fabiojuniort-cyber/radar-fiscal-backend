@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { Pool } from 'pg';
+import {performance} from 'node:perf_hooks';
+import {setTimeout as delay} from 'node:timers/promises';
 import { Kysely, PostgresDialect } from 'kysely';
 import { buildApp } from '../src/app.js';
 import type { DB } from '../src/infrastructure/database/database.types.js';
@@ -64,7 +66,17 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     }
     const ruleBefore=(await owner.query("SELECT md5(jsonb_agg(to_jsonb(r) ORDER BY r.id)::text) AS hash FROM collection_filter_type_rules r WHERE policy_id=$1",[policy.id])).rows[0].hash;
     const queueBefore=(await owner.query('SELECT count(*)::int AS count FROM collection_filter_new_types')).rows[0].count;
-    const namesResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    const started=performance.now();
+    let namesResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    assert.ok(performance.now()-started<3000,'cold inventory response must not wait for archive rebuild');
+    for(let attempt=0;attempt<100&&namesResponse.json().inventory?.status!=='READY';attempt++){
+      await delay(100);
+      namesResponse=await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    }
+    assert.equal(namesResponse.json().inventory?.status,'READY',namesResponse.body);
+    const warmStart=performance.now();
+    await app.inject({method:'GET',url:'/api/v1/admin/collection-filter/new-types?status=OPEN',headers});
+    assert.ok(performance.now()-warmStart<3000,'warm inventory response must stay below three seconds');
     assert.equal(namesResponse.statusCode,200,namesResponse.body);
     const nameItems=namesResponse.json<{items:Array<{id:string;source_code:string;normalized_type:string;act_name:string;occurrence_count:number;queue_basis:string;examples:unknown[]}>}>().items;
     for(const code of ['dou','doe-sp']){
@@ -119,6 +131,9 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     }
     for(const fixtureItem of [ordinary,doeItem]){
       const runtime=await loadApprovedCollectionFilterRuntime(inspection,fixtureItem.sourceId,{readOnly:true});assert.ok(runtime);
+      const douRuntime=await loadApprovedCollectionFilterRuntime(inspection,dou,{readOnly:true});
+      assert.ok(douRuntime);
+      assert.deepEqual(evaluateHistoricalCollectionCandidate(douRuntime.policy, {publication_id:fixtureItem.id,title:fixtureItem.title,source_code:fixtureItem.sourceId===dou?'dou':'doe-sp',section:fixtureItem.sourceId===dou?'DO3E':'ATOS NORMATIVOS',source_act_type:'Aviso',content_text:'Contratacao administrativa de rotina.',evidence_complete:true,has_material:false,provenance_conflict:false} as HistoricalCollectionCandidate), evaluateHistoricalCollectionCandidate(runtime.policy,{publication_id:fixtureItem.id,title:fixtureItem.title,source_code:fixtureItem.sourceId===dou?'dou':'doe-sp',section:fixtureItem.sourceId===dou?'DO3E':'ATOS NORMATIVOS',source_act_type:'Aviso',content_text:'Contratacao administrativa de rotina.',evidence_complete:true,has_material:false,provenance_conflict:false} as HistoricalCollectionCandidate),'source used to load global policy must not affect a decision');
       const publication={title:fixtureItem.title,actType:'AVISO',contentText:'Contratacao administrativa de rotina.',metadata:fixtureItem.metadata,originMetadata:fixtureItem.metadata,files:[]};
       const capture=evaluateRuntimeCollectionFilter(runtime,publication as Parameters<typeof evaluateRuntimeCollectionFilter>[1]);
       const history=(await owner.query<HistoricalCollectionCandidate>('SELECT * FROM collection_filter_f3_candidates((SELECT id FROM publications WHERE id<$2::uuid ORDER BY id DESC LIMIT 1),500,$1) WHERE publication_id=$2::uuid',[runtime.sourceCode,fixtureItem.id])).rows[0];
