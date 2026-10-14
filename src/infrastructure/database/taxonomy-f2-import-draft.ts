@@ -11,7 +11,7 @@ import {
 import { resolveCuratorDatabaseUrl } from './curator-url.js';
 
 function fail(code: string): never { throw new Error(code); }
-function parse(args: string[]): {mode: 'plan' | 'apply'; batch?: string; sha?: string} {
+function parse(args: string[]): {mode: 'plan' | 'apply'; batch: string | undefined; sha: string | undefined} {
   const input: Record<string,string> = {};
   for (const arg of args) {
     const match=/^--(mode|confirm-batch-id|confirm-content-sha256)=([^\s]+)$/.exec(arg);
