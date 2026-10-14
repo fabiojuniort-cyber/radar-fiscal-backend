@@ -34,10 +34,10 @@ test('F2-LOAD-11 teardown honors explicit REVOKEs and never DROP OWNED',()=>{
   assert.match(s,/REVOKE USAGE ON SCHEMA public FROM f2_loader/);
   assert.match(s,/REVOKE CONNECT ON DATABASE railway FROM f2_loader/);
   assert.match(s,/DROP ROLE f2_loader/);
-  assert.doesNotMatch(s,/DROP OWNED/);
+  assert.doesNotMatch(s,/\bDROP\s+OWNED\s+BY\b/i);
   assert.match(s,/IF EXISTS\(SELECT 1 FROM pg_roles WHERE rolname='f2_loader'\)/);
   assert.match(s,/ALTER ROLE f2_loader WITH LOGIN NOINHERIT/);
-  assert.match(s,/F2_LOAD_ALL_ORIGINAL_BLOCK=\'+failure/);
+  assert.match(s,/console\.error\('F2_LOAD_ALL_ORIGINAL_BLOCK='\+failure\)/);
   assert.match(s,/finally\s*\{[\s\S]*if\(cleanRole\)\s*\{\s*try\s*\{\s*await removeRole\(adminUrl\)/);
   assert.match(s,/F2_LOAD_ALL_INSPECT=/);
   assert.doesNotMatch(s,/importDraft|F2_DRAFT_IMPORT_CONTRACT_MISSING|taxonomy:publish-draft/);
