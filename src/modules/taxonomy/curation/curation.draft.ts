@@ -268,12 +268,12 @@ async function copyReleaseGraph(
       INSERT INTO taxonomy_release_concepts (
         release_id, concept_id, concept_revision_id, membership_status,
         release_notes, group_id, profile_visible, display_order,
-        help_text, classify_by_label, official_codes
+        help_text, classify_by_label, official_codes, f2_suggested_products, f2_suggested_ncms
       )
       SELECT
         $2::uuid, rc.concept_id, rc.concept_revision_id, rc.membership_status,
         rc.release_notes, tg.id, rc.profile_visible, rc.display_order,
-        rc.help_text, rc.classify_by_label, rc.official_codes
+        rc.help_text, rc.classify_by_label, rc.official_codes, rc.f2_suggested_products, rc.f2_suggested_ncms
       FROM taxonomy_release_concepts rc
       LEFT JOIN taxonomy_release_groups sg ON sg.id = rc.group_id
       LEFT JOIN taxonomy_release_groups tg
