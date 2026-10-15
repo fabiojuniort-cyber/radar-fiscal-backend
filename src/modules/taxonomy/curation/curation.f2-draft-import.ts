@@ -131,6 +131,8 @@ export interface DraftImportConcept {
   label: string;
   definition: string;
   group: string;
+  /** Exact source column 1: parent segment, never inferred from the truncated group code. */
+  parentSegment?: string;
   officialCodes: string[];
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
@@ -222,7 +224,7 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     const parent=normalizeCell(c[0]??'');
     if(!sub||!parent)bad('F2_DRAFT_SECTOR_LABEL_MISSING');
     return {line:row.source_line,code:codeFor('sector',c[11]??'','cnae_'+row.cnae_code),
-      dimension:'sector',label,definition:label,group:parent+' – '+sub,
+      dimension:'sector',label,definition:label,group:parent+' – '+sub,parentSegment:parent,
       officialCodes:[row.cnae_code],aliases:aliases(c[5]??''),
       profileVisible:optFlag(c[8]??''),classifyByLabel:optFlag(c[9]??''),
       displayOrder:asOrder(c[10]??'')};
