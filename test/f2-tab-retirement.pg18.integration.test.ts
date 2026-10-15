@@ -18,7 +18,7 @@ test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent 
    INSERT INTO taxonomy_releases(version_major,version_minor,version_patch,status,
      approved_at,published_at,artifact_repository,artifact_path,artifact_git_sha,artifact_sha256,
      created_by_actor)
-   VALUES(1,6,0,'PUBLISHED',now(),now(),'isolated-pg18','f2-tab-fixture',
+   VALUES(1,6,0,'DRAFT',now(),now(),'isolated-pg18','f2-tab-fixture',
      $1,$2,'f2-tab-test') RETURNING id`,['a'.repeat(40),'b'.repeat(64)]);
   const publishedId=published.rows[0]!.id;
   await db.query(`INSERT INTO taxonomy_releases(id,version_major,version_minor,version_patch,
@@ -52,6 +52,7 @@ test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent 
     if(id===publishedId&&code==='treatment')taggedReleaseConceptId=rc.rows[0]!.id;
    }
   }
+  await db.query("UPDATE taxonomy_releases SET status='PUBLISHED' WHERE id=$1::uuid",[publishedId]);
   await db.query(`
     INSERT INTO publication_taxonomy_curator_tags(publication_version_id,taxonomy_release_id,
     release_concept_id,action,actor_id,rationale)
