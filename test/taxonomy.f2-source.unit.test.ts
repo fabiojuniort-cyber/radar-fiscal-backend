@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { attachF2SourceSuggestions } from '../src/modules/taxonomy/curation/curation.f2-source.js';
+import { attachF2SourceSuggestions, F2_SOURCE_SEGMENT_SHA256 } from '../src/modules/taxonomy/curation/curation.f2-source.js';
 import type { ReleaseView, SqlRunner } from '../src/modules/taxonomy/curation/curation.read.js';
 
-const SEGMENT_SHA = '588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd';
+const SEGMENT_SHA = F2_SOURCE_SEGMENT_SHA256;
 const mkView = (): ReleaseView => ({
   release: { id: 'release-test', version: 'v1', status: 'DRAFT', createdAt: '', publishedAt: null, previousReleaseId: null, changeNotes: null },
   dimensions: [], groups: [],
@@ -60,20 +60,50 @@ test('F2 source: no exact CNAE never reads staging at all', async () => {
   assert.equal(updated, view);
 });
 
-test('F2 source: duplicate CNAEs and wrong source hash fail closed', async () => {
+test('F2 source: duplicate CNAEs or wrong source hash omit overlay, never crash the curator', async () => {
   const view = mkView();
   const row = {
     cnae_code: '0111301', atuacao: 'Produção agropecuária',
     suggested_products: '', suggested_ncms: '', source_sha256: SEGMENT_SHA,
     source_batch_id: 'batch-1',
   };
-  await assert.rejects(
-    attachF2SourceSuggestions(async <T>() => [row, row] as T[], view),
-    /F2_SOURCE_DUPLICATE_CNAE/,
-  );
-  await assert.rejects(
-    attachF2SourceSuggestions(async <T>() =>
-      [{ ...row, source_sha256: '0'.repeat(64) }] as T[], view),
-    /F2_SOURCE_HASH_MISMATCH/,
-  );
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args.join(' ')); };
+  try {
+    const duplicate = await attachF2SourceSuggestions(
+      async <T>() => [row, row] as T[], view,
+    );
+    assert.equal(duplicate, view);
+    assert.deepEqual(duplicate.concepts.map(c => c.f2Source),
+      [undefined, undefined, undefined, undefined, undefined]);
+
+    const mismatch = await attachF2SourceSuggestions(
+      async <T>() => [{ ...row, source_sha256: '0'.repeat(64) }] as T[], view,
+    );
+    assert.equal(mismatch, view);
+    assert.ok(mismatch.concepts.every(c => c.f2Source === undefined));
+    assert.deepEqual(warnings, [
+      'F2_SOURCE_SUGGESTIONS_SKIPPED=F2_SOURCE_DUPLICATE_CNAE',
+      'F2_SOURCE_SUGGESTIONS_SKIPPED=F2_SOURCE_HASH_MISMATCH',
+    ]);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('F2 source: unavailable SQL view only drops suggestions, original release still loads', async () => {
+  const view = mkView();
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args.join(' ')); };
+  try {
+    const unchanged = await attachF2SourceSuggestions(async () => {
+      throw new Error('permission denied: never expose SQL credentials');
+    }, view);
+    assert.equal(unchanged, view);
+    assert.deepEqual(warnings, ['F2_SOURCE_SUGGESTIONS_SKIPPED=F2_SOURCE_OVERLAY_UNAVAILABLE']);
+  } finally {
+    console.warn = originalWarn;
+  }
 });
