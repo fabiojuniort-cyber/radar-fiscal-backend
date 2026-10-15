@@ -19,6 +19,52 @@ const NCM = /^\d{2,8}$/;
 const CNAE = /^\d{7}$/;
 const LENGTH = { sector: 1332, product: 4225 } as const;
 
+export type F2DraftStage = 'preflight' | 'sector' | 'product' | 'actuacao' | 'readback' | 'ledger';
+export class F2DraftStageError extends Error {
+  constructor(readonly stage: F2DraftStage, readonly sourceLine: number | undefined, cause: unknown) {
+    super('F2_DRAFT_STAGE_FAILURE', { cause });
+  }
+}
+async function inF2DraftStage<T>(
+  stage: F2DraftStage, line: number | undefined, operation: () => Promise<T>,
+): Promise<T> {
+  try { return await operation(); }
+  catch (error) {
+    if (error instanceof F2DraftStageError) throw error;
+    throw new F2DraftStageError(stage, line, error);
+  }
+}
+
+/** Strictly allowlisted metadata. Never print driver messages, SQL, details or values. */
+export function safeF2DraftError(error: unknown): string {
+  const outer = error instanceof F2DraftStageError ? error : null;
+  const original = outer?.cause ?? error;
+  const metadata = original && typeof original === 'object'
+    ? original as Record<string, unknown> : {};
+  const value = (key: string): string => typeof metadata[key] === 'string'
+    ? metadata[key] as string : '';
+  const rawMessage = original instanceof Error ? original.message : '';
+  const safeNcm = /^F2_DRAFT_PRODUCT_NCM_INVALID line=\d+ reason=(?:LENGTH_\d+|NOT_ARRAY|NOT_STRING|NON_DIGIT)$/;
+  const safeF2 = /^F2_[A-Z0-9_]+$/;
+  const code = safeF2.test(rawMessage) || safeNcm.test(rawMessage)
+    ? rawMessage : 'F2_DRAFT_IMPORT_BLOCK';
+  const pieces = [code, 'stage=' + (outer?.stage ?? 'preflight')];
+  if (outer?.sourceLine !== undefined && Number.isSafeInteger(outer.sourceLine) &&
+      outer.sourceLine >= 1) pieces.push('line=' + outer.sourceLine);
+  const pgCode = value('code');
+  if (/^[A-Z0-9]{5}$/.test(pgCode)) pieces.push('sqlstate=' + pgCode);
+  // Curator domain codes are safe to show as identifiers only (no messages).
+  else if (/^[A-Z][A-Z0-9_]{2,63}$/.test(pgCode)) pieces.push('domain=' + pgCode);
+  for (const [key, printed] of [
+    ['constraint', 'constraint'], ['table', 'table'], ['column', 'column'],
+  ] as const) {
+    const identifier = value(key);
+    if (/^[a-z_][a-z0-9_]{0,62}$/.test(identifier)) pieces.push(printed + '=' + identifier);
+  }
+  return pieces.join(' ');
+}
+
+
 interface Batch {
   id: string;
   status: string;
@@ -324,6 +370,7 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
     .map(g=>[normalizeAliasText(g.label),g.id]));
   const report={created:0,updated:0,groupsCreated:0};
   for(const item of concepts){
+    await inF2DraftStage(dimension,item.line,async()=>{
     let groupId=byGroup.get(normalizeAliasText(item.group));
     if(!groupId){
       groupId=await createGroup(client,actor,dimension,{label:item.group});
@@ -331,7 +378,7 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
       report.groupsCreated++;
     }
     const current=byCode.get(item.code);
-    if (current && identicalCodes.has(item.code)) continue;
+    if (current && identicalCodes.has(item.code)) return;
     const allAliases=new Map<string,ConceptAliasInput>();
     for(const alias of [...(current?.aliases??[]),...item.aliases]){
       const key=normalizeAliasText(alias.text);
@@ -350,6 +397,7 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
       await createConcept(client,actor,dimension,{...values,code:item.code});
       report.created++;
     }
+    });
   }
   return report;
 }
@@ -369,7 +417,7 @@ async function verifyDraftReadback(client:PoolClient,draftId:string,plan:F2Draft
 export async function applyF2Draft(client:PoolClient,actor:CuratorActor,confirmed:{
   batchId:string;contentSha256:string;exceptionsApprovalSha256?:string | undefined;
 }):Promise<Record<string,unknown>> {
-  const preview=await currentDraftPlan(client);
+  const preview=await inF2DraftStage('preflight',undefined,()=>currentDraftPlan(client));
   const {source,draftId}=preview;
   if(source.batchId!==confirmed.batchId||source.contentSha256!==confirmed.contentSha256)
     bad('F2_DRAFT_CONFIRMATION_MISMATCH');
@@ -377,21 +425,21 @@ export async function applyF2Draft(client:PoolClient,actor:CuratorActor,confirme
       preview.audit.exceptionsApprovalSha256 !== confirmed.exceptionsApprovalSha256)
     bad('F2_DRAFT_COORD_EXCEPTION_APPROVAL_REQUIRED');
   if(preview.alreadyImported){
-    await verifyDraftReadback(client,draftId,source);
+    await inF2DraftStage('readback',undefined,()=>verifyDraftReadback(client,draftId,source));
     return {draftId,draftVersion:preview.draftVersion,batchId:source.batchId,
       reusedExisting:true,imported:{sector:1332,product:4225},published:false,readback:'PASS'};
   }
-  const segmentResult=await upsertDimension(client,actor,'sector',source.sector,draftId,
-    new Set(preview.audit.identicalCodes.sector));
-  const productResult=await upsertDimension(client,actor,'product',source.product,draftId,
-    new Set(preview.audit.identicalCodes.product));
-  await initializeF2Actuacao(client,actor);
-  const origins=await persistF2ActuacaoCnaeOrigins(client,actor,source.atuacaoOrigins,SEGMENTO_SHA);
+  const segmentResult=await inF2DraftStage('sector',undefined,()=>upsertDimension(client,actor,'sector',source.sector,draftId,
+    new Set(preview.audit.identicalCodes.sector)));
+  const productResult=await inF2DraftStage('product',undefined,()=>upsertDimension(client,actor,'product',source.product,draftId,
+    new Set(preview.audit.identicalCodes.product)));
+  await inF2DraftStage('actuacao',undefined,()=>initializeF2Actuacao(client,actor));
+  const origins=await inF2DraftStage('actuacao',undefined,()=>persistF2ActuacaoCnaeOrigins(client,actor,source.atuacaoOrigins,SEGMENTO_SHA));
   if(origins.originCount!==LENGTH.sector)bad('F2_DRAFT_ACTUACAO_COUNT_MISMATCH');
-  await verifyDraftReadback(client,draftId,source);
-  await client.query(
+  await inF2DraftStage('readback',undefined,()=>verifyDraftReadback(client,draftId,source));
+  await inF2DraftStage('ledger',undefined,()=>client.query(
     'INSERT INTO public.taxonomy_f2_draft_import_ledger (release_id,batch_id,source_content_sha256,segmento_rows,produto_rows) VALUES ($1::uuid,$2::uuid,$3,$4,$5)',
-    [draftId,source.batchId,source.contentSha256,LENGTH.sector,LENGTH.product]);
+    [draftId,source.batchId,source.contentSha256,LENGTH.sector,LENGTH.product]));
   return {draftId,draftVersion:preview.draftVersion,batchId:source.batchId,
     reusedExisting:false,imported:{sector:LENGTH.sector,product:LENGTH.product},
     changes:{sector:segmentResult,product:productResult,actuacaoOrigins:origins.originCount},
