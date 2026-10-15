@@ -80,24 +80,30 @@ export function plannedToRetire(plan:RetirementPlan):number{
 function assertNoHistoricChange(before:RetirementPlan['historical'],after:RetirementPlan['historical']){
  if(JSON.stringify(before)!==JSON.stringify(after)) throw Error('F2_TAB_HISTORIC_CHANGED');
 }
+/** The only mutating primitive; isolated PG18 tests invoke it inside a rolled-back fixture transaction. */
+export async function retireDraftMemberships(client:PoolClient,draftId:string){
+ const target=await client.query<{version:string;status:string}>(
+  'SELECT version,status FROM taxonomy_releases WHERE id=$1::uuid',[draftId]);
+ if(target.rows[0]?.version!=='v1.7.0'||target.rows[0]?.status!=='DRAFT')
+  throw Error('F2_TAB_DRAFT_MISMATCH');
+ const concepts=await client.query(`
+   UPDATE taxonomy_release_concepts rc SET membership_status='RETIRED'
+    FROM taxonomy_concepts c JOIN taxonomy_dimensions d ON d.id=c.dimension_id
+    WHERE rc.release_id=$1::uuid AND rc.concept_id=c.id AND d.code=ANY($2::text[])
+      AND rc.membership_status='INCLUDED'`,[draftId,[...RETIRED_TAXONOMY_DIMENSIONS]]);
+ const dimensions=await client.query(`
+   UPDATE taxonomy_release_dimensions rd SET membership_status='RETIRED',profile_visible=FALSE
+    FROM taxonomy_dimensions d
+    WHERE rd.release_id=$1::uuid AND rd.dimension_id=d.id AND d.code=ANY($2::text[])
+      AND rd.membership_status='INCLUDED'`,[draftId,[...RETIRED_TAXONOMY_DIMENSIONS]]);
+ return {conceptsRetired:concepts.rowCount??0,dimensionsRetired:dimensions.rowCount??0};
+}
+
 async function apply(client:PoolClient,expected:string){
  const pre=makeRetirementPlan(await snapshot(client));
  if(pre.planSha256!==expected)throw Error('F2_TAB_PLAN_SHA_MISMATCH');
  const changed=plannedToRetire(pre);
- if(changed){
-   // Keep relations, groups, mappings and evidence in their existing release:
-   // never physically remove them, including the draft.
-   await client.query(`
-   UPDATE taxonomy_release_concepts rc SET membership_status='RETIRED'
-    FROM taxonomy_concepts c JOIN taxonomy_dimensions d ON d.id=c.dimension_id
-    WHERE rc.release_id=$1::uuid AND rc.concept_id=c.id AND d.code=ANY($2::text[])
-      AND rc.membership_status='INCLUDED'`,[F2_TAB_DRAFT_ID,[...RETIRED_TAXONOMY_DIMENSIONS]]);
-   await client.query(`
-   UPDATE taxonomy_release_dimensions rd SET membership_status='RETIRED',profile_visible=FALSE
-    FROM taxonomy_dimensions d
-    WHERE rd.release_id=$1::uuid AND rd.dimension_id=d.id AND d.code=ANY($2::text[])
-      AND rd.membership_status='INCLUDED'`,[F2_TAB_DRAFT_ID,[...RETIRED_TAXONOMY_DIMENSIONS]]);
- }
+ if(changed)await retireDraftMemberships(client,F2_TAB_DRAFT_ID);
  const post=makeRetirementPlan(await snapshot(client));
  if(post.dimensions.some(d=>d.dimension_status!=='RETIRED'||d.included!==0))
   throw Error('F2_TAB_READBACK_FAILED');
