@@ -47,8 +47,7 @@ export async function attachF2SourceSuggestions(
   // override it, including [] (an explicit removal), and survive publication.
   const byCnae=new Map<string,F2SourceSuggestion>();
   try {
-    const rows=await run<F2SourceRow>(`
-      SELECT cnae_code,atuacao,suggested_products,suggested_ncms,
+    const rows=await run<F2SourceRow>(`SELECT cnae_code,atuacao,suggested_products,suggested_ncms,
              source_sha256,source_batch_id
       FROM taxonomy_f2_segment_suggestions_readonly
       WHERE cnae_code=ANY($1::text[])
@@ -72,15 +71,17 @@ export async function attachF2SourceSuggestions(
       });
     }
   }catch(error){
+    byCnae.clear();
     const reason=error instanceof Error&&/^F2_SOURCE_[A-Z_]+$/.test(error.message)
       ?error.message:'F2_SOURCE_OVERLAY_UNAVAILABLE';
     console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED='+reason);
   }
-  const eligibleIds=new Set(eligible.map(c=>c.releaseConceptId));
+  const eligibleSet=new Set(eligible);
+  if(byCnae.size===0&&!eligible.some(c=>c.f2DraftSuggestions?.products!=null||c.f2DraftSuggestions?.ncms!=null))return view;
   return {
     ...view,
     concepts:view.concepts.map(concept=>{
-      if(!eligibleIds.has(concept.releaseConceptId))return concept;
+      if(!eligibleSet.has(concept))return concept;
       const source=byCnae.get(concept.officialCodes[0]!);
       const override=concept.f2DraftSuggestions;
       if(!source&&override?.products==null&&override?.ncms==null)return concept;
