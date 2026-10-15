@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {buildF2DraftPlan,auditF2Draft,readF2Stage,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
+import {buildF2DraftPlan,auditF2Draft,readF2Stage,validateF2DraftProductNcms,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
 import type {ReleaseView} from '../src/modules/taxonomy/curation/curation.read.js';
 import type {PoolClient} from 'pg';
 
@@ -46,7 +46,8 @@ test('F2-DRAFT-01 fails on changed cells and duplicate concept codes',()=>{
 test('F2-DRAFT-01 rejects nine-digit NCM with no truncation',()=>{
   const invalid=fixture();
   invalid.products[0]!.ncm_normalized=['123456789'];
-  assert.throws(()=>buildF2DraftPlan(invalid),/F2_DRAFT_PRODUCT_NCM_INVALID/);
+  assert.throws(()=>buildF2DraftPlan(invalid),
+    /F2_DRAFT_PRODUCT_NCM_INVALID line=2 reason=LENGTH_9/);
 });
 
 test('F2-DRAFT-02: exact equal, updated, created and out-of-lot counts per dimension', () => {
@@ -139,4 +140,70 @@ test('F2-DRAFT-02: approved batch status exists and is STAGED before reading row
       [{...snapshot.batch,id:F2_APPROVED_BATCH_ID,status:'READY'}]:[]}),
   } as unknown as PoolClient;
   await assert.rejects(readF2Stage(invalid),/F2_DRAFT_BATCH_NOT_STAGED/);
+});
+
+/** Exact normalized examples from the signed Produto v5 XLSX, lines from
+ * xl/worksheets/sheet1.xml. Staging JSONB is an array of digit strings.
+ * The previous validator wrongly required even lengths.
+ */
+test('F2-DRAFT-04 accepts all ten real 5/7-digit failures without truncation',()=>{
+  const samples=[
+    {line:204,raw:'2710.12.4',digits:'2710124'},
+    {line:205,raw:'2710.19.3',digits:'2710193'},
+    {line:207,raw:'2815.1',digits:'28151'},
+    {line:232,raw:'2306.4',digits:'23064'},
+    {line:280,raw:'2306.4',digits:'23064'},
+    {line:4001,raw:'1209.2',digits:'12092'},
+    {line:4035,raw:'0307.1',digits:'03071'},
+    {line:4036,raw:'0307.3',digits:'03073'},
+    {line:4040,raw:'0307.1',digits:'03071'},
+    {line:4171,raw:'0901.1',digits:'09011'},
+  ];
+  const v=fixture();
+  for(const {line,raw,digits} of samples){
+    const r=v.products[line-2]!;
+    r.raw_cells[3]=raw;
+    r.ncm_normalized=[digits];
+    r.row_sha256=sha(JSON.stringify(r.raw_cells));
+  }
+  v.batch.content_sha256=sha(JSON.stringify({
+    segmento:v.segments.map(r=>r.raw_cells),produto:v.products.map(r=>r.raw_cells),
+  }));
+  const plan=buildF2DraftPlan(v);
+  for(const {line,digits} of samples)
+    assert.deepEqual(plan.product[line-2]?.officialCodes,[digits],String(line));
+  assert.equal(plan.produtoRows,4225);
+});
+
+test('F2-DRAFT-04 preserves two-to-eight digits, odd lengths and leading zeroes',()=>{
+  for(const ncm of ['01','001','0001','00101','001001','0010010','00100101'])
+    assert.deepEqual(validateF2DraftProductNcms([ncm],42),[ncm]);
+  assert.deepEqual(validateF2DraftProductNcms(['03071','03071','2710124'],204),
+    ['03071','2710124']);
+  assert.deepEqual(validateF2DraftProductNcms([],42),[]);
+});
+
+test('F2-DRAFT-04 error contains only safe line and reason, never actual values',()=>{
+  const problems=[
+    {value:['1'],reason:'LENGTH_1'},
+    {value:['123456789'],reason:'LENGTH_9'},
+    {value:['12.34'],reason:'NON_DIGIT'},
+    {value:['-123'],reason:'NON_DIGIT'},
+    {value:[12345],reason:'NOT_STRING'},
+    {value:[null],reason:'NOT_STRING'},
+    {value:{ncm:'03071'},reason:'NOT_ARRAY'},
+    {value:'03071',reason:'NOT_ARRAY'},
+  ];
+  for(const {value,reason} of problems){
+    assert.throws(()=>validateF2DraftProductNcms(value,123),error=>{
+      assert.ok(error instanceof Error);
+      assert.equal(error.message,'F2_DRAFT_PRODUCT_NCM_INVALID line=123 reason='+reason);
+      assert.equal(error.message.includes('03071'),false);
+      return true;
+    });
+  }
+  const badSnapshot=fixture();
+  badSnapshot.products[203]!.ncm_normalized=['123456789'];
+  assert.throws(()=>buildF2DraftPlan(badSnapshot),
+    /F2_DRAFT_PRODUCT_NCM_INVALID line=205 reason=LENGTH_9/);
 });
