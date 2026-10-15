@@ -13,7 +13,8 @@ try {
     to_regclass('public.taxonomy_releases') IS NOT NULL releases,
     to_regclass('public.taxonomy_f2_import_batches') IS NOT NULL batches,
     to_regclass('public.taxonomy_f2_draft_import_ledger') IS NOT NULL ledger`);
-  const report={database:'isolated-restore',version:metadata.rows[0].version,
+  const dbs=await c.query("SELECT datname FROM pg_database WHERE datistemplate=false ORDER BY datname");
+  const report={database:'isolated-restore',databases:dbs.rows.map(r=>r.datname),version:metadata.rows[0].version,
     tables:{releases:metadata.rows[0].releases,batches:metadata.rows[0].batches,ledger:metadata.rows[0].ledger}};
   if(report.tables.releases){
     const a=await c.query(`SELECT id::text,version_major,version_minor,version_patch,status FROM public.taxonomy_releases WHERE (version_major=1 AND version_minor IN (6,7) AND version_patch=0) ORDER BY version_minor`);
