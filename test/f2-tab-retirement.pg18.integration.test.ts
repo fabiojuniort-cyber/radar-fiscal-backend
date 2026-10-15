@@ -10,8 +10,8 @@ test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent 
  const db=await pool.connect();
  try {
   await db.query('BEGIN');
-  const version=await db.query<{version:string}>('SHOW server_version');
-  assert.match(version.rows[0]!.version,/^18\./);
+  const version=await db.query<{server_version:string}>('SHOW server_version');
+  assert.match(version.rows[0]!.server_version,/^18\./);
   const prior=await db.query<{n:number}>(`SELECT count(*)::int n FROM taxonomy_releases WHERE version='v1.6.0'`);
   assert.equal(prior.rows[0]!.n,0,'PG18 fixture must not reuse a real v1.6.0');
   const published=await db.query<{id:string}>(`
