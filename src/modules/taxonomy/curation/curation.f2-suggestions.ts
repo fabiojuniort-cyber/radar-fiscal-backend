@@ -11,9 +11,9 @@ export function validateF2Suggestions(input:F2SuggestionEdit):F2SuggestionEdit {
     for(const raw of values){
       const value=raw.trim();
       if(!value||value.length>150)throw new CurationError('F2_SUGGESTIONS_INVALID_'+type,400);
-      if(type==='NCM'&&!/^\\d{2,8}$/.test(value.replace(/[.\\-/\\s]/g,'')))
+      if(type==='NCM'&&!/^\d{2,8}$/.test(value.replace(/[./\s-]/g,'')))
         throw new CurationError('F2_SUGGESTIONS_INVALID_NCM',400);
-      const normalized=type==='NCM'?value.replace(/[.\\-/\\s]/g,''):value;
+      const normalized=type==='NCM'?value.replace(/[./\s-]/g,''):value;
       const key=type==='NCM'?normalized:normalized.toLocaleLowerCase('pt-BR');
       if(seen.has(key))continue;
       seen.add(key);
@@ -43,7 +43,7 @@ export async function updateF2DraftSuggestions(
   `,[draft.id,conceptCode]);
  const row=rows.rows[0];
  if(!row||row.membership!=='INCLUDED'||row.codes?.length!==1||
-    !/^\\d{7}$/.test(row.codes[0]??''))throw new CurationError('F2_SUGGESTIONS_CNAE_REQUIRED',400);
+    !/^\d{7}$/.test(row.codes[0]??''))throw new CurationError('F2_SUGGESTIONS_CNAE_REQUIRED',400);
  await client.query(`
   UPDATE taxonomy_release_concepts
      SET f2_suggested_products=$2::text[],f2_suggested_ncms=$3::text[]
