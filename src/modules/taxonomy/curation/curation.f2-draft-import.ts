@@ -84,7 +84,7 @@ export function validateF2DraftProductNcms(raw: unknown, sourceLine: number): st
   const codes: string[] = [];
   for (const code of raw as unknown[]) {
     if (typeof code !== 'string') invalid('NOT_STRING');
-    if (!/^\\d+$/.test(code as string)) invalid('NON_DIGIT');
+    if (!/^\d+$/.test(code as string)) invalid('NON_DIGIT');
     if (!NCM.test(code as string)) invalid(`LENGTH_${(code as string).length}`);
     codes.push(code as string);
   }
