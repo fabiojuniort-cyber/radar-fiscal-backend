@@ -3,14 +3,6 @@
  * curated settings existed (v1.0.0, v1.1.0) are presented, and seed the
  * first curated DRAFT. Curated releases store explicit values instead.
  */
-
-/**
- * Sources that are never classified, whatever the runtime setting says: the
- * DOE-SP rebuild guard refuses classification history attached to its
- * publications until the DOE-SP front is formally closed.
- */
-export const PROTECTED_EXCLUDED_SOURCES = ['doe-sp'] as const;
-
 export const OFFICIAL_CODE_TYPES = [
   'NCM',
   'CNAE',
@@ -210,3 +202,4 @@ export function formatOfficialCode(
 export function isCnaeActivity(officialCodes: readonly string[]): boolean {
   return officialCodes.some((code) => /^\d{7}$/.test(code.replace(/\D/g, '')));
 }
+

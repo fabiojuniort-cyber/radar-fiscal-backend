@@ -1,3 +1,4 @@
+import { collectionFilterCatalogVisibilitySql } from '../../collection/collection-filter.catalog-visibility.js';
 import {
   CURATED_ENGINE_KEY,
   CURATED_ENGINE_VERSION,
@@ -10,7 +11,6 @@ import {
 } from '../taxonomy-code-compatibility.js';
 import {
   DEFAULT_SECTION_ORDER,
-  PROTECTED_EXCLUDED_SOURCES,
 } from './curation.constants.js';
 import {
   findLatestPublishedRelease,
@@ -132,26 +132,13 @@ export async function loadPublicationTaxonomy(
 
   const version = await run<{ id: string; excluded: boolean }>(
     `
-      SELECT pv.id,
-        EXISTS (
-          SELECT 1
-          FROM publication_origins po
-          JOIN sources s ON s.id = po.source_id
-          WHERE po.publication_id = pv.publication_id
-            AND (
-              s.code = ANY($2::text[])
-              OR s.code = ANY(
-                SELECT jsonb_array_elements_text(value)
-                FROM taxonomy_runtime_settings
-                WHERE key = 'classification_excluded_sources'
-              )
-            )
-        ) AS excluded
-      FROM publication_versions pv
-      WHERE pv.publication_id = $1::uuid AND pv.is_current = true
+      SELECT pv.id, NOT ${collectionFilterCatalogVisibilitySql('p')} AS excluded
+      FROM publications p
+      JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
+      WHERE p.id = $1::uuid
       LIMIT 1
     `,
-    [publicationId, [...PROTECTED_EXCLUDED_SOURCES]],
+    [publicationId],
   );
   const current = version[0];
   if (!current) return base;
@@ -231,8 +218,8 @@ export async function loadPublicationTaxonomy(
 
   const settings = await loadRuntimeSettings(run);
   let status: PublicationTaxonomyStatus;
-  if (scan?.status === 'SUCCESS') status = 'CLASSIFIED';
-  else if (current.excluded) status = 'EXCLUDED';
+  if (current.excluded) status = 'EXCLUDED';
+  else if (scan?.status === 'SUCCESS') status = 'CLASSIFIED';
   else if (!settings.classificationEnabled) status = 'DISABLED';
   else if (scan?.status === 'FAILED') status = 'FAILED';
   else status = 'PENDING';
@@ -451,3 +438,4 @@ export async function loadPublicationTaxonomy(
     sections: ordered,
   };
 }
+

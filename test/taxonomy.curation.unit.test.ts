@@ -19,7 +19,7 @@ import {
   diffReleaseViews,
   normalizeCodes,
 } from '../src/modules/taxonomy/curation/curation.draft.js';
-import type { ReleaseView } from '../src/modules/taxonomy/curation/curation.read.js';
+import { loadRuntimeSettings, type ReleaseView } from '../src/modules/taxonomy/curation/curation.read.js';
 import {
   LEGACY_SEGMENT_TARGETS,
   planLegacySegmentRetirement,
@@ -509,4 +509,15 @@ test('legacy segments: groups move to the TriFaros segment before old items reti
   // A link to a TriFaros segment missing from the draft stops the change.
   const withoutQui = { ...view, concepts: view.concepts.filter((item) => item.code !== 'sector.trifaros_qui') };
   assert.deepEqual(planLegacySegmentRetirement(withoutQui).missingTargets, ['sector.trifaros_qui']);
+});
+
+
+
+test('legacy excluded-source settings never restrict classification of the Acervo', async () => {
+  const settings = await loadRuntimeSettings(async <T>() => [
+    { key: 'classification_enabled', value: true, updated_at: '2026-10-15T00:00:00Z', updated_by: 'test' },
+    { key: 'classification_excluded_sources', value: ['doe-sp', 'any-source'], updated_at: '2026-10-15T00:00:00Z', updated_by: 'test' },
+  ] as T[]);
+  assert.equal(settings.classificationEnabled, true);
+  assert.deepEqual(settings.classificationExcludedSources, []);
 });

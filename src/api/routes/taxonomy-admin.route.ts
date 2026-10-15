@@ -65,7 +65,7 @@ import {
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from '../../modules/taxonomy/curation/curation.actuacao.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
-import { PROTECTED_EXCLUDED_SOURCES } from '../../modules/taxonomy/curation/curation.constants.js';
+import { collectionFilterCatalogVisibility } from '../../modules/collection/collection-filter.catalog-visibility.js';
 import { importNcmCatalog } from '../../modules/taxonomy/ncm/ncm-catalog.importer.js';
 import {
   NCM_SOURCE_URL,
@@ -255,7 +255,6 @@ function csvCell(value: string | number | boolean | null): string {
 async function classificationProgress(
   app: FastifyInstance,
   releaseId: string | null,
-  excluded: readonly string[],
 ): Promise<Record<string, number> | null> {
   if (!releaseId) return null;
   const result = await sql<{
@@ -265,33 +264,23 @@ async function classificationProgress(
     failed: number;
     excluded: number;
   }>`
-    WITH current_versions AS (
-      SELECT
-        pv.id,
-        EXISTS (
-          SELECT 1
-          FROM publication_origins po
-          JOIN sources s ON s.id = po.source_id
-          WHERE po.publication_id = pv.publication_id
-            AND s.code = ANY(${[...excluded]}::text[])
-        ) AS is_excluded
-      FROM publication_versions pv
-      WHERE pv.is_current = true
-    )
     SELECT
-      count(*) FILTER (WHERE NOT cv.is_excluded)::int AS total,
-      count(*) FILTER (WHERE NOT cv.is_excluded AND s.status = 'SUCCESS')::int AS classified,
+      count(*)::int AS total,
+      count(*) FILTER (WHERE s.status = 'SUCCESS')::int AS classified,
       count(*) FILTER (
-        WHERE NOT cv.is_excluded AND s.status = 'SUCCESS' AND s.assertion_count = 0
+        WHERE s.status = 'SUCCESS' AND s.assertion_count = 0
       )::int AS without_tags,
-      count(*) FILTER (WHERE NOT cv.is_excluded AND s.status = 'FAILED')::int AS failed,
-      count(*) FILTER (WHERE cv.is_excluded)::int AS excluded
-    FROM current_versions cv
+      count(*) FILTER (WHERE s.status = 'FAILED')::int AS failed,
+      0::int AS excluded
+    FROM publications p
+    LEFT JOIN publication_versions cv
+      ON cv.publication_id = p.id AND cv.is_current = true
     LEFT JOIN publication_taxonomy_scans s
       ON s.publication_version_id = cv.id
      AND s.taxonomy_release_id = ${releaseId}::uuid
      AND s.engine_key = ${CURATED_ENGINE_KEY}
      AND s.engine_version = ${CURATED_ENGINE_VERSION}
+    WHERE ${collectionFilterCatalogVisibility('p')}
   `.execute(app.db);
   const row = result.rows[0];
   if (!row) return null;
@@ -444,7 +433,6 @@ export async function taxonomyAdminRoutes(
         progress: await classificationProgress(
           app,
           published?.id ?? null,
-          [...new Set([...settings.classificationExcludedSources, ...PROTECTED_EXCLUDED_SOURCES])],
         ),
         catalogs,
         curatorDatabase: app.curatorPool !== null,
@@ -804,13 +792,10 @@ export async function taxonomyAdminRoutes(
       },
     },
     async (request, reply) => {
-      const missing = PROTECTED_EXCLUDED_SOURCES.filter(
-        (source) => !request.body.sources.includes(source),
-      );
-      if (missing.length > 0) {
+      if (request.body.sources.length > 0) {
         return reply.status(409).send({
-          error: 'protected_excluded_source',
-          message: `A fonte ${missing.join(', ')} só pode voltar à classificação após o fechamento formal da reconstrução DOE-SP (operação própria).`,
+          error: 'classification_archive_scope_fixed',
+          message: 'A classificação automática considera sempre todo o Acervo visível, sem exclusões por fonte.',
         });
       }
       await withCuratorTransaction(curatorPool(), (client) =>
@@ -1113,3 +1098,4 @@ export async function taxonomyAdminRoutes(
     },
   );
 }
+

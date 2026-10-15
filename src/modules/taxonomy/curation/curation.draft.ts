@@ -2689,7 +2689,7 @@ export async function setRuntimeSetting(
   }
   if (
     key === 'classification_excluded_sources' &&
-    (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))
+    (!Array.isArray(value) || value.length > 0)
   ) {
     throw new CurationError('INVALID_SETTING_VALUE');
   }
@@ -2705,3 +2705,4 @@ export async function setRuntimeSetting(
     value,
   });
 }
+
