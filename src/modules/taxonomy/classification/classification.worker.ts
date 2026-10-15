@@ -88,7 +88,8 @@ export async function loadClassificationConcepts(
     ]),
   );
 
-  const concepts = view.concepts.map((concept) => {
+  const excluded=new Set(['treatment','act_type','platform','tax_species','sphere']);
+  const concepts = view.concepts.filter(concept=>!excluded.has(concept.dimensionCode)).map((concept) => {
     const type = typeByDimension.get(concept.dimensionCode) ?? null;
     return {
       releaseConceptId: concept.releaseConceptId,
