@@ -57,6 +57,7 @@ async function run() {
           staging:{segmento:preview.source.segmentoRows,produto:preview.source.produtoRows,
             errors:0,warnings:preview.source.expectedWarnings},
           dimensions:preview.audit.dimensions,
+          groupSlugMerges:preview.audit.groupSlugMerges,
           requiresCoordApproval:preview.audit.requiresCoordApproval,
           exceptionsApprovalSha256:preview.audit.exceptionsApprovalSha256,
           alreadyImported:preview.alreadyImported,
