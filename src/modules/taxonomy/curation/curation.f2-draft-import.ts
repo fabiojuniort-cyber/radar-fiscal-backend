@@ -350,7 +350,7 @@ async function verifyDraftReadback(client:PoolClient,draftId:string,plan:F2Draft
   }
 }
 export async function applyF2Draft(client:PoolClient,actor:CuratorActor,confirmed:{
-  batchId:string;contentSha256:string;exceptionsApprovalSha256?:string;
+  batchId:string;contentSha256:string;exceptionsApprovalSha256?:string | undefined;
 }):Promise<Record<string,unknown>> {
   const preview=await currentDraftPlan(client);
   const {source,draftId}=preview;
