@@ -110,7 +110,9 @@ export interface ConceptView {
   classifyByLabel: boolean;
   officialCodes: string[];
   aliases: AliasView[];
-  /** Optional admin-only F2 staging suggestion, never a legal classification. */
+  /** Release-scoped overrides: NULL means inherit F2 source suggestions; [] means cleared. */
+  f2DraftSuggestions?: {products:string[]|null;ncms:string[]|null};
+  /** F2 suggestions, not legal classification evidence. */
   f2Source?: {
     atuacao: string;
     suggestedProducts: string;
@@ -279,6 +281,8 @@ interface ConceptRow {
   help_text: string | null;
   classify_by_label: boolean | null;
   official_codes: string[];
+  f2_suggested_products: string[] | null;
+  f2_suggested_ncms: string[] | null;
   aliases: AliasView[] | null;
 }
 
@@ -371,6 +375,8 @@ export async function loadReleaseView(
         rc.help_text,
         rc.classify_by_label,
         rc.official_codes,
+        rc.f2_suggested_products,
+        rc.f2_suggested_ncms,
         (
           SELECT json_agg(
             json_build_object('text', a.text, 'aliasType', b.alias_type)
@@ -462,6 +468,7 @@ export async function loadReleaseView(
     helpText: row.help_text,
     classifyByLabel: row.classify_by_label ?? true,
     officialCodes: row.official_codes ?? [],
+    f2DraftSuggestions:{products:row.f2_suggested_products,ncms:row.f2_suggested_ncms},
     aliases: row.aliases ?? [],
   }));
 
