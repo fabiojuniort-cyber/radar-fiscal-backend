@@ -11,10 +11,10 @@ import {
 import { resolveCuratorDatabaseUrl } from './curator-url.js';
 
 function fail(code: string): never { throw new Error(code); }
-function parse(args: string[]): {mode: 'plan' | 'apply'; batch: string | undefined; sha: string | undefined} {
+function parse(args: string[]): {mode: 'plan' | 'apply'; batch: string | undefined; sha: string | undefined; exceptionSha: string | undefined} {
   const input: Record<string,string> = {};
   for (const arg of args) {
-    const match=/^--(mode|confirm-batch-id|confirm-content-sha256)=([^\s]+)$/.exec(arg);
+    const match=/^--(mode|confirm-batch-id|confirm-content-sha256|coord-approval-exceptions-sha256)=([^\s]+)$/.exec(arg);
     if (!match || input[match[1]!]!==undefined) fail('F2_DRAFT_INVALID_ARGUMENT');
     input[match[1]!]=match[2]!;
   }
@@ -23,7 +23,10 @@ function parse(args: string[]): {mode: 'plan' | 'apply'; batch: string | undefin
     (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(input['confirm-batch-id']??'') ||
       !/^[0-9a-f]{64}$/.test(input['confirm-content-sha256']??'')))
     fail('F2_DRAFT_CONFIRMATION_REQUIRED');
-  return {mode:input.mode,batch:input['confirm-batch-id'],sha:input['confirm-content-sha256']};
+  if (input['coord-approval-exceptions-sha256'] && !/^[0-9a-f]{64}$/.test(input['coord-approval-exceptions-sha256']))
+    fail('F2_DRAFT_COORD_EXCEPTION_APPROVAL_INVALID');
+  return {mode:input.mode,batch:input['confirm-batch-id'],sha:input['confirm-content-sha256'],
+    exceptionSha:input['coord-approval-exceptions-sha256']};
 }
 async function run() {
   const args=parse(process.argv.slice(2));
@@ -52,7 +55,10 @@ async function run() {
           batchId:preview.source.batchId,contentSha256:preview.source.contentSha256,
           staging:{segmento:preview.source.segmentoRows,produto:preview.source.produtoRows,
             errors:0,warnings:preview.source.expectedWarnings},
-          create:preview.create,update:preview.update,alreadyImported:preview.alreadyImported,
+          dimensions:preview.audit.dimensions,
+          requiresCoordApproval:preview.audit.requiresCoordApproval,
+          exceptionsApprovalSha256:preview.audit.exceptionsApprovalSha256,
+          alreadyImported:preview.alreadyImported,
           published:false,
         }));
       } finally {
@@ -67,7 +73,8 @@ async function run() {
       return applyF2Draft(client,{
         userId:'ops:f2-draft-01',
         justification:'Importação explícita de lote F2 validado, apenas no rascunho',
-      },{batchId:args.batch!,contentSha256:args.sha!});
+      },{batchId:args.batch!,contentSha256:args.sha!,
+        exceptionsApprovalSha256:args.exceptionSha});
     });
     console.log('F2_DRAFT_IMPORT_RESULT='+JSON.stringify(result));
   }finally {await pool.end();}
