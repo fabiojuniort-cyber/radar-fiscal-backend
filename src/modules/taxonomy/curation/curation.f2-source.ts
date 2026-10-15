@@ -55,7 +55,7 @@ export async function attachF2SourceSuggestions(
       ORDER BY cnae_code
     `,[cnaes]);
     for(const row of rows){
-      if(!cnaes.includes(row.cnae_code)||!/^\\d{7}$/.test(row.cnae_code))
+      if(!cnaes.includes(row.cnae_code)||!/^\d{7}$/.test(row.cnae_code))
         throw new Error('F2_SOURCE_UNEXPECTED_CNAE');
       if(byCnae.has(row.cnae_code))throw new Error('F2_SOURCE_DUPLICATE_CNAE');
       if(row.source_sha256!==F2_SOURCE_SEGMENT_SHA256){
