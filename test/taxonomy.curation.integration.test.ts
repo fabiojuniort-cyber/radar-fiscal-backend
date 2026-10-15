@@ -411,7 +411,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       headers: curator.headers,
       payload: {
         justification: 'Grade',
-        rows: [gridRow('Calcário'), gridRow('Ureia', { code: 'product.urea', officialCodes: ['31021'] })],
+        rows: [gridRow('Calcário'), gridRow('Ureia', { code: 'product.urea', officialCodes: ['310'] })],
         retire: ['product.gesso_2'],
       },
     });
