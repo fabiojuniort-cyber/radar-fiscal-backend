@@ -80,7 +80,11 @@ async function run() {
   }finally {await pool.end();}
 }
 run().catch(e=>{
-  const code=e instanceof Error&&/^F2_[A-Z0-9_]+$/.test(e.message)?
-    e.message:'F2_DRAFT_IMPORT_BLOCK';
+  // Only the whitelisted line/reason diagnostic is allowed; never echo raw
+  // staging JSON, SQL error details, credentials, or arbitrary exception text.
+  const message=e instanceof Error?e.message:'';
+  const safeDetail=/^F2_DRAFT_PRODUCT_NCM_INVALID line=[0-9]+ reason=(?:LENGTH_[0-9]+|NOT_ARRAY|NOT_STRING|NON_DIGIT)$/.test(message);
+  const code=(safeDetail||/^F2_[A-Z0-9_]+$/.test(message))?
+    message:'F2_DRAFT_IMPORT_BLOCK';
   console.error(code);process.exitCode=1;
 });
