@@ -1,5 +1,9 @@
 import type { ReleaseView, SqlRunner } from './curation.read.js';
 
+/** Approved Segmento v5.1 hash; single source of truth for the F2 overlay. */
+export const F2_SOURCE_SEGMENT_SHA256 =
+  '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67';
+
 export interface F2SourceSuggestion {
   atuacao: string;
   suggestedProducts: string;
@@ -39,7 +43,10 @@ export async function attachF2SourceSuggestions(
   const cnaes = [...new Set(eligible.map((concept) => concept.officialCodes[0]!))];
   if (cnaes.length === 0) return view;
 
-  const rows = await run<F2SourceRow>(
+  // This is a non-essential admin overlay. A bad or unavailable source must
+  // never prevent the curator's release view from loading.
+  try {
+    const rows = await run<F2SourceRow>(
     `SELECT cnae_code, atuacao, suggested_products, suggested_ncms,
             source_sha256, source_batch_id
        FROM taxonomy_f2_segment_suggestions_readonly
@@ -53,11 +60,10 @@ export async function attachF2SourceSuggestions(
       throw new Error('F2_SOURCE_UNEXPECTED_CNAE');
     }
     if (byCnae.has(row.cnae_code)) throw new Error('F2_SOURCE_DUPLICATE_CNAE');
-    // The view guarantees the approved SHA. Refuse any unexpected payload
-    // rather than letting unaudited values masquerade as official suggestions.
-    if (row.source_sha256 !==
-        '588a89871044a1ca67036fb5c17cdba3ba70f447bd1412fc476f14bb1d6440cd') {
-      throw new Error('F2_SOURCE_HASH_MISMATCH');
+    // Fail closed only for suggestions: never attach unapproved source data.
+    if (row.source_sha256 !== F2_SOURCE_SEGMENT_SHA256) {
+      console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED=F2_SOURCE_HASH_MISMATCH');
+      return view;
     }
     byCnae.set(row.cnae_code, {
       atuacao: row.atuacao,
@@ -77,4 +83,11 @@ export async function attachF2SourceSuggestions(
       return f2Source ? { ...concept, f2Source } : concept;
     }),
   };
+  } catch (error) {
+    const reason = error instanceof Error &&
+      /^F2_SOURCE_[A-Z_]+$/.test(error.message)
+      ? error.message : 'F2_SOURCE_OVERLAY_UNAVAILABLE';
+    console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED=' + reason);
+    return view;
+  }
 }
