@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {buildF2DraftPlan,auditF2Draft,readF2Stage,validateF2DraftProductNcms,safeF2DraftError,F2DraftStageError,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
+import {buildF2DraftPlan,auditF2Draft,readF2Stage,validateF2DraftProductNcms,safeF2DraftError,F2DraftStageError,f2GroupSlugify,getOrCreateF2Group,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
 import type {ReleaseView} from '../src/modules/taxonomy/curation/curation.read.js';
 import type {PoolClient} from 'pg';
 
@@ -246,4 +246,66 @@ test('F2-DRAFT-09 refuses untrusted SQL metadata and URLs in diagnostic fields',
   assert.equal(safeF2DraftError(new F2DraftStageError('ledger',undefined,unexpected)),
     'F2_DRAFT_IMPORT_BLOCK stage=ledger');
   assert.equal(safeF2DraftError(null),'F2_DRAFT_IMPORT_BLOCK stage=preflight');
+});
+
+test('F2-DRAFT-11: different normalized labels sharing a 60-char slug reuse one group',async()=>{
+  // createGroup uses a max-60-char slug, not a normalized-label uniqueness key.
+  const a='a'.repeat(60)+' A';
+  const b='a'.repeat(60)+' B';
+  assert.notEqual(a.toLowerCase(),b.toLowerCase());
+  assert.equal(f2GroupSlugify(a),f2GroupSlugify(b));
+  const groups=new Map<string,string>();
+  let creations=0;
+  const create=async()=>{
+    creations++;
+    return 'group-'+creations;
+  };
+  const first=await getOrCreateF2Group(groups,a,create);
+  const second=await getOrCreateF2Group(groups,b,create);
+  assert.deepEqual(first,{id:'group-1',created:true});
+  assert.deepEqual(second,{id:'group-1',created:false});
+  assert.equal(creations,1);
+  assert.equal(groups.size,1);
+
+  // Existing group's label is intentionally NOT renamed; even a retired
+  // group's code is a valid lookup target (all release groups are indexed).
+  const already=new Map([[f2GroupSlugify(a),'previous-group']]);
+  const reused=await getOrCreateF2Group(already,b,create);
+  assert.deepEqual(reused,{id:'previous-group',created:false});
+  assert.equal(creations,1);
+});
+
+test('F2-DRAFT-11: groupSlugMerges informational only; ten examples and no hash change',()=>{
+  const plan=buildF2DraftPlan(fixture());
+  plan.sector=plan.sector.slice(0,13);
+  plan.product=[];
+  const prefix='a'.repeat(60);
+  plan.sector.forEach((item,i)=>{item.group=prefix+' '+(i+1);});
+  const existingLabel=prefix+' original';
+  const originalGroup={
+    id:'existing-sector-group',code:f2GroupSlugify(existingLabel),
+    label:existingLabel,dimensionCode:'sector',
+  };
+  const outside={
+    code:'sector.preserve',dimensionCode:'sector',officialCodes:['9988776'],
+    membershipStatus:'RETIRED',aliases:[],
+  };
+  const view={groups:[originalGroup],concepts:[outside]} as unknown as ReleaseView;
+  const report=auditF2Draft(plan,view,'release-test');
+  assert.equal(report.dimensions.sector.groupSlugMerges.count,13);
+  assert.equal(report.dimensions.sector.groupSlugMerges.examples.length,10);
+  assert.equal(report.groupSlugMerges.count,13);
+  assert.equal(report.groupSlugMerges.examples.length,10);
+  assert.deepEqual(report.groupSlugMerges.examples[0],{
+    label:prefix+' 1',code:f2GroupSlugify(existingLabel),dimension:'sector',
+  });
+  assert.equal(report.requiresCoordApproval,true);
+  const oldHash=report.exceptionsApprovalSha256;
+  assert.match(oldHash??'',/^[0-9a-f]{64}$/);
+  // Different group labels affect the audit warning but NOT the approved
+  // outsideLot/duplicate SHA256 or the decision to require COORD approval.
+  const noMerge=auditF2Draft(plan,{...view,groups:[]},'release-test');
+  assert.equal(noMerge.groupSlugMerges.count,12);
+  assert.equal(noMerge.exceptionsApprovalSha256,oldHash);
+  assert.equal(noMerge.requiresCoordApproval,true);
 });
