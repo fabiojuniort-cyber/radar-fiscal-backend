@@ -56,6 +56,8 @@ async function run() {
           batchId:preview.source.batchId,contentSha256:preview.source.contentSha256,
           staging:{segmento:preview.source.segmentoRows,produto:preview.source.produtoRows,
             errors:0,warnings:preview.source.expectedWarnings},
+          invalidOfficialCodes:preview.validation.invalidOfficialCodes,
+          invalidConceptInputs:preview.validation.invalidConceptInputs,
           dimensions:preview.audit.dimensions,
           groupSlugMerges:preview.audit.groupSlugMerges,
           requiresCoordApproval:preview.audit.requiresCoordApproval,

@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {buildF2DraftPlan,auditF2Draft,readF2Stage,validateF2DraftProductNcms,safeF2DraftError,F2DraftStageError,f2GroupSlugify,getOrCreateF2Group,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
+import {buildF2DraftPlan,auditF2Draft,validateF2DraftInputs,F2DraftInputError,currentDraftPlan,applyF2Draft,readF2Stage,validateF2DraftProductNcms,safeF2DraftError,F2DraftStageError,f2GroupSlugify,getOrCreateF2Group,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
 import type {ReleaseView} from '../src/modules/taxonomy/curation/curation.read.js';
 import type {PoolClient} from 'pg';
 
@@ -308,4 +308,131 @@ test('F2-DRAFT-11: groupSlugMerges informational only; ten examples and no hash 
   assert.equal(noMerge.groupSlugMerges.count,12);
   assert.equal(noMerge.exceptionsApprovalSha256,oldHash);
   assert.equal(noMerge.requiresCoordApproval,true);
+});
+
+
+function inputView(): ReleaseView {
+  return {dimensions:[
+    {code:'sector',officialCodeType:'CNAE'}, {code:'product',officialCodeType:'NCM'},
+  ],concepts:[],groups:[]} as unknown as ReleaseView;
+}
+
+test('F2-DRAFT-12: all real five/seven-digit prefixes pass the shared domain preflight',()=>{
+  const plan=buildF2DraftPlan(fixture());
+  plan.product[202]!.officialCodes=['2710124']; // real line 204
+  plan.product[205]!.officialCodes=['28151']; // real line 207
+  plan.product[4033]!.officialCodes=['03071']; // real leading-zero prefix
+  assert.deepEqual(validateF2DraftInputs(plan,inputView()),{
+    invalidOfficialCodes:{count:0,examples:[]}, invalidConceptInputs:{count:0,examples:[]},
+  });
+});
+
+test('F2-DRAFT-12: invalid official codes across BOTH dimensions are bounded, counted and value-free',()=>{
+  const plan=buildF2DraftPlan(fixture());
+  plan.sector[0]!.officialCodes=['CNAE_PRIVATE_VALUE'];
+  // Last product verifies that preflight traverses every concept, including equal/update rows.
+  for(const item of plan.product.slice(-12))item.officialCodes=['010'];
+  const view=inputView();
+  view.concepts=[{...plan.product.at(-1)!,dimensionCode:'product',aliases:[]}] as unknown as ReleaseView['concepts'];
+  assert.throws(()=>validateF2DraftInputs(plan,view),error=>{
+    assert.ok(error instanceof F2DraftInputError);
+    assert.equal(error.message,'F2_DRAFT_OFFICIAL_CODE_INVALID');
+    assert.equal(error.validation.invalidOfficialCodes.count,13);
+    assert.equal(error.validation.invalidOfficialCodes.examples.length,10);
+    assert.deepEqual(error.validation.invalidOfficialCodes.examples[0],
+      {dimension:'sector',line:2,reason:'NON_DIGIT'});
+    assert.deepEqual(error.validation.invalidOfficialCodes.examples[1],
+      {dimension:'product',line:4215,reason:'LENGTH_3'});
+    const output=safeF2DraftError(new F2DraftStageError('preflight',undefined,error));
+    assert.match(output,/^F2_DRAFT_OFFICIAL_CODE_INVALID stage=preflight validation=/);
+    assert.equal(output.includes('CNAE_PRIVATE_VALUE'),false);
+    assert.equal(output.includes('product.item_'),false);
+    return true;
+  });
+});
+
+test('F2-DRAFT-12: preflight uses the actual dimension type, not a hardcoded NCM/CNAE guess',()=>{
+  const plan=buildF2DraftPlan(fixture());
+  plan.sector=plan.sector.slice(0,1);plan.product=plan.product.slice(0,1);
+  plan.sector[0]!.officialCodes=['12345']; // CFOP does not accept this width
+  const view=inputView();view.dimensions[0]!.officialCodeType='CFOP';
+  assert.throws(()=>validateF2DraftInputs(plan,view),error=>{
+    assert.ok(error instanceof F2DraftInputError);
+    assert.deepEqual(error.validation.invalidOfficialCodes,
+      {count:1,examples:[{dimension:'sector',line:2,reason:'INVALID_FORMAT'}]});
+    return true;
+  });
+});
+
+test('F2-DRAFT-12: domain preflight covers labels, definitions, aliases, groups and concept ownership',()=>{
+  const plan=buildF2DraftPlan(fixture());
+  plan.sector=plan.sector.slice(0,1);plan.product=plan.product.slice(0,1);
+  plan.product[0]!.label=' ';plan.product[0]!.definition='';
+  plan.product[0]!.group='***';
+  const view=inputView();
+  view.concepts=[{code:plan.sector[0]!.code,aliases:[{text:'existing',aliasType:'INVALID'}]}] as unknown as ReleaseView['concepts'];
+  const owners=[{code:plan.product[0]!.code,dimension_code:'other_dimension'}];
+  assert.throws(()=>validateF2DraftInputs(plan,view,owners),error=>{
+    assert.ok(error instanceof F2DraftInputError);
+    assert.equal(error.message,'F2_DRAFT_CONCEPT_INPUT_INVALID');
+    assert.deepEqual(error.validation.invalidConceptInputs.examples.map(e=>e.reason),
+      ['INVALID_ALIAS_TYPE','LABEL_REQUIRED','DEFINITION_REQUIRED','GROUP_CODE_REQUIRED','CONCEPT_CODE_TAKEN']);
+    assert.equal(error.validation.invalidOfficialCodes.count,0);
+    return true;
+  });
+});
+
+function planClient(snapshot: F2StageSnapshot, calls: string[]): PoolClient {
+  const release={id:'11111111-1111-4111-8111-111111111111',version:'v1.8.0',status:'DRAFT',
+    created_at:'2026-10-15T00:00:00Z',published_at:null,previous_release_id:null,change_notes:null};
+  return {query:async(sql:string)=>{
+    calls.push(sql);
+    assert.match(sql.trim(),/^SELECT/i,'no write is allowed before domain preflight');
+    if(sql.includes('FROM taxonomy_releases'))return {rows:[release]};
+    if(sql.includes('FROM public.taxonomy_f2_import_batches'))return {rows:[{...snapshot.batch,id:F2_APPROVED_BATCH_ID}]};
+    if(sql.includes('FROM public.taxonomy_f2_import_segment_rows'))return {rows:snapshot.segments};
+    if(sql.includes('FROM public.taxonomy_f2_import_product_rows'))return {rows:snapshot.products};
+    if(sql.includes('FROM public.taxonomy_f2_draft_import_ledger'))return {rows:[]};
+    if(sql.includes('FROM taxonomy_release_dimensions rd'))return {rows:[
+      {id:'sector-id',code:'sector',name:'Segmento',profile_visible:true,profile_order:1,official_code_type:'CNAE'},
+      {id:'product-id',code:'product',name:'Produto',profile_visible:true,profile_order:2,official_code_type:'NCM'},
+    ]};
+    if(sql.includes('FROM taxonomy_release_groups g') || sql.includes('FROM taxonomy_release_concepts rc') ||
+       sql.includes('FROM taxonomy_concepts c'))return {rows:[]};
+    assert.fail('unexpected preflight query');
+  }} as unknown as PoolClient;
+}
+
+test('F2-DRAFT-12: actual currentDraftPlan/apply reject invalid NCM before any write',async()=>{
+  const snapshot=fixture();snapshot.products[202]!.ncm_normalized=['010'];
+  for(const apply of [false,true]){
+    const calls:string[]=[];const client=planClient(snapshot,calls);
+    const operation=apply?applyF2Draft(client,{userId:'test',justification:'preflight test'},
+      {batchId:F2_APPROVED_BATCH_ID,contentSha256:snapshot.batch.content_sha256}):currentDraftPlan(client);
+    await assert.rejects(operation,error=>{
+      const original=error instanceof F2DraftStageError?error.cause:error;
+      assert.ok(original instanceof F2DraftInputError);
+      assert.equal(original.message,'F2_DRAFT_OFFICIAL_CODE_INVALID');
+      assert.deepEqual(original.validation.invalidOfficialCodes,
+        {count:1,examples:[{dimension:'product',line:204,reason:'LENGTH_3'}]});
+      return true;
+    });
+    assert.ok(calls.length>0);
+    assert.ok(calls.every(sql=>/^SELECT/i.test(sql.trim())));
+  }
+});
+
+test('F2-DRAFT-12: a blank source label reaches the domain gate with a source line, without writing',async()=>{
+  const snapshot=fixture();snapshot.products[0]!.raw_cells[2]=' ';
+  snapshot.products[0]!.row_sha256=sha(JSON.stringify(snapshot.products[0]!.raw_cells));
+  snapshot.batch.content_sha256=sha(JSON.stringify({
+    segmento:snapshot.segments.map(s=>s.raw_cells),produto:snapshot.products.map(p=>p.raw_cells),
+  }));
+  await assert.rejects(currentDraftPlan(planClient(snapshot,[])),error=>{
+    assert.ok(error instanceof F2DraftInputError);
+    assert.equal(error.message,'F2_DRAFT_CONCEPT_INPUT_INVALID');
+    assert.deepEqual(error.validation.invalidConceptInputs.examples,
+      [{dimension:'product',line:2,reason:'LABEL_REQUIRED'},{dimension:'product',line:2,reason:'DEFINITION_REQUIRED'}]);
+    return true;
+  });
 });

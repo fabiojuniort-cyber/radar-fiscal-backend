@@ -161,7 +161,7 @@ export function normalizeOfficialCode(raw: string): string {
 }
 
 const CODE_SHAPES: Record<OfficialCodeType, RegExp> = {
-  NCM: /^\d{2}(\d{2}(\d{2}(\d{2})?)?)?$/,
+  NCM: /^(?:\d{2}|\d{4,8})$/,
   CNAE: /^(\d{2,7})$/,
   CFOP: /^\d{4}$/,
   NBS: /^\d{1,9}$/,
@@ -185,7 +185,7 @@ export function formatOfficialCode(
 ): string {
   if (type === 'NCM') {
     if (code.length <= 4) return code;
-    if (code.length === 6) return `${code.slice(0, 4)}.${code.slice(4)}`;
+    if (code.length <= 6) return `${code.slice(0, 4)}.${code.slice(4)}`;
     return `${code.slice(0, 4)}.${code.slice(4, 6)}.${code.slice(6)}`;
   }
   if (type === 'CNAE') {

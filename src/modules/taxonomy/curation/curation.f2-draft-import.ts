@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import {
-  createConcept, createGroup, requireOpenDraft, updateConcept,
+  ALIAS_TYPES, createConcept, createGroup, normalizeCodes, requireOpenDraft, updateConcept, validateSemanticInput,
   type CuratorActor, type ConceptAliasInput, type ConceptInput,
 } from './curation.draft.js';
 import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from './curation.actuacao.js';
 import { loadReleaseView, pgRunner, type ReleaseView } from './curation.read.js';
 import { normalizeAliasText } from '../baseline/baseline.parser.js';
-import { normalizeOfficialCode } from './curation.constants.js';
+import { normalizeOfficialCode, type OfficialCodeType } from './curation.constants.js';
 
 export const SEGMENTO_SHA = '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67';
 export const PRODUTO_SHA = '261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a';
@@ -87,6 +87,9 @@ export function safeF2DraftError(error: unknown): string {
     const identifier = value(key);
     if (/^[a-z_][a-z0-9_]{0,62}$/.test(identifier)) pieces.push(printed + '=' + identifier);
   }
+  if (original instanceof F2DraftInputError) {
+    pieces.push('validation=' + JSON.stringify(original.validation));
+  }
   return pieces.join(' ');
 }
 
@@ -145,7 +148,8 @@ export interface F2DraftPlan {
   atuacaoOrigins: { sourceLine: number; cnaeCode: string; atuacaoLabel: string }[];
 }
 
-/** Preserve approved 2–8 digit NCM prefixes (including 3/5/7 and zero-prefixes).
+/** Preserve the staging's structural 2–8 digit strings, without changing source data.
+ * Domain approval (2/4/5/6/7/8; NOT 3) is checked using the actual dimension type in preflight.
  * No normalization/coercion occurs: PostgreSQL jsonb must be an array of strings.
  * Errors contain only source line and structural reason, never product/customer data.
  */
@@ -216,7 +220,7 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     const label=normalizeCell(c[4]??'');
     const sub=normalizeCell(c[1]??'');
     const parent=normalizeCell(c[0]??'');
-    if(!label||!sub||!parent)bad('F2_DRAFT_SECTOR_LABEL_MISSING');
+    if(!sub||!parent)bad('F2_DRAFT_SECTOR_LABEL_MISSING');
     return {line:row.source_line,code:codeFor('sector',c[11]??'','cnae_'+row.cnae_code),
       dimension:'sector',label,definition:label,group:parent+' – '+sub,
       officialCodes:[row.cnae_code],aliases:aliases(c[5]??''),
@@ -227,7 +231,6 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     const c=row.raw_cells;
     const group=normalizeCell(c[1]??'');
     const label=normalizeCell(c[2]??'');
-    if(!group||!label)bad('F2_DRAFT_PRODUCT_LABEL_MISSING');
     const canonical = validateF2DraftProductNcms(row.ncm_normalized, row.source_line);
     return {line:row.source_line,
       code:codeFor('product',c[8]??'','f2_'+DIGEST(row.product_code).slice(0,20)),
@@ -252,6 +255,105 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     atuacaoOrigins:segments.map(row=>({sourceLine:row.source_line,cnaeCode:row.cnae_code,atuacaoLabel:row.atuacao}))};
 }
 
+
+export interface F2InvalidInputExample {
+  dimension: 'sector' | 'product';
+  line: number;
+  reason: string;
+}
+export interface F2InputIssues {
+  /** Number of invalid codes/inputs; examples alone are capped. */
+  count: number;
+  examples: F2InvalidInputExample[];
+}
+export interface F2DraftInputValidation {
+  invalidOfficialCodes: F2InputIssues;
+  invalidConceptInputs: F2InputIssues;
+}
+export class F2DraftInputError extends Error {
+  readonly validation: F2DraftInputValidation;
+  constructor(validation: F2DraftInputValidation) {
+    super(validation.invalidOfficialCodes.count > 0
+      ? 'F2_DRAFT_OFFICIAL_CODE_INVALID' : 'F2_DRAFT_CONCEPT_INPUT_INVALID');
+    // Rebuild the report from a closed vocabulary: never serialize arbitrary error data.
+    const safe = (issues: F2InputIssues): F2InputIssues => ({
+      count: Number.isSafeInteger(issues.count) && issues.count >= 0 ? issues.count : 0,
+      examples: issues.examples.filter(e =>
+        ['sector', 'product'].includes(e.dimension) && Number.isSafeInteger(e.line) && e.line >= 1 &&
+        (/^LENGTH_[0-9]+$/.test(e.reason) || [
+          'NOT_STRING', 'NON_DIGIT', 'INVALID_FORMAT', 'LABEL_REQUIRED', 'DEFINITION_REQUIRED',
+          'ALIAS_TEXT_INVALID', 'INVALID_ALIAS_TYPE', 'GROUP_LABEL_REQUIRED', 'GROUP_CODE_REQUIRED',
+          'INVALID_CONCEPT_CODE', 'CONCEPT_CODE_TAKEN',
+        ].includes(e.reason)))
+        .slice(0, 10).map(({dimension, line, reason}) => ({dimension, line, reason})),
+    });
+    this.validation = {
+      invalidOfficialCodes: safe(validation.invalidOfficialCodes),
+      invalidConceptInputs: safe(validation.invalidConceptInputs),
+    };
+  }
+}
+
+/** Same pure validations as createConcept/updateConcept; no writes, no source values in errors. */
+export function validateF2DraftInputs(
+  plan: F2DraftPlan,
+  view: ReleaseView,
+  owners: readonly {code: string; dimension_code: string}[] = [],
+): F2DraftInputValidation {
+  const validation: F2DraftInputValidation = {
+    invalidOfficialCodes: {count: 0, examples: []},
+    invalidConceptInputs: {count: 0, examples: []},
+  };
+  const currentByCode = new Map(view.concepts.map(c => [c.code, c]));
+  const dimensionByCode = new Map(view.dimensions.map(d => [d.code, d]));
+  const ownerByCode = new Map(owners.map(c => [c.code, c.dimension_code]));
+  const add = (issues: F2InputIssues, item: DraftImportConcept, reason: string) => {
+    issues.count++;
+    if (issues.examples.length < 10)
+      issues.examples.push({dimension: item.dimension, line: item.line, reason});
+  };
+  const codeReason = (type: OfficialCodeType | null, code: string): string => {
+    if (typeof code !== 'string') return 'NOT_STRING';
+    const normalized = normalizeOfficialCode(code);
+    if (type === 'NCM' || type === 'CNAE')
+      return /^\d+$/.test(normalized) ? `LENGTH_${normalized.length}` : 'NON_DIGIT';
+    return 'INVALID_FORMAT';
+  };
+  // Never skip equal/update rows: apply can merge legacy aliases and change domains too.
+  for (const item of [...plan.sector, ...plan.product]) {
+    const dimension = dimensionByCode.get(item.dimension);
+    if (!dimension) bad('F2_DRAFT_DIMENSION_MISSING');
+    const type = dimension!.officialCodeType;
+    try { normalizeCodes(type, item.officialCodes); }
+    catch {
+      for (const code of item.officialCodes) {
+        try { normalizeCodes(type, [code]); }
+        catch { add(validation.invalidOfficialCodes, item, codeReason(type, code)); }
+      }
+    }
+    // Each field is checked independently so the plan reports all affected source lines.
+    for (const [field, reason] of [['label', 'LABEL_REQUIRED'], ['definition', 'DEFINITION_REQUIRED']] as const) {
+      try { validateSemanticInput({[field]: item[field]}); }
+      catch { add(validation.invalidConceptInputs, item, reason); }
+    }
+    if (!item.group.trim()) add(validation.invalidConceptInputs, item, 'GROUP_LABEL_REQUIRED');
+    else if (!f2GroupSlugify(item.group)) add(validation.invalidConceptInputs, item, 'GROUP_CODE_REQUIRED');
+    if (!CODE.test(item.code) || !item.code.startsWith(item.dimension + '.'))
+      add(validation.invalidConceptInputs, item, 'INVALID_CONCEPT_CODE');
+    if (ownerByCode.has(item.code) && ownerByCode.get(item.code) !== item.dimension)
+      add(validation.invalidConceptInputs, item, 'CONCEPT_CODE_TAKEN');
+    // apply preserves existing aliases; validate those as well as the incoming aliases.
+    for (const alias of [...(currentByCode.get(item.code)?.aliases ?? []), ...item.aliases]) {
+      if (typeof alias.text !== 'string')
+        add(validation.invalidConceptInputs, item, 'ALIAS_TEXT_INVALID');
+      else if (alias.text.trim() && !(ALIAS_TYPES as readonly string[]).includes(alias.aliasType))
+        add(validation.invalidConceptInputs, item, 'INVALID_ALIAS_TYPE');
+    }
+  }
+  if (validation.invalidOfficialCodes.count || validation.invalidConceptInputs.count)
+    throw new F2DraftInputError(validation);
+  return validation;
+}
 
 export interface F2DimensionAudit {
   created: number;
@@ -400,6 +502,7 @@ export async function readF2Stage(client:PoolClient):Promise<F2StageSnapshot> {
 export async function currentDraftPlan(client:PoolClient):Promise<{
   draftId:string;draftVersion:string;source:F2DraftPlan;alreadyImported:boolean;
   audit:F2DraftAudit;
+  validation:F2DraftInputValidation;
 }>{
   const draft=await requireOpenDraft(client);
   const plan=buildF2DraftPlan(await readF2Stage(client));
@@ -413,9 +516,14 @@ export async function currentDraftPlan(client:PoolClient):Promise<{
   for(const dimension of ['sector','product']){
     if(!view.dimensions.some(d=>d.code===dimension))bad('F2_DRAFT_DIMENSION_MISSING');
   }
+  const owners = await client.query<{code:string;dimension_code:string}>(
+    'SELECT c.code, d.code AS dimension_code FROM taxonomy_concepts c '+
+    'JOIN taxonomy_dimensions d ON d.id=c.dimension_id WHERE c.code=ANY($1::text[])',
+    [[...plan.sector, ...plan.product].map(c=>c.code)]);
+  const validation = validateF2DraftInputs(plan, view, owners.rows);
   const audit = auditF2Draft(plan, view, draft.id);
   return {draftId:draft.id,draftVersion:draft.version,source:plan,
-    alreadyImported:ledger.rows.length>0,audit};
+    alreadyImported:ledger.rows.length>0,audit,validation};
 }
 async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'sector'|'product',
   concepts:DraftImportConcept[],draftId:string,identicalCodes:ReadonlySet<string>):Promise<{created:number;updated:number;groupsCreated:number}> {
