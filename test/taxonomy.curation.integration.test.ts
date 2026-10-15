@@ -320,7 +320,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       method: 'PATCH',
       url: '/api/v1/admin/taxonomy/drafts/current/concepts/product.urea',
       headers: curator.headers,
-      payload: { justification: 'NCM inválido', officialCodes: ['31021'] },
+      payload: { justification: 'NCM de 3 dígitos inválido (5/7 são válidos)', officialCodes: ['310'] },
     });
     assert.equal(invalidCode.statusCode, 400);
 
