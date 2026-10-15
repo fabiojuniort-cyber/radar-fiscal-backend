@@ -6,7 +6,7 @@ import {
   isPublicationOutOfScopeError,
   lockPublicationVersionInScope,
 } from '../../publication-scope/publication-scope.guard.js';
-import { PROTECTED_EXCLUDED_SOURCES } from '../curation/curation.constants.js';
+import { collectionFilterCatalogVisibility } from '../../collection/collection-filter.catalog-visibility.js';
 import {
   findLatestPublishedRelease,
   kyselyRunner,
@@ -114,7 +114,6 @@ function classificationText(row: PendingVersion): string | null {
 async function selectPending(
   db: Kysely<DB>,
   releaseId: string,
-  excludedSources: readonly string[],
   limit: number,
 ): Promise<PendingVersion[]> {
   const result = await sql<PendingVersion>`
@@ -155,13 +154,7 @@ async function selectPending(
           AND n.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
           AND n.status = 'SUCCESS'
       )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM publication_origins po
-        JOIN sources src ON src.id = po.source_id
-        WHERE po.publication_id = p.id
-          AND src.code = ANY(${[...excludedSources]}::text[])
-      )
+      AND ${collectionFilterCatalogVisibility('p')}
     ORDER BY
       p.published_on DESC NULLS LAST,
       pv.captured_at DESC,
@@ -384,7 +377,6 @@ export async function processPublicationTaxonomyBatch(
   const pending = await selectPending(
     db,
     release.id,
-    [...new Set([...settings.classificationExcludedSources, ...PROTECTED_EXCLUDED_SOURCES])],
     limit,
   );
   result.selected = pending.length;
@@ -452,6 +444,7 @@ export async function classifySinglePublication(
     FROM publications p
     JOIN publication_versions pv ON pv.publication_id = p.id AND pv.is_current = true
     WHERE p.id = ${input.publicationId}::uuid
+      AND ${collectionFilterCatalogVisibility('p')}
       AND public.publication_scope_is_in_scope(p.id)
   `.execute(db);
   const row = current.rows[0];
@@ -496,3 +489,4 @@ export async function classifySinglePublication(
       .sort((a, b) => a.conceptCode.localeCompare(b.conceptCode)),
   };
 }
+

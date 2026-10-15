@@ -1,6 +1,7 @@
 import { sql, type Kysely, type RawBuilder, type Transaction } from 'kysely';
 
 import type { DB } from '../../../infrastructure/database/database.types.js';
+import { collectionFilterCatalogVisibility } from '../../collection/collection-filter.catalog-visibility.js';
 import { currentWordingText } from '../../collection/legal-presentation.js';
 import {
   isPublicationOutOfScopeError,
@@ -386,6 +387,7 @@ async function selectBatch(
      AND pns.detector_key = ${PUBLICATION_NCM_DETECTOR_KEY}
      AND pns.detector_version = ${PUBLICATION_NCM_DETECTOR_VERSION}
     WHERE public.publication_scope_is_in_scope(p.id)
+      AND ${collectionFilterCatalogVisibility('p')}
       AND (
         pns.id IS NULL
         OR (
@@ -462,3 +464,4 @@ export async function processPublicationNcmEnrichmentBatch(
 
   return result;
 }
+

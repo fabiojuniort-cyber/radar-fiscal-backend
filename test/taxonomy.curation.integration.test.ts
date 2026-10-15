@@ -252,7 +252,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     assert.equal(state.json().published.version, `v${MAJOR}.0.0`);
     assert.equal(state.json().draft, null);
     assert.equal(state.json().settings.classificationEnabled, false);
-    assert.deepEqual(state.json().settings.classificationExcludedSources, ['doe-sp']);
+    assert.deepEqual(state.json().settings.classificationExcludedSources, []);
 
     // Justification is mandatory
     const noJustification = await app.inject({
@@ -1167,14 +1167,22 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
     });
     assert.equal(restored.statusCode, 200, restored.body);
 
-    // DOE-SP cannot be put back into classification from the API.
+    // The compatibility endpoint permits clearing old settings but forbids exclusions.
     const unprotect = await app.inject({
       method: 'PUT',
       url: '/api/v1/admin/taxonomy/settings/excluded-sources',
       headers: curator.headers,
       payload: { justification: 'Tentar incluir DOE-SP', sources: [] },
     });
-    assert.equal(unprotect.statusCode, 409);
+    assert.equal(unprotect.statusCode, 204);
+    const exclude = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/taxonomy/settings/excluded-sources',
+      headers: curator.headers,
+      payload: { justification: 'Excluir uma fonte', sources: ['doe-sp'] },
+    });
+    assert.equal(exclude.statusCode, 409);
+    assert.equal(exclude.json().error, 'classification_archive_scope_fixed');
 
     // Curator decisions survive a new release: remove the automatic tag,
     // publish the next version and reclassify.
@@ -1272,6 +1280,78 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       await app.inject({ method: 'GET', url: '/api/v1/admin/taxonomy/state', headers: curator.headers })
     ).json().progress;
     assert.ok(progress.classified >= 1);
+
+    await t.test('classification covers exactly the visible Acervo, including DOE-SP and legacy settings', async () => {
+      const before = (await app.inject({
+        method: 'GET', url: '/api/v1/admin/taxonomy/state', headers: curator.headers,
+      })).json().progress;
+      const otherCode = `class-all-${randomUUID().slice(0, 8)}`;
+      const fixtures: Array<{ publicationId: string; versionId: string; visible: boolean }> = [];
+      for (const [code, hiddenTitle, visible] of [
+        ['doe-sp', true, true], ['dou', true, true],
+        [otherCode, false, true], [otherCode, true, false],
+      ] as const) {
+        await admin.query(
+          `INSERT INTO sources (code, name, jurisdiction_level, base_url, connector_key, schedule_cron, is_active)
+           VALUES ($1, $1, 'FEDERAL', 'https://example.test', $1, '0 7 * * *', false)
+           ON CONFLICT (code) DO NOTHING`, [code],
+        );
+        const fixture = await createPublication(admin,
+          hiddenTitle ? 'AVISO DE LICITAÇÃO — ureia' : 'Ato sobre ureia', 'Ureia NCM 3102.10.10.');
+        await admin.query(`UPDATE publications SET published_on = '2099-01-01' WHERE id = $1`, [fixture.publicationId]);
+        await admin.query(
+          `INSERT INTO publication_origins (publication_id, source_id, official_url)
+           SELECT $1, id, $2 FROM sources WHERE code = $3`,
+          [fixture.publicationId, `https://example.test/${fixture.publicationId}`, code],
+        );
+        fixtures.push({ ...fixture, visible });
+      }
+      // Even a visible publication awaiting content belongs to the total (pending).
+      await admin.query(
+        `INSERT INTO publications (identity_hash, identity_strength, identity_basis, jurisdiction_level, title)
+         VALUES ($1, 'STRONG', '{}'::jsonb, 'FEDERAL', 'Aguardando versão')`,
+        [createHash('sha256').update(randomUUID()).digest('hex')],
+      );
+      await admin.query(
+        `UPDATE taxonomy_runtime_settings SET value = $1::jsonb WHERE key = 'classification_excluded_sources'`,
+        [JSON.stringify(['doe-sp', otherCode])],
+      );
+      const stateAfter = (await app.inject({
+        method: 'GET', url: '/api/v1/admin/taxonomy/state', headers: curator.headers,
+      })).json();
+      assert.equal(stateAfter.progress.total, before.total + 4);
+      assert.equal(stateAfter.progress.pending, before.pending + 4);
+      assert.equal(stateAfter.progress.excluded, 0);
+      assert.deepEqual(stateAfter.settings.classificationExcludedSources, []);
+      const archive = await app.inject({ method: 'GET', url: '/api/v2/archive', headers: customer.headers });
+      assert.equal(archive.statusCode, 200, archive.body);
+      assert.equal(stateAfter.progress.total, archive.json().totalItems);
+
+      await processPublicationNcmEnrichmentBatch(worker, { limit: 100 });
+      await processPublicationTaxonomyBatch(worker, { limit: 200 });
+      for (const fixture of fixtures) {
+        const scan = await admin.query(
+          `SELECT status FROM publication_taxonomy_scans WHERE publication_version_id = $1
+           AND taxonomy_release_id = $2`, [fixture.versionId, stateAfter.published.id],
+        );
+        assert.equal(scan.rows[0]?.status ?? null, fixture.visible ? 'SUCCESS' : null);
+        const ncm = await admin.query(
+          `SELECT status FROM publication_ncm_scans WHERE publication_version_id = $1`, [fixture.versionId],
+        );
+        assert.equal(ncm.rows[0]?.status ?? null, fixture.visible ? 'SUCCESS' : null);
+        const view = (await app.inject({
+          method: 'GET', url: `/api/v1/publications/${fixture.publicationId}/taxonomy`, headers: customer.headers,
+        })).json();
+        assert.equal(view.status, fixture.visible ? 'CLASSIFIED' : 'EXCLUDED');
+      }
+      await processPublicationTaxonomyBatch(worker, { limit: 200 });
+      const seals = await admin.query(
+        `SELECT count(*)::int AS n FROM publication_taxonomy_scans
+         WHERE publication_version_id = ANY($1::uuid[]) AND taxonomy_release_id = $2`,
+        [fixtures.map((f) => f.versionId), stateAfter.published.id],
+      );
+      assert.equal(seals.rows[0].n, 3, 'second batch preserves idempotency across all sources');
+    });
 
     // Leave the shared CI database with classification disabled again.
     const disable = await app.inject({
@@ -1426,3 +1506,4 @@ test('F2-T02: Atuação curator draft, CNAE origin FK and unauthorized callers',
     await admin.end();
   }
 });
+

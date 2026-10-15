@@ -486,14 +486,12 @@ export async function loadRuntimeSettings(
   }>(`SELECT key, value, updated_at, updated_by FROM taxonomy_runtime_settings`);
 
   const byKey = new Map(rows.map((row) => [row.key, row]));
-  const excluded = byKey.get('classification_excluded_sources')?.value;
 
   return {
     classificationEnabled:
       byKey.get('classification_enabled')?.value === true,
-    classificationExcludedSources: Array.isArray(excluded)
-      ? excluded.filter((item): item is string => typeof item === 'string')
-      : [],
+    // Legacy persisted exclusions no longer restrict the Acervo.
+    classificationExcludedSources: [],
     updatedAt: Object.fromEntries(
       rows.map((row) => [row.key, iso(row.updated_at) ?? '']),
     ),
@@ -502,3 +500,4 @@ export async function loadRuntimeSettings(
     ),
   };
 }
+
