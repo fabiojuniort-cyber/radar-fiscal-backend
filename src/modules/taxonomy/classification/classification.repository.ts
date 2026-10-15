@@ -72,6 +72,8 @@ async function loadConcepts(
       FROM taxonomy_release_concepts rc
       JOIN taxonomy_concepts c
         ON c.id = rc.concept_id
+      JOIN taxonomy_dimensions d
+        ON d.id = c.dimension_id
       JOIN taxonomy_concept_revisions cr
         ON cr.id = rc.concept_revision_id
       LEFT JOIN taxonomy_release_alias_bindings b
@@ -82,6 +84,7 @@ async function loadConcepts(
         ON a.id = b.alias_id
       WHERE rc.release_id = $1
         AND rc.membership_status = 'INCLUDED'
+        AND d.code NOT IN ('treatment','act_type','platform','tax_species','sphere')
       ORDER BY c.code, a.normalized_text NULLS LAST
     `,
     [taxonomyReleaseId],
