@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import {
-  createConcept, createGroup, requireOpenDraft, updateConcept,
+  ALIAS_TYPES, createConcept, createGroup, normalizeCodes, requireOpenDraft, updateConcept, validateSemanticInput,
   type CuratorActor, type ConceptAliasInput, type ConceptInput,
 } from './curation.draft.js';
 import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from './curation.actuacao.js';
 import { loadReleaseView, pgRunner, type ReleaseView } from './curation.read.js';
 import { normalizeAliasText } from '../baseline/baseline.parser.js';
-import { normalizeOfficialCode } from './curation.constants.js';
+import { normalizeOfficialCode, type OfficialCodeType } from './curation.constants.js';
 
 export const SEGMENTO_SHA = '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67';
 export const PRODUTO_SHA = '261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a';
@@ -18,6 +18,81 @@ const CODE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/;
 const NCM = /^\d{2,8}$/;
 const CNAE = /^\d{7}$/;
 const LENGTH = { sector: 1332, product: 4225 } as const;
+
+/** Keep precisely in sync with slugify() used by createGroup in curation.draft.ts.
+ * Group uniqueness is (release, dimension, code), NOT normalized label.
+ */
+export function f2GroupSlugify(label: string): string {
+  return normalizeAliasText(label)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+}
+
+/** Reuse an existing (even historically retired) group by its database code. */
+export async function getOrCreateF2Group(
+  idsByCode: Map<string,string>,
+  label: string,
+  create: () => Promise<string>,
+): Promise<{id:string;created:boolean}> {
+  const code=f2GroupSlugify(label);
+  const id=idsByCode.get(code);
+  if(id) return {id,created:false};
+  const createdId=await create();
+  idsByCode.set(code,createdId);
+  return {id:createdId,created:true};
+}
+
+
+
+export type F2DraftStage = 'preflight' | 'sector' | 'product' | 'actuacao' | 'readback' | 'ledger';
+export class F2DraftStageError extends Error {
+  constructor(readonly stage: F2DraftStage, readonly sourceLine: number | undefined, cause: unknown) {
+    super('F2_DRAFT_STAGE_FAILURE', { cause });
+  }
+}
+async function inF2DraftStage<T>(
+  stage: F2DraftStage, line: number | undefined, operation: () => Promise<T>,
+): Promise<T> {
+  try { return await operation(); }
+  catch (error) {
+    if (error instanceof F2DraftStageError) throw error;
+    throw new F2DraftStageError(stage, line, error);
+  }
+}
+
+/** Strictly allowlisted metadata. Never print driver messages, SQL, details or values. */
+export function safeF2DraftError(error: unknown): string {
+  const outer = error instanceof F2DraftStageError ? error : null;
+  const original = outer?.cause ?? error;
+  const metadata = original && typeof original === 'object'
+    ? original as Record<string, unknown> : {};
+  const value = (key: string): string => typeof metadata[key] === 'string'
+    ? metadata[key] as string : '';
+  const rawMessage = original instanceof Error ? original.message : '';
+  const safeNcm = /^F2_DRAFT_PRODUCT_NCM_INVALID line=\d+ reason=(?:LENGTH_\d+|NOT_ARRAY|NOT_STRING|NON_DIGIT)$/;
+  const safeF2 = /^F2_[A-Z0-9_]+$/;
+  const code = safeF2.test(rawMessage) || safeNcm.test(rawMessage)
+    ? rawMessage : 'F2_DRAFT_IMPORT_BLOCK';
+  const pieces = [code, 'stage=' + (outer?.stage ?? 'preflight')];
+  if (outer?.sourceLine !== undefined && Number.isSafeInteger(outer.sourceLine) &&
+      outer.sourceLine >= 1) pieces.push('line=' + outer.sourceLine);
+  const pgCode = value('code');
+  if (/^[A-Z0-9]{5}$/.test(pgCode)) pieces.push('sqlstate=' + pgCode);
+  // Curator domain codes are safe to show as identifiers only (no messages).
+  else if (/^[A-Z][A-Z0-9_]{2,63}$/.test(pgCode)) pieces.push('domain=' + pgCode);
+  for (const [key, printed] of [
+    ['constraint', 'constraint'], ['table', 'table'], ['column', 'column'],
+  ] as const) {
+    const identifier = value(key);
+    if (/^[a-z_][a-z0-9_]{0,62}$/.test(identifier)) pieces.push(printed + '=' + identifier);
+  }
+  if (original instanceof F2DraftInputError) {
+    pieces.push('validation=' + JSON.stringify(original.validation));
+  }
+  return pieces.join(' ');
+}
+
 
 interface Batch {
   id: string;
@@ -73,7 +148,8 @@ export interface F2DraftPlan {
   atuacaoOrigins: { sourceLine: number; cnaeCode: string; atuacaoLabel: string }[];
 }
 
-/** Preserve approved 2–8 digit NCM prefixes (including 3/5/7 and zero-prefixes).
+/** Preserve the staging's structural 2–8 digit strings, without changing source data.
+ * Domain approval (2/4/5/6/7/8; NOT 3) is checked using the actual dimension type in preflight.
  * No normalization/coercion occurs: PostgreSQL jsonb must be an array of strings.
  * Errors contain only source line and structural reason, never product/customer data.
  */
@@ -144,7 +220,7 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     const label=normalizeCell(c[4]??'');
     const sub=normalizeCell(c[1]??'');
     const parent=normalizeCell(c[0]??'');
-    if(!label||!sub||!parent)bad('F2_DRAFT_SECTOR_LABEL_MISSING');
+    if(!sub||!parent)bad('F2_DRAFT_SECTOR_LABEL_MISSING');
     return {line:row.source_line,code:codeFor('sector',c[11]??'','cnae_'+row.cnae_code),
       dimension:'sector',label,definition:label,group:parent+' – '+sub,
       officialCodes:[row.cnae_code],aliases:aliases(c[5]??''),
@@ -155,7 +231,6 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     const c=row.raw_cells;
     const group=normalizeCell(c[1]??'');
     const label=normalizeCell(c[2]??'');
-    if(!group||!label)bad('F2_DRAFT_PRODUCT_LABEL_MISSING');
     const canonical = validateF2DraftProductNcms(row.ncm_normalized, row.source_line);
     return {line:row.source_line,
       code:codeFor('product',c[8]??'','f2_'+DIGEST(row.product_code).slice(0,20)),
@@ -181,6 +256,105 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
 }
 
 
+export interface F2InvalidInputExample {
+  dimension: 'sector' | 'product';
+  line: number;
+  reason: string;
+}
+export interface F2InputIssues {
+  /** Number of invalid codes/inputs; examples alone are capped. */
+  count: number;
+  examples: F2InvalidInputExample[];
+}
+export interface F2DraftInputValidation {
+  invalidOfficialCodes: F2InputIssues;
+  invalidConceptInputs: F2InputIssues;
+}
+export class F2DraftInputError extends Error {
+  readonly validation: F2DraftInputValidation;
+  constructor(validation: F2DraftInputValidation) {
+    super(validation.invalidOfficialCodes.count > 0
+      ? 'F2_DRAFT_OFFICIAL_CODE_INVALID' : 'F2_DRAFT_CONCEPT_INPUT_INVALID');
+    // Rebuild the report from a closed vocabulary: never serialize arbitrary error data.
+    const safe = (issues: F2InputIssues): F2InputIssues => ({
+      count: Number.isSafeInteger(issues.count) && issues.count >= 0 ? issues.count : 0,
+      examples: issues.examples.filter(e =>
+        ['sector', 'product'].includes(e.dimension) && Number.isSafeInteger(e.line) && e.line >= 1 &&
+        (/^LENGTH_[0-9]+$/.test(e.reason) || [
+          'NOT_STRING', 'NON_DIGIT', 'INVALID_FORMAT', 'LABEL_REQUIRED', 'DEFINITION_REQUIRED',
+          'ALIAS_TEXT_INVALID', 'INVALID_ALIAS_TYPE', 'GROUP_LABEL_REQUIRED', 'GROUP_CODE_REQUIRED',
+          'INVALID_CONCEPT_CODE', 'CONCEPT_CODE_TAKEN',
+        ].includes(e.reason)))
+        .slice(0, 10).map(({dimension, line, reason}) => ({dimension, line, reason})),
+    });
+    this.validation = {
+      invalidOfficialCodes: safe(validation.invalidOfficialCodes),
+      invalidConceptInputs: safe(validation.invalidConceptInputs),
+    };
+  }
+}
+
+/** Same pure validations as createConcept/updateConcept; no writes, no source values in errors. */
+export function validateF2DraftInputs(
+  plan: F2DraftPlan,
+  view: ReleaseView,
+  owners: readonly {code: string; dimension_code: string}[] = [],
+): F2DraftInputValidation {
+  const validation: F2DraftInputValidation = {
+    invalidOfficialCodes: {count: 0, examples: []},
+    invalidConceptInputs: {count: 0, examples: []},
+  };
+  const currentByCode = new Map(view.concepts.map(c => [c.code, c]));
+  const dimensionByCode = new Map(view.dimensions.map(d => [d.code, d]));
+  const ownerByCode = new Map(owners.map(c => [c.code, c.dimension_code]));
+  const add = (issues: F2InputIssues, item: DraftImportConcept, reason: string) => {
+    issues.count++;
+    if (issues.examples.length < 10)
+      issues.examples.push({dimension: item.dimension, line: item.line, reason});
+  };
+  const codeReason = (type: OfficialCodeType | null, code: string): string => {
+    if (typeof code !== 'string') return 'NOT_STRING';
+    const normalized = normalizeOfficialCode(code);
+    if (type === 'NCM' || type === 'CNAE')
+      return /^\d+$/.test(normalized) ? `LENGTH_${normalized.length}` : 'NON_DIGIT';
+    return 'INVALID_FORMAT';
+  };
+  // Never skip equal/update rows: apply can merge legacy aliases and change domains too.
+  for (const item of [...plan.sector, ...plan.product]) {
+    const dimension = dimensionByCode.get(item.dimension);
+    if (!dimension) bad('F2_DRAFT_DIMENSION_MISSING');
+    const type = dimension!.officialCodeType;
+    try { normalizeCodes(type, item.officialCodes); }
+    catch {
+      for (const code of item.officialCodes) {
+        try { normalizeCodes(type, [code]); }
+        catch { add(validation.invalidOfficialCodes, item, codeReason(type, code)); }
+      }
+    }
+    // Each field is checked independently so the plan reports all affected source lines.
+    for (const [field, reason] of [['label', 'LABEL_REQUIRED'], ['definition', 'DEFINITION_REQUIRED']] as const) {
+      try { validateSemanticInput({[field]: item[field]}); }
+      catch { add(validation.invalidConceptInputs, item, reason); }
+    }
+    if (!item.group.trim()) add(validation.invalidConceptInputs, item, 'GROUP_LABEL_REQUIRED');
+    else if (!f2GroupSlugify(item.group)) add(validation.invalidConceptInputs, item, 'GROUP_CODE_REQUIRED');
+    if (!CODE.test(item.code) || !item.code.startsWith(item.dimension + '.'))
+      add(validation.invalidConceptInputs, item, 'INVALID_CONCEPT_CODE');
+    if (ownerByCode.has(item.code) && ownerByCode.get(item.code) !== item.dimension)
+      add(validation.invalidConceptInputs, item, 'CONCEPT_CODE_TAKEN');
+    // apply preserves existing aliases; validate those as well as the incoming aliases.
+    for (const alias of [...(currentByCode.get(item.code)?.aliases ?? []), ...item.aliases]) {
+      if (typeof alias.text !== 'string')
+        add(validation.invalidConceptInputs, item, 'ALIAS_TEXT_INVALID');
+      else if (alias.text.trim() && !(ALIAS_TYPES as readonly string[]).includes(alias.aliasType))
+        add(validation.invalidConceptInputs, item, 'INVALID_ALIAS_TYPE');
+    }
+  }
+  if (validation.invalidOfficialCodes.count || validation.invalidConceptInputs.count)
+    throw new F2DraftInputError(validation);
+  return validation;
+}
+
 export interface F2DimensionAudit {
   created: number;
   updated: number;
@@ -193,6 +367,8 @@ export interface F2DimensionAudit {
     count: number;
     examples: { officialCode: string; conceptCodes: string[]; conceptCount: number }[];
   };
+  /** Informative only: distinct incoming labels that reuse a pre-existing group code. */
+  groupSlugMerges: {count:number;examples:{label:string;code:string}[]};
 }
 export interface F2DraftAudit {
   dimensions: { sector: F2DimensionAudit; product: F2DimensionAudit };
@@ -200,6 +376,7 @@ export interface F2DraftAudit {
   exceptionsApprovalSha256: string | null;
   requiresCoordApproval: boolean;
   identicalCodes: { sector: string[]; product: string[] };
+  groupSlugMerges: {count:number;examples:{dimension:'sector'|'product';label:string;code:string}[]};
 }
 
 /** Pure, read-only comparison with the exact release view used by apply. */
@@ -212,8 +389,27 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
     const existing = view.concepts.filter(c => c.dimensionCode === dimension);
     const incomingCodes = new Set(incoming.map(c => c.code));
     const existingByCode = new Map(existing.map(c => [c.code, c]));
-    const groupById = new Map(view.groups.filter(g => g.dimensionCode === dimension)
-      .map(g => [g.id, g.label]));
+    const dimensionGroups=view.groups.filter(g=>g.dimensionCode===dimension);
+    const groupById = new Map(dimensionGroups.map(g => [g.id, g.label]));
+    // Existing group codes include retired groups; simulate createGroup's code lookup
+    // and count label variants merging onto the same slug (not a new approval gate).
+    const seenGroupLabels = new Map<string,Set<string>>();
+    for(const group of dimensionGroups){
+      seenGroupLabels.set(group.code,new Set([normalizeAliasText(group.label)]));
+    }
+    const groupSlugMergeExamples:{label:string;code:string}[]=[];
+    let groupSlugMergeCount=0;
+    for(const item of incoming){
+      const code=f2GroupSlugify(item.group);
+      const label=normalizeAliasText(item.group);
+      const labels=seenGroupLabels.get(code);
+      if(!labels){seenGroupLabels.set(code,new Set([label]));continue;}
+      if(labels.has(label))continue;
+      labels.add(label);
+      groupSlugMergeCount++;
+      if(groupSlugMergeExamples.length<10)
+        groupSlugMergeExamples.push({label:item.group,code});
+    }
     const outside = existing.filter(c => !incomingCodes.has(c.code))
       .sort((a, b) => a.code.localeCompare(b.code));
     const officialOwners = new Map<string, Set<string>>();
@@ -262,6 +458,7 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
       duplicateOfficialCodes: { count: duplicates.length, examples: duplicates.slice(0, 10)
         .map(d => ({ officialCode: d.officialCode, conceptCount: d.conceptCodes.length,
           conceptCodes: d.conceptCodes.slice(0, 10) })) },
+      groupSlugMerges:{count:groupSlugMergeCount,examples:groupSlugMergeExamples},
     };
     // No truncation in the approval digest, even if preview examples are limited to 10.
     fullExceptions[dimension] = {
@@ -274,6 +471,13 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
     dimensions[d].outsideLot.count > 0 || dimensions[d].duplicateOfficialCodes.count > 0);
   return {
     dimensions, identicalCodes, requiresCoordApproval,
+    groupSlugMerges:{
+      count:dimensions.sector.groupSlugMerges.count+dimensions.product.groupSlugMerges.count,
+      examples:([
+        ...dimensions.sector.groupSlugMerges.examples.map(e=>({...e,dimension:'sector' as const})),
+        ...dimensions.product.groupSlugMerges.examples.map(e=>({...e,dimension:'product' as const})),
+      ]).slice(0,10),
+    },
     exceptionsApprovalSha256: requiresCoordApproval
       ? DIGEST(JSON.stringify({ draftId, batchId: plan.batchId,
         contentSha256: plan.contentSha256, exceptions: fullExceptions }))
@@ -298,6 +502,7 @@ export async function readF2Stage(client:PoolClient):Promise<F2StageSnapshot> {
 export async function currentDraftPlan(client:PoolClient):Promise<{
   draftId:string;draftVersion:string;source:F2DraftPlan;alreadyImported:boolean;
   audit:F2DraftAudit;
+  validation:F2DraftInputValidation;
 }>{
   const draft=await requireOpenDraft(client);
   const plan=buildF2DraftPlan(await readF2Stage(client));
@@ -311,9 +516,14 @@ export async function currentDraftPlan(client:PoolClient):Promise<{
   for(const dimension of ['sector','product']){
     if(!view.dimensions.some(d=>d.code===dimension))bad('F2_DRAFT_DIMENSION_MISSING');
   }
+  const owners = await client.query<{code:string;dimension_code:string}>(
+    'SELECT c.code, d.code AS dimension_code FROM taxonomy_concepts c '+
+    'JOIN taxonomy_dimensions d ON d.id=c.dimension_id WHERE c.code=ANY($1::text[])',
+    [[...plan.sector, ...plan.product].map(c=>c.code)]);
+  const validation = validateF2DraftInputs(plan, view, owners.rows);
   const audit = auditF2Draft(plan, view, draft.id);
   return {draftId:draft.id,draftVersion:draft.version,source:plan,
-    alreadyImported:ledger.rows.length>0,audit};
+    alreadyImported:ledger.rows.length>0,audit,validation};
 }
 async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'sector'|'product',
   concepts:DraftImportConcept[],draftId:string,identicalCodes:ReadonlySet<string>):Promise<{created:number;updated:number;groupsCreated:number}> {
@@ -321,17 +531,16 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
   if(!view)throw new Error('F2_DRAFT_RELEASE_UNAVAILABLE');
   const byCode=new Map(view.concepts.filter(c=>c.dimensionCode===dimension).map(c=>[c.code,c]));
   const byGroup=new Map(view.groups.filter(g=>g.dimensionCode===dimension)
-    .map(g=>[normalizeAliasText(g.label),g.id]));
+    .map(g=>[g.code,g.id]));
   const report={created:0,updated:0,groupsCreated:0};
   for(const item of concepts){
-    let groupId=byGroup.get(normalizeAliasText(item.group));
-    if(!groupId){
-      groupId=await createGroup(client,actor,dimension,{label:item.group});
-      byGroup.set(normalizeAliasText(item.group),groupId);
-      report.groupsCreated++;
-    }
+    await inF2DraftStage(dimension,item.line,async()=>{
+    const group=await getOrCreateF2Group(byGroup,item.group,
+      ()=>createGroup(client,actor,dimension,{label:item.group}));
+    const groupId=group.id;
+    if(group.created)report.groupsCreated++;
     const current=byCode.get(item.code);
-    if (current && identicalCodes.has(item.code)) continue;
+    if (current && identicalCodes.has(item.code)) return;
     const allAliases=new Map<string,ConceptAliasInput>();
     for(const alias of [...(current?.aliases??[]),...item.aliases]){
       const key=normalizeAliasText(alias.text);
@@ -350,6 +559,7 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
       await createConcept(client,actor,dimension,{...values,code:item.code});
       report.created++;
     }
+    });
   }
   return report;
 }
@@ -369,7 +579,7 @@ async function verifyDraftReadback(client:PoolClient,draftId:string,plan:F2Draft
 export async function applyF2Draft(client:PoolClient,actor:CuratorActor,confirmed:{
   batchId:string;contentSha256:string;exceptionsApprovalSha256?:string | undefined;
 }):Promise<Record<string,unknown>> {
-  const preview=await currentDraftPlan(client);
+  const preview=await inF2DraftStage('preflight',undefined,()=>currentDraftPlan(client));
   const {source,draftId}=preview;
   if(source.batchId!==confirmed.batchId||source.contentSha256!==confirmed.contentSha256)
     bad('F2_DRAFT_CONFIRMATION_MISMATCH');
@@ -377,21 +587,21 @@ export async function applyF2Draft(client:PoolClient,actor:CuratorActor,confirme
       preview.audit.exceptionsApprovalSha256 !== confirmed.exceptionsApprovalSha256)
     bad('F2_DRAFT_COORD_EXCEPTION_APPROVAL_REQUIRED');
   if(preview.alreadyImported){
-    await verifyDraftReadback(client,draftId,source);
+    await inF2DraftStage('readback',undefined,()=>verifyDraftReadback(client,draftId,source));
     return {draftId,draftVersion:preview.draftVersion,batchId:source.batchId,
       reusedExisting:true,imported:{sector:1332,product:4225},published:false,readback:'PASS'};
   }
-  const segmentResult=await upsertDimension(client,actor,'sector',source.sector,draftId,
-    new Set(preview.audit.identicalCodes.sector));
-  const productResult=await upsertDimension(client,actor,'product',source.product,draftId,
-    new Set(preview.audit.identicalCodes.product));
-  await initializeF2Actuacao(client,actor);
-  const origins=await persistF2ActuacaoCnaeOrigins(client,actor,source.atuacaoOrigins,SEGMENTO_SHA);
+  const segmentResult=await inF2DraftStage('sector',undefined,()=>upsertDimension(client,actor,'sector',source.sector,draftId,
+    new Set(preview.audit.identicalCodes.sector)));
+  const productResult=await inF2DraftStage('product',undefined,()=>upsertDimension(client,actor,'product',source.product,draftId,
+    new Set(preview.audit.identicalCodes.product)));
+  await inF2DraftStage('actuacao',undefined,()=>initializeF2Actuacao(client,actor));
+  const origins=await inF2DraftStage('actuacao',undefined,()=>persistF2ActuacaoCnaeOrigins(client,actor,source.atuacaoOrigins,SEGMENTO_SHA));
   if(origins.originCount!==LENGTH.sector)bad('F2_DRAFT_ACTUACAO_COUNT_MISMATCH');
-  await verifyDraftReadback(client,draftId,source);
-  await client.query(
+  await inF2DraftStage('readback',undefined,()=>verifyDraftReadback(client,draftId,source));
+  await inF2DraftStage('ledger',undefined,()=>client.query(
     'INSERT INTO public.taxonomy_f2_draft_import_ledger (release_id,batch_id,source_content_sha256,segmento_rows,produto_rows) VALUES ($1::uuid,$2::uuid,$3,$4,$5)',
-    [draftId,source.batchId,source.contentSha256,LENGTH.sector,LENGTH.product]);
+    [draftId,source.batchId,source.contentSha256,LENGTH.sector,LENGTH.product]));
   return {draftId,draftVersion:preview.draftVersion,batchId:source.batchId,
     reusedExisting:false,imported:{sector:LENGTH.sector,product:LENGTH.product},
     changes:{sector:segmentResult,product:productResult,actuacaoOrigins:origins.originCount},

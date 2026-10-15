@@ -309,7 +309,12 @@ test('official codes are normalized and validated by type', () => {
   assert.equal(normalizeOfficialCode(' 3102.10 '), '310210');
   assert.equal(normalizeOfficialCode('0111-3/01'), '0111301');
   assert.deepEqual(normalizeCodes('NCM', ['3102.10', '31', '310210']), ['310210', '31']);
-  assert.throws(() => normalizeCodes('NCM', ['31021']), /inválido/);
+  assert.deepEqual(normalizeCodes('NCM', ['0101.2', '0101.21.0']), ['01012', '0101210']);
+  assert.throws(() => normalizeCodes('NCM', ['010']), /inválido/);
+  for (const length of [2,4,5,6,7,8]) assert.equal(isValidOfficialCode('NCM', '0'.repeat(length)), true);
+  for (const length of [0,1,3,9]) assert.equal(isValidOfficialCode('NCM', '0'.repeat(length)), false);
+  assert.equal(formatOfficialCode('NCM', '01012'), '0101.2');
+  assert.equal(formatOfficialCode('NCM', '0101210'), '0101.21.0');
   assert.equal(isValidOfficialCode('DOCUMENT_MODEL', '55'), true);
   assert.equal(isValidOfficialCode('CCLASSTRIB', '200034'), true);
   assert.equal(isValidOfficialCode('CNAE', '1011'), true);

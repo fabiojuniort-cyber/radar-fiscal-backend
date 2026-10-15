@@ -1491,7 +1491,7 @@ async function applyConceptSettings(
   }
 }
 
-function validateSemanticInput(input: ConceptInput): void {
+export function validateSemanticInput(input: ConceptInput): void {
   if (
     input.governanceStatus !== undefined &&
     !(GOVERNANCE_STATUSES as readonly string[]).includes(input.governanceStatus)

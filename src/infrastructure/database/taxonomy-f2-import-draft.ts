@@ -7,6 +7,7 @@ import {
 import {
   currentDraftPlan,
   applyF2Draft,
+  safeF2DraftError,
 } from '../../modules/taxonomy/curation/curation.f2-draft-import.js';
 import { resolveCuratorDatabaseUrl } from './curator-url.js';
 
@@ -55,7 +56,10 @@ async function run() {
           batchId:preview.source.batchId,contentSha256:preview.source.contentSha256,
           staging:{segmento:preview.source.segmentoRows,produto:preview.source.produtoRows,
             errors:0,warnings:preview.source.expectedWarnings},
+          invalidOfficialCodes:preview.validation.invalidOfficialCodes,
+          invalidConceptInputs:preview.validation.invalidConceptInputs,
           dimensions:preview.audit.dimensions,
+          groupSlugMerges:preview.audit.groupSlugMerges,
           requiresCoordApproval:preview.audit.requiresCoordApproval,
           exceptionsApprovalSha256:preview.audit.exceptionsApprovalSha256,
           alreadyImported:preview.alreadyImported,
@@ -80,11 +84,7 @@ async function run() {
   }finally {await pool.end();}
 }
 run().catch(e=>{
-  // Only the whitelisted line/reason diagnostic is allowed; never echo raw
-  // staging JSON, SQL error details, credentials, or arbitrary exception text.
-  const message=e instanceof Error?e.message:'';
-  const safeDetail=/^F2_DRAFT_PRODUCT_NCM_INVALID line=[0-9]+ reason=(?:LENGTH_[0-9]+|NOT_ARRAY|NOT_STRING|NON_DIGIT)$/.test(message);
-  const code=(safeDetail||/^F2_[A-Z0-9_]+$/.test(message))?
-    message:'F2_DRAFT_IMPORT_BLOCK';
-  console.error(code);process.exitCode=1;
+  // Structured, allowlisted identifiers only; no SQL, messages, URLs, or values.
+  console.error(safeF2DraftError(e));
+  process.exitCode=1;
 });
