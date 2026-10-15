@@ -39,6 +39,7 @@
     "taxonomy:ncm-rescan-one": "node dist/infrastructure/database/taxonomy-ncm-rescan-one.js",
     "taxonomy:retire-legacy-segments": "node dist/infrastructure/database/taxonomy-retire-legacy-segments.js",
     "taxonomy:f2-tab-retire-draft": "node dist/infrastructure/database/taxonomy-f2-tab-retire-draft.js",
+    "taxonomy:f2-group-repair": "node dist/infrastructure/database/taxonomy-f2-group-repair.js",
     "taxonomy:retire-dimensions": "node dist/infrastructure/database/taxonomy-retire-dimensions.js",
     "taxonomy:merge-dimension": "node dist/infrastructure/database/taxonomy-merge-dimension.js",
     "taxonomy:publish-draft": "node dist/infrastructure/database/taxonomy-publish-draft.js",
