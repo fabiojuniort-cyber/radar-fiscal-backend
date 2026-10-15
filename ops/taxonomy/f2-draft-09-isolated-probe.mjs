@@ -4,7 +4,8 @@ let url;
 try {url=new URL(target??'');}catch{throw new Error('F2_ISOLATED_URL_MISSING');}
 if(!/^(?:f2-restore-pg)(?:\.|$)/.test(url.hostname))
   throw new Error('F2_ISOLATED_TARGET_NOT_RESTORE_ONLY');
-const pool=new Pool({connectionString:target,max:1,connectionTimeoutMillis:12000});
+url.pathname='/f2_load07_restore_20261014';
+const pool=new Pool({connectionString:url.toString(),max:1,connectionTimeoutMillis:12000});
 try {
  const c=await pool.connect();
  try {
