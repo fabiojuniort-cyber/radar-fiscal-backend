@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import test from 'node:test';
 import {Pool} from 'pg';
 import {F2_TAB_DRAFT_ID,retireDraftMemberships} from '../src/infrastructure/database/taxonomy-f2-tab-retire-draft.js';
+import {loadReleaseView,pgRunner} from '../src/modules/taxonomy/curation/curation.read.js';
 
 test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent and preserve published release + tag rows',async()=>{
  if(!process.env.DATABASE_ADMIN_URL)throw Error('isolated DATABASE_ADMIN_URL required');
@@ -85,6 +86,12 @@ test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent 
   const after=await readback();
   assert.deepEqual(after.published,before.published);
   assert.deepEqual(after.history,before.history);
+  const historicalView=await loadReleaseView(pgRunner(db),publishedId);
+  assert.ok(historicalView,'v1.6.0 remains queryable after retiring v1.7.0');
+  assert.equal(historicalView.release.version,'v1.6.0');
+  assert.deepEqual(historicalView.dimensions.map(d=>d.code).sort(),
+   ['act_type','platform','sphere','tax_species','treatment'].sort());
+  assert.equal(historicalView.concepts.length,5);
   assert.equal(after.statuses.length,5);
   assert.ok(after.statuses.every(x=>x.membership_status==='RETIRED'&&x.included===0));
   const second=await retireDraftMemberships(db,F2_TAB_DRAFT_ID);
