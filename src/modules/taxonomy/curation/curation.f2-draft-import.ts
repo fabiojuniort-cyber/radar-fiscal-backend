@@ -174,7 +174,7 @@ export interface F2DimensionAudit {
   };
   duplicateOfficialCodes: {
     count: number;
-    examples: { officialCode: string; conceptCodes: string[] }[];
+    examples: { officialCode: string; conceptCodes: string[]; conceptCount: number }[];
   };
 }
 export interface F2DraftAudit {
@@ -242,7 +242,9 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
         examples: outside.slice(0, 10).map(c => ({
           code: c.code, officialCodes: c.officialCodes, membershipStatus: c.membershipStatus,
         })) },
-      duplicateOfficialCodes: { count: duplicates.length, examples: duplicates.slice(0, 10) },
+      duplicateOfficialCodes: { count: duplicates.length, examples: duplicates.slice(0, 10)
+        .map(d => ({ officialCode: d.officialCode, conceptCount: d.conceptCodes.length,
+          conceptCodes: d.conceptCodes.slice(0, 10) })) },
     };
     // No truncation in the approval digest, even if preview examples are limited to 10.
     fullExceptions[dimension] = {
