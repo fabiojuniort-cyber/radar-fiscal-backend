@@ -5,12 +5,13 @@ import {
   type CuratorActor, type ConceptAliasInput, type ConceptInput,
 } from './curation.draft.js';
 import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from './curation.actuacao.js';
-import { loadReleaseView, pgRunner } from './curation.read.js';
+import { loadReleaseView, pgRunner, type ReleaseView } from './curation.read.js';
 import { normalizeAliasText } from '../baseline/baseline.parser.js';
 import { normalizeOfficialCode } from './curation.constants.js';
 
 export const SEGMENTO_SHA = '695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67';
 export const PRODUTO_SHA = '261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a';
+export const F2_APPROVED_BATCH_ID = 'f4ab4f0c-9755-4957-9b51-826aeddb4bca';
 const DIGEST = (value: string) => createHash('sha256').update(value).digest('hex');
 const bad = (code: string): never => { throw new Error(code); };
 const CODE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/;
@@ -162,13 +163,113 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     atuacaoOrigins:segments.map(row=>({sourceLine:row.source_line,cnaeCode:row.cnae_code,atuacaoLabel:row.atuacao}))};
 }
 
+
+export interface F2DimensionAudit {
+  created: number;
+  updated: number;
+  equal: number;
+  outsideLot: {
+    count: number;
+    examples: { code: string; officialCodes: string[]; membershipStatus: string }[];
+  };
+  duplicateOfficialCodes: {
+    count: number;
+    examples: { officialCode: string; conceptCodes: string[] }[];
+  };
+}
+export interface F2DraftAudit {
+  dimensions: { sector: F2DimensionAudit; product: F2DimensionAudit };
+  /** A digest of ALL exceptions, including items not shown in examples. */
+  exceptionsApprovalSha256: string | null;
+  requiresCoordApproval: boolean;
+  identicalCodes: { sector: string[]; product: string[] };
+}
+
+/** Pure, read-only comparison with the exact release view used by apply. */
+export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: string): F2DraftAudit {
+  const identicalCodes = { sector: [] as string[], product: [] as string[] };
+  const fullExceptions: Record<string, unknown> = {};
+  const dimensions = {} as F2DraftAudit['dimensions'];
+  for (const dimension of ['sector', 'product'] as const) {
+    const incoming = plan[dimension];
+    const existing = view.concepts.filter(c => c.dimensionCode === dimension);
+    const incomingCodes = new Set(incoming.map(c => c.code));
+    const existingByCode = new Map(existing.map(c => [c.code, c]));
+    const groupById = new Map(view.groups.filter(g => g.dimensionCode === dimension)
+      .map(g => [g.id, g.label]));
+    const outside = existing.filter(c => !incomingCodes.has(c.code))
+      .sort((a, b) => a.code.localeCompare(b.code));
+    const officialOwners = new Map<string, Set<string>>();
+    const register = (code: string, officialCodes: readonly string[]) => {
+      for (const officialCode of new Set(officialCodes)) {
+        let owners = officialOwners.get(officialCode);
+        if (!owners) { owners = new Set(); officialOwners.set(officialCode, owners); }
+        owners.add(code);
+      }
+    };
+    for (const item of incoming) register(item.code, item.officialCodes);
+    // Retired concepts do not create active collisions, but are still counted outside.
+    for (const item of outside.filter(c => c.membershipStatus === 'INCLUDED')) {
+      register(item.code, item.officialCodes);
+    }
+    const duplicates = [...officialOwners.entries()]
+      .filter(([, owners]) => owners.size > 1)
+      .map(([officialCode, owners]) => ({ officialCode, conceptCodes: [...owners].sort() }))
+      .sort((a, b) => a.officialCode.localeCompare(b.officialCode));
+    let created = 0, updated = 0, equal = 0;
+    for (const item of incoming) {
+      const current = existingByCode.get(item.code);
+      if (!current) { created++; continue; }
+      const group = current.groupId ? groupById.get(current.groupId) : undefined;
+      const existingAliases = new Set(current.aliases.map(a => normalizeAliasText(a.text)));
+      const changed =
+        current.membershipStatus !== 'INCLUDED' ||
+        current.label !== item.label ||
+        current.definition !== item.definition ||
+        normalizeAliasText(group ?? '') !== normalizeAliasText(item.group) ||
+        current.profileVisible !== item.profileVisible ||
+        current.classifyByLabel !== item.classifyByLabel ||
+        current.displayOrder !== item.displayOrder ||
+        JSON.stringify([...new Set(current.officialCodes)].sort()) !==
+          JSON.stringify([...new Set(item.officialCodes)].sort()) ||
+        item.aliases.some(a => !existingAliases.has(normalizeAliasText(a.text)));
+      if (changed) updated++;
+      else { equal++; identicalCodes[dimension].push(item.code); }
+    }
+    dimensions[dimension] = {
+      created, updated, equal,
+      outsideLot: { count: outside.length,
+        examples: outside.slice(0, 10).map(c => ({
+          code: c.code, officialCodes: c.officialCodes, membershipStatus: c.membershipStatus,
+        })) },
+      duplicateOfficialCodes: { count: duplicates.length, examples: duplicates.slice(0, 10) },
+    };
+    // No truncation in the approval digest, even if preview examples are limited to 10.
+    fullExceptions[dimension] = {
+      outside: outside.map(c => ({ code: c.code, codes: [...c.officialCodes].sort(),
+        membershipStatus: c.membershipStatus })),
+      duplicates,
+    };
+  }
+  const requiresCoordApproval = (['sector', 'product'] as const).some(d =>
+    dimensions[d].outsideLot.count > 0 || dimensions[d].duplicateOfficialCodes.count > 0);
+  return {
+    dimensions, identicalCodes, requiresCoordApproval,
+    exceptionsApprovalSha256: requiresCoordApproval
+      ? DIGEST(JSON.stringify({ draftId, batchId: plan.batchId,
+        contentSha256: plan.contentSha256, exceptions: fullExceptions }))
+      : null,
+  };
+}
+
 export async function readF2Stage(client:PoolClient):Promise<F2StageSnapshot> {
   const batches=await client.query<Batch>(
     'SELECT id,status,segmento_sha256,produto_sha256,content_sha256,segmento_rows,produto_rows,expected_warnings '+
-    'FROM public.taxonomy_f2_import_batches WHERE segmento_sha256=$1 AND produto_sha256=$2',
-    [SEGMENTO_SHA,PRODUTO_SHA]);
+    'FROM public.taxonomy_f2_import_batches WHERE segmento_sha256=$1 AND produto_sha256=$2 AND id=$3::uuid',
+    [SEGMENTO_SHA,PRODUTO_SHA,F2_APPROVED_BATCH_ID]);
   if(batches.rows.length!==1)bad('F2_DRAFT_APPROVED_BATCH_MISSING');
   const batch=batches.rows[0]!;
+  if (batch.status !== 'STAGED') bad('F2_DRAFT_BATCH_NOT_STAGED');
   const [segments,products]=await Promise.all([
     client.query<SegmentRow>('SELECT source_line,cnae_code,atuacao,raw_cells,row_sha256 FROM public.taxonomy_f2_import_segment_rows WHERE batch_id=$1::uuid ORDER BY source_line',[batch.id]),
     client.query<ProductRow>('SELECT source_line,product_code,ncm_normalized,raw_cells,row_sha256 FROM public.taxonomy_f2_import_product_rows WHERE batch_id=$1::uuid ORDER BY source_line',[batch.id]),
@@ -177,7 +278,7 @@ export async function readF2Stage(client:PoolClient):Promise<F2StageSnapshot> {
 }
 export async function currentDraftPlan(client:PoolClient):Promise<{
   draftId:string;draftVersion:string;source:F2DraftPlan;alreadyImported:boolean;
-  create:{sector:number;product:number};update:{sector:number;product:number};
+  audit:F2DraftAudit;
 }>{
   const draft=await requireOpenDraft(client);
   const plan=buildF2DraftPlan(await readF2Stage(client));
@@ -191,15 +292,12 @@ export async function currentDraftPlan(client:PoolClient):Promise<{
   for(const dimension of ['sector','product']){
     if(!view.dimensions.some(d=>d.code===dimension))bad('F2_DRAFT_DIMENSION_MISSING');
   }
-  const codes=new Set(view.concepts.map(c=>c.code));
-  const created={sector:plan.sector.filter(x=>!codes.has(x.code)).length,
-    product:plan.product.filter(x=>!codes.has(x.code)).length};
+  const audit = auditF2Draft(plan, view, draft.id);
   return {draftId:draft.id,draftVersion:draft.version,source:plan,
-    alreadyImported:ledger.rows.length>0,create:created,
-    update:{sector:plan.segmentoRows-created.sector,product:plan.produtoRows-created.product}};
+    alreadyImported:ledger.rows.length>0,audit};
 }
 async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'sector'|'product',
-  concepts:DraftImportConcept[],draftId:string):Promise<{created:number;updated:number;groupsCreated:number}> {
+  concepts:DraftImportConcept[],draftId:string,identicalCodes:ReadonlySet<string>):Promise<{created:number;updated:number;groupsCreated:number}> {
   const view=await loadReleaseView(pgRunner(client),draftId,{includeRetired:true});
   if(!view)throw new Error('F2_DRAFT_RELEASE_UNAVAILABLE');
   const byCode=new Map(view.concepts.filter(c=>c.dimensionCode===dimension).map(c=>[c.code,c]));
@@ -214,6 +312,7 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
       report.groupsCreated++;
     }
     const current=byCode.get(item.code);
+    if (current && identicalCodes.has(item.code)) continue;
     const allAliases=new Map<string,ConceptAliasInput>();
     for(const alias of [...(current?.aliases??[]),...item.aliases]){
       const key=normalizeAliasText(alias.text);
@@ -249,19 +348,24 @@ async function verifyDraftReadback(client:PoolClient,draftId:string,plan:F2Draft
   }
 }
 export async function applyF2Draft(client:PoolClient,actor:CuratorActor,confirmed:{
-  batchId:string;contentSha256:string;
+  batchId:string;contentSha256:string;exceptionsApprovalSha256?:string;
 }):Promise<Record<string,unknown>> {
   const preview=await currentDraftPlan(client);
   const {source,draftId}=preview;
   if(source.batchId!==confirmed.batchId||source.contentSha256!==confirmed.contentSha256)
     bad('F2_DRAFT_CONFIRMATION_MISMATCH');
+  if (preview.audit.requiresCoordApproval &&
+      preview.audit.exceptionsApprovalSha256 !== confirmed.exceptionsApprovalSha256)
+    bad('F2_DRAFT_COORD_EXCEPTION_APPROVAL_REQUIRED');
   if(preview.alreadyImported){
     await verifyDraftReadback(client,draftId,source);
     return {draftId,draftVersion:preview.draftVersion,batchId:source.batchId,
       reusedExisting:true,imported:{sector:1332,product:4225},published:false,readback:'PASS'};
   }
-  const segmentResult=await upsertDimension(client,actor,'sector',source.sector,draftId);
-  const productResult=await upsertDimension(client,actor,'product',source.product,draftId);
+  const segmentResult=await upsertDimension(client,actor,'sector',source.sector,draftId,
+    new Set(preview.audit.identicalCodes.sector));
+  const productResult=await upsertDimension(client,actor,'product',source.product,draftId,
+    new Set(preview.audit.identicalCodes.product));
   await initializeF2Actuacao(client,actor);
   const origins=await persistF2ActuacaoCnaeOrigins(client,actor,source.atuacaoOrigins,SEGMENTO_SHA);
   if(origins.originCount!==LENGTH.sector)bad('F2_DRAFT_ACTUACAO_COUNT_MISMATCH');
