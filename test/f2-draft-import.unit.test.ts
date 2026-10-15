@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {buildF2DraftPlan,auditF2Draft,readF2Stage,validateF2DraftProductNcms,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
+import {buildF2DraftPlan,auditF2Draft,readF2Stage,validateF2DraftProductNcms,safeF2DraftError,F2DraftStageError,F2_APPROVED_BATCH_ID,SEGMENTO_SHA,PRODUTO_SHA,type F2StageSnapshot} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
 import type {ReleaseView} from '../src/modules/taxonomy/curation/curation.read.js';
 import type {PoolClient} from 'pg';
 
@@ -206,4 +206,44 @@ test('F2-DRAFT-04 error contains only safe line and reason, never actual values'
   badSnapshot.products[203]!.ncm_normalized=['123456789'];
   assert.throws(()=>buildF2DraftPlan(badSnapshot),
     /F2_DRAFT_PRODUCT_NCM_INVALID line=205 reason=LENGTH_9/);
+});
+
+test('F2-DRAFT-09 outputs only trusted PostgreSQL identifiers and exact stage and source line',()=>{
+  const driverError=Object.assign(new Error('secret://dbuser:dbpassword@private; NCM 0101'),{
+    code:'23505',constraint:'taxonomy_release_groups_release_dimension_code_key',
+    table:'taxonomy_release_groups',column:'code',
+    detail:'Key (code)=(sensitive-value) already exists',
+    hint:'connect postgresql://private-user:password@db',
+  });
+  const result=safeF2DraftError(new F2DraftStageError('sector',123,driverError));
+  assert.equal(result,
+    'F2_DRAFT_IMPORT_BLOCK stage=sector line=123 sqlstate=23505 '+
+    'constraint=taxonomy_release_groups_release_dimension_code_key '+
+    'table=taxonomy_release_groups column=code');
+  for(const secret of ['secret://','dbuser','dbpassword','NCM 0101','sensitive-value',
+    'postgresql://private-user','password@db'])assert.equal(result.includes(secret),false);
+});
+
+test('F2-DRAFT-09 retains sanitized domain errors and F2 source diagnostics',()=>{
+  assert.equal(safeF2DraftError(new F2DraftStageError('product',204,
+    Object.assign(new Error('Confidential SQL parameter value'),{code:'INVALID_OFFICIAL_CODE'}))),
+    'F2_DRAFT_IMPORT_BLOCK stage=product line=204 domain=INVALID_OFFICIAL_CODE');
+  assert.equal(safeF2DraftError(new F2DraftStageError('readback',undefined,
+    new Error('F2_DRAFT_READBACK_MISMATCH'))),
+    'F2_DRAFT_READBACK_MISMATCH stage=readback');
+  assert.equal(safeF2DraftError(new Error('F2_DRAFT_PRODUCT_NCM_INVALID line=207 reason=LENGTH_5')),
+    'F2_DRAFT_PRODUCT_NCM_INVALID line=207 reason=LENGTH_5 stage=preflight');
+  assert.equal(safeF2DraftError(new F2DraftStageError('actuacao',undefined,
+    Object.assign(new Error('SQL with secret'), {code:'42501',table:'taxonomy_release_actuacao_cnae_origins'}))),
+    'F2_DRAFT_IMPORT_BLOCK stage=actuacao sqlstate=42501 table=taxonomy_release_actuacao_cnae_origins');
+});
+
+test('F2-DRAFT-09 refuses untrusted SQL metadata and URLs in diagnostic fields',()=>{
+  const unexpected=Object.assign(new Error('F2_READ_THE_PASSWORD url://secret'),{
+    code:'23505 secrets',table:'taxonomy_release_concepts\\nleak',
+    column:'password://url',constraint:'something-secret;DROP_TABLE',
+  });
+  assert.equal(safeF2DraftError(new F2DraftStageError('ledger',undefined,unexpected)),
+    'F2_DRAFT_IMPORT_BLOCK stage=ledger');
+  assert.equal(safeF2DraftError(null),'F2_DRAFT_IMPORT_BLOCK stage=preflight');
 });
