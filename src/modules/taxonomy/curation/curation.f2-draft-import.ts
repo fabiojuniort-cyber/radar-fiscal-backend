@@ -19,6 +19,32 @@ const NCM = /^\d{2,8}$/;
 const CNAE = /^\d{7}$/;
 const LENGTH = { sector: 1332, product: 4225 } as const;
 
+/** Keep precisely in sync with slugify() used by createGroup in curation.draft.ts.
+ * Group uniqueness is (release, dimension, code), NOT normalized label.
+ */
+export function f2GroupSlugify(label: string): string {
+  return normalizeAliasText(label)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+}
+
+/** Reuse an existing (even historically retired) group by its database code. */
+export async function getOrCreateF2Group(
+  idsByCode: Map<string,string>,
+  label: string,
+  create: () => Promise<string>,
+): Promise<{id:string;created:boolean}> {
+  const code=f2GroupSlugify(label);
+  const id=idsByCode.get(code);
+  if(id) return {id,created:false};
+  const createdId=await create();
+  idsByCode.set(code,createdId);
+  return {id:createdId,created:true};
+}
+
+
+
 export type F2DraftStage = 'preflight' | 'sector' | 'product' | 'actuacao' | 'readback' | 'ledger';
 export class F2DraftStageError extends Error {
   constructor(readonly stage: F2DraftStage, readonly sourceLine: number | undefined, cause: unknown) {
@@ -239,6 +265,8 @@ export interface F2DimensionAudit {
     count: number;
     examples: { officialCode: string; conceptCodes: string[]; conceptCount: number }[];
   };
+  /** Informative only: distinct incoming labels that reuse a pre-existing group code. */
+  groupSlugMerges: {count:number;examples:{label:string;code:string}[]};
 }
 export interface F2DraftAudit {
   dimensions: { sector: F2DimensionAudit; product: F2DimensionAudit };
@@ -246,6 +274,7 @@ export interface F2DraftAudit {
   exceptionsApprovalSha256: string | null;
   requiresCoordApproval: boolean;
   identicalCodes: { sector: string[]; product: string[] };
+  groupSlugMerges: {count:number;examples:{dimension:'sector'|'product';label:string;code:string}[]};
 }
 
 /** Pure, read-only comparison with the exact release view used by apply. */
@@ -258,8 +287,27 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
     const existing = view.concepts.filter(c => c.dimensionCode === dimension);
     const incomingCodes = new Set(incoming.map(c => c.code));
     const existingByCode = new Map(existing.map(c => [c.code, c]));
-    const groupById = new Map(view.groups.filter(g => g.dimensionCode === dimension)
-      .map(g => [g.id, g.label]));
+    const dimensionGroups=view.groups.filter(g=>g.dimensionCode===dimension);
+    const groupById = new Map(dimensionGroups.map(g => [g.id, g.label]));
+    // Existing group codes include retired groups; simulate createGroup's code lookup
+    // and count label variants merging onto the same slug (not a new approval gate).
+    const seenGroupLabels = new Map<string,Set<string>>();
+    for(const group of dimensionGroups){
+      seenGroupLabels.set(group.code,new Set([normalizeAliasText(group.label)]));
+    }
+    const groupSlugMergeExamples:{label:string;code:string}[]=[];
+    let groupSlugMergeCount=0;
+    for(const item of incoming){
+      const code=f2GroupSlugify(item.group);
+      const label=normalizeAliasText(item.group);
+      const labels=seenGroupLabels.get(code);
+      if(!labels){seenGroupLabels.set(code,new Set([label]));continue;}
+      if(labels.has(label))continue;
+      labels.add(label);
+      groupSlugMergeCount++;
+      if(groupSlugMergeExamples.length<10)
+        groupSlugMergeExamples.push({label:item.group,code});
+    }
     const outside = existing.filter(c => !incomingCodes.has(c.code))
       .sort((a, b) => a.code.localeCompare(b.code));
     const officialOwners = new Map<string, Set<string>>();
@@ -308,6 +356,7 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
       duplicateOfficialCodes: { count: duplicates.length, examples: duplicates.slice(0, 10)
         .map(d => ({ officialCode: d.officialCode, conceptCount: d.conceptCodes.length,
           conceptCodes: d.conceptCodes.slice(0, 10) })) },
+      groupSlugMerges:{count:groupSlugMergeCount,examples:groupSlugMergeExamples},
     };
     // No truncation in the approval digest, even if preview examples are limited to 10.
     fullExceptions[dimension] = {
@@ -320,6 +369,13 @@ export function auditF2Draft(plan: F2DraftPlan, view: ReleaseView, draftId: stri
     dimensions[d].outsideLot.count > 0 || dimensions[d].duplicateOfficialCodes.count > 0);
   return {
     dimensions, identicalCodes, requiresCoordApproval,
+    groupSlugMerges:{
+      count:dimensions.sector.groupSlugMerges.count+dimensions.product.groupSlugMerges.count,
+      examples:([
+        ...dimensions.sector.groupSlugMerges.examples.map(e=>({...e,dimension:'sector' as const})),
+        ...dimensions.product.groupSlugMerges.examples.map(e=>({...e,dimension:'product' as const})),
+      ]).slice(0,10),
+    },
     exceptionsApprovalSha256: requiresCoordApproval
       ? DIGEST(JSON.stringify({ draftId, batchId: plan.batchId,
         contentSha256: plan.contentSha256, exceptions: fullExceptions }))
@@ -367,16 +423,14 @@ async function upsertDimension(client:PoolClient,actor:CuratorActor,dimension:'s
   if(!view)throw new Error('F2_DRAFT_RELEASE_UNAVAILABLE');
   const byCode=new Map(view.concepts.filter(c=>c.dimensionCode===dimension).map(c=>[c.code,c]));
   const byGroup=new Map(view.groups.filter(g=>g.dimensionCode===dimension)
-    .map(g=>[normalizeAliasText(g.label),g.id]));
+    .map(g=>[g.code,g.id]));
   const report={created:0,updated:0,groupsCreated:0};
   for(const item of concepts){
     await inF2DraftStage(dimension,item.line,async()=>{
-    let groupId=byGroup.get(normalizeAliasText(item.group));
-    if(!groupId){
-      groupId=await createGroup(client,actor,dimension,{label:item.group});
-      byGroup.set(normalizeAliasText(item.group),groupId);
-      report.groupsCreated++;
-    }
+    const group=await getOrCreateF2Group(byGroup,item.group,
+      ()=>createGroup(client,actor,dimension,{label:item.group}));
+    const groupId=group.id;
+    if(group.created)report.groupsCreated++;
     const current=byCode.get(item.code);
     if (current && identicalCodes.has(item.code)) return;
     const allAliases=new Map<string,ConceptAliasInput>();
