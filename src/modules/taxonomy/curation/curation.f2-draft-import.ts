@@ -15,7 +15,7 @@ export const F2_APPROVED_BATCH_ID = 'f4ab4f0c-9755-4957-9b51-826aeddb4bca';
 const DIGEST = (value: string) => createHash('sha256').update(value).digest('hex');
 const bad = (code: string): never => { throw new Error(code); };
 const CODE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$/;
-const NCM = /^\d{2}(?:\d{2}){0,3}$/;
+const NCM = /^\d{2,8}$/;
 const CNAE = /^\d{7}$/;
 const LENGTH = { sector: 1332, product: 4225 } as const;
 
@@ -39,7 +39,8 @@ interface SegmentRow {
 interface ProductRow {
   source_line: number;
   product_code: string;
-  ncm_normalized: string[];
+  /** pg JSONB is expected to decode as a string array; never coerce numbers (leading zeroes). */
+  ncm_normalized: unknown;
   raw_cells: string[];
   row_sha256: string;
 }
@@ -70,6 +71,24 @@ export interface F2DraftPlan {
   sector: DraftImportConcept[];
   product: DraftImportConcept[];
   atuacaoOrigins: { sourceLine: number; cnaeCode: string; atuacaoLabel: string }[];
+}
+
+/** Preserve approved 2–8 digit NCM prefixes (including 3/5/7 and zero-prefixes).
+ * No normalization/coercion occurs: PostgreSQL jsonb must be an array of strings.
+ * Errors contain only source line and structural reason, never product/customer data.
+ */
+export function validateF2DraftProductNcms(raw: unknown, sourceLine: number): string[] {
+  const invalid = (reason: string): never =>
+    bad(`F2_DRAFT_PRODUCT_NCM_INVALID line=${sourceLine} reason=${reason}`);
+  if (!Array.isArray(raw)) invalid('NOT_ARRAY');
+  const codes: string[] = [];
+  for (const code of raw as unknown[]) {
+    if (typeof code !== 'string') invalid('NOT_STRING');
+    if (!/^\\d+$/.test(code as string)) invalid('NON_DIGIT');
+    if (!NCM.test(code as string)) invalid(`LENGTH_${(code as string).length}`);
+    codes.push(code as string);
+  }
+  return [...new Set(codes)];
 }
 
 function normalizeCell(value: string): string {
@@ -137,9 +156,7 @@ export function buildF2DraftPlan(snapshot: F2StageSnapshot): F2DraftPlan {
     const group=normalizeCell(c[1]??'');
     const label=normalizeCell(c[2]??'');
     if(!group||!label)bad('F2_DRAFT_PRODUCT_LABEL_MISSING');
-    if(!Array.isArray(row.ncm_normalized)||row.ncm_normalized.some(x=>typeof x!=='string'||!NCM.test(x)))
-      bad('F2_DRAFT_PRODUCT_NCM_INVALID');
-    const canonical=Array.from(new Set(row.ncm_normalized));
+    const canonical = validateF2DraftProductNcms(row.ncm_normalized, row.source_line);
     return {line:row.source_line,
       code:codeFor('product',c[8]??'','f2_'+DIGEST(row.product_code).slice(0,20)),
       dimension:'product',label,definition:normalizeCell(c[9]??'')||label,
