@@ -7,6 +7,8 @@ import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
 
 const PASSWORD = 'Act-Type-Test-2026!Safe';
+// Fixed historical UTC calendar date; independent of CI timezone and midnight.
+const FIXTURE_PUBLISHED_ON_UTC = '2025-06-15';
 
 interface ArchiveBody {
   totalItems: number;
@@ -42,9 +44,9 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
          jurisdiction_level, act_type, title, published_on
        ) VALUES (
          $1, $2, 'STRONG', '{}'::jsonb,
-         'FEDERAL', $3, $4, current_date
+         'FEDERAL', $3, $4, $5::date
        )`,
-      [id, hash, actType, title],
+      [id, hash, actType, title, FIXTURE_PUBLISHED_ON_UTC],
     );
     return id;
   }
@@ -149,11 +151,11 @@ test('Acervo exposes and filters by the collected legal act type', async () => {
       'act type facet must not contain duplicates',
     );
 
-    const today = new Date().toISOString().slice(0, 10);
+    const publishedOn = FIXTURE_PUBLISHED_ON_UTC;
     const cases: Array<Record<string, string>> = [
       { source: 'cat01-dou' },
       { q: marker },
-      { q: marker, source: 'cat01-dou', publishedOn: today },
+      { q: marker, source: 'cat01-dou', publishedOn },
       { q: marker, jurisdiction: 'STATE' },
       { q: marker, publishedTo: '2000-01-01' },
       { q: marker, actType: 'Decreto' },
