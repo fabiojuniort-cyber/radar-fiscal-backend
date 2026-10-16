@@ -2067,6 +2067,7 @@ const CONCEPT_DIFF_FIELDS: Array<keyof ConceptView> = [
   'helpText',
   'classifyByLabel',
   'officialCodes',
+  'actuacaoCodes',
   'aliases',
 ];
 
@@ -2182,6 +2183,22 @@ export async function validateReleaseView(
   const issues: ValidationIssue[] = [];
   const included = view.concepts.filter((c) => c.membershipStatus === 'INCLUDED');
   const dimensionByCode = new Map(view.dimensions.map((d) => [d.code, d]));
+
+  const version=/^v(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(view.release.version);
+  // F2-TAB-03: every included 7-digit CNAE in v1.8+ requires ≥1 release
+  // Atuação membership; no change to published v1.7 or to source staging.
+  if(version&&Number(version[1])===1&&Number(version[2])>=8){
+    const atuacoes=new Set(included.filter(c=>c.dimensionCode==='actuacao').map(c=>c.code));
+    for(const cnae of included){
+      if(cnae.dimensionCode!=='sector'||cnae.officialCodes.length!==1||
+         !/^\\d{7}$/.test(cnae.officialCodes[0]??''))continue;
+      const codes=cnae.actuacaoCodes??[];
+      if(codes.length<1||codes.some(code=>!atuacoes.has(code))){
+        issues.push({severity:'BLOCKER',code:'F2_TAB03_CNAE_ACTUACAO_REQUIRED',
+          message:'CNAE sem Atuação válida no rascunho v1.8.0.',subject:cnae.code});
+      }
+    }
+  }
 
   for (const dimension of view.dimensions) {
     const concepts = included.filter((c) => c.dimensionCode === dimension.code);
