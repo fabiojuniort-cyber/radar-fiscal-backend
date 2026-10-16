@@ -4,8 +4,9 @@ import {resolveCuratorDatabaseUrl} from './curator-url.js';
 import {assertCuratorSession,withCuratorTransaction} from '../../modules/taxonomy/curation/curation.draft.js';
 import {readF2Stage,buildF2DraftPlan} from '../../modules/taxonomy/curation/curation.f2-draft-import.js';
 import {loadReleaseView,pgRunner} from '../../modules/taxonomy/curation/curation.read.js';
+import {requireExactlyOneOpenF2Draft} from './taxonomy-f2-open-draft.js';
 import {
- F2_GROUP_REPAIR_DRAFT_ID,buildF2GroupRepairPlan,applyF2GroupRepair,
+ buildF2GroupRepairPlan,applyF2GroupRepair,
 } from '../../modules/taxonomy/curation/curation.f2-group-repair.js';
 
 function abort(code:string):never{throw new Error(code);}
@@ -18,10 +19,11 @@ function parse(args:string[]){
  }
  const mode=entries.get('mode');
  if(mode!=='plan'&&mode!=='apply')abort('F2_GROUP_EXPLICIT_MODE_REQUIRED');
- if(mode==='apply'&&(entries.get('confirm-draft-id')!==F2_GROUP_REPAIR_DRAFT_ID||
+ if(mode==='apply'&&(!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(entries.get('confirm-draft-id')??'')||
      !/^[0-9a-f]{64}$/.test(entries.get('confirm-plan-sha256')??'')))
    abort('F2_GROUP_CONFIRMATION_REQUIRED');
- return {mode,confirmSha:entries.get('confirm-plan-sha256')??''};
+ return {mode,confirmSha:entries.get('confirm-plan-sha256')??'',
+   confirmedDraft:entries.get('confirm-draft-id')??''};
 }
 async function historical(client:PoolClient){
  const q=await client.query<{published:number;automatic:number;manual:number}>(`
@@ -33,10 +35,11 @@ async function historical(client:PoolClient){
  return q.rows[0]!;
 }
 async function snapshot(client:PoolClient){
+ const draft=await requireExactlyOneOpenF2Draft(client);
  const batch=buildF2DraftPlan(await readF2Stage(client));
- const view=await loadReleaseView(pgRunner(client),F2_GROUP_REPAIR_DRAFT_ID,{includeRetired:true});
+ const view=await loadReleaseView(pgRunner(client),draft.id,{includeRetired:true});
  if(!view)abort('F2_GROUP_DRAFT_MISSING');
- return buildF2GroupRepairPlan({draftId:F2_GROUP_REPAIR_DRAFT_ID,plan:batch,view});
+ return buildF2GroupRepairPlan({draftId:draft.id,plan:batch,view});
 }
 function preview(p:Awaited<ReturnType<typeof snapshot>>){
  return {
@@ -70,6 +73,7 @@ async function run(){
    }
    const result=await withCuratorTransaction(pool,async client=>{
      const original=await snapshot(client);
+     if(original.draftId!==opts.confirmedDraft)abort('F2_GROUP_DRAFT_CHANGED');
      if(original.planSha256!==opts.confirmSha)abort('F2_GROUP_PLAN_CHANGED');
      const before=await historical(client);
      const changes=await applyF2GroupRepair(client,
