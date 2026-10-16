@@ -485,7 +485,7 @@ export async function loadReleaseView(
     classifyByLabel: row.classify_by_label ?? true,
     officialCodes: row.official_codes ?? [],
     f2DraftSuggestions:{products:row.f2_suggested_products,ncms:row.f2_suggested_ncms},
-    ...(row.dimension_code==='sector'&&row.official_codes?.length===1&&/^\\d{7}$/.test(row.official_codes[0]??'')
+    ...(row.dimension_code==='sector'&&row.official_codes?.length===1&&/^\d{7}$/.test(row.official_codes[0]??'')
       ? {actuacaoCodes:actuacaoByCnae.get(row.official_codes[0]!)??[]} : {}),
     aliases: row.aliases ?? [],
   }));
