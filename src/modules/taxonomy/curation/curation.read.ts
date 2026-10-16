@@ -113,7 +113,7 @@ export interface ConceptView {
   /** Release-scoped overrides: NULL means inherit F2 source suggestions; [] means cleared. */
   f2DraftSuggestions?: {products:string[]|null;ncms:string[]|null};
   /** Release-scoped, editable multi-valued Atuação memberships for one CNAE. */
-  actuacaoCodes?: string[];
+  atuacaoCodes?: string[];
   /** F2 suggestions, not legal classification evidence. */
   f2Source?: {
     atuacao: string;
@@ -486,7 +486,7 @@ export async function loadReleaseView(
     officialCodes: row.official_codes ?? [],
     f2DraftSuggestions:{products:row.f2_suggested_products,ncms:row.f2_suggested_ncms},
     ...(row.dimension_code==='sector'&&row.official_codes?.length===1&&/^\d{7}$/.test(row.official_codes[0]??'')
-      ? {actuacaoCodes:actuacaoByCnae.get(row.official_codes[0]!)??[]} : {}),
+      ? {atuacaoCodes:actuacaoByCnae.get(row.official_codes[0]!)??[]} : {}),
     aliases: row.aliases ?? [],
   }));
 
