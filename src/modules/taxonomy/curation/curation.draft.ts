@@ -1888,7 +1888,7 @@ export interface GridRowInput {
   label: string;
   officialCodes: string[];
   /** F2-TAB-03, required when adding a CNAE in v1.8.0. */
-  actuacaoCodes?: string[];
+  atuacaoCodes?: string[];
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
   classifyByLabel: boolean;
@@ -1971,7 +1971,7 @@ export async function saveDimensionRows(
         // This is part of the same curator transaction as row creation.
         if(draft.version==='v1.8.0'&&dimensionCode==='sector'&&
            row.officialCodes.length===1&&/^\d{7}$/.test(row.officialCodes[0]??'')){
-          const codes=row.actuacaoCodes??[];
+          const codes=row.atuacaoCodes??[];
           if(codes.length<1)throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',422);
           if(codes.length>12||new Set(codes).size!==codes.length||
             codes.some(x=>!/^actuacao\.[a-z0-9_]+$/.test(x)))
@@ -2067,7 +2067,7 @@ const CONCEPT_DIFF_FIELDS: Array<keyof ConceptView> = [
   'helpText',
   'classifyByLabel',
   'officialCodes',
-  'actuacaoCodes',
+  'atuacaoCodes',
   'aliases',
 ];
 
@@ -2192,7 +2192,7 @@ export async function validateReleaseView(
     for(const cnae of included){
       if(cnae.dimensionCode!=='sector'||cnae.officialCodes.length!==1||
          !/^\d{7}$/.test(cnae.officialCodes[0]??''))continue;
-      const codes=cnae.actuacaoCodes??[];
+      const codes=cnae.atuacaoCodes??[];
       if(codes.length<1||codes.some(code=>!atuacoes.has(code))){
         issues.push({severity:'BLOCKER',code:'F2_TAB03_CNAE_ACTUACAO_REQUIRED',
           message:'CNAE sem Atuação válida no rascunho v1.8.0.',subject:cnae.code});
