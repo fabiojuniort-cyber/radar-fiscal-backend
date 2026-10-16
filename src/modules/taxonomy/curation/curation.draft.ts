@@ -1888,7 +1888,7 @@ export interface GridRowInput {
   label: string;
   officialCodes: string[];
   /** F2-TAB-03, required when adding a CNAE in v1.8.0. */
-  atuacaoCodes?: string[];
+  atuacaoCodes?: string[] | undefined;
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
   classifyByLabel: boolean;
