@@ -397,6 +397,8 @@ function planClient(snapshot: F2StageSnapshot, calls: string[]): PoolClient {
       {id:'sector-id',code:'sector',name:'Segmento',profile_visible:true,profile_order:1,official_code_type:'CNAE'},
       {id:'product-id',code:'product',name:'Produto',profile_visible:true,profile_order:2,official_code_type:'NCM'},
     ]};
+    // F2-TAB-03 release view adds a read-only multi-Atuação lookup.
+    if(sql.includes('FROM taxonomy_release_cnae_actuacao x'))return {rows:[]};
     if(sql.includes('FROM taxonomy_release_groups g') || sql.includes('FROM taxonomy_release_concepts rc') ||
        sql.includes('FROM taxonomy_concepts c'))return {rows:[]};
     assert.fail('unexpected preflight query');
