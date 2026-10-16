@@ -1882,6 +1882,8 @@ export interface GridRowInput {
   group?: string | null | undefined;
   label: string;
   officialCodes: string[];
+  /** F2-TAB-03: required when creating a new CNAE in the v1.8.0 draft. */
+  actuacaoCodes?: string[];
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
   classifyByLabel: boolean;
@@ -1959,7 +1961,19 @@ export async function saveDimensionRows(
         await updateConcept(client, actor, row.code, fields);
         result.updated += 1;
       } else {
-        result.created.push(await createConcept(client, actor, dimensionCode, fields));
+        // New CNAEs must never enter the v1.8.0 draft without Atuação.
+        // The relationship is created in this SAME curator transaction.
+        const isNewCnae=dimensionCode==='sector'&&draft.version==='v1.8.0'&&
+          row.officialCodes.some(code=>/^\d{7}$/.test(normalizeOfficialCode(code)));
+        if(isNewCnae&&(!row.actuacaoCodes||row.actuacaoCodes.length===0))
+          throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',400);
+        const newCode=await createConcept(client, actor, dimensionCode, fields);
+        result.created.push(newCode);
+        if(isNewCnae){
+          const cnae=row.officialCodes.map(normalizeOfficialCode).find(code=>/^\d{7}$/.test(code))!;
+          const { updateDraftCnaeActuacoes }=await import('./curation.actuacao-multiple.js');
+          await updateDraftCnaeActuacoes(client, actor, cnae, row.actuacaoCodes!);
+        }
       }
     } catch (error) {
       const message =
