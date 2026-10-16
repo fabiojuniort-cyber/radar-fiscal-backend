@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {
- buildF2GroupRepairPlan,F2_GROUP_REPAIR_DRAFT_ID,
+ buildF2GroupRepairPlan,
 } from '../src/modules/taxonomy/curation/curation.f2-group-repair.js';
 import {f2GroupSlugify,type F2DraftPlan} from '../src/modules/taxonomy/curation/curation.f2-draft-import.js';
 import type {ReleaseView} from '../src/modules/taxonomy/curation/curation.read.js';
 
+const F2_GROUP_REPAIR_DRAFT_ID='05b8027b-aaf0-41ab-8d88-7a7e07a7052a';
 const label='Produção Agrícola';
 const base='a'.repeat(60);
 const first=base+' A',second=base+' B';
@@ -36,7 +37,7 @@ function scenario(applied=false){
    groupId:!i?'legacy':applied?'new-group':'legacy',
   })),
  ];
- const view={release:{id:F2_GROUP_REPAIR_DRAFT_ID,status:'DRAFT',version:'v1.7.0'},
+ const view={release:{id:F2_GROUP_REPAIR_DRAFT_ID,status:'DRAFT',version:'v1.8.0'},
   groups,concepts} as unknown as ReleaseView;
  return {plan,view};
 }
@@ -68,4 +69,11 @@ test('F2-TAB-02: same source and release make stable plan hash',()=>{
  const one=buildF2GroupRepairPlan({draftId:F2_GROUP_REPAIR_DRAFT_ID,...input});
  const two=buildF2GroupRepairPlan({draftId:F2_GROUP_REPAIR_DRAFT_ID,...input});
  assert.equal(one.planSha256,two.planSha256);
+});
+
+test('F2-TAB-02: plan rejects a view for a different release',()=>{
+ const {plan,view}=scenario();
+ assert.throws(()=>buildF2GroupRepairPlan({
+   draftId:'52791d3b-afdc-496f-8ada-c6cd5c819dff',plan,view,
+ }),/F2_GROUP_DRAFT_IDENTITY_MISMATCH/);
 });
