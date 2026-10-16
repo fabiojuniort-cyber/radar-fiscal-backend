@@ -535,10 +535,10 @@ export async function taxonomyAdminRoutes(
   typed.patch(
     '/api/v1/admin/taxonomy/drafts/current/cnaes/:cnaeCode/actuacoes',
     { preHandler: requirePlatformAdmin, schema: {
-      params:z.object({cnaeCode:z.string().regex(/^\\d{7}$/)}),
+      params:z.object({cnaeCode:z.string().regex(/^\d{7}$/)}),
       body:z.object({
         justification:z.string().trim().min(3),
-        actuacaoCodes:z.array(z.string().regex(/^actuacao\\.[a-z0-9_]+$/))
+        actuacaoCodes:z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/))
           .min(1).max(12),
       }),
     }},
