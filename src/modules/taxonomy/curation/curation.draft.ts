@@ -416,6 +416,31 @@ async function copyReleaseGraph(
     );
   }
 
+  // Preserve multi-valued bindings across drafts; for the first v1.8.0
+  // copy, migrate all immutable v1.7.0 one-to-one source origins without
+  // modifying either source publication or its imported provenance.
+  await client.query(`
+    INSERT INTO taxonomy_release_cnae_actuacao(release_id,cnae_code,release_concept_id)
+    SELECT $2::uuid, source.cnae_code, target_rc.id
+    FROM (
+      SELECT x.cnae_code, src_rc.concept_id
+      FROM taxonomy_release_cnae_actuacao x
+      JOIN taxonomy_release_concepts src_rc ON src_rc.id=x.release_concept_id
+      WHERE x.release_id=$1::uuid
+      UNION ALL
+      SELECT o.cnae_code, src_rc.concept_id
+      FROM taxonomy_release_actuacao_cnae_origins o
+      JOIN taxonomy_release_concepts src_rc ON src_rc.id=o.release_concept_id
+      WHERE o.release_id=$1::uuid
+        AND NOT EXISTS (
+          SELECT 1 FROM taxonomy_release_cnae_actuacao x
+          WHERE x.release_id=$1::uuid AND x.cnae_code=o.cnae_code)
+    ) source
+    JOIN taxonomy_release_concepts target_rc
+      ON target_rc.release_id=$2::uuid AND target_rc.concept_id=source.concept_id
+    ON CONFLICT DO NOTHING
+  `,[sourceId,targetId]);
+
   void bindings;
 }
 
