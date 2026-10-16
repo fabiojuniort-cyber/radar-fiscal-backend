@@ -326,6 +326,26 @@ async function copyReleaseGraph(
     [sourceId, targetId],
   );
 
+  // Copy curator-edited multi-value associations to a successor release.
+  // The published source release is never mutated; FK points to the cloned
+  // Atuação membership rather than to the earlier release's row ID.
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_cnae_actuacoes
+        (release_id,cnae_code,release_actuacao_concept_id)
+      SELECT $2::uuid, source.cnae_code, target_concept.id
+      FROM taxonomy_release_cnae_actuacoes source
+      JOIN taxonomy_release_concepts old_concept
+        ON old_concept.id=source.release_actuacao_concept_id
+        AND old_concept.release_id=$1::uuid
+      JOIN taxonomy_release_concepts target_concept
+        ON target_concept.release_id=$2::uuid
+        AND target_concept.concept_id=old_concept.concept_id
+      WHERE source.release_id=$1::uuid
+    `,
+    [sourceId,targetId],
+  );
+
   await client.query(
     `
       INSERT INTO taxonomy_release_relation_rules (
