@@ -679,6 +679,7 @@ export async function taxonomyAdminRoutes(
                 group: z.string().trim().max(200).nullable().optional(),
                 label: z.string().max(300),
                 officialCodes: z.array(z.string().trim().min(1).max(40)).max(500),
+                actuacaoCodes: z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/)).min(1).max(12).optional(),
                 aliases: z
                   .array(
                     z.object({
