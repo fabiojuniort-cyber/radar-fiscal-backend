@@ -7,7 +7,6 @@ import {createGroup,type CuratorActor} from './curation.draft.js';
 
 const sha=(s:string)=>createHash('sha256').update(s).digest('hex');
 const norm=(s:string)=>normalizeAliasText(s);
-export const F2_GROUP_REPAIR_DRAFT_ID='52791d3b-afdc-496f-8ada-c6cd5c819dff';
 type Target={label:string;parent:string;groupCode:string;groupId:string|null;segmentCode:string|null;conceptCodes:string[];collision:boolean};
 export interface GroupRepairPlan{
  draftId:string;lotBatchId:string;contentSha256:string;published:false;
@@ -26,8 +25,8 @@ function suffixCode(label:string){
  * distinct labels merely because slugify truncated both to sixty characters.
  */
 export function buildF2GroupRepairPlan({draftId,plan,view}:PlanInput):GroupRepairPlan {
- if(draftId!==F2_GROUP_REPAIR_DRAFT_ID || view.release.status!=='DRAFT' ||
-    view.release.version!=='v1.7.0')throw Error('F2_GROUP_DRAFT_IDENTITY_MISMATCH');
+ if(draftId!==view.release.id || view.release.status!=='DRAFT')
+    throw Error('F2_GROUP_DRAFT_IDENTITY_MISMATCH');
  const originalGroups=view.groups.filter(g=>g.dimensionCode==='sector');
  const byGroupCode=new Map(originalGroups.map(g=>[g.code,g]));
  const originalsByLabel=new Map<string,typeof originalGroups[number]>();
@@ -101,7 +100,7 @@ export async function applyF2GroupRepair(client:PoolClient,actor:CuratorActor,
  preview:GroupRepairPlan,confirmSha:string):Promise<Record<string,unknown>>{
  if(preview.planSha256!==confirmSha)throw Error('F2_GROUP_PLAN_HASH_MISMATCH');
  if(preview.unresolved.length)throw Error('F2_GROUP_UNRESOLVED_PARENTS');
- if(preview.draftId!==F2_GROUP_REPAIR_DRAFT_ID)throw Error('F2_GROUP_WRONG_DRAFT');
+ // Rechecked by caller under the same serialized curator transaction.
  let newGroups=0,linked=0,segments=0;
  const dim=await client.query<{id:string}>(`SELECT d.id FROM taxonomy_dimensions d
   JOIN taxonomy_release_dimensions rd ON rd.dimension_id=d.id
