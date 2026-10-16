@@ -6,6 +6,8 @@ export const F2_SOURCE_SEGMENT_SHA256 =
 
 export interface F2SourceSuggestion {
   atuacao: string;
+  /** Editable release memberships (1..12), independent of XLSX provenance. */
+  actuacaoCodes: string[];
   suggestedProducts: string;
   suggestedNcms: string;
   /** Immutable XLSX provenance. Not a legal or published classification. */
@@ -64,6 +66,7 @@ export async function attachF2SourceSuggestions(
       }
       byCnae.set(row.cnae_code,{
         atuacao:row.atuacao,
+        actuacaoCodes:[],
         suggestedProducts:row.suggested_products??'',
         suggestedNcms:row.suggested_ncms??'',
         sourceSha256:row.source_sha256,
@@ -76,17 +79,49 @@ export async function attachF2SourceSuggestions(
       ?error.message:'F2_SOURCE_OVERLAY_UNAVAILABLE';
     console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED='+reason);
   }
+  // Curated release memberships override the immutable one-to-one XLSX origin.
+  // No stored override means the original one-code association still applies.
+  const originRows=await run<{cnae_code:string;code:string}>(`
+    SELECT o.cnae_code,c.code
+    FROM taxonomy_release_actuacao_cnae_origins o
+    JOIN taxonomy_release_concepts rc ON rc.id=o.release_concept_id
+      AND rc.release_id=o.release_id
+    JOIN taxonomy_concepts c ON c.id=rc.concept_id
+    WHERE o.release_id=$1::uuid AND o.cnae_code=ANY($2::text[])
+    ORDER BY o.cnae_code,c.code
+  `,[view.release.id,cnaes]);
+  const overrides=await run<{cnae_code:string;code:string}>(`
+    SELECT a.cnae_code,c.code
+    FROM taxonomy_release_cnae_actuacoes a
+    JOIN taxonomy_release_concepts rc ON rc.id=a.release_actuacao_concept_id
+      AND rc.release_id=a.release_id
+    JOIN taxonomy_concepts c ON c.id=rc.concept_id
+    WHERE a.release_id=$1::uuid AND a.cnae_code=ANY($2::text[])
+    ORDER BY a.cnae_code,c.code
+  `,[view.release.id,cnaes]);
+  const atuacaoByCnae=new Map<string,string[]>();
+  for(const row of originRows) atuacaoByCnae.set(row.cnae_code,[row.code]);
+  const seenOverrides=new Set<string>();
+  for(const row of overrides){
+    if(!seenOverrides.has(row.cnae_code)){
+      atuacaoByCnae.set(row.cnae_code,[]);
+      seenOverrides.add(row.cnae_code);
+    }
+    atuacaoByCnae.get(row.cnae_code)!.push(row.code);
+  }
   const eligibleSet=new Set(eligible);
-  if(byCnae.size===0&&!eligible.some(c=>c.f2DraftSuggestions?.products!=null||c.f2DraftSuggestions?.ncms!=null))return view;
+  if(byCnae.size===0&&atuacaoByCnae.size===0&&!eligible.some(c=>c.f2DraftSuggestions?.products!=null||c.f2DraftSuggestions?.ncms!=null))return view;
   return {
     ...view,
     concepts:view.concepts.map(concept=>{
       if(!eligibleSet.has(concept))return concept;
       const source=byCnae.get(concept.officialCodes[0]!);
       const override=concept.f2DraftSuggestions;
-      if(!source&&override?.products==null&&override?.ncms==null)return concept;
+      const actuacaoCodes=atuacaoByCnae.get(concept.officialCodes[0]!)??[];
+      if(!source&&!actuacaoCodes.length&&override?.products==null&&override?.ncms==null)return concept;
       const data:F2SourceSuggestion={
         atuacao:source?.atuacao??'',
+        actuacaoCodes,
         suggestedProducts:override?.products!=null?override.products.join(', '):source?.suggestedProducts??'',
         suggestedNcms:override?.ncms!=null?override.ncms.join(', '):source?.suggestedNcms??'',
         sourceSha256:source?.sourceSha256??'',
