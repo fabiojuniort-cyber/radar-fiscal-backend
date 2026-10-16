@@ -81,7 +81,7 @@ export async function attachF2SourceSuggestions(
   }
   // Curated release memberships override the immutable one-to-one XLSX origin.
   // No stored override means the original one-code association still applies.
-  const parsed=/^v(\d+)\.(\d+)\./.exec(view.release.version);
+  const parsed=/^v(\d+)\.(\d+)\./.exec(view.release?.version??'');
   const major=Number(parsed?.[1]??0), minor=Number(parsed?.[2]??0);
   const supportsMulti=major>1||(major===1&&minor>=8);
   const originRows=supportsMulti ? await run<{cnae_code:string;code:string}>(`
