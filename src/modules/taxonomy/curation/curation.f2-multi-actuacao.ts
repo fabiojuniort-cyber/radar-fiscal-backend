@@ -3,6 +3,14 @@ import {CurationError,requireOpenDraft,type CuratorActor} from './curation.draft
 
 export const MULTI_ACTUACAO_DRAFT_VERSION='v1.8.0';
 
+/** Strict domain validation independent of F2 source (one origin per XLSX row). */
+export function validateActuacaoSelection(codes:readonly string[]):void {
+ if(codes.length<1)throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',422);
+ if(codes.length>12||new Set(codes).size!==codes.length||
+    codes.some(x=>!/^actuacao\.[a-z0-9_]+$/.test(x)))
+   throw new CurationError('F2_TAB03_INVALID_ACTUACAO',422);
+}
+
 /** One CNAE has one or more DISTINCT, approved Atuação concepts.
  * This is curated release data, separate from immutable XLSX provenance. */
 export async function updateCnaeActuacoes(
@@ -12,10 +20,7 @@ export async function updateCnaeActuacoes(
  const draft=await requireOpenDraft(client);
  if(draft.version!==MULTI_ACTUACAO_DRAFT_VERSION)
    throw new CurationError('F2_TAB03_V18_DRAFT_REQUIRED',409);
- if(atuacaoCodes.length<1)throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',422);
- if(atuacaoCodes.length>12||new Set(atuacaoCodes).size!==atuacaoCodes.length||
-    atuacaoCodes.some(x=>!/^actuacao\.[a-z0-9_]+$/.test(x)))
-   throw new CurationError('F2_TAB03_INVALID_ACTUACAO',422);
+ validateActuacaoSelection(atuacaoCodes);
 
  const cnae=await client.query<{id:string;official_codes:string[]}>(`
    SELECT rc.id,rc.official_codes
