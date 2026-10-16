@@ -1887,6 +1887,8 @@ export interface GridRowInput {
   group?: string | null | undefined;
   label: string;
   officialCodes: string[];
+  /** F2-TAB-03, required when adding a CNAE in v1.8.0. */
+  actuacaoCodes?: string[];
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
   classifyByLabel: boolean;
@@ -1964,7 +1966,34 @@ export async function saveDimensionRows(
         await updateConcept(client, actor, row.code, fields);
         result.updated += 1;
       } else {
-        result.created.push(await createConcept(client, actor, dimensionCode, fields));
+        const created=await createConcept(client, actor, dimensionCode, fields);
+        // A new CNAE cannot enter the v1.8 DRAFT without 1+ valid Atuações.
+        // This is part of the same curator transaction as row creation.
+        if(draft.version==='v1.8.0'&&dimensionCode==='sector'&&
+           row.officialCodes.length===1&&/^\d{7}$/.test(row.officialCodes[0]??'')){
+          const codes=row.actuacaoCodes??[];
+          if(codes.length<1)throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',422);
+          if(codes.length>12||new Set(codes).size!==codes.length||
+            codes.some(x=>!/^actuacao\.[a-z0-9_]+$/.test(x)))
+            throw new CurationError('F2_TAB03_INVALID_ACTUACAO',422);
+          const eligible=await client.query<{id:string}>(`
+            SELECT rc.id FROM taxonomy_release_concepts rc
+            JOIN taxonomy_concepts c ON c.id=rc.concept_id
+            JOIN taxonomy_dimensions d ON d.id=c.dimension_id
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id=rc.release_id AND rd.dimension_id=d.id
+            WHERE rc.release_id=$1::uuid AND rc.membership_status='INCLUDED'
+              AND rd.membership_status='INCLUDED' AND d.code='actuacao'
+              AND c.code=ANY($2::text[])
+          `,[draft.id,codes]);
+          if(eligible.rows.length!==codes.length)
+            throw new CurationError('F2_TAB03_ACTUACAO_NOT_IN_DRAFT',422);
+          await client.query(`
+            INSERT INTO taxonomy_release_cnae_actuacao(release_id,cnae_code,release_concept_id)
+            SELECT $1::uuid,$2,unnest($3::uuid[])
+          `,[draft.id,row.officialCodes[0],eligible.rows.map(x=>x.id)]);
+        }
+        result.created.push(created);
       }
     } catch (error) {
       const message =
