@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {Pool,type PoolClient} from 'pg';
 import {resolveCuratorDatabaseUrl} from './curator-url.js';
 import {assertCuratorSession,withCuratorTransaction} from '../../modules/taxonomy/curation/curation.draft.js';
+import {requireExactlyOneOpenF2Draft} from './taxonomy-f2-open-draft.js';
 
 /**
  * F2-TAB-01: membership-only retirement. Deliberately NO DELETE, TRUNCATE,
@@ -12,7 +13,6 @@ import {assertCuratorSession,withCuratorTransaction} from '../../modules/taxonom
 export const RETIRED_TAXONOMY_DIMENSIONS = [
   'treatment','act_type','platform','tax_species','sphere',
 ] as const;
-export const F2_TAB_DRAFT_ID = '52791d3b-afdc-496f-8ada-c6cd5c819dff';
 
 type DimensionCode=(typeof RETIRED_TAXONOMY_DIMENSIONS)[number];
 type CountRow={dimension:string;dimension_status:string;included:number;retired:number;groups:number;relations:number;mappings:number;relation_rules:number};
@@ -56,13 +56,8 @@ async function historic(client:PoolClient){
  return {publishedConceptMemberships:x.published_concepts,automaticTags:x.automatic_tags,manualTags:x.manual_tags};
 }
 async function snapshot(client:PoolClient):Promise<Omit<RetirementPlan,'planSha256'>>{
- const r=await client.query<{id:string;version:string;status:string}>(
-  "SELECT id::text,version,status FROM taxonomy_releases WHERE id=$1::uuid",
-  [F2_TAB_DRAFT_ID]);
- const release=r.rows[0];
- if(!release||release.version!=='v1.7.0'||release.status!=='DRAFT')
-  throw Error('F2_TAB_DRAFT_MISMATCH');
- const rows=await client.query<CountRow>(countSql,[F2_TAB_DRAFT_ID,[...RETIRED_TAXONOMY_DIMENSIONS]]);
+ const release=await requireExactlyOneOpenF2Draft(client);
+ const rows=await client.query<CountRow>(countSql,[release.id,[...RETIRED_TAXONOMY_DIMENSIONS]]);
  if(rows.rows.length!==RETIRED_TAXONOMY_DIMENSIONS.length)
   throw Error('F2_TAB_DIMENSIONS_MISSING');
  return {draftId:release.id,version:release.version,status:release.status,
@@ -82,10 +77,8 @@ function assertNoHistoricChange(before:RetirementPlan['historical'],after:Retire
 }
 /** The only mutating primitive; isolated PG18 tests invoke it inside a rolled-back fixture transaction. */
 export async function retireDraftMemberships(client:PoolClient,draftId:string){
- const target=await client.query<{version:string;status:string}>(
-  'SELECT version,status FROM taxonomy_releases WHERE id=$1::uuid',[draftId]);
- if(target.rows[0]?.version!=='v1.7.0'||target.rows[0]?.status!=='DRAFT')
-  throw Error('F2_TAB_DRAFT_MISMATCH');
+ const target=await requireExactlyOneOpenF2Draft(client);
+ if(target.id!==draftId)throw Error('F2_TAB_DRAFT_MISMATCH');
  const concepts=await client.query(`
    UPDATE taxonomy_release_concepts rc SET membership_status='RETIRED'
     FROM taxonomy_concepts c JOIN taxonomy_dimensions d ON d.id=c.dimension_id
@@ -99,16 +92,17 @@ export async function retireDraftMemberships(client:PoolClient,draftId:string){
  return {conceptsRetired:concepts.rowCount??0,dimensionsRetired:dimensions.rowCount??0};
 }
 
-async function apply(client:PoolClient,expected:string){
+async function apply(client:PoolClient,expected:string,confirmedDraft:string){
  const pre=makeRetirementPlan(await snapshot(client));
+ if(pre.draftId!==confirmedDraft)throw Error('F2_TAB_DRAFT_CHANGED');
  if(pre.planSha256!==expected)throw Error('F2_TAB_PLAN_SHA_MISMATCH');
  const changed=plannedToRetire(pre);
- if(changed)await retireDraftMemberships(client,F2_TAB_DRAFT_ID);
+ if(changed)await retireDraftMemberships(client,pre.draftId);
  const post=makeRetirementPlan(await snapshot(client));
  if(post.dimensions.some(d=>d.dimension_status!=='RETIRED'||d.included!==0))
   throw Error('F2_TAB_READBACK_FAILED');
  assertNoHistoricChange(pre.historical,post.historical);
- return {draftId:F2_TAB_DRAFT_ID,published:false,readback:'PASS',
+ return {draftId:pre.draftId,published:false,readback:'PASS',
   retiredDimensions:changed,reusedExisting:changed===0,
   historicalPreserved:true,pre,post};
 }
@@ -127,6 +121,7 @@ async function main(){
    try{
     await assertCuratorSession(client);
     await client.query('BEGIN TRANSACTION READ ONLY');
+    await client.query('SET LOCAL ROLE radar_taxonomy_curator');
     const plan=makeRetirementPlan(await snapshot(client));
     console.log('F2_TAB_PLAN='+JSON.stringify(plan));
     await client.query('ROLLBACK');
@@ -134,9 +129,10 @@ async function main(){
   }else{
    const expected=process.argv.find(x=>x.startsWith('--confirm-plan-sha256='))?.split('=')[1]??'';
    const confirmedDraft=process.argv.find(x=>x.startsWith('--confirm-draft-id='))?.split('=')[1]??'';
-   if(!/^[a-f0-9]{64}$/.test(expected)||confirmedDraft!==F2_TAB_DRAFT_ID)
+   if(!/^[a-f0-9]{64}$/.test(expected)||
+      !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(confirmedDraft))
     throw Error('F2_TAB_CONFIRMATION_REQUIRED');
-   const result=await withCuratorTransaction(pool,client=>apply(client,expected));
+   const result=await withCuratorTransaction(pool,client=>apply(client,expected,confirmedDraft));
    console.log('F2_TAB_RESULT='+JSON.stringify(result));
   }
  }finally{await pool.end();}
