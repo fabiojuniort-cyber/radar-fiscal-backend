@@ -326,6 +326,26 @@ async function copyReleaseGraph(
     [sourceId, targetId],
   );
 
+  // Copy curator-edited multi-value associations to a successor release.
+  // The published source release is never mutated; FK points to the cloned
+  // Atuação membership rather than to the earlier release's row ID.
+  await client.query(
+    `
+      INSERT INTO taxonomy_release_cnae_actuacoes
+        (release_id,cnae_code,release_actuacao_concept_id)
+      SELECT $2::uuid, source.cnae_code, target_concept.id
+      FROM taxonomy_release_cnae_actuacoes source
+      JOIN taxonomy_release_concepts old_concept
+        ON old_concept.id=source.release_actuacao_concept_id
+        AND old_concept.release_id=$1::uuid
+      JOIN taxonomy_release_concepts target_concept
+        ON target_concept.release_id=$2::uuid
+        AND target_concept.concept_id=old_concept.concept_id
+      WHERE source.release_id=$1::uuid
+    `,
+    [sourceId,targetId],
+  );
+
   await client.query(
     `
       INSERT INTO taxonomy_release_relation_rules (
@@ -1862,6 +1882,8 @@ export interface GridRowInput {
   group?: string | null | undefined;
   label: string;
   officialCodes: string[];
+  /** F2-TAB-03: required when creating a new CNAE in the v1.8.0 draft. */
+  actuacaoCodes?: string[] | undefined;
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
   classifyByLabel: boolean;
@@ -1939,7 +1961,19 @@ export async function saveDimensionRows(
         await updateConcept(client, actor, row.code, fields);
         result.updated += 1;
       } else {
-        result.created.push(await createConcept(client, actor, dimensionCode, fields));
+        // New CNAEs must never enter the v1.8.0 draft without Atuação.
+        // The relationship is created in this SAME curator transaction.
+        const isNewCnae=dimensionCode==='sector'&&draft.version==='v1.8.0'&&
+          row.officialCodes.some(code=>/^\d{7}$/.test(normalizeOfficialCode(code)));
+        if(isNewCnae&&(!row.actuacaoCodes||row.actuacaoCodes.length===0))
+          throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',400);
+        const newCode=await createConcept(client, actor, dimensionCode, fields);
+        result.created.push(newCode);
+        if(isNewCnae){
+          const cnae=row.officialCodes.map(normalizeOfficialCode).find(code=>/^\d{7}$/.test(code))!;
+          const { updateDraftCnaeActuacoes }=await import('./curation.actuacao-multiple.js');
+          await updateDraftCnaeActuacoes(client, actor, cnae, row.actuacaoCodes!);
+        }
       }
     } catch (error) {
       const message =

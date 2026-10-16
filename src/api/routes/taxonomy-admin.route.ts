@@ -64,6 +64,7 @@ import {
   pgRunner,
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from '../../modules/taxonomy/curation/curation.actuacao.js';
+import { updateDraftCnaeActuacoes } from '../../modules/taxonomy/curation/curation.actuacao-multiple.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import { collectionFilterCatalogVisibility } from '../../modules/collection/collection-filter.catalog-visibility.js';
 import { importNcmCatalog } from '../../modules/taxonomy/ncm/ncm-catalog.importer.js';
@@ -530,6 +531,25 @@ export async function taxonomyAdminRoutes(
     },
   );
 
+  // F2-TAB-03: explicit multiple Atuação memberships per CNAE in v1.8 draft only.
+  typed.patch(
+    '/api/v1/admin/taxonomy/drafts/current/cnaes/:cnaeCode/actuacoes',
+    { preHandler: requirePlatformAdmin, schema: {
+      params:z.object({cnaeCode:z.string().regex(/^\d{7}$/)}),
+      body:z.object({
+        justification:z.string().trim().min(3),
+        actuacaoCodes:z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/))
+          .min(1).max(12),
+      }),
+    }},
+    async (request, reply) => {
+      const result=await withCuratorTransaction(curatorPool(), client=>
+        updateDraftCnaeActuacoes(client,actorFrom(request,request.body.justification),
+          request.params.cnaeCode,request.body.actuacaoCodes));
+      return reply.send(result);
+    },
+  );
+
   // F2-T02: load only the exact cryptographically pinned 1,332 CNAE
   // origins from Segmento 1.7.3 into an open DRAFT; no publication or T03 load.
   typed.post(
@@ -659,6 +679,7 @@ export async function taxonomyAdminRoutes(
                 group: z.string().trim().max(200).nullable().optional(),
                 label: z.string().max(300),
                 officialCodes: z.array(z.string().trim().min(1).max(40)).max(500),
+                actuacaoCodes: z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/)).min(1).max(12).optional(),
                 aliases: z
                   .array(
                     z.object({

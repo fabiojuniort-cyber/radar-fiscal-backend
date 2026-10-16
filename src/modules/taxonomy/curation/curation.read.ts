@@ -115,6 +115,7 @@ export interface ConceptView {
   /** F2 suggestions, not legal classification evidence. */
   f2Source?: {
     atuacao: string;
+    actuacaoCodes: string[];
     suggestedProducts: string;
     suggestedNcms: string;
     sourceSha256: string;

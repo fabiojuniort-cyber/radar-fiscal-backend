@@ -35,6 +35,7 @@ test('F2 source: admin overlay uses exact 7-digit CNAE and remains read-only', a
   assert.equal(reads, 1);
   assert.deepEqual(updated.concepts[0]?.f2Source, {
     atuacao: 'Produção agropecuária',
+    actuacaoCodes: [],
     suggestedProducts: 'Arroz em casca',
     suggestedNcms: '1006.10.92',
     sourceSha256: SEGMENT_SHA, sourceBatchId: 'batch-1',
@@ -106,4 +107,32 @@ test('F2 source: unavailable SQL view only drops suggestions, original release s
   } finally {
     console.warn = originalWarn;
   }
+});
+
+test('F2-TAB-03: v1.8 release uses one-to-many override; published legacy remains unchanged',async()=>{
+ const view=mkView();
+ view.release.version='v1.8.0';
+ const queried:string[]=[];
+ const run:SqlRunner=async<T>(sql:string)=>{
+  queried.push(sql);
+  if(sql.includes('taxonomy_f2_segment_suggestions_readonly'))return [{
+    cnae_code:'0111301',atuacao:'Produtor rural',suggested_products:'Arroz',
+    suggested_ncms:'1006',source_sha256:SEGMENT_SHA,source_batch_id:'batch-1',
+  }] as T[];
+  if(sql.includes('taxonomy_release_actuacao_cnae_origins'))return [
+    {cnae_code:'0111301',code:'actuacao.produtor_rural'},
+  ] as T[];
+  if(sql.includes('taxonomy_release_cnae_actuacoes'))return [
+    {cnae_code:'0111301',code:'actuacao.industria'},
+    {cnae_code:'0111301',code:'actuacao.produtor_rural'},
+  ] as T[];
+  throw Error('unexpected query');
+ };
+ const changed=await attachF2SourceSuggestions(run,view);
+ assert.deepEqual(changed.concepts[0]?.f2Source?.actuacaoCodes,[
+  'actuacao.industria','actuacao.produtor_rural',
+ ]);
+ assert.equal(changed.concepts[0]?.f2Source?.atuacao,'Produtor rural');
+ assert.equal(queried.length,3);
+ assert.equal(view.concepts[0]?.f2Source,undefined);
 });
