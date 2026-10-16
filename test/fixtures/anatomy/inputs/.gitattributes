@@ -1,0 +1,2 @@
+# Frozen source bytes: never normalize line endings on add/checkout.
+* -text -whitespace
