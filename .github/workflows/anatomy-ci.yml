@@ -1,0 +1,50 @@
+name: ANAT-04 disposable CI
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/modules/anatomy/**'
+      - 'test/anatomy.*'
+      - 'test/fixtures/anatomy/**'
+      - 'test/support/anatomy-ci-schema.sql'
+      - 'docs/anatomy/**'
+      - '.github/workflows/anatomy-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: read
+concurrency:
+  group: anatomy-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  anatomy-disposable-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Offline isolation guards and disposable schema integration
+        run: node --import tsx --test test/anatomy.schema.integration.test.ts

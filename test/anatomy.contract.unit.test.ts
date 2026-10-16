@@ -8,7 +8,7 @@ const digest = 'a'.repeat(64);
 const pointer = { resourceId: 'snapshot', representation: 'text' as const, locator: '/text', sourceSpan: null };
 function fixture(text = 'NCM 0101.21.00'): AnatomyResult {
   const identity = { publicationVersionId: 'fixture-v1', representationId: 'fixture-text', inputTextHash: sha256(text),
-    inputPresentationHash: null, attachmentManifestHash: sha256('[]'), engineVersion: 'fixture-engine/1',
+    inputPresentationHash: null, attachmentManifestHash: sha256('[]'), engineVersion: 'fixture-engine/1', engineHash: sha256('controlled-engine-build'),
     ruleSetId: 'fixture-rules', ruleSetVersion: '1', ruleSetHash: digest, contractVersion: ANATOMY_CONTRACT_VERSION };
   const root = { id: 'root', parentId: null, order: 0, type: 'document' as const, label: '',
     span: { start: 0, end: text.length }, sourcePointers: [pointer], recognition: 'explicit' as const,
@@ -69,6 +69,13 @@ test('approval of an NCM prefix cannot authorize the entire occurrence', () => {
   result.evidence[0]!.scope = { start: 4, end: 14 };
   assert.equal(anatomyResultSchema.safeParse(resign(result)).success, true);
 });
+test('a separate exception relation constrains a base code even outside its own span', () => {
+  const result = positiveFixture();
+  result.entities.push({ ...result.entities[0]!, id: 'compound', domain: 'NCM_EXCEPTION', literal: 'NCM',
+    normalized: 'except', span: { start: 0, end: 3 }, relation: { kind: 'exception', groupId: 'compound',
+      targetEntityIds: ['ncm'], operator: 'controlled-exception', scopePartId: 'body', condition: null, expansion: [] } });
+  assert.equal(anatomyResultSchema.safeParse(resign(result)).success, false);
+});
 test('coverage is a partition, container spans are not counted twice', () => {
   const result = fixture();
   result.coverage.segments.push({ span: { start: 0, end: 14 }, partId: 'root', classification: 'recognized' });
@@ -83,7 +90,7 @@ test('invalid parent, cycles and sibling overlap are rejected', () => {
   assert.equal(anatomyResultSchema.safeParse(resign(result)).success, false);
 });
 test('input, presentation, attachment and rule identities invalidate snapshot evidence', () => {
-  for (const field of ['inputPresentationHash', 'attachmentManifestHash', 'ruleSetHash'] as const) {
+  for (const field of ['inputPresentationHash', 'attachmentManifestHash', 'ruleSetHash', 'engineHash'] as const) {
     const result = positiveFixture(); result.identity[field] = 'b'.repeat(64);
     result.analysisId = anatomyIdentityHash(result.identity);
     assert.equal(anatomyResultSchema.safeParse(resign(result)).success, false);

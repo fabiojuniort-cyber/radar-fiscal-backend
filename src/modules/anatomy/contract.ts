@@ -20,6 +20,7 @@ export const anatomyIdentitySchema = z.strictObject({
   inputPresentationHash: hash.nullable(),
   attachmentManifestHash: hash,
   engineVersion: id,
+  engineHash: hash,
   ruleSetId: id,
   ruleSetVersion: id,
   ruleSetHash: hash,
@@ -237,6 +238,7 @@ export const anatomyResultSchema = anatomyResultShapeSchema.superRefine((result,
       ancestor = ancestor.parentId === null ? undefined : parts.get(ancestor.parentId);
     }
     if (entity && (entity.domain !== 'NCM' || entity.validation.status !== 'valid' || entity.validation.method !== 'catalog' || entity.normalized.length === 2 || entity.relation !== null)) issue(`Entity cannot be selected independently: ${selection.id}`);
+    if (entity && result.entities.some(occurrence => occurrence.relation?.targetEntityIds.includes(entity.id))) issue(`Entity is constrained by another range or exception: ${selection.id}`);
     if (selection.purpose === 'ncm' && result.entities.some((occurrence) => overlaps(occurrence.span, selection.span)
       && (occurrence.relation !== null || occurrence.domain !== 'NCM'))) issue(`NCM selection overlaps a compound or protected domain: ${selection.id}`);
     // A broad thematic selection cannot smuggle forbidden structural descendants.

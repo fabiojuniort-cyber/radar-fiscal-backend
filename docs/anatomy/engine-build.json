@@ -1,0 +1,13 @@
+{
+  "engineHash": "d7e8d116552a0e87ee6adf61e91ff18eb66029c9680409780533926209a60873",
+  "normalization": "UTF-8 source with LF line endings",
+  "sourceHashes": {
+    "ops/anatomy/build-identity.mjs": "8ce6d54aa82dd3d85a65cd72990f0eef8fec37157adcf1eaf78088e5f7c57fcb",
+    "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
+    "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
+    "src/modules/anatomy/contract.ts": "e294eb6fb50c2fc2b624c13bc68f281f3271a88f4a00d98f1a7a923928893c2a",
+    "src/modules/anatomy/engine.ts": "8720e3c1f51053c070d6cb3d446271fdd90f03d18895b103ae69dac9b1de6481",
+    "src/modules/anatomy/entities.ts": "07159255102c75905d8b8164a48b65ea5be920df5cd1f9ec850b128f4cdbb5c0",
+    "src/modules/anatomy/readers.ts": "c1d07e509409f6d90dd5fcd44c88aff5aedcaa11db58f76e1e4400df50b4f11a"
+  }
+}
