@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import test from 'node:test';
 import {Pool} from 'pg';
-import {F2_TAB_DRAFT_ID,retireDraftMemberships} from '../src/infrastructure/database/taxonomy-f2-tab-retire-draft.js';
+import {retireDraftMemberships} from '../src/infrastructure/database/taxonomy-f2-tab-retire-draft.js';
 import {loadReleaseView,pgRunner} from '../src/modules/taxonomy/curation/curation.read.js';
+
+const F2_TAB_DRAFT_ID='05b8027b-aaf0-41ab-8d88-7a7e07a7052a';
 
 test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent and preserve published release + tag rows',async()=>{
  if(!process.env.DATABASE_ADMIN_URL)throw Error('isolated DATABASE_ADMIN_URL required');
@@ -23,8 +25,8 @@ test('F2-TAB-01 isolated PostgreSQL18: 5 retirements are reversible, idempotent 
      $1,$2,'f2-tab-test') RETURNING id`,['a'.repeat(40),'b'.repeat(64)]);
   const publishedId=published.rows[0]!.id;
   await db.query(`INSERT INTO taxonomy_releases(id,version_major,version_minor,version_patch,
-   status,previous_release_id,created_by_actor)
-   VALUES($1::uuid,1,7,0,'DRAFT',$2::uuid,'f2-tab-test')`,[F2_TAB_DRAFT_ID,publishedId]);
+   status,previous_release_id,created_by_actor,manifest)
+   VALUES($1::uuid,1,8,0,'DRAFT',$2::uuid,'f2-tab-test','{"kind":"TAX-11_CURATED_RELEASE"}'::jsonb)`,[F2_TAB_DRAFT_ID,publishedId]);
   let taggedReleaseConceptId='';
   for(const code of ['treatment','act_type','platform','tax_species','sphere']){
    const dim=await db.query<{id:string}>(`
