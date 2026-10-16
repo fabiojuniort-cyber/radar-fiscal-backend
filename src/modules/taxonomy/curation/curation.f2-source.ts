@@ -81,7 +81,9 @@ export async function attachF2SourceSuggestions(
   }
   // Curated release memberships override the immutable one-to-one XLSX origin.
   // No stored override means the original one-code association still applies.
-  const originRows=await run<{cnae_code:string;code:string}>(`
+  const [major,minor]=/^v(\d+)\.(\d+)\./.exec(view.release.version)?.slice(1).map(Number)??[0,0];
+  const supportsMulti=major>1||(major===1&&minor>=8);
+  const originRows=supportsMulti ? await run<{cnae_code:string;code:string}>(`
     SELECT o.cnae_code,c.code
     FROM taxonomy_release_actuacao_cnae_origins o
     JOIN taxonomy_release_concepts rc ON rc.id=o.release_concept_id
@@ -89,8 +91,8 @@ export async function attachF2SourceSuggestions(
     JOIN taxonomy_concepts c ON c.id=rc.concept_id
     WHERE o.release_id=$1::uuid AND o.cnae_code=ANY($2::text[])
     ORDER BY o.cnae_code,c.code
-  `,[view.release.id,cnaes]);
-  const overrides=await run<{cnae_code:string;code:string}>(`
+  `,[view.release.id,cnaes]) : [];
+  const overrides=supportsMulti ? await run<{cnae_code:string;code:string}>(`
     SELECT a.cnae_code,c.code
     FROM taxonomy_release_cnae_actuacoes a
     JOIN taxonomy_release_concepts rc ON rc.id=a.release_actuacao_concept_id
@@ -98,7 +100,7 @@ export async function attachF2SourceSuggestions(
     JOIN taxonomy_concepts c ON c.id=rc.concept_id
     WHERE a.release_id=$1::uuid AND a.cnae_code=ANY($2::text[])
     ORDER BY a.cnae_code,c.code
-  `,[view.release.id,cnaes]);
+  `,[view.release.id,cnaes]) : [];
   const atuacaoByCnae=new Map<string,string[]>();
   for(const row of originRows) atuacaoByCnae.set(row.cnae_code,[row.code]);
   const seenOverrides=new Set<string>();
