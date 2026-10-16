@@ -43,51 +43,56 @@ export async function attachF2SourceSuggestions(
   const cnaes = [...new Set(eligible.map((concept) => concept.officialCodes[0]!))];
   if (cnaes.length === 0) return view;
 
-  // This is a non-essential admin overlay. A bad or unavailable source must
-  // never prevent the curator's release view from loading.
+  // Staging is an immutable read-only fallback. Curated release values
+  // override it, including [] (an explicit removal), and survive publication.
+  const byCnae=new Map<string,F2SourceSuggestion>();
   try {
-    const rows = await run<F2SourceRow>(
-    `SELECT cnae_code, atuacao, suggested_products, suggested_ncms,
-            source_sha256, source_batch_id
-       FROM taxonomy_f2_segment_suggestions_readonly
-      WHERE cnae_code = ANY($1::text[])
-      ORDER BY cnae_code`,
-    [cnaes],
-  );
-  const byCnae = new Map<string, F2SourceSuggestion>();
-  for (const row of rows) {
-    if (!cnaes.includes(row.cnae_code) || !/^\d{7}$/.test(row.cnae_code)) {
-      throw new Error('F2_SOURCE_UNEXPECTED_CNAE');
+    const rows=await run<F2SourceRow>(`SELECT cnae_code,atuacao,suggested_products,suggested_ncms,
+             source_sha256,source_batch_id
+      FROM taxonomy_f2_segment_suggestions_readonly
+      WHERE cnae_code=ANY($1::text[])
+      ORDER BY cnae_code
+    `,[cnaes]);
+    for(const row of rows){
+      if(!cnaes.includes(row.cnae_code)||!/^\d{7}$/.test(row.cnae_code))
+        throw new Error('F2_SOURCE_UNEXPECTED_CNAE');
+      if(byCnae.has(row.cnae_code))throw new Error('F2_SOURCE_DUPLICATE_CNAE');
+      if(row.source_sha256!==F2_SOURCE_SEGMENT_SHA256){
+        byCnae.clear();
+        console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED=F2_SOURCE_HASH_MISMATCH');
+        break;
+      }
+      byCnae.set(row.cnae_code,{
+        atuacao:row.atuacao,
+        suggestedProducts:row.suggested_products??'',
+        suggestedNcms:row.suggested_ncms??'',
+        sourceSha256:row.source_sha256,
+        sourceBatchId:row.source_batch_id,
+      });
     }
-    if (byCnae.has(row.cnae_code)) throw new Error('F2_SOURCE_DUPLICATE_CNAE');
-    // Fail closed only for suggestions: never attach unapproved source data.
-    if (row.source_sha256 !== F2_SOURCE_SEGMENT_SHA256) {
-      console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED=F2_SOURCE_HASH_MISMATCH');
-      return view;
-    }
-    byCnae.set(row.cnae_code, {
-      atuacao: row.atuacao,
-      suggestedProducts: row.suggested_products ?? '',
-      suggestedNcms: row.suggested_ncms ?? '',
-      sourceSha256: row.source_sha256,
-      sourceBatchId: row.source_batch_id,
-    });
+  }catch(error){
+    byCnae.clear();
+    const reason=error instanceof Error&&/^F2_SOURCE_[A-Z_]+$/.test(error.message)
+      ?error.message:'F2_SOURCE_OVERLAY_UNAVAILABLE';
+    console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED='+reason);
   }
-  if (byCnae.size === 0) return view;
-
+  const eligibleSet=new Set(eligible);
+  if(byCnae.size===0&&!eligible.some(c=>c.f2DraftSuggestions?.products!=null||c.f2DraftSuggestions?.ncms!=null))return view;
   return {
     ...view,
-    concepts: view.concepts.map((concept) => {
-      if (!eligible.includes(concept)) return concept;
-      const f2Source = byCnae.get(concept.officialCodes[0]!);
-      return f2Source ? { ...concept, f2Source } : concept;
+    concepts:view.concepts.map(concept=>{
+      if(!eligibleSet.has(concept))return concept;
+      const source=byCnae.get(concept.officialCodes[0]!);
+      const override=concept.f2DraftSuggestions;
+      if(!source&&override?.products==null&&override?.ncms==null)return concept;
+      const data:F2SourceSuggestion={
+        atuacao:source?.atuacao??'',
+        suggestedProducts:override?.products!=null?override.products.join(', '):source?.suggestedProducts??'',
+        suggestedNcms:override?.ncms!=null?override.ncms.join(', '):source?.suggestedNcms??'',
+        sourceSha256:source?.sourceSha256??'',
+        sourceBatchId:source?.sourceBatchId??'',
+      };
+      return {...concept,f2Source:data};
     }),
   };
-  } catch (error) {
-    const reason = error instanceof Error &&
-      /^F2_SOURCE_[A-Z_]+$/.test(error.message)
-      ? error.message : 'F2_SOURCE_OVERLAY_UNAVAILABLE';
-    console.warn('F2_SOURCE_SUGGESTIONS_SKIPPED=' + reason);
-    return view;
-  }
 }

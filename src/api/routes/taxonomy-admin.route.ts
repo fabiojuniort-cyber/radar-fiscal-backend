@@ -371,6 +371,7 @@ async function downloadNcm(): Promise<{
 }
 
 import { attachF2SourceSuggestions } from '../../modules/taxonomy/curation/curation.f2-source.js';
+import {updateF2DraftSuggestions} from '../../modules/taxonomy/curation/curation.f2-suggestions.js';
 
 export async function taxonomyAdminRoutes(
   app: FastifyInstance,
@@ -499,6 +500,25 @@ export async function taxonomyAdminRoutes(
   // F2-T02: initialize seven curated Atuação labels in the open DRAFT only.
   // Uses the existing platform-admin auth, dedicated curator role and lock.
   // Does not publish, classify, alter sector aliases or write tenant profiles.
+  typed.patch(
+    '/api/v1/admin/taxonomy/drafts/current/f2-suggestions/:code',
+    {preHandler:requirePlatformAdmin,schema:{
+      params:z.object({code:z.string().min(1).max(250)}),
+      body:z.object({
+        justification:z.string().trim().min(3),
+        suggestedProducts:z.array(z.string().max(150)).max(100),
+        suggestedNcms:z.array(z.string().max(30)).max(100),
+      }),
+    }},
+    async(request,reply)=>{
+      const {justification,...values}=request.body;
+      const updated=await withCuratorTransaction(curatorPool(),client=>
+        updateF2DraftSuggestions(client,actorFrom(request,justification),
+          request.params.code,values));
+      return reply.send({...updated,published:false,stagingModified:false});
+    },
+  );
+
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/actuacao/initialize',
     { preHandler: requirePlatformAdmin, schema: { body: justificationBody } },
