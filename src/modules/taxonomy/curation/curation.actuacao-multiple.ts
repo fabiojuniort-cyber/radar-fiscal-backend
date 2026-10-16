@@ -1,6 +1,15 @@
 import type { PoolClient } from 'pg';
 import { CurationError, requireOpenDraft, type CuratorActor } from './curation.draft.js';
 
+export function validateF2Tab03Actuacoes(actuacaoCodes:readonly string[]):string[]{
+  const codes=[...new Set(actuacaoCodes)];
+  if(codes.length===0)throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',400);
+  if(codes.length!==actuacaoCodes.length||codes.length>12||
+     codes.some(code=>!/^actuacao\.[a-z0-9_]+$/.test(code)))
+    throw new CurationError('F2_TAB03_ACTUACOES_INVALID',400);
+  return codes;
+}
+
 /** Explicit release membership override, never rewrite the immutable XLSX source. */
 export async function updateDraftCnaeActuacoes(
   client: PoolClient,
@@ -12,11 +21,7 @@ export async function updateDraftCnaeActuacoes(
   const draft = await requireOpenDraft(client);
   if (draft.version !== 'v1.8.0') throw new CurationError('F2_TAB03_DRAFT_VERSION_MISMATCH',409);
   if (!/^\d{7}$/.test(cnaeCode)) throw new CurationError('F2_TAB03_CNAE_INVALID');
-  const codes=[...new Set(actuacaoCodes)];
-  if (codes.length === 0) throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',400);
-  if (codes.length !== actuacaoCodes.length || codes.length>12 ||
-      codes.some(code=>!/^actuacao\.[a-z0-9_]+$/.test(code)))
-    throw new CurationError('F2_TAB03_ACTUACOES_INVALID');
+  const codes=validateF2Tab03Actuacoes(actuacaoCodes);
 
   const linkedCnae=await client.query<{count:number}>(`
     SELECT count(*)::int AS count
