@@ -112,6 +112,8 @@ export interface ConceptView {
   aliases: AliasView[];
   /** Release-scoped overrides: NULL means inherit F2 source suggestions; [] means cleared. */
   f2DraftSuggestions?: {products:string[]|null;ncms:string[]|null};
+  /** Release-scoped, editable multi-valued Atuação memberships for one CNAE. */
+  actuacaoCodes?: string[];
   /** F2 suggestions, not legal classification evidence. */
   f2Source?: {
     atuacao: string;
@@ -446,6 +448,20 @@ export async function loadReleaseView(
     segmentCodes: row.segment_codes ?? [],
   }));
 
+  const actuacaoRows=await run<{cnae_code:string;code:string}>(`
+    SELECT x.cnae_code,c.code
+    FROM taxonomy_release_cnae_actuacao x
+    JOIN taxonomy_release_concepts rc ON rc.id=x.release_concept_id
+    JOIN taxonomy_concepts c ON c.id=rc.concept_id
+    WHERE x.release_id=$1::uuid
+    ORDER BY x.cnae_code,c.code`,[releaseId]);
+  const actuacaoByCnae=new Map<string,string[]>();
+  for(const item of actuacaoRows){
+    const values=actuacaoByCnae.get(item.cnae_code)??[];
+    values.push(item.code);
+    actuacaoByCnae.set(item.cnae_code,values);
+  }
+
   const concepts: ConceptView[] = conceptRows.map((row) => ({
     releaseConceptId: row.release_concept_id,
     conceptId: row.concept_id,
@@ -469,6 +485,8 @@ export async function loadReleaseView(
     classifyByLabel: row.classify_by_label ?? true,
     officialCodes: row.official_codes ?? [],
     f2DraftSuggestions:{products:row.f2_suggested_products,ncms:row.f2_suggested_ncms},
+    ...(row.dimension_code==='sector'&&row.official_codes?.length===1&&/^\\d{7}$/.test(row.official_codes[0]??'')
+      ? {actuacaoCodes:actuacaoByCnae.get(row.official_codes[0]!)??[]} : {}),
     aliases: row.aliases ?? [],
   }));
 
