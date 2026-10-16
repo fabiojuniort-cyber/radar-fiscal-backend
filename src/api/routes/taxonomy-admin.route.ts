@@ -506,7 +506,7 @@ export async function taxonomyAdminRoutes(
       params:z.object({code:z.string().startsWith('sector.').min(8).max(250)}),
       body:z.object({
         justification:z.string().trim().min(3),
-        atuacaoCodes:z.array(z.string().regex(/^actuacao\\.[a-z0-9_]+$/)).min(1).max(12),
+        atuacaoCodes:z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/)).min(1).max(12),
       }).strict(),
     }},
     async(request,reply)=>{
