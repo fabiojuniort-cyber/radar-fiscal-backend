@@ -79,6 +79,14 @@ WHERE rolname IN
   'radar_db_owner','postgres')
 ORDER BY rolname;
 
+-- Candidate non-FK references: only schema identifiers are exposed.
+SELECT table_schema,table_name,column_name,data_type
+FROM information_schema.columns
+WHERE table_schema='public'
+  AND (column_name ~* '(company|establishment|tenant|cnpj|account)'
+       OR udt_name IN ('jsonb','json'))
+ORDER BY table_name,column_name;
+
 -- Trigger definitions & privileged deletion entry point fingerprint.
 SELECT t.tgrelid::regclass::text AS table_name,t.tgname,t.tgenabled,
        t.tgfoid::regprocedure::text AS trigger_function
