@@ -277,7 +277,10 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
   } finally {
     await app.close();
     if (users.length) await admin.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);
-    if (tenants.length) await admin.query('DELETE FROM tenants WHERE id = ANY($1::uuid[])', [tenants]);
+    if (tenants.length) {
+      await admin.query("DELETE FROM audit_log WHERE action = 'COMPANY_PURGED' AND tenant_id = ANY($1::uuid[])", [tenants]);
+      await admin.query('DELETE FROM tenants WHERE id = ANY($1::uuid[])', [tenants]);
+    }
     await admin.end();
   }
 });
