@@ -4,9 +4,10 @@ import { sql, type Kysely, type Transaction } from 'kysely';
 import { validateActiveCollectionFilter } from './collection-filter.direct-admin.js';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
+import {rememberDirectPreview,findDirectPreview,forgetDirectPreview} from './collection-filter.preview-witness.js';
 import {
   compileCollectionFilterPolicy, evaluateCollectionFilter,
-  normalizeCollectionFilterType, type CollectionFilterMode,
+  normalizeCollectionFilterType, normalizeCollectionFilterSection, type CollectionFilterMode,
   type CollectionFilterPolicyInput, type CompiledCollectionFilterPolicy,
 } from './collection-filter.engine.js';
 
@@ -103,6 +104,51 @@ export function resolveDirectActNameRule(input:DirectRuleInput,saved:ReadonlyArr
   return {...rule,canonicalType};
 }
 
+/**
+ * Necessary-condition precheck only: uses the SAME compiled pattern buckets as
+ * evaluateCollectionFilter. A rule (or its alias) cannot win for a title that
+ * does not match one of these patterns. Never prefilter SQL evidence by
+ * official type, section or title; DOxE inheritance and aliases are preserved.
+ */
+export function couldMatchDirectRule(
+  policy:CompiledCollectionFilterPolicy,rule:DirectRuleInput,
+  title:string,rawSection:string,
+):boolean {
+  const name=normalizeCollectionFilterType(collectionFilterActName(title));
+  if(!name)return false;
+  const first=name.split(' ')[0]??'';
+  const canonical=normalizeCollectionFilterType(rule.canonicalType);
+  const targetSection=normalizeCollectionFilterSection(rule.section)===rule.section
+    ? normalizeCollectionFilterType(rule.section)
+    : normalizeCollectionFilterType(rule.section);
+  const sections=new Set([normalizeCollectionFilterType(rawSection),
+    normalizeCollectionFilterSection(rawSection),'']);
+  for(const section of sections){
+    for(const pattern of policy.patterns.get([rule.sourceCode,section,first].join(String.fromCharCode(0)))??[]){
+      if(pattern.rule.canonicalType===canonical&&
+         pattern.rule.section===targetSection&&pattern.rule.mode===rule.mode&&
+         (name===pattern.pattern||name.startsWith(pattern.pattern+' '))) return true;
+    }
+  }
+  return false;
+}
+
+/** Read-only freshness hint, not a deletion authorization. An archive change
+ * forces the legacy full scan on save. The save operation never deletes data. */
+async function directArchiveStamp(trx:Transaction<DB>,sourceCode:string):Promise<string> {
+  const r=await sql<{stamp:string}>`
+    SELECT jsonb_build_array(
+      public.publication_scope_epoch(),
+      (SELECT jsonb_build_array(cr.id,cr.updated_at)
+       FROM public.collection_runs cr
+       JOIN public.sources s ON s.id=cr.source_id
+       WHERE s.code=${sourceCode}
+       ORDER BY cr.updated_at DESC,cr.id DESC LIMIT 1)
+    )::text AS stamp
+  `.execute(trx);
+  return r.rows[0]?.stamp??'';
+}
+
 export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   let rule = validated(input);
   const policies = await sql<{
@@ -159,13 +205,14 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   let cursor:string|null=null;
   let pages=0;
   const hash=createHash('sha256').update(JSON.stringify(['F3-NOME-02',rule,approved.id,approved.revision]));
-  while (true) {
+  if(rule.mode!=='KEEP_ALWAYS')while (true) {
     if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
     const page=await sql<HistoricalCollectionCandidate>`
       SELECT * FROM collection_filter_f3_candidates(${cursor}::uuid,500,${rule.sourceCode})
     `.execute(trx);
     if (!page.rows.length) break;
     for (const item of page.rows) {
+      if(!couldMatchDirectRule(engine,rule,item.title,item.section))continue;
       const decision=evaluateHistoricalCollectionCandidate(engine,item);
       if (decision.decision!=='DISCARD' || !decision.canonicalType ||
           normalizeCollectionFilterType(decision.matchedRuleName??'')!==
@@ -198,8 +245,17 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
+    const before=await directArchiveStamp(trx,input.sourceCode.trim().toLowerCase());
+    const plan=await candidates(trx,input);
+    const after=await directArchiveStamp(trx,plan.rule.sourceCode);
+    // If the inventory changed while scanning, do not issue a fast-save proof.
+    if(before===after)rememberDirectPreview(db,{
+      userId,requested:input,rule:plan.rule,count:plan.count,token:plan.token,
+      confirmationToken:plan.confirmationToken,policyRevision:plan.policyRevision,
+      archiveStamp:after,issuedAt:Date.now(),
+    });
     const {actName,count,blockedCompany,blockedOtherSource,samples,token,
-      policyRevision,confirmationToken}=await candidates(trx,input);
+      policyRevision,confirmationToken}=plan;
     return {actName,count,blockedCompany,blockedOtherSource,samples,token,
       policyRevision,confirmationToken};
   });
@@ -328,18 +384,35 @@ export async function saveDirectFilterRule(
     await sql`SET LOCAL statement_timeout = '11000ms'`.execute(trx);
     await sql`SET LOCAL lock_timeout = '2500ms'`.execute(trx);
     await sql`SELECT pg_advisory_xact_lock(hashtextextended('collection-filter-direct-rule',0))`.execute(trx);
-    const plan=await candidates(trx,input);
-    const rule=plan.rule;
-    if(plan.policyRevision!==policyRevision ||
-       plan.confirmationToken!==confirmationToken ||
-       plan.count!==expectedCount || plan.token!==previewToken)
-      throw new RangeError('f3_preview_expired_or_policy_revision_changed');
+    // Fast path: only an exact, recent, same-admin server-side preview.
+    // On a different worker/restart/expired token/archive stamp change,
+    // retain the old full recomputation. /confirm NEVER uses this shortcut.
+    const witness=findDirectPreview(db,userId,input,expectedCount,
+      previewToken,policyRevision,confirmationToken);
+    let rule:DirectRuleInput;
+    if(witness&&await directArchiveStamp(trx,witness.rule.sourceCode)===witness.archiveStamp){
+      const current=await sql<{revision:number}>`
+        SELECT revision FROM public.collection_filter_policies
+        WHERE status='APPROVED' FOR SHARE
+      `.execute(trx);
+      if(Number(current.rows[0]?.revision)!==policyRevision)
+        throw new RangeError('f3_preview_expired_or_policy_revision_changed');
+      rule=witness.rule;
+    } else {
+      const plan=await candidates(trx,input);
+      if(plan.policyRevision!==policyRevision ||
+         plan.confirmationToken!==confirmationToken ||
+         plan.count!==expectedCount || plan.token!==previewToken)
+        throw new RangeError('f3_preview_expired_or_policy_revision_changed');
+      rule=plan.rule;
+    }
     const result=await sql<{policy_revision:number}>`
       SELECT * FROM collection_filter_direct_set_rule(
         ${rule.sourceCode},${rule.section},${rule.canonicalType},
         ${rule.mode},${rule.newTypeId??null}::uuid)
     `.execute(trx);
     await validateActiveCollectionFilter(trx);
+    if(witness)forgetDirectPreview(db,witness);
     return {revision:Number(result.rows[0]?.policy_revision),
       deletedCount:0 as const,historicalPurgeRequired:true as const};
   });
