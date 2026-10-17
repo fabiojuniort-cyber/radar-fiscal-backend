@@ -238,7 +238,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput,
   if(rule.mode!=='KEEP_ALWAYS')while(true){
     if(++pages>1000)throw new Error('direct_filter_archive_limit_exceeded');
     if(sparse){
-      const headers=firstHeaders??(await sql<Header>`
+      const headers:Header[]=firstHeaders??(await sql<Header>`
         SELECT * FROM collection_filter_f3_headers(${cursor}::uuid,500,${rule.sourceCode})
       `.execute(trx)).rows;
       firstHeaders=undefined;
