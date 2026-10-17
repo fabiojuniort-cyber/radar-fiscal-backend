@@ -201,6 +201,53 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     await disallowed(refsA.cp, refsB.mp);
     await disallowed(refsB.cp, refsA.mp);
 
+    // A concurrent writer already inserting the reverse link holds FK KEY
+    // SHARE locks. The purge must wait on the profile/publication FOR UPDATE
+    // locks, then observe the committed mismatch and refuse the deletion.
+    const writer = await admin.connect();
+    let insertedWhileOpen: string | undefined;
+    try {
+      await writer.query('BEGIN');
+      const insert = await writer.query<{ id: string }>(`
+        INSERT INTO publication_matches(company_publication_id,monitoring_profile_id,
+          profile_version,rule_engine_version)
+        VALUES($1,$2,1,'ONB02-CONCURRENT') RETURNING id
+      `,[refsA.cp,refsB.mp]);
+      insertedWhileOpen = insert.rows[0]!.id;
+      let done = false;
+      const pendingDelete = app.inject({
+        method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
+      }).then((response) => { done=true; return response; });
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      assert.equal(done,false,'deletion must wait for in-flight matching FK writer');
+      await writer.query('COMMIT');
+      const refused = await pendingDelete;
+      assert.notEqual(refused.statusCode,204);
+      assert.equal(await count('companies','id',target.company.id),1);
+    } finally {
+      // A real failed write remains atomic; remove test-only mismatched link.
+      await writer.query('ROLLBACK').catch(() => undefined);
+      writer.release();
+      if (insertedWhileOpen) await admin.query(
+        'DELETE FROM publication_matches WHERE id=$1',[insertedWhileOpen]);
+    }
+
+    // Only a tenant admin may invoke the narrow definer function.
+    const unauth = await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+target.company.id,
+    });
+    assert.equal(unauth.statusCode,401);
+    const permissions = (await admin.query<{
+      worker_execute:boolean; app_delete:boolean;
+    }>(`
+      SELECT has_function_privilege('radar_worker_runtime',
+             'public.app_purge_company(uuid)','EXECUTE') AS worker_execute,
+             has_table_privilege('radar_app_runtime','public.companies','DELETE')
+             AS app_delete
+    `)).rows[0]!;
+    assert.equal(permissions.worker_execute,false);
+    assert.equal(permissions.app_delete,false);
+
     // B2: an unlinked legacy name is ambiguous and must fail closed.
     await admin.query('UPDATE tenant_onboarding_profiles SET cnpj=NULL,company_name=$2 WHERE tenant_id=$1',
       [a.tenantId,'Empresa Legada Excluir']);
@@ -234,6 +281,41 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       method:'DELETE',url:'/api/v1/companies/'+remote.company.id,headers:a.headers,
     });
     assert.equal(crossTenant.statusCode,404,crossTenant.body);
+    // Inject a failure AFTER the DELETE statements (during audit insertion)
+    // to verify transaction rollback, not only initial validation failure.
+    await admin.query(`
+      CREATE OR REPLACE FUNCTION public.onb02_ci_force_audit_failure()
+      RETURNS trigger LANGUAGE plpgsql AS $
+      BEGIN
+        IF NEW.action='COMPANY_PURGED' THEN
+          RAISE EXCEPTION 'onb02_ci_forced_rollback';
+        END IF;
+        RETURN NEW;
+      END $;
+      CREATE TRIGGER onb02_ci_force_audit_failure_trigger
+      BEFORE INSERT ON public.audit_log
+      FOR EACH ROW EXECUTE FUNCTION public.onb02_ci_force_audit_failure();
+    `);
+    try {
+      const failedInAudit = await app.inject({
+        method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
+      });
+      assert.notEqual(failedInAudit.statusCode,204);
+      assert.equal(await count('companies','id',target.company.id),1);
+      for (const [table,column,id] of populated) assert.ok(
+        await count(table,column,id)>0,'rollback must restore '+table);
+      const stillLegacy = (await admin.query(`
+        SELECT p.cnpj,p.company_name,t.name FROM tenant_onboarding_profiles p
+          JOIN tenants t ON t.id=p.tenant_id WHERE p.tenant_id=$1
+      `,[a.tenantId])).rows[0];
+      assert.equal(stillLegacy.cnpj,cnpjA);
+      assert.equal(stillLegacy.company_name,'Empresa Legada Excluir');
+      assert.equal(stillLegacy.name,'Empresa Legada Excluir');
+    } finally {
+      await admin.query('DROP TRIGGER IF EXISTS onb02_ci_force_audit_failure_trigger ON public.audit_log');
+      await admin.query('DROP FUNCTION IF EXISTS public.onb02_ci_force_audit_failure()');
+    }
+
     const deleted = await app.inject({
       method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
     });
