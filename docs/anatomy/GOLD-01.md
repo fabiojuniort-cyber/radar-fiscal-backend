@@ -60,13 +60,15 @@ Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de des
 
 **Limites declarados pelo revisor:** o hash do 01 não foi recalculado (JSON grande demais para o conector); a suíte não foi reexecutada; a conferência de todos os spans não foi concluída. Nenhum hash foi aprovado.
 
-| Achado | Correção |
-|---|---|
-| Aprovação aceitava estados inconsistentes: anotador como revisor, revisor nulo, `prepared` com aprovação, `reviewed` sem data | `validateAnatomyGold` passou a exigir que `approved` ⇔ `reviewed`, com anotador e revisor identificados e distintos, data e hash igual ao do conteúdo. Todas as combinações têm teste |
-| 02: `3507.90.4` como NCM, embora a fonte o identifique como NBM/SH | Domínio corrigido para **NBM** na especificação, sem conversão |
-| Cobertura incompleta: listas de citações e códigos não enumerados | Cada número de lista virou citação (01: +45, 02: +28); posições de 4 dígitos enumeradas com o domínio da qualificação; domínio pelo cabeçalho da coluna; 9 exceções M02; escopo definido acima, antes da medição |
+| Achado (verificado pelo revisor) | Correção relatada pelo executor | Verificação do revisor |
+|---|---|---|
+| Aprovação aceitava estados inconsistentes: anotador como revisor, revisor nulo, `prepared` com aprovação, `reviewed` sem data | `validateAnatomyGold` passou a exigir que `approved` ⇔ `reviewed`, com anotador e revisor identificados e distintos, data e hash igual ao do conteúdo. Todas as combinações têm teste | pendente (rodada 2) |
+| 02: `3507.90.4` como NCM, embora a fonte o identifique como NBM/SH | Domínio corrigido para **NBM** na especificação, sem conversão | pendente (rodada 2) |
+| Cobertura incompleta: listas de citações e códigos não enumerados | Cada número de lista virou citação (01: +45, 02: +28); posições de 4 dígitos enumeradas com o domínio da qualificação; domínio pelo cabeçalho da coluna; 9 exceções M02; escopo definido acima, antes da medição | pendente (rodada 2) |
 
-**Mudaram de hash:** 01 e 02. Os demais continuam iguais aos conferidos.
+> As correções acima foram **relatadas pelo executor** e ainda não foram verificadas pelo revisor.
+
+**Mudaram de hash:** 01 e 02. Os demais continuam iguais aos conferidos na rodada 1, que não aprovou nenhuma entrada.
 
 ## Pontos para a revisão
 
@@ -93,11 +95,11 @@ Estes são os itens em que a decisão do anotador é mais discutível.
 |---|---|---|
 | 01 | `0909f12d82efaf67846f1906846a656b5772e6fadeeefe955523f0c264c96339` | novo (rodada 1: `3ad3fabb…69c0e`) |
 | 02 | `256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a` | novo (rodada 1: `3b92ef2c…64ced`) |
-| 03 | `a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b` | inalterado; hash conferido na rodada 1, sem aprovação |
-| 05 | `44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7` | inalterado; hash conferido na rodada 1, sem aprovação |
-| 07 | `59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d` | inalterado; hash conferido na rodada 1, sem aprovação |
-| 10 | `c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083` | inalterado; hash conferido na rodada 1, sem aprovação |
-| 11 | `678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79` | inalterado; hash conferido na rodada 1, sem aprovação |
+| 03 | `a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
+| 05 | `44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
+| 07 | `59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
+| 10 | `c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
+| 11 | `678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
 
 ## Não executado
 
