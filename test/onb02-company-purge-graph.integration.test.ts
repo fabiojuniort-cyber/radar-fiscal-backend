@@ -315,6 +315,80 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
         'DELETE FROM publication_matches WHERE id=$1',[insertedWhileOpen]);
     }
 
+    // Writer started AFTER parent locks: an independent session holds a
+    // publication_matches row, forcing the purge to wait during its DELETE.
+    // Reaching that wait means its company/mp/cp FOR UPDATE locks were taken.
+    const raceRoot = randomUUID().replace(/\D/g, '').padEnd(8,'6').slice(0,8);
+    const race = await createCompany(b,validCnpj(raceRoot),'Empresa Concorrencia Isolada');
+    const raceRefs = await seed(race.company.id,'Monitoramento concorrente');
+    const controller = await admin.connect();
+    const postLockWriter = await admin.connect();
+    let pendingRaceDelete: Promise<Awaited<ReturnType<typeof app.inject>>> | undefined;
+    let pendingRaceInsert: Promise<{ok:boolean;code?:string}> | undefined;
+    try {
+      await controller.query('BEGIN');
+      await controller.query('SELECT id FROM publication_matches WHERE id=$1 FOR UPDATE',
+        [raceRefs.pm]);
+      const controllerPid = (await controller.query<{pid:number}>(
+        'SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+      await postLockWriter.query('BEGIN');
+      await postLockWriter.query("SET LOCAL statement_timeout='15000ms'");
+      const writerPid = (await postLockWriter.query<{pid:number}>(
+        'SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+      pendingRaceDelete = Promise.resolve(app.inject({
+        method:'DELETE',url:'/api/v1/companies/'+race.company.id,headers:b.headers,
+      }));
+      const poll = async (probe: () => Promise<boolean>, error: string) => {
+        for (let attempt=0;attempt<160;attempt++) {
+          if (await probe()) return;
+          await new Promise(resolve=>setTimeout(resolve,50));
+        }
+        assert.fail(error);
+      };
+      let purgePid = 0;
+      await poll(async () => {
+        const blocked = await admin.query<{pid:number}>(
+          "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid)) AND query ILIKE '%app_purge_company%'",
+          [controllerPid],
+        );
+        purgePid=Number(blocked.rows[0]?.pid??0);
+        return purgePid>0;
+      },'purge must reach publication_matches deletion AFTER acquiring parent locks');
+      assert.equal(await count('companies','id',race.company.id),1);
+      // Write begins only once the purge is positively observed waiting at
+      // DELETE, while its FK parent locks are still held.
+      pendingRaceInsert = postLockWriter.query(
+        'INSERT INTO publication_matches(company_publication_id,monitoring_profile_id,profile_version,rule_engine_version) VALUES($1,$2,1,$3)',
+        [raceRefs.cp,refsA.mp,'ONB02-POST-LOCK-WRITER'],
+      ).then(()=>({ok:true})).catch((error:{code?:string})=>({
+        ok:false,code:error.code,
+      }));
+      await poll(async () => {
+        const row=(await admin.query<{blocked:boolean}>(
+          'SELECT $1::int=ANY(pg_blocking_pids($2::int)) AS blocked',
+          [purgePid,writerPid],
+        )).rows[0];
+        return row?.blocked===true;
+      },'post-lock writer must wait on the purge database backend');
+      await controller.query('COMMIT');
+      const [purgeReply,insertOutcome]=await Promise.all([
+        pendingRaceDelete,pendingRaceInsert,
+      ]);
+      assert.equal(purgeReply.statusCode,204,purgeReply.body);
+      assert.equal(insertOutcome.ok,false,'post-lock writer cannot commit cross-company match');
+      assert.equal(insertOutcome.code,'23503',
+        'FK must reject a match whose company was deleted during the wait');
+      assert.equal(await count('companies','id',race.company.id),0);
+      assert.deepEqual(await snapshotOtherGraph(),otherGraphBefore);
+    } finally {
+      await controller.query('ROLLBACK').catch(()=>undefined);
+      if (pendingRaceDelete) await pendingRaceDelete.catch(()=>undefined);
+      if (pendingRaceInsert) await pendingRaceInsert.catch(()=>undefined);
+      await postLockWriter.query('ROLLBACK').catch(()=>undefined);
+      controller.release();
+      postLockWriter.release();
+    }
+
     // Only a tenant admin may invoke the narrow definer function.
     const unauth = await app.inject({
       method:'DELETE',url:'/api/v1/companies/'+target.company.id,
