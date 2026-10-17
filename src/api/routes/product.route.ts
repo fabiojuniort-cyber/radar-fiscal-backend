@@ -949,6 +949,15 @@ export async function productRoutes(
 
         return reply.status(204).send();
       } catch (error) {
+        // Inconsistent references or ambiguous legacy ownership are a
+        // recoverable business conflict, never a silent partial deletion.
+        // Do not leak internal identifiers or CNPJ to the client.
+        if (error instanceof Error && (
+          error.message === 'company_purge_cross_company_link' ||
+          error.message === 'company_purge_legacy_identity_ambiguous'
+        )) {
+          return reply.status(409).send({ error: 'company_purge_review_required' });
+        }
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
         throw error;
