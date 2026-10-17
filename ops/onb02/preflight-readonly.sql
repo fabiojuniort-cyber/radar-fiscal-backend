@@ -109,49 +109,71 @@ WHERE p.pronamespace='public'::regnamespace
 -- pg_depend on a view's SELECT points to a pg_rewrite _RETURN rule.
 -- Joining d.objid directly to pg_class.oid is incorrect and can miss views.
 -- Track root dependencies and views-of-views, including materialized views.
-WITH RECURSIVE dependent_views AS (
+-- Roots derive from the complete FK subtree of companies, not a fixed
+-- list of three relations. The same materialization may depend on tax profile
+-- or product tables without referencing companies directly.
+WITH RECURSIVE company_graph AS (
+  SELECT 'public.companies'::regclass::oid AS rel_oid,
+         ARRAY['public.companies'::regclass::oid]::oid[] AS visited,
+         0 AS depth
+  UNION ALL
+  SELECT fk.conrelid, parent.visited||fk.conrelid,parent.depth+1
+  FROM company_graph parent
+  JOIN pg_constraint fk
+    ON fk.contype='f' AND fk.confrelid=parent.rel_oid
+  WHERE NOT fk.conrelid=ANY(parent.visited)
+    AND parent.depth<32
+), owned_roots AS (
+  SELECT DISTINCT rel_oid FROM company_graph
+), dependent_views AS (
   SELECT r.ev_class AS view_oid,
-         d.refobjid AS source_oid,
          d.refobjid AS root_oid,
          ARRAY[d.refobjid,r.ev_class]::oid[] AS visited,
          1 AS depth
-  FROM pg_depend d
-  JOIN pg_rewrite r
-    ON d.classid='pg_rewrite'::regclass AND d.objid=r.oid
-  JOIN pg_class child ON child.oid=r.ev_class
-  WHERE d.refclassid='pg_class'::regclass
-    AND child.relkind IN ('v','m')
-    AND r.rulename='_RETURN'
-    AND r.ev_class<>d.refobjid
-    AND d.refobjid IN (
-      'public.companies'::regclass,
-      'public.monitoring_profiles'::regclass,
-      'public.company_publications'::regclass
-    )
+  FROM owned_roots roots
+  JOIN pg_depend d ON d.refobjid=roots.rel_oid
+    AND d.refclassid='pg_class'::regclass
+    AND d.classid='pg_rewrite'::regclass
+  JOIN pg_rewrite r ON r.oid=d.objid AND r.rulename='_RETURN'
+  JOIN pg_class v ON v.oid=r.ev_class AND v.relkind IN ('v','m')
+  WHERE r.ev_class<>d.refobjid
   UNION ALL
-  SELECT r.ev_class, d.refobjid, parent.root_oid,
-         parent.visited || r.ev_class, parent.depth+1
+  SELECT r.ev_class, parent.root_oid,
+         parent.visited||r.ev_class,parent.depth+1
   FROM dependent_views parent
   JOIN pg_depend d
     ON d.classid='pg_rewrite'::regclass
    AND d.refclassid='pg_class'::regclass
    AND d.refobjid=parent.view_oid
-  JOIN pg_rewrite r ON r.oid=d.objid
-  JOIN pg_class child ON child.oid=r.ev_class
-  WHERE child.relkind IN ('v','m')
-    AND r.rulename='_RETURN'
-    AND r.ev_class<>d.refobjid
+  JOIN pg_rewrite r ON r.oid=d.objid AND r.rulename='_RETURN'
+  JOIN pg_class v ON v.oid=r.ev_class AND v.relkind IN ('v','m')
+  WHERE r.ev_class<>d.refobjid
     AND NOT r.ev_class=ANY(parent.visited)
-    AND parent.depth<16
+    AND parent.depth<32
+), deduplicated AS (
+ SELECT DISTINCT view_oid,root_oid FROM dependent_views
 )
-SELECT DISTINCT view_oid::regclass::text AS dependent_view,
-       root_oid::regclass::text AS root_company_relation,
-       depth,
-       CASE (SELECT relkind FROM pg_class WHERE oid=view_oid)
-         WHEN 'm' THEN 'MATERIALIZED_VIEW'
-         ELSE 'VIEW' END AS view_kind
-FROM dependent_views
-ORDER BY dependent_view,root_company_relation,depth;
+SELECT d.view_oid::regclass::text AS dependent_view,
+       d.root_oid::regclass::text AS root_private_relation,
+       CASE v.relkind WHEN 'm' THEN 'MATERIALIZED_VIEW' ELSE 'VIEW' END AS view_kind
+FROM deduplicated d
+JOIN pg_class v ON v.oid=d.view_oid
+ORDER BY dependent_view,root_private_relation;
+
+-- A finite recursion cap may hide deeper dependencies; mark as incomplete
+-- rather than silently declaring the graph exhaustive.
+WITH RECURSIVE fk_graph AS (
+ SELECT 'public.companies'::regclass::oid AS rel_oid,
+        ARRAY['public.companies'::regclass::oid]::oid[] AS visited, 0 AS depth
+ UNION ALL
+ SELECT fk.conrelid, g.visited||fk.conrelid,g.depth+1
+ FROM fk_graph g JOIN pg_constraint fk
+   ON fk.contype='f' AND fk.confrelid=g.rel_oid
+ WHERE NOT fk.conrelid=ANY(g.visited) AND g.depth<32
+)
+SELECT CASE WHEN EXISTS(SELECT 1 FROM fk_graph WHERE depth=32)
+            THEN 'BLOCK_FK_DEPTH_LIMIT'
+            ELSE 'FK_RECURSION_COMPLETE_WITHIN_LIMIT' END AS depth_coverage;
 
 -- Trigger definitions alone are not enough; include body fingerprints to
 -- reconcile real trigger side effects against the versioned migrations.
