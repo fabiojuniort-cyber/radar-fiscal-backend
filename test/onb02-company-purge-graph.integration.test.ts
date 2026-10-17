@@ -9,8 +9,8 @@ import { ensureCnaeFixture } from './onboarding-cnae-fixture.js';
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const PASSWORD = 'ONB02-R3-Isolated-2026!';
 
-function validCnpj(root: string): string {
-  const base = root + '0001';
+function validCnpj(root: string, unit = '0001'): string {
+  const base = root + unit;
   const dv = (digits: string, weights: number[]) => {
     const remainder = [...weights].reduce((acc, w, i) => acc + w * Number(digits[i]), 0) % 11;
     return remainder < 2 ? 0 : 11 - remainder;
@@ -71,6 +71,25 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     const target = await createCompany(a, cnpjA, 'Empresa Legada Excluir');
     const sibling = await createCompany(a, cnpjA2, 'Empresa do Mesmo Tenant');
     const remote = await createCompany(b, cnpjA, 'Empresa do Outro Tenant');
+
+    // Second establishment of target company with a different full CNPJ.
+    // The original integration test only covered the matrix.
+    const branchCnpj=validCnpj(base.slice(0,8),'0002');
+    const branch=(await admin.query<{id:string}>(`
+      INSERT INTO establishments(company_id,cnpj,name,establishment_type_code,
+        is_head_office,uf)
+      VALUES($1,$2,'Filial de teste ONB02','OFFICE',false,'GO')
+      RETURNING id
+    `,[target.company.id,branchCnpj])).rows[0]!;
+    await admin.query(`
+      INSERT INTO establishment_cnaes(establishment_id,cnae_code)
+      VALUES($1,'6201501')
+    `,[branch.id]);
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
+      VALUES($1,'USER','ONB02_CI_BRANCH_HISTORICAL','establishment',$2,
+        jsonb_build_object('branch_id',$2::text))
+    `,[a.tenantId,branch.id]);
 
     // Immutable shared catalogue fixture, never a company-owned row.
     await admin.query(`
@@ -366,6 +385,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       ['publication_matches','company_publication_id',refsA.cp],
       ['establishments','company_id',target.company.id],
       ['establishment_cnaes','establishment_id',target.establishment.id],
+      ['establishment_cnaes','establishment_id',branch.id],
     ] as const;
     for (const [table,column,id] of populated) assert.ok(
       await count(table,column,id) > 0, table+' must have seeded children');
@@ -432,6 +452,15 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     for (const [table,column,id] of populated) assert.equal(
       await count(table,column,id),0,table+' retains former company data');
     assert.equal(await count('company_cnaes','company_id',target.company.id),0);
+    assert.equal(await count('establishments','id',branch.id),0);
+    assert.equal(await count('establishment_cnaes','establishment_id',branch.id),0);
+    // Existing security audit is retained by current retention policy; it
+    // is independently classified and is not proof of complete PII erasure.
+    assert.equal(Number((await admin.query<{total:string}>(`
+      SELECT count(*)::text AS total FROM audit_log
+      WHERE tenant_id=$1 AND entity_type='establishment'
+        AND entity_id=$2 AND action='ONB02_CI_BRANCH_HISTORICAL'
+    `,[a.tenantId,branch.id])).rows[0]!.total),1);
     assert.deepEqual(await stableRows('companies','id',[sibling.company.id,remote.company.id]),siblingsBefore);
     assert.deepEqual(await stableRows('company_publications','id',[refsA2.cp,refsB.cp]),otherCpsBefore);
     assert.deepEqual(await stableRows('monitoring_profiles','id',[refsA2.mp,refsB.mp]),otherMpsBefore);
@@ -472,6 +501,46 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(await count('company_tax_profiles','company_id',recreate.company.id),0);
     assert.equal(await count('company_product_profiles','company_id',recreate.company.id),0);
     assert.equal(await count('company_publications','company_id',recreate.company.id),0);
+
+    // Ambiguity B2: another company using the same display name MUST block,
+    // even when legacy onboarding contains an explicit target CNPJ.
+    await admin.query('UPDATE companies SET trade_name=$2 WHERE id=$1',
+      [sibling.company.id,'Novo perfil do zero']);
+    await admin.query(`
+      UPDATE tenant_onboarding_profiles SET cnpj=$2,company_name=$3
+      WHERE tenant_id=$1
+    `,[a.tenantId,cnpjA,'Novo perfil do zero']);
+    await admin.query('UPDATE tenants SET name=$2 WHERE id=$1',
+      [a.tenantId,'Novo perfil do zero']);
+    const sameNameRejected=await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+recreate.company.id,
+      headers:a.headers,
+    });
+    assert.equal(sameNameRejected.statusCode,409,sameNameRejected.body);
+    assert.equal(await count('companies','id',recreate.company.id),1);
+    await admin.query('UPDATE companies SET trade_name=NULL WHERE id=$1',
+      [sibling.company.id]);
+
+    // A renamed PERSONAL ACCOUNT must survive a subsequent company purge.
+    await admin.query('UPDATE tenants SET name=$2 WHERE id=$1',
+      [a.tenantId,'Minha conta personalizada']);
+    const deletedWithCustomAccount=await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+recreate.company.id,
+      headers:a.headers,
+    });
+    assert.equal(deletedWithCustomAccount.statusCode,204,deletedWithCustomAccount.body);
+    const custom=(await admin.query<{
+      name:string;cnpj:string|null;company_name:string|null
+    }>(`
+      SELECT t.name,p.cnpj,p.company_name
+      FROM tenants t JOIN tenant_onboarding_profiles p ON p.tenant_id=t.id
+      WHERE t.id=$1
+    `,[a.tenantId])).rows[0]!;
+    assert.equal(custom.name,'Minha conta personalizada');
+    assert.equal(custom.cnpj,null);
+    assert.equal(custom.company_name,null);
+    assert.equal(await count('companies','id',sibling.company.id),1);
+    assert.equal(await count('companies','id',remote.company.id),1);
   } finally {
     await app.close();
     try {
