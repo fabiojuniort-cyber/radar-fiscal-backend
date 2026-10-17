@@ -1,5 +1,16 @@
 # TriBusca — contexto para agentes do backend
 
+## Regras obrigatórias (prioridade sobre o restante deste arquivo)
+Siga `coordenacao/PROTOCOLO.md` do `tribusca-control`. Resumo:
+- Implementar só o que a tarefa pede; nada de validação, hardening, backfill ou retroativo sem pedido.
+- Propor o mínimo em até 5 linhas e aguardar o OK do Fábio antes de codar.
+- Coleta: somente o dia corrente, salvo instrução contrária.
+- Preferir remover a adicionar; nenhum script, migration, dependência ou serviço Railway novo sem aprovação.
+- Executar todos os itens da tarefa e somente eles; item sem evidência conta como não feito.
+- Gravar checkpoint ao fim de cada passo e retomar dele ao travar.
+- Retornar sempre no formato do protocolo, com % de avanço e prompt pronto.
+- Migrations: numeração única daqui pra frente; nunca renomear migration já aplicada.
+
 Este repositório contém o código; a governança e o contexto entre chats ficam no `tribusca-control`. Antes de qualquer tarefa, leia:
 1. https://github.com/fabiojuniort-cyber/tribusca-control/blob/main/contexts/BACKEND.md
 2. O índice da frente indicada na Issue (DOE-SP: https://github.com/fabiojuniort-cyber/tribusca-control/blob/main/contexts/DOE-SP.md).
