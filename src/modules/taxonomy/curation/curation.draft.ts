@@ -416,6 +416,31 @@ async function copyReleaseGraph(
     );
   }
 
+  // Preserve multi-valued bindings across drafts; for the first v1.8.0
+  // copy, migrate all immutable v1.7.0 one-to-one source origins without
+  // modifying either source publication or its imported provenance.
+  await client.query(`
+    INSERT INTO taxonomy_release_cnae_actuacao(release_id,cnae_code,release_concept_id)
+    SELECT $2::uuid, source.cnae_code, target_rc.id
+    FROM (
+      SELECT x.cnae_code, src_rc.concept_id
+      FROM taxonomy_release_cnae_actuacao x
+      JOIN taxonomy_release_concepts src_rc ON src_rc.id=x.release_concept_id
+      WHERE x.release_id=$1::uuid
+      UNION ALL
+      SELECT o.cnae_code, src_rc.concept_id
+      FROM taxonomy_release_actuacao_cnae_origins o
+      JOIN taxonomy_release_concepts src_rc ON src_rc.id=o.release_concept_id
+      WHERE o.release_id=$1::uuid
+        AND NOT EXISTS (
+          SELECT 1 FROM taxonomy_release_cnae_actuacao x
+          WHERE x.release_id=$1::uuid AND x.cnae_code=o.cnae_code)
+    ) source
+    JOIN taxonomy_release_concepts target_rc
+      ON target_rc.release_id=$2::uuid AND target_rc.concept_id=source.concept_id
+    ON CONFLICT DO NOTHING
+  `,[sourceId,targetId]);
+
   void bindings;
 }
 
@@ -1862,6 +1887,8 @@ export interface GridRowInput {
   group?: string | null | undefined;
   label: string;
   officialCodes: string[];
+  /** F2-TAB-03, required when adding a CNAE in v1.8.0. */
+  atuacaoCodes?: string[] | undefined;
   aliases: ConceptAliasInput[];
   profileVisible: boolean;
   classifyByLabel: boolean;
@@ -1939,7 +1966,34 @@ export async function saveDimensionRows(
         await updateConcept(client, actor, row.code, fields);
         result.updated += 1;
       } else {
-        result.created.push(await createConcept(client, actor, dimensionCode, fields));
+        const created=await createConcept(client, actor, dimensionCode, fields);
+        // A new CNAE cannot enter the v1.8 DRAFT without 1+ valid Atuações.
+        // This is part of the same curator transaction as row creation.
+        if(draft.version==='v1.8.0'&&dimensionCode==='sector'&&
+           row.officialCodes.length===1&&/^\d{7}$/.test(row.officialCodes[0]??'')){
+          const codes=row.atuacaoCodes??[];
+          if(codes.length<1)throw new CurationError('F2_TAB03_LAST_ACTUACAO_REQUIRED',422);
+          if(codes.length>12||new Set(codes).size!==codes.length||
+            codes.some(x=>!/^actuacao\.[a-z0-9_]+$/.test(x)))
+            throw new CurationError('F2_TAB03_INVALID_ACTUACAO',422);
+          const eligible=await client.query<{id:string}>(`
+            SELECT rc.id FROM taxonomy_release_concepts rc
+            JOIN taxonomy_concepts c ON c.id=rc.concept_id
+            JOIN taxonomy_dimensions d ON d.id=c.dimension_id
+            JOIN taxonomy_release_dimensions rd
+              ON rd.release_id=rc.release_id AND rd.dimension_id=d.id
+            WHERE rc.release_id=$1::uuid AND rc.membership_status='INCLUDED'
+              AND rd.membership_status='INCLUDED' AND d.code='actuacao'
+              AND c.code=ANY($2::text[])
+          `,[draft.id,codes]);
+          if(eligible.rows.length!==codes.length)
+            throw new CurationError('F2_TAB03_ACTUACAO_NOT_IN_DRAFT',422);
+          await client.query(`
+            INSERT INTO taxonomy_release_cnae_actuacao(release_id,cnae_code,release_concept_id)
+            SELECT $1::uuid,$2,unnest($3::uuid[])
+          `,[draft.id,row.officialCodes[0],eligible.rows.map(x=>x.id)]);
+        }
+        result.created.push(created);
       }
     } catch (error) {
       const message =
@@ -2013,6 +2067,7 @@ const CONCEPT_DIFF_FIELDS: Array<keyof ConceptView> = [
   'helpText',
   'classifyByLabel',
   'officialCodes',
+  'atuacaoCodes',
   'aliases',
 ];
 
@@ -2128,6 +2183,22 @@ export async function validateReleaseView(
   const issues: ValidationIssue[] = [];
   const included = view.concepts.filter((c) => c.membershipStatus === 'INCLUDED');
   const dimensionByCode = new Map(view.dimensions.map((d) => [d.code, d]));
+
+  const version=/^v(\d+)\.(\d+)\.(\d+)$/.exec(view.release.version);
+  // F2-TAB-03: every included 7-digit CNAE in v1.8+ requires ≥1 release
+  // Atuação membership; no change to published v1.7 or to source staging.
+  if(version&&Number(version[1])===1&&Number(version[2])>=8){
+    const atuacoes=new Set(included.filter(c=>c.dimensionCode==='actuacao').map(c=>c.code));
+    for(const cnae of included){
+      if(cnae.dimensionCode!=='sector'||cnae.officialCodes.length!==1||
+         !/^\d{7}$/.test(cnae.officialCodes[0]??''))continue;
+      const codes=cnae.atuacaoCodes??[];
+      if(codes.length<1||codes.some(code=>!atuacoes.has(code))){
+        issues.push({severity:'BLOCKER',code:'F2_TAB03_CNAE_ACTUACAO_REQUIRED',
+          message:'CNAE sem Atuação válida no rascunho v1.8.0.',subject:cnae.code});
+      }
+    }
+  }
 
   for (const dimension of view.dimensions) {
     const concepts = included.filter((c) => c.dimensionCode === dimension.code);
