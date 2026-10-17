@@ -323,17 +323,6 @@ jobs:
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
       - name: ONB-02 R3 hard-delete full graph on PG18
         run: npx tsx --test test/onb02-company-purge-graph.integration.test.ts
-      - name: ONB-02 R3 read-only SQL inventory and fingerprint smoke on PG18
+      - name: ONB-02 R3 semantic SQL evidence on isolated PG18
         shell: bash
-        run: |
-          set -euo pipefail
-          export PGPASSWORD=postgres
-          psql -X -v ON_ERROR_STOP=1 -h localhost -U postgres -d radar_fiscal_test \
-            -f ops/onb02/preflight-readonly.sql \
-            > "$RUNNER_TEMP/onb02-preflight-synthetic.log"
-          psql -X -v ON_ERROR_STOP=1 -v company_id=00000000-0000-4000-8000-000000000001 \
-            -h localhost -U postgres -d radar_fiscal_test \
-            -f ops/onb02/company-manifest-readonly.sql \
-            > "$RUNNER_TEMP/onb02-manifest-synthetic.log"
-          grep -q 'company_count' "$RUNNER_TEMP/onb02-preflight-synthetic.log"
-          grep -q 'global_publications_total' "$RUNNER_TEMP/onb02-manifest-synthetic.log"
+        run: bash ops/onb02/ci-evidence-pg18.sh
