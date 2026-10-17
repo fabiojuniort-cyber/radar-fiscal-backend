@@ -146683,6 +146683,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (\", 97/99, 08/00\") após o primeiro não anotados. Anexos: I e II vigentes candidatos (Conv. 89/09); versões anteriores do Anexo I (Conv. 112/08) e do Anexo II (Conv. 112/08) e redação original dos Anexos I e II (NBM/SH) são irmãs históricas no nível do documento, por estarem separadas no texto. Linhas de nota dentro das tabelas são notas editoriais; a linha imediatamente seguinte a uma nota 'Redação anterior' (RemissoAnt) é a redação anterior do mesmo subitem (histórica). Coluna NCM/SH: códigos NCM (8 e 6 dígitos; 4 casos atípicos dddd.dddd anotados como NCM com nota); tabelas originais: códigos NBM/SH de 10 dígitos como NBM. Faixas 'X a Y' anotadas como relação range sem expansão. Ocorrências históricas (ex.: 8450.11.00) permanecem anotadas com contexto histórico."
  }
 }

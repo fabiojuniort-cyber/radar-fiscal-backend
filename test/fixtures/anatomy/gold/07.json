@@ -177,6 +177,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "Despacho MF: cabeçalho (processo/interessado/assunto) não operativo; decisão no parágrafo 5. 'nº 26, de 14 de agosto de 2026' é Resolução do Senado elíptica. Valores monetários fora do escopo de entidades v1."
  }
 }

@@ -138,6 +138,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "Retificação: introdução operativa; 'Onde se lê' e 'Leia-se' citam o ato retificado e ficam proibidos. O bloco 'Leia-se' inclui por inteiro 'mantidas as demais condições' e o processo SEI (exclusão conservadora). Números de requerimento/processo não são NCM."
  }
 }

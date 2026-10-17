@@ -3904,6 +3904,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (\", 97/99, 08/00\") após o primeiro não anotados. Único NCM/NBM explícito: 3507.90.4 (inciso X da cláusula primeira, 7 dígitos). Anos de 4 dígitos e percentuais não são NCM e não constam como entidade."
  }
 }

@@ -62,7 +62,20 @@ Estes são os itens em que a decisão do anotador é mais discutível.
 **Protocolo da revisão:**
 - registrar as divergências em `review.notes`;
 - corrigir a especificação, nunca o JSON gerado, e reconstruir;
-- marcar `review.status: approved` com o revisor e a data; o status `reviewed` exige um revisor diferente do anotador.
+- a aprovação fica na especificação (`review` com `reviewer`, `reviewedAt`, `status: approved` e `approvedContentSha256`);
+- o status `reviewed` exige um revisor diferente do anotador.
+
+**Vínculo da aprovação ao conteúdo.** `goldContentSha256` é o SHA-256 da serialização canônica do gold inteiro, exceto `status` e `review`. A validação recusa uma aprovação cujo hash não seja igual ao do conteúdo atual. Assim, qualquer alteração posterior na anotação invalida a aprovação, e o trecho alterado precisa ser conferido de novo. Os hashes abaixo são os do conteúdo entregue para revisão; o Astra deve aprovar exatamente esses valores ou os da versão corrigida.
+
+| ID | `goldContentSha256` submetido à revisão |
+|---|---|
+| 01 | `3ad3fabb1f913e939d3be44e6666156f7f5a79f7bff6cb68af664fe249169c0e` |
+| 02 | `3b92ef2c5d5a6b80aaa1a732a441a57f5631542e1b7990a590277d368c164ced` |
+| 03 | `a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b` |
+| 05 | `44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7` |
+| 07 | `59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d` |
+| 10 | `c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083` |
+| 11 | `678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79` |
 
 ## Não executado
 

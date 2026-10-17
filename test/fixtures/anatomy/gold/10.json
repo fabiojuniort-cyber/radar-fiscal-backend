@@ -16368,6 +16368,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "Portaria SAES/MS 4.940: matéria única em três arquivos (representação consolidada). Anexo I em duas tabelas chave-valor (t1 no arquivo _001, t2 continuação no _002); Anexo II tabela de compatibilidades; Anexo III tabela dividida entre _002 (t4) e _003 (t5). Geometria derivada da marcação original pelo caminhador do anotador. Nenhum NCM: códigos SIGTAP, CBO, CID, habilitação (NN.NN) e regras de 4 dígitos anotados como OTHER para medir falso positivo. Art. 8º: vigência/efeitos operacionais, não situação jurídica. Valores R$ e códigos de 2-3 dígitos (financiamento/atributo) fora do escopo v1."
  }
 }

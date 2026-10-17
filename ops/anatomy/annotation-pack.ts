@@ -21,7 +21,7 @@ export function goldSkeleton(entry: (typeof frozen.entries)[number]): AnatomyGol
   return { goldVersion: ANATOMY_GOLD_VERSION, id: entry.id, partition: 'development', preparation: entry.preparation,
     canonicalTextSha256: entry.canonicalTextSha256, canonicalTextUtf16Length: entry.canonicalTextUtf16Length,
     status: 'not_started', annotator: null, annotatedAt: null, parts: [], entities: [], relations: [], gaps: [],
-    review: { reviewer: null, status: 'not_requested', reviewedAt: null, notes: '' } };
+    review: { reviewer: null, status: 'not_requested', reviewedAt: null, approvedContentSha256: null, notes: '' } };
 }
 
 export function developmentCanonicalText(entryId: string): string {

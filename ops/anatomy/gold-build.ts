@@ -21,7 +21,7 @@ interface TableSpec { id: string; parent?: string; tableIndex: number; startLine
 interface EntitySpec { part: string; literal: string; nth?: number; domain: AnatomyGold['entities'][number]['domain']; note?: string; id?: string }
 interface ColumnEntitySpec { table: string; column: number; pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string; skipHeader?: boolean }
 interface Spec { id: string; annotator: string; annotatedAt: string; blocks: BlockSpec[]; tables?: TableSpec[]; entities?: EntitySpec[];
-  columnEntities?: ColumnEntitySpec[]; textEntities?: { pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string }[]; relations?: AnatomyGold['relations']; ranges?: boolean; gaps?: AnatomyGold['gaps']; notes?: string }
+  columnEntities?: ColumnEntitySpec[]; textEntities?: { pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string }[]; relations?: AnatomyGold['relations']; ranges?: boolean; review?: AnatomyGold['review']; gaps?: AnatomyGold['gaps']; notes?: string }
 
 const root = new URL('../../', import.meta.url);
 const frozen = JSON.parse(readFileSync(new URL('test/fixtures/anatomy/canonical/development.json', root), 'utf8')) as
@@ -194,7 +194,10 @@ export function buildGold(id: string): AnatomyGold {
   const gold: AnatomyGold = { goldVersion: ANATOMY_GOLD_VERSION, id, partition: 'development', preparation: entry.preparation,
     canonicalTextSha256: entry.canonicalTextSha256, canonicalTextUtf16Length: entry.canonicalTextUtf16Length, status: 'prepared',
     annotator: spec.annotator, annotatedAt: spec.annotatedAt, parts, entities, relations, gaps: spec.gaps ?? [],
-    review: { reviewer: null, status: 'requested', reviewedAt: null, notes: spec.notes ?? '' } };
+    // A reviewer's approval lives in the spec and binds the content hash it was given for.
+    review: spec.review ? { ...spec.review, notes: [spec.notes ?? '', spec.review.notes].filter(Boolean).join('\n\n') }
+      : { reviewer: null, status: 'requested', reviewedAt: null, approvedContentSha256: null, notes: spec.notes ?? '' } };
+  if (gold.review.status === 'approved') gold.status = 'reviewed';
   return validateAnatomyGold(gold, text);
 }
 

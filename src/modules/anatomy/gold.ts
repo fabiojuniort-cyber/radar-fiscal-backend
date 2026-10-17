@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entitySchema, partSchema, sha256, spanSchema } from './contract.js';
+import { canonicalJson, entitySchema, partSchema, sha256, spanSchema } from './contract.js';
 
 /**
  * Structural gold for corpus measurement. A gold file is an independent human annotation over a frozen
@@ -32,9 +32,17 @@ export const anatomyGoldShapeSchema = z.strictObject({
   annotatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   parts: z.array(goldPartSchema), entities: z.array(goldEntitySchema), relations: z.array(goldRelationSchema), gaps: z.array(goldGapSchema),
   review: z.strictObject({ reviewer: id.nullable(), status: z.enum(['not_requested', 'requested', 'changes_requested', 'approved']),
-    reviewedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), notes: z.string().max(20000) }),
+    reviewedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    /** Hash of the exact annotation content the reviewer approved; any later change invalidates it. */
+    approvedContentSha256: z.string().regex(/^[0-9a-f]{64}$/).nullable(), notes: z.string().max(20000) }),
 });
 export type AnatomyGold = z.infer<typeof anatomyGoldShapeSchema>;
+
+/** SHA-256 of the annotation content (everything except status and review), as bound by an approval. */
+export function goldContentSha256(gold: AnatomyGold): string {
+  const { status: _status, review: _review, ...content } = gold;
+  return sha256(canonicalJson(content));
+}
 
 /** Validate shape and structural invariants; with `canonicalText`, also literals and the text hash. */
 export function validateAnatomyGold(value: unknown, canonicalText?: string): AnatomyGold {
@@ -83,6 +91,10 @@ export function validateAnatomyGold(value: unknown, canonicalText?: string): Ana
     if (r.operatorSpan) inside(r.operatorSpan, r.id); if (r.scopeSpan) inside(r.scopeSpan, r.id);
   }
   for (const g of gold.gaps) if (g.span) inside(g.span, 'gap');
+  if (gold.review.status === 'approved' && gold.review.approvedContentSha256 !== goldContentSha256(gold)) {
+    fail('approval does not match the current annotation content; the changed annotation needs a new review');
+  }
+  if (gold.review.status !== 'approved' && gold.review.approvedContentSha256 !== null) fail('approvedContentSha256 is only set by an approved review');
   if (gold.status === 'reviewed' && (gold.review.status !== 'approved' || !gold.review.reviewer || gold.review.reviewer === gold.annotator)) {
     fail('reviewed gold requires an approved review by someone other than the annotator');
   }

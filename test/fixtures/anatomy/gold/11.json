@@ -704,6 +704,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "IN que altera a IN RFB 2.228/2024. Cada redação citada (de \" até (NR)) é um único quoted_text proibido; a estrutura interna da redação citada (arts. 143-A a 143-L, §§, incisos) não é anotada como dispositivo próprio. Remissões internas (art. 143-J etc.) e percentuais fora do escopo de entidades v1. Sem NCM."
  }
 }

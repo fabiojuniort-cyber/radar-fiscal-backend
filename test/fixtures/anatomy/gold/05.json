@@ -166,6 +166,7 @@
   "reviewer": null,
   "status": "requested",
   "reviewedAt": null,
+  "approvedContentSha256": null,
   "notes": "ADE Coana: três artigos operativos; preâmbulo com citações; CNPJ da certificada. Sem NCM."
  }
 }

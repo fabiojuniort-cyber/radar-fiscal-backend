@@ -4,7 +4,7 @@ import test from 'node:test';
 import { developmentCanonicalText, GOLD_DIR } from '../ops/anatomy/annotation-pack.js';
 import { buildGold } from '../ops/anatomy/gold-build.js';
 import { sha256 } from '../src/modules/anatomy/contract.js';
-import { ANATOMY_GOLD_VERSION, validateAnatomyGold, type AnatomyGold } from '../src/modules/anatomy/gold.js';
+import { ANATOMY_GOLD_VERSION, goldContentSha256, validateAnatomyGold, type AnatomyGold } from '../src/modules/anatomy/gold.js';
 
 const text = 'Art. 1º NCM 0101.21.00 😀.';
 function base(over: Partial<AnatomyGold> = {}): AnatomyGold {
@@ -13,7 +13,7 @@ function base(over: Partial<AnatomyGold> = {}): AnatomyGold {
     parts: [{ id: 'd', parentId: null, order: 0, type: 'document', span: { start: 0, end: text.length }, context: 'unknown', contextReason: 'document', table: null },
       { id: 'a1', parentId: 'd', order: 0, type: 'article', span: { start: 0, end: text.length }, context: 'operative_candidate', contextReason: 'article_marker', table: null }],
     entities: [{ id: 'e1', partId: 'a1', span: { start: 12, end: 22 }, literal: '0101.21.00', domain: 'NCM', note: '' }],
-    relations: [], gaps: [], review: { reviewer: null, status: 'requested', reviewedAt: null, notes: '' }, ...over };
+    relations: [], gaps: [], review: { reviewer: null, status: 'requested', reviewedAt: null, approvedContentSha256: null, notes: '' }, ...over };
 }
 const rejects = (g: unknown, re: RegExp, t: string | undefined = text) => assert.throws(() => validateAnatomyGold(g, t), re);
 
@@ -28,9 +28,21 @@ test('gold invariants fail closed', () => {
   rejects(base({ parts: [base().parts[0]!, { ...base().parts[1]!, span: { start: 0, end: emoji } }], entities: [] }), /surrogate/);
   rejects(base({ parts: [base().parts[0]!, { ...base().parts[1]!, order: 1 }] }), /contiguous/);
   rejects(base({ parts: [base().parts[1]!, base().parts[0]!] }), /follow its parent|document root/);
-  rejects(base({ status: 'reviewed', review: { reviewer: 'exec', status: 'approved', reviewedAt: '2026-10-17', notes: '' } }), /other than the annotator/);
+  const approve = (reviewer: string, g = base()): AnatomyGold['review'] => ({ reviewer, status: 'approved', reviewedAt: '2026-10-17', approvedContentSha256: goldContentSha256(g), notes: '' });
+  rejects(base({ status: 'reviewed', review: approve('exec') }), /other than the annotator/);
+  rejects(base({ review: { ...approve('astra'), status: 'requested' } }), /only set by an approved review/);
   rejects(base({ relations: [{ id: 'r', kind: 'range', operatorSpan: null, memberEntityIds: ['nope'], targetEntityIds: [], scopeSpan: null, condition: null }] }), /unknown entity/);
   rejects({ ...base(), partition: 'reserved-final' }, /partition|invalid/i);
+});
+
+test('approval is bound to the reviewed content hash; any later annotation change needs a new review', () => {
+  const g = base();
+  const review: AnatomyGold['review'] = { reviewer: 'astra', status: 'approved', reviewedAt: '2026-10-17', approvedContentSha256: goldContentSha256(g), notes: '' };
+  assert.equal(validateAnatomyGold({ ...g, status: 'reviewed', review }, text).status, 'reviewed');
+  // Review metadata itself is outside the bound content.
+  assert.equal(goldContentSha256({ ...g, review }), goldContentSha256(g));
+  const changed = { ...g, status: 'reviewed' as const, review, entities: [{ ...g.entities[0]!, note: 'edited after approval' }] };
+  rejects(changed, /needs a new review/);
 });
 
 test('committed development gold is reproducible from its human-written specs', () => {
