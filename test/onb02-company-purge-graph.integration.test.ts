@@ -1,0 +1,281 @@
+import assert from 'node:assert/strict';
+import { createHash, randomUUID } from 'node:crypto';
+import test from 'node:test';
+import { Pool } from 'pg';
+
+import { buildApp } from '../src/app.js';
+import { ensureCnaeFixture } from './onboarding-cnae-fixture.js';
+
+const sha = (text: string) => createHash('sha256').update(text).digest('hex');
+const PASSWORD = 'ONB02-R3-Isolated-2026!';
+
+function validCnpj(root: string): string {
+  const base = root + '0001';
+  const dv = (digits: string, weights: number[]) => {
+    const remainder = [...weights].reduce((acc, w, i) => acc + w * Number(digits[i]), 0) % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+  const first = dv(base, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return base + first + dv(base + first, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+}
+
+test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelated tenant and global publication', async () => {
+  assert.ok(process.env.DATABASE_ADMIN_URL, 'isolated DATABASE_ADMIN_URL is required');
+  const admin = new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 3 });
+  const app = await buildApp();
+  const users: string[] = [];
+  const tenants: string[] = [];
+  let globalPublicationId: string | undefined;
+  try {
+    await app.ready();
+    await ensureCnaeFixture(admin);
+    const owner = async () => {
+      const email = 'onb02-r3-' + randomUUID() + '@example.test';
+      const signup = await app.inject({
+        method: 'POST', url: '/auth/register',
+        payload: { name: 'Test R3 Owner', email, password: PASSWORD,
+          confirmPassword: PASSWORD, acceptedTerms: true },
+      });
+      assert.equal(signup.statusCode, 201, signup.body);
+      const identity = signup.json<{ user: { id: string }; tenant: { id: string } }>();
+      users.push(identity.user.id);
+      tenants.push(identity.tenant.id);
+      const login = await app.inject({
+        method: 'POST', url: '/auth/login', payload: { email, password: PASSWORD },
+      });
+      assert.equal(login.statusCode, 200, login.body);
+      return {
+        tenantId: identity.tenant.id,
+        headers: { authorization: 'Bearer ' + login.json<{ accessToken: string }>().accessToken,
+          'x-tenant-id': identity.tenant.id },
+      };
+    };
+    const a = await owner();
+    const b = await owner();
+    const base = randomUUID().replace(/\D/g, '').padEnd(16, '7');
+    const cnpjA = validCnpj(base.slice(0, 8));
+    const cnpjA2 = validCnpj(base.slice(8, 16) === base.slice(0, 8) ? '76543210' : base.slice(8, 16));
+    const createCompany = async (
+      account: typeof a, cnpj: string, name: string,
+    ) => {
+      const response = await app.inject({
+        method: 'POST', url: '/api/v1/companies/manual', headers: account.headers,
+        payload: {
+          cnpj, legalName: name, uf: 'GO',
+          cnaes: [{ code: '6201501', description: 'descricao do browser', isPrimary: true }],
+        },
+      });
+      assert.equal(response.statusCode, 201, response.body);
+      return response.json<{ company: { id: string }; establishment: { id: string } }>();
+    };
+    const target = await createCompany(a, cnpjA, 'Empresa Legada Excluir');
+    const sibling = await createCompany(a, cnpjA2, 'Empresa do Mesmo Tenant');
+    const remote = await createCompany(b, cnpjA, 'Empresa do Outro Tenant');
+
+    // Immutable shared catalogue fixture, never a company-owned row.
+    await admin.query(`
+      INSERT INTO official_catalogs(code,name,maintainer)
+      VALUES ('NCM','NCM','Receita Federal')
+      ON CONFLICT(code) DO NOTHING;
+      INSERT INTO official_catalog_editions(catalog_id,edition_code,source_url,status)
+      SELECT c.id,'onb02-ci-only','https://www.gov.br/receitafederal/', 'CURRENT'
+      FROM official_catalogs c WHERE c.code='NCM'
+        AND NOT EXISTS (
+          SELECT 1 FROM official_catalog_editions e
+          WHERE e.catalog_id=c.id AND e.status='CURRENT'
+        ) ON CONFLICT(catalog_id,edition_code) DO NOTHING;
+      INSERT INTO official_catalog_entries(catalog_edition_id,official_code,description,metadata)
+      SELECT e.id,'1234.56.78','NCM sintetica ONB02','{"assignable":true}'::jsonb
+      FROM official_catalog_editions e
+      JOIN official_catalogs c ON c.id=e.catalog_id
+      WHERE c.code='NCM' AND e.status='CURRENT'
+      ON CONFLICT(catalog_edition_id,official_code) DO NOTHING;
+    `);
+    const entry = (await admin.query<{ id: string }>(`
+      SELECT oce.id FROM official_catalog_entries oce
+      JOIN official_catalog_editions e ON e.id=oce.catalog_edition_id
+      JOIN official_catalogs c ON c.id=e.catalog_id
+      WHERE c.code='NCM' AND e.status='CURRENT'
+        AND oce.official_code='1234.56.78' LIMIT 1
+    `)).rows[0];
+    assert.ok(entry, 'NCM fixture must exist before the purge');
+
+    const pub = (await admin.query<{ id: string }>(`
+      INSERT INTO publications(identity_hash,identity_strength,identity_basis,
+         jurisdiction_level,title,act_type,act_number,primary_official_url)
+      VALUES ($1,'STRONG','{}'::jsonb,'FEDERAL','Norma de teste R3','LEI','123',
+              'https://example.test/ato')
+      RETURNING id
+    `, [sha(randomUUID())])).rows[0]!;
+    globalPublicationId = pub.id;
+    await admin.query(`
+      INSERT INTO publication_versions(publication_id,version_no,content_hash,content_text)
+      VALUES ($1,1,$2,'Texto global da norma, pertence ao acervo compartilhado')
+    `, [pub.id, sha(randomUUID())]);
+
+    const seed = async (companyId: string, label: string) => {
+      const mp = (await admin.query<{ id: string }>(`
+        INSERT INTO monitoring_profiles(company_id,name,criteria,is_active)
+        VALUES($1,$2,'{"taxes":["ICMS"]}'::jsonb,true) RETURNING id
+      `, [companyId,label])).rows[0]!;
+      const cp = (await admin.query<{ id: string }>(`
+        INSERT INTO company_publications(company_id,publication_id)
+        VALUES($1,$2) RETURNING id
+      `, [companyId,pub.id])).rows[0]!;
+      const pm = (await admin.query<{ id: string }>(`
+        INSERT INTO publication_matches(company_publication_id,monitoring_profile_id,
+           profile_version,rule_engine_version,matched_fields)
+        VALUES($1,$2,1,'TEST-R3','{"matched":true}'::jsonb)
+        RETURNING id
+      `, [cp.id,mp.id])).rows[0]!;
+      return {mp:mp.id,cp:cp.id,pm:pm.id};
+    };
+    const refsA = await seed(target.company.id,'Monitoramento alvo');
+    const refsA2 = await seed(sibling.company.id,'Monitoramento mesmo tenant');
+    const refsB = await seed(remote.company.id,'Monitoramento outro tenant');
+
+    await admin.query(`
+      INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,
+        personalization,is_current)
+      VALUES($1,1,'LUCRO_REAL','{"products":["soja"]}'::jsonb,false),
+            ($1,2,'LUCRO_REAL','{"products":["fertilizantes"]}'::jsonb,true)
+    `,[target.company.id]);
+    const product = (await admin.query<{ id: string }>(`
+      INSERT INTO company_product_profiles(company_id,product_label)
+      VALUES($1,'Adubo teste') RETURNING id
+    `,[target.company.id])).rows[0]!;
+    await admin.query(`
+      INSERT INTO company_product_ncms(company_product_profile_id,official_catalog_entry_id)
+      VALUES($1,$2)
+    `,[product.id,entry.id]);
+    await admin.query(`
+      INSERT INTO company_cnae_ncms(company_id,cnae_code,official_catalog_entry_id)
+      VALUES($1,'6201501',$2)
+    `,[target.company.id,entry.id]);
+    await admin.query(`
+      INSERT INTO monitoring_profiles(company_id,name,is_active)
+      VALUES($1,'Monitoramento inativo',false)
+    `,[target.company.id]);
+
+    const count = async (table: string, column: string, id: string) => {
+      const row = await admin.query<{ total: number }>(
+        'SELECT count(*)::int AS total FROM ' + table + ' WHERE ' + column + '=$1',
+        [id],
+      );
+      return Number(row.rows[0]!.total);
+    };
+    const stableRows = async (table: string, column: string, ids: string[]) => {
+      const rows = await admin.query(
+        'SELECT to_jsonb(t) AS data FROM ' + table +
+          ' t WHERE ' + column + ' = ANY($1::uuid[]) ORDER BY id',
+        [ids],
+      );
+      return rows.rows;
+    };
+    const globalsBefore = {
+      publication: (await admin.query('SELECT * FROM publications WHERE id=$1',[pub.id])).rows,
+      versions: (await admin.query('SELECT * FROM publication_versions WHERE publication_id=$1',[pub.id])).rows,
+      ncm: (await admin.query('SELECT * FROM official_catalog_entries WHERE id=$1',[entry.id])).rows,
+    };
+    const siblingsBefore = await stableRows('companies','id',[sibling.company.id,remote.company.id]);
+    const otherCpsBefore = await stableRows('company_publications','id',[refsA2.cp,refsB.cp]);
+    const otherMpsBefore = await stableRows('monitoring_profiles','id',[refsA2.mp,refsB.mp]);
+    const otherMatchesBefore = await stableRows('publication_matches','id',[refsA2.pm,refsB.pm]);
+
+    // B1: both inverse links are blockers even in the same tenant.
+    const disallowed = async (cpId: string, mpId: string) => {
+      const row = (await admin.query<{ id: string }>(`
+        INSERT INTO publication_matches(company_publication_id,monitoring_profile_id,
+             profile_version,rule_engine_version)
+        VALUES($1,$2,1,'TEST-R3-MISMATCH') RETURNING id
+      `,[cpId,mpId])).rows[0]!;
+      const blocked = await app.inject({
+        method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
+      });
+      assert.notEqual(blocked.statusCode,204,'inconsistent match must block purge');
+      assert.equal(await count('companies','id',target.company.id),1);
+      await admin.query('DELETE FROM publication_matches WHERE id=$1',[row.id]);
+    };
+    await disallowed(refsA.cp, refsA2.mp);
+    await disallowed(refsA2.cp, refsA.mp);
+    await disallowed(refsA.cp, refsB.mp);
+    await disallowed(refsB.cp, refsA.mp);
+
+    // B2: an unlinked legacy name is ambiguous and must fail closed.
+    await admin.query('UPDATE tenant_onboarding_profiles SET cnpj=NULL,company_name=$2 WHERE tenant_id=$1',
+      [a.tenantId,'Empresa Legada Excluir']);
+    const ambiguous = await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
+    });
+    assert.notEqual(ambiguous.statusCode,204);
+    assert.equal(await count('companies','id',target.company.id),1);
+    // The CNPJ is the explicit legacy link, unlike a customized account name.
+    await admin.query('UPDATE tenant_onboarding_profiles SET cnpj=$2 WHERE tenant_id=$1',
+      [a.tenantId,cnpjA]);
+    await admin.query('UPDATE tenants SET name=$2 WHERE id=$1',
+      [a.tenantId,'Empresa Legada Excluir']);
+
+    // Before purge the graph MUST be populated: zero-count assertions are not proof.
+    const populated = [
+      ['company_tax_profiles','company_id',target.company.id],
+      ['company_product_profiles','company_id',target.company.id],
+      ['company_product_ncms','company_product_profile_id',product.id],
+      ['company_cnae_ncms','company_id',target.company.id],
+      ['monitoring_profiles','company_id',target.company.id],
+      ['company_publications','company_id',target.company.id],
+      ['publication_matches','company_publication_id',refsA.cp],
+      ['establishments','company_id',target.company.id],
+      ['establishment_cnaes','establishment_id',target.establishment.id],
+    ] as const;
+    for (const [table,column,id] of populated) assert.ok(
+      await count(table,column,id) > 0, table+' must have seeded children');
+
+    const crossTenant = await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+remote.company.id,headers:a.headers,
+    });
+    assert.equal(crossTenant.statusCode,404,crossTenant.body);
+    const deleted = await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
+    });
+    assert.equal(deleted.statusCode,204,deleted.body);
+    assert.equal(await count('companies','id',target.company.id),0);
+    for (const [table,column,id] of populated) assert.equal(
+      await count(table,column,id),0,table+' retains former company data');
+    assert.equal(await count('company_cnaes','company_id',target.company.id),0);
+    assert.deepEqual(await stableRows('companies','id',[sibling.company.id,remote.company.id]),siblingsBefore);
+    assert.deepEqual(await stableRows('company_publications','id',[refsA2.cp,refsB.cp]),otherCpsBefore);
+    assert.deepEqual(await stableRows('monitoring_profiles','id',[refsA2.mp,refsB.mp]),otherMpsBefore);
+    assert.deepEqual(await stableRows('publication_matches','id',[refsA2.pm,refsB.pm]),otherMatchesBefore);
+    assert.deepEqual((await admin.query('SELECT * FROM publications WHERE id=$1',[pub.id])).rows,globalsBefore.publication);
+    assert.deepEqual((await admin.query('SELECT * FROM publication_versions WHERE publication_id=$1',[pub.id])).rows,globalsBefore.versions);
+    assert.deepEqual((await admin.query('SELECT * FROM official_catalog_entries WHERE id=$1',[entry.id])).rows,globalsBefore.ncm);
+    const legacy=(await admin.query(`
+      SELECT p.company_name,p.cnpj,t.name AS account_name,
+             p.terms_accepted_at,p.privacy_policy_accepted_at
+      FROM tenant_onboarding_profiles p JOIN tenants t ON t.id=p.tenant_id
+      WHERE p.tenant_id=$1
+    `,[a.tenantId])).rows[0];
+    assert.equal(legacy.company_name,null);
+    assert.equal(legacy.cnpj,null);
+    assert.equal(legacy.account_name,'Conta TriFaros');
+    assert.ok(legacy.terms_accepted_at);
+    assert.ok(legacy.privacy_policy_accepted_at);
+    assert.equal(await count('audit_log','tenant_id',a.tenantId) >= 1,true);
+
+    const recreate = await createCompany(a,cnpjA,'Novo perfil do zero');
+    assert.notEqual(recreate.company.id,target.company.id);
+    assert.notEqual(recreate.establishment.id,target.establishment.id);
+    assert.equal(await count('company_tax_profiles','company_id',recreate.company.id),0);
+    assert.equal(await count('company_product_profiles','company_id',recreate.company.id),0);
+    assert.equal(await count('company_publications','company_id',recreate.company.id),0);
+  } finally {
+    await app.close();
+    if (users.length) await admin.query('DELETE FROM app_users WHERE id=ANY($1::uuid[])',[users]);
+    if (tenants.length) {
+      await admin.query("DELETE FROM audit_log WHERE action='COMPANY_PURGED' AND tenant_id=ANY($1::uuid[])",[tenants]);
+      await admin.query('DELETE FROM tenants WHERE id=ANY($1::uuid[])',[tenants]);
+    }
+    if (globalPublicationId) await admin.query('DELETE FROM publications WHERE id=$1',[globalPublicationId]);
+    await admin.end();
+  }
+});
