@@ -1037,99 +1037,53 @@ test(
           204,
         );
 
-        const withoutConsent = await app.inject({
+        // After deleting a company, its CNPJ must be available for a clean
+        // new registration with fresh IDs and no inherited Local Negócio.
+        const previousCompanyId = registryBody.company.id;
+        const previousEstablishmentId = registryBody.establishment.id;
+        const registryRecreate = await app.inject({
           method: 'POST',
           url: '/api/v1/companies/from-cnpj',
           headers: firstHeaders,
           payload: { cnpj: registryCnpj },
         });
-        assert.equal(withoutConsent.statusCode, 409);
-        assert.equal(
-          withoutConsent.json<{ error: string }>().error,
-          'reactivation_required',
-        );
-
-        const registryRecreate =
-          await app.inject({
-            method: 'POST',
-            url: '/api/v1/companies/from-cnpj',
-            headers: firstHeaders,
-            payload: {
-              cnpj: registryCnpj,
-              reactivateInactive: true,
-            },
-          });
-
-        assert.equal(
-          registryRecreate.statusCode,
-          201,
-        );
-
+        assert.equal(registryRecreate.statusCode, 201, registryRecreate.body);
         await assertRegistryReadback(registryRecreate.json());
-        assert.equal(registryRecreate.json().company.businessLocationCode, 'MATRIZ-001');
-        const sqlCompany = await admin.query('SELECT legal_name, trade_name FROM companies WHERE id = $1', [registryBody.company.id]);
-        assert.equal(registryRecreate.json().company.legalName, sqlCompany.rows[0].legal_name);
-        assert.equal(registryRecreate.json().company.tradeName, sqlCompany.rows[0].trade_name);
-        const recreatedBody =
-          registryRecreate.json<{
-            company: {
-              id: string;
-            };
-            establishment: {
-              id: string;
-              stateRegistration:
-                string | null;
-              cnaes: unknown[];
-            };
-          }>();
 
-        assert.equal(
-          recreatedBody.company.id,
-          registryBody.company.id,
-        );
-        assert.equal(
-          recreatedBody.establishment.id,
-          registryBody.establishment.id,
-        );
-        assert.equal(
-          recreatedBody.establishment
-            .stateRegistration,
-          '10.999.888-7',
-        );
-        assert.equal(
-          recreatedBody.establishment
-            .cnaes.length,
-          3,
-        );
+        const recreatedBody = registryRecreate.json<{
+          company: { id: string; businessLocationCode: string | null };
+          establishment: {
+            id: string;
+            businessLocationCode: string | null;
+            stateRegistration: string | null;
+            cnaes: unknown[];
+          };
+        }>();
+        assert.notEqual(recreatedBody.company.id, previousCompanyId);
+        assert.notEqual(recreatedBody.establishment.id, previousEstablishmentId);
+        assert.equal(recreatedBody.company.businessLocationCode, null);
+        assert.equal(recreatedBody.establishment.businessLocationCode, null);
+        assert.equal(recreatedBody.establishment.stateRegistration, '10.999.888-7');
+        assert.equal(recreatedBody.establishment.cnaes.length, 3);
 
-        const accountAfterRecreate =
-          await app.inject({
-            method: 'GET',
-            url: '/api/v1/account',
-            headers: firstHeaders,
-          });
+        const oldCompanyRows = await admin.query(
+          'SELECT id FROM companies WHERE id = $1', [previousCompanyId],
+        );
+        assert.equal(oldCompanyRows.rowCount, 0);
+        const oldEstablishmentRows = await admin.query(
+          'SELECT id FROM establishments WHERE id = $1', [previousEstablishmentId],
+        );
+        assert.equal(oldEstablishmentRows.rowCount, 0);
 
-        assert.equal(
-          accountAfterRecreate.statusCode,
-          200,
-        );
-        assert.ok(
-          accountAfterRecreate
-            .json<{
-              companies: Array<{
-                id: string;
-                cnpj: string;
-              }>;
-            }>()
-            .companies
-            .some(
-              (item) =>
-                item.id ===
-                  registryBody.company.id &&
-                item.cnpj ===
-                  registryCnpj,
-            ),
-        );
+        const accountAfterRecreate = await app.inject({
+          method: 'GET', url: '/api/v1/account', headers: firstHeaders,
+        });
+        assert.equal(accountAfterRecreate.statusCode, 200);
+        assert.ok(accountAfterRecreate.json<{
+          companies: Array<{ id: string; cnpj: string }>;
+        }>().companies.some(
+          (item) => item.id === recreatedBody.company.id && item.cnpj === registryCnpj,
+        ));
       } finally {
         globalThis.fetch =
           originalFetch;
