@@ -33,9 +33,25 @@ Regras para cadastro por CNPJ e perfil do Sonar:
 - UFs com CAPTCHA, Gov.br ou outro desafio humano não podem ser automatizadas por bypass. Nesses casos, manter IE editável/manual e informar que a automação está indisponível ou em implementação.
 - Reconsulta cadastral deve atualizar RFB e tentar novamente a consulta estadual suportada.
 
+## Exclusão definitiva de empresa — ONB-02 (R3; gate obrigatório)
+
+A exclusão de **empresa** pelo usuário deve remover fisicamente o cadastro,
+a matriz e filiais, perfis tributários e vínculos dependentes daquela empresa,
+sem apagar publicações legais globais ou a taxonomia de outros usuários. Um novo
+cadastro do mesmo CNPJ deve criar novo identificador e perfil vazio, sem
+reativação de dados anteriores. É uma mudança **R3**: aplicar somente após
+CI integral, revisão independente, backup/restauração comprovada e aprovação
+do gate produtivo, conforme `ops/onb02/README.md` e Issue #118.
+Nenhum `GRANT DELETE ON companies` generalizado ao runtime.
+
+A exclusão individual de um **estabelecimento**, sem excluir sua empresa,
+ainda é soft-delete e mantém o fluxo próprio de reativação. Não confundir os
+dois procedimentos. Dados de auditoria de segurança e backups exigem avaliação
+de retenção antes de qualquer promessa de apagamento integral nesses meios.
+
 ## Reativação de cadastros soft-deleted
 
-Empresas e estabelecimentos são desativados com `is_active = false` para preservar histórico. As restrições únicas de CNPJ continuam válidas para registros inativos.
+Estabelecimentos excluídos individualmente são desativados com `is_active = false` para preservar histórico. A exclusão de uma empresa inteira segue o contrato R3 de remoção física acima. As restrições únicas de CNPJ continuam válidas para registros inativos.
 
 Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro quando o mesmo identificador já existir:
 - empresa existente no mesmo tenant deve ser atualizada e reativada;
