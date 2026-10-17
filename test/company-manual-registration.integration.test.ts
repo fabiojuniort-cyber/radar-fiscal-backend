@@ -335,6 +335,11 @@ test(
       }
 
       if (tenants.length > 0) {
+        // Clear synthetic R3 audit events before dropping ephemeral tenants.
+        await admin.query(
+          "DELETE FROM audit_log WHERE action = 'COMPANY_PURGED' AND tenant_id = ANY($1::uuid[])",
+          [tenants],
+        );
         await admin.query(
           'DELETE FROM tenants WHERE id = ANY($1::uuid[])',
           [tenants],
