@@ -228,9 +228,29 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       confirmationToken:first.confirmationToken,policyRevision:first.policyRevision+1}});
     assert.equal(forgedRevision.statusCode,409,forgedRevision.body);
     assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'wrong policy revision may not delete');
-    const safeSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
+    // Adversarial stale preview: a new company link MUST invalidate the
+    // server witness transactionally, without ever touching the purge endpoint.
+    const e0=(await owner.query<{revision:string}>(
+      "SELECT revision::text AS revision FROM collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
+    )).rows[0]!.revision;
+    await owner.query('INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)',
+      [company,ordinary.id]);
+    const e1=(await owner.query<{revision:string}>(
+      "SELECT revision::text AS revision FROM collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
+    )).rows[0]!.revision;
+    assert.ok(BigInt(e1)>BigInt(e0),'company link must bump F3 evidence revision');
+    const staleSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
       ...rule,expectedCount:first.count,previewToken:first.token,
       confirmationToken:first.confirmationToken,policyRevision:first.policyRevision}});
+    assert.equal(staleSave.statusCode,409,staleSave.body);
+    assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1);
+    await owner.query('DELETE FROM company_publications WHERE company_id=$1 AND publication_id=$2',
+      [company,ordinary.id]);
+    const renewed=await preview();
+    assert.equal(renewed.count,1);
+    const safeSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
+      ...rule,expectedCount:renewed.count,previewToken:renewed.token,
+      confirmationToken:renewed.confirmationToken,policyRevision:renewed.policyRevision}});
     assert.equal(safeSave.statusCode,200,safeSave.body);
     assert.equal(safeSave.json<{deletedCount:number}>().deletedCount,0);
     assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'save is never a purge');
