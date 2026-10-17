@@ -926,30 +926,16 @@ export async function productRoutes(
               return null;
             }
 
-            const company = await trx
-              .selectFrom('companies')
-              .select('id')
-              .where('id', '=', request.params.companyId)
-              .where('is_active', '=', true)
-              .executeTakeFirst();
-
-            if (!company) {
-              return 'COMPANY_NOT_FOUND' as const;
-            }
-
-            await trx
-              .updateTable('establishments')
-              .set({ is_active: false })
-              .where('company_id', '=', request.params.companyId)
-              .execute();
-
-            await trx
-              .updateTable('companies')
-              .set({ is_active: false })
-              .where('id', '=', request.params.companyId)
-              .execute();
-
-            return 'DELETED' as const;
+            // ONB-02-R3: the SECURITY DEFINER function rechecks tenant/admin
+            // authorization and atomically removes all company-owned records.
+            // No direct companies DELETE grant is added to radar_app.
+            const purge = await sql<{ removed: boolean }>`
+              SELECT public.app_purge_company(${request.params.companyId}::uuid)
+                AS removed
+            `.execute(trx);
+            return purge.rows[0]?.removed
+              ? 'DELETED' as const
+              : 'COMPANY_NOT_FOUND' as const;
           },
         );
 
