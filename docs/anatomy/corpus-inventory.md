@@ -58,3 +58,7 @@ Passos de recuperação, sem coleta nova neste pacote:
 5. Congelar gold, regras e partição antes da aferição. Executar a reserva final sem usar seus resultados para ajustar regras; eventual nova versão requer protocolo explícito de avaliação.
 
 O manifesto não concede elegibilidade a qualquer trecho. A aplicação do dossiê continua no ANAT-06; testes de elegibilidade do ANAT-04 usam somente evidência aprovada em fixtures controladas.
+
+## Busca de recuperação (17/10/2026)
+
+[RECOVERY-01](RECOVERY-01.md) registra a busca por hash bruto no histórico Git dos dois repositórios, no disco local e nas sessões, além da proposta de recaptura (ainda não executada). A análise das marcações oficiais está em [official-structure.md](official-structure.md) e o roteiro do gold em [gold-protocol.md](gold-protocol.md). O manifesto não foi alterado.
