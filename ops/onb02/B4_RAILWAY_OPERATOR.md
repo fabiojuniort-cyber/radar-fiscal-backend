@@ -1,6 +1,6 @@
 # ONB-02 R3 — B4: procedimento operacional com evidência (HOLD produção)
 
-**Status na elaboração: B4 NOT_PROVEN.** Este documento não equivale a backup,
+**Status na elaboração: B4 BLOCK (recuperabilidade ACCEPTED_RISK).** Este documento não equivale a backup,
 restore, inventário real, dry-run ou aprovação. Executar somente com operador
 autenticado na Railway e os gates da Issue
 [tribusca-control#118](https://github.com/fabiojuniort-cyber/tribusca-control/issues/118).
@@ -24,6 +24,25 @@ O conector ChatGPT Railway permite ler metadados, NÃO possui ação de executar
 SQL, invocar CLI remoto, criar backup PITR ou efetuar restore PITR. A prova B4
 exige um terminal Railway CLI autenticado e permissão operacional adequada.
 O agente de IA da Railway é proibido nesta frente.
+
+## Exceção de recuperação expressamente aceita pelo responsável (17/10/2026)
+
+A solicitação do responsável foi **NÃO criar backup novo e NÃO realizar
+ensaio de restauração**. Um snapshot de volume datado 17/10/2026 02:44,
+aproximadamente 9,34 GB, foi observado em tela, mas a integridade e a
+recuperabilidade NÃO foram provadas. Classificação **ACCEPTED_RISK**, jamais
+PASS técnico. Histórico PITR sem janela recente confirmada.
+
+Os passos originais de backup e PITR/restore abaixo ficam documentados
+APENAS como alternativas técnicas, **NÃO EXECUTAR na ONB-02 atual**,
+salvo mudança posterior expressa do responsável. O aceite dessa exceção
+não dispensa inventário read-only do banco real, conciliação de referências
+sem FK/JSONB, preservação do Acervo e de terceiros, testes adversariais,
+revisão independente e autorização R3/LOCK separada.
+
+Os instrumentos de comparação devem ser usados em instância sintética
+de schema equivalente, sem acessar ou alterar dados reais em produção.
+O inventário produtivo permitido é exclusivamente SELECT/read-only.
 
 ## 0. Gates de autorização da coleta
 
