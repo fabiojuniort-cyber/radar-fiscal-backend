@@ -7,7 +7,7 @@ import { withUserContext } from '../../infrastructure/database/tenant-context.js
 import {rememberDirectPreview,findDirectPreview,forgetDirectPreview} from './collection-filter.preview-witness.js';
 import {
   compileCollectionFilterPolicy, evaluateCollectionFilter,
-  normalizeCollectionFilterType, normalizeCollectionFilterSection, type CollectionFilterMode,
+  normalizeCollectionFilterType, normalizeCollectionFilterText, normalizeCollectionFilterSection, type CollectionFilterMode,
   type CollectionFilterPolicyInput, type CompiledCollectionFilterPolicy,
 } from './collection-filter.engine.js';
 
@@ -118,11 +118,12 @@ export function couldMatchDirectRule(
   if(!name)return false;
   const first=name.split(' ')[0]??'';
   const canonical=normalizeCollectionFilterType(rule.canonicalType);
-  const targetSection=normalizeCollectionFilterType(rule.section);
-  const sections=new Set([normalizeCollectionFilterType(rawSection),
+  const targetSection=normalizeCollectionFilterText(rule.section);
+  const sections=new Set([normalizeCollectionFilterText(rawSection),
     normalizeCollectionFilterSection(rawSection),'']);
+  const normalizedSource=normalizeCollectionFilterText(rule.sourceCode);
   for(const section of sections){
-    for(const pattern of policy.patterns.get([rule.sourceCode,section,first].join(String.fromCharCode(0)))??[]){
+    for(const pattern of policy.patterns.get([normalizedSource,section,first].join(String.fromCharCode(0)))??[]){
       if(pattern.rule.canonicalType===canonical&&
          pattern.rule.section===targetSection&&pattern.rule.mode===rule.mode&&
          (name===pattern.pattern||name.startsWith(pattern.pattern+' '))) return true;
