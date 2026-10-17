@@ -388,16 +388,15 @@ export async function saveDirectFilterRule(
       previewToken,policyRevision,confirmationToken);
     let rule:DirectRuleInput|undefined;
     let verified=false;
-    // Cheap no-lock comparison avoids locking writers when the cache is stale.
-    if(witness&&await directArchiveStamp(trx)===witness.archiveStamp){
-      // Acquire policy lock before evidence locks: fixed lock order prevents
-      // deadlock with a concurrent policy writer (also holding the revision).
-      const current=await sql<{revision:number}>`
-        SELECT public.collection_filter_safe_save_revision() AS revision
+    // A single SECURITY DEFINER helper obtains revision + evidence locks
+    // atomically with NOWAIT. On any stale proof/contended writer it releases
+    // all partial locks and returns false, so fallback never blocks ingestion.
+    if(witness){
+      const safe=await sql<{valid:boolean}>`
+        SELECT public.collection_filter_f3_safe_witness_valid(
+          ${policyRevision},${witness.archiveStamp}) AS valid
       `.execute(trx);
-      if(Number(current.rows[0]?.revision)!==policyRevision)
-        throw new RangeError('f3_preview_expired_or_policy_revision_changed');
-      if(await directArchiveStamp(trx,true)===witness.archiveStamp){
+      if(safe.rows[0]?.valid){
         rule=witness.rule;
         verified=true;
       }
