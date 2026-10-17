@@ -399,6 +399,10 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     // ran, even though the main transaction must roll back completely.
     const beforeRollback = await snapshotTargetAndAccount();
     await admin.query('CREATE SEQUENCE public.onb02_ci_audit_marker START 1');
+    const virgin=(await admin.query<{is_called:boolean;last_value:string}>(
+      'SELECT is_called,last_value::text FROM public.onb02_ci_audit_marker')).rows[0]!;
+    assert.equal(virgin.is_called,false,'negative control: uncalled sequence must not prove audit reached');
+    assert.equal(virgin.last_value,'1');
     await admin.query(`
       CREATE OR REPLACE FUNCTION public.onb02_ci_force_audit_failure()
       RETURNS trigger LANGUAGE plpgsql AS $onb02_ci$
@@ -418,9 +422,10 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
         method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
       });
       assert.equal(failedInAudit.statusCode,500,'must have reached injected audit failure');
-      const marker=(await admin.query<{last_value:string}>(
-        'SELECT last_value::text FROM public.onb02_ci_audit_marker')).rows[0]!;
-      assert.equal(marker.last_value,'1','audit failure MUST run after deletion');
+      const marker=(await admin.query<{last_value:string;is_called:boolean}>(
+        'SELECT last_value::text,is_called FROM public.onb02_ci_audit_marker')).rows[0]!;
+      assert.equal(marker.last_value,'1','first nextval returns sequence START value');
+      assert.equal(marker.is_called,true,'audit failure MUST invoke nextval after all DELETEs');
       assert.deepEqual(await snapshotTargetAndAccount(),beforeRollback,
         'all private and audit rows must roll back byte-for-byte');
       assert.deepEqual(await snapshotOtherGraph(),otherGraphBefore,
