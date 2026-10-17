@@ -20,7 +20,7 @@ interface TableSpec { id: string; parent?: string; tableIndex: number; startLine
   headerRows?: number; headerDomains?: Record<string, string | null> }
 interface EntitySpec { part: string; literal: string; nth?: number; domain: AnatomyGold['entities'][number]['domain']; note?: string; id?: string }
 interface ColumnEntitySpec { table: string; column: number; pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string; skipHeader?: boolean }
-interface Spec { id: string; annotator: string; annotatedAt: string; blocks: BlockSpec[]; tables?: TableSpec[]; entities?: EntitySpec[];
+export interface Spec { id: string; annotator: string; annotatedAt: string; blocks: BlockSpec[]; tables?: TableSpec[]; entities?: EntitySpec[];
   columnEntities?: ColumnEntitySpec[]; textEntities?: { pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string }[]; relations?: AnatomyGold['relations']; ranges?: boolean; review?: AnatomyGold['review']; gaps?: AnatomyGold['gaps']; notes?: string }
 
 const root = new URL('../../', import.meta.url);
@@ -64,8 +64,10 @@ export function tablesOf(html: string): Table[] {
   return tables;
 }
 
-export function buildGold(id: string): AnatomyGold {
-  const spec = JSON.parse(readFileSync(new URL(`ops/anatomy/gold-specs/${id}.json`, root), 'utf8')) as Spec;
+/** `transform` lets tests derive a variant of the committed spec in memory; the CLI never uses it. */
+export function buildGold(id: string, transform?: (spec: Spec) => Spec): AnatomyGold {
+  const loaded = JSON.parse(readFileSync(new URL(`ops/anatomy/gold-specs/${id}.json`, root), 'utf8')) as Spec;
+  const spec = transform ? transform(structuredClone(loaded)) : loaded;
   const entry = frozen.entries.find((e) => e.id === id);
   if (!entry) throw new Error(`${id} is not a frozen development entry`);
   const text = developmentCanonicalText(id);

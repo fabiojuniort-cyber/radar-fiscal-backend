@@ -45,6 +45,17 @@ test('approval is bound to the reviewed content hash; any later annotation chang
   rejects(changed, /needs a new review/);
 });
 
+test('rebuilding from a spec keeps a valid approval and rejects it after any content change', () => {
+  const submitted = goldContentSha256(buildGold('03'));
+  const approval = { reviewer: 'GPT-ASTRA', status: 'approved' as const, reviewedAt: '2026-10-17', approvedContentSha256: submitted, notes: 'synthetic approval for this test only' };
+  const approved = buildGold('03', (s) => ({ ...s, review: approval }));
+  assert.equal(approved.status, 'reviewed');
+  assert.equal(approved.review.approvedContentSha256, submitted);
+  assert.deepEqual(buildGold('03', (s) => ({ ...s, review: approval })), approved, 'rebuild is deterministic and keeps the approval');
+  assert.throws(() => buildGold('03', (s) => ({ ...s, review: approval, entities: s.entities!.map((e, i) => (i === 0 ? { ...e, note: `${e.note} (editado)` } : e)) })), /needs a new review/);
+  assert.throws(() => buildGold('03', (s) => ({ ...s, review: approval, blocks: s.blocks.map((b) => (b.id === 'intro' ? { ...b, context: 'unknown' as const } : b)) })), /needs a new review/);
+});
+
 test('committed development gold is reproducible from its human-written specs', () => {
   for (const id of ['01', '02', '03', '05', '07', '10', '11']) {
     assert.deepEqual(buildGold(id), JSON.parse(readFileSync(new URL(`${id}.json`, GOLD_DIR), 'utf8')), id);
