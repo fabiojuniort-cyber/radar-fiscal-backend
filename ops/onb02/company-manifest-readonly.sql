@@ -73,4 +73,36 @@ SELECT count(*) AS global_cnaes_total,
              ORDER BY c.code),'EMPTY')) AS cnaes_digest
 FROM cnaes c;
 
+-- Unrelated companies and their private dependencies must be byte-identical
+-- before/after a company purge in the isolated restore. Never expose rows.
+SELECT 'other_companies' AS relation,
+       count(*)::bigint AS rows,
+       md5(coalesce(string_agg(md5(to_jsonb(c)::text),'' ORDER BY c.id),'EMPTY')) AS fingerprint
+FROM companies c WHERE c.id <> :'company_id'::uuid
+UNION ALL
+SELECT 'other_establishments',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(e)::text),'' ORDER BY e.id),'EMPTY'))
+FROM establishments e WHERE e.company_id <> :'company_id'::uuid
+UNION ALL
+SELECT 'other_tax_profiles',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(p)::text),'' ORDER BY p.id),'EMPTY'))
+FROM company_tax_profiles p WHERE p.company_id <> :'company_id'::uuid
+UNION ALL
+SELECT 'other_products',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(p)::text),'' ORDER BY p.id),'EMPTY'))
+FROM company_product_profiles p WHERE p.company_id <> :'company_id'::uuid
+UNION ALL
+SELECT 'other_monitoring_profiles',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(mp)::text),'' ORDER BY mp.id),'EMPTY'))
+FROM monitoring_profiles mp WHERE mp.company_id <> :'company_id'::uuid
+UNION ALL
+SELECT 'other_company_publications',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(cp)::text),'' ORDER BY cp.id),'EMPTY'))
+FROM company_publications cp WHERE cp.company_id <> :'company_id'::uuid
+UNION ALL
+SELECT 'other_matches',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(pm)::text),'' ORDER BY pm.id),'EMPTY'))
+FROM publication_matches pm JOIN company_publications cp
+  ON cp.id=pm.company_publication_id WHERE cp.company_id <> :'company_id'::uuid;
+
 ROLLBACK;
