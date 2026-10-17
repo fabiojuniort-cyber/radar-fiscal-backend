@@ -192,7 +192,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       const blocked = await app.inject({
         method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
       });
-      assert.notEqual(blocked.statusCode,204,'inconsistent match must block purge');
+      assert.equal(blocked.statusCode,409,'inconsistent match must block purge');
       assert.equal(await count('companies','id',target.company.id),1);
       await admin.query('DELETE FROM publication_matches WHERE id=$1',[row.id]);
     };
@@ -222,7 +222,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       assert.equal(done,false,'deletion must wait for in-flight matching FK writer');
       await writer.query('COMMIT');
       const refused = await pendingDelete;
-      assert.notEqual(refused.statusCode,204);
+      assert.equal(refused.statusCode,409);
       assert.equal(await count('companies','id',target.company.id),1);
     } finally {
       // A real failed write remains atomic; remove test-only mismatched link.
@@ -254,7 +254,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     const ambiguous = await app.inject({
       method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
     });
-    assert.notEqual(ambiguous.statusCode,204);
+    assert.equal(ambiguous.statusCode,409);
     assert.equal(await count('companies','id',target.company.id),1);
     // The CNPJ is the explicit legacy link, unlike a customized account name.
     await admin.query('UPDATE tenant_onboarding_profiles SET cnpj=$2 WHERE tenant_id=$1',
