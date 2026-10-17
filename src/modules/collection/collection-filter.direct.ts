@@ -391,8 +391,7 @@ export async function saveDirectFilterRule(
     let rule:DirectRuleInput;
     if(witness&&await directArchiveStamp(trx,witness.rule.sourceCode)===witness.archiveStamp){
       const current=await sql<{revision:number}>`
-        SELECT revision FROM public.collection_filter_policies
-        WHERE status='APPROVED' FOR SHARE
+        SELECT public.collection_filter_safe_save_revision() AS revision
       `.execute(trx);
       if(Number(current.rows[0]?.revision)!==policyRevision)
         throw new RangeError('f3_preview_expired_or_policy_revision_changed');
