@@ -12,21 +12,21 @@ SELECT current_database() AS database_name, current_user AS inspection_role,
 -- Full recursive inbound FK graph. All tables that can contain company-owned
 -- references must be accounted for, including grandchildren and non-CASCADE.
 WITH RECURSIVE graph AS (
-  SELECT 'public.companies'::regclass AS table_oid,
+  SELECT 'public.companies'::regclass::oid AS table_oid,
          ARRAY['public.companies'::regclass::oid] AS ancestors,
          0 AS depth,
-         ''::text AS constraint_name,
-         ''::text AS delete_action
+         ''::text COLLATE "C" AS constraint_name,
+         ''::text COLLATE "C" AS delete_action
   UNION ALL
   SELECT fk.conrelid, graph.ancestors || fk.conrelid, graph.depth+1,
-         fk.conname::text,
+         fk.conname::text COLLATE "C",
          CASE fk.confdeltype
            WHEN 'c' THEN 'CASCADE'
            WHEN 'r' THEN 'RESTRICT'
            WHEN 'a' THEN 'NO ACTION'
            WHEN 'n' THEN 'SET NULL'
            WHEN 'd' THEN 'SET DEFAULT'
-           ELSE '?' END
+           ELSE '?' END COLLATE "C"
   FROM graph JOIN pg_constraint fk ON fk.contype='f'
    AND fk.confrelid=graph.table_oid
   WHERE graph.depth<16 AND NOT fk.conrelid=ANY(graph.ancestors)
