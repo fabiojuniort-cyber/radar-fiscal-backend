@@ -34,6 +34,27 @@ RETURNING id AS branch_id \gset
 INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
 VALUES(:'tenant_id'::uuid,'USER','ONB02_CI_AUDIT','establishment',:'branch_id',
   jsonb_build_object('company_id',:'company_id','branch_id',:'branch_id'));
+INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,is_current)
+VALUES (:'company_id'::uuid,1,'LUCRO_REAL',true)
+RETURNING id AS tax_profile_id \gset
+INSERT INTO company_product_profiles(company_id,product_label)
+VALUES (:'company_id'::uuid,'ONB02 CI Product')
+RETURNING id AS product_id \gset
+INSERT INTO monitoring_profiles(company_id,name)
+VALUES (:'company_id'::uuid,'ONB02 CI Monitoring')
+RETURNING id AS monitoring_id \gset
+INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,after_data)
+VALUES (:'tenant_id'::uuid,'USER','ONB02_CI_CNPJ','company',
+  jsonb_build_object('cnpj','11222333000181'));
+INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,after_data)
+VALUES (:'tenant_id'::uuid,'USER','ONB02_CI_PRODUCT','profile',
+  jsonb_build_object('old_product_id',:'product_id'));
+CREATE MATERIALIZED VIEW public.onb02_ci_private_tax_matview
+AS SELECT id FROM public.company_tax_profiles WITH NO DATA;
+CREATE VIEW public.onb02_ci_private_est_view
+AS SELECT id FROM public.establishments;
+CREATE VIEW public.onb02_ci_private_est_chain
+AS SELECT id FROM public.onb02_ci_private_est_view;
 INSERT INTO cnaes(code,description) VALUES('9900001','ONB02 synthetic') ON CONFLICT DO NOTHING;
 INSERT INTO company_cnaes(company_id,cnae_code)
 VALUES (:'sibling_company_id'::uuid,'9900001');
@@ -45,10 +66,18 @@ CREATE MATERIALIZED VIEW public.onb02_ci_dep_matview
 AS SELECT id FROM public.companies WITH NO DATA;
 \echo ONB02_TARGET_ID= :company_id
 \echo ONB02_BRANCH_ID= :branch_id
+\echo ONB02_TENANT_ID= :tenant_id
+\echo ONB02_PRODUCT_ID= :product_id
+\echo ONB02_TAX_ID= :tax_profile_id
+\echo ONB02_MONITORING_ID= :monitoring_id
 SQL
 
 target_id="$(awk '/^ONB02_TARGET_ID=/{print $2}' "$FIXTURE")"
 branch_id="$(awk '/^ONB02_BRANCH_ID=/{print $2}' "$FIXTURE")"
+tenant_id="$(awk '/^ONB02_TENANT_ID=/{print $2}' "$FIXTURE")"
+product_id="$(awk '/^ONB02_PRODUCT_ID=/{print $2}' "$FIXTURE")"
+tax_id="$(awk '/^ONB02_TAX_ID=/{print $2}' "$FIXTURE")"
+monitoring_id="$(awk '/^ONB02_MONITORING_ID=/{print $2}' "$FIXTURE")"
 test -n "$target_id"
 test -n "$branch_id"
 
@@ -61,6 +90,10 @@ test -n "$branch_id"
 grep -q 'onb02_ci_dep_direct_view' "$OUT"
 grep -q 'onb02_ci_dep_transitive' "$OUT"
 grep -q 'onb02_ci_dep_matview' "$OUT"
+grep -q 'onb02_ci_private_tax_matview' "$OUT"
+grep -q 'onb02_ci_private_est_chain' "$OUT"
+grep -q 'onb02_ci_private_est_view' "$OUT"
+grep -q 'FK_RECURSION_COMPLETE_WITHIN_LIMIT' "$OUT"
 grep -q 'ONB02_GLOBAL relation=' "$NOTICES"
 
 # Confirm actual data values, never just the SQL's header.
@@ -82,15 +115,28 @@ assert.ok(rows.some(s=>/^other_establishment_cnaes\|0\|[a-f0-9]{32}$/.test(s)),
  'target branch company_cnaes must not count as other company');
 assert.ok(rows.some(s=>/^other_companies\|2\|[a-f0-9]{32}$/.test(s)),
  'both unrelated companies must be counted');
+const scopeHeader=rows.findIndex(s=>s.startsWith('evidence_scope_status|old_ids_covered|'));
+assert.ok(scopeHeader>=0,'scope-aware audit report must be present');
+const scopeColumns=rows[scopeHeader].split('|');
+const scopeValues=rows[scopeHeader+1].split('|');
+const metric=k=>scopeValues[scopeColumns.indexOf(k)];
+assert.equal(metric('evidence_scope_status'),'CURRENT_SCOPE_VISIBLE');
+assert.equal(metric('historical_cnpj_mentions'),'1',
+ 'audit with CNPJ ONLY must not be missed');
+assert.equal(metric('historical_payload_id_mentions'),'2',
+ 'audit references of filial + product must be counted');
 console.log('ONB02_R3_SEMANTIC_SQL_PASS');
 NODE
 
 # Teardown on a synthetic disposable DB only.
 "${PSQL[@]}" -q <<'SQL'
+DROP VIEW public.onb02_ci_private_est_chain;
+DROP VIEW public.onb02_ci_private_est_view;
+DROP MATERIALIZED VIEW public.onb02_ci_private_tax_matview;
 DROP VIEW public.onb02_ci_dep_transitive;
 DROP VIEW public.onb02_ci_dep_direct_view;
 DROP MATERIALIZED VIEW public.onb02_ci_dep_matview;
-DELETE FROM audit_log WHERE action='ONB02_CI_AUDIT';
+DELETE FROM audit_log WHERE action IN ('ONB02_CI_AUDIT','ONB02_CI_CNPJ','ONB02_CI_PRODUCT');
 DELETE FROM tenants WHERE slug IN ('onb02-semantic-owner','onb02-semantic-foreign');
 DELETE FROM cnaes WHERE code='9900001';
 SQL
