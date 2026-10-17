@@ -383,7 +383,7 @@ export async function saveDirectFilterRule(
     // retain the old full recomputation. /confirm NEVER uses this shortcut.
     const witness=findDirectPreview(db,userId,input,expectedCount,
       previewToken,policyRevision,confirmationToken);
-    let rule:DirectRuleInput;
+    let rule:DirectRuleInput|undefined;
     let verified=false;
     // Cheap no-lock comparison avoids locking writers when the cache is stale.
     if(witness&&await directArchiveStamp(trx)===witness.archiveStamp){
@@ -409,6 +409,7 @@ export async function saveDirectFilterRule(
         throw new RangeError('f3_preview_expired_or_policy_revision_changed');
       rule=plan.rule;
     }
+    if(!rule)throw new Error('f3_safe_save_rule_unresolved');
     const result=await sql<{policy_revision:number}>`
       SELECT * FROM collection_filter_direct_set_rule(
         ${rule.sourceCode},${rule.section},${rule.canonicalType},
