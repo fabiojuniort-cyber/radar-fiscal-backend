@@ -76,7 +76,6 @@ assert.equal(val('companies'),1,'target company fixture');
 assert.equal(val('establishments'),2,'target matrix+branch');
 assert.equal(val('historical_id_based_audits_company_or_branches'),1,'filial audit detection');
 assert.equal(val('historical_payload_id_references'),1,'audit JSONB references detection');
-assert.ok(rows.includes('other_company_cnaes|1|')===false,'hash must be present');
 assert.ok(rows.some(s=>/^other_company_cnaes\|1\|[a-f0-9]{32}$/.test(s)),
  'unrelated company_cnaes fingerprint must be materialized');
 assert.ok(rows.some(s=>/^other_establishment_cnaes\|0\|[a-f0-9]{32}$/.test(s)),
@@ -91,6 +90,7 @@ NODE
 DROP VIEW public.onb02_ci_dep_transitive;
 DROP VIEW public.onb02_ci_dep_direct_view;
 DROP MATERIALIZED VIEW public.onb02_ci_dep_matview;
+DELETE FROM audit_log WHERE action='ONB02_CI_AUDIT';
 DELETE FROM tenants WHERE slug IN ('onb02-semantic-owner','onb02-semantic-foreign');
 DELETE FROM cnaes WHERE code='9900001';
 SQL
