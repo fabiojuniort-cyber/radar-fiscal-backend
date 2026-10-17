@@ -40,11 +40,18 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='platform_admin_required';
   END IF;
   IF p_lock THEN
-    SELECT string_agg(t.table_name||':'||t.revision::text,'|' ORDER BY t.table_name)
-      INTO v_stamp
-    FROM (SELECT table_name,revision
-          FROM public.collection_filter_f3_evidence_epoch
-          ORDER BY table_name FOR SHARE) t;
+    BEGIN
+      -- Never wait behind a writer holding only some epoch locks. A partial
+      -- blocking lock acquisition could otherwise deadlock against a
+      -- multi-table ingestion transaction. Fall back to the full F3 scan.
+      SELECT string_agg(t.table_name||':'||t.revision::text,'|' ORDER BY t.table_name)
+        INTO v_stamp
+      FROM (SELECT table_name,revision
+            FROM public.collection_filter_f3_evidence_epoch
+            ORDER BY table_name FOR SHARE NOWAIT) t;
+    EXCEPTION WHEN lock_not_available THEN
+      RETURN NULL; -- no fast-path capability; saves recompute as before
+    END;
   ELSE
     SELECT string_agg(table_name||':'||revision::text,'|' ORDER BY table_name)
       INTO v_stamp
