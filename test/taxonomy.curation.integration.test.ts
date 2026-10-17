@@ -610,6 +610,42 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         .sort((x, y) => String(x.code).localeCompare(String(y.code)));
     assert.deepEqual(pick(afterRoundTrip), pick(beforeRoundTrip));
 
+    // Clearing sector aliases preserves every other field/dimension and the
+    // global alias dictionary; the dry-run leaves the original draft intact.
+    {
+      const { clearSectorAliases, sectorAliases, sectorStateWithoutAliases } = await import('../src/modules/taxonomy/curation/curation.clear-sector-aliases.js');
+      const { updateConcept } = await import('../src/modules/taxonomy/curation/curation.draft.js');
+      const { loadReleaseView, pgRunner } = await import('../src/modules/taxonomy/curation/curation.read.js');
+      const client = await app.curatorPool!.connect();
+      let original: Awaited<ReturnType<typeof loadReleaseView>> = null;
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE radar_taxonomy_curator');
+        original = await loadReleaseView(pgRunner(client), draft.draft.id, { includeRetired: true });
+        const actor = { userId: 'ops:test-clear-aliases', justification: 'Clear sector aliases dry-run' };
+        await updateConcept(client, actor, 'sector.agribusiness', { aliases: [{ text: 'teste agrícola', aliasType: 'EXACT_LEXICAL' }] });
+        const before = await loadReleaseView(pgRunner(client), draft.draft.id, { includeRetired: true });
+        const dictionaryBefore = await client.query('SELECT count(*) FROM taxonomy_aliases');
+        const result = await clearSectorAliases(client, actor, before!);
+        assert.ok(result.removedSynonyms > 0);
+        assert.ok(result.recoveryAuditId);
+        const after = await loadReleaseView(pgRunner(client), draft.draft.id, { includeRetired: true });
+        assert.equal(sectorAliases(after!), 0);
+        assert.deepEqual(sectorStateWithoutAliases(after!), sectorStateWithoutAliases(before!));
+        assert.deepEqual(after!.concepts.filter(c => c.dimensionCode !== 'sector'), before!.concepts.filter(c => c.dimensionCode !== 'sector'));
+        assert.deepEqual((await client.query('SELECT count(*) FROM taxonomy_aliases')).rows, dictionaryBefore.rows);
+        const repeat = await clearSectorAliases(client, actor, after!);
+        assert.equal(repeat.removedSynonyms, 0);
+        assert.equal(repeat.rowsAffected, 0);
+      } finally { await client.query('ROLLBACK'); client.release(); }
+      const persisted = await app.curatorPool!.connect();
+      try {
+        await persisted.query('BEGIN READ ONLY');
+        await persisted.query('SET LOCAL ROLE radar_taxonomy_curator');
+        assert.deepEqual(await loadReleaseView(pgRunner(persisted), draft.draft.id, { includeRetired: true }), original);
+      } finally { await persisted.query('ROLLBACK'); persisted.release(); }
+    }
+
     // Bulk load of the PO's product sheet: the sheet is the latest truth
     // (rolled back here so the rest of the gate keeps its fixture).
     {
