@@ -1,21 +1,709 @@
 {
-  "goldVersion": "ANAT-GOLD/1.0.0",
-  "id": "11",
-  "partition": "development",
-  "preparation": "dou-xml-cdata/1.0.0",
-  "canonicalTextSha256": "f34ce3ce4ede15770ba1420763f80c3a83e76d252f6326b19920fde4a65a17ef",
-  "canonicalTextUtf16Length": 17021,
-  "status": "not_started",
-  "annotator": null,
-  "annotatedAt": null,
-  "parts": [],
-  "entities": [],
-  "relations": [],
-  "gaps": [],
-  "review": {
-    "reviewer": null,
-    "status": "not_requested",
-    "reviewedAt": null,
-    "notes": ""
+ "goldVersion": "ANAT-GOLD/1.0.0",
+ "id": "11",
+ "partition": "development",
+ "preparation": "dou-xml-cdata/1.0.0",
+ "canonicalTextSha256": "f34ce3ce4ede15770ba1420763f80c3a83e76d252f6326b19920fde4a65a17ef",
+ "canonicalTextUtf16Length": 17021,
+ "status": "prepared",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "parts": [
+  {
+   "id": "doc",
+   "parentId": null,
+   "order": 0,
+   "type": "document",
+   "span": {
+    "start": 0,
+    "end": 17021
+   },
+   "context": "unknown",
+   "contextReason": "document",
+   "table": null
+  },
+  {
+   "id": "ep",
+   "parentId": "doc",
+   "order": 0,
+   "type": "epigraph",
+   "span": {
+    "start": 0,
+    "end": 59
+   },
+   "context": "prohibited",
+   "contextReason": "dou_identifica",
+   "table": null
+  },
+  {
+   "id": "em",
+   "parentId": "doc",
+   "order": 1,
+   "type": "summary",
+   "span": {
+    "start": 60,
+    "end": 292
+   },
+   "context": "prohibited",
+   "contextReason": "dou_ementa",
+   "table": null
+  },
+  {
+   "id": "pre",
+   "parentId": "doc",
+   "order": 2,
+   "type": "preamble",
+   "span": {
+    "start": 293,
+    "end": 638
+   },
+   "context": "prohibited",
+   "contextReason": "preamble",
+   "table": null
+  },
+  {
+   "id": "a1",
+   "parentId": "doc",
+   "order": 3,
+   "type": "article",
+   "span": {
+    "start": 639,
+    "end": 14873
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a2",
+   "parentId": "doc",
+   "order": 4,
+   "type": "article",
+   "span": {
+    "start": 14874,
+    "end": 15035
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a3",
+   "parentId": "doc",
+   "order": 5,
+   "type": "article",
+   "span": {
+    "start": 15036,
+    "end": 15305
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a4",
+   "parentId": "doc",
+   "order": 6,
+   "type": "article",
+   "span": {
+    "start": 15306,
+    "end": 16017
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a5",
+   "parentId": "doc",
+   "order": 7,
+   "type": "article",
+   "span": {
+    "start": 16018,
+    "end": 16898
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a6",
+   "parentId": "doc",
+   "order": 8,
+   "type": "article",
+   "span": {
+    "start": 16899,
+    "end": 17000
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "sig",
+   "parentId": "doc",
+   "order": 9,
+   "type": "signature",
+   "span": {
+    "start": 17001,
+    "end": 17019
+   },
+   "context": "prohibited",
+   "contextReason": "dou_assina",
+   "table": null
+  },
+  {
+   "id": "a1-q1",
+   "parentId": "a1",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 753,
+    "end": 1336
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q2",
+   "parentId": "a1",
+   "order": 1,
+   "type": "quoted_text",
+   "span": {
+    "start": 1337,
+    "end": 2267
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q3",
+   "parentId": "a1",
+   "order": 2,
+   "type": "quoted_text",
+   "span": {
+    "start": 2268,
+    "end": 3028
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q4",
+   "parentId": "a1",
+   "order": 3,
+   "type": "quoted_text",
+   "span": {
+    "start": 3029,
+    "end": 3872
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q5",
+   "parentId": "a1",
+   "order": 4,
+   "type": "quoted_text",
+   "span": {
+    "start": 3873,
+    "end": 5483
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q6",
+   "parentId": "a1",
+   "order": 5,
+   "type": "quoted_text",
+   "span": {
+    "start": 5484,
+    "end": 5826
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q7",
+   "parentId": "a1",
+   "order": 6,
+   "type": "quoted_text",
+   "span": {
+    "start": 5827,
+    "end": 6951
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q8",
+   "parentId": "a1",
+   "order": 7,
+   "type": "quoted_text",
+   "span": {
+    "start": 6952,
+    "end": 8172
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q9",
+   "parentId": "a1",
+   "order": 8,
+   "type": "quoted_text",
+   "span": {
+    "start": 8173,
+    "end": 8502
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q10",
+   "parentId": "a1",
+   "order": 9,
+   "type": "quoted_text",
+   "span": {
+    "start": 8503,
+    "end": 8983
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q11",
+   "parentId": "a1",
+   "order": 10,
+   "type": "quoted_text",
+   "span": {
+    "start": 8984,
+    "end": 9648
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q12",
+   "parentId": "a1",
+   "order": 11,
+   "type": "quoted_text",
+   "span": {
+    "start": 9649,
+    "end": 10345
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q13",
+   "parentId": "a1",
+   "order": 12,
+   "type": "quoted_text",
+   "span": {
+    "start": 10346,
+    "end": 11969
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q14",
+   "parentId": "a1",
+   "order": 13,
+   "type": "quoted_text",
+   "span": {
+    "start": 11970,
+    "end": 13362
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a1-q15",
+   "parentId": "a1",
+   "order": 14,
+   "type": "quoted_text",
+   "span": {
+    "start": 13363,
+    "end": 14873
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a3-q1",
+   "parentId": "a3",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 15216,
+    "end": 15305
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a4-i1",
+   "parentId": "a4",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 15443,
+    "end": 15570
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a4-i2",
+   "parentId": "a4",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 15571,
+    "end": 15714
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a4-i3",
+   "parentId": "a4",
+   "order": 2,
+   "type": "inciso",
+   "span": {
+    "start": 15715,
+    "end": 15881
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a4-i4",
+   "parentId": "a4",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 15882,
+    "end": 16017
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a5-i1",
+   "parentId": "a5",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 16185,
+    "end": 16307
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a5-i2",
+   "parentId": "a5",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 16308,
+    "end": 16450
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a5-i3",
+   "parentId": "a5",
+   "order": 2,
+   "type": "inciso",
+   "span": {
+    "start": 16451,
+    "end": 16596
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a5-i4",
+   "parentId": "a5",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 16597,
+    "end": 16747
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a5-i5",
+   "parentId": "a5",
+   "order": 4,
+   "type": "inciso",
+   "span": {
+    "start": 16748,
+    "end": 16898
+   },
+   "context": "operative_candidate",
+   "contextReason": "inciso_marker",
+   "table": null
+  },
+  {
+   "id": "a4-i1-q",
+   "parentId": "a4-i1",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 15534,
+    "end": 15570
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a4-i2-q",
+   "parentId": "a4-i2",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 15664,
+    "end": 15714
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a4-i3-q",
+   "parentId": "a4-i3",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 15810,
+    "end": 15881
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a4-i4-q",
+   "parentId": "a4-i4",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 15975,
+    "end": 16017
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a5-i1-q",
+   "parentId": "a5-i1",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 16285,
+    "end": 16307
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a5-i2-q",
+   "parentId": "a5-i2",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 16409,
+    "end": 16450
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a5-i3-q",
+   "parentId": "a5-i3",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 16553,
+    "end": 16596
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a5-i4-q",
+   "parentId": "a5-i4",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 16698,
+    "end": 16747
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
+  },
+  {
+   "id": "a5-i5-q",
+   "parentId": "a5-i5",
+   "order": 0,
+   "type": "quoted_text",
+   "span": {
+    "start": 16848,
+    "end": 16898
+   },
+   "context": "prohibited",
+   "contextReason": "amended_wording",
+   "table": null
   }
+ ],
+ "entities": [
+  {
+   "id": "e1",
+   "partId": "em",
+   "span": {
+    "start": 69,
+    "end": 126
+   },
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e2",
+   "partId": "pre",
+   "span": {
+    "start": 513,
+    "end": 555
+   },
+   "literal": "Portaria ME nº 284, de 27 de julho de 2020",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e3",
+   "partId": "pre",
+   "span": {
+    "start": 588,
+    "end": 628
+   },
+   "literal": "Lei nº 15.079, de 27 de dezembro de 2024",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e4",
+   "partId": "a1",
+   "span": {
+    "start": 649,
+    "end": 706
+   },
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": "ato alterado"
+  },
+  {
+   "id": "e5",
+   "partId": "a2",
+   "span": {
+    "start": 14977,
+    "end": 15034
+   },
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e6",
+   "partId": "a3",
+   "span": {
+    "start": 15088,
+    "end": 15145
+   },
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e7",
+   "partId": "a4",
+   "span": {
+    "start": 15384,
+    "end": 15441
+   },
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e8",
+   "partId": "a5",
+   "span": {
+    "start": 16126,
+    "end": 16183
+   },
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": ""
+  }
+ ],
+ "relations": [],
+ "gaps": [
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Bloco citado do art. 143-L (linhas 83-90) termina em \". (NR)\" sem aspas de fechamento na fonte; o gold fecha a redação citada no (NR)."
+  },
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Estrutura interna das redações citadas não anotada (zona proibida)."
+  }
+ ],
+ "review": {
+  "reviewer": null,
+  "status": "requested",
+  "reviewedAt": null,
+  "notes": "IN que altera a IN RFB 2.228/2024. Cada redação citada (de \" até (NR)) é um único quoted_text proibido; a estrutura interna da redação citada (arts. 143-A a 143-L, §§, incisos) não é anotada como dispositivo próprio. Remissões internas (art. 143-J etc.) e percentuais fora do escopo de entidades v1. Sem NCM."
+ }
 }

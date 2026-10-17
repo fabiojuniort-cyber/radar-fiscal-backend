@@ -1,0 +1,39 @@
+{
+ "notes": "Anexos: I e II vigentes candidatos (Conv. 89/09); versões anteriores do Anexo I (Conv. 112/08) e do Anexo II (Conv. 112/08) e redação original dos Anexos I e II (NBM/SH) são irmãs históricas no nível do documento, por estarem separadas no texto. Linhas de nota dentro das tabelas são notas editoriais; a linha imediatamente seguinte a uma nota 'Redação anterior' (RemissoAnt) é a redação anterior do mesmo subitem (histórica). Coluna NCM/SH: códigos NCM (8 e 6 dígitos; 4 casos atípicos dddd.dddd anotados como NCM com nota); tabelas originais: códigos NBM/SH de 10 dígitos como NBM. Faixas 'X a Y' anotadas como relação range sem expansão. Ocorrências históricas (ex.: 8450.11.00) permanecem anotadas com contexto histórico.",
+ "overrides": {
+  "annex-119": { "at": { "lines": [244, 9553] }, "parent": null },
+  "editorial_note-122": { "parent": null },
+  "annex-123": { "at": { "lines": [9557, 16195] }, "parent": null },
+  "annex-127": { "at": { "lines": [16199, 18198] }, "parent": null },
+  "editorial_note-130": { "parent": null },
+  "annex-131": { "at": { "lines": [18202, 18844] }, "parent": null },
+  "editorial_note-134": { "parent": null },
+  "annex-135": { "at": { "lines": [18848, 25219] }, "parent": null },
+  "annex-138": { "at": { "lines": [25221, 25946] }, "parent": null }
+ },
+ "tables": [
+  { "id": "t1", "parent": "annex-119", "tableIndex": 0, "startLine": 250, "context": "operative_candidate", "reason": "annex_table_row", "headerRows": 1, "headerDomains": { "2": "NCM" },
+    "classContext": { "historical": ["RedaoAnt", "A8-3RedacaoAnt"], "note": ["Remisso", "RemissoAnt", "A8-1Remissao", "A8-2RemissaoAnt", "DataPublicao", "A2DataPublicacao"], "previousWordingNote": ["RemissoAnt", "A8-2RemissaoAnt"] } },
+  { "id": "t2", "parent": "annex-123", "tableIndex": 1, "startLine": 9563, "context": "historical", "reason": "previous_annex_wording", "headerRows": 1, "headerDomains": { "2": "NCM" },
+    "classContext": { "historical": [], "note": ["Remisso", "RemissoAnt", "A8-1Remissao", "A8-2RemissaoAnt"] } },
+  { "id": "t3", "parent": "annex-127", "tableIndex": 2, "startLine": 16204, "context": "operative_candidate", "reason": "annex_table_row", "headerRows": 1, "headerDomains": { "2": "NCM" },
+    "classContext": { "historical": ["RedaoAnt", "A8-3RedacaoAnt"], "note": ["Remisso", "RemissoAnt", "A8-1Remissao", "A8-2RemissaoAnt", "DataPublicao", "A2DataPublicacao"], "previousWordingNote": ["RemissoAnt", "A8-2RemissaoAnt"] } },
+  { "id": "t4", "parent": "annex-131", "tableIndex": 3, "startLine": 18208, "context": "historical", "reason": "previous_annex_wording", "headerRows": 1, "headerDomains": { "1": "NCM" },
+    "classContext": { "historical": [], "note": ["Remisso", "RemissoAnt", "A8-1Remissao", "A8-2RemissaoAnt"] } },
+  { "id": "t5", "parent": "annex-135", "tableIndex": 4, "startLine": 18854, "context": "historical", "reason": "original_annex_wording", "headerRows": 1, "headerDomains": { "2": "NBM" },
+    "classContext": { "historical": [], "note": ["Remisso", "RemissoAnt", "A8-1Remissao", "A8-2RemissaoAnt"] } },
+  { "id": "t6", "parent": "annex-138", "tableIndex": 5, "startLine": 25227, "context": "historical", "reason": "original_annex_wording", "headerRows": 1, "headerDomains": { "1": "NBM" },
+    "classContext": { "historical": [], "note": ["Remisso", "RemissoAnt", "A8-1Remissao", "A8-2RemissaoAnt"] } }
+ ],
+ "ranges": true,
+ "textEntities": [
+  { "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}\\.\\d{4}(?![\\d.])", "domain": "NBM", "note": "código NBM/SH de 10 dígitos" },
+  { "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}\\.\\d{2}(?![\\d.])", "domain": "NCM", "note": "NCM 8 dígitos" },
+  { "pattern": "(?<![\\d.])\\d{4}\\.\\d{4}(?![\\d.])", "domain": "NCM", "note": "NCM 8 dígitos em formato atípico dddd.dddd (fonte)" },
+  { "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}(?![\\d.])", "domain": "NCM", "note": "NCM 6 dígitos (subposição)" }
+ ],
+ "gaps": [
+  { "kind": "other", "span": null, "resource": null, "note": "Códigos de 4 dígitos sem ponto (posição) e listas sem separador não foram enumerados; a revisão deve conferir as células com texto livre na coluna NCM." },
+  { "kind": "other", "span": null, "resource": null, "note": "Linhas 'Redação anterior' em tabelas: considerada histórica apenas a sequência de linhas imediatamente seguinte com o mesmo nº de item; casos de múltiplos itens dependem de revisão." }
+ ]
+}

@@ -1,21 +1,171 @@
 {
-  "goldVersion": "ANAT-GOLD/1.0.0",
-  "id": "05",
-  "partition": "development",
-  "preparation": "dou-xml-cdata/1.0.0",
-  "canonicalTextSha256": "7dc6c74fc357f2ff303cf84fcc8f31b003969795235e871ee2d27f24266b9276",
-  "canonicalTextUtf16Length": 1099,
-  "status": "not_started",
-  "annotator": null,
-  "annotatedAt": null,
-  "parts": [],
-  "entities": [],
-  "relations": [],
-  "gaps": [],
-  "review": {
-    "reviewer": null,
-    "status": "not_requested",
-    "reviewedAt": null,
-    "notes": ""
+ "goldVersion": "ANAT-GOLD/1.0.0",
+ "id": "05",
+ "partition": "development",
+ "preparation": "dou-xml-cdata/1.0.0",
+ "canonicalTextSha256": "7dc6c74fc357f2ff303cf84fcc8f31b003969795235e871ee2d27f24266b9276",
+ "canonicalTextUtf16Length": 1099,
+ "status": "prepared",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "parts": [
+  {
+   "id": "doc",
+   "parentId": null,
+   "order": 0,
+   "type": "document",
+   "span": {
+    "start": 0,
+    "end": 1099
+   },
+   "context": "unknown",
+   "contextReason": "document",
+   "table": null
+  },
+  {
+   "id": "ep",
+   "parentId": "doc",
+   "order": 0,
+   "type": "epigraph",
+   "span": {
+    "start": 0,
+    "end": 66
+   },
+   "context": "prohibited",
+   "contextReason": "dou_identifica",
+   "table": null
+  },
+  {
+   "id": "em",
+   "parentId": "doc",
+   "order": 1,
+   "type": "summary",
+   "span": {
+    "start": 67,
+    "end": 145
+   },
+   "context": "prohibited",
+   "contextReason": "dou_ementa",
+   "table": null
+  },
+  {
+   "id": "pre",
+   "parentId": "doc",
+   "order": 2,
+   "type": "preamble",
+   "span": {
+    "start": 146,
+    "end": 600
+   },
+   "context": "prohibited",
+   "contextReason": "preamble",
+   "table": null
+  },
+  {
+   "id": "a1",
+   "parentId": "doc",
+   "order": 3,
+   "type": "article",
+   "span": {
+    "start": 601,
+    "end": 855
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a2",
+   "parentId": "doc",
+   "order": 4,
+   "type": "article",
+   "span": {
+    "start": 856,
+    "end": 953
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "a3",
+   "parentId": "doc",
+   "order": 5,
+   "type": "article",
+   "span": {
+    "start": 954,
+    "end": 1062
+   },
+   "context": "operative_candidate",
+   "contextReason": "article_marker",
+   "table": null
+  },
+  {
+   "id": "sig",
+   "parentId": "doc",
+   "order": 6,
+   "type": "signature",
+   "span": {
+    "start": 1063,
+    "end": 1097
+   },
+   "context": "prohibited",
+   "contextReason": "dou_assina",
+   "table": null
   }
+ ],
+ "entities": [
+  {
+   "id": "e1",
+   "partId": "pre",
+   "span": {
+    "start": 245,
+    "end": 301
+   },
+   "literal": "Instrução Normativa RFB nº 2.318, de 26 de março de 2026",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e2",
+   "partId": "pre",
+   "span": {
+    "start": 307,
+    "end": 352
+   },
+   "literal": "Portaria Coana nº 189, de 16 de abril de 2026",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e3",
+   "partId": "pre",
+   "span": {
+    "start": 566,
+    "end": 571
+   },
+   "literal": "25724",
+   "domain": "OTHER",
+   "note": "nº de requerimento OEA"
+  },
+  {
+   "id": "e4",
+   "partId": "a1",
+   "span": {
+    "start": 836,
+    "end": 854
+   },
+   "literal": "18.483.666/0001-03",
+   "domain": "CNPJ",
+   "note": ""
+  }
+ ],
+ "relations": [],
+ "gaps": [],
+ "review": {
+  "reviewer": null,
+  "status": "requested",
+  "reviewedAt": null,
+  "notes": "ADE Coana: três artigos operativos; preâmbulo com citações; CNPJ da certificada. Sem NCM."
+ }
 }

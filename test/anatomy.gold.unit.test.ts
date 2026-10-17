@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { developmentCanonicalText, GOLD_DIR } from '../ops/anatomy/annotation-pack.js';
+import { buildGold } from '../ops/anatomy/gold-build.js';
 import { sha256 } from '../src/modules/anatomy/contract.js';
 import { ANATOMY_GOLD_VERSION, validateAnatomyGold, type AnatomyGold } from '../src/modules/anatomy/gold.js';
 
@@ -32,7 +33,13 @@ test('gold invariants fail closed', () => {
   rejects({ ...base(), partition: 'reserved-final' }, /partition|invalid/i);
 });
 
-test('committed development skeletons match the frozen canonical text and contain no engine output', () => {
+test('committed development gold is reproducible from its human-written specs', () => {
+  for (const id of ['01', '02', '03', '05', '07', '10', '11']) {
+    assert.deepEqual(buildGold(id), JSON.parse(readFileSync(new URL(`${id}.json`, GOLD_DIR), 'utf8')), id);
+  }
+});
+
+test('committed development gold matches the frozen canonical text and is not marked reviewed', () => {
   const files = readdirSync(GOLD_DIR).filter((f) => f.endsWith('.json')).sort();
   assert.deepEqual(files, ['01.json', '02.json', '03.json', '05.json', '07.json', '10.json', '11.json']);
   for (const f of files) {

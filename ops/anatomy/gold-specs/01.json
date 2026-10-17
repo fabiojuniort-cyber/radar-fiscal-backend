@@ -1,0 +1,1632 @@
+{
+ "id": "01",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (\", 97/99, 08/00\") após o primeiro não anotados. Anexos: I e II vigentes candidatos (Conv. 89/09); versões anteriores do Anexo I (Conv. 112/08) e do Anexo II (Conv. 112/08) e redação original dos Anexos I e II (NBM/SH) são irmãs históricas no nível do documento, por estarem separadas no texto. Linhas de nota dentro das tabelas são notas editoriais; a linha imediatamente seguinte a uma nota 'Redação anterior' (RemissoAnt) é a redação anterior do mesmo subitem (histórica). Coluna NCM/SH: códigos NCM (8 e 6 dígitos; 4 casos atípicos dddd.dddd anotados como NCM com nota); tabelas originais: códigos NBM/SH de 10 dígitos como NBM. Faixas 'X a Y' anotadas como relação range sem expansão. Ocorrências históricas (ex.: 8450.11.00) permanecem anotadas com contexto histórico.",
+ "blocks": [
+  {
+   "id": "epigraph-0",
+   "type": "epigraph",
+   "at": {
+    "line": 1
+   },
+   "context": "prohibited",
+   "reason": "confaz_title"
+  },
+  {
+   "id": "editorial_note-1",
+   "type": "editorial_note",
+   "at": {
+    "line": 3
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-2",
+   "type": "editorial_note",
+   "at": {
+    "line": 5
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-3",
+   "type": "editorial_note",
+   "at": {
+    "line": 7
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-4",
+   "type": "editorial_note",
+   "at": {
+    "line": 9
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-5",
+   "type": "editorial_note",
+   "at": {
+    "line": 11
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-6",
+   "type": "editorial_note",
+   "at": {
+    "line": 13
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-7",
+   "type": "editorial_note",
+   "at": {
+    "line": 15
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-8",
+   "type": "editorial_note",
+   "at": {
+    "line": 17
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-9",
+   "type": "editorial_note",
+   "at": {
+    "line": 19
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-10",
+   "type": "editorial_note",
+   "at": {
+    "line": 21
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-11",
+   "type": "editorial_note",
+   "at": {
+    "line": 23
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-12",
+   "type": "editorial_note",
+   "at": {
+    "line": 25
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-13",
+   "type": "editorial_note",
+   "at": {
+    "line": 27
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-14",
+   "type": "editorial_note",
+   "at": {
+    "line": 29
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-15",
+   "type": "editorial_note",
+   "at": {
+    "line": 31
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-16",
+   "type": "editorial_note",
+   "at": {
+    "line": 33
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-17",
+   "type": "editorial_note",
+   "at": {
+    "line": 35
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-18",
+   "type": "editorial_note",
+   "at": {
+    "line": 37
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-19",
+   "type": "editorial_note",
+   "at": {
+    "line": 39
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-20",
+   "type": "editorial_note",
+   "at": {
+    "line": 41
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-21",
+   "type": "editorial_note",
+   "at": {
+    "line": 43
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-22",
+   "type": "editorial_note",
+   "at": {
+    "line": 45
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-23",
+   "type": "editorial_note",
+   "at": {
+    "line": 47
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-24",
+   "type": "editorial_note",
+   "at": {
+    "line": 49
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-25",
+   "type": "editorial_note",
+   "at": {
+    "line": 51
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-26",
+   "type": "editorial_note",
+   "at": {
+    "line": 53
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-27",
+   "type": "editorial_note",
+   "at": {
+    "line": 55
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-28",
+   "type": "editorial_note",
+   "at": {
+    "line": 57
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-29",
+   "type": "editorial_note",
+   "at": {
+    "line": 59
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-30",
+   "type": "editorial_note",
+   "at": {
+    "line": 61
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-31",
+   "type": "editorial_note",
+   "at": {
+    "line": 63
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-32",
+   "type": "editorial_note",
+   "at": {
+    "line": 65
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-33",
+   "type": "editorial_note",
+   "at": {
+    "line": 67
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-34",
+   "type": "editorial_note",
+   "at": {
+    "line": 69
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-35",
+   "type": "editorial_note",
+   "at": {
+    "line": 71
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-36",
+   "type": "editorial_note",
+   "at": {
+    "line": 73
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-37",
+   "type": "editorial_note",
+   "at": {
+    "line": 75
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-38",
+   "type": "editorial_note",
+   "at": {
+    "line": 77
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-39",
+   "type": "editorial_note",
+   "at": {
+    "line": 79
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-40",
+   "type": "editorial_note",
+   "at": {
+    "line": 81
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-41",
+   "type": "editorial_note",
+   "at": {
+    "line": 83
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "editorial_note-42",
+   "type": "editorial_note",
+   "at": {
+    "line": 85
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "summary-43",
+   "type": "summary",
+   "at": {
+    "line": 92
+   },
+   "context": "prohibited",
+   "reason": "confaz_ementa"
+  },
+  {
+   "id": "preamble-44",
+   "type": "preamble",
+   "at": {
+    "line": 94
+   },
+   "context": "prohibited",
+   "reason": "preamble"
+  },
+  {
+   "id": "body-45",
+   "type": "body",
+   "at": {
+    "line": 96
+   },
+   "context": "prohibited",
+   "reason": "act_type_heading"
+  },
+  {
+   "id": "editorial_note-46",
+   "type": "editorial_note",
+   "at": {
+    "line": 98
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "clause-47",
+   "type": "clause",
+   "at": {
+    "lines": [
+     100,
+     132
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "inciso-48",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     102,
+     106
+    ]
+   },
+   "parent": "clause-47",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "alinea-49",
+   "type": "alinea",
+   "at": {
+    "line": 104
+   },
+   "parent": "inciso-48",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "alinea-50",
+   "type": "alinea",
+   "at": {
+    "line": 106
+   },
+   "parent": "inciso-48",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-51",
+   "type": "editorial_note",
+   "at": {
+    "line": 108
+   },
+   "parent": "clause-47",
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "inciso-52",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     110,
+     114
+    ]
+   },
+   "parent": "clause-47",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-53",
+   "type": "editorial_note",
+   "at": {
+    "line": 112
+   },
+   "parent": "inciso-52",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "inciso-54",
+   "type": "inciso",
+   "at": {
+    "line": 114
+   },
+   "parent": "inciso-52",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-55",
+   "type": "editorial_note",
+   "at": {
+    "line": 116
+   },
+   "parent": "clause-47",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "clause-56",
+   "type": "clause",
+   "at": {
+    "lines": [
+     118,
+     132
+    ]
+   },
+   "parent": "clause-47",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "inciso-57",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     120,
+     124
+    ]
+   },
+   "parent": "clause-56",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "alinea-58",
+   "type": "alinea",
+   "at": {
+    "line": 122
+   },
+   "parent": "inciso-57",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "alinea-59",
+   "type": "alinea",
+   "at": {
+    "line": 124
+   },
+   "parent": "inciso-57",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-60",
+   "type": "editorial_note",
+   "at": {
+    "line": 126
+   },
+   "parent": "clause-56",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "inciso-61",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     128,
+     130
+    ]
+   },
+   "parent": "clause-56",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "body-62",
+   "type": "body",
+   "at": {
+    "line": 130
+   },
+   "parent": "inciso-61",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "inciso-63",
+   "type": "inciso",
+   "at": {
+    "line": 132
+   },
+   "parent": "clause-56",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-64",
+   "type": "editorial_note",
+   "at": {
+    "line": 134
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "clause-65",
+   "type": "clause",
+   "at": {
+    "lines": [
+     136,
+     180
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "inciso-66",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     138,
+     142
+    ]
+   },
+   "parent": "clause-65",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "alinea-67",
+   "type": "alinea",
+   "at": {
+    "line": 140
+   },
+   "parent": "inciso-66",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "alinea-68",
+   "type": "alinea",
+   "at": {
+    "line": 142
+   },
+   "parent": "inciso-66",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-69",
+   "type": "editorial_note",
+   "at": {
+    "line": 144
+   },
+   "parent": "clause-65",
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "inciso-70",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     146,
+     150
+    ]
+   },
+   "parent": "clause-65",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-71",
+   "type": "editorial_note",
+   "at": {
+    "line": 148
+   },
+   "parent": "inciso-70",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "inciso-72",
+   "type": "inciso",
+   "at": {
+    "line": 150
+   },
+   "parent": "inciso-70",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-73",
+   "type": "editorial_note",
+   "at": {
+    "line": 152
+   },
+   "parent": "clause-65",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "clause-74",
+   "type": "clause",
+   "at": {
+    "lines": [
+     154,
+     162
+    ]
+   },
+   "parent": "clause-65",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "inciso-75",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     156,
+     160
+    ]
+   },
+   "parent": "clause-74",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "alinea-76",
+   "type": "alinea",
+   "at": {
+    "line": 158
+   },
+   "parent": "inciso-75",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "alinea-77",
+   "type": "alinea",
+   "at": {
+    "line": 160
+   },
+   "parent": "inciso-75",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "inciso-78",
+   "type": "inciso",
+   "at": {
+    "line": 162
+   },
+   "parent": "clause-74",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-79",
+   "type": "editorial_note",
+   "at": {
+    "line": 164
+   },
+   "parent": "clause-65",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "clause-80",
+   "type": "clause",
+   "at": {
+    "lines": [
+     166,
+     180
+    ]
+   },
+   "parent": "clause-65",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "inciso-81",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     168,
+     172
+    ]
+   },
+   "parent": "clause-80",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "alinea-82",
+   "type": "alinea",
+   "at": {
+    "line": 170
+   },
+   "parent": "inciso-81",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "alinea-83",
+   "type": "alinea",
+   "at": {
+    "line": 172
+   },
+   "parent": "inciso-81",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-84",
+   "type": "editorial_note",
+   "at": {
+    "line": 174
+   },
+   "parent": "clause-80",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "inciso-85",
+   "type": "inciso",
+   "at": {
+    "line": 176
+   },
+   "parent": "clause-80",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-86",
+   "type": "editorial_note",
+   "at": {
+    "line": 178
+   },
+   "parent": "clause-80",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "inciso-87",
+   "type": "inciso",
+   "at": {
+    "line": 180
+   },
+   "parent": "clause-80",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-88",
+   "type": "editorial_note",
+   "at": {
+    "line": 182
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "clause-89",
+   "type": "clause",
+   "at": {
+    "lines": [
+     184,
+     190
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-90",
+   "type": "editorial_note",
+   "at": {
+    "line": 186
+   },
+   "parent": "clause-89",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "clause-91",
+   "type": "clause",
+   "at": {
+    "lines": [
+     188,
+     190
+    ]
+   },
+   "parent": "clause-89",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "paragraph-92",
+   "type": "paragraph",
+   "at": {
+    "line": 190
+   },
+   "parent": "clause-91",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-93",
+   "type": "editorial_note",
+   "at": {
+    "line": 192
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "clause-94",
+   "type": "clause",
+   "at": {
+    "lines": [
+     194,
+     222
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-95",
+   "type": "editorial_note",
+   "at": {
+    "line": 196
+   },
+   "parent": "clause-94",
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "paragraph-96",
+   "type": "paragraph",
+   "at": {
+    "lines": [
+     198,
+     214
+    ]
+   },
+   "parent": "clause-94",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-97",
+   "type": "editorial_note",
+   "at": {
+    "line": 200
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "paragraph-98",
+   "type": "paragraph",
+   "at": {
+    "line": 202
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-99",
+   "type": "editorial_note",
+   "at": {
+    "line": 204
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "paragraph-100",
+   "type": "paragraph",
+   "at": {
+    "line": 206
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-101",
+   "type": "editorial_note",
+   "at": {
+    "line": 208
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "paragraph-102",
+   "type": "paragraph",
+   "at": {
+    "line": 210
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-103",
+   "type": "editorial_note",
+   "at": {
+    "line": 212
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "paragraph-104",
+   "type": "paragraph",
+   "at": {
+    "line": 214
+   },
+   "parent": "paragraph-96",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-105",
+   "type": "editorial_note",
+   "at": {
+    "line": 216
+   },
+   "parent": "clause-94",
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "paragraph-106",
+   "type": "paragraph",
+   "at": {
+    "lines": [
+     218,
+     222
+    ]
+   },
+   "parent": "clause-94",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-107",
+   "type": "editorial_note",
+   "at": {
+    "line": 220
+   },
+   "parent": "paragraph-106",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "paragraph-108",
+   "type": "paragraph",
+   "at": {
+    "line": 222
+   },
+   "parent": "paragraph-106",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-109",
+   "type": "editorial_note",
+   "at": {
+    "line": 224
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "clause-110",
+   "type": "clause",
+   "at": {
+    "lines": [
+     226,
+     234
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-111",
+   "type": "editorial_note",
+   "at": {
+    "line": 228
+   },
+   "parent": "clause-110",
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "paragraph-112",
+   "type": "paragraph",
+   "at": {
+    "lines": [
+     230,
+     234
+    ]
+   },
+   "parent": "clause-110",
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "editorial_note-113",
+   "type": "editorial_note",
+   "at": {
+    "line": 232
+   },
+   "parent": "paragraph-112",
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "paragraph-114",
+   "type": "paragraph",
+   "at": {
+    "line": 234
+   },
+   "parent": "paragraph-112",
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "editorial_note-115",
+   "type": "editorial_note",
+   "at": {
+    "line": 236
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "clause-116",
+   "type": "clause",
+   "at": {
+    "line": 238
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "footer-117",
+   "type": "footer",
+   "at": {
+    "line": 240
+   },
+   "context": "prohibited",
+   "reason": "place_and_date"
+  },
+  {
+   "id": "editorial_note-118",
+   "type": "editorial_note",
+   "at": {
+    "line": 242
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "annex-119",
+   "type": "annex",
+   "at": {
+    "lines": [
+     244,
+     9553
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "body-120",
+   "type": "body",
+   "at": {
+    "line": 246
+   },
+   "parent": "annex-119",
+   "context": "operative_candidate",
+   "reason": "unmarked_act_text"
+  },
+  {
+   "id": "body-121",
+   "type": "body",
+   "at": {
+    "line": 248
+   },
+   "parent": "annex-119",
+   "context": "operative_candidate",
+   "reason": "unmarked_act_text"
+  },
+  {
+   "id": "editorial_note-122",
+   "type": "editorial_note",
+   "at": {
+    "line": 9555
+   },
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "annex-123",
+   "type": "annex",
+   "at": {
+    "lines": [
+     9557,
+     16195
+    ]
+   },
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "body-124",
+   "type": "body",
+   "at": {
+    "line": 9559
+   },
+   "parent": "annex-123",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "body-125",
+   "type": "body",
+   "at": {
+    "line": 9561
+   },
+   "parent": "annex-123",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "editorial_note-126",
+   "type": "editorial_note",
+   "at": {
+    "line": 16197
+   },
+   "context": "prohibited",
+   "reason": "editorial_note"
+  },
+  {
+   "id": "annex-127",
+   "type": "annex",
+   "at": {
+    "lines": [
+     16199,
+     18198
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "current_wording_candidate"
+  },
+  {
+   "id": "body-128",
+   "type": "body",
+   "at": {
+    "line": 16201
+   },
+   "parent": "annex-127",
+   "context": "operative_candidate",
+   "reason": "unmarked_act_text"
+  },
+  {
+   "id": "body-129",
+   "type": "body",
+   "at": {
+    "line": 16203
+   },
+   "parent": "annex-127",
+   "context": "operative_candidate",
+   "reason": "unmarked_act_text"
+  },
+  {
+   "id": "editorial_note-130",
+   "type": "editorial_note",
+   "at": {
+    "line": 18200
+   },
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "annex-131",
+   "type": "annex",
+   "at": {
+    "lines": [
+     18202,
+     18844
+    ]
+   },
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "body-132",
+   "type": "body",
+   "at": {
+    "line": 18204
+   },
+   "parent": "annex-131",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "body-133",
+   "type": "body",
+   "at": {
+    "line": 18206
+   },
+   "parent": "annex-131",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "editorial_note-134",
+   "type": "editorial_note",
+   "at": {
+    "line": 18846
+   },
+   "context": "historical",
+   "reason": "historical_editorial_note"
+  },
+  {
+   "id": "annex-135",
+   "type": "annex",
+   "at": {
+    "lines": [
+     18848,
+     25219
+    ]
+   },
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "body-136",
+   "type": "body",
+   "at": {
+    "line": 18850
+   },
+   "parent": "annex-135",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "body-137",
+   "type": "body",
+   "at": {
+    "line": 18852
+   },
+   "parent": "annex-135",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "annex-138",
+   "type": "annex",
+   "at": {
+    "lines": [
+     25221,
+     25946
+    ]
+   },
+   "context": "historical",
+   "reason": "previous_wording"
+  },
+  {
+   "id": "body-139",
+   "type": "body",
+   "at": {
+    "line": 25223
+   },
+   "parent": "annex-138",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  },
+  {
+   "id": "body-140",
+   "type": "body",
+   "at": {
+    "line": 25225
+   },
+   "parent": "annex-138",
+   "context": "historical",
+   "reason": "previous_wording_unmarked"
+  }
+ ],
+ "tables": [
+  {
+   "id": "t1",
+   "parent": "annex-119",
+   "tableIndex": 0,
+   "startLine": 250,
+   "context": "operative_candidate",
+   "reason": "annex_table_row",
+   "headerRows": 1,
+   "headerDomains": {
+    "2": "NCM"
+   },
+   "classContext": {
+    "historical": [
+     "RedaoAnt",
+     "A8-3RedacaoAnt"
+    ],
+    "note": [
+     "Remisso",
+     "RemissoAnt",
+     "A8-1Remissao",
+     "A8-2RemissaoAnt",
+     "DataPublicao",
+     "A2DataPublicacao"
+    ],
+    "previousWordingNote": [
+     "RemissoAnt",
+     "A8-2RemissaoAnt"
+    ]
+   }
+  },
+  {
+   "id": "t2",
+   "parent": "annex-123",
+   "tableIndex": 1,
+   "startLine": 9563,
+   "context": "historical",
+   "reason": "previous_annex_wording",
+   "headerRows": 1,
+   "headerDomains": {
+    "2": "NCM"
+   },
+   "classContext": {
+    "historical": [],
+    "note": [
+     "Remisso",
+     "RemissoAnt",
+     "A8-1Remissao",
+     "A8-2RemissaoAnt"
+    ]
+   }
+  },
+  {
+   "id": "t3",
+   "parent": "annex-127",
+   "tableIndex": 2,
+   "startLine": 16204,
+   "context": "operative_candidate",
+   "reason": "annex_table_row",
+   "headerRows": 1,
+   "headerDomains": {
+    "2": "NCM"
+   },
+   "classContext": {
+    "historical": [
+     "RedaoAnt",
+     "A8-3RedacaoAnt"
+    ],
+    "note": [
+     "Remisso",
+     "RemissoAnt",
+     "A8-1Remissao",
+     "A8-2RemissaoAnt",
+     "DataPublicao",
+     "A2DataPublicacao"
+    ],
+    "previousWordingNote": [
+     "RemissoAnt",
+     "A8-2RemissaoAnt"
+    ]
+   }
+  },
+  {
+   "id": "t4",
+   "parent": "annex-131",
+   "tableIndex": 3,
+   "startLine": 18208,
+   "context": "historical",
+   "reason": "previous_annex_wording",
+   "headerRows": 1,
+   "headerDomains": {
+    "1": "NCM"
+   },
+   "classContext": {
+    "historical": [],
+    "note": [
+     "Remisso",
+     "RemissoAnt",
+     "A8-1Remissao",
+     "A8-2RemissaoAnt"
+    ]
+   }
+  },
+  {
+   "id": "t5",
+   "parent": "annex-135",
+   "tableIndex": 4,
+   "startLine": 18854,
+   "context": "historical",
+   "reason": "original_annex_wording",
+   "headerRows": 1,
+   "headerDomains": {
+    "2": "NBM"
+   },
+   "classContext": {
+    "historical": [],
+    "note": [
+     "Remisso",
+     "RemissoAnt",
+     "A8-1Remissao",
+     "A8-2RemissaoAnt"
+    ]
+   }
+  },
+  {
+   "id": "t6",
+   "parent": "annex-138",
+   "tableIndex": 5,
+   "startLine": 25227,
+   "context": "historical",
+   "reason": "original_annex_wording",
+   "headerRows": 1,
+   "headerDomains": {
+    "1": "NBM"
+   },
+   "classContext": {
+    "historical": [],
+    "note": [
+     "Remisso",
+     "RemissoAnt",
+     "A8-1Remissao",
+     "A8-2RemissaoAnt"
+    ]
+   }
+  }
+ ],
+ "entities": [],
+ "columnEntities": [],
+ "textEntities": [
+  {
+   "pattern": "(?:Convs?\\.|Conv[êe]nios?)\\s*(?:ICMS\\s*)?(?:n[ºo]\\s*)?\\d{1,3}/\\d{2,4}",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "pattern": "Ato\\s+COTEPE(?:[-/]ICMS)?\\s*(?:n[ºo]\\s*)?\\d{1,3}/\\d{2,4}",
+   "domain": "CITATION",
+   "note": "ato COTEPE citado"
+  },
+  {
+   "pattern": "Ajuste\\s+SINIEF\\s*\\d{1,3}/\\d{2,4}",
+   "domain": "CITATION",
+   "note": "ajuste citado"
+  },
+  {
+   "pattern": "(?:Lei(?:\\s+Complementar)?|Decreto(?:-Lei)?|Resolução(?:\\s+do\\s+Senado\\s+Federal)?)\\s+n[ºo°]\\s*[\\d.]+(?:/\\d{2,4})?(?:,\\s+de\\s+\\d{1,2}º?\\s+de\\s+\\p{L}+\\s+de\\s+\\d{4})?",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}\\.\\d{4}(?![\\d.])",
+   "domain": "NBM",
+   "note": "código NBM/SH de 10 dígitos"
+  },
+  {
+   "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}\\.\\d{2}(?![\\d.])",
+   "domain": "NCM",
+   "note": "NCM 8 dígitos"
+  },
+  {
+   "pattern": "(?<![\\d.])\\d{4}\\.\\d{4}(?![\\d.])",
+   "domain": "NCM",
+   "note": "NCM 8 dígitos em formato atípico dddd.dddd (fonte)"
+  },
+  {
+   "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}(?![\\d.])",
+   "domain": "NCM",
+   "note": "NCM 6 dígitos (subposição)"
+  }
+ ],
+ "relations": [],
+ "ranges": true,
+ "gaps": [
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Códigos de 4 dígitos sem ponto (posição) e listas sem separador não foram enumerados; a revisão deve conferir as células com texto livre na coluna NCM."
+  },
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Linhas 'Redação anterior' em tabelas: considerada histórica apenas a sequência de linhas imediatamente seguinte com o mesmo nº de item; casos de múltiplos itens dependem de revisão."
+  }
+ ]
+}

@@ -1,0 +1,438 @@
+{
+ "id": "10",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "notes": "Portaria SAES/MS 4.940: matéria única em três arquivos (representação consolidada). Anexo I em duas tabelas chave-valor (t1 no arquivo _001, t2 continuação no _002); Anexo II tabela de compatibilidades; Anexo III tabela dividida entre _002 (t4) e _003 (t5). Geometria derivada da marcação original pelo caminhador do anotador. Nenhum NCM: códigos SIGTAP, CBO, CID, habilitação (NN.NN) e regras de 4 dígitos anotados como OTHER para medir falso positivo. Art. 8º: vigência/efeitos operacionais, não situação jurídica. Valores R$ e códigos de 2-3 dígitos (financiamento/atributo) fora do escopo v1.",
+ "blocks": [
+  {
+   "id": "ep",
+   "type": "epigraph",
+   "at": {
+    "line": 1
+   },
+   "context": "prohibited",
+   "reason": "dou_identifica"
+  },
+  {
+   "id": "em",
+   "type": "summary",
+   "at": {
+    "line": 2
+   },
+   "context": "prohibited",
+   "reason": "dou_ementa"
+  },
+  {
+   "id": "pre",
+   "type": "preamble",
+   "at": {
+    "line": 3
+   },
+   "context": "prohibited",
+   "reason": "preamble"
+  },
+  {
+   "id": "a1",
+   "type": "article",
+   "at": {
+    "line": 4
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a2",
+   "type": "article",
+   "at": {
+    "line": 5
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a3",
+   "type": "article",
+   "at": {
+    "lines": [
+     6,
+     10
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a3-i1",
+   "type": "inciso",
+   "at": {
+    "line": 7
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a3"
+  },
+  {
+   "id": "a3-i2",
+   "type": "inciso",
+   "at": {
+    "line": 8
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a3"
+  },
+  {
+   "id": "a3-i3",
+   "type": "inciso",
+   "at": {
+    "line": 9
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a3"
+  },
+  {
+   "id": "a3-i4",
+   "type": "inciso",
+   "at": {
+    "line": 10
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a3"
+  },
+  {
+   "id": "a4",
+   "type": "article",
+   "at": {
+    "line": 11
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a5",
+   "type": "article",
+   "at": {
+    "line": 12
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a6",
+   "type": "article",
+   "at": {
+    "line": 13
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a7",
+   "type": "article",
+   "at": {
+    "lines": [
+     14,
+     15
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a8",
+   "type": "article",
+   "at": {
+    "line": 16
+   },
+   "context": "operative_candidate",
+   "reason": "article_effects_not_legal_status"
+  },
+  {
+   "id": "sig",
+   "type": "signature",
+   "at": {
+    "line": 17
+   },
+   "context": "prohibited",
+   "reason": "dou_assina"
+  },
+  {
+   "id": "anx1",
+   "type": "annex",
+   "at": {
+    "lines": [
+     18,
+     615
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "annex_heading"
+  },
+  {
+   "id": "anx1-t",
+   "type": "body",
+   "at": {
+    "line": 19
+   },
+   "context": "operative_candidate",
+   "reason": "annex_title",
+   "parent": "anx1"
+  },
+  {
+   "id": "anx2",
+   "type": "annex",
+   "at": {
+    "lines": [
+     616,
+     776
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "annex_heading"
+  },
+  {
+   "id": "anx2-t",
+   "type": "body",
+   "at": {
+    "line": 617
+   },
+   "context": "operative_candidate",
+   "reason": "annex_title",
+   "parent": "anx2"
+  },
+  {
+   "id": "anx3",
+   "type": "annex",
+   "at": {
+    "lines": [
+     777,
+     1234
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "annex_heading"
+  },
+  {
+   "id": "anx3-t",
+   "type": "body",
+   "at": {
+    "line": 778
+   },
+   "context": "operative_candidate",
+   "reason": "annex_title",
+   "parent": "anx3"
+  }
+ ],
+ "tables": [
+  {
+   "id": "t1",
+   "parent": "anx1",
+   "tableIndex": 0,
+   "startLine": 20,
+   "context": "operative_candidate",
+   "reason": "key_value_table",
+   "headerRows": 0
+  },
+  {
+   "id": "t2",
+   "parent": "anx1",
+   "tableIndex": 1,
+   "startLine": 20,
+   "context": "operative_candidate",
+   "reason": "key_value_table_continuation",
+   "headerRows": 0
+  },
+  {
+   "id": "t3",
+   "parent": "anx2",
+   "tableIndex": 2,
+   "startLine": 618,
+   "context": "operative_candidate",
+   "reason": "compatibility_table",
+   "headerRows": 2
+  },
+  {
+   "id": "t4",
+   "parent": "anx3",
+   "tableIndex": 3,
+   "startLine": 779,
+   "context": "operative_candidate",
+   "reason": "compatibility_table",
+   "headerRows": 2
+  },
+  {
+   "id": "t5",
+   "parent": "anx3",
+   "tableIndex": 4,
+   "startLine": 779,
+   "context": "operative_candidate",
+   "reason": "compatibility_table_continuation",
+   "headerRows": 0
+  }
+ ],
+ "columnEntities": [
+  {
+   "table": "t1",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t1",
+   "column": 1,
+   "pattern": "(?<![\\d.-])\\d{4}-\\d{2}(?!\\d)",
+   "domain": "OTHER",
+   "note": "CBO; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t1",
+   "column": 1,
+   "pattern": "(?<![\\p{L}\\d])[A-Z]\\d{2}(?:\\.\\d)?(?![\\d.])",
+   "domain": "OTHER",
+   "note": "CID-10; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t1",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}(?![\\d.])",
+   "domain": "OTHER",
+   "note": "código de habilitação SUS com formato de posição NCM; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t1",
+   "column": 1,
+   "pattern": "(?<![\\d.,-])\\d{4}(?= \\p{Lu})",
+   "domain": "OTHER",
+   "note": "código de regra/atributo SIGTAP de 4 dígitos; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t2",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t2",
+   "column": 1,
+   "pattern": "(?<![\\d.-])\\d{4}-\\d{2}(?!\\d)",
+   "domain": "OTHER",
+   "note": "CBO; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t2",
+   "column": 1,
+   "pattern": "(?<![\\p{L}\\d])[A-Z]\\d{2}(?:\\.\\d)?(?![\\d.])",
+   "domain": "OTHER",
+   "note": "CID-10; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t2",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}(?![\\d.])",
+   "domain": "OTHER",
+   "note": "código de habilitação SUS com formato de posição NCM; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t2",
+   "column": 1,
+   "pattern": "(?<![\\d.,-])\\d{4}(?= \\p{Lu})",
+   "domain": "OTHER",
+   "note": "código de regra/atributo SIGTAP de 4 dígitos; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t3",
+   "column": 0,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t3",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t4",
+   "column": 0,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t4",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t5",
+   "column": 0,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  },
+  {
+   "table": "t5",
+   "column": 1,
+   "pattern": "(?<![\\d.])\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3}-\\d(?!\\d)",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM",
+   "skipHeader": false
+  }
+ ],
+ "entities": [
+  {
+   "part": "pre",
+   "literal": "Decreto nº 11.798, de 28 de novembro de 2023",
+   "domain": "CITATION"
+  },
+  {
+   "part": "a6",
+   "literal": "04.18.01.008-0",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM"
+  },
+  {
+   "part": "a6",
+   "literal": "04.18.01.003-0",
+   "domain": "OTHER",
+   "note": "código SIGTAP; não é NCM"
+  }
+ ],
+ "gaps": [
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Tabelas do Anexo I e do Anexo III continuam entre arquivos (t1→t2, t4→t5); continuidade lógica registrada aqui, geometria mantida por tabela física."
+  },
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Linhas <tr/> vazias da fonte viram linhas sem células."
+  }
+ ]
+}

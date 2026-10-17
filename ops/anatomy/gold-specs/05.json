@@ -1,0 +1,19 @@
+{
+ "id": "05", "annotator": "CLAUDE-EXEC", "annotatedAt": "2026-10-17",
+ "notes": "ADE Coana: três artigos operativos; preâmbulo com citações; CNPJ da certificada. Sem NCM.",
+ "blocks": [
+  { "id": "ep", "type": "epigraph", "at": { "line": 1 }, "context": "prohibited", "reason": "dou_identifica" },
+  { "id": "em", "type": "summary", "at": { "line": 2 }, "context": "prohibited", "reason": "dou_ementa" },
+  { "id": "pre", "type": "preamble", "at": { "line": 3 }, "context": "prohibited", "reason": "preamble" },
+  { "id": "a1", "type": "article", "at": { "line": 4 }, "context": "operative_candidate", "reason": "article_marker" },
+  { "id": "a2", "type": "article", "at": { "line": 5 }, "context": "operative_candidate", "reason": "article_marker" },
+  { "id": "a3", "type": "article", "at": { "line": 6 }, "context": "operative_candidate", "reason": "article_marker" },
+  { "id": "sig", "type": "signature", "at": { "line": 7 }, "context": "prohibited", "reason": "dou_assina" }
+ ],
+ "entities": [
+  { "part": "pre", "literal": "Instrução Normativa RFB nº 2.318, de 26 de março de 2026", "domain": "CITATION" },
+  { "part": "pre", "literal": "Portaria Coana nº 189, de 16 de abril de 2026", "domain": "CITATION" },
+  { "part": "pre", "literal": "25724", "domain": "OTHER", "note": "nº de requerimento OEA" },
+  { "part": "a1", "literal": "18.483.666/0001-03", "domain": "CNPJ" }
+ ]
+}

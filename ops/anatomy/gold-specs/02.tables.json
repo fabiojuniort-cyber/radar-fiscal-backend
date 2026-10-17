@@ -1,0 +1,4 @@
+{
+ "notes": "Único NCM/NBM explícito: 3507.90.4 (inciso X da cláusula primeira, 7 dígitos). Anos de 4 dígitos e percentuais não são NCM e não constam como entidade.",
+ "textEntities": [ { "pattern": "(?<![\\d.])3507\\.90\\.4(?![\\d.])", "domain": "NCM", "note": "código NBM/SH citado no inciso X" } ]
+}

@@ -1,0 +1,20 @@
+{
+ "id": "07", "annotator": "CLAUDE-EXEC", "annotatedAt": "2026-10-17",
+ "notes": "Despacho MF: cabeçalho (processo/interessado/assunto) não operativo; decisão no parágrafo 5. 'nº 26, de 14 de agosto de 2026' é Resolução do Senado elíptica. Valores monetários fora do escopo de entidades v1.",
+ "blocks": [
+  { "id": "ep", "type": "epigraph", "at": { "line": 1 }, "context": "prohibited", "reason": "dou_identifica" },
+  { "id": "h1", "type": "publication_header", "at": { "line": 2 }, "context": "prohibited", "reason": "despacho_header" },
+  { "id": "h2", "type": "publication_header", "at": { "line": 3 }, "context": "prohibited", "reason": "despacho_header" },
+  { "id": "h3", "type": "publication_header", "at": { "line": 4 }, "context": "prohibited", "reason": "despacho_header" },
+  { "id": "dec", "type": "body", "at": { "line": 5 }, "context": "operative_candidate", "reason": "despacho_decision" },
+  { "id": "sig", "type": "signature", "at": { "line": 6 }, "context": "prohibited", "reason": "dou_assina" },
+  { "id": "cargo", "type": "signature", "at": { "line": 7 }, "context": "prohibited", "reason": "dou_cargo" }
+ ],
+ "entities": [
+  { "part": "h1", "literal": "17944.003839/2025-17", "domain": "PROCESS" },
+  { "part": "dec", "literal": "Lei Complementar nº 101, de 4 de maio de 2000", "domain": "CITATION" },
+  { "part": "dec", "literal": "Resolução nº 48, de 21 de dezembro de 2007", "domain": "CITATION" },
+  { "part": "dec", "literal": "nº 26, de 14 de agosto de 2026", "domain": "CITATION", "note": "Resolução do Senado nº 26 (elipse)" },
+  { "part": "dec", "literal": "Decreto-Lei nº 1.312, de 15 de fevereiro de 1974", "domain": "CITATION" }
+ ]
+}
