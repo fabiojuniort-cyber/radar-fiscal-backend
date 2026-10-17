@@ -16,6 +16,57 @@ Issue: https://github.com/fabiojuniort-cyber/tribusca-control/issues/118
 - A operação não poderá ser liberada enquanto houver dados privados da empresa
   em referências sem cobertura identificadas pelo preflight.
 
+## Parecer independente — BLOCK (17/10/2026)
+
+O parecer no HEAD `2dc7a525` identificou B1–B4, e continua BLOCK
+até uma **nova revisão independente** do SHA corrigido. CI verde é condição
+necessária, não autoriza merge/deploy.
+
+**B1:** a função verifica vínculos de matches com origens em empresas
+diferentes nos dois sentidos e bloqueia novas referências com locks
+`FOR UPDATE` sobre empresa, perfis de monitoramento e relacionamentos com
+publicações. A prova de concorrência é executada no teste adversarial.
+
+**B2:** o legado de signup só é associado à empresa mediante CNPJ; o nome
+da conta só é redefinido automaticamente quando coincide com o nome guardado
+nesse legado comprovadamente associado. Nomes coincidentes mas sem vínculo
+confiável provocam `company_purge_legacy_identity_ambiguous` e cancelamento
+atômico, para não apagar nome personalizado da conta. A limpeza do nome do
+tenant não é permitida por mera coincidência sem prova.
+
+**B3:** `test/onb02-company-purge-graph.integration.test.ts` semeia linhas
+não vazias das dependências, publicação e versão compartilhadas, perfis
+históricos, NCMs, empresas em dois tenants e duas empresas no mesmo tenant,
+vínculos cruzados normais e inconsistentes, rollback após falha auditada,
+concorrência e recadastro novo. O teste é gate em PostgreSQL 16 e 18.
+
+**B4:** o script `ops/onb02/preflight-readonly.sql` prepara inventário
+read-only de grafo recursivo FK, policies, owner, grants, triggers e possíveis
+anomalias. **Não executado em produção nesta entrega.**
+
+### Estado Railway observado (somente metadata, sem SQL)
+
+Consulta read-only ao ambiente production em 17/10/2026:
+- serviços `Postgres`, `radar-fiscal-backend`, `radar-fiscal-worker`
+  e `radar-fiscal-scheduler` estavam com último deploy SUCCESS;
+- há volume `postgres-volume`, bucket `Postgres-PITR` e serviços
+  de restauração usados em outras frentes; **nenhum constitui por si
+  backup/restore comprobatório desta operação**;
+- nenhum deploy do ONB-02 ou exclusão de empresa foi executado neste trabalho.
+
+### Evidências ainda ausentes — mantenha BLOCK
+
+- Inventário efetivo do PostgreSQL produtivo + referências sem FK (textos,
+  JSONB, cache, nomes/slugs da conta, auditoria e arquivos externos), obtido
+  por canal autorizado, com saída sanitizada e comparação com o schema;
+- ID/data/hash de backup **específico ONB-02**, integridade, restauração testada
+  em PostgreSQL isolado dentro da Railway e consistência antes/depois;
+- dry-run no restore do **SHA exato** em cenário representativo, com manifesto
+  de objetos próprios, contas não relacionadas e publicações globais;
+- simulação de rollback de deployment compatível com migration; se dados
+  já foram eliminados, recuperação seletiva ensaiada (não é rollback de código);
+- parecer independente PASS, autorização R3 explícita e LOCK válido.
+
 ## Gates antes de produção — NÃO EXECUTAR SEM PROVAS
 1. Confirmar autorização R3 vigente, LOCK e ausência de outra execução.
 2. Revisão independente adversarial do SHA exato da migration/função, endpoint,
