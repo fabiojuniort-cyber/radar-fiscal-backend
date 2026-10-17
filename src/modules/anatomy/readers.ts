@@ -37,14 +37,25 @@ const classesOf = (node: Node): string[] => {
   }
   return found;
 };
-function describe(node: Node, confaz: boolean): Descriptor {
+function describe(node: Node, source: AnatomyReaderInput['source']): Descriptor {
+  const confaz = source === 'CONFAZ';
+  const dou = source === 'DOU';
   const text = textOf(node).trim();
   const classes = classesOf(node);
+  const own = (node.attrs.class ?? '').split(/\s+/);
   const hist = confaz && classes.some((name) => historical.test(name));
   const context = hist ? 'historical' : 'operative_candidate';
   if (confaz && classes.includes('TituloAcordo')) return { type: 'epigraph', context: 'prohibited', reason: 'confaz_epigraph', rank: 100 };
   if (confaz && classes.includes('Ementa')) return { type: 'summary', context: 'prohibited', reason: 'confaz_summary', rank: 100 };
   if (confaz && classes.some((name) => notes.test(name))) return { type: 'editorial_note', context: hist ? 'historical' : 'prohibited', reason: 'confaz_editorial_note', rank: 100 };
+  // DOU official INLABS classes on the block itself describe position, never legal status.
+  if (dou && own.includes('identifica')) return { type: 'epigraph', context: 'prohibited', reason: 'dou_identifica', rank: 100 };
+  if (dou && own.includes('ementa')) return { type: 'summary', context: 'prohibited', reason: 'dou_ementa', rank: 100 };
+  if (dou && own.includes('assina')) return { type: 'signature', context: 'prohibited', reason: 'dou_assina', rank: 100 };
+  if (dou && own.includes('cargo')) return { type: 'signature', context: 'prohibited', reason: 'dou_cargo', rank: 100 };
+  // Rectification wording quotes another act: original and corrected text both stay out of positive selection.
+  if (dou && /^Onde\s+se\s+l[êe](?![\p{L}\p{N}])/iu.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: 'dou_rectification_original', rank: 100 };
+  if (dou && /^Leia-se(?![\p{L}\p{N}])/iu.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: 'dou_rectification_corrected', rank: 100 };
   if (/^\s*["“]/u.test(text)) return { type: 'quoted_text', context: hist ? 'historical' : 'prohibited', reason: 'quoted_block', rank: 100 };
   if (/^(?:O\s+(?:Conselho|Ministro|Secret[áa]rio|Governador|Presidente)|A\s+(?:Secret[áa]ria|Receita Federal)|CONSIDERANDO\b)/iu.test(text)) return { type: 'preamble', context: hist ? 'historical' : 'prohibited', reason: 'preamble_marker', rank: 100 };
   // Only block-initial markers are recognized. A reference to an annex in prose is not a heading.
@@ -259,7 +270,7 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
       if (/^[“"]/u.test(text)) openQuotation = true;
       const descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
-        : describe(node, input.source === 'CONFAZ');
+        : describe(node, input.source);
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
       const part = attach(node, descriptor);

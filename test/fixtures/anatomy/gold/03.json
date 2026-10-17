@@ -1,0 +1,21 @@
+{
+  "goldVersion": "ANAT-GOLD/1.0.0",
+  "id": "03",
+  "partition": "development",
+  "preparation": "dou-xml-cdata/1.0.0",
+  "canonicalTextSha256": "c9af5e182931961d75e6ae1cc1b4dab158e82b0bbbdc2428ee69a31d800b9d41",
+  "canonicalTextUtf16Length": 433,
+  "status": "not_started",
+  "annotator": null,
+  "annotatedAt": null,
+  "parts": [],
+  "entities": [],
+  "relations": [],
+  "gaps": [],
+  "review": {
+    "reviewer": null,
+    "status": "not_requested",
+    "reviewedAt": null,
+    "notes": ""
+  }
+}

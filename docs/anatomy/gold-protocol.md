@@ -16,6 +16,8 @@ Os spans do gold precisam se referir ao mesmo `canonicalText` que o contrato ANA
 3. O anotador recebe apenas o texto canônico e a representação original. **Não recebe a árvore de partes, as entidades nem a elegibilidade do motor**, para não copiar a saída do motor como gabarito.
 4. Mudar a preparação ou a extração de texto invalida o gold daquela entrada. A reancoragem é manual e precisa ser revisada; nunca é aplicada às cegas.
 
+> **Atualização ANAT-04-DOU-01:** a preparação DOU foi versionada (`dou-xml-cdata/1.0.0`) e os hashes **congelados** estão em [dou-preparation.md](dou-preparation.md) e em `test/fixtures/anatomy/canonical/development.json`. A tabela abaixo é histórica: os valores DOU dela não valem mais.
+
 Os hashes provisórios das entradas de desenvolvimento disponíveis estão na tabela abaixo. Eles valem para a preparação provisória e só são congelados quando a preparação DOU estiver versionada.
 
 | ID | Recurso | UTF-16 | SHA-256 do texto canônico (provisório) |

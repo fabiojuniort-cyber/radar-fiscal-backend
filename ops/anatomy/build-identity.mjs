@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 // Canonical source form matches Git's LF representation on Linux and Windows.
 // Generated identity is excluded from its own inputs to avoid a recursive hash.
 const files = ['package-lock.json', 'src/modules/anatomy/contract.ts', 'src/modules/anatomy/readers.ts',
-  'src/modules/anatomy/entities.ts', 'src/modules/anatomy/engine.ts', 'src/modules/anatomy/consumer.ts',
+  'src/modules/anatomy/entities.ts', 'src/modules/anatomy/engine.ts', 'src/modules/anatomy/consumer.ts', 'src/modules/anatomy/dou-preparation.ts', 'src/modules/anatomy/gold.ts',
   'ops/anatomy/build-identity.mjs'];
 const root = new URL('../../', import.meta.url);
 const digest = value => createHash('sha256').update(value, 'utf8').digest('hex');

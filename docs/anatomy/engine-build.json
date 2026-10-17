@@ -1,13 +1,15 @@
 {
-  "engineHash": "d7e8d116552a0e87ee6adf61e91ff18eb66029c9680409780533926209a60873",
+  "engineHash": "f6c8e6285c0cfa51f1429fb4bb73fa6de7865c709a4377dff9d4521c01efae05",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
-    "ops/anatomy/build-identity.mjs": "8ce6d54aa82dd3d85a65cd72990f0eef8fec37157adcf1eaf78088e5f7c57fcb",
+    "ops/anatomy/build-identity.mjs": "a9e826463ef2440548e0a7a360e7bfc3a031ce2cc26612b0af6436f0c69a092f",
     "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
     "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
     "src/modules/anatomy/contract.ts": "e294eb6fb50c2fc2b624c13bc68f281f3271a88f4a00d98f1a7a923928893c2a",
+    "src/modules/anatomy/dou-preparation.ts": "41827ee32c8b14bf0db9b56b3695ba06f40f7dd9a25658e2584ab16e435bb293",
     "src/modules/anatomy/engine.ts": "8720e3c1f51053c070d6cb3d446271fdd90f03d18895b103ae69dac9b1de6481",
     "src/modules/anatomy/entities.ts": "07159255102c75905d8b8164a48b65ea5be920df5cd1f9ec850b128f4cdbb5c0",
-    "src/modules/anatomy/readers.ts": "c1d07e509409f6d90dd5fcd44c88aff5aedcaa11db58f76e1e4400df50b4f11a"
+    "src/modules/anatomy/gold.ts": "5f7db2ad7b97fbd0dbd9dee67b6a10129b1884e9a2f09322fa855fa8ae1b5a03",
+    "src/modules/anatomy/readers.ts": "faed285360be5750cc8938e5358c72209d1bd544b40b5295d868959b0ac3c0ce"
   }
 }
