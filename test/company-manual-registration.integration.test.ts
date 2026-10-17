@@ -287,79 +287,43 @@ test(
 
       assert.equal(deleted.statusCode, 204);
 
+      // ONB-02-R3: the same CNPJ is now an entirely new registration.
       const recreated = await app.inject({
         method: 'POST',
         url: '/api/v1/companies/manual',
         headers,
         payload: {
           cnpj,
-          legalName:
-            'Empresa Manual Reativada Ltda.',
-          reactivateInactive: true,
+          legalName: 'Empresa Manual Nova Ltda.',
           uf: 'GO',
           municipalityName: 'Goiânia',
+          cnaes: [{ code: '6201501', description: 'Descrição de teste', isPrimary: true }],
         },
       });
+      assert.equal(recreated.statusCode, 201, recreated.body);
 
-      assert.equal(
-        recreated.statusCode,
-        201,
-      );
+      const recreatedBody = recreated.json<{
+        company: { id: string; legalName: string };
+        establishment: { id: string; businessLocationCode: string | null;
+          stateRegistration: string | null; stateRegistrationSource: string | null };
+      }>();
+      assert.notEqual(recreatedBody.company.id, body.company.id);
+      assert.notEqual(recreatedBody.establishment.id, body.establishment.id);
+      assert.equal(recreatedBody.company.legalName, 'Empresa Manual Nova Ltda.');
+      assert.equal(recreatedBody.establishment.businessLocationCode, null);
+      assert.equal(recreatedBody.establishment.stateRegistration, null);
 
-      const recreatedBody =
-        recreated.json<{
-          company: { id: string };
-          establishment: {
-            id: string;
-          };
-        }>();
+      const afterRecreation = await app.inject({
+        method: 'GET',
+        url: '/api/v1/companies/' + recreatedBody.company.id + '/establishments',
+        headers,
+      });
+      assert.equal(afterRecreation.statusCode, 200, afterRecreation.body);
+      assert.equal(afterRecreation.json<{ items: unknown[] }>().items.length, 1);
+      assert.equal((await admin.query(
+        'SELECT id FROM companies WHERE id = $1', [body.company.id],
+      )).rowCount, 0, 'old company must not be retained as inactive');
 
-      assert.equal(
-        recreatedBody.company.id,
-        body.company.id,
-      );
-      assert.equal(
-        recreatedBody.establishment.id,
-        body.establishment.id,
-      );
-
-      const afterReactivation =
-        await app.inject({
-          method: 'GET',
-          url:
-            '/api/v1/companies/' +
-            body.company.id +
-            '/establishments',
-          headers,
-        });
-
-      const reactivatedHeadOffice =
-        afterReactivation.json<{
-          items: Array<{
-            businessLocationCode:
-              string | null;
-            stateRegistration:
-              string | null;
-            stateRegistrationSource:
-              string | null;
-          }>;
-        }>().items[0];
-
-      assert.equal(
-        reactivatedHeadOffice
-          ?.businessLocationCode,
-        'MATRIZ-MANUAL',
-      );
-      assert.equal(
-        reactivatedHeadOffice
-          ?.stateRegistration,
-        '110042490114',
-      );
-      assert.equal(
-        reactivatedHeadOffice
-          ?.stateRegistrationSource,
-        'MANUAL',
-      );
     } finally {
       await app.close();
 
