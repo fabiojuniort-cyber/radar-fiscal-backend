@@ -174,26 +174,132 @@ BEGIN
   END LOOP;
 END $onb02_global$;
 
--- A second, PRIVATE pre-deletion scope artifact is needed to check orphan
--- references AFTER the company has vanished. Supply UUIDs collected under
--- restricted access as comma-separated original_establishment_ids, not in
--- GitHub, public logs or application screenshots. Without this input the
--- historical filial audit verdict after deletion remains NOT_PROVEN.
-\if :{?original_establishment_ids}
-WITH saved_ids AS (
-  SELECT unnest(string_to_array(:'original_establishment_ids',',')::uuid[])::text AS id
-), all_ids AS (
-  SELECT :'company_id'::text AS id UNION ALL SELECT id FROM saved_ids
-)
-SELECT count(*) FILTER (WHERE a.entity_id IN (SELECT id FROM all_ids)) AS historical_entity_id_mentions,
-       count(*) FILTER (WHERE EXISTS (
-         SELECT 1 FROM all_ids x
-         WHERE coalesce(a.before_data::text,'') LIKE '%'||x.id||'%'
-            OR coalesce(a.after_data::text,'') LIKE '%'||x.id||'%'
-       )) AS historical_payload_id_mentions
-FROM audit_log a;
+-- The old parents will disappear after COMMIT. Prior to an authorized purge,
+-- capture the complete scope privately, including CNPJ digits, tenant UUID,
+-- company UUID, establishment/product/tax/monitoring/publication/match UUIDs.
+-- Supply original_* values only within restricted psql sessions, NOT via
+-- visible shell arguments, GitHub issues or public Actions. No raw values
+-- are printed by these queries. A missing original scope after purge must
+-- be classified NOT_PROVEN rather than 'zero residual data'.
+\if :{?original_tenant_id}
 \else
-\echo 'ONB02 BLOCK: original_establishment_ids missing; post-purge historical audit reconciliation NOT_PROVEN.'
+\set original_tenant_id ''
 \endif
+\if :{?original_establishment_ids}
+\else
+\set original_establishment_ids ''
+\endif
+\if :{?original_tax_profile_ids}
+\else
+\set original_tax_profile_ids ''
+\endif
+\if :{?original_product_profile_ids}
+\else
+\set original_product_profile_ids ''
+\endif
+\if :{?original_monitoring_profile_ids}
+\else
+\set original_monitoring_profile_ids ''
+\endif
+\if :{?original_company_publication_ids}
+\else
+\set original_company_publication_ids ''
+\endif
+\if :{?original_publication_match_ids}
+\else
+\set original_publication_match_ids ''
+\endif
+\if :{?original_cnpjs}
+\else
+\set original_cnpjs ''
+\endif
+
+WITH private_company AS (
+  SELECT id,tenant_id,head_office_cnpj FROM companies
+  WHERE id=:'company_id'::uuid
+),
+current_ids AS (
+  SELECT id::text FROM private_company
+  UNION ALL SELECT id::text FROM establishments WHERE company_id=:'company_id'::uuid
+  UNION ALL SELECT id::text FROM company_tax_profiles WHERE company_id=:'company_id'::uuid
+  UNION ALL SELECT id::text FROM company_product_profiles WHERE company_id=:'company_id'::uuid
+  UNION ALL SELECT id::text FROM monitoring_profiles WHERE company_id=:'company_id'::uuid
+  UNION ALL SELECT id::text FROM company_publications WHERE company_id=:'company_id'::uuid
+  UNION ALL
+    SELECT pm.id::text FROM publication_matches pm
+    JOIN company_publications cp ON cp.id=pm.company_publication_id
+    WHERE cp.company_id=:'company_id'::uuid
+),
+saved_ids AS (
+  SELECT btrim(id) AS id FROM unnest(ARRAY[
+    :'original_establishment_ids', :'original_tax_profile_ids',
+    :'original_product_profile_ids', :'original_monitoring_profile_ids',
+    :'original_company_publication_ids', :'original_publication_match_ids'
+  ]) AS group_ids
+  CROSS JOIN LATERAL regexp_split_to_table(group_ids,',') AS id
+),
+all_ids AS (
+  SELECT DISTINCT lower(id) AS id FROM (
+    SELECT id FROM current_ids
+    UNION ALL SELECT :'company_id'::text
+    UNION ALL SELECT id FROM saved_ids
+  ) s
+  WHERE id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+),
+current_cnpjs AS (
+  SELECT head_office_cnpj::text AS digits FROM private_company
+  UNION ALL SELECT cnpj::text FROM establishments WHERE company_id=:'company_id'::uuid
+),
+saved_cnpjs AS (
+  SELECT regexp_replace(btrim(raw),'[^0-9]','','g') AS digits
+  FROM regexp_split_to_table(:'original_cnpjs',',') AS raw
+),
+all_cnpjs AS (
+  SELECT DISTINCT digits FROM (
+    SELECT digits FROM current_cnpjs UNION ALL SELECT digits FROM saved_cnpjs
+  ) raw
+  WHERE digits ~ '^[0-9]{14}$'
+),
+audit_scope AS (
+  SELECT a.* FROM audit_log a
+  WHERE a.tenant_id=coalesce(
+    (SELECT tenant_id FROM private_company),
+    nullif(:'original_tenant_id','')::uuid
+  )
+)
+SELECT
+  CASE
+    WHEN EXISTS(SELECT 1 FROM private_company) THEN 'CURRENT_SCOPE_VISIBLE'
+    WHEN nullif(:'original_tenant_id','') IS NULL
+       OR nullif(:'original_establishment_ids','') IS NULL
+       OR nullif(:'original_cnpjs','') IS NULL
+      THEN 'BLOCK_POST_PURGE_PRIVATE_SCOPE_MISSING'
+    ELSE 'SAVED_SCOPE_NEEDS_CLASSIFICATION'
+  END AS evidence_scope_status,
+  (SELECT count(*) FROM all_ids) AS old_ids_covered,
+  (SELECT count(*) FROM all_cnpjs) AS original_cnpjs_covered,
+  count(*) FILTER(WHERE a.entity_id IN (SELECT id FROM all_ids))
+    AS historical_entity_id_mentions,
+  count(*) FILTER(WHERE EXISTS (
+     SELECT 1 FROM all_ids x WHERE
+       coalesce(a.before_data::text,'') ILIKE '%'||x.id||'%'
+       OR coalesce(a.after_data::text,'') ILIKE '%'||x.id||'%'
+  )) AS historical_payload_id_mentions,
+  count(*) FILTER(WHERE EXISTS (
+    SELECT 1 FROM all_cnpjs x
+    WHERE regexp_replace(coalesce(a.before_data::text,''),'[^0-9]','','g')
+          LIKE '%'||x.digits||'%'
+       OR regexp_replace(coalesce(a.after_data::text,''),'[^0-9]','','g')
+          LIKE '%'||x.digits||'%'
+       OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')
+          LIKE '%'||x.digits||'%'
+  )) AS historical_cnpj_mentions
+FROM audit_scope a;
+
+-- These are historical retention/classification indicators, NOT automatic
+-- targets for DELETE: compliance audit rows may need to remain, and official
+-- publications mentioning the CNPJ must remain in the global legal Acervo.
+-- Any additional JSON/text candidate identified by preflight-readonly.sql
+-- requires an explicit signed classification, not an inferred blanket wipe.
 
 ROLLBACK;
