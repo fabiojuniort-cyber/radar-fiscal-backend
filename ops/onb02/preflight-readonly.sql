@@ -106,15 +106,65 @@ WHERE p.pronamespace='public'::regnamespace
   AND p.proname IN ('app_purge_company','app_user_is_tenant_admin',
                     'app_current_tenant_id','app_current_user_id');
 
-SELECT c.oid::regclass::text AS relation, d.refobjid::regclass::text AS depends_on,
-       d.deptype
-FROM pg_depend d JOIN pg_class c ON c.oid=d.objid
-WHERE c.relnamespace='public'::regnamespace
-  AND c.relkind IN ('v','m') AND d.refclassid='pg_class'::regclass
-  AND d.refobjid IN ('public.companies'::regclass,
-     'public.monitoring_profiles'::regclass,
-     'public.company_publications'::regclass)
-ORDER BY relation,depends_on;
+-- pg_depend on a view's SELECT points to a pg_rewrite _RETURN rule.
+-- Joining d.objid directly to pg_class.oid is incorrect and can miss views.
+-- Track root dependencies and views-of-views, including materialized views.
+WITH RECURSIVE dependent_views AS (
+  SELECT r.ev_class AS view_oid,
+         d.refobjid AS source_oid,
+         d.refobjid AS root_oid,
+         ARRAY[d.refobjid,r.ev_class]::oid[] AS visited,
+         1 AS depth
+  FROM pg_depend d
+  JOIN pg_rewrite r
+    ON d.classid='pg_rewrite'::regclass AND d.objid=r.oid
+  JOIN pg_class child ON child.oid=r.ev_class
+  WHERE d.refclassid='pg_class'::regclass
+    AND child.relkind IN ('v','m')
+    AND r.rulename='_RETURN'
+    AND r.ev_class<>d.refobjid
+    AND d.refobjid IN (
+      'public.companies'::regclass,
+      'public.monitoring_profiles'::regclass,
+      'public.company_publications'::regclass
+    )
+  UNION ALL
+  SELECT r.ev_class, d.refobjid, parent.root_oid,
+         parent.visited || r.ev_class, parent.depth+1
+  FROM dependent_views parent
+  JOIN pg_depend d
+    ON d.classid='pg_rewrite'::regclass
+   AND d.refclassid='pg_class'::regclass
+   AND d.refobjid=parent.view_oid
+  JOIN pg_rewrite r ON r.oid=d.objid
+  JOIN pg_class child ON child.oid=r.ev_class
+  WHERE child.relkind IN ('v','m')
+    AND r.rulename='_RETURN'
+    AND r.ev_class<>d.refobjid
+    AND NOT r.ev_class=ANY(parent.visited)
+    AND parent.depth<16
+)
+SELECT DISTINCT view_oid::regclass::text AS dependent_view,
+       root_oid::regclass::text AS root_company_relation,
+       depth,
+       CASE (SELECT relkind FROM pg_class WHERE oid=view_oid)
+         WHEN 'm' THEN 'MATERIALIZED_VIEW'
+         ELSE 'VIEW' END AS view_kind
+FROM dependent_views
+ORDER BY dependent_view,root_company_relation,depth;
+
+-- Trigger definitions alone are not enough; include body fingerprints to
+-- reconcile real trigger side effects against the versioned migrations.
+SELECT DISTINCT tg.tgfoid::regprocedure::text AS trigger_function,
+       pg_get_userbyid(fn.proowner) AS function_owner,
+       fn.prosecdef AS security_definer,
+       md5(pg_get_functiondef(fn.oid)) AS function_definition_md5
+FROM pg_trigger tg JOIN pg_proc fn ON fn.oid=tg.tgfoid
+WHERE NOT tg.tgisinternal
+  AND tg.tgrelid IN (
+     SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace
+  )
+ORDER BY trigger_function;
 
 -- No raw names, CNPJs, publications or audit contents. Counts alone cannot
 -- prove erasure and must be paired with the restore-based per-company manifest.
