@@ -118,9 +118,7 @@ export function couldMatchDirectRule(
   if(!name)return false;
   const first=name.split(' ')[0]??'';
   const canonical=normalizeCollectionFilterType(rule.canonicalType);
-  const targetSection=normalizeCollectionFilterSection(rule.section)===rule.section
-    ? normalizeCollectionFilterType(rule.section)
-    : normalizeCollectionFilterType(rule.section);
+  const targetSection=normalizeCollectionFilterType(rule.section);
   const sections=new Set([normalizeCollectionFilterType(rawSection),
     normalizeCollectionFilterSection(rawSection),'']);
   for(const section of sections){
