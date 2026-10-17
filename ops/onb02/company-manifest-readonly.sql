@@ -51,7 +51,19 @@ SELECT
     WHERE tp.cnpj IS NULL AND tp.company_name IS NOT NULL
       AND (tp.company_name=t.legal_name OR tp.company_name=t.trade_name)) AS ambiguous_legacy_names,
  (SELECT count(*) FROM audit_log a
-    WHERE a.entity_type IN ('company','establishment') AND a.entity_id=:'company_id') AS historical_id_based_audits;
+    WHERE a.entity_type IN ('company','establishment')
+      AND (a.entity_id=:'company_id' OR a.entity_id IN
+        (SELECT e.id::text FROM establishments e WHERE e.company_id=:'company_id'::uuid))
+ ) AS historical_id_based_audits_company_or_branches,
+ (SELECT count(*) FROM audit_log a
+    WHERE a.before_data::text LIKE '%'||:'company_id'||'%'
+       OR a.after_data::text LIKE '%'||:'company_id'||'%'
+       OR EXISTS (
+         SELECT 1 FROM establishments e WHERE e.company_id=:'company_id'::uuid
+           AND (a.before_data::text LIKE '%'||e.id::text||'%'
+             OR a.after_data::text LIKE '%'||e.id::text||'%')
+       )
+ ) AS historical_payload_id_references;
 
 -- Global/publication preservation: rows in publications and versions are not
 -- company-owned. This digest must be evaluated on the restore before and
@@ -104,5 +116,84 @@ SELECT 'other_matches',count(*)::bigint,
        md5(coalesce(string_agg(md5(to_jsonb(pm)::text),'' ORDER BY pm.id),'EMPTY'))
 FROM publication_matches pm JOIN company_publications cp
   ON cp.id=pm.company_publication_id WHERE cp.company_id <> :'company_id'::uuid;
+
+-- Other companies' relationship tables must be preserved too. The
+-- synthetic test must seed these and assert unchanged fingerprints.
+SELECT 'other_company_cnaes' AS relation,count(*)::bigint AS rows,
+       md5(coalesce(string_agg(md5(to_jsonb(cc)::text),'' ORDER BY cc.company_id,cc.cnae_code),'EMPTY')) AS fingerprint
+FROM company_cnaes cc WHERE cc.company_id<>:'company_id'::uuid
+UNION ALL
+SELECT 'other_establishment_cnaes',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(ec)::text),'' ORDER BY ec.establishment_id,ec.cnae_code),'EMPTY'))
+FROM establishment_cnaes ec JOIN establishments e ON e.id=ec.establishment_id
+WHERE e.company_id<>:'company_id'::uuid
+UNION ALL
+SELECT 'other_company_product_ncms',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(n)::text),''
+         ORDER BY n.company_product_profile_id,n.official_catalog_entry_id),'EMPTY'))
+FROM company_product_ncms n JOIN company_product_profiles p
+  ON p.id=n.company_product_profile_id
+WHERE p.company_id<>:'company_id'::uuid
+UNION ALL
+SELECT 'other_company_cnae_ncms',count(*)::bigint,
+       md5(coalesce(string_agg(md5(to_jsonb(n)::text),'' ORDER BY n.id),'EMPTY'))
+FROM company_cnae_ncms n WHERE n.company_id<>:'company_id'::uuid;
+
+-- Snapshot global/non-company tables, including source records, taxonomies,
+-- catalog editions/entries and publication attachments. Dynamic discovery
+-- ensures newly added matching tables are not silently omitted.
+-- WARNING: hashing full payloads can be expensive; compare on authorized
+-- isolated datasets. These are only hashes and counts, never raw legal/PII.
+DO $onb02_global$
+DECLARE
+  source_table regclass;
+  number_of_rows bigint;
+  row_digest text;
+BEGIN
+  FOR source_table IN
+    SELECT c.oid::regclass
+    FROM pg_class c
+    WHERE c.relnamespace='public'::regnamespace
+      AND c.relkind IN ('r','p')
+      AND (
+        c.relname IN ('publications','cnaes','official_sources','sources')
+        OR c.relname LIKE 'publication_%'
+        OR c.relname LIKE 'taxonomy_%'
+        OR c.relname LIKE 'official_catalog%'
+        OR c.relname LIKE 'source_%'
+      )
+      AND c.relname NOT IN ('publication_matches')
+    ORDER BY c.relname
+  LOOP
+    EXECUTE format(
+      'SELECT count(*)::bigint, md5(coalesce(string_agg(md5(to_jsonb(t)::text),'''' ORDER BY md5(to_jsonb(t)::text)),''EMPTY'')) FROM %s t',
+      source_table
+    ) INTO number_of_rows,row_digest;
+    RAISE NOTICE 'ONB02_GLOBAL relation=% rows=% fingerprint=%',
+      source_table,number_of_rows,row_digest;
+  END LOOP;
+END $onb02_global$;
+
+-- A second, PRIVATE pre-deletion scope artifact is needed to check orphan
+-- references AFTER the company has vanished. Supply UUIDs collected under
+-- restricted access as comma-separated original_establishment_ids, not in
+-- GitHub, public logs or application screenshots. Without this input the
+-- historical filial audit verdict after deletion remains NOT_PROVEN.
+\if :{?original_establishment_ids}
+WITH saved_ids AS (
+  SELECT unnest(string_to_array(:'original_establishment_ids',',')::uuid[])::text AS id
+), all_ids AS (
+  SELECT :'company_id'::text AS id UNION ALL SELECT id FROM saved_ids
+)
+SELECT count(*) FILTER (WHERE a.entity_id IN (SELECT id FROM all_ids)) AS historical_entity_id_mentions,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM all_ids x
+         WHERE coalesce(a.before_data::text,'') LIKE '%'||x.id||'%'
+            OR coalesce(a.after_data::text,'') LIKE '%'||x.id||'%'
+       )) AS historical_payload_id_mentions
+FROM audit_log a;
+\else
+\echo 'ONB02 BLOCK: original_establishment_ids missing; post-purge historical audit reconciliation NOT_PROVEN.'
+\endif
 
 ROLLBACK;
