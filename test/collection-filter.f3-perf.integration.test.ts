@@ -126,7 +126,7 @@ test('F3-PERF-02: paired p50/p95 and byte-exact plans for 0/10/100 percent candi
         }
       }
       const survived=await admin.query<{n:string}>(
-        'SELECT count(*)::text AS n FROM public.publications p JOIN pg_temp.f3_perf_ids b ON b.id=p.id');
+        'SELECT count(*)::text AS n FROM public.publications WHERE primary_official_url LIKE \'https://perf.example.test/%\'');
       assert.equal(Number(survived.rows[0]?.n),ROWS,'no benchmark publication may be deleted by save');
       console.log('F3_PERF_02_SAVE_PG18='+JSON.stringify({synthetic:true,fixtureCount:ROWS,
         repetitions:REPETITIONS,
