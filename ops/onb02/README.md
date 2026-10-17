@@ -38,7 +38,7 @@ Issue: https://github.com/fabiojuniort-cyber/tribusca-control/issues/118
    novo CNPJ começa do zero, logs sem dados pessoais.
 
 ## Esquema
-- Migration 070 cria `app_purge_company(UUID)` sem apagar dados no momento de
+- Migration 073 cria `app_purge_company(UUID)` sem apagar dados no momento de
   sua aplicação. Nenhum `GRANT DELETE ON companies` ao runtime.
 - A função SECURITY DEFINER revalida user/tenant/admin, usa FOR UPDATE, impede
   vínculos de matching entre companhias e efetua DELETE da company + cascatas.
