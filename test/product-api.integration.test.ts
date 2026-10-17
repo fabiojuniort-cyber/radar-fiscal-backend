@@ -292,6 +292,8 @@ test(
         establishmentResponse.statusCode,
         201,
       );
+      const unitId = establishmentResponse.json<{ establishment: { id: string } }>()
+        .establishment.id;
 
       const profileResponse =
         await app.inject({
@@ -324,6 +326,12 @@ test(
               keywords: [
                 'crédito presumido',
               ],
+              establishmentOverrides: [{
+                establishmentId: unitId,
+                taxRegime: 'LUCRO_PRESUMIDO',
+                conceptCodes: [],
+                ncmCodes: [],
+              }],
             },
           },
         });
@@ -372,6 +380,38 @@ test(
         }>().profile?.taxRegime,
         'LUCRO_REAL',
       );
+
+      assert.deepEqual(
+        profile.json<{ profile: { personalization: { establishmentOverrides: unknown[] } } }>()
+          .profile.personalization.establishmentOverrides,
+        [{
+          establishmentId: unitId,
+          taxRegime: 'LUCRO_PRESUMIDO',
+          conceptCodes: [],
+          ncmCodes: [],
+        }],
+        'an establishment must have its own profile distinct from company regime',
+      );
+
+      const invalidUnit = await app.inject({
+        method: 'PUT',
+        url: '/api/v1/companies/' + company.id + '/tax-profile',
+        headers: firstHeaders,
+        payload: {
+          taxRegime: 'LUCRO_REAL',
+          personalization: {
+            establishmentOverrides: [{
+              establishmentId: randomUUID(),
+              taxRegime: 'SIMPLES_NACIONAL',
+              conceptCodes: [],
+              ncmCodes: [],
+            }],
+          },
+        },
+      });
+      assert.equal(invalidUnit.statusCode, 400, invalidUnit.body);
+      assert.equal(invalidUnit.json<{ error: string }>().error,
+        'invalid_establishment_overrides');
 
       const after = await app.inject({
         method: 'GET',
