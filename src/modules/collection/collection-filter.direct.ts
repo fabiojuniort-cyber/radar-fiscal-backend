@@ -143,7 +143,10 @@ async function directArchiveStamp(trx:Transaction<DB>,lock=false):Promise<string
   return r.rows[0]?.stamp??'';
 }
 
-export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
+/** Test-only baseline option retains the original full JS evaluation for exact
+ * before/after equivalence; HTTP callers never expose this option. */
+export async function candidates(trx: Transaction<DB>, input: DirectRuleInput,
+  {disableTitlePrecheck=false}:{disableTitlePrecheck?:boolean}={}) {
   let rule = validated(input);
   const policies = await sql<{
     id:string; version:number; revision:number;
@@ -206,7 +209,7 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
     `.execute(trx);
     if (!page.rows.length) break;
     for (const item of page.rows) {
-      if(!couldMatchDirectRule(engine,rule,item.title,item.section))continue;
+      if(!disableTitlePrecheck && !couldMatchDirectRule(engine,rule,item.title,item.section))continue;
       const decision=evaluateHistoricalCollectionCandidate(engine,item);
       if (decision.decision!=='DISCARD' || !decision.canonicalType ||
           normalizeCollectionFilterType(decision.matchedRuleName??'')!==
