@@ -237,6 +237,35 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       method:'DELETE',url:'/api/v1/companies/'+target.company.id,
     });
     assert.equal(unauth.statusCode,401);
+
+    // An authenticated analyst of the same tenant has read permissions but
+    // cannot use the owner-only irreversible deletion.
+    const bToken = b.headers.authorization;
+    await admin.query(`
+      INSERT INTO tenant_memberships(tenant_id,user_id,role)
+      VALUES($1,$2,'ANALYST')
+      ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=EXCLUDED.role
+    `,[a.tenantId,users[1]]);
+    const analystDelete = await app.inject({
+      method:'DELETE',url:'/api/v1/companies/'+target.company.id,
+      headers:{authorization:bToken,'x-tenant-id':a.tenantId},
+    });
+    assert.equal(analystDelete.statusCode,403,analystDelete.body);
+    assert.equal(await count('companies','id',target.company.id),1);
+
+    // A direct SQL call without authenticated tenant context must fail.
+    const withoutContext = await admin.connect();
+    try {
+      await withoutContext.query('BEGIN');
+      await withoutContext.query('SET LOCAL ROLE radar_app_runtime');
+      await assert.rejects(
+        () => withoutContext.query('SELECT public.app_purge_company($1::uuid)',[target.company.id]),
+        /admin_required|permission denied/i,
+      );
+    } finally {
+      await withoutContext.query('ROLLBACK').catch(() => undefined);
+      withoutContext.release();
+    }
     const permissions = (await admin.query<{
       worker_execute:boolean; app_delete:boolean;
     }>(`
