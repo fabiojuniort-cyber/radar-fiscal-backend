@@ -157,6 +157,70 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       VALUES($1,'Monitoramento inativo',false)
     `,[target.company.id]);
 
+    // Populate OTHER tenants' relationships too: an empty table is not an
+    // evidence of preservation after deletion.
+    await admin.query(`
+      INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,is_current)
+      VALUES($1,1,'LUCRO_REAL',true),($2,1,'LUCRO_REAL',true)
+    `,[sibling.company.id,remote.company.id]);
+    const preservedProducts = (await admin.query<{ id: string; company_id: string }>(`
+      INSERT INTO company_product_profiles(company_id,product_label)
+      VALUES($1,'Semente de teste'),($2,'Defensivo de teste')
+      RETURNING id,company_id
+    `,[sibling.company.id,remote.company.id])).rows;
+    for (const productOfOther of preservedProducts) {
+      await admin.query(`
+        INSERT INTO company_product_ncms(company_product_profile_id,official_catalog_entry_id)
+        VALUES($1,$2)
+      `,[productOfOther.id,entry.id]);
+      await admin.query(`
+        INSERT INTO company_cnae_ncms(company_id,cnae_code,official_catalog_entry_id)
+        VALUES($1,'6201501',$2)
+      `,[productOfOther.company_id,entry.id]);
+    }
+
+    const rowsSnapshot = async (query: string, ids: string[]) => {
+      const result = await admin.query<{snapshot:string}>(`
+        SELECT coalesce(jsonb_agg(to_jsonb(q) ORDER BY to_jsonb(q)::text),'[]'::jsonb)::text
+          AS snapshot FROM (${query}) q
+      `,[ids]);
+      return result.rows[0]!.snapshot;
+    };
+    const otherCompanyIds = [sibling.company.id,remote.company.id];
+    const snapshotOtherGraph = async () => Promise.all([
+      'SELECT t.* FROM companies t WHERE t.id=ANY($1::uuid[])',
+      'SELECT t.* FROM establishments t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_cnaes t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT ec.* FROM establishment_cnaes ec JOIN establishments e ON e.id=ec.establishment_id WHERE e.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_tax_profiles t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_product_profiles t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT n.* FROM company_product_ncms n JOIN company_product_profiles p ON p.id=n.company_product_profile_id WHERE p.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_cnae_ncms t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM monitoring_profiles t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_publications t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT pm.* FROM publication_matches pm JOIN company_publications cp ON cp.id=pm.company_publication_id WHERE cp.company_id=ANY($1::uuid[])',
+    ].map(query=>rowsSnapshot(query,otherCompanyIds)));
+    const otherGraphBefore = await snapshotOtherGraph();
+    assert.ok(otherGraphBefore.every(rows=>rows!=='[]'),
+      'unrelated companies must have nonempty rows in EVERY relation');
+
+    const snapshotTargetAndAccount = async () => Promise.all([
+      'SELECT t.* FROM companies t WHERE t.id=ANY($1::uuid[])',
+      'SELECT t.* FROM establishments t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_cnaes t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT ec.* FROM establishment_cnaes ec JOIN establishments e ON e.id=ec.establishment_id WHERE e.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_tax_profiles t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_product_profiles t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT n.* FROM company_product_ncms n JOIN company_product_profiles p ON p.id=n.company_product_profile_id WHERE p.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_cnae_ncms t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM monitoring_profiles t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM company_publications t WHERE t.company_id=ANY($1::uuid[])',
+      'SELECT pm.* FROM publication_matches pm JOIN company_publications cp ON cp.id=pm.company_publication_id WHERE cp.company_id=ANY($1::uuid[])',
+      'SELECT t.* FROM tenants t JOIN companies c ON c.tenant_id=t.id WHERE c.id=ANY($1::uuid[])',
+      'SELECT t.* FROM tenant_onboarding_profiles t JOIN companies c ON c.tenant_id=t.tenant_id WHERE c.id=ANY($1::uuid[])',
+      'SELECT t.* FROM audit_log t JOIN companies c ON c.tenant_id=t.tenant_id WHERE c.id=ANY($1::uuid[])',
+    ].map(query=>rowsSnapshot(query,[target.company.id])));
+
     const count = async (table: string, column: string, id: string) => {
       const row = await admin.query<{ total: number }>(
         'SELECT count(*)::int AS total FROM ' + table + ' WHERE ' + column + '=$1',
@@ -310,13 +374,17 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       method:'DELETE',url:'/api/v1/companies/'+remote.company.id,headers:a.headers,
     });
     assert.equal(crossTenant.statusCode,404,crossTenant.body);
-    // Inject a failure AFTER the DELETE statements (during audit insertion)
-    // to verify transaction rollback, not only initial validation failure.
+    // Inject a failure AFTER all DELETE statements. PostgreSQL sequences
+    // are intentionally nontransactional; nextval proves the audit trigger
+    // ran, even though the main transaction must roll back completely.
+    const beforeRollback = await snapshotTargetAndAccount();
+    await admin.query('CREATE SEQUENCE public.onb02_ci_audit_marker START 1');
     await admin.query(`
       CREATE OR REPLACE FUNCTION public.onb02_ci_force_audit_failure()
       RETURNS trigger LANGUAGE plpgsql AS $onb02_ci$
       BEGIN
         IF NEW.action='COMPANY_PURGED' THEN
+          PERFORM nextval('public.onb02_ci_audit_marker');
           RAISE EXCEPTION 'onb02_ci_forced_rollback';
         END IF;
         RETURN NEW;
@@ -329,7 +397,14 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       const failedInAudit = await app.inject({
         method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
       });
-      assert.notEqual(failedInAudit.statusCode,204);
+      assert.equal(failedInAudit.statusCode,500,'must have reached injected audit failure');
+      const marker=(await admin.query<{last_value:string}>(
+        'SELECT last_value::text FROM public.onb02_ci_audit_marker')).rows[0]!;
+      assert.equal(marker.last_value,'1','audit failure MUST run after deletion');
+      assert.deepEqual(await snapshotTargetAndAccount(),beforeRollback,
+        'all private and audit rows must roll back byte-for-byte');
+      assert.deepEqual(await snapshotOtherGraph(),otherGraphBefore,
+        'unrelated tenants must be unchanged after abort');
       assert.equal(await count('companies','id',target.company.id),1);
       for (const [table,column,id] of populated) assert.ok(
         await count(table,column,id)>0,'rollback must restore '+table);
@@ -343,12 +418,16 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     } finally {
       await admin.query('DROP TRIGGER IF EXISTS onb02_ci_force_audit_failure_trigger ON public.audit_log');
       await admin.query('DROP FUNCTION IF EXISTS public.onb02_ci_force_audit_failure()');
+      await admin.query('DROP SEQUENCE IF EXISTS public.onb02_ci_audit_marker');
     }
 
-    const deleted = await app.inject({
+    // Two concurrent irreversible requests: exactly one may succeed,
+    // the second must observe that the company is already gone.
+    const deletedResponses = await Promise.all([1,2].map(() => app.inject({
       method:'DELETE',url:'/api/v1/companies/'+target.company.id,headers:a.headers,
-    });
-    assert.equal(deleted.statusCode,204,deleted.body);
+    })));
+    assert.deepEqual(deletedResponses.map(x=>x.statusCode).sort((x,y)=>x-y),
+      [204,404],'concurrent DELETE must have exactly one successful purge');
     assert.equal(await count('companies','id',target.company.id),0);
     for (const [table,column,id] of populated) assert.equal(
       await count(table,column,id),0,table+' retains former company data');
@@ -371,7 +450,21 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(legacy.account_name,'Conta TriFaros');
     assert.ok(legacy.terms_accepted_at);
     assert.ok(legacy.privacy_policy_accepted_at);
-    assert.equal(await count('audit_log','tenant_id',a.tenantId) >= 1,true);
+    assert.deepEqual(await snapshotOtherGraph(),otherGraphBefore,
+      'every populated other-company relationship remains exactly identical');
+    const purgeAudits=(await admin.query<{
+      actor_type:string;actor_id:string;entity_id:string|null;after_data:any;
+      before_data:any;
+    }>(`
+      SELECT actor_type,actor_id,entity_id,after_data,before_data
+      FROM audit_log WHERE tenant_id=$1 AND action='COMPANY_PURGED'
+    `,[a.tenantId])).rows;
+    assert.equal(purgeAudits.length,1,'two DELETEs must create exactly one audit');
+    assert.equal(purgeAudits[0]!.actor_type,'USER');
+    assert.equal(purgeAudits[0]!.actor_id,users[0]);
+    assert.equal(purgeAudits[0]!.entity_id,null);
+    assert.equal(purgeAudits[0]!.before_data,null);
+    assert.deepEqual(purgeAudits[0]!.after_data,{purged:true});
 
     const recreate = await createCompany(a,cnpjA,'Novo perfil do zero');
     assert.notEqual(recreate.company.id,target.company.id);
