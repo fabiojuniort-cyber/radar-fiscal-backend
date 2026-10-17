@@ -560,7 +560,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
             )
         `,[tenants]);
         await admin.query(
-          "DELETE FROM audit_log WHERE action='COMPANY_PURGED' AND tenant_id=ANY($1::uuid[])",
+          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL') AND tenant_id=ANY($1::uuid[])",
           [tenants],
         );
       }
