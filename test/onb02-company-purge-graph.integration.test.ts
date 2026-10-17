@@ -314,13 +314,13 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     // to verify transaction rollback, not only initial validation failure.
     await admin.query(`
       CREATE OR REPLACE FUNCTION public.onb02_ci_force_audit_failure()
-      RETURNS trigger LANGUAGE plpgsql AS $
+      RETURNS trigger LANGUAGE plpgsql AS $onb02_ci$
       BEGIN
         IF NEW.action='COMPANY_PURGED' THEN
           RAISE EXCEPTION 'onb02_ci_forced_rollback';
         END IF;
         RETURN NEW;
-      END $;
+      END $onb02_ci$;
       CREATE TRIGGER onb02_ci_force_audit_failure_trigger
       BEFORE INSERT ON public.audit_log
       FOR EACH ROW EXECUTE FUNCTION public.onb02_ci_force_audit_failure();
@@ -381,12 +381,35 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(await count('company_publications','company_id',recreate.company.id),0);
   } finally {
     await app.close();
-    if (users.length) await admin.query('DELETE FROM app_users WHERE id=ANY($1::uuid[])',[users]);
-    if (tenants.length) {
-      await admin.query("DELETE FROM audit_log WHERE action='COMPANY_PURGED' AND tenant_id=ANY($1::uuid[])",[tenants]);
-      await admin.query('DELETE FROM tenants WHERE id=ANY($1::uuid[])',[tenants]);
+    try {
+      if (tenants.length) {
+        // Only disposable CI tenant fixtures. A failed assertion must not
+        // trigger a SECOND error via monitoring_profiles' NO ACTION FK.
+        await admin.query(`
+          DELETE FROM publication_matches pm WHERE
+            pm.company_publication_id IN (
+              SELECT cp.id FROM company_publications cp
+              JOIN companies c ON c.id = cp.company_id
+              WHERE c.tenant_id = ANY($1::uuid[])
+            ) OR pm.monitoring_profile_id IN (
+              SELECT mp.id FROM monitoring_profiles mp
+              JOIN companies c ON c.id = mp.company_id
+              WHERE c.tenant_id = ANY($1::uuid[])
+            )
+        `,[tenants]);
+        await admin.query(
+          "DELETE FROM audit_log WHERE action='COMPANY_PURGED' AND tenant_id=ANY($1::uuid[])",
+          [tenants],
+        );
+      }
+      if (users.length) await admin.query(
+        'DELETE FROM app_users WHERE id=ANY($1::uuid[])',[users]);
+      if (tenants.length) await admin.query(
+        'DELETE FROM tenants WHERE id=ANY($1::uuid[])',[tenants]);
+      if (globalPublicationId) await admin.query(
+        'DELETE FROM publications WHERE id=$1',[globalPublicationId]);
+    } finally {
+      await admin.end();
     }
-    if (globalPublicationId) await admin.query('DELETE FROM publications WHERE id=$1',[globalPublicationId]);
-    await admin.end();
   }
 });
