@@ -239,12 +239,12 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
     // Adversarial stale preview: a new company link MUST invalidate the
     // server witness transactionally, without ever touching the purge endpoint.
     const e0=(await owner.query<{revision:string}>(
-      "SELECT revision::text AS revision FROM collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
+      "SELECT revision::text AS revision FROM f3_runtime.collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
     )).rows[0]!.revision;
     await owner.query('INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)',
       [company,ordinary.id]);
     const e1=(await owner.query<{revision:string}>(
-      "SELECT revision::text AS revision FROM collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
+      "SELECT revision::text AS revision FROM f3_runtime.collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
     )).rows[0]!.revision;
     assert.ok(BigInt(e1)>BigInt(e0),'company link must bump F3 evidence revision');
     const staleSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
