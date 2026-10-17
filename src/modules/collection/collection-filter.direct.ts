@@ -202,33 +202,66 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput,
   let cursor:string|null=null;
   let pages=0;
   const hash=createHash('sha256').update(JSON.stringify(['F3-NOME-02',rule,approved.id,approved.revision]));
-  if(rule.mode!=='KEEP_ALWAYS')while (true) {
-    if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
-    const page=await sql<HistoricalCollectionCandidate>`
-      SELECT * FROM collection_filter_f3_candidates(${cursor}::uuid,500,${rule.sourceCode})
+  // Exactly the same decision, hash, order and protection logic in both plans.
+  const absorb=(item:HistoricalCollectionCandidate):void=>{
+    const decision=evaluateHistoricalCollectionCandidate(engine,item);
+    if (decision.decision!=='DISCARD' || !decision.canonicalType ||
+        normalizeCollectionFilterType(decision.matchedRuleName??'')!==
+          normalizeCollectionFilterType(rule.canonicalType) ||
+        decision.mode!==rule.mode ||
+        decision.matchedSection!==normalizeCollectionFilterType(rule.section))return;
+    hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
+      item.source_act_type,item.section,item.provenance_conflict,
+      item.has_company,item.has_other_source,decision.reasonCode]));
+    if(samples.length<10)samples.push({id:item.publication_id,title:item.title,
+      sourceCode:item.source_code,section:item.section,officialType:item.source_act_type,
+      actName:collectionFilterActName(item.title),
+      pattern:decision.matchedPattern??decision.canonicalType,
+      protection:item.has_company?'COMPANY':item.has_other_source?'OTHER_ORIGIN':null});
+    if(item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
+    else if(item.has_other_source){blockedOtherSource++;blockedOtherSourceIds.push(item.publication_id);}
+    else ids.push(item.publication_id);
+  };
+  type Header={publication_id:string;title:string;section:string};
+  let firstHeaders:Header[]|undefined;
+  let sparse=false;
+  if(rule.mode!=='KEEP_ALWAYS'&&!disableTitlePrecheck){
+    // Sample only the FIRST page. If most titles could match, reading headers
+    // and then full evidence would cost more than the original single pass.
+    const probe=await sql<Header>`
+      SELECT * FROM collection_filter_f3_headers(${null}::uuid,500,${rule.sourceCode})
     `.execute(trx);
-    if (!page.rows.length) break;
-    for (const item of page.rows) {
-      if(!disableTitlePrecheck && !couldMatchDirectRule(engine,rule,item.title,item.section))continue;
-      const decision=evaluateHistoricalCollectionCandidate(engine,item);
-      if (decision.decision!=='DISCARD' || !decision.canonicalType ||
-          normalizeCollectionFilterType(decision.matchedRuleName??'')!==
-            normalizeCollectionFilterType(rule.canonicalType) ||
-          decision.mode!==rule.mode || decision.matchedSection!==normalizeCollectionFilterType(rule.section)) continue;
-      hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
-        item.source_act_type,item.section,item.provenance_conflict,
-        item.has_company,item.has_other_source,decision.reasonCode]));
-      if (samples.length<10) samples.push({id:item.publication_id,title:item.title,
-        sourceCode:item.source_code,section:item.section,officialType:item.source_act_type,
-        actName:collectionFilterActName(item.title),
-        pattern:decision.matchedPattern??decision.canonicalType,
-        protection:item.has_company?'COMPANY':item.has_other_source?'OTHER_ORIGIN':null});
-      if (item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
-      else if (item.has_other_source){blockedOtherSource++;blockedOtherSourceIds.push(item.publication_id);}
-      else ids.push(item.publication_id);
+    firstHeaders=probe.rows;
+    const matching=probe.rows.filter(h=>couldMatchDirectRule(engine,rule,h.title,h.section)).length;
+    sparse=matching<=Math.floor(probe.rows.length*.30);
+  }
+  if(rule.mode!=='KEEP_ALWAYS')while(true){
+    if(++pages>1000)throw new Error('direct_filter_archive_limit_exceeded');
+    if(sparse){
+      const headers=firstHeaders??(await sql<Header>`
+        SELECT * FROM collection_filter_f3_headers(${cursor}::uuid,500,${rule.sourceCode})
+      `.execute(trx)).rows;
+      firstHeaders=undefined;
+      if(!headers.length)break;
+      const selected=headers.filter(h=>couldMatchDirectRule(engine,rule,h.title,h.section));
+      if(selected.length){
+        const selectedIds=selected.map(h=>h.publication_id);
+        const evidence=await sql<HistoricalCollectionCandidate>`
+          SELECT * FROM collection_filter_f3_candidates_by_ids(${selectedIds}::uuid[],${rule.sourceCode})
+        `.execute(trx);
+        for(const item of evidence.rows)absorb(item);
+      }
+      cursor=headers[headers.length-1]!.publication_id;
+      if(headers.length<500)break;
+    } else {
+      const page=await sql<HistoricalCollectionCandidate>`
+        SELECT * FROM collection_filter_f3_candidates(${cursor}::uuid,500,${rule.sourceCode})
+      `.execute(trx);
+      if(!page.rows.length)break;
+      for(const item of page.rows)absorb(item);
+      cursor=page.rows[page.rows.length-1]!.publication_id;
+      if(page.rows.length<500)break;
     }
-    cursor=page.rows[page.rows.length-1]!.publication_id;
-    if (page.rows.length<500) break;
   }
   hash.update(String(blockedCompany)).update(String(blockedOtherSource));
   const token=hash.digest('hex');
