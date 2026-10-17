@@ -158,6 +158,10 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
 
+      - name: ONB-02 R3 full graph and adversarial hard-delete tests
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/onb02-company-purge-graph.integration.test.ts
+
       - name: News API integration test
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/news.api.integration.test.ts
@@ -317,3 +321,5 @@ jobs:
         run: npx tsx --test test/public-signup.integration.test.ts
       - name: Adversarial CNAE/branch/isolation on PG18
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
+      - name: ONB-02 R3 hard-delete full graph on PG18
+        run: npx tsx --test test/onb02-company-purge-graph.integration.test.ts
