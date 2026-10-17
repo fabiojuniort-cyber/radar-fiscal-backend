@@ -4,7 +4,8 @@
 -- Per-table epoch rows reduce write contention between different evidence tables.
 CREATE TABLE public.collection_filter_f3_evidence_epoch (
   table_name TEXT PRIMARY KEY,
-  revision BIGINT NOT NULL DEFAULT 0 CHECK(revision >= 0)
+  revision BIGINT NOT NULL DEFAULT 0 CHECK(revision >= 0),
+  generation UUID NOT NULL DEFAULT pg_catalog.gen_random_uuid()
 );
 INSERT INTO public.collection_filter_f3_evidence_epoch(table_name)
 VALUES ('publications'),('publication_versions'),('publication_origins'),
@@ -20,7 +21,12 @@ BEGIN
   UPDATE public.collection_filter_f3_evidence_epoch
   SET revision=revision+1 WHERE table_name=TG_TABLE_NAME;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'untracked_f3_evidence_table: %',TG_TABLE_NAME;
+    -- DOE-SP restore/repair fixtures can TRUNCATE auxiliary tables. Recreate
+    -- an epoch row with a NEW generation, never a reusable old counter.
+    INSERT INTO public.collection_filter_f3_evidence_epoch(table_name,revision)
+      VALUES(TG_TABLE_NAME,1)
+    ON CONFLICT(table_name) DO UPDATE
+      SET revision=public.collection_filter_f3_evidence_epoch.revision+1;
   END IF;
   RETURN NULL; -- statement-level trigger; ignored
 END;
@@ -44,16 +50,16 @@ BEGIN
       -- Never wait behind a writer holding only some epoch locks. A partial
       -- blocking lock acquisition could otherwise deadlock against a
       -- multi-table ingestion transaction. Fall back to the full F3 scan.
-      SELECT string_agg(t.table_name||':'||t.revision::text,'|' ORDER BY t.table_name)
+      SELECT string_agg(t.table_name||':'||t.generation::text||':'||t.revision::text,'|' ORDER BY t.table_name)
         INTO v_stamp
-      FROM (SELECT table_name,revision
+      FROM (SELECT table_name,generation,revision
             FROM public.collection_filter_f3_evidence_epoch
             ORDER BY table_name FOR SHARE NOWAIT) t;
     EXCEPTION WHEN lock_not_available THEN
       RETURN NULL; -- no fast-path capability; saves recompute as before
     END;
   ELSE
-    SELECT string_agg(table_name||':'||revision::text,'|' ORDER BY table_name)
+    SELECT string_agg(table_name||':'||generation::text||':'||revision::text,'|' ORDER BY table_name)
       INTO v_stamp
     FROM public.collection_filter_f3_evidence_epoch;
   END IF;
@@ -112,9 +118,9 @@ BEGIN
     IF v_revision IS DISTINCT FROM p_policy_revision THEN
       RAISE EXCEPTION USING ERRCODE='P0002',MESSAGE='f3_witness_stale';
     END IF;
-    SELECT string_agg(t.table_name||':'||t.revision::text,'|' ORDER BY t.table_name)
+    SELECT string_agg(t.table_name||':'||t.generation::text||':'||t.revision::text,'|' ORDER BY t.table_name)
       INTO v_stamp
-    FROM (SELECT table_name,revision
+    FROM (SELECT table_name,generation,revision
           FROM public.collection_filter_f3_evidence_epoch
           ORDER BY table_name FOR SHARE NOWAIT) t;
     IF v_stamp IS DISTINCT FROM p_stamp THEN
