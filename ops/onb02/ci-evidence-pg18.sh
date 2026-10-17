@@ -128,6 +128,32 @@ assert.equal(metric('historical_payload_id_mentions'),'2',
 console.log('ONB02_R3_SEMANTIC_SQL_PASS');
 NODE
 
+# Post-deletion readback: this DELETE affects GitHub's throwaway test DB ONLY.
+"${PSQL[@]}" -q -v "company_id=$target_id" -c "DELETE FROM companies WHERE id='$target_id'::uuid" > /dev/null
+AFTER="${RUNNER_TEMP:-/tmp}/onb02-r3-post-delete-synthetic.out"
+"${PSQL[@]}" -A -v "company_id=$target_id" \
+  -v "original_tenant_id=$tenant_id" \
+  -v "original_establishment_ids=$branch_id" \
+  -v "original_tax_profile_ids=$tax_id" \
+  -v "original_product_profile_ids=$product_id" \
+  -v "original_monitoring_profile_ids=$monitoring_id" \
+  -v "original_cnpjs=11222333000181,11222333000262" \
+  -f ops/onb02/company-manifest-readonly.sql > "$AFTER" 2> /dev/null
+node - "$AFTER" <<'NODE'
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const rows=fs.readFileSync(process.argv[2],'utf8').split(/\r?\n/);
+const idx=rows.findIndex(s=>s.startsWith('evidence_scope_status|old_ids_covered|'));
+assert.ok(idx>=0,'post-delete reconciliation exists');
+const header=rows[idx].split('|'), data=rows[idx+1].split('|');
+const get=n=>data[header.indexOf(n)];
+assert.equal(get('evidence_scope_status'),'SAVED_SCOPE_NEEDS_CLASSIFICATION');
+assert.ok(Number(get('old_ids_covered'))>=5,'must retain private UUID scope');
+assert.equal(get('historical_entity_id_mentions'),'1');
+assert.equal(get('historical_payload_id_mentions'),'2');
+assert.equal(get('historical_cnpj_mentions'),'1');
+console.log('ONB02_R3_POST_DELETE_RESIDUES_DETECTED');
+NODE
 # Teardown on a synthetic disposable DB only.
 "${PSQL[@]}" -q <<'SQL'
 DROP VIEW public.onb02_ci_private_est_chain;
