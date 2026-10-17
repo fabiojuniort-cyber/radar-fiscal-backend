@@ -21,7 +21,7 @@ interface TableSpec { id: string; parent?: string; tableIndex: number; startLine
 interface EntitySpec { part: string; literal: string; nth?: number; domain: AnatomyGold['entities'][number]['domain']; note?: string; id?: string }
 interface ColumnEntitySpec { table: string; column: number; pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string; skipHeader?: boolean }
 export interface Spec { id: string; annotator: string; annotatedAt: string; blocks: BlockSpec[]; tables?: TableSpec[]; entities?: EntitySpec[];
-  columnEntities?: ColumnEntitySpec[]; textEntities?: { pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string }[]; relations?: AnatomyGold['relations']; ranges?: boolean; review?: AnatomyGold['review']; gaps?: AnatomyGold['gaps']; notes?: string }
+  columnEntities?: ColumnEntitySpec[]; textEntities?: { pattern: string; domain: AnatomyGold['entities'][number]['domain']; note?: string }[]; relations?: AnatomyGold['relations']; ranges?: boolean; exceptions?: boolean; headerDomainOverride?: boolean; review?: AnatomyGold['review']; gaps?: AnatomyGold['gaps']; notes?: string }
 
 const root = new URL('../../', import.meta.url);
 const frozen = JSON.parse(readFileSync(new URL('test/fixtures/anatomy/canonical/development.json', root), 'utf8')) as
@@ -183,15 +183,32 @@ export function buildGold(id: string, transform?: (spec: Spec) => Spec): Anatomy
     }
   }
   entities.sort((a, b) => a.span.start - b.span.start);
+  // A code inside a column whose header names its nomenclature takes that nomenclature (no conversion).
+  if (spec.headerDomainOverride) for (const e of entities) {
+    const header = parts.find((p) => p.id === e.partId)?.table?.headerDomain;
+    if ((header === 'NCM' || header === 'NBM') && (e.domain === 'NCM' || e.domain === 'NBM') && e.domain !== header) {
+      e.domain = header; e.note = `${e.note}; domínio pelo cabeçalho da coluna (${header})`;
+    }
+  }
   // Ranges: two consecutive codes in the same part joined only by "a" (M01 operator), never expanded.
   const relations = [...(spec.relations ?? [])];
   if (spec.ranges) for (let i = 1; i < entities.length; i++) {
     const a = entities[i - 1]!; const b = entities[i]!;
     if (a.partId !== b.partId || !/^(?:NCM|NBM)$/.test(a.domain) || a.domain !== b.domain) continue;
-    const between = text.slice(a.span.end, b.span.start); const op = /^(\s*)a(\s*)$/u.exec(between);
+    const between = text.slice(a.span.end, b.span.start); const op = /^(\s*)[aA](\s*)$/u.exec(between);
     if (!op) continue;
     const start = a.span.end + op[1]!.length;
     relations.push({ id: `range-${relations.length + 1}`, kind: 'range', operatorSpan: { start, end: start + 1 }, memberEntityIds: [a.id, b.id], targetEntityIds: [], scopeSpan: { start: a.span.start, end: b.span.end }, condition: null });
+  }
+  // Exceptions (M02): a code preceded, within the same part and clause, by "exceto/exclusive/salvo".
+  if (spec.exceptions) for (const e of entities) {
+    if (!/^(?:NCM|NBM)$/.test(e.domain)) continue;
+    const part = parts.find((p) => p.id === e.partId)!;
+    const from = Math.max(part.span.start, e.span.start - 80); const before = text.slice(from, e.span.start);
+    const m = /(exceto|exclusive|salvo)(?![\p{L}])[^.;:\n]*$/iu.exec(before);
+    if (!m) continue;
+    const start = from + m.index!;
+    relations.push({ id: `exception-${relations.length + 1}`, kind: 'exception', operatorSpan: { start, end: start + m[1]!.length }, memberEntityIds: [], targetEntityIds: [e.id], scopeSpan: { start, end: e.span.end }, condition: null });
   }
   const gold: AnatomyGold = { goldVersion: ANATOMY_GOLD_VERSION, id, partition: 'development', preparation: entry.preparation,
     canonicalTextSha256: entry.canonicalTextSha256, canonicalTextUtf16Length: entry.canonicalTextUtf16Length, status: 'prepared',

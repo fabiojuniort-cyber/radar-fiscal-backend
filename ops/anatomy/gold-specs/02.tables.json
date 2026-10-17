@@ -1,4 +1,4 @@
 {
- "notes": "Único NCM/NBM explícito: 3507.90.4 (inciso X da cláusula primeira, 7 dígitos). Anos de 4 dígitos e percentuais não são NCM e não constam como entidade.",
- "textEntities": [ { "pattern": "(?<![\\d.])3507\\.90\\.4(?![\\d.])", "domain": "NCM", "note": "código NBM/SH citado no inciso X" } ]
+ "notes": "Único código de nomenclatura explícito: 3507.90.4, que a fonte identifica como código da Nomenclatura Brasileira de Mercadorias (NBM/SH) no inciso X da cláusula primeira. Anotado como NBM, sem conversão para NCM (correção do parecer GOLD-01 de GPT/Codex, 17/10/2026). Anos de 4 dígitos e percentuais não são códigos de nomenclatura e não constam como entidade.",
+ "textEntities": [ { "pattern": "(?<![\\d.])3507\\.90\\.4(?![\\d.])", "domain": "NBM", "note": "código NBM/SH citado no inciso X; nomenclatura histórica, não convertido para NCM" } ]
 }

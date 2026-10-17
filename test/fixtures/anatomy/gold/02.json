@@ -2820,7 +2820,7 @@
  ],
  "entities": [
   {
-   "id": "e87",
+   "id": "e115",
    "partId": "editorial_note-2",
    "span": {
     "start": 95,
@@ -2840,6 +2840,314 @@
    "literal": "Convs. ICMS 40/98",
    "domain": "CITATION",
    "note": "convênio citado"
+  },
+  {
+   "id": "e87",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 153,
+    "end": 158
+   },
+   "literal": "97/99",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e88",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 160,
+    "end": 165
+   },
+   "literal": "08/00",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e89",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 167,
+    "end": 172
+   },
+   "literal": "58/01",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e90",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 174,
+    "end": 179
+   },
+   "literal": "89/01",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e91",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 181,
+    "end": 186
+   },
+   "literal": "20/02",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e92",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 188,
+    "end": 194
+   },
+   "literal": "106/02",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e93",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 196,
+    "end": 202
+   },
+   "literal": "152/02",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e94",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 204,
+    "end": 209
+   },
+   "literal": "25/03",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e95",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 211,
+    "end": 216
+   },
+   "literal": "57/03",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e96",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 218,
+    "end": 223
+   },
+   "literal": "93/03",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e97",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 225,
+    "end": 230
+   },
+   "literal": "99/04",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e98",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 232,
+    "end": 237
+   },
+   "literal": "16/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e99",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 239,
+    "end": 244
+   },
+   "literal": "63/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e100",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 246,
+    "end": 252
+   },
+   "literal": "149/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e101",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 254,
+    "end": 260
+   },
+   "literal": "150/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e102",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 262,
+    "end": 267
+   },
+   "literal": "54/06",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e103",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 269,
+    "end": 274
+   },
+   "literal": "93/06",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e104",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 276,
+    "end": 282
+   },
+   "literal": "156/08",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e105",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 284,
+    "end": 289
+   },
+   "literal": "55/09",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e106",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 291,
+    "end": 297
+   },
+   "literal": "195/10",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e107",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 299,
+    "end": 304
+   },
+   "literal": "17/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e108",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 306,
+    "end": 311
+   },
+   "literal": "49/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e109",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 313,
+    "end": 318
+   },
+   "literal": "62/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e110",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 320,
+    "end": 326
+   },
+   "literal": "123/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e111",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 328,
+    "end": 333
+   },
+   "literal": "21/16",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e112",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 335,
+    "end": 340
+   },
+   "literal": "26/21",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e113",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 342,
+    "end": 348
+   },
+   "literal": "104/21",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e114",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 350,
+    "end": 355
+   },
+   "literal": "79/25",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
   },
   {
    "id": "e2",
@@ -3040,7 +3348,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e88",
+   "id": "e116",
    "partId": "editorial_note-22",
    "span": {
     "start": 1748,
@@ -3216,7 +3524,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e89",
+   "id": "e117",
    "partId": "preamble-38",
    "span": {
     "start": 3105,
@@ -3293,7 +3601,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e90",
+   "id": "e118",
    "partId": "inciso-67",
    "span": {
     "start": 7098,
@@ -3304,7 +3612,7 @@
    "note": "lei/decreto/resolução citada"
   },
   {
-   "id": "e91",
+   "id": "e119",
    "partId": "inciso-67",
    "span": {
     "start": 7157,
@@ -3326,7 +3634,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e92",
+   "id": "e120",
    "partId": "inciso-69",
    "span": {
     "start": 7845,
@@ -3337,7 +3645,7 @@
    "note": "lei/decreto/resolução citada"
   },
   {
-   "id": "e93",
+   "id": "e121",
    "partId": "inciso-69",
    "span": {
     "start": 7904,
@@ -3348,7 +3656,7 @@
    "note": "lei/decreto/resolução citada"
   },
   {
-   "id": "e94",
+   "id": "e122",
    "partId": "inciso-71",
    "span": {
     "start": 8425,
@@ -3359,7 +3667,7 @@
    "note": "lei/decreto/resolução citada"
   },
   {
-   "id": "e95",
+   "id": "e123",
    "partId": "inciso-71",
    "span": {
     "start": 8485,
@@ -3458,15 +3766,15 @@
    "note": "convênio citado"
   },
   {
-   "id": "e98",
+   "id": "e126",
    "partId": "inciso-94",
    "span": {
     "start": 14278,
     "end": 14287
    },
    "literal": "3507.90.4",
-   "domain": "NCM",
-   "note": "código NBM/SH citado no inciso X"
+   "domain": "NBM",
+   "note": "código NBM/SH citado no inciso X; nomenclatura histórica, não convertido para NCM"
   },
   {
    "id": "e50",
@@ -3601,7 +3909,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e96",
+   "id": "e124",
    "partId": "paragraph-136",
    "span": {
     "start": 19346,
@@ -3854,7 +4162,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e97",
+   "id": "e125",
    "partId": "inciso-206",
    "span": {
     "start": 29274,
@@ -3905,6 +4213,6 @@
   "status": "requested",
   "reviewedAt": null,
   "approvedContentSha256": null,
-  "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (\", 97/99, 08/00\") após o primeiro não anotados. Único NCM/NBM explícito: 3507.90.4 (inciso X da cláusula primeira, 7 dígitos). Anos de 4 dígitos e percentuais não são NCM e não constam como entidade."
+  "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; cada número de lista (\", 97/99 e 08/00\") anotado como citação própria. Único código de nomenclatura explícito: 3507.90.4, que a fonte identifica como código da Nomenclatura Brasileira de Mercadorias (NBM/SH) no inciso X da cláusula primeira. Anotado como NBM, sem conversão para NCM (correção do parecer GOLD-01 de GPT/Codex, 17/10/2026). Anos de 4 dígitos e percentuais não são códigos de nomenclatura e não constam como entidade."
  }
 }

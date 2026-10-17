@@ -94,14 +94,16 @@ for (const [bid, o] of Object.entries((extra.overrides ?? {}) as Record<string, 
   if (o.at) b.at = o.at; if (o.parent === null) delete b.parent; else if (o.parent) b.parent = o.parent;
 }
 const spec = { id, annotator: 'CLAUDE-EXEC', annotatedAt: '2026-10-17',
-  notes: `CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (", 97/99, 08/00") após o primeiro não anotados. ${extra.notes ?? ''}`.trim(),
+  notes: `CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; cada número de lista (", 97/99 e 08/00") anotado como citação própria. ${extra.notes ?? ''}`.trim(),
   blocks: [...blocksOut, ...(extra.blocks ?? [])], tables: extra.tables ?? [], entities: extra.entities ?? [], columnEntities: extra.columnEntities ?? [],
   textEntities: [
     { pattern: String.raw`(?:Convs?\.|Conv[êe]nios?)\s*(?:ICMS\s*)?(?:n[ºo]\s*)?\d{1,3}/\d{2,4}`, domain: 'CITATION', note: 'convênio citado' },
+    // Each further number of a list ("Convs. ICMS 40/98, 97/99 e 08/00") is its own citation.
+    { pattern: String.raw`(?<=(?:Convs?\.|Conv[êe]nios?)\s*(?:ICMS\s*)?(?:n[ºo]\s*)?\d{1,3}/\d{2,4}(?:(?:,\s*|\s+e\s+)\d{1,3}/\d{2,4})*(?:,\s*|\s+e\s+))\d{1,3}/\d{2,4}`, domain: 'CITATION', note: 'convênio citado (item de lista)' },
     { pattern: String.raw`Ato\s+COTEPE(?:[-/]ICMS)?\s*(?:n[ºo]\s*)?\d{1,3}/\d{2,4}`, domain: 'CITATION', note: 'ato COTEPE citado' },
     { pattern: String.raw`Ajuste\s+SINIEF\s*\d{1,3}/\d{2,4}`, domain: 'CITATION', note: 'ajuste citado' },
     { pattern: String.raw`(?:Lei(?:\s+Complementar)?|Decreto(?:-Lei)?|Resolução(?:\s+do\s+Senado\s+Federal)?)\s+n[ºo°]\s*[\d.]+(?:/\d{2,4})?(?:,\s+de\s+\d{1,2}º?\s+de\s+\p{L}+\s+de\s+\d{4})?`, domain: 'CITATION', note: 'lei/decreto/resolução citada' },
     ...(extra.textEntities ?? []) ],
-  relations: extra.relations ?? [], ranges: extra.ranges ?? false, gaps: extra.gaps ?? [] };
+  relations: extra.relations ?? [], ranges: extra.ranges ?? false, exceptions: extra.exceptions ?? false, headerDomainOverride: extra.headerDomainOverride ?? false, gaps: extra.gaps ?? [] };
 writeFileSync(new URL(`ops/anatomy/gold-specs/${id}.json`, root), JSON.stringify(spec, null, 1) + '\n');
 console.log(`${id}: ${items.length} blocks (${items.filter((x) => x.context === 'historical').length} historical)`);

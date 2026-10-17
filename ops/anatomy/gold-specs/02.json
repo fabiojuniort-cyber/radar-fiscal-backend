@@ -2,7 +2,7 @@
  "id": "02",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
- "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (\", 97/99, 08/00\") após o primeiro não anotados. Único NCM/NBM explícito: 3507.90.4 (inciso X da cláusula primeira, 7 dígitos). Anos de 4 dígitos e percentuais não são NCM e não constam como entidade.",
+ "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; cada número de lista (\", 97/99 e 08/00\") anotado como citação própria. Único código de nomenclatura explícito: 3507.90.4, que a fonte identifica como código da Nomenclatura Brasileira de Mercadorias (NBM/SH) no inciso X da cláusula primeira. Anotado como NBM, sem conversão para NCM (correção do parecer GOLD-01 de GPT/Codex, 17/10/2026). Anos de 4 dígitos e percentuais não são códigos de nomenclatura e não constam como entidade.",
  "blocks": [
   {
    "id": "epigraph-0",
@@ -2197,6 +2197,11 @@
    "note": "convênio citado"
   },
   {
+   "pattern": "(?<=(?:Convs?\\.|Conv[êe]nios?)\\s*(?:ICMS\\s*)?(?:n[ºo]\\s*)?\\d{1,3}/\\d{2,4}(?:(?:,\\s*|\\s+e\\s+)\\d{1,3}/\\d{2,4})*(?:,\\s*|\\s+e\\s+))\\d{1,3}/\\d{2,4}",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
    "pattern": "Ato\\s+COTEPE(?:[-/]ICMS)?\\s*(?:n[ºo]\\s*)?\\d{1,3}/\\d{2,4}",
    "domain": "CITATION",
    "note": "ato COTEPE citado"
@@ -2213,10 +2218,13 @@
   },
   {
    "pattern": "(?<![\\d.])3507\\.90\\.4(?![\\d.])",
-   "domain": "NCM",
-   "note": "código NBM/SH citado no inciso X"
+   "domain": "NBM",
+   "note": "código NBM/SH citado no inciso X; nomenclatura histórica, não convertido para NCM"
   }
  ],
  "relations": [],
+ "ranges": false,
+ "exceptions": false,
+ "headerDomainOverride": false,
  "gaps": []
 }

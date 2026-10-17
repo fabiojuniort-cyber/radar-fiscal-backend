@@ -91,12 +91,14 @@ export function validateAnatomyGold(value: unknown, canonicalText?: string): Ana
     if (r.operatorSpan) inside(r.operatorSpan, r.id); if (r.scopeSpan) inside(r.scopeSpan, r.id);
   }
   for (const g of gold.gaps) if (g.span) inside(g.span, 'gap');
-  if (gold.review.status === 'approved' && gold.review.approvedContentSha256 !== goldContentSha256(gold)) {
-    fail('approval does not match the current annotation content; the changed annotation needs a new review');
-  }
-  if (gold.review.status !== 'approved' && gold.review.approvedContentSha256 !== null) fail('approvedContentSha256 is only set by an approved review');
-  if (gold.status === 'reviewed' && (gold.review.status !== 'approved' || !gold.review.reviewer || gold.review.reviewer === gold.annotator)) {
-    fail('reviewed gold requires an approved review by someone other than the annotator');
-  }
+  // Approval and "reviewed" are one state: identified independent reviewer, date and the exact content hash.
+  const approved = gold.review.status === 'approved';
+  if (approved !== (gold.status === 'reviewed')) fail('review.status approved and status reviewed must go together');
+  if (approved) {
+    if (!gold.annotator) fail('approved gold requires an identified annotator');
+    if (!gold.review.reviewer || gold.review.reviewer === gold.annotator) fail('approved gold requires an identified reviewer other than the annotator');
+    if (!gold.review.reviewedAt) fail('approved gold requires the review date');
+    if (gold.review.approvedContentSha256 !== goldContentSha256(gold)) fail('approval does not match the current annotation content; the changed annotation needs a new review');
+  } else if (gold.review.approvedContentSha256 !== null) fail('approvedContentSha256 is only set by an approved review');
   return gold;
 }

@@ -31,6 +31,13 @@ test('gold invariants fail closed', () => {
   const approve = (reviewer: string, g = base()): AnatomyGold['review'] => ({ reviewer, status: 'approved', reviewedAt: '2026-10-17', approvedContentSha256: goldContentSha256(g), notes: '' });
   rejects(base({ status: 'reviewed', review: approve('exec') }), /other than the annotator/);
   rejects(base({ review: { ...approve('astra'), status: 'requested' } }), /only set by an approved review/);
+  // Inconsistent approval states reproduced by the GOLD-01 reviewer (GPT/Codex, 17/10/2026).
+  rejects(base({ status: 'prepared', review: approve('exec') }), /must go together/);
+  rejects(base({ status: 'prepared', review: approve('astra') }), /must go together/);
+  rejects(base({ status: 'reviewed', review: { ...approve('astra'), reviewer: null } }), /identified reviewer/);
+  rejects(base({ status: 'reviewed', review: { ...approve('astra'), reviewedAt: null } }), /review date/);
+  rejects(base({ status: 'reviewed', annotator: null, review: approve('astra', base({ annotator: null })) }), /identified annotator/);
+  rejects(base({ status: 'reviewed', review: { reviewer: 'astra', status: 'requested', reviewedAt: null, approvedContentSha256: null, notes: '' } }), /must go together/);
   rejects(base({ relations: [{ id: 'r', kind: 'range', operatorSpan: null, memberEntityIds: ['nope'], targetEntityIds: [], scopeSpan: null, condition: null }] }), /unknown entity/);
   rejects({ ...base(), partition: 'reserved-final' }, /partition|invalid/i);
 });

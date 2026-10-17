@@ -1,5 +1,5 @@
 {
-  "engineHash": "345e8be862e91155b0b1cad755a0546d32918c6ee5d3c46e060e780e7ee71422",
+  "engineHash": "95dac3d09807d09b1be618eedaf993c9f352196adb1750227e60b5b2831d13ee",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "ops/anatomy/build-identity.mjs": "a9e826463ef2440548e0a7a360e7bfc3a031ce2cc26612b0af6436f0c69a092f",
@@ -9,7 +9,7 @@
     "src/modules/anatomy/dou-preparation.ts": "41827ee32c8b14bf0db9b56b3695ba06f40f7dd9a25658e2584ab16e435bb293",
     "src/modules/anatomy/engine.ts": "8720e3c1f51053c070d6cb3d446271fdd90f03d18895b103ae69dac9b1de6481",
     "src/modules/anatomy/entities.ts": "07159255102c75905d8b8164a48b65ea5be920df5cd1f9ec850b128f4cdbb5c0",
-    "src/modules/anatomy/gold.ts": "a3ac4d9337c9d2d8414d12c527cf316b1242ee0429b4746dc9c69e2a38c14b7a",
+    "src/modules/anatomy/gold.ts": "e7491f75e5dabacac76ca858a3d0348820832bba4a53d22ef050e1a60d9b0c23",
     "src/modules/anatomy/readers.ts": "faed285360be5750cc8938e5358c72209d1bd544b40b5295d868959b0ac3c0ce"
   }
 }

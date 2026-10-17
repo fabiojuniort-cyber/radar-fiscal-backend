@@ -2,7 +2,7 @@
  "id": "01",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
- "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; números de listas (\", 97/99, 08/00\") após o primeiro não anotados. Anexos: I e II vigentes candidatos (Conv. 89/09); versões anteriores do Anexo I (Conv. 112/08) e do Anexo II (Conv. 112/08) e redação original dos Anexos I e II (NBM/SH) são irmãs históricas no nível do documento, por estarem separadas no texto. Linhas de nota dentro das tabelas são notas editoriais; a linha imediatamente seguinte a uma nota 'Redação anterior' (RemissoAnt) é a redação anterior do mesmo subitem (histórica). Coluna NCM/SH: códigos NCM (8 e 6 dígitos; 4 casos atípicos dddd.dddd anotados como NCM com nota); tabelas originais: códigos NBM/SH de 10 dígitos como NBM. Faixas 'X a Y' anotadas como relação range sem expansão. Ocorrências históricas (ex.: 8450.11.00) permanecem anotadas com contexto histórico.",
+ "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; cada número de lista (\", 97/99 e 08/00\") anotado como citação própria. Anexos: I e II vigentes candidatos (Conv. 89/09); versões anteriores do Anexo I (Conv. 112/08) e do Anexo II (Conv. 112/08) e redação original dos Anexos I e II (NBM/SH) são irmãs históricas no nível do documento, por estarem separadas no texto. Linhas de nota dentro das tabelas são notas editoriais; a linha imediatamente seguinte a uma nota 'Redação anterior' (RemissoAnt) é a redação anterior do mesmo subitem (histórica). Coluna NCM/SH: códigos NCM (8 e 6 dígitos; 4 casos atípicos dddd.dddd anotados como NCM com nota); tabelas originais: códigos NBM/SH de 10 dígitos como NBM. Faixas 'X a Y' anotadas como relação range sem expansão. Ocorrências históricas (ex.: 8450.11.00) permanecem anotadas com contexto histórico.",
  "blocks": [
   {
    "id": "epigraph-0",
@@ -1578,6 +1578,11 @@
    "note": "convênio citado"
   },
   {
+   "pattern": "(?<=(?:Convs?\\.|Conv[êe]nios?)\\s*(?:ICMS\\s*)?(?:n[ºo]\\s*)?\\d{1,3}/\\d{2,4}(?:(?:,\\s*|\\s+e\\s+)\\d{1,3}/\\d{2,4})*(?:,\\s*|\\s+e\\s+))\\d{1,3}/\\d{2,4}",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
    "pattern": "Ato\\s+COTEPE(?:[-/]ICMS)?\\s*(?:n[ºo]\\s*)?\\d{1,3}/\\d{2,4}",
    "domain": "CITATION",
    "note": "ato COTEPE citado"
@@ -1611,16 +1616,28 @@
    "pattern": "(?<![\\d.])\\d{4}\\.\\d{2}(?![\\d.])",
    "domain": "NCM",
    "note": "NCM 6 dígitos (subposição)"
+  },
+  {
+   "pattern": "(?<=[Pp][Oo][Ss][Ii][Çç](?:[ÃãAa][Oo]|[Õõ][Ee][Ss])\\s+(?:\\d{4}\\s+(?:[aA]|ou|OU|e|E)\\s+)?)\\d{4}(?![\\d.,/])(?=(?:\\s+(?:[aA]|ou|OU|e|E)\\s+\\d{4})?\\s+(?:da|DA)\\s+NBM)",
+   "domain": "NBM",
+   "note": "posição de 4 dígitos qualificada como NBM no texto"
+  },
+  {
+   "pattern": "(?<=[Pp][Oo][Ss][Ii][Çç](?:[ÃãAa][Oo]|[Õõ][Ee][Ss])\\s+(?:\\d{4}\\s+(?:[aA]|ou|OU|e|E)\\s+)?)\\d{4}(?![\\d.,/])(?!(?:\\s+(?:[aA]|ou|OU|e|E)\\s+\\d{4})?\\s+(?:da|DA)\\s+NBM)",
+   "domain": "NCM",
+   "note": "posição de 4 dígitos (sem qualificação NBM)"
   }
  ],
  "relations": [],
  "ranges": true,
+ "exceptions": true,
+ "headerDomainOverride": true,
  "gaps": [
   {
    "kind": "other",
    "span": null,
    "resource": null,
-   "note": "Códigos de 4 dígitos sem ponto (posição) e listas sem separador não foram enumerados; a revisão deve conferir as células com texto livre na coluna NCM."
+   "note": "Escopo de códigos (definido antes da medição): todo código de nomenclatura com ponto (6, 8, 10 dígitos e atípico dddd.dddd) e toda posição de 4 dígitos introduzida por 'posição/posições'. Fora do escopo, por definição: anos, datas, números de item/subitem e números de atos. Domínio pela qualificação explícita (cabeçalho 'CÓDIGO DA NBM/SH' ou 'da NBM'); sem qualificação, NCM."
   },
   {
    "kind": "other",
