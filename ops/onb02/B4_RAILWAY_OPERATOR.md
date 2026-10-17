@@ -1,6 +1,16 @@
 # ONB-02 R3 — B4: procedimento operacional com evidência (HOLD produção)
 
-**Status na elaboração: B4 BLOCK (recuperabilidade ACCEPTED_RISK).** Este documento não equivale a backup,
+**Status atual: B4 BLOCK (recuperabilidade ACCEPTED_RISK).**
+
+**Inventário de produção coletado em etapas (17/10/2026):** veja
+[B4_INVENTARIO_REAL_RELATORIO_20261017.md](./B4_INVENTARIO_REAL_RELATORIO_20261017.md).
+Foram examinados grafo FK, subset de RLS/ACLs, roles, funções, triggers, views,
+colunas JSONB, auditorias, cadastro legado e componentes Railway. Não há desvio
+evidente nos objetos críticos amostrados, mas buscas por IDs históricos do
+escopo privado e dependências externas continuam sem comprovação. Dados brutos
+identificadores ficam exclusivamente no perímetro privado. **Essa coleta não
+é prova de autorização para purge nem substitui re-review independente.**
+ Este documento não equivale a backup,
 restore, inventário real, dry-run ou aprovação. Executar somente com operador
 autenticado na Railway e os gates da Issue
 [tribusca-control#118](https://github.com/fabiojuniort-cyber/tribusca-control/issues/118).
@@ -178,13 +188,13 @@ migração e deploy produtivo. Este roteiro **NÃO é autorização**.
 
 | Evidência | Critério de aceite | Status inicial |
 | --- | --- | --- |
-| HEAD e CI | 3/3 workflows SUCCESS no mesmo HEAD | PASS em a04c7a75 |
-| Banco-fonte | Read-only SQL, grafo real + papéis/RLS/triggers | NOT_PROVEN |
-| Backup | ID, UTC, cobertura PITR, integridade, hash | NOT_PROVEN |
-| Restore | Serviço clone isolado, leitura/consistência | NOT_PROVEN |
+| HEAD e CI | 3/3 workflows SUCCESS no HEAD final exato | REVALIDAR após último commit |
+| Banco-fonte | Read-only SQL, grafo real + papéis/RLS/triggers e referências sem FK | PARCIAL / BLOCK |
+| Backup | Novo backup e prova de integridade dispensados expressamente | ACCEPTED_RISK |
+| Restore | Ensaio de restauração dispensado expressamente | ACCEPTED_RISK |
 | Dry-run | Dados A removidos; B e globais iguais | NOT_PROVEN |
 | Recadastro | IDs novos e perfis vazios no clone | NOT_PROVEN |
-| Recovery | Teste seletivo e rollback de código | NOT_PROVEN |
+| Recovery | Recuperabilidade não comprovada, conforme exceção | ACCEPTED_RISK |
 | Revisão | Revisor independente PASS no HEAD | BLOCK |
 | Produção | R3/LOCK e rollout seguro | PROIBIDO |
 
