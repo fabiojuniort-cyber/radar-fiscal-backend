@@ -132,18 +132,13 @@ export function couldMatchDirectRule(
   return false;
 }
 
-/** Read-only freshness hint, not a deletion authorization. An archive change
- * forces the legacy full scan on save. The save operation never deletes data. */
-async function directArchiveStamp(trx:Transaction<DB>,sourceCode:string):Promise<string> {
+/** An exact, transactionally maintained F3 evidence revision.
+ * The SQL lock holds all evidence-epoch rows during safe save, so concurrent
+ * writes cannot slip between validation and committing the new policy.
+ * No publication DELETE is called from this module's save path. */
+async function directArchiveStamp(trx:Transaction<DB>,lock=false):Promise<string> {
   const r=await sql<{stamp:string}>`
-    SELECT jsonb_build_array(
-      public.publication_scope_epoch(),
-      (SELECT jsonb_build_array(cr.id,cr.updated_at)
-       FROM public.collection_runs cr
-       JOIN public.sources s ON s.id=cr.source_id
-       WHERE s.code=${sourceCode}
-       ORDER BY cr.updated_at DESC,cr.id DESC LIMIT 1)
-    )::text AS stamp
+    SELECT public.collection_filter_f3_evidence_stamp(${lock}) AS stamp
   `.execute(trx);
   return r.rows[0]?.stamp??'';
 }
@@ -244,9 +239,9 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
-    const before=await directArchiveStamp(trx,input.sourceCode.trim().toLowerCase());
+    const before=await directArchiveStamp(trx);
     const plan=await candidates(trx,input);
-    const after=await directArchiveStamp(trx,plan.rule.sourceCode);
+    const after=await directArchiveStamp(trx);
     // If the inventory changed while scanning, do not issue a fast-save proof.
     if(before===after)rememberDirectPreview(db,{
       userId,requested:input,rule:plan.rule,count:plan.count,token:plan.token,
@@ -389,14 +384,24 @@ export async function saveDirectFilterRule(
     const witness=findDirectPreview(db,userId,input,expectedCount,
       previewToken,policyRevision,confirmationToken);
     let rule:DirectRuleInput;
-    if(witness&&await directArchiveStamp(trx,witness.rule.sourceCode)===witness.archiveStamp){
+    let verified=false;
+    // Cheap no-lock comparison avoids locking writers when the cache is stale.
+    if(witness&&await directArchiveStamp(trx)===witness.archiveStamp){
+      // Acquire policy lock before evidence locks: fixed lock order prevents
+      // deadlock with a concurrent policy writer (also holding the revision).
       const current=await sql<{revision:number}>`
         SELECT public.collection_filter_safe_save_revision() AS revision
       `.execute(trx);
       if(Number(current.rows[0]?.revision)!==policyRevision)
         throw new RangeError('f3_preview_expired_or_policy_revision_changed');
-      rule=witness.rule;
-    } else {
+      if(await directArchiveStamp(trx,true)===witness.archiveStamp){
+        rule=witness.rule;
+        verified=true;
+      }
+    }
+    if(!verified){
+      // No witness, stale evidence or another web process: keep the original
+      // full preview + hash/revision/token recomputation, with no DELETE.
       const plan=await candidates(trx,input);
       if(plan.policyRevision!==policyRevision ||
          plan.confirmationToken!==confirmationToken ||
