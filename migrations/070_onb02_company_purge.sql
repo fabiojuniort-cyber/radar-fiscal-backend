@@ -34,6 +34,19 @@ BEGIN
         RETURN FALSE;
     END IF;
 
+    -- Fail closed on inconsistent links: one company's monitoring profile
+    -- must not be referenced by a different company's publication match.
+    IF EXISTS (
+        SELECT 1
+        FROM public.publication_matches pm
+        JOIN public.monitoring_profiles mp ON mp.id = pm.monitoring_profile_id
+        JOIN public.company_publications cp ON cp.id = pm.company_publication_id
+        WHERE mp.company_id = p_company_id AND cp.company_id <> p_company_id
+    ) THEN
+        RAISE EXCEPTION 'company_purge_cross_company_link'
+            USING ERRCODE = '23514';
+    END IF;
+
     -- publication_matches has a NO ACTION FK to monitoring_profiles, so
     -- delete those matches explicitly before cascading profiles. This does
     -- NOT remove the shared/global publication or its official history.
