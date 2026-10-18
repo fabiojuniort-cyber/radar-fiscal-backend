@@ -104,6 +104,6 @@ const spec = { id, annotator: 'CLAUDE-EXEC', annotatedAt: '2026-10-17',
     { pattern: String.raw`Ajuste\s+SINIEF\s*\d{1,3}/\d{2,4}`, domain: 'CITATION', note: 'ajuste citado' },
     { pattern: String.raw`(?:Lei(?:\s+Complementar)?|Decreto(?:-Lei)?|Resolução(?:\s+do\s+Senado\s+Federal)?)\s+n[ºo°]\s*[\d.]+(?:/\d{2,4})?(?:,\s+de\s+\d{1,2}º?\s+de\s+\p{L}+\s+de\s+\d{4})?`, domain: 'CITATION', note: 'lei/decreto/resolução citada' },
     ...(extra.textEntities ?? []) ],
-  relations: extra.relations ?? [], ranges: extra.ranges ?? false, exceptions: extra.exceptions ?? false, headerDomainOverride: extra.headerDomainOverride ?? false, gaps: extra.gaps ?? [] };
+  relations: extra.relations ?? [], ranges: extra.ranges ?? false, exceptions: extra.exceptions ?? false, headerDomainOverride: extra.headerDomainOverride ?? false, ...(extra.review ? { review: extra.review } : {}), gaps: extra.gaps ?? [] };
 writeFileSync(new URL(`ops/anatomy/gold-specs/${id}.json`, root), JSON.stringify(spec, null, 1) + '\n');
 console.log(`${id}: ${items.length} blocks (${items.filter((x) => x.context === 'historical').length} historical)`);

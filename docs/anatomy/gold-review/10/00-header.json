@@ -5,7 +5,7 @@
  "preparation": "dou-xml-cdata/1.0.0",
  "canonicalTextSha256": "525a7604c9344e6b1ee7895c3ca382e1a184492e1bffa97be23f75e35a3f94b1",
  "canonicalTextUtf16Length": 23246,
- "status": "prepared",
+ "status": "reviewed",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
  "gaps": [
@@ -23,10 +23,10 @@
   }
  ],
  "review": {
-  "reviewer": null,
-  "status": "requested",
-  "reviewedAt": null,
-  "approvedContentSha256": null,
-  "notes": "Portaria SAES/MS 4.940: matéria única em três arquivos (representação consolidada). Anexo I em duas tabelas chave-valor (t1 no arquivo _001, t2 continuação no _002); Anexo II tabela de compatibilidades; Anexo III tabela dividida entre _002 (t4) e _003 (t5). Geometria derivada da marcação original pelo caminhador do anotador. Nenhum NCM: códigos SIGTAP, CBO, CID, habilitação (NN.NN) e regras de 4 dígitos anotados como OTHER para medir falso positivo. Art. 8º: vigência/efeitos operacionais, não situação jurídica. Valores R$ e códigos de 2-3 dígitos (financiamento/atributo) fora do escopo v1."
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083",
+  "notes": "Portaria SAES/MS 4.940: matéria única em três arquivos (representação consolidada). Anexo I em duas tabelas chave-valor (t1 no arquivo _001, t2 continuação no _002); Anexo II tabela de compatibilidades; Anexo III tabela dividida entre _002 (t4) e _003 (t5). Geometria derivada da marcação original pelo caminhador do anotador. Nenhum NCM: códigos SIGTAP, CBO, CID, habilitação (NN.NN) e regras de 4 dígitos anotados como OTHER para medir falso positivo. Art. 8º: vigência/efeitos operacionais, não situação jurídica. Valores R$ e códigos de 2-3 dígitos (financiamento/atributo) fora do escopo v1.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
  }
 }

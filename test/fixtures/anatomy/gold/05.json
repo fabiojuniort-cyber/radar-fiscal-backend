@@ -5,7 +5,7 @@
  "preparation": "dou-xml-cdata/1.0.0",
  "canonicalTextSha256": "7dc6c74fc357f2ff303cf84fcc8f31b003969795235e871ee2d27f24266b9276",
  "canonicalTextUtf16Length": 1099,
- "status": "prepared",
+ "status": "reviewed",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
  "parts": [
@@ -163,10 +163,10 @@
  "relations": [],
  "gaps": [],
  "review": {
-  "reviewer": null,
-  "status": "requested",
-  "reviewedAt": null,
-  "approvedContentSha256": null,
-  "notes": "ADE Coana: três artigos operativos; preâmbulo com citações; CNPJ da certificada. Sem NCM."
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7",
+  "notes": "ADE Coana: três artigos operativos; preâmbulo com citações; CNPJ da certificada. Sem NCM.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
  }
 }

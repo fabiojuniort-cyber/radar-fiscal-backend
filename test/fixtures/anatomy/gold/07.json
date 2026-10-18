@@ -5,7 +5,7 @@
  "preparation": "dou-xml-cdata/1.0.0",
  "canonicalTextSha256": "6f9fd606a8ec136ff6ce14edb3353608b5ccfe2accc861c0580967d7a1bf48e2",
  "canonicalTextUtf16Length": 1222,
- "status": "prepared",
+ "status": "reviewed",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
  "parts": [
@@ -174,10 +174,10 @@
  "relations": [],
  "gaps": [],
  "review": {
-  "reviewer": null,
-  "status": "requested",
-  "reviewedAt": null,
-  "approvedContentSha256": null,
-  "notes": "Despacho MF: cabeçalho (processo/interessado/assunto) não operativo; decisão no parágrafo 5. 'nº 26, de 14 de agosto de 2026' é Resolução do Senado elíptica. Valores monetários fora do escopo de entidades v1."
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d",
+  "notes": "Despacho MF: cabeçalho (processo/interessado/assunto) não operativo; decisão no parágrafo 5. 'nº 26, de 14 de agosto de 2026' é Resolução do Senado elíptica. Valores monetários fora do escopo de entidades v1.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
  }
 }

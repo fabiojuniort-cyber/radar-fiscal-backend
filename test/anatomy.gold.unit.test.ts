@@ -83,11 +83,32 @@ test('committed development gold is reproducible from its human-written specs', 
   }
 });
 
-test('committed development gold matches the frozen canonical text and is not marked reviewed', () => {
+// Approvals documented in the R2 review (GPT/Codex, 2026-10-18, SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17):
+// PR #244 review 5563875392 and tribusca-control#116 comment 6252319710. 01 received changes_requested.
+const R2_APPROVED: Record<string, string> = {
+  '02': '256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a',
+  '03': 'a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b',
+  '05': '44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7',
+  '07': '59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d',
+  '10': 'c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083',
+  '11': '678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79',
+};
+
+test('committed development gold matches the frozen text; only the documented R2 approvals are reviewed', () => {
   const files = readdirSync(GOLD_DIR).filter((f) => f.endsWith('.json')).sort();
   assert.deepEqual(files, ['01.json', '02.json', '03.json', '05.json', '07.json', '10.json', '11.json']);
   for (const f of files) {
-    const gold = validateAnatomyGold(JSON.parse(readFileSync(new URL(f, GOLD_DIR), 'utf8')), developmentCanonicalText(f.slice(0, 2)));
-    assert.equal(gold.status === 'reviewed', false, 'no gold is reviewed in this package');
+    const id = f.slice(0, 2);
+    const gold = validateAnatomyGold(JSON.parse(readFileSync(new URL(f, GOLD_DIR), 'utf8')), developmentCanonicalText(id));
+    const approved = R2_APPROVED[id];
+    if (approved) {
+      assert.equal(gold.status, 'reviewed', id);
+      assert.deepEqual([gold.review.reviewer, gold.review.status, gold.review.reviewedAt, gold.review.approvedContentSha256],
+        ['GPT/Codex', 'approved', '2026-10-18', approved], id);
+      assert.equal(goldContentSha256(gold), approved, `${id}: content still equals the approved hash`);
+    } else {
+      assert.equal(gold.status, 'prepared', `${id} is not approved`);
+      assert.equal(gold.review.approvedContentSha256, null, id);
+    }
   }
 });

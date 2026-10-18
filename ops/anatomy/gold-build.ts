@@ -205,9 +205,13 @@ export function buildGold(id: string, transform?: (spec: Spec) => Spec): Anatomy
     if (!/^(?:NCM|NBM)$/.test(e.domain)) continue;
     const part = parts.find((p) => p.id === e.partId)!;
     const from = Math.max(part.span.start, e.span.start - 80); const before = text.slice(from, e.span.start);
-    const m = /(exceto|exclusive|salvo)(?![\p{L}])[^.;:\n]*$/iu.exec(before);
+    // The clause runs to the code; a dot between digits (84.56) belongs to a code and does not end it.
+    const m = /(exceto|exclusive|salvo)(?![\p{L}])(?:[^.;:\n]|(?<=\d)\.(?=\d))*$/iu.exec(before);
     if (!m) continue;
     const start = from + m.index!;
+    // One relation per operator: every code it excludes (a list or both ends of a range) is a target of it.
+    const same = relations.find((r) => r.kind === 'exception' && r.operatorSpan?.start === start);
+    if (same) { same.targetEntityIds.push(e.id); same.scopeSpan = { start, end: e.span.end }; continue; }
     relations.push({ id: `exception-${relations.length + 1}`, kind: 'exception', operatorSpan: { start, end: start + m[1]!.length }, memberEntityIds: [], targetEntityIds: [e.id], scopeSpan: { start, end: e.span.end }, condition: null });
   }
   const gold: AnatomyGold = { goldVersion: ANATOMY_GOLD_VERSION, id, partition: 'development', preparation: entry.preparation,

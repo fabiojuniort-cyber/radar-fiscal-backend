@@ -1298,6 +1298,28 @@
   "note": "NCM 8 dígitos"
  },
  {
+  "id": "e2141",
+  "partId": "t1-r9c1",
+  "span": {
+   "start": 12567,
+   "end": 12572
+  },
+  "literal": "84.02",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e2142",
+  "partId": "t1-r10c1",
+  "span": {
+   "start": 12641,
+   "end": 12646
+  },
+  "literal": "84.02",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
   "id": "e809",
   "partId": "t1-r10c2",
   "span": {
@@ -1747,6 +1769,17 @@
   "literal": "8418.69.20",
   "domain": "NCM",
   "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2143",
+  "partId": "t1-r58c1",
+  "span": {
+   "start": 16730,
+   "end": 16735
+  },
+  "literal": "85.14",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
  },
  {
   "id": "e845",
@@ -2713,39 +2746,6 @@
    "end": 26587
   },
   "literal": "8426.30.00",
-  "domain": "NCM",
-  "note": "NCM 8 dígitos"
- },
- {
-  "id": "e918",
-  "partId": "t1-r147c2",
-  "span": {
-   "start": 26624,
-   "end": 26634
-  },
-  "literal": "8426.99.00",
-  "domain": "NCM",
-  "note": "NCM 8 dígitos"
- },
- {
-  "id": "e919",
-  "partId": "t1-r148c2",
-  "span": {
-   "start": 26707,
-   "end": 26717
-  },
-  "literal": "8427.90.00",
-  "domain": "NCM",
-  "note": "NCM 8 dígitos"
- },
- {
-  "id": "e920",
-  "partId": "t1-r150c2",
-  "span": {
-   "start": 26963,
-   "end": 26973
-  },
-  "literal": "8428.10.00",
   "domain": "NCM",
   "note": "NCM 8 dígitos"
  }

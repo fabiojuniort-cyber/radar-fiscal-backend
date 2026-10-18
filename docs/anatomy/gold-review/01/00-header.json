@@ -13,7 +13,7 @@
    "kind": "other",
    "span": null,
    "resource": null,
-   "note": "Escopo de códigos (definido antes da medição): todo código de nomenclatura com ponto (6, 8, 10 dígitos e atípico dddd.dddd) e toda posição de 4 dígitos introduzida por 'posição/posições'. Fora do escopo, por definição: anos, datas, números de item/subitem e números de atos. Domínio pela qualificação explícita (cabeçalho 'CÓDIGO DA NBM/SH' ou 'da NBM'); sem qualificação, NCM."
+   "note": "Escopo de códigos (definido antes da medição): todo código de nomenclatura com ponto (6, 8, 10 dígitos e atípico dddd.dddd) e toda posição introduzida por 'posição/posições' nos formatos NNNN ou NN.NN, isolada ou em lista (vírgula, 'a', 'ou', 'e'); 'X a Y' é faixa M01; 'exceto/exclusive/salvo' gera uma relação de exceção por operador com todos os alvos; capítulos de 2 dígitos ('Capítulo 84') são anotados como informativos (correção R2, GPT/Codex, 18/10/2026). Fora do escopo, por definição: anos, datas, números de item/subitem e números de atos. Domínio pela qualificação explícita (cabeçalho 'CÓDIGO DA NBM/SH' ou 'da NBM'); sem qualificação, NCM."
   },
   {
    "kind": "other",

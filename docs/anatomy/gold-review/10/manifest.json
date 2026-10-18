@@ -2,8 +2,8 @@
  "id": "10",
  "purpose": "Leitura em partes para revisão; o gold completo e o texto canônico congelado continuam sendo a fonte.",
  "goldFile": "test/fixtures/anatomy/gold/10.json",
- "goldFileSha256Lf": "04a703bcf0ea39aeeac3e23fb7c33da8df9bce86c96d292689e36121b1ee8207",
- "goldCanonicalJsonSha256": "9d5a276eba744d10817baf2ea3cbff4454986e56fd02014ba64c0781d83d64a2",
+ "goldFileSha256Lf": "6f35dcdd24acc9b8e086feb9e665cf96351c1b162ed21244d35e1adf2e7a48cc",
+ "goldCanonicalJsonSha256": "3ad1fa743b0a63bab2271a659061fe638cdbee5605ce4b6a01a2893a52255623",
  "goldContentSha256": "c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083",
  "canonicalTextSha256": "525a7604c9344e6b1ee7895c3ca382e1a184492e1bffa97be23f75e35a3f94b1",
  "canonicalTextUtf16Length": 23246,
@@ -14,7 +14,7 @@
    "section": "header",
    "from": 0,
    "to": 0,
-   "sha256": "4b91b7dab35fec6f3e2c1e1dd6cfa95647b99fc03846688e20cc37226eaea2c8"
+   "sha256": "21ff3c3f19b340fa4f60ab3e49eaf9d84df5a55c209bb0e46b4ccb58555e3bc3"
   },
   {
    "file": "parts-001.json",

@@ -5,7 +5,7 @@
  "preparation": "dou-xml-cdata/1.0.0",
  "canonicalTextSha256": "c9af5e182931961d75e6ae1cc1b4dab158e82b0bbbdc2428ee69a31d800b9d41",
  "canonicalTextUtf16Length": 433,
- "status": "prepared",
+ "status": "reviewed",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
  "parts": [
@@ -135,10 +135,10 @@
  "relations": [],
  "gaps": [],
  "review": {
-  "reviewer": null,
-  "status": "requested",
-  "reviewedAt": null,
-  "approvedContentSha256": null,
-  "notes": "Retificação: introdução operativa; 'Onde se lê' e 'Leia-se' citam o ato retificado e ficam proibidos. O bloco 'Leia-se' inclui por inteiro 'mantidas as demais condições' e o processo SEI (exclusão conservadora). Números de requerimento/processo não são NCM."
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b",
+  "notes": "Retificação: introdução operativa; 'Onde se lê' e 'Leia-se' citam o ato retificado e ficam proibidos. O bloco 'Leia-se' inclui por inteiro 'mantidas as demais condições' e o processo SEI (exclusão conservadora). Números de requerimento/processo não são NCM.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
  }
 }

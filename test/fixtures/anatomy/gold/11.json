@@ -5,7 +5,7 @@
  "preparation": "dou-xml-cdata/1.0.0",
  "canonicalTextSha256": "f34ce3ce4ede15770ba1420763f80c3a83e76d252f6326b19920fde4a65a17ef",
  "canonicalTextUtf16Length": 17021,
- "status": "prepared",
+ "status": "reviewed",
  "annotator": "CLAUDE-EXEC",
  "annotatedAt": "2026-10-17",
  "parts": [
@@ -701,10 +701,10 @@
   }
  ],
  "review": {
-  "reviewer": null,
-  "status": "requested",
-  "reviewedAt": null,
-  "approvedContentSha256": null,
-  "notes": "IN que altera a IN RFB 2.228/2024. Cada redação citada (de \" até (NR)) é um único quoted_text proibido; a estrutura interna da redação citada (arts. 143-A a 143-L, §§, incisos) não é anotada como dispositivo próprio. Remissões internas (art. 143-J etc.) e percentuais fora do escopo de entidades v1. Sem NCM."
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79",
+  "notes": "IN que altera a IN RFB 2.228/2024. Cada redação citada (de \" até (NR)) é um único quoted_text proibido; a estrutura interna da redação citada (arts. 143-A a 143-L, §§, incisos) não é anotada como dispositivo próprio. Remissões internas (art. 143-J etc.) e percentuais fora do escopo de entidades v1. Sem NCM.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
  }
 }

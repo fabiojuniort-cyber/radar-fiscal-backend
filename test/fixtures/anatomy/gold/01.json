@@ -124018,6 +124018,28 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2141",
+   "partId": "t1-r9c1",
+   "span": {
+    "start": 12567,
+    "end": 12572
+   },
+   "literal": "84.02",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2142",
+   "partId": "t1-r10c1",
+   "span": {
+    "start": 12641,
+    "end": 12646
+   },
+   "literal": "84.02",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e809",
    "partId": "t1-r10c2",
    "span": {
@@ -124467,6 +124489,17 @@
    "literal": "8418.69.20",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2143",
+   "partId": "t1-r58c1",
+   "span": {
+    "start": 16730,
+    "end": 16735
+   },
+   "literal": "85.14",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e845",
@@ -125635,6 +125668,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2207",
+   "partId": "t1-r168c1",
+   "span": {
+    "start": 29215,
+    "end": 29217
+   },
+   "literal": "84",
+   "domain": "NCM",
+   "note": "capítulo de 2 dígitos; informativo, nunca seleção positiva"
+  },
+  {
    "id": "e936",
    "partId": "t1-r169c2",
    "span": {
@@ -125998,6 +126042,28 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2144",
+   "partId": "t1-r202c1",
+   "span": {
+    "start": 32929,
+    "end": 32934
+   },
+   "literal": "84.56",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2145",
+   "partId": "t1-r202c1",
+   "span": {
+    "start": 32937,
+    "end": 32942
+   },
+   "literal": "84.65",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e967",
    "partId": "t1-r203c2",
    "span": {
@@ -126018,6 +126084,17 @@
    "literal": "8442.30.20",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2146",
+   "partId": "t1-r205c1",
+   "span": {
+    "start": 33560,
+    "end": 33565
+   },
+   "literal": "84.42",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e969",
@@ -126152,6 +126229,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2147",
+   "partId": "t1-r218c1",
+   "span": {
+    "start": 35512,
+    "end": 35517
+   },
+   "literal": "84.42",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e981",
    "partId": "t1-r218c2",
    "span": {
@@ -126183,6 +126271,17 @@
    "literal": "8443.91.92",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2148",
+   "partId": "t1-r221c1",
+   "span": {
+    "start": 35782,
+    "end": 35787
+   },
+   "literal": "84.42",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e984",
@@ -126251,6 +126350,28 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2149",
+   "partId": "t1-r228c1",
+   "span": {
+    "start": 36739,
+    "end": 36744
+   },
+   "literal": "84.46",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2150",
+   "partId": "t1-r228c1",
+   "span": {
+    "start": 36748,
+    "end": 36753
+   },
+   "literal": "84.47",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e989",
    "partId": "t1-r229c2",
    "span": {
@@ -126260,6 +126381,17 @@
    "literal": "8445.11.10",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2208",
+   "partId": "t1-r230c1",
+   "span": {
+    "start": 36849,
+    "end": 36851
+   },
+   "literal": "53",
+   "domain": "NCM",
+   "note": "capítulo de 2 dígitos; informativo, nunca seleção positiva"
   },
   {
    "id": "e990",
@@ -126359,6 +126491,17 @@
    "literal": "8445.19.24",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2209",
+   "partId": "t1-r239c1",
+   "span": {
+    "start": 37536,
+    "end": 37538
+   },
+   "literal": "53",
+   "domain": "NCM",
+   "note": "capítulo de 2 dígitos; informativo, nunca seleção positiva"
   },
   {
    "id": "e999",
@@ -126790,6 +126933,94 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2151",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41534,
+    "end": 41539
+   },
+   "literal": "84.44",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2152",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41541,
+    "end": 41546
+   },
+   "literal": "84.45",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2153",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41548,
+    "end": 41553
+   },
+   "literal": "84.46",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2154",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41557,
+    "end": 41562
+   },
+   "literal": "84.47",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2155",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41821,
+    "end": 41826
+   },
+   "literal": "84.44",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2156",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41828,
+    "end": 41833
+   },
+   "literal": "84.45",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2157",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41835,
+    "end": 41840
+   },
+   "literal": "84.46",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2158",
+   "partId": "t1-r280c1",
+   "span": {
+    "start": 41844,
+    "end": 41849
+   },
+   "literal": "84.47",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1038",
    "partId": "t1-r281c2",
    "span": {
@@ -126821,6 +127052,50 @@
    "literal": "8448.11.90",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2159",
+   "partId": "t1-r284c1",
+   "span": {
+    "start": 42360,
+    "end": 42365
+   },
+   "literal": "84.44",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2160",
+   "partId": "t1-r284c1",
+   "span": {
+    "start": 42367,
+    "end": 42372
+   },
+   "literal": "84.45",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2161",
+   "partId": "t1-r284c1",
+   "span": {
+    "start": 42374,
+    "end": 42379
+   },
+   "literal": "84.46",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2162",
+   "partId": "t1-r284c1",
+   "span": {
+    "start": 42383,
+    "end": 42388
+   },
+   "literal": "84.47",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1041",
@@ -126975,6 +127250,17 @@
    "literal": "8450.20.90",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2163",
+   "partId": "t1-r300c1",
+   "span": {
+    "start": 44260,
+    "end": 44265
+   },
+   "literal": "84.50",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1051",
@@ -127228,6 +127514,17 @@
    "literal": "8451.80.00",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2164",
+   "partId": "t1-r324c1",
+   "span": {
+    "start": 47111,
+    "end": 47116
+   },
+   "literal": "84.40",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1068",
@@ -127758,6 +128055,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2165",
+   "partId": "t1-r378c1",
+   "span": {
+    "start": 52738,
+    "end": 52743
+   },
+   "literal": "84.58",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1114",
    "partId": "t1-r379c2",
    "span": {
@@ -127899,6 +128207,17 @@
    "literal": "8459.70.00",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2166",
+   "partId": "t1-r392c1",
+   "span": {
+    "start": 54003,
+    "end": 54008
+   },
+   "literal": "84.61",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1127",
@@ -128748,6 +129067,28 @@
    "note": "convênio citado"
   },
   {
+   "id": "e2167",
+   "partId": "t1-r474c1",
+   "span": {
+    "start": 63561,
+    "end": 63566
+   },
+   "literal": "84.56",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2168",
+   "partId": "t1-r474c1",
+   "span": {
+    "start": 63569,
+    "end": 63574
+   },
+   "literal": "84.65",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1202",
    "partId": "t1-r475c2",
    "span": {
@@ -128770,6 +129111,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2169",
+   "partId": "t1-r477c1",
+   "span": {
+    "start": 64040,
+    "end": 64045
+   },
+   "literal": "84.64",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1204",
    "partId": "t1-r477c2",
    "span": {
@@ -128779,6 +129131,17 @@
    "literal": "8466.91.00",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2170",
+   "partId": "t1-r478c1",
+   "span": {
+    "start": 64127,
+    "end": 64132
+   },
+   "literal": "84.65",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1205",
@@ -128792,6 +129155,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2171",
+   "partId": "t1-r479c1",
+   "span": {
+    "start": 64262,
+    "end": 64267
+   },
+   "literal": "84.56",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1206",
    "partId": "t1-r479c2",
    "span": {
@@ -128801,6 +129175,17 @@
    "literal": "8466.93.19",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2172",
+   "partId": "t1-r480c1",
+   "span": {
+    "start": 64350,
+    "end": 64355
+   },
+   "literal": "84.57",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1207",
@@ -128814,6 +129199,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2173",
+   "partId": "t1-r481c1",
+   "span": {
+    "start": 64438,
+    "end": 64443
+   },
+   "literal": "84.58",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1208",
    "partId": "t1-r481c2",
    "span": {
@@ -128823,6 +129219,17 @@
    "literal": "8466.93.30",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2174",
+   "partId": "t1-r482c1",
+   "span": {
+    "start": 64526,
+    "end": 64531
+   },
+   "literal": "84.59",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1209",
@@ -128836,6 +129243,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2175",
+   "partId": "t1-r483c1",
+   "span": {
+    "start": 64614,
+    "end": 64619
+   },
+   "literal": "84.60",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1210",
    "partId": "t1-r483c2",
    "span": {
@@ -128845,6 +129263,17 @@
    "literal": "8466.93.50",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2176",
+   "partId": "t1-r484c1",
+   "span": {
+    "start": 64703,
+    "end": 64708
+   },
+   "literal": "84.61",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1211",
@@ -128924,6 +129353,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2177",
+   "partId": "t1-r488c1",
+   "span": {
+    "start": 65467,
+    "end": 65472
+   },
+   "literal": "84.63",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1215",
    "partId": "t1-r488c2",
    "span": {
@@ -128944,6 +129384,28 @@
    "literal": "Conv. ICMS 89/09",
    "domain": "CITATION",
    "note": "convênio citado"
+  },
+  {
+   "id": "e2178",
+   "partId": "t1-r490c1",
+   "span": {
+    "start": 65760,
+    "end": 65765
+   },
+   "literal": "84.56",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
+   "id": "e2179",
+   "partId": "t1-r490c1",
+   "span": {
+    "start": 65768,
+    "end": 65773
+   },
+   "literal": "84.65",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1216",
@@ -128968,6 +129430,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2180",
+   "partId": "t1-r493c1",
+   "span": {
+    "start": 66248,
+    "end": 66253
+   },
+   "literal": "84.64",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1218",
    "partId": "t1-r493c2",
    "span": {
@@ -128977,6 +129450,17 @@
    "literal": "8466.91.00",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2181",
+   "partId": "t1-r494c1",
+   "span": {
+    "start": 66308,
+    "end": 66313
+   },
+   "literal": "84.65",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1219",
@@ -128990,6 +129474,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2182",
+   "partId": "t1-r495c1",
+   "span": {
+    "start": 66451,
+    "end": 66456
+   },
+   "literal": "84.56",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1220",
    "partId": "t1-r495c2",
    "span": {
@@ -128999,6 +129494,17 @@
    "literal": "8466.93.19",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2183",
+   "partId": "t1-r496c1",
+   "span": {
+    "start": 66546,
+    "end": 66551
+   },
+   "literal": "84.57",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1221",
@@ -129012,6 +129518,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2184",
+   "partId": "t1-r497c1",
+   "span": {
+    "start": 66641,
+    "end": 66646
+   },
+   "literal": "84.58",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1222",
    "partId": "t1-r497c2",
    "span": {
@@ -129021,6 +129538,17 @@
    "literal": "8466.93.30",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2185",
+   "partId": "t1-r498c1",
+   "span": {
+    "start": 66736,
+    "end": 66741
+   },
+   "literal": "84.59",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1223",
@@ -129034,6 +129562,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2186",
+   "partId": "t1-r499c1",
+   "span": {
+    "start": 66831,
+    "end": 66836
+   },
+   "literal": "84.60",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e1224",
    "partId": "t1-r499c2",
    "span": {
@@ -129043,6 +129582,17 @@
    "literal": "8466.93.50",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2187",
+   "partId": "t1-r500c1",
+   "span": {
+    "start": 66927,
+    "end": 66932
+   },
+   "literal": "84.61",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1225",
@@ -129120,6 +129670,17 @@
    "literal": "8466.94.30",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2188",
+   "partId": "t1-r504c1",
+   "span": {
+    "start": 67719,
+    "end": 67724
+   },
+   "literal": "84.63",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1229",
@@ -129230,6 +129791,17 @@
    "literal": "8467.89.00",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2189",
+   "partId": "t1-r514c1",
+   "span": {
+    "start": 68675,
+    "end": 68680
+   },
+   "literal": "85.15",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1236",
@@ -129384,6 +129956,17 @@
    "literal": "8475.21.00",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2190",
+   "partId": "t1-r531c1",
+   "span": {
+    "start": 71042,
+    "end": 71047
+   },
+   "literal": "70.10",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1250",
@@ -130167,7 +130750,7 @@
    "note": "NCM 8 dígitos"
   },
   {
-   "id": "e2141",
+   "id": "e2191",
    "partId": "t2-r7c0",
    "span": {
     "start": 81010,
@@ -130175,7 +130758,7 @@
    },
    "literal": "8402",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1320",
@@ -133233,7 +133816,7 @@
    },
    "literal": "8440",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1595",
@@ -135125,7 +135708,7 @@
    },
    "literal": "8456",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e2115",
@@ -135136,7 +135719,7 @@
    },
    "literal": "8465",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1766",
@@ -135169,7 +135752,7 @@
    },
    "literal": "8464",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1768",
@@ -135224,7 +135807,7 @@
    },
    "literal": "8465",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1772",
@@ -135378,7 +135961,7 @@
    },
    "literal": "8456",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1785",
@@ -135400,7 +135983,7 @@
    },
    "literal": "8457",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1786",
@@ -135422,7 +136005,7 @@
    },
    "literal": "8458",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1787",
@@ -135444,7 +136027,7 @@
    },
    "literal": "8459",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1788",
@@ -135466,7 +136049,7 @@
    },
    "literal": "8460",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1789",
@@ -135488,7 +136071,7 @@
    },
    "literal": "8461",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1790",
@@ -135510,7 +136093,7 @@
    },
    "literal": "8462",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e2125",
@@ -135521,7 +136104,7 @@
    },
    "literal": "8463",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1791",
@@ -135664,7 +136247,7 @@
    },
    "literal": "8463",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e1803",
@@ -135744,7 +136327,7 @@
    "note": "NCM 8 dígitos"
   },
   {
-   "id": "e2142",
+   "id": "e2192",
    "partId": "t2-r483",
    "span": {
     "start": 113572,
@@ -135752,7 +136335,7 @@
    },
    "literal": "8515",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e1810",
@@ -136259,6 +136842,17 @@
    "literal": "8478.10.90",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2205",
+   "partId": "t2-r527",
+   "span": {
+    "start": 117355,
+    "end": 117357
+   },
+   "literal": "84",
+   "domain": "NBM",
+   "note": "capítulo de 2 dígitos qualificado como NBM; informativo"
   },
   {
    "id": "e1856",
@@ -138208,6 +138802,17 @@
    "note": "NCM 8 dígitos"
   },
   {
+   "id": "e2193",
+   "partId": "t3-r121c1",
+   "span": {
+    "start": 136278,
+    "end": 136283
+   },
+   "literal": "87.09",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+  },
+  {
    "id": "e2012",
    "partId": "t3-r122c2",
    "span": {
@@ -138360,6 +138965,17 @@
    "literal": "8802.30.10",
    "domain": "NCM",
    "note": "NCM 8 dígitos"
+  },
+  {
+   "id": "e2194",
+   "partId": "t3-r134c1",
+   "span": {
+    "start": 137686,
+    "end": 137691
+   },
+   "literal": "88.02",
+   "domain": "NCM",
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e2024",
@@ -138956,7 +139572,7 @@
    "note": "NCM 8 dígitos"
   },
   {
-   "id": "e2143",
+   "id": "e2195",
    "partId": "t4-r48c0",
    "span": {
     "start": 142616,
@@ -138964,7 +139580,7 @@
    },
    "literal": "8201",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e2077",
@@ -138989,7 +139605,7 @@
    "note": "NCM 8 dígitos"
   },
   {
-   "id": "e2144",
+   "id": "e2196",
    "partId": "t4-r49c0",
    "span": {
     "start": 142679,
@@ -138997,7 +139613,7 @@
    },
    "literal": "8432",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e2079",
@@ -139022,7 +139638,7 @@
    "note": "NCM 8 dígitos"
   },
   {
-   "id": "e2145",
+   "id": "e2197",
    "partId": "t4-r50c0",
    "span": {
     "start": 142742,
@@ -139030,7 +139646,7 @@
    },
    "literal": "8433",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e2081",
@@ -139055,7 +139671,7 @@
    "note": "NCM 8 dígitos"
   },
   {
-   "id": "e2146",
+   "id": "e2198",
    "partId": "t4-r51c0",
    "span": {
     "start": 142794,
@@ -139063,7 +139679,7 @@
    },
    "literal": "8436",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e2083",
@@ -139275,7 +139891,7 @@
    "note": "código NBM/SH de 10 dígitos"
   },
   {
-   "id": "e2147",
+   "id": "e2199",
    "partId": "t5-r12c0",
    "span": {
     "start": 144465,
@@ -139283,7 +139899,7 @@
    },
    "literal": "8402",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e217",
@@ -141945,7 +142561,7 @@
    },
    "literal": "8440",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e454",
@@ -143496,7 +144112,7 @@
    },
    "literal": "8456",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e2129",
@@ -143507,7 +144123,7 @@
    },
    "literal": "8465",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e594",
@@ -143551,7 +144167,7 @@
    },
    "literal": "8464",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e596",
@@ -143606,7 +144222,7 @@
    },
    "literal": "8465",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e600",
@@ -143760,7 +144376,7 @@
    },
    "literal": "8456",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e613",
@@ -143782,7 +144398,7 @@
    },
    "literal": "8457",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e614",
@@ -143804,7 +144420,7 @@
    },
    "literal": "8458",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e615",
@@ -143826,7 +144442,7 @@
    },
    "literal": "8459",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e616",
@@ -143848,7 +144464,7 @@
    },
    "literal": "8460",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e617",
@@ -143870,7 +144486,7 @@
    },
    "literal": "8461",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e618",
@@ -143892,7 +144508,7 @@
    },
    "literal": "8462",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e2139",
@@ -143903,7 +144519,7 @@
    },
    "literal": "8463",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e619",
@@ -144046,7 +144662,7 @@
    },
    "literal": "8463",
    "domain": "NBM",
-   "note": "posição de 4 dígitos qualificada como NBM no texto"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) qualificada como NBM no texto"
   },
   {
    "id": "e631",
@@ -144126,7 +144742,7 @@
    "note": "código NBM/SH de 10 dígitos"
   },
   {
-   "id": "e2148",
+   "id": "e2200",
    "partId": "t5-r494",
    "span": {
     "start": 177361,
@@ -144134,7 +144750,7 @@
    },
    "literal": "8515",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e638",
@@ -144553,6 +145169,17 @@
    "literal": "8478.10.9900",
    "domain": "NBM",
    "note": "código NBM/SH de 10 dígitos"
+  },
+  {
+   "id": "e2206",
+   "partId": "t5-r538",
+   "span": {
+    "start": 181091,
+    "end": 181093
+   },
+   "literal": "84",
+   "domain": "NBM",
+   "note": "capítulo de 2 dígitos qualificado como NBM; informativo"
   },
   {
    "id": "e676",
@@ -146062,7 +146689,7 @@
    "note": "código NBM/SH de 10 dígitos"
   },
   {
-   "id": "e2149",
+   "id": "e2201",
    "partId": "t6-r57c0",
    "span": {
     "start": 192992,
@@ -146070,7 +146697,7 @@
    },
    "literal": "8201",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e791",
@@ -146095,7 +146722,7 @@
    "note": "código NBM/SH de 10 dígitos"
   },
   {
-   "id": "e2150",
+   "id": "e2202",
    "partId": "t6-r58c0",
    "span": {
     "start": 193058,
@@ -146103,7 +146730,7 @@
    },
    "literal": "8432",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e793",
@@ -146205,7 +146832,7 @@
    "note": "convênio citado"
   },
   {
-   "id": "e2151",
+   "id": "e2203",
    "partId": "t6-r60c0",
    "span": {
     "start": 193431,
@@ -146213,7 +146840,7 @@
    },
    "literal": "8433",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e797",
@@ -146238,7 +146865,7 @@
    "note": "código NBM/SH de 10 dígitos"
   },
   {
-   "id": "e2152",
+   "id": "e2204",
    "partId": "t6-r61c0",
    "span": {
     "start": 193486,
@@ -146246,7 +146873,7 @@
    },
    "literal": "8436",
    "domain": "NCM",
-   "note": "posição de 4 dígitos (sem qualificação NBM)"
+   "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
   },
   {
    "id": "e799",
@@ -146397,6 +147024,60 @@
    "id": "range-1",
    "kind": "range",
    "operatorSpan": {
+    "start": 32935,
+    "end": 32936
+   },
+   "memberEntityIds": [
+    "e2144",
+    "e2145"
+   ],
+   "targetEntityIds": [],
+   "scopeSpan": {
+    "start": 32929,
+    "end": 32942
+   },
+   "condition": null
+  },
+  {
+   "id": "range-2",
+   "kind": "range",
+   "operatorSpan": {
+    "start": 63567,
+    "end": 63568
+   },
+   "memberEntityIds": [
+    "e2167",
+    "e2168"
+   ],
+   "targetEntityIds": [],
+   "scopeSpan": {
+    "start": 63561,
+    "end": 63574
+   },
+   "condition": null
+  },
+  {
+   "id": "range-3",
+   "kind": "range",
+   "operatorSpan": {
+    "start": 65766,
+    "end": 65767
+   },
+   "memberEntityIds": [
+    "e2178",
+    "e2179"
+   ],
+   "targetEntityIds": [],
+   "scopeSpan": {
+    "start": 65760,
+    "end": 65773
+   },
+   "condition": null
+  },
+  {
+   "id": "range-4",
+   "kind": "range",
+   "operatorSpan": {
     "start": 80677,
     "end": 80678
    },
@@ -146412,7 +147093,7 @@
    "condition": null
   },
   {
-   "id": "range-2",
+   "id": "range-5",
    "kind": "range",
    "operatorSpan": {
     "start": 80933,
@@ -146430,7 +147111,7 @@
    "condition": null
   },
   {
-   "id": "range-3",
+   "id": "range-6",
    "kind": "range",
    "operatorSpan": {
     "start": 81504,
@@ -146448,7 +147129,7 @@
    "condition": null
   },
   {
-   "id": "range-4",
+   "id": "range-7",
    "kind": "range",
    "operatorSpan": {
     "start": 81783,
@@ -146466,7 +147147,7 @@
    "condition": null
   },
   {
-   "id": "range-5",
+   "id": "range-8",
    "kind": "range",
    "operatorSpan": {
     "start": 83952,
@@ -146484,7 +147165,7 @@
    "condition": null
   },
   {
-   "id": "range-6",
+   "id": "range-9",
    "kind": "range",
    "operatorSpan": {
     "start": 84656,
@@ -146502,7 +147183,7 @@
    "condition": null
   },
   {
-   "id": "range-7",
+   "id": "range-10",
    "kind": "range",
    "operatorSpan": {
     "start": 84799,
@@ -146520,7 +147201,7 @@
    "condition": null
   },
   {
-   "id": "range-8",
+   "id": "range-11",
    "kind": "range",
    "operatorSpan": {
     "start": 86941,
@@ -146538,7 +147219,7 @@
    "condition": null
   },
   {
-   "id": "range-9",
+   "id": "range-12",
    "kind": "range",
    "operatorSpan": {
     "start": 87177,
@@ -146556,7 +147237,7 @@
    "condition": null
   },
   {
-   "id": "range-10",
+   "id": "range-13",
    "kind": "range",
    "operatorSpan": {
     "start": 88385,
@@ -146574,7 +147255,7 @@
    "condition": null
   },
   {
-   "id": "range-11",
+   "id": "range-14",
    "kind": "range",
    "operatorSpan": {
     "start": 88453,
@@ -146592,7 +147273,7 @@
    "condition": null
   },
   {
-   "id": "range-12",
+   "id": "range-15",
    "kind": "range",
    "operatorSpan": {
     "start": 89078,
@@ -146610,7 +147291,7 @@
    "condition": null
   },
   {
-   "id": "range-13",
+   "id": "range-16",
    "kind": "range",
    "operatorSpan": {
     "start": 93606,
@@ -146628,7 +147309,7 @@
    "condition": null
   },
   {
-   "id": "range-14",
+   "id": "range-17",
    "kind": "range",
    "operatorSpan": {
     "start": 94885,
@@ -146646,7 +147327,7 @@
    "condition": null
   },
   {
-   "id": "range-15",
+   "id": "range-18",
    "kind": "range",
    "operatorSpan": {
     "start": 96770,
@@ -146664,7 +147345,7 @@
    "condition": null
   },
   {
-   "id": "range-16",
+   "id": "range-19",
    "kind": "range",
    "operatorSpan": {
     "start": 97483,
@@ -146682,7 +147363,7 @@
    "condition": null
   },
   {
-   "id": "range-17",
+   "id": "range-20",
    "kind": "range",
    "operatorSpan": {
     "start": 99938,
@@ -146700,7 +147381,7 @@
    "condition": null
   },
   {
-   "id": "range-18",
+   "id": "range-21",
    "kind": "range",
    "operatorSpan": {
     "start": 100269,
@@ -146718,7 +147399,7 @@
    "condition": null
   },
   {
-   "id": "range-19",
+   "id": "range-22",
    "kind": "range",
    "operatorSpan": {
     "start": 101155,
@@ -146736,7 +147417,7 @@
    "condition": null
   },
   {
-   "id": "range-20",
+   "id": "range-23",
    "kind": "range",
    "operatorSpan": {
     "start": 102887,
@@ -146754,7 +147435,7 @@
    "condition": null
   },
   {
-   "id": "range-21",
+   "id": "range-24",
    "kind": "range",
    "operatorSpan": {
     "start": 103059,
@@ -146772,7 +147453,7 @@
    "condition": null
   },
   {
-   "id": "range-22",
+   "id": "range-25",
    "kind": "range",
    "operatorSpan": {
     "start": 103324,
@@ -146790,7 +147471,7 @@
    "condition": null
   },
   {
-   "id": "range-23",
+   "id": "range-26",
    "kind": "range",
    "operatorSpan": {
     "start": 103483,
@@ -146808,7 +147489,7 @@
    "condition": null
   },
   {
-   "id": "range-24",
+   "id": "range-27",
    "kind": "range",
    "operatorSpan": {
     "start": 104451,
@@ -146826,7 +147507,7 @@
    "condition": null
   },
   {
-   "id": "range-25",
+   "id": "range-28",
    "kind": "range",
    "operatorSpan": {
     "start": 105147,
@@ -146844,7 +147525,7 @@
    "condition": null
   },
   {
-   "id": "range-26",
+   "id": "range-29",
    "kind": "range",
    "operatorSpan": {
     "start": 105237,
@@ -146862,7 +147543,7 @@
    "condition": null
   },
   {
-   "id": "range-27",
+   "id": "range-30",
    "kind": "range",
    "operatorSpan": {
     "start": 105288,
@@ -146880,7 +147561,7 @@
    "condition": null
   },
   {
-   "id": "range-28",
+   "id": "range-31",
    "kind": "range",
    "operatorSpan": {
     "start": 105838,
@@ -146898,7 +147579,7 @@
    "condition": null
   },
   {
-   "id": "range-29",
+   "id": "range-32",
    "kind": "range",
    "operatorSpan": {
     "start": 106992,
@@ -146916,7 +147597,7 @@
    "condition": null
   },
   {
-   "id": "range-30",
+   "id": "range-33",
    "kind": "range",
    "operatorSpan": {
     "start": 108956,
@@ -146934,7 +147615,7 @@
    "condition": null
   },
   {
-   "id": "range-31",
+   "id": "range-34",
    "kind": "range",
    "operatorSpan": {
     "start": 108999,
@@ -146952,7 +147633,7 @@
    "condition": null
   },
   {
-   "id": "range-32",
+   "id": "range-35",
    "kind": "range",
    "operatorSpan": {
     "start": 110158,
@@ -146970,7 +147651,7 @@
    "condition": null
   },
   {
-   "id": "range-33",
+   "id": "range-36",
    "kind": "range",
    "operatorSpan": {
     "start": 115944,
@@ -146988,7 +147669,7 @@
    "condition": null
   },
   {
-   "id": "range-34",
+   "id": "range-37",
    "kind": "range",
    "operatorSpan": {
     "start": 139505,
@@ -147006,7 +147687,7 @@
    "condition": null
   },
   {
-   "id": "range-35",
+   "id": "range-38",
    "kind": "range",
    "operatorSpan": {
     "start": 142014,
@@ -147024,7 +147705,7 @@
    "condition": null
   },
   {
-   "id": "range-36",
+   "id": "range-39",
    "kind": "range",
    "operatorSpan": {
     "start": 142647,
@@ -147042,7 +147723,7 @@
    "condition": null
   },
   {
-   "id": "range-37",
+   "id": "range-40",
    "kind": "range",
    "operatorSpan": {
     "start": 142710,
@@ -147060,7 +147741,7 @@
    "condition": null
   },
   {
-   "id": "range-38",
+   "id": "range-41",
    "kind": "range",
    "operatorSpan": {
     "start": 142762,
@@ -147078,7 +147759,7 @@
    "condition": null
   },
   {
-   "id": "range-39",
+   "id": "range-42",
    "kind": "range",
    "operatorSpan": {
     "start": 142814,
@@ -147096,7 +147777,7 @@
    "condition": null
   },
   {
-   "id": "range-40",
+   "id": "range-43",
    "kind": "range",
    "operatorSpan": {
     "start": 144386,
@@ -147114,7 +147795,7 @@
    "condition": null
   },
   {
-   "id": "range-41",
+   "id": "range-44",
    "kind": "range",
    "operatorSpan": {
     "start": 144948,
@@ -147132,7 +147813,7 @@
    "condition": null
   },
   {
-   "id": "range-42",
+   "id": "range-45",
    "kind": "range",
    "operatorSpan": {
     "start": 150763,
@@ -147150,7 +147831,7 @@
    "condition": null
   },
   {
-   "id": "range-43",
+   "id": "range-46",
    "kind": "range",
    "operatorSpan": {
     "start": 151954,
@@ -147168,7 +147849,7 @@
    "condition": null
   },
   {
-   "id": "range-44",
+   "id": "range-47",
    "kind": "range",
    "operatorSpan": {
     "start": 152028,
@@ -147186,7 +147867,7 @@
    "condition": null
   },
   {
-   "id": "range-45",
+   "id": "range-48",
    "kind": "range",
    "operatorSpan": {
     "start": 153016,
@@ -147204,7 +147885,7 @@
    "condition": null
   },
   {
-   "id": "range-46",
+   "id": "range-49",
    "kind": "range",
    "operatorSpan": {
     "start": 161324,
@@ -147222,7 +147903,7 @@
    "condition": null
   },
   {
-   "id": "range-47",
+   "id": "range-50",
    "kind": "range",
    "operatorSpan": {
     "start": 166978,
@@ -147240,7 +147921,7 @@
    "condition": null
   },
   {
-   "id": "range-48",
+   "id": "range-51",
    "kind": "range",
    "operatorSpan": {
     "start": 167092,
@@ -147258,7 +147939,7 @@
    "condition": null
   },
   {
-   "id": "range-49",
+   "id": "range-52",
    "kind": "range",
    "operatorSpan": {
     "start": 167152,
@@ -147276,7 +147957,7 @@
    "condition": null
   },
   {
-   "id": "range-50",
+   "id": "range-53",
    "kind": "range",
    "operatorSpan": {
     "start": 167214,
@@ -147294,7 +147975,7 @@
    "condition": null
   },
   {
-   "id": "range-51",
+   "id": "range-54",
    "kind": "range",
    "operatorSpan": {
     "start": 167539,
@@ -147312,7 +147993,7 @@
    "condition": null
   },
   {
-   "id": "range-52",
+   "id": "range-55",
    "kind": "range",
    "operatorSpan": {
     "start": 167600,
@@ -147330,7 +148011,7 @@
    "condition": null
   },
   {
-   "id": "range-53",
+   "id": "range-56",
    "kind": "range",
    "operatorSpan": {
     "start": 167670,
@@ -147348,7 +148029,7 @@
    "condition": null
   },
   {
-   "id": "range-54",
+   "id": "range-57",
    "kind": "range",
    "operatorSpan": {
     "start": 167719,
@@ -147366,7 +148047,7 @@
    "condition": null
   },
   {
-   "id": "range-55",
+   "id": "range-58",
    "kind": "range",
    "operatorSpan": {
     "start": 167905,
@@ -147384,7 +148065,7 @@
    "condition": null
   },
   {
-   "id": "range-56",
+   "id": "range-59",
    "kind": "range",
    "operatorSpan": {
     "start": 167989,
@@ -147402,7 +148083,7 @@
    "condition": null
   },
   {
-   "id": "range-57",
+   "id": "range-60",
    "kind": "range",
    "operatorSpan": {
     "start": 168425,
@@ -147420,7 +148101,7 @@
    "condition": null
   },
   {
-   "id": "range-58",
+   "id": "range-61",
    "kind": "range",
    "operatorSpan": {
     "start": 168692,
@@ -147438,7 +148119,7 @@
    "condition": null
   },
   {
-   "id": "range-59",
+   "id": "range-62",
    "kind": "range",
    "operatorSpan": {
     "start": 169828,
@@ -147456,7 +148137,7 @@
    "condition": null
   },
   {
-   "id": "range-60",
+   "id": "range-63",
    "kind": "range",
    "operatorSpan": {
     "start": 169875,
@@ -147474,7 +148155,7 @@
    "condition": null
   },
   {
-   "id": "range-61",
+   "id": "range-64",
    "kind": "range",
    "operatorSpan": {
     "start": 173651,
@@ -147492,7 +148173,7 @@
    "condition": null
   },
   {
-   "id": "range-62",
+   "id": "range-65",
    "kind": "range",
    "operatorSpan": {
     "start": 178389,
@@ -147510,7 +148191,7 @@
    "condition": null
   },
   {
-   "id": "range-63",
+   "id": "range-66",
    "kind": "range",
    "operatorSpan": {
     "start": 178488,
@@ -147528,7 +148209,7 @@
    "condition": null
   },
   {
-   "id": "range-64",
+   "id": "range-67",
    "kind": "range",
    "operatorSpan": {
     "start": 188835,
@@ -147546,7 +148227,7 @@
    "condition": null
   },
   {
-   "id": "range-65",
+   "id": "range-68",
    "kind": "range",
    "operatorSpan": {
     "start": 189121,
@@ -147564,7 +148245,7 @@
    "condition": null
   },
   {
-   "id": "range-66",
+   "id": "range-69",
    "kind": "range",
    "operatorSpan": {
     "start": 193024,
@@ -147582,7 +148263,7 @@
    "condition": null
   },
   {
-   "id": "range-67",
+   "id": "range-70",
    "kind": "range",
    "operatorSpan": {
     "start": 193090,
@@ -147600,7 +148281,7 @@
    "condition": null
   },
   {
-   "id": "range-68",
+   "id": "range-71",
    "kind": "range",
    "operatorSpan": {
     "start": 193452,
@@ -147618,7 +148299,7 @@
    "condition": null
   },
   {
-   "id": "range-69",
+   "id": "range-72",
    "kind": "range",
    "operatorSpan": {
     "start": 193507,
@@ -147636,7 +148317,24 @@
    "condition": null
   },
   {
-   "id": "exception-70",
+   "id": "exception-73",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 16683,
+    "end": 16689
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2143"
+   ],
+   "scopeSpan": {
+    "start": 16683,
+    "end": 16735
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-74",
    "kind": "exception",
    "operatorSpan": {
     "start": 19286,
@@ -147653,7 +148351,110 @@
    "condition": null
   },
   {
-   "id": "exception-71",
+   "id": "exception-75",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 32885,
+    "end": 32891
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2144",
+    "e2145"
+   ],
+   "scopeSpan": {
+    "start": 32885,
+    "end": 32942
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-76",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 44230,
+    "end": 44236
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2163"
+   ],
+   "scopeSpan": {
+    "start": 44230,
+    "end": 44265
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-77",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 47069,
+    "end": 47075
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2164"
+   ],
+   "scopeSpan": {
+    "start": 47069,
+    "end": 47116
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-78",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 52672,
+    "end": 52678
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2165"
+   ],
+   "scopeSpan": {
+    "start": 52672,
+    "end": 52743
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-79",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 53941,
+    "end": 53947
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2166"
+   ],
+   "scopeSpan": {
+    "start": 53941,
+    "end": 54008
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-80",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 68654,
+    "end": 68660
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2189"
+   ],
+   "scopeSpan": {
+    "start": 68654,
+    "end": 68680
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-81",
    "kind": "exception",
    "operatorSpan": {
     "start": 85235,
@@ -147670,7 +148471,7 @@
    "condition": null
   },
   {
-   "id": "exception-72",
+   "id": "exception-82",
    "kind": "exception",
    "operatorSpan": {
     "start": 85971,
@@ -147687,7 +148488,7 @@
    "condition": null
   },
   {
-   "id": "exception-73",
+   "id": "exception-83",
    "kind": "exception",
    "operatorSpan": {
     "start": 100625,
@@ -147704,7 +148505,7 @@
    "condition": null
   },
   {
-   "id": "exception-74",
+   "id": "exception-84",
    "kind": "exception",
    "operatorSpan": {
     "start": 113551,
@@ -147712,7 +148513,7 @@
    },
    "memberEntityIds": [],
    "targetEntityIds": [
-    "e2142"
+    "e2192"
    ],
    "scopeSpan": {
     "start": 113551,
@@ -147721,7 +148522,24 @@
    "condition": null
   },
   {
-   "id": "exception-75",
+   "id": "exception-85",
+   "kind": "exception",
+   "operatorSpan": {
+    "start": 136241,
+    "end": 136247
+   },
+   "memberEntityIds": [],
+   "targetEntityIds": [
+    "e2193"
+   ],
+   "scopeSpan": {
+    "start": 136241,
+    "end": 136283
+   },
+   "condition": null
+  },
+  {
+   "id": "exception-86",
    "kind": "exception",
    "operatorSpan": {
     "start": 148744,
@@ -147738,7 +148556,7 @@
    "condition": null
   },
   {
-   "id": "exception-76",
+   "id": "exception-87",
    "kind": "exception",
    "operatorSpan": {
     "start": 149434,
@@ -147755,7 +148573,7 @@
    "condition": null
   },
   {
-   "id": "exception-77",
+   "id": "exception-88",
    "kind": "exception",
    "operatorSpan": {
     "start": 164417,
@@ -147772,7 +148590,7 @@
    "condition": null
   },
   {
-   "id": "exception-78",
+   "id": "exception-89",
    "kind": "exception",
    "operatorSpan": {
     "start": 177340,
@@ -147780,7 +148598,7 @@
    },
    "memberEntityIds": [],
    "targetEntityIds": [
-    "e2148"
+    "e2200"
    ],
    "scopeSpan": {
     "start": 177340,
@@ -147794,7 +148612,7 @@
    "kind": "other",
    "span": null,
    "resource": null,
-   "note": "Escopo de códigos (definido antes da medição): todo código de nomenclatura com ponto (6, 8, 10 dígitos e atípico dddd.dddd) e toda posição de 4 dígitos introduzida por 'posição/posições'. Fora do escopo, por definição: anos, datas, números de item/subitem e números de atos. Domínio pela qualificação explícita (cabeçalho 'CÓDIGO DA NBM/SH' ou 'da NBM'); sem qualificação, NCM."
+   "note": "Escopo de códigos (definido antes da medição): todo código de nomenclatura com ponto (6, 8, 10 dígitos e atípico dddd.dddd) e toda posição introduzida por 'posição/posições' nos formatos NNNN ou NN.NN, isolada ou em lista (vírgula, 'a', 'ou', 'e'); 'X a Y' é faixa M01; 'exceto/exclusive/salvo' gera uma relação de exceção por operador com todos os alvos; capítulos de 2 dígitos ('Capítulo 84') são anotados como informativos (correção R2, GPT/Codex, 18/10/2026). Fora do escopo, por definição: anos, datas, números de item/subitem e números de atos. Domínio pela qualificação explícita (cabeçalho 'CÓDIGO DA NBM/SH' ou 'da NBM'); sem qualificação, NCM."
   },
   {
    "kind": "other",

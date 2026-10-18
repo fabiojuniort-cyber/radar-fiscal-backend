@@ -1,19 +1,101 @@
 {
- "id": "05", "annotator": "CLAUDE-EXEC", "annotatedAt": "2026-10-17",
+ "id": "05",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
  "notes": "ADE Coana: três artigos operativos; preâmbulo com citações; CNPJ da certificada. Sem NCM.",
  "blocks": [
-  { "id": "ep", "type": "epigraph", "at": { "line": 1 }, "context": "prohibited", "reason": "dou_identifica" },
-  { "id": "em", "type": "summary", "at": { "line": 2 }, "context": "prohibited", "reason": "dou_ementa" },
-  { "id": "pre", "type": "preamble", "at": { "line": 3 }, "context": "prohibited", "reason": "preamble" },
-  { "id": "a1", "type": "article", "at": { "line": 4 }, "context": "operative_candidate", "reason": "article_marker" },
-  { "id": "a2", "type": "article", "at": { "line": 5 }, "context": "operative_candidate", "reason": "article_marker" },
-  { "id": "a3", "type": "article", "at": { "line": 6 }, "context": "operative_candidate", "reason": "article_marker" },
-  { "id": "sig", "type": "signature", "at": { "line": 7 }, "context": "prohibited", "reason": "dou_assina" }
+  {
+   "id": "ep",
+   "type": "epigraph",
+   "at": {
+    "line": 1
+   },
+   "context": "prohibited",
+   "reason": "dou_identifica"
+  },
+  {
+   "id": "em",
+   "type": "summary",
+   "at": {
+    "line": 2
+   },
+   "context": "prohibited",
+   "reason": "dou_ementa"
+  },
+  {
+   "id": "pre",
+   "type": "preamble",
+   "at": {
+    "line": 3
+   },
+   "context": "prohibited",
+   "reason": "preamble"
+  },
+  {
+   "id": "a1",
+   "type": "article",
+   "at": {
+    "line": 4
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a2",
+   "type": "article",
+   "at": {
+    "line": 5
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a3",
+   "type": "article",
+   "at": {
+    "line": 6
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "sig",
+   "type": "signature",
+   "at": {
+    "line": 7
+   },
+   "context": "prohibited",
+   "reason": "dou_assina"
+  }
  ],
  "entities": [
-  { "part": "pre", "literal": "Instrução Normativa RFB nº 2.318, de 26 de março de 2026", "domain": "CITATION" },
-  { "part": "pre", "literal": "Portaria Coana nº 189, de 16 de abril de 2026", "domain": "CITATION" },
-  { "part": "pre", "literal": "25724", "domain": "OTHER", "note": "nº de requerimento OEA" },
-  { "part": "a1", "literal": "18.483.666/0001-03", "domain": "CNPJ" }
- ]
+  {
+   "part": "pre",
+   "literal": "Instrução Normativa RFB nº 2.318, de 26 de março de 2026",
+   "domain": "CITATION"
+  },
+  {
+   "part": "pre",
+   "literal": "Portaria Coana nº 189, de 16 de abril de 2026",
+   "domain": "CITATION"
+  },
+  {
+   "part": "pre",
+   "literal": "25724",
+   "domain": "OTHER",
+   "note": "nº de requerimento OEA"
+  },
+  {
+   "part": "a1",
+   "literal": "18.483.666/0001-03",
+   "domain": "CNPJ"
+  }
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7",
+  "notes": "R2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
 }

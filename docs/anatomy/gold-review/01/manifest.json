@@ -2,9 +2,9 @@
  "id": "01",
  "purpose": "Leitura em partes para revisão; o gold completo e o texto canônico congelado continuam sendo a fonte.",
  "goldFile": "test/fixtures/anatomy/gold/01.json",
- "goldFileSha256Lf": "2ace61ab0961bae7fe342a81b02ae58146a4979d003069d6b88c1b97af29ecd5",
- "goldCanonicalJsonSha256": "91e4e6bc0ab8bc393943397886e54e6f54910fbcc2dc647dd938682630a4fb52",
- "goldContentSha256": "0909f12d82efaf67846f1906846a656b5772e6fadeeefe955523f0c264c96339",
+ "goldFileSha256Lf": "e1ef64dacbf23bb8a11d4a1e615e767f97af1dac4ed95873fb855af778c0c5f9",
+ "goldCanonicalJsonSha256": "c615cd41c33d14dd722033eaa04faf5b716460205999e88d0b45d3a1f16e0de8",
+ "goldContentSha256": "d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a",
  "canonicalTextSha256": "465186b95fbd52e3d771257d80105c0408e77b61f7192860802907334ddfbeb8",
  "canonicalTextUtf16Length": 194470,
  "reassembly": "gold = { ...header, parts: concat(parts-*), entities: concat(entities-*), relations: concat(relations-*) }; canonicalText = concat(canonical-*.text); file-name order; ranges [from, to) (UTF-16 for canonical text).",
@@ -14,7 +14,7 @@
    "section": "header",
    "from": 0,
    "to": 0,
-   "sha256": "262744f68959c983af0c3e5eb9847f2309d9a2397d49804b3f7271c5d13d0ca2"
+   "sha256": "1cd5e3c06f01f301843ebbb263a2d09d7854301c13aad218ed8300127b79d1ad"
   },
   {
    "file": "parts-001.json",
@@ -217,70 +217,70 @@
    "section": "entities",
    "from": 0,
    "to": 250,
-   "sha256": "c9ea764b4d9f67135443e669169455b7488a0c6c6ba31e7247a58299ae91a27f"
+   "sha256": "7a0e05ad59dfb599c664ec8f14611d04a2edd7b1b69b73cb4d2d6b59277d7fd8"
   },
   {
    "file": "entities-002.json",
    "section": "entities",
    "from": 250,
    "to": 500,
-   "sha256": "79050fb85546cca0dbee20c47e9935556f2fe6247438ddc55d7301bbcf82a6ee"
+   "sha256": "314340d6bb3439d8b7c0d142cd4c3574736d177e076e11ebbc8d745ac2c83fcb"
   },
   {
    "file": "entities-003.json",
    "section": "entities",
    "from": 500,
    "to": 750,
-   "sha256": "f0e11297e70403bdd6e6a5e8c8d350e8aab037a06d90f29054f2d3a951cc4cd3"
+   "sha256": "124feed133e6e31d71451bdcf851be52ac47f7d7cc24da501bc3dc8958ffcded"
   },
   {
    "file": "entities-004.json",
    "section": "entities",
    "from": 750,
    "to": 1000,
-   "sha256": "d41964ed10348f841290f45f6d4aab64c1540748c1ad225a49a66225e6307d43"
+   "sha256": "923066de0f803d1e3f308ef26c07d6cba38292ac629e062c33294381f0c7c6c9"
   },
   {
    "file": "entities-005.json",
    "section": "entities",
    "from": 1000,
    "to": 1250,
-   "sha256": "8479aeca443eeb884fe9ab33ffb79c4bad6198f0007b0d80ff4012e701959278"
+   "sha256": "f7c942f0a4631297cb55a1afd63e7080fc582de4808cc727bdcf6be0c6937405"
   },
   {
    "file": "entities-006.json",
    "section": "entities",
    "from": 1250,
    "to": 1500,
-   "sha256": "071d5a76f742dde74ecff73b426d7499c2853947c1c340fe8ded8c3f3fdfce06"
+   "sha256": "f4bf1af019a571ead502d47fcaba353e5b091d14a9ceae9380de2ecaa47679d1"
   },
   {
    "file": "entities-007.json",
    "section": "entities",
    "from": 1500,
    "to": 1750,
-   "sha256": "a98fd392ceee84d1a06f71950dd764f38960b328a0a4dc3815e2d5d9f636cf37"
+   "sha256": "cde6410864946a8faa316691db0c6d9755e0eab14794068c79875894ddc3ba25"
   },
   {
    "file": "entities-008.json",
    "section": "entities",
    "from": 1750,
    "to": 2000,
-   "sha256": "c8ecbccc1a29f5ce8ff88fa81f2913b03d0b6c556ff8cfc8da87f1cac1cc59f9"
+   "sha256": "f6139aa3be8f212e09ace9482efba22453bcb1ec2f9a0fe3f66fd3d0e24b024e"
   },
   {
    "file": "entities-009.json",
    "section": "entities",
    "from": 2000,
-   "to": 2152,
-   "sha256": "283e6143ce7da2b22df5c9a3de87cff6c0eeb9fcbbb82e5b0e29c7263c4e4070"
+   "to": 2209,
+   "sha256": "15326ee4d4cb5ba294e7ce9eb09e9e6833e66b6995503e4488daaf0c835c892c"
   },
   {
    "file": "relations-001.json",
    "section": "relations",
    "from": 0,
-   "to": 78,
-   "sha256": "af90907ed8135efa2ae3583b45189a3805b12201ff3306e74851f8a165633897"
+   "to": 89,
+   "sha256": "57c5b3a087a49ca9575ab3122fc2aab19d7df56c8ddbb65ddb31c8259991ff8f"
   },
   {
    "file": "canonical-001.json",

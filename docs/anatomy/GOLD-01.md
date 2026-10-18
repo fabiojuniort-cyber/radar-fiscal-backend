@@ -2,7 +2,7 @@
 
 Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de desenvolvimento, [issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116), PR #244 (draft). Anotador: CLAUDE-EXEC, em 17/10/2026.
 
-**Estado: `prepared` em 7/7, `reviewed` em 0/7.** Rodada 1 de revisão independente: `changes_requested` (GPT/Codex, em substituição ao Astra). As correções estão aplicadas e a nova versão aguarda conferência (`review.status: requested`). Isto não é gold homologado nem análise jurídica, e não libera medição: os 18 originais DOE-SP/RFB continuam ausentes e a reserva não foi aberta.
+**Estado: `reviewed` em 6/7 (02, 03, 05, 07, 10 e 11, aprovadas por GPT/Codex em 18/10/2026 na R2, cada uma no hash exato); 01 em `prepared`, com `changes_requested` na R2.** As correções do 01 estão aplicadas e o novo hash aguarda a rodada 3. O pacote como um todo continua com alterações solicitadas. Isto não é gold homologado nem análise jurídica, e não libera medição: os 18 originais DOE-SP/RFB continuam ausentes e a reserva não foi aberta.
 
 ## Método
 
@@ -29,7 +29,8 @@ Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de des
 **Escopo de entidades v1:**
 - incluídos: NCM, NBM, faixas M01 (relação `range`, sem expansão), citações de atos externos, processos, CNPJ, e códigos com aparência de NCM que **não** são NCM (domínio `OTHER`, para medir falso positivo);
 - exceções M02 (relação `exception`, para o código introduzido por "exceto/exclusive/salvo" na mesma parte e oração);
-- **cobertura completa dentro do escopo** (definida antes da medição): todo código de nomenclatura com ponto (6, 8 e 10 dígitos, e o atípico `dddd.dddd`), toda posição de 4 dígitos introduzida por "posição/posições", e cada número de uma lista de convênios como citação própria;
+- **cobertura completa dentro do escopo** (definida antes da medição): todo código de nomenclatura com ponto (6, 8 e 10 dígitos, e o atípico `dddd.dddd`); toda posição introduzida por "posição/posições" nos formatos `NNNN` ou `NN.NN`, isolada ou em lista (vírgula, "a", "ou", "e"); referências a capítulo de 2 dígitos ("Capítulo 84"), como informativas; e cada número de uma lista de convênios como citação própria;
+- uma relação `exception` por operador "exceto/exclusive/salvo", com todos os códigos excluídos como alvos, inclusive as duas pontas de uma faixa;
 - **domínio NCM × NBM** pela qualificação explícita da fonte ("NBM/SH", "da NBM" ou cabeçalho "CÓDIGO DA NBM/SH"); sem qualificação, NCM. Nenhuma conversão entre nomenclaturas;
 - fora do escopo, por definição (não são ocorrências omitidas): datas e anos, valores monetários, percentuais, números de item/subitem, remissões internas ao próprio ato e a identificação do próprio ato no título.
 
@@ -39,7 +40,7 @@ Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de des
 
 | ID | Partes | Contexto (operativo candidato / histórico / proibido) | Entidades | Faixas | Lacunas |
 |---|---|---|---|---|---|
-| 01 Conv. 52/91 | 6.918 (6 tabelas, 4.682 células) | 2.633 / 4.096 / 188 | 2.152: NCM 1.322 (602 operativos candidatos), NBM 623, citações 207 | 69 faixas + 9 exceções | 2 |
+| 01 Conv. 52/91 | 6.918 (6 tabelas, 4.682 células) | 2.633 / 4.096 / 188 | 2.209: NCM 1.377, NBM 625, citações 207 (após a correção da R2) | 72 faixas + 17 exceções | 2 |
 | 02 Conv. 100/97 | 216 | 69 / 73 / 73 | 126: citações 125, NBM 1 (`3507.90.4`) | 0 | 0 |
 | 03 Retificação MDHC | 5 | 1 / 0 / 3 | 5: citação 1, processo 1, OTHER 3 | 0 | 0 |
 | 05 ADE Coana 119 | 8 | 3 / 0 / 4 | 4: citações 2, CNPJ 1, OTHER 1 | 0 | 0 |
@@ -70,6 +71,27 @@ Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de des
 
 **Mudaram de hash:** 01 e 02. Os demais continuam iguais aos conferidos na rodada 1, que não aprovou nenhuma entrada.
 
+## Rodada 2 de revisão: 6 aprovadas, 01 com changes_requested
+
+**Revisor:** GPT/Codex. **Base revisada:** `c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17`. **Data:** 18/10/2026. **Parecer:** [PR #244, review 5563875392](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392); registro em [tribusca-control#116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710).
+
+**Verificação declarada pelo revisor:** sete hashes confirmados; sete testes específicos PASS; geometria e texto das 5.219 células conferidos contra as fontes.
+
+**Aprovadas no escopo estrutural v1 e no hash exato** (`review` gravado na especificação com `reviewer: GPT/Codex` e `reviewedAt: 2026-10-18`): 02 `256dfcb9…`, 03 `a4c9e445…`, 05 `44c6407d…`, 07 `59867895…`, 10 `c4602fdd…`, 11 `678bf7e0…`. Depois da reconstrução, os seis hashes de conteúdo continuam idênticos aos aprovados. O teste compara cada aprovação com o hash documentado.
+
+**01 com `changes_requested`:** faltavam posições pontuadas (`84.02`, `85.14`), a faixa `84.56 A 84.65` e as relações de exclusão correspondentes.
+
+| Achado R2 (01) | Correção relatada pelo executor | Verificação do revisor |
+|---|---|---|
+| Posições pontuadas `NN.NN` ausentes | Regra de posição passou a aceitar `NNNN` e `NN.NN`, isolados ou em lista ("84.44, 84.45, 84.46 OU 84.47"), com domínio NBM quando o texto diz "da NBM" | pendente (rodada 3) |
+| Faixa `84.56 A 84.65` | Faixa M01 com as duas pontas, sem expansão | pendente (rodada 3) |
+| Relações de exclusão | Uma relação `exception` por operador, com todos os alvos; o ponto dentro de um código (`84.56`) não encerra mais a oração. Total de 17 exceções; "EXCETO … 84.56 A 84.65" tem os dois códigos como alvo | pendente (rodada 3) |
+| Escopo (complemento do executor) | Referências a capítulo de 2 dígitos ("Capítulo 84", "Capítulo 53") anotadas como informativas; "deste capítulo 60.1" é número de item e fica fora | pendente (rodada 3) |
+
+**Varredura residual do executor:** os tokens `NN.NN` e `NNNN` perto de palavras de nomenclatura que ficaram fora do gold são só números de item ou subitem (por exemplo, "32.14", "55.10", "33.01"), fora do escopo por definição.
+
+**Novo hash do 01 para a rodada 3:** `d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a` (antes: `0909f12d…`).
+
 ## Pontos para a revisão
 
 Estes são os itens em que a decisão do anotador é mais discutível.
@@ -89,17 +111,17 @@ Estes são os itens em que a decisão do anotador é mais discutível.
 - a aprovação fica na especificação (`review` com `reviewer`, `reviewedAt`, `status: approved` e `approvedContentSha256`);
 - o status `reviewed` exige um revisor diferente do anotador.
 
-**Vínculo da aprovação ao conteúdo.** `goldContentSha256` é o SHA-256 da serialização canônica do gold inteiro, exceto `status` e `review`. A validação recusa uma aprovação cujo hash não seja igual ao do conteúdo atual. Assim, qualquer alteração posterior na anotação invalida a aprovação, e o trecho alterado precisa ser conferido de novo. Os hashes abaixo são os do conteúdo submetido à **rodada 2**. A aprovação deve citar exatamente esses valores.
+**Vínculo da aprovação ao conteúdo.** `goldContentSha256` é o SHA-256 da serialização canônica do gold inteiro, exceto `status` e `review`. A validação recusa uma aprovação cujo hash não seja igual ao do conteúdo atual. Assim, qualquer alteração posterior na anotação invalida a aprovação, e o trecho alterado precisa ser conferido de novo. Situação atual dos hashes:
 
-| ID | `goldContentSha256` (rodada 2) | Situação |
+| ID | `goldContentSha256` | Situação |
 |---|---|---|
-| 01 | `0909f12d82efaf67846f1906846a656b5772e6fadeeefe955523f0c264c96339` | novo (rodada 1: `3ad3fabb…69c0e`) |
-| 02 | `256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a` | novo (rodada 1: `3b92ef2c…64ced`) |
-| 03 | `a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
-| 05 | `44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
-| 07 | `59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
-| 10 | `c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
-| 11 | `678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79` | inalterado; hash conferido na rodada 1, sem aprovação; requer aprovação explícita por hash |
+| 01 | `d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a` | **submetido à rodada 3** (R2: `0909f12d…`, changes_requested) |
+| 02 | `256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
+| 03 | `a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
+| 05 | `44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
+| 07 | `59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
+| 10 | `c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
+| 11 | `678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
 
 ## Não executado
 
