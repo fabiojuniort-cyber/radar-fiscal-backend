@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { developmentCanonicalText, GOLD_DIR } from '../ops/anatomy/annotation-pack.js';
 import { buildGold } from '../ops/anatomy/gold-build.js';
+import { chunkDir, goldChunks, reassembleCanonical, reassembleGold, REVIEW_IDS } from '../ops/anatomy/gold-chunks.js';
 import { sha256 } from '../src/modules/anatomy/contract.js';
 import { ANATOMY_GOLD_VERSION, goldContentSha256, validateAnatomyGold, type AnatomyGold } from '../src/modules/anatomy/gold.js';
 
@@ -61,6 +62,19 @@ test('rebuilding from a spec keeps a valid approval and rejects it after any con
   assert.deepEqual(buildGold('03', (s) => ({ ...s, review: approval })), approved, 'rebuild is deterministic and keeps the approval');
   assert.throws(() => buildGold('03', (s) => ({ ...s, review: approval, entities: s.entities!.map((e, i) => (i === 0 ? { ...e, note: `${e.note} (editado)` } : e)) })), /needs a new review/);
   assert.throws(() => buildGold('03', (s) => ({ ...s, review: approval, blocks: s.blocks.map((b) => (b.id === 'intro' ? { ...b, context: 'unknown' as const } : b)) })), /needs a new review/);
+});
+
+test('review packs are current: chunks reassemble the complete gold and the exact frozen canonical text', () => {
+  for (const id of REVIEW_IDS) {
+    for (const [file, body] of goldChunks(id)) assert.equal(readFileSync(new URL(file, chunkDir(id)), 'utf8').replace(/\r\n/g, '\n'), body, `${id}/${file}`);
+    const full = JSON.parse(readFileSync(new URL(`${id}.json`, GOLD_DIR), 'utf8')) as AnatomyGold;
+    const manifest = JSON.parse(readFileSync(new URL('manifest.json', chunkDir(id)), 'utf8'));
+    assert.equal(manifest.goldContentSha256, goldContentSha256(full), id);
+    const text = reassembleCanonical(id);
+    assert.equal(text, developmentCanonicalText(id), id);
+    assert.equal(sha256(text), full.canonicalTextSha256, id);
+    if (id === '01' || id === '10') assert.deepEqual(reassembleGold(id), full, id);
+  }
 });
 
 test('committed development gold is reproducible from its human-written specs', () => {

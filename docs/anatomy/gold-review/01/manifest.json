@@ -1,0 +1,321 @@
+{
+ "id": "01",
+ "purpose": "Leitura em partes para revisão; o gold completo e o texto canônico congelado continuam sendo a fonte.",
+ "goldFile": "test/fixtures/anatomy/gold/01.json",
+ "goldFileSha256Lf": "2ace61ab0961bae7fe342a81b02ae58146a4979d003069d6b88c1b97af29ecd5",
+ "goldCanonicalJsonSha256": "91e4e6bc0ab8bc393943397886e54e6f54910fbcc2dc647dd938682630a4fb52",
+ "goldContentSha256": "0909f12d82efaf67846f1906846a656b5772e6fadeeefe955523f0c264c96339",
+ "canonicalTextSha256": "465186b95fbd52e3d771257d80105c0408e77b61f7192860802907334ddfbeb8",
+ "canonicalTextUtf16Length": 194470,
+ "reassembly": "gold = { ...header, parts: concat(parts-*), entities: concat(entities-*), relations: concat(relations-*) }; canonicalText = concat(canonical-*.text); file-name order; ranges [from, to) (UTF-16 for canonical text).",
+ "chunks": [
+  {
+   "file": "00-header.json",
+   "section": "header",
+   "from": 0,
+   "to": 0,
+   "sha256": "262744f68959c983af0c3e5eb9847f2309d9a2397d49804b3f7271c5d13d0ca2"
+  },
+  {
+   "file": "parts-001.json",
+   "section": "parts",
+   "from": 0,
+   "to": 250,
+   "sha256": "8cd4de8c8b8a6d95cae38bb07f54fb74719c823ed1965bca06f5d70f80c7a5ca"
+  },
+  {
+   "file": "parts-002.json",
+   "section": "parts",
+   "from": 250,
+   "to": 500,
+   "sha256": "d402a0e30aaef2ab621051c2baefb811aee5832f0f76df3ca63b2a2a33bbeaa4"
+  },
+  {
+   "file": "parts-003.json",
+   "section": "parts",
+   "from": 500,
+   "to": 750,
+   "sha256": "7897b5da793dcbb9847d2cd720797b8874930b81f4ea61108e3908ead3b85ef3"
+  },
+  {
+   "file": "parts-004.json",
+   "section": "parts",
+   "from": 750,
+   "to": 1000,
+   "sha256": "36e5f58fdb6d99d1dd31d503c640a5fbf7106be2a2d454bb78fcd2c266af7871"
+  },
+  {
+   "file": "parts-005.json",
+   "section": "parts",
+   "from": 1000,
+   "to": 1250,
+   "sha256": "aadd7c9d6267c12256560c554058040a16f058977c24bdf713f1692112d4826e"
+  },
+  {
+   "file": "parts-006.json",
+   "section": "parts",
+   "from": 1250,
+   "to": 1500,
+   "sha256": "2a6f9d8391f0af5907876d0447491e06da9bd1de58201db2cc45f7cd94b4c035"
+  },
+  {
+   "file": "parts-007.json",
+   "section": "parts",
+   "from": 1500,
+   "to": 1750,
+   "sha256": "f21f246f9a06819b89fc8f675ead328f9449fed9d40b697ac595326c583d1cc7"
+  },
+  {
+   "file": "parts-008.json",
+   "section": "parts",
+   "from": 1750,
+   "to": 2000,
+   "sha256": "7e978c4d81f99175e1f194c23b3c1e450ad1a73d84594539bfd93ed2f4d60ae3"
+  },
+  {
+   "file": "parts-009.json",
+   "section": "parts",
+   "from": 2000,
+   "to": 2250,
+   "sha256": "3e842a410253eff39702eb118afd83f2d46a12769f3b204099438b5aeb1c5648"
+  },
+  {
+   "file": "parts-010.json",
+   "section": "parts",
+   "from": 2250,
+   "to": 2500,
+   "sha256": "58da5860d11dfaa3f410a7b9bfae153d8d767b868bb03076e06e433542944731"
+  },
+  {
+   "file": "parts-011.json",
+   "section": "parts",
+   "from": 2500,
+   "to": 2750,
+   "sha256": "5e82cf4f75f979e27adb0786398dbf69c590f4f61c25ac6ee97c07463aeadf9a"
+  },
+  {
+   "file": "parts-012.json",
+   "section": "parts",
+   "from": 2750,
+   "to": 3000,
+   "sha256": "02ea0577094dafffb6de2f1d9aec85e2aa7fe12613e57d0ed64017354d99fe09"
+  },
+  {
+   "file": "parts-013.json",
+   "section": "parts",
+   "from": 3000,
+   "to": 3250,
+   "sha256": "fd15fd3f4038a16684219637ffef2f884f27fa98c95903ef6dd2ce8a7643c42e"
+  },
+  {
+   "file": "parts-014.json",
+   "section": "parts",
+   "from": 3250,
+   "to": 3500,
+   "sha256": "41cdb90b6cafe9d3de3ace60cb27a51bee1e49701e475ce10686b64aafb39868"
+  },
+  {
+   "file": "parts-015.json",
+   "section": "parts",
+   "from": 3500,
+   "to": 3750,
+   "sha256": "09caad0c7195d5b74659f6f19e86533d80e00c21f68922e5b650152a94442d58"
+  },
+  {
+   "file": "parts-016.json",
+   "section": "parts",
+   "from": 3750,
+   "to": 4000,
+   "sha256": "781f095472149a571e6fc410f393de684ba38548539ea9536986e508057d775b"
+  },
+  {
+   "file": "parts-017.json",
+   "section": "parts",
+   "from": 4000,
+   "to": 4250,
+   "sha256": "31d000a89ee73d6424fae01340622b2dfbf6d443417b0621c7370851ca113de6"
+  },
+  {
+   "file": "parts-018.json",
+   "section": "parts",
+   "from": 4250,
+   "to": 4500,
+   "sha256": "9c0e8a7bad7120df96f3a9154033eb108bb67b63ee5962e886e582b0d487cc94"
+  },
+  {
+   "file": "parts-019.json",
+   "section": "parts",
+   "from": 4500,
+   "to": 4750,
+   "sha256": "0414b404a4fbd53a4ec3653d588dece2604a787e8c9dc86dab85f2657fd3580a"
+  },
+  {
+   "file": "parts-020.json",
+   "section": "parts",
+   "from": 4750,
+   "to": 5000,
+   "sha256": "d9aaa849bda3c4590e94de04a7ee0928d210867ba7607ee37f8d9355f3d269a2"
+  },
+  {
+   "file": "parts-021.json",
+   "section": "parts",
+   "from": 5000,
+   "to": 5250,
+   "sha256": "4901213528b16f8326102bd92c0ea547eca674a0853ce7b8ee6a175c0c446813"
+  },
+  {
+   "file": "parts-022.json",
+   "section": "parts",
+   "from": 5250,
+   "to": 5500,
+   "sha256": "f0f1f69a04f1fd2ffefc20492a68a987b338964eb074f5b913920a199499a24b"
+  },
+  {
+   "file": "parts-023.json",
+   "section": "parts",
+   "from": 5500,
+   "to": 5750,
+   "sha256": "e402ecdc27a987118dc6022e24f328b720139679a84663b7cbc2191ad25e4bbd"
+  },
+  {
+   "file": "parts-024.json",
+   "section": "parts",
+   "from": 5750,
+   "to": 6000,
+   "sha256": "50f786ceda442bee8f38c64046cb8e015cd38bdda18e15eb526cc749fd34484b"
+  },
+  {
+   "file": "parts-025.json",
+   "section": "parts",
+   "from": 6000,
+   "to": 6250,
+   "sha256": "b4711936e3402b78cc486cd54f0cd630bfdbaee6568313e3472d44d5188df534"
+  },
+  {
+   "file": "parts-026.json",
+   "section": "parts",
+   "from": 6250,
+   "to": 6500,
+   "sha256": "f12a3fba860c2ece369018657b332b0d96c02d9bbe497d60f1aa0d8185ea792b"
+  },
+  {
+   "file": "parts-027.json",
+   "section": "parts",
+   "from": 6500,
+   "to": 6750,
+   "sha256": "89b9e4795a5e860520db97d2b145c733eacadb85ca45d25e78cf7a318a1265e6"
+  },
+  {
+   "file": "parts-028.json",
+   "section": "parts",
+   "from": 6750,
+   "to": 6918,
+   "sha256": "39b5348fe75834c746ccfe3ad0f6b07f0edc09820cb0fcd95257a09c365e0d7d"
+  },
+  {
+   "file": "entities-001.json",
+   "section": "entities",
+   "from": 0,
+   "to": 250,
+   "sha256": "c9ea764b4d9f67135443e669169455b7488a0c6c6ba31e7247a58299ae91a27f"
+  },
+  {
+   "file": "entities-002.json",
+   "section": "entities",
+   "from": 250,
+   "to": 500,
+   "sha256": "79050fb85546cca0dbee20c47e9935556f2fe6247438ddc55d7301bbcf82a6ee"
+  },
+  {
+   "file": "entities-003.json",
+   "section": "entities",
+   "from": 500,
+   "to": 750,
+   "sha256": "f0e11297e70403bdd6e6a5e8c8d350e8aab037a06d90f29054f2d3a951cc4cd3"
+  },
+  {
+   "file": "entities-004.json",
+   "section": "entities",
+   "from": 750,
+   "to": 1000,
+   "sha256": "d41964ed10348f841290f45f6d4aab64c1540748c1ad225a49a66225e6307d43"
+  },
+  {
+   "file": "entities-005.json",
+   "section": "entities",
+   "from": 1000,
+   "to": 1250,
+   "sha256": "8479aeca443eeb884fe9ab33ffb79c4bad6198f0007b0d80ff4012e701959278"
+  },
+  {
+   "file": "entities-006.json",
+   "section": "entities",
+   "from": 1250,
+   "to": 1500,
+   "sha256": "071d5a76f742dde74ecff73b426d7499c2853947c1c340fe8ded8c3f3fdfce06"
+  },
+  {
+   "file": "entities-007.json",
+   "section": "entities",
+   "from": 1500,
+   "to": 1750,
+   "sha256": "a98fd392ceee84d1a06f71950dd764f38960b328a0a4dc3815e2d5d9f636cf37"
+  },
+  {
+   "file": "entities-008.json",
+   "section": "entities",
+   "from": 1750,
+   "to": 2000,
+   "sha256": "c8ecbccc1a29f5ce8ff88fa81f2913b03d0b6c556ff8cfc8da87f1cac1cc59f9"
+  },
+  {
+   "file": "entities-009.json",
+   "section": "entities",
+   "from": 2000,
+   "to": 2152,
+   "sha256": "283e6143ce7da2b22df5c9a3de87cff6c0eeb9fcbbb82e5b0e29c7263c4e4070"
+  },
+  {
+   "file": "relations-001.json",
+   "section": "relations",
+   "from": 0,
+   "to": 78,
+   "sha256": "af90907ed8135efa2ae3583b45189a3805b12201ff3306e74851f8a165633897"
+  },
+  {
+   "file": "canonical-001.json",
+   "section": "canonicalText",
+   "from": 0,
+   "to": 40001,
+   "sha256": "3226faa386202a60d9885361dbc5e40762fb15a9c04d607e1501d32c68f3a9d0"
+  },
+  {
+   "file": "canonical-002.json",
+   "section": "canonicalText",
+   "from": 40001,
+   "to": 79953,
+   "sha256": "1d18d34d2e6c67ae194d066ed4dc19e10679742c565b9f38332039dd91b0aafb"
+  },
+  {
+   "file": "canonical-003.json",
+   "section": "canonicalText",
+   "from": 79953,
+   "to": 119828,
+   "sha256": "56570f85f89131e6bcdda6d31906bc2fd4e19201e0ec1ff090cdb8548397617b"
+  },
+  {
+   "file": "canonical-004.json",
+   "section": "canonicalText",
+   "from": 119828,
+   "to": 159803,
+   "sha256": "d50cec68105391a95c2d33891a6c88c91891d162d77c915dff989b37c8dd24ab"
+  },
+  {
+   "file": "canonical-005.json",
+   "section": "canonicalText",
+   "from": 159803,
+   "to": 194470,
+   "sha256": "2e20127b810565a15bc184ac53eebb199830603493accd6042b45886365b526f"
+  }
+ ]
+}
