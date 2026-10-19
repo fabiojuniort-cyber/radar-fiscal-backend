@@ -13,6 +13,7 @@ function isolatedDatabase() {
   const url = new URL(databaseUrl);
   assert.ok(['localhost','127.0.0.1'].includes(url.hostname));
   assert.ok(['/radar_fiscal_test','/onb02_r6_test'].includes(url.pathname));
+  assert.equal(url.search,'','connection override parameters are not allowed');
   assert.equal(process.env.CI, 'true', 'isolated CI only; no production database');
   return new Kysely<DB>({dialect:new PostgresDialect({pool:new Pool({connectionString:databaseUrl,max:2})})});
 }
@@ -42,7 +43,7 @@ async function fixture(trx:Transaction<DB>, scale:boolean) {
     SELECT $1,(9000000+n)::text,n=1 FROM generate_series(1,35)n`,[company]);
   await q(`INSERT INTO establishment_cnaes(establishment_id,cnae_code,is_primary)
     SELECT CASE WHEN n<=24 THEN $1::uuid ELSE $2::uuid END,
-      (9000000+CASE WHEN n<=24 THEN n ELSE n-24 END)::text,n IN(1,25)
+      (9000000+CASE WHEN n<=24 THEN n ELSE n-12 END)::text,n IN(1,25)
     FROM generate_series(1,47)n`,[branches[0]!.id,branches[1]!.id]);
   const products=await q<{id:string}>(`INSERT INTO company_product_profiles(company_id,product_label)
     SELECT $1,'R6 synthetic product '||n FROM generate_series(1,5)n RETURNING id`,[company]);

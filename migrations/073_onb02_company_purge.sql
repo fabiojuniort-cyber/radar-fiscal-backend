@@ -112,9 +112,7 @@ DECLARE
     v_ambiguous_names TEXT[];
     v_ambiguous_name_count INTEGER := 0;
     v_previous_id_count INTEGER;
-    v_history_ids TEXT[];
     v_history_id TEXT;
-    v_history_type TEXT;
     v_stage_started TIMESTAMPTZ := clock_timestamp();
     v_total_started TIMESTAMPTZ := clock_timestamp();
     v_stage_ms JSONB := '{}'::jsonb;
@@ -227,7 +225,9 @@ BEGIN
        WHERE monitoring_profile_id IN (SELECT id FROM public.monitoring_profiles WHERE company_id=p_company_id)
           OR company_publication_id IN (SELECT id FROM public.company_publications WHERE company_id=p_company_id)
     ) refs;
-    -- Conflicting explicit ownership is not resolved by choosing one snapshot.
+    -- R6: historical ownership is based only on explicit private parent keys.
+    -- Conflicting company owners abort; names, CNPJs or free-text mentions do not
+    -- establish ownership. Global product/taxonomy entity types are excluded.
     IF EXISTS (
       SELECT 1 FROM public.audit_log a
       WHERE a.tenant_id=v_tenant
@@ -242,18 +242,60 @@ BEGIN
       RAISE EXCEPTION 'company_purge_historical_identity_ambiguous' USING ERRCODE='23514';
     END IF;
 
-    -- R6: recover deleted CHILD identities only from explicit top-level ownership
-    -- fields in this tenant's audit. A CNPJ/name/reference anywhere in JSON is
-    -- not ownership. Entity kinds are private child kinds, never global product.
-    -- Iterate because old profiles can reference a previously deleted branch.
     LOOP
       v_previous_id_count := cardinality(v_private_ids);
-      FOR v_history_id,v_history_type IN
-        SELECT DISTINCT candidate.child_id,a.entity_type
+      FOR v_history_id IN
+        SELECT DISTINCT candidate.child_id
         FROM public.audit_log a
         CROSS JOIN LATERAL (
           SELECT coalesce(
-            substring(a.entity_id FROM '^(?:[a-z_]+:)?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}) FROM (
+            substring(a.entity_id FROM '^(?:[a-z_]+:)?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$'),
+            CASE WHEN a.entity_id IS NULL OR a.entity_id=''
+              THEN coalesce(a.after_data->>'id',a.before_data->>'id') END
+          ) AS child_id
+        ) candidate
+        WHERE a.tenant_id=v_tenant
+          AND a.entity_type IN ('establishment','company_tax_profile','company_product_profile',
+            'company_cnae_ncm','monitoring_profile','company_publication','publication_match')
+          AND candidate.child_id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          AND NOT lower(candidate.child_id)=ANY(v_private_ids)
+          AND EXISTS (
+            SELECT 1 FROM (VALUES(a.before_data),(a.after_data)) payload(data)
+            WHERE payload.data->>'company_id'=p_company_id::text
+               OR payload.data->>'companyId'=p_company_id::text
+               OR (a.entity_type IN ('company_tax_profile','company_product_profile')
+                 AND (payload.data->>'establishment_id'=ANY(v_private_ids)
+                   OR payload.data->>'establishmentId'=ANY(v_private_ids)))
+               OR (a.entity_type='publication_match'
+                 AND (payload.data->>'monitoring_profile_id'=ANY(v_private_ids)
+                   OR payload.data->>'company_publication_id'=ANY(v_private_ids)))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM (VALUES(a.before_data),(a.after_data)) payload(data)
+            CROSS JOIN LATERAL (VALUES(payload.data->>'company_id'),(payload.data->>'companyId')) owner(company_id)
+            WHERE owner.company_id IS NOT NULL AND owner.company_id<>p_company_id::text
+          )
+      LOOP
+        IF EXISTS (
+          SELECT 1 FROM public.establishments WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.company_tax_profiles WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.company_product_profiles WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.company_cnae_ncms WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.monitoring_profiles WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.company_publications WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.publication_matches pm
+            JOIN public.company_publications cp ON cp.id=pm.company_publication_id
+            WHERE pm.id::text=lower(v_history_id) AND cp.company_id<>p_company_id
+          UNION ALL SELECT 1 FROM public.companies WHERE id::text=lower(v_history_id) AND id<>p_company_id
+        ) THEN
+          RAISE EXCEPTION 'company_purge_historical_identity_ambiguous' USING ERRCODE='23514';
+        END IF;
+        v_private_ids := array_append(v_private_ids,lower(v_history_id));
+      END LOOP;
+      EXIT WHEN cardinality(v_private_ids)=v_previous_id_count;
+    END LOOP;
+
+    SELECT coalesce(array_agg(DISTINCT ref),ARRAY[]::text[]) INTO v_private_cnpjs FROM (
       SELECT regexp_replace(head_office_cnpj::text,'[^0-9]','','g') AS ref
        FROM public.companies WHERE id=p_company_id
       UNION ALL SELECT regexp_replace(cnpj::text,'[^0-9]','','g')
@@ -391,307 +433,6 @@ BEGIN
         (v_stage_ms || jsonb_build_object('total_ms',
           extract(epoch FROM clock_timestamp()-v_total_started)*1000))::text,true);
     END IF;
-    RETURN TRUE;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.app_purge_company(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.app_purge_company(UUID) FROM radar_worker;
-GRANT EXECUTE ON FUNCTION public.app_purge_company(UUID) TO radar_app;
-),
-            CASE WHEN a.entity_id IS NULL OR a.entity_id=''
-              THEN coalesce(a.after_data->>'id',a.before_data->>'id') END
-          ) AS child_id
-        ) candidate
-        WHERE a.tenant_id=v_tenant
-          AND a.entity_type IN ('establishment','company_tax_profile',
-            'company_product_profile','company_cnae_ncm','monitoring_profile','company_publication',
-            'publication_match')
-          AND candidate.child_id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12} FROM (
-      SELECT regexp_replace(head_office_cnpj::text,'[^0-9]','','g') AS ref
-       FROM public.companies WHERE id=p_company_id
-      UNION ALL SELECT regexp_replace(cnpj::text,'[^0-9]','','g')
-       FROM public.establishments WHERE company_id=p_company_id
-    ) refs;
-    SELECT coalesce(array_agg(DISTINCT name),ARRAY[]::text[]) INTO v_private_names FROM (
-      SELECT legal_name AS name FROM public.companies WHERE id=p_company_id
-      UNION ALL SELECT trade_name FROM public.companies WHERE id=p_company_id
-      UNION ALL SELECT name FROM public.establishments WHERE company_id=p_company_id
-    ) names WHERE name IS NOT NULL AND btrim(name)<>'';
-
-    -- R5: a homonymous company in THIS tenant makes that name ambiguous.
-    -- Count DISTINCT other company IDs; never persist any competing name.
-    SELECT COALESCE(array_agg(DISTINCT public.onb02_normalize_company_name(name)),ARRAY[]::text[])
-      INTO v_normalized_names
-      FROM unnest(v_private_names) AS names(name);
-
-    SELECT count(DISTINCT company_id)::int,
-           COALESCE(array_agg(DISTINCT normalized_name),ARRAY[]::text[])
-      INTO v_ambiguous_name_count,v_ambiguous_names
-    FROM (
-      SELECT c.id AS company_id, public.onb02_normalize_company_name(n.name) AS normalized_name
-        FROM public.companies c
-        CROSS JOIN LATERAL unnest(ARRAY[c.legal_name,c.trade_name]) AS n(name)
-        WHERE c.tenant_id=v_tenant AND c.id<>p_company_id AND n.name IS NOT NULL
-      UNION ALL
-      SELECT c.id,public.onb02_normalize_company_name(e.name)
-        FROM public.companies c
-        JOIN public.establishments e ON e.company_id=c.id
-        WHERE c.tenant_id=v_tenant AND c.id<>p_company_id AND e.name IS NOT NULL
-    ) others
-    WHERE normalized_name=ANY(v_normalized_names)
-      AND normalized_name<>'';
-
-    SELECT COALESCE(array_agg(DISTINCT original_name),ARRAY[]::text[])
-      INTO v_private_names
-      FROM unnest(v_private_names) AS target_names(original_name)
-    WHERE public.onb02_normalize_company_name(original_name)
-          <> ALL(v_ambiguous_names);
-
-    -- Never change an audit associated with a DIFFERENT entity, even when
-    -- its JSON mentions the target company as a third-party reference.
-    -- Name-only historical audit is eligible only on an unowned/empty entity_id.
-    UPDATE public.audit_log a
-       SET entity_id=CASE
-         WHEN a.entity_id IS NULL
-           OR a.entity_id=ANY(v_private_ids)
-           OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
-           THEN NULL
-         ELSE public.onb02_redact_audit_json(
-           to_jsonb(a.entity_id),v_private_ids,v_private_cnpjs,v_private_names) #>> '{}' END,
-           before_data=public.onb02_redact_audit_json(a.before_data,v_private_ids,v_private_cnpjs,v_private_names),
-           after_data=public.onb02_redact_audit_json(a.after_data,v_private_ids,v_private_cnpjs,v_private_names)
-     WHERE a.tenant_id=v_tenant
-       AND (
-         NULLIF(a.entity_id,'') IS NULL
-         OR EXISTS (SELECT 1 FROM unnest(v_private_ids) AS r(id)
-           WHERE strpos(lower(a.entity_id),lower(r.id))>0)
-         OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
-         OR public.onb02_normalize_company_name(a.entity_id)=ANY(
-           SELECT public.onb02_normalize_company_name(n) FROM unnest(v_private_names) n)
-       )
-       AND (
-         EXISTS (SELECT 1 FROM unnest(v_private_ids) AS r(id)
-           WHERE strpos(lower(coalesce(a.entity_id,'')),lower(r.id))>0
-             OR strpos(lower(coalesce(a.before_data::text,'')),lower(r.id))>0
-             OR strpos(lower(coalesce(a.after_data::text,'')),lower(r.id))>0)
-         OR EXISTS (SELECT 1 FROM unnest(v_private_cnpjs) AS r(cnpj)
-           WHERE regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=r.cnpj
-              OR strpos(coalesce(a.before_data::text,''),r.cnpj)>0
-              OR strpos(coalesce(a.after_data::text,''),r.cnpj)>0
-              OR (length(r.cnpj)=14 AND (
-                 strpos(coalesce(a.before_data::text,''),
-                   substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
-                 OR strpos(coalesce(a.after_data::text,''),
-                   substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0)))
-         OR (cardinality(v_private_names)>0 AND (
-           public.onb02_redact_audit_json(
-             a.before_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
-               IS DISTINCT FROM a.before_data
-           OR public.onb02_redact_audit_json(
-             a.after_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
-               IS DISTINCT FROM a.after_data
-           OR public.onb02_normalize_company_name(a.entity_id)=ANY(
-             SELECT public.onb02_normalize_company_name(n) FROM unnest(v_private_names) n)
-         ))
-       );
-
-    -- publication_matches has a NO ACTION FK to monitoring_profiles, so
-    -- delete those matches explicitly before cascading profiles. This does
-    -- NOT remove the shared/global publication or its official history.
-    DELETE FROM public.publication_matches pm
-    WHERE pm.company_publication_id IN (
-        SELECT cp.id FROM public.company_publications cp
-        WHERE cp.company_id = p_company_id
-    ) OR pm.monitoring_profile_id IN (
-        SELECT mp.id FROM public.monitoring_profiles mp
-        WHERE mp.company_id = p_company_id
-    );
-
-    -- 002/005/026/032 and related company-owned tables use ON DELETE CASCADE.
-    -- Child deletion is atomic within withTenantContext's transaction.
-    DELETE FROM public.companies c
-    WHERE c.id = p_company_id AND c.tenant_id = v_tenant;
-
-    -- Audit the action without persisting the deleted CNPJ or company ID.
-    INSERT INTO public.audit_log(
-        tenant_id, actor_type, actor_id, action, entity_type,
-        entity_id, after_data, correlation_id
-    )
-    VALUES (
-        v_tenant, 'USER', v_actor::text, 'COMPANY_PURGED',
-        'company', NULL, jsonb_build_object('purged',true,'ambiguous_name_count',v_ambiguous_name_count), gen_random_uuid()
-    );
-
-    RETURN TRUE;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.app_purge_company(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.app_purge_company(UUID) FROM radar_worker;
-GRANT EXECUTE ON FUNCTION public.app_purge_company(UUID) TO radar_app;
-
-          AND NOT lower(candidate.child_id)=ANY(v_private_ids)
-          AND EXISTS (
-            SELECT 1 FROM (VALUES(a.before_data),(a.after_data)) payload(data)
-            WHERE payload.data->>'company_id'=p_company_id::text
-               OR payload.data->>'companyId'=p_company_id::text
-               OR (a.entity_type IN ('company_tax_profile','company_product_profile')
-                 AND (payload.data->>'establishment_id'=ANY(v_private_ids)
-                   OR payload.data->>'establishmentId'=ANY(v_private_ids)))
-               OR (a.entity_type='publication_match'
-                 AND (payload.data->>'monitoring_profile_id'=ANY(v_private_ids)
-                   OR payload.data->>'company_publication_id'=ANY(v_private_ids)))
-          )
-          -- A conflicting explicit company owner is never overwritten.
-          AND NOT EXISTS (
-            SELECT 1 FROM (VALUES(a.before_data),(a.after_data)) payload(data)
-            CROSS JOIN LATERAL (VALUES(payload.data->>'company_id'),
-              (payload.data->>'companyId')) owner(company_id)
-            WHERE owner.company_id IS NOT NULL AND owner.company_id<>p_company_id::text
-          )
-      LOOP
-        -- An ID still belonging to another company is contradictory provenance:
-        -- abort atomically rather than redact the other company's history.
-        IF EXISTS (
-          SELECT 1 FROM public.establishments WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.company_tax_profiles WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.company_product_profiles WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.company_cnae_ncms WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.monitoring_profiles WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.company_publications WHERE id::text=lower(v_history_id) AND company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.publication_matches pm
-            JOIN public.company_publications cp ON cp.id=pm.company_publication_id
-            WHERE pm.id::text=lower(v_history_id) AND cp.company_id<>p_company_id
-          UNION ALL SELECT 1 FROM public.companies WHERE id::text=lower(v_history_id) AND id<>p_company_id
-        ) THEN
-          RAISE EXCEPTION 'company_purge_historical_identity_ambiguous' USING ERRCODE='23514';
-        END IF;
-        v_private_ids := array_append(v_private_ids,lower(v_history_id));
-      END LOOP;
-      EXIT WHEN cardinality(v_private_ids)=v_previous_id_count;
-    END LOOP;
-
-    SELECT coalesce(array_agg(DISTINCT ref),ARRAY[]::text[]) INTO v_private_cnpjs FROM (
-      SELECT regexp_replace(head_office_cnpj::text,'[^0-9]','','g') AS ref
-       FROM public.companies WHERE id=p_company_id
-      UNION ALL SELECT regexp_replace(cnpj::text,'[^0-9]','','g')
-       FROM public.establishments WHERE company_id=p_company_id
-    ) refs;
-    SELECT coalesce(array_agg(DISTINCT name),ARRAY[]::text[]) INTO v_private_names FROM (
-      SELECT legal_name AS name FROM public.companies WHERE id=p_company_id
-      UNION ALL SELECT trade_name FROM public.companies WHERE id=p_company_id
-      UNION ALL SELECT name FROM public.establishments WHERE company_id=p_company_id
-    ) names WHERE name IS NOT NULL AND btrim(name)<>'';
-
-    -- R5: a homonymous company in THIS tenant makes that name ambiguous.
-    -- Count DISTINCT other company IDs; never persist any competing name.
-    SELECT COALESCE(array_agg(DISTINCT public.onb02_normalize_company_name(name)),ARRAY[]::text[])
-      INTO v_normalized_names
-      FROM unnest(v_private_names) AS names(name);
-
-    SELECT count(DISTINCT company_id)::int,
-           COALESCE(array_agg(DISTINCT normalized_name),ARRAY[]::text[])
-      INTO v_ambiguous_name_count,v_ambiguous_names
-    FROM (
-      SELECT c.id AS company_id, public.onb02_normalize_company_name(n.name) AS normalized_name
-        FROM public.companies c
-        CROSS JOIN LATERAL unnest(ARRAY[c.legal_name,c.trade_name]) AS n(name)
-        WHERE c.tenant_id=v_tenant AND c.id<>p_company_id AND n.name IS NOT NULL
-      UNION ALL
-      SELECT c.id,public.onb02_normalize_company_name(e.name)
-        FROM public.companies c
-        JOIN public.establishments e ON e.company_id=c.id
-        WHERE c.tenant_id=v_tenant AND c.id<>p_company_id AND e.name IS NOT NULL
-    ) others
-    WHERE normalized_name=ANY(v_normalized_names)
-      AND normalized_name<>'';
-
-    SELECT COALESCE(array_agg(DISTINCT original_name),ARRAY[]::text[])
-      INTO v_private_names
-      FROM unnest(v_private_names) AS target_names(original_name)
-    WHERE public.onb02_normalize_company_name(original_name)
-          <> ALL(v_ambiguous_names);
-
-    -- Never change an audit associated with a DIFFERENT entity, even when
-    -- its JSON mentions the target company as a third-party reference.
-    -- Name-only historical audit is eligible only on an unowned/empty entity_id.
-    UPDATE public.audit_log a
-       SET entity_id=CASE
-         WHEN a.entity_id IS NULL
-           OR a.entity_id=ANY(v_private_ids)
-           OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
-           THEN NULL
-         ELSE public.onb02_redact_audit_json(
-           to_jsonb(a.entity_id),v_private_ids,v_private_cnpjs,v_private_names) #>> '{}' END,
-           before_data=public.onb02_redact_audit_json(a.before_data,v_private_ids,v_private_cnpjs,v_private_names),
-           after_data=public.onb02_redact_audit_json(a.after_data,v_private_ids,v_private_cnpjs,v_private_names)
-     WHERE a.tenant_id=v_tenant
-       AND (
-         NULLIF(a.entity_id,'') IS NULL
-         OR EXISTS (SELECT 1 FROM unnest(v_private_ids) AS r(id)
-           WHERE strpos(lower(a.entity_id),lower(r.id))>0)
-         OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
-         OR public.onb02_normalize_company_name(a.entity_id)=ANY(
-           SELECT public.onb02_normalize_company_name(n) FROM unnest(v_private_names) n)
-       )
-       AND (
-         EXISTS (SELECT 1 FROM unnest(v_private_ids) AS r(id)
-           WHERE strpos(lower(coalesce(a.entity_id,'')),lower(r.id))>0
-             OR strpos(lower(coalesce(a.before_data::text,'')),lower(r.id))>0
-             OR strpos(lower(coalesce(a.after_data::text,'')),lower(r.id))>0)
-         OR EXISTS (SELECT 1 FROM unnest(v_private_cnpjs) AS r(cnpj)
-           WHERE regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=r.cnpj
-              OR strpos(coalesce(a.before_data::text,''),r.cnpj)>0
-              OR strpos(coalesce(a.after_data::text,''),r.cnpj)>0
-              OR (length(r.cnpj)=14 AND (
-                 strpos(coalesce(a.before_data::text,''),
-                   substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
-                 OR strpos(coalesce(a.after_data::text,''),
-                   substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0)))
-         OR (cardinality(v_private_names)>0 AND (
-           public.onb02_redact_audit_json(
-             a.before_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
-               IS DISTINCT FROM a.before_data
-           OR public.onb02_redact_audit_json(
-             a.after_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
-               IS DISTINCT FROM a.after_data
-           OR public.onb02_normalize_company_name(a.entity_id)=ANY(
-             SELECT public.onb02_normalize_company_name(n) FROM unnest(v_private_names) n)
-         ))
-       );
-
-    -- publication_matches has a NO ACTION FK to monitoring_profiles, so
-    -- delete those matches explicitly before cascading profiles. This does
-    -- NOT remove the shared/global publication or its official history.
-    DELETE FROM public.publication_matches pm
-    WHERE pm.company_publication_id IN (
-        SELECT cp.id FROM public.company_publications cp
-        WHERE cp.company_id = p_company_id
-    ) OR pm.monitoring_profile_id IN (
-        SELECT mp.id FROM public.monitoring_profiles mp
-        WHERE mp.company_id = p_company_id
-    );
-
-    -- 002/005/026/032 and related company-owned tables use ON DELETE CASCADE.
-    -- Child deletion is atomic within withTenantContext's transaction.
-    DELETE FROM public.companies c
-    WHERE c.id = p_company_id AND c.tenant_id = v_tenant;
-
-    -- Audit the action without persisting the deleted CNPJ or company ID.
-    INSERT INTO public.audit_log(
-        tenant_id, actor_type, actor_id, action, entity_type,
-        entity_id, after_data, correlation_id
-    )
-    VALUES (
-        v_tenant, 'USER', v_actor::text, 'COMPANY_PURGED',
-        'company', NULL, jsonb_build_object('purged',true,'ambiguous_name_count',v_ambiguous_name_count), gen_random_uuid()
-    );
-
     RETURN TRUE;
 END;
 $$;
