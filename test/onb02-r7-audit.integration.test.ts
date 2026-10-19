@@ -78,6 +78,18 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
    await client.query('ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard');
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  const gateClient=await pool.connect();
+  try {
+   await gateClient.query('BEGIN');
+   const actor=(await gateClient.query<{id:string}>(
+     "INSERT INTO app_users(email,name) VALUES($1,'R7 synthetic actor') RETURNING id",
+     [randomUUID()+'@example.test'])).rows[0]!.id;
+   await gateClient.query("INSERT INTO tenant_memberships(tenant_id,user_id,role) VALUES($1,$2,'OWNER')",[tenants[1],actor]);
+   await gateClient.query("SELECT set_config('app.user_id',$1,true),set_config('app.tenant_id',$2,true)",[actor,tenants[1]]);
+   await assert.rejects(gateClient.query('SELECT public.app_purge_company($1)',[company]),
+     (e:unknown)=>(e as {code?:string;message?:string}).code==='55000' &&
+       (e as {message?:string}).message==='company_purge_audit_backfill_required');
+  }finally{await gateClient.query('ROLLBACK');gateClient.release();}
   const headers=async()=> (await pool.query<{hash:string}>(`SELECT md5(string_agg(
     md5(jsonb_build_array(id,tenant_id,actor_type,actor_id,action,entity_type,occurred_at,correlation_id)::text),
     '' ORDER BY id)) hash FROM audit_log WHERE tenant_id=ANY($1::uuid[])`,[tenants])).rows[0]!.hash;

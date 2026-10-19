@@ -26,12 +26,6 @@ BEGIN
         RAISE EXCEPTION 'admin_required' USING ERRCODE = '42501';
     END IF;
 
-    -- Do not enable deletion between deploy and the separately authorized backfill.
-    -- An indexed marker check; never search payloads or identities here.
-    IF EXISTS (SELECT 1 FROM public.audit_log WHERE audit_policy_version=0) THEN
-      RAISE EXCEPTION 'company_purge_audit_backfill_required' USING ERRCODE='55000';
-    END IF;
-
     -- Only the company belonging to the authenticated tenant is eligible.
     -- Row lock serializes overlapping actions with this endpoint.
     SELECT c.head_office_cnpj, c.legal_name, c.trade_name
@@ -42,6 +36,12 @@ BEGIN
 
     IF NOT FOUND THEN
         RETURN FALSE;
+    END IF;
+
+    -- Do not enable deletion between deploy and the separately authorized backfill.
+    -- An indexed marker check; never search payloads or identities here.
+    IF EXISTS (SELECT 1 FROM public.audit_log WHERE audit_policy_version=0) THEN
+      RAISE EXCEPTION 'company_purge_audit_backfill_required' USING ERRCODE='55000';
     END IF;
 
     -- Inserts/updates of matching rows take FK KEY SHARE locks on these

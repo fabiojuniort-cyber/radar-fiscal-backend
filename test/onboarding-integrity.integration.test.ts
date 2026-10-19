@@ -1,3 +1,4 @@
+import { applyAuditBackfill } from '../src/modules/audit/audit-backfill.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
@@ -27,6 +28,8 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
   const tenants: string[] = [];
   try {
     await app.ready();
+    // Isolated fixture setup: production cleanup remains a separate authorization.
+    await applyAuditBackfill(admin);
     await ensureCnaeFixture(admin);
 
     const newOwner = async () => {
