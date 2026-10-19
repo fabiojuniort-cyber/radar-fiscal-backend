@@ -12,7 +12,7 @@ export interface PredictedPart { id: string; parentId: string | null; type: stri
   table?: { row: number; column: number; rowSpan: number; columnSpan: number } | null }
 export interface PredictedEntity { id: string; domain: string; span: Span }
 export interface PredictedRelation { kind: 'range' | 'exception'; operatorSpan: Span | null; memberEntityIds: string[]; targetEntityIds: string[]; scopeSpan: Span | null; condition: string | null }
-export interface PredictedSelection { purpose: 'ncm' | 'thematic_text'; positive: boolean; span: Span }
+export interface PredictedSelection { purpose: 'ncm' | 'thematic_text'; positive: boolean; /** null or invalid = unlocated (still counted in S1b). */ span: Span | null }
 export interface Prediction { parts: PredictedPart[]; entities: PredictedEntity[]; relations: PredictedRelation[]; selections: PredictedSelection[];
   coverage?: { textLength: number; recognizedLength: number } }
 
@@ -63,12 +63,25 @@ export function goldCodeRoles(gold: AnatomyGold): { nonCandidates: Span[]; candi
   return { nonCandidates, candidates };
 }
 
+/**
+ * S1b classes of positive `ncm` emissions (exhaustive; their sum equals `emitted`):
+ * - exactCandidate: span equals a structural candidate (not a violation of exclusion);
+ * - onNonCandidate: touches a gold non-candidate code (proven violation);
+ * - inexactOnCandidate: touches a candidate without its exact span (proven violation: the gold fixes the code span);
+ * - outsideGoldCodes: touches no gold code, in annotated text (proven violation, e.g. an invented positive);
+ * - inGap: touches no gold code but lies in a declared gap or unidentified part (unverifiable, not proven);
+ * - unlocated: no valid span inside the text (unverifiable, reported).
+ */
+export interface S1Classes { exactCandidate: number; onNonCandidate: number; inexactOnCandidate: number; outsideGoldCodes: number; inGap: number; unlocated: number }
+export interface S1b { emitted: number; violations: number; unverifiable: number; classes: S1Classes }
+const s1b = (emitted: number, c: S1Classes): S1b => ({ emitted, violations: c.onNonCandidate + c.inexactOnCandidate + c.outsideGoldCodes, unverifiable: c.inGap + c.unlocated, classes: c });
+
 export interface EntryEvaluation {
   version: typeof EVALUATION_VERSION; id: string; source: string;
   E1: Prf; E2: Ratio; E3: Ratio; E4: Ratio & { confusion: Record<string, number> }; E5: Prf;
   R1: Prf; R2: Prf; R3: Ratio; R4: Prf; R5: Ratio; R6: Prf;
   M1: Prf; M2a: Prf; M2b: Ratio; M2c: NotApplicable; M2: NotApplicable;
-  S1a: Ratio; S1b: { violations: number; onNonCandidate: number; outsideGoldCodes: number }; S2: NotApplicable;
+  S1a: Ratio; S1b: S1b; S2: NotApplicable;
   C1: Ratio | NotApplicable;
 }
 
@@ -86,14 +99,15 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
     const parentPair = pairOf.get(g.parentId); if (!parentPair) continue;
     e2d++; if (p.parentId === parentPair.id) e2n++;
   }
-  // E3 — consecutive gold siblings, both matched, keep their relative order under the same predicted parent.
+  // E3 — among the MATCHED gold siblings (in gold order), each consecutive pair keeps its relative order under the
+  // same predicted parent. Pairing only matched siblings means an omitted sibling cannot hide an inversion around it.
   const siblings = new Map<string | null, typeof gParts>();
   for (const g of gParts) siblings.set(g.parentId, [...(siblings.get(g.parentId) ?? []), g]);
   let e3n = 0; let e3d = 0;
   for (const list of siblings.values()) {
-    const ordered = [...list].sort((a, b) => a.order - b.order);
-    for (let i = 1; i < ordered.length; i++) {
-      const a = pairOf.get(ordered[i - 1]!.id); const b = pairOf.get(ordered[i]!.id); if (!a || !b) continue;
+    const matched = [...list].sort((a, b) => a.order - b.order).map((g) => pairOf.get(g.id)).filter((p): p is PredictedPart => p !== undefined);
+    for (let i = 1; i < matched.length; i++) {
+      const a = matched[i - 1]!; const b = matched[i]!;
       e3d++; if (a.parentId === b.parentId && a.order < b.order) e3n++;
     }
   }
@@ -125,34 +139,49 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
   // R5 — gold non-code spans hit by any predicted NCM (each span counted once).
   const nonCode = gold.entities.filter((e) => NON_CODE.has(e.domain)); const predNcm = pred.entities.filter((e) => e.domain === 'NCM');
   const R5 = ratio(nonCode.filter((g) => predNcm.some((p) => overlaps(g.span, p.span))).length, nonCode.length);
-  // M1/M2 — relations keyed by operator span and member/target spans.
-  const gEnt = new Map(gold.entities.map((e) => [e.id, e.span])); const pEnt = new Map(pred.entities.map((e) => [e.id, e.span]));
-  // Range: operator + both ends in order. Exception: operator + the SET of target spans (order-free).
-  const relKey = (spans: Map<string, Span>) => (r: { operatorSpan: Span | null; memberEntityIds: string[]; targetEntityIds: string[]; kind: string }) => {
-    const ends = (r.kind === 'range' ? r.memberEntityIds : r.targetEntityIds).map((i) => sk(spans.get(i)));
+  // M1/M2 — relations keyed by operator span and the DOMAIN + span of each member/target, so a relation whose ends
+  // carry the wrong nomenclature (NCM↔NBM) is not a hit. An unresolved id gets a key that can never match.
+  const ref = (e: { domain: string; span: Span }) => `${e.domain}@${sk(e.span)}`;
+  const gEnt = new Map(gold.entities.map((e) => [e.id, ref(e)])); const pEnt = new Map(pred.entities.map((e) => [e.id, ref(e)]));
+  // Range: operator + both ends in order. Exception: operator + the SET of targets (order-free).
+  const relKey = (refs: Map<string, string>, side: 'g' | 'p') => (r: { operatorSpan: Span | null; memberEntityIds: string[]; targetEntityIds: string[]; kind: string }) => {
+    const ends = (r.kind === 'range' ? r.memberEntityIds : r.targetEntityIds).map((i) => refs.get(i) ?? `unresolved:${side}:${i}`);
     if (r.kind !== 'range') ends.sort();
     return `${r.kind}|${sk(r.operatorSpan)}|${ends.join(',')}`;
   };
   const gRanges = gold.relations.filter((r) => r.kind === 'range'); const pRanges = pred.relations.filter((r) => r.kind === 'range');
-  const M1 = prf(matchOneToOne(gRanges, pRanges, relKey(gEnt), relKey(pEnt)).pairs.length, pRanges.length, gRanges.length);
+  const M1 = prf(matchOneToOne(gRanges, pRanges, relKey(gEnt, 'g'), relKey(pEnt, 'p')).pairs.length, pRanges.length, gRanges.length);
   const gExc = gold.relations.filter((r) => r.kind === 'exception'); const pExc = pred.relations.filter((r) => r.kind === 'exception');
-  const m2 = matchOneToOne(gExc, pExc, relKey(gEnt), relKey(pEnt));
+  const m2 = matchOneToOne(gExc, pExc, relKey(gEnt, 'g'), relKey(pEnt, 'p'));
   const M2a = prf(m2.pairs.length, pExc.length, gExc.length);
   const M2b = ratio(m2.pairs.filter(([g, p]) => sk(g.scopeSpan) === sk(p.scopeSpan)).length, m2.pairs.length);
-  // S1 — denominator from the gold, independent of matching; raw emissions reported apart.
+  // S1 — denominator from the gold, independent of matching. Every positive `ncm` emission falls in exactly one class,
+  // so none can disappear; only classes the gold can prove count as violations.
   const roles = goldCodeRoles(gold);
   const positives = pred.selections.filter((s) => s.purpose === 'ncm' && s.positive);
-  const S1a = ratio(roles.nonCandidates.filter((n) => positives.some((s) => overlaps(n, s.span))).length, roles.nonCandidates.length);
-  const goldCodes = gold.entities.filter((e) => CODE.has(e.domain)).map((e) => e.span);
-  const onNonCandidate = positives.filter((s) => roles.nonCandidates.some((n) => overlaps(n, s.span))).length;
-  const outsideGoldCodes = positives.filter((s) => !goldCodes.some((g) => overlaps(g, s.span))).length;
+  const validSpan = (s: Span | null | undefined): s is Span => !!s && Number.isInteger(s.start) && Number.isInteger(s.end)
+    && s.start >= 0 && s.start < s.end && s.end <= gold.canonicalTextUtf16Length;
+  const located = positives.map((s) => s.span).filter(validSpan);
+  const S1a = ratio(roles.nonCandidates.filter((n) => located.some((s) => overlaps(n, s))).length, roles.nonCandidates.length);
+  // Regions the gold does not vouch for: declared gaps with a span and parts annotated as unidentified.
+  const unverifiedRegions = [...gold.gaps.flatMap((g) => (g.span ? [g.span] : [])), ...gold.parts.filter((p) => p.type === 'unidentified').map((p) => p.span)];
+  const classes: S1Classes = { exactCandidate: 0, onNonCandidate: 0, inexactOnCandidate: 0, outsideGoldCodes: 0, inGap: 0, unlocated: 0 };
+  for (const s of positives) {
+    const span = s.span;
+    if (!validSpan(span)) classes.unlocated++;
+    else if (roles.nonCandidates.some((n) => overlaps(n, span))) classes.onNonCandidate++;
+    else if (roles.candidates.some((c) => c.start === span.start && c.end === span.end)) classes.exactCandidate++;
+    else if (roles.candidates.some((c) => overlaps(c, span))) classes.inexactOnCandidate++;
+    else if (unverifiedRegions.some((r) => overlaps(r, span))) classes.inGap++;
+    else classes.outsideGoldCodes++;
+  }
   const C1 = pred.coverage ? ratio(pred.coverage.recognizedLength, pred.coverage.textLength) : { ...NA, reason: 'prediction carries no coverage' };
   return { version: EVALUATION_VERSION, id, source,
     E1: prf(m1.pairs.length, pParts.length, gParts.length), E2: ratio(e2n, e2d), E3: ratio(e3n, e3d), E4: { ...ratio(e4n, m1.pairs.length), confusion },
     E5: prf(e5.pairs.length, pCells.length, gCells.length), R1, R2, R3, R4, R5, R6, M1, M2a, M2b,
     M2c: { ...NA, reason: 'gold condition null does not prove absence of a condition (not annotated in this stage)' },
     M2: { ...NA, reason: 'complete exception depends on M2c' },
-    S1a, S1b: { violations: onNonCandidate + outsideGoldCodes, onNonCandidate, outsideGoldCodes },
+    S1a, S1b: s1b(positives.length, classes),
     S2: { ...NA, reason: 'positive selection requires approved legal evidence (ANAT-06)' }, C1 };
 }
 
@@ -169,7 +198,8 @@ export function aggregate(entries: EntryEvaluation[]): Record<string, Pick<Entry
     const sumRatio = (k: 'E2' | 'E3' | 'E4' | 'R3' | 'R5' | 'M2b' | 'S1a') => ratio(list.reduce((a, e) => a + e[k].numerator, 0), list.reduce((a, e) => a + e[k].denominator, 0));
     out[key] = { E1: sumPrf('E1'), E5: sumPrf('E5'), R1: sumPrf('R1'), R2: sumPrf('R2'), R4: sumPrf('R4'), R6: sumPrf('R6'), M1: sumPrf('M1'), M2a: sumPrf('M2a'),
       E2: sumRatio('E2'), E3: sumRatio('E3'), E4: sumRatio('E4'), R3: sumRatio('R3'), R5: sumRatio('R5'), M2b: sumRatio('M2b'), S1a: sumRatio('S1a'),
-      S1b: { violations: list.reduce((a, e) => a + e.S1b.violations, 0), onNonCandidate: list.reduce((a, e) => a + e.S1b.onNonCandidate, 0), outsideGoldCodes: list.reduce((a, e) => a + e.S1b.outsideGoldCodes, 0) },
+      S1b: s1b(list.reduce((a, e) => a + e.S1b.emitted, 0), (Object.keys(list[0]!.S1b.classes) as (keyof S1Classes)[])
+        .reduce((acc, k) => ({ ...acc, [k]: list.reduce((a, e) => a + e.S1b.classes[k], 0) }), {} as S1Classes)),
       entries: list.map((e) => e.id) };
   }
   return out;

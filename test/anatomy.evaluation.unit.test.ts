@@ -121,7 +121,7 @@ test('S1: denominator from the gold; each hit span once in S1a; raw emissions an
   ];
   const r = evaluateEntry('99', 'SYN', g, p);
   assert.deepEqual([r.S1a.numerator, r.S1a.denominator], [2, 6]);
-  assert.deepEqual(r.S1b, { violations: 4, onNonCandidate: 3, outsideGoldCodes: 1 });
+  assert.deepEqual(r.S1b, { emitted: 5, violations: 4, unverifiable: 0, classes: { exactCandidate: 1, onNonCandidate: 3, inexactOnCandidate: 0, outsideGoldCodes: 1, inGap: 0, unlocated: 0 } });
   // Matching does not change the S1 denominator.
   const empty = evaluateEntry('99', 'SYN', g, { parts: [], entities: [], relations: [], selections: [] });
   assert.equal(empty.S1a.denominator, 6);
@@ -131,7 +131,7 @@ test('S1b flags invented positives in a document without codes, where S1a is N/A
   const g = goldDoc(); g.entities = g.entities.filter((e) => e.domain === 'CITATION'); g.relations = [];
   const r = evaluateEntry('98', 'SYN', g, { ...perfect(g), selections: [{ purpose: 'ncm', positive: true, span: at('Art. 1º') }] });
   assert.equal(r.S1a.value, null);
-  assert.deepEqual(r.S1b, { violations: 1, onNonCandidate: 0, outsideGoldCodes: 1 });
+  assert.deepEqual(r.S1b, { emitted: 1, violations: 1, unverifiable: 0, classes: { exactCandidate: 0, onNonCandidate: 0, inexactOnCandidate: 0, outsideGoldCodes: 1, inGap: 0, unlocated: 0 } });
 });
 
 test('aggregation sums counts per source and overall; ratios are not averaged; N/A survives', () => {
@@ -149,6 +149,74 @@ test('aggregation sums counts per source and overall; ratios are not averaged; N
   assert.equal(agg.DOU!.S1a.value, null); assert.equal(agg.DOU!.S1b.violations, 1);
   assert.deepEqual([agg.ALL!.S1a.denominator, agg.ALL!.S1b.violations], [12, 1]);
   assert.deepEqual(agg.ALL!.entries, ['a', 'b', 'c']);
+});
+
+// Adversarial reproductions of the EVAL-01 review findings (GPT/Codex, PR #244 review 5566614441).
+
+test('finding 1: a relation whose ends carry the wrong nomenclature (NCM↔NBM) is not a hit', () => {
+  const g = goldDoc(); const p = perfect(g);
+  for (const id of ['p-n2', 'p-n3', 'p-n4']) p.entities.find((e) => e.id === id)!.domain = 'NBM';
+  const r = evaluateEntry('99', 'SYN', g, p);
+  assert.deepEqual([r.M1.tp, r.M1.fp, r.M1.fn], [0, 1, 1], 'range with NBM ends');
+  assert.deepEqual([r.M2a.tp, r.M2a.fp, r.M2a.fn], [0, 1, 1], 'exception with one NBM target');
+  assert.equal(r.M2b.value, null, 'no M2a pair, so scope is N/A');
+  // A relation pointing to an entity id that does not exist never matches.
+  const q = perfect(g); q.relations.find((x) => x.kind === 'range')!.memberEntityIds = ['ghost', 'p-n3'];
+  assert.equal(evaluateEntry('99', 'SYN', g, q).M1.tp, 0);
+});
+
+test('finding 2: every positive ncm emission is classified; inexact and unlocated spans never disappear', () => {
+  const g = goldDoc(); const cand = at('8471.30.12');
+  const sel = (span: { start: number; end: number } | null) => ({ purpose: 'ncm' as const, positive: true, span });
+  const p = { ...perfect(g), selections: [
+    sel({ start: cand.start, end: cand.end - 1 }),          // inexact on a candidate
+    sel({ start: cand.start - 4, end: cand.end }),          // wider than the candidate
+    sel(null),                                              // no span
+    sel({ start: 5, end: 3 }),                              // inverted span
+    sel({ start: text.length, end: text.length + 4 }),      // outside the text
+    sel(cand),                                              // exact candidate
+  ] };
+  const r = evaluateEntry('99', 'SYN', g, p);
+  assert.deepEqual(r.S1b.classes, { exactCandidate: 1, onNonCandidate: 0, inexactOnCandidate: 2, outsideGoldCodes: 0, inGap: 0, unlocated: 3 });
+  assert.deepEqual([r.S1b.emitted, r.S1b.violations, r.S1b.unverifiable], [6, 2, 3]);
+  const sum = Object.values(r.S1b.classes).reduce((a, b) => a + b, 0);
+  assert.equal(sum, r.S1b.emitted, 'classes are exhaustive');
+});
+
+test('finding 3: emissions in declared gaps or unidentified parts are unverifiable, not proven violations', () => {
+  const g = goldDoc(); const law = at('Lei nº 1.234');
+  g.entities = g.entities.filter((e) => e.domain !== 'CITATION');
+  g.gaps = [{ kind: 'missing_attachment', span: law, resource: null, note: 'synthetic gap' }];
+  const tail = at('Capítulo 84');
+  g.parts.push(gp('u1', 'a1', 2, 'unidentified', { start: tail.end + 2, end: tail.end + 3 }, 'unknown'));
+  const p = { ...perfect(g), selections: [
+    { purpose: 'ncm' as const, positive: true, span: law },                                   // in a declared gap
+    { purpose: 'ncm' as const, positive: true, span: { start: tail.end + 2, end: tail.end + 3 } }, // in an unidentified part
+    { purpose: 'ncm' as const, positive: true, span: at('Art. 1º') },                           // annotated text, no code
+  ] };
+  const r = evaluateEntry('99', 'SYN', g, p);
+  assert.deepEqual([r.S1b.classes.inGap, r.S1b.classes.outsideGoldCodes, r.S1b.violations, r.S1b.unverifiable], [2, 1, 1, 2]);
+});
+
+test('finding 4: an omitted sibling cannot hide an inversion between its neighbours (E3)', () => {
+  const g = goldDoc();
+  const s = (n: number) => ({ start: 120 + n * 2, end: 121 + n * 2 });
+  g.parts = [g.parts[0]!, gp('x', 'doc', 0, 'body', s(0)), gp('y', 'doc', 1, 'body', s(1)), gp('z', 'doc', 2, 'body', s(2))];
+  g.entities = []; g.relations = [];
+  const p: Prediction = { parts: [pp('p-doc', null, 0, 'document', g.parts[0]!.span, 'unknown'), pp('pz', 'p-doc', 0, 'body', s(2)), pp('px', 'p-doc', 1, 'body', s(0))],
+    entities: [], relations: [], selections: [] };   // y omitted; z placed before x
+  const r = evaluateEntry('99', 'SYN', g, p);
+  assert.deepEqual([r.E3.numerator, r.E3.denominator], [0, 1], 'x→z inversion is caught despite the missing y');
+  const ok: Prediction = { ...p, parts: [p.parts[0]!, pp('px', 'p-doc', 0, 'body', s(0)), pp('pz', 'p-doc', 1, 'body', s(2))] };
+  assert.deepEqual([evaluateEntry('99', 'SYN', g, ok).E3.numerator, evaluateEntry('99', 'SYN', g, ok).E3.denominator], [1, 1]);
+});
+
+test('aggregation keeps the S1b classes and the exhaustive sum', () => {
+  const g = goldDoc();
+  const a = evaluateEntry('a', 'CONFAZ', g, { ...perfect(g), selections: [{ purpose: 'ncm', positive: true, span: null }] });
+  const b = evaluateEntry('b', 'DOU', g, { ...perfect(g), selections: [{ purpose: 'ncm', positive: true, span: at('8450.11.00') }] });
+  const agg = aggregate([a, b]).ALL!;
+  assert.deepEqual([agg.S1b.emitted, agg.S1b.violations, agg.S1b.unverifiable, agg.S1b.classes.unlocated, agg.S1b.classes.onNonCandidate], [2, 1, 1, 1, 1]);
 });
 
 test('static gold roles agree with the approved 01 matrix counts (no engine, no measurement)', () => {
