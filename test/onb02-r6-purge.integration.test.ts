@@ -110,37 +110,73 @@ async function fixture(trx:Transaction<DB>, scale:boolean) {
   return {q,tenant,company,actor,graph,expected,run:undefined,before:undefined};
 }
 
-test('ONB-02 R7: graph-only purge with 150k audits and recorded company graph; stages; global rows unchanged', {timeout:180000}, async()=>{
+test('ONB-02 R7: committed graph-only purge with 150k audits, stage timings and global rows unchanged', {timeout:180000}, async()=>{
   const db=isolatedDatabase();
+  let tenant:string|undefined;
   try {
-    await assert.rejects(db.transaction().execute(async trx=>{
-      const version=await sql<{server_version:string}>`SHOW server_version`.execute(trx);
-      assert.match(version.rows[0]!.server_version,/^18\./);
-      const f=await fixture(trx,true);
-      await f.q('ANALYZE audit_log');
-      await f.q('ANALYZE collection_items');
-      await f.q("SELECT set_config('app.onb02_measure','on',true)");
-      const start=performance.now();
+    const version=(await sql<{server_version:string}>`SHOW server_version`.execute(db)).rows[0]!.server_version;
+    assert.match(version,/^18\./);
+    // Persist the fixture first. Measurement excludes seeding but includes the
+    // actual purge transaction's BEGIN/context/timeouts/graph/audit/COMMIT.
+    const f=await db.transaction().execute(async trx=>{
+      const seeded=await fixture(trx,true);
+      tenant=seeded.tenant;
+      return seeded;
+    });
+    const q=async <T=Record<string,unknown>>(text:string,params:readonly unknown[]=[]) =>
+      (await db.executeQuery<T>(CompiledQuery.raw(text,params))).rows;
+    await q('ANALYZE audit_log');
+    await q('ANALYZE collection_items');
+    let metrics:Record<string,number>={};
+    const start=performance.now();
+    await db.transaction().execute(async trx=>{
+      await trx.executeQuery(CompiledQuery.raw(
+        "SELECT set_config('app.user_id',$1,true),set_config('app.tenant_id',$2,true),set_config('app.onb02_measure','on',true)",
+        [f.actor,f.tenant]));
       assert.equal(await purgeCompany(trx,f.company),true);
-      const clientMs=performance.now()-start;
-      const metrics=(await f.q<{metrics:Record<string,number>}>(`
-        SELECT current_setting('app.onb02_purge_metrics')::jsonb AS metrics`))[0]!.metrics;
-      for(const value of Object.values(await f.graph()))assert.equal(value,0);
-      const after=(await f.q<{n:string;hash:string}>(`SELECT count(*)::text n,
-        md5(string_agg(md5(to_jsonb(i)::text),'' ORDER BY i.id)) hash
-        FROM collection_items i WHERE collection_run_id=$1`,[f.run]))[0]!;
-      assert.deepEqual(after,f.before);
-      assert.equal(Number((await f.q<{n:string}>(`SELECT count(*)::text n FROM audit_log
-        WHERE tenant_id=$1 AND action='COMPANY_UPDATED'`,[f.tenant]))[0]!.n),150000);
-      assert.ok(metrics.total_ms<30000);
-      console.log('ONB02_R7_FULL_PURGE '+JSON.stringify({
-        postgres:version.rows[0]!.server_version,audit_rows:150000,collection_items:420000,
-        graph_rows:116,graph:f.expected,client_total_ms:clientMs,stage_ms:metrics,
-        preserved_global_rows:true,fixture:'synthetic row-count match; not production hardware/JSON distribution'
-      }));
-      throw new FixtureRollback();
-    }),FixtureRollback);
-  } finally { await db.destroy(); }
+      metrics=(await sql<{metrics:Record<string,number>}>`
+        SELECT current_setting('app.onb02_purge_metrics')::jsonb AS metrics`.execute(trx)).rows[0]!.metrics;
+    });
+    const clientMs=performance.now()-start;
+    const graph=(await q<{graph:Record<string,number>}>(`SELECT jsonb_build_object(
+    'companies',(SELECT count(*) FROM companies WHERE id=$1),
+    'establishments',(SELECT count(*) FROM establishments WHERE company_id=$1),
+    'company_tax_profiles',(SELECT count(*) FROM company_tax_profiles WHERE company_id=$1),
+    'company_cnaes',(SELECT count(*) FROM company_cnaes WHERE company_id=$1),
+    'establishment_cnaes',(SELECT count(*) FROM establishment_cnaes ec JOIN establishments e ON e.id=ec.establishment_id WHERE e.company_id=$1),
+    'company_product_profiles',(SELECT count(*) FROM company_product_profiles WHERE company_id=$1),
+    'company_product_ncms',(SELECT count(*) FROM company_product_ncms n JOIN company_product_profiles p ON p.id=n.company_product_profile_id WHERE p.company_id=$1),
+    'company_cnae_ncms',(SELECT count(*) FROM company_cnae_ncms WHERE company_id=$1),
+    'monitoring_profiles',(SELECT count(*) FROM monitoring_profiles WHERE company_id=$1),
+    'company_publications',(SELECT count(*) FROM company_publications WHERE company_id=$1),
+    'publication_matches',(SELECT count(*) FROM publication_matches pm JOIN monitoring_profiles mp ON mp.id=pm.monitoring_profile_id WHERE mp.company_id=$1)
+  ) AS graph`,[f.company]))[0]!.graph;
+    for(const value of Object.values(graph))assert.equal(value,0);
+    const after=(await q<{n:string;hash:string}>(`SELECT count(*)::text n,
+      md5(string_agg(md5(to_jsonb(i)::text),'' ORDER BY i.id)) hash
+      FROM collection_items i WHERE collection_run_id=$1`,[f.run]))[0]!;
+    assert.deepEqual(after,f.before);
+    assert.equal(Number((await q<{n:string}>(`SELECT count(*)::text n FROM audit_log
+      WHERE tenant_id=$1 AND action='COMPANY_UPDATED'`,[f.tenant]))[0]!.n),150000);
+    assert.equal(Number((await q<{n:string}>(`SELECT count(*)::text n FROM audit_log
+      WHERE tenant_id=$1 AND action='COMPANY_PURGED'`,[f.tenant]))[0]!.n),1);
+    assert.ok(clientMs<30000);
+    console.log('ONB02_R7_FULL_PURGE '+JSON.stringify({
+      postgres:version,audit_rows:150000,collection_items:420000,
+      graph_rows:116,graph:f.expected,client_total_ms:clientMs,stage_ms:metrics,
+      committed:true,includes_begin_context_and_commit:true,preserved_global_rows:true,
+      fixture:'committed synthetic row-count match; not production hardware/JSON distribution'
+    }));
+  } finally {
+    // Global synthetic collection evidence remains in this disposable CI database
+    // for the following tests; only this fixture's private account/audits are removed.
+    if(tenant){
+      await db.executeQuery(CompiledQuery.raw('DELETE FROM audit_log WHERE tenant_id=$1',[tenant]));
+      await db.executeQuery(CompiledQuery.raw('DELETE FROM app_users WHERE id IN (SELECT user_id FROM tenant_memberships WHERE tenant_id=$1)',[tenant]));
+      await db.executeQuery(CompiledQuery.raw('DELETE FROM tenants WHERE id=$1',[tenant]));
+    }
+    await db.destroy();
+  }
 });
 
 test('ONB-02 R7: service statement timeout cancels AFTER cascade and rolls back every stage', {timeout:60000}, async()=>{
