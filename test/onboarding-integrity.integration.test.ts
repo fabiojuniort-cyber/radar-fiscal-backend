@@ -171,22 +171,20 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
         uf: 'GO', typeCode: 'OTHER' },
     });
     assert.equal(implicit.statusCode, 409, implicit.body);
-    assert.equal(implicit.json<{ error: string }>().error, 'reactivation_required');
+    assert.equal(implicit.json<{ error: string }>().error, 'establishment_inactive_requires_deletion');
 
     const reactivation = await app.inject({
       method: 'POST', url: '/api/v1/establishments/manual', headers: a.headers,
       payload: { companyId, cnpj: branchCnpj, name: 'Não reescrever',
         uf: 'GO', typeCode: 'OTHER', reactivateInactive: true },
     });
-    assert.equal(reactivation.statusCode, 201, reactivation.body);
-    await assertReadback(reactivation.json());
-    assert.equal(reactivation.json().establishment.name, 'Filial autorizada');
-    assert.equal(reactivation.json<{ establishment: { id: string } }>().establishment.id, branchId);
+    assert.equal(reactivation.statusCode,410,reactivation.body);
+    assert.equal(reactivation.json<{error:string}>().error,'reactivation_removed');
     const afterReactivation = await admin.query<{ name: string; is_active: boolean }>(
       'SELECT name, is_active FROM establishments WHERE id = $1', [branchId]
     );
     assert.equal(afterReactivation.rows[0]?.name, 'Filial autorizada');
-    assert.equal(afterReactivation.rows[0]?.is_active, true);
+    assert.equal(afterReactivation.rows[0]?.is_active, false);
 
     // R3 contract: company purge removes private profile/establishment data.
     const otherTenantCompany = await app.inject({

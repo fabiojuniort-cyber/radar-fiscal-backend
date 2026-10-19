@@ -75,7 +75,7 @@ const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   businessLocationCode:
     businessLocationCodeSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 const companyUpdateBodySchema = z.object({
@@ -90,7 +90,7 @@ const establishmentFromCnpjBodySchema = z.object({
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
   businessLocationCode:
     businessLocationCodeSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 const cnaeBodySchema = z.object({
@@ -682,6 +682,11 @@ export async function productRoutes(
         return reply.status(400).send({ error: 'tenant_required' });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const registry = await lookupCnpjRegistry(
           request.body.cnpj,
@@ -713,7 +718,6 @@ export async function productRoutes(
               registry,
               stateRegistration,
               request.body.businessLocationCode,
-              request.body.reactivateInactive,
             );
             return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
           },
@@ -1375,6 +1379,11 @@ export async function productRoutes(
         return reply.status(400).send({ error: 'tenant_required' });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const registry = await lookupCnpjRegistry(request.body.cnpj);
         const stateRegistration =
@@ -1428,7 +1437,6 @@ export async function productRoutes(
                 request.body.typeCode,
                 stateRegistration,
                 request.body.businessLocationCode,
-                request.body.reactivateInactive,
               );
 
             return readRegistrationEstablishment(trx, establishmentId);

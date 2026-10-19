@@ -1018,10 +1018,11 @@ test(
           url: '/api/v1/companies/' + registryBody.company.id + '/establishments/from-cnpj',
           headers: firstHeaders, payload: { cnpj: branchRegistryCnpj, typeCode: 'OTHER',
             businessLocationCode: 'NÃO-REESCREVER', reactivateInactive: true } });
-        assert.equal(reactivatedBranch.statusCode, 201, reactivatedBranch.body);
-        assert.equal(reactivatedBranch.json().establishment.id, branchId);
-        assert.equal(reactivatedBranch.json().establishment.businessLocationCode, 'FILIAL-003');
-        await assertRegistryReadback(reactivatedBranch.json());
+        assert.equal(reactivatedBranch.statusCode,410,reactivatedBranch.body);
+        assert.equal(reactivatedBranch.json().error,'reactivation_removed');
+        const stored=await admin.query<{is_active:boolean}>(
+          'SELECT is_active FROM establishments WHERE id=$1',[branchId]);
+        assert.equal(stored.rows[0]?.is_active,false);
 
         const deleteRegistryCompany =
           await app.inject({

@@ -5,6 +5,69 @@
 -- REVIEW GATE: confirm all company-specific FKs and audit/retention obligations
 -- against the current PostgreSQL schema before merge/deploy.
 
+-- ONB-02 R4: redact only strongly attributable historical audit values.
+-- Literal matching avoids regex injection and preserves audit structure.
+CREATE OR REPLACE FUNCTION public.onb02_redact_literal_ci(p_text TEXT,p_needle TEXT,p_mask TEXT)
+RETURNS TEXT LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog AS $lit$
+DECLARE v_rest TEXT:=p_text; v_out TEXT:=''; v_at INTEGER;
+BEGIN
+ IF p_text IS NULL OR p_needle IS NULL OR p_needle='' THEN RETURN p_text; END IF;
+ LOOP
+  v_at:=strpos(lower(v_rest),lower(p_needle));
+  EXIT WHEN v_at=0;
+  v_out:=v_out||substr(v_rest,1,v_at-1)||p_mask;
+  v_rest:=substr(v_rest,v_at+char_length(p_needle));
+ END LOOP;
+ RETURN v_out||v_rest;
+END;
+$lit$;
+
+CREATE OR REPLACE FUNCTION public.onb02_redact_audit_json(p_json JSONB,p_ids TEXT[],p_cnpjs TEXT[],p_names TEXT[])
+RETURNS JSONB LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,public AS $mask$
+DECLARE v_type TEXT; v_text TEXT; v_needle TEXT; v_fmt TEXT; v_key TEXT; v_child JSONB; v_result JSONB;
+BEGIN
+ IF p_json IS NULL THEN RETURN NULL; END IF;
+ v_type:=jsonb_typeof(p_json);
+ IF v_type='string' OR v_type='number' THEN
+  v_text:=CASE WHEN v_type='string' THEN p_json #>> '{}' ELSE p_json::text END;
+  FOREACH v_needle IN ARRAY coalesce(p_ids,ARRAY[]::text[]) LOOP
+    v_text:=public.onb02_redact_literal_ci(v_text,v_needle,'[ID_MASCARADO]');
+  END LOOP;
+  FOREACH v_needle IN ARRAY coalesce(p_cnpjs,ARRAY[]::text[]) LOOP
+    v_text:=public.onb02_redact_literal_ci(v_text,v_needle,'[CNPJ_MASCARADO]');
+    IF char_length(v_needle)=14 THEN
+      v_fmt:=substr(v_needle,1,2)||'.'||substr(v_needle,3,3)||'.'||substr(v_needle,6,3)||
+             '/'||substr(v_needle,9,4)||'-'||substr(v_needle,13,2);
+      v_text:=public.onb02_redact_literal_ci(v_text,v_fmt,'[CNPJ_MASCARADO]');
+    END IF;
+  END LOOP;
+  FOREACH v_needle IN ARRAY coalesce(p_names,ARRAY[]::text[]) LOOP
+    v_text:=public.onb02_redact_literal_ci(v_text,v_needle,'[NOME_EMPRESA_MASCARADO]');
+  END LOOP;
+  IF v_type='number' AND v_text=p_json::text THEN RETURN p_json; END IF;
+  RETURN to_jsonb(v_text);
+ ELSIF v_type='object' THEN
+  v_result:='{}'::jsonb;
+  FOR v_key,v_child IN SELECT key,value FROM jsonb_each(p_json) LOOP
+    v_result:=v_result||jsonb_build_object(v_key,
+      public.onb02_redact_audit_json(v_child,p_ids,p_cnpjs,p_names));
+  END LOOP;
+  RETURN v_result;
+ ELSIF v_type='array' THEN
+  v_result:='[]'::jsonb;
+  FOR v_child IN SELECT value FROM jsonb_array_elements(p_json) LOOP
+    v_result:=v_result||jsonb_build_array(
+      public.onb02_redact_audit_json(v_child,p_ids,p_cnpjs,p_names));
+  END LOOP;
+  RETURN v_result;
+ END IF;
+ RETURN p_json;
+END;
+$mask$;
+
+REVOKE ALL ON FUNCTION public.onb02_redact_literal_ci(TEXT,TEXT,TEXT) FROM PUBLIC,radar_app,radar_worker;
+REVOKE ALL ON FUNCTION public.onb02_redact_audit_json(JSONB,TEXT[],TEXT[],TEXT[]) FROM PUBLIC,radar_app,radar_worker;
+
 CREATE OR REPLACE FUNCTION public.app_purge_company(
     p_company_id UUID
 )
@@ -22,6 +85,9 @@ DECLARE
     v_onboarding_cnpj CHAR(14);
     v_onboarding_name TEXT;
     v_account_name TEXT;
+    v_private_ids TEXT[];
+    v_private_cnpjs TEXT[];
+    v_private_names TEXT[];
 BEGIN
     IF v_tenant IS NULL OR v_actor IS NULL
        OR NOT public.app_user_is_tenant_admin(v_tenant) THEN
@@ -111,6 +177,58 @@ BEGIN
         RAISE EXCEPTION 'company_purge_legacy_identity_ambiguous'
             USING ERRCODE = '23514';
     END IF;
+
+    -- Gather private identifiers before cascading. Do not include tenant, user, or global acts.
+    SELECT coalesce(array_agg(DISTINCT ref),ARRAY[]::text[]) INTO v_private_ids FROM (
+      SELECT id::text AS ref FROM public.companies WHERE id=p_company_id
+      UNION ALL SELECT id::text FROM public.establishments WHERE company_id=p_company_id
+      UNION ALL SELECT id::text FROM public.company_tax_profiles WHERE company_id=p_company_id
+      UNION ALL SELECT id::text FROM public.company_product_profiles WHERE company_id=p_company_id
+      UNION ALL SELECT id::text FROM public.monitoring_profiles WHERE company_id=p_company_id
+      UNION ALL SELECT id::text FROM public.company_publications WHERE company_id=p_company_id
+      UNION ALL SELECT id::text FROM public.publication_matches
+       WHERE monitoring_profile_id IN (SELECT id FROM public.monitoring_profiles WHERE company_id=p_company_id)
+          OR company_publication_id IN (SELECT id FROM public.company_publications WHERE company_id=p_company_id)
+    ) refs;
+    SELECT coalesce(array_agg(DISTINCT ref),ARRAY[]::text[]) INTO v_private_cnpjs FROM (
+      SELECT regexp_replace(head_office_cnpj::text,'[^0-9]','','g') AS ref
+       FROM public.companies WHERE id=p_company_id
+      UNION ALL SELECT regexp_replace(cnpj::text,'[^0-9]','','g')
+       FROM public.establishments WHERE company_id=p_company_id
+    ) refs;
+    SELECT coalesce(array_agg(DISTINCT name),ARRAY[]::text[]) INTO v_private_names FROM (
+      SELECT legal_name AS name FROM public.companies WHERE id=p_company_id
+      UNION ALL SELECT trade_name FROM public.companies WHERE id=p_company_id
+      UNION ALL SELECT name FROM public.establishments WHERE company_id=p_company_id
+    ) names WHERE name IS NOT NULL AND btrim(name)<>'';
+
+    -- Strong ownership gate: tenant AND an owned UUID/CNPJ. Never redact merely
+    -- because a shared account or another company mentions the same display name.
+    UPDATE public.audit_log a
+       SET entity_id=CASE WHEN a.entity_id=ANY(v_private_ids) THEN NULL ELSE a.entity_id END,
+           before_data=public.onb02_redact_audit_json(a.before_data,v_private_ids,v_private_cnpjs,v_private_names),
+           after_data=public.onb02_redact_audit_json(a.after_data,v_private_ids,v_private_cnpjs,v_private_names)
+     WHERE a.tenant_id=v_tenant AND (
+       a.entity_id=ANY(v_private_ids)
+       OR EXISTS (
+         SELECT 1 FROM unnest(v_private_ids) AS r(id)
+          WHERE strpos(coalesce(a.before_data::text,''),r.id)>0
+             OR strpos(coalesce(a.after_data::text,''),r.id)>0
+       )
+       OR EXISTS (
+         SELECT 1 FROM unnest(v_private_cnpjs) AS r(cnpj)
+          WHERE strpos(coalesce(a.before_data::text,''),r.cnpj)>0
+             OR strpos(coalesce(a.after_data::text,''),r.cnpj)>0
+             OR (char_length(r.cnpj)=14 AND (
+                strpos(coalesce(a.before_data::text,''),
+                  substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
+                  '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
+                OR strpos(coalesce(a.after_data::text,''),
+                  substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
+                  '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
+             ))
+       )
+     );
 
     -- publication_matches has a NO ACTION FK to monitoring_profiles, so
     -- delete those matches explicitly before cascading profiles. This does

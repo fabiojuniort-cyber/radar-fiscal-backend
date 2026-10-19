@@ -86,10 +86,12 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       VALUES($1,'6201501')
     `,[branch.id]);
     await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
       VALUES($1,'USER','ONB02_CI_BRANCH_HISTORICAL','establishment',$2,
-        jsonb_build_object('branch_id',$2::text))
-    `,[a.tenantId,branch.id]);
+        jsonb_build_object('branch_id',$2::text,'cnpj',$3::text,'name','Filial de teste ONB02',
+          'nested',jsonb_build_array(jsonb_build_object('legal','Empresa Legada Excluir'))),
+        jsonb_build_object('cnpj',$3::text))
+    `,[a.tenantId,branch.id,branchCnpj]);
 
     // Immutable shared catalogue fixture, never a company-owned row.
     await admin.query(`
@@ -533,13 +535,22 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(await count('company_cnaes','company_id',target.company.id),0);
     assert.equal(await count('establishments','id',branch.id),0);
     assert.equal(await count('establishment_cnaes','establishment_id',branch.id),0);
-    // Existing security audit is retained by current retention policy; it
-    // is independently classified and is not proof of complete PII erasure.
-    assert.equal(Number((await admin.query<{total:string}>(`
-      SELECT count(*)::text AS total FROM audit_log
-      WHERE tenant_id=$1 AND entity_type='establishment'
-        AND entity_id=$2 AND action='ONB02_CI_BRANCH_HISTORICAL'
-    `,[a.tenantId,branch.id])).rows[0]!.total),1);
+    // R4: the original event is preserved with its private values redacted.
+    const oldAudit=(await admin.query<{
+      entity_id:string|null;before_data:any;after_data:any;action:string;
+    }>(`
+      SELECT entity_id,before_data,after_data,action FROM audit_log
+      WHERE tenant_id=$1 AND action='ONB02_CI_BRANCH_HISTORICAL'
+    `,[a.tenantId])).rows[0]!;
+    assert.equal(oldAudit.action,'ONB02_CI_BRANCH_HISTORICAL');
+    assert.equal(oldAudit.entity_id,null);
+    assert.equal(oldAudit.before_data.branch_id,'[ID_MASCARADO]');
+    assert.equal(oldAudit.before_data.cnpj,'[CNPJ_MASCARADO]');
+    assert.equal(oldAudit.before_data.name,'[NOME_EMPRESA_MASCARADO]');
+    assert.equal(oldAudit.before_data.nested[0].legal,'[NOME_EMPRESA_MASCARADO]');
+    assert.equal(oldAudit.after_data.cnpj,'[CNPJ_MASCARADO]');
+    assert.equal(JSON.stringify(oldAudit).includes(branch.id),false);
+    assert.equal(JSON.stringify(oldAudit).includes(branchCnpj),false);
     assert.deepEqual(await stableRows('companies','id',[sibling.company.id,remote.company.id]),siblingsBefore);
     assert.deepEqual(await stableRows('company_publications','id',[refsA2.cp,refsB.cp]),otherCpsBefore);
     assert.deepEqual(await stableRows('monitoring_profiles','id',[refsA2.mp,refsB.mp]),otherMpsBefore);
@@ -580,6 +591,8 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(await count('company_tax_profiles','company_id',recreate.company.id),0);
     assert.equal(await count('company_product_profiles','company_id',recreate.company.id),0);
     assert.equal(await count('company_publications','company_id',recreate.company.id),0);
+    assert.equal(await count('monitoring_profiles','company_id',recreate.company.id),0);
+    assert.equal(await count('company_cnae_ncms','company_id',recreate.company.id),0);
 
     // Ambiguity B2: another company using the same display name MUST block,
     // even when legacy onboarding contains an explicit target CNPJ.
