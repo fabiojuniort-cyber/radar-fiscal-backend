@@ -131,6 +131,10 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run db:prepare
 
+      - name: Clean synthetic legacy audit fixtures before regression (isolated CI only)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7
+
       - name: NEWS worker privilege policy
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: node dist/infrastructure/database/verify-news-worker-runtime-role.js
@@ -304,6 +308,8 @@ jobs:
       - run: npm run build
       - name: Apply complete migrations including ONB-01 042 and 043
         run: npm run db:prepare
+      - name: Clean synthetic legacy audit fixtures (isolated PG18 only)
+        run: node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7
       - name: Verify onboarding migration on PostgreSQL 18
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 -Atc "

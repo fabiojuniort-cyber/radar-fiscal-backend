@@ -490,7 +490,7 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
             id, tenant_id, actor_type, action, entity_type
           )
           VALUES (
-            $1, $2, 'ADMIN', 'TENANT_PRIVATE_TEST', 'taxonomy_test'
+            $1, $2, 'ADMIN', 'COMPANY_UPDATED', 'company'
           )
         `,
         [tenantAuditId, tenantId],
@@ -503,7 +503,7 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
               id, tenant_id, actor_type, action, entity_type
             )
             VALUES (
-              $1, NULL, 'ADMIN', 'TAXONOMY_TEST', 'taxonomy_release'
+              $1, NULL, 'ADMIN', 'TAXONOMY_RELEASE_CREATED', 'taxonomy_release'
             )
           `,
           [globalAuditId],
@@ -531,7 +531,7 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
                 tenant_id, actor_type, action, entity_type
               )
               VALUES (
-                $1, 'ADMIN', 'FORBIDDEN_TENANT_AUDIT', 'taxonomy_test'
+                $1, 'ADMIN', 'COMPANY_UPDATED', 'company'
               )
             `,
             [tenantId],
@@ -545,7 +545,7 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
                 tenant_id, actor_type, action, entity_type
               )
               VALUES (
-                NULL, 'USER', 'FORBIDDEN_USER_AUDIT', 'taxonomy_test'
+                NULL, 'USER', 'TAXONOMY_RELEASE_CREATED', 'taxonomy_release'
               )
             `,
           ),
