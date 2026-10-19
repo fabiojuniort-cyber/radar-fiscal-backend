@@ -35,7 +35,7 @@ async function legacy(pool:Pool,tenant:string,rows:Array<{
         before_data,after_data,audit_policy_version,occurred_at)
       VALUES($1,'SYSTEM',$2,$3,$4,$5::jsonb,$5::jsonb,$6,'2025-01-02T03:04:05Z')`,
       [tenant,row.actor,row.action??'COMPANY_UPDATED',row.entity??'company',
-        JSON.stringify(row.payload),row.version??0]);
+        row.payload===null ? null : JSON.stringify(row.payload),row.version??0]);
     await client.query('ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard');
     await client.query('COMMIT');
   } catch(error) {await client.query('ROLLBACK');throw error;}
@@ -83,6 +83,9 @@ test('R7.2 historical authors: private values redacted including marked v1; resu
     const select=()=>pool.query(`SELECT id,actor_id,action,entity_type,occurred_at,
       before_data,after_data,audit_policy_version,correlation_id,tenant_id FROM audit_log
       WHERE tenant_id=$1 ORDER BY id`,[tenant]);
+    assert.equal(Number((await pool.query(`SELECT count(*) n FROM audit_log
+      WHERE tenant_id=$1 AND before_data IS NULL AND after_data IS NULL`,[tenant])).rows[0].n),1,
+      'fixture must contain SQL NULL, not the JSON null scalar');
     const before=(await select()).rows;
     const plan=await planAuditBackfill(pool);
     assert.equal(plan.pending,10,'invalid v1 authors are pending too');
