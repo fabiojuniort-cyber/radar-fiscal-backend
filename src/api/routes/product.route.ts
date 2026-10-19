@@ -560,8 +560,10 @@ export async function productRoutes(
               },
               onboarding: onboarding
                 ? {
-                    companyName: onboarding.company_name,
-                    cnpj: onboarding.cnpj,
+                    // R4: account identity/consent is retained, but the legacy
+                    // onboarding identity is NEVER offered as a new company's preset.
+                    companyName: null,
+                    cnpj: null,
                     createdAt: new Date(onboarding.created_at).toISOString(),
                   }
                 : null,

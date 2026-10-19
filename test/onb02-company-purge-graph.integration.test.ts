@@ -464,6 +464,16 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       [a.tenantId,cnpjA]);
     await admin.query('UPDATE tenants SET name=$2 WHERE id=$1',
       [a.tenantId,'Empresa Legada Excluir']);
+    // D2 R4: even before purge, account APIs must not prefill from legacy identity.
+    const accountBeforePurge = await app.inject({
+      method:'GET', url:'/api/v1/account', headers:a.headers,
+    });
+    assert.equal(accountBeforePurge.statusCode,200);
+    const onboardBefore = accountBeforePurge.json<{
+      onboarding: {cnpj:string|null;companyName:string|null}|null;
+    }>().onboarding;
+    assert.equal(onboardBefore?.cnpj,null);
+    assert.equal(onboardBefore?.companyName,null);
 
     // Before purge the graph MUST be populated: zero-count assertions are not proof.
     const populated = [
