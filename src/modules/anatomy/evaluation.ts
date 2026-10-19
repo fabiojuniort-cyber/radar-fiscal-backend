@@ -68,13 +68,23 @@ export function goldCodeRoles(gold: AnatomyGold): { nonCandidates: Span[]; candi
  * - exactCandidate: span equals a structural candidate (not a violation of exclusion);
  * - onNonCandidate: touches a gold non-candidate code (proven violation);
  * - inexactOnCandidate: touches a candidate without its exact span (proven violation: the gold fixes the code span);
- * - outsideGoldCodes: touches no gold code, in annotated text (proven violation, e.g. an invented positive);
- * - inGap: touches no gold code but lies in a declared gap or unidentified part (unverifiable, not proven);
+ * - outsideGoldCodes: touches no gold code and lies entirely inside a region PROVEN to be fully annotated
+ *   (`options.annotationCoverage`, given in memory apart from the gold) — proven violation, e.g. an invented positive;
+ * - pendingCoverage: touches no gold code and coverage of that text is not proven — pending, never a violation;
+ * - inGap: touches no gold code and lies in a declared gap or unidentified part (unverifiable, not proven);
  * - unlocated: no valid span inside the text (unverifiable, reported).
  */
-export interface S1Classes { exactCandidate: number; onNonCandidate: number; inexactOnCandidate: number; outsideGoldCodes: number; inGap: number; unlocated: number }
+export interface S1Classes { exactCandidate: number; onNonCandidate: number; inexactOnCandidate: number; outsideGoldCodes: number; pendingCoverage: number; inGap: number; unlocated: number }
 export interface S1b { emitted: number; violations: number; unverifiable: number; classes: S1Classes }
-const s1b = (emitted: number, c: S1Classes): S1b => ({ emitted, violations: c.onNonCandidate + c.inexactOnCandidate + c.outsideGoldCodes, unverifiable: c.inGap + c.unlocated, classes: c });
+const s1b = (emitted: number, c: S1Classes): S1b => ({ emitted, violations: c.onNonCandidate + c.inexactOnCandidate + c.outsideGoldCodes,
+  unverifiable: c.pendingCoverage + c.inGap + c.unlocated, classes: c });
+
+/**
+ * Evaluation options kept OUT of the gold: approved golds are never edited to carry them.
+ * `annotationCoverage` lists canonical-text regions proven to be fully annotated for nomenclature codes; without it,
+ * an emission over text with no gold code is pending, not a violation.
+ */
+export interface EvaluationOptions { annotationCoverage?: Span[] }
 
 export interface EntryEvaluation {
   version: typeof EVALUATION_VERSION; id: string; source: string;
@@ -85,7 +95,7 @@ export interface EntryEvaluation {
   C1: Ratio | NotApplicable;
 }
 
-export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pred: Prediction): EntryEvaluation {
+export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pred: Prediction, options: EvaluationOptions = {}): EntryEvaluation {
   // E1 — parts, root excluded.
   const gParts = gold.parts.filter((p) => p.type !== 'document'); const pParts = pred.parts.filter((p) => p.type !== 'document');
   const partKey = (p: { type: string; span: Span }) => `${p.type}|${sk(p.span)}`;
@@ -99,16 +109,18 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
     const parentPair = pairOf.get(g.parentId); if (!parentPair) continue;
     e2d++; if (p.parentId === parentPair.id) e2n++;
   }
-  // E3 — among the MATCHED gold siblings (in gold order), each consecutive pair keeps its relative order under the
-  // same predicted parent. Pairing only matched siblings means an omitted sibling cannot hide an inversion around it.
+  // E3 — EVERY pair of matched gold siblings (n·(n−1)/2 per parent, in gold order) must keep its relative order under
+  // the same predicted parent. All pairs, not only neighbours, so partial inversions and omissions are both counted.
   const siblings = new Map<string | null, typeof gParts>();
   for (const g of gParts) siblings.set(g.parentId, [...(siblings.get(g.parentId) ?? []), g]);
   let e3n = 0; let e3d = 0;
   for (const list of siblings.values()) {
     const matched = [...list].sort((a, b) => a.order - b.order).map((g) => pairOf.get(g.id)).filter((p): p is PredictedPart => p !== undefined);
-    for (let i = 1; i < matched.length; i++) {
-      const a = matched[i - 1]!; const b = matched[i]!;
-      e3d++; if (a.parentId === b.parentId && a.order < b.order) e3n++;
+    for (let i = 0; i < matched.length; i++) {
+      for (let j = i + 1; j < matched.length; j++) {
+        const a = matched[i]!; const b = matched[j]!;
+        e3d++; if (a.parentId === b.parentId && a.order < b.order) e3n++;
+      }
     }
   }
   // E4 — context over matched parts, with confusion counts gold→pred.
@@ -146,7 +158,7 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
   // Range: operator + both ends in order. Exception: operator + the SET of targets (order-free).
   const relKey = (refs: Map<string, string>, side: 'g' | 'p') => (r: { operatorSpan: Span | null; memberEntityIds: string[]; targetEntityIds: string[]; kind: string }) => {
     const ends = (r.kind === 'range' ? r.memberEntityIds : r.targetEntityIds).map((i) => refs.get(i) ?? `unresolved:${side}:${i}`);
-    if (r.kind !== 'range') ends.sort();
+    if (r.kind !== 'range') return `${r.kind}|${sk(r.operatorSpan)}|${[...new Set(ends)].sort().join(',')}`; // targets are a set: repeats collapse
     return `${r.kind}|${sk(r.operatorSpan)}|${ends.join(',')}`;
   };
   const gRanges = gold.relations.filter((r) => r.kind === 'range'); const pRanges = pred.relations.filter((r) => r.kind === 'range');
@@ -165,7 +177,9 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
   const S1a = ratio(roles.nonCandidates.filter((n) => located.some((s) => overlaps(n, s))).length, roles.nonCandidates.length);
   // Regions the gold does not vouch for: declared gaps with a span and parts annotated as unidentified.
   const unverifiedRegions = [...gold.gaps.flatMap((g) => (g.span ? [g.span] : [])), ...gold.parts.filter((p) => p.type === 'unidentified').map((p) => p.span)];
-  const classes: S1Classes = { exactCandidate: 0, onNonCandidate: 0, inexactOnCandidate: 0, outsideGoldCodes: 0, inGap: 0, unlocated: 0 };
+  const classes: S1Classes = { exactCandidate: 0, onNonCandidate: 0, inexactOnCandidate: 0, outsideGoldCodes: 0, pendingCoverage: 0, inGap: 0, unlocated: 0 };
+  const proven = (options.annotationCoverage ?? []).filter(validSpan);
+  const insideProven = (s: Span) => proven.some((r) => r.start <= s.start && s.end <= r.end);
   for (const s of positives) {
     const span = s.span;
     if (!validSpan(span)) classes.unlocated++;
@@ -173,7 +187,8 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
     else if (roles.candidates.some((c) => c.start === span.start && c.end === span.end)) classes.exactCandidate++;
     else if (roles.candidates.some((c) => overlaps(c, span))) classes.inexactOnCandidate++;
     else if (unverifiedRegions.some((r) => overlaps(r, span))) classes.inGap++;
-    else classes.outsideGoldCodes++;
+    else if (insideProven(span)) classes.outsideGoldCodes++;
+    else classes.pendingCoverage++;
   }
   const C1 = pred.coverage ? ratio(pred.coverage.recognizedLength, pred.coverage.textLength) : { ...NA, reason: 'prediction carries no coverage' };
   return { version: EVALUATION_VERSION, id, source,

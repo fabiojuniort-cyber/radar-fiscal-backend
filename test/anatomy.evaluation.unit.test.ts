@@ -27,6 +27,7 @@ function goldDoc(): AnatomyGold {
       { id: 'x1', kind: 'exception', operatorSpan: at('exceto'), memberEntityIds: [], targetEntityIds: ['n4', 'n5'], scopeSpan: { start: at('exceto').start, end: at('8471.60.00').end }, condition: null }],
     gaps: [], review: { reviewer: null, status: 'requested', reviewedAt: null, approvedContentSha256: null, notes: '' } };
 }
+const FULL = { annotationCoverage: [{ start: 0, end: text.length }] }; // synthetic text is fully annotated
 const pp = (id: string, parentId: string | null, order: number, type: string, span: { start: number; end: number }, context = 'operative_candidate', table: PredictedPart['table'] = null): PredictedPart => ({ id, parentId, order, type, span, context, table });
 /** A prediction identical to the gold structure; tests then perturb copies of it. */
 function perfect(g: AnatomyGold): Prediction {
@@ -119,9 +120,9 @@ test('S1: denominator from the gold; each hit span once in S1a; raw emissions an
     { purpose: 'thematic_text', positive: true, span: at('8471.60.00') }, // thematic channel: ignored
     { purpose: 'ncm', positive: true, span: at('Lei nº') },          // invented over no gold code
   ];
-  const r = evaluateEntry('99', 'SYN', g, p);
+  const r = evaluateEntry('99', 'SYN', g, p, FULL);
   assert.deepEqual([r.S1a.numerator, r.S1a.denominator], [2, 6]);
-  assert.deepEqual(r.S1b, { emitted: 5, violations: 4, unverifiable: 0, classes: { exactCandidate: 1, onNonCandidate: 3, inexactOnCandidate: 0, outsideGoldCodes: 1, inGap: 0, unlocated: 0 } });
+  assert.deepEqual(r.S1b, { emitted: 5, violations: 4, unverifiable: 0, classes: { exactCandidate: 1, onNonCandidate: 3, inexactOnCandidate: 0, outsideGoldCodes: 1, pendingCoverage: 0, inGap: 0, unlocated: 0 } });
   // Matching does not change the S1 denominator.
   const empty = evaluateEntry('99', 'SYN', g, { parts: [], entities: [], relations: [], selections: [] });
   assert.equal(empty.S1a.denominator, 6);
@@ -129,9 +130,9 @@ test('S1: denominator from the gold; each hit span once in S1a; raw emissions an
 
 test('S1b flags invented positives in a document without codes, where S1a is N/A', () => {
   const g = goldDoc(); g.entities = g.entities.filter((e) => e.domain === 'CITATION'); g.relations = [];
-  const r = evaluateEntry('98', 'SYN', g, { ...perfect(g), selections: [{ purpose: 'ncm', positive: true, span: at('Art. 1º') }] });
+  const r = evaluateEntry('98', 'SYN', g, { ...perfect(g), selections: [{ purpose: 'ncm', positive: true, span: at('Art. 1º') }] }, FULL);
   assert.equal(r.S1a.value, null);
-  assert.deepEqual(r.S1b, { emitted: 1, violations: 1, unverifiable: 0, classes: { exactCandidate: 0, onNonCandidate: 0, inexactOnCandidate: 0, outsideGoldCodes: 1, inGap: 0, unlocated: 0 } });
+  assert.deepEqual(r.S1b, { emitted: 1, violations: 1, unverifiable: 0, classes: { exactCandidate: 0, onNonCandidate: 0, inexactOnCandidate: 0, outsideGoldCodes: 1, pendingCoverage: 0, inGap: 0, unlocated: 0 } });
 });
 
 test('aggregation sums counts per source and overall; ratios are not averaged; N/A survives', () => {
@@ -140,7 +141,7 @@ test('aggregation sums counts per source and overall; ratios are not averaged; N
   const p = perfect(g); p.entities = p.entities.filter((e) => e.domain !== 'NCM');
   const bad = evaluateEntry('b', 'CONFAZ', g, p);
   const g2 = goldDoc(); g2.entities = []; g2.relations = [];
-  const dou = evaluateEntry('c', 'DOU', g2, { ...perfect(g2), selections: [{ purpose: 'ncm', positive: true, span: at('Art. 1º') }] });
+  const dou = evaluateEntry('c', 'DOU', g2, { ...perfect(g2), selections: [{ purpose: 'ncm', positive: true, span: at('Art. 1º') }] }, FULL);
   const agg = aggregate([good, bad, dou]);
   assert.deepEqual(Object.keys(agg).sort(), ['ALL', 'CONFAZ', 'DOU']);
   assert.deepEqual([agg.CONFAZ!.R1.tp, agg.CONFAZ!.R1.fp, agg.CONFAZ!.R1.fn], [6, 0, 6]);
@@ -177,7 +178,7 @@ test('finding 2: every positive ncm emission is classified; inexact and unlocate
     sel(cand),                                              // exact candidate
   ] };
   const r = evaluateEntry('99', 'SYN', g, p);
-  assert.deepEqual(r.S1b.classes, { exactCandidate: 1, onNonCandidate: 0, inexactOnCandidate: 2, outsideGoldCodes: 0, inGap: 0, unlocated: 3 });
+  assert.deepEqual(r.S1b.classes, { exactCandidate: 1, onNonCandidate: 0, inexactOnCandidate: 2, outsideGoldCodes: 0, pendingCoverage: 0, inGap: 0, unlocated: 3 });
   assert.deepEqual([r.S1b.emitted, r.S1b.violations, r.S1b.unverifiable], [6, 2, 3]);
   const sum = Object.values(r.S1b.classes).reduce((a, b) => a + b, 0);
   assert.equal(sum, r.S1b.emitted, 'classes are exhaustive');
@@ -194,7 +195,7 @@ test('finding 3: emissions in declared gaps or unidentified parts are unverifiab
     { purpose: 'ncm' as const, positive: true, span: { start: tail.end + 2, end: tail.end + 3 } }, // in an unidentified part
     { purpose: 'ncm' as const, positive: true, span: at('Art. 1º') },                           // annotated text, no code
   ] };
-  const r = evaluateEntry('99', 'SYN', g, p);
+  const r = evaluateEntry('99', 'SYN', g, p, FULL);
   assert.deepEqual([r.S1b.classes.inGap, r.S1b.classes.outsideGoldCodes, r.S1b.violations, r.S1b.unverifiable], [2, 1, 1, 2]);
 });
 
@@ -217,6 +218,55 @@ test('aggregation keeps the S1b classes and the exhaustive sum', () => {
   const b = evaluateEntry('b', 'DOU', g, { ...perfect(g), selections: [{ purpose: 'ncm', positive: true, span: at('8450.11.00') }] });
   const agg = aggregate([a, b]).ALL!;
   assert.deepEqual([agg.S1b.emitted, agg.S1b.violations, agg.S1b.unverifiable, agg.S1b.classes.unlocated, agg.S1b.classes.onNonCandidate], [2, 1, 1, 1, 1]);
+});
+
+// R2 of the EVAL-01 review (GPT/Codex, PR #244 review 5566651307).
+
+function threeSiblings(orders: [number, number, number]) {
+  const g = goldDoc(); const s = (n: number) => ({ start: 120 + n * 2, end: 121 + n * 2 });
+  g.parts = [g.parts[0]!, gp('x', 'doc', 0, 'body', s(0)), gp('y', 'doc', 1, 'body', s(1)), gp('z', 'doc', 2, 'body', s(2))]; g.entities = []; g.relations = [];
+  const p: Prediction = { parts: [pp('p-doc', null, 0, 'document', g.parts[0]!.span, 'unknown'),
+    pp('px', 'p-doc', orders[0], 'body', s(0)), pp('py', 'p-doc', orders[1], 'body', s(1)), pp('pz', 'p-doc', orders[2], 'body', s(2))], entities: [], relations: [], selections: [] };
+  const r = evaluateEntry('99', 'SYN', g, p).E3; return [r.numerator, r.denominator];
+}
+
+test('E3 counts every pair of matched siblings: [2,0,1] → 1/3, perfect → 3/3, reversed → 0/3', () => {
+  assert.deepEqual(threeSiblings([2, 0, 1]), [1, 3]);
+  assert.deepEqual(threeSiblings([0, 1, 2]), [3, 3]);
+  assert.deepEqual(threeSiblings([2, 1, 0]), [0, 3]);
+  assert.deepEqual(threeSiblings([1, 0, 2]), [2, 3]);
+});
+
+test('S1: without proven annotation coverage an emission over text with no gold code is pending, never a violation', () => {
+  const g = goldDoc(); const law = at('Lei nº 1.234'); const art1 = at('Art. 1º');
+  const p = { ...perfect(g), selections: [{ purpose: 'ncm' as const, positive: true, span: law }, { purpose: 'ncm' as const, positive: true, span: art1 }] };
+  const none = evaluateEntry('99', 'SYN', g, p).S1b;
+  assert.deepEqual([none.classes.pendingCoverage, none.classes.outsideGoldCodes, none.violations, none.unverifiable], [2, 0, 0, 2]);
+  // Coverage proven only for the article opening: that emission becomes a proven violation; the other stays pending.
+  const part = evaluateEntry('99', 'SYN', g, p, { annotationCoverage: [{ start: 0, end: art1.end }] }).S1b;
+  assert.deepEqual([part.classes.outsideGoldCodes, part.classes.pendingCoverage, part.violations], [1, 1, 1]);
+  // An emission only partly inside the proven region is still pending.
+  const edge = evaluateEntry('99', 'SYN', g, p, { annotationCoverage: [{ start: 0, end: law.start + 2 }] }).S1b;
+  assert.equal(edge.classes.pendingCoverage, 1);
+  // A declared gap wins over coverage: unverifiable, not a violation.
+  g.gaps = [{ kind: 'other', span: law, resource: null, note: 'synthetic gap' }];
+  const gap = evaluateEntry('99', 'SYN', g, p, FULL).S1b;
+  assert.deepEqual([gap.classes.inGap, gap.classes.outsideGoldCodes], [1, 1]);
+  // Proven violations on codes do not depend on coverage.
+  const onCode = evaluateEntry('99', 'SYN', goldDoc(), { ...perfect(goldDoc()), selections: [{ purpose: 'ncm', positive: true, span: at('8450.11.00') }] }).S1b;
+  assert.deepEqual([onCode.classes.onNonCandidate, onCode.violations], [1, 1]);
+  // Invalid coverage spans are ignored rather than trusted.
+  const bad = evaluateEntry('99', 'SYN', goldDoc(), p, { annotationCoverage: [{ start: 5, end: 2 }] }).S1b;
+  assert.equal(bad.classes.pendingCoverage, 2);
+});
+
+test('M2a: repeated targets collapse to a set; a duplicated whole relation is still a false positive', () => {
+  const g = goldDoc(); const p = perfect(g);
+  const exc = p.relations.find((r) => r.kind === 'exception')!; exc.targetEntityIds = ['p-n4', 'p-n4', 'p-n5', 'p-n5'];
+  assert.deepEqual([evaluateEntry('99', 'SYN', g, p).M2a.tp, evaluateEntry('99', 'SYN', g, p).M2a.fp], [1, 0]);
+  const q = perfect(g); q.relations.push({ ...q.relations.find((r) => r.kind === 'exception')! });
+  const r = evaluateEntry('99', 'SYN', g, q).M2a;
+  assert.deepEqual([r.tp, r.fp, r.fn], [1, 1, 0]);
 });
 
 test('static gold roles agree with the approved 01 matrix counts (no engine, no measurement)', () => {

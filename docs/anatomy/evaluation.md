@@ -26,7 +26,7 @@ A predição é uma forma mínima: partes, entidades, relações, seleções e c
 |---|---|
 | E1 | tipo + span (sem a raiz) |
 | E2 | pai previsto igual ao par do pai do gold; denominador = partes casadas cujo pai do gold não é a raiz e também foi casado |
-| E3 | entre os irmãos **casados** do gold, na ordem do gold, cada par consecutivo precisa ter o mesmo pai previsto e a mesma ordem relativa. Assim, um irmão omitido não esconde uma inversão entre os vizinhos (correção EVAL-01) |
+| E3 | **todos os pares** de irmãos casados do gold, n·(n−1)/2 por pai e na ordem do gold: cada par precisa ter o mesmo pai previsto e a mesma ordem relativa. Exemplo: ordens previstas `[2,0,1]` dão 1/3 (correção R2 do EVAL-01) |
 | E4 | contexto igual entre partes casadas, com matriz de confusão `gold->previsto` |
 | E5 | span + linha/coluna/rowSpan/colSpan |
 | R1 / R2 | NCM e NBM por domínio + span, **sem capítulos** (span de 2 caracteres) |
@@ -35,17 +35,17 @@ A predição é uma forma mínima: partes, entidades, relações, seleções e c
 | R5 | spans de CITATION/OTHER/PROCESS/CNPJ do gold atingidos por algum NCM previsto, cada span contado uma vez |
 | R6 | CITATION |
 | M1 | span do operador + as duas pontas **em ordem**, cada ponta identificada por **domínio + span**; ponta NCM↔NBM trocada ou id inexistente não casa (correção EVAL-01) |
-| M2a | span do operador + **conjunto** de alvos (sem ordem), cada alvo por **domínio + span** (correção EVAL-01) |
+| M2a | span do operador + **conjunto** de alvos (sem ordem; alvos repetidos contam uma vez), cada alvo por **domínio + span**. Uma relação inteira duplicada continua sendo FP (correção R2 do EVAL-01) |
 | M2b | `scopeSpan` exato entre pares de M2a; escopo ampliado ou reduzido é erro |
 | M2c / M2 | **N/A** nesta etapa (`condition: null` não prova ausência de condição) |
 | S1a | não candidatos do gold atingidos por pelo menos uma seleção `ncm` positiva **com span válido** ÷ não candidatos do gold. Denominador do gold, independente de casamento; cada span conta uma vez |
-| S1b | `emitted` = todas as positivas `ncm`, classificadas de forma **exaustiva** em uma única classe (a soma das classes é igual a `emitted`): `onNonCandidate`, `exactCandidate`, `inexactOnCandidate`, `outsideGoldCodes`, `inGap`, `unlocated`. **`violations`** (comprovadas) = `onNonCandidate` + `inexactOnCandidate` + `outsideGoldCodes`. **`unverifiable`** = `inGap` (lacuna declarada com span ou parte `unidentified` do gold) + `unlocated` (sem span, invertido ou fora do texto). Classes avaliadas nesta ordem de prioridade (correção EVAL-01) |
+| S1b | `emitted` = todas as positivas `ncm`, classificadas de forma **exaustiva** em uma única classe (soma = `emitted`), nesta prioridade: `unlocated` (sem span, invertido ou fora do texto) → `onNonCandidate` → `exactCandidate` → `inexactOnCandidate` → `inGap` (lacuna declarada com span ou parte `unidentified`) → `outsideGoldCodes` (**só** se a emissão estiver inteira dentro de uma região de `options.annotationCoverage`) → `pendingCoverage` (sem código e sem cobertura comprovada). **`violations`** = `onNonCandidate` + `inexactOnCandidate` + `outsideGoldCodes`. **`unverifiable`** = `pendingCoverage` + `inGap` + `unlocated` (correções do EVAL-01) |
 | S2 | **N/A**: depende de evidência jurídica aprovada (ANAT-06) |
 | C1 | `recognizedLength ÷ textLength` quando a predição traz cobertura; caso contrário N/A. É descritiva |
 
 Seleções `thematic_text` e seleções negativas não entram em S1.
 
-**Limitação conhecida:** os golds aprovados declaram lacunas quase sempre sem span (`span: null`). Nesses casos, a lacuna não delimita uma região, e uma emissão nela cai em `outsideGoldCodes` só quando o texto está anotado. Se surgir uma região sem garantia, ela deve ganhar span no gold antes da medição.
+**Cobertura fora do gold (correção R2 do EVAL-01):** `evaluateEntry(id, fonte, gold, predição, { annotationCoverage })` recebe, em memória e separada do gold, a lista de regiões do texto canônico **comprovadamente anotadas por completo** para códigos. Sem essa informação, uma emissão sobre texto sem código no gold fica como **pendência** (`pendingCoverage`), nunca como violação. Spans de cobertura inválidos são ignorados, não presumidos. Os sete golds aprovados **não** foram alterados para ganhar spans; quem fornece e justifica a cobertura é a etapa de medição, e isso precisa ser registrado com a medição.
 
 ## Testes (`test/anatomy.evaluation.unit.test.ts`, sintéticos)
 
@@ -59,4 +59,5 @@ Seleções `thematic_text` e seleções negativas não entram em S1.
 - documento sem códigos: S1a N/A e S1b igual a 1;
 - agregação por fonte e `ALL`, sem média, preservando N/A;
 - **reproduções adversariais do parecer EVAL-01** (PR #244, review 5566614441): relação com ponta NCM↔NBM trocada e id inexistente; seleções inexatas, sem span, invertidas e fora do texto, sempre classificadas; emissões em lacuna declarada e em parte `unidentified` como não verificáveis; irmão omitido sem esconder inversão; agregação das classes S1b;
+- **R2 do parecer EVAL-01** (review 5566651307): E3 com três irmãos (`[2,0,1]` → 1/3, perfeito → 3/3, invertido → 0/3, `[1,0,2]` → 2/3); S1 sem cobertura = pendência, com cobertura parcial, emissão na borda, lacuna acima da cobertura, violação em código independente de cobertura e cobertura inválida ignorada; M2a com alvos repetidos e relação duplicada;
 - papéis estáticos dos golds 01 (640 candidatos e 1.362 não candidatos) e 02 (0 e 1), iguais aos da matriz.
