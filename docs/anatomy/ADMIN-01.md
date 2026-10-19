@@ -77,15 +77,16 @@ O ponto de partida é o desenho aprovado no ANAT-03 (§2.3, "Regras fáceis de a
   "listTokens": ["até", "a", "e", "ou", "exceto", "salvo"],
   "rangeOperators": ["a", "até"],
   "exceptionMarkers": ["exceto", "excetuado", "salvo", "exclusive"],
-  "tablePolicy": { "trustMergedCells": "unknown_if_ambiguous" },
+  "tablePolicy": { "ambiguousGeometry": "unknown_partial" },   // único valor aceito: conservador e obrigatório
   "examples": [ { "id": "ex-1", "purpose": "coluna NCM/SH", "input": "…html…", "expect": { "parts": [ … ], "entities": [ … ] }, "polarity": "positive" } ]
 }
 ```
 
 **Restrições de segurança (validadas no backend, em falha fechada):**
 - só **listas de literais**; nenhum regex livre, JavaScript, SQL ou URL;
-- limites por campo, para início de conversa: no máximo 64 itens, até 64 caracteres cada, e perfil efetivo de até 64 KiB;
-- tempo máximo de simulação por amostra, por exemplo 2 s, com a amostra marcada como `partial` quando estourar;
+- **limites (decisão do COORD):** no máximo 64 itens por campo, de 64 unidades UTF-16 por literal e de 64 KiB por perfil;
+- **simulação futura (decisão do COORD):** 2 s por amostra, execução sequencial, até 20 amostras; a amostra que estourar o tempo é marcada como `partial`;
+- **política de tabela ambígua (obrigatória):** geometria ambígua sempre vira `unknown` com resultado `partial`; nenhum perfil pode afrouxar isso;
 - campos fora do schema são rejeitados;
 - os formatos de domínio (CNPJ, CEP, data, NCM 4–8) continuam built-ins versionados com o código e não são editáveis.
 
@@ -102,7 +103,7 @@ ATIVO ──substituído──▶ retirado (somente leitura)
 ```
 
 - **Uma versão ativa por escopo.** Uma versão ativada é **imutável**: corrigir significa criar uma nova versão.
-- **Retorno:** reativa a versão anterior e os resultados dela, mantendo o histórico da nova. Não apaga análises.
+- **Retorno:** reativa a versão anterior e os resultados dela, mantendo o histórico da nova. Não apaga análises. **Retornar a uma versão não reaprova evidências jurídicas:** aprovações de vigência ficam presas ao hash de entrada e de trecho, e qualquer análise cuja identidade mude por causa do retorno volta a depender de conferência própria.
 - **Revisão:** o revisor precisa ser diferente do autor, a regra usada no gold. O revisor registra fundamento e a decisão sobre cada diferença da comparação.
 - **Ativar não reprocessa nada.** A tela mostra o **escopo afetado** (fontes, famílias e representações cujo `ruleSetHash` muda; contagem de publicações). O reprocessamento é uma operação separada e autorizada, já prevista em `anatomy_runs`.
 - **Estrutura não decide direito:** mudar uma regra de estrutura nunca aprova situação jurídica. A conferência de vigência é outra tela, com outra trilha.
@@ -198,7 +199,8 @@ Toda mutação grava em `audit_log`:
 
 | Fase | Entrega | Critério de aceite | Dependências |
 |---|---|---|---|
-| **P1** Perfil padrão sem mudança de comportamento | `profile.ts` e leitor/extrator recebendo o perfil efetivo | Nas 7 entradas de desenvolvimento e em todos os testes sintéticos, o `AnatomyResult` é **idêntico** ao atual, salvo `ruleSetHash`. Os 7 golds e as aprovações não mudam. `engineHash` muda, de forma explícita e registrada | Autorização do COORD (muda o motor) |
+| **P1.A** Schema e resolução pura dos perfis (**autorizada**) | `profile.ts`: validação, limites, herança, perfil efetivo, hash determinístico; perfis padrão extraídos das constantes atuais | Só testes sintéticos. **Sem integração ao motor**, sem alteração de contrato, `engineHash` ou golds | Branch e PR próprios |
+| **P1.B** Perfil padrão no motor | Leitor e extrator recebendo o perfil efetivo | Nas 7 entradas de desenvolvimento e em todos os testes sintéticos, **o comportamento estrutural é o mesmo** (partes, spans, contextos, entidades, relações, seleções e limitações). **Os hashes derivados mudam necessariamente:** `engineHash`, `ruleSetHash`, `analysisId` e `outputHash`. Por isso a comparação é feita sobre o conteúdo, excluindo campos de identidade, e a mudança de hashes é registrada de forma explícita. Os 7 golds e suas aprovações não mudam, porque não dependem desses hashes | Autorização do COORD (muda o motor) |
 | **P2** Simulação e comparação puras | Serviços puros e testes sintéticos | Diferença classificada; reserva rejeitada pelo ID; limites de perfil e de tempo testados | P1 |
 | **P3** Persistência e API | Migration produtiva, rotas admin, `audit_log` | Testes de integração em banco descartável; autor ≠ revisor; ativação sem reprocessar; retorno sem apagar | **Autorização de migration produtiva** |
 | **P4** Telas | T1–T8 no frontend | Os quatro exemplos de manutenção da seção 4 executados de ponta a ponta em ambiente de teste | Acesso ao repositório do frontend e P3 |
@@ -206,12 +208,17 @@ Toda mutação grava em `audit_log`:
 
 **Aceite da Fase 1, item "tela":** P1 a P4 concluídos, com os quatro exemplos de manutenção demonstrados e auditados, e permissões e reserva testadas. P5 não faz parte do aceite da tela.
 
-## 8. Decisões pedidas ao COORD
+## 8. Decisões do COORD (19/10/2026)
 
-1. **Política de ativação:** quem pode ativar (o próprio revisor, um terceiro, ou basta autor ≠ revisor).
-2. **Famílias de ato da Fase 1:** quais famílias por fonte terão perfil próprio. Proposta: só perfil por fonte na Fase 1.
-3. **Limites iniciais** dos campos e do tempo de simulação (os valores propostos estão na seção 2).
-4. **Autorizações por fase:** P1 (refatoração do motor), P3 (migration produtiva) e acesso ao repositório do frontend (P4).
-5. **Métricas na simulação:** confirmar se os golds de desenvolvimento podem aparecer como informação na T5, sem gate. A proposta é sim, só desenvolvimento e nunca a reserva.
+Registradas na [issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6260137987).
+
+1. **Ativação:** admin de plataforma, depois de revisão independente vinculada ao **hash exato** da versão. Alterar o conteúdo invalida a aprovação.
+2. **Perfis:** padrão geral e por fonte. A herança por família continua suportada, mas sem especializações desnecessárias no início.
+3. **Limites iniciais:** 64 itens por campo, 64 unidades UTF-16 por literal, 64 KiB por perfil. Simulação futura: 2 s por amostra, sequencial, até 20 amostras.
+4. **Métricas:** diagnósticas na comparação. A execução sobre o corpus exige autorização específica.
+5. **Migration:** a preparação e os testes isolados podem fazer parte de um pacote posterior. A aplicação produtiva continua **não autorizada**.
+6. **Próxima atividade autorizada:** P1.A, em branch e PR próprios.
+
+A **tela continua obrigatória na Fase 1**.
 
 **Limites mantidos:** sem código de produto, migration, abertura da reserva, medição, merge ou deploy. A recaptura dos 18 originais continua pendente da autorização do Fábio e não bloqueia este documento.
