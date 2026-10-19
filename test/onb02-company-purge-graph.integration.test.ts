@@ -101,8 +101,8 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     `,[branch.id]);
     // R7: only IDs and typed context are stored; purging never edits old audit.
     await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
-      VALUES($1,'USER','ESTABLISHMENT_UPDATED','establishment',$2,
+      INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,entity_id,before_data,after_data)
+      VALUES($1,'USER',gen_random_uuid()::text,'ESTABLISHMENT_UPDATED','establishment',$2,
         jsonb_build_object('company_id',$3::text,'is_active',true),
         jsonb_build_object('company_id',$3::text,'is_active',false))
     `,[a.tenantId,branch.id,target.company.id]);

@@ -40,7 +40,7 @@ BEGIN
 
     -- Do not enable deletion between deploy and the separately authorized backfill.
     -- An indexed marker check; never search payloads or identities here.
-    IF EXISTS (SELECT 1 FROM public.audit_log WHERE audit_policy_version=0) THEN
+    IF EXISTS (SELECT 1 FROM public.audit_log WHERE public.audit_backfill_pending(audit_policy_version,actor_id)) THEN
       RAISE EXCEPTION 'company_purge_audit_backfill_required' USING ERRCODE='55000';
     END IF;
 

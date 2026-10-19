@@ -24,20 +24,20 @@ test('R7: allowlist rejects unregistered events, unknown keys, nested payloads, 
     {message:'blocked'},{company_id:{name:'blocked'}},{is_active:'blocked'},
     {['private-' + randomUUID()]:true}
   ]){
-   await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,action,entity_type,after_data)
-     VALUES('SYSTEM',$1,$2,$3::jsonb)`,[action,entity,JSON.stringify(payload)]),
+   await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type,after_data)
+     VALUES('SYSTEM','system:worker',$1,$2,$3::jsonb)`,[action,entity,JSON.stringify(payload)]),
      (e:unknown)=>(e as {code?:string}).code==='23514');
   }
-  await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,action,entity_type)
-    VALUES('SYSTEM','UNREGISTERED_NEW_EVENT','company')`),
+  await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type)
+    VALUES('SYSTEM','system:worker','UNREGISTERED_NEW_EVENT','company')`),
     (e:unknown)=>(e as {code?:string}).code==='23514');
   for (const [column,value] of [['entity_id','not-an-opaque-id'],['request_id','not-an-opaque-id']] as const) {
-   await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,action,entity_type,${column})
-     VALUES('SYSTEM','COMPANY_UPDATED','company',$1)`,[value]),
+   await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type,${column})
+     VALUES('SYSTEM','system:worker','COMPANY_UPDATED','company',$1)`,[value]),
      (e:unknown)=>(e as {code?:string}).code==='23514');
   }
-  const safe=await pool.query<{id:string}>(`INSERT INTO audit_log(actor_type,action,entity_type,after_data)
-    VALUES('SYSTEM','COMPANY_UPDATED','company','{"is_active":true}') RETURNING id`);
+  const safe=await pool.query<{id:string}>(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type,after_data)
+    VALUES('SYSTEM','system:worker','COMPANY_UPDATED','company','{"is_active":true}') RETURNING id`);
   await assert.rejects(pool.query("SET ROLE radar_worker; SELECT * FROM public.audit_backfill_batch(10)"),
     (e:unknown)=>(e as {code?:string}).code==='42501');
   await pool.query('RESET ROLE');
@@ -61,8 +61,8 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
    // Only this isolated legacy-fixture transaction bypasses the new-write guard.
    // There is no runtime flag or callable application bypass.
    await client.query('ALTER TABLE audit_log DISABLE TRIGGER audit_allowlist_guard');
-   await client.query(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
-    SELECT CASE WHEN n%2=0 THEN $1::uuid ELSE $2::uuid END,'SYSTEM',
+   await client.query(`INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,entity_id,before_data,after_data)
+    SELECT CASE WHEN n%2=0 THEN $1::uuid ELSE $2::uuid END,'SYSTEM','system:worker',
       CASE WHEN n%3=0 THEN 'COMPANY_CREATED' ELSE 'COMPANY_UPDATED' END,
       'company',CASE WHEN n%2=0 THEN $3::text ELSE lpad(n::text,14,'0') END,
       jsonb_build_object('company_id',$3::text,'is_active',true,'cnpj',lpad(n::text,14,'0'),
@@ -71,8 +71,8 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
         gen_random_uuid()::text,'old private key'),
       jsonb_build_object('company_id',$3::text,'is_active',false,'tradeName','old private name')
     FROM generate_series(1,100000)n`,[tenants[0],tenants[1],company]);
-   await client.query(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,after_data)
-    SELECT $1,'ADMIN','TAXONOMY_CURATION_IMPORT','taxonomy_curation',
+   await client.query(`INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,after_data)
+    SELECT $1,'ADMIN',NULL,'TAXONOMY_CURATION_IMPORT','taxonomy_curation',
       jsonb_build_object('rows',n,'created',1,'errors',0)
     FROM generate_series(1,50000)n`,[tenants[1]]);
    await client.query('ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard');
@@ -170,11 +170,11 @@ test('R7: company history resolves current names, distinguishes deletion from un
     VALUES($1,'R7 current synthetic name',$2) RETURNING id`,
     [a.tenant,randomUUID().replace(/\D/g,'').padEnd(14,'7').slice(0,14)])).rows[0]!.id;
   const missing=randomUUID(),deleted=randomUUID();
-  await pool.query(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,after_data)
-    VALUES($1,'SYSTEM','COMPANY_UPDATED','company',$2,'{}'),
-      ($1,'SYSTEM','COMPANY_UPDATED','company',$3,'{}'),
-      ($1,'SYSTEM','COMPANY_PURGED','company',$4,'{"purged":true}'),
-      ($5,'SYSTEM','COMPANY_PURGED','company',$3,'{"purged":true}')`,
+  await pool.query(`INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,entity_id,after_data)
+    VALUES($1,'SYSTEM','system:worker','COMPANY_UPDATED','company',$2,'{}'),
+      ($1,'SYSTEM','system:worker','COMPANY_UPDATED','company',$3,'{}'),
+      ($1,'SYSTEM','system:worker','COMPANY_PURGED','company',$4,'{"purged":true}'),
+      ($5,'SYSTEM','system:worker','COMPANY_PURGED','company',$3,'{"purged":true}')`,
     [a.tenant,company,missing,deleted,b.tenant]);
   const list=async()=>{const r=await app.inject({method:'GET',url:'/api/v1/company-audit-history',headers:a.headers});assert.equal(r.statusCode,200);return r.json<{items:Array<{companyState:string;companyName:string|null}>}>().items};
   let items=await list();

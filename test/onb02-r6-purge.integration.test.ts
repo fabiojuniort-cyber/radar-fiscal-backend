@@ -84,8 +84,8 @@ async function fixture(trx:Transaction<DB>, scale:boolean) {
     establishment_cnaes:47,company_product_profiles:5,company_product_ncms:2,company_cnae_ncms:13,
     monitoring_profiles:0,company_publications:0,publication_matches:0};
   assert.deepEqual(await graph(),expected);
-  if(!scale) await q(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
-    VALUES($1,'SYSTEM','COMPANY_UPDATED','company',$2,
+  if(!scale) await q(`INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,entity_id,before_data)
+    VALUES($1,'SYSTEM','system:worker','COMPANY_UPDATED','company',$2,
       jsonb_build_object('company_id',$2::text,'is_active',true))`,[tenant,company]);
   if(scale) {
     const source=(await q<{id:string}>(`INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key)
@@ -95,8 +95,8 @@ async function fixture(trx:Transaction<DB>, scale:boolean) {
     await q(`INSERT INTO collection_items(collection_run_id,source_item_key,status,raw_metadata)
       SELECT $1,n::text,'PROCESSED_EXISTING',jsonb_build_object('official',true,'text',repeat('x',128))
       FROM generate_series(1,420000)n`,[run]);
-    await q(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
-      SELECT $1,'SYSTEM','COMPANY_UPDATED','company',$2::text,
+    await q(`INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,entity_id,before_data,after_data)
+      SELECT $1,'SYSTEM','system:worker','COMPANY_UPDATED','company',$2::text,
         jsonb_build_object('company_id',$2::text,'is_active',true),
         jsonb_build_object('company_id',$2::text,'is_active',false)
       FROM generate_series(1,150000)n`,[tenant,company]);

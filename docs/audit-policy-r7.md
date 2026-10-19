@@ -1,4 +1,4 @@
-# Auditoria R7.1 — política aprovada em 19/10/2026
+# Auditoria R7.2 — política aprovada em 19/10/2026
 
 ## Contrato
 
@@ -12,7 +12,10 @@ abaixo. Não são gravados os snapshots/justificativas livres desses adaptadores
 Novos eventos exigem uma política explícita; não se deve usar a projeção para evitar
 definir o contrato de um novo evento. O teste de inserção inválida protege a fronteira.
 
-Ação, data, autor, tenant, ID do evento e correlação continuam na trilha.
+Ação, data, tenant, ID do evento e correlação continuam na trilha.
+Autor é preservado quando atende ao contrato abaixo. No backfill, um autor privado
+é substituído por NULL e after_data recebe actor_redacted=true; nunca copiar o valor
+rejeitado para outro campo.
 entity_id e request_id são UUID ou NULL; IDs de empresa não são hashes de CNPJ.
 São identificadores pseudônimos: não se deve prometer anonimização absoluta enquanto
 houver possibilidade de correlação. COMPANY_PURGED retém o UUID da empresa para
@@ -127,7 +130,11 @@ lotes conhecidos já confirmados permanecem confirmados e retomáveis.
 
 Cada lote confirma alteração das linhas e checkpoint na mesma transação. O marcador por linha é a verdade para retomada:
 UUID aleatório, timestamps antigos e novas inserções não causam saltos. Falha no lote
-não avança o checkpoint. Linhas v1 não são reprocessadas. Um novo processo/conexão
+não avança o checkpoint. Linhas v1 com autor válido (ou NULL legado) não são reprocessadas.
+R7.2 também seleciona linhas v1 com autor inválido: o marcador antigo não pode esconder
+um vazamento de autor. O índice parcial ix_audit_r72_pending e a purga usam o mesmo
+predicado audit_backfill_pending. NULL legado significa autor ausente e permanece NULL,
+sem inventar uma identidade ou sinalizar dado privado que não existia. Um novo processo/conexão
 retoma os lotes restantes; execução repetida sem pendência faz zero alterações.
 
 ## Purga e implantação
@@ -137,7 +144,7 @@ guardas de tenant/admin, concorrência e a identidade legada compartilhada já e
 apaga o grafo e grava COMPANY_PURGED. Timeouts no serviço: statement 30s, lock 5s.
 O header permanent-v1 e a confirmação digitada são mantidos.
 
-Enquanto houver qualquer auditoria legada v0, a purga retorna conflito, por verificação
+Enquanto houver qualquer auditoria legada v0 ou autor não-NULL inválido, a purga retorna conflito, por verificação
 indexada do marcador. Assim o deploy não permite exclusão antes do backfill separado.
 
 Autorizações futuras independentes: (1) deploy; (2) apply do backfill. Na implantação,
@@ -172,3 +179,53 @@ fixtures desconhecidas do teste, apply funciona. Os 40 tipos inventariados são
 processados em lotes pelo CLI e a repetição altera zero linhas.
 A massa de 150 mil registros usa exclusivamente tipos conhecidos; desconhecidos
 ficam no teste de aborto e não recebem uma política artificial.
+
+## R7.2 — identidade do autor e simulações históricas
+
+A guarda do banco rejeita INSERT sem actor_id, com string vazia ou com qualquer
+valor fora de UUID integral e da lista fechada abaixo (23514 audit_invalid_actor).
+UUID é uma referência opaca no formato validado; não se infere identidade por texto.
+Não há aceite por prefixo. Os identificadores operacionais preexistentes são
+enumerados individualmente para manter os escritores existentes compatíveis:
+
+| Identidade de sistema aceita | Escritor |
+| --- | --- |
+| system:worker | trabalho de sistema com identidade explícita |
+| system:scheduler | agendamento com identidade explícita |
+| taxonomy-baseline-importer | importação da baseline |
+| taxonomy-v1.1-successor | criação da sucessora |
+| taxonomy-v1.1-publisher | publicação da sucessora |
+| ops:grant-platform-admin | concessão/revogação operacional |
+| ops:grant-taxonomy-curator | concessão/revogação operacional |
+| ops:import-confaz-act | importação operacional de ato |
+| l17:scheduler | limpeza global do acervo |
+
+options.actor da publicação também passa por essa guarda: texto livre é rejeitado
+e a transação falha, sem substituir silenciosamente um autor fornecido.
+Novas identidades de sistema exigem mudança explícita da lista e testes.
+
+actor_redacted é booleano reservado, declarado nas 52 políticas. INSERT não pode
+fornecer essa chave em before_data nem after_data. Só a transformação canônica do
+backfill pode sinalizar a redação histórica, inclusive quando o payload era NULL.
+O UPDATE autorizado só permite o autor canônico e o payload canônico do registro
+original; ação, data e demais cabeçalhos não podem ser alterados. O backfill não
+altera tabelas de usuários nem outras entidades de negócio.
+
+A regra COLLECTION_FILTER_SIMULATION_REQUESTED/collection_filter_simulation preserva
+policyId, version, revision, scope e reviewMode. Os valores históricos são exatamente:
+
+| scope | reviewMode |
+| --- | --- |
+| FULL_ARCHIVE | ALL |
+| FULL_ARCHIVE | SAMPLE |
+| FULL_ARCHIVE | NONE |
+| RECENT | ALL |
+| RECENT | SAMPLE |
+| RECENT | NONE |
+
+São os enums emitidos pela migration 039; funções aposentadas pela 051 não são
+recriadas. Seis testes PG18 comparam before_data e after_data antes/depois e exigem
+igualdade semântica dos cinco campos, retirando apenas campos não permitidos.
+O teste de autores cobre INSERT inválido, e-mail/CNPJ/nome sintéticos no legado,
+linhas v0 e v1, payload NULL, retomada, cabeçalhos, registros válidos intactos e
+idempotência. Toda essa execução é em PostgreSQL 18 descartável da CI.

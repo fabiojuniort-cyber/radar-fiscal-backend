@@ -56,6 +56,10 @@ automaticamente. A política R7 usa allowlist tipada por evento em toda escrita.
 A purga não minimiza auditoria por texto e fica bloqueada até o backfill histórico
 separado estar concluído. R7.1: tipos sem regra são listados no --plan e bloqueiam
 --apply antes de qualquer escrita; nunca esvaziar payload de evento desconhecido.
+R7.2: autores novos exigem UUID ou identidade de sistema enumerada; autor privado
+legado vira NULL com actor_redacted=true. Linhas v1 com autor inválido também são
+pendentes. Simulações históricas preservam as seis combinações FULL_ARCHIVE/RECENT
+e ALL/SAMPLE/NONE.
 Ver docs/audit-policy-r7.md e docs/audit-event-inventory-r7.json. O backfill em produção exige
 autorização própria, além do deploy. Políticas de recuperação seguem ACCEPTED_RISK.
 

@@ -5,13 +5,32 @@ CREATE INDEX IF NOT EXISTS ix_audit_r7_company_event ON public.audit_log(tenant_
 
 CREATE OR REPLACE FUNCTION public.audit_event_policy(p_action TEXT,p_type TEXT)
 RETURNS JSONB LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog AS $policy$
- SELECT $json${"COMPANY_CREATED|company":{"company_id":"uuid","is_active":"bool","version":"int"},"COMPANY_UPDATED|company":{"company_id":"uuid","is_active":"bool","version":"int"},"COMPANY_PURGED|company":{"purged":"bool"},"ESTABLISHMENT_CREATED|establishment":{"company_id":"uuid","is_active":"bool"},"ESTABLISHMENT_UPDATED|establishment":{"company_id":"uuid","is_active":"bool"},"ESTABLISHMENT_DELETED|establishment":{"company_id":"uuid","is_active":"bool"},"COMPANY_TAX_PROFILE_UPDATED|company_tax_profile":{"company_id":"uuid","version":"int"},"COMPANY_PRODUCT_PROFILE_UPDATED|company_product_profile":{"company_id":"uuid","is_active":"bool"},"PLATFORM_ROLE_GRANTED|platform_user_role":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"]},"PLATFORM_ROLE_REVOKED|platform_user_role":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"]},"PLATFORM_ROLE_GRANTED|app_user":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"]},"PLATFORM_ROLE_REVOKED|app_user":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"]},"COLLECTION_FILTER_DRAFT_SAVED|collection_filter_policy":{"version":"int","revision":"int"},"COLLECTION_FILTER_SIMULATION_REQUESTED|collection_filter_simulation":{"policyId":"uuid","version":"int","revision":"int","scope":["SAMPLE","FULL_ARCHIVE","FULL_HISTORY","ALL"],"reviewMode":["PREVIEW","APPROVAL","REVIEW","SAMPLE","FULL"]},"COLLECTION_FILTER_POLICY_APPROVED|collection_filter_policy":{"version":"int","revision":"int","simulationId":"uuid"},"COLLECTION_FILTER_DIRECT_ADMIN_EDIT|collection_filter_policy":{"policyRevision":"int","action":["RULE_KEEP","RULE_DELETE","TERM_PUT","TERM_DELETE","ALIAS_PUT","ALIAS_DELETE","NEWTYPE_MERGE","NEWTYPE_KEEP"]},"COLLECTION_FILTER_DIRECT_RULE_CHANGED|collection_filter_type_rule":{"policyRevision":"int","mode":["KEEP_ALWAYS","KEEP_IF_TAX_TERM","EXCLUDE_UNLESS_STRONG","EXCLUDE_ALWAYS","EXCLUDE_ONCE"]},"COLLECTION_FILTER_DIRECT_PURGE|collection_filter_type_rule":{"deletedCount":"int","deletedIds":"uuids","mode":["KEEP_ALWAYS","KEEP_IF_TAX_TERM","EXCLUDE_UNLESS_STRONG","EXCLUDE_ALWAYS","EXCLUDE_ONCE"]},"L17_HIDDEN_PURGE|publications":{"deletedCount":"int","deletedIds":"uuids","policyId":"uuid","policyRevision":"int","mode":["RETENTION","EXCLUDE_ALWAYS"]},"L17_RULE_PURGE|publications":{"deletedCount":"int","deletedIds":"uuids","policyId":"uuid","policyRevision":"int","mode":["RETENTION","EXCLUDE_ALWAYS"]},"L18_PRESERVATION_RULES|collection_filter_policy":{"policyId":"uuid","policyRevision":"int","changedRuleCount":"int","addedStrongTerms":"int"},"BASELINE_IMPORT_STARTED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"]},"BASELINE_IMPORT_FAILED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"]},"BASELINE_IMPORT_VALIDATED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"]},"BASELINE_IMPORT_COMMITTED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"]},"TAXONOMY_RELEASE_CREATED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"]},"TAXONOMY_SUCCESSOR_CREATED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"]},"TAXONOMY_RELEASE_CREATED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"]},"TAXONOMY_RELEASE_PUBLISHED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"]},"TAXONOMY_SUCCESSOR_PUBLISHED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"]},"TAXONOMY_RELEASE_VALIDATED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"]},"TAXONOMY_CURATION_DRAFT_CREATED|taxonomy_curation":{"sourceReleaseId":"uuid","initialCuration":"bool"},"TAXONOMY_CURATION_DIMENSION_UPDATED|taxonomy_curation":{},"TAXONOMY_CURATION_DIMENSION_RETIRED|taxonomy_curation":{},"TAXONOMY_CURATION_CONCEPT_CREATED|taxonomy_curation":{},"TAXONOMY_CURATION_CONCEPT_UPDATED|taxonomy_curation":{},"TAXONOMY_RUNTIME_SETTING_UPDATED|taxonomy_curation":{},"TAXONOMY_CURATION_GROUP_CREATED|taxonomy_curation":{"groupId":"uuid"},"TAXONOMY_CURATION_GROUP_UPDATED|taxonomy_curation":{"groupId":"uuid"},"TAXONOMY_CURATION_GROUP_DELETED|taxonomy_curation":{"groupId":"uuid"},"TAXONOMY_CURATION_IMPORT|taxonomy_curation":{"rows":"int","created":"int","updated":"int","errors":"int"},"TAXONOMY_CURATION_GRID_SAVE|taxonomy_curation":{"created":"int","updated":"int","retired":"int","groupsCreated":"int","groupsUpdated":"int"},"TAXONOMY_CURATION_PUBLISHED|taxonomy_curation":{"snapshotSha256":"sha256"},"F2_T02_ACTUACAO_INITIALIZED|taxonomy_curation":{"seedSha256":"sha256"},"F2_T02_ACTUACAO_CNAE_ORIGINS_IMPORTED|taxonomy_curation":{"sourceSha256":"sha256","projectionSha256":"sha256","originCount":"int","publicationRequested":"bool"},"TAXONOMY_F2_SUGGESTIONS_CHANGED|taxonomy_curation":{"productsCount":"int","ncmsCount":"int"},"F2_TAB03_CNAE_ACTUACOES_CHANGED|taxonomy_curation":{"published":"bool"},"OFFICIAL_CATALOG_IMPORTED|official_catalog_edition":{"editionId":"uuid","inserted":"int","updated":"int","total":"int","sourceSha256":"sha256"},"PUBLICATION_TAG_CURATED|publication":{"action":["ADD","REMOVE","RESTORE"]},"PUBLICATION_PRESENTATION_REFRESHED|publication_version":{"savedPageSha256":"sha256","htmlChars":"int","effectiveUntil":"date"},"TAXONOMY_V1_1_DRAFT_CREATED|taxonomy_release":{"sourceReleaseId":"uuid"},"TAXONOMY_V1_1_PUBLISHED|taxonomy_release":{"artifactSha256":"sha256"}}$json$::jsonb -> (p_action||'|'||p_type)
+ SELECT $json${"COMPANY_CREATED|company":{"company_id":"uuid","is_active":"bool","version":"int","actor_redacted":"bool"},"COMPANY_UPDATED|company":{"company_id":"uuid","is_active":"bool","version":"int","actor_redacted":"bool"},"COMPANY_PURGED|company":{"purged":"bool","actor_redacted":"bool"},"ESTABLISHMENT_CREATED|establishment":{"company_id":"uuid","is_active":"bool","actor_redacted":"bool"},"ESTABLISHMENT_UPDATED|establishment":{"company_id":"uuid","is_active":"bool","actor_redacted":"bool"},"ESTABLISHMENT_DELETED|establishment":{"company_id":"uuid","is_active":"bool","actor_redacted":"bool"},"COMPANY_TAX_PROFILE_UPDATED|company_tax_profile":{"company_id":"uuid","version":"int","actor_redacted":"bool"},"COMPANY_PRODUCT_PROFILE_UPDATED|company_product_profile":{"company_id":"uuid","is_active":"bool","actor_redacted":"bool"},"PLATFORM_ROLE_GRANTED|platform_user_role":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"],"actor_redacted":"bool"},"PLATFORM_ROLE_REVOKED|platform_user_role":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"],"actor_redacted":"bool"},"PLATFORM_ROLE_GRANTED|app_user":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"],"actor_redacted":"bool"},"PLATFORM_ROLE_REVOKED|app_user":{"role":["PLATFORM_ADMIN","TAXONOMY_CURATOR"],"actor_redacted":"bool"},"COLLECTION_FILTER_DRAFT_SAVED|collection_filter_policy":{"version":"int","revision":"int","actor_redacted":"bool"},"COLLECTION_FILTER_SIMULATION_REQUESTED|collection_filter_simulation":{"policyId":"uuid","version":"int","revision":"int","scope":["FULL_ARCHIVE","RECENT"],"reviewMode":["ALL","SAMPLE","NONE"],"actor_redacted":"bool"},"COLLECTION_FILTER_POLICY_APPROVED|collection_filter_policy":{"version":"int","revision":"int","simulationId":"uuid","actor_redacted":"bool"},"COLLECTION_FILTER_DIRECT_ADMIN_EDIT|collection_filter_policy":{"policyRevision":"int","action":["RULE_KEEP","RULE_DELETE","TERM_PUT","TERM_DELETE","ALIAS_PUT","ALIAS_DELETE","NEWTYPE_MERGE","NEWTYPE_KEEP"],"actor_redacted":"bool"},"COLLECTION_FILTER_DIRECT_RULE_CHANGED|collection_filter_type_rule":{"policyRevision":"int","mode":["KEEP_ALWAYS","KEEP_IF_TAX_TERM","EXCLUDE_UNLESS_STRONG","EXCLUDE_ALWAYS","EXCLUDE_ONCE"],"actor_redacted":"bool"},"COLLECTION_FILTER_DIRECT_PURGE|collection_filter_type_rule":{"deletedCount":"int","deletedIds":"uuids","mode":["KEEP_ALWAYS","KEEP_IF_TAX_TERM","EXCLUDE_UNLESS_STRONG","EXCLUDE_ALWAYS","EXCLUDE_ONCE"],"actor_redacted":"bool"},"L17_HIDDEN_PURGE|publications":{"deletedCount":"int","deletedIds":"uuids","policyId":"uuid","policyRevision":"int","mode":["RETENTION","EXCLUDE_ALWAYS"],"actor_redacted":"bool"},"L17_RULE_PURGE|publications":{"deletedCount":"int","deletedIds":"uuids","policyId":"uuid","policyRevision":"int","mode":["RETENTION","EXCLUDE_ALWAYS"],"actor_redacted":"bool"},"L18_PRESERVATION_RULES|collection_filter_policy":{"policyId":"uuid","policyRevision":"int","changedRuleCount":"int","addedStrongTerms":"int","actor_redacted":"bool"},"BASELINE_IMPORT_STARTED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"BASELINE_IMPORT_FAILED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"BASELINE_IMPORT_VALIDATED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"BASELINE_IMPORT_COMMITTED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_RELEASE_CREATED|taxonomy_baseline":{"manifestSha256":"sha256","derivationFingerprint":"sha256","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_SUCCESSOR_CREATED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_RELEASE_CREATED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_RELEASE_PUBLISHED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_SUCCESSOR_PUBLISHED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_RELEASE_VALIDATED|taxonomy_release":{"manifestSha256":"sha256","snapshotSha256":"sha256","sourceReleaseId":"uuid","status":["DRAFT","PUBLISHED"],"actor_redacted":"bool"},"TAXONOMY_CURATION_DRAFT_CREATED|taxonomy_curation":{"sourceReleaseId":"uuid","initialCuration":"bool","actor_redacted":"bool"},"TAXONOMY_CURATION_DIMENSION_UPDATED|taxonomy_curation":{"actor_redacted":"bool"},"TAXONOMY_CURATION_DIMENSION_RETIRED|taxonomy_curation":{"actor_redacted":"bool"},"TAXONOMY_CURATION_CONCEPT_CREATED|taxonomy_curation":{"actor_redacted":"bool"},"TAXONOMY_CURATION_CONCEPT_UPDATED|taxonomy_curation":{"actor_redacted":"bool"},"TAXONOMY_RUNTIME_SETTING_UPDATED|taxonomy_curation":{"actor_redacted":"bool"},"TAXONOMY_CURATION_GROUP_CREATED|taxonomy_curation":{"groupId":"uuid","actor_redacted":"bool"},"TAXONOMY_CURATION_GROUP_UPDATED|taxonomy_curation":{"groupId":"uuid","actor_redacted":"bool"},"TAXONOMY_CURATION_GROUP_DELETED|taxonomy_curation":{"groupId":"uuid","actor_redacted":"bool"},"TAXONOMY_CURATION_IMPORT|taxonomy_curation":{"rows":"int","created":"int","updated":"int","errors":"int","actor_redacted":"bool"},"TAXONOMY_CURATION_GRID_SAVE|taxonomy_curation":{"created":"int","updated":"int","retired":"int","groupsCreated":"int","groupsUpdated":"int","actor_redacted":"bool"},"TAXONOMY_CURATION_PUBLISHED|taxonomy_curation":{"snapshotSha256":"sha256","actor_redacted":"bool"},"F2_T02_ACTUACAO_INITIALIZED|taxonomy_curation":{"seedSha256":"sha256","actor_redacted":"bool"},"F2_T02_ACTUACAO_CNAE_ORIGINS_IMPORTED|taxonomy_curation":{"sourceSha256":"sha256","projectionSha256":"sha256","originCount":"int","publicationRequested":"bool","actor_redacted":"bool"},"TAXONOMY_F2_SUGGESTIONS_CHANGED|taxonomy_curation":{"productsCount":"int","ncmsCount":"int","actor_redacted":"bool"},"F2_TAB03_CNAE_ACTUACOES_CHANGED|taxonomy_curation":{"published":"bool","actor_redacted":"bool"},"OFFICIAL_CATALOG_IMPORTED|official_catalog_edition":{"editionId":"uuid","inserted":"int","updated":"int","total":"int","sourceSha256":"sha256","actor_redacted":"bool"},"PUBLICATION_TAG_CURATED|publication":{"action":["ADD","REMOVE","RESTORE"],"actor_redacted":"bool"},"PUBLICATION_PRESENTATION_REFRESHED|publication_version":{"savedPageSha256":"sha256","htmlChars":"int","effectiveUntil":"date","actor_redacted":"bool"},"TAXONOMY_V1_1_DRAFT_CREATED|taxonomy_release":{"sourceReleaseId":"uuid","actor_redacted":"bool"},"TAXONOMY_V1_1_PUBLISHED|taxonomy_release":{"artifactSha256":"sha256","actor_redacted":"bool"}}$json$::jsonb -> (p_action||'|'||p_type)
 $policy$;
 
 CREATE OR REPLACE FUNCTION public.audit_entity_reference(p_value TEXT)
 RETURNS TEXT LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog AS $ref$
  SELECT CASE WHEN p_value ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN lower(p_value) ELSE NULL END
 $ref$;
+
+
+-- Closed identities: no prefix matching, e-mail, names or arbitrary operator labels.
+CREATE OR REPLACE FUNCTION public.audit_actor_reference(p_value TEXT)
+RETURNS TEXT LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $actor$
+ SELECT CASE WHEN public.audit_entity_reference(p_value) IS NOT NULL THEN public.audit_entity_reference(p_value)
+  WHEN p_value IN ('system:worker','system:scheduler','taxonomy-baseline-importer',
+    'taxonomy-v1.1-successor','taxonomy-v1.1-publisher','ops:grant-platform-admin',
+    'ops:grant-taxonomy-curator','ops:import-confaz-act','l17:scheduler')
+  THEN p_value ELSE NULL END
+$actor$;
+
+-- Also repair an invalid author on rows previously marked by R7/R7.1.
+CREATE OR REPLACE FUNCTION public.audit_backfill_pending(p_version SMALLINT,p_actor TEXT)
+RETURNS BOOLEAN LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $pending$
+ SELECT p_version=0 OR (p_actor IS NOT NULL AND public.audit_actor_reference(p_actor) IS NULL)
+$pending$;
+CREATE INDEX IF NOT EXISTS ix_audit_r72_pending ON public.audit_log(id)
+ WHERE public.audit_backfill_pending(audit_policy_version,actor_id);
 
 -- Flat, typed fields only. No arbitrary strings, nested payloads, messages or keys.
 -- Used explicitly by the existing writer adapters and the separately run backfill.
@@ -49,6 +68,15 @@ BEGIN
 END;
 $project$;
 
+
+-- Redaction flag is backfill metadata. Never copy the rejected author into JSON.
+CREATE OR REPLACE FUNCTION public.audit_backfill_after(p_action TEXT,p_type TEXT,p_json JSONB,p_actor TEXT)
+RETURNS JSONB LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $after$
+ SELECT CASE WHEN p_actor IS NOT NULL AND public.audit_actor_reference(p_actor) IS NULL
+ THEN coalesce(public.audit_project(p_action,p_type,p_json),'{}'::jsonb)||'{"actor_redacted":true}'::jsonb
+ ELSE public.audit_project(p_action,p_type,p_json) END
+$after$;
+
 CREATE OR REPLACE FUNCTION public.audit_allowlist_guard()
 RETURNS TRIGGER LANGUAGE plpgsql SET search_path=pg_catalog,public AS $guard$
 BEGIN
@@ -56,17 +84,24 @@ BEGIN
   IF public.audit_event_policy(NEW.action,NEW.entity_type) IS NULL THEN
     RAISE EXCEPTION 'audit_event_not_registered' USING ERRCODE='23514';
   END IF;
+  IF NEW.actor_id IS NULL OR public.audit_actor_reference(NEW.actor_id) IS NULL THEN
+    RAISE EXCEPTION 'audit_invalid_actor' USING ERRCODE='23514';
+  END IF;
+  IF coalesce(NEW.before_data ? 'actor_redacted',false) OR coalesce(NEW.after_data ? 'actor_redacted',false) THEN
+    RAISE EXCEPTION 'audit_reserved_metadata' USING ERRCODE='23514';
+  END IF;
  ELSE
   -- Runtime roles have no UPDATE. Only the table owner may transform legacy rows,
   -- preserving immutable headers and using exactly the event's canonical projection.
   IF current_user<>(SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid='public.audit_log'::regclass)
-     OR OLD.audit_policy_version<>0
-     OR (to_jsonb(NEW)-ARRAY['entity_id','before_data','after_data','audit_policy_version','request_id'])
+     OR NOT public.audit_backfill_pending(OLD.audit_policy_version,OLD.actor_id)
+     OR (to_jsonb(NEW)-ARRAY['entity_id','before_data','after_data','audit_policy_version','request_id','actor_id'])
        IS DISTINCT FROM
-        (to_jsonb(OLD)-ARRAY['entity_id','before_data','after_data','audit_policy_version','request_id'])
+        (to_jsonb(OLD)-ARRAY['entity_id','before_data','after_data','audit_policy_version','request_id','actor_id'])
      OR NEW.entity_id IS DISTINCT FROM public.audit_entity_reference(OLD.entity_id)
      OR NEW.before_data IS DISTINCT FROM public.audit_project(OLD.action,OLD.entity_type,OLD.before_data)
-     OR NEW.after_data IS DISTINCT FROM public.audit_project(OLD.action,OLD.entity_type,OLD.after_data)
+     OR NEW.after_data IS DISTINCT FROM public.audit_backfill_after(OLD.action,OLD.entity_type,OLD.after_data,OLD.actor_id)
+     OR NEW.actor_id IS DISTINCT FROM public.audit_actor_reference(OLD.actor_id)
      OR NEW.request_id IS DISTINCT FROM public.audit_entity_reference(OLD.request_id)
   THEN RAISE EXCEPTION 'audit_immutable' USING ERRCODE='23514'; END IF;
  END IF;
@@ -120,18 +155,19 @@ BEGIN
  INSERT INTO public.audit_backfill_checkpoint(job_key) VALUES('onb02-r7-v1') ON CONFLICT DO NOTHING;
  PERFORM 1 FROM public.audit_backfill_checkpoint WHERE job_key='onb02-r7-v1' FOR UPDATE;
  WITH picked AS MATERIALIZED (
-   SELECT id FROM public.audit_log WHERE audit_policy_version=0 ORDER BY id
+   SELECT id FROM public.audit_log WHERE public.audit_backfill_pending(audit_policy_version,actor_id) ORDER BY id
    LIMIT p_limit FOR UPDATE
  ), changed AS (
    UPDATE public.audit_log a SET
+     actor_id=public.audit_actor_reference(a.actor_id),
      entity_id=public.audit_entity_reference(a.entity_id),
      request_id=public.audit_entity_reference(a.request_id),
      before_data=public.audit_project(a.action,a.entity_type,a.before_data),
-     after_data=public.audit_project(a.action,a.entity_type,a.after_data),
+     after_data=public.audit_backfill_after(a.action,a.entity_type,a.after_data,a.actor_id),
      audit_policy_version=1
    FROM picked WHERE a.id=picked.id RETURNING a.id
  ) SELECT count(*)::int INTO v_count FROM changed;
- SELECT count(*) INTO v_remaining FROM public.audit_log WHERE audit_policy_version=0;
+ SELECT count(*) INTO v_remaining FROM public.audit_log WHERE public.audit_backfill_pending(audit_policy_version,actor_id);
  UPDATE public.audit_backfill_checkpoint SET processed=audit_backfill_checkpoint.processed+v_count,
    last_batch_at=clock_timestamp(),
    completed_at=CASE WHEN v_remaining=0 THEN clock_timestamp() ELSE NULL END

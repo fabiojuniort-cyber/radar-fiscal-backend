@@ -30,7 +30,7 @@ export async function planAuditBackfill(pool: Pool): Promise<AuditBackfillPlan> 
   }>(`
     WITH event_types AS MATERIALIZED (
       SELECT action, entity_type, count(*)::text AS count,
-        count(*) FILTER (WHERE audit_policy_version=0)::text AS pending
+        count(*) FILTER (WHERE public.audit_backfill_pending(audit_policy_version,actor_id))::text AS pending
       FROM public.audit_log GROUP BY action, entity_type
     )
     SELECT *, public.audit_event_policy(action,entity_type) IS NOT NULL AS rule_exists
