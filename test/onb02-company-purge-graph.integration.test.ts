@@ -71,6 +71,10 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     const target = await createCompany(a, cnpjA, 'Empresa Legada Excluir');
     const sibling = await createCompany(a, cnpjA2, 'Empresa do Mesmo Tenant');
     const remote = await createCompany(b, cnpjA, 'Empresa do Outro Tenant');
+    // R5: overlapping company names must be isolated at tenant + ownership scope.
+    await admin.query("UPDATE companies SET trade_name='Marca São R5' WHERE id=$1",[target.company.id]);
+    await admin.query("UPDATE companies SET trade_name='MARCA SAO R5' WHERE id=$1",[sibling.company.id]);
+    await admin.query("UPDATE companies SET trade_name='Empresa Legada Excluir' WHERE id=$1",[remote.company.id]);
     // R4: preexisting inactive companies MUST stay dormant with their profiles.
     const dormantCnpj = validCnpj('24681357');
     const dormant = await createCompany(a, dormantCnpj, 'Empresa Inativa Legada');
@@ -107,6 +111,37 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       VALUES($1,'USER','ONB02_R4_CNPJ_ENTITY','establishment',$2,
         jsonb_build_object('message','referência histórica por CNPJ'))
     `,[a.tenantId,formattedCnpj]);
+
+    // Name-only owned audit, without any current UUID/CNPJ.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
+      VALUES($1,'USER','ONB02_R5_NAME_ONLY','company',
+        jsonb_build_object('name','EMPRESA LEGADA EXCLUIR'))
+    `,[a.tenantId]);
+    // A homologous NAME in the same tenant must be preserved, with collision count.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
+      VALUES($1,'USER','ONB02_R5_SAME_TENANT_NAME','company',
+        jsonb_build_object('name','MARCA SAO R5'))
+    `,[a.tenantId]);
+    // Another tenant sharing the legal name is never affected.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
+      VALUES($1,'USER','ONB02_R5_OTHER_TENANT_NAME','company',
+        jsonb_build_object('name','empresa legada excluir'))
+    `,[b.tenantId]);
+    // An owned event can use a compound entity ID, which must also be masked.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
+      VALUES($1,'USER','ONB02_R5_COMPOSITE_ID','establishment',$2,
+        jsonb_build_object('owned_id',$3::text))
+    `,[a.tenantId,'branch:'+branch.id,branch.id]);
+    // Sibling event that MENTIONS target CNPJ must not become target's audit.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
+      VALUES($1,'USER','ONB02_R5_SIBLING_REFERENCE','company',$2,
+        jsonb_build_object('referenced_cnpj',$3::text,'name','EMPRESA LEGADA EXCLUIR'))
+    `,[a.tenantId,sibling.company.id,cnpjA]);
 
     // Immutable shared catalogue fixture, never a company-owned row.
     await admin.query(`
@@ -576,6 +611,23 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(oldAudit.after_data.cnpj,'[CNPJ_MASCARADO]');
     assert.equal(JSON.stringify(oldAudit).includes(branch.id),false);
     assert.equal(JSON.stringify(oldAudit).includes(branchCnpj),false);
+    const getAudit = async (tenant:string,action:string) => (await admin.query<{
+      entity_id:string|null;before_data:any;after_data:any;
+    }>("SELECT entity_id,before_data,after_data FROM audit_log WHERE tenant_id=$1 AND action=$2",
+      [tenant,action])).rows[0]!;
+    const nameOnly=await getAudit(a.tenantId,'ONB02_R5_NAME_ONLY');
+    assert.equal(nameOnly.before_data.name,'[NOME_EMPRESA_MASCARADO]');
+    const sameTenantHomonym=await getAudit(a.tenantId,'ONB02_R5_SAME_TENANT_NAME');
+    assert.equal(sameTenantHomonym.before_data.name,'MARCA SAO R5');
+    const otherTenantHomonym=await getAudit(b.tenantId,'ONB02_R5_OTHER_TENANT_NAME');
+    assert.equal(otherTenantHomonym.before_data.name,'empresa legada excluir');
+    const compound=await getAudit(a.tenantId,'ONB02_R5_COMPOSITE_ID');
+    assert.equal(compound.entity_id,'branch:[ID_MASCARADO]');
+    assert.equal(compound.before_data.owned_id,'[ID_MASCARADO]');
+    const otherCompanyAudit=await getAudit(a.tenantId,'ONB02_R5_SIBLING_REFERENCE');
+    assert.equal(otherCompanyAudit.entity_id,sibling.company.id);
+    assert.equal(otherCompanyAudit.before_data.referenced_cnpj,cnpjA);
+    assert.equal(otherCompanyAudit.before_data.name,'EMPRESA LEGADA EXCLUIR');
     const maskedEntity=(await admin.query<{entity_id:string|null;action:string}>(`
       SELECT entity_id,action FROM audit_log WHERE tenant_id=$1 AND action='ONB02_R4_CNPJ_ENTITY'
     `,[a.tenantId])).rows[0]!;
@@ -630,7 +682,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(purgeAudits[0]!.actor_id,users[0]);
     assert.equal(purgeAudits[0]!.entity_id,null);
     assert.equal(purgeAudits[0]!.before_data,null);
-    assert.deepEqual(purgeAudits[0]!.after_data,{purged:true});
+    assert.deepEqual(purgeAudits[0]!.after_data,{purged:true,ambiguous_name_count:1});
 
     const recreate = await createCompany(a,cnpjA,'Novo perfil do zero');
     assert.notEqual(recreate.company.id,target.company.id);
@@ -699,7 +751,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
             )
         `,[tenants]);
         await admin.query(
-          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL','ONB02_R4_CNPJ_ENTITY') AND tenant_id=ANY($1::uuid[])",
+          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL','ONB02_R4_CNPJ_ENTITY','ONB02_R5_NAME_ONLY','ONB02_R5_SAME_TENANT_NAME','ONB02_R5_OTHER_TENANT_NAME','ONB02_R5_COMPOSITE_ID','ONB02_R5_SIBLING_REFERENCE') AND tenant_id=ANY($1::uuid[])",
           [tenants],
         );
       }

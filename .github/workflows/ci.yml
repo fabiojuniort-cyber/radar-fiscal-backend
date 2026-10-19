@@ -323,6 +323,8 @@ jobs:
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
       - name: ONB-02 R3 hard-delete full graph on PG18
         run: npx tsx --test test/onb02-company-purge-graph.integration.test.ts
+      - name: ONB-02 R5 audit 50k EXPLAIN ANALYZE in isolated PostgreSQL 18
+        run: npx tsx --test test/onb02-r5-audit-benchmark.integration.test.ts
       - name: ONB-02 R3 semantic SQL evidence on isolated PG18
         shell: bash
         run: bash ops/onb02/ci-evidence-pg18.sh
