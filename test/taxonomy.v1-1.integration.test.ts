@@ -364,12 +364,27 @@ test('TAX-10 creates, validates and publishes v1.1 without retired dimensions', 
     assert.equal(sourceBeforePublish.rows[0]?.dimensions, 20);
     assert.equal(sourceBeforePublish.rows[0]?.concepts, 628);
 
+    // R7.2: free options.actor used to bypass every JSON allowlist. The database
+    // must reject it and the caller can roll back the entire publication attempt.
+    await client.query('SAVEPOINT invalid_audit_actor');
+    await assert.rejects(publishTaxonomyV11InTransaction(client, {
+      artifactRepository: 'fabiojuniort-cyber/radar-fiscal-backend',
+      artifactPath: 'docs/taxonomy/TAXONOMY_V1_1_RELEASE_POLICY.json',
+      artifactGitSha: 'c'.repeat(40),
+      artifactSha256: 'd'.repeat(64),
+      actor: 'synthetic@example.test',
+    }), (error: unknown) => (error as { code: string; message: string }).code === '23514'
+      && (error as { message: string }).message === 'audit_invalid_actor');
+    await client.query('ROLLBACK TO SAVEPOINT invalid_audit_actor');
+    assert.equal((await client.query('SELECT status FROM taxonomy_releases WHERE id=$1',
+      [created.releaseId])).rows[0]?.status, 'DRAFT');
+
     const published = await publishTaxonomyV11InTransaction(client, {
       artifactRepository: 'fabiojuniort-cyber/radar-fiscal-backend',
       artifactPath: 'docs/taxonomy/TAXONOMY_V1_1_RELEASE_POLICY.json',
       artifactGitSha: 'c'.repeat(40),
       artifactSha256: 'd'.repeat(64),
-      actor: 'tax-10-integration-test',
+      actor: 'taxonomy-v1.1-publisher',
     });
     assert.equal(published.disposition, 'PUBLISHED');
     assert.equal(published.snapshot.status, 'PUBLISHED');
@@ -379,7 +394,7 @@ test('TAX-10 creates, validates and publishes v1.1 without retired dimensions', 
       artifactPath: 'docs/taxonomy/TAXONOMY_V1_1_RELEASE_POLICY.json',
       artifactGitSha: 'c'.repeat(40),
       artifactSha256: 'd'.repeat(64),
-      actor: 'tax-10-integration-test',
+      actor: 'taxonomy-v1.1-publisher',
     });
     assert.equal(publishReplay.disposition, 'ALREADY_PUBLISHED');
 
