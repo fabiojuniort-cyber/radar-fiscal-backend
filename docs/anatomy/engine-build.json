@@ -1,16 +1,18 @@
 {
-  "engineHash": "ad69d28524ad6478764b203dc962c9d8a0600fbeac07aa985854b18868ab9d9d",
+  "engineHash": "8b2eefbb2f4d051934f8aeea9b80078adcd58bccfa4ebb9a0430cc4fe10fe638",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
-    "ops/anatomy/build-identity.mjs": "d38b24de5d21e9631900d76e5dc51fa86e8a20686cf2e27ae8efd2db1e79941c",
+    "ops/anatomy/build-identity.mjs": "42d5beb99eff025a5790bec4d0432bf34504742a9578de8b11b1d4258e6b77f7",
     "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
     "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
     "src/modules/anatomy/contract.ts": "e294eb6fb50c2fc2b624c13bc68f281f3271a88f4a00d98f1a7a923928893c2a",
     "src/modules/anatomy/dou-preparation.ts": "41827ee32c8b14bf0db9b56b3695ba06f40f7dd9a25658e2584ab16e435bb293",
-    "src/modules/anatomy/engine.ts": "8720e3c1f51053c070d6cb3d446271fdd90f03d18895b103ae69dac9b1de6481",
-    "src/modules/anatomy/entities.ts": "07159255102c75905d8b8164a48b65ea5be920df5cd1f9ec850b128f4cdbb5c0",
+    "src/modules/anatomy/engine.ts": "025d64a1c62c58daffd1ee5639600f315dc09a4fc722d8fe58af5fb3159c4f46",
+    "src/modules/anatomy/entities.ts": "cb42503083e873b976f48966754fc0eb4447f6d916e3bbaeb579bf5b8cb19293",
     "src/modules/anatomy/gold.ts": "e7491f75e5dabacac76ca858a3d0348820832bba4a53d22ef050e1a60d9b0c23",
     "src/modules/anatomy/json-preparation.ts": "a9ec313236e869dad4be493648358d7fa5c2be1e74ad58fba895e2758adcb8bb",
-    "src/modules/anatomy/readers.ts": "faed285360be5750cc8938e5358c72209d1bd544b40b5295d868959b0ac3c0ce"
+    "src/modules/anatomy/profile-rules.ts": "644417ba8ec6de2f262807f3909338f23bb33b9383e9534196837ad514e329aa",
+    "src/modules/anatomy/profile.ts": "15444f76d8587c446546e2ec396aa6ce8197d97e6b35f442c622ac2b2a10d3f4",
+    "src/modules/anatomy/readers.ts": "a753cf1d70b848e550bacf345977c16001e7d3f2815fadb4d3f4d12b47363285"
   }
 }

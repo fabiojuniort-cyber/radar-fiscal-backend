@@ -4,6 +4,8 @@ import { ANATOMY_CONTRACT_VERSION, anatomyIdentityHash, anatomyOutputHash, canon
   validateAnatomyResult, type AnatomyResult } from './contract.js';
 import { extractAnatomyEntities } from './entities.js';
 import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS } from './readers.js';
+import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
+import { compileProfileRules } from './profile-rules.js';
 
 export const ANATOMY_ENGINE_VERSION = 'anatomy/0.1.0' as const;
 const requestSchema = z.strictObject({
@@ -16,6 +18,9 @@ const requestSchema = z.strictObject({
   attachments: z.array(z.strictObject({ resourceId: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
     state: z.enum(['missing', 'unprocessed']) })).default([]),
   catalog: z.strictObject({ edition: z.string().min(1), codes: z.array(z.string().regex(/^\d{4,8}$/)) }).optional(),
+  // Rule profiles (ANAT-PROFILE/1). Omitted = the shipped DEFAULT_PROFILES. Validated and resolved fail-closed.
+  profiles: z.array(z.unknown()).optional(),
+  family: z.string().min(1).max(64).nullable().optional(),
 });
 export type AnatomyRequest = z.input<typeof requestSchema>;
 
@@ -27,12 +32,14 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   const attachments = [...request.attachments].sort((a, b) => a.resourceId.localeCompare(b.resourceId, 'en'));
   const missingResources = [...new Set([...(request.input.missingResources ?? []),
     ...attachments.map(item => `${item.state}:${item.resourceId}`)])].sort();
-  const read = readAnatomyInput({ ...request.input, missingResources });
+  const effective = resolveEffectiveProfile(request.profiles ?? [...DEFAULT_PROFILES], { source: request.input.source, family: request.family ?? null });
+  const rules = compileProfileRules(effective, request.input.source);
+  const read = readAnatomyInput({ ...request.input, missingResources, rules });
   const catalog = request.catalog && { edition: request.catalog.edition, codes: [...new Set(request.catalog.codes)].sort() };
   let entities: ReturnType<typeof extractAnatomyEntities> = [];
   try {
-    entities = extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ncmPartIds: identifyNcmPartIds(read),
-      ...(catalog ? { catalog } : {}) });
+    entities = extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ncmPartIds: identifyNcmPartIds(read, rules),
+      ...(catalog ? { catalog } : {}), rules });
   } catch {
     read.status = 'partial';
     read.limitations.push({ code: 'entity_extraction_failed', message: 'Entity extraction failed; no positive selection is available.',
@@ -44,8 +51,9 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
     attachmentManifestHash: sha256(canonicalJson(attachments)), engineVersion: ANATOMY_ENGINE_VERSION,
     engineHash: ANATOMY_ENGINE_BUILD_HASH,
     ruleSetId: request.ruleSet.id, ruleSetVersion: request.ruleSet.version,
+    // The effective profile (behaviour hash) replaces the former fixed label 'conservative/0.1.0'.
     ruleSetHash: sha256(canonicalJson({ source: request.input.source, limits: ANATOMY_READER_LIMITS,
-      profile: 'conservative/0.1.0', entityRules: 'entities/0.1.0', catalog: catalog ?? null })),
+      profile: { format: PROFILE_FORMAT_VERSION, effectiveHash: effective.effectiveHash }, entityRules: 'entities/0.1.0', catalog: catalog ?? null })),
     contractVersion: ANATOMY_CONTRACT_VERSION };
   const result: AnatomyResult = { ...read, contractVersion: ANATOMY_CONTRACT_VERSION,
     analysisId: anatomyIdentityHash(identity), identity, referenceDate: request.referenceDate, entities, evidence: [],

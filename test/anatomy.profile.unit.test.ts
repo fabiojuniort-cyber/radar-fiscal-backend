@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
+import { LEGACY } from './support/anatomy-legacy-rules.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, PROFILE_LIMITS, ProfileValidationError, profileHash, resolveEffectiveProfile, validateProfile,
   type AnatomyProfile } from '../src/modules/anatomy/profile.js';
 
@@ -164,53 +165,37 @@ test('a header cannot be allowed and blocked at once — inside one profile or a
   for (const source of ['CONFAZ', 'DOU', 'DOE-SP', 'RFB']) assert.equal(code(() => resolveEffectiveProfile([...DEFAULT_PROFILES], { source })), 'no-error', source);
 });
 
-// Fidelity of the extracted defaults to the rules CURRENTLY hard-coded in the engine (read as source text; the
-// engine is not imported or changed). Class lists must be exactly equal; every other literal must be accepted
-// by the corresponding current rule, and the documented variants must all be present.
-const readers = readFileSync(new URL('../src/modules/anatomy/readers.ts', import.meta.url), 'utf8');
-const entities = readFileSync(new URL('../src/modules/anatomy/entities.ts', import.meta.url), 'utf8');
-const alternation = (re: RegExp, text: string) => { const m = re.exec(text); assert.ok(m, String(re)); return m![1]!.split('|').sort(); };
-const regexFrom = (text: string, anchor: string) => {
-  const line = text.split('\n').find((l) => l.includes(anchor)); assert.ok(line, anchor);
-  const m = /(?<![\w)])\/((?:\\\/|[^/\s])(?:\\\/|[^/])*?)\/([a-z]*)\.(?:test|exec)\(/u.exec(line!); assert.ok(m, `regex on line with ${anchor}`);
-  return new RegExp(m![1]!, m![2]!);
-};
+// Fidelity of the extracted defaults to the rules that were hard-coded before P1.B. Since P1.B those constants live in
+// the profile, so the original rules are kept verbatim as an oracle (test/support/anatomy-legacy-rules.ts, from 585f5a49).
+const alternation = (re: RegExp) => /^\^\(\?:([^)]+)\)\$$/u.exec(re.source)![1]!.split('|').sort();
 
-test('fidelity: CONFAZ class lists equal the current reader constants exactly', () => {
+test('fidelity: CONFAZ and DOU class lists equal the original reader constants exactly', () => {
   const confaz = resolveEffectiveProfile([...DEFAULT_PROFILES], { source: 'CONFAZ' }).fields.classes;
-  assert.deepEqual([...confaz.historical].sort(), alternation(/const historical = \/\^\(\?:([^)]+)\)\$\//u, readers));
-  assert.deepEqual([...confaz.editorialNote].sort(), alternation(/const notes = \/\^\(\?:([^)]+)\)\$\//u, readers));
-  assert.deepEqual([...confaz.body].sort(), alternation(/\/\^\(\?:(TextoAcordo[^)]+)\)\$\/\.test/u, readers));
-  assert.ok(readers.includes("classes.includes('TituloAcordo')") && readers.includes("classes.includes('Ementa')"));
-  const dou = resolveEffectiveProfile([...DEFAULT_PROFILES], { source: 'DOU' }).fields;
-  for (const c of ['identifica', 'ementa', 'assina', 'cargo']) assert.ok(readers.includes(`own.includes('${c}')`), c);
-  assert.deepEqual([dou.classes.epigraph, dou.classes.summary, dou.classes.signature], [['identifica'], ['ementa'], ['assina', 'cargo']]);
+  assert.deepEqual([...confaz.historical].sort(), alternation(LEGACY.historical));
+  assert.deepEqual([...confaz.editorialNote].sort(), alternation(LEGACY.notes));
+  assert.deepEqual([...confaz.body].sort(), alternation(LEGACY.body));
+  assert.deepEqual([confaz.epigraph, confaz.summary], [LEGACY.confazEpigraph, LEGACY.confazSummary]);
+  const dou = resolveEffectiveProfile([...DEFAULT_PROFILES], { source: 'DOU' }).fields.classes;
+  assert.deepEqual([dou.epigraph, dou.summary, dou.signature], [LEGACY.douEpigraph, LEGACY.douSummary, LEGACY.douSignature]);
 });
 
-test('fidelity: every default literal is accepted by the current rule it was extracted from', () => {
+test('fidelity: every default literal is accepted by the original rule it was extracted from', () => {
   const d = resolveEffectiveProfile([...DEFAULT_PROFILES], { source: 'DOU' }).fields;
-  const preamble = regexFrom(readers, "type: 'preamble'");
-  for (const s of d.blockStarts.preamble) assert.ok(preamble.test(`${s} resolve:`), s);
-  const original = regexFrom(readers, 'dou_rectification_original'); const corrected = regexFrom(readers, 'dou_rectification_corrected');
-  for (const s of d.blockStarts.rectificationOriginal) assert.ok(original.test(`${s} "x"`), s);
-  for (const s of d.blockStarts.rectificationCorrected) assert.ok(corrected.test(`${s} "x"`), s);
-  const header = regexFrom(readers, 'columns.add(cell.table.column)'); const blocker = regexFrom(readers, 'columns.delete(cell.table.column)');
-  for (const s of d.ncm.columnHeaders) assert.ok(header.test(s), s);
-  for (const s of d.ncm.columnBlockers) assert.ok(blocker.test(s), s);
-  const annex = regexFrom(readers, "type: 'annex'"); const clause = regexFrom(readers, "type: 'clause'");
-  const article = regexFrom(readers, "type: 'article'"); const paragraph = regexFrom(readers, "type: 'paragraph'");
-  for (const s of d.labels.annex) assert.ok(annex.test(`${s} I`), s);
-  for (const s of d.labels.clause) assert.ok(clause.test(`${s} primeira`), s);
-  for (const s of d.labels.article) assert.ok(article.test(`${s} 1º`), s);
-  for (const s of d.labels.paragraph) assert.ok(paragraph.test(s === '§' ? '§ 1º' : s), s);
-  const listRe = regexFrom(entities, 'const list = '); for (const s of d.lists.tokens) assert.ok(listRe.test(` ${s} `), s);
-  const bridgeRe = /^\s*(?:a|at[eé]|[-–—])\s*$/iu; assert.ok(entities.includes(String(bridgeRe).slice(1, -3)));
-  for (const s of d.ranges.operators) assert.ok(bridgeRe.test(` ${s} `), s);
-  const exceptionRe = /\b(?:exceto|excetuad[oa]s?|exclu[ií]d[oa]s?|salvo|exclusive)\b/iu; assert.ok(entities.includes(String(exceptionRe).slice(1, -3)));
-  for (const s of d.exceptions.markers) assert.ok(new RegExp(`^${exceptionRe.source}$`, 'iu').test(s), s);
-  const marker = /\bNCM(?:\/SH)?\b/iu; for (const s of d.ncm.markers) assert.ok(marker.test(s), s);
-  for (const q of d.quotes.open) assert.ok(readers.includes(`["“]`) && '"“'.includes(q), q);
-  // The current closing rule is `/[”"](?:\s*\(NR\)\.?)?\s*$/u`; every default close/suffix literal must satisfy it.
-  const closeRe = regexFrom(readers, ')) openQuotation = false');
-  for (const c of d.quotes.close) for (const suffix of ['', ...d.quotes.closeSuffix.map((s) => ` ${s}`)]) assert.ok(closeRe.test(`texto${c}${suffix}`), `${c}${suffix}`);
+  const L = LEGACY;
+  for (const s of d.blockStarts.preamble) assert.ok(L.preamble.test(`${s} resolve:`), s);
+  for (const s of d.blockStarts.rectificationOriginal) assert.ok(L.rectificationOriginal.test(`${s} "x"`), s);
+  for (const s of d.blockStarts.rectificationCorrected) assert.ok(L.rectificationCorrected.test(`${s} "x"`), s);
+  for (const s of d.ncm.columnHeaders) assert.ok(L.ncmHeader.test(s), s);
+  for (const s of d.ncm.columnBlockers) assert.ok(L.ncmBlocker.test(s), s);
+  for (const s of d.labels.annex) assert.ok(L.annex.test(`${s} I`), s);
+  for (const s of d.labels.clause) assert.ok(L.clause.test(`${s} primeira`), s);
+  for (const s of d.labels.article) assert.ok(L.article.test(`${s} 1º`), s);
+  for (const s of d.labels.paragraph) assert.ok(L.paragraph.test(s === '§' ? '§ 1º' : s), s);
+  for (const s of d.lists.tokens) assert.ok(L.codeList.test(` ${s} `), s);
+  for (const s of d.ranges.operators) assert.ok(L.rangeBridge.test(` ${s} `), s);
+  for (const s of d.exceptions.markers) assert.ok(new RegExp(`^${L.exceptionMarker.source}$`, 'iu').test(s), s);
+  for (const s of d.ncm.markers) assert.ok(new RegExp(L.ncmMarker.source, 'iu').test(s), s);
+  for (const q of d.quotes.open) assert.ok(L.quoteOpen.test(q) && L.quoteBlockOpen.test(` ${q}`), q);
+  for (const c of d.quotes.close) for (const suffix of ['', ...d.quotes.closeSuffix.map((s) => ` ${s}`)]) assert.ok(L.quoteClose.test(`texto${c}${suffix}`), `${c}${suffix}`);
 });
+

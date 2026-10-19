@@ -1,5 +1,6 @@
 import { Parser } from 'htmlparser2';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
+import { defaultRules, type CompiledRules } from './profile-rules.js';
 
 export interface AnatomyReaderInput {
   source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB';
@@ -7,6 +8,8 @@ export interface AnatomyReaderInput {
   html?: string | undefined;
   text?: string | undefined;
   missingResources?: string[];
+  /** Compiled effective profile for this source; defaults to the shipped DEFAULT_PROFILES. */
+  rules?: CompiledRules;
 }
 export type AnatomyReaderResult = Pick<AnatomyResult, 'canonicalText' | 'parts' | 'sourceMap' | 'coverage' | 'limitations' | 'status'>;
 export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, maxDepth: 128, maxNodes: 50_000 });
@@ -16,8 +19,6 @@ type Node = { tag: string; attrs: Record<string, string>; path: string; start: n
 type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
-const historical = /^(?:RedaoAnt|RemissoAnt|A8-2RemissaoAnt|A8-3RedacaoAnt)$/;
-const notes = /^(?:DataPublicao|A2DataPublicacao|Remisso|RemissoAnt|A8-1Remissao|A8-2RemissaoAnt)$/;
 const textOf = (node: Node): string => {
   const stack = [node]; let text = '';
   while (stack.length) {
@@ -37,40 +38,50 @@ const classesOf = (node: Node): string[] => {
   }
   return found;
 };
-function describe(node: Node, source: AnatomyReaderInput['source']): Descriptor {
-  const confaz = source === 'CONFAZ';
-  const dou = source === 'DOU';
+function describe(node: Node, rules: CompiledRules): Descriptor {
+  // Class scope is fixed per source (rules.classScope): CONFAZ looks at the block and its descendants, others at the block.
+  const subtree = rules.classScope === 'subtree';
   const text = textOf(node).trim();
-  const classes = classesOf(node);
   const own = (node.attrs.class ?? '').split(/\s+/);
-  const hist = confaz && classes.some((name) => historical.test(name));
+  const classes = subtree ? classesOf(node) : own;
+  const c = rules.classes; const p = rules.reasonPrefix;
+  const pick = (list: string[]): string | undefined => list.find((name) => classes.includes(name));
+  const hist = classes.some((name) => c.historical.has(name));
   const context = hist ? 'historical' : 'operative_candidate';
-  if (confaz && classes.includes('TituloAcordo')) return { type: 'epigraph', context: 'prohibited', reason: 'confaz_epigraph', rank: 100 };
-  if (confaz && classes.includes('Ementa')) return { type: 'summary', context: 'prohibited', reason: 'confaz_summary', rank: 100 };
-  if (confaz && classes.some((name) => notes.test(name))) return { type: 'editorial_note', context: hist ? 'historical' : 'prohibited', reason: 'confaz_editorial_note', rank: 100 };
-  // DOU official INLABS classes on the block itself describe position, never legal status.
-  if (dou && own.includes('identifica')) return { type: 'epigraph', context: 'prohibited', reason: 'dou_identifica', rank: 100 };
-  if (dou && own.includes('ementa')) return { type: 'summary', context: 'prohibited', reason: 'dou_ementa', rank: 100 };
-  if (dou && own.includes('assina')) return { type: 'signature', context: 'prohibited', reason: 'dou_assina', rank: 100 };
-  if (dou && own.includes('cargo')) return { type: 'signature', context: 'prohibited', reason: 'dou_cargo', rank: 100 };
+  const note = classes.some((name) => c.editorialNote.has(name));
+  if (subtree) {
+    if (pick(c.epigraph)) return { type: 'epigraph', context: 'prohibited', reason: `${p}_epigraph`, rank: 100 };
+    if (pick(c.summary)) return { type: 'summary', context: 'prohibited', reason: `${p}_summary`, rank: 100 };
+    if (note) return { type: 'editorial_note', context: hist ? 'historical' : 'prohibited', reason: `${p}_editorial_note`, rank: 100 };
+    if (pick(c.signature)) return { type: 'signature', context: 'prohibited', reason: `${p}_signature`, rank: 100 };
+  } else {
+    // Official classes on the block itself describe position, never legal status; the reason names the class.
+    const epigraph = pick(c.epigraph); if (epigraph) return { type: 'epigraph', context: 'prohibited', reason: `${p}_${epigraph}`, rank: 100 };
+    const summary = pick(c.summary); if (summary) return { type: 'summary', context: 'prohibited', reason: `${p}_${summary}`, rank: 100 };
+    const signature = pick(c.signature); if (signature) return { type: 'signature', context: 'prohibited', reason: `${p}_${signature}`, rank: 100 };
+    if (note) return { type: 'editorial_note', context: hist ? 'historical' : 'prohibited', reason: `${p}_editorial_note`, rank: 100 };
+  }
   // Rectification wording quotes another act: original and corrected text both stay out of positive selection.
-  if (dou && /^Onde\s+se\s+l[êe](?![\p{L}\p{N}])/iu.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: 'dou_rectification_original', rank: 100 };
-  if (dou && /^Leia-se(?![\p{L}\p{N}])/iu.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: 'dou_rectification_corrected', rank: 100 };
-  if (/^\s*["“]/u.test(text)) return { type: 'quoted_text', context: hist ? 'historical' : 'prohibited', reason: 'quoted_block', rank: 100 };
-  if (/^(?:O\s+(?:Conselho|Ministro|Secret[áa]rio|Governador|Presidente)|A\s+(?:Secret[áa]ria|Receita Federal)|CONSIDERANDO\b)/iu.test(text)) return { type: 'preamble', context: hist ? 'historical' : 'prohibited', reason: 'preamble_marker', rank: 100 };
+  if (rules.rectificationOriginal.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: `${p}_rectification_original`, rank: 100 };
+  if (rules.rectificationCorrected.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: `${p}_rectification_corrected`, rank: 100 };
+  if (rules.quoteBlockOpen.test(text)) return { type: 'quoted_text', context: hist ? 'historical' : 'prohibited', reason: 'quoted_block', rank: 100 };
+  if (rules.preamble.test(text)) return { type: 'preamble', context: hist ? 'historical' : 'prohibited', reason: 'preamble_marker', rank: 100 };
   // Only block-initial markers are recognized. A reference to an annex in prose is not a heading.
-  if (/^ANEXO\s+(?:[IVXLCDM]+|[0-9]+)(?:\s*[-–—:(]|\s*$)/iu.test(text)) return { type: 'annex', context, reason: 'annex_heading', rank: 2 };
-  if (/^Cl[áa]usula\s+(?:primeira|segunda|terceira|quarta|quinta|sexta|s[ée]tima|oitava|nona|d[ée]cima|\d+)/iu.test(text)) return { type: 'clause', context, reason: 'clause_marker', rank: 3 };
-  if (/^(?:Art(?:igo|\.)\s*\d+[ºo°]?)/iu.test(text)) return { type: 'article', context, reason: 'article_marker', rank: 3 };
-  if (/^(?:§\s*\d+|Par[áa]grafo\s+[úu]nico)/iu.test(text)) return { type: 'paragraph', context, reason: 'paragraph_marker', rank: 4 };
+  if (rules.annex.test(text)) return { type: 'annex', context, reason: 'annex_heading', rank: 2 };
+  if (rules.clause.test(text)) return { type: 'clause', context, reason: 'clause_marker', rank: 3 };
+  if (rules.article.test(text)) return { type: 'article', context, reason: 'article_marker', rank: 3 };
+  if (rules.paragraph.test(text)) return { type: 'paragraph', context, reason: 'paragraph_marker', rank: 4 };
+  // Inciso and alínea numbering is built-in grammar, not a profile label.
   if (/^[IVXLCDM]+\s*[-–—]/u.test(text)) return { type: 'inciso', context, reason: 'inciso_marker', rank: 5 };
   if (/^[a-z]\)\s/u.test(text)) return { type: 'alinea', context, reason: 'alinea_marker', rank: 6 };
-  if (confaz && classes.some((name) => /^(?:TextoAcordo|A5-1TextoAcordo|RedaoAnt|A8-3RedacaoAnt)$/.test(name))) return { type: 'body', context, reason: hist ? 'confaz_historical_wording' : 'confaz_text_class', rank: 100 };
+  if (classes.some((name) => c.body.has(name))) return { type: 'body', context, reason: hist ? `${p}_historical_wording` : `${p}_text_class`, rank: 100 };
   return { type: 'unidentified', context: 'unknown', reason: 'unrecognized_block', rank: 100 };
 }
 
 /** Pure snapshot reader. It never fetches resources, infers current legal status, or grants eligibility. */
 export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult {
+  const rules = input.rules ?? defaultRules(input.source);
+  if (rules.source !== input.source) throw new TypeError(`Rules compiled for ${rules.source} cannot read ${input.source}`);
   const result: AnatomyReaderResult = { canonicalText: '', parts: [], sourceMap: [],
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
     limitations: [], status: 'complete' };
@@ -185,12 +196,14 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
     return part;
   };
   type DomContext = 'operative_candidate' | 'historical' | 'prohibited';
+  // DOM zones inherited from editorial classes are a fixed CONFAZ behaviour (subtree class scope).
+  const zones = rules.classScope === 'subtree';
   const domContext = (node: Node, inherited: DomContext): DomContext => {
     const ownClasses = (node.attrs.class ?? '').split(/\s+/);
     if (inherited === 'prohibited' || node.tag === 'blockquote' || node.tag === 'q'
-      || (input.source === 'CONFAZ' && ownClasses.some((name) => ['TituloAcordo', 'Ementa'].includes(name)))) return 'prohibited';
-    if (inherited === 'historical' || (input.source === 'CONFAZ' && ownClasses.some((name) => historical.test(name)))) return 'historical';
-    if (input.source === 'CONFAZ' && ownClasses.some((name) => notes.test(name))) return 'prohibited';
+      || (zones && ownClasses.some((name) => rules.classes.epigraph.includes(name) || rules.classes.summary.includes(name)))) return 'prohibited';
+    if (inherited === 'historical' || (zones && ownClasses.some((name) => rules.classes.historical.has(name)))) return 'historical';
+    if (zones && ownClasses.some((name) => rules.classes.editorialNote.has(name))) return 'prohibited';
     return 'operative_candidate';
   };
   const hasInlineQuote = (node: Node): boolean => {
@@ -232,7 +245,7 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
         const rowSpan = parseSpan(cell.attrs.rowspan); const columnSpan = parseSpan(cell.attrs.colspan);
         const inlineQuote = hasInlineQuote(cell);
         const ownCellContext = domContext(cell, rowContext);
-        const cellHistorical = input.source === 'CONFAZ' && classesOf(cell).some((name) => historical.test(name));
+        const cellHistorical = zones && classesOf(cell).some((name) => rules.classes.historical.has(name));
         const cellContext = inlineQuote || ownCellContext === 'prohibited' ? 'prohibited' : cellHistorical ? 'historical' : ownCellContext;
         const cp = newPart('cell', cell.span.start, cell.span.end, rp.id, cellContext, 'table_cell', pointer(cell.path, cell.start, cell.end));
         if (cellContext !== 'operative_candidate') cp.contextReasons.push('inherited_dom_zone');
@@ -267,16 +280,16 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
       const text = textOf(node).trim();
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
-      if (/^[“"]/u.test(text)) openQuotation = true;
+      if (rules.quoteOpen.test(text)) openQuotation = true;
       const descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
-        : describe(node, input.source);
+        : describe(node, rules);
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
       const part = attach(node, descriptor);
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (inlineQuote) { part.contextReasons.push('inline_quote_conservative_exclusion'); limitation('inline_quote_conservative_exclusion', 'Inline quoted content excludes its entire containing block; no operative selection is inferred.', node.span); }
-      if (/[”"](?:\s*\(NR\)\.?)?\s*$/u.test(text) && !/^[“"]$/.test(text)) openQuotation = false;
+      if (rules.quoteClose.test(text) && !rules.quoteOnly.test(text)) openQuotation = false;
       return;
     }
     for (const child of node.children) walk(child, context, quotedDom);
@@ -316,8 +329,8 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
   return result;
 }
 
-/** Explicit NCM header columns only. Generic CÓDIGO, NBM, SH or TIPI columns do not qualify. */
-export function identifyNcmPartIds(result: Pick<AnatomyReaderResult, 'parts' | 'canonicalText'>): string[] {
+/** Explicit NCM header columns only (profile `ncm.columnHeaders`); blockers (`ncm.columnBlockers`) close a column. */
+export function identifyNcmPartIds(result: Pick<AnatomyReaderResult, 'parts' | 'canonicalText'>, rules: CompiledRules = defaultRules('DOE-SP')): string[] {
   const ids: string[] = [];
   const children = new Map<string, AnatomyPart[]>();
   for (const part of result.parts) if (part.parentId !== null) {
@@ -329,8 +342,8 @@ export function identifyNcmPartIds(result: Pick<AnatomyReaderResult, 'parts' | '
       for (const cell of (children.get(row.id) ?? []).filter((part) => part.type === 'cell')) {
         if (!cell.table || cell.table.geometry === 'unknown' || cell.table.columnSpan !== 1) continue;
         const text = result.canonicalText.slice(cell.span.start, cell.span.end).trim();
-        if (/^(?:C[ÓO]DIGO\s+)?NCM(?:\s*\/\s*SH)?$/iu.test(text)) columns.add(cell.table.column);
-        else if (/^(?:NBM|TIPI|SH|C[ÓO]DIGO)(?:\s*\/.*)?$/iu.test(text)) columns.delete(cell.table.column);
+        if (rules.ncmHeader.test(text)) columns.add(cell.table.column);
+        else if (rules.ncmBlocker.test(text)) columns.delete(cell.table.column);
         else if (columns.has(cell.table.column)) ids.push(cell.id);
       }
     }

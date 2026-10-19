@@ -45,7 +45,8 @@ Origem: COORD → CLAUDE-EXEC, autorização de 19/10/2026 ([issue #116](https:/
 
 ## Limites e próximos passos
 
-- Os perfis ainda **não mudam o comportamento** do motor. O P1.B vai ligar o leitor e o extrator ao perfil efetivo. Nessa fase o comportamento estrutural precisa ser preservado, e os hashes derivados (`engineHash`, `ruleSetHash`, `analysisId`, `outputHash`) vão mudar necessariamente.
+- **Atualização P1.B:** os perfis passaram a dirigir o motor; ver [profile-engine.md](profile-engine.md). Os testes de fidelidade agora usam o oráculo `test/support/anatomy-legacy-rules.ts`, cópia literal das regras de `585f5a49`, porque as constantes saíram do leitor.
+- (Texto original do P1.A) Os perfis ainda **não mudam o comportamento** do motor. O P1.B vai ligar o leitor e o extrator ao perfil efetivo. Nessa fase o comportamento estrutural precisa ser preservado, e os hashes derivados (`engineHash`, `ruleSetHash`, `analysisId`, `outputHash`) vão mudar necessariamente.
 - Os testes de fidelidade checam **solidez** (todo literal padrão é aceito pela regra atual) e, nas listas de classes, **igualdade**. Nas regras que hoje são regex com variações gramaticais (por exemplo, numeral romano de inciso), a gramática continua built-in e fora do perfil.
 - Sem migration, endpoint, tela, medição, reserva, merge ou deploy.
 

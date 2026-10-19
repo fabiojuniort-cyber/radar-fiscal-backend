@@ -1,4 +1,5 @@
 import type { AnatomyEntity, AnatomyPart } from './contract.js';
+import { defaultRules, type CompiledRules } from './profile-rules.js';
 
 export interface AnatomyEntityInput {
   canonicalText: string;
@@ -7,6 +8,8 @@ export interface AnatomyEntityInput {
   ncmPartIds?: readonly string[];
   /** Controlled, exact-code catalog snapshot; no remote resolution or prefix expansion. */
   catalog?: { edition: string; codes: readonly string[] };
+  /** Profile-driven matchers (NCM marker, list tokens, range operators, exception markers). Domain protections stay fixed. */
+  rules?: Pick<CompiledRules, 'ncmMarker' | 'codeList' | 'rangeBridge' | 'exceptionMarker'>;
 }
 type Span = { start: number; end: number };
 const overlap = (a: Span, b: Span): boolean => a.start < b.end && b.start < a.end;
@@ -34,6 +37,7 @@ const protectedPatterns: ReadonlyArray<[AnatomyEntity['domain'], RegExp, string]
 /** Deterministic occurrence extraction. Recognition/validation never grants legal eligibility. */
 export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity[] {
   const text = input.canonicalText;
+  const rules = input.rules ?? defaultRules('DOE-SP');
   if (text.length > 2 * 1024 * 1024) throw new RangeError('ANAT entity input exceeds 2 Mi UTF-16 units');
   const hierarchy = new Map(input.parts.map(part => [part.id, part]));
   const depth = (part: AnatomyPart): number => {
@@ -93,10 +97,10 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
     contexts.push(part.span);
   }
   // A marker permits only a bounded numeric list, stopping before unrelated prose/new lines.
-  for (const marker of text.matchAll(/\bNCM(?:\/SH)?\b\s*(?:(?:c[oó]digos?|n[.º°o]s?)\s*)?[:=-]?\s*/giu)) {
+  for (const marker of text.matchAll(rules.ncmMarker)) {
     const start = marker.index + marker[0].length;
     const tail = text.slice(start, Math.min(text.length, start + 1024)).split(/[\r\n]/, 1)[0]!;
-    const list = /^(?:[ \t]*(?:\d[\d.]*|at[eé](?!\p{L})|a\b|e\b|ou\b|exceto\b|excetuad[oa]s?\b|exclu[ií]d[oa]s?\b|salvo\b|exclusive\b|inclusive\b|de\b|[,:;()–—-]))+/iu.exec(tail);
+    const list = rules.codeList.exec(tail);
     if (list) {
       // A dot followed by whitespace/end is a sentence boundary, never an internal code separator.
       const sentenceEnd = /\.(?=[ \t]|$)/u.exec(list[0]);
@@ -122,12 +126,12 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
   for (let index = 0; index + 1 < ncms.length; index += 1) {
     const first = ncms[index]!; const last = ncms[index + 1]!;
     const bridge = text.slice(first.span.end, last.span.start);
-    if (first.partId !== last.partId || !/^\s*(?:a|at[eé]|[-–—])\s*$/iu.test(bridge) || /[\r\n]/u.test(bridge)) continue;
+    if (first.partId !== last.partId || !rules.rangeBridge.test(bridge) || /[\r\n]/u.test(bridge)) continue;
     const members = [first, last];
     while (index + members.length < ncms.length) {
       const next = ncms[index + members.length]!;
       const nextBridge = text.slice(members.at(-1)!.span.end, next.span.start);
-      if (next.partId !== first.partId || /[\r\n]/u.test(nextBridge) || !/^\s*(?:a|at[eé]|[-–—])\s*$/iu.test(nextBridge)) break;
+      if (next.partId !== first.partId || /[\r\n]/u.test(nextBridge) || !rules.rangeBridge.test(nextBridge)) break;
       members.push(next);
     }
     const span = { start: first.span.start, end: members.at(-1)!.span.end };
@@ -144,7 +148,7 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
     for (const member of members.slice(1)) member.relation = { kind: 'range_end', groupId, targetEntityIds: [first.id], operator: bridge.trim(), scopePartId: compound.partId, condition: null, expansion: [] };
     index += members.length - 1;
   }
-  for (const marker of text.matchAll(/\b(?:exceto|excetuad[oa]s?|exclu[ií]d[oa]s?|salvo|exclusive)\b/giu)) {
+  for (const marker of text.matchAll(rules.exceptionMarker)) {
     const markerEnd = marker.index + marker[0].length;
     let scope = owner({ start: marker.index, end: markerEnd });
     if (scope.type === 'cell' && scope.parentId !== null && byId.get(scope.parentId)?.type === 'row') scope = byId.get(scope.parentId)!;
