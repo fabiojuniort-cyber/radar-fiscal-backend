@@ -61,3 +61,26 @@ Seleções `thematic_text` e seleções negativas não entram em S1.
 - **reproduções adversariais do parecer EVAL-01** (PR #244, review 5566614441): relação com ponta NCM↔NBM trocada e id inexistente; seleções inexatas, sem span, invertidas e fora do texto, sempre classificadas; emissões em lacuna declarada e em parte `unidentified` como não verificáveis; irmão omitido sem esconder inversão; agregação das classes S1b;
 - **R2 do parecer EVAL-01** (review 5566651307): E3 com três irmãos (`[2,0,1]` → 1/3, perfeito → 3/3, invertido → 0/3, `[1,0,2]` → 2/3); S1 sem cobertura = pendência, com cobertura parcial, emissão na borda, lacuna acima da cobertura, violação em código independente de cobertura e cobertura inválida ignorada; M2a com alvos repetidos e relação duplicada;
 - papéis estáticos dos golds 01 (640 candidatos e 1.362 não candidatos) e 02 (0 e 1), iguais aos da matriz.
+
+## ANAT-04-EVAL-02 — adaptador `AnatomyResult` → `Prediction`
+
+Arquivo: `src/modules/anatomy/evaluation-adapter.ts` (`ANAT-EVAL-ADAPTER/1.0.0`). Função pura, só em memória, sem medição.
+
+- `anatomyResultToPrediction(result, { selections })`: valida o resultado pelo contrato antes de converter e falha de modo fechado. Não altera a entrada.
+  - **Partes:** id, pai, ordem, tipo, span e contexto preservados. Uma célula com geometria `unknown` não vira célula com geometria (`table: null`) e fica registrada em `pending.unresolved`.
+  - **Entidades:** span e domínio preservados, sem remapeamento (por exemplo, `LAW_NUMBER` continua `LAW_NUMBER`). As entidades compostas `NCM_RANGE`/`NCM_EXCEPTION` não viram ocorrências; viram **relações**.
+  - **Faixa:** os membros saem de `relation.targetEntityIds`, em ordem. O span do operador só é localizado se o texto do operador aparecer **uma única vez** entre o primeiro e o último membro; caso contrário fica `null` e vai para `pending.unresolved`.
+  - **Exceção:** os alvos são exatamente os emitidos pelo motor. O operador é localizado no início do span composto ou, se não estiver lá, uma única vez dentro dele; caso contrário fica `null`. O escopo é o span composto, e a condição é a de `relation.condition`. O M2b compara esse escopo com a convenção do gold, e o M2c continua N/A.
+  - **Pendências** (`pending`): status, limitações, segmentos `unidentified`, `missingResources` e itens não resolvidos (span de operador, geometria, alvo inexistente). São carregadas para o relatório e nunca contam como acerto.
+  - **Seleções:** argumento **obrigatório e explícito**. Passar `[]` significa nenhuma seleção. Nada é derivado de `eligibility`.
+  - **Cobertura:** `coverage` traz só os números do próprio motor, para o C1 descritivo. Nunca é usada como `annotationCoverage`, que continua sendo opção do avaliador, fornecida e justificada à parte.
+- `selectionsFromEligibility(result)`: mapeamento **opcional** e um a um de `eligibility` para seleções (`eligible` → `positive`). O adaptador não o chama; quem avalia decide usá-lo.
+
+Testes (`test/anatomy.evaluation-adapter.unit.test.ts`): rodam o motor só sobre HTML sintético escrito no próprio teste. Cobrem:
+- seleções explícitas obrigatórias e o mapeamento opcional;
+- preservação de partes, spans e domínios;
+- entidades compostas convertidas em relação;
+- operadores localizados;
+- pendências: status `partial`, recurso ausente, geometria desconhecida, operador não localizável;
+- validação do contrato e não mutação da entrada;
+- um caso de ponta a ponta em memória, em que uma positiva inventada fica pendente sem cobertura e uma positiva sobre código histórico é violação.

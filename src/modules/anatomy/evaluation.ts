@@ -13,8 +13,18 @@ export interface PredictedPart { id: string; parentId: string | null; type: stri
 export interface PredictedEntity { id: string; domain: string; span: Span }
 export interface PredictedRelation { kind: 'range' | 'exception'; operatorSpan: Span | null; memberEntityIds: string[]; targetEntityIds: string[]; scopeSpan: Span | null; condition: string | null }
 export interface PredictedSelection { purpose: 'ncm' | 'thematic_text'; positive: boolean; /** null or invalid = unlocated (still counted in S1b). */ span: Span | null }
+/** Items the prediction itself declares unresolved; carried for the report, never scored as hits. */
+export interface PredictionPending {
+  status: 'complete' | 'partial' | 'failed';
+  limitations: { code: string; partId: string | null; span: Span | null }[];
+  unidentifiedSegments: Span[];
+  missingResources: string[];
+  unresolved: { kind: 'operator_span' | 'table_geometry' | 'relation_target'; ref: string; detail: string }[];
+}
 export interface Prediction { parts: PredictedPart[]; entities: PredictedEntity[]; relations: PredictedRelation[]; selections: PredictedSelection[];
-  coverage?: { textLength: number; recognizedLength: number } }
+  /** Engine-reported coverage for the descriptive C1 only; never used as proven annotation coverage. */
+  coverage?: { textLength: number; recognizedLength: number };
+  pending?: PredictionPending }
 
 /** P/R/F1 with the decision table: P is N/A without predictions; R is N/A without gold; zero hits with both → 0/0/0. */
 export interface Prf { tp: number; fp: number; fn: number; precision: number | null; recall: number | null; f1: number | null }
