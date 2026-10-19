@@ -24,7 +24,7 @@ Origem: COORD → CLAUDE-EXEC, autorização de 19/10/2026 ([issue #116](https:/
 - **Identidade:**
   - `ruleSetHash` deixa de usar o rótulo fixo `profile: 'conservative/0.1.0'` e passa a usar `{ format: 'ANAT-PROFILE/1', effectiveHash }`;
   - `profile.ts` e `profile-rules.ts` entram na identidade da build;
-  - **`engineHash` vai de `ad69d285…` para `8b2eefbb2f4d051934f8aeea9b80078adcd58bccfa4ebb9a0430cc4fe10fe638`.**
+  - **`engineHash` vai de `ad69d285…` para `8b2eefbb…` no `fef9d51` e, depois das correções da revisão do #249, para `5c68a23c3d25e735be55cc4ce2c431c66eb70e992c28b10324d4ad750be5ae0b`.**
 
   Como previsto no ADMIN-01, `ruleSetHash`, `analysisId` e `outputHash` mudam necessariamente.
 - **Contrato (`contract.ts`):** inalterado.
@@ -87,7 +87,31 @@ Cada campo editável muda o motor da forma configurada:
 
 ## 5. Validação e o que **não** foi feito
 
-- `npm run test:anatomy`: **139/139**; `tsc --noEmit` e `npm run build`: OK; identidade verificada (`8b2eefbb…`); snapshot sintético verificado.
+- `npm run test:anatomy`: **142/142** (eram 139 no `fef9d51`); `tsc --noEmit` e `npm run build`: OK; identidade verificada (`5c68a23c…`); snapshot sintético verificado.
 - **Golds, especificações, aprovações e contrato:** diferença vazia em relação a `585f5a49`.
 - **Testes que já existiam e tocam as entradas de desenvolvimento:** `test:anatomy` já incluía a verificação do **texto canônico** congelado (`dev-canonical`) e a reprodutibilidade dos golds. Ambos usam o leitor só para extrair o **texto** das 7 entradas de desenvolvimento, que continua idêntico. **Nenhuma comparação estrutural do motor com essas entradas foi feita** nem relatada.
 - Sem medição, reserva, recaptura, migration, endpoint, tela, merge ou deploy.
+
+## 6. Correções da revisão do PR #249
+
+Origem: parecer BLOCK do revisor GPT/Codex no `fef9d51` ([revisão no PR #249](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/249#pullrequestreview-5569875729); [encaminhamento na issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6264618914)). Testes novos, todos sintéticos, em `test/anatomy.profile-engine.unit.test.ts` (`#249 finding 1/2/3`).
+
+1. **ALTA — piso das proteções de contexto** (`protection_weakened`).
+   - **Antes:** remover `RedaoAnt` ou `TituloAcordo` da configuração fazia uma cláusula virar `operative_candidate`. O teste reproduz isso compilando as regras sem passar pela resolução.
+   - **Agora:** `resolveEffectiveProfile`, por onde o motor sempre passa, exige que o perfil efetivo **contenha** todos os literais entregues em `DEFAULT_PROFILES` para a mesma fonte nestes campos:
+     - `classes.historical`, `classes.editorialNote`, `classes.epigraph`, `classes.summary` e `classes.signature`;
+     - `blockStarts.preamble`, `blockStarts.rectificationOriginal` e `blockStarts.rectificationCorrected`;
+     - `quotes.open`, `ncm.columnBlockers` e `exceptions.markers`.
+   - **Aspas de fechamento:** em `quotes.close` e `quotes.closeSuffix` vale o contrário, o teto. Um fechamento novo encerraria a citação antes e exporia texto citado, então só é possível manter ou retirar literais entregues.
+   - **Alcance:** o piso vale nos níveis de fonte e de família e também quando quem chama substitui o próprio `default`. Acrescentar proteções continua permitido. Uma grafia equivalente pelo casador (`EXCETO` ≡ `exceto`) mantém a proteção.
+   - **Cobertura:** o teste remove, um a um, cada literal protegido de cada fonte.
+   - **Custo:** um perfil não consegue mais desligar uma proteção entregue. Isso exige uma nova versão dos perfis padrão, com revisão.
+2. **MÉDIA — uma única normalização.**
+   - **Forma canônica obrigatória:** literais só são aceitos em NFC, com palavras separadas por um único espaço U+0020; classes CSS e aspas não podem ter espaço. Formas não canônicas, como espaço duplo, NBSP ou NFD, são recusadas (`invalid_fields`) em vez de normalizadas em silêncio.
+   - **Mesmos fragmentos dos dois lados:** validação e compilador usam os mesmos fragmentos de regex (`literalPattern` em `profile.ts`). "Duplicata" passa a significar "o casador compilado de um aceita o outro" (`sameLiteral`). O texto do documento continua com espaçamento flexível.
+3. **MÉDIA — cabeçalho e bloqueador equivalentes.**
+   - **Bloqueadores:** passam a ser compilados com o mesmo fragmento dos cabeçalhos, que tolera espaços em volta de `/`.
+   - **Conflito:** é decidido pelo bloqueador compilado (`blockerPattern`) aplicado a cada cabeçalho. `NCM/SH` permitido com `NCM / SH` bloqueado, ou o contrário, é recusado dentro de um perfil (`semantic_conflict`) e depois da herança (`effective_conflict`).
+   - **Defaults:** nenhum dos padrões entregues muda, porque nenhum bloqueador padrão tem `/` ou espaço.
+
+**Equivalência preservada:** o snapshot dos 12 documentos e o diferencial contra o oráculo continuam idênticos; as duas diferenças de preâmbulo são as mesmas e ainda **aguardam aceite específico**. A identidade foi regenerada (`5c68a23c…`), porque `profile.ts` e `profile-rules.ts` fazem parte dela. Testes existentes que removiam proteções passaram a acrescentar literais ou a usar uma fonte sem esse piso; o efeito testado continua o mesmo.

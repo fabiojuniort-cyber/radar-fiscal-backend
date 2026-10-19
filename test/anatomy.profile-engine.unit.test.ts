@@ -4,7 +4,7 @@ import test from 'node:test';
 import { structuralOutput } from '../ops/anatomy/synthetic-snapshot.js';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../src/modules/anatomy/build-identity.js';
 import { analyzeAnatomy, type AnatomyRequest } from '../src/modules/anatomy/engine.js';
-import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, ProfileValidationError } from '../src/modules/anatomy/profile.js';
+import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, ProfileValidationError, resolveEffectiveProfile, validateProfile } from '../src/modules/anatomy/profile.js';
 import { compileProfileRules, defaultRules } from '../src/modules/anatomy/profile-rules.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
 import { LEGACY } from './support/anatomy-legacy-rules.js';
@@ -108,7 +108,7 @@ test('configuration effects: each editable field changes the engine as configure
   assert.ok(reasons(analyzeAnatomy(base(pre, 'RFB', { profiles: withSource('RFB', { blockStarts: { ...defaults.blockStarts, preamble: [...defaults.blockStarts.preamble!, 'O Diretor'] } }) })))
     .includes('preamble:preamble_marker:prohibited'));
   // A family profile applies only when the request names that family.
-  const famProfiles = [...DEFAULT_PROFILES, { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'family', source: 'RFB', family: 'Despacho' }, fields: { blockStarts: { preamble: ['O Diretor'] } } }];
+  const famProfiles = [...DEFAULT_PROFILES, { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'family', source: 'RFB', family: 'Despacho' }, fields: { blockStarts: { preamble: [...defaults.blockStarts.preamble!, 'O Diretor'] } } }];
   assert.ok(!reasons(analyzeAnatomy(base(pre, 'RFB', { profiles: famProfiles }))).some((r) => r.startsWith('preamble')));
   assert.ok(reasons(analyzeAnatomy(base(pre, 'RFB', { profiles: famProfiles, family: 'Despacho' }))).includes('preamble:preamble_marker:prohibited'));
 });
@@ -118,7 +118,7 @@ test('identity: ruleSetHash follows the effective profile; engineHash is the reg
   const a = analyzeAnatomy(base(html));
   const sameEffective = analyzeAnatomy(base(html, 'CONFAZ', { profiles: [...DEFAULT_PROFILES].reverse() }));
   assert.equal(sameEffective.identity.ruleSetHash, a.identity.ruleSetHash, 'same effective profile, any order');
-  const changed = analyzeAnatomy(base(html, 'CONFAZ', { profiles: withSource('CONFAZ', { quotes: { open: ['"'], close: ['"'], closeSuffix: ['(NR)'] } }) }));
+  const changed = analyzeAnatomy(base(html, 'CONFAZ', { profiles: withSource('CONFAZ', { quotes: { open: ['"', '“', '«'], close: ['"', '”'], closeSuffix: ['(NR)'] } }) }));
   assert.notEqual(changed.identity.ruleSetHash, a.identity.ruleSetHash);
   assert.notEqual(changed.analysisId, a.analysisId);
   assert.equal(a.identity.engineHash, ANATOMY_ENGINE_BUILD_HASH);
@@ -156,4 +156,105 @@ test('fail closed: invalid profiles, wrong-source rules, and conflicting effecti
   const defaults = DEFAULT_PROFILES[0]!.fields as { ncm: Record<string, string[]> };
   assert.throws(() => analyzeAnatomy(base('<p>x</p>', 'RFB', { profiles: withSource('RFB', { ncm: { columnHeaders: [...defaults.ncm.columnHeaders!, 'TIPI'] } }) })), ProfileValidationError);
   assert.throws(() => readAnatomyInput({ source: 'DOU', representationId: 'x', html: '<p>x</p>', rules: defaultRules('CONFAZ') }), TypeError);
+});
+
+// Review of PR #249 (GPT/Codex, BLOCK on fef9d51): the three findings, reproduced and closed with synthetic data only.
+const codeOf = (fn: () => unknown): string => { try { fn(); } catch (e) { assert.ok(e instanceof ProfileValidationError, String(e)); return e.code; } return 'no-error'; };
+const confazClasses = () => structuredClone((DEFAULT_PROFILES.find((p) => p.scope.level === 'source' && p.scope.source === 'CONFAZ')!.fields as { classes: Record<string, string[]> }).classes);
+const shippedDefault = () => structuredClone(DEFAULT_PROFILES[0]!.fields) as unknown as Record<string, Record<string, string[]>>;
+const src249 = (source: string, fields: unknown) => ({ profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'source' as const, source }, fields });
+const partOf = (r: ReturnType<typeof analyzeAnatomy>, type: string) => r.parts.find((p) => p.type === type);
+
+test('#249 finding 1: shipped context protections cannot be removed by configuration', () => {
+  const historical = '<p class="RedaoAnt">Cláusula primeira NCM 8471.30.12.</p>';
+  const epigraph = '<p class="TituloAcordo">Cláusula primeira NCM 8471.30.12.</p>';
+  assert.equal(partOf(analyzeAnatomy(base(historical)), 'clause')?.context, 'historical');
+  assert.equal(analyzeAnatomy(base(epigraph)).parts.find((p) => p.type === 'epigraph')?.context, 'prohibited');
+  // The hazard, reproduced below the resolution gate: rules compiled without RedaoAnt / TituloAcordo make the text operative.
+  const unsafe = (classes: Record<string, string[]>) => compileProfileRules({ fields: { ...shippedDefault(), classes: { ...shippedDefault().classes, ...classes } } as never, effectiveHash: 'unsafe' }, 'CONFAZ');
+  const noRedao = confazClasses(); noRedao.historical = noRedao.historical!.filter((c) => c !== 'RedaoAnt');
+  const noTitulo = confazClasses(); noTitulo.epigraph = [];
+  const operative = (html: string, classes: Record<string, string[]>) => readAnatomyInput({ source: 'CONFAZ', representationId: 'x', html, rules: unsafe(classes) }).parts.find((p) => p.type === 'clause')?.context;
+  assert.equal(operative(historical, noRedao), 'operative_candidate');
+  assert.equal(operative(epigraph, noTitulo), 'operative_candidate');
+  // The engine always resolves the profile, and resolution refuses both configurations (source and family levels).
+  for (const classes of [noRedao, noTitulo]) {
+    assert.equal(codeOf(() => analyzeAnatomy(base(historical, 'CONFAZ', { profiles: withSource('CONFAZ', { classes }) }))), 'protection_weakened');
+    const fam = [...DEFAULT_PROFILES, { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'family', source: 'CONFAZ', family: 'Ajuste' }, fields: { classes } }];
+    assert.equal(codeOf(() => analyzeAnatomy(base(historical, 'CONFAZ', { profiles: fam, family: 'Ajuste' }))), 'protection_weakened');
+  }
+  // Replacing the shipped default by a caller-supplied one cannot lower the floor either.
+  assert.equal(codeOf(() => analyzeAnatomy(base(historical, 'CONFAZ', { profiles: [DEFAULT_PROFILES[0]!] }))), 'protection_weakened', 'CONFAZ classes missing');
+  const noConsiderando = shippedDefault(); noConsiderando.blockStarts!.preamble = noConsiderando.blockStarts!.preamble!.filter((s) => s !== 'CONSIDERANDO');
+  assert.equal(codeOf(() => resolveEffectiveProfile([{ profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'default' }, fields: noConsiderando }], { source: 'RFB' })), 'protection_weakened');
+  // Every protective field is covered: removing any shipped literal is refused, for every source.
+  const floor: [string, string][] = [['classes', 'historical'], ['classes', 'editorialNote'], ['classes', 'epigraph'], ['classes', 'summary'], ['classes', 'signature'],
+    ['blockStarts', 'preamble'], ['blockStarts', 'rectificationOriginal'], ['blockStarts', 'rectificationCorrected'], ['quotes', 'open'], ['ncm', 'columnBlockers'], ['exceptions', 'markers']];
+  let checked = 0;
+  for (const source of ['CONFAZ', 'DOU', 'DOE-SP', 'RFB'] as const) {
+    const shipped = resolveEffectiveProfile([...DEFAULT_PROFILES], { source }).fields as unknown as Record<string, Record<string, string[]>>;
+    for (const [g, f] of floor) for (const lit of shipped[g]![f]!) {
+      const fields = { [g]: { [f]: shipped[g]![f]!.filter((x) => x !== lit) } };
+      assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES.filter((p) => !(p.scope.level === 'source' && p.scope.source === source)), { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'source', source },
+        fields: { ...(DEFAULT_PROFILES.find((p) => p.scope.level === 'source' && p.scope.source === source)?.fields ?? {}), ...fields } }], { source })), 'protection_weakened', `${source} ${g}.${f} ${lit}`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 40, `${checked} removals checked`);
+  // A new closing quote mark (or suffix) would end quotations earlier and expose quoted text: refused. Dropping one is safe.
+  assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { quotes: { close: ['"', '”', '»'] } })], { source: 'RFB' })), 'protection_weakened');
+  assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { quotes: { closeSuffix: ['(NR)', '(AC)'] } })], { source: 'RFB' })), 'protection_weakened');
+  assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { quotes: { closeSuffix: [] } })], { source: 'RFB' })), 'no-error');
+  // Adding protections stays allowed; a matcher-equivalent spelling of a shipped literal keeps it (EXCETO ≡ exceto).
+  const markers = (shippedDefault().exceptions!.markers!).map((m) => (m === 'exceto' ? 'EXCETO' : m));
+  assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { exceptions: { markers } })], { source: 'RFB' })), 'no-error');
+  assert.equal(codeOf(() => analyzeAnatomy(base(historical, 'CONFAZ', { profiles: withSource('CONFAZ', { classes: { ...confazClasses(), historical: [...confazClasses().historical!, 'NovaHist'] } }) }))), 'no-error');
+});
+
+test('#249 finding 2: one normalisation — non-canonical literals are rejected, so validation and compiler agree', () => {
+  const invalid: [string, unknown][] = [
+    ['double space', src249('RFB', { blockStarts: { preamble: [...shippedDefault().blockStarts!.preamble!, 'O  Diretor'] } })],
+    ['NBSP', src249('RFB', { blockStarts: { preamble: [...shippedDefault().blockStarts!.preamble!, 'O Diretor'] } })],
+    ['NFD label', src249('RFB', { labels: { clause: ['Cláusula'] } })],
+    ['NFD token', src249('RFB', { lists: { tokens: ['até'] } })],
+    ['NFD class', src249('CONFAZ', { classes: { body: ['Remé'] } })],
+    ['space in class', src249('CONFAZ', { classes: { body: ['Texto Acordo'] } })],
+    ['space in quote', src249('RFB', { quotes: { open: ['"', '“', '« '] } })],
+  ];
+  for (const [name, p] of invalid) assert.equal(codeOf(() => validateProfile(p)), 'invalid_fields', name);
+  // Duplicates are decided by the field's compiled matcher: case for words, case and spacing around "/" for NCM headers.
+  assert.equal(codeOf(() => validateProfile(src249('RFB', { ncm: { columnHeaders: ['NCM/SH', 'ncm / sh'] } }))), 'semantic_conflict');
+  assert.equal(codeOf(() => validateProfile(src249('RFB', { labels: { clause: ['Cláusula', 'CLÁUSULA'] } }))), 'semantic_conflict');
+  // For accepted literals, "duplicate" means exactly "the compiled matcher of one accepts the other".
+  const rules = (headers: string[]) => compileProfileRules(resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { ncm: { columnHeaders: headers } })], { source: 'RFB' }), 'RFB');
+  assert.ok(rules(['NCM/SH']).ncmHeader.test('ncm / sh'));
+  // Document text keeps flexible whitespace: one canonical literal matches any run of spaces or tabs in the text.
+  const pre = defaultRules('RFB').preamble;
+  assert.ok(pre.test('A Receita Federal resolve') && pre.test('A  Receita\tFederal resolve'));
+  // The shipped defaults are canonical (they validate unchanged).
+  for (const p of DEFAULT_PROFILES) assert.equal(codeOf(() => validateProfile(p)), 'no-error');
+});
+
+test('#249 finding 3: a header and a blocker that the reader treats alike cannot coexist', () => {
+  const blockers = [...shippedDefault().ncm!.columnBlockers!];
+  const conflict: [string, string[], string[]][] = [
+    ['NCM/SH allowed, NCM / SH blocked', ['NCM/SH'], [...blockers, 'NCM / SH']],
+    ['NCM / SH allowed, NCM/SH blocked', ['NCM / SH'], [...blockers, 'NCM/SH']],
+    ['case and spacing', ['Código NCM/SH'], [...blockers, 'CÓDIGO NCM / SH']],
+    ['blocker prefix before /', ['NCM / SH'], [...blockers, 'NCM']],
+  ];
+  for (const [name, columnHeaders, columnBlockers] of conflict) {
+    assert.equal(codeOf(() => validateProfile(src249('RFB', { ncm: { columnHeaders, columnBlockers } }))), 'semantic_conflict', name);
+  }
+  // Across inheritance: a family blocker against an inherited header.
+  const fam = { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'family' as const, source: 'RFB', family: 'IN' }, fields: { ncm: { columnBlockers: [...blockers, 'NCM / SH'] } } };
+  assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES, fam], { source: 'RFB', family: 'IN' })), 'effective_conflict');
+  // The compiled blocker treats "NCM / SH" and "NCM/SH" alike, as the compiled header does.
+  const accepted = compileProfileRules(resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { ncm: { columnHeaders: ['NCM'], columnBlockers: [...blockers, 'NCM / SH'] } })], { source: 'RFB' }), 'RFB');
+  for (const text of ['NCM/SH', 'NCM / SH', 'ncm  /  sh']) assert.ok(accepted.ncmBlocker.test(text), text);
+  // Whatever validation accepts, no header text is also blocked: checked on every shipped header variant.
+  for (const source of ['CONFAZ', 'DOU', 'DOE-SP', 'RFB'] as const) {
+    const r = defaultRules(source);
+    for (const h of shippedDefault().ncm!.columnHeaders!) for (const text of [h, h.toLowerCase(), h.replace('/', ' / ')]) assert.ok(r.ncmHeader.test(text) && !r.ncmBlocker.test(text), `${source} ${text}`);
+  }
 });

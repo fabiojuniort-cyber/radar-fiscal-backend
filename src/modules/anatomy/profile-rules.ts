@@ -1,4 +1,5 @@
-import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile, type EffectiveProfile, type ProfileFields } from './profile.js';
+import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, blockerPattern, escapeLiteral as esc, literalPattern, resolveEffectiveProfile, type EffectiveProfile,
+  type ProfileFields } from './profile.js';
 
 /**
  * ANAT P1.B — compiles an effective profile into the matchers used by the reader and the entity extractor.
@@ -22,16 +23,14 @@ export interface CompiledRules {
   codeList: RegExp; rangeBridge: RegExp; exceptionMarker: RegExp;
 }
 
-// Only regex syntax characters are escaped (required in `u` mode, where escaping other characters is an error).
-const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/gu, (c) => `\\${c}`);
 const NEVER = '(?!)';
 /** Longest first, so a literal that extends another (NCM/SH vs NCM) wins, as in the original alternations. */
 const byLength = (items: readonly string[]) => [...items].sort((a, b) => b.length - a.length || (a < b ? -1 : a > b ? 1 : 0));
 const alt = (parts: string[]) => (parts.length ? `(?:${parts.join('|')})` : NEVER);
-/** Words separated by spaces in a literal match any run of whitespace. */
-const words = (lit: string) => lit.split(' ').map(esc).join('\\s+');
-/** NCM header literals also tolerate whitespace around "/" (e.g. "NCM / SH"). */
-const header = (lit: string) => lit.split('/').map((side) => words(side.trim())).join('\\s*\\/\\s*');
+// Literal fragments come from profile.ts, the same ones validation uses for duplicates and header conflicts: spaces
+// in a literal match any run of whitespace; NCM header literals also tolerate whitespace around "/".
+const words = (lit: string) => literalPattern('blockStarts', 'preamble', lit);
+const header = (lit: string) => literalPattern('ncm', 'columnHeaders', lit);
 const strip = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '');
 /**
  * Word end used after list tokens and exception markers: `\b` for ASCII-ending words; when any accent variant of the
@@ -66,7 +65,8 @@ export function compileProfileRules(effective: Pick<EffectiveProfile, 'fields' |
     // A symbol label (no letters, e.g. §) requires a number; a phrase label (Parágrafo único) is complete by itself.
     paragraph: new RegExp(`^(?:${[...(symbols.length ? [`${alt(byLength(symbols).map(esc))}\\s*\\d+`] : []), ...(phrases.length ? [alt(byLength(phrases).map(words))] : [])].join('|') || NEVER})`, 'iu'),
     ncmHeader: new RegExp(`^${alt(byLength(f.ncm.columnHeaders).map(header))}$`, 'iu'),
-    ncmBlocker: new RegExp(`^${alt(byLength(f.ncm.columnBlockers).map(words))}(?:\\s*\\/.*)?$`, 'iu'),
+    // Blockers use the header fragment too, so "NCM / SH" and "NCM/SH" are the same blocker (review of PR #249).
+    ncmBlocker: new RegExp(blockerPattern(byLength(f.ncm.columnBlockers)), 'iu'),
     ncmMarker: new RegExp(`\\b${alt(byLength(f.ncm.markers).map(esc))}\\b\\s*(?:(?:c[oó]digos?|n[.º°o]s?)\\s*)?[:=-]?\\s*`, 'giu'),
     codeList: new RegExp(`^(?:[ \\t]*(?:\\d[\\d.]*|${byLength(f.lists.tokens).map((t) => `${esc(t)}${listEnd(t)}`).join('|') || NEVER}|[,:;()–—-]))+`, 'iu'),
     rangeBridge: new RegExp(`^\\s*${alt(byLength(f.ranges.operators).map(esc))}\\s*$`, 'iu'),

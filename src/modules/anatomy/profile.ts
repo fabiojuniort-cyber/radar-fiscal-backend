@@ -14,19 +14,26 @@ export const PROFILE_FORMAT_VERSION = 'ANAT-PROFILE/1' as const;
 export const PROFILE_LIMITS = Object.freeze({ maxItemsPerField: 64, maxLiteralUtf16: 64, maxProfileBytes: 64 * 1024 });
 export const PROFILE_SOURCES = ['CONFAZ', 'DOU', 'DOE-SP', 'RFB'] as const;
 
-// Control characters and leading/trailing whitespace are rejected so a literal always means exactly what it shows.
+// A literal is accepted only in its canonical form, so validation and compilation read it the same way (review of
+// PR #249): Unicode NFC, no control characters, no leading/trailing whitespace and, inside, only single U+0020 spaces.
 const literal = z.string()
   .refine((s) => s.length >= 1 && s.length <= PROFILE_LIMITS.maxLiteralUtf16, { message: `literal must have 1–${PROFILE_LIMITS.maxLiteralUtf16} UTF-16 units` })
   .refine((s) => !/[\u0000-\u001f\u007f]/u.test(s), { message: 'literal must not contain control characters' })
-  .refine((s) => s === s.trim(), { message: 'literal must not start or end with whitespace' });
-const list = z.array(literal).max(PROFILE_LIMITS.maxItemsPerField, { message: `at most ${PROFILE_LIMITS.maxItemsPerField} items per field` })
+  .refine((s) => s === s.trim(), { message: 'literal must not start or end with whitespace' })
+  .refine((s) => s === s.normalize('NFC'), { message: 'literal must be in Unicode NFC' })
+  .refine((s) => !/[^\S ]| {2}/u.test(s), { message: 'words in a literal must be separated by a single space' });
+// CSS classes and quote characters are single tokens: whitespace could never match a class token or a quote mark.
+const token = literal.refine((s) => !/\s/u.test(s), { message: 'class names and quote marks must not contain whitespace' });
+const listOf = (item: typeof literal) => z.array(item).max(PROFILE_LIMITS.maxItemsPerField, { message: `at most ${PROFILE_LIMITS.maxItemsPerField} items per field` })
   .refine((items) => new Set(items).size === items.length, { message: 'duplicate literal in field' });
+const list = listOf(literal);
+const tokens = listOf(token);
 
 /** Every editable field, grouped. Group objects are strict: unknown keys are rejected. */
 const groups = {
-  classes: z.strictObject({ historical: list, editorialNote: list, body: list, epigraph: list, summary: list, signature: list }),
+  classes: z.strictObject({ historical: tokens, editorialNote: tokens, body: tokens, epigraph: tokens, summary: tokens, signature: tokens }),
   blockStarts: z.strictObject({ preamble: list, rectificationOriginal: list, rectificationCorrected: list }),
-  quotes: z.strictObject({ open: list, close: list, closeSuffix: list }),
+  quotes: z.strictObject({ open: tokens, close: tokens, closeSuffix: tokens }),
   labels: z.strictObject({ annex: list, clause: list, article: list, paragraph: list }),
   ncm: z.strictObject({ markers: list, columnHeaders: list, columnBlockers: list }),
   lists: z.strictObject({ tokens: list }),
@@ -68,14 +75,32 @@ export type ProfileScope = z.infer<typeof scope>;
 export interface AnatomyProfile { profileVersion: typeof PROFILE_FORMAT_VERSION; scope: ProfileScope; fields: ProfileFields | Partial<{ [K in keyof ProfileFields]: Partial<ProfileFields[K]> }> }
 
 /**
- * Comparison key per field, matching how the field is matched (PROFILE_FIELD_SEMANTICS): CSS classes and quote
- * characters are exact (after NFC); every other field matches case-insensitively with internal whitespace collapsed.
- * Accent variants (até/ate) stay distinct on purpose: the current rules accept both spellings explicitly.
+ * Regex fragment of one literal, shared by the compiler (profile-rules.ts) and by validation, so "same literal" and
+ * "header blocked" are decided by the very matcher the engine runs (review of PR #249). Only regex syntax characters
+ * are escaped (required in `u` mode). Spaces in block starts and labels match any run of whitespace; NCM header and
+ * blocker literals also tolerate whitespace around "/". Other fields match the literal as written.
+ */
+export const escapeLiteral = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/gu, (c) => `\\${c}`);
+const wordsPattern = (lit: string) => lit.split(' ').map(escapeLiteral).join('\\s+');
+const headerPattern = (lit: string) => lit.split('/').map((side) => wordsPattern(side.trim())).join('\\s*\\/\\s*');
+export function literalPattern(group: string, field: string, lit: string): string {
+  if (group === 'ncm' && (field === 'columnHeaders' || field === 'columnBlockers')) return headerPattern(lit);
+  if (group === 'blockStarts' || group === 'labels') return wordsPattern(lit);
+  return escapeLiteral(lit);
+}
+/** Header text matched by any blocker: the blocker literal, optionally followed by "/…" (fixed reader rule). */
+export const blockerPattern = (blockers: readonly string[]) => (blockers.length ? `^(?:${blockers.map((b) => literalPattern('ncm', 'columnBlockers', b)).join('|')})(?:\\s*\\/.*)?$` : '(?!)');
+
+/**
+ * Two literals of a field are the same when the field's matcher cannot tell them apart. CSS classes and quote
+ * characters are exact (literals are already NFC); every other field matches case-insensitively through its compiled
+ * fragment. Accent variants (até/ate) stay distinct on purpose: the current rules accept both spellings explicitly.
  */
 const EXACT_GROUPS = new Set(['classes', 'quotes']);
-export function semanticKey(group: string, value: string): string {
-  const nfc = value.normalize('NFC');
-  return EXACT_GROUPS.has(group) ? nfc : nfc.replace(/\s+/gu, ' ').toLocaleLowerCase('pt-BR');
+export function sameLiteral(group: string, field: string, a: string, b: string): boolean {
+  if (EXACT_GROUPS.has(group)) return a === b;
+  const full = (x: string) => new RegExp(`^(?:${literalPattern(group, field, x)})$`, 'iu');
+  return full(a).test(b) || full(b).test(a);
 }
 
 /** Duplicates under the field's own semantics, and headers both allowed and blocked for NCM columns. */
@@ -85,11 +110,11 @@ function semanticIssues(fields: Partial<Record<string, Record<string, unknown> |
     if (!values) continue;
     for (const [field, value] of Object.entries(values)) {
       if (!Array.isArray(value)) continue;
-      const seen = new Map<string, string>();
-      for (const item of value as string[]) {
-        const key = semanticKey(group, item); const prior = seen.get(key);
-        if (prior !== undefined) issues.push(`${group}.${field}: "${item}" duplicates "${prior}"`); else seen.set(key, item);
-      }
+      const items = value as string[];
+      items.forEach((item, i) => {
+        const prior = items.slice(0, i).find((p) => sameLiteral(group, field, p, item));
+        if (prior !== undefined) issues.push(`${group}.${field}: "${item}" duplicates "${prior}"`);
+      });
     }
   }
   const ncm = fields.ncm as { columnHeaders?: string[]; columnBlockers?: string[] } | undefined;
@@ -97,15 +122,38 @@ function semanticIssues(fields: Partial<Record<string, Record<string, unknown> |
   return issues;
 }
 
-/** A blocker closes a column whose header equals it or starts with it followed by "/" (current reader rule). */
+/**
+ * A header is in conflict when the compiled blocker rule matches it. Header text is matched up to case, whitespace
+ * and spacing around "/", and the blocker rule is invariant under the same changes, so testing each header literal
+ * covers every text the header accepts (e.g. header "NCM/SH" with blocker "NCM / SH" or "ncm").
+ */
 function headerConflicts(headers: string[], blockers: string[]): string[] {
   const out: string[] = [];
   for (const h of headers) {
-    const hk = semanticKey('ncm', h);
-    for (const b of blockers) {
-      const bk = semanticKey('ncm', b);
-      if (hk === bk || hk.startsWith(`${bk}/`) || hk.startsWith(`${bk} /`)) out.push(`ncm: header "${h}" is also blocked by "${b}"`);
-    }
+    for (const b of blockers) if (new RegExp(blockerPattern([b]), 'iu').test(h)) out.push(`ncm: header "${h}" is also blocked by "${b}"`);
+  }
+  return out;
+}
+
+/**
+ * Context protections (review of PR #249). A configuration may ADD to the fields that keep text out of positive
+ * selection, never remove a shipped literal from them: removing `RedaoAnt` or `TituloAcordo` would turn historical
+ * or prohibited text into `operative_candidate`. Quote-closing fields work the other way (a new closing mark ends a
+ * quotation earlier, exposing quoted text), so they may only keep or drop shipped literals. The floor is the shipped
+ * `DEFAULT_PROFILES` resolved for the same source; a family cannot go below it either.
+ */
+export const PROTECTED_FLOOR_FIELDS = Object.freeze(['classes.historical', 'classes.editorialNote', 'classes.epigraph', 'classes.summary', 'classes.signature',
+  'blockStarts.preamble', 'blockStarts.rectificationOriginal', 'blockStarts.rectificationCorrected', 'quotes.open', 'ncm.columnBlockers', 'exceptions.markers'] as const);
+export const PROTECTED_CEILING_FIELDS = Object.freeze(['quotes.close', 'quotes.closeSuffix'] as const);
+const fieldOf = (fields: ProfileFields, path: string): string[] => { const [g, f] = path.split('.') as [string, string]; return (fields as unknown as Record<string, Record<string, string[]>>)[g]![f]!; };
+function protectionIssues(fields: ProfileFields, shipped: ProfileFields): string[] {
+  const out: string[] = [];
+  const has = (path: string, list: string[], lit: string) => { const [g, f] = path.split('.') as [string, string]; return list.some((x) => sameLiteral(g, f, x, lit)); };
+  for (const path of PROTECTED_FLOOR_FIELDS) {
+    for (const lit of fieldOf(shipped, path)) if (!has(path, fieldOf(fields, path), lit)) out.push(`${path}: shipped protection "${lit}" cannot be removed`);
+  }
+  for (const path of PROTECTED_CEILING_FIELDS) {
+    for (const lit of fieldOf(fields, path)) if (!has(path, fieldOf(shipped, path), lit)) out.push(`${path}: "${lit}" would close quotations the shipped profile keeps open`);
   }
   return out;
 }
@@ -155,6 +203,21 @@ export function resolveEffectiveProfile(profiles: unknown[], target: { source: s
   if (!source.success) fail('invalid_target', `unknown source ${String(target.source)}`);
   const family = target.family ?? null;
   if (family !== null && !literal.safeParse(family).success) fail('invalid_target', 'invalid family');
+  const resolved = resolveChain(profiles, source.data!, family);
+  const weakened = protectionIssues(resolved.fields, shippedFields(source.data!));
+  if (weakened.length) fail('protection_weakened', weakened.join('; '));
+  return resolved;
+}
+
+const shipped = new Map<string, ProfileFields>();
+/** The shipped DEFAULT_PROFILES resolved for a source: the protection floor/ceiling for any configuration. */
+function shippedFields(source: (typeof PROFILE_SOURCES)[number]): ProfileFields {
+  let f = shipped.get(source);
+  if (!f) { f = resolveChain([...DEFAULT_PROFILES], source, null).fields; shipped.set(source, f); }
+  return f;
+}
+
+function resolveChain(profiles: unknown[], source: (typeof PROFILE_SOURCES)[number], family: string | null): EffectiveProfile {
   const valid = profiles.map(validateProfile);
   const byScope = new Map<string, AnatomyProfile>();
   for (const p of valid) {
@@ -163,7 +226,7 @@ export function resolveEffectiveProfile(profiles: unknown[], target: { source: s
     byScope.set(k, p);
   }
   const base = byScope.get('default') ?? fail('missing_default', 'exactly one default profile is required');
-  const chain = [base, byScope.get(`source:${source.data}`), family === null ? undefined : byScope.get(`family:${source.data}:${family}`)].filter((p): p is AnatomyProfile => !!p);
+  const chain = [base, byScope.get(`source:${source}`), family === null ? undefined : byScope.get(`family:${source}:${family}`)].filter((p): p is AnatomyProfile => !!p);
   const fields = structuredClone(base.fields) as ProfileFields;
   for (const p of chain.slice(1)) {
     for (const [group, values] of Object.entries(p.fields) as [keyof ProfileFields, Record<string, unknown>][]) {
@@ -176,7 +239,7 @@ export function resolveEffectiveProfile(profiles: unknown[], target: { source: s
   const inherited = semanticIssues(checked as unknown as Record<string, Record<string, unknown>>);
   if (inherited.length) fail('effective_conflict', inherited.join('; '));
   if (utf8Bytes({ profileVersion: PROFILE_FORMAT_VERSION, fields: checked }) > PROFILE_LIMITS.maxProfileBytes) fail('profile_too_large', 'effective profile exceeds the size limit');
-  return { profileVersion: PROFILE_FORMAT_VERSION, target: { source: source.data!, family }, fields: checked,
+  return { profileVersion: PROFILE_FORMAT_VERSION, target: { source: source, family }, fields: checked,
     chain: chain.map((p) => ({ scope: p.scope, profileHash: profileHash(p) })),
     effectiveHash: sha256(canonicalJson({ profileVersion: PROFILE_FORMAT_VERSION, fields: checked })) };
 }

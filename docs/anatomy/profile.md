@@ -62,3 +62,5 @@ Origem: COORD → CLAUDE-EXEC, autorização de 19/10/2026 ([issue #116](https:/
    - Sobrescrever as duas listas de forma coerente resolve o conflito. Os perfis padrão resolvem sem conflito para as quatro fontes.
 
 Testes novos: 2, num total de 10 em `test/anatomy.profile.unit.test.ts`.
+
+**Atualização da revisão do PR #249:** a comparação por `semanticKey` foi substituída. Agora os literais só são aceitos na forma canônica (NFC, palavras separadas por um único espaço, classes e aspas sem espaço), e duplicatas e conflitos de cabeçalho são decididos pelo próprio casador compilado (`sameLiteral`, `blockerPattern`). Os casos `O  Conselho` e NFD deixaram de ser duplicatas e passaram a ser rejeitados como `invalid_fields`. O bloqueador de família `['NBM']` do teste de coerência virou uma lista que mantém os bloqueadores entregues, por causa do piso de proteções. Ver [profile-engine.md](profile-engine.md#6-correções-da-revisão-do-pr-249).
