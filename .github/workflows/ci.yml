@@ -333,6 +333,8 @@ jobs:
         run: npx tsx --test test/onb02-r6-purge.integration.test.ts
       - name: ONB-02 R7 audit allowlist and resumable backfill 150k on PG18
         run: npx tsx --test test/onb02-r7-audit.integration.test.ts
+      - name: ONB-02 R7.1 unknown event preflight and actual CLI on PG18
+        run: npx tsx --test test/onb02-r71-backfill.integration.test.ts
       - name: ONB-02 R3 semantic SQL evidence on isolated PG18
         shell: bash
         run: bash ops/onb02/ci-evidence-pg18.sh

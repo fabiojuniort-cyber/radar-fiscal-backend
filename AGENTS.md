@@ -54,7 +54,9 @@ O serviço aplica SET LOCAL statement_timeout=30s e lock_timeout=5s antes do SEL
 Os endpoints rejeitam reactivateInactive=true com 410; inativas não são purgadas
 automaticamente. A política R7 usa allowlist tipada por evento em toda escrita.
 A purga não minimiza auditoria por texto e fica bloqueada até o backfill histórico
-separado estar concluído. Ver docs/audit-policy-r7.md. O backfill em produção exige
+separado estar concluído. R7.1: tipos sem regra são listados no --plan e bloqueiam
+--apply antes de qualquer escrita; nunca esvaziar payload de evento desconhecido.
+Ver docs/audit-policy-r7.md e docs/audit-event-inventory-r7.json. O backfill em produção exige
 autorização própria, além do deploy. Políticas de recuperação seguem ACCEPTED_RISK.
 
 ### Local Negócio

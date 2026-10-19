@@ -1,4 +1,4 @@
-# Auditoria R7 — política aprovada em 19/10/2026
+# Auditoria R7.1 — política aprovada em 19/10/2026
 
 ## Contrato
 
@@ -82,10 +82,18 @@ deletedIds só permite UUIDs de publicações da operação global correspondent
 
 A migration 074 apenas instala a política, guardas, marcador por linha e checkpoint.
 Ela NÃO executa o backfill. Auditorias legadas têm audit_policy_version=0; novas têm 1.
-O backfill aplica a política de cada par ação/tipo aos snapshots; chaves desconhecidas,
-valores fora do tipo e texto livre são descartados. A política explícita de fallback
-para evento legado não registrado é contexto vazio e UUID válido ou NULL, mantendo
-ação/data/autor/correlação. Novas escritas de evento não registrado são proibidas.
+O backfill aplica a política explícita de cada par ação/tipo conhecido aos snapshots;
+chaves não permitidas, valores fora do tipo e texto livre são descartados somente
+depois dessa validação. **R7.1 substitui o fallback do R7: evento sem regra nunca
+tem seu payload esvaziado.** A projeção também rejeita evento desconhecido, inclusive
+com payload NULL. Novas escritas de evento não registrado continuam proibidas.
+
+O inventário [audit-event-inventory-r7.json](audit-event-inventory-r7.json) identifica
+40 pares emitidos pelo código e migrations existentes, com arquivos de origem.
+Todos têm regra explícita na tabela acima e em audit_event_policy. As 12 políticas
+adicionais do contrato legado continuam explícitas; nenhuma regra genérica é usada
+para aceitar tipos novos. O teste PG18 percorre todos os 40 pares do inventário,
+confere as fontes e processa essas fixtures com o CLI real.
 
 A regra é global para auditoria histórica, conforme autorização de produto. Não
 altera companies, perfis, usuários, publicações ou qualquer tabela de outra entidade.
@@ -98,9 +106,26 @@ Comandos preparados (NÃO executados em produção):
 - node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7 --batch-size 5000
 - interrupção controlada: acrescentar --max-batches 3; repetir o comando para retomar.
 
---plan só devolve contagens. --apply usa conexão de operador, sem permissão de
-execução para radar_app/worker/curator. Cada lote confirma alteração das linhas e
-checkpoint na mesma transação. O marcador por linha é a verdade para retomada:
+--plan é SELECT-only e lista **todos** os pares ação/tipo encontrados no audit_log,
+inclusive registros já marcados: action, entityType, count, pending e ruleExists
+(boolean: sim/não). Também retorna os totais pending e unregistered. Não mostra
+payload, autor, identificadores de linha ou dados cadastrais e não cria checkpoint.
+
+Se qualquer par não tiver regra, --apply termina com código 1 e relatório JSON
+audit_backfill_unknown_events dos tipos/contagens sem regra, **antes de escrever
+qualquer auditoria ou checkpoint**. Não há opção de ignorar/destruir desconhecidos.
+O operador deve interromper e encaminhar os tipos para definição/revisão de regras;
+depois roda --plan novamente. Não inventar regra apenas para liberar a execução.
+
+--apply usa conexão de operador, sem permissão de execução para
+radar_app/worker/curator. A função SQL de lote repete a verificação global antes
+da primeira escrita do lote, inclusive em chamadas diretas. Um lock de tabela
+SHARE ROW EXCLUSIVE, limitado a cada lote, impede escritores concorrentes durante
+essa verificação e UPDATE; SELECTs continuam disponíveis. O lock termina no commit
+ou rollback do lote. Se um tipo novo aparecer entre lotes, o próximo lote aborta;
+lotes conhecidos já confirmados permanecem confirmados e retomáveis.
+
+Cada lote confirma alteração das linhas e checkpoint na mesma transação. O marcador por linha é a verdade para retomada:
 UUID aleatório, timestamps antigos e novas inserções não causam saltos. Falha no lote
 não avança o checkpoint. Linhas v1 não são reprocessadas. Um novo processo/conexão
 retoma os lotes restantes; execução repetida sem pendência faz zero alterações.
@@ -135,3 +160,15 @@ e de outra entidade; purga sem varrer 150 mil auditorias, 420 mil collection_ite
 preservados e grafo inventariado de 116 linhas; timeouts/rollback. As fixtures legadas
 são inseridas com a guarda desabilitada apenas dentro de transação administrativa
 descartável de teste. Não há flag de bypass no runtime.
+
+## Evidência R7.1
+
+O teste test/onb02-r71-backfill.integration.test.ts usa o executável CLI compilado
+em processos Node reais no PG18 descartável. Tipo desconhecido (ação nova ou entidade
+sem regra, inclusive linha já marcada) aparece no --plan; --apply retorna erro/relatório
+e os fingerprints globais das auditorias e checkpoint permanecem iguais.
+A chamada SQL direta também é bloqueada antes de escrever. Após remover somente as
+fixtures desconhecidas do teste, apply funciona. Os 40 tipos inventariados são
+processados em lotes pelo CLI e a repetição altera zero linhas.
+A massa de 150 mil registros usa exclusivamente tipos conhecidos; desconhecidos
+ficam no teste de aborto e não recebem uma política artificial.

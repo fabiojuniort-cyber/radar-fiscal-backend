@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Operator-only. --plan does not initialize checkpoints or mutate rows.
 import {Pool} from 'pg';
-import {planAuditBackfill,applyAuditBackfill} from '../../dist/modules/audit/audit-backfill.js';
+import {planAuditBackfill,applyAuditBackfill,AuditBackfillUnknownEventsError} from '../../dist/modules/audit/audit-backfill.js';
 const args=process.argv.slice(2);
 const value=key=>{const at=args.indexOf(key);return at<0?undefined:args[at+1]};
 const known=new Set(['--plan','--apply','--ack-irreversible-r7','--batch-size','--max-batches']);
@@ -19,5 +19,11 @@ try {
    ...(value('--batch-size')?{batchSize:Number(value('--batch-size'))}:{}),
    ...(value('--max-batches')?{maxBatches:Number(value('--max-batches'))}:{})
  })}));
-} catch { console.error('audit_backfill_failed');process.exitCode=1; }
+ } catch (error) {
+ if(error instanceof AuditBackfillUnknownEventsError) {
+   console.error(JSON.stringify({mode:'apply',error:'audit_backfill_unknown_events',
+     aborted:true,events:error.events}));
+ } else console.error('audit_backfill_failed');
+ process.exitCode=1;
+}
 finally{await pool.end();}

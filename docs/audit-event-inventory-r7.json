@@ -1,0 +1,290 @@
+{
+  "scope": "Current code and historical migrations at e9391f58; excludes test-only synthetic events",
+  "events": [
+    {
+      "action": "BASELINE_IMPORT_COMMITTED",
+      "entityType": "taxonomy_baseline",
+      "sources": [
+        "src/modules/taxonomy/baseline/baseline.importer.ts"
+      ]
+    },
+    {
+      "action": "BASELINE_IMPORT_FAILED",
+      "entityType": "taxonomy_baseline",
+      "sources": [
+        "src/modules/taxonomy/baseline/baseline.importer.ts"
+      ]
+    },
+    {
+      "action": "BASELINE_IMPORT_STARTED",
+      "entityType": "taxonomy_baseline",
+      "sources": [
+        "src/modules/taxonomy/baseline/baseline.importer.ts"
+      ]
+    },
+    {
+      "action": "BASELINE_IMPORT_VALIDATED",
+      "entityType": "taxonomy_baseline",
+      "sources": [
+        "src/modules/taxonomy/baseline/baseline.importer.ts"
+      ]
+    },
+    {
+      "action": "COLLECTION_FILTER_DIRECT_ADMIN_EDIT",
+      "entityType": "collection_filter_policy",
+      "sources": [
+        "migrations/052_collection_filter_direct_admin_edits.sql"
+      ]
+    },
+    {
+      "action": "COLLECTION_FILTER_DIRECT_PURGE",
+      "entityType": "collection_filter_type_rule",
+      "sources": [
+        "migrations/069_f3_unified_type_decision.sql",
+        "migrations/063_l18_non_dou_legacy_and_doe_type.sql",
+        "migrations/051_collection_filter_direct_rules_cleanup.sql"
+      ]
+    },
+    {
+      "action": "COLLECTION_FILTER_DIRECT_RULE_CHANGED",
+      "entityType": "collection_filter_type_rule",
+      "sources": [
+        "migrations/069_f3_unified_type_decision.sql",
+        "migrations/051_collection_filter_direct_rules_cleanup.sql"
+      ]
+    },
+    {
+      "action": "COLLECTION_FILTER_DRAFT_SAVED",
+      "entityType": "collection_filter_policy",
+      "sources": [
+        "migrations/038_collection_filter_admin.sql"
+      ]
+    },
+    {
+      "action": "COLLECTION_FILTER_POLICY_APPROVED",
+      "entityType": "collection_filter_policy",
+      "sources": [
+        "migrations/039_collection_filter_simulation_review.sql"
+      ]
+    },
+    {
+      "action": "COLLECTION_FILTER_SIMULATION_REQUESTED",
+      "entityType": "collection_filter_simulation",
+      "sources": [
+        "migrations/039_collection_filter_simulation_review.sql"
+      ]
+    },
+    {
+      "action": "COMPANY_PURGED",
+      "entityType": "company",
+      "sources": [
+        "migrations/073_onb02_company_purge.sql"
+      ]
+    },
+    {
+      "action": "F2_T02_ACTUACAO_CNAE_ORIGINS_IMPORTED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.actuacao.ts"
+      ]
+    },
+    {
+      "action": "F2_T02_ACTUACAO_INITIALIZED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.actuacao.ts"
+      ]
+    },
+    {
+      "action": "F2_TAB03_CNAE_ACTUACOES_CHANGED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.f2-multi-actuacao.ts"
+      ]
+    },
+    {
+      "action": "L17_HIDDEN_PURGE",
+      "entityType": "publications",
+      "sources": [
+        "migrations/056_l17_hidden_cleanup.sql"
+      ]
+    },
+    {
+      "action": "L17_RULE_PURGE",
+      "entityType": "publications",
+      "sources": [
+        "migrations/060_l17_worker_always.sql"
+      ]
+    },
+    {
+      "action": "L18_PRESERVATION_RULES",
+      "entityType": "collection_filter_policy",
+      "sources": [
+        "migrations/062_l18_preserve_federal_tax_acts.sql"
+      ]
+    },
+    {
+      "action": "OFFICIAL_CATALOG_IMPORTED",
+      "entityType": "official_catalog_edition",
+      "sources": [
+        "src/api/routes/taxonomy-admin.route.ts"
+      ]
+    },
+    {
+      "action": "PLATFORM_ROLE_GRANTED",
+      "entityType": "app_user",
+      "sources": [
+        "src/infrastructure/database/grant-taxonomy-curator.ts"
+      ]
+    },
+    {
+      "action": "PLATFORM_ROLE_GRANTED",
+      "entityType": "platform_user_role",
+      "sources": [
+        "migrations/036_platform_admin.sql",
+        "src/infrastructure/database/grant-platform-admin.ts"
+      ]
+    },
+    {
+      "action": "PLATFORM_ROLE_REVOKED",
+      "entityType": "app_user",
+      "sources": [
+        "src/infrastructure/database/grant-taxonomy-curator.ts"
+      ]
+    },
+    {
+      "action": "PLATFORM_ROLE_REVOKED",
+      "entityType": "platform_user_role",
+      "sources": [
+        "migrations/036_platform_admin.sql",
+        "src/infrastructure/database/grant-platform-admin.ts"
+      ]
+    },
+    {
+      "action": "PUBLICATION_PRESENTATION_REFRESHED",
+      "entityType": "publication_version",
+      "sources": [
+        "src/infrastructure/database/import-confaz-act.ts"
+      ]
+    },
+    {
+      "action": "PUBLICATION_TAG_CURATED",
+      "entityType": "publication",
+      "sources": [
+        "src/api/routes/taxonomy-admin.route.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_CONCEPT_CREATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_CONCEPT_UPDATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_DIMENSION_RETIRED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_DIMENSION_UPDATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_DRAFT_CREATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_GRID_SAVE",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_GROUP_CREATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_GROUP_DELETED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_GROUP_UPDATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_IMPORT",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_PUBLISHED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_F2_SUGGESTIONS_CHANGED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.f2-suggestions.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_RELEASE_CREATED",
+      "entityType": "taxonomy_baseline",
+      "sources": [
+        "src/modules/taxonomy/baseline/baseline.importer.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_RUNTIME_SETTING_UPDATED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_V1_1_DRAFT_CREATED",
+      "entityType": "taxonomy_release",
+      "sources": [
+        "src/modules/taxonomy/release/taxonomy-successor-v1-1.database.ts"
+      ]
+    },
+    {
+      "action": "TAXONOMY_V1_1_PUBLISHED",
+      "entityType": "taxonomy_release",
+      "sources": [
+        "src/modules/taxonomy/release/taxonomy-successor-v1-1.database.ts"
+      ]
+    }
+  ]
+}

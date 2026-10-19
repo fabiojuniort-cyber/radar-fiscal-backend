@@ -63,7 +63,7 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
    await client.query('ALTER TABLE audit_log DISABLE TRIGGER audit_allowlist_guard');
    await client.query(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
     SELECT CASE WHEN n%2=0 THEN $1::uuid ELSE $2::uuid END,'SYSTEM',
-      CASE WHEN n%3=0 THEN 'LEGACY_COMPANY_SNAPSHOT' ELSE 'COMPANY_UPDATED' END,
+      CASE WHEN n%3=0 THEN 'COMPANY_CREATED' ELSE 'COMPANY_UPDATED' END,
       'company',CASE WHEN n%2=0 THEN $3::text ELSE lpad(n::text,14,'0') END,
       jsonb_build_object('company_id',$3::text,'is_active',true,'cnpj',lpad(n::text,14,'0'),
         'legalName',normalize('Empresa Sintética Árvore',NFD),
@@ -129,10 +129,11 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
       AND before_data=jsonb_build_object('company_id',$2::text,'is_active',true)
       AND after_data=jsonb_build_object('company_id',$2::text,'is_active',false)`,[tenants,company]);
   assert.equal(Number(retained.rows[0]!.n),66667,'known event retains exactly the permitted context');
-  const fallback=await pool.query<{n:string}>(`SELECT count(*)::text n FROM audit_log
-    WHERE tenant_id=ANY($1::uuid[]) AND action='LEGACY_COMPANY_SNAPSHOT'
-      AND before_data='{}'::jsonb AND after_data='{}'::jsonb`,[tenants]);
-  assert.equal(Number(fallback.rows[0]!.n),33333,'unknown historical event keeps headers, clears free context');
+  const created=await pool.query<{n:string}>(`SELECT count(*)::text n FROM audit_log
+    WHERE tenant_id=ANY($1::uuid[]) AND action='COMPANY_CREATED'
+      AND before_data=jsonb_build_object('company_id',$2::text,'is_active',true)
+      AND after_data=jsonb_build_object('company_id',$2::text,'is_active',false)`,[tenants,company]);
+  assert.equal(Number(created.rows[0]!.n),33333,'second known event uses its explicit rule');
   console.log('ONB02_R7_BACKFILL '+JSON.stringify({rows:150000,batchSize:5000,
     total_ms:elapsed,first_ms:first.elapsedMs,resume_ms:resumed.elapsedMs,
     restart:true,idempotent:true,atomicFailure:true,headersPreserved:true,otherEntityPreserved:true}));

@@ -20,8 +20,11 @@ RETURNS JSONB LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,public AS $p
 DECLARE v_rules JSONB:=public.audit_event_policy(p_action,p_type);
  v_out JSONB:='{}'; v_key TEXT; v_rule JSONB; v_value JSONB; v_ok BOOLEAN;
 BEGIN
+ IF v_rules IS NULL THEN
+   RAISE EXCEPTION 'audit_event_not_registered' USING ERRCODE='23514';
+ END IF;
  IF p_json IS NULL THEN RETURN NULL; END IF;
- IF jsonb_typeof(p_json)<>'object' OR v_rules IS NULL THEN RETURN '{}'::jsonb; END IF;
+ IF jsonb_typeof(p_json)<>'object' THEN RETURN '{}'::jsonb; END IF;
  FOR v_key,v_rule IN SELECT key,value FROM jsonb_each(v_rules) LOOP
   v_value:=p_json->v_key; v_ok:=false;
   IF v_value IS NULL THEN CONTINUE; END IF;
@@ -94,9 +97,26 @@ REVOKE ALL ON public.audit_backfill_checkpoint FROM PUBLIC,radar_app,radar_worke
 CREATE OR REPLACE FUNCTION public.audit_backfill_batch(p_limit INTEGER DEFAULT 5000)
 RETURNS TABLE(processed INTEGER,remaining BIGINT)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $batch$
-DECLARE v_count INTEGER; v_remaining BIGINT;
+DECLARE v_count INTEGER; v_remaining BIGINT; v_unknown JSONB;
 BEGIN
  IF p_limit<1 OR p_limit>10000 THEN RAISE EXCEPTION 'invalid_batch_limit'; END IF;
+ -- R7.1: no unknown type may be projected to empty JSON. Check every stored
+ -- action/type before any UPDATE or checkpoint write. The per-batch lock
+ -- prevents concurrent inserts/updates between this check and the write;
+ -- ordinary readers remain available and the lock ends with the batch.
+ LOCK TABLE public.audit_log IN SHARE ROW EXCLUSIVE MODE;
+ WITH event_types AS MATERIALIZED (
+   SELECT action,entity_type,count(*) AS count FROM public.audit_log
+   GROUP BY action,entity_type
+ )
+ SELECT jsonb_agg(jsonb_build_object('action',action,'entityType',entity_type,
+   'count',count,'ruleExists',false) ORDER BY action,entity_type)
+ INTO v_unknown FROM event_types
+ WHERE public.audit_event_policy(action,entity_type) IS NULL;
+ IF v_unknown IS NOT NULL THEN
+   RAISE EXCEPTION 'audit_backfill_unknown_events'
+     USING ERRCODE='55000',DETAIL=v_unknown::text;
+ END IF;
  INSERT INTO public.audit_backfill_checkpoint(job_key) VALUES('onb02-r7-v1') ON CONFLICT DO NOTHING;
  PERFORM 1 FROM public.audit_backfill_checkpoint WHERE job_key='onb02-r7-v1' FOR UPDATE;
  WITH picked AS MATERIALIZED (
