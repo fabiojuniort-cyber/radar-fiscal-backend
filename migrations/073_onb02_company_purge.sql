@@ -259,7 +259,11 @@ BEGIN
     -- its JSON mentions the target company as a third-party reference.
     -- Name-only historical audit is eligible only on an unowned/empty entity_id.
     UPDATE public.audit_log a
-       SET entity_id=CASE WHEN a.entity_id IS NULL THEN NULL
+       SET entity_id=CASE
+         WHEN a.entity_id IS NULL
+           OR a.entity_id=ANY(v_private_ids)
+           OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
+           THEN NULL
          ELSE public.onb02_redact_audit_json(
            to_jsonb(a.entity_id),v_private_ids,v_private_cnpjs,v_private_names) #>> '{}' END,
            before_data=public.onb02_redact_audit_json(a.before_data,v_private_ids,v_private_cnpjs,v_private_names),
