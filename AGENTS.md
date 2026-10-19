@@ -44,22 +44,15 @@ CI integral, revisão independente, backup/restauração comprovada e aprovaçã
 do gate produtivo, conforme `ops/onb02/README.md` e Issue #118.
 Nenhum `GRANT DELETE ON companies` generalizado ao runtime.
 
-A exclusão individual de um **estabelecimento**, sem excluir sua empresa,
-ainda é soft-delete e mantém o fluxo próprio de reativação. Não confundir os
-dois procedimentos. Dados de auditoria de segurança e backups exigem avaliação
-de retenção antes de qualquer promessa de apagamento integral nesses meios.
-
-## Reativação de cadastros soft-deleted
-
-Estabelecimentos excluídos individualmente são desativados com `is_active = false` para preservar histórico. A exclusão de uma empresa inteira segue o contrato R3 de remoção física acima. As restrições únicas de CNPJ continuam válidas para registros inativos.
-
-Por isso, fluxos cadastrais por CNPJ não devem tentar inserir um novo registro quando o mesmo identificador já existir:
-- empresa existente no mesmo tenant deve ser atualizada e reativada;
-- matriz existente deve ser atualizada e reativada;
-- estabelecimento existente na mesma empresa deve ser atualizado e reativado;
-- CNAEs e dados de RFB/IE devem ser atualizados na reativação;
-- não remover histórico nem contornar unicidade com novos UUIDs.
-
+A exclusão individual de estabelecimento mantém os dados preexistentes inativos até
+exclusão explícita autorizada. **Não existe reativação** de empresa, matriz ou filial:
+qualquer novo cadastro exige exclusão definitiva prévia e gera novo identificador,
+sem recuperar perfis, histórico privado nem pré-preenchimento do onboarding legado.
+Os endpoints rejeitam `reactivateInactive=true` com 410; registros inativos são
+preservados, nunca purgados automaticamente. Auditorias próprias da empresa têm
+retenção minimizada; nomes homônimos de outras empresas do mesmo tenant não
+são mascarados e são contados no evento de exclusão, sem identificar as empresas.
+Políticas de recuperação seguem o `ACCEPTED_RISK` registrado no ONB-02.
 
 ### Local Negócio
 

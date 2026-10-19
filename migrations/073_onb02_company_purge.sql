@@ -22,6 +22,22 @@ BEGIN
 END;
 $lit$;
 
+-- R5: stable accent- and case-insensitive exact-name comparisons.
+CREATE OR REPLACE FUNCTION public.onb02_normalize_company_name(p_value TEXT)
+RETURNS TEXT LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $norm$
+  SELECT btrim(regexp_replace(
+    translate(lower(coalesce(p_value,'')),
+      'áàâãäåāéèêëēíìîïīóòôõöōúùûüūçñ',
+      'aaaaaaaeeeeeiiiiioooooouuuuucn'),
+    '[[:space:]]+',' ','g'))
+$norm$;
+
+CREATE INDEX IF NOT EXISTS ix_audit_r5_tenant_entity
+ON public.audit_log (tenant_id, entity_id);
+
+REVOKE ALL ON FUNCTION public.onb02_normalize_company_name(TEXT)
+  FROM PUBLIC,radar_app,radar_worker;
+
 CREATE OR REPLACE FUNCTION public.onb02_redact_audit_json(p_json JSONB,p_ids TEXT[],p_cnpjs TEXT[],p_names TEXT[])
 RETURNS JSONB LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,public AS $mask$
 DECLARE v_type TEXT; v_text TEXT; v_needle TEXT; v_fmt TEXT; v_key TEXT; v_child JSONB; v_result JSONB;
@@ -42,7 +58,11 @@ BEGIN
     END IF;
   END LOOP;
   FOREACH v_needle IN ARRAY coalesce(p_names,ARRAY[]::text[]) LOOP
-    v_text:=public.onb02_redact_literal_ci(v_text,v_needle,'[NOME_EMPRESA_MASCARADO]');
+    IF public.onb02_normalize_company_name(v_text) =
+       public.onb02_normalize_company_name(v_needle) THEN
+       v_text:='[NOME_EMPRESA_MASCARADO]';
+       EXIT;
+    END IF;
   END LOOP;
   IF v_type='number' AND v_text=p_json::text THEN RETURN p_json; END IF;
   RETURN to_jsonb(v_text);
@@ -75,6 +95,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
+SET statement_timeout = '30s'
 AS $$
 DECLARE
     v_tenant UUID := public.app_current_tenant_id();
@@ -88,6 +109,9 @@ DECLARE
     v_private_ids TEXT[];
     v_private_cnpjs TEXT[];
     v_private_names TEXT[];
+    v_normalized_names TEXT[];
+    v_ambiguous_names TEXT[];
+    v_ambiguous_name_count INTEGER := 0;
 BEGIN
     IF v_tenant IS NULL OR v_actor IS NULL
        OR NOT public.app_user_is_tenant_admin(v_tenant) THEN
@@ -202,36 +226,80 @@ BEGIN
       UNION ALL SELECT name FROM public.establishments WHERE company_id=p_company_id
     ) names WHERE name IS NOT NULL AND btrim(name)<>'';
 
-    -- Strong ownership gate: tenant AND an owned UUID/CNPJ. Never redact merely
-    -- because a shared account or another company mentions the same display name.
+    -- R5: a homonymous company in THIS tenant makes that name ambiguous.
+    -- Count DISTINCT other company IDs; never persist any competing name.
+    SELECT COALESCE(array_agg(DISTINCT public.onb02_normalize_company_name(name)),ARRAY[]::text[])
+      INTO v_normalized_names
+      FROM unnest(v_private_names) AS names(name);
+
+    SELECT count(DISTINCT company_id)::int,
+           COALESCE(array_agg(DISTINCT normalized_name),ARRAY[]::text[])
+      INTO v_ambiguous_name_count,v_ambiguous_names
+    FROM (
+      SELECT c.id AS company_id, public.onb02_normalize_company_name(n.name) AS normalized_name
+        FROM public.companies c
+        CROSS JOIN LATERAL unnest(ARRAY[c.legal_name,c.trade_name]) AS n(name)
+        WHERE c.tenant_id=v_tenant AND c.id<>p_company_id AND n.name IS NOT NULL
+      UNION ALL
+      SELECT c.id,public.onb02_normalize_company_name(e.name)
+        FROM public.companies c
+        JOIN public.establishments e ON e.company_id=c.id
+        WHERE c.tenant_id=v_tenant AND c.id<>p_company_id AND e.name IS NOT NULL
+    ) others
+    WHERE normalized_name=ANY(v_normalized_names)
+      AND normalized_name<>'';
+
+    SELECT COALESCE(array_agg(DISTINCT original_name),ARRAY[]::text[])
+      INTO v_private_names
+      FROM unnest(v_private_names) AS target_names(original_name)
+    WHERE public.onb02_normalize_company_name(original_name)
+          <> ALL(v_ambiguous_names);
+
+    -- Never change an audit associated with a DIFFERENT entity, even when
+    -- its JSON mentions the target company as a third-party reference.
+    -- Name-only historical audit is eligible only on an unowned/empty entity_id.
     UPDATE public.audit_log a
-       SET entity_id=CASE WHEN a.entity_id=ANY(v_private_ids)
-                 OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
-               THEN NULL ELSE a.entity_id END,
+       SET entity_id=CASE WHEN a.entity_id IS NULL THEN NULL
+         ELSE public.onb02_redact_audit_json(
+           to_jsonb(a.entity_id),v_private_ids,v_private_cnpjs,v_private_names) #>> '{}' END,
            before_data=public.onb02_redact_audit_json(a.before_data,v_private_ids,v_private_cnpjs,v_private_names),
            after_data=public.onb02_redact_audit_json(a.after_data,v_private_ids,v_private_cnpjs,v_private_names)
-     WHERE a.tenant_id=v_tenant AND (
-       a.entity_id=ANY(v_private_ids)
-       OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
-       OR EXISTS (
-         SELECT 1 FROM unnest(v_private_ids) AS r(id)
-          WHERE strpos(coalesce(a.before_data::text,''),r.id)>0
-             OR strpos(coalesce(a.after_data::text,''),r.id)>0
+     WHERE a.tenant_id=v_tenant
+       AND (
+         NULLIF(a.entity_id,'') IS NULL
+         OR EXISTS (SELECT 1 FROM unnest(v_private_ids) AS r(id)
+           WHERE strpos(lower(a.entity_id),lower(r.id))>0)
+         OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
+         OR public.onb02_normalize_company_name(a.entity_id)=ANY(
+           SELECT public.onb02_normalize_company_name(n) FROM unnest(v_private_names) n)
        )
-       OR EXISTS (
-         SELECT 1 FROM unnest(v_private_cnpjs) AS r(cnpj)
-          WHERE strpos(coalesce(a.before_data::text,''),r.cnpj)>0
-             OR strpos(coalesce(a.after_data::text,''),r.cnpj)>0
-             OR (char_length(r.cnpj)=14 AND (
-                strpos(coalesce(a.before_data::text,''),
-                  substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                  '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
-                OR strpos(coalesce(a.after_data::text,''),
-                  substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                  '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
-             ))
-       )
-     );
+       AND (
+         EXISTS (SELECT 1 FROM unnest(v_private_ids) AS r(id)
+           WHERE strpos(lower(coalesce(a.entity_id,'')),lower(r.id))>0
+             OR strpos(lower(coalesce(a.before_data::text,'')),lower(r.id))>0
+             OR strpos(lower(coalesce(a.after_data::text,'')),lower(r.id))>0)
+         OR EXISTS (SELECT 1 FROM unnest(v_private_cnpjs) AS r(cnpj)
+           WHERE regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=r.cnpj
+              OR strpos(coalesce(a.before_data::text,''),r.cnpj)>0
+              OR strpos(coalesce(a.after_data::text,''),r.cnpj)>0
+              OR (length(r.cnpj)=14 AND (
+                 strpos(coalesce(a.before_data::text,''),
+                   substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
+                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
+                 OR strpos(coalesce(a.after_data::text,''),
+                   substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
+                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0))
+         OR (cardinality(v_private_names)>0 AND (
+           public.onb02_redact_audit_json(
+             a.before_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
+               IS DISTINCT FROM a.before_data
+           OR public.onb02_redact_audit_json(
+             a.after_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
+               IS DISTINCT FROM a.after_data
+           OR public.onb02_normalize_company_name(a.entity_id)=ANY(
+             SELECT public.onb02_normalize_company_name(n) FROM unnest(v_private_names) n)
+         ))
+       );
 
     -- publication_matches has a NO ACTION FK to monitoring_profiles, so
     -- delete those matches explicitly before cascading profiles. This does
@@ -257,7 +325,7 @@ BEGIN
     )
     VALUES (
         v_tenant, 'USER', v_actor::text, 'COMPANY_PURGED',
-        'company', NULL, '{"purged": true}'::jsonb, gen_random_uuid()
+        'company', NULL, jsonb_build_object('purged',true,'ambiguous_name_count',v_ambiguous_name_count), gen_random_uuid()
     );
 
     RETURN TRUE;

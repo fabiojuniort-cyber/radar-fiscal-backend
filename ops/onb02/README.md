@@ -103,3 +103,12 @@ app, backup/restore não comprovado ou revisão pendente: **HOLD**. Nenhuma
 exclusão física em PR, merge, migration ou deploy por inferência. Reverter
 código para versão anterior se necessário, depois de verificar compatibilidade
 com schema; dados purgados exigem restauração individual autorizada.
+
+
+## R5 — complemento ao R4 (sem liberação produtiva)
+
+- Não há reativação de matriz, filial ou empresa; inativas preexistentes permanecem intocadas até exclusão explícita.
+- A auditoria histórica só é minimizada quando o evento é inequivocamente atribuível; nomes exatos normalizados por caixa/acentos são mascarados dentro do tenant se não existirem homônimos nele. A contagem de outras empresas homônimas é registrada sem nome no evento `COMPANY_PURGED`.
+- `audit_log` mantém ação/data/usuário/tipo de entidade; menções a empresa-alvo em auditorias de outra entidade do tenant não autorizam editar esse histórico.
+- A migration 073 deve estar ausente do ledger antes do rollout: checksum divergente proíbe sobrescrever migração já aplicada. O gate permanece BLOCK; `statement_timeout` da função = 30s e índice composto `ix_audit_r5_tenant_entity`. Benchmark de 50 mil auditorias somente em PG18 isolado (CI).
+- R5 exige revisão independente de novo HEAD e CI integral verde. Não executar DDL/DELETE/EXPLAIN em produção para validação.
