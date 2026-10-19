@@ -1,6 +1,6 @@
 # ANAT-04 — matriz de medição: cobertura, fórmulas e lacunas do gold
 
-Origem: COORD → CLAUDE-EXEC, [issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116), PR #244 (draft). Revisão de 18/10/2026, depois do fechamento do GOLD-01 (7/7 aprovados).
+Origem: COORD → CLAUDE-EXEC, [issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116), PR #244 (draft). Revisão de 18/10/2026, depois do fechamento do GOLD-01 (7/7 aprovados). Ajuste do protocolo pedido pelo COORD (casamento um a um, tabela de decisão de P, R e F1, N/A por denominador efetivo e M02 decomposta), sem alterar os golds aprovados.
 
 **Este documento não mede nada e não traz números de desempenho.** Ele define o que pode ser medido com o gold aprovado, como medir e onde não se aplica. Os denominadores vêm só do gold; as contagens de códigos são travadas por `test/anatomy.gold.unit.test.ts` ("measurement matrix counts…"), que usa `ops/anatomy/gold-stats.ts`. `BLOCK_CORPUS_INPUTS_AND_GOLD` continua de pé: 7/20 entradas de desenvolvimento aprovadas, reserva fechada e 18 originais ausentes.
 
@@ -41,33 +41,48 @@ Ordem de prioridade dos papéis, usada na contagem: capítulo > ponta de faixa >
 
 ## 3. Métricas, fórmulas e denominadores
 
-**Convenções:**
-- **Casamento:** a parte ou entidade prevista e a do gold têm o mesmo tipo (ou domínio) e o mesmo span `[início, fim)` UTF-16 no texto canônico congelado. A raiz `document` fica fora.
-- **P** = TP / previstos; **R** = TP / gold; **F1** = 2PR / (P + R).
-- **N/A:**
-  - P é N/A quando não há nada previsto;
-  - R é N/A quando o gold tem 0 itens da classe;
-  - F1 é N/A quando P ou R for N/A.
+**Convenções** (protocolo ajustado em 18/10/2026; os sete golds aprovados não mudam):
 
-  Nunca substituir N/A por 0 ou por 1.
-- Toda métrica é reportada **por entrada e por fonte** (CONFAZ, DOU). Somas entre fontes só aparecem junto com o resultado estratificado.
+- **Chave de casamento:** tipo (parte) ou domínio (entidade) e span exato `[início, fim)` em UTF-16 no texto canônico congelado. A raiz `document` fica fora. Relações têm chave própria (M1, M2).
+- **Casamento um a um.** Cada item do gold casa com no máximo uma predição, e cada predição com no máximo um item do gold:
+  - itens com a mesma chave são pareados em ordem de ocorrência;
+  - **uma predição duplicada (mesma chave) não gera outro acerto**: o excedente é FP;
+  - um item do gold repetido só conta como acerto se houver predições suficientes.
+
+  `TP` = número de pares; `FP` = predições sem par; `FN` = itens do gold sem par.
+- **P** = TP / previstos; **R** = TP / gold; **F1** = 2·P·R / (P + R).
+- **Tabela de decisão** (`G` = itens do gold da classe; `Pr` = predições da classe):
+
+  | Situação | P | R | F1 |
+  |---|---|---|---|
+  | `G = 0` e `Pr = 0` | N/A | N/A | N/A |
+  | `G = 0` e `Pr > 0` | 0 (só FP) | N/A | N/A |
+  | `G > 0` e `Pr = 0` | **N/A** (sem predições) | 0 | N/A |
+  | `G > 0`, `Pr > 0` e `TP = 0` | **0** | **0** | **0** |
+  | `G > 0`, `Pr > 0` e `TP > 0` | TP/Pr | TP/G | 2PR/(P+R) |
+
+- **Razões (E2, E3, E4, R3, S1):** a métrica é N/A sempre que o **denominador efetivo**, calculado sobre os casamentos de fato obtidos, for zero. Nunca substituir N/A por 0 ou por 1.
+- Toda métrica é reportada **por entrada e por fonte** (CONFAZ, DOU). Somas entre fontes só aparecem junto com o resultado estratificado. Uma soma também segue a tabela de decisão sobre os totais e não é média de razões.
 
 | ID | Métrica | Fórmula | Denominador do gold, por entrada (01 / 02 / 03 / 05 / 07 / 10 / 11) | N/A |
 |---|---|---|---|---|
-| E1 | Partes (tipo + span) | P, R e F1 sobre as partes casadas | 6.917 / 215 / 4 / 7 / 7 / 788 / 44 | — |
-| E2 | Hierarquia | partes casadas cujo pai também casa ÷ partes casadas cujo pai no gold não é a raiz | depende do casamento E1 | quando E1 não tem partes casadas |
-| E3 | Ordem entre irmãos | pares de irmãos casados com a mesma ordem relativa ÷ pares de irmãos casados | depende de E1 | sem pares |
-| E4 | Contexto | partes casadas com o mesmo `context` ÷ partes casadas; também matriz de confusão | `historical`: 4.096 / 73 / 0 / 0 / 0 / 0 / 0 | recall da classe `historical` é N/A nas DOU (sem histórico no gold) |
-| E5 | Geometria de tabela | células com span e linha/coluna/rowSpan/colSpan iguais ÷ células do gold | 4.682 / 0 / 0 / 0 / 0 / 537 / 0 | entradas sem tabela (02, 03, 05, 07, 11) |
+| E1 | Partes (tipo + span) | P, R e F1, casamento um a um | 6.917 / 215 / 4 / 7 / 7 / 788 / 44 | pela tabela de decisão |
+| E2 | Hierarquia | partes casadas cujo pai previsto é o par do pai do gold ÷ partes casadas cujo pai no gold não é a raiz e também foi casado | efetivo: depende de E1 | **N/A se o denominador efetivo for 0** |
+| E3 | Ordem entre irmãos | pares de irmãos do gold, ambos casados, com a mesma ordem relativa na predição ÷ esses pares | efetivo: depende de E1 | **N/A se não houver pares** |
+| E4 | Contexto | partes casadas com o mesmo `context` ÷ partes casadas; também matriz de confusão por classe | `historical`: 4.096 / 73 / 0 / 0 / 0 / 0 / 0 | N/A sem partes casadas; recall da classe `historical` é N/A nas DOU |
+| E5 | Geometria de tabela | P, R e F1 de células com chave estendida (span e linha/coluna/rowSpan/colSpan iguais), casamento um a um | 4.682 / 0 / 0 / 0 / 0 / 537 / 0 | pela tabela de decisão; entradas sem tabela têm R N/A |
 | R1 | Reconhecimento NCM (todas as ocorrências, qualquer contexto, sem capítulos) | P e R por domínio e span exatos | 1.374 / 0 / 0 / 0 / 0 / 0 / 0 | R é N/A em 02–11; P continua definida (todo NCM previsto é FP) |
 | R2 | Reconhecimento NBM | idem | 623 / 1 / 0 / 0 / 0 / 0 / 0 | R é N/A em 03–11 |
-| R3 | Confusão NCM × NBM | códigos casados por span com domínio trocado ÷ códigos casados por span | 01 e 02 | demais entradas |
+| R3 | Confusão NCM × NBM | códigos casados **só por span** (um a um, ignorando o domínio) com domínio trocado ÷ códigos casados só por span | efetivo: até 2.002 (01, todos os códigos, inclusive capítulos) / 1 (02) | **N/A se não houver código casado por span**; sempre N/A em 03–11 |
 | R4 | Capítulos informativos | P e R da classe capítulo de 2 dígitos | 5 (3 operativos e 2 históricos) / 0 / … | R é N/A fora do 01 |
 | R5 | Falso NCM sobre outros domínios | spans de entidade não-código (CITATION, OTHER, PROCESS, CNPJ) com NCM previsto sobreposto ÷ esses spans | 207 / 125 / 5 / 4 / 5 / 211 / 8 (565 no total; 214 são `OTHER`, com cara de NCM) | — |
 | R6 | Citações | P e R da classe CITATION | 207 / 125 / 1 / 2 / 4 / 1 / 8 | — |
-| M1 | Faixas M01 | faixas previstas com as duas pontas casadas e o operador no mesmo span ÷ (previstas; gold) | 72 / 0 / … | R é N/A fora do 01 |
-| M2 | Exceções M02 | exceções com o mesmo operador e o mesmo **conjunto** de alvos ÷ (previstas; gold) | 17 / 0 / … | R é N/A fora do 01 |
-| S1 | Exclusão estrutural (o que **pode** ser medido sobre elegibilidade) | seleções `ncm` positivas emitidas sobre não candidatos ÷ não candidatos. **Meta: 0** | 1.362 / 1 / 0 / … | 03–11 (0 códigos); para elas, qualquer positiva é registrada como violação absoluta |
+| M1 | Faixas M01 | P, R e F1 com chave = span do operador e as duas pontas casadas como entidades; um a um | 72 / 0 / … | pela tabela de decisão; R é N/A fora do 01 |
+| M2a | Exceção, alvos | P, R e F1 com chave = span do operador e **conjunto** de alvos igual; um a um | 17 / 0 / … | pela tabela de decisão |
+| M2b | Exceção, escopo | entre os pares de M2a: `scopeSpan` previsto igual ao do gold ÷ pares de M2a. Convenção do gold: o escopo vai do início do operador ao fim do último alvo. **Escopo ampliado ou reduzido é erro** | efetivo: pares de M2a | N/A sem pares em M2a |
+| M2c | Exceção, condição | entre os pares de M2a: condição prevista igual à do gold ÷ pares de M2a. No gold atual, as 17 condições são `null`; uma condição prevista não nula é erro | efetivo: pares de M2a | N/A sem pares em M2a; recall de condições não nulas é N/A (gold sem condição) |
+| M2 | Exceção **completa** | pares de M2a que também acertam M2b **e** M2c ÷ (previstas; gold), pela tabela de decisão | 17 / 0 / … | **alvos certos com escopo ampliado ou condição errada não contam como acerto completo**; M2a, M2b e M2c são sempre reportadas separadamente |
+| S1 | Exclusão estrutural (o que **pode** ser medido sobre elegibilidade) | seleções `ncm` positivas emitidas sobre não candidatos ÷ não candidatos. **Meta: 0** | 1.362 / 1 / 0 / 0 / 0 / 0 / 0 | a razão é N/A em 03–11 (denominador 0), mas a **contagem absoluta** de positivas `ncm` emitidas é sempre reportada, e qualquer valor acima de 0 é violação |
 | S2 | Seleção positiva (precisão e recall) | — | teto estrutural: 640 (01) | **N/A no ANAT-04.** Exige evidência jurídica aprovada (ANAT-06); o gold só dá o teto, não o gabarito |
 | C1 | Cobertura do motor | `recognizedLength` ÷ comprimento do texto e fração `unidentified` | comprimento UTF-16 de cada texto | descritiva: **não** conta como acerto |
 
