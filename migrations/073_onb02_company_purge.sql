@@ -288,7 +288,7 @@ BEGIN
                    '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0
                  OR strpos(coalesce(a.after_data::text,''),
                    substr(r.cnpj,1,2)||'.'||substr(r.cnpj,3,3)||'.'||substr(r.cnpj,6,3)||
-                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0))
+                   '/'||substr(r.cnpj,9,4)||'-'||substr(r.cnpj,13,2))>0)))
          OR (cardinality(v_private_names)>0 AND (
            public.onb02_redact_audit_json(
              a.before_data,ARRAY[]::text[],ARRAY[]::text[],v_private_names)
