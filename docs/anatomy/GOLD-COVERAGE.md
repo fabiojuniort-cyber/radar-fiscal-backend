@@ -86,6 +86,8 @@ Ordem de prioridade dos papéis, usada na contagem: capítulo > ponta de faixa >
 | S2 | Seleção positiva (precisão e recall) | — | teto estrutural: 640 (01) | **N/A no ANAT-04.** Exige evidência jurídica aprovada (ANAT-06); o gold só dá o teto, não o gabarito |
 | C1 | Cobertura do motor | `recognizedLength` ÷ comprimento do texto e fração `unidentified` | comprimento UTF-16 de cada texto | descritiva: **não** conta como acerto |
 
+Implementação pura destas regras, sem medição: [evaluation.md](evaluation.md) (`src/modules/anatomy/evaluation.ts`).
+
 ## 4. Limitações de cobertura (sempre visíveis no relatório de medição)
 
 | Limitação | Onde | Efeito |
