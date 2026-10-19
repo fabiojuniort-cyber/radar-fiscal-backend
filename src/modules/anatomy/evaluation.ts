@@ -107,8 +107,10 @@ export interface EntryEvaluation {
   pending: PredictionPending | null;
 }
 
-/** Counts of pending items across entries; never folded into any score. */
-export interface PendingSummary { entriesWithPending: string[]; nonCompleteEntries: string[]; unresolved: Record<string, number>; limitations: number; missingResources: number; unidentifiedSegments: number }
+/** Counts of pending items across entries plus the full per-entry detail; never folded into any score. */
+export interface PendingSummary { entriesWithPending: string[]; nonCompleteEntries: string[]; unresolved: Record<string, number>; limitations: number; missingResources: number; unidentifiedSegments: number;
+  /** Every entry of the group, with its pending items copied unchanged (resources, reasons, references, spans); null when undeclared. */
+  byEntry: { id: string; source: string; pending: PredictionPending | null }[] }
 function summarizePending(list: EntryEvaluation[]): PendingSummary {
   const unresolved: Record<string, number> = {}; let limitations = 0; let missingResources = 0; let unidentifiedSegments = 0;
   for (const e of list) {
@@ -117,7 +119,8 @@ function summarizePending(list: EntryEvaluation[]): PendingSummary {
     limitations += e.pending.limitations.length; missingResources += e.pending.missingResources.length; unidentifiedSegments += e.pending.unidentifiedSegments.length;
   }
   return { entriesWithPending: list.filter((e) => e.pending && (e.pending.unresolved.length || e.pending.limitations.length || e.pending.missingResources.length || e.pending.unidentifiedSegments.length || e.pending.status !== 'complete')).map((e) => e.id),
-    nonCompleteEntries: list.filter((e) => e.pending && e.pending.status !== 'complete').map((e) => e.id), unresolved, limitations, missingResources, unidentifiedSegments };
+    nonCompleteEntries: list.filter((e) => e.pending && e.pending.status !== 'complete').map((e) => e.id), unresolved, limitations, missingResources, unidentifiedSegments,
+    byEntry: list.map((e) => ({ id: e.id, source: e.source, pending: e.pending ? structuredClone(e.pending) : null })) };
 }
 
 export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pred: Prediction, options: EvaluationOptions = {}): EntryEvaluation {
@@ -152,10 +155,11 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
   const confusion: Record<string, number> = {}; let e4n = 0;
   for (const [g, p] of m1.pairs) { const k = `${g.context}->${p.context}`; confusion[k] = (confusion[k] ?? 0) + 1; if (g.context === p.context) e4n++; }
   // E5 — cells with extended geometry key.
-  // A cell without known geometry cannot earn E5 credit (its key is unique), on either side.
+  // A cell without known geometry cannot earn E5 credit (its key is unique), on either side: a missing table, or a
+  // table whose declared geometry is `unknown` (the gold carries it; a prediction may too).
   let unknownCell = 0;
-  const cellKey = (side: 'g' | 'p') => (c: { span: Span; table?: { row: number; column: number; rowSpan: number; columnSpan: number } | null }) =>
-    `${sk(c.span)}|${c.table ? `${c.table.row},${c.table.column},${c.table.rowSpan},${c.table.columnSpan}` : `unknown-geometry:${side}:${unknownCell++}`}`;
+  const cellKey = (side: 'g' | 'p') => (c: { span: Span; table?: { row: number; column: number; rowSpan: number; columnSpan: number; geometry?: string } | null }) =>
+    `${sk(c.span)}|${c.table && c.table.geometry !== 'unknown' ? `${c.table.row},${c.table.column},${c.table.rowSpan},${c.table.columnSpan}` : `unknown-geometry:${side}:${unknownCell++}`}`;
   const gCells = gParts.filter((p) => p.type === 'cell'); const pCells = pParts.filter((p) => p.type === 'cell');
   const e5 = matchOneToOne(gCells, pCells, cellKey('g'), cellKey('p'));
   // R — entities by class, one to one on domain + span.

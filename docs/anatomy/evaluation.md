@@ -93,3 +93,9 @@ Testes (`test/anatomy.evaluation-adapter.unit.test.ts`): rodam o motor só sobre
    - `evaluateEntry` devolve `pending`, que é a cópia das pendências da predição, ou `null` quando a predição não declara nenhuma, sem inventar "nada pendente";
    - `aggregate` devolve, por fonte e em `ALL`, um resumo: entradas com pendência, entradas não completas, contagem de `unresolved` por tipo, limitações, recursos ausentes e segmentos `unidentified`. Pendências **nunca** entram nos escores;
    - **campo desconhecido nunca recebe crédito**: operador `null` não casa com nada, nem com outro `null` (M1/M2a); escopo `null` em qualquer lado não conta em M2b; célula sem geometria conhecida não conta em E5.
+
+### Ajustes residuais (R2 do EVAL-02, GPT/Codex, PR #244, review 5566918687)
+
+1. **E5 no lado do gold:** uma célula cujo `table.geometry` é `unknown` no gold também não recebe crédito, mesmo com linha e coluna iguais às da predição. Vale para os dois lados: tabela ausente ou geometria `unknown` geram chave que nunca casa.
+2. **Referência a composta:** um alvo de relação que aponta para uma entidade composta (`NCM_RANGE`/`NCM_EXCEPTION`), e que portanto não existe como ocorrência na predição, gera `pending.unresolved` com `kind: relation_target`, a composta de origem como `ref` e o motivo no `detail`. A referência é mantida como foi emitida e não recebe crédito em M1/M2a.
+3. **Detalhe por entrada na agregação:** `pending.byEntry: [{ id, source, pending }]` em cada grupo (fonte e `ALL`), com cópia integral das pendências: recursos ausentes, limitações com spans, segmentos `unidentified` e itens não resolvidos com referência e motivo. `pending` fica `null` quando a entrada não declarou nada. As contagens continuam e nada disso entra nos escores.

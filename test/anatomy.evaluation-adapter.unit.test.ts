@@ -166,6 +166,58 @@ test('finding 3: pending items reach evaluateEntry and the aggregation, and unkn
   assert.equal(evaluateEntry('h', 'SYN', g1, { parts: [], entities: [], relations: [], selections: [] }).pending, null);
 });
 
+// Residual items of the EVAL-02 R2 review (GPT/Codex, PR #244 review 5566918687).
+
+test('residual 1: unknown geometry on the GOLD side never earns E5 credit', () => {
+  const base = analyzeAnatomy(request()); const text = base.canonicalText;
+  const cell = base.parts.find((x) => x.type === 'cell')!;
+  const goldWith = (geometry: 'original' | 'unknown') => syntheticGold(text, [], [], [{ id: 'c', parentId: 'b', order: 0, type: 'cell', span: cell.span, context: 'operative_candidate',
+    contextReason: 'synthetic', table: { row: cell.table!.row, column: cell.table!.column, rowSpan: cell.table!.rowSpan, columnSpan: cell.table!.columnSpan, geometry, headerDomain: null } }]);
+  const pred = anatomyResultToPrediction(base, { selections: [] });
+  assert.equal(evaluateEntry('96', 'SYN', goldWith('original'), pred).E5.tp, 1);
+  const r = evaluateEntry('96', 'SYN', goldWith('unknown'), pred).E5;
+  assert.deepEqual([r.tp, r.fn], [0, 1], 'same row/column but the gold geometry is unknown');
+});
+
+test('residual 2: a relation target that is a compound (removed from the prediction) is diagnosed and earns nothing', () => {
+  const base = analyzeAnatomy(request());
+  const rangeId = base.entities.find((e) => e.domain === 'NCM_RANGE')!.id;
+  const excId = base.entities.find((e) => e.domain === 'NCM_EXCEPTION')!.id;
+  const pointing = reseal(base, (r) => { r.entities.find((e) => e.id === excId)!.relation!.targetEntityIds.push(rangeId); });
+  const p = anatomyResultToPrediction(pointing, { selections: [] });
+  assert.ok(p.pending!.unresolved.some((u) => u.kind === 'relation_target' && u.ref === excId && u.detail.includes(rangeId) && /compound NCM_RANGE/.test(u.detail)));
+  assert.ok(p.relations.find((x) => x.kind === 'exception')!.targetEntityIds.includes(rangeId), 'reference kept as emitted, not rewritten');
+  // Scored against a gold exception with the same operator and the real targets, the dangling compound reference blocks M2a.
+  const text = base.canonicalText; const exc = p.relations.find((x) => x.kind === 'exception')!;
+  const real = exc.targetEntityIds.filter((id) => id !== rangeId).map((id, i) => { const s = p.entities.find((e) => e.id === id)!.span;
+    return { id: `t${i}`, partId: 'b', span: s, literal: text.slice(s.start, s.end), domain: 'NCM' as const, note: '' }; });
+  const g = syntheticGold(text, [{ id: 'x', kind: 'exception', operatorSpan: exc.operatorSpan, memberEntityIds: [], targetEntityIds: real.map((e) => e.id), scopeSpan: null, condition: null }], real);
+  assert.equal(evaluateEntry('96', 'SYN', g, p).M2a.tp, 0);
+  assert.equal(evaluateEntry('96', 'SYN', g, anatomyResultToPrediction(base, { selections: [] })).M2a.tp, 1, 'without the compound reference it matches');
+});
+
+test('residual 3: the aggregation keeps per-entry pending detail (resources, reasons, references, spans) next to the counts', () => {
+  const base = analyzeAnatomy(request()); const text = base.canonicalText;
+  const g = syntheticGold(text, [], []);
+  const partial = analyzeAnatomy(request({ attachments: [{ resourceId: 'synthetic-annex', sha256: null, state: 'missing' }] }));
+  const lost = reseal(base, (r) => { for (const e of r.entities) if (e.relation && ['range', 'range_start', 'range_end'].includes(e.relation.kind)) e.relation.operator = 'até'; });
+  const a = evaluateEntry('p', 'CONFAZ', g, anatomyResultToPrediction(partial, { selections: [] }));
+  const b = evaluateEntry('l', 'DOU', g, anatomyResultToPrediction(lost, { selections: [] }));
+  const c = evaluateEntry('h', 'DOU', g, { parts: [], entities: [], relations: [], selections: [] });
+  const agg = aggregate([a, b, c]);
+  assert.deepEqual(agg.ALL!.pending.byEntry.map((x) => [x.id, x.source]), [['p', 'CONFAZ'], ['l', 'DOU'], ['h', 'DOU']]);
+  assert.deepEqual(agg.ALL!.pending.byEntry[0]!.pending, a.pending, 'resources, limitations and spans preserved');
+  assert.deepEqual(agg.ALL!.pending.byEntry[0]!.pending!.missingResources, partial.coverage.missingResources);
+  const lostDetail = agg.ALL!.pending.byEntry[1]!.pending!.unresolved.find((u) => u.kind === 'operator_span')!;
+  assert.ok(lostDetail.ref.startsWith('entity:NCM_RANGE') && /até/.test(lostDetail.detail), 'reference and reason preserved');
+  assert.equal(agg.ALL!.pending.byEntry[2]!.pending, null, 'undeclared pending stays null');
+  assert.deepEqual(agg.DOU!.pending.byEntry.map((x) => x.id), ['l', 'h']);
+  assert.equal(agg.ALL!.pending.missingResources, partial.coverage.missingResources.length, 'counts kept');
+  // The detail is a copy: changing it does not alter the entry evaluation.
+  agg.ALL!.pending.byEntry[0]!.pending!.missingResources.push('tampered');
+  assert.ok(!a.pending!.missingResources.includes('tampered'));
+});
+
 test('end to end in memory: adapted prediction without coverage keeps an invented positive pending, and with an explicit selection on a code it is proven', () => {
   const result = analyzeAnatomy(request());
   const text = result.canonicalText;

@@ -50,7 +50,12 @@ export function anatomyResultToPrediction(input: AnatomyResult, explicit: Adapte
       continue;
     }
     const r = c.relation; const targets = [...r.targetEntityIds];
-    for (const t of targets) if (!byId.has(t)) pending.unresolved.push({ kind: 'relation_target', ref: c.id, detail: `target ${t} not in result` });
+    for (const t of targets) {
+      const target = byId.get(t);
+      if (!target) pending.unresolved.push({ kind: 'relation_target', ref: c.id, detail: `target ${t} not in result` });
+      // Compounds are not occurrences in the prediction, so a reference to one cannot be scored; it is reported.
+      else if (COMPOUND.has(target.domain)) pending.unresolved.push({ kind: 'relation_target', ref: c.id, detail: `target ${t} is a compound ${target.domain}, not an occurrence` });
+    }
     const operator = r.operator.trim();
     if (r.kind === 'range') {
       const first = byId.get(targets[0]!); const last = byId.get(targets[targets.length - 1]!);
