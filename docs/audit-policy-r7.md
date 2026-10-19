@@ -119,10 +119,10 @@ depois roda --plan novamente. Não inventar regra apenas para liberar a execuç�
 
 --apply usa conexão de operador, sem permissão de execução para
 radar_app/worker/curator. A função SQL de lote repete a verificação global antes
-da primeira escrita do lote, inclusive em chamadas diretas. Um lock de tabela
-SHARE ROW EXCLUSIVE, limitado a cada lote, impede escritores concorrentes durante
-essa verificação e UPDATE; SELECTs continuam disponíveis. O lock termina no commit
-ou rollback do lote. Se um tipo novo aparecer entre lotes, o próximo lote aborta;
+da primeira escrita do lote, inclusive em chamadas diretas. O lock comum de escrita
+ROW EXCLUSIVE é adquirido antes da verificação: impede DDL que desabilite a guarda
+durante o lote, sem bloquear INSERTs normais. A guarda rejeita novos tipos sem regra.
+O lock termina no commit/rollback. Se um tipo novo aparecer entre lotes, o próximo lote aborta;
 lotes conhecidos já confirmados permanecem confirmados e retomáveis.
 
 Cada lote confirma alteração das linhas e checkpoint na mesma transação. O marcador por linha é a verdade para retomada:

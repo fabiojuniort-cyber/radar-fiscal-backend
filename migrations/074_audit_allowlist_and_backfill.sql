@@ -101,10 +101,10 @@ DECLARE v_count INTEGER; v_remaining BIGINT; v_unknown JSONB;
 BEGIN
  IF p_limit<1 OR p_limit>10000 THEN RAISE EXCEPTION 'invalid_batch_limit'; END IF;
  -- R7.1: no unknown type may be projected to empty JSON. Check every stored
- -- action/type before any UPDATE or checkpoint write. The per-batch lock
- -- prevents concurrent inserts/updates between this check and the write;
- -- ordinary readers remain available and the lock ends with the batch.
- LOCK TABLE public.audit_log IN SHARE ROW EXCLUSIVE MODE;
+ -- action/type before any UPDATE or checkpoint write. The ordinary write lock
+ -- prevents trigger-disabling DDL during this check/write. Concurrent normal
+ -- INSERTs remain possible, but the guard rejects every unregistered type.
+ LOCK TABLE public.audit_log IN ROW EXCLUSIVE MODE;
  WITH event_types AS MATERIALIZED (
    SELECT action,entity_type,count(*) AS count FROM public.audit_log
    GROUP BY action,entity_type
