@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { developmentCanonicalText, GOLD_DIR } from '../ops/anatomy/annotation-pack.js';
 import { buildGold } from '../ops/anatomy/gold-build.js';
+import { codeBreakdown } from '../ops/anatomy/gold-stats.js';
 import { chunkDir, goldChunks, reassembleCanonical, reassembleGold, REVIEW_IDS } from '../ops/anatomy/gold-chunks.js';
 import { sha256 } from '../src/modules/anatomy/contract.js';
 import { ANATOMY_GOLD_VERSION, goldContentSha256, validateAnatomyGold, type AnatomyGold } from '../src/modules/anatomy/gold.js';
@@ -113,6 +114,19 @@ test('all seven development golds carry the documented independent approval of t
 // Direct checks of the cases corrected after the R1/R2 findings, so a later spec change cannot silently undo them.
 const gold = (id: string) => JSON.parse(readFileSync(new URL(`${id}.json`, GOLD_DIR), 'utf8')) as AnatomyGold;
 const literals = (g: AnatomyGold, literal: string) => g.entities.filter((e) => e.literal === literal);
+
+test('measurement matrix counts match the approved gold (recognition is not positive selection)', () => {
+  const b = codeBreakdown(gold('01'));
+  assert.equal(b.total, 2002);
+  assert.deepEqual(b.byContext, { operative_candidate: 655, historical: 1347 });
+  assert.deepEqual(b.operative, { total: 655, byRole: { chapter: 3, range_member: 4, exception_target: 8, standalone: 640 },
+    standaloneInCodeColumn: 591, standaloneInText: 49, rangeAndException: 2 });
+  assert.deepEqual(b.structuralPositiveCandidates, { NCM: 640, NBM: 0 });
+  assert.equal(b.nonCandidates, 1362);
+  const b02 = codeBreakdown(gold('02'));
+  assert.deepEqual([b02.total, b02.structuralPositiveCandidates, b02.nonCandidates], [1, { NCM: 0, NBM: 1 }, 1]);
+  for (const id of ['03', '05', '07', '10', '11']) assert.equal(codeBreakdown(gold(id)).total, 0, `${id} has no nomenclature code`);
+});
 
 test('R1 correction: 02 keeps 3507.90.4 as NBM and annotates every convention number of a list', () => {
   const g = gold('02');
