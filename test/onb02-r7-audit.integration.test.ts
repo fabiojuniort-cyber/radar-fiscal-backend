@@ -31,6 +31,11 @@ test('R7: allowlist rejects unregistered events, unknown keys, nested payloads, 
   await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,action,entity_type)
     VALUES('SYSTEM','UNREGISTERED_NEW_EVENT','company')`),
     (e:unknown)=>(e as {code?:string}).code==='23514');
+  for (const [column,value] of [['entity_id','not-an-opaque-id'],['request_id','not-an-opaque-id']] as const) {
+   await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,action,entity_type,${column})
+     VALUES('SYSTEM','COMPANY_UPDATED','company',$1)`,[value]),
+     (e:unknown)=>(e as {code?:string}).code==='23514');
+  }
   const safe=await pool.query<{id:string}>(`INSERT INTO audit_log(actor_type,action,entity_type,after_data)
     VALUES('SYSTEM','COMPANY_UPDATED','company','{"is_active":true}') RETURNING id`);
   await assert.rejects(pool.query("SET ROLE radar_worker; SELECT * FROM public.audit_backfill_batch(10)"),
@@ -107,6 +112,15 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
       OR after_data IS DISTINCT FROM public.audit_project(action,entity_type,after_data)
       OR entity_id IS DISTINCT FROM public.audit_entity_reference(entity_id))`,[tenants])).rows[0]!.n;
   assert.equal(Number(remaining),0);
+  const retained=await pool.query<{n:string}>(`SELECT count(*)::text n FROM audit_log
+    WHERE tenant_id=ANY($1::uuid[]) AND action='COMPANY_UPDATED'
+      AND before_data=jsonb_build_object('company_id',$2::text,'is_active',true)
+      AND after_data=jsonb_build_object('company_id',$2::text,'is_active',false)`,[tenants,company]);
+  assert.equal(Number(retained.rows[0]!.n),66667,'known event retains exactly the permitted context');
+  const fallback=await pool.query<{n:string}>(`SELECT count(*)::text n FROM audit_log
+    WHERE tenant_id=ANY($1::uuid[]) AND action='LEGACY_COMPANY_SNAPSHOT'
+      AND before_data='{}'::jsonb AND after_data='{}'::jsonb`,[tenants]);
+  assert.equal(Number(fallback.rows[0]!.n),33333,'unknown historical event keeps headers, clears free context');
   console.log('ONB02_R7_BACKFILL '+JSON.stringify({rows:150000,batchSize:5000,
     total_ms:elapsed,first_ms:first.elapsedMs,resume_ms:resumed.elapsedMs,
     restart:true,idempotent:true,atomicFailure:true,headersPreserved:true,otherEntityPreserved:true}));
