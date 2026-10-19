@@ -11,7 +11,7 @@ test('ONB-02 R5: EXPLAIN ANALYZE audit mask on 50,000 synthetic records, rollbac
   const pool = new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 1 });
   const client = await pool.connect();
   try {
-    const version = (await client.query<{version:string}>('SHOW server_version')).rows[0]!.version;
+    const version = (await client.query<{server_version:string}>('SHOW server_version')).rows[0]!.server_version;
     assert.match(version,/^18\./,'PostgreSQL 18 required');
     await client.query('BEGIN');
     await client.query("SET LOCAL statement_timeout='30000ms'");
