@@ -237,7 +237,7 @@ try {
           await sql`
             INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
             VALUES (NULL, 'SYSTEM', 'ops:import-confaz-act', 'PUBLICATION_PRESENTATION_REFRESHED', 'publication_version', ${latest.id}::uuid,
-                    ${JSON.stringify({ officialUrl, savedPageSha256: fileSha256, htmlChars: (presentation as { html?: string }).html?.length ?? 0, effectiveUntil: normalized.metadata.effectiveUntil ?? null })}::jsonb, gen_random_uuid())
+                    public.audit_project('PUBLICATION_PRESENTATION_REFRESHED','publication_version',${JSON.stringify({ savedPageSha256: fileSha256, htmlChars: (presentation as { html?: string }).html?.length ?? 0, effectiveUntil: normalized.metadata.effectiveUntil ?? null })}::jsonb), gen_random_uuid())
           `.execute(trx);
         });
         console.log('CONFAZ_PRESENTATION_REFRESH=' + JSON.stringify({ refreshed: true, versionId: latest.id, versionNo: latest.version_no, effectiveUntil: normalized.metadata.effectiveUntil ?? null }));

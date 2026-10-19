@@ -85,8 +85,8 @@ async function fixture(trx:Transaction<DB>, scale:boolean) {
     monitoring_profiles:0,company_publications:0,publication_matches:0};
   assert.deepEqual(await graph(),expected);
   if(!scale) await q(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
-    VALUES($1,'SYSTEM','ONB02_R6_ROLLBACK','company',$2,
-      jsonb_build_object('company_id',$2::text,'name','R6 Synthetic Company'))`,[tenant,company]);
+    VALUES($1,'SYSTEM','COMPANY_UPDATED','company',$2,
+      jsonb_build_object('company_id',$2::text,'is_active',true))`,[tenant,company]);
   if(scale) {
     const source=(await q<{id:string}>(`INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key)
       VALUES($1,'R6 synthetic global source','FEDERAL','https://example.test/',$1) RETURNING id`,[randomUUID()]))[0]!.id;
@@ -96,23 +96,21 @@ async function fixture(trx:Transaction<DB>, scale:boolean) {
       SELECT $1,n::text,'PROCESSED_EXISTING',jsonb_build_object('official',true,'text',repeat('x',128))
       FROM generate_series(1,420000)n`,[run]);
     await q(`INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
-      SELECT $1,'SYSTEM','ONB02_R6_SCALE','company',
-        CASE WHEN n%100=0 THEN $2::text ELSE NULL END,
-        jsonb_build_object('name',CASE WHEN n%100=0 THEN 'R6 Synthetic Company' ELSE 'Unrelated historical value' END,
-          'context',repeat('x',256),'nested',jsonb_build_array(jsonb_build_object('iteration',n))),
-        jsonb_build_object('reference',CASE WHEN n%100=0 THEN $2::text ELSE '' END)
-      FROM generate_series(1,41000)n`,[tenant,company]);
+      SELECT $1,'SYSTEM','COMPANY_UPDATED','company',$2::text,
+        jsonb_build_object('company_id',$2::text,'is_active',true),
+        jsonb_build_object('company_id',$2::text,'is_active',false)
+      FROM generate_series(1,150000)n`,[tenant,company]);
     const before=(await q<{n:string;hash:string}>(`SELECT count(*)::text n,
       md5(string_agg(md5(to_jsonb(i)::text),'' ORDER BY i.id)) hash
       FROM collection_items i WHERE collection_run_id=$1`,[run]))[0]!;
     assert.equal(Number(before.n),420000);
-    assert.equal(Number((await q<{n:string}>("SELECT count(*)::text n FROM audit_log WHERE tenant_id=$1",[tenant]))[0]!.n),41000);
+    assert.equal(Number((await q<{n:string}>("SELECT count(*)::text n FROM audit_log WHERE tenant_id=$1",[tenant]))[0]!.n),150000);
     return {q,tenant,company,actor,graph,expected,run,before};
   }
   return {q,tenant,company,actor,graph,expected,run:undefined,before:undefined};
 }
 
-test('ONB-02 R6: full purge at recorded production row counts; stages; global rows unchanged', {timeout:180000}, async()=>{
+test('ONB-02 R7: graph-only purge with 150k audits and recorded company graph; stages; global rows unchanged', {timeout:180000}, async()=>{
   const db=isolatedDatabase();
   try {
     await assert.rejects(db.transaction().execute(async trx=>{
@@ -132,12 +130,11 @@ test('ONB-02 R6: full purge at recorded production row counts; stages; global ro
         md5(string_agg(md5(to_jsonb(i)::text),'' ORDER BY i.id)) hash
         FROM collection_items i WHERE collection_run_id=$1`,[f.run]))[0]!;
       assert.deepEqual(after,f.before);
-      const mask=(await f.q<{n:string}>(`SELECT count(*)::text n FROM audit_log
-        WHERE tenant_id=$1 AND before_data->>'name'='[NOME_EMPRESA_MASCARADO]'`,[f.tenant]))[0]!.n;
-      assert.equal(Number(mask),410);
+      assert.equal(Number((await f.q<{n:string}>(`SELECT count(*)::text n FROM audit_log
+        WHERE tenant_id=$1 AND action='COMPANY_UPDATED'`,[f.tenant]))[0]!.n),150000);
       assert.ok(metrics.total_ms<30000);
-      console.log('ONB02_R6_FULL_PURGE '+JSON.stringify({
-        postgres:version.rows[0]!.server_version,audit_rows:41000,collection_items:420000,
+      console.log('ONB02_R7_FULL_PURGE '+JSON.stringify({
+        postgres:version.rows[0]!.server_version,audit_rows:150000,collection_items:420000,
         graph_rows:116,graph:f.expected,client_total_ms:clientMs,stage_ms:metrics,
         preserved_global_rows:true,fixture:'synthetic row-count match; not production hardware/JSON distribution'
       }));
@@ -146,7 +143,7 @@ test('ONB-02 R6: full purge at recorded production row counts; stages; global ro
   } finally { await db.destroy(); }
 });
 
-test('ONB-02 R6: service statement timeout cancels AFTER cascade and rolls back every stage', {timeout:60000}, async()=>{
+test('ONB-02 R7: service statement timeout cancels AFTER cascade and rolls back every stage', {timeout:60000}, async()=>{
   const db=isolatedDatabase();
   try {
     await assert.rejects(db.transaction().execute(async trx=>{
@@ -167,13 +164,13 @@ test('ONB-02 R6: service statement timeout cancels AFTER cascade and rolls back 
       assert.deepEqual(await f.q('SHOW statement_timeout'),settingsBefore);
       assert.equal(Number((await f.q<{n:string}>(
         "SELECT count(*)::text n FROM audit_log WHERE tenant_id=$1 AND action='COMPANY_PURGED'",[f.tenant]))[0]!.n),0);
-      console.log('ONB02_R6_STATEMENT_TIMEOUT rollback=PASS sqlstate=57014');
+      console.log('ONB02_R7_STATEMENT_TIMEOUT rollback=PASS sqlstate=57014');
       throw new FixtureRollback();
     }),FixtureRollback);
   } finally { await db.destroy(); }
 });
 
-test('ONB-02 R6: service lock timeout rolls back audit changes and releases locks', {timeout:30000}, async()=>{
+test('ONB-02 R7: service lock timeout rolls back audit changes and releases locks', {timeout:30000}, async()=>{
   const db=isolatedDatabase();
   const blocker=new Pool({connectionString:databaseUrl,max:1});
   const hold=await blocker.connect();
@@ -196,7 +193,7 @@ test('ONB-02 R6: service lock timeout rolls back audit changes and releases lock
       assert.deepEqual(await f.graph(),before);
       assert.deepEqual(await f.q('SELECT before_data,entity_id FROM audit_log WHERE tenant_id=$1',[f.tenant]),audits);
       assert.deepEqual(await f.q('SHOW lock_timeout'),timeouts);
-      console.log('ONB02_R6_LOCK_TIMEOUT rollback=PASS sqlstate=55P03');
+      console.log('ONB02_R7_LOCK_TIMEOUT rollback=PASS sqlstate=55P03');
       throw new FixtureRollback();
     }),FixtureRollback);
   } finally {

@@ -12,6 +12,9 @@ FIXTURE="${RUNNER_TEMP:-/tmp}/onb02-r3-semantic-ids.out"
 # Seed a target, a same-tenant company, another tenant, branch and audit.
 # All table mutations here occur exclusively on GitHub's throwaway DB.
 "${PSQL[@]}" -A -t > "$FIXTURE" <<'SQL'
+BEGIN;
+-- Deliberately seed pre-R7 legacy data only in this disposable semantic fixture.
+ALTER TABLE audit_log DISABLE TRIGGER audit_allowlist_guard;
 INSERT INTO tenants(name,slug)
 VALUES('ONB02 CI OWN','onb02-semantic-owner') RETURNING id AS tenant_id \gset
 INSERT INTO tenants(name,slug)
@@ -49,6 +52,8 @@ VALUES (:'tenant_id'::uuid,'USER','ONB02_CI_CNPJ','company',
 INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,after_data)
 VALUES (:'tenant_id'::uuid,'USER','ONB02_CI_PRODUCT','profile',
   jsonb_build_object('old_product_id',:'product_id'));
+ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard;
+COMMIT;
 CREATE MATERIALIZED VIEW public.onb02_ci_private_tax_matview
 AS SELECT id FROM public.company_tax_profiles WITH NO DATA;
 CREATE VIEW public.onb02_ci_private_est_view

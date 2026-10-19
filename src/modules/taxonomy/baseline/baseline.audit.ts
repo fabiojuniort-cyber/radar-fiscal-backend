@@ -27,7 +27,7 @@ export async function writeBaselineAudit(
       '  $1,',
       "  'taxonomy_baseline',",
       '  $2,',
-      '  $3::jsonb,',
+      "  public.audit_project($1,'taxonomy_baseline',$3::jsonb),",
       '  $4::uuid',
       ')',
     ].join('\n'),

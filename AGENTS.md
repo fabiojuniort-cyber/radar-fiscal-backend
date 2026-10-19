@@ -51,11 +51,11 @@ sem recuperar perfis, histórico privado nem pré-preenchimento do onboarding le
 A confirmação de exclusão definitiva exige o nome digitado; clientes antigos sem
 `X-Company-Delete-Intent: permanent-v1` recebem 409 e não executam a purga.
 O serviço aplica SET LOCAL statement_timeout=30s e lock_timeout=5s antes do SELECT.
-Os endpoints rejeitam `reactivateInactive=true` com 410; registros inativos são
-preservados, nunca purgados automaticamente. Auditorias próprias da empresa têm
-retenção minimizada; nomes homônimos de outras empresas do mesmo tenant não
-são mascarados e são contados no evento de exclusão, sem identificar as empresas.
-Políticas de recuperação seguem o `ACCEPTED_RISK` registrado no ONB-02.
+Os endpoints rejeitam reactivateInactive=true com 410; inativas não são purgadas
+automaticamente. A política R7 usa allowlist tipada por evento em toda escrita.
+A purga não minimiza auditoria por texto e fica bloqueada até o backfill histórico
+separado estar concluído. Ver docs/audit-policy-r7.md. O backfill em produção exige
+autorização própria, além do deploy. Políticas de recuperação seguem ACCEPTED_RISK.
 
 ### Local Negócio
 

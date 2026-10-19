@@ -1,3 +1,4 @@
+import { applyAuditBackfill } from '../src/modules/audit/audit-backfill.js';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
@@ -28,6 +29,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
   let globalPublicationId: string | undefined;
   try {
     await app.ready();
+    await applyAuditBackfill(admin);
     await ensureCnaeFixture(admin);
     const owner = async () => {
       const email = 'onb02-r3-' + randomUUID() + '@example.test';
@@ -97,88 +99,17 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       INSERT INTO establishment_cnaes(establishment_id,cnae_code)
       VALUES($1,'6201501')
     `,[branch.id]);
+    // R7: only IDs and typed context are stored; purging never edits old audit.
     await admin.query(`
       INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
-      VALUES($1,'USER','ONB02_CI_BRANCH_HISTORICAL','establishment',$2,
-        jsonb_build_object('branch_id',$2::text,'cnpj',$3::text,'name','Filial Árvore R6',
-          'nested',jsonb_build_array(jsonb_build_object('legal','Empresa Legada Excluir'))),
-        jsonb_build_object('cnpj',$3::text))
-    `,[a.tenantId,branch.id,branchCnpj]);
-    const formattedCnpj = branchCnpj.slice(0,2)+'.'+branchCnpj.slice(2,5)+'.'+
-      branchCnpj.slice(5,8)+'/'+branchCnpj.slice(8,12)+'-'+branchCnpj.slice(12);
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,after_data)
-      VALUES($1,'USER','ONB02_R4_CNPJ_ENTITY','establishment',$2,
-        jsonb_build_object('message','referência histórica por CNPJ'))
-    `,[a.tenantId,formattedCnpj]);
-
-    // Name-only owned audit, without any current UUID/CNPJ.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
-      VALUES($1,'USER','ONB02_R5_NAME_ONLY','company',
-        jsonb_build_object('name','EMPRESA LEGADA EXCLUIR'))
-    `,[a.tenantId]);
-    // A homologous NAME in the same tenant must be preserved, with collision count.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
-      VALUES($1,'USER','ONB02_R5_SAME_TENANT_NAME','company',
-        jsonb_build_object('name',normalize('MARCA SÃO R5',NFD)))
-    `,[a.tenantId]);
-    // Another tenant sharing the legal name is never affected.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
-      VALUES($1,'USER','ONB02_R5_OTHER_TENANT_NAME','company',
-        jsonb_build_object('name','empresa legada excluir'))
-    `,[b.tenantId]);
-    // An owned event can use a compound entity ID, which must also be masked.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
-      VALUES($1,'USER','ONB02_R5_COMPOSITE_ID','establishment',$2,
-        jsonb_build_object('owned_id',$3::text))
-    `,[a.tenantId,'branch:'+branch.id,branch.id]);
-    // Sibling event that MENTIONS target CNPJ must not become target's audit.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
-      VALUES($1,'USER','ONB02_R5_SIBLING_REFERENCE','company',$2,
-        jsonb_build_object('referenced_cnpj',$3::text,'name','EMPRESA LEGADA EXCLUIR'))
-    `,[a.tenantId,sibling.company.id,cnpjA]);
-
-    const deletedBranchId=(await admin.query<{id:string}>(`
-      INSERT INTO establishments(company_id,cnpj,name,establishment_type_code,is_head_office,uf)
-      VALUES($1,$2,'R6 historical branch','OFFICE',false,'GO') RETURNING id
-    `,[target.company.id,validCnpj(base.slice(0,8),'0003')])).rows[0]!.id;
-    const deletedProfileId=(await admin.query<{id:string}>(`
-      INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,is_current)
-      VALUES($1,99,'LUCRO_REAL',false) RETURNING id
-    `,[target.company.id])).rows[0]!.id;
-    await admin.query('DELETE FROM establishments WHERE id=$1',[deletedBranchId]);
-    await admin.query('DELETE FROM company_tax_profiles WHERE id=$1',[deletedProfileId]);
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
-      VALUES($1,'USER','ONB02_R6_OLD_BRANCH','establishment',$2,
-        jsonb_build_object('company_id',$3::text,'name','Empresa Legada Excluir')),
-        ($1,'USER','ONB02_R6_OLD_PROFILE','company_tax_profile',$4,
-        jsonb_build_object('establishment_id',$2::text,'name','Empresa Legada Excluir'))
-    `,[a.tenantId,deletedBranchId,target.company.id,deletedProfileId]);
-    // The same historical identity in another tenant must remain untouched.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
-      VALUES($1,'USER','ONB02_R6_REMOTE_HISTORY','establishment',$2,
-        jsonb_build_object('company_id',$3::text))
-    `,[b.tenantId,deletedBranchId,target.company.id]);
-    // Even an exact unique name in NFD must be masked.
-    await admin.query(`
-      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
-      VALUES($1,'USER','ONB02_R6_NFD_NAME','company',
-        jsonb_build_object('name',normalize('Filial Árvore R6',NFD)))
-    `,[a.tenantId]);
-    // Older clients cannot invoke the new irreversible operation.
-    const oldClient = await app.inject({method:'DELETE',
+      VALUES($1,'USER','ESTABLISHMENT_UPDATED','establishment',$2,
+        jsonb_build_object('company_id',$3::text,'is_active',true),
+        jsonb_build_object('company_id',$3::text,'is_active',false))
+    `,[a.tenantId,branch.id,target.company.id]);
+    const oldClient=await app.inject({method:'DELETE',
       url:'/api/v1/companies/'+target.company.id,
       headers:{authorization:a.headers.authorization,'x-tenant-id':a.tenantId}});
     assert.equal(oldClient.statusCode,409);
-    assert.equal(oldClient.json<{error:string}>().error,'permanent_delete_confirmation_required');
-
     // Immutable shared catalogue fixture, never a company-owned row.
     await admin.query(`
       INSERT INTO official_catalogs(code,name,maintainer)
@@ -631,52 +562,13 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(await count('company_cnaes','company_id',target.company.id),0);
     assert.equal(await count('establishments','id',branch.id),0);
     assert.equal(await count('establishment_cnaes','establishment_id',branch.id),0);
-    // R4: the original event is preserved with its private values redacted.
-    const oldAudit=(await admin.query<{
-      entity_id:string|null;before_data:any;after_data:any;action:string;
-    }>(`
-      SELECT entity_id,before_data,after_data,action FROM audit_log
-      WHERE tenant_id=$1 AND action='ONB02_CI_BRANCH_HISTORICAL'
+    const oldAudit=(await admin.query<{entity_id:string;before_data:any;after_data:any}>(`
+      SELECT entity_id,before_data,after_data FROM audit_log
+      WHERE tenant_id=$1 AND action='ESTABLISHMENT_UPDATED'
     `,[a.tenantId])).rows[0]!;
-    assert.equal(oldAudit.action,'ONB02_CI_BRANCH_HISTORICAL');
-    assert.equal(oldAudit.entity_id,null);
-    assert.equal(oldAudit.before_data.branch_id,'[ID_MASCARADO]');
-    assert.equal(oldAudit.before_data.cnpj,'[CNPJ_MASCARADO]');
-    assert.equal(oldAudit.before_data.name,'[NOME_EMPRESA_MASCARADO]');
-    assert.equal(oldAudit.before_data.nested[0].legal,'[NOME_EMPRESA_MASCARADO]');
-    assert.equal(oldAudit.after_data.cnpj,'[CNPJ_MASCARADO]');
-    assert.equal(JSON.stringify(oldAudit).includes(branch.id),false);
-    assert.equal(JSON.stringify(oldAudit).includes(branchCnpj),false);
-    const getAudit = async (tenant:string,action:string) => (await admin.query<{
-      entity_id:string|null;before_data:any;after_data:any;
-    }>("SELECT entity_id,before_data,after_data FROM audit_log WHERE tenant_id=$1 AND action=$2",
-      [tenant,action])).rows[0]!;
-    const nameOnly=await getAudit(a.tenantId,'ONB02_R5_NAME_ONLY');
-    assert.equal(nameOnly.before_data.name,'[NOME_EMPRESA_MASCARADO]');
-    const oldBranchAudit=await getAudit(a.tenantId,'ONB02_R6_OLD_BRANCH');
-    assert.equal(oldBranchAudit.entity_id,null);
-    assert.equal(oldBranchAudit.before_data.company_id,'[ID_MASCARADO]');
-    const oldProfileAudit=await getAudit(a.tenantId,'ONB02_R6_OLD_PROFILE');
-    assert.equal(oldProfileAudit.entity_id,null);
-    assert.equal(oldProfileAudit.before_data.establishment_id,'[ID_MASCARADO]');
-    assert.equal((await getAudit(b.tenantId,'ONB02_R6_REMOTE_HISTORY')).entity_id,deletedBranchId);
-    assert.equal((await getAudit(a.tenantId,'ONB02_R6_NFD_NAME')).before_data.name,'[NOME_EMPRESA_MASCARADO]');
-    const sameTenantHomonym=await getAudit(a.tenantId,'ONB02_R5_SAME_TENANT_NAME');
-    assert.equal(sameTenantHomonym.before_data.name,'MARCA SÃO R5'.normalize('NFD'));
-    const otherTenantHomonym=await getAudit(b.tenantId,'ONB02_R5_OTHER_TENANT_NAME');
-    assert.equal(otherTenantHomonym.before_data.name,'empresa legada excluir');
-    const compound=await getAudit(a.tenantId,'ONB02_R5_COMPOSITE_ID');
-    assert.equal(compound.entity_id,'branch:[ID_MASCARADO]');
-    assert.equal(compound.before_data.owned_id,'[ID_MASCARADO]');
-    const otherCompanyAudit=await getAudit(a.tenantId,'ONB02_R5_SIBLING_REFERENCE');
-    assert.equal(otherCompanyAudit.entity_id,sibling.company.id);
-    assert.equal(otherCompanyAudit.before_data.referenced_cnpj,cnpjA);
-    assert.equal(otherCompanyAudit.before_data.name,'EMPRESA LEGADA EXCLUIR');
-    const maskedEntity=(await admin.query<{entity_id:string|null;action:string}>(`
-      SELECT entity_id,action FROM audit_log WHERE tenant_id=$1 AND action='ONB02_R4_CNPJ_ENTITY'
-    `,[a.tenantId])).rows[0]!;
-    assert.equal(maskedEntity.action,'ONB02_R4_CNPJ_ENTITY');
-    assert.equal(maskedEntity.entity_id,null);
+    assert.equal(oldAudit.entity_id,branch.id);
+    assert.deepEqual(oldAudit.before_data,{company_id:target.company.id,is_active:true});
+    assert.deepEqual(oldAudit.after_data,{company_id:target.company.id,is_active:false});
     const dormantAfter=(await admin.query<{is_active:boolean}>(`
       SELECT is_active FROM companies WHERE id=$1
     `,[dormant.company.id])).rows[0];
@@ -724,9 +616,9 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(purgeAudits.length,1,'two DELETEs must create exactly one audit');
     assert.equal(purgeAudits[0]!.actor_type,'USER');
     assert.equal(purgeAudits[0]!.actor_id,users[0]);
-    assert.equal(purgeAudits[0]!.entity_id,null);
+    assert.equal(purgeAudits[0]!.entity_id,target.company.id);
     assert.equal(purgeAudits[0]!.before_data,null);
-    assert.deepEqual(purgeAudits[0]!.after_data,{purged:true,ambiguous_name_count:1});
+    assert.deepEqual(purgeAudits[0]!.after_data,{purged:true});
 
     const recreate = await createCompany(a,cnpjA,'Novo perfil do zero');
     assert.notEqual(recreate.company.id,target.company.id);
@@ -795,7 +687,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
             )
         `,[tenants]);
         await admin.query(
-          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL','ONB02_R4_CNPJ_ENTITY','ONB02_R5_NAME_ONLY','ONB02_R5_SAME_TENANT_NAME','ONB02_R5_OTHER_TENANT_NAME','ONB02_R5_COMPOSITE_ID','ONB02_R5_SIBLING_REFERENCE','ONB02_R6_OLD_BRANCH','ONB02_R6_OLD_PROFILE','ONB02_R6_REMOTE_HISTORY','ONB02_R6_NFD_NAME') AND tenant_id=ANY($1::uuid[])",
+          "DELETE FROM audit_log WHERE tenant_id=ANY($1::uuid[])",
           [tenants],
         );
       }

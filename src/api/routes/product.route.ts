@@ -965,6 +965,7 @@ export async function productRoutes(
         // recoverable business conflict, never a silent partial deletion.
         // Do not leak internal identifiers or CNPJ to the client.
         if (error instanceof Error && (
+          error.message === 'company_purge_audit_backfill_required' ||
           error.message === 'company_purge_cross_company_link' ||
           error.message === 'company_purge_legacy_identity_ambiguous' ||
           error.message === 'company_purge_historical_identity_ambiguous'

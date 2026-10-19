@@ -38,6 +38,7 @@ export interface AppUsers {
 }
 
 export interface AuditLog {
+  audit_policy_version: Generated<number>;
   action: string;
   actor_id: string | null;
   actor_type: string;
