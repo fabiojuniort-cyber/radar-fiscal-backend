@@ -269,5 +269,12 @@
    "resource": null,
    "note": "Linhas 'Redação anterior' em tabelas: considerada histórica apenas a sequência de linhas imediatamente seguinte com o mesmo nº de item; casos de múltiplos itens dependem de revisão."
   }
- ]
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a",
+  "notes": "R3 (GPT/Codex) no SHA 04d896e5f6ab6a7c95c9a813e4f41280f48650f3: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5566220164 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6258080394"
+ }
 }

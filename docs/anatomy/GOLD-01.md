@@ -2,7 +2,7 @@
 
 Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de desenvolvimento, [issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116), PR #244 (draft). Anotador: CLAUDE-EXEC, em 17/10/2026.
 
-**Estado: `reviewed` em 6/7 (02, 03, 05, 07, 10 e 11, aprovadas por GPT/Codex em 18/10/2026 na R2, cada uma no hash exato); 01 em `prepared`, com `changes_requested` na R2.** As correções do 01 estão aplicadas e o novo hash aguarda a rodada 3. O pacote como um todo continua com alterações solicitadas. Isto não é gold homologado nem análise jurídica, e não libera medição: os 18 originais DOE-SP/RFB continuam ausentes e a reserva não foi aberta.
+**Estado: `reviewed` em 7/7.** Aprovações independentes de GPT/Codex em 18/10/2026, cada uma no hash exato: 02, 03, 05, 07, 10 e 11 na R2 (base `c8ee0fe4…`) e 01 na R3 (base `04d896e5…`). Isso não é homologação jurídica e não libera a medição, que continua bloqueada pela falta dos 18 originais e do gold restante. Cobertura e lacunas: [GOLD-COVERAGE.md](GOLD-COVERAGE.md).
 
 ## Método
 
@@ -63,11 +63,11 @@ Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de des
 
 | Achado (verificado pelo revisor) | Correção relatada pelo executor | Verificação do revisor |
 |---|---|---|
-| Aprovação aceitava estados inconsistentes: anotador como revisor, revisor nulo, `prepared` com aprovação, `reviewed` sem data | `validateAnatomyGold` passou a exigir que `approved` ⇔ `reviewed`, com anotador e revisor identificados e distintos, data e hash igual ao do conteúdo. Todas as combinações têm teste | pendente (rodada 2) |
-| 02: `3507.90.4` como NCM, embora a fonte o identifique como NBM/SH | Domínio corrigido para **NBM** na especificação, sem conversão | pendente (rodada 2) |
-| Cobertura incompleta: listas de citações e códigos não enumerados | Cada número de lista virou citação (01: +45, 02: +28); posições de 4 dígitos enumeradas com o domínio da qualificação; domínio pelo cabeçalho da coluna; 9 exceções M02; escopo definido acima, antes da medição | pendente (rodada 2) |
+| Aprovação aceitava estados inconsistentes: anotador como revisor, revisor nulo, `prepared` com aprovação, `reviewed` sem data | `validateAnatomyGold` passou a exigir que `approved` ⇔ `reviewed`, com anotador e revisor identificados e distintos, data e hash igual ao do conteúdo. Todas as combinações têm teste | testes específicos de aprovação PASS nos pareceres R2 e R3; aprovações gravadas validadas |
+| 02: `3507.90.4` como NCM, embora a fonte o identifique como NBM/SH | Domínio corrigido para **NBM** na especificação, sem conversão | verificado: 02 aprovado na R2 com `3507.90.4` como NBM |
+| Cobertura incompleta: listas de citações e códigos não enumerados | Cada número de lista virou citação (01: +45, 02: +28); posições de 4 dígitos enumeradas com o domínio da qualificação; domínio pelo cabeçalho da coluna; 9 exceções M02; escopo definido acima, antes da medição | 02 aprovado na R2; 01 aprovado na R3, após a correção das posições pontuadas |
 
-> As correções acima foram **relatadas pelo executor** e ainda não foram verificadas pelo revisor.
+> As correções acima foram relatadas pelo executor; a última coluna registra o que os pareceres R2 e R3 conferiram.
 
 **Mudaram de hash:** 01 e 02. Os demais continuam iguais aos conferidos na rodada 1, que não aprovou nenhuma entrada.
 
@@ -83,14 +83,20 @@ Origem: COORD → EXEC, autorização do Fábio para anotar as 7 entradas de des
 
 | Achado R2 (01) | Correção relatada pelo executor | Verificação do revisor |
 |---|---|---|
-| Posições pontuadas `NN.NN` ausentes | Regra de posição passou a aceitar `NNNN` e `NN.NN`, isolados ou em lista ("84.44, 84.45, 84.46 OU 84.47"), com domínio NBM quando o texto diz "da NBM" | pendente (rodada 3) |
-| Faixa `84.56 A 84.65` | Faixa M01 com as duas pontas, sem expansão | pendente (rodada 3) |
-| Relações de exclusão | Uma relação `exception` por operador, com todos os alvos; o ponto dentro de um código (`84.56`) não encerra mais a oração. Total de 17 exceções; "EXCETO … 84.56 A 84.65" tem os dois códigos como alvo | pendente (rodada 3) |
-| Escopo (complemento do executor) | Referências a capítulo de 2 dígitos ("Capítulo 84", "Capítulo 53") anotadas como informativas; "deste capítulo 60.1" é número de item e fica fora | pendente (rodada 3) |
+| Posições pontuadas `NN.NN` ausentes | Regra de posição passou a aceitar `NNNN` e `NN.NN`, isolados ou em lista ("84.44, 84.45, 84.46 OU 84.47"), com domínio NBM quando o texto diz "da NBM" | verificado (R3) |
+| Faixa `84.56 A 84.65` | Faixa M01 com as duas pontas, sem expansão | verificado (R3) |
+| Relações de exclusão | Uma relação `exception` por operador, com todos os alvos; o ponto dentro de um código (`84.56`) não encerra mais a oração. Total de 17 exceções; "EXCETO … 84.56 A 84.65" tem os dois códigos como alvo | verificado (R3) |
+| Escopo (complemento do executor) | Referências a capítulo de 2 dígitos ("Capítulo 84", "Capítulo 53") anotadas como informativas; "deste capítulo 60.1" é número de item e fica fora | verificado (R3) |
 
 **Varredura residual do executor:** os tokens `NN.NN` e `NNNN` perto de palavras de nomenclatura que ficaram fora do gold são só números de item ou subitem (por exemplo, "32.14", "55.10", "33.01"), fora do escopo por definição.
 
 **Novo hash do 01 para a rodada 3:** `d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a` (antes: `0909f12d…`).
+
+## Rodada 3 de revisão: 01 aprovado
+
+**Revisor:** GPT/Codex. **Base:** `04d896e5f6ab6a7c95c9a813e4f41280f48650f3`. **Data:** 18/10/2026. **Parecer:** [PR #244, review 5566220164](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5566220164); registro em [tribusca-control#116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6258080394). CI ANAT na base: [39155429509](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/actions/runs/39155429509), SUCCESS.
+
+**Verificado pelo revisor:** as correções do 01, as seis aprovações anteriores e sete testes específicos (PASS). **Aprovado:** 01 `d6ba1bbf…` no escopo estrutural v1. As correções da R2 listadas acima ficam, portanto, verificadas.
 
 ## Pontos para a revisão
 
@@ -115,7 +121,7 @@ Estes são os itens em que a decisão do anotador é mais discutível.
 
 | ID | `goldContentSha256` | Situação |
 |---|---|---|
-| 01 | `d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a` | **submetido à rodada 3** (R2: `0909f12d…`, changes_requested) |
+| 01 | `d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a` | **aprovado** (R3, GPT/Codex, 18/10/2026, base `04d896e5…`; [parecer](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5566220164)) |
 | 02 | `256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
 | 03 | `a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b` | **aprovado** (R2, GPT/Codex, 18/10/2026) |
 | 05 | `44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7` | **aprovado** (R2, GPT/Codex, 18/10/2026) |

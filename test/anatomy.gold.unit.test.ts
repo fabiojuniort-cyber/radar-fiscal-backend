@@ -83,9 +83,11 @@ test('committed development gold is reproducible from its human-written specs', 
   }
 });
 
-// Approvals documented in the R2 review (GPT/Codex, 2026-10-18, SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17):
-// PR #244 review 5563875392 and tribusca-control#116 comment 6252319710. 01 received changes_requested.
-const R2_APPROVED: Record<string, string> = {
+// Independent approvals (GPT/Codex, 2026-10-18), each bound to the exact content hash:
+// R2 on c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17 (PR #244 review 5563875392; tribusca-control#116 comment 6252319710): 02–11.
+// R3 on 04d896e5f6ab6a7c95c9a813e4f41280f48650f3 (PR #244 review 5566220164; tribusca-control#116 comment 6258080394): 01.
+const APPROVED: Record<string, string> = {
+  '01': 'd6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a',
   '02': '256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a',
   '03': 'a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b',
   '05': '44c6407dc014d399e977e15315b3d4e46d82a0c2d77b6dbe595ee43dcdf1c2e7',
@@ -94,21 +96,50 @@ const R2_APPROVED: Record<string, string> = {
   '11': '678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79',
 };
 
-test('committed development gold matches the frozen text; only the documented R2 approvals are reviewed', () => {
+test('all seven development golds carry the documented independent approval of their exact content', () => {
   const files = readdirSync(GOLD_DIR).filter((f) => f.endsWith('.json')).sort();
   assert.deepEqual(files, ['01.json', '02.json', '03.json', '05.json', '07.json', '10.json', '11.json']);
+  assert.deepEqual(Object.keys(APPROVED).sort(), files.map((f) => f.slice(0, 2)));
   for (const f of files) {
     const id = f.slice(0, 2);
     const gold = validateAnatomyGold(JSON.parse(readFileSync(new URL(f, GOLD_DIR), 'utf8')), developmentCanonicalText(id));
-    const approved = R2_APPROVED[id];
-    if (approved) {
-      assert.equal(gold.status, 'reviewed', id);
-      assert.deepEqual([gold.review.reviewer, gold.review.status, gold.review.reviewedAt, gold.review.approvedContentSha256],
-        ['GPT/Codex', 'approved', '2026-10-18', approved], id);
-      assert.equal(goldContentSha256(gold), approved, `${id}: content still equals the approved hash`);
-    } else {
-      assert.equal(gold.status, 'prepared', `${id} is not approved`);
-      assert.equal(gold.review.approvedContentSha256, null, id);
-    }
+    assert.equal(gold.status, 'reviewed', id);
+    assert.deepEqual([gold.annotator, gold.review.reviewer, gold.review.status, gold.review.reviewedAt, gold.review.approvedContentSha256],
+      ['CLAUDE-EXEC', 'GPT/Codex', 'approved', '2026-10-18', APPROVED[id]], id);
+    assert.equal(goldContentSha256(gold), APPROVED[id], `${id}: content still equals the approved hash`);
   }
+});
+
+// Direct checks of the cases corrected after the R1/R2 findings, so a later spec change cannot silently undo them.
+const gold = (id: string) => JSON.parse(readFileSync(new URL(`${id}.json`, GOLD_DIR), 'utf8')) as AnatomyGold;
+const literals = (g: AnatomyGold, literal: string) => g.entities.filter((e) => e.literal === literal);
+
+test('R1 correction: 02 keeps 3507.90.4 as NBM and annotates every convention number of a list', () => {
+  const g = gold('02');
+  assert.deepEqual(literals(g, '3507.90.4').map((e) => e.domain), ['NBM']);
+  const text = developmentCanonicalText('02');
+  const line7 = text.split('\n')[6]!;
+  assert.ok(line7.startsWith('Alterado pelos Convs. ICMS 40/98, 97/99, 08/00'));
+  const start = text.indexOf(line7); const end = start + line7.length;
+  const inLine = g.entities.filter((e) => e.domain === 'CITATION' && e.span.start >= start && e.span.end <= end).map((e) => e.literal);
+  assert.ok(inLine.includes('97/99') && inLine.includes('08/00') && inLine.includes('149/05'), 'list items are citations');
+  assert.equal(inLine.length, (line7.match(/\d{1,3}\/\d{2}/g) ?? []).length, 'every number of the list is annotated');
+});
+
+test('R2 correction: 01 annotates dotted positions, the 84.56 A 84.65 range and its exclusion with both ends', () => {
+  const g = gold('01'); const byId = new Map(g.entities.map((e) => [e.id, e]));
+  for (const code of ['84.02', '85.14', '84.56', '84.65', '84.44', '84.47']) assert.ok(literals(g, code).length > 0, code);
+  assert.ok(g.entities.some((e) => e.literal === '85.14' && e.domain === 'NCM'));
+  const ranges = g.relations.filter((r) => r.kind === 'range' && r.memberEntityIds.map((i) => byId.get(i)!.literal).join(' A ') === '84.56 A 84.65');
+  assert.ok(ranges.length >= 1, 'range 84.56 A 84.65');
+  const exceptions = g.relations.filter((r) => r.kind === 'exception');
+  const both = exceptions.find((r) => r.targetEntityIds.map((i) => byId.get(i)!.literal).join('+') === '84.56+84.65');
+  assert.ok(both, 'one exception targets both ends of the excluded range');
+  assert.ok(exceptions.some((r) => r.targetEntityIds.some((i) => byId.get(i)!.literal === '85.14')), '85.14 is excluded');
+  for (const r of exceptions) assert.equal(new Set(exceptions.map((x) => x.operatorSpan!.start)).size, exceptions.length, 'one relation per operator');
+  // Chapter references are informative two-digit codes; an item number after "deste capítulo" is not.
+  assert.deepEqual(g.entities.filter((e) => /capítulo/.test(e.note)).map((e) => e.literal).sort(), ['53', '53', '84', '84', '84']);
+  // The two historical occurrences of 8450.11.00 stay historical (contract cross-check).
+  const parts = new Map(g.parts.map((p) => [p.id, p]));
+  assert.deepEqual(literals(g, '8450.11.00').map((e) => parts.get(e.partId)!.context), ['historical', 'historical']);
 });
