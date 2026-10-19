@@ -19,7 +19,7 @@ export interface PredictionPending {
   limitations: { code: string; partId: string | null; span: Span | null }[];
   unidentifiedSegments: Span[];
   missingResources: string[];
-  unresolved: { kind: 'operator_span' | 'table_geometry' | 'relation_target'; ref: string; detail: string }[];
+  unresolved: { kind: 'operator_span' | 'table_geometry' | 'relation_target' | 'compound_relation'; ref: string; detail: string }[];
 }
 export interface Prediction { parts: PredictedPart[]; entities: PredictedEntity[]; relations: PredictedRelation[]; selections: PredictedSelection[];
   /** Engine-reported coverage for the descriptive C1 only; never used as proven annotation coverage. */
@@ -103,6 +103,21 @@ export interface EntryEvaluation {
   M1: Prf; M2a: Prf; M2b: Ratio; M2c: NotApplicable; M2: NotApplicable;
   S1a: Ratio; S1b: S1b; S2: NotApplicable;
   C1: Ratio | NotApplicable;
+  /** The prediction's own pending items, carried unchanged; `null` only when the prediction declares none. */
+  pending: PredictionPending | null;
+}
+
+/** Counts of pending items across entries; never folded into any score. */
+export interface PendingSummary { entriesWithPending: string[]; nonCompleteEntries: string[]; unresolved: Record<string, number>; limitations: number; missingResources: number; unidentifiedSegments: number }
+function summarizePending(list: EntryEvaluation[]): PendingSummary {
+  const unresolved: Record<string, number> = {}; let limitations = 0; let missingResources = 0; let unidentifiedSegments = 0;
+  for (const e of list) {
+    if (!e.pending) continue;
+    for (const u of e.pending.unresolved) unresolved[u.kind] = (unresolved[u.kind] ?? 0) + 1;
+    limitations += e.pending.limitations.length; missingResources += e.pending.missingResources.length; unidentifiedSegments += e.pending.unidentifiedSegments.length;
+  }
+  return { entriesWithPending: list.filter((e) => e.pending && (e.pending.unresolved.length || e.pending.limitations.length || e.pending.missingResources.length || e.pending.unidentifiedSegments.length || e.pending.status !== 'complete')).map((e) => e.id),
+    nonCompleteEntries: list.filter((e) => e.pending && e.pending.status !== 'complete').map((e) => e.id), unresolved, limitations, missingResources, unidentifiedSegments };
 }
 
 export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pred: Prediction, options: EvaluationOptions = {}): EntryEvaluation {
@@ -137,10 +152,12 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
   const confusion: Record<string, number> = {}; let e4n = 0;
   for (const [g, p] of m1.pairs) { const k = `${g.context}->${p.context}`; confusion[k] = (confusion[k] ?? 0) + 1; if (g.context === p.context) e4n++; }
   // E5 — cells with extended geometry key.
-  const cellKey = (c: { span: Span; table?: { row: number; column: number; rowSpan: number; columnSpan: number } | null }) =>
-    `${sk(c.span)}|${c.table ? `${c.table.row},${c.table.column},${c.table.rowSpan},${c.table.columnSpan}` : '-'}`;
+  // A cell without known geometry cannot earn E5 credit (its key is unique), on either side.
+  let unknownCell = 0;
+  const cellKey = (side: 'g' | 'p') => (c: { span: Span; table?: { row: number; column: number; rowSpan: number; columnSpan: number } | null }) =>
+    `${sk(c.span)}|${c.table ? `${c.table.row},${c.table.column},${c.table.rowSpan},${c.table.columnSpan}` : `unknown-geometry:${side}:${unknownCell++}`}`;
   const gCells = gParts.filter((p) => p.type === 'cell'); const pCells = pParts.filter((p) => p.type === 'cell');
-  const e5 = matchOneToOne(gCells, pCells, cellKey, cellKey);
+  const e5 = matchOneToOne(gCells, pCells, cellKey('g'), cellKey('p'));
   // R — entities by class, one to one on domain + span.
   const entKey = (e: { domain: string; span: Span }) => `${e.domain}|${sk(e.span)}`;
   // A two-character code span is a chapter reference (informative class R4), kept out of R1/R2.
@@ -166,17 +183,21 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
   const ref = (e: { domain: string; span: Span }) => `${e.domain}@${sk(e.span)}`;
   const gEnt = new Map(gold.entities.map((e) => [e.id, ref(e)])); const pEnt = new Map(pred.entities.map((e) => [e.id, ref(e)]));
   // Range: operator + both ends in order. Exception: operator + the SET of targets (order-free).
+  // An unknown operator span never matches anything, not even another unknown one (no credit for null = null).
+  let unknownSeq = 0;
   const relKey = (refs: Map<string, string>, side: 'g' | 'p') => (r: { operatorSpan: Span | null; memberEntityIds: string[]; targetEntityIds: string[]; kind: string }) => {
+    const op = r.operatorSpan ? sk(r.operatorSpan) : `unknown-operator:${side}:${unknownSeq++}`;
     const ends = (r.kind === 'range' ? r.memberEntityIds : r.targetEntityIds).map((i) => refs.get(i) ?? `unresolved:${side}:${i}`);
-    if (r.kind !== 'range') return `${r.kind}|${sk(r.operatorSpan)}|${[...new Set(ends)].sort().join(',')}`; // targets are a set: repeats collapse
-    return `${r.kind}|${sk(r.operatorSpan)}|${ends.join(',')}`;
+    if (r.kind !== 'range') return `${r.kind}|${op}|${[...new Set(ends)].sort().join(',')}`; // targets are a set: repeats collapse
+    return `${r.kind}|${op}|${ends.join(',')}`;
   };
   const gRanges = gold.relations.filter((r) => r.kind === 'range'); const pRanges = pred.relations.filter((r) => r.kind === 'range');
   const M1 = prf(matchOneToOne(gRanges, pRanges, relKey(gEnt, 'g'), relKey(pEnt, 'p')).pairs.length, pRanges.length, gRanges.length);
   const gExc = gold.relations.filter((r) => r.kind === 'exception'); const pExc = pred.relations.filter((r) => r.kind === 'exception');
   const m2 = matchOneToOne(gExc, pExc, relKey(gEnt, 'g'), relKey(pEnt, 'p'));
   const M2a = prf(m2.pairs.length, pExc.length, gExc.length);
-  const M2b = ratio(m2.pairs.filter(([g, p]) => sk(g.scopeSpan) === sk(p.scopeSpan)).length, m2.pairs.length);
+  // Scope earns credit only when both sides KNOW it and agree; an unknown scope is never equal to anything.
+  const M2b = ratio(m2.pairs.filter(([g, p]) => g.scopeSpan !== null && p.scopeSpan !== null && sk(g.scopeSpan) === sk(p.scopeSpan)).length, m2.pairs.length);
   // S1 — denominator from the gold, independent of matching. Every positive `ncm` emission falls in exactly one class,
   // so none can disappear; only classes the gold can prove count as violations.
   const roles = goldCodeRoles(gold);
@@ -207,11 +228,12 @@ export function evaluateEntry(id: string, source: string, gold: AnatomyGold, pre
     M2c: { ...NA, reason: 'gold condition null does not prove absence of a condition (not annotated in this stage)' },
     M2: { ...NA, reason: 'complete exception depends on M2c' },
     S1a, S1b: s1b(positives.length, classes),
-    S2: { ...NA, reason: 'positive selection requires approved legal evidence (ANAT-06)' }, C1 };
+    S2: { ...NA, reason: 'positive selection requires approved legal evidence (ANAT-06)' }, C1,
+    pending: pred.pending ? structuredClone(pred.pending) : null };
 }
 
 /** Aggregate per source (or overall): P/R/F1 recomputed from summed counts and ratios from summed parts, never averaged. */
-export function aggregate(entries: EntryEvaluation[]): Record<string, Pick<EntryEvaluation, 'E1' | 'E5' | 'R1' | 'R2' | 'R4' | 'R6' | 'M1' | 'M2a'> & Record<'E2' | 'E3' | 'E4' | 'R3' | 'R5' | 'M2b' | 'S1a', Ratio> & { S1b: EntryEvaluation['S1b']; entries: string[] }> {
+export function aggregate(entries: EntryEvaluation[]): Record<string, Pick<EntryEvaluation, 'E1' | 'E5' | 'R1' | 'R2' | 'R4' | 'R6' | 'M1' | 'M2a'> & Record<'E2' | 'E3' | 'E4' | 'R3' | 'R5' | 'M2b' | 'S1a', Ratio> & { S1b: EntryEvaluation['S1b']; entries: string[]; pending: PendingSummary }> {
   const groups = new Map<string, EntryEvaluation[]>();
   for (const e of entries) { groups.set(e.source, [...(groups.get(e.source) ?? []), e]); groups.set('ALL', [...(groups.get('ALL') ?? []), e]); }
   const out: ReturnType<typeof aggregate> = {};
@@ -225,7 +247,7 @@ export function aggregate(entries: EntryEvaluation[]): Record<string, Pick<Entry
       E2: sumRatio('E2'), E3: sumRatio('E3'), E4: sumRatio('E4'), R3: sumRatio('R3'), R5: sumRatio('R5'), M2b: sumRatio('M2b'), S1a: sumRatio('S1a'),
       S1b: s1b(list.reduce((a, e) => a + e.S1b.emitted, 0), (Object.keys(list[0]!.S1b.classes) as (keyof S1Classes)[])
         .reduce((acc, k) => ({ ...acc, [k]: list.reduce((a, e) => a + e.S1b.classes[k], 0) }), {} as S1Classes)),
-      entries: list.map((e) => e.id) };
+      entries: list.map((e) => e.id), pending: summarizePending(list) };
   }
   return out;
 }

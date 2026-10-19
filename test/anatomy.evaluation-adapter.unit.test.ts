@@ -3,7 +3,7 @@ import test from 'node:test';
 import { anatomyOutputHash, type AnatomyResult } from '../src/modules/anatomy/contract.js';
 import { analyzeAnatomy, type AnatomyRequest } from '../src/modules/anatomy/engine.js';
 import { anatomyResultToPrediction, selectionsFromEligibility } from '../src/modules/anatomy/evaluation-adapter.js';
-import { evaluateEntry } from '../src/modules/anatomy/evaluation.js';
+import { aggregate, evaluateEntry } from '../src/modules/anatomy/evaluation.js';
 import { ANATOMY_GOLD_VERSION, type AnatomyGold } from '../src/modules/anatomy/gold.js';
 
 // SYNTHETIC inputs only: the engine runs on inline HTML written here; no corpus entry, reserve or source is used.
@@ -82,6 +82,88 @@ test('the adapter validates the contract (fail closed) and never mutates its inp
   assert.equal(JSON.stringify(result), before);
   const tampered = structuredClone(result); tampered.entities[0]!.span = { start: 0, end: 1 }; // hash no longer matches
   assert.throws(() => anatomyResultToPrediction(tampered, { selections: [] }));
+});
+
+// Reproductions of the EVAL-02 review (GPT/Codex, PR #244 review 5566856002). The contract accepts these shapes,
+// so the adapter must report them instead of dropping them.
+
+test('finding 1: a compound without a relation of its own kind is reported with id and reason, never dropped', () => {
+  const base = analyzeAnatomy(request());
+  const rangeId = base.entities.find((e) => e.domain === 'NCM_RANGE')!.id;
+  const excId = base.entities.find((e) => e.domain === 'NCM_EXCEPTION')!.id;
+  const noRel = reseal(base, (r) => { r.entities.find((e) => e.id === rangeId)!.relation = null; });
+  const a = anatomyResultToPrediction(noRel, { selections: [] });
+  assert.ok(!a.relations.some((x) => x.kind === 'range'));
+  assert.deepEqual(a.pending!.unresolved.filter((u) => u.kind === 'compound_relation'), [{ kind: 'compound_relation', ref: rangeId, detail: 'NCM_RANGE has no relation' }]);
+  const wrong = reseal(base, (r) => { r.entities.find((e) => e.id === excId)!.relation!.kind = 'range'; });
+  const b = anatomyResultToPrediction(wrong, { selections: [] });
+  assert.ok(b.pending!.unresolved.some((u) => u.kind === 'compound_relation' && u.ref === excId && /expected "exception"/.test(u.detail)));
+  assert.equal(b.relations.filter((x) => x.kind === 'exception').length, 0, 'not converted under the wrong kind');
+});
+
+test('finding 2: a range keeps the condition it was given', () => {
+  const base = analyzeAnatomy(request());
+  const rangeId = base.entities.find((e) => e.domain === 'NCM_RANGE')!.id;
+  const withCond = reseal(base, (r) => { r.entities.find((e) => e.id === rangeId)!.relation!.condition = 'desde que sintético'; });
+  assert.equal(anatomyResultToPrediction(withCond, { selections: [] }).relations.find((x) => x.kind === 'range')!.condition, 'desde que sintético');
+  assert.equal(anatomyResultToPrediction(base, { selections: [] }).relations.find((x) => x.kind === 'range')!.condition, null);
+});
+
+function syntheticGold(text: string, relations: AnatomyGold['relations'], entities: AnatomyGold['entities'], extraParts: AnatomyGold['parts'] = []): AnatomyGold {
+  return { goldVersion: ANATOMY_GOLD_VERSION, id: '96', partition: 'development', preparation: 'synthetic/1', canonicalTextSha256: '0'.repeat(64),
+    canonicalTextUtf16Length: text.length, status: 'prepared', annotator: 'synthetic', annotatedAt: '2026-10-19',
+    parts: [{ id: 'd', parentId: null, order: 0, type: 'document', span: { start: 0, end: text.length }, context: 'unknown', contextReason: 'document', table: null },
+      { id: 'b', parentId: 'd', order: 0, type: 'body', span: { start: 0, end: text.length }, context: 'operative_candidate', contextReason: 'synthetic', table: null }, ...extraParts],
+    entities, relations, gaps: [], review: { reviewer: null, status: 'requested', reviewedAt: null, approvedContentSha256: null, notes: '' } };
+}
+
+test('finding 3: pending items reach evaluateEntry and the aggregation, and unknown fields never earn credit', () => {
+  const base = analyzeAnatomy(request());
+  const text = base.canonicalText; const at = (s: string) => ({ start: text.indexOf(s), end: text.indexOf(s) + s.length });
+  const ent = (id: string, lit: string) => ({ id, partId: 'b', span: at(lit), literal: lit, domain: 'NCM' as const, note: '' });
+  const ents = [ent('a', '8471.41.00'), ent('z', '8471.49.00'), ent('x', '8471.50.00')];
+  // Unknown operator on BOTH sides: null = null must not be a hit.
+  const lost = reseal(base, (r) => { for (const e of r.entities) if (e.relation && ['range', 'range_start', 'range_end'].includes(e.relation.kind)) e.relation.operator = 'até'; });
+  const pLost = anatomyResultToPrediction(lost, { selections: [] });
+  const g1 = syntheticGold(text, [{ id: 'r', kind: 'range', operatorSpan: null, memberEntityIds: ['a', 'z'], targetEntityIds: [], scopeSpan: null, condition: null }], ents);
+  const e1 = evaluateEntry('96', 'SYN', g1, pLost);
+  assert.deepEqual([e1.M1.tp, e1.M1.fp, e1.M1.fn], [0, 1, 1], 'unknown operator on both sides earns nothing');
+  // Gold operator known, prediction unknown: still no credit.
+  const opSpan = { start: at('8471.41.00').end + 1, end: at('8471.41.00').end + 2 };
+  const g2 = syntheticGold(text, [{ id: 'r', kind: 'range', operatorSpan: opSpan, memberEntityIds: ['a', 'z'], targetEntityIds: [], scopeSpan: null, condition: null }], ents);
+  assert.equal(evaluateEntry('96', 'SYN', g2, pLost).M1.tp, 0);
+  assert.equal(evaluateEntry('96', 'SYN', g2, anatomyResultToPrediction(base, { selections: [] })).M1.tp, 1, 'known and equal operator does match');
+  // Unknown scope (null on both sides) never earns M2b, even with an M2a pair.
+  const pBase = anatomyResultToPrediction(base, { selections: [] });
+  const exc = pBase.relations.find((r) => r.kind === 'exception')!;
+  const targets = exc.targetEntityIds.map((id) => pBase.entities.find((e) => e.id === id)!);
+  const gEnts = targets.map((t, i) => ({ id: `t${i}`, partId: 'b', span: t.span, literal: text.slice(t.span.start, t.span.end), domain: t.domain as 'NCM', note: '' }));
+  const g3 = syntheticGold(text, [{ id: 'x', kind: 'exception', operatorSpan: exc.operatorSpan, memberEntityIds: [], targetEntityIds: gEnts.map((e) => e.id), scopeSpan: null, condition: null }], gEnts);
+  const nullScope = { ...pBase, relations: pBase.relations.map((r) => (r.kind === 'exception' ? { ...r, scopeSpan: null } : r)) };
+  const e3 = evaluateEntry('96', 'SYN', g3, nullScope);
+  assert.equal(e3.M2a.tp, 1); assert.deepEqual([e3.M2b.numerator, e3.M2b.denominator], [0, 1], 'unknown scope earns nothing');
+  // Unknown table geometry never earns E5, even against another unknown.
+  const cell = base.parts.find((x) => x.type === 'cell')!;
+  const gCell = syntheticGold(text, [], [], [{ id: 'c', parentId: 'b', order: 0, type: 'cell', span: cell.span, context: 'operative_candidate', contextReason: 'synthetic',
+    table: { row: cell.table!.row, column: cell.table!.column, rowSpan: cell.table!.rowSpan, columnSpan: cell.table!.columnSpan, geometry: 'original', headerDomain: null } }]);
+  const unknownGeo = anatomyResultToPrediction(reseal(base, (r) => { r.parts.find((x) => x.id === cell.id)!.table!.geometry = 'unknown'; }), { selections: [] });
+  assert.equal(evaluateEntry('96', 'SYN', gCell, unknownGeo).E5.tp, 0);
+  assert.equal(evaluateEntry('96', 'SYN', gCell, pBase).E5.tp, 1, 'known geometry still matches');
+  // Pending propagation: entry and aggregation.
+  const partial = analyzeAnatomy(request({ attachments: [{ resourceId: 'synthetic-annex', sha256: null, state: 'missing' }] }));
+  const ePartial = evaluateEntry('p', 'CONFAZ', g1, anatomyResultToPrediction(partial, { selections: [] }));
+  assert.equal(ePartial.pending!.status, 'partial');
+  assert.deepEqual(ePartial.pending!.missingResources, partial.coverage.missingResources);
+  const eLost = evaluateEntry('l', 'DOU', g1, pLost);
+  assert.ok(eLost.pending!.unresolved.some((u) => u.kind === 'operator_span'));
+  const agg = aggregate([ePartial, eLost]);
+  assert.deepEqual(agg.ALL!.pending.nonCompleteEntries, ['p']);
+  assert.deepEqual(agg.ALL!.pending.entriesWithPending.sort(), ['l', 'p']);
+  assert.ok((agg.ALL!.pending.unresolved.operator_span ?? 0) >= 1);
+  assert.equal(agg.ALL!.pending.missingResources, partial.coverage.missingResources.length);
+  assert.deepEqual(agg.DOU!.pending.entriesWithPending, ['l']);
+  // A hand-written prediction without pending is reported as null, not as "nothing pending" invented.
+  assert.equal(evaluateEntry('h', 'SYN', g1, { parts: [], entities: [], relations: [], selections: [] }).pending, null);
 });
 
 test('end to end in memory: adapted prediction without coverage keeps an invented positive pending, and with an explicit selection on a code it is proven', () => {

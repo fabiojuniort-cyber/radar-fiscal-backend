@@ -41,7 +41,14 @@ export function anatomyResultToPrediction(input: AnatomyResult, explicit: Adapte
   const byId = new Map(result.entities.map((e) => [e.id, e]));
   const relations: PredictedRelation[] = [];
   for (const c of result.entities) {
-    if (!COMPOUND.has(c.domain) || !c.relation) continue;
+    if (!COMPOUND.has(c.domain)) continue;
+    // A compound carrier must hold the relation of its own kind; anything else is reported, never silently dropped.
+    const expected = c.domain === 'NCM_RANGE' ? 'range' : 'exception';
+    if (!c.relation || c.relation.kind !== expected) {
+      pending.unresolved.push({ kind: 'compound_relation', ref: c.id,
+        detail: c.relation ? `${c.domain} carries relation kind "${c.relation.kind}", expected "${expected}"` : `${c.domain} has no relation` });
+      continue;
+    }
     const r = c.relation; const targets = [...r.targetEntityIds];
     for (const t of targets) if (!byId.has(t)) pending.unresolved.push({ kind: 'relation_target', ref: c.id, detail: `target ${t} not in result` });
     const operator = r.operator.trim();
@@ -51,7 +58,7 @@ export function anatomyResultToPrediction(input: AnatomyResult, explicit: Adapte
       const hits = first && last ? occurrences(text, operator, first.span.end, last.span.start) : [];
       const operatorSpan: Span | null = hits.length === 1 ? { start: hits[0]!, end: hits[0]! + operator.length } : null;
       if (!operatorSpan) pending.unresolved.push({ kind: 'operator_span', ref: c.id, detail: `range operator "${operator}" not uniquely located` });
-      relations.push({ kind: 'range', operatorSpan, memberEntityIds: targets, targetEntityIds: [], scopeSpan: { ...c.span }, condition: null });
+      relations.push({ kind: 'range', operatorSpan, memberEntityIds: targets, targetEntityIds: [], scopeSpan: { ...c.span }, condition: r.condition });
     } else if (r.kind === 'exception') {
       // The marker opens the compound span when the extractor anchored it there; otherwise it must occur once inside.
       const atStart = text.slice(c.span.start, c.span.start + operator.length) === operator;

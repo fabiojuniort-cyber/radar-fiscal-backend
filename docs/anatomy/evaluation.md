@@ -84,3 +84,12 @@ Testes (`test/anatomy.evaluation-adapter.unit.test.ts`): rodam o motor só sobre
 - pendências: status `partial`, recurso ausente, geometria desconhecida, operador não localizável;
 - validação do contrato e não mutação da entrada;
 - um caso de ponta a ponta em memória, em que uma positiva inventada fica pendente sem cobertura e uma positiva sobre código histórico é violação.
+
+### Correções da revisão do EVAL-02 (GPT/Codex, PR #244, review 5566856002)
+
+1. **Composta sem relação do próprio tipo:** o contrato aceita `NCM_RANGE`/`NCM_EXCEPTION` com `relation: null` ou com tipo trocado. O adaptador **não descarta mais em silêncio**: registra `pending.unresolved` com `kind: compound_relation`, o ID da composta e o motivo (por exemplo, "NCM_RANGE has no relation"), e não converte a relação sob o tipo errado.
+2. **Condição de faixa:** a condição recebida é preservada (antes saía `null`).
+3. **Pendências e campos desconhecidos:**
+   - `evaluateEntry` devolve `pending`, que é a cópia das pendências da predição, ou `null` quando a predição não declara nenhuma, sem inventar "nada pendente";
+   - `aggregate` devolve, por fonte e em `ALL`, um resumo: entradas com pendência, entradas não completas, contagem de `unresolved` por tipo, limitações, recursos ausentes e segmentos `unidentified`. Pendências **nunca** entram nos escores;
+   - **campo desconhecido nunca recebe crédito**: operador `null` não casa com nada, nem com outro `null` (M1/M2a); escopo `null` em qualquer lado não conta em M2b; célula sem geometria conhecida não conta em E5.
