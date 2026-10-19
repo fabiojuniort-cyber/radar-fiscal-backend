@@ -71,6 +71,14 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     const target = await createCompany(a, cnpjA, 'Empresa Legada Excluir');
     const sibling = await createCompany(a, cnpjA2, 'Empresa do Mesmo Tenant');
     const remote = await createCompany(b, cnpjA, 'Empresa do Outro Tenant');
+    // R4: preexisting inactive companies MUST stay dormant with their profiles.
+    const dormantCnpj = validCnpj('24681357');
+    const dormant = await createCompany(a, dormantCnpj, 'Empresa Inativa Legada');
+    await admin.query('UPDATE companies SET is_active=false WHERE id=$1',[dormant.company.id]);
+    await admin.query(
+      "INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,is_current) VALUES($1,1,'LUCRO_REAL',true)",
+      [dormant.company.id],
+    );
 
     // Second establishment of target company with a different full CNPJ.
     // The original integration test only covered the matrix.
@@ -92,6 +100,13 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
           'nested',jsonb_build_array(jsonb_build_object('legal','Empresa Legada Excluir'))),
         jsonb_build_object('cnpj',$3::text))
     `,[a.tenantId,branch.id,branchCnpj]);
+    const formattedCnpj = branchCnpj.slice(0,2)+'.'+branchCnpj.slice(2,5)+'.'+
+      branchCnpj.slice(5,8)+'/'+branchCnpj.slice(8,12)+'-'+branchCnpj.slice(12);
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,after_data)
+      VALUES($1,'USER','ONB02_R4_CNPJ_ENTITY','establishment',$2,
+        jsonb_build_object('message','referência histórica por CNPJ'))
+    `,[a.tenantId,formattedCnpj]);
 
     // Immutable shared catalogue fixture, never a company-owned row.
     await admin.query(`
@@ -551,6 +566,28 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     assert.equal(oldAudit.after_data.cnpj,'[CNPJ_MASCARADO]');
     assert.equal(JSON.stringify(oldAudit).includes(branch.id),false);
     assert.equal(JSON.stringify(oldAudit).includes(branchCnpj),false);
+    const maskedEntity=(await admin.query<{entity_id:string|null;action:string}>(`
+      SELECT entity_id,action FROM audit_log WHERE tenant_id=$1 AND action='ONB02_R4_CNPJ_ENTITY'
+    `,[a.tenantId])).rows[0]!;
+    assert.equal(maskedEntity.action,'ONB02_R4_CNPJ_ENTITY');
+    assert.equal(maskedEntity.entity_id,null);
+    const dormantAfter=(await admin.query<{is_active:boolean}>(`
+      SELECT is_active FROM companies WHERE id=$1
+    `,[dormant.company.id])).rows[0];
+    assert.equal(dormantAfter?.is_active,false, 'preexisting inactive company must not be purged');
+    assert.equal(await count('company_tax_profiles','company_id',dormant.company.id),1);
+    const attemptReactivation = await app.inject({
+      method:'POST',url:'/api/v1/companies/manual',headers:a.headers,
+      payload:{cnpj:dormantCnpj,legalName:'Tentativa proibida',uf:'GO',reactivateInactive:true},
+    });
+    assert.equal(attemptReactivation.statusCode,410);
+    assert.equal(attemptReactivation.json<{error:string}>().error,'reactivation_removed');
+    const attemptFreshWithoutDelete = await app.inject({
+      method:'POST',url:'/api/v1/companies/manual',headers:a.headers,
+      payload:{cnpj:dormantCnpj,legalName:'Novo cadastro sem exclusão',uf:'GO',
+        cnaes:[{code:'6201501',description:'cnae sintético',isPrimary:true}]},
+    });
+    assert.equal(attemptFreshWithoutDelete.statusCode,409);
     assert.deepEqual(await stableRows('companies','id',[sibling.company.id,remote.company.id]),siblingsBefore);
     assert.deepEqual(await stableRows('company_publications','id',[refsA2.cp,refsB.cp]),otherCpsBefore);
     assert.deepEqual(await stableRows('monitoring_profiles','id',[refsA2.mp,refsB.mp]),otherMpsBefore);
@@ -652,7 +689,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
             )
         `,[tenants]);
         await admin.query(
-          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL') AND tenant_id=ANY($1::uuid[])",
+          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL','ONB02_R4_CNPJ_ENTITY') AND tenant_id=ANY($1::uuid[])",
           [tenants],
         );
       }

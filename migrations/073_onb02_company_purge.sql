@@ -205,11 +205,14 @@ BEGIN
     -- Strong ownership gate: tenant AND an owned UUID/CNPJ. Never redact merely
     -- because a shared account or another company mentions the same display name.
     UPDATE public.audit_log a
-       SET entity_id=CASE WHEN a.entity_id=ANY(v_private_ids) THEN NULL ELSE a.entity_id END,
+       SET entity_id=CASE WHEN a.entity_id=ANY(v_private_ids)
+                 OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
+               THEN NULL ELSE a.entity_id END,
            before_data=public.onb02_redact_audit_json(a.before_data,v_private_ids,v_private_cnpjs,v_private_names),
            after_data=public.onb02_redact_audit_json(a.after_data,v_private_ids,v_private_cnpjs,v_private_names)
      WHERE a.tenant_id=v_tenant AND (
        a.entity_id=ANY(v_private_ids)
+       OR regexp_replace(coalesce(a.entity_id,''),'[^0-9]','','g')=ANY(v_private_cnpjs)
        OR EXISTS (
          SELECT 1 FROM unnest(v_private_ids) AS r(id)
           WHERE strpos(coalesce(a.before_data::text,''),r.id)>0
