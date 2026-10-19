@@ -15,7 +15,7 @@ function isolated() {
   assert.ok(['localhost', '127.0.0.1'].includes(url.hostname));
   assert.equal(url.pathname, '/radar_fiscal_test');
   assert.equal(url.search, '');
-  return new Pool({connectionString, max: 2});
+  return new Pool({connectionString, max: 2, options:'-c statement_timeout=45000 -c lock_timeout=5000'});
 }
 function cli(...args: string[]): Promise<{code: number; stdout: string; stderr: string}> {
   return new Promise(resolve => execFile(process.execPath, [script, ...args],

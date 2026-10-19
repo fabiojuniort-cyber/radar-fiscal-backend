@@ -13,7 +13,7 @@ function isolated(){
  assert.ok(['localhost','127.0.0.1'].includes(u.hostname));
  assert.equal(u.pathname,'/radar_fiscal_test');
  assert.equal(u.search,'');
- return new Pool({connectionString:url,max:2});
+ return new Pool({connectionString:url,max:2,options:'-c statement_timeout=45000 -c lock_timeout=5000'});
 }
 test('R7: allowlist rejects unregistered events, unknown keys, nested payloads, names and CNPJ',async()=>{
  const pool=isolated();
@@ -78,6 +78,7 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
    await client.query('ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard');
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  console.log('ONB02_R71_STAGE legacy_fixture_committed');
   const gateClient=await pool.connect();
   try {
    await gateClient.query('BEGIN');
@@ -108,11 +109,16 @@ test('R7: 150k legacy audits, read-only plan, atomic batch failure, restart, ide
   finally {await pool.query('DROP TRIGGER onb02_r7_fail_batch ON audit_log; DROP FUNCTION public.onb02_r7_fail_batch()');}
   assert.equal((await planAuditBackfill(pool)).pending,150000);
   assert.deepEqual((await pool.query('SELECT * FROM audit_backfill_checkpoint')).rows,checkpointBefore,'failed batch must not advance');
+  console.log('ONB02_R71_STAGE failed_batch_rolled_back');
   const start=performance.now();
   const first=await applyAuditBackfill(pool,{batchSize:5000,maxBatches:3});
   assert.equal(first.processed,15000);assert.equal(first.remaining,135000);assert.equal(first.completed,false);
-  await pool.end();pool=isolated(); // Actual new connection after a committed interruption.
+  console.log('ONB02_R71_STAGE first_three_batches_committed');
+  await pool.end();
+  console.log('ONB02_R71_STAGE original_pool_closed');
+  pool=isolated(); // Actual new connection after a committed interruption.
   const resumed=await applyAuditBackfill(pool,{batchSize:5000});
+  console.log('ONB02_R71_STAGE resumed_batches_committed');
   const elapsed=performance.now()-start;
   assert.equal(resumed.processed,135000);assert.equal(resumed.remaining,0);
   assert.equal((await applyAuditBackfill(pool)).processed,0);
