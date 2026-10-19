@@ -116,6 +116,54 @@ test('resolution errors: one default, one profile per scope, valid target', () =
   assert.equal(code(() => resolveEffectiveProfile([def(), { not: 'a profile' }], { source: 'DOU' })), 'invalid_profile');
 });
 
+// Review of PR #248 (GPT/Codex, issue #116 comment 6260301226).
+
+test('semantic duplicates are rejected under the matching semantics of each field', () => {
+  const ci: [string, unknown][] = [
+    ['case', src('DOU', { exceptions: { markers: ['exceto', 'EXCETO'] } })],
+    ['mixed case', src('DOU', { lists: { tokens: ['Salvo', 'salvo'] } })],
+    ['internal whitespace', src('DOU', { blockStarts: { preamble: ['O  Conselho', 'O Conselho'] } })],
+    ['NFC vs NFD', src('DOU', { labels: { clause: ['Cláusula', 'Cláusula'] } })],
+    ['header case', src('DOU', { ncm: { columnHeaders: ['ncm', 'NCM'] } })],
+    ['operator', src('DOU', { ranges: { operators: ['ATÉ', 'até'] } })],
+  ];
+  for (const [name, p] of ci) assert.equal(code(() => validateProfile(p)), 'semantic_conflict', name);
+  // Exact fields: CSS classes and quote characters are case-sensitive, but still NFC-normalised.
+  assert.equal(code(() => validateProfile(src('CONFAZ', { classes: { body: ['Remisso', 'remisso'] } }))), 'no-error', 'CSS classes are case-sensitive');
+  assert.equal(code(() => validateProfile(src('CONFAZ', { classes: { body: ['Remé', 'Remé'] } }))), 'semantic_conflict', 'NFC duplicate class');
+  // Accent variants stay distinct on purpose (the current rules accept both spellings).
+  assert.equal(code(() => validateProfile(src('DOU', { lists: { tokens: ['até', 'ate'] } }))), 'no-error');
+  // The same literal in two different fields is not a duplicate.
+  assert.equal(code(() => validateProfile(src('DOU', { ncm: { markers: ['NCM'], columnHeaders: ['NCM'] } }))), 'no-error');
+  // The default profile itself has no semantic duplicate.
+  for (const p of DEFAULT_PROFILES) assert.equal(code(() => validateProfile(p)), 'no-error');
+});
+
+test('a header cannot be allowed and blocked at once — inside one profile or after inheritance', () => {
+  const both: [string, unknown][] = [
+    ['equal', src('DOU', { ncm: { columnHeaders: ['NCM'], columnBlockers: ['NCM'] } })],
+    ['equal ignoring case', src('DOU', { ncm: { columnHeaders: ['Código NCM'], columnBlockers: ['CÓDIGO NCM'] } })],
+    ['blocker as prefix with /', src('DOU', { ncm: { columnHeaders: ['NCM/SH'], columnBlockers: ['NCM'] } })],
+    ['blocker as prefix with spaced /', src('DOU', { ncm: { columnHeaders: ['NCM / SH'], columnBlockers: ['ncm'] } })],
+  ];
+  for (const [name, p] of both) assert.equal(code(() => validateProfile(p)), 'semantic_conflict', name);
+  // Not a conflict: different words, or a blocker that is only a word prefix without "/".
+  assert.equal(code(() => validateProfile(src('DOU', { ncm: { columnHeaders: ['CÓDIGO NCM'], columnBlockers: ['CÓDIGO'] } }))), 'no-error');
+  // Each profile valid alone, conflict only in the effective profile: a source header blocked by an inherited blocker…
+  const header = src('DOU', { ncm: { columnHeaders: ['TIPI'] } });
+  assert.equal(code(() => validateProfile(header)), 'no-error');
+  assert.equal(code(() => resolveEffectiveProfile([def(), header], { source: 'DOU' })), 'effective_conflict');
+  // …or a family blocker that blocks an inherited header.
+  const blocker = fam('DOU', 'Portaria', { ncm: { columnBlockers: ['NCM'] } });
+  assert.equal(code(() => validateProfile(blocker)), 'no-error');
+  assert.equal(code(() => resolveEffectiveProfile([def(), blocker], { source: 'DOU', family: 'Portaria' })), 'effective_conflict');
+  // Overriding both lists consistently resolves it.
+  const consistent = fam('DOU', 'Portaria', { ncm: { columnHeaders: ['NCM'], columnBlockers: ['NBM'] } });
+  assert.deepEqual(resolveEffectiveProfile([def(), consistent], { source: 'DOU', family: 'Portaria' }).fields.ncm.columnBlockers, ['NBM']);
+  // The shipped defaults resolve without conflict for every source.
+  for (const source of ['CONFAZ', 'DOU', 'DOE-SP', 'RFB']) assert.equal(code(() => resolveEffectiveProfile([...DEFAULT_PROFILES], { source })), 'no-error', source);
+});
+
 // Fidelity of the extracted defaults to the rules CURRENTLY hard-coded in the engine (read as source text; the
 // engine is not imported or changed). Class lists must be exactly equal; every other literal must be accepted
 // by the corresponding current rule, and the documented variants must all be present.

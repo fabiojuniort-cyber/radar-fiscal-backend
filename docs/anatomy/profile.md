@@ -48,3 +48,16 @@ Origem: COORD → CLAUDE-EXEC, autorização de 19/10/2026 ([issue #116](https:/
 - Os perfis ainda **não mudam o comportamento** do motor. O P1.B vai ligar o leitor e o extrator ao perfil efetivo. Nessa fase o comportamento estrutural precisa ser preservado, e os hashes derivados (`engineHash`, `ruleSetHash`, `analysisId`, `outputHash`) vão mudar necessariamente.
 - Os testes de fidelidade checam **solidez** (todo literal padrão é aceito pela regra atual) e, nas listas de classes, **igualdade**. Nas regras que hoje são regex com variações gramaticais (por exemplo, numeral romano de inciso), a gramática continua built-in e fora do perfil.
 - Sem migration, endpoint, tela, medição, reserva, merge ou deploy.
+
+## Correções da revisão do PR #248 (GPT/Codex, [issue #116](https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6260301226))
+
+1. **Duplicatas semânticas:** a unicidade de cada campo é verificada pela mesma semântica de casamento do campo (`semanticKey`), e não pela igualdade exata de strings.
+   - `classes.*` e `quotes.*` (exatos): comparação após NFC, diferenciando maiúsculas. `Remisso` e `remisso` são classes CSS diferentes, mas `Remé` em NFC e em NFD é a mesma.
+   - Demais campos: NFC, sem diferenciar maiúsculas (`pt-BR`) e com espaços internos colapsados. `exceto`/`EXCETO`, `O  Conselho`/`O Conselho` e `ATÉ`/`até` são rejeitados com `semantic_conflict`.
+   - Variantes de acento (`até`/`ate`) continuam **distintas de propósito**, porque as regras atuais aceitam as duas grafias. O mesmo literal em campos diferentes não é duplicata.
+2. **Cabeçalho permitido e bloqueado:** um cabeçalho de `ncm.columnHeaders` não pode ser igual a um bloqueador de `ncm.columnBlockers`, nem bloqueado por ele (`X/…`, `X /…`, como na regra atual do leitor), sempre sob a semântica do campo.
+   - Num único perfil, o erro é `semantic_conflict`.
+   - Depois da herança, o erro é `effective_conflict`. É o caso de um cabeçalho da fonte bloqueado por um bloqueador herdado, ou de um bloqueador de família que bloqueia um cabeçalho herdado.
+   - Sobrescrever as duas listas de forma coerente resolve o conflito. Os perfis padrão resolvem sem conflito para as quatro fontes.
+
+Testes novos: 2, num total de 10 em `test/anatomy.profile.unit.test.ts`.

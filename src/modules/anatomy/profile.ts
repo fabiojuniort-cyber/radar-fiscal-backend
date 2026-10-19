@@ -67,6 +67,49 @@ const profileShape = z.strictObject({ profileVersion: z.literal(PROFILE_FORMAT_V
 export type ProfileScope = z.infer<typeof scope>;
 export interface AnatomyProfile { profileVersion: typeof PROFILE_FORMAT_VERSION; scope: ProfileScope; fields: ProfileFields | Partial<{ [K in keyof ProfileFields]: Partial<ProfileFields[K]> }> }
 
+/**
+ * Comparison key per field, matching how the field is matched (PROFILE_FIELD_SEMANTICS): CSS classes and quote
+ * characters are exact (after NFC); every other field matches case-insensitively with internal whitespace collapsed.
+ * Accent variants (até/ate) stay distinct on purpose: the current rules accept both spellings explicitly.
+ */
+const EXACT_GROUPS = new Set(['classes', 'quotes']);
+export function semanticKey(group: string, value: string): string {
+  const nfc = value.normalize('NFC');
+  return EXACT_GROUPS.has(group) ? nfc : nfc.replace(/\s+/gu, ' ').toLocaleLowerCase('pt-BR');
+}
+
+/** Duplicates under the field's own semantics, and headers both allowed and blocked for NCM columns. */
+function semanticIssues(fields: Partial<Record<string, Record<string, unknown> | undefined>>): string[] {
+  const issues: string[] = [];
+  for (const [group, values] of Object.entries(fields)) {
+    if (!values) continue;
+    for (const [field, value] of Object.entries(values)) {
+      if (!Array.isArray(value)) continue;
+      const seen = new Map<string, string>();
+      for (const item of value as string[]) {
+        const key = semanticKey(group, item); const prior = seen.get(key);
+        if (prior !== undefined) issues.push(`${group}.${field}: "${item}" duplicates "${prior}"`); else seen.set(key, item);
+      }
+    }
+  }
+  const ncm = fields.ncm as { columnHeaders?: string[]; columnBlockers?: string[] } | undefined;
+  if (ncm?.columnHeaders && ncm.columnBlockers) issues.push(...headerConflicts(ncm.columnHeaders, ncm.columnBlockers));
+  return issues;
+}
+
+/** A blocker closes a column whose header equals it or starts with it followed by "/" (current reader rule). */
+function headerConflicts(headers: string[], blockers: string[]): string[] {
+  const out: string[] = [];
+  for (const h of headers) {
+    const hk = semanticKey('ncm', h);
+    for (const b of blockers) {
+      const bk = semanticKey('ncm', b);
+      if (hk === bk || hk.startsWith(`${bk}/`) || hk.startsWith(`${bk} /`)) out.push(`ncm: header "${h}" is also blocked by "${b}"`);
+    }
+  }
+  return out;
+}
+
 export class ProfileValidationError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'ProfileValidationError'; }
 }
@@ -82,6 +125,8 @@ export function validateProfile(value: unknown): AnatomyProfile {
   if (!parsed.success) fail(s.level === 'default' ? 'incomplete_default' : 'invalid_fields', parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   const profile = { profileVersion: PROFILE_FORMAT_VERSION, scope: s, fields: parsed.data } as AnatomyProfile;
   if (utf8Bytes(profile) > PROFILE_LIMITS.maxProfileBytes) fail('profile_too_large', `profile exceeds ${PROFILE_LIMITS.maxProfileBytes} bytes`);
+  const issues = semanticIssues(profile.fields as Record<string, Record<string, unknown>>);
+  if (issues.length) fail('semantic_conflict', issues.join('; '));
   return profile;
 }
 
@@ -127,6 +172,9 @@ export function resolveEffectiveProfile(profiles: unknown[], target: { source: s
     }
   }
   const checked = fullFields.parse(fields) as ProfileFields;
+  // Inheritance can combine lists that were each valid alone (e.g. a source header blocked by a default blocker).
+  const inherited = semanticIssues(checked as unknown as Record<string, Record<string, unknown>>);
+  if (inherited.length) fail('effective_conflict', inherited.join('; '));
   if (utf8Bytes({ profileVersion: PROFILE_FORMAT_VERSION, fields: checked }) > PROFILE_LIMITS.maxProfileBytes) fail('profile_too_large', 'effective profile exceeds the size limit');
   return { profileVersion: PROFILE_FORMAT_VERSION, target: { source: source.data!, family }, fields: checked,
     chain: chain.map((p) => ({ scope: p.scope, profileHash: profileHash(p) })),
