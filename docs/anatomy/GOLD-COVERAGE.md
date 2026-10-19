@@ -61,7 +61,7 @@ Ordem de prioridade dos papéis, usada na contagem: capítulo > ponta de faixa >
   | `G > 0`, `Pr > 0` e `TP = 0` | **0** | **0** | **0** |
   | `G > 0`, `Pr > 0` e `TP > 0` | TP/Pr | TP/G | 2PR/(P+R) |
 
-- **Razões (E2, E3, E4, R3, S1):** a métrica é N/A sempre que o **denominador efetivo**, calculado sobre os casamentos de fato obtidos, for zero. Nunca substituir N/A por 0 ou por 1.
+- **Razões sobre casamentos (E2, E3, E4, R3):** a métrica é N/A sempre que o **denominador efetivo**, calculado sobre os casamentos de fato obtidos, for zero. **S1 é diferente:** o denominador vem do gold e não depende de casamento (ver a linha S1). Nunca substituir N/A por 0 ou por 1.
 - Toda métrica é reportada **por entrada e por fonte** (CONFAZ, DOU). Somas entre fontes só aparecem junto com o resultado estratificado. Uma soma também segue a tabela de decisão sobre os totais e não é média de razões.
 
 | ID | Métrica | Fórmula | Denominador do gold, por entrada (01 / 02 / 03 / 05 / 07 / 10 / 11) | N/A |
@@ -71,7 +71,7 @@ Ordem de prioridade dos papéis, usada na contagem: capítulo > ponta de faixa >
 | E3 | Ordem entre irmãos | pares de irmãos do gold, ambos casados, com a mesma ordem relativa na predição ÷ esses pares | efetivo: depende de E1 | **N/A se não houver pares** |
 | E4 | Contexto | partes casadas com o mesmo `context` ÷ partes casadas; também matriz de confusão por classe | `historical`: 4.096 / 73 / 0 / 0 / 0 / 0 / 0 | N/A sem partes casadas; recall da classe `historical` é N/A nas DOU |
 | E5 | Geometria de tabela | P, R e F1 de células com chave estendida (span e linha/coluna/rowSpan/colSpan iguais), casamento um a um | 4.682 / 0 / 0 / 0 / 0 / 537 / 0 | pela tabela de decisão; entradas sem tabela têm R N/A |
-| R1 | Reconhecimento NCM (todas as ocorrências, qualquer contexto, sem capítulos) | P e R por domínio e span exatos | 1.374 / 0 / 0 / 0 / 0 / 0 / 0 | R é N/A em 02–11; P continua definida (todo NCM previsto é FP) |
+| R1 | Reconhecimento NCM (todas as ocorrências, qualquer contexto, sem capítulos) | P e R por domínio e span exatos | 1.374 / 0 / 0 / 0 / 0 / 0 / 0 | pela tabela de decisão. Em 02–11 (G = 0), R e F1 são N/A; P é 0 se houver NCM previsto (todo previsto é FP) e **N/A sem predições** |
 | R2 | Reconhecimento NBM | idem | 623 / 1 / 0 / 0 / 0 / 0 / 0 | R é N/A em 03–11 |
 | R3 | Confusão NCM × NBM | códigos casados **só por span** (um a um, ignorando o domínio) com domínio trocado ÷ códigos casados só por span | efetivo: até 2.002 (01, todos os códigos, inclusive capítulos) / 1 (02) | **N/A se não houver código casado por span**; sempre N/A em 03–11 |
 | R4 | Capítulos informativos | P e R da classe capítulo de 2 dígitos | 5 (3 operativos e 2 históricos) / 0 / … | R é N/A fora do 01 |
@@ -80,9 +80,9 @@ Ordem de prioridade dos papéis, usada na contagem: capítulo > ponta de faixa >
 | M1 | Faixas M01 | P, R e F1 com chave = span do operador e as duas pontas casadas como entidades; um a um | 72 / 0 / … | pela tabela de decisão; R é N/A fora do 01 |
 | M2a | Exceção, alvos | P, R e F1 com chave = span do operador e **conjunto** de alvos igual; um a um | 17 / 0 / … | pela tabela de decisão |
 | M2b | Exceção, escopo | entre os pares de M2a: `scopeSpan` previsto igual ao do gold ÷ pares de M2a. Convenção do gold: o escopo vai do início do operador ao fim do último alvo. **Escopo ampliado ou reduzido é erro** | efetivo: pares de M2a | N/A sem pares em M2a |
-| M2c | Exceção, condição | entre os pares de M2a: condição prevista igual à do gold ÷ pares de M2a. No gold atual, as 17 condições são `null`; uma condição prevista não nula é erro | efetivo: pares de M2a | N/A sem pares em M2a; recall de condições não nulas é N/A (gold sem condição) |
-| M2 | Exceção **completa** | pares de M2a que também acertam M2b **e** M2c ÷ (previstas; gold), pela tabela de decisão | 17 / 0 / … | **alvos certos com escopo ampliado ou condição errada não contam como acerto completo**; M2a, M2b e M2c são sempre reportadas separadamente |
-| S1 | Exclusão estrutural (o que **pode** ser medido sobre elegibilidade) | seleções `ncm` positivas emitidas sobre não candidatos ÷ não candidatos. **Meta: 0** | 1.362 / 1 / 0 / 0 / 0 / 0 / 0 | a razão é N/A em 03–11 (denominador 0), mas a **contagem absoluta** de positivas `ncm` emitidas é sempre reportada, e qualquer valor acima de 0 é violação |
+| M2c | Exceção, condição | — | — | **N/A nesta etapa.** No gold, `condition: null` **não comprova ausência de condição**: a condição semântica (por exemplo, "salvo se…") não foi anotada. Condições previstas são listadas sem pontuação |
+| M2 | Exceção **completa** | — | — | **N/A nesta etapa**, porque depende de M2c. M2a (alvos) e M2b (escopo) são reportadas como **resultado estrutural parcial**, nunca como acerto completo. Alvos certos com escopo ampliado ou reduzido não contam como acerto em M2b |
+| S1 | Exclusão estrutural (o que **pode** ser medido sobre elegibilidade) | **S1a (taxa):** spans de não candidatos do gold atingidos por pelo menos uma seleção `ncm` positiva ÷ não candidatos do gold. Cada span conta **uma vez**, mesmo atingido por várias seleções. **S1b (emissões):** total bruto de seleções `ncm` positivas sobre spans de não candidatos, reportado à parte, sem dividir. **Meta: 0 em ambos.** | denominador **do gold**, independente de casamento: 1.362 / 1 / 0 / 0 / 0 / 0 / 0 | S1a é N/A em 03–11 (denominador do gold igual a 0); S1b é sempre reportado, e qualquer valor acima de 0 é violação |
 | S2 | Seleção positiva (precisão e recall) | — | teto estrutural: 640 (01) | **N/A no ANAT-04.** Exige evidência jurídica aprovada (ANAT-06); o gold só dá o teto, não o gabarito |
 | C1 | Cobertura do motor | `recognizedLength` ÷ comprimento do texto e fração `unidentified` | comprimento UTF-16 de cada texto | descritiva: **não** conta como acerto |
 
@@ -97,6 +97,7 @@ Ordem de prioridade dos papéis, usada na contagem: capítulo > ponta de faixa >
 | Linhas `<tr/>` vazias | 10 | Linhas sem células; não contam como erro |
 | Linhas de redação anterior por leitura de nota | 01 (29 linhas) | Contexto histórico de linha é julgamento aprovado do anotador |
 | Fechamento de citação sem aspas | 11 (art. 143-L) | Convenção: fechar no `(NR)` |
+| Condição semântica das exceções não anotada | 01 (17 exceções, `condition: null`) | `null` não prova que não há condição; M2c e M2 completa ficam N/A, e só alvos e escopo são medidos |
 | Fora do escopo por definição | todas | Datas e anos, valores, percentuais, números de item/subitem, remissões internas, identificação do próprio ato e situação jurídica não são ocorrências omitidas |
 | Fontes sem gold | DOE-SP e RFB | **Nenhuma métrica disponível**; preparações só provisórias e sintéticas |
 | Amostra concentrada | NCM, faixas e exceções só no 01 | Baixa diversidade; não generalizar para outras fontes |
