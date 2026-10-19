@@ -47,7 +47,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       return {
         tenantId: identity.tenant.id,
         headers: { authorization: 'Bearer ' + login.json<{ accessToken: string }>().accessToken,
-          'x-tenant-id': identity.tenant.id },
+          'x-tenant-id': identity.tenant.id, 'x-company-delete-intent': 'permanent-v1' },
       };
     };
     const a = await owner();
@@ -90,7 +90,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     const branch=(await admin.query<{id:string}>(`
       INSERT INTO establishments(company_id,cnpj,name,establishment_type_code,
         is_head_office,uf)
-      VALUES($1,$2,'Filial de teste ONB02','OFFICE',false,'GO')
+      VALUES($1,$2,'Filial Árvore R6','OFFICE',false,'GO')
       RETURNING id
     `,[target.company.id,branchCnpj])).rows[0]!;
     await admin.query(`
@@ -100,7 +100,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     await admin.query(`
       INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data,after_data)
       VALUES($1,'USER','ONB02_CI_BRANCH_HISTORICAL','establishment',$2,
-        jsonb_build_object('branch_id',$2::text,'cnpj',$3::text,'name','Filial de teste ONB02',
+        jsonb_build_object('branch_id',$2::text,'cnpj',$3::text,'name','Filial Árvore R6',
           'nested',jsonb_build_array(jsonb_build_object('legal','Empresa Legada Excluir'))),
         jsonb_build_object('cnpj',$3::text))
     `,[a.tenantId,branch.id,branchCnpj]);
@@ -122,7 +122,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     await admin.query(`
       INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
       VALUES($1,'USER','ONB02_R5_SAME_TENANT_NAME','company',
-        jsonb_build_object('name','MARCA SAO R5'))
+        jsonb_build_object('name',normalize('MARCA SÃO R5',NFD)))
     `,[a.tenantId]);
     // Another tenant sharing the legal name is never affected.
     await admin.query(`
@@ -142,6 +142,42 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       VALUES($1,'USER','ONB02_R5_SIBLING_REFERENCE','company',$2,
         jsonb_build_object('referenced_cnpj',$3::text,'name','EMPRESA LEGADA EXCLUIR'))
     `,[a.tenantId,sibling.company.id,cnpjA]);
+
+    const deletedBranchId=(await admin.query<{id:string}>(`
+      INSERT INTO establishments(company_id,cnpj,name,establishment_type_code,is_head_office,uf)
+      VALUES($1,$2,'R6 historical branch','OFFICE',false,'GO') RETURNING id
+    `,[target.company.id,validCnpj(base.slice(0,8),'0003')])).rows[0]!.id;
+    const deletedProfileId=(await admin.query<{id:string}>(`
+      INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,is_current)
+      VALUES($1,99,'LUCRO_REAL',false) RETURNING id
+    `,[target.company.id])).rows[0]!.id;
+    await admin.query('DELETE FROM establishments WHERE id=$1',[deletedBranchId]);
+    await admin.query('DELETE FROM company_tax_profiles WHERE id=$1',[deletedProfileId]);
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
+      VALUES($1,'USER','ONB02_R6_OLD_BRANCH','establishment',$2,
+        jsonb_build_object('company_id',$3::text,'name','Empresa Legada Excluir')),
+        ($1,'USER','ONB02_R6_OLD_PROFILE','company_tax_profile',$4,
+        jsonb_build_object('establishment_id',$2::text,'name','Empresa Legada Excluir'))
+    `,[a.tenantId,deletedBranchId,target.company.id,deletedProfileId]);
+    // The same historical identity in another tenant must remain untouched.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,entity_id,before_data)
+      VALUES($1,'USER','ONB02_R6_REMOTE_HISTORY','establishment',$2,
+        jsonb_build_object('company_id',$3::text))
+    `,[b.tenantId,deletedBranchId,target.company.id]);
+    // Even an exact unique name in NFD must be masked.
+    await admin.query(`
+      INSERT INTO audit_log(tenant_id,actor_type,action,entity_type,before_data)
+      VALUES($1,'USER','ONB02_R6_NFD_NAME','company',
+        jsonb_build_object('name',normalize('Filial Árvore R6',NFD)))
+    `,[a.tenantId]);
+    // Older clients cannot invoke the new irreversible operation.
+    const oldClient = await app.inject({method:'DELETE',
+      url:'/api/v1/companies/'+target.company.id,
+      headers:{authorization:a.headers.authorization,'x-tenant-id':a.tenantId}});
+    assert.equal(oldClient.statusCode,409);
+    assert.equal(oldClient.json<{error:string}>().error,'permanent_delete_confirmation_required');
 
     // Immutable shared catalogue fixture, never a company-owned row.
     await admin.query(`
@@ -617,8 +653,16 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
       [tenant,action])).rows[0]!;
     const nameOnly=await getAudit(a.tenantId,'ONB02_R5_NAME_ONLY');
     assert.equal(nameOnly.before_data.name,'[NOME_EMPRESA_MASCARADO]');
+    const oldBranchAudit=await getAudit(a.tenantId,'ONB02_R6_OLD_BRANCH');
+    assert.equal(oldBranchAudit.entity_id,null);
+    assert.equal(oldBranchAudit.before_data.company_id,'[ID_MASCARADO]');
+    const oldProfileAudit=await getAudit(a.tenantId,'ONB02_R6_OLD_PROFILE');
+    assert.equal(oldProfileAudit.entity_id,null);
+    assert.equal(oldProfileAudit.before_data.establishment_id,'[ID_MASCARADO]');
+    assert.equal((await getAudit(b.tenantId,'ONB02_R6_REMOTE_HISTORY')).entity_id,deletedBranchId);
+    assert.equal((await getAudit(a.tenantId,'ONB02_R6_NFD_NAME')).before_data.name,'[NOME_EMPRESA_MASCARADO]');
     const sameTenantHomonym=await getAudit(a.tenantId,'ONB02_R5_SAME_TENANT_NAME');
-    assert.equal(sameTenantHomonym.before_data.name,'MARCA SAO R5');
+    assert.equal(sameTenantHomonym.before_data.name,'MARCA SÃO R5'.normalize('NFD'));
     const otherTenantHomonym=await getAudit(b.tenantId,'ONB02_R5_OTHER_TENANT_NAME');
     assert.equal(otherTenantHomonym.before_data.name,'empresa legada excluir');
     const compound=await getAudit(a.tenantId,'ONB02_R5_COMPOSITE_ID');
@@ -751,7 +795,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
             )
         `,[tenants]);
         await admin.query(
-          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL','ONB02_R4_CNPJ_ENTITY','ONB02_R5_NAME_ONLY','ONB02_R5_SAME_TENANT_NAME','ONB02_R5_OTHER_TENANT_NAME','ONB02_R5_COMPOSITE_ID','ONB02_R5_SIBLING_REFERENCE') AND tenant_id=ANY($1::uuid[])",
+          "DELETE FROM audit_log WHERE action IN ('COMPANY_PURGED','ONB02_CI_BRANCH_HISTORICAL','ONB02_R4_CNPJ_ENTITY','ONB02_R5_NAME_ONLY','ONB02_R5_SAME_TENANT_NAME','ONB02_R5_OTHER_TENANT_NAME','ONB02_R5_COMPOSITE_ID','ONB02_R5_SIBLING_REFERENCE','ONB02_R6_OLD_BRANCH','ONB02_R6_OLD_PROFILE','ONB02_R6_REMOTE_HISTORY','ONB02_R6_NFD_NAME') AND tenant_id=ANY($1::uuid[])",
           [tenants],
         );
       }

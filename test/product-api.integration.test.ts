@@ -138,6 +138,7 @@ test(
         authorization:
           'Bearer ' + first.accessToken,
         'x-tenant-id': first.tenantId,
+        'x-company-delete-intent': 'permanent-v1',
       };
 
       const initial = await app.inject({

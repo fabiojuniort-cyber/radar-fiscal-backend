@@ -45,7 +45,7 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
       });
       assert.equal(logged.statusCode, 200, logged.body);
       const token = logged.json<{ accessToken: string }>().accessToken;
-      return { headers: { authorization: 'Bearer ' + token, 'x-tenant-id': identity.tenant.id } };
+      return { headers: { authorization: 'Bearer ' + token, 'x-tenant-id': identity.tenant.id, 'x-company-delete-intent': 'permanent-v1' } };
     };
 
     const a = await newOwner();

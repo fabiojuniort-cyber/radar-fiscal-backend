@@ -18,7 +18,7 @@ Regras para cadastro por CNPJ e perfil do Sonar:
 - ao cadastrar uma empresa por CNPJ, criar também a matriz e registrar CNAE principal e todos os secundários;
 - `company_cnaes` deve refletir o conjunto de CNAEs dos estabelecimentos ativos; a matriz define o CNAE principal da empresa;
 - CNPJ é identidade cadastral e não deve ser alterado por edição manual; correções cadastrais usam nova consulta ou exclusão/recriação controlada;
-- exclusão de empresa/estabelecimento é lógica (`is_active=false`) para preservar histórico; matriz só é desativada junto com a empresa;
+- exclusão de empresa é definitiva, com matriz/filiais e perfis; estabelecimentos inativos preexistentes permanecem armazenados até ação explícita, sem reativação;
 - o Perfil Tributário mistura contexto cadastral automático com seleção manual baseada em conceitos de uma release `PUBLISHED` da Taxonomia TriBusca;
 - salvar códigos canônicos e `releaseId/releaseVersion` no perfil para permitir matching reprodutível; nunca converter a taxonomia em tags livres.
 
@@ -48,6 +48,9 @@ A exclusão individual de estabelecimento mantém os dados preexistentes inativo
 exclusão explícita autorizada. **Não existe reativação** de empresa, matriz ou filial:
 qualquer novo cadastro exige exclusão definitiva prévia e gera novo identificador,
 sem recuperar perfis, histórico privado nem pré-preenchimento do onboarding legado.
+A confirmação de exclusão definitiva exige o nome digitado; clientes antigos sem
+`X-Company-Delete-Intent: permanent-v1` recebem 409 e não executam a purga.
+O serviço aplica SET LOCAL statement_timeout=30s e lock_timeout=5s antes do SELECT.
 Os endpoints rejeitam `reactivateInactive=true` com 410; registros inativos são
 preservados, nunca purgados automaticamente. Auditorias próprias da empresa têm
 retenção minimizada; nomes homônimos de outras empresas do mesmo tenant não
@@ -72,7 +75,7 @@ Políticas de recuperação seguem o `ACCEPTED_RISK` registrado no ONB-02.
 - Providers futuros devem implementar o contrato `CnpjRegistryProvider`; o código reserva integração oficial/comercial futura (por exemplo SERPRO) sem ativar credenciais ou endpoints do Conecta GOV por padrão.
 - Provider de terceiro não deve ser adicionado a produção quando seus termos de uso/licenciamento forem incompatíveis ou não comprovados para um SaaS multi-tenant.
 - Persistir somente os campos necessários ao produto; nenhum provider cadastral autoriza expor QSA ou ampliar o conjunto de dados sem escopo específico.
-- Cadastro manual de matriz deve ser atômico: empresa e estabelecimento matriz são criados/reativados na mesma transação; Local Negócio e IE manuais mantêm proveniência manual e não são sobrescritos por indisponibilidade externa.
+- Cadastro manual de matriz deve ser atômico: empresa e estabelecimento matriz são criados na mesma transação; Local Negócio e IE manuais mantêm proveniência manual e não são sobrescritos por indisponibilidade externa.
 
 ## CI com custo controlado
 

@@ -112,3 +112,14 @@ com schema; dados purgados exigem restauração individual autorizada.
 - `audit_log` mantém ação/data/usuário/tipo de entidade; menções a empresa-alvo em auditorias de outra entidade do tenant não autorizam editar esse histórico.
 - A migration 073 deve estar ausente do ledger antes do rollout: checksum divergente proíbe sobrescrever migração já aplicada. O gate permanece BLOCK; `statement_timeout` da função = 30s e índice composto `ix_audit_r5_tenant_entity`. Benchmark de 50 mil auditorias somente em PG18 isolado (CI).
 - R5 exige revisão independente de novo HEAD e CI integral verde. Não executar DDL/DELETE/EXPLAIN em produção para validação.
+
+## R6 — implementação para revisão, sem produção
+
+- Nome exato digitado no diálogo de exclusão definitiva. Header versionado de intenção impede purga por abas antigas que ainda prometam desativação; backend primeiro passa a bloquear essas abas com 409 até atualizar o web.
+- O serviço company-purge.service aplica SET LOCAL statement_timeout='30s' e lock_timeout='5s' no transaction antes do SELECT, não como SET na função.
+- IDs históricos privados são recuperados por tipo de entidade privado e campos top-level explícitos de propriedade (company_id/companyId e pais privados conhecidos), somente no mesmo tenant. Menção livre, nome/CNPJ ou tipo de produto global não comprovam propriedade. Contradição com entidade atual de outra empresa aborta.
+- Nomes são normalizados por normalize(..., NFC) antes da remoção de acentos e comparação exata nos dois lados.
+- Testes PG18: filial e perfil previamente eliminados, auditoria remota intacta, nomes NFD/homônimos, cliente antigo bloqueado, statement_timeout após cascata com rollback total e lock_timeout com rollback.
+- Benchmark PG18 descartável: 41.000 auditorias, 420.000 collection_items globais preservados por contagem/hash, grafo 1+2+11+35+47+5+2+13=116; monitoring/matches/company_publications=0 conforme inventário comunicado. Dados são sintéticos com igualdade de contagens, não réplica da distribuição/tamanho de JSON nem do hardware produtivo.
+- Medição opcional via app.onb02_measure=on retorna somente tempos em app.onb02_purge_metrics da mesma transação: locks/guards, legado, identidade/histórico, auditoria, matches, cascatas, evento e total. Sem identificadores/nomes.
+- Produção permanece proibida. O preflight do ledger 073 e índice/owner/ACL continua obrigatório para eventual pacote posterior. ACCEPTED_RISK de recuperação é preservado.

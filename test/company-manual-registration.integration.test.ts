@@ -124,6 +124,7 @@ test(
         authorization:
           'Bearer ' + owner.accessToken,
         'x-tenant-id': owner.tenantId,
+        'x-company-delete-intent': 'permanent-v1',
       };
       const cnpj = cnpjFromSeed(
         randomUUID(),

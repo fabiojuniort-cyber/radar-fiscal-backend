@@ -1,3 +1,4 @@
+import { purgeCompany } from '../../modules/company/company-purge.service.js';
 import { readCompanyRegistration, readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
@@ -932,14 +933,15 @@ export async function productRoutes(
               return null;
             }
 
+            // Reject old browser tabs that still promise a soft-delete.
+            if (request.headers['x-company-delete-intent'] !== 'permanent-v1') {
+              return 'CONFIRMATION_REQUIRED' as const;
+            }
             // ONB-02-R3: the SECURITY DEFINER function rechecks tenant/admin
             // authorization and atomically removes all company-owned records.
             // No direct companies DELETE grant is added to radar_app.
-            const purge = await sql<{ removed: boolean }>`
-              SELECT public.app_purge_company(${request.params.companyId}::uuid)
-                AS removed
-            `.execute(trx);
-            return purge.rows[0]?.removed
+            const removed = await purgeCompany(trx, request.params.companyId);
+            return removed
               ? 'DELETED' as const
               : 'COMPANY_NOT_FOUND' as const;
           },
@@ -947,6 +949,10 @@ export async function productRoutes(
 
         if (result === null) {
           return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'CONFIRMATION_REQUIRED') {
+          return reply.status(409).send({ error: 'permanent_delete_confirmation_required' });
         }
 
         if (result === 'COMPANY_NOT_FOUND') {
@@ -960,7 +966,8 @@ export async function productRoutes(
         // Do not leak internal identifiers or CNPJ to the client.
         if (error instanceof Error && (
           error.message === 'company_purge_cross_company_link' ||
-          error.message === 'company_purge_legacy_identity_ambiguous'
+          error.message === 'company_purge_legacy_identity_ambiguous' ||
+          error.message === 'company_purge_historical_identity_ambiguous'
         )) {
           return reply.status(409).send({ error: 'company_purge_review_required' });
         }
