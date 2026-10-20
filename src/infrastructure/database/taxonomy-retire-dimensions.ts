@@ -44,7 +44,7 @@ if (!connectionString) {
 }
 
 const actor: CuratorActor = {
-  userId: 'ops:taxonomy-retire-dimensions',
+  userId: 'system:taxonomy-retire-dimensions',
   justification: 'Retirada de dimensões aprovada para a taxonomia corrente',
 };
 

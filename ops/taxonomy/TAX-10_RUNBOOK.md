@@ -26,6 +26,11 @@ A release `v1.0.0` e suas classificações históricas não são alteradas.
    --git-sha=<SHA_DO_COMMIT_PUBLICADO>` no mesmo executor, com
    `DATABASE_ADMIN_URL`. O comando calcula o SHA-256 do manifesto versionado
    e publica explicitamente a release numa transação serializável.
+   A identidade fixa de auditoria do comando é
+   `system:taxonomy-v1.1-publisher`, incluída na lista fechada do banco.
+   O comando não recebe autor livre. O teste PG18 ONB-02 R7.3 executa este
+   mesmo entrypoint em banco sintético isolado e verifica o commit da release
+   e do evento, além da repetição idempotente.
 6. Reexecutar o dry-run. Exigir `action=ALREADY_PUBLISHED`, última release
    publicada `v1.1.0`, `v1.0.0` ainda `PUBLISHED` e as contagens/integridade
    anteriores. Conferir a API de opções do Perfil Tributário e o matching

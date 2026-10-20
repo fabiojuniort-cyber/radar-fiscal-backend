@@ -33,7 +33,7 @@ if (!connectionString) {
 }
 
 const actor: CuratorActor = {
-  userId: 'ops:taxonomy-retire-legacy-segments',
+  userId: 'system:taxonomy-retire-legacy-segments',
   justification: 'Segmentos antigos (baseline) substituídos pela tabela Segmento TriFaros',
 };
 

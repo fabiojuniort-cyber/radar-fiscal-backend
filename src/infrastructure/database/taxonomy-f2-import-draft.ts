@@ -75,7 +75,7 @@ async function run() {
       const identity=await client.query<{version:number}>("SELECT current_setting('server_version_num')::int AS version");
       if(identity.rows[0]!.version<180000)fail('F2_DRAFT_PG18_REQUIRED');
       return applyF2Draft(client,{
-        userId:'ops:f2-draft-01',
+        userId:'system:f2-draft-01',
         justification:'Importação explícita de lote F2 validado, apenas no rascunho',
       },{batchId:args.batch!,contentSha256:args.sha!,
         exceptionsApprovalSha256:args.exceptionSha});

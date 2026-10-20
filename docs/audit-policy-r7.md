@@ -1,4 +1,4 @@
-# Auditoria R7.2 — política aprovada em 19/10/2026
+# Auditoria R7.3 — política aprovada em 19/10/2026
 
 ## Contrato
 
@@ -190,15 +190,22 @@ enumerados individualmente para manter os escritores existentes compatíveis:
 
 | Identidade de sistema aceita | Escritor |
 | --- | --- |
-| system:worker | trabalho de sistema com identidade explícita |
+| system:f2-draft-01 | importação F2 em rascunho |
+| system:f2-tab-02 | reparo explícito dos grupos F2 em rascunho |
+| system:grant-platform-admin | concessão/revogação operacional de administrador |
+| system:grant-taxonomy-curator | concessão/revogação operacional de curador |
+| system:import-confaz-act | importação operacional de ato CONFAZ |
+| system:l17-scheduler | limpeza global L17 executada pelo worker/scheduler |
 | system:scheduler | agendamento com identidade explícita |
-| taxonomy-baseline-importer | importação da baseline |
-| taxonomy-v1.1-successor | criação da sucessora |
-| taxonomy-v1.1-publisher | publicação da sucessora |
-| ops:grant-platform-admin | concessão/revogação operacional |
-| ops:grant-taxonomy-curator | concessão/revogação operacional |
-| ops:import-confaz-act | importação operacional de ato |
-| l17:scheduler | limpeza global do acervo |
+| system:taxonomy-baseline-importer | importação da baseline |
+| system:taxonomy-load-products | carga da planilha de produtos |
+| system:taxonomy-merge-dimension | unificação explícita de dimensões |
+| system:taxonomy-publish-draft | comando operacional de publicação do rascunho |
+| system:taxonomy-retire-dimensions | retirada explícita de dimensões |
+| system:taxonomy-retire-legacy-segments | retirada explícita dos segmentos legados |
+| system:taxonomy-v1.1-publisher | publicação TAX-10: biblioteca e entrypoint documentado |
+| system:taxonomy-v1.1-successor | criação da sucessora TAX-10 |
+| system:worker | trabalho de sistema com identidade explícita |
 
 options.actor da publicação também passa por essa guarda: texto livre é rejeitado
 e a transação falha, sem substituir silenciosamente um autor fornecido.
@@ -229,3 +236,35 @@ igualdade semântica dos cinco campos, retirando apenas campos não permitidos.
 O teste de autores cobre INSERT inválido, e-mail/CNPJ/nome sintéticos no legado,
 linhas v0 e v1, payload NULL, retomada, cabeçalhos, registros válidos intactos e
 idempotência. Toda essa execução é em PostgreSQL 18 descartável da CI.
+
+## R7.3 — inventário operacional e prova do entrypoint
+
+[Inventário de atores](audit-actors-r73.json) registra os 16 IDs canônicos, seus
+escritores e os nomes anteriores. Só UUID e esses IDs são aceitos em INSERT;
+não existe autorização por prefixo nem alias antigo aceito em nova escrita.
+A política de backfill permanece: autor fora da lista/formato vira NULL com
+actor_redacted=true. Os nomes anteriores não padronizados passam por essa regra;
+o mapa do inventário é documentação, não uma exceção de aceitação no banco.
+
+O inventário cobre src, scripts, package.json, jobs, worker/scheduler, CLIs e
+docs/runbooks, incluindo TAX-10, F2, DOE, DOU e RFB.
+publication_scope_events.actor_ref e os manifests R3 DOU têm contratos próprios;
+as referências operacionais desses históricos não são autores de audit_log.
+Elas são inventariadas com fonte e contrato, sem ampliar a allowlist da auditoria
+ou alterar manifests/contratos produtivos anteriores. Histórico de migrations
+001–073 é preservado e conferido por hash; as definições SQL ativas são as da 074.
+
+npm run test:audit-actors varre recursivamente os arquivos operacionais/documentais,
+compara o registro com a lista SQL real e rejeita declarações estáticas desconhecidas,
+atores antigos em instruções ativas, flags/env, defaults, referências constantes,
+SQL literal e o adaptador SQL array.join da baseline. Diagnósticos mostram só
+arquivo/linha/tipo de falha, sem ecoar o conteúdo do autor.
+Casos negativos provam a detecção de um arquivo novo e do autor exato que quebrava
+o TAX-10. Valores dinâmicos autenticados continuam sujeitos à guarda do banco.
+
+A CI PG18 executa o Node compilado indicado no runbook TAX-10, desde uma origem
+sintética publicada e uma sucessora DRAFT em banco adicional descartável.
+O primeiro comando deve retornar PUBLISHED; uma nova conexão precisa observar a
+release e a auditoria confirmadas, com o ator canônico e hash do artefato.
+A repetição retorna ALREADY_PUBLISHED e não duplica o evento.
+Nenhuma taxonomia real é publicada por esse teste.

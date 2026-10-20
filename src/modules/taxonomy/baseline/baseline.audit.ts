@@ -23,7 +23,7 @@ export async function writeBaselineAudit(
       ') VALUES (',
       '  NULL,',
       "  'SYSTEM',",
-      "  'taxonomy-baseline-importer',",
+      "  'system:taxonomy-baseline-importer',",
       '  $1,',
       "  'taxonomy_baseline',",
       '  $2,',

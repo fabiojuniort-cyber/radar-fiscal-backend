@@ -236,7 +236,7 @@ try {
           `.execute(trx);
           await sql`
             INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-            VALUES (NULL, 'SYSTEM', 'ops:import-confaz-act', 'PUBLICATION_PRESENTATION_REFRESHED', 'publication_version', ${latest.id}::uuid,
+            VALUES (NULL, 'SYSTEM', 'system:import-confaz-act', 'PUBLICATION_PRESENTATION_REFRESHED', 'publication_version', ${latest.id}::uuid,
                     public.audit_project('PUBLICATION_PRESENTATION_REFRESHED','publication_version',${JSON.stringify({ savedPageSha256: fileSha256, htmlChars: (presentation as { html?: string }).html?.length ?? 0, effectiveUntil: normalized.metadata.effectiveUntil ?? null })}::jsonb), gen_random_uuid())
           `.execute(trx);
         });

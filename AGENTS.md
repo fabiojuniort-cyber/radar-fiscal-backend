@@ -60,6 +60,9 @@ R7.2: autores novos exigem UUID ou identidade de sistema enumerada; autor privad
 legado vira NULL com actor_redacted=true. Linhas v1 com autor inválido também são
 pendentes. Simulações históricas preservam as seis combinações FULL_ARCHIVE/RECENT
 e ALL/SAMPLE/NONE.
+R7.3: todos os autores de sistema ativos da auditoria usam system:<nome> e constam
+do inventário docs/audit-actors-r73.json. npm run test:audit-actors confere scripts,
+jobs e documentação; o entrypoint TAX-10 é exercitado em PG18 descartável.
 Ver docs/audit-policy-r7.md e docs/audit-event-inventory-r7.json. O backfill em produção exige
 autorização própria, além do deploy. Políticas de recuperação seguem ACCEPTED_RISK.
 

@@ -77,7 +77,7 @@ async function run(){
      if(original.planSha256!==opts.confirmSha)abort('F2_GROUP_PLAN_CHANGED');
      const before=await historical(client);
      const changes=await applyF2GroupRepair(client,
-       {userId:'ops:f2-tab-02',justification:'Correção aprovada de grupos F2 no rascunho, sem publicação'},
+       {userId:'system:f2-tab-02',justification:'Correção aprovada de grupos F2 no rascunho, sem publicação'},
        original,opts.confirmSha);
      const after=await snapshot(client);
      const history=await historical(client);

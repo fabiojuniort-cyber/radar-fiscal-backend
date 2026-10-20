@@ -1,0 +1,318 @@
+{
+  "version": "ONB-02-R7.3",
+  "systemActors": [
+    "system:f2-draft-01",
+    "system:f2-tab-02",
+    "system:grant-platform-admin",
+    "system:grant-taxonomy-curator",
+    "system:import-confaz-act",
+    "system:l17-scheduler",
+    "system:scheduler",
+    "system:taxonomy-baseline-importer",
+    "system:taxonomy-load-products",
+    "system:taxonomy-merge-dimension",
+    "system:taxonomy-publish-draft",
+    "system:taxonomy-retire-dimensions",
+    "system:taxonomy-retire-legacy-segments",
+    "system:taxonomy-v1.1-publisher",
+    "system:taxonomy-v1.1-successor",
+    "system:worker"
+  ],
+  "writers": [
+    {
+      "id": "system:f2-draft-01",
+      "sources": [
+        "src/infrastructure/database/taxonomy-f2-import-draft.ts"
+      ],
+      "previousIds": [
+        "ops:f2-draft-01"
+      ],
+      "purpose": "importação F2 em rascunho"
+    },
+    {
+      "id": "system:f2-tab-02",
+      "sources": [
+        "src/infrastructure/database/taxonomy-f2-group-repair.ts"
+      ],
+      "previousIds": [
+        "ops:f2-tab-02"
+      ],
+      "purpose": "reparo explícito dos grupos F2 em rascunho"
+    },
+    {
+      "id": "system:grant-platform-admin",
+      "sources": [
+        "src/infrastructure/database/grant-platform-admin.ts"
+      ],
+      "previousIds": [
+        "ops:grant-platform-admin"
+      ],
+      "purpose": "concessão/revogação operacional de administrador"
+    },
+    {
+      "id": "system:grant-taxonomy-curator",
+      "sources": [
+        "src/infrastructure/database/grant-taxonomy-curator.ts"
+      ],
+      "previousIds": [
+        "ops:grant-taxonomy-curator"
+      ],
+      "purpose": "concessão/revogação operacional de curador"
+    },
+    {
+      "id": "system:import-confaz-act",
+      "sources": [
+        "src/infrastructure/database/import-confaz-act.ts"
+      ],
+      "previousIds": [
+        "ops:import-confaz-act"
+      ],
+      "purpose": "importação operacional de ato CONFAZ"
+    },
+    {
+      "id": "system:l17-scheduler",
+      "sources": [
+        "migrations/074_audit_allowlist_and_backfill.sql"
+      ],
+      "previousIds": [
+        "l17:scheduler"
+      ],
+      "purpose": "limpeza global L17 executada pelo worker/scheduler"
+    },
+    {
+      "id": "system:scheduler",
+      "sources": [],
+      "previousIds": [],
+      "purpose": "agendamento com identidade explícita"
+    },
+    {
+      "id": "system:taxonomy-baseline-importer",
+      "sources": [
+        "src/modules/taxonomy/baseline/baseline.audit.ts",
+        "src/modules/taxonomy/baseline/baseline.repository.ts"
+      ],
+      "previousIds": [
+        "taxonomy-baseline-importer"
+      ],
+      "purpose": "importação da baseline"
+    },
+    {
+      "id": "system:taxonomy-load-products",
+      "sources": [
+        "src/infrastructure/database/taxonomy-load-products.ts"
+      ],
+      "previousIds": [
+        "ops:taxonomy-load-products"
+      ],
+      "purpose": "carga da planilha de produtos"
+    },
+    {
+      "id": "system:taxonomy-merge-dimension",
+      "sources": [
+        "src/infrastructure/database/taxonomy-merge-dimension.ts"
+      ],
+      "previousIds": [
+        "ops:taxonomy-merge-dimension"
+      ],
+      "purpose": "unificação explícita de dimensões"
+    },
+    {
+      "id": "system:taxonomy-publish-draft",
+      "sources": [
+        "src/infrastructure/database/taxonomy-publish-draft.ts"
+      ],
+      "previousIds": [
+        "ops:taxonomy-publish-draft"
+      ],
+      "purpose": "comando operacional de publicação do rascunho"
+    },
+    {
+      "id": "system:taxonomy-retire-dimensions",
+      "sources": [
+        "src/infrastructure/database/taxonomy-retire-dimensions.ts"
+      ],
+      "previousIds": [
+        "ops:taxonomy-retire-dimensions"
+      ],
+      "purpose": "retirada explícita de dimensões"
+    },
+    {
+      "id": "system:taxonomy-retire-legacy-segments",
+      "sources": [
+        "src/infrastructure/database/taxonomy-retire-legacy-segments.ts"
+      ],
+      "previousIds": [
+        "ops:taxonomy-retire-legacy-segments"
+      ],
+      "purpose": "retirada explícita dos segmentos legados"
+    },
+    {
+      "id": "system:taxonomy-v1.1-publisher",
+      "sources": [
+        "src/infrastructure/database/taxonomy-v1-1-publish.ts",
+        "src/modules/taxonomy/release/taxonomy-successor-v1-1.database.ts"
+      ],
+      "previousIds": [
+        "taxonomy-v1.1-publisher",
+        "taxonomy-v1.1-publish-command"
+      ],
+      "purpose": "publicação TAX-10: biblioteca e entrypoint documentado"
+    },
+    {
+      "id": "system:taxonomy-v1.1-successor",
+      "sources": [
+        "src/modules/taxonomy/release/taxonomy-successor-v1-1.database.ts"
+      ],
+      "previousIds": [
+        "taxonomy-v1.1-successor"
+      ],
+      "purpose": "criação da sucessora TAX-10"
+    },
+    {
+      "id": "system:worker",
+      "sources": [],
+      "previousIds": [],
+      "purpose": "trabalho de sistema com identidade explícita"
+    }
+  ],
+  "nonAuditReferences": [
+    {
+      "value": "DOU_CLEAN_01_BATCH_EXECUTOR",
+      "paths": [
+        "src/infrastructure/database/dou-historical-cleanup-execute.ts"
+      ],
+      "contract": "publication_scope_events.actor_ref; validation and R3 manifest contract, never audit_log"
+    },
+    {
+      "value": "DOU_CLEAN_02_POSTDEPLOY_SMOKE_RUNNER",
+      "paths": [
+        "ops/dou-clean-02/runner/postdeploy-smoke.sh"
+      ],
+      "contract": "controlled smoke manifest / publication_scope_events.actor_ref, never audit_log"
+    },
+    {
+      "value": "isolated-fixture",
+      "paths": [
+        "ops/dou-clean-02/runner/test-pg18-isolated.sh"
+      ],
+      "contract": "disposable PG18 runner fixture only, never audit_log"
+    }
+  ],
+  "historicalMigrationBlobs": {
+    "migrations/001_foundation.sql": "33479056c631ecc53a9ed05406117922948036cf",
+    "migrations/002_companies.sql": "3a9049c09e767eb8d3b78ada8ca1de6c10aa0c25",
+    "migrations/003_sources_and_collection.sql": "f5e18262bcc204bcbaab8884c90d6a1954f741a8",
+    "migrations/004_publications.sql": "8e8aceed91901d7078fac8d0661289bbfaf96d06",
+    "migrations/005_monitoring_and_matching.sql": "18a6e51bc42e655363fe1dd1cb763473cd9aecba",
+    "migrations/006_audit.sql": "f53c9fbb69e8839733b466f0244eb30dfbedc357",
+    "migrations/007_monitoring_views.sql": "db2a91c97e4a2796775a0b6fa9a1ac7ceb6e5b50",
+    "migrations/008_auth_credentials_and_sessions.sql": "9e0838f5a1c26497fd2e84df517d13112af51228",
+    "migrations/009_rls_policies.sql": "c7726414a2d423315fb94cfa91916cd581795ad0",
+    "migrations/010_page_reference_origins.sql": "82e2bb885566c4e6e52278bb93d48d71a6b0112f",
+    "migrations/011_collection_attempt_no_integer.sql": "454af18929f0788accc59182fb5922eac937f78f",
+    "migrations/012_collection_checkpoints.sql": "3e7ff124c4c8924e225d387415f5f04af940ce88",
+    "migrations/013_db_capacity_snapshots.sql": "7a9335c7ad023b0905c41d3fa59faf44fb42b351",
+    "migrations/014_bound_publication_search_vector.sql": "f864c76f01d8757d485fa5055c8c07765dd2c084",
+    "migrations/015_taxonomy_core.sql": "80c639aa1775cb28a75d105741d7287558fc0e56",
+    "migrations/016_taxonomy_aliases_relations.sql": "225622660b23bf2e76fce0fed5bdd2c69834372e",
+    "migrations/017_taxonomy_evidence_official_catalogs.sql": "be6e7131a71735934522bfcf2d2022615744a43c",
+    "migrations/018_taxonomy_privileges.sql": "9b76415e544e65c1aeeb88a59bb0d5dadf9c3145",
+    "migrations/019_public_signup.sql": "9d6751117ad9d4b6b07012016f878b649137376d",
+    "migrations/020_taxonomy_classification.sql": "dafe53cac9129a58475af9cc523e6ec74d7d89b9",
+    "migrations/021_taxonomy_candidates.sql": "a96a18f9a3464343024d3bcc6b103b81bb5dfe09",
+    "migrations/022_cnae_runtime_write.sql": "f3bb5dbedb79d726818f1638ab6a12202bf44e8a",
+    "migrations/023_state_registration.sql": "ea670d327605c6bcad9e7f5c01c00f9d5b74282c",
+    "migrations/024_business_location_code.sql": "2d46d27ee4ddf40de59cdf9d6361e504129cfc7f",
+    "migrations/025_news_content.sql": "1655df4f0f9037ba6bd4c02d1a21fb7b0b4f3489",
+    "migrations/026_company_product_ncm.sql": "c3849e96f4f6ccd544722f364c92acbd746b0ee0",
+    "migrations/027_rfb_news_source.sql": "fae16221e276c2ef3ecf06655418fb60f24120b6",
+    "migrations/028_publication_ncm_scans.sql": "47ac84dbd07cf3a551487f5d470cb0101755f86b",
+    "migrations/029_catalog_scale.sql": "2f4230d1a9ac5a9fe977c19534bc94e4e9650d3f",
+    "migrations/030_archive_act_type_scale.sql": "f8243ac134114e87d3f63a699e35bdc0862a30b0",
+    "migrations/031_taxonomy_curation.sql": "214ed5e1d596a7ed7c8cb6e3d1fb5aaa32785d55",
+    "migrations/032_company_cnae_ncms.sql": "eb855564f46ec7d671f9516f2f9e6304bbc2039e",
+    "migrations/033_publication_ncm_scans_read.sql": "4565a6979e7c92b9ab52cc87e8987fc68846263d",
+    "migrations/033_publication_scope_suppression.sql": "31dab3ac5e01294f1138d9dc796150244acf4087",
+    "migrations/034_publication_scope_cache_epoch.sql": "97da46b1e75a2e197d30ae855c8a9ea1c2eb9e0c",
+    "migrations/035_publication_scope_collection_history.sql": "94146bbe116dbb1cc79d39c04bd5414fe8aa8ed1",
+    "migrations/036_platform_admin.sql": "2a665fe18636799d678c38721598b52a052485ab",
+    "migrations/037_collection_filter_policy.sql": "bbeedc65e0096c206186005e5935d33159ac4f54",
+    "migrations/038_collection_filter_admin.sql": "fc1a8cf2b86a984accea5456fa59114051e36b47",
+    "migrations/039_collection_filter_simulation_review.sql": "81a46e7a82fcd07bb574a99fdeb3a37009cd3b28",
+    "migrations/040_collection_filter_simulation_runner.sql": "a91a8d379dbac0760f67d6cc1fc25c3a990ae05b",
+    "migrations/041_collection_filter_runtime.sql": "3b057224f2de350a51f4ef27f4eac1255c46bac6",
+    "migrations/042_signup_without_company.sql": "c50aac916400555e101562b62ae3cf78b03625eb",
+    "migrations/043_establishment_company_root.sql": "e930cd7428e72e973dbb10699c5271db0d8d7f04",
+    "migrations/051_collection_filter_direct_rules_cleanup.sql": "07c298a261ef94b735ff14606374b2dd7281526d",
+    "migrations/052_collection_filter_direct_admin_edits.sql": "346ce904b5775f6e9ae7e78968b620a25e93e820",
+    "migrations/053_collection_filter_purge_lookup_indexes.sql": "c415b54ef739bfdc9c5368e3b77617baf0c4460e",
+    "migrations/054_l15_scope_purge_and_l10_runner.sql": "129933c4a4c9b6662145345cf9c82d7e24fdeaf8",
+    "migrations/055_collection_items_created_at_index.sql": "ffe6b20595a366e358930f2ea9c50d965100eff4",
+    "migrations/056_l17_hidden_cleanup.sql": "950cf0849fc828da62ff8acf903af1a1132e48e2",
+    "migrations/057_l17_canonical_type_conflict.sql": "c7aa579f2fe56d493a728898a562560c9cffa95a",
+    "migrations/058_l17_archive_purge_discards.sql": "42e759a6376c23248abae7268d4784b5dbb3996b",
+    "migrations/059_l17_admin_lock.sql": "2575a4bcabd4eab80be25cc04d4e1903174922a2",
+    "migrations/060_l17_worker_always.sql": "edac56b971dba2f2427e608e5126a55e7ddca243",
+    "migrations/061_l17_rule_cap_index.sql": "a72880f5f1d26c328b7ad5e684908f2a49529335",
+    "migrations/062_l18_preserve_federal_tax_acts.sql": "93e594ed2ae55b644cf03572493789e2ede8c46c",
+    "migrations/063_l18_non_dou_legacy_and_doe_type.sql": "11a224491e46a35008906acf674b735b34075295",
+    "migrations/064_f2_actuacao_cnae_origins.sql": "3514c8f077ad6f2ed84a225da710f08b2b31c384",
+    "migrations/065_f2_ncm_short_legal_mentions.sql": "094b41abc7d95b811f7089f83cf852e6d132773e",
+    "migrations/066_f2_t03_lossless_import_staging.sql": "11d867fcf66a2e774742b03ae5ee6685e49a8a14",
+    "migrations/067_f2_t03_readonly_source_suggestions.sql": "5ee9370387285a19147a5ccd40cb1cc1c645bfac",
+    "migrations/068_f2_t03_v51_staging_contract.sql": "6048347562257311d3dc08edeca9fbbf236075fb",
+    "migrations/069_f3_unified_type_decision.sql": "2f01b78937a5ba4b45e0c050e32b924df7f205eb",
+    "migrations/070_f2_draft_import_ledger.sql": "e07301c4ee29f6b627bd178265ce0f6f616d72a1",
+    "migrations/071_f2_tab02_draft_suggestions.sql": "18323918c269bd88a2c83b610e4987801dea5918",
+    "migrations/072_f2_tab03_multi_actuacao.sql": "d52259ca892c7efb98a98c479009c9336707b0e1",
+    "migrations/073_onb02_company_purge.sql": "f27c7c943a6b5311122491840c49f480d86b6209"
+  },
+  "coverage": [
+    {
+      "paths": [
+        "package.json",
+        ".github/workflows",
+        "scripts",
+        "src",
+        "ops",
+        "docs"
+      ],
+      "scope": "all static operational actor declarations and audit INSERT literals; new paths included recursively"
+    },
+    {
+      "paths": [
+        "src/worker.ts",
+        "src/scheduler.ts"
+      ],
+      "scope": "no separate literal audit actor; L17 SQL writers use system:l17-scheduler"
+    },
+    {
+      "paths": [
+        "src/infrastructure/database/ensure-doe-sp-source.ts",
+        "src/infrastructure/database/trigger-doe-sp-run.ts",
+        "src/infrastructure/database/ensure-rfb-normas-source.ts",
+        "src/infrastructure/database/trigger-rfb-normas-run.ts"
+      ],
+      "scope": "source/collection operations do not write audit_log"
+    },
+    {
+      "paths": [
+        "ops/taxonomy/f2-production-load.mjs"
+      ],
+      "scope": "HTTP administrative writes use authenticated user UUID, not a static system actor"
+    },
+    {
+      "paths": [
+        "src/api/routes/taxonomy-admin.route.ts",
+        "src/modules/taxonomy/curation/curation.draft.ts"
+      ],
+      "scope": "authenticated UUID in audit; curator:<UUID> metadata in separate taxonomy/tag tables is not an audit actor"
+    },
+    {
+      "paths": [
+        "test"
+      ],
+      "scope": "explicit negative fixtures excluded from production scan; positive system actors separately checked by PG18"
+    }
+  ]
+}

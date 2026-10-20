@@ -57,8 +57,8 @@ test('R7.2 new writes: only UUID or exact closed system identities; invalid auth
       'known event with invalid author must be rejected by database');
     assert.equal(Number((await pool.query('SELECT count(*) n FROM audit_log WHERE tenant_id=$1',[tenant])).rows[0].n),0);
     for(const actor of [randomUUID(),'system:worker','system:scheduler',
-      'taxonomy-baseline-importer','taxonomy-v1.1-successor','taxonomy-v1.1-publisher',
-      'ops:grant-platform-admin','ops:grant-taxonomy-curator','ops:import-confaz-act','l17:scheduler']) {
+      'system:taxonomy-baseline-importer','system:taxonomy-v1.1-successor','system:taxonomy-v1.1-publisher',
+      'system:grant-platform-admin','system:grant-taxonomy-curator','system:import-confaz-act','system:l17-scheduler']) {
       await insert(actor);
     }
     await assert.rejects(insert('system:worker',{actor_redacted:true}),

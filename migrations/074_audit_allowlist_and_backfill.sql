@@ -18,9 +18,22 @@ $ref$;
 CREATE OR REPLACE FUNCTION public.audit_actor_reference(p_value TEXT)
 RETURNS TEXT LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $actor$
  SELECT CASE WHEN public.audit_entity_reference(p_value) IS NOT NULL THEN public.audit_entity_reference(p_value)
-  WHEN p_value IN ('system:worker','system:scheduler','taxonomy-baseline-importer',
-    'taxonomy-v1.1-successor','taxonomy-v1.1-publisher','ops:grant-platform-admin',
-    'ops:grant-taxonomy-curator','ops:import-confaz-act','l17:scheduler')
+  WHEN p_value IN ('system:f2-draft-01',
+    'system:f2-tab-02',
+    'system:grant-platform-admin',
+    'system:grant-taxonomy-curator',
+    'system:import-confaz-act',
+    'system:l17-scheduler',
+    'system:scheduler',
+    'system:taxonomy-baseline-importer',
+    'system:taxonomy-load-products',
+    'system:taxonomy-merge-dimension',
+    'system:taxonomy-publish-draft',
+    'system:taxonomy-retire-dimensions',
+    'system:taxonomy-retire-legacy-segments',
+    'system:taxonomy-v1.1-publisher',
+    'system:taxonomy-v1.1-successor',
+    'system:worker')
   THEN p_value ELSE NULL END
 $actor$;
 
@@ -729,7 +742,7 @@ BEGIN
  VALUES(
     NULL,
     'SYSTEM',
-    'l17:scheduler',
+    'system:l17-scheduler',
     'L17_HIDDEN_PURGE',
     'publications',
     public.audit_entity_reference(('LEGACY_HIDDEN')::text),
@@ -901,7 +914,7 @@ BEGIN
  ) VALUES(
     NULL,
     'SYSTEM',
-    'l17:scheduler',
+    'system:l17-scheduler',
     'L17_RULE_PURGE',
     'publications',
     public.audit_entity_reference((p_type)::text),
