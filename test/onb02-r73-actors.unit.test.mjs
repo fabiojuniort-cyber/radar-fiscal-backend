@@ -54,6 +54,7 @@ test('R7.3 every operational script, job, package command and document uses regi
 });
 test('R7.3 inventory guard catches a newly added CLI/doc/SQL writer and the exact pre-fix TAX-10 command actor',()=>{
   const cases=[
+    ["src/infrastructure/database/dou-historical-cleanup-execute.ts","const x={actor_id:'DOU_CLEAN_01_BATCH_EXECUTOR'}"],
     ["src/fallback.ts","const x={actor:options.actor ?? 'unregistered-command'}"],
     ["src/binding.ts","const commandActor='unregistered-command'; const x={actor:commandActor}"],
     ["src/infrastructure/database/new-cli.ts","const x={actor:'unregistered-command'}"],

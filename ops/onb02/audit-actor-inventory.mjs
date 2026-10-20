@@ -6,7 +6,8 @@ export function actorViolations(path,text,registry) {
   const errors=[],seen=new Set(),allowed=new Set(registry.systemActors);
   function check(value,position,kind) {
     if(uuid.test(value))return;
-    const nonAudit=registry.nonAuditReferences.some(item=>item.value===value&&item.paths.includes(path));
+    const nonAudit=kind==='external_actor_ref' &&
+      registry.nonAuditReferences.some(item=>item.value===value&&item.paths.includes(path));
     if(allowed.has(value)||nonAudit)return;
     // Runtime values remain guarded by the DB. Operator UUID placeholders are not static actors.
     if(/^(?:<[^>]+>|\$[A-Z_][A-Z0-9_]*|\$\{[A-Z_][A-Z0-9_]*\})$/.test(value))return;
@@ -15,11 +16,11 @@ export function actorViolations(path,text,registry) {
   }
   // Documentation, JSON, YAML and shell declarations as well as TS object literals.
   for(const match of text.matchAll(/(?:\b(?:actor|actorId|actor_id|userId|createdByActor|actorRef|actor_ref)\b|["'](?:actor|actor_id|userId|actorRef|actor_ref)["'])\s*[:=]\s*(["'`])([^"'\`\r\n]+)\1/g))
-    check(match[2],match.index,'literal_actor');
+    check(match[2],match.index,/actorRef|actor_ref/.test(match[0])?'external_actor_ref':'literal_actor');
   for(const match of text.matchAll(/\b[A-Z_]*(?:ACTOR|ACTOR_ID|ACTOR_REF)\s*[:=]\s*["']?([A-Za-z0-9_:.$<>\{\}-]+)/g))
-    check(match[1],match.index,'environment_actor');
+    check(match[1],match.index,/ACTOR_REF/.test(match[0])?'external_actor_ref':'environment_actor');
   for(const match of text.matchAll(/--(?:actor|actor-id|actor_id|actor-ref|actor_ref)(?:=|\s+)["']?([A-Za-z0-9_:.$<>\{\}-]+)/g))
-    check(match[1],match.index,'command_actor');
+    check(match[1],match.index,/actor[-_]ref/.test(match[0])?'external_actor_ref':'command_actor');
   for(const match of text.matchAll(/\bsystem:[a-z0-9][a-z0-9.-]*/g))
     check(match[0],match.index,'system_identity');
   for(const writer of registry.writers)for(const legacy of writer.previousIds) {
@@ -50,7 +51,7 @@ export function actorViolations(path,text,registry) {
   for(const match of text.matchAll(/\b(actor|actorId|actor_id|userId|actorRef|actor_ref)\s*:\s*(\w+)\b/g))
     if(bindings.has(match[2]))check(bindings.get(match[2]),match.index,'bound_actor');
   for(const match of text.matchAll(/\b(?:actor|actorId|actor_id|userId|actorRef|actor_ref)\s*:[^\n;]{0,160}?(?:\?\?|\|\|)\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g))
-    check(decode(match[1]),match.index,'fallback_actor');
+    check(decode(match[1]),match.index,/^actorRef|^actor_ref/.test(match[0])?'external_actor_ref':'fallback_actor');
   for(const match of text.matchAll(/\b(?:const|let)\s+([A-Za-z_]*[Aa][Cc][Tt][Oo][Rr][A-Za-z_]*)(?:\s*:[^=\n]+)?\s*=\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g))
     check(decode(match[2]),match.index,'actor_binding');
   for(const match of text.matchAll(stringPattern))sqlActors(decode(match[0]),match.index);
