@@ -242,9 +242,11 @@ idempotência. Toda essa execução é em PostgreSQL 18 descartável da CI.
 [Inventário de atores](audit-actors-r73.json) registra os 16 IDs canônicos, seus
 escritores e os nomes anteriores. Só UUID e esses IDs são aceitos em INSERT;
 não existe autorização por prefixo nem alias antigo aceito em nova escrita.
-A política de backfill permanece: autor fora da lista/formato vira NULL com
-actor_redacted=true. Os nomes anteriores não padronizados passam por essa regra;
-o mapa do inventário é documentação, não uma exceção de aceitação no banco.
+No backfill, os nomes anteriores explicitamente reconhecidos são convertidos pelo
+mapa fechado audit_historical_actor_reference ao ID canônico, preservando a autoria
+de sistema e sem acrescentar redação indevida. O plano inclui essas linhas v0/v1.
+Autor não reconhecido fora do formato/lista continua virando NULL com
+actor_redacted=true. O mapa histórico não permite aliases em novas escritas.
 
 O inventário cobre src, scripts, package.json, jobs, worker/scheduler, CLIs e
 docs/runbooks, incluindo TAX-10, F2, DOE, DOU e RFB.

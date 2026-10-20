@@ -23,6 +23,13 @@ test('R7.3 every operational script, job, package command and document uses regi
   const clause=policy.match(/WHEN p_value IN \(([\s\S]*?)\)\s+THEN p_value/)[1];
   const sqlActors=[...clause.matchAll(/'([^']+)'/g)].map(value=>value[1]).sort();
   assert.deepEqual(sqlActors,[...registry.systemActors].sort(),'registry and actual DB guard must agree exactly');
+  const historicalPolicy=policy.split('AS $historical_actor$')[1]?.split('$historical_actor$')[0];
+  assert.equal(typeof historicalPolicy,'string');
+  const aliases=Object.fromEntries([...historicalPolicy.matchAll(/WHEN '([^']+)' THEN '([^']+)'/g)]
+    .map(match=>[match[1],match[2]]));
+  const expectedAliases=Object.fromEntries(registry.writers.flatMap(writer=>
+    writer.previousIds.map(previous=>[previous,writer.id])));
+  assert.deepEqual(aliases,expectedAliases,'historical canonicalization must be an explicit closed map');
   for(const path of await files()) {
     if(path==='docs/audit-actors-r73.json')continue; // inventory contains previous labels, not executable instructions.
     const text=await readFile(path,'utf8');
@@ -31,7 +38,10 @@ test('R7.3 every operational script, job, package command and document uses regi
       assert.equal(blob,registry.historicalMigrationBlobs[path],'historical migration changed: '+path);
       historical++;continue;
     }
-    scanned++;failures.push(...actorViolations(path,text,registry));
+    scanned++;
+    const operational=path==='migrations/074_audit_allowlist_and_backfill.sql' ?
+      text.replace(historicalPolicy,'') : text;
+    failures.push(...actorViolations(path,operational,registry));
   }
   for(const writer of registry.writers) {
     assert.ok(writer.sources.length>0||['system:worker','system:scheduler'].includes(writer.id));

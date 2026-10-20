@@ -40,12 +40,47 @@ test('R7.3 TAX-10 documented entrypoint commits publication and audit on real is
       await client.query('COMMIT');
     }catch(error){await client.query('ROLLBACK');throw error;}
     finally{client.release();}
-    const registry=JSON.parse(await readFile('docs/audit-actors-r73.json','utf8')) as {systemActors:string[]};
+    const registry=JSON.parse(await readFile('docs/audit-actors-r73.json','utf8')) as {systemActors:string[];writers:Array<{id:string;previousIds:string[]}>};
     for(const actor of registry.systemActors) {
       assert.equal((await pool.query('SELECT audit_actor_reference($1) actor',[actor])).rows[0].actor,actor);
       await pool.query(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type,after_data)
         VALUES('SYSTEM',$1,'COMPANY_UPDATED','company','{"is_active":true}')`,[actor]);
     }
+    // Recognized historical system authors are renamed, not erased.
+    const previous=registry.writers.flatMap(writer=>writer.previousIds.map(old=>({old,id:writer.id})));
+    for(const item of previous) {
+      await assert.rejects(pool.query(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type)
+        VALUES('SYSTEM',$1,'COMPANY_UPDATED','company')`,[item.old]),
+        (error:unknown)=>(error as {message:string}).message==='audit_invalid_actor');
+    }
+    const seed=await pool.connect();
+    const oldRows:Array<{id:string;canonical:string;action:string;occurred_at:Date;after_data:unknown}>=[];
+    try {
+      await seed.query('BEGIN');
+      await seed.query('ALTER TABLE audit_log DISABLE TRIGGER audit_allowlist_guard');
+      for(let i=0;i<previous.length;i++) {
+        const item=previous[i]!;
+        const row=(await seed.query(`INSERT INTO audit_log(actor_type,actor_id,action,entity_type,
+          after_data,audit_policy_version) VALUES('SYSTEM',$1,'COMPANY_UPDATED','company',
+          '{"is_active":true}',$2) RETURNING id,action,occurred_at,after_data`,
+          [item.old,i%2])).rows[0]!;
+        oldRows.push({...row,canonical:item.id});
+      }
+      await seed.query('ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard');
+      await seed.query('COMMIT');
+    }catch(error){await seed.query('ROLLBACK');throw error;}
+    finally{seed.release();}
+    const batch=(await pool.query('SELECT * FROM audit_backfill_batch(5000)')).rows[0]!;
+    assert.equal(Number(batch.remaining),0);
+    for(const old of oldRows) {
+      const row=(await pool.query('SELECT actor_id,action,occurred_at,after_data FROM audit_log WHERE id=$1',
+        [old.id])).rows[0]!;
+      assert.equal(row.actor_id,old.canonical);
+      assert.equal(row.action,old.action);assert.deepEqual(row.occurred_at,old.occurred_at);
+      assert.deepEqual(row.after_data,old.after_data,'known system author must not be marked redacted');
+    }
+    assert.equal(Number((await pool.query('SELECT * FROM audit_backfill_batch(5000)')).rows[0].processed),0);
+    console.log('ONB02_R73_LEGACY_ACTORS aliases='+previous.length+' versions=2 canonicalized=true new_alias_insert_rejected=true idempotent=true');
     const execute=(name:string,args:string[]=[])=>run(process.execPath,[
       'dist/infrastructure/database/'+name+'.js',...args],env);
     const draft=await execute('taxonomy-v1-1-create-draft');

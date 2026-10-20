@@ -37,6 +37,29 @@ RETURNS TEXT LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $actor$
   THEN p_value ELSE NULL END
 $actor$;
 
+
+-- Historical identity normalization is a separate closed map, never an INSERT alias.
+CREATE OR REPLACE FUNCTION public.audit_historical_actor_reference(p_value TEXT)
+RETURNS TEXT LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $historical_actor$
+ SELECT CASE p_value
+  WHEN 'taxonomy-baseline-importer' THEN 'system:taxonomy-baseline-importer'
+  WHEN 'taxonomy-v1.1-successor' THEN 'system:taxonomy-v1.1-successor'
+  WHEN 'taxonomy-v1.1-publisher' THEN 'system:taxonomy-v1.1-publisher'
+  WHEN 'taxonomy-v1.1-publish-command' THEN 'system:taxonomy-v1.1-publisher'
+  WHEN 'ops:grant-platform-admin' THEN 'system:grant-platform-admin'
+  WHEN 'ops:grant-taxonomy-curator' THEN 'system:grant-taxonomy-curator'
+  WHEN 'ops:import-confaz-act' THEN 'system:import-confaz-act'
+  WHEN 'l17:scheduler' THEN 'system:l17-scheduler'
+  WHEN 'ops:f2-tab-02' THEN 'system:f2-tab-02'
+  WHEN 'ops:f2-draft-01' THEN 'system:f2-draft-01'
+  WHEN 'ops:taxonomy-load-products' THEN 'system:taxonomy-load-products'
+  WHEN 'ops:taxonomy-merge-dimension' THEN 'system:taxonomy-merge-dimension'
+  WHEN 'ops:taxonomy-publish-draft' THEN 'system:taxonomy-publish-draft'
+  WHEN 'ops:taxonomy-retire-dimensions' THEN 'system:taxonomy-retire-dimensions'
+  WHEN 'ops:taxonomy-retire-legacy-segments' THEN 'system:taxonomy-retire-legacy-segments'
+  ELSE public.audit_actor_reference(p_value) END
+$historical_actor$;
+
 -- Also repair an invalid author on rows previously marked by R7/R7.1.
 CREATE OR REPLACE FUNCTION public.audit_backfill_pending(p_version SMALLINT,p_actor TEXT)
 RETURNS BOOLEAN LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $pending$
@@ -85,7 +108,7 @@ $project$;
 -- Redaction flag is backfill metadata. Never copy the rejected author into JSON.
 CREATE OR REPLACE FUNCTION public.audit_backfill_after(p_action TEXT,p_type TEXT,p_json JSONB,p_actor TEXT)
 RETURNS JSONB LANGUAGE SQL IMMUTABLE SET search_path=pg_catalog,public AS $after$
- SELECT CASE WHEN p_actor IS NOT NULL AND public.audit_actor_reference(p_actor) IS NULL
+ SELECT CASE WHEN p_actor IS NOT NULL AND public.audit_historical_actor_reference(p_actor) IS NULL
  THEN coalesce(public.audit_project(p_action,p_type,p_json),'{}'::jsonb)||'{"actor_redacted":true}'::jsonb
  ELSE public.audit_project(p_action,p_type,p_json) END
 $after$;
@@ -114,7 +137,7 @@ BEGIN
      OR NEW.entity_id IS DISTINCT FROM public.audit_entity_reference(OLD.entity_id)
      OR NEW.before_data IS DISTINCT FROM public.audit_project(OLD.action,OLD.entity_type,OLD.before_data)
      OR NEW.after_data IS DISTINCT FROM public.audit_backfill_after(OLD.action,OLD.entity_type,OLD.after_data,OLD.actor_id)
-     OR NEW.actor_id IS DISTINCT FROM public.audit_actor_reference(OLD.actor_id)
+     OR NEW.actor_id IS DISTINCT FROM public.audit_historical_actor_reference(OLD.actor_id)
      OR NEW.request_id IS DISTINCT FROM public.audit_entity_reference(OLD.request_id)
   THEN RAISE EXCEPTION 'audit_immutable' USING ERRCODE='23514'; END IF;
  END IF;
@@ -172,7 +195,7 @@ BEGIN
    LIMIT p_limit FOR UPDATE
  ), changed AS (
    UPDATE public.audit_log a SET
-     actor_id=public.audit_actor_reference(a.actor_id),
+     actor_id=public.audit_historical_actor_reference(a.actor_id),
      entity_id=public.audit_entity_reference(a.entity_id),
      request_id=public.audit_entity_reference(a.request_id),
      before_data=public.audit_project(a.action,a.entity_type,a.before_data),
