@@ -24,7 +24,7 @@ Origem: COORD → CLAUDE-EXEC, autorização de 19/10/2026 ([issue #116](https:/
 - **Identidade:**
   - `ruleSetHash` deixa de usar o rótulo fixo `profile: 'conservative/0.1.0'` e passa a usar `{ format: 'ANAT-PROFILE/1', effectiveHash }`;
   - `profile.ts` e `profile-rules.ts` entram na identidade da build;
-  - **`engineHash` vai de `ad69d285…` para `8b2eefbb…` no `fef9d51` e, depois das correções da revisão do #249, para `5c68a23c3d25e735be55cc4ce2c431c66eb70e992c28b10324d4ad750be5ae0b`.**
+  - **`engineHash` vai de `ad69d285…` para `8b2eefbb…` no `fef9d51` e, depois das correções da revisão do #249, para `5c68a23c…` no `c4bc8c9` e, na segunda rodada de correções (seção 7), para `a1fe9aef3ba9358ee6a04db41f24c12c1b2ec0552267114f42a72f097264807b`.**
 
   Como previsto no ADMIN-01, `ruleSetHash`, `analysisId` e `outputHash` mudam necessariamente.
 - **Contrato (`contract.ts`):** inalterado.
@@ -52,11 +52,7 @@ Origem: COORD → CLAUDE-EXEC, autorização de 19/10/2026 ([issue #116](https:/
 ## 3. Equivalência do perfil padrão
 
 1. **Snapshot estrutural antes e depois.** Em 12 documentos sintéticos (`test/support/anatomy-synthetic-docs.ts`), cobrindo todas as regras movidas para o perfil e as proteções fixas, a saída do motor **sem** `identity`, `analysisId` e `outputHash` foi congelada **antes** da integração. Isso está no commit `ab9f9f4`, gerado com o `src` idêntico ao de `585f5a49`. Depois da integração, a saída é **idêntica** nos 12 documentos: partes, spans, contextos, motivos, entidades, relações, seleções, cobertura e limitações.
-2. **Diferencial contra o oráculo.** As 20 regex originais foram copiadas literalmente de `585f5a49` para `test/support/anatomy-legacy-rules.ts` (a cópia foi conferida contra `git show`). Cada casador compilado do perfil padrão é comparado com a regra original numa bateria de variantes: maiúsculas e minúsculas, espaços, tabulação, letra ou dígito colado, pontuação, prefixos. **Resultado: idêntico em todas as regras, exceto as diferenças deliberadas do preâmbulo:**
-   - **Fronteira de palavra no fim do início de bloco:** a regra original só exigia fronteira depois de `CONSIDERANDO`; agora todo início de bloco termina em fronteira. Exemplo: `O Conselhox` deixa de ser preâmbulo.
-   - **Espaço interno flexível:** cada espaço num literal aceita qualquer sequência de espaços. A regra original tinha um espaço literal em `Receita Federal`, então `A  Receita  Federal` e `A\tReceita\tFederal` passam a ser preâmbulo.
-
-   Essas são as **únicas** diferenças encontradas, e o teste exige exatamente essa lista. Nenhuma ocorre nos 12 documentos sintéticos.
+2. **Diferencial contra o oráculo.** As 20 regex originais foram copiadas literalmente de `585f5a49` para `test/support/anatomy-legacy-rules.ts` (a cópia foi conferida contra `git show`). Cada casador compilado do perfil padrão é comparado com a regra original numa bateria de variantes: maiúsculas e minúsculas, espaços, tabulação, letra ou dígito colado, pontuação, prefixos. **Resultado: idêntico em todas as regras, preâmbulo incluído.** As duas diferenças de preâmbulo do `fef9d51`/`c4bc8c9` (fronteira de palavra após todo início de bloco; espaço interno flexível em `A Receita Federal`) não foram aprovadas e foram **revertidas** na seção 7. O teste exige lista de diferenças vazia, com casos de borda (`O Conselhox`, `A  Receita  Federal`, `A\tReceita\tFederal`, NBSP, `CONSIDERANDOé`, `CONSIDERANDO_`, NFD).
 3. **Classes:** os conjuntos CONFAZ compilados são exatamente as alternâncias originais; o escopo é `subtree` no CONFAZ e `own` nas demais fontes.
 
 ## 4. Efeitos das configurações (sintético)
@@ -87,7 +83,7 @@ Cada campo editável muda o motor da forma configurada:
 
 ## 5. Validação e o que **não** foi feito
 
-- `npm run test:anatomy`: **142/142** (eram 139 no `fef9d51`); `tsc --noEmit` e `npm run build`: OK; identidade verificada (`5c68a23c…`); snapshot sintético verificado.
+- `npm run test:anatomy`: **146/146** (139 no `fef9d51`, 142 no `c4bc8c9`); `tsc --noEmit` e `npm run build`: OK; identidade verificada (`a1fe9aef…`); snapshot sintético verificado.
 - **Golds, especificações, aprovações e contrato:** diferença vazia em relação a `585f5a49`.
 - **Testes que já existiam e tocam as entradas de desenvolvimento:** `test:anatomy` já incluía a verificação do **texto canônico** congelado (`dev-canonical`) e a reprodutibilidade dos golds. Ambos usam o leitor só para extrair o **texto** das 7 entradas de desenvolvimento, que continua idêntico. **Nenhuma comparação estrutural do motor com essas entradas foi feita** nem relatada.
 - Sem medição, reserva, recaptura, migration, endpoint, tela, merge ou deploy.
@@ -114,4 +110,22 @@ Origem: parecer BLOCK do revisor GPT/Codex no `fef9d51` ([revisão no PR #249](h
    - **Conflito:** é decidido pelo bloqueador compilado (`blockerPattern`) aplicado a cada cabeçalho. `NCM/SH` permitido com `NCM / SH` bloqueado, ou o contrário, é recusado dentro de um perfil (`semantic_conflict`) e depois da herança (`effective_conflict`).
    - **Defaults:** nenhum dos padrões entregues muda, porque nenhum bloqueador padrão tem `/` ou espaço.
 
-**Equivalência preservada:** o snapshot dos 12 documentos e o diferencial contra o oráculo continuam idênticos; as duas diferenças de preâmbulo são as mesmas e ainda **aguardam aceite específico**. A identidade foi regenerada (`5c68a23c…`), porque `profile.ts` e `profile-rules.ts` fazem parte dela. Testes existentes que removiam proteções passaram a acrescentar literais ou a usar uma fonte sem esse piso; o efeito testado continua o mesmo.
+**Equivalência preservada:** o snapshot dos 12 documentos e o diferencial contra o oráculo continuam idênticos. As duas diferenças de preâmbulo permaneciam neste commit e foram revertidas na seção 7. A identidade foi regenerada (`5c68a23c…`), porque `profile.ts` e `profile-rules.ts` fazem parte dela. Testes existentes que removiam proteções passaram a acrescentar literais ou a usar uma fonte sem esse piso; o efeito testado continua o mesmo.
+
+## 7. Segunda rodada (handover do COORD, issue #116) — sobre `c4bc8c9`
+
+Executor verificou o delta `fef9d51 → c4bc8c9` e completou as lacunas. Não é revisão independente. Testes novos em `test/anatomy.profile-engine.unit.test.ts` (`#249 R2 / A|B|C` e `#249 R2: restored preamble`), só com dados sintéticos.
+
+| Item | Lacuna encontrada no `c4bc8c9` | Correção | Teste |
+|---|---|---|---|
+| A — proteções | O piso só rodava em `resolveEffectiveProfile`. `compileProfileRules` e `readAnatomyInput({ rules })` (exportados) aceitavam regras sem `RedaoAnt`/`TituloAcordo`, e o objeto compilado era mutável (`classes.historical.delete`). | `assertProtectionFloor` também roda no compilador; regras compiladas ficam congeladas (conjuntos de classe só leitura) e leitor, `identifyNcmPartIds` e extrator recusam objetos que o compilador não emitiu. | `finding 1` (compilador recusa, objeto forjado recusado, mutação recusada); `R2 / A` (remoção de histórico, nota, ementa, epígrafe, assinatura, retificação, aspas, preâmbulo, bloqueador e exceção recusada por `analyzeAnatomy` em fonte e família). |
+| B — Unicode/espaços | Comportamento para texto do documento não declarado. | Declarado e testado: configuração aceita só NFC e espaço simples (NFD, NBSP e espaço duplo recusados); o **texto do documento nunca é normalizado** (texto canônico, hashes e offsets UTF-16 intactos); texto NFD **não** é reconhecido por literais NFC — falha segura (`unidentified`, sem NCM), igual ao motor anterior; NBSP no texto conta como espaço onde o separador é flexível; classes/aspas comparam caixa exata; `até`/`ate` seguem distintos. **A equivalência Unicode do documento continua em aberto** e depende de decisão própria. | `finding 2`; `R2 / B`. |
+| C — cabeçalho × bloqueador | Correção já presente; faltava cobertura de herança entre níveis. | Sem mudança de código. | `finding 3`; `R2 / C` (default × fonte, fonte × família, caixa, espaço em volta da barra; `CÓDIGO NCM` × `CÓDIGO` válido). |
+| Preâmbulo — fronteira | Todo início terminava em `(?![\p{L}\p{N}])`; `O Conselhox`, `CONSIDERANDOé`, `CONSIDERANDO_` mudavam de classificação. | Regra anterior restaurada: início de uma palavra termina em `\b`; início de várias palavras é prefixo. | oráculo sem diferenças; `R2: restored preamble`. |
+| Preâmbulo — espaços | Todo espaço do literal aceitava qualquer sequência; `A  Receita  Federal` virava preâmbulo. | Regra anterior restaurada: só o espaço após a primeira palavra é flexível (`A\s+Receita Federal`). Validação de duplicatas usa o mesmo fragmento. Retificação e rótulos mantêm o espaço flexível, como antes. | idem. |
+
+**Comparação com o motor anterior:** além do snapshot dos 12 documentos, 9 documentos sintéticos adversariais (NFD, NBSP, preâmbulos colados/espaçados, CONSIDERANDO, retificação, histórico/epígrafe, tabela) foram analisados pelo motor de `585f5a49` e por este; a saída sem `identity`, `analysisId` e `outputHash` é **idêntica**. No `c4bc8c9`, 3 desses 9 divergiam (preâmbulo). Os valores esperados do teste foram gerados pelo motor anterior, não pelo novo.
+
+**Identidade:** `engineHash` `5c68a23c…` → `a1fe9aef3ba9358ee6a04db41f24c12c1b2ec0552267114f42a72f097264807b`, regenerado com `ops/anatomy/build-identity.mjs --write` e verificado. Snapshot, oráculo, contrato, golds, especificações e aprovações: diferença vazia em relação a `585f5a49`/`ab9f9f4`.
+
+**Limitações:** sem motor no corpus real, medição, reserva, recaptura, migration, tela, merge ou deploy. A integridade das regras compiladas protege contra uso acidental por código do próprio processo; não é fronteira de segurança contra código malicioso no mesmo processo.

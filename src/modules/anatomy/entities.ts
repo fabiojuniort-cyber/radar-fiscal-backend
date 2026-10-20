@@ -1,5 +1,5 @@
 import type { AnatomyEntity, AnatomyPart } from './contract.js';
-import { defaultRules, type CompiledRules } from './profile-rules.js';
+import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 
 export interface AnatomyEntityInput {
   canonicalText: string;
@@ -38,6 +38,7 @@ const protectedPatterns: ReadonlyArray<[AnatomyEntity['domain'], RegExp, string]
 export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity[] {
   const text = input.canonicalText;
   const rules = input.rules ?? defaultRules('DOE-SP');
+  assertCompiledRules(rules);
   if (text.length > 2 * 1024 * 1024) throw new RangeError('ANAT entity input exceeds 2 Mi UTF-16 units');
   const hierarchy = new Map(input.parts.map(part => [part.id, part]));
   const depth = (part: AnatomyPart): number => {

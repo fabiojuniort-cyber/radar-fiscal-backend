@@ -77,14 +77,21 @@ export interface AnatomyProfile { profileVersion: typeof PROFILE_FORMAT_VERSION;
 /**
  * Regex fragment of one literal, shared by the compiler (profile-rules.ts) and by validation, so "same literal" and
  * "header blocked" are decided by the very matcher the engine runs (review of PR #249). Only regex syntax characters
- * are escaped (required in `u` mode). Spaces in block starts and labels match any run of whitespace; NCM header and
+ * are escaped (required in `u` mode). Spaces in rectification starts and labels match any run of whitespace (preamble: see preamblePattern); NCM header and
  * blocker literals also tolerate whitespace around "/". Other fields match the literal as written.
  */
 export const escapeLiteral = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/gu, (c) => `\\${c}`);
 const wordsPattern = (lit: string) => lit.split(' ').map(escapeLiteral).join('\\s+');
 const headerPattern = (lit: string) => lit.split('/').map((side) => wordsPattern(side.trim())).join('\\s*\\/\\s*');
+/**
+ * Preamble starts keep the pre-profile rule exactly (review of PR #249: the two preamble changes were not approved):
+ * only the space after the first word accepts any whitespace run ("O\\s+Conselho", "A\\s+Receita Federal"); later
+ * spaces are literal.
+ */
+const preamblePattern = (lit: string) => { const [first, ...rest] = lit.split(' '); return rest.length ? `${escapeLiteral(first!)}\\s+${escapeLiteral(rest.join(' '))}` : escapeLiteral(first!); };
 export function literalPattern(group: string, field: string, lit: string): string {
   if (group === 'ncm' && (field === 'columnHeaders' || field === 'columnBlockers')) return headerPattern(lit);
+  if (group === 'blockStarts' && field === 'preamble') return preamblePattern(lit);
   if (group === 'blockStarts' || group === 'labels') return wordsPattern(lit);
   return escapeLiteral(lit);
 }
@@ -204,9 +211,17 @@ export function resolveEffectiveProfile(profiles: unknown[], target: { source: s
   const family = target.family ?? null;
   if (family !== null && !literal.safeParse(family).success) fail('invalid_target', 'invalid family');
   const resolved = resolveChain(profiles, source.data!, family);
-  const weakened = protectionIssues(resolved.fields, shippedFields(source.data!));
-  if (weakened.length) fail('protection_weakened', weakened.join('; '));
+  assertProtectionFloor(resolved.fields, source.data!);
   return resolved;
+}
+
+/**
+ * The protection floor/ceiling check, also run by the rule compiler, so no caller (analyzeAnatomy, readAnatomyInput
+ * with compiled rules, or a direct compileProfileRules call) can obtain matchers below the shipped protections.
+ */
+export function assertProtectionFloor(fields: ProfileFields, source: (typeof PROFILE_SOURCES)[number]): void {
+  const weakened = protectionIssues(fields, shippedFields(source));
+  if (weakened.length) fail('protection_weakened', weakened.join('; '));
 }
 
 const shipped = new Map<string, ProfileFields>();

@@ -6,6 +6,7 @@ import { ANATOMY_ENGINE_BUILD_HASH } from '../src/modules/anatomy/build-identity
 import { analyzeAnatomy, type AnatomyRequest } from '../src/modules/anatomy/engine.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, ProfileValidationError, resolveEffectiveProfile, validateProfile } from '../src/modules/anatomy/profile.js';
 import { compileProfileRules, defaultRules } from '../src/modules/anatomy/profile-rules.js';
+import { extractAnatomyEntities } from '../src/modules/anatomy/entities.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
 import { LEGACY } from './support/anatomy-legacy-rules.js';
 
@@ -27,15 +28,14 @@ function differential(name: string, legacy: RegExp, compiled: RegExp, inputs: st
 }
 const sampleText = 'O Conselho Nacional resolve; A Receita Federal informa; CONSIDERANDOS; O Secretario; A Secretária; O Presidente; O Ministro; O Governador';
 
-test('oracle: compiled default matchers equal the original rules (documented preamble differences only)', () => {
+test('oracle: compiled default matchers equal the original rules, preamble included (no differences)', () => {
   const dou = defaultRules('DOU'); const confaz = defaultRules('CONFAZ');
   const preambleBases = ['O Conselho', 'O Ministro', 'O Secretário', 'O Secretario', 'O Governador', 'O Presidente', 'A Secretária', 'A Secretaria', 'A Receita Federal', 'CONSIDERANDO', 'O Diretor', 'A Lei', 'Considerando'];
-  // Two deliberate, documented differences (docs/anatomy/profile-engine.md): block starts end at a word boundary, and
-  // every space inside a literal accepts any whitespace run. The original only bounded CONSIDERANDO and used a single
-  // literal space inside "Receita Federal".
-  const glued = ['O Conselho', 'O Ministro', 'O Secretário', 'O Secretario', 'O Governador', 'O Presidente', 'A Secretária', 'A Secretaria', 'A Receita Federal']
-    .flatMap((l) => [`${l}x`, `${l}1`]);
-  differential('preamble', LEGACY.preamble, dou.preamble, [...variants(preambleBases), ...sampleText.split('; ')], [...glued, 'A  Receita  Federal', 'A	Receita	Federal']);
+  // Review of PR #249: the two preamble changes of fef9d51 (word boundary after every start, flexible inner spaces)
+  // were not approved and are reverted, so the preamble now has no difference at all, including the edge cases below.
+  const edges = ['O Conselhox', 'A Receita Federal1', 'A  Receita  Federal', 'A\tReceita\tFederal', 'A\u00a0Receita Federal', 'A Receita\u00a0Federal',
+    'CONSIDERANDOé', 'CONSIDERANDO_', 'CONSIDERANDO\u0301', 'A Secreta\u0301ria', 'O\u00a0Conselho', 'O\nConselho'];
+  differential('preamble', LEGACY.preamble, dou.preamble, [...variants(preambleBases), ...sampleText.split('; '), ...edges]);
   differential('rectification original', LEGACY.rectificationOriginal, dou.rectificationOriginal, variants(['Onde se lê', 'Onde se le', 'Onde se lêem', 'Onde lê']));
   differential('rectification corrected', LEGACY.rectificationCorrected, dou.rectificationCorrected, variants(['Leia-se', 'Leia-seguinte', 'Leia se']));
   differential('quote block open', LEGACY.quoteBlockOpen, dou.quoteBlockOpen, ['"a', '“a', '  "a', '”a', "'a", 'a"', '«a']);
@@ -124,7 +124,7 @@ test('identity: ruleSetHash follows the effective profile; engineHash is the reg
   assert.equal(a.identity.engineHash, ANATOMY_ENGINE_BUILD_HASH);
   assert.notEqual(ANATOMY_ENGINE_BUILD_HASH, 'ad69d28524ad6478764b203dc962c9d8a0600fbeac07aa985854b18868ab9d9d', 'engine identity changed explicitly with P1.B');
   // The compiled rules carry the behaviour hash of the profile they came from.
-  assert.equal(compileProfileRules({ fields: DEFAULT_PROFILES[0]!.fields as never, effectiveHash: 'h' }, 'CONFAZ').effectiveHash, 'h');
+  assert.equal(compileProfileRules({ fields: resolveEffectiveProfile([...DEFAULT_PROFILES], { source: 'CONFAZ' }).fields, effectiveHash: 'h' }, 'CONFAZ').effectiveHash, 'h');
   assert.match(defaultRules('CONFAZ').effectiveHash, /^[0-9a-f]{64}$/);
 });
 
@@ -170,13 +170,23 @@ test('#249 finding 1: shipped context protections cannot be removed by configura
   const epigraph = '<p class="TituloAcordo">Cláusula primeira NCM 8471.30.12.</p>';
   assert.equal(partOf(analyzeAnatomy(base(historical)), 'clause')?.context, 'historical');
   assert.equal(analyzeAnatomy(base(epigraph)).parts.find((p) => p.type === 'epigraph')?.context, 'prohibited');
-  // The hazard, reproduced below the resolution gate: rules compiled without RedaoAnt / TituloAcordo make the text operative.
-  const unsafe = (classes: Record<string, string[]>) => compileProfileRules({ fields: { ...shippedDefault(), classes: { ...shippedDefault().classes, ...classes } } as never, effectiveHash: 'unsafe' }, 'CONFAZ');
   const noRedao = confazClasses(); noRedao.historical = noRedao.historical!.filter((c) => c !== 'RedaoAnt');
   const noTitulo = confazClasses(); noTitulo.epigraph = [];
-  const operative = (html: string, classes: Record<string, string[]>) => readAnatomyInput({ source: 'CONFAZ', representationId: 'x', html, rules: unsafe(classes) }).parts.find((p) => p.type === 'clause')?.context;
-  assert.equal(operative(historical, noRedao), 'operative_candidate');
-  assert.equal(operative(epigraph, noTitulo), 'operative_candidate');
+  // Every public way to obtain or use matchers enforces the floor: the compiler itself refuses fields without the
+  // shipped protections, so readAnatomyInput with compiled rules cannot reach the hazard of fef9d51 either.
+  const unsafeFields = (classes: Record<string, string[]>) => ({ ...shippedDefault(), classes: { ...shippedDefault().classes, ...classes } }) as never;
+  for (const classes of [noRedao, noTitulo]) {
+    assert.equal(codeOf(() => compileProfileRules({ fields: unsafeFields(classes), effectiveHash: 'unsafe' }, 'CONFAZ')), 'protection_weakened');
+  }
+  // Hand-made or mutated rules objects are refused by the reader and the extractor; compiled rules are read-only.
+  const real = defaultRules('CONFAZ');
+  const forged = { ...real, classes: { ...real.classes, historical: new Set<string>(), epigraph: [] } };
+  assert.throws(() => readAnatomyInput({ source: 'CONFAZ', representationId: 'x', html: historical, rules: forged }), /compileProfileRules/);
+  assert.throws(() => extractAnatomyEntities({ canonicalText: 'NCM 8471.30.12', parts: [], ncmPartIds: [], rules: forged }), /compileProfileRules/);
+  assert.throws(() => real.classes.historical.delete('RedaoAnt'), TypeError);
+  assert.throws(() => { (real.classes as { epigraph: string[] }).epigraph.length = 0; }, TypeError);
+  assert.throws(() => { (real as { classes: unknown }).classes = forged.classes; }, TypeError);
+  assert.equal(readAnatomyInput({ source: 'CONFAZ', representationId: 'x', html: historical, rules: real }).parts.find((p) => p.type === 'clause')?.context, 'historical');
   // The engine always resolves the profile, and resolution refuses both configurations (source and family levels).
   for (const classes of [noRedao, noTitulo]) {
     assert.equal(codeOf(() => analyzeAnatomy(base(historical, 'CONFAZ', { profiles: withSource('CONFAZ', { classes }) }))), 'protection_weakened');
@@ -228,9 +238,11 @@ test('#249 finding 2: one normalisation — non-canonical literals are rejected,
   // For accepted literals, "duplicate" means exactly "the compiled matcher of one accepts the other".
   const rules = (headers: string[]) => compileProfileRules(resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { ncm: { columnHeaders: headers } })], { source: 'RFB' }), 'RFB');
   assert.ok(rules(['NCM/SH']).ncmHeader.test('ncm / sh'));
-  // Document text keeps flexible whitespace: one canonical literal matches any run of spaces or tabs in the text.
-  const pre = defaultRules('RFB').preamble;
-  assert.ok(pre.test('A Receita Federal resolve') && pre.test('A  Receita\tFederal resolve'));
+  // Document text keeps flexible whitespace for labels and block starts: one canonical literal matches any run of
+  // spaces, tabs or NBSP in the text. The preamble keeps its original rule (only the first space is flexible).
+  const r = defaultRules('DOU');
+  assert.ok(r.clause.test('Cláusula  primeira') && r.clause.test('Cláusula\u00a0primeira') && r.rectificationOriginal.test('Onde\tse lê'));
+  assert.ok(r.preamble.test('A Receita Federal resolve') && r.preamble.test('A\tReceita Federal') && !r.preamble.test('A  Receita\tFederal resolve'));
   // The shipped defaults are canonical (they validate unchanged).
   for (const p of DEFAULT_PROFILES) assert.equal(codeOf(() => validateProfile(p)), 'no-error');
 });
@@ -257,4 +269,83 @@ test('#249 finding 3: a header and a blocker that the reader treats alike cannot
     const r = defaultRules(source);
     for (const h of shippedDefault().ncm!.columnHeaders!) for (const text of [h, h.toLowerCase(), h.replace('/', ' / ')]) assert.ok(r.ncmHeader.test(text) && !r.ncmBlocker.test(text), `${source} ${text}`);
   }
+});
+
+// Second remediation round (COORD handover, issue #116): public-path protections, document Unicode, header conflicts
+// after inheritance and the restored preamble. Expected values below were produced by the pre-integration engine
+// (585f5a49) on these same synthetic documents; they are not regenerated from the new engine.
+test('#249 R2 / A: removing any protected marker is refused through analyzeAnatomy, at source and family level', () => {
+  const html = '<p>x</p>';
+  const cases: [AnatomyRequest['input']['source'], string, string, string][] = [
+    ['CONFAZ', 'classes', 'editorialNote', 'DataPublicao'], ['CONFAZ', 'classes', 'summary', 'Ementa'], ['CONFAZ', 'classes', 'historical', 'RemissoAnt'],
+    ['DOU', 'classes', 'signature', 'assina'], ['DOU', 'classes', 'epigraph', 'identifica'], ['DOU', 'blockStarts', 'rectificationOriginal', 'Onde se lê'],
+    ['DOU', 'blockStarts', 'rectificationCorrected', 'Leia-se'], ['RFB', 'quotes', 'open', '“'], ['RFB', 'blockStarts', 'preamble', 'A Receita Federal'],
+    ['RFB', 'ncm', 'columnBlockers', 'TIPI'], ['RFB', 'exceptions', 'markers', 'exceto'],
+  ];
+  for (const [source, g, f, lit] of cases) {
+    const effective = resolveEffectiveProfile([...DEFAULT_PROFILES], { source }).fields as unknown as Record<string, Record<string, string[]>>;
+    assert.ok(effective[g]![f]!.includes(lit), `${source} ${g}.${f} ships ${lit}`);
+    const fields = { [g]: { [f]: effective[g]![f]!.filter((x) => x !== lit) } };
+    assert.equal(codeOf(() => analyzeAnatomy(base(html, source, { profiles: withSource(source, fields) }))), 'protection_weakened', `source ${source} ${lit}`);
+    const fam = [...DEFAULT_PROFILES, { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'family', source, family: 'F' }, fields }];
+    assert.equal(codeOf(() => analyzeAnatomy(base(html, source, { profiles: fam, family: 'F' }))), 'protection_weakened', `family ${source} ${lit}`);
+    assert.equal(codeOf(() => analyzeAnatomy(base(html, source, { profiles: fam }))), 'no-error', 'family not requested');
+  }
+  // The shipped CONFAZ body classes already include RedaoAnt: being a body class never demotes a protected class.
+  assert.ok(confazClasses().body!.includes('RedaoAnt'));
+  assert.equal(partOf(analyzeAnatomy(base('<p class="RedaoAnt">Cláusula primeira NCM 8471.30.12.</p>')), 'clause')?.context, 'historical');
+});
+
+test('#249 R2 / B: document text is never normalised; decomposed text behaves exactly as in the pre-integration engine', () => {
+  // Declared behaviour: canonical text, hashes and UTF-16 offsets are the supplied text. Literals are NFC; text in NFD
+  // is NOT recognised by them (fail-safe: unidentified, no NCM), exactly as before P1.B. Unicode equivalence of the
+  // document is an open item for a separate decision, not resolved by rejecting NFD configuration.
+  const nfd = analyzeAnatomy(base('<p>Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.</p>'));
+  assert.equal(nfd.canonicalText, 'Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.\n');
+  assert.notEqual(nfd.canonicalText, nfd.canonicalText.normalize('NFC'));
+  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'unidentified:unknown:0-54']);
+  assert.deepEqual(nfd.entities, []);
+  for (const t of ['Cla\u0301usula primeira', 'Cláusula primeira', 'Cláusula\u00a0primeira', 'CONSIDERANDO\u0301', 'Onde se le\u0302', 'A Secreta\u0301ria']) {
+    const r = defaultRules('DOU');
+    assert.equal(r.clause.test(t), LEGACY.clause.test(t), `clause ${t}`);
+    assert.equal(r.preamble.test(t), LEGACY.preamble.test(t), `preamble ${t}`);
+    assert.equal(r.rectificationOriginal.test(t), LEGACY.rectificationOriginal.test(t), `rectification ${t}`);
+  }
+  // NBSP in the text is whitespace for flexible separators; offsets stay in UTF-16 units of the supplied text.
+  const nbsp = analyzeAnatomy(base('<p>Cláusula\u00a0primeira NCM 8471.30.12.</p>'));
+  const e = nbsp.entities.find((x) => x.domain === 'NCM')!;
+  assert.equal(nbsp.canonicalText.slice(e.span.start, e.span.end), '8471.30.12');
+  // Configuration: NFC literals only (NFD, NBSP, double spaces refused); accent variants stay distinct (até/ate).
+  assert.equal(codeOf(() => validateProfile(src249('RFB', { lists: { tokens: ['até', 'ate'] } }))), 'no-error');
+  assert.equal(codeOf(() => validateProfile(src249('RFB', { lists: { tokens: ['ate\u0301'] } }))), 'invalid_fields');
+  // Classes and quotes compare exactly, case included.
+  assert.equal(codeOf(() => validateProfile(src249('CONFAZ', { classes: { body: ['TextoAcordo', 'textoacordo'] } }))), 'no-error');
+});
+
+test('#249 R2 / C: header/blocker conflicts across inheritance, case and spacing; CÓDIGO NCM vs CÓDIGO stays valid', () => {
+  const blockers = [...shippedDefault().ncm!.columnBlockers!];
+  // Source-level header against the default blockers, and default-level blocker against a source header.
+  assert.equal(codeOf(() => resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { ncm: { columnHeaders: ['NCM', 'tipi / x'] } })], { source: 'RFB' })), 'effective_conflict');
+  const def = { ...DEFAULT_PROFILES[0]!, fields: { ...DEFAULT_PROFILES[0]!.fields, ncm: { ...(DEFAULT_PROFILES[0]!.fields as { ncm: object }).ncm, columnBlockers: [...blockers, 'naladi'] } } };
+  assert.equal(codeOf(() => resolveEffectiveProfile([def, ...DEFAULT_PROFILES.slice(1)], { source: 'DOU' })), 'no-error');
+  assert.equal(codeOf(() => resolveEffectiveProfile([def, ...withSource('DOU', { ncm: { columnHeaders: ['NCM', 'NALADI / SH'] } }).filter((p) => p.scope.level !== 'default')], { source: 'DOU' })), 'effective_conflict');
+  // Family header against a source blocker (spacing reversed).
+  const famProfiles = [...DEFAULT_PROFILES, src249('DOE-SP', { ncm: { columnBlockers: [...blockers, 'NALADI/SH'] } }),
+    { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'family' as const, source: 'DOE-SP', family: 'Portaria' }, fields: { ncm: { columnHeaders: ['NCM', 'naladi / sh'] } } }];
+  assert.equal(codeOf(() => resolveEffectiveProfile(famProfiles, { source: 'DOE-SP', family: 'Portaria' })), 'effective_conflict');
+  assert.equal(codeOf(() => resolveEffectiveProfile(famProfiles, { source: 'DOE-SP' })), 'no-error');
+  // Legitimate: blocker CÓDIGO only blocks "CÓDIGO" or "CÓDIGO/…", never "CÓDIGO NCM" (isolated and after inheritance).
+  assert.equal(codeOf(() => validateProfile(src249('RFB', { ncm: { columnHeaders: ['CÓDIGO NCM', 'Código NCM / SH'], columnBlockers: ['CÓDIGO'] } }))), 'no-error');
+  const ok = compileProfileRules(resolveEffectiveProfile([...DEFAULT_PROFILES, src249('RFB', { ncm: { columnHeaders: ['CÓDIGO NCM'] } })], { source: 'RFB' }), 'RFB');
+  assert.ok(ok.ncmHeader.test('código  ncm') && !ok.ncmBlocker.test('código ncm') && ok.ncmBlocker.test('CÓDIGO / x'));
+});
+
+test('#249 R2: restored preamble — engine output equals the pre-integration engine on adversarial synthetic documents', () => {
+  const docs: [string, AnatomyRequest['input']['source'], string][] = [
+    ['preamble-glued', 'RFB', '<p>O Conselhox resolve NCM 8471.30.12.</p><p>A Receita Federal1 NCM 8471.30.12</p>'],
+    ['preamble-spaces', 'RFB', '<p>A  Receita  Federal informa NCM 8471.30.12.</p><p>A\tReceita\tFederal NCM 8471.30.12</p><p>A\u00a0Receita Federal NCM 8471.30.12</p>'],
+    ['considerando', 'DOU', '<p>CONSIDERANDOé x NCM 8471.30.12</p><p>CONSIDERANDO_ x</p><p>CONSIDERANDOS x</p><p>Considerando que NCM 8471.30.12</p>'],
+  ];
+  const expected: Record<string, string[]> = {"preamble-glued": ["document:document:operative_candidate", "preamble:preamble_marker:prohibited", "preamble:preamble_marker:prohibited"], "preamble-spaces": ["document:document:operative_candidate", "unidentified:unrecognized_block:unknown", "unidentified:unrecognized_block:unknown", "preamble:preamble_marker:prohibited"], "considerando": ["document:document:operative_candidate", "preamble:preamble_marker:prohibited", "unidentified:unrecognized_block:unknown", "unidentified:unrecognized_block:unknown", "preamble:preamble_marker:prohibited"]};
+  for (const [id, source, html] of docs) assert.deepEqual(reasons(analyzeAnatomy(base(html, source))), expected[id], id);
 });

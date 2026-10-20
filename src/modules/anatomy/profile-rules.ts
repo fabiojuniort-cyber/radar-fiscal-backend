@@ -1,4 +1,4 @@
-import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, blockerPattern, escapeLiteral as esc, literalPattern, resolveEffectiveProfile, type EffectiveProfile,
+import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, assertProtectionFloor, blockerPattern, escapeLiteral as esc, literalPattern, resolveEffectiveProfile, type EffectiveProfile,
   type ProfileFields } from './profile.js';
 
 /**
@@ -29,7 +29,7 @@ const byLength = (items: readonly string[]) => [...items].sort((a, b) => b.lengt
 const alt = (parts: string[]) => (parts.length ? `(?:${parts.join('|')})` : NEVER);
 // Literal fragments come from profile.ts, the same ones validation uses for duplicates and header conflicts: spaces
 // in a literal match any run of whitespace; NCM header literals also tolerate whitespace around "/".
-const words = (lit: string) => literalPattern('blockStarts', 'preamble', lit);
+const words = (lit: string) => literalPattern('labels', 'clause', lit);
 const header = (lit: string) => literalPattern('ncm', 'columnHeaders', lit);
 const strip = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '');
 /**
@@ -41,18 +41,35 @@ function wordEnd(items: readonly string[]): (lit: string) => string {
   return (lit) => (nonAsciiEnd.has(strip(lit).toLocaleLowerCase('pt-BR')) || /[^\x00-\x7f]$/u.test(lit) ? '(?!\\p{L})' : '\\b');
 }
 
+/**
+ * Compiled rules are only accepted from this compiler (review of PR #249): the floor check runs here, the object and
+ * its class sets are read-only, and the reader/extractor refuse any rules object this module did not produce.
+ */
+const issued = new WeakSet<object>();
+export function assertCompiledRules(rules: object): void {
+  if (!issued.has(rules)) throw new TypeError('Rules must come from compileProfileRules (protection floor check)');
+}
+const readOnlySet = (items: readonly string[]): Set<string> => {
+  const set = new Set(items);
+  set.add = set.delete = () => { throw new TypeError('Compiled rules are read-only'); };
+  set.clear = () => { throw new TypeError('Compiled rules are read-only'); };
+  return Object.freeze(set);
+};
+
 export function compileProfileRules(effective: Pick<EffectiveProfile, 'fields' | 'effectiveHash'>, source: ReaderSource): CompiledRules {
   const f: ProfileFields = effective.fields;
+  assertProtectionFloor(f, source);
   const symbols = f.labels.paragraph.filter((l) => !/\p{L}/u.test(l));
   const phrases = f.labels.paragraph.filter((l) => /\p{L}/u.test(l));
   const listEnd = wordEnd(f.lists.tokens); const excEnd = wordEnd(f.exceptions.markers);
-  return {
+  const rules: CompiledRules = {
     profileVersion: PROFILE_FORMAT_VERSION, effectiveHash: effective.effectiveHash, source,
     classScope: source === 'CONFAZ' ? 'subtree' : 'own', reasonPrefix: source.toLowerCase().replace(/-/gu, '_'),
-    classes: { historical: new Set(f.classes.historical), editorialNote: new Set(f.classes.editorialNote), body: new Set(f.classes.body),
-      epigraph: [...f.classes.epigraph], summary: [...f.classes.summary], signature: [...f.classes.signature] },
-    // Block starts end at a non-letter/digit boundary (the original preamble only enforced it after CONSIDERANDO; see docs).
-    preamble: new RegExp(`^${alt(byLength(f.blockStarts.preamble).map(words))}(?![\\p{L}\\p{N}])`, 'iu'),
+    classes: Object.freeze({ historical: readOnlySet(f.classes.historical), editorialNote: readOnlySet(f.classes.editorialNote), body: readOnlySet(f.classes.body),
+      epigraph: Object.freeze([...f.classes.epigraph]) as string[], summary: Object.freeze([...f.classes.summary]) as string[], signature: Object.freeze([...f.classes.signature]) as string[] }),
+    // Preamble starts keep the pre-profile rule (review of PR #249): a one-word start ends at `\\b` (CONSIDERANDO\\b);
+    // a multi-word start is a plain prefix. Rectification starts end at a non-letter/digit boundary, as before.
+    preamble: new RegExp(`^${alt(byLength(f.blockStarts.preamble).map((l) => `${literalPattern('blockStarts', 'preamble', l)}${l.includes(' ') ? '' : '\\b'}`))}`, 'iu'),
     rectificationOriginal: new RegExp(`^${alt(byLength(f.blockStarts.rectificationOriginal).map(words))}(?![\\p{L}\\p{N}])`, 'iu'),
     rectificationCorrected: new RegExp(`^${alt(byLength(f.blockStarts.rectificationCorrected).map(words))}(?![\\p{L}\\p{N}])`, 'iu'),
     quoteBlockOpen: new RegExp(`^\\s*${alt(f.quotes.open.map(esc))}`, 'u'),
@@ -72,6 +89,8 @@ export function compileProfileRules(effective: Pick<EffectiveProfile, 'fields' |
     rangeBridge: new RegExp(`^\\s*${alt(byLength(f.ranges.operators).map(esc))}\\s*$`, 'iu'),
     exceptionMarker: new RegExp(`\\b${alt(byLength(f.exceptions.markers).map((m) => `${esc(m)}${excEnd(m)}`))}`, 'giu'),
   };
+  issued.add(Object.freeze(rules));
+  return rules;
 }
 
 const cache = new Map<ReaderSource, CompiledRules>();

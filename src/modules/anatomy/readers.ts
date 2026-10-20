@@ -1,6 +1,6 @@
 import { Parser } from 'htmlparser2';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
-import { defaultRules, type CompiledRules } from './profile-rules.js';
+import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 
 export interface AnatomyReaderInput {
   source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB';
@@ -81,6 +81,7 @@ function describe(node: Node, rules: CompiledRules): Descriptor {
 /** Pure snapshot reader. It never fetches resources, infers current legal status, or grants eligibility. */
 export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult {
   const rules = input.rules ?? defaultRules(input.source);
+  assertCompiledRules(rules);
   if (rules.source !== input.source) throw new TypeError(`Rules compiled for ${rules.source} cannot read ${input.source}`);
   const result: AnatomyReaderResult = { canonicalText: '', parts: [], sourceMap: [],
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
@@ -331,6 +332,7 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
 
 /** Explicit NCM header columns only (profile `ncm.columnHeaders`); blockers (`ncm.columnBlockers`) close a column. */
 export function identifyNcmPartIds(result: Pick<AnatomyReaderResult, 'parts' | 'canonicalText'>, rules: CompiledRules = defaultRules('DOE-SP')): string[] {
+  assertCompiledRules(rules);
   const ids: string[] = [];
   const children = new Map<string, AnatomyPart[]>();
   for (const part of result.parts) if (part.parentId !== null) {
