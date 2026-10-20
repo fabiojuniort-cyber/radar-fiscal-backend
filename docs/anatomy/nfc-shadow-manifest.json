@@ -1,0 +1,19 @@
+{
+ "component": "anatomy/nfc-shadow (UNICODE-01b/B1)",
+ "engineIdentity": "not part of engineHash: no reader, extractor, engine or adapter imports this component",
+ "unicodeVersion": "17.0.0",
+ "source": "Official UCD files from unicode-org/icu tag release-78.3, icu4c/source/data/unidata/ (ICU 78.3 = Unicode 17.0, the ICU of Node 24)",
+ "inputs": {
+  "UnicodeData.txt": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c",
+  "DerivedNormalizationProps.txt": "18f6857f9542dd942bc5b62e1547d156912e3fe9e9342d6bd2b544d5ece13c42",
+  "NormalizationTest.txt": "437f84e715febc5bd8285020560768318045eb51d3e06cfa8c2a54fed2dddcc3"
+ },
+ "generator": "ops/anatomy/nfc-shadow-table.mjs",
+ "generatorSha256": "ad34e5643a27d32d741baf1d8ac88599af708184234254b300e7b938034db99e",
+ "table": "src/modules/anatomy/nfc-shadow-table.ts",
+ "tableSha256": "893e1507eef53e6a3b970995796fa3a6ae04cc84050623b293a095fe6da0d669",
+ "ranges": 295,
+ "codePoints": 2177,
+ "module": "src/modules/anatomy/nfc-shadow.ts",
+ "moduleSha256": "dbcd8f1f1ee271b9033d3ef438f8d8659c61c8a669f172089bdf0deef6b818e5"
+}
