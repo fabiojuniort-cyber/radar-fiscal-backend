@@ -648,7 +648,7 @@ async function writeAudit(
         entity_type, entity_id, after_data, correlation_id
       ) VALUES (
         NULL, 'SYSTEM', $1, $2,
-        'taxonomy_release', $3::uuid, $4::jsonb, $5::uuid
+        'taxonomy_release', $3::uuid, public.audit_project($2,'taxonomy_release',$4::jsonb), $5::uuid
       )
     `,
     [
@@ -1071,7 +1071,7 @@ export async function createTaxonomyV11DraftInTransaction(
       ) VALUES (
         1, 1, 0,
         'DRAFT', $1::uuid, $2::jsonb,
-        $3, 'taxonomy-v1.1-successor'
+        $3, 'system:taxonomy-v1.1-successor'
       ) RETURNING id
     `,
     [
@@ -1102,7 +1102,7 @@ export async function createTaxonomyV11DraftInTransaction(
     action: 'TAXONOMY_V1_1_DRAFT_CREATED',
     releaseId,
     correlationId: randomUUID(),
-    actor: 'taxonomy-v1.1-successor',
+    actor: 'system:taxonomy-v1.1-successor',
     payload: {
       sourceReleaseId: report.sourceReleaseId,
       targetVersion: TAXONOMY_V1_1_VERSION,
@@ -1211,7 +1211,7 @@ export async function publishTaxonomyV11InTransaction(
     action: 'TAXONOMY_V1_1_PUBLISHED',
     releaseId: report.targetReleaseId,
     correlationId: randomUUID(),
-    actor: options.actor ?? 'taxonomy-v1.1-publisher',
+    actor: options.actor ?? 'system:taxonomy-v1.1-publisher',
     payload: {
       sourceVersion: TAXONOMY_V1_SOURCE_VERSION,
       targetVersion: TAXONOMY_V1_1_VERSION,

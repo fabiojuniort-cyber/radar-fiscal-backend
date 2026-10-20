@@ -970,7 +970,7 @@ export async function taxonomyAdminRoutes(
         await withCuratorTransaction(curatorPool(), async (tx) => {
           await tx.query(
             `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-             VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, $3::jsonb, gen_random_uuid())`,
+             VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, public.audit_project('OFFICIAL_CATALOG_IMPORTED','official_catalog_edition',$3::jsonb), gen_random_uuid())`,
             [actor.userId, result.editionId, JSON.stringify({ catalog, ...result, justification: actor.justification })],
           );
         });
@@ -1002,7 +1002,7 @@ export async function taxonomyAdminRoutes(
         });
         await client.query(
           `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-           VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, $3::jsonb, gen_random_uuid())`,
+           VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, public.audit_project('OFFICIAL_CATALOG_IMPORTED','official_catalog_edition',$3::jsonb), gen_random_uuid())`,
           [actor.userId, imported.editionId, JSON.stringify({ catalog, ...imported, justification: actor.justification })],
         );
         return imported;
@@ -1118,7 +1118,7 @@ export async function taxonomyAdminRoutes(
 
         await client.query(
           `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-           VALUES (NULL, 'ADMIN', $1, 'PUBLICATION_TAG_CURATED', 'publication', $2::uuid, $3::jsonb, gen_random_uuid())`,
+           VALUES (NULL, 'ADMIN', $1, 'PUBLICATION_TAG_CURATED', 'publication', $2::uuid, public.audit_project('PUBLICATION_TAG_CURATED','publication',$3::jsonb), gen_random_uuid())`,
           [
             actor.userId,
             request.params.publicationId,

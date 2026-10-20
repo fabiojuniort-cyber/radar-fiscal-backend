@@ -78,7 +78,7 @@ export async function updateCnaeActuacoes(
  if(!reusedExisting){
    await client.query(`INSERT INTO audit_log
       (tenant_id,actor_type,actor_id,action,entity_type,entity_id,after_data,correlation_id)
-      VALUES(NULL,'ADMIN',$1,'F2_TAB03_CNAE_ACTUACOES_CHANGED','taxonomy_curation',$2::uuid,$3::jsonb,gen_random_uuid())`,
+      VALUES(NULL,'ADMIN',$1,'F2_TAB03_CNAE_ACTUACOES_CHANGED','taxonomy_curation',$2::uuid,public.audit_project('F2_TAB03_CNAE_ACTUACOES_CHANGED','taxonomy_curation',$3::jsonb),gen_random_uuid())`,
     [actor.userId,draft.id,JSON.stringify({conceptCode,cnaeCode,before,after,
       justification:actor.justification,published:false})]);
  }

@@ -537,7 +537,7 @@ export async function createBaselineRelease(
       manifest.source.sha256,
       JSON.stringify(releaseManifest),
       'TriBusca taxonomy baseline R6',
-      'taxonomy-baseline-importer',
+      'system:taxonomy-baseline-importer',
     ],
   );
 

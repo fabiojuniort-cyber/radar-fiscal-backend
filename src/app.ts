@@ -1,3 +1,4 @@
+import { auditHistoryRoutes } from './api/routes/audit-history.route.js';
 import {closeCollectionFilterActNameInventory} from './modules/collection/collection-filter.act-name-inventory.js';
 import Fastify, {
   type FastifyInstance,
@@ -52,6 +53,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(publicRoutes);
   await app.register(authRoutes);
   await app.register(productRoutes);
+  await app.register(auditHistoryRoutes);
   await app.register(productNcmRoutes);
   await app.register(newsRoutes);
   await app.register(catalogMonitoringRoutes);

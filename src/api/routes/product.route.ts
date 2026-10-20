@@ -1,3 +1,4 @@
+import { purgeCompany } from '../../modules/company/company-purge.service.js';
 import { readCompanyRegistration, readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
@@ -75,7 +76,7 @@ const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   businessLocationCode:
     businessLocationCodeSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 const companyUpdateBodySchema = z.object({
@@ -90,7 +91,7 @@ const establishmentFromCnpjBodySchema = z.object({
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
   businessLocationCode:
     businessLocationCodeSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 const cnaeBodySchema = z.object({
@@ -560,8 +561,10 @@ export async function productRoutes(
               },
               onboarding: onboarding
                 ? {
-                    companyName: onboarding.company_name,
-                    cnpj: onboarding.cnpj,
+                    // R4: account identity/consent is retained, but the legacy
+                    // onboarding identity is NEVER offered as a new company's preset.
+                    companyName: null,
+                    cnpj: null,
                     createdAt: new Date(onboarding.created_at).toISOString(),
                   }
                 : null,
@@ -682,6 +685,11 @@ export async function productRoutes(
         return reply.status(400).send({ error: 'tenant_required' });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const registry = await lookupCnpjRegistry(
           request.body.cnpj,
@@ -713,7 +721,6 @@ export async function productRoutes(
               registry,
               stateRegistration,
               request.body.businessLocationCode,
-              request.body.reactivateInactive,
             );
             return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
           },
@@ -926,35 +933,26 @@ export async function productRoutes(
               return null;
             }
 
-            const company = await trx
-              .selectFrom('companies')
-              .select('id')
-              .where('id', '=', request.params.companyId)
-              .where('is_active', '=', true)
-              .executeTakeFirst();
-
-            if (!company) {
-              return 'COMPANY_NOT_FOUND' as const;
+            // Reject old browser tabs that still promise a soft-delete.
+            if (request.headers['x-company-delete-intent'] !== 'permanent-v1') {
+              return 'CONFIRMATION_REQUIRED' as const;
             }
-
-            await trx
-              .updateTable('establishments')
-              .set({ is_active: false })
-              .where('company_id', '=', request.params.companyId)
-              .execute();
-
-            await trx
-              .updateTable('companies')
-              .set({ is_active: false })
-              .where('id', '=', request.params.companyId)
-              .execute();
-
-            return 'DELETED' as const;
+            // ONB-02-R3: the SECURITY DEFINER function rechecks tenant/admin
+            // authorization and atomically removes all company-owned records.
+            // No direct companies DELETE grant is added to radar_app.
+            const removed = await purgeCompany(trx, request.params.companyId);
+            return removed
+              ? 'DELETED' as const
+              : 'COMPANY_NOT_FOUND' as const;
           },
         );
 
         if (result === null) {
           return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'CONFIRMATION_REQUIRED') {
+          return reply.status(409).send({ error: 'permanent_delete_confirmation_required' });
         }
 
         if (result === 'COMPANY_NOT_FOUND') {
@@ -963,6 +961,17 @@ export async function productRoutes(
 
         return reply.status(204).send();
       } catch (error) {
+        // Inconsistent references or ambiguous legacy ownership are a
+        // recoverable business conflict, never a silent partial deletion.
+        // Do not leak internal identifiers or CNPJ to the client.
+        if (error instanceof Error && (
+          error.message === 'company_purge_audit_backfill_required' ||
+          error.message === 'company_purge_cross_company_link' ||
+          error.message === 'company_purge_legacy_identity_ambiguous' ||
+          error.message === 'company_purge_historical_identity_ambiguous'
+        )) {
+          return reply.status(409).send({ error: 'company_purge_review_required' });
+        }
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
         throw error;
@@ -1380,6 +1389,11 @@ export async function productRoutes(
         return reply.status(400).send({ error: 'tenant_required' });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const registry = await lookupCnpjRegistry(request.body.cnpj);
         const stateRegistration =
@@ -1433,7 +1447,6 @@ export async function productRoutes(
                 request.body.typeCode,
                 stateRegistration,
                 request.body.businessLocationCode,
-                request.body.reactivateInactive,
               );
 
             return readRegistrationEstablishment(trx, establishmentId);

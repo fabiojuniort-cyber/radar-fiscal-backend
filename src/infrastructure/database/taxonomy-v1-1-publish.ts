@@ -44,7 +44,7 @@ try {
     artifactPath: ARTIFACT_PATH,
     artifactGitSha: gitSha(),
     artifactSha256,
-    actor: 'taxonomy-v1.1-publish-command',
+    actor: 'system:taxonomy-v1.1-publisher',
   });
 
   console.log(

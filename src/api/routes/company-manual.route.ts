@@ -127,7 +127,7 @@ const manualCompanyBodySchema = z.object({
   stateRegistration: nullableText(30),
   businessLocationCode: nullableText(80),
   cnaes: cnaesSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 function tenantIdFromRequest(
@@ -208,6 +208,11 @@ export async function companyManualRoutes(
         return reply.status(400).send({
           error: 'tenant_required',
         });
+      }
+
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
       }
 
       try {

@@ -16,7 +16,7 @@ import { isValidCnpj } from '../../modules/auth/public-signup.service.js';
 import { CompanyIdentityError } from '../../modules/company/company-identity.guard.js';
 import { ManualCnaeValidationError } from '../../modules/company/manual-cnae-validation.service.js';
 import {
-  createOrReactivateManualEstablishment,
+  createManualEstablishment,
   ManualEstablishmentConflictError,
 } from '../../modules/company/manual-establishment-registration.service.js';
 
@@ -143,7 +143,7 @@ const bodySchema = z.object({
   businessLocationCode:
     businessLocationCodeSchema,
   cnaes: cnaesSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 function tenantIdFromRequest(
@@ -222,6 +222,11 @@ export async function establishmentManualRoutes(
         });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const result = await withTenantContext(
           app.db,
@@ -260,7 +265,7 @@ export async function establishmentManualRoutes(
               return 'TYPE_NOT_FOUND' as const;
             }
 
-            const registered = await createOrReactivateManualEstablishment(
+            const registered = await createManualEstablishment(
               trx,
               request.body,
             );
