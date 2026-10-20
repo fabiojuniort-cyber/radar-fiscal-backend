@@ -3,7 +3,7 @@ import { ANATOMY_ENGINE_BUILD_HASH } from './build-identity.js';
 import { ANATOMY_CONTRACT_VERSION, anatomyIdentityHash, anatomyOutputHash, canonicalJson, sha256,
   validateAnatomyResult, type AnatomyResult } from './contract.js';
 import { extractAnatomyEntities } from './entities.js';
-import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS } from './readers.js';
+import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TEXT } from './readers.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
 import { compileProfileRules } from './profile-rules.js';
 
@@ -37,7 +37,9 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   const read = readAnatomyInput({ ...request.input, missingResources, rules });
   const catalog = request.catalog && { edition: request.catalog.edition, codes: [...new Set(request.catalog.codes)].sort() };
   let entities: ReturnType<typeof extractAnatomyEntities> = [];
-  try {
+  // UNICODE-01a: a document flagged `non_nfc_text` by the reader is quarantined: no entities, relations or NCM
+  // eligibility entries; it stays partial with its text, structure and diagnostics.
+  if (!read.limitations.some((l) => l.code === NON_NFC_TEXT)) try {
     entities = extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ncmPartIds: identifyNcmPartIds(read, rules),
       ...(catalog ? { catalog } : {}), rules });
   } catch {

@@ -78,8 +78,33 @@ function describe(node: Node, rules: CompiledRules): Descriptor {
   return { type: 'unidentified', context: 'unknown', reason: 'unrecognized_block', rank: 100 };
 }
 
+/**
+ * ANAT-UNICODE-01a (containment, issue #116). Text that is not in Unicode NFC (e.g. decomposed accents) is not read
+ * reliably by NFC literals and rules: exception markers, citations and ranges can be lost. Until a mapped
+ * normalisation exists (UNICODE-01b), such a document is flagged here and its entity extraction is suspended
+ * (engine.ts, entities.ts). The NFC copy only serves detection: text, hashes and positions stay the supplied ones.
+ */
+export const NON_NFC_TEXT = 'non_nfc_text' as const;
+/** True when the text is not in NFC; a failure to normalise counts as not NFC (fail closed). */
+export function isNonNfcText(text: string): boolean {
+  try { return text !== text.normalize('NFC'); } catch { return true; }
+}
+
 /** Pure snapshot reader. It never fetches resources, infers current legal status, or grants eligibility. */
 export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult {
+  const result = readSnapshot(input);
+  const raw = input.html ?? input.text ?? '';
+  const textNonNfc = isNonNfcText(result.canonicalText);
+  if (textNonNfc || isNonNfcText(raw)) {
+    const where = textNonNfc ? 'The canonical text' : 'The supplied representation (markup or attributes)';
+    result.limitations.push({ code: NON_NFC_TEXT, partId: null, span: textNonNfc ? { start: 0, end: result.canonicalText.length } : null,
+      message: `${where} is not in Unicode NFC. Entity and relation extraction was not performed for this document (temporary Unicode containment); text and positions are unchanged.` });
+    result.status = 'partial';
+  }
+  return result;
+}
+
+function readSnapshot(input: AnatomyReaderInput): AnatomyReaderResult {
   const rules = input.rules ?? defaultRules(input.source);
   assertCompiledRules(rules);
   if (rules.source !== input.source) throw new TypeError(`Rules compiled for ${rules.source} cannot read ${input.source}`);

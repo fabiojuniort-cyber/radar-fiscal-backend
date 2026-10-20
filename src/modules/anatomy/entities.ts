@@ -1,5 +1,6 @@
 import type { AnatomyEntity, AnatomyPart } from './contract.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
+import { isNonNfcText } from './readers.js';
 
 export interface AnatomyEntityInput {
   canonicalText: string;
@@ -39,6 +40,9 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
   const text = input.canonicalText;
   const rules = input.rules ?? defaultRules('DOE-SP');
   assertCompiledRules(rules);
+  // UNICODE-01a: no codes are extracted from non-NFC text, so a direct call cannot return apparently normal codes.
+  // The reader records the `non_nfc_text` limitation; the engine skips this call for such documents.
+  if (isNonNfcText(text)) throw new TypeError('non_nfc_text: entity extraction is suspended for text that is not in Unicode NFC');
   if (text.length > 2 * 1024 * 1024) throw new RangeError('ANAT entity input exceeds 2 Mi UTF-16 units');
   const hierarchy = new Map(input.parts.map(part => [part.id, part]));
   const depth = (part: AnatomyPart): number => {

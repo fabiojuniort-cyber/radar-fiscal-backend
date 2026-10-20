@@ -146,7 +146,11 @@ test('forbidden ancestors suppress NCM while historical body occurrences remain 
   assert.notEqual(history[0]!.id, history[1]!.id);
 });
 test('UTF-16 spans preserve combining accents and emoji, and historical occurrence is only recognized', () => {
-  const text = 'e\u0301 😀 NCM 8450.11.00';
+  // UNICODE-01a: 'e\u0301' is not NFC, so extraction is now refused for it; 'q\u0301' has no precomposed form and is
+  // NFC, so it still exercises a combining accent (plus an astral emoji) before the code.
+  assert.throws(() => extractAnatomyEntities({ canonicalText: 'e\u0301 😀 NCM 8450.11.00', parts: [part('e\u0301 😀 NCM 8450.11.00')] }), /non_nfc_text/);
+  const text = 'q\u0301 😀 NCM 8450.11.00';
+  assert.equal(text, text.normalize('NFC'));
   const p = part(text, { context: 'historical', legalStatus: 'repealed' });
   const entities = extractAnatomyEntities({ canonicalText: text, parts: [p] });
   assert.equal(entities[0]!.span.start, text.indexOf('8450'));
