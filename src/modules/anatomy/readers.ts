@@ -92,11 +92,14 @@ export function isNonNfcText(text: string): boolean {
 
 /** Pure snapshot reader. It never fetches resources, infers current legal status, or grants eligibility. */
 export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult {
-  const result = readSnapshot(input);
+  // Decoded attributes (e.g. class="Histo&#x301;rica") drive context but are in neither the raw markup nor the text.
+  const seen = { decodedAttributeNonNfc: false };
+  const result = readSnapshot(input, seen);
   const raw = input.html ?? input.text ?? '';
   const textNonNfc = isNonNfcText(result.canonicalText);
-  if (textNonNfc || isNonNfcText(raw)) {
-    const where = textNonNfc ? 'The canonical text' : 'The supplied representation (markup or attributes)';
+  if (textNonNfc || isNonNfcText(raw) || seen.decodedAttributeNonNfc) {
+    const where = textNonNfc ? 'The canonical text' : isNonNfcText(raw) ? 'The supplied representation (markup or attributes)'
+      : 'A decoded HTML attribute (e.g. a class name written with character references)';
     result.limitations.push({ code: NON_NFC_TEXT, partId: null, span: textNonNfc ? { start: 0, end: result.canonicalText.length } : null,
       message: `${where} is not in Unicode NFC. Entity and relation extraction was not performed for this document (temporary Unicode containment); text and positions are unchanged.` });
     result.status = 'partial';
@@ -104,7 +107,7 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
   return result;
 }
 
-function readSnapshot(input: AnatomyReaderInput): AnatomyReaderResult {
+function readSnapshot(input: AnatomyReaderInput, seen: { decodedAttributeNonNfc: boolean }): AnatomyReaderResult {
   const rules = input.rules ?? defaultRules(input.source);
   assertCompiledRules(rules);
   if (rules.source !== input.source) throw new TypeError(`Rules compiled for ${rules.source} cannot read ${input.source}`);
@@ -158,6 +161,8 @@ function readSnapshot(input: AnatomyReaderInput): AnatomyReaderResult {
     onopentag(tag, attrs) {
       if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
+      // Every decoded attribute name/value is checked (a superset of the class attributes the reader consumes).
+      if (!seen.decodedAttributeNonNfc && Object.entries(attrs).some(([k, v]) => isNonNfcText(k) || isNonNfcText(v))) seen.decodedAttributeNonNfc = true;
       const index = childIndex(parent, tag);
       if (parent.path.length + tag.length + 16 > 4096) { exceeded = true; parser.pause(); return; }
       const node: Node = { tag, attrs, path: `${parent.path}/${tag}[${index}]`, start: parser.startIndex,

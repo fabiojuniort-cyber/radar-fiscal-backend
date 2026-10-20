@@ -6,7 +6,7 @@ import { extractAnatomyEntities } from '../src/modules/anatomy/entities.js';
 import { anatomyResultToPrediction } from '../src/modules/anatomy/evaluation-adapter.js';
 import { aggregate, evaluateEntry } from '../src/modules/anatomy/evaluation.js';
 import { ANATOMY_GOLD_VERSION, type AnatomyGold } from '../src/modules/anatomy/gold.js';
-import { PROFILE_FORMAT_VERSION, ProfileValidationError, validateProfile } from '../src/modules/anatomy/profile.js';
+import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, ProfileValidationError, validateProfile } from '../src/modules/anatomy/profile.js';
 import { isNonNfcText, NON_NFC_TEXT, readAnatomyInput } from '../src/modules/anatomy/readers.js';
 
 // ANAT-UNICODE-01a (issue #116): containment of non-NFC documents. SYNTHETIC inputs only.
@@ -117,4 +117,35 @@ test('UNICODE-01a: adapter and evaluator carry non_nfc_text as pending, never as
   const agg = aggregate([e]);
   const group = Object.values(agg)[0]!;
   assert.ok(group.pending.nonCompleteEntries.includes('97') && group.pending.entriesWithPending.includes('97'));
+});
+
+// Review U01A-R1-01 (PR #250): a class decoded from character references can be non-NFC while both the raw markup
+// and the canonical text are NFC. Reproduction with a valid profile that adds the NFC class "Histórica".
+test('UNICODE-01a R1-01: decoded non-NFC attributes (character references) are detected and quarantined', () => {
+  const profiles = structuredClone([...DEFAULT_PROFILES]) as typeof DEFAULT_PROFILES[number][];
+  const confaz = profiles.find((p) => p.scope.level === 'source' && p.scope.source === 'CONFAZ')! as { fields: { classes: { historical: string[] } } };
+  confaz.fields.classes.historical.push('Histórica');
+  const run = (html: string) => analyzeAnatomy(req(html, 'CONFAZ', { profiles }));
+  const clause = 'Cláusula primeira NCM 8471.30.12.';
+  // NFC classes, literal or encoded (&#xF3; / &#243; decode to the precomposed ó): recognised as historical, no flag.
+  for (const cls of ['Histórica', 'Hist&#xF3;rica', 'Hist&#243;rica']) {
+    for (const html of [`<p class="${cls}">${clause}</p>`, `<div class="${cls}"><p>${clause}</p></div>`]) {
+      const r = run(html);
+      assert.ok(!codes(r).includes(NON_NFC_TEXT), html);
+      assert.equal(r.parts.find((p) => p.type === 'clause')?.context, 'historical', html);
+    }
+  }
+  // Non-NFC classes: literal NFD, decimal &#769; and hexadecimal &#x301; — on the block, an ancestor and a descendant.
+  for (const cls of ['Histórica', 'Histo&#769;rica', 'Histo&#x301;rica']) {
+    for (const html of [`<p class="${cls}">${clause}</p>`, `<div class="${cls}"><p>${clause}</p></div>`, `<p>${clause}<span class="${cls}">x</span></p>`]) {
+      const raw = html;
+      const r = run(raw);
+      assertQuarantined(r, html);
+      assert.equal(r.identity.inputPresentationHash, sha256(raw), 'presentation untouched');
+      assert.equal(r.canonicalText, r.canonicalText.normalize('NFC'), 'text itself is NFC: the attribute alone triggers');
+      if (!cls.includes('́')) assert.equal(r.limitations.find((l) => l.code === NON_NFC_TEXT)!.span, null);
+    }
+  }
+  // Any other decoded attribute is covered too (superset of the consumed class attribute).
+  assertQuarantined(run(`<p title="a&#x301;">${clause}</p>`), 'title attribute');
 });

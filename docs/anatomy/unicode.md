@@ -10,12 +10,13 @@ Os literais do perfil e as regras fixas (citação, código de receita, `cl[áa]
 
 - **Detecção:** o critério é `texto !== texto.normalize('NFC')`, não a presença de `\p{M}`. Ele é aplicado:
   - ao texto canônico;
-  - à representação recebida (marcação e atributos, por exemplo uma classe CSS em NFD).
+  - à representação recebida (marcação e atributos, por exemplo uma classe CSS em NFD);
+  - a cada nome e valor de **atributo decodificado pelo parser** (correção U01A-R1-01). Por exemplo, `class="Histo&#x301;rica"` está em NFC na marcação bruta, mas decodifica para NFD e determina contexto. A verificação cobre todos os atributos, um superconjunto das classes consumidas.
 
   Uma falha ao normalizar conta como não NFC. A cópia NFC serve só para detectar: texto, hashes, offsets UTF-16 e apresentação continuam sendo os da fonte.
 - **Diagnóstico:**
   - o resultado recebe a limitação `non_nfc_text` e `status: partial`;
-  - o span da limitação é o documento inteiro `[0, length)` quando o texto canônico não está em NFC, e `null` quando só a marcação está;
+  - o span da limitação é o documento inteiro `[0, length)` quando o texto canônico não está em NFC, e `null` quando só a marcação ou um atributo decodificado está;
   - a mensagem informa que a extração não foi feita.
 
   A detecção é **documental**: não promete localizar cada caractere.
@@ -41,6 +42,11 @@ Nenhum helper normaliza texto. A configuração em NFD continua recusada pelo va
 
 - **Detectados como não NFC:** acento decomposto; emoji antes e depois de acento decomposto; singletons canônicos (U+212B Å, U+2126 Ω); Hangul em jamo decomposto; marcas combinantes em ordem não canônica.
 - **Não detectados:** acentos NFC; Hangul NFC; caracteres fora do BMP (incluindo emoji com ZWJ); marca sem forma pré-composta (`q́`); marca inicial isolada; entrada vazia; surrogate isolado.
+- **U01A-R1-01:**
+  - classe `Histo&#x301;rica` e `Histo&#769;rica` (bruto e texto em NFC) e a forma NFD literal, no bloco, no ancestral e no descendente, com perfil válido que acrescenta `Histórica`: quarentena;
+  - os equivalentes NFC codificados (`Hist&#xF3;rica`, `Hist&#243;rica`) são reconhecidos como históricos e não sinalizados;
+  - outro atributo (`title`) também é coberto;
+  - o teste falha no `a7db4be` e passa com a correção.
 - Documento misto (artigo, citação, exceção, faixa e tabela em NFC, mais uma exceção em NFD): quarentena do documento inteiro.
 - Preservação do texto canônico, `inputTextHash`, `inputPresentationHash`, spans e recursos ausentes; o validador aceita a limitação e recusa `complete`.
 
@@ -66,7 +72,12 @@ O texto canônico congelado das 7 entradas de desenvolvimento foi remontado a pa
 | 10 | DOU | `525a7604…3f94b1` | 23246 | sim | sim |
 | 11 | DOU | `f34ce3ce…65a17ef` | 17021 | sim | sim |
 
-As 7 entradas estão em NFC. A marcação bruta das entradas não foi inspecionada, porque a autorização cobria só o texto canônico. É inventário de entrada, não medição de qualidade.
+As 7 entradas estão em NFC. É inventário de entrada, não medição de qualidade. **Esse inventário não prova** que a marcação bruta ou os atributos decodificados das sete publicações estejam em NFC; eles não foram inspecionados.
+
+**Registro de escopo:**
+- **Autorizado:** a inspeção textual acima, feita só sobre os artefatos congelados, sem leitor, motor nem avaliador.
+- **Fora da autorização:** o executor rodou uma vez `ops/anatomy/dev-canonical.ts`. Esse script passa as 7 entradas pelo **leitor** (`readAnatomyInput`) para extrair o texto e comparar hash e comprimento. O COORD não concedeu autorização retroativa nem para repetir. A suíte agregada `test:anatomy` contém `anatomy.dev-canonical` e por isso não foi rodada na correção R1. Na correção foram executados só testes sintéticos selecionados.
+- **Não realizado:** `analyzeAnatomy` e avaliador sobre as entradas, medição, reserva e recaptura.
 
 ## Fora deste pacote
 
