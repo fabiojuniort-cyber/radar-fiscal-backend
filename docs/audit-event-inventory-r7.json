@@ -1,5 +1,5 @@
 {
-  "scope": "Current code and historical migrations at e9391f58; excludes test-only synthetic events",
+  "scope": "Current code/migrations and explicit one-off historical operator contracts; R7.4 extends e9391f58 inventory without importing retired writers",
   "events": [
     {
       "action": "BASELINE_IMPORT_COMMITTED",
@@ -122,6 +122,14 @@
       "sources": [
         "migrations/062_l18_preserve_federal_tax_acts.sql"
       ]
+    },
+    {
+      "action": "MERGE_RFB_NORMAS_DOU_HISTORICAL",
+      "entityType": "publication",
+      "sources": [
+        "migrations/075_audit_historical_event_rules.sql"
+      ],
+      "historicalOperatorEvidence": "docs/audit-historical-events-r74.md"
     },
     {
       "action": "OFFICIAL_CATALOG_IMPORTED",
@@ -250,6 +258,22 @@
       "sources": [
         "src/modules/taxonomy/curation/curation.draft.ts"
       ]
+    },
+    {
+      "action": "TAXONOMY_CURATION_SECTOR_ALIASES_CLEARED",
+      "entityType": "taxonomy_curation",
+      "sources": [
+        "migrations/075_audit_historical_event_rules.sql"
+      ],
+      "historicalOperatorEvidence": "docs/audit-historical-events-r74.md"
+    },
+    {
+      "action": "TAXONOMY_DRAFT_ORPHAN_RELATIONS_REMOVED",
+      "entityType": "taxonomy_release",
+      "sources": [
+        "migrations/075_audit_historical_event_rules.sql"
+      ],
+      "historicalOperatorEvidence": "docs/audit-historical-events-r74.md"
     },
     {
       "action": "TAXONOMY_F2_SUGGESTIONS_CHANGED",
