@@ -178,6 +178,17 @@ test('B1: span validation — half-open integer spans, no clipping, identity map
   const lone = buildNfcShadow('a\ud800b\udc00');
   assert.equal(lone.shadow, 'a\ud800b\udc00'); assert.ok(lone.identity);
   assert.deepEqual(shadowToOriginal(lone, { start: 1, end: 2 }).span, { start: 1, end: 2 });
+  // Review B1-R1-01: `identity` is textual equality only; spans inside a segment are still widened.
+  const q = buildNfcShadow('q\u0301x');
+  assert.ok(q.identity && q.shadow === q.original);
+  const qr = shadowToOriginal(q, { start: 0, end: 1 });
+  assert.equal(qr.exact, false); assert.deepEqual(qr.span, { start: 0, end: 2 });
+  assert.deepEqual(shadowToOriginal(q, { start: 2, end: 3 }), { span: { start: 2, end: 3 }, exact: true });
+  // A lone surrogate followed by a mark: kept, and the mark stays in its segment [0,2).
+  const lm = buildNfcShadow('\ud800\u0301x');
+  assert.equal(lm.shadow, '\ud800\u0301x'); assert.ok(lm.identity);
+  assert.deepEqual([...lm.origStart], [0, 2, 3]);
+  assert.equal(shadowToOriginal(lm, { start: 0, end: 1 }).exact, false);
   // Limits.
   assert.equal(codeOf(() => buildNfcShadow('a'.repeat(NFC_SHADOW_LIMITS.maxInputUtf16 + 1))), 'input_too_large');
 });

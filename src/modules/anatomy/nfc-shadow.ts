@@ -11,6 +11,8 @@ import { NFC_NO_BOUNDARY_BEFORE, NFC_SHADOW_TABLE_SHA256, NFC_SHADOW_UNICODE_VER
  * maps back to the original as the union of the segments it touches; when it starts or ends inside a segment's NFC
  * form the result is widened and reported, never silently clipped. Forced boundaries (text-node limits) must already
  * be NFC boundaries; otherwise the map is unusable for recognition (e.g. Hangul L|V, LV|T, a mark after a limit).
+ * A lone surrogate is a starter (boundary before it) and is never replaced or dropped; combining marks that
+ * follow it stay in its segment (e.g. '\ud800\u0301' is one segment [0,2)).
  * Guarantee: a mapped span never splits a surrogate pair or a normalisation segment. Extended grapheme clusters
  * (UAX #29, e.g. emoji ZWJ sequences) are out of scope.
  */
@@ -25,7 +27,11 @@ export interface NfcShadowMap {
   unicodeVersion: typeof NFC_SHADOW_UNICODE_VERSION;
   original: string;
   shadow: string;
-  /** True when the original is already NFC with no unsupported forced boundary: the map is the identity. */
+  /**
+   * Textual equality only: the original is already NFC (shadow === original) and the map is usable. It does NOT make
+   * every span exact: spans are still mapped by whole segments (e.g. 'q\u0301x', shadow [0,1) → original [0,2),
+   * widened). Consumers must always check `MappedSpan.exact` (review B1-R1-01).
+   */
   identity: boolean;
   /** False when any diagnostic exists: the shadow must not be used for recognition (quarantine stays). */
   usable: boolean;

@@ -17,8 +17,8 @@ Origem: [decisão do COORD na issue #116](https://github.com/fabiojuniort-cyber/
 
 ## Algoritmo
 
-- **Segmentação:** existe fronteira antes de um code point quando `ccc = 0` e `NFC_Quick_Check = Yes` (UAX #15 §9). O primeiro segmento começa em 0 (marca inicial). Um surrogate isolado é tratado como segmento próprio, sem ser substituído nem descartado.
-- **Sombra:** é a concatenação de `NFC(segmento)`. Quando já é NFC e não há fronteira inválida, `identity = true`.
+- **Segmentação:** existe fronteira antes de um code point quando `ccc = 0` e `NFC_Quick_Check = Yes` (UAX #15 §9). O primeiro segmento começa em 0 (marca inicial). Um surrogate isolado é um starter (há fronteira antes dele) e nunca é substituído nem descartado. As marcas que vierem depois dele ficam no mesmo segmento: em `\ud800\u0301x`, o segmento inicial é [0,2) (ressalva B1-R1-01).
+- **Sombra:** é a concatenação de `NFC(segmento)`. Quando já é NFC e não há fronteira inválida, `identity = true`. Isso indica **só igualdade textual** entre original e sombra, não exatidão automática de qualquer intervalo: os spans continuam mapeados por segmentos inteiros. Por exemplo, em `q\u0301x`, o intervalo [0,1) da sombra vira [0,2) no original, alargado. Todo consumidor deve conferir `MappedSpan.exact` (ressalva B1-R1-01). A política de alargamento do B2 vale também para documentos NFC.
 - **Mapa:** dois `Uint32Array` com os inícios dos segmentos no original e na sombra (n+1 posições). Os segmentos são contíguos, não vazios e estritamente monótonos nos dois lados.
 - **`shadowToOriginal` / `originalToShadow`:**
   - recebem intervalos semiabertos `[start, end)` em UTF-16, inteiros, com `0 ≤ start ≤ end ≤ length`;
@@ -66,7 +66,7 @@ Origem: [decisão do COORD na issue #116](https://github.com/fabiojuniort-cyber/
 | Runtime Unicode 17.0, falha fechada em outra versão; hashes dos dados, tabela, gerador e módulo conferidos com o manifesto | `runtime and data identity` |
 | Componente fora do caminho e da identidade do motor (`engineHash` inalterado) | `stays outside the engine path` |
 | Conformidade oficial: `NormalizationTest-17.0.0`, todas as partes, coluna NFC (100.170 verificações) e complemento da Part 1 (1.094.978 code points inalterados) | `official conformance` |
-| A tabela concorda com o runtime: todo code point com fronteira é estável e não compõe com o que vem antes | `table agrees with the runtime` |
+| A tabela concorda com o runtime: todo code point com fronteira é estável sozinho e não compõe com o que vem antes, testado com **oito contextos à esquerda escolhidos**. Não é prova exaustiva de todo contexto; completam a evidência as propriedades oficiais, a conformidade e a invariante verificada por mapa. | `table agrees with the runtime` |
 | Os 10 exemplos da proposta, com span na sombra, span original, fatia e alargamento | `map examples` |
 | Fronteiras forçadas: L\|V, LV\|T, acento e reordenação entre nós recusados; fronteiras NFC aceitas; listas inválidas recusadas | `forced boundaries` |
 | Validação de intervalos (negativo, invertido, fora do texto, não inteiro, NaN, nulo, par substituto), vazio, surrogate isolado e limites | `span validation` |
