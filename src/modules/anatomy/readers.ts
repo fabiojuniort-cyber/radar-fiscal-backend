@@ -1,5 +1,6 @@
 import { Parser } from 'htmlparser2';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
+import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, registerShadowContext, shadowContextOf, type RecoveryDecision } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 
 export interface AnatomyReaderInput {
@@ -38,10 +39,10 @@ const classesOf = (node: Node): string[] => {
   }
   return found;
 };
-function describe(node: Node, rules: CompiledRules): Descriptor {
+function describe(node: Node, rules: CompiledRules, matchText: (node: Node) => string = textOf): Descriptor {
   // Class scope is fixed per source (rules.classScope): CONFAZ looks at the block and its descendants, others at the block.
   const subtree = rules.classScope === 'subtree';
-  const text = textOf(node).trim();
+  const text = matchText(node).trim();
   const own = (node.attrs.class ?? '').split(/\s+/);
   const classes = subtree ? classesOf(node) : own;
   const c = rules.classes; const p = rules.reasonPrefix;
@@ -93,21 +94,51 @@ export function isNonNfcText(text: string): boolean {
 /** Pure snapshot reader. It never fetches resources, infers current legal status, or grants eligibility. */
 export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult {
   // Decoded attributes (e.g. class="Histo&#x301;rica") drive context but are in neither the raw markup nor the text.
-  const seen = { decodedAttributeNonNfc: false };
+  const seen: ReaderSignals = { decodedAttributeNonNfc: false, recovery: undefined };
   const result = readSnapshot(input, seen);
   const raw = input.html ?? input.text ?? '';
   const textNonNfc = isNonNfcText(result.canonicalText);
-  if (textNonNfc || isNonNfcText(raw) || seen.decodedAttributeNonNfc) {
-    const where = textNonNfc ? 'The canonical text' : isNonNfcText(raw) ? 'The supplied representation (markup or attributes)'
-      : 'A decoded HTML attribute (e.g. a class name written with character references)';
-    result.limitations.push({ code: NON_NFC_TEXT, partId: null, span: textNonNfc ? { start: 0, end: result.canonicalText.length } : null,
+  // Fallback paths (plain text, limits, parse failure) return before the HTML walk: decide recovery here.
+  if (textNonNfc && !seen.recovery) seen.recovery = decideWithExactSourceMap(result, seen.decodedAttributeNonNfc);
+  const span = { start: 0, end: result.canonicalText.length };
+  if (textNonNfc && seen.recovery?.mode === 'recover') {
+    // UNICODE-01b/B2: exact NFC recovery. The result stays partial; the engine may still quarantine extraction.
+    registerShadowContext(result, seen.recovery.context);
+    result.limitations.push({ code: NON_NFC_TEXT, partId: null, span,
+      message: 'The canonical text is not in Unicode NFC; text, hashes and positions are unchanged.' });
+    result.limitations.push({ code: NFC_DIAGNOSTICS.shadowMatching, partId: null, span,
+      message: 'Recognition used an NFC shadow with exact position mapping to the original text; the result stays partial and carries no positive selection.' });
+    result.status = 'partial';
+  } else if (textNonNfc || isNonNfcText(raw) || seen.decodedAttributeNonNfc) {
+    const where = seen.decodedAttributeNonNfc ? 'A decoded HTML attribute (e.g. a class name written with character references)'
+      : textNonNfc ? 'The canonical text' : 'The supplied representation (markup or attributes)';
+    result.limitations.push({ code: NON_NFC_TEXT, partId: null, span: textNonNfc ? span : null,
       message: `${where} is not in Unicode NFC. Entity and relation extraction was not performed for this document (temporary Unicode containment); text and positions are unchanged.` });
+    const decision = seen.recovery;
+    if (decision?.mode === 'quarantine' && decision.code !== NON_NFC_TEXT) {
+      result.limitations.push({ code: decision.code, partId: null, span: textNonNfc ? span : null,
+        message: `NFC recovery is not supported for this document: ${decision.detail.replace(/\.+$/u, '')}. The Unicode quarantine stays in force.` });
+    }
     result.status = 'partial';
   }
   return result;
 }
 
-function readSnapshot(input: AnatomyReaderInput, seen: { decodedAttributeNonNfc: boolean }): AnatomyReaderResult {
+type ReaderSignals = { decodedAttributeNonNfc: boolean; recovery: RecoveryDecision | undefined };
+/** Recovery decision with every sourceMap span checked exact in the shadow (provenance boundaries are forced). */
+function decideWithExactSourceMap(result: AnatomyReaderResult, decodedAttributeNonNfc: boolean): RecoveryDecision {
+  const decision = decideRecovery(result.canonicalText, result.sourceMap.flatMap((entry) => [entry.span.start, entry.span.end]), decodedAttributeNonNfc);
+  if (decision.mode !== 'recover') return decision;
+  try {
+    for (const entry of result.sourceMap) exactToShadow(decision.context, entry.span, 'sourceMap span');
+  } catch (error) {
+    if (error instanceof NfcQuarantineError) return { mode: 'quarantine', code: error.code, detail: error.message };
+    throw error;
+  }
+  return decision;
+}
+
+function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyReaderResult {
   const rules = input.rules ?? defaultRules(input.source);
   assertCompiledRules(rules);
   if (rules.source !== input.source) throw new TypeError(`Rules compiled for ${rules.source} cannot read ${input.source}`);
@@ -200,6 +231,25 @@ function readSnapshot(input: AnatomyReaderInput, seen: { decodedAttributeNonNfc:
   };
   render(dom);
   const length = result.canonicalText.length;
+  // UNICODE-01b/B2: for a non-NFC canonical text, decide recovery before any matcher runs. Matchers then read each
+  // block through the shadow (text nodes mapped exactly); structure, spans, labels and attributes stay original.
+  let matchText: (node: Node) => string = textOf;
+  if (isNonNfcText(result.canonicalText)) {
+    seen.recovery = decideWithExactSourceMap(result, seen.decodedAttributeNonNfc);
+    if (seen.recovery.mode === 'recover') {
+      const context = seen.recovery.context;
+      matchText = (node: Node): string => {
+        const stack = [node]; let text = '';
+        while (stack.length) {
+          const next = stack.pop()!;
+          if (next.blocked) continue;
+          if (next.text !== null) { const s = exactToShadow(context, next.span, 'text node'); text += context.map.shadow.slice(s.start, s.end); }
+          else for (let i = next.children.length - 1; i >= 0; i--) stack.push(next.children[i]!);
+        }
+        return text;
+      };
+    }
+  }
   if (!result.canonicalText.trim()) limitation('missing_readable_body', 'The supplied representation contains no readable body.');
   const root = newPart('document', 0, length, null, 'operative_candidate', 'document', pointer('/'));
   const logical: { part: AnatomyPart; rank: number }[] = [{ part: root, rank: 0 }];
@@ -308,13 +358,13 @@ function readSnapshot(input: AnatomyReaderInput, seen: { decodedAttributeNonNfc:
     const hasBlock = node.children.some((child) => blocks.has(child.tag));
     const quotedDom = quotedAncestor || node.tag === 'blockquote' || node.tag === 'q';
     if (blocks.has(node.tag) && !hasBlock && node.span.end > node.span.start) {
-      const text = textOf(node).trim();
+      const text = matchText(node).trim();
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
       if (rules.quoteOpen.test(text)) openQuotation = true;
       const descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
-        : describe(node, rules);
+        : describe(node, rules, matchText);
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
       const part = attach(node, descriptor);
@@ -363,6 +413,13 @@ function readSnapshot(input: AnatomyReaderInput, seen: { decodedAttributeNonNfc:
 /** Explicit NCM header columns only (profile `ncm.columnHeaders`); blockers (`ncm.columnBlockers`) close a column. */
 export function identifyNcmPartIds(result: Pick<AnatomyReaderResult, 'parts' | 'canonicalText'>, rules: CompiledRules = defaultRules('DOE-SP')): string[] {
   assertCompiledRules(rules);
+  // UNICODE-01b/B2: for a recovered result, header cells are read through the reader's own NFC shadow (exact spans).
+  const context = shadowContextOf(result);
+  const headerText = (span: { start: number; end: number }): string => {
+    if (!context) return result.canonicalText.slice(span.start, span.end);
+    const s = exactToShadow(context, span, 'header cell');
+    return context.map.shadow.slice(s.start, s.end);
+  };
   const ids: string[] = [];
   const children = new Map<string, AnatomyPart[]>();
   for (const part of result.parts) if (part.parentId !== null) {
@@ -373,7 +430,7 @@ export function identifyNcmPartIds(result: Pick<AnatomyReaderResult, 'parts' | '
     for (const row of (children.get(table.id) ?? []).filter((part) => part.type === 'row')) {
       for (const cell of (children.get(row.id) ?? []).filter((part) => part.type === 'cell')) {
         if (!cell.table || cell.table.geometry === 'unknown' || cell.table.columnSpan !== 1) continue;
-        const text = result.canonicalText.slice(cell.span.start, cell.span.end).trim();
+        const text = headerText(cell.span).trim();
         if (rules.ncmHeader.test(text)) columns.add(cell.table.column);
         else if (rules.ncmBlocker.test(text)) columns.delete(cell.table.column);
         else if (columns.has(cell.table.column)) ids.push(cell.id);

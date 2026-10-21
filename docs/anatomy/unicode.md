@@ -84,3 +84,7 @@ As 7 entradas estão em NFC. É inventário de entrada, não medição de qualid
 - UNICODE-01b (sombra NFC com mapa de posições), que está em desenho;
 - NFKC;
 - corpus real, reserva, recaptura, medição, merge e deploy.
+
+## Atualização UNICODE-01b/B2
+
+O B2 passa a **recuperar**, com mapeamento exato, os documentos com texto canônico fora de NFC e atributos decodificados em NFC. Esses documentos continuam `partial` e sem seleção positiva. A quarentena descrita acima continua valendo para os casos residuais (atributos, marcação, fronteiras inseguras, alargamento e runtime incompatível). Ver [unicode-recovery.md](unicode-recovery.md).

@@ -1,5 +1,6 @@
 import type { AnatomyEntity, AnatomyPart } from './contract.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
+import { NfcQuarantineError, NFC_DIAGNOSTICS, exactToOriginal, exactToShadow, shadowContextOf } from './nfc-recovery.js';
 import { isNonNfcText } from './readers.js';
 
 export interface AnatomyEntityInput {
@@ -35,14 +36,69 @@ const protectedPatterns: ReadonlyArray<[AnatomyEntity['domain'], RegExp, string]
   ['OTHER', /\b(?:SUS|SIGTAP|CNES)\s*:?\s*\d[\d.-]{1,19}/giu, 'sus_domain_not_ncm'],
 ];
 
+/** Internal positions of a relation's operator and condition (not v1 contract fields; used for exact mapping). */
+type RelationSpans = { operator: Span; condition: Span | null };
+type Rules = Pick<CompiledRules, 'ncmMarker' | 'codeList' | 'rangeBridge' | 'exceptionMarker'>;
+
 /** Deterministic occurrence extraction. Recognition/validation never grants legal eligibility. */
 export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity[] {
-  const text = input.canonicalText;
   const rules = input.rules ?? defaultRules('DOE-SP');
   assertCompiledRules(rules);
-  // UNICODE-01a: no codes are extracted from non-NFC text, so a direct call cannot return apparently normal codes.
-  // The reader records the `non_nfc_text` limitation; the engine skips this call for such documents.
-  if (isNonNfcText(text)) throw new TypeError('non_nfc_text: entity extraction is suspended for text that is not in Unicode NFC');
+  // UNICODE-01a: no codes are extracted from non-NFC text by a direct call, so it cannot return apparently normal
+  // codes. Non-NFC documents are only processed by extractRecoveredEntities, through the reader's own context.
+  if (isNonNfcText(input.canonicalText)) throw new TypeError('non_nfc_text: entity extraction is suspended for text that is not in Unicode NFC');
+  return extractCore(input.canonicalText, input, rules, new WeakMap());
+}
+
+/**
+ * UNICODE-01b/B2: extraction for a document the reader accepted for NFC recovery. Matching runs on the reader's NFC
+ * shadow; every entity, operator and condition must map back EXACTLY, otherwise NfcQuarantineError is thrown and the
+ * caller discards the whole extraction. Published spans and literals are the original ones; `operator` is the derived
+ * NFC form; `condition` is the original slice; `normalized` keeps digits for NCM domains and the original literal for
+ * other domains (identifiers are never normalised), except the exception marker prefix (derived, NFC).
+ */
+export function extractRecoveredEntities(read: object & { canonicalText: string; parts: readonly AnatomyPart[] },
+  input: Omit<AnatomyEntityInput, 'canonicalText' | 'parts'>): AnatomyEntity[] {
+  const context = shadowContextOf(read);
+  if (!context || context.map.original !== read.canonicalText) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, 'no reader-built NFC context for this result');
+  const rules = input.rules ?? defaultRules('DOE-SP');
+  assertCompiledRules(rules);
+  const original = read.canonicalText;
+  const shadowParts = read.parts.map((part) => ({ ...part, span: exactToShadow(context, part.span, `part ${part.id}`) }));
+  const aux = new WeakMap<object, RelationSpans>();
+  const found = extractCore(context.map.shadow, { ...input, canonicalText: context.map.shadow, parts: shadowParts }, rules, aux);
+  const partsById = new Map(read.parts.map((part) => [part.id, part]));
+  const ids = new Map<string, string>();
+  const spans = new Map<AnatomyEntity, Span>();
+  for (const entity of found) {
+    const span = exactToOriginal(context, entity.span, `entity ${entity.id}`);
+    const owner = partsById.get(entity.partId)!;
+    if (owner.span.start > span.start || owner.span.end < span.end) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `entity ${entity.id} leaves its owning part after mapping`);
+    const id = `entity:${entity.domain}:${span.start}:${span.end}`;
+    if ([...ids.values()].includes(id)) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `duplicate entity identity ${id} after mapping`);
+    ids.set(entity.id, id); spans.set(entity, span);
+  }
+  const remap = (id: string) => { const next = ids.get(id); if (!next) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `dangling reference ${id}`); return next; };
+  const ncmFamily = new Set<AnatomyEntity['domain']>(['NCM', 'NCM_RANGE', 'NCM_EXCEPTION']);
+  const out = found.map((entity): AnatomyEntity => {
+    const span = spans.get(entity)!;
+    const literal = original.slice(span.start, span.end);
+    let relation = entity.relation;
+    if (relation) {
+      const internal = aux.get(relation);
+      if (!internal) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `relation of ${entity.id} has no recorded operator span`);
+      exactToOriginal(context, internal.operator, `operator of ${entity.id}`);
+      const condition = internal.condition ? exactToOriginal(context, internal.condition, `condition of ${entity.id}`) : null;
+      relation = { ...relation, groupId: remap(relation.groupId), targetEntityIds: relation.targetEntityIds.map(remap),
+        condition: condition ? original.slice(condition.start, condition.end) : null, expansion: [...relation.expansion] };
+    }
+    return { ...entity, id: remap(entity.id), span, literal, normalized: ncmFamily.has(entity.domain) ? entity.normalized : literal,
+      validation: { ...entity.validation }, relation };
+  });
+  return out.sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end || a.domain.localeCompare(b.domain, 'en'));
+}
+
+function extractCore(text: string, input: AnatomyEntityInput, rules: Rules, aux: WeakMap<object, RelationSpans>): AnatomyEntity[] {
   if (text.length > 2 * 1024 * 1024) throw new RangeError('ANAT entity input exceeds 2 Mi UTF-16 units');
   const hierarchy = new Map(input.parts.map(part => [part.id, part]));
   const depth = (part: AnatomyPart): number => {
@@ -147,14 +203,22 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
     compound.normalized = `${first.normalized}..${last.normalized}`;
     compound.validation = { status: compatible ? 'unknown' : 'invalid', method: 'none', catalogEdition: input.catalog?.edition ?? null,
       reason: compatible ? 'range_membership_not_expanded' : 'incompatible_or_reversed_range' };
+    const lead = bridge.length - bridge.trimStart().length;
+    const operatorSpan = { start: first.span.end + lead, end: first.span.end + lead + bridge.trim().length };
     compound.relation = { kind: 'range', groupId, targetEntityIds: members.map((entity) => entity.id), operator: bridge.trim(),
       scopePartId: compound.partId, condition: null, expansion: [] };
+    aux.set(compound.relation, { operator: operatorSpan, condition: null });
     first.relation = { kind: 'range_start', groupId, targetEntityIds: [last.id], operator: bridge.trim(), scopePartId: compound.partId, condition: null, expansion: [] };
-    for (const member of members.slice(1)) member.relation = { kind: 'range_end', groupId, targetEntityIds: [first.id], operator: bridge.trim(), scopePartId: compound.partId, condition: null, expansion: [] };
+    aux.set(first.relation, { operator: operatorSpan, condition: null });
+    for (const member of members.slice(1)) {
+      member.relation = { kind: 'range_end', groupId, targetEntityIds: [first.id], operator: bridge.trim(), scopePartId: compound.partId, condition: null, expansion: [] };
+      aux.set(member.relation, { operator: operatorSpan, condition: null });
+    }
     index += members.length - 1;
   }
   for (const marker of text.matchAll(rules.exceptionMarker)) {
     const markerEnd = marker.index + marker[0].length;
+    const operatorSpan = { start: marker.index, end: markerEnd };
     let scope = owner({ start: marker.index, end: markerEnd });
     if (scope.type === 'cell' && scope.parentId !== null && byId.get(scope.parentId)?.type === 'row') scope = byId.get(scope.parentId)!;
     const scopeNcms = ncms.filter((entity) => entity.span.start >= scope.span.start && entity.span.end <= scope.span.end);
@@ -166,10 +230,15 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
       const affected = scopeNcms;
       if (!affected.length) continue;
       const compound = make({ start: Math.min(marker.index, affected[0]!.span.start), end: scope.span.end }, 'NCM_EXCEPTION', 'M02_unknown_scope_conservative_mask');
+      const conditionSpan = { start: marker.index, end: scope.span.end };
       compound.relation = { kind: 'exception', groupId: compound.id, targetEntityIds: affected.map((entity) => entity.id),
-        operator: marker[0], scopePartId: scope.id, condition: text.slice(marker.index, scope.span.end), expansion: [] };
-      for (const item of affected) if (!item.relation) item.relation = { kind: 'exception_target', groupId: compound.id,
-        targetEntityIds: [compound.id], operator: marker[0], scopePartId: scope.id, condition: compound.relation.condition, expansion: [] };
+        operator: marker[0], scopePartId: scope.id, condition: text.slice(conditionSpan.start, conditionSpan.end), expansion: [] };
+      aux.set(compound.relation, { operator: operatorSpan, condition: conditionSpan });
+      for (const item of affected) if (!item.relation) {
+        item.relation = { kind: 'exception_target', groupId: compound.id,
+          targetEntityIds: [compound.id], operator: marker[0], scopePartId: scope.id, condition: compound.relation.condition, expansion: [] };
+        aux.set(item.relation, { operator: operatorSpan, condition: conditionSpan });
+      }
       continue;
     }
     const targets = [target];
@@ -184,9 +253,13 @@ export function extractAnatomyEntities(input: AnatomyEntityInput): AnatomyEntity
     compound.normalized = `${marker[0].toLocaleLowerCase('pt-BR')}:${target.normalized}`;
     compound.relation = { kind: 'exception', groupId: compound.id, targetEntityIds: scopeNcms.map((entity) => entity.id), operator: marker[0],
       scopePartId: part.id, condition: text.slice(span.start, span.end), expansion: [] };
+    aux.set(compound.relation, { operator: operatorSpan, condition: span });
     // Keep an existing range relation; the overlapping compound still blocks every member.
-    for (const item of scopeNcms) if (!item.relation) item.relation = { kind: 'exception_target', groupId: compound.id, targetEntityIds: [compound.id],
-      operator: marker[0], scopePartId: part.id, condition: compound.relation.condition, expansion: [] };
+    for (const item of scopeNcms) if (!item.relation) {
+      item.relation = { kind: 'exception_target', groupId: compound.id, targetEntityIds: [compound.id],
+        operator: marker[0], scopePartId: part.id, condition: compound.relation.condition, expansion: [] };
+      aux.set(item.relation, { operator: operatorSpan, condition: span });
+    }
   }
   return entities.sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end || a.domain.localeCompare(b.domain, 'en'));
 }

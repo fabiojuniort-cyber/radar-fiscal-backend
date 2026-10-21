@@ -1,18 +1,22 @@
 {
-  "engineHash": "bbcd7a7cc41c98129468fd7d3ceaa46fad7f21b2d60966e48a1b7f676f4ba001",
+  "engineHash": "3708b6dd052e23cc9d03aa9c3a86612747a8c12130a42098debf4463f178c9ff",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
-    "ops/anatomy/build-identity.mjs": "42d5beb99eff025a5790bec4d0432bf34504742a9578de8b11b1d4258e6b77f7",
+    "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
+    "ops/anatomy/build-identity.mjs": "1b9c091bd466574508e35f7b1d66075d8c9bf13fcb9a6bafebe96fefc6c5e178",
     "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
     "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
     "src/modules/anatomy/contract.ts": "e294eb6fb50c2fc2b624c13bc68f281f3271a88f4a00d98f1a7a923928893c2a",
     "src/modules/anatomy/dou-preparation.ts": "41827ee32c8b14bf0db9b56b3695ba06f40f7dd9a25658e2584ab16e435bb293",
-    "src/modules/anatomy/engine.ts": "1363824fc42ba2f65f379019000f37cc27d080879febda6c7060825156a0a66c",
-    "src/modules/anatomy/entities.ts": "fc1de2d04ef8d8a11a825bf4f6f100d7799b296cbb7c7fe5fde0d84a2b10d72a",
+    "src/modules/anatomy/engine.ts": "24861649ccfade58d93b16e9e3556acd128649143c4ec72165342cfec2b2c0b0",
+    "src/modules/anatomy/entities.ts": "5b4efbb6d2f92eb0e996a2f880891178de8c7f36209a228d0dab1db7a32d0833",
     "src/modules/anatomy/gold.ts": "e7491f75e5dabacac76ca858a3d0348820832bba4a53d22ef050e1a60d9b0c23",
     "src/modules/anatomy/json-preparation.ts": "a9ec313236e869dad4be493648358d7fa5c2be1e74ad58fba895e2758adcb8bb",
+    "src/modules/anatomy/nfc-recovery.ts": "782edbefd25e3f80cab3b25493da63f07618045513ffc44444e2bf77d281e502",
+    "src/modules/anatomy/nfc-shadow-table.ts": "a9074dad75bcd1f328769451c00715d2483f2e4a06c863b67cfcd382ac37d153",
+    "src/modules/anatomy/nfc-shadow.ts": "92424d7c1f17c35197a3a1254f91ffe0d64918b32df87ce4b98b49091dfc9e49",
     "src/modules/anatomy/profile-rules.ts": "c033e3e117d822df4a271a47b853a7b3b9d9651b35fe2fa9f4eb45646672f9fa",
     "src/modules/anatomy/profile.ts": "79138d91af4abda2ac28b072db958ba877d75889d3725c9752421c95cd6c2a32",
-    "src/modules/anatomy/readers.ts": "6614d47aabf35fe12733a3345149020ded7d0c20abaa292c735e12fbfd565097"
+    "src/modules/anatomy/readers.ts": "c21e92c4b6d52255791da815605b7b97deba6d841cec16e28b5926ccc763926c"
   }
 }

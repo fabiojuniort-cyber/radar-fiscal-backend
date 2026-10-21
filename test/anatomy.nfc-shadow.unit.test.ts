@@ -34,12 +34,16 @@ test('B1: runtime and data identity — Unicode 17.0 table, fail closed on anoth
   assert.match(ucd('DerivedNormalizationProps.txt').slice(0, 80), /DerivedNormalizationProps-17\.0\.0/);
 });
 
-test('B1: the component stays outside the engine path and outside the engine identity', () => {
+test('B2: the component is reached only through nfc-recovery, and it is part of the engine identity', () => {
+  // UNICODE-01b/B2 (authorised): reader, extractor and engine use the component only through nfc-recovery.ts;
+  // adapter, consumer and profile rules do not touch it.
   for (const f of ['readers.ts', 'entities.ts', 'engine.ts', 'evaluation-adapter.ts', 'consumer.ts', 'profile-rules.ts']) {
-    assert.ok(!/nfc-shadow/u.test(readFileSync(new URL(`../src/modules/anatomy/${f}`, import.meta.url), 'utf8')), f);
+    assert.ok(!/from '\.\/nfc-shadow\.js'/u.test(readFileSync(new URL(`../src/modules/anatomy/${f}`, import.meta.url), 'utf8')), f);
   }
-  assert.ok(!/nfc-shadow/u.test(readFileSync(new URL('../ops/anatomy/build-identity.mjs', import.meta.url), 'utf8')));
-  assert.equal(ANATOMY_ENGINE_BUILD_HASH, 'bbcd7a7cc41c98129468fd7d3ceaa46fad7f21b2d60966e48a1b7f676f4ba001', 'engineHash of the accepted UNICODE-01a');
+  for (const f of ['readers.ts', 'entities.ts', 'engine.ts']) assert.match(readFileSync(new URL(`../src/modules/anatomy/${f}`, import.meta.url), 'utf8'), /from '\.\/nfc-recovery\.js'/u, f);
+  const identity = readFileSync(new URL('../ops/anatomy/build-identity.mjs', import.meta.url), 'utf8');
+  for (const f of ['nfc-recovery.ts', 'nfc-shadow.ts', 'nfc-shadow-table.ts', 'nfc-shadow-manifest.json']) assert.ok(identity.includes(f), f);
+  assert.notEqual(ANATOMY_ENGINE_BUILD_HASH, 'bbcd7a7cc41c98129468fd7d3ceaa46fad7f21b2d60966e48a1b7f676f4ba001', 'identity regenerated after integration');
 });
 
 /** Structural invariants of any usable map. */

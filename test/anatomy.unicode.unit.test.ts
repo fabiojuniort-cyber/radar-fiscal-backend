@@ -22,28 +22,39 @@ function assertQuarantined(r: AnatomyResult, label: string) {
   assert.equal(r.eligibility.filter((e) => e.eligible).length, 0, `${label}: no positive selection`);
   assert.equal(r.eligibility.filter((e) => e.purpose === 'ncm').length, 0, `${label}: no NCM eligibility entries`);
 }
+// UNICODE-01b/B2 (authorised): a non-NFC canonical text with NFC attributes is recovered through the exact NFC shadow.
+// It stays partial (non_nfc_text + nfc_shadow_matching), with original spans/literals and no positive selection.
+function assertRecovered(r: AnatomyResult, label: string) {
+  assert.equal(r.status, 'partial', label);
+  assert.ok(codes(r).includes(NON_NFC_TEXT) && codes(r).includes('nfc_shadow_matching'), label);
+  assert.equal(r.eligibility.filter((e) => e.eligible).length, 0, `${label}: no positive selection`);
+  for (const e of r.entities) assert.equal(r.canonicalText.slice(e.span.start, e.span.end), e.literal, `${label}: original literal`);
+}
 
-test('UNICODE-01a: the NFD exception that was complete is now partial, non_nfc_text, with no entities', () => {
+test('UNICODE-01a → 01b/B2: the NFD exception (complete before 01a) is now recovered with its exclusion relation, partial', () => {
   const html = '<p>Art. 1º NCM 8471.41.00, excluída a NCM 8471.30.12.</p>';
   const nfc = analyzeAnatomy(req(html));
   assert.ok(nfc.entities.some((e) => e.domain === 'NCM_EXCEPTION'), 'NFC: exception relation recognised');
   assert.ok(!codes(nfc).includes(NON_NFC_TEXT));
   const nfd = analyzeAnatomy(req(NFD(html)));
-  assertQuarantined(nfd, 'NFD exception');
-  assert.ok(nfd.parts.some((p) => p.type === 'article'), 'structure stays available for inspection');
+  assertRecovered(nfd, 'NFD exception');
+  assert.ok(nfd.parts.some((p) => p.type === 'article'), 'structure recognised');
+  assert.deepEqual(nfd.entities.map((e) => e.domain), nfc.entities.map((e) => e.domain), 'same recognition as the NFC equivalent');
+  assert.ok(nfd.entities.some((e) => e.domain === 'NCM_EXCEPTION'), 'exclusion relation kept');
   const lim = nfd.limitations.find((l) => l.code === NON_NFC_TEXT)!;
   assert.deepEqual(lim.span, { start: 0, end: nfd.canonicalText.length });
-  assert.match(lim.message, /extraction was not performed/);
+  assert.doesNotMatch(lim.message, /extraction was not performed/, 'the containment message is replaced when no longer true');
 });
 
-test('UNICODE-01a: quarantine covers the whole document, including codes in NFC passages', () => {
+test('UNICODE-01b/B2: a mixed NFC/NFD document is recovered as a whole (it was a whole-document quarantine in 01a)', () => {
   const nfcPart = '<p>Art. 1º Conforme Resolução nº 10, NCM 8471.41.00 até 8471.90.00.</p><table><tr><td>CÓDIGO NCM</td></tr><tr><td>8471.30.12</td></tr></table>';
   const mixedPart = `<p>Art. 2º NCM 8471, ${NFD('excluída')} a NCM 8471.30.12.</p>`;
   const r = analyzeAnatomy(req(nfcPart + mixedPart));
   assert.equal(analyzeAnatomy(req(nfcPart)).entities.filter((e) => e.domain === 'NCM').length > 0, true, 'the NFC part alone yields codes');
-  assertQuarantined(r, 'mixed document');
+  assertRecovered(r, 'mixed document');
+  assert.deepEqual(r.entities.map((e) => e.domain), analyzeAnatomy(req(nfcPart + mixedPart.normalize('NFC'))).entities.map((e) => e.domain));
   // Mixed forms inside one paragraph.
-  assertQuarantined(analyzeAnatomy(req(`<p>Art. 1º Cláusula NCM 8471.41.00, ${NFD('excluída')} a NCM 8471.30.12 e Instrução Normativa 5.</p>`)), 'mixed paragraph');
+  assertRecovered(analyzeAnatomy(req(`<p>Art. 1º Cláusula NCM 8471.41.00, ${NFD('excluída')} a NCM 8471.30.12 e Instrução Normativa 5.</p>`)), 'mixed paragraph');
 });
 
 test('UNICODE-01a: detection uses the NFC comparison (not a search for \\p{M}) across edge cases', () => {
@@ -62,7 +73,8 @@ test('UNICODE-01a: detection uses the NFC comparison (not a search for \\p{M}) a
   ];
   for (const [name, s] of flagged) assert.equal(isNonNfcText(s), true, name);
   for (const [name, s] of clean) assert.equal(isNonNfcText(s), false, name);
-  for (const [name, s] of flagged) assertQuarantined(analyzeAnatomy(req(`<p>Art. 1º ${s} NCM 8471.30.12.</p>`)), name);
+  // Detection is unchanged; with NFC attributes and exact mapping these documents are now recovered (01b/B2).
+  for (const [name, s] of flagged) assertRecovered(analyzeAnatomy(req(`<p>Art. 1º ${s} NCM 8471.30.12.</p>`)), name);
   for (const [name, s] of clean) assert.ok(!codes(analyzeAnatomy(req(`<p>Art. 1º ${s} NCM 8471.30.12.</p>`))).includes(NON_NFC_TEXT), name);
   // Empty input keeps its own diagnostics and is not flagged.
   const empty = analyzeAnatomy(req(''));
@@ -72,7 +84,7 @@ test('UNICODE-01a: detection uses the NFC comparison (not a search for \\p{M}) a
 test('UNICODE-01a: text, hashes and positions are the supplied ones; other diagnostics are kept', () => {
   const html = NFD('<p>Art. 1º Produtos da posição NCM 8471.</p>');
   const r = analyzeAnatomy(req(html, 'RFB', { attachments: [{ resourceId: 'synthetic-annex', sha256: null, state: 'missing' }] }));
-  assertQuarantined(r, 'with missing resource');
+  assertRecovered(r, 'with missing resource');
   assert.equal(r.canonicalText, NFD('Art. 1º Produtos da posição NCM 8471.\n'), 'canonical text is not normalised');
   assert.equal(r.identity.inputTextHash, sha256(r.canonicalText));
   assert.equal(r.identity.inputPresentationHash, sha256(html));
@@ -101,7 +113,9 @@ test('UNICODE-01a: layer responsibilities — reader flags, engine skips, direct
 });
 
 test('UNICODE-01a: adapter and evaluator carry non_nfc_text as pending, never as completeness', () => {
-  const r = analyzeAnatomy(req(NFD('<p>Art. 1º NCM 8471.41.00, excluída a NCM 8471.30.12.</p>')));
+  // Quarantined case (01b/B2 keeps it): non-NFC text plus a non-NFC decoded attribute.
+  const r = analyzeAnatomy(req(NFD('<p title="a&#x301;">Art. 1º NCM 8471.41.00, excluída a NCM 8471.30.12.</p>')));
+  assertQuarantined(r, 'attribute keeps the quarantine');
   const p = anatomyResultToPrediction(r, { selections: [] });
   assert.equal(p.pending!.status, 'partial');
   assert.ok(p.pending!.limitations.some((l) => l.code === NON_NFC_TEXT));

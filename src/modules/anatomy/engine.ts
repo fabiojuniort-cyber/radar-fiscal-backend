@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { ANATOMY_ENGINE_BUILD_HASH } from './build-identity.js';
 import { ANATOMY_CONTRACT_VERSION, anatomyIdentityHash, anatomyOutputHash, canonicalJson, sha256,
   validateAnatomyResult, type AnatomyResult } from './contract.js';
-import { extractAnatomyEntities } from './entities.js';
+import { extractAnatomyEntities, extractRecoveredEntities } from './entities.js';
+import { NfcQuarantineError, shadowContextOf } from './nfc-recovery.js';
 import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TEXT } from './readers.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
 import { compileProfileRules } from './profile-rules.js';
@@ -37,15 +38,25 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   const read = readAnatomyInput({ ...request.input, missingResources, rules });
   const catalog = request.catalog && { edition: request.catalog.edition, codes: [...new Set(request.catalog.codes)].sort() };
   let entities: ReturnType<typeof extractAnatomyEntities> = [];
-  // UNICODE-01a: a document flagged `non_nfc_text` by the reader is quarantined: no entities, relations or NCM
-  // eligibility entries; it stays partial with its text, structure and diagnostics.
-  if (!read.limitations.some((l) => l.code === NON_NFC_TEXT)) try {
-    entities = extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ncmPartIds: identifyNcmPartIds(read, rules),
-      ...(catalog ? { catalog } : {}), rules });
-  } catch {
+  // UNICODE-01a/01b: a non-NFC document is either recovered through the reader's own NFC context (exact mapping,
+  // partial, no positive selection) or quarantined: no entities, relations or NCM eligibility entries. A late
+  // failure on the recovery path discards the WHOLE extraction (never only the failing exception or range).
+  const recovered = shadowContextOf(read) !== undefined;
+  const quarantined = !recovered && read.limitations.some((l) => l.code === NON_NFC_TEXT);
+  if (!quarantined) try {
+    const options = { ncmPartIds: identifyNcmPartIds(read, rules), ...(catalog ? { catalog } : {}), rules };
+    entities = recovered ? extractRecoveredEntities(read, options)
+      : extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ...options });
+  } catch (error) {
+    entities = [];
     read.status = 'partial';
-    read.limitations.push({ code: 'entity_extraction_failed', message: 'Entity extraction failed; no positive selection is available.',
-      partId: null, span: null });
+    if (error instanceof NfcQuarantineError) {
+      read.limitations.push({ code: error.code, partId: null, span: { start: 0, end: read.canonicalText.length },
+        message: `NFC recovery could not be shown exact (${error.message}). Entity and relation extraction was not performed for this document (Unicode quarantine); text and positions are unchanged.` });
+    } else {
+      read.limitations.push({ code: 'entity_extraction_failed', message: 'Entity extraction failed; no positive selection is available.',
+        partId: null, span: null });
+    }
   }
   const identity = { publicationVersionId: request.publicationVersionId, representationId: request.input.representationId,
     inputTextHash: sha256(read.canonicalText),

@@ -296,15 +296,17 @@ test('#249 R2 / A: removing any protected marker is refused through analyzeAnato
   assert.equal(partOf(analyzeAnatomy(base('<p class="RedaoAnt">Cláusula primeira NCM 8471.30.12.</p>')), 'clause')?.context, 'historical');
 });
 
-test('#249 R2 / B: document text is never normalised; decomposed text behaves exactly as in the pre-integration engine', () => {
-  // Declared behaviour: canonical text, hashes and UTF-16 offsets are the supplied text. Literals are NFC; text in NFD
-  // is NOT recognised by them (fail-safe: unidentified, no NCM), exactly as before P1.B. Unicode equivalence of the
-  // document is an open item for a separate decision, not resolved by rejecting NFD configuration.
+test('#249 R2 / B: document text is never normalised; matchers equal the pre-integration rules on decomposed text', () => {
+  // Declared behaviour: canonical text, hashes and UTF-16 offsets are the supplied text. The compiled matchers are
+  // unchanged (NFC literals, compared below with the original rules). Since UNICODE-01b/B2 (authorised, issue #116),
+  // NFD documents are recognised through the exact NFC shadow and stay partial; before, they were unidentified.
   const nfd = analyzeAnatomy(base('<p>Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.</p>'));
   assert.equal(nfd.canonicalText, 'Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.\n');
   assert.notEqual(nfd.canonicalText, nfd.canonicalText.normalize('NFC'));
-  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'unidentified:unknown:0-54']);
-  assert.deepEqual(nfd.entities, []);
+  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'clause:operative_candidate:0-54']);
+  assert.equal(nfd.status, 'partial');
+  assert.ok(nfd.limitations.some((l) => l.code === 'nfc_shadow_matching'));
+  assert.equal(nfd.eligibility.filter((e) => e.eligible).length, 0);
   for (const t of ['Cla\u0301usula primeira', 'Cláusula primeira', 'Cláusula\u00a0primeira', 'CONSIDERANDO\u0301', 'Onde se le\u0302', 'A Secreta\u0301ria']) {
     const r = defaultRules('DOU');
     assert.equal(r.clause.test(t), LEGACY.clause.test(t), `clause ${t}`);
