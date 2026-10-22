@@ -5,9 +5,9 @@ import { sha256, validateAnatomyResult, type AnatomyResult } from '../src/module
 import { analyzeAnatomy, type AnatomyRequest } from '../src/modules/anatomy/engine.js';
 import { extractAnatomyEntities, extractRecoveredEntities } from '../src/modules/anatomy/entities.js';
 import { anatomyResultToPrediction } from '../src/modules/anatomy/evaluation-adapter.js';
-import { NfcQuarantineError, shadowContextOf } from '../src/modules/anatomy/nfc-recovery.js';
+import { NfcQuarantineError } from '../src/modules/anatomy/nfc-recovery.js';
 import { DEFAULT_PROFILES } from '../src/modules/anatomy/profile.js';
-import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
+import { readAnatomyInput, shadowContextOf } from '../src/modules/anatomy/readers.js';
 
 // ANAT-UNICODE-01b/B2 (issue #116, COORD authorisation 6315618204). SYNTHETIC inputs only; Node 24 / Unicode 17.0.
 const NFD = (s: string) => s.normalize('NFD');
@@ -159,4 +159,36 @@ test('B2: adapter and evaluator keep partial + diagnostics; an NFC operator abse
   const exc = p.relations.find((x) => x.kind === 'exception')!;
   assert.equal(exc.operatorSpan, null, 'no guessed operator span');
   assert.ok(p.pending!.unresolved.some((u) => u.kind === 'operator_span'), 'kept as pending');
+});
+
+// Review B2-R1 (PR #253, BLOCK on 69a8229). Synthetic reproductions of both findings.
+test('B2-R1-01: no exported way to attach a recovery context to a result the reader refused', async () => {
+  const recovery = await import('../src/modules/anatomy/nfc-recovery.js');
+  assert.equal('registerShadowContext' in recovery, false, 'no exported setter');
+  const readers = await import('../src/modules/anatomy/readers.js');
+  assert.deepEqual(Object.keys(readers).filter((k) => /regist|issue|attach/iu.test(k)), [], 'no setter on the reader either');
+  const { buildNfcShadow } = await import('../src/modules/anatomy/nfc-shadow.js');
+  const read = readAnatomyInput({ source: 'DOU', representationId: 'synthetic://forge', html: '<p class="Histo&#769;rica">Art. 1º NCM 8471.30.12.</p>' });
+  assert.ok(read.limitations.some((l) => l.code === 'non_nfc_text'));
+  assert.equal(shadowContextOf(read), undefined, 'a refused document has no context');
+  void buildNfcShadow(read.canonicalText); // building a map by hand gives no way to register it
+  assert.throws(() => extractRecoveredEntities(read, {}), NfcQuarantineError);
+  assert.equal(recovery.decideRecovery(read.canonicalText, [], true).mode, 'quarantine', 'the decision itself refuses non-NFC attributes');
+});
+
+test('B2-R1-02: a recovered span that crosses an incompatible part quarantines the whole document', () => {
+  const sig = '<p>Art. 1º ' + 'Resolução'.normalize('NFD') + '</p><p class="assina">8471.30.12</p><p>Art. 2º NCM 8471.41.00.</p>';
+  const r = analyzeAnatomy(req(sig, 'DOU'));
+  assertQuarantined(r, 'citation into signature', 'nfc_shadow_unusable');
+  assert.match(r.limitations.find((l) => l.code === 'nfc_shadow_unusable')!.message, /crosses signature/u);
+  // Historical/editorial zone inside an operative container (CONFAZ subtree classes).
+  const hist = `<div><p>Cláusula primeira ${NFD('Resolução')}</p><p class="RedaoAnt">8471.30.12</p></div>`;
+  const h = analyzeAnatomy(req(hist, 'CONFAZ'));
+  assertQuarantined(h, 'citation into historical wording', 'nfc_shadow_unusable');
+  // Compatible traversals stay recovered: across inline nodes of one block and into a child paragraph of the article
+  // (same context). An adjacent unidentified block (context unknown) is not compatible and would quarantine.
+  const ok = '<p>Art. 1\u00ba <b>' + 'Resolu\u00e7\u00e3o'.normalize('NFD') + '</b> n\u00ba <i>8471.30.12</i>, NCM 8471.41.00.</p><p>\u00a7 1\u00ba NCM 8471.30.12.</p>';
+  const c = analyzeAnatomy(req(ok, 'DOU'));
+  assertRecovered(c, 'compatible traversal');
+  assert.deepEqual(view(c), view(analyzeAnatomy(req(ok.normalize('NFC'), 'DOU'))), 'same as the NFC equivalent');
 });

@@ -32,10 +32,10 @@ Origem: [autorização do COORD na issue #116](https://github.com/fabiojuniort-c
 ## Responsabilidades e arquivos
 
 - **`nfc-recovery.ts` (novo):**
-  - decide entre recuperação e quarentena;
-  - mantém o contexto interno num `WeakMap` cuja chave é o **próprio objeto de resultado do leitor**. O chamador não consegue fornecer nem forjar mapa, hash, `usable` ou versão Unicode;
+  - decide entre recuperação e quarentena (função pura; não registra nada);
   - oferece o mapeamento exato ida e volta, que gera `NfcQuarantineError` quando o span não é exato.
 - **`readers.ts`:**
+  - é o **único** lugar que registra o contexto de recuperação: um `WeakMap` privado, sem setter exportado, cuja chave é o próprio objeto de resultado do leitor. A API exportada não permite anexar contexto ou mapa a um resultado que o leitor recusou (correção B2-R1-01). Isso **não** é fronteira de segurança contra código malicioso no mesmo processo;
   - depois de montar `canonicalText` e `sourceMap`, e antes de qualquer casador, decide a recuperação forçando todas as fronteiras de `sourceMap` e conferindo cada span de `sourceMap` como exato;
   - na recuperação, `describe` e o rastreio de aspas leem cada bloco pela sombra, montada nó de texto a nó de texto;
   - estrutura, spans, rótulos (`label`) e atributos continuam originais;
@@ -46,6 +46,7 @@ Origem: [autorização do COORD na issue #116](https://github.com/fabiojuniort-c
   - `extractRecoveredEntities` só funciona com o contexto do leitor. Ela:
     - mapeia as partes para a sombra (exigindo exatidão) e extrai na sombra;
     - devolve cada entidade ao original (exata), confere que a parte dona ainda a contém e recalcula os IDs pelas posições originais, sem duplicata;
+    - **confere os proprietários atravessados** (correção B2-R1-02): os spans de entidade, operador e condição só podem atravessar partes que os contêm ou partes com o mesmo contexto do dono e de tipo permitido. Atravessar assinatura, histórico, epígrafe, ementa, preâmbulo, citação, conteúdo não identificado etc. leva à quarentena integral (`nfc_shadow_unusable`);
     - remapeia `groupId` e `targetEntityIds` sem deixar referência pendurada;
     - confere a exatidão dos spans internos de operador e condição.
 - **`engine.ts`:** com contexto, usa `extractRecoveredEntities`. Qualquer `NfcQuarantineError` descarta toda a extração e publica o motivo. Sem contexto e com `non_nfc_text`, mantém a quarentena do 01a.
@@ -69,7 +70,7 @@ Origem: [autorização do COORD na issue #116](https://github.com/fabiojuniort-c
 ## Identidade
 
 - `build-identity.mjs` passou a incluir `nfc-recovery.ts`, `nfc-shadow.ts`, `nfc-shadow-table.ts` e `docs/anatomy/nfc-shadow-manifest.json` (versão Unicode 17.0.0 e hashes dos arquivos UCD).
-- **`engineHash`: `bbcd7a7c…` → `3708b6dd052e23cc9d03aa9c3a86612747a8c12130a42098debf4463f178c9ff`**, regenerado com `--write` e verificado. O valor final está em `docs/anatomy/engine-build.json`.
+- **`engineHash`: `bbcd7a7c…` → `b6ccf583621e647e6861204dfa7a2761afe801a3a2173dedc1abdd025d9bf918`**, regenerado com `--write` e verificado. O valor final está em `docs/anatomy/engine-build.json`.
 - `analysisId` e `outputHash` mudam para todos os documentos, inclusive os NFC.
 - Não há download em runtime.
 
@@ -85,6 +86,9 @@ Arquivo novo `test/anatomy.unicode-recovery.unit.test.ts`, incluído em `test:an
 | Atributo NFD literal, decimal e hexadecimal; só atributo | Quarentena `non_nfc_text` | idem |
 | Entidade alargada (código seguido de marca sem composição) | Quarentena `nfc_span_widened` | idem |
 | Operador alargado, descoberto depois do mapeamento dos códigos (erro tardio) | Quarentena da extração inteira | idem |
+| Citação recuperada atravessando assinatura (DOU) ou bloco histórico (CONFAZ) | Quarentena integral `nfc_shadow_unusable` | `B2-R1-02…` |
+| Travessias compatíveis (nós inline de um bloco) | Recuperado, igual ao NFC | idem |
+| Contexto anexado por chamada exportada a documento recusado (atributo NFD) | Impossível: não há setter; o extrator recusa | `B2-R1-01…` |
 | Condição ou escopo inexatos | Começam no operador e terminam numa entidade ou no fim de uma parte, então qualquer inexatidão passa pelos casos acima | idem |
 | Runtime Unicode 16.0 (simulado) | Quarentena `unicode_runtime_unsupported`; documento NFC inalterado | `incompatible runtime…` |
 | NFC com `q́`, surrogate isolado + marca, emoji ZWJ | Igual à saída do motor pré-B2 (`317d177`, fixture `unicode-b2-nfc-equivalence.json`); sem contexto de sombra | `NFC path never uses the shadow…` |

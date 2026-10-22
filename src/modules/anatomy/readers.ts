@@ -1,6 +1,6 @@
 import { Parser } from 'htmlparser2';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
-import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, registerShadowContext, shadowContextOf, type RecoveryDecision } from './nfc-recovery.js';
+import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, type RecoveryDecision, type ShadowContext } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 
 export interface AnatomyReaderInput {
@@ -91,6 +91,12 @@ export function isNonNfcText(text: string): boolean {
   try { return text !== text.normalize('NFC'); } catch { return true; }
 }
 
+// Recovery contexts are registered only here, by readAnatomyInput after its own checks (review B2-R1-01): there is no
+// exported setter, so no caller can attach a context or map to a result the reader did not accept for recovery.
+const recoveryRegistry = new WeakMap<object, ShadowContext>();
+/** The recovery context the reader issued for this very result object, or undefined (NFC path or quarantine). */
+export function shadowContextOf(result: object): ShadowContext | undefined { return recoveryRegistry.get(result); }
+
 /** Pure snapshot reader. It never fetches resources, infers current legal status, or grants eligibility. */
 export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult {
   // Decoded attributes (e.g. class="Histo&#x301;rica") drive context but are in neither the raw markup nor the text.
@@ -103,7 +109,7 @@ export function readAnatomyInput(input: AnatomyReaderInput): AnatomyReaderResult
   const span = { start: 0, end: result.canonicalText.length };
   if (textNonNfc && seen.recovery?.mode === 'recover') {
     // UNICODE-01b/B2: exact NFC recovery. The result stays partial; the engine may still quarantine extraction.
-    registerShadowContext(result, seen.recovery.context);
+    recoveryRegistry.set(result, Object.freeze({ map: seen.recovery.context.map }));
     result.limitations.push({ code: NON_NFC_TEXT, partId: null, span,
       message: 'The canonical text is not in Unicode NFC; text, hashes and positions are unchanged.' });
     result.limitations.push({ code: NFC_DIAGNOSTICS.shadowMatching, partId: null, span,

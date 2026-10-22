@@ -1,7 +1,7 @@
 import type { AnatomyEntity, AnatomyPart } from './contract.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
-import { NfcQuarantineError, NFC_DIAGNOSTICS, exactToOriginal, exactToShadow, shadowContextOf } from './nfc-recovery.js';
-import { isNonNfcText } from './readers.js';
+import { NfcQuarantineError, NFC_DIAGNOSTICS, exactToOriginal, exactToShadow } from './nfc-recovery.js';
+import { isNonNfcText, shadowContextOf } from './readers.js';
 
 export interface AnatomyEntityInput {
   canonicalText: string;
@@ -68,12 +68,28 @@ export function extractRecoveredEntities(read: object & { canonicalText: string;
   const aux = new WeakMap<object, RelationSpans>();
   const found = extractCore(context.map.shadow, { ...input, canonicalText: context.map.shadow, parts: shadowParts }, rules, aux);
   const partsById = new Map(read.parts.map((part) => [part.id, part]));
+  // Review B2-R1-02: a recovered span must not traverse a part whose context or type differs from its owner's
+  // (e.g. a citation running from an article into a signature). Parts containing the span (ancestors) are fine; any
+  // other overlapped part must share the owner's context and be of a permitted type, otherwise the whole document
+  // stays in quarantine.
+  const crossingForbidden = new Set<AnatomyPart['type']>(['publication_header', 'epigraph', 'summary', 'preamble',
+    'consideration', 'signature', 'footer', 'editorial_note', 'unidentified', 'quoted_text']);
+  const assertCompatible = (span: Span, owner: AnatomyPart, what: string): void => {
+    for (const part of read.parts) {
+      if (part.span.end <= span.start || part.span.start >= span.end || part === owner) continue;
+      if (part.span.start <= span.start && part.span.end >= span.end) continue;
+      if (part.context !== owner.context || (crossingForbidden.has(part.type) && part.type !== owner.type)) {
+        throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `${what} [${span.start}, ${span.end}) crosses ${part.type} ${part.id} (${part.context}), incompatible with its owner ${owner.type} ${owner.id} (${owner.context})`);
+      }
+    }
+  };
   const ids = new Map<string, string>();
   const spans = new Map<AnatomyEntity, Span>();
   for (const entity of found) {
     const span = exactToOriginal(context, entity.span, `entity ${entity.id}`);
     const owner = partsById.get(entity.partId)!;
     if (owner.span.start > span.start || owner.span.end < span.end) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `entity ${entity.id} leaves its owning part after mapping`);
+    assertCompatible(span, owner, `entity ${entity.id}`);
     const id = `entity:${entity.domain}:${span.start}:${span.end}`;
     if ([...ids.values()].includes(id)) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `duplicate entity identity ${id} after mapping`);
     ids.set(entity.id, id); spans.set(entity, span);
@@ -87,8 +103,10 @@ export function extractRecoveredEntities(read: object & { canonicalText: string;
     if (relation) {
       const internal = aux.get(relation);
       if (!internal) throw new NfcQuarantineError(NFC_DIAGNOSTICS.shadowUnusable, `relation of ${entity.id} has no recorded operator span`);
-      exactToOriginal(context, internal.operator, `operator of ${entity.id}`);
+      const owner = partsById.get(entity.partId)!;
+      assertCompatible(exactToOriginal(context, internal.operator, `operator of ${entity.id}`), owner, `operator of ${entity.id}`);
       const condition = internal.condition ? exactToOriginal(context, internal.condition, `condition of ${entity.id}`) : null;
+      if (condition) assertCompatible(condition, partsById.get(relation.scopePartId) ?? owner, `condition of ${entity.id}`);
       relation = { ...relation, groupId: remap(relation.groupId), targetEntityIds: relation.targetEntityIds.map(remap),
         condition: condition ? original.slice(condition.start, condition.end) : null, expansion: [...relation.expansion] };
     }

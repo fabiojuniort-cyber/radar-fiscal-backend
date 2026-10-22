@@ -1,9 +1,10 @@
 import { buildNfcShadow, NfcShadowError, originalToShadow, shadowToOriginal, type NfcShadowMap, type Span } from './nfc-shadow.js';
 
 /**
- * ANAT-UNICODE-01b/B2 (issue #116) — internal NFC recovery context shared by the reader, the column identification
- * and the extractor. It is built ONLY inside readAnatomyInput from the effective canonical text and its sourceMap;
- * callers can neither supply nor forge it (WeakMap keyed by the reader's own result object).
+ * ANAT-UNICODE-01b/B2 (issue #116) — NFC recovery decision and exact mapping helpers. The recovery context is issued
+ * and registered ONLY by readAnatomyInput (private registry in readers.ts, no exported setter) from the effective
+ * canonical text and its sourceMap; callers cannot register a context or map through the exported API. This is not
+ * a security boundary against malicious code running in the same process (review B2-R1-01).
  *
  * Policy (COORD decision):
  * - NFC documents never get a context: the current path runs unchanged.
@@ -27,11 +28,6 @@ export type RecoveryDecision =
 export class NfcQuarantineError extends Error {
   constructor(readonly code: QuarantineCode, message: string) { super(`${code}: ${message}`); this.name = 'NfcQuarantineError'; }
 }
-
-const registry = new WeakMap<object, ShadowContext>();
-export function registerShadowContext(result: object, context: ShadowContext): void { registry.set(result, context); }
-/** The context the reader built for this very result object, or undefined (NFC path or quarantine). */
-export function shadowContextOf(result: object): ShadowContext | undefined { return registry.get(result); }
 
 /** Decides recovery vs quarantine for a non-NFC canonical text; `boundaries` are all sourceMap span limits. */
 export function decideRecovery(canonicalText: string, boundaries: readonly number[], decodedAttributeNonNfc: boolean): RecoveryDecision {

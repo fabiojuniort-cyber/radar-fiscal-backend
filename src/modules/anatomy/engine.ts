@@ -3,8 +3,8 @@ import { ANATOMY_ENGINE_BUILD_HASH } from './build-identity.js';
 import { ANATOMY_CONTRACT_VERSION, anatomyIdentityHash, anatomyOutputHash, canonicalJson, sha256,
   validateAnatomyResult, type AnatomyResult } from './contract.js';
 import { extractAnatomyEntities, extractRecoveredEntities } from './entities.js';
-import { NfcQuarantineError, shadowContextOf } from './nfc-recovery.js';
-import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TEXT } from './readers.js';
+import { NfcQuarantineError } from './nfc-recovery.js';
+import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TEXT, shadowContextOf } from './readers.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
 import { compileProfileRules } from './profile-rules.js';
 
