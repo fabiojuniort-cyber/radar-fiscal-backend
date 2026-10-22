@@ -103,3 +103,15 @@ Arquivo novo `test/anatomy.unicode-recovery.unit.test.ts`, incluído em `test:an
 **Não alterados:** snapshot dos 12 sintéticos, oráculo, golds, especificações e aprovações. Dos 9 adversariais do #249, os 7 em NFC continuam idênticos ao motor anterior; os 2 em NFD passam a ser recuperados.
 
 **Exemplos de diagnóstico:** ver o handoff na issue #116.
+
+## Revisões
+
+- **R1, BLOCK** em `69a82290a1ef936fa5e4a30bb9c052909641fa3e`: B2-R1-01 (setter exportado) e B2-R1-02 (travessia de parte proibida).
+- **R2, PASS técnico no escopo revisado** em `a11d1cf7847136a5cf0ae94b7784b849eb0a90ab` ([parecer](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/253#pullrequestreview-5622320636)). O SHA de código revisado é esse; este registro vem num commit apenas documental, fora da identidade do motor (`engineHash` continua `b6ccf583…`).
+- **Decisão do COORD — manter a quarentena conservadora:** um span recuperado que atravesse parte não identificada ou de contexto incompatível põe a extração inteira em quarentena, mesmo quando o caminho NFC publicaria o caso.
+  - Uma região não identificada não prova que o cruzamento seja aceitável.
+  - Não se relaxa a regra para imitar o caminho NFC, nem se troca a quarentena por descarte seletivo.
+  - Isso reduz a cobertura da recuperação e não comprova equivalência geral entre NFC e NFD.
+  - Os cruzamentos que já existem no caminho NFC não foram tratados.
+  - Ampliar a cobertura exige evidência e escopo próprios.
+- **Fora do aceite:** CI (zero execuções no SHA), medição, corpus, merge e deploy. A quarentena não foi removida.
