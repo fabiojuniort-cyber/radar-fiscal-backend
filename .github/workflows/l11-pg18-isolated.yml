@@ -11,6 +11,7 @@ on:
       - 'test/collection-filter.admin.integration.test.ts'
       - 'test/collection-filter.l11-staged.integration.test.ts'
       - 'test/collection-filter.l11-performance.integration.test.ts'
+      - 'test/collection-filter.f3-perf.integration.test.ts'
       - 'scripts/test-l11-configured-draft-guard.sh'
       - '.github/workflows/l11-pg18-isolated.yml'
 
@@ -62,6 +63,9 @@ jobs:
         run: npx tsx --test test/collection-filter.l11-staged.integration.test.ts
       - name: L11 configured DRAFT blocks migration 051 without data loss
         run: bash scripts/test-l11-configured-draft-guard.sh
+      - name: F3-PERF-02 compare baseline and optimized p50 p95 (isolated PG18)
+        timeout-minutes: 18
+        run: npx tsx --test test/collection-filter.f3-perf.integration.test.ts
       - name: Measure preview and confirmation over 120k synthetic DOU acts
         timeout-minutes: 19
         run: npx tsx --test test/collection-filter.l11-performance.integration.test.ts

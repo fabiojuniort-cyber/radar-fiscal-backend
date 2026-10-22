@@ -3,7 +3,9 @@ import test from 'node:test';
 import { compileCollectionFilterPolicy, evaluateCollectionFilter,
   normalizeCollectionFilterType, collectionFilterTitleType,
   type CollectionFilterTypeRule } from '../src/modules/collection/collection-filter.engine.js';
-import { evaluateHistoricalCollectionCandidate } from '../src/modules/collection/collection-filter.direct.js';
+import { evaluateHistoricalCollectionCandidate, couldMatchDirectRule } from '../src/modules/collection/collection-filter.direct.js';
+import {rememberDirectPreview,findDirectPreview,forgetDirectPreview,DIRECT_PREVIEW_TTL_MS}
+  from '../src/modules/collection/collection-filter.preview-witness.js';
 import { evaluateRuntimeCollectionFilter } from '../src/modules/collection/collection-filter.runtime.js';
 
 const compile = (rules: CollectionFilterTypeRule[]) => compileCollectionFilterPolicy({
@@ -117,4 +119,71 @@ test('nenhuma rotina altera a política ao avaliar uma publicação histórica',
   const before=JSON.stringify([...policy.rules]);
   evaluateCollectionFilter(policy,item);
   assert.equal(JSON.stringify([...policy.rules]),before);
+});
+
+test('F3-PERF-02: title-only necessary condition never drops a winning rule or alias',()=>{
+  const exclude=rule('EXTRATO DE CONTRATO','EXCLUDE_ALWAYS');
+  const policy=compileCollectionFilterPolicy({
+    version:1,contextWindowWords:5,weakScoreThreshold:3,
+    locationWeights:{title:3,summary:2,body:1},terms:[],
+    rules:[exclude,rule('EXTRATO DE CONTRATO ESPECIAL','KEEP_ALWAYS'),
+      rule('PORTARIA','KEEP_ALWAYS','DO1')],
+    aliases:[{sourceCode:'dou',section:'DO3',alias:'AVISO DE CONTRATO',
+      canonicalType:'EXTRATO DE CONTRATO'}],
+  });
+  const cases=[
+    ['EXTRATO DE CONTRATO Nº 33/2026','DO3'],
+    ['AVISO DE CONTRATO Nº 33/2026','DO3E'],
+    ['extráto de contrato BF - SEFAZ','DO3'],
+    ['EXTRATO DE CONTRATO ESPECIAL Nº 33/2026','DO3'],
+    ['PORTARIA Nº 10/2026','DO3'],
+    ['NOTÍCIA SOBRE EXTRATO DE CONTRATO','DO3'],
+    ['EXTRATO DE CONTRATOS Nº 34','DO3'],
+    ['EXTRATO DE CONTRATO Nº 35','DO1'],
+  ] as const;
+  for(const [title,section] of cases){
+    const decision=evaluateCollectionFilter(policy,{...item,title,section,
+      evidenceComplete:true,materialAttachmentsUnexamined:false});
+    if(decision.decision==='DISCARD'&&decision.matchedRuleName===
+      normalizeCollectionFilterType(exclude.canonicalType)){
+      assert.ok(couldMatchDirectRule(policy,exclude,title,section),
+        'winning DISCARD cannot be excluded by fast precheck: '+title);
+    }
+  }
+  assert.equal(couldMatchDirectRule(policy,exclude,'AVISO DE CONTRATO Nº 33','DO3E'),true,
+    'aliases inherit the principal section');
+  assert.equal(couldMatchDirectRule(policy,exclude,'PORTARIA Nº 1','DO3'),false);
+  assert.equal(couldMatchDirectRule(policy,exclude,'EXTRATO DE CONTRATOS Nº 1','DO3'),false);
+  assert.equal(couldMatchDirectRule(policy,exclude,'EXTRATO DE CONTRATO Nº 1','DO1'),false);
+});
+
+test('F3-PERF-02: preview witness is user-bound, mode-bound, short-lived and single-use',()=>{
+  const db={};
+  const savedRule={sourceCode:'dou',section:'DO3',
+    canonicalType:'Extrato de contrato',mode:'EXCLUDE_ALWAYS' as const,newTypeId:'queue-1'};
+  const witness={userId:'admin-1',requested:savedRule,
+    rule:{...savedRule,canonicalType:'EXTRATO DE CONTRATO'},
+    count:42,token:'hash-123',policyRevision:10,
+    confirmationToken:'confirm-123',archiveStamp:'archive-1',issuedAt:1000};
+  rememberDirectPreview(db,witness,1000);
+  const lookup=(userId:string,input:typeof savedRule,count=42,token='hash-123',
+    revision=10,confirmation='confirm-123',now=1001)=>
+    findDirectPreview(db,userId,input,count,token,revision,confirmation,now);
+  assert.ok(lookup('admin-1',savedRule));
+  assert.equal(lookup('admin-2',savedRule),undefined,'another admin cannot reuse a preview');
+  assert.equal(lookup('admin-1',{...savedRule,mode:'KEEP_ALWAYS'}),undefined);
+  assert.equal(lookup('admin-1',{...savedRule,newTypeId:'queue-2'}),undefined);
+  assert.equal(lookup('admin-1',savedRule,43),undefined);
+  assert.equal(lookup('admin-1',savedRule,42,'forged'),undefined);
+  assert.equal(lookup('admin-1',savedRule,42,'hash-123',11),undefined);
+  assert.equal(lookup('admin-1',savedRule,42,'hash-123',10,'forged'),undefined);
+  assert.equal(lookup('admin-1',savedRule,42,'hash-123',10,'confirm-123',
+    1001+DIRECT_PREVIEW_TTL_MS),undefined,'witness expires');
+  rememberDirectPreview(db,witness,1000);
+  const found=lookup('admin-1',savedRule);
+  assert.ok(found);
+  forgetDirectPreview(db,found);
+  assert.equal(lookup('admin-1',savedRule),undefined,'witness consumed');
+  assert.equal(findDirectPreview({},'admin-1',savedRule,42,'hash-123',10,'confirm-123',1001),
+    undefined,'another process/db gets safe full-scan fallback');
 });

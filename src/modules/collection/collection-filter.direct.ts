@@ -4,9 +4,10 @@ import { sql, type Kysely, type Transaction } from 'kysely';
 import { validateActiveCollectionFilter } from './collection-filter.direct-admin.js';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import { withUserContext } from '../../infrastructure/database/tenant-context.js';
+import {rememberDirectPreview,findDirectPreview,forgetDirectPreview} from './collection-filter.preview-witness.js';
 import {
   compileCollectionFilterPolicy, evaluateCollectionFilter,
-  normalizeCollectionFilterType, type CollectionFilterMode,
+  normalizeCollectionFilterType, normalizeCollectionFilterText, normalizeCollectionFilterSection, type CollectionFilterMode,
   type CollectionFilterPolicyInput, type CompiledCollectionFilterPolicy,
 } from './collection-filter.engine.js';
 
@@ -103,7 +104,49 @@ export function resolveDirectActNameRule(input:DirectRuleInput,saved:ReadonlyArr
   return {...rule,canonicalType};
 }
 
-export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
+/**
+ * Necessary-condition precheck only: uses the SAME compiled pattern buckets as
+ * evaluateCollectionFilter. A rule (or its alias) cannot win for a title that
+ * does not match one of these patterns. Never prefilter SQL evidence by
+ * official type, section or title; DOxE inheritance and aliases are preserved.
+ */
+export function couldMatchDirectRule(
+  policy:CompiledCollectionFilterPolicy,rule:DirectRuleInput,
+  title:string,rawSection:string,
+):boolean {
+  const name=normalizeCollectionFilterType(collectionFilterActName(title));
+  if(!name)return false;
+  const first=name.split(' ')[0]??'';
+  const canonical=normalizeCollectionFilterType(rule.canonicalType);
+  const targetSection=normalizeCollectionFilterText(rule.section);
+  const sections=new Set([normalizeCollectionFilterText(rawSection),
+    normalizeCollectionFilterSection(rawSection),'']);
+  const normalizedSource=normalizeCollectionFilterText(rule.sourceCode);
+  for(const section of sections){
+    for(const pattern of policy.patterns.get([normalizedSource,section,first].join(String.fromCharCode(0)))??[]){
+      if(pattern.rule.canonicalType===canonical&&
+         pattern.rule.section===targetSection&&pattern.rule.mode===rule.mode&&
+         (name===pattern.pattern||name.startsWith(pattern.pattern+' '))) return true;
+    }
+  }
+  return false;
+}
+
+/** An exact, transactionally maintained F3 evidence revision.
+ * The SQL lock holds all evidence-epoch rows during safe save, so concurrent
+ * writes cannot slip between validation and committing the new policy.
+ * No publication DELETE is called from this module's save path. */
+async function directArchiveStamp(trx:Transaction<DB>,lock=false):Promise<string> {
+  const r=await sql<{stamp:string}>`
+    SELECT public.collection_filter_f3_evidence_stamp(${lock}) AS stamp
+  `.execute(trx);
+  return r.rows[0]?.stamp??'';
+}
+
+/** Test-only baseline option retains the original full JS evaluation for exact
+ * before/after equivalence; HTTP callers never expose this option. */
+export async function candidates(trx: Transaction<DB>, input: DirectRuleInput,
+  {disableTitlePrecheck=false}:{disableTitlePrecheck?:boolean}={}) {
   let rule = validated(input);
   const policies = await sql<{
     id:string; version:number; revision:number;
@@ -159,32 +202,66 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
   let cursor:string|null=null;
   let pages=0;
   const hash=createHash('sha256').update(JSON.stringify(['F3-NOME-02',rule,approved.id,approved.revision]));
-  while (true) {
-    if (++pages>1000) throw new Error('direct_filter_archive_limit_exceeded');
-    const page=await sql<HistoricalCollectionCandidate>`
-      SELECT * FROM collection_filter_f3_candidates(${cursor}::uuid,500,${rule.sourceCode})
+  // Exactly the same decision, hash, order and protection logic in both plans.
+  const absorb=(item:HistoricalCollectionCandidate):void=>{
+    const decision=evaluateHistoricalCollectionCandidate(engine,item);
+    if (decision.decision!=='DISCARD' || !decision.canonicalType ||
+        normalizeCollectionFilterType(decision.matchedRuleName??'')!==
+          normalizeCollectionFilterType(rule.canonicalType) ||
+        decision.mode!==rule.mode ||
+        decision.matchedSection!==normalizeCollectionFilterType(rule.section))return;
+    hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
+      item.source_act_type,item.section,item.provenance_conflict,
+      item.has_company,item.has_other_source,decision.reasonCode]));
+    if(samples.length<10)samples.push({id:item.publication_id,title:item.title,
+      sourceCode:item.source_code,section:item.section,officialType:item.source_act_type,
+      actName:collectionFilterActName(item.title),
+      pattern:decision.matchedPattern??decision.canonicalType,
+      protection:item.has_company?'COMPANY':item.has_other_source?'OTHER_ORIGIN':null});
+    if(item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
+    else if(item.has_other_source){blockedOtherSource++;blockedOtherSourceIds.push(item.publication_id);}
+    else ids.push(item.publication_id);
+  };
+  type Header={publication_id:string;title:string;section:string};
+  let firstHeaders:Header[]|undefined;
+  let sparse=false;
+  if(rule.mode!=='KEEP_ALWAYS'&&!disableTitlePrecheck){
+    // Sample only the FIRST page. If most titles could match, reading headers
+    // and then full evidence would cost more than the original single pass.
+    const probe=await sql<Header>`
+      SELECT * FROM collection_filter_f3_headers(${null}::uuid,500,${rule.sourceCode})
     `.execute(trx);
-    if (!page.rows.length) break;
-    for (const item of page.rows) {
-      const decision=evaluateHistoricalCollectionCandidate(engine,item);
-      if (decision.decision!=='DISCARD' || !decision.canonicalType ||
-          normalizeCollectionFilterType(decision.matchedRuleName??'')!==
-            normalizeCollectionFilterType(rule.canonicalType) ||
-          decision.mode!==rule.mode || decision.matchedSection!==normalizeCollectionFilterType(rule.section)) continue;
-      hash.update(JSON.stringify([item.publication_id,item.content_hash,item.title,
-        item.source_act_type,item.section,item.provenance_conflict,
-        item.has_company,item.has_other_source,decision.reasonCode]));
-      if (samples.length<10) samples.push({id:item.publication_id,title:item.title,
-        sourceCode:item.source_code,section:item.section,officialType:item.source_act_type,
-        actName:collectionFilterActName(item.title),
-        pattern:decision.matchedPattern??decision.canonicalType,
-        protection:item.has_company?'COMPANY':item.has_other_source?'OTHER_ORIGIN':null});
-      if (item.has_company){blockedCompany++;blockedCompanyIds.push(item.publication_id);}
-      else if (item.has_other_source){blockedOtherSource++;blockedOtherSourceIds.push(item.publication_id);}
-      else ids.push(item.publication_id);
+    firstHeaders=probe.rows;
+    const matching=probe.rows.filter(h=>couldMatchDirectRule(engine,rule,h.title,h.section)).length;
+    sparse=matching<=Math.floor(probe.rows.length*.30);
+  }
+  if(rule.mode!=='KEEP_ALWAYS')while(true){
+    if(++pages>1000)throw new Error('direct_filter_archive_limit_exceeded');
+    if(sparse){
+      const headers:Header[]=firstHeaders??(await sql<Header>`
+        SELECT * FROM collection_filter_f3_headers(${cursor}::uuid,500,${rule.sourceCode})
+      `.execute(trx)).rows;
+      firstHeaders=undefined;
+      if(!headers.length)break;
+      const selected=headers.filter(h=>couldMatchDirectRule(engine,rule,h.title,h.section));
+      if(selected.length){
+        const selectedIds=selected.map(h=>h.publication_id);
+        const evidence=await sql<HistoricalCollectionCandidate>`
+          SELECT * FROM collection_filter_f3_candidates_by_ids(${selectedIds}::uuid[],${rule.sourceCode})
+        `.execute(trx);
+        for(const item of evidence.rows)absorb(item);
+      }
+      cursor=headers[headers.length-1]!.publication_id;
+      if(headers.length<500)break;
+    } else {
+      const page=await sql<HistoricalCollectionCandidate>`
+        SELECT * FROM collection_filter_f3_candidates(${cursor}::uuid,500,${rule.sourceCode})
+      `.execute(trx);
+      if(!page.rows.length)break;
+      for(const item of page.rows)absorb(item);
+      cursor=page.rows[page.rows.length-1]!.publication_id;
+      if(page.rows.length<500)break;
     }
-    cursor=page.rows[page.rows.length-1]!.publication_id;
-    if (page.rows.length<500) break;
   }
   hash.update(String(blockedCompany)).update(String(blockedOtherSource));
   const token=hash.digest('hex');
@@ -198,8 +275,17 @@ export async function candidates(trx: Transaction<DB>, input: DirectRuleInput) {
 
 export async function previewDirectFilterRule(db:Kysely<DB>,userId:string,input:DirectRuleInput) {
   return withUserContext(db,userId,async trx=>{
+    const before=await directArchiveStamp(trx);
+    const plan=await candidates(trx,input);
+    const after=await directArchiveStamp(trx);
+    // If the inventory changed while scanning, do not issue a fast-save proof.
+    if(before===after)rememberDirectPreview(db,{
+      userId,requested:input,rule:plan.rule,count:plan.count,token:plan.token,
+      confirmationToken:plan.confirmationToken,policyRevision:plan.policyRevision,
+      archiveStamp:after,issuedAt:Date.now(),
+    });
     const {actName,count,blockedCompany,blockedOtherSource,samples,token,
-      policyRevision,confirmationToken}=await candidates(trx,input);
+      policyRevision,confirmationToken}=plan;
     return {actName,count,blockedCompany,blockedOtherSource,samples,token,
       policyRevision,confirmationToken};
   });
@@ -328,18 +414,44 @@ export async function saveDirectFilterRule(
     await sql`SET LOCAL statement_timeout = '11000ms'`.execute(trx);
     await sql`SET LOCAL lock_timeout = '2500ms'`.execute(trx);
     await sql`SELECT pg_advisory_xact_lock(hashtextextended('collection-filter-direct-rule',0))`.execute(trx);
-    const plan=await candidates(trx,input);
-    const rule=plan.rule;
-    if(plan.policyRevision!==policyRevision ||
-       plan.confirmationToken!==confirmationToken ||
-       plan.count!==expectedCount || plan.token!==previewToken)
-      throw new RangeError('f3_preview_expired_or_policy_revision_changed');
+    // Fast path: only an exact, recent, same-admin server-side preview.
+    // On a different worker/restart/expired token/archive stamp change,
+    // retain the old full recomputation. /confirm NEVER uses this shortcut.
+    const witness=findDirectPreview(db,userId,input,expectedCount,
+      previewToken,policyRevision,confirmationToken);
+    let rule:DirectRuleInput|undefined;
+    let verified=false;
+    // A single SECURITY DEFINER helper obtains revision + evidence locks
+    // atomically with NOWAIT. On any stale proof/contended writer it releases
+    // all partial locks and returns false, so fallback never blocks ingestion.
+    if(witness){
+      const safe=await sql<{valid:boolean}>`
+        SELECT public.collection_filter_f3_safe_witness_valid(
+          ${policyRevision},${witness.archiveStamp}) AS valid
+      `.execute(trx);
+      if(safe.rows[0]?.valid){
+        rule=witness.rule;
+        verified=true;
+      }
+    }
+    if(!verified){
+      // No witness, stale evidence or another web process: keep the original
+      // full preview + hash/revision/token recomputation, with no DELETE.
+      const plan=await candidates(trx,input);
+      if(plan.policyRevision!==policyRevision ||
+         plan.confirmationToken!==confirmationToken ||
+         plan.count!==expectedCount || plan.token!==previewToken)
+        throw new RangeError('f3_preview_expired_or_policy_revision_changed');
+      rule=plan.rule;
+    }
+    if(!rule)throw new Error('f3_safe_save_rule_unresolved');
     const result=await sql<{policy_revision:number}>`
       SELECT * FROM collection_filter_direct_set_rule(
         ${rule.sourceCode},${rule.section},${rule.canonicalType},
         ${rule.mode},${rule.newTypeId??null}::uuid)
     `.execute(trx);
     await validateActiveCollectionFilter(trx);
+    if(witness)forgetDirectPreview(db,witness);
     return {revision:Number(result.rows[0]?.policy_revision),
       deletedCount:0 as const,historicalPurgeRequired:true as const};
   });

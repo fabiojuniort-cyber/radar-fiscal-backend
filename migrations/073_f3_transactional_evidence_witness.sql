@@ -1,0 +1,140 @@
+-- F3-PERF-02. Strict, transactionally maintained evidence revision.
+-- A preview witness is invalid after ANY committed change to F3 inputs.
+-- Statement-level triggers avoid per-row overhead for large ingestion batches.
+-- Per-table epoch rows reduce write contention between different evidence tables.
+-- Runtime-only invalidation metadata lives OUTSIDE public. DOE-SP restore
+-- counts/fingerprints enumerate all public tables and must remain unchanged.
+CREATE SCHEMA IF NOT EXISTS f3_runtime;
+REVOKE ALL ON SCHEMA f3_runtime FROM PUBLIC;
+CREATE TABLE f3_runtime.collection_filter_f3_evidence_epoch (
+  table_name TEXT PRIMARY KEY,
+  revision BIGINT NOT NULL DEFAULT 0 CHECK(revision >= 0),
+  generation UUID NOT NULL DEFAULT pg_catalog.gen_random_uuid()
+);
+INSERT INTO f3_runtime.collection_filter_f3_evidence_epoch(table_name)
+VALUES ('publications'),('publication_versions'),('publication_origins'),
+  ('publication_files'),('company_publications'),('sources'),
+  ('collection_filter_policies'),('collection_filter_type_rules'),
+  ('collection_filter_type_aliases'),('collection_filter_terms');
+REVOKE ALL ON f3_runtime.collection_filter_f3_evidence_epoch FROM PUBLIC;
+
+CREATE FUNCTION public.collection_filter_f3_epoch_touch()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public AS $$
+BEGIN
+  UPDATE f3_runtime.collection_filter_f3_evidence_epoch
+  SET revision=revision+1 WHERE table_name=TG_TABLE_NAME;
+  IF NOT FOUND THEN
+    -- DOE-SP restore/repair fixtures can TRUNCATE auxiliary tables. Recreate
+    -- an epoch row with a NEW generation, never a reusable old counter.
+    INSERT INTO f3_runtime.collection_filter_f3_evidence_epoch(table_name,revision)
+      VALUES(TG_TABLE_NAME,1)
+    ON CONFLICT(table_name) DO UPDATE
+      SET revision=f3_runtime.collection_filter_f3_evidence_epoch.revision+1;
+  END IF;
+  RETURN NULL; -- statement-level trigger; ignored
+END;
+$$;
+REVOKE ALL ON FUNCTION public.collection_filter_f3_epoch_touch() FROM PUBLIC;
+
+-- Strict snapshot: on save, lock ALL evidence epochs until transaction commit.
+-- Every mutation touches its table epoch inside its own writer transaction.
+-- The lock serializes concurrent evidence changes after validation, preventing
+-- the unchecked window between an accepted preview and saving a policy rule.
+CREATE FUNCTION public.collection_filter_f3_evidence_stamp(p_lock BOOLEAN)
+RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public AS $$
+DECLARE v_stamp TEXT;
+BEGIN
+  IF public.app_current_user_id() IS NULL OR NOT public.app_user_is_platform_admin() THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='platform_admin_required';
+  END IF;
+  IF p_lock THEN
+    BEGIN
+      -- Never wait behind a writer holding only some epoch locks. A partial
+      -- blocking lock acquisition could otherwise deadlock against a
+      -- multi-table ingestion transaction. Fall back to the full F3 scan.
+      SELECT string_agg(t.table_name||':'||t.generation::text||':'||t.revision::text,'|' ORDER BY t.table_name)
+        INTO v_stamp
+      FROM (SELECT table_name,generation,revision
+            FROM f3_runtime.collection_filter_f3_evidence_epoch
+            ORDER BY table_name FOR SHARE NOWAIT) t;
+    EXCEPTION WHEN lock_not_available THEN
+      RETURN NULL; -- no fast-path capability; saves recompute as before
+    END;
+  ELSE
+    SELECT string_agg(table_name||':'||generation::text||':'||revision::text,'|' ORDER BY table_name)
+      INTO v_stamp
+    FROM f3_runtime.collection_filter_f3_evidence_epoch;
+  END IF;
+  RETURN v_stamp;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.collection_filter_f3_evidence_stamp(BOOLEAN) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.collection_filter_f3_evidence_stamp(BOOLEAN) TO radar_app;
+
+-- Track only columns used to classify/rank F3 evidence where possible.
+-- INSERT/DELETE/TRUNCATE always invalidate; no old row can be silently reused.
+DO $$
+DECLARE t RECORD;
+BEGIN
+ FOR t IN SELECT * FROM (VALUES
+   ('publications','id,title,act_type'),
+   ('publication_versions','id,publication_id,is_current,content_text,relevant_excerpt,source_metadata,content_hash'),
+   ('publication_origins','id,publication_id,source_id,metadata'),
+   ('publication_files','id,publication_version_id'),
+   ('company_publications','publication_id,company_id'),
+   ('sources','id,code'),
+   ('collection_filter_policies','id,version,revision,status,context_window_words,weak_score_threshold,title_weight,summary_weight,body_weight'),
+   ('collection_filter_type_rules','policy_id,source_code,section,canonical_type,mode'),
+   ('collection_filter_type_aliases','policy_id,source_code,section,normalized_alias,canonical_type'),
+   ('collection_filter_terms','policy_id,term_text,strength,source_code,section,canonical_type,location_scope')
+ ) AS tracked(relation_name,updated_columns)
+ LOOP
+   EXECUTE format('CREATE TRIGGER %I AFTER INSERT OR DELETE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.collection_filter_f3_epoch_touch()',
+     'trg_f3_witness_insert_delete_'||t.relation_name,t.relation_name);
+   EXECUTE format('CREATE TRIGGER %I AFTER UPDATE OF %s ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.collection_filter_f3_epoch_touch()',
+     'trg_f3_witness_update_'||t.relation_name,t.updated_columns,t.relation_name);
+   EXECUTE format('CREATE TRIGGER %I AFTER TRUNCATE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.collection_filter_f3_epoch_touch()',
+     'trg_f3_witness_truncate_'||t.relation_name,t.relation_name);
+ END LOOP;
+END;
+$$;
+
+
+-- Atomic safe-save capability check: policy and all evidence epochs are held
+-- together until commit when the witness is valid. A failed NOWAIT or stale
+-- stamp rolls back any locks acquired inside this PL/pgSQL subtransaction,
+-- then the application falls back to the original full F3 recomputation.
+-- No deletion authorization is granted or stored in the session.
+CREATE FUNCTION public.collection_filter_f3_safe_witness_valid(
+  p_policy_revision INTEGER,p_stamp TEXT
+) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,public AS $$
+DECLARE v_revision INTEGER;v_stamp TEXT;
+BEGIN
+  IF public.app_current_user_id() IS NULL OR NOT public.app_user_is_platform_admin() THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='platform_admin_required';
+  END IF;
+  BEGIN
+    SELECT revision INTO v_revision
+    FROM public.collection_filter_policies WHERE status='APPROVED' FOR SHARE NOWAIT;
+    IF v_revision IS DISTINCT FROM p_policy_revision THEN
+      RAISE EXCEPTION USING ERRCODE='P0002',MESSAGE='f3_witness_stale';
+    END IF;
+    SELECT string_agg(t.table_name||':'||t.generation::text||':'||t.revision::text,'|' ORDER BY t.table_name)
+      INTO v_stamp
+    FROM (SELECT table_name,generation,revision
+          FROM f3_runtime.collection_filter_f3_evidence_epoch
+          ORDER BY table_name FOR SHARE NOWAIT) t;
+    IF v_stamp IS DISTINCT FROM p_stamp THEN
+      RAISE EXCEPTION USING ERRCODE='P0002',MESSAGE='f3_witness_stale';
+    END IF;
+    RETURN TRUE;
+  EXCEPTION WHEN lock_not_available OR SQLSTATE 'P0002' THEN
+    RETURN FALSE;
+  END;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.collection_filter_f3_safe_witness_valid(INTEGER,TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.collection_filter_f3_safe_witness_valid(INTEGER,TEXT) TO radar_app;

@@ -8,7 +8,7 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { buildApp } from '../src/app.js';
 import type { DB } from '../src/infrastructure/database/database.types.js';
 import { loadApprovedCollectionFilterRuntime, evaluateRuntimeCollectionFilter } from '../src/modules/collection/collection-filter.runtime.js';
-import { evaluateHistoricalCollectionCandidate, type HistoricalCollectionCandidate } from '../src/modules/collection/collection-filter.direct.js';
+import { evaluateHistoricalCollectionCandidate, candidates, type HistoricalCollectionCandidate } from '../src/modules/collection/collection-filter.direct.js';
 import { withUserContext } from '../src/infrastructure/database/tenant-context.js';
 import { loadF3ArchivePlan } from '../src/modules/collection/collection-filter.scope-purge.js';
 import { runL17ExcludeAlways } from '../src/modules/collection/l17-daily-always.js';
@@ -218,6 +218,14 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       const result=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/preview',headers,payload:rule});assert.equal(result.statusCode,200,result.body);
       return result.json<{count:number;token:string;confirmationToken:string;policyRevision:number;blockedCompany:number;blockedOtherSource:number;confirmationToken:string;policyRevision:number}>();
     };
+    // Byte-for-byte F3 contract: prefiltered and original full-evaluation
+    // paths MUST return identical IDs, hash, company/origin protection,
+    // samples, policy revision and confirm capability in isolated PG18.
+    const baseline=await withUserContext(inspection,account.user.id,
+      trx=>candidates(trx,rule,{disableTitlePrecheck:true}));
+    const optimized=await withUserContext(inspection,account.user.id,
+      trx=>candidates(trx,rule));
+    assert.deepEqual(optimized,baseline,'F3 optimized preview must equal original engine plan');
     const first=await preview();assert.equal(first.count,1);assert.equal(first.blockedCompany,1);assert.equal(first.blockedOtherSource,1);
     const legacy=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/confirm',headers,payload:{...rule,expectedCount:first.count,previewToken:first.token}});
     assert.equal(legacy.statusCode,409,legacy.body);
@@ -228,12 +236,57 @@ test('F3 PG18: central decisions, protected origins/companies, preview-only cron
       confirmationToken:first.confirmationToken,policyRevision:first.policyRevision+1}});
     assert.equal(forgedRevision.statusCode,409,forgedRevision.body);
     assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'wrong policy revision may not delete');
-    const safeSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
+    // Adversarial stale preview: a new company link MUST invalidate the
+    // server witness transactionally, without ever touching the purge endpoint.
+    const e0=(await owner.query<{revision:string}>(
+      "SELECT revision::text AS revision FROM f3_runtime.collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
+    )).rows[0]!.revision;
+    await owner.query('INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)',
+      [company,ordinary.id]);
+    const e1=(await owner.query<{revision:string}>(
+      "SELECT revision::text AS revision FROM f3_runtime.collection_filter_f3_evidence_epoch WHERE table_name='company_publications'"
+    )).rows[0]!.revision;
+    assert.ok(BigInt(e1)>BigInt(e0),'company link must bump F3 evidence revision');
+    const staleSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
       ...rule,expectedCount:first.count,previewToken:first.token,
       confirmationToken:first.confirmationToken,policyRevision:first.policyRevision}});
+    assert.equal(staleSave.statusCode,409,staleSave.body);
+    assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1);
+    await owner.query('DELETE FROM company_publications WHERE company_id=$1 AND publication_id=$2',
+      [company,ordinary.id]);
+    const renewed=await preview();
+    assert.equal(renewed.count,1);
+    const safeSave=await app.inject({method:'POST',url:'/api/v1/admin/collection-filter/direct-rule/save',headers,payload:{
+      ...rule,expectedCount:renewed.count,previewToken:renewed.token,
+      confirmationToken:renewed.confirmationToken,policyRevision:renewed.policyRevision}});
     assert.equal(safeSave.statusCode,200,safeSave.body);
     assert.equal(safeSave.json<{deletedCount:number}>().deletedCount,0);
     assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=$1',[ordinary.id])).rowCount,1,'save is never a purge');
+    // A locked evidence stamp MUST block concurrent writes until the admin
+    // transaction commits. No table-level locks or blanket runtime grants.
+    const guard=await owner.connect();
+    const concurrent=new Pool({connectionString:adminUrl,max:1});
+    try {
+      await guard.query('BEGIN');
+      await guard.query("SELECT set_config('app.user_id',$1,true)",[account.user.id]);
+      await guard.query('SELECT public.collection_filter_f3_evidence_stamp(true)');
+      const writer=await concurrent.connect();
+      try {
+        await writer.query('BEGIN');
+        await writer.query("SET LOCAL lock_timeout = '200ms'");
+        await assert.rejects(
+          writer.query("UPDATE publication_versions SET content_text=content_text||' x' WHERE publication_id=$1",
+            [ordinary.id]),
+          (err:unknown)=>(err as {code:string}).code==='55P03',
+          'writer must block while admin holds evidence epoch snapshot lock',
+        );
+        await writer.query('ROLLBACK');
+      } finally { writer.release(); }
+    } finally {
+      await guard.query('ROLLBACK');
+      guard.release();
+      await concurrent.end();
+    }
     const additional=await fixture('new-after-preview');
     assert.equal((await owner.query('SELECT 1 FROM publications WHERE id=ANY($1::uuid[])',[[ordinary.id,additional.id]])).rowCount,2);
     const refreshed=await preview();assert.equal(refreshed.count,2);
