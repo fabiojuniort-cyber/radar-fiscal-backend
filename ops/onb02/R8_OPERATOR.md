@@ -69,9 +69,16 @@ const execute = process.argv.includes('"'"'--execute-inactive-purge'"'"');
 assert.ok(process.argv.slice(process.argv[1]?.startsWith('"'"'--'"'"') ? 1 : 2).every(x => ['"'"'--plan'"'"','"'"'--execute-inactive-purge'"'"'].includes(x)));
 assert.ok(!(execute && process.argv.includes('"'"'--plan'"'"')));
 const value = process.env.F2_ADMIN_DATABASE_URL || process.env.SOURCE_PG_DUMP_URL;
-const url = new URL(value);
-assert.ok((url.hostname === '"'"'postgres.railway.internal'"'"' && url.port === '"'"'5432'"'"') ||
-  (url.hostname === '"'"'acela.proxy.rlwy.net'"'"' && url.port === '"'"'39637'"'"'));
+let url;
+try { url = new URL(value); } catch {
+  console.log(JSON.stringify({event:'"'"'R8_STOP'"'"',committed:0,code:'"'"'invalid_database_configuration'"'"'}));
+  process.exit(2);
+}
+if (!((url.hostname === '"'"'postgres.railway.internal'"'"' && url.port === '"'"'5432'"'"') ||
+  (url.hostname === '"'"'acela.proxy.rlwy.net'"'"' && url.port === '"'"'39637'"'"'))) {
+  console.log(JSON.stringify({event:'"'"'R8_STOP'"'"',committed:0,code:'"'"'wrong_database'"'"'}));
+  process.exit(2);
+}
 const pool = new pg.Pool({connectionString:value,max:2,connectionTimeoutMillis:10000});
 const db = new Kysely({dialect:new PostgresDialect({pool})});
 const check = (condition, code) => { if (!condition) throw Object.assign(new Error(code),{safeCode:code}); };
