@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../src/modules/anatomy/build-identity.js';
+import { anatomyOutputHash, type AnatomyResult } from '../src/modules/anatomy/contract.js';
+import { analyzeAnatomy } from '../src/modules/anatomy/engine.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION } from '../src/modules/anatomy/profile.js';
 import {
-  compareProfiles, RESERVED_ENTRY_IDS, reviewDifferences, SIMULATION_LIMITS, simulateProfiles, SimulationError, type SimulationExample,
+  compareProfiles, compareResults, RESERVED_ENTRY_IDS, reviewDifferences, SIMULATION_LIMITS, simulateProfiles, SimulationError, type SimulationExample,
 } from '../src/modules/anatomy/rules-simulation.js';
 
 // ANAT-ADMIN-01 / P2 (issue #116). SYNTHETIC examples only: no corpus entry, gold or reserve is read.
@@ -82,7 +84,7 @@ test('P2 comparison: parts, entities, relations, limitations and eligibility, id
   const c = compareProfiles({ example: table, before: defaults(), after: candidate });
   assert.equal(c.before.engineHash, ANATOMY_ENGINE_BUILD_HASH); assert.equal(c.after.engineHash, ANATOMY_ENGINE_BUILD_HASH);
   assert.notEqual(c.before.ruleSetHash, c.after.ruleSetHash);
-  assert.notEqual(c.beforeProfileSetHash, c.afterProfileSetHash);
+  assert.notEqual(c.provenance.beforeProfileSetHash, c.provenance.afterProfileSetHash);
   const cats = new Set(c.differences.map((d) => d.category));
   assert.ok(cats.has('entity') && cats.has('eligibility'), [...cats].join(','));
   const added = c.differences.find((d) => d.category === 'entity' && d.change === 'added')!;
@@ -124,4 +126,71 @@ test('P2 review: explicit classification; counts never decide; unknown ids and t
   assert.equal(codeOf(() => reviewDifferences(c, [{ differenceId: c.differences[0]!.id, decision: 'maybe' }])), 'invalid_input');
   const tampered = { ...c, differences: c.differences.slice(1) };
   assert.equal(codeOf(() => reviewDifferences(tampered, [])), 'invalid_input', 'review is bound to the exact comparison');
+});
+
+// Review P2-R1 (PR #255, BLOCK on aec5ebd). Synthetic reproductions of the three findings.
+const synthetic = (html: string): AnatomyResult => analyzeAnatomy({ publicationVersionId: 's', referenceDate: '2026-10-23', ruleSet: { id: 's', version: '1' },
+  input: { source: 'RFB', representationId: 'synthetic://p2r1', html } });
+const reseal = (r: AnatomyResult, mutate: (x: AnatomyResult) => void): AnatomyResult => { const c = structuredClone(r); mutate(c); c.outputHash = anatomyOutputHash(c); return c; };
+
+test('P2-R1-01: every exposed provenance hash is inside the comparison id; tampering any of them is refused', () => {
+  const c = compareProfiles({ example: table, before: defaults(), after: candidate });
+  assert.match(c.provenance.beforeProfileSetHash!, /^[0-9a-f]{64}$/u);
+  assert.equal(reviewDifferences(c, []).comparisonId, c.id);
+  const mutations: [string, (x: typeof c) => void][] = [
+    ['afterProfileSetHash', (x) => { x.provenance.afterProfileSetHash = 'f'.repeat(64); }],
+    ['beforeProfileSetHash', (x) => { x.provenance.beforeProfileSetHash = 'f'.repeat(64); }],
+    ['provenance removed', (x) => { x.provenance.afterProfileSetHash = null; }],
+    ['before.engineHash', (x) => { x.before.engineHash = '0'.repeat(64); }],
+    ['after.ruleSetHash', (x) => { x.after.ruleSetHash = '0'.repeat(64); }],
+    ['after.outputHash', (x) => { x.after.outputHash = '0'.repeat(64); }],
+    ['before.analysisId', (x) => { x.before.analysisId = '0'.repeat(64); }],
+    ['snapshot', (x) => { x.snapshot.inputTextHash = '0'.repeat(64); }],
+    ['counts', (x) => { x.counts.entity.after += 1; }],
+    ['unknown field', (x) => { (x as unknown as Record<string, unknown>).extra = 'x'; }],
+  ];
+  for (const [name, mutate] of mutations) { const x = structuredClone(c); mutate(x); assert.equal(codeOf(() => reviewDifferences(x, [])), 'invalid_input', name); }
+  // compareResults without profile sets stays usable: provenance is explicitly null and covered by the id.
+  const r = synthetic('<p>Art. 1o NCM 8471.30.12.</p>');
+  const plain = compareResults(r, r);
+  assert.deepEqual(plain.provenance, { beforeProfileSetHash: null, afterProfileSetHash: null });
+  assert.equal(reviewDifferences(plain, []).verdict, 'clear');
+});
+
+test('P2-R1-02: occurrences sharing a content key are never collapsed (duplicates, different attributes, order)', () => {
+  const base = synthetic('<p>Art. 1o NCM 8471.30.12.</p>');
+  const ncm = base.entities.find((e) => e.domain === 'NCM')!;
+  const dup = reseal(base, (x) => { x.entities.unshift({ ...structuredClone(ncm), id: 'extra-duplicate', ruleId: 'synthetic.extra' }); });
+  const dupSame = reseal(base, (x) => { x.entities.unshift({ ...structuredClone(ncm), id: 'extra-identical' }); });
+  // Removal of a duplicate with a different attribute is reported.
+  const c1 = compareResults(dup, base);
+  assert.deepEqual(c1.counts.entity, { before: base.entities.length + 1, after: base.entities.length });
+  assert.ok(c1.differences.some((d) => d.category === 'entity' && d.change === 'removed' && (d.before as { ruleId: string }).ruleId === 'synthetic.extra'));
+  assert.equal(reviewDifferences(c1, []).verdict, 'incomplete', 'the removal must be classified');
+  // Removal of an identical duplicate is reported too.
+  const c2 = compareResults(dupSame, base);
+  assert.equal(c2.differences.filter((d) => d.category === 'entity' && d.change === 'removed').length, 1);
+  // Reordering occurrences changes nothing.
+  const reordered = reseal(dup, (x) => { x.entities.reverse(); });
+  assert.deepEqual(compareResults(dup, reordered).differences, []);
+  // Same multiplicity on both sides: no difference.
+  assert.deepEqual(compareResults(dup, dup).differences, []);
+  // Every occurrence is accounted for: added + removed surplus equals the count difference, in every category.
+  for (const cat of ['part', 'entity', 'relation', 'limitation', 'eligibility'] as const) {
+    const added = c1.differences.filter((d) => d.category === cat && d.change === 'added').length;
+    const removed = c1.differences.filter((d) => d.category === cat && d.change === 'removed').length;
+    assert.equal(added - removed, c1.counts[cat].after - c1.counts[cat].before, cat);
+  }
+});
+
+test('P2-R1-03: compareResults validates both inputs (contract, outputHash, analysisId)', () => {
+  const r = synthetic('<p>Art. 1o NCM 8471.30.12.</p>');
+  const badHash = structuredClone(r); badHash.outputHash = '0'.repeat(64);
+  const badId = reseal(r, (x) => { x.analysisId = '0'.repeat(64); });
+  const badRef = reseal(r, (x) => { x.entities[0]!.partId = 'missing-part'; });
+  for (const [name, bad] of [['outputHash', badHash], ['analysisId', badId], ['contract reference', badRef]] as const) {
+    assert.equal(codeOf(() => compareResults(bad, r)), 'invalid_input', `before ${name}`);
+    assert.equal(codeOf(() => compareResults(r, bad)), 'invalid_input', `after ${name}`);
+  }
+  assert.equal(codeOf(() => compareResults(r, r, { beforeProfileSetHash: 'nope', afterProfileSetHash: null })), 'invalid_input');
 });

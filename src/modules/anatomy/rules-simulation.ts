@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ANATOMY_ENGINE_BUILD_HASH } from './build-identity.js';
-import { canonicalJson, sha256, type AnatomyResult } from './contract.js';
+import { anatomyIdentityHash, anatomyOutputHash, canonicalJson, sha256, validateAnatomyResult, type AnatomyResult } from './contract.js';
 import { analyzeAnatomy, type AnatomyRequest } from './engine.js';
 import { ProfileValidationError, resolveEffectiveProfile } from './profile.js';
 
@@ -104,42 +104,66 @@ export function simulateProfiles(raw: { profiles: unknown[]; examples: Simulatio
 
 export type DiffCategory = 'part' | 'entity' | 'relation' | 'limitation' | 'eligibility';
 export interface Difference { id: string; category: DiffCategory; key: string; change: 'added' | 'removed' | 'changed'; before: unknown; after: unknown }
+/** Profile-set provenance; null when the caller compares two results without profile sets (compareResults). */
+export interface ComparisonProvenance { beforeProfileSetHash: string | null; afterProfileSetHash: string | null }
 export interface Comparison {
+  /** SHA-256 of the canonical envelope: every other field below, provenance included (review P2-R1-01). */
   id: string;
   snapshot: { inputTextHash: string; inputPresentationHash: string | null };
-  before: { engineHash: string; ruleSetHash: string; outputHash: string; status: string };
-  after: { engineHash: string; ruleSetHash: string; outputHash: string; status: string };
+  before: { engineHash: string; ruleSetHash: string; outputHash: string; analysisId: string; status: string };
+  after: { engineHash: string; ruleSetHash: string; outputHash: string; analysisId: string; status: string };
+  provenance: ComparisonProvenance;
   differences: Difference[];
-  /** Informational only: a count change never decides a regression (see reviewDifferences). */
+  /** Informational only: occurrence counts per category; a count change never decides a regression. */
   counts: Record<DiffCategory, { before: number; after: number }>;
 }
+const ENVELOPE_KEYS = ['id', 'snapshot', 'before', 'after', 'provenance', 'differences', 'counts'] as const;
+const envelopeId = (c: Omit<Comparison, 'id'>) => sha256(canonicalJson({ snapshot: c.snapshot, before: c.before, after: c.after,
+  provenance: c.provenance, differences: c.differences, counts: c.counts }));
 
 const spanKey = (s: { start: number; end: number } | null) => (s ? `${s.start}-${s.end}` : 'null');
-function itemsOf(r: AnatomyResult): Record<DiffCategory, Map<string, unknown>> {
+/** Items per category as MULTISETS (key → values): occurrences sharing a content key are never collapsed (P2-R1-02). */
+function itemsOf(r: AnatomyResult): Record<DiffCategory, Map<string, unknown[]>> {
   const partKey = new Map(r.parts.map((p) => [p.id, `${p.type}@${spanKey(p.span)}`]));
   const entityKey = new Map(r.entities.map((e) => [e.id, `${e.domain}@${spanKey(e.span)}`]));
-  const out: Record<DiffCategory, Map<string, unknown>> = { part: new Map(), entity: new Map(), relation: new Map(), limitation: new Map(), eligibility: new Map() };
-  for (const p of r.parts) out.part.set(partKey.get(p.id)!, { context: p.context, contextReasons: p.contextReasons, recognition: p.recognition,
-    coverage: p.coverage, parent: p.parentId === null ? null : partKey.get(p.parentId) ?? null, table: p.table });
+  const out: Record<DiffCategory, Map<string, unknown[]>> = { part: new Map(), entity: new Map(), relation: new Map(), limitation: new Map(), eligibility: new Map() };
+  const add = (c: DiffCategory, key: string, value: unknown) => { const list = out[c].get(key) ?? []; list.push(value); out[c].set(key, list); };
+  for (const p of r.parts) add('part', partKey.get(p.id)!, { label: p.label, context: p.context, contextReasons: p.contextReasons, recognition: p.recognition,
+    coverage: p.coverage, ruleId: p.ruleId, legalStatus: p.legalStatus, parent: p.parentId === null ? null : partKey.get(p.parentId) ?? null, table: p.table });
   for (const e of r.entities) {
-    out.entity.set(entityKey.get(e.id)!, { literal: e.literal, normalized: e.normalized, part: partKey.get(e.partId) ?? null, ruleId: e.ruleId, validation: e.validation });
-    if (e.relation) out.relation.set(entityKey.get(e.id)!, { kind: e.relation.kind, operator: e.relation.operator, condition: e.relation.condition,
+    add('entity', entityKey.get(e.id)!, { literal: e.literal, normalized: e.normalized, part: partKey.get(e.partId) ?? null, ruleId: e.ruleId,
+      confidence: e.confidence, validation: e.validation });
+    if (e.relation) add('relation', entityKey.get(e.id)!, { kind: e.relation.kind, operator: e.relation.operator, condition: e.relation.condition,
       group: entityKey.get(e.relation.groupId) ?? e.relation.groupId, targets: e.relation.targetEntityIds.map((t) => entityKey.get(t) ?? t).sort(),
       scope: partKey.get(e.relation.scopePartId) ?? null, expansion: e.relation.expansion });
   }
-  const limitationCount = new Map<string, number>();
-  for (const l of r.limitations) {
-    const base = `${l.code}@${spanKey(l.span)}@${l.partId === null ? 'null' : partKey.get(l.partId) ?? l.partId}`;
-    const n = (limitationCount.get(base) ?? 0) + 1; limitationCount.set(base, n);
-    out.limitation.set(`${base}#${n}`, { message: l.message });
-  }
-  for (const x of r.eligibility) out.eligibility.set(`${x.purpose}@${spanKey(x.span)}@${x.entityId ? entityKey.get(x.entityId) : x.partId ? partKey.get(x.partId) : 'null'}`,
+  for (const l of r.limitations) add('limitation', `${l.code}@${spanKey(l.span)}@${l.partId === null ? 'null' : partKey.get(l.partId) ?? l.partId}`, { message: l.message });
+  for (const x of r.eligibility) add('eligibility', `${x.purpose}@${spanKey(x.span)}@${x.entityId ? entityKey.get(x.entityId) : x.partId ? partKey.get(x.partId) : 'null'}`,
     { eligible: x.eligible, exclusionReasons: [...x.exclusionReasons].sort(), evidenceIds: x.evidenceIds });
   return out;
 }
 
-/** Deterministic content diff of two results computed from the same input snapshot. */
-export function compareResults(before: AnatomyResult, after: AnatomyResult): Comparison {
+/** Valid, untampered contract result: schema/cross-references, outputHash and analysisId recomputed (P2-R1-03). */
+function assertValidResult(r: AnatomyResult, side: string): AnatomyResult {
+  let valid: AnatomyResult;
+  try { valid = validateAnatomyResult(r); } catch (error) {
+    throw new SimulationError('invalid_input', `${side} result violates the contract: ${error instanceof Error ? error.message.slice(0, 300) : 'invalid'}`, error);
+  }
+  if (anatomyOutputHash(valid) !== valid.outputHash) throw new SimulationError('invalid_input', `${side} result outputHash does not match its content`);
+  if (anatomyIdentityHash(valid.identity) !== valid.analysisId) throw new SimulationError('invalid_input', `${side} result analysisId does not match its identity`);
+  return valid;
+}
+
+/**
+ * Deterministic content diff of two valid results computed from the same input snapshot. Occurrences with the same
+ * content key are matched one to one: identical values first, then the remaining ones in canonical order as
+ * `changed`, and any surplus as `added`/`removed`. Order of occurrences in the inputs does not matter.
+ */
+export function compareResults(beforeRaw: AnatomyResult, afterRaw: AnatomyResult, provenance: ComparisonProvenance = { beforeProfileSetHash: null, afterProfileSetHash: null }): Comparison {
+  const before = assertValidResult(beforeRaw, 'before'); const after = assertValidResult(afterRaw, 'after');
+  for (const h of [provenance.beforeProfileSetHash, provenance.afterProfileSetHash]) {
+    if (h !== null && !/^[0-9a-f]{64}$/u.test(h)) throw new SimulationError('invalid_input', 'profile set hashes must be SHA-256 hex or null');
+  }
   if (before.identity.inputTextHash !== after.identity.inputTextHash || before.identity.inputPresentationHash !== after.identity.inputPresentationHash) {
     throw new SimulationError('invalid_input', 'results come from different input snapshots');
   }
@@ -147,23 +171,33 @@ export function compareResults(before: AnatomyResult, after: AnatomyResult): Com
   const differences: Difference[] = [];
   const categories: DiffCategory[] = ['part', 'entity', 'relation', 'limitation', 'eligibility'];
   for (const category of categories) {
-    const keys = [...new Set([...a[category].keys(), ...b[category].keys()])].sort();
-    for (const key of keys) {
-      const x = a[category].get(key); const y = b[category].get(key);
-      const change = x === undefined ? 'added' : y === undefined ? 'removed' : canonicalJson(x) === canonicalJson(y) ? null : 'changed';
-      if (!change) continue;
-      differences.push({ id: sha256(canonicalJson({ category, key, change, x: x ?? null, y: y ?? null })).slice(0, 32), category, key, change, before: x ?? null, after: y ?? null });
+    for (const key of [...new Set([...a[category].keys(), ...b[category].keys()])].sort()) {
+      const left = (a[category].get(key) ?? []).map((v) => canonicalJson(v)).sort();
+      const right = (b[category].get(key) ?? []).map((v) => canonicalJson(v)).sort();
+      // Remove identical occurrences pairwise (multiset intersection).
+      const remaining = [...right];
+      const unmatchedLeft: string[] = [];
+      for (const v of left) { const i = remaining.indexOf(v); if (i >= 0) remaining.splice(i, 1); else unmatchedLeft.push(v); }
+      const n = Math.max(unmatchedLeft.length, remaining.length);
+      for (let i = 0; i < n; i++) {
+        const x = unmatchedLeft[i]; const y = remaining[i];
+        const change = x === undefined ? 'added' : y === undefined ? 'removed' : 'changed';
+        const occurrenceKey = `${key}#${i + 1}`;
+        const before = x === undefined ? null : JSON.parse(x); const after = y === undefined ? null : JSON.parse(y);
+        differences.push({ id: sha256(canonicalJson({ category, key: occurrenceKey, change, before, after })).slice(0, 32), category, key: occurrenceKey, change, before, after });
+      }
     }
   }
-  const head = (r: AnatomyResult) => ({ engineHash: r.identity.engineHash, ruleSetHash: r.identity.ruleSetHash, outputHash: r.outputHash, status: r.status });
-  const counts = Object.fromEntries(categories.map((c) => [c, { before: a[c].size, after: b[c].size }])) as Comparison['counts'];
+  const head = (r: AnatomyResult) => ({ engineHash: r.identity.engineHash, ruleSetHash: r.identity.ruleSetHash, outputHash: r.outputHash, analysisId: r.analysisId, status: r.status });
+  const size = (m: Map<string, unknown[]>) => [...m.values()].reduce((n, l) => n + l.length, 0);
+  const counts = Object.fromEntries(categories.map((c) => [c, { before: size(a[c]), after: size(b[c]) }])) as Comparison['counts'];
   const body = { snapshot: { inputTextHash: before.identity.inputTextHash, inputPresentationHash: before.identity.inputPresentationHash },
-    before: head(before), after: head(after), differences, counts };
-  return { id: sha256(canonicalJson(body)), ...body };
+    before: head(before), after: head(after), provenance: { ...provenance }, differences, counts };
+  return { id: envelopeId(body), ...body };
 }
 
-/** Runs one synthetic example under two profile sets and compares the results. */
-export function compareProfiles(raw: { example: SimulationExample; before: unknown[]; after: unknown[] }): Comparison & { beforeProfileSetHash: string; afterProfileSetHash: string } {
+/** Runs one synthetic example under two profile sets and compares the results; profile-set hashes are inside the id. */
+export function compareProfiles(raw: { example: SimulationExample; before: unknown[]; after: unknown[] }): Comparison {
   const e = example.safeParse(raw.example);
   if (!e.success) throw new SimulationError('invalid_input', e.error.issues.map((i) => i.message).join('; '));
   const run = (profiles: unknown[]) => {
@@ -172,8 +206,8 @@ export function compareProfiles(raw: { example: SimulationExample; before: unkno
       throw error;
     }
   };
-  const comparison = compareResults(run(raw.before), run(raw.after));
-  return { ...comparison, beforeProfileSetHash: sha256(canonicalJson(raw.before)), afterProfileSetHash: sha256(canonicalJson(raw.after)) };
+  return compareResults(run(raw.before), run(raw.after),
+    { beforeProfileSetHash: sha256(canonicalJson(raw.before)), afterProfileSetHash: sha256(canonicalJson(raw.after)) });
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -194,10 +228,11 @@ const decisionInput = z.array(z.strictObject({ differenceId: z.string().min(1), 
  * The verdict depends only on these explicit decisions, never on how many items were added or removed.
  */
 export function reviewDifferences(comparison: Comparison, rawDecisions: unknown): Review {
+  // The review binds to the whole envelope: no unknown fields, and the id must equal the hash of every other field.
+  const keys = Object.keys(comparison).sort();
+  if (keys.join() !== [...ENVELOPE_KEYS].sort().join()) throw new SimulationError('invalid_input', `comparison has unexpected fields: ${keys.join(', ')}`);
   const { id, ...body } = comparison;
-  if (sha256(canonicalJson({ snapshot: body.snapshot, before: body.before, after: body.after, differences: body.differences, counts: body.counts })) !== id) {
-    throw new SimulationError('invalid_input', 'comparison content does not match its id');
-  }
+  if (envelopeId(body) !== id) throw new SimulationError('invalid_input', 'comparison content does not match its id');
   const parsed = decisionInput.safeParse(rawDecisions);
   if (!parsed.success) throw new SimulationError('invalid_input', parsed.error.issues.map((i) => i.message).join('; '));
   const known = new Set(comparison.differences.map((d) => d.id));
