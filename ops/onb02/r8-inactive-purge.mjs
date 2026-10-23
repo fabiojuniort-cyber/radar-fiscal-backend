@@ -6,7 +6,7 @@ import pg from 'pg';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 
 const execute = process.argv.includes('--execute-inactive-purge');
-assert.ok(process.argv.slice(2).every(x => ['--plan','--execute-inactive-purge'].includes(x)));
+assert.ok(process.argv.slice(process.argv[1]?.startsWith('--') ? 1 : 2).every(x => ['--plan','--execute-inactive-purge'].includes(x)));
 assert.ok(!(execute && process.argv.includes('--plan')));
 const value = process.env.F2_ADMIN_DATABASE_URL || process.env.SOURCE_PG_DUMP_URL;
 const url = new URL(value);
@@ -101,7 +101,7 @@ try {
   }
 } catch(error) {
   // Never print PostgreSQL message/detail, URLs, SQL parameters, IDs or payload.
-  console.log(JSON.stringify({event:'R8_STOP',committed,current_transaction_rolled_back:true,
+  console.log(JSON.stringify({event:'R8_STOP',committed,transaction_failure_rolls_back:true,
     code:error.safeCode || error.code || 'unclassified_failure'}));
   process.exitCode=2;
 } finally { await db.destroy(); }
