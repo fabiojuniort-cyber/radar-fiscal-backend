@@ -1,7 +1,8 @@
 name: ANAT-04 disposable CI
 on:
   pull_request:
-    # main plus the bases of the stacked ANAT PRs (#244 → #248 → #249 → #250 → #252 → #253 → this PR), so a PR in the
+    # main plus the bases of the stacked ANAT PRs (#244 → #248 → #249 → #250 → #252 → #253 → …; P3-B1 stacks on
+    # feat/anat-admin-p3-design), so a PR in the
     # stack runs this workflow when its head carries this file. Event types (draft behaviour) are unchanged.
     branches:
       - main
@@ -12,12 +13,15 @@ on:
       - feat/anat-unicode-01b-map
       - feat/anat-unicode-01b-integration
       - feat/anat-ci-stack
+      - feat/anat-admin-p3-design
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'src/modules/anatomy/**'
       - 'test/anatomy.*'
       - 'test/fixtures/anatomy/**'
       - 'test/support/anatomy-ci-schema.sql'
+      - 'test/support/anatomy-*.sql'
+      - 'test/support/anatomy-audit-chain/**'
       - 'test/support/anatomy-*.ts'
       - 'ops/anatomy/**'
       - 'docs/anatomy/**'
@@ -60,6 +64,44 @@ jobs:
       - run: npm ci
       - name: Offline isolation guards and disposable schema integration
         run: node --import tsx --test test/anatomy.schema.integration.test.ts
+  # ANAT-ADMIN-01 / P3-B1: admin persistence and audit rehearsal. Needs a FRESH database (the test commits so two
+  # clients can race), hence its own job and service per PostgreSQL major. Test SQL only (test/support); no migrations.
+  anatomy-admin-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server version
+        run: node -e "const pg=require('pg'); const c=new pg.Client(process.env.ANAT04_CI_DATABASE_URL); c.connect().then(()=>c.query('SHOW server_version')).then(r=>{console.log(r.rows[0].server_version); if(!r.rows[0].server_version.startsWith('${{ matrix.postgres }}.')) process.exit(1); return c.end();})"
+      - name: Admin schema, audit chain, tokens and concurrency (disposable database)
+        run: node --import tsx --test test/anatomy.admin-schema.integration.test.ts
   # Synthetic-only checks. Corpus/gold readers are excluded on purpose: anatomy.dev-canonical, anatomy.gold,
   # anatomy.corpus-integrity and anatomy.evaluation (and the aggregate test:anatomy that includes them) are NOT run.
   anatomy-synthetic:
