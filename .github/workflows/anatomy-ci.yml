@@ -1,13 +1,24 @@
 name: ANAT-04 disposable CI
 on:
   pull_request:
-    branches: [main]
+    # main plus the bases of the stacked ANAT PRs (#244 → #248 → #249 → #250 → #252 → #253 → this PR), so a PR in the
+    # stack runs this workflow when its head carries this file. Event types (draft behaviour) are unchanged.
+    branches:
+      - main
+      - feat/anat-04-core
+      - feat/anat-p1a-profiles
+      - feat/anat-p1b-engine-profiles
+      - feat/anat-unicode-01a
+      - feat/anat-unicode-01b-map
+      - feat/anat-unicode-01b-integration
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'src/modules/anatomy/**'
       - 'test/anatomy.*'
       - 'test/fixtures/anatomy/**'
       - 'test/support/anatomy-ci-schema.sql'
+      - 'test/support/anatomy-*.ts'
+      - 'ops/anatomy/**'
       - 'docs/anatomy/**'
       - '.github/workflows/anatomy-ci.yml'
       - 'package.json'
@@ -48,3 +59,35 @@ jobs:
       - run: npm ci
       - name: Offline isolation guards and disposable schema integration
         run: node --import tsx --test test/anatomy.schema.integration.test.ts
+  # Synthetic-only checks. Corpus/gold readers are excluded on purpose: anatomy.dev-canonical, anatomy.gold,
+  # anatomy.corpus-integrity and anatomy.evaluation (and the aggregate test:anatomy that includes them) are NOT run.
+  anatomy-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Runtime (the NFC shadow requires Unicode 17.0)
+        run: node -e "const v=process.versions; console.log(v.node, v.icu, v.unicode); if (v.unicode !== '17.0') process.exit(1)"
+      - name: Synthetic unit tests (no corpus or gold)
+        run: >-
+          node --import tsx --test
+          test/anatomy.contract.unit.test.ts test/anatomy.consumer.unit.test.ts test/anatomy.engine.unit.test.ts
+          test/anatomy.entities.unit.test.ts test/anatomy.readers.unit.test.ts test/anatomy.dou-preparation.unit.test.ts
+          test/anatomy.json-preparation.unit.test.ts test/anatomy.evaluation-adapter.unit.test.ts test/anatomy.profile.unit.test.ts
+          test/anatomy.profile-engine.unit.test.ts test/anatomy.unicode.unit.test.ts test/anatomy.unicode-recovery.unit.test.ts
+          test/anatomy.nfc-shadow.unit.test.ts
+      - name: Engine identity
+        run: node ops/anatomy/build-identity.mjs
+      - name: NFC shadow table (generator verification)
+        run: node ops/anatomy/nfc-shadow-table.mjs
+      - name: Synthetic structural snapshot
+        run: node --import tsx ops/anatomy/synthetic-snapshot.ts
