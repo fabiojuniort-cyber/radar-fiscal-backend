@@ -69,8 +69,8 @@ try {
   if (!execute) {
     console.log(JSON.stringify({event:'R8_PLAN_OK',purged:0,expected_inactive:3}));
   } else {
-    // The Issue must record reviewed exact artifact and backup/restore evidence,
-    // or the user's explicit operation-specific waiver BEFORE this command.
+    // The Issue must record review of this exact operator artifact before execution.
+    // ONB-02 backup/restore waiver remains ACCEPTED_RISK (Issue #118, 6230378528).
     const {purgeCompany} = await import(pathToFileURL(resolve('dist/modules/company/company-purge.service.js')).href);
     const {withTenantContext} = await import(pathToFileURL(resolve('dist/infrastructure/database/tenant-context.js')).href);
     for (const target of preflight.inv.inactive) {

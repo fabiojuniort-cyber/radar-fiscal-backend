@@ -5,12 +5,15 @@ em 1 tenant; 2 ativas; 0 auditorias pendentes; health HTTP 200. Nenhuma purga fe
 
 ## Gate antes de executar
 
-Operação destrutiva R3. Registrar na Issue #118: revisão independente do SHA exato
-do script abaixo, backup dentro da Railway + restauração testada em Postgres
-temporário dentro da Railway + dry-run/rollback com resultado esperado, ou
-dispensa explícita do Fábio das salvaguardas ausentes para ESTA purga R8.
-A dispensa do backfill anterior não é uma dispensa desta operação.
-Sem esse gate, executar somente o preflight READ ONLY; não usar o comando abaixo.
+Operação destrutiva R3. A autorização atual permite purgar somente as 3 inativas.
+A decisão ONB-02 de não criar backup novo nem realizar ensaio de restauração já
+está registrada: https://github.com/fabiojuniort-cyber/tribusca-control/issues/118#issuecomment-6230378528 .
+Ela permanece ACCEPTED_RISK; não reabrir essa decisão nem declarar restore/PITR
+comprovado. Integridade de outras empresas e dados globais não foi dispensada.
+Registrar na Issue #118 a revisão independente do SHA exato do novo script e
+a evidência de validação aplicável. O EXEC não emite esse parecer nesta sessão.
+Enquanto o artefato operacional não tiver esse gate, executar somente o preflight
+READ ONLY; não usar o comando abaixo.
 
 O script versionado está em ops/onb02/r8-inactive-purge.mjs.
 O comando inline contém o mesmo código e usa os módulos compilados já implantados
@@ -129,8 +132,8 @@ try {
   if (!execute) {
     console.log(JSON.stringify({event:'"'"'R8_PLAN_OK'"'"',purged:0,expected_inactive:3}));
   } else {
-    // The Issue must record reviewed exact artifact and backup/restore evidence,
-    // or the user'"'"'s explicit operation-specific waiver BEFORE this command.
+    // The Issue must record review of this exact operator artifact before execution.
+    // ONB-02 backup/restore waiver remains ACCEPTED_RISK (Issue #118, 6230378528).
     const {purgeCompany} = await import(pathToFileURL(resolve('"'"'dist/modules/company/company-purge.service.js'"'"')).href);
     const {withTenantContext} = await import(pathToFileURL(resolve('"'"'dist/infrastructure/database/tenant-context.js'"'"')).href);
     for (const target of preflight.inv.inactive) {
