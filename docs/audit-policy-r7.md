@@ -1,4 +1,4 @@
-# Auditoria R7.3 — política aprovada em 19/10/2026
+# Auditoria R7.4 — política aprovada em 19/10/2026
 
 ## Contrato
 
@@ -270,3 +270,29 @@ O primeiro comando deve retornar PUBLISHED; uma nova conexão precisa observar a
 release e a auditoria confirmadas, com o ator canônico e hash do artefato.
 A repetição retorna ALREADY_PUBLISHED e não duplica o evento.
 Nenhuma taxonomia real é publicada por esse teste.
+
+## R7.4 — três operadores históricos fora da main
+
+A migration 075 estende os 52 contratos anteriores com três pares explícitos,
+sem modificar a 074 já aplicada e sem executar o backfill. As 40 origens do código
+original continuam no inventário; três contratos históricos adicionais apontam à
+075 e à evidência detalhada em [audit-historical-events-r74.md](audit-historical-events-r74.md).
+São 43 entradas no inventário e 55 políticas totais; não são 43 escritores ativos.
+
+| Evento | Entidade | IDs/contexto retidos |
+| --- | --- | --- |
+| MERGE_RFB_NORMAS_DOU_HISTORICAL | publication | IDs das duas publicações e da resultante; hashes das identidades; external IDs em enum fechado dos 11 pares; origins exatamente [dou, rfb-normas] |
+| TAXONOMY_CURATION_SECTOR_ALIASES_CLEARED | taxonomy_curation | ID da release no cabeçalho; removedSynonyms, rowsAffected |
+| TAXONOMY_DRAFT_ORPHAN_RELATIONS_REMOVED | taxonomy_release | ID da release no cabeçalho; removedRelationIds (UUIDs), removedCount, preservedHistory |
+
+Todos admitem actor_redacted, metadado reservado exclusivamente ao backfill.
+Listas de aliases/snapshots e justification/reason livres não são permitidos;
+a remoção histórica também elimina a antiga cópia de recuperação de aliases na
+auditoria. Não confundir essa trilha minimizada com backup da curadoria.
+A enumeração de external IDs e a constante origins não abrem texto/listas livres.
+Eventos futuros sem política continuam bloqueados antes de qualquer escrita.
+
+PROD-1.1 prepara a 075 e os testes; não a aplica em produção, não executa --apply
+e não autoriza merge. A origem inline do reparo de relações não foi recuperada:
+seu contrato foi conferido por chaves/tipos em leitura produtiva e recibo histórico,
+conforme as limitações explicitadas na evidência. Não atribuir a ele código inventado.
