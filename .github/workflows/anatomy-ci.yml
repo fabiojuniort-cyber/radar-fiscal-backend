@@ -11,6 +11,7 @@ on:
       - feat/anat-unicode-01a
       - feat/anat-unicode-01b-map
       - feat/anat-unicode-01b-integration
+      - feat/anat-ci-stack
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'src/modules/anatomy/**'
