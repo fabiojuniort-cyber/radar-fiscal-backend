@@ -77,10 +77,25 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     await admin.query("UPDATE companies SET trade_name='Marca São R5' WHERE id=$1",[target.company.id]);
     await admin.query("UPDATE companies SET trade_name='MARCA SAO R5' WHERE id=$1",[sibling.company.id]);
     await admin.query("UPDATE companies SET trade_name='Empresa Legada Excluir' WHERE id=$1",[remote.company.id]);
-    // R4: preexisting inactive companies MUST stay dormant with their profiles.
+    // R8: an unrelated active company and its profile must survive another company's purge.
     const dormantCnpj = validCnpj('24681357');
-    const dormant = await createCompany(a, dormantCnpj, 'Empresa Inativa Legada');
-    await admin.query('UPDATE companies SET is_active=false WHERE id=$1',[dormant.company.id]);
+    const dormant = await createCompany(a, dormantCnpj, 'Empresa Ativa Preservada');
+    // The database invariant covers every writer, including direct/admin SQL.
+    const activeOnly = (error: unknown) =>
+      (error as { code?: string; constraint?: string }).code === '23514' &&
+      (error as { constraint?: string }).constraint === 'companies_active_only';
+    await assert.rejects(
+      admin.query('UPDATE companies SET is_active=false WHERE id=$1', [dormant.company.id]),
+      activeOnly,
+    );
+    await assert.rejects(
+      admin.query(`INSERT INTO companies(tenant_id,legal_name,head_office_cnpj,is_active)
+        VALUES($1,'R8 synthetic rejected company',$2,false)`, [a.tenantId, validCnpj('13572468')]),
+      activeOnly,
+    );
+    assert.equal((await admin.query('SELECT is_active FROM companies WHERE id=$1',
+      [dormant.company.id])).rows[0]?.is_active, true);
+    assert.equal((await admin.query('SELECT count(*)::int AS n FROM companies WHERE is_active=false')).rows[0]?.n, 0);
     await admin.query(
       "INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,is_current) VALUES($1,1,'LUCRO_REAL',true)",
       [dormant.company.id],
@@ -572,7 +587,7 @@ test('ONB-02 R3: complete company graph, symmetric guards, legacy name, unrelate
     const dormantAfter=(await admin.query<{is_active:boolean}>(`
       SELECT is_active FROM companies WHERE id=$1
     `,[dormant.company.id])).rows[0];
-    assert.equal(dormantAfter?.is_active,false, 'preexisting inactive company must not be purged');
+    assert.equal(dormantAfter?.is_active,true, 'unrelated active company must not be purged');
     assert.equal(await count('company_tax_profiles','company_id',dormant.company.id),1);
     const attemptReactivation = await app.inject({
       method:'POST',url:'/api/v1/companies/manual',headers:a.headers,
