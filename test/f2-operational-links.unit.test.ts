@@ -20,12 +20,12 @@ test('T07/T08 resolves only unique products and explicit source NCMs, independen
   assert.equal(plan.links.filter(l=>l.target==='product.rice').length,1);
   assert.ok(plan.links.some(l=>l.target==='product.other'));
   assert.deepEqual(plan.exclusions.map(e=>e.reason).sort(),
-    ['NCM_NOT_IN_CURRENT_CATALOG','NCM_UNSUPPORTED_SHAPE','PRODUCT_NOT_FOUND'].sort());
+    ['NCM_NOT_IN_CURRENT_CATALOG','NCM_NOT_IN_CURRENT_CATALOG','PRODUCT_NOT_FOUND'].sort());
   assert.ok(plan.links.every(l=>l.cnae==='0111301'&&l.evidence.origin==='STAGING'&&l.evidence.sourceLine===2));
 });
 test('NCM examines all lengths preserving zeros; malformed or unsupported values are excluded, never padded',()=>{
-  for(const value of ['01','0101','01012','010121','0101210','01012100']) assert.equal(operationalNcm(value),value);
-  for(const value of ['','0','010','010121000','1e6','0101/21','01-01','abc0101']) assert.equal(operationalNcm(value),null);
+  for(const value of ['01','010','0101','01012','010121','0101210','01012100']) assert.equal(operationalNcm(value),value);
+  for(const value of ['','0','010121000','1e6','0101/21','01-01','abc0101']) assert.equal(operationalNcm(value),null);
   assert.equal(operationalNcm('0101.21.00'),'01012100');
 });
 test('ambiguous product, missing CNAE, duplicate source CNAE and retired products cannot become links',()=>{
@@ -77,4 +77,14 @@ test('legacy publication without explicit operational approval performs no stagi
   const client={query:()=>{throw new Error('unexpected query');}} as unknown as PoolClient;
   assert.equal(await validateOperationalPublication(client,'unused',{}),null);
   assert.deepEqual(await publishedOperationalLinks(async<T>()=>[{approval:null}] as T[],'0111301'),[]);
+});
+
+test('three-digit NCM is proposed only on an exact CURRENT catalog match, with exclusion evidence otherwise',()=>{
+  const data=input();data.sources[0]!.ncms='010;0100;012';
+  data.catalogNcms=['010','01000'];
+  const plan=buildOperationalPlan(data);
+  assert.deepEqual(plan.links.filter(l=>l.kind==='NCM').map(l=>l.target),['010']);
+  assert.ok(plan.exclusions.some(e=>e.token==='0100'&&e.normalized==='0100'&&e.sourceLine===2&&e.rowSha256==='b'.repeat(64)));
+  assert.ok(plan.exclusions.some(e=>e.token==='012'&&e.reason==='NCM_NOT_IN_CURRENT_CATALOG'));
+  assert.ok(!plan.links.some(l=>l.target==='01000'),'never invent a descendant from a short token');
 });

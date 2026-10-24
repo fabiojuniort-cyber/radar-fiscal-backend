@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const F2_LINK_RULE = 'onb03-t07-t08-v1';
+export const F2_LINK_RULE = 'onb03-t07-t08-v2';
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const textKey = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
 export interface LinkConcept {
@@ -16,7 +16,11 @@ export interface ProposedLink {
   kind: 'PRODUCT' | 'NCM'; target: string;
   evidence: { sourceLine: number; rowSha256: string; origin: 'STAGING' | 'CURATED'; token: string };
 }
-export interface LinkExclusion { cnae: string; segment: string; kind: 'PRODUCT' | 'NCM' | 'CNAE'; reason: string; count: number }
+export interface LinkExclusion {
+  cnae: string; segment: string; kind: 'PRODUCT' | 'NCM' | 'CNAE'; reason: string; count: number;
+  token: string; normalized: string | null; sourceLine: number; rowSha256: string;
+  origin: 'STAGING' | 'CURATED'; candidates: string[];
+}
 export interface OperationalPlan {
   ruleVersion: string; sourceSha256: string; planSha256: string;
   links: ProposedLink[]; exclusions: LinkExclusion[];
@@ -29,7 +33,7 @@ export interface OperationalPlan {
 export function operationalNcm(raw: string): string | null {
   if (!/^[0-9.\s]+$/.test(raw.trim())) return null;
   const digits = raw.replace(/[.\s]/g, '');
-  return [2,4,5,6,7,8].includes(digits.length) && /^\d+$/.test(digits) ? digits : null;
+  return [2,3,4,5,6,7,8].includes(digits.length) && /^\d+$/.test(digits) ? digits : null;
 }
 export function buildOperationalPlan(input: {
   sourceSha256: string; sources: LinkSource[]; concepts: LinkConcept[];
@@ -53,12 +57,16 @@ export function buildOperationalPlan(input: {
     const segment = source.segment.trim() || 'Sem segmento';
     if (!segments.has(segment)) segments.set(segment,{segment,products:0,ncms:0,excluded:0});
     const count = segments.get(segment)!;
-    const exclude = (kind:LinkExclusion['kind'],reason:string) => {
-      exclusions.push({cnae:source.cnae,segment,kind,reason,count:1}); count.excluded++;
+    const exclude = (kind:LinkExclusion['kind'],reason:string,token:string,
+      origin:'STAGING'|'CURATED'='STAGING',candidates:string[]=[]) => {
+      exclusions.push({cnae:source.cnae,segment,kind,reason,count:1,token,
+        normalized:kind==='NCM'?operationalNcm(token):null,sourceLine:source.line,
+        rowSha256:source.rowSha256,origin,candidates:[...candidates].sort()});
+      count.excluded++;
     };
     const sectors = active.filter(c=>c.dimensionCode==='sector' && c.officialCodes.length===1 && c.officialCodes[0]===source.cnae);
     if (!/^\d{7}$/.test(source.cnae) || sectors.length!==1 || sourceCounts.get(source.cnae)!==1) {
-      exclude('CNAE','CNAE_NOT_UNIQUE_IN_SOURCE_AND_DRAFT'); continue;
+      exclude('CNAE','CNAE_NOT_UNIQUE_IN_SOURCE_AND_DRAFT',source.cnae,'STAGING',sectors.map(c=>c.code)); continue;
     }
     const sector = sectors[0]!;
     for (const kind of ['PRODUCT','NCM'] as const) {
@@ -71,12 +79,12 @@ export function buildOperationalPlan(input: {
         let target:string;
         if (kind==='PRODUCT') {
           const matches=productIndex.get(textKey(token)) ?? [];
-          if(matches.length!==1) { exclude(kind,matches.length?'PRODUCT_AMBIGUOUS':'PRODUCT_NOT_FOUND'); continue; }
+          if(matches.length!==1) { exclude(kind,matches.length?'PRODUCT_AMBIGUOUS':'PRODUCT_NOT_FOUND',token,curated==null?'STAGING':'CURATED',matches.map(c=>c.code)); continue; }
           target=matches[0]!.code;
         } else {
           const code=operationalNcm(token);
-          if(!code) { exclude(kind,'NCM_UNSUPPORTED_SHAPE'); continue; }
-          if(!catalog.has(code)) { exclude(kind,'NCM_NOT_IN_CURRENT_CATALOG'); continue; }
+          if(!code) { exclude(kind,'NCM_UNSUPPORTED_SHAPE',token,curated==null?'STAGING':'CURATED'); continue; }
+          if(!catalog.has(code)) { exclude(kind,'NCM_NOT_IN_CURRENT_CATALOG',token,curated==null?'STAGING':'CURATED'); continue; }
           target=code;
         }
         const identity={cnae:source.cnae,sectorCode:sector.code,kind,target};

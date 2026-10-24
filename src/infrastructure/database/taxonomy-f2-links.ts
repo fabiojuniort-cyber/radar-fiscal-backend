@@ -5,8 +5,8 @@ import { currentOperationalPlan } from '../../modules/taxonomy/curation/curation
 import { assertCuratorSession } from '../../modules/taxonomy/curation/curation.draft.js';
 import { findLatestPublishedRelease, findOpenDraft, pgRunner } from '../../modules/taxonomy/curation/curation.read.js';
 
-if(process.argv.slice(2).length!==1 || process.argv[2]!=='--plan') {
-  console.error('Usage: taxonomy:f2-links -- --plan (read only; no apply/publication mode)'); process.exit(1);
+if(!process.argv.includes('--plan') || process.argv.slice(2).some(arg=>!['--plan','--exclusions'].includes(arg))) {
+  console.error('Usage: taxonomy:f2-links -- --plan [--exclusions] (read only; no apply/publication mode)'); process.exit(1);
 }
 const connectionString=resolveCuratorDatabaseUrl({
   DATABASE_URL:process.env.DATABASE_URL??'',
@@ -31,6 +31,7 @@ try {
     proposed:plan.links.length,products:plan.links.filter(l=>l.kind==='PRODUCT').length,
     ncms:plan.links.filter(l=>l.kind==='NCM').length,excluded:plan.exclusions.length,
     bySegment:plan.bySegment,
+    exclusions:process.argv.includes('--exclusions')?plan.exclusions:undefined,
     excludedByReason:Object.fromEntries([...new Set(plan.exclusions.map(e=>e.reason))].sort().map(reason=>
       [reason,plan.exclusions.filter(e=>e.reason===reason).length])),published:false,profilesModified:false,
   }));

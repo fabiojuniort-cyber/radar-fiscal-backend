@@ -344,3 +344,50 @@ jobs:
       - name: ONB-02 R3 semantic SQL evidence on isolated PG18
         shell: bash
         run: bash ops/onb02/ci-evidence-pg18.sh
+
+  onb03-links-pg18:
+    name: ONB-03 operational links approval-publication-reversal on PostgreSQL 18
+    needs: verify
+    if: needs.verify.result == 'success' && needs.verify.outputs.full_regression == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Apply complete migrations including ONB-01 042 and 043
+        run: npm run db:prepare
+      - name: Clean synthetic legacy audit fixtures (isolated PG18 only)
+        run: node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7
+      - name: ONB-03 real API approval publication reversal and profile invariance
+        run: node --test test/f2-operational-links.pg18.integration.mjs
