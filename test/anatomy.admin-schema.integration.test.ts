@@ -72,18 +72,30 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
   await db.connect(); await db2.connect();
   const E = 'e'.repeat(64); const E2 = 'f'.repeat(64);
   const h = (s: string) => sha256(s);
-  const [A, B, R, R2] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()]; // authors A/B, reviewers R/R2
+  const [A, B, R, R2, N] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()]; // admins A/B (authors), R/R2 (reviewers); N not admin
   type Row = Record<string, any>;
-  async function asApp(c: pg.Client, actor: string | null, sql: string, params: unknown[] = [], iso = 'READ COMMITTED'): Promise<Row[]> {
+  async function asRole(role: string, c: pg.Client, actor: string | null, sql: string, params: unknown[] = [], iso = 'READ COMMITTED'): Promise<Row[]> {
     await c.query(`BEGIN ISOLATION LEVEL ${iso}`);
     try {
-      await c.query('SET LOCAL ROLE radar_app');
+      await c.query(`SET LOCAL ROLE ${role}`);
       if (actor) await c.query("SELECT set_config('app.user_id', $1, true)", [actor]);
       const result = await c.query(sql, params);
       await c.query('COMMIT');
       return result.rows;
     } catch (error) { await c.query('ROLLBACK').catch(() => undefined); throw error; }
   }
+  const asApp = (c: pg.Client, actor: string | null, sql: string, params: unknown[] = [], iso = 'READ COMMITTED') => asRole('radar_app', c, actor, sql, params, iso);
+  /** Several statements in ONE transaction as `role` (null = the owner connection itself); no trigger is disabled. */
+  async function inTx(role: string | null, actor: string, body: (q: (sql: string, params?: unknown[]) => Promise<Row[]>) => Promise<void>, c = db): Promise<void> {
+    await c.query('BEGIN');
+    try {
+      if (role) await c.query(`SET LOCAL ROLE ${role}`);
+      await c.query("SELECT set_config('app.user_id', $1, true)", [actor]);
+      await body(async (sql, params = []) => (await c.query(sql, params)).rows);
+      await c.query('COMMIT');
+    } catch (error) { await c.query('ROLLBACK').catch(() => undefined); throw error; }
+  }
+  const asWriter = (actor: string | null, sql: string, params: unknown[] = []) => asRole('anat_rules_writer', db, actor, sql, params);
   const one = async (...a: Parameters<typeof asApp>) => (await asApp(...a))[0]!;
   const fails = (p: Promise<unknown>, code: RegExp | string) => assert.rejects(p, typeof code === 'string' ? new RegExp(`anat:${code}`, 'u') : code);
   const auditCount = async (where = 'true', params: unknown[] = []) =>
@@ -173,6 +185,11 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
     const newPolicy = await snapshotPolicy();
     await db.query(await read('anatomy-admin-ci-schema.sql'));
     await db.query('COMMIT');
+    // Platform admins A, B, R, R2 (active, unrevoked) and ordinary user N (036 predicate inputs).
+    for (const [id, admin] of [[A, true], [B, true], [R, true], [R2, true], [N, false]] as const) {
+      await db.query("INSERT INTO app_users (id, email) VALUES ($1, $2)", [id, `${id}@example.test`]);
+      if (admin) await db.query("INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ($1, 'PLATFORM_ADMIN', 'system:ci')", [id]);
+    }
 
     await t.test('M_AUDIT_ANAT: every pre-existing event has the same rule and the same projection', () => {
       assert.equal(oldPolicy.length, oldKeys.length);
@@ -198,17 +215,52 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
     await t.test('audit chain: ANAT events typed and flat; unregistered, extra field, foreign actor and tenant events refused', async () => {
       const ins = `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data) VALUES (NULL,'ADMIN',$1,$2,'anatomy_rules',$3,$4::jsonb)`;
       const id = randomUUID();
-      await fails(asApp(db, A, ins, [A, 'ANAT_RULES_UNKNOWN', id, '{}']), /audit_event_not_registered/u);
+      // The guard of 074/075 still applies to the only role allowed to write ANAT rows.
+      await fails(asWriter(A, ins, [A, 'ANAT_RULES_UNKNOWN', id, '{}']), /audit_event_not_registered/u);
       const projected = (await db.query(`SELECT audit_project('ANAT_RULES_REVIEWED','anatomy_rules',$1::jsonb) AS p`,
         [JSON.stringify({ reviewId: id, outcome: 'APPROVED', rationale: 'texto livre', comparisonCount: 2, nested: { a: 1 } })])).rows[0].p;
       assert.deepEqual(projected, { reviewId: id, outcome: 'APPROVED', comparisonCount: 2 });
-      await fails(asApp(db, A, ins, [A, 'ANAT_RULES_REVIEWED', id, JSON.stringify({ reviewId: id, rationale: 'texto livre' })]), /audit_field_not_allowed/u);
-      await fails(asApp(db, A, ins, ['admin@example.test', 'ANAT_RULES_REVIEWED', id, '{}']), /audit_invalid_actor|row-level security/u);
-      await fails(asApp(db, A, ins, [B, 'ANAT_RULES_REVIEWED', id, '{}']), /row-level security/u); // actor must be the session
-      await fails(asApp(db, A, `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data)
+      await fails(asWriter(A, ins, [A, 'ANAT_RULES_REVIEWED', id, JSON.stringify({ reviewId: id, rationale: 'texto livre' })]), /audit_field_not_allowed/u);
+      await fails(asWriter(A, ins, ['admin@example.test', 'ANAT_RULES_REVIEWED', id, '{}']), /audit_invalid_actor|row-level security/u);
+      await fails(asWriter(A, ins, [B, 'ANAT_RULES_REVIEWED', id, '{}']), /row-level security/u); // actor must be the session
+      await fails(asWriter(N, ins, [N, 'ANAT_RULES_REVIEWED', id, '{}']), /row-level security/u); // session must be an admin
+      await fails(asWriter(A, `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data)
         VALUES (NULL,'ADMIN',$1,'COMPANY_PURGED','company',$2,'{}')`, [A, id]), /row-level security/u); // no widening
-      await asApp(db, A, ins, [A, 'ANAT_RULES_REVIEWED', id, JSON.stringify({ reviewId: id, outcome: 'APPROVED' })]);
+      await asWriter(A, ins, [A, 'ANAT_RULES_REVIEWED', id, JSON.stringify({ reviewId: id, outcome: 'APPROVED' })]);
       assert.equal(await auditCount('entity_id=$1', [id]), 1);
+      // radar_app cannot write ANAT rows directly, even as an admin (only through the audited entry functions).
+      await fails(asApp(db, A, ins, [A, 'ANAT_RULES_REVIEWED', randomUUID(), JSON.stringify({ outcome: 'APPROVED' })]), /row-level security/u);
+    });
+
+    await t.test('B1-R1-03: ANAT audit and admin tables are readable only by an active platform admin', async () => {
+      const rd = await saveDraft(A, profiles('rls'), [example('ex-r')]);
+      await freeze(A, rd.draft_id, 1);
+      const visible = async (role: string, actor: string | null) => Number((await asRole(role, db, actor,
+        "SELECT (SELECT count(*) FROM audit_log WHERE entity_type='anatomy_rules') + (SELECT count(*) FROM anatomy_rule_drafts) AS n"))[0]!.n);
+      assert.ok(await visible('radar_app', A) > 0, 'admin sees');
+      assert.equal(await visible('radar_app', null), 0, 'no session user');
+      assert.equal(await visible('radar_app', N), 0, 'authenticated, not admin');
+      await db.query("UPDATE platform_user_roles SET revoked_at=now(), revoked_by='system:ci' WHERE user_id=$1", [R2]);
+      assert.equal(await visible('radar_app', R2), 0, 'revoked admin');
+      await fails(saveDraft(R2, profiles('rls'), [example('ex-r')]), 'PLATFORM_ADMIN_REQUIRED');
+      await db.query("UPDATE platform_user_roles SET revoked_at=NULL, revoked_by=NULL WHERE user_id=$1", [R2]);
+      await fails(saveDraft(N, profiles('rls'), [example('ex-r')]), 'PLATFORM_ADMIN_REQUIRED');
+      await fails(asApp(db, N, 'SELECT anat_audit_attempt($1,$2,$3,$4)', ['FREEZE', 'STALE_REVISION', null, randomUUID()]), 'PLATFORM_ADMIN_REQUIRED');
+      // Other roles: curator sees nothing of the admin tables; worker only rule sets/activations (P3 §2.3).
+      await fails(asRole('radar_taxonomy_curator', db, A, 'SELECT count(*) FROM anatomy_rule_drafts'), /permission denied/u);
+      await fails(asRole('radar_worker', db, A, 'SELECT count(*) FROM anatomy_rule_drafts'), /permission denied/u);
+      assert.ok(Number((await asRole('radar_worker', db, null, 'SELECT count(*) AS n FROM anatomy_rule_sets'))[0]!.n) > 0);
+      // 009 (worker) and 018 (curator) already allow broad tenant_id NULL audit access; their policies stay as they are,
+      // and two RESTRICTIVE ANAT-only policies keep them from writing or reading ANAT rows. Their own events still work.
+      const ins = `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data) VALUES (NULL,'ADMIN',$1,'ANAT_RULES_REVIEWED','anatomy_rules',$2,'{}')`;
+      for (const role of ['radar_worker', 'radar_taxonomy_curator']) {
+        await fails(asRole(role, db, A, ins, [A, randomUUID()]), /row-level security/u);
+        assert.equal(Number((await asRole(role, db, A, "SELECT count(*) AS n FROM audit_log WHERE entity_type='anatomy_rules'"))[0]!.n), 0, role);
+      }
+      const curatorEvent = randomUUID();
+      await asRole('radar_taxonomy_curator', db, A, `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data)
+        VALUES (NULL,'ADMIN',$1,'TAXONOMY_CURATION_CONCEPT_CREATED','taxonomy_curation',$2,'{}')`, [A, curatorEvent]);
+      assert.equal(Number((await asRole('radar_taxonomy_curator', db, A, 'SELECT count(*) AS n FROM audit_log WHERE entity_id=$1', [curatorEvent]))[0]!.n), 1, 'curator events unchanged');
     });
 
     await t.test('drafts: revision lock, author only, examples validated (reserve, limit), one audit row per save', async () => {
@@ -326,9 +378,11 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       }
       await fails(review(R, s.cand, s.sim, s.comps, [...s.decisions, { ...s.decisions[0]!, differenceId: 'f'.repeat(32) }]), 'REVIEW_INCOMPLETE');
       await fails(review(R, s.cand, s.sim, s.comps, [...s.decisions, s.decisions[0]!]), /duplicate key/u);
-      // Direct INSERT path cannot skip the rules: the deferred trigger re-checks at COMMIT.
-      await fails(asApp(db, R, `INSERT INTO anatomy_rule_reviews (candidate_id, simulation_id, reviewer, outcome, rationale)
-        VALUES ($1,$2,$3,'approved','Sem vínculos de comparação.')`, [s.cand, s.sim, R]), 'REVIEW_INCOMPLETE');
+      // No direct INSERT for radar_app; and even the writer role cannot skip the rules: the deferred trigger re-checks at COMMIT.
+      const directReview = `INSERT INTO anatomy_rule_reviews (candidate_id, simulation_id, reviewer, outcome, rationale)
+        VALUES ($1,$2,$3,'approved','Sem vínculos de comparação.')`;
+      await fails(asApp(db, R, directReview, [s.cand, s.sim, R]), /permission denied/u);
+      await fails(asWriter(R, directReview, [s.cand, s.sim, R]), 'REVIEW_INCOMPLETE');
       assert.equal(Number((await db.query("SELECT count(*) FROM anatomy_rule_reviews WHERE candidate_id=$1", [s.cand])).rows[0].count), 0);
       // Valid path.
       const corr = randomUUID();
@@ -412,10 +466,10 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       await fails(confirm(db, R, tok2, stalePv.intent_hash), 'PREVIEW_STALE');
       // Expired and unconsumed (row written directly by the owner with past times; intent computed by the same function).
       const tok4 = token();
-      await db.query(`INSERT INTO anatomy_rule_activation_previews (token_hash, action, actor, scope, candidate_id, review_id, observed_activation_id,
+      await inTx(null, R, async (q) => { await q(`INSERT INTO anatomy_rule_activation_previews (token_hash, action, actor, scope, candidate_id, review_id, observed_activation_id,
         intent_hash, affected_scope, created_at, expires_at)
         SELECT $1,'activate',$2,$3,$4,$5,$6, anat_intent_hash('activate',$4,$5,$6,$3, now()-interval '1 minute'), '{}', now()-interval '11 minutes', now()-interval '1 minute'`,
-      [h(tok4), R, scope, s.cand, s.rev, first.activation_id]);
+      [h(tok4), R, scope, s.cand, s.rev, first.activation_id]); });
       const expiredIntent = (await db.query('SELECT intent_hash FROM anatomy_rule_activation_previews WHERE token_hash=$1', [h(tok4)])).rows[0].intent_hash;
       await fails(confirm(db, R, tok4, expiredIntent), 'PREVIEW_EXPIRED');
       // Second activation supersedes; rollback returns to the first candidate without reprocessing.
@@ -456,6 +510,96 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       assert.equal(Number((await db.query("SELECT count(*) FROM anatomy_rule_activations WHERE scope='scope-race-2'")).rows[0].count), 1);
     });
 
+    await t.test('B1-R1-01: granted surface preserves the flow — direct DML refused for radar_app and checked for any writer', async () => {
+      // 1. Session B updates A's draft with a correct revision increment.
+      const d = await saveDraft(A, profiles('own'), [example('ex-o')]);
+      const upd = 'UPDATE anatomy_rule_drafts SET profiles=$2::jsonb, revision=revision+1 WHERE id=$1';
+      await fails(asApp(db, B, upd, [d.draft_id, JSON.stringify(profiles('stolen'))]), /permission denied/u);
+      await fails(asWriter(B, upd, [d.draft_id, JSON.stringify(profiles('stolen'))]), 'ACTOR_MISMATCH');
+      await fails(inTx(null, B, async (q) => { await q(upd, [d.draft_id, JSON.stringify(profiles('stolen'))]); }), 'ACTOR_MISMATCH'); // owner too
+      await fails(saveDraft(B, profiles('stolen'), [example('ex-o')], d.draft_id, 1), 'DRAFT_NOT_FOUND');
+      await fails(asApp(db, A, `INSERT INTO anatomy_rule_drafts (author, profiles, examples, revision) VALUES ($1,'[]','[{"id":"x"}]',1)`, [A]), /permission denied/u);
+      await fails(asWriter(A, `INSERT INTO anatomy_rule_drafts (author, profiles, examples, revision) VALUES ($1,'[]','[{"id":"x"}]',1)`, [B]), 'ACTOR_MISMATCH');
+      assert.deepEqual((await db.query('SELECT profiles, revision FROM anatomy_rule_drafts WHERE id=$1', [d.draft_id])).rows[0], { profiles: profiles('own'), revision: 1 });
+      // 2. Direct activation with an expired, consumed, foreign or mismatched preview.
+      const s = await approved(); const other = await approved();
+      const tok = token(); const pv = await preview(R, s, s.rev, 'scope-direct', tok);
+      const insAct = `INSERT INTO anatomy_rule_activations (id, scope, candidate_id, review_id, kind, preview_id, affected_scope, actor, justification)
+        VALUES ($1,$2,$3,$4,'activate',$5,'{}',$6,'Ativação direta indevida.')`;
+      const consume = 'UPDATE anatomy_rule_activation_previews SET consumed_at=now(), consumed_activation_id=$2 WHERE id=$1';
+      await fails(asApp(db, R, insAct, [randomUUID(), 'scope-direct', s.cand, s.rev, pv.preview_id, R]), /permission denied/u);
+      await fails(inTx('anat_rules_writer', R, async (q) => { await q(insAct, [randomUUID(), 'scope-direct', s.cand, s.rev, pv.preview_id, R]); }), 'PREVIEW_REQUIRED');
+      await fails(inTx('anat_rules_writer', R, async (q) => { const id = randomUUID();
+        await q(insAct, [id, 'scope-other', s.cand, s.rev, pv.preview_id, R]); await q(consume, [pv.preview_id, id]); }), 'PREVIEW_STALE'); // other scope
+      await fails(inTx('anat_rules_writer', R, async (q) => { const id = randomUUID();
+        await q(insAct, [id, 'scope-direct', other.cand, other.rev, pv.preview_id, R]); await q(consume, [pv.preview_id, id]); }), 'PREVIEW_STALE'); // other candidate
+      await fails(inTx('anat_rules_writer', R2, async (q) => { const id = randomUUID();
+        await q(insAct, [id, 'scope-direct', s.cand, s.rev, pv.preview_id, R2]); await q(consume, [pv.preview_id, id]); }), 'PREVIEW_EXPIRED'); // other actor
+      const tokE = token();
+      await inTx(null, R, async (q) => { await q(`INSERT INTO anatomy_rule_activation_previews (token_hash, action, actor, scope, candidate_id, review_id,
+        intent_hash, affected_scope, created_at, expires_at) VALUES ($1,'activate',$2,'scope-direct',$3,$4,$5,'{}', now()-interval '11 minutes', now()-interval '1 minute')`,
+      [h(tokE), R, s.cand, s.rev, h('expired intent')]); });
+      const expired = (await db.query('SELECT id FROM anatomy_rule_activation_previews WHERE token_hash=$1', [h(tokE)])).rows[0].id;
+      await fails(inTx('anat_rules_writer', R, async (q) => { const id = randomUUID();
+        await q(insAct, [id, 'scope-direct', s.cand, s.rev, expired, R]); await q(consume, [expired, id]); }), 'PREVIEW_EXPIRED');
+      const first = await confirm(db, R, tok, pv.intent_hash);
+      await fails(inTx('anat_rules_writer', R, async (q) => { await q(insAct, [randomUUID(), 'scope-direct-2', s.cand, s.rev, pv.preview_id, R]); }), /duplicate key/u); // consumed
+      assert.equal(Number((await db.query("SELECT count(*) FROM anatomy_rule_activations WHERE scope LIKE 'scope-direct%' OR scope='scope-other'")).rows[0].count), 1);
+      // 3. Superseding the only active activation without an audited replacement fails at COMMIT (writer and owner).
+      const supersede = 'UPDATE anatomy_rule_activations SET superseded_at=now() WHERE id=$1';
+      await fails(asApp(db, R, supersede, [first.activation_id]), /permission denied/u);
+      await fails(asWriter(R, supersede, [first.activation_id]), 'REPLACEMENT_REQUIRED');
+      await fails(inTx(null, R, async (q) => { await q(supersede, [first.activation_id]); }), 'REPLACEMENT_REQUIRED');
+      assert.equal((await db.query('SELECT superseded_at FROM anatomy_rule_activations WHERE id=$1', [first.activation_id])).rows[0].superseded_at, null);
+      // 5. The author's session inserting a review attributed to a third party.
+      const insReview = `INSERT INTO anatomy_rule_reviews (candidate_id, simulation_id, reviewer, outcome, rationale) VALUES ($1,$2,$3,'rejected','Atribuída a terceiro.')`;
+      await fails(asApp(db, A, insReview, [s.cand, s.sim, R2]), /permission denied/u);
+      await fails(asWriter(A, insReview, [s.cand, s.sim, R2]), 'ACTOR_MISMATCH');
+      await fails(inTx(null, A, async (q) => { await q(insReview, [s.cand, s.sim, R2]); }), 'ACTOR_MISMATCH');
+      // Every other provenance field is bound to the session as well.
+      await fails(asWriter(A, `INSERT INTO anatomy_rule_comparisons (comparison_hash, candidate_id, example_id, baseline_rule_set_id, baseline_rule_hash, created_by)
+        VALUES ($1,$2,'ex-a',$3,$4,$5)`, [s.envs[0]!.id, s.cand, s.base.id, s.base.hash, B]), 'ACTOR_MISMATCH');
+      // No direct audit row from radar_app (only through the entry points).
+      await fails(asApp(db, A, `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data)
+        VALUES (NULL,'ADMIN',$1,'ANAT_RULES_ACTIVATED','anatomy_rules',$2,'{}')`, [A, randomUUID()]), /row-level security/u);
+    });
+
+    await t.test('B1-R1-02: an approved simulation is sealed; rows, counters and report hash agree at COMMIT', async () => {
+      const s = await approved();
+      const extra = (id: string, outcome: string) => [s.sim, id, outcome, E];
+      // Executed outcomes carry their hashes (table CHECK); 'failed'/'cancelled' may omit them.
+      const ins = `INSERT INTO anatomy_rule_simulation_examples (simulation_id, example_id, outcome, engine_hash, input_text_hash, output_hash, analysis_id, rule_set_hash)
+        SELECT $1, $2, $3, $4, h, h, h, h FROM (SELECT CASE WHEN $3 IN ('failed','cancelled') THEN NULL ELSE repeat('a', 64) END AS h) x`;
+      await fails(asApp(db, A, ins, extra('ex-new', 'failed')), /permission denied/u);
+      await fails(asWriter(A, ins, extra('ex-new', 'failed')), 'SIMULATION_SEALED');
+      await fails(inTx(null, A, async (q) => { await q(ins, extra('ex-new', 'failed')); }), 'SIMULATION_SEALED'); // owner too
+      await fails(asWriter(A, ins, extra('ex-a', 'failed')), 'SIMULATION_SEALED');
+      // A partial simulation (2 of 3 examples) cannot be completed later with the missing, valid example id.
+      nonce += 1;
+      const d = await saveDraft(A, profiles(`seal-${nonce}`), ['ex-a', 'ex-b', 'ex-c'].map(example));
+      const f = await freeze(A, d.draft_id, 1);
+      const partial = await simulate(A, f.candidate_id, [run('ex-a'), run('ex-b')], 'partial');
+      await fails(asWriter(A, ins, [partial, 'ex-c', 'pass', E]), 'SIMULATION_SEALED');
+      assert.equal(Number((await db.query('SELECT count(*) FROM anatomy_rule_simulation_examples WHERE simulation_id=$1', [partial])).rows[0].count), 2);
+      // The review over the sealed proof still passes every rule, and activation re-validates it.
+      const tokS = token(); const pvS = await preview(R, s, s.rev, 'scope-seal', tokS);
+      assert.equal((await confirm(db, R, tokS, pvS.intent_hash)).replayed, false);
+      // Counters, rows and report hash must agree (writer inserting a simulation directly with forged counters).
+      const insSim = `INSERT INTO anatomy_rule_simulations (id, candidate_id, report, report_hash, status, pass_count, fail_count, partial_count,
+        cancelled_count, inconclusive_count, example_count, requested_by) VALUES ($1,$2,'{}',$3,'complete',$4,0,0,0,0,$5,$6)`;
+      const goodHash = sha256(canonicalJson({}));
+      await fails(inTx('anat_rules_writer', A, async (q) => { const id = randomUUID();
+        await q(insSim, [id, f.candidate_id, goodHash, 3, 3, A]); await q(ins, [id, 'ex-a', 'fail', E]); await q(ins, [id, 'ex-b', 'pass', E]); await q(ins, [id, 'ex-c', 'pass', E]); }), 'SIMULATION_INCONSISTENT');
+      await fails(inTx('anat_rules_writer', A, async (q) => { const id = randomUUID();
+        await q(insSim, [id, f.candidate_id, goodHash, 1, 2, A]); await q(ins, [id, 'ex-a', 'pass', E]); }), 'SIMULATION_INCONSISTENT'); // missing row
+      await fails(inTx('anat_rules_writer', A, async (q) => { const id = randomUUID();
+        await q(insSim, [id, f.candidate_id, h('forged report'), 1, 1, A]); await q(ins, [id, 'ex-a', 'pass', E]); }), 'SIMULATION_INCONSISTENT'); // report hash
+      await fails(inTx('anat_rules_writer', A, async (q) => { const id = randomUUID();
+        await q(insSim, [id, f.candidate_id, goodHash, 1, 1, A]); await q(ins, [id, 'ex-zz', 'pass', E]); }), 'INVALID_EXAMPLE');
+      await fails(inTx('anat_rules_writer', A, async (q) => { const id = randomUUID();
+        await q(insSim, [id, f.candidate_id, goodHash, 1, 1, A]); await q(ins, [id, 'ex-a', 'pass', E2]); }), 'ENGINE_MISMATCH');
+    });
+
     await t.test('immutability: UPDATE/DELETE/TRUNCATE refused for radar_app (grants) and for the owner (triggers)', async () => {
       const s = await approved();
       const immutable: [string, string][] = [['anatomy_rule_sets', `rule_hash='${s.ruleHash}'`], ['anatomy_rule_example_sets', 'true'],
@@ -475,12 +619,14 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       await fails(db.query(`UPDATE anatomy_rule_reviews SET outcome='rejected' WHERE id=$1`, [s.rev]), /anat:IMMUTABLE UPDATE/u);
       // Allowed transitions only.
       const act = (await db.query("SELECT id FROM anatomy_rule_activations WHERE superseded_at IS NOT NULL LIMIT 1")).rows[0].id;
-      await fails(asApp(db, A, 'UPDATE anatomy_rule_activations SET superseded_at=now() WHERE id=$1', [act]), 'IMMUTABLE');
+      await fails(asApp(db, A, 'UPDATE anatomy_rule_activations SET superseded_at=now() WHERE id=$1', [act]), /permission denied/u);
+      await fails(asWriter(A, 'UPDATE anatomy_rule_activations SET superseded_at=now() WHERE id=$1', [act]), 'IMMUTABLE');
       await fails(asApp(db, A, 'UPDATE anatomy_rule_activations SET justification=$2 WHERE id=$1', [act, 'x'.repeat(20)]), /permission denied/u);
       const current = (await db.query('SELECT id FROM anatomy_rule_activations WHERE superseded_at IS NULL LIMIT 1')).rows[0].id;
       await fails(db.query('UPDATE anatomy_rule_activations SET justification=$2, superseded_at=now() WHERE id=$1', [current, 'y'.repeat(20)]), /anat:IMMUTABLE/u);
       const consumed = (await db.query('SELECT id FROM anatomy_rule_activation_previews WHERE consumed_at IS NOT NULL LIMIT 1')).rows[0].id;
-      await fails(asApp(db, A, 'UPDATE anatomy_rule_activation_previews SET consumed_at=NULL, consumed_activation_id=NULL WHERE id=$1', [consumed]), 'IMMUTABLE');
+      await fails(asApp(db, A, 'UPDATE anatomy_rule_activation_previews SET consumed_at=NULL, consumed_activation_id=NULL WHERE id=$1', [consumed]), /permission denied/u);
+      await fails(asWriter(A, 'UPDATE anatomy_rule_activation_previews SET consumed_at=NULL, consumed_activation_id=NULL WHERE id=$1', [consumed]), 'IMMUTABLE');
       await fails(db.query('DELETE FROM anatomy_rule_activations'), /anat:IMMUTABLE DELETE/u);
       await fails(db.query('DELETE FROM anatomy_rule_activation_previews'), /anat:IMMUTABLE DELETE/u);
       await fails(db.query('DELETE FROM anatomy_rule_drafts'), /anat:IMMUTABLE DELETE/u);
@@ -495,26 +641,47 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       const col = async (role: string, table: string, c: string, p: string) => (await db.query('SELECT has_column_privilege($1,$2,$3,$4) AS ok', [role, table, c, p])).rows[0].ok as boolean;
       for (const table of tables) {
         assert.equal(await priv('radar_app', table, 'SELECT'), true, table);
-        assert.equal(await priv('radar_app', table, 'INSERT'), true, table);
-        for (const p of ['UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) assert.equal(await priv('radar_app', table, p), false, `${table} ${p}`);
+        for (const p of ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) assert.equal(await priv('radar_app', table, p), false, `${table} ${p}`);
+        assert.equal(await priv('anat_rules_writer', table, 'SELECT'), true, table);
+        assert.equal(await priv('anat_rules_writer', table, 'INSERT'), true, table);
+        for (const p of ['UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) assert.equal(await priv('anat_rules_writer', table, p), false, `${table} writer ${p}`);
         assert.equal(await priv('radar_taxonomy_curator', table, 'SELECT'), false, table);
         assert.equal(await priv('radar_worker', table, 'SELECT'), ['anatomy_rule_sets', 'anatomy_rule_activations'].includes(table), table);
         for (const p of ['INSERT', 'UPDATE', 'DELETE']) assert.equal(await priv('radar_worker', table, p), false, `${table} worker ${p}`);
         const pub = await db.query(`SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='PUBLIC' AND table_name=$1`, [table]);
         assert.equal(Number(pub.rows[0].count), 0, `${table} PUBLIC`);
+        const rls = (await db.query('SELECT relrowsecurity AND relforcerowsecurity AS ok FROM pg_class WHERE oid=$1::regclass', [table])).rows[0].ok;
+        assert.equal(rls, true, `${table} RLS forced`);
       }
       const updatable: Record<string, string[]> = { anatomy_rule_drafts: ['profiles', 'examples', 'revision', 'updated_at'],
         anatomy_rule_activation_previews: ['consumed_at', 'consumed_activation_id'], anatomy_rule_activations: ['superseded_at'] };
       for (const table of tables) {
         const cols = (await db.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1`, [table])).rows.map((r) => r.column_name as string);
-        for (const c of cols) assert.equal(await col('radar_app', table, c, 'UPDATE'), (updatable[table] ?? []).includes(c), `${table}.${c}`);
+        for (const c of cols) {
+          assert.equal(await col('radar_app', table, c, 'UPDATE'), false, `${table}.${c} app`);
+          assert.equal(await col('anat_rules_writer', table, c, 'UPDATE'), (updatable[table] ?? []).includes(c), `${table}.${c} writer`);
+        }
       }
-      const fn = await db.query(`SELECT p.proname, has_function_privilege('radar_app', p.oid, 'EXECUTE') AS app,
-        has_function_privilege('radar_worker', p.oid, 'EXECUTE') AS worker, has_function_privilege('radar_taxonomy_curator', p.oid, 'EXECUTE') AS curator
-        FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'anat\\_%'`);
-      assert.ok(fn.rows.length > 10);
-      for (const r of fn.rows) assert.deepEqual([r.app, r.worker, r.curator], [true, false, false], r.proname);
-      assert.equal((await db.query("SELECT bool_or(prosecdef) AS any FROM pg_proc WHERE proname LIKE 'anat\\_%'")).rows[0].any, false, 'no SECURITY DEFINER');
+      // Functions: radar_app executes only the eight entry points; those (and the four commit-time checks) are the only
+      // SECURITY DEFINER ones, owned by the NOLOGIN writer, with a fixed search_path; nobody else has CREATE on public.
+      const entry = ['anat_audit_attempt', 'anat_confirm', 'anat_freeze', 'anat_preview', 'anat_record_comparison', 'anat_record_review', 'anat_record_simulation', 'anat_save_draft'];
+      const commitChecks = ['anat_check_activation_at_commit', 'anat_check_approval_at_commit', 'anat_check_review_at_commit', 'anat_check_simulation_at_commit'];
+      const fn = (await db.query(`SELECT p.proname, p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proconfig,
+        has_function_privilege('radar_app', p.oid, 'EXECUTE') AS app, has_function_privilege('radar_worker', p.oid, 'EXECUTE') AS worker,
+        has_function_privilege('radar_taxonomy_curator', p.oid, 'EXECUTE') AS curator
+        FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'anat\\_%' ORDER BY p.proname`)).rows;
+      assert.ok(fn.length > 20);
+      for (const r of fn) {
+        assert.deepEqual([r.app, r.worker, r.curator], [entry.includes(r.proname), false, false], r.proname);
+        const definer = entry.includes(r.proname) || commitChecks.includes(r.proname);
+        assert.equal(r.prosecdef, definer, `${r.proname} SECURITY DEFINER`);
+        if (definer) { assert.equal(r.owner, 'anat_rules_writer', r.proname); assert.deepEqual(r.proconfig, ['search_path=pg_catalog, public, pg_temp'], r.proname); }
+      }
+      const writer = (await db.query("SELECT rolsuper, rolbypassrls, rolcanlogin, rolinherit FROM pg_roles WHERE rolname='anat_rules_writer'")).rows[0];
+      assert.deepEqual(writer, { rolsuper: false, rolbypassrls: false, rolcanlogin: false, rolinherit: false });
+      const creators = (await db.query(`SELECT r.rolname FROM pg_roles r WHERE has_schema_privilege(r.oid, 'public', 'CREATE') AND NOT r.rolsuper
+        AND r.rolname IN ('radar_app','radar_worker','radar_taxonomy_curator','anat_rules_writer')`)).rows;
+      assert.deepEqual(creators, [], 'no runtime role can create objects in public (search_path hijack)');
     });
 
     await t.test('audit: atomic with success; rollback leaves nothing; attempt in a separate transaction; audit down ⇒ no mutation', async () => {
@@ -529,18 +696,31 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       assert.deepEqual((await db.query('SELECT action, entity_id, after_data FROM audit_log WHERE correlation_id=$1', [failCorr])).rows,
         [{ action: 'ANAT_RULES_ATTEMPT_REJECTED', entity_id: d.draft_id, after_data: { operation: 'DRAFT_SAVE', code: 'STALE_REVISION', targetId: d.draft_id } }]);
       await fails(asApp(db, A, 'SELECT anat_audit_attempt($1,$2,$3,$4)', ['DRAFT_SAVE', 'free text code', d.draft_id, randomUUID()]), /audit_field_not_allowed/u);
-      // Audit unavailable: INSERT on audit_log revoked inside the transaction → the draft update is rolled back too.
-      await db.query('BEGIN');
-      try {
-        await db.query('REVOKE INSERT ON audit_log FROM radar_app');
-        await db.query('SET LOCAL ROLE radar_app');
-        await db.query("SELECT set_config('app.user_id', $1, true)", [A]);
-        await assert.rejects(db.query('SELECT * FROM anat_save_draft($1,1,$2::jsonb,$3::jsonb,$4)',
-          [d.draft_id, JSON.stringify(profiles('down')), JSON.stringify([example('ex-1')]), randomUUID()]), /permission denied for table audit_log/u);
-      } finally { await db.query('ROLLBACK'); }
+      // Audit unavailable: INSERT on audit_log revoked from the only writer, inside the transaction → every mutation
+      // through the entry points is rolled back with it (B1-R1-01 scenario 4; radar_app has no other write path).
+      const down = async (sql: string, params: unknown[]) => {
+        await db.query('BEGIN');
+        try {
+          await db.query('REVOKE INSERT ON audit_log FROM anat_rules_writer');
+          await db.query('SET LOCAL ROLE radar_app');
+          await db.query("SELECT set_config('app.user_id', $1, true)", [A]);
+          await assert.rejects(db.query(sql, params), /permission denied for table audit_log/u);
+        } finally { await db.query('ROLLBACK'); }
+      };
+      const counts = async () => (await db.query(`SELECT (SELECT count(*) FROM anatomy_rule_drafts) d, (SELECT count(*) FROM anatomy_rule_candidates) c,
+        (SELECT count(*) FROM anatomy_rule_simulations) s, (SELECT count(*) FROM anatomy_rule_activation_previews) p, (SELECT count(*) FROM audit_log) a`)).rows[0];
+      const before = await counts();
+      await down('SELECT * FROM anat_save_draft($1,1,$2::jsonb,$3::jsonb,$4)', [d.draft_id, JSON.stringify(profiles('down')), JSON.stringify([example('ex-1')]), randomUUID()]);
+      await down('SELECT * FROM anat_save_draft(NULL,NULL,$1::jsonb,$2::jsonb,$3)', [JSON.stringify(profiles('down')), JSON.stringify([example('ex-1')]), randomUUID()]);
+      await down('SELECT * FROM anat_freeze($1,1,$2,$3)', [d.draft_id, E, randomUUID()]);
+      const s = await scenario();
+      const mid = await counts();
+      await down('SELECT anat_record_simulation($1,$2,$3::jsonb,$4::jsonb,$5)', [s.cand, 'complete', '{}', JSON.stringify(s.rows), randomUUID()]);
+      assert.deepEqual(await counts(), mid);
       const after = (await db.query('SELECT revision, profiles FROM anatomy_rule_drafts WHERE id=$1', [d.draft_id])).rows[0];
       assert.deepEqual(after, { revision: 1, profiles: profiles('atomic') });
-      assert.equal((await db.query("SELECT has_table_privilege('radar_app','audit_log','INSERT') AS ok")).rows[0].ok, true, 'grant restored by rollback');
+      assert.ok(Number(before.d) <= Number(mid.d));
+      assert.equal((await db.query("SELECT has_table_privilege('anat_rules_writer','audit_log','INSERT') AS ok")).rows[0].ok, true, 'grant restored by rollback');
     });
 
     await t.test('nothing is reprocessed: no analyses, runs or run items were written', async () => {

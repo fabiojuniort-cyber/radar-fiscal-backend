@@ -27,3 +27,25 @@ CREATE FUNCTION app_user_has_tenant_access(p_tenant_id uuid) RETURNS boolean LAN
  SECURITY DEFINER SET search_path = pg_catalog, public AS $$ SELECT false; $$;
 GRANT EXECUTE ON FUNCTION app_current_user_id(), app_current_tenant_id() TO radar_app, radar_worker;
 GRANT EXECUTE ON FUNCTION app_user_has_tenant_access(uuid) TO radar_app;
+-- 001/031/036 (reduced): the platform-admin predicate of main, verbatim body, over the two tables it reads.
+CREATE TABLE app_users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL,
+ status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')));
+CREATE TABLE platform_user_roles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES app_users(id),
+ role text NOT NULL CHECK (role IN ('TAXONOMY_CURATOR', 'PLATFORM_ADMIN')), granted_at timestamptz NOT NULL DEFAULT now(),
+ granted_by text NOT NULL CHECK (btrim(granted_by) <> ''), revoked_at timestamptz, revoked_by text);
+REVOKE ALL ON app_users, platform_user_roles FROM PUBLIC;
+CREATE FUNCTION app_user_is_platform_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+ SET search_path = pg_catalog, public AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.platform_user_roles r
+        JOIN public.app_users u
+          ON u.id = r.user_id
+        WHERE r.user_id = public.app_current_user_id()
+          AND r.role = 'PLATFORM_ADMIN'
+          AND r.revoked_at IS NULL
+          AND u.status = 'ACTIVE'
+    );
+$$;
+REVOKE ALL ON FUNCTION app_user_is_platform_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app_user_is_platform_admin() TO radar_app;

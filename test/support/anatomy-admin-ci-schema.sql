@@ -57,7 +57,12 @@ BEGIN RAISE EXCEPTION '%', 'anat:' || p_code USING ERRCODE = p_errcode; END $$;
 
 CREATE FUNCTION anat_actor() RETURNS uuid LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public AS $$
 DECLARE v uuid := app_current_user_id();
-BEGIN IF v IS NULL THEN PERFORM anat_fail('ACTOR_REQUIRED', '42501'); END IF; RETURN v; END $$;
+BEGIN
+ IF v IS NULL THEN PERFORM anat_fail('ACTOR_REQUIRED', '42501'); END IF;
+ -- Same predicate as main (036): an active, unrevoked PLATFORM_ADMIN. Every write and every trigger goes through it.
+ IF NOT app_user_is_platform_admin() THEN PERFORM anat_fail('PLATFORM_ADMIN_REQUIRED', '42501'); END IF;
+ RETURN v;
+END $$;
 
 -- Example list validation (P2 schema subset relevant to persistence): 1..20 objects, id ^[A-Za-z0-9._-]{1,64}$,
 -- unique, never a reserved (holdout) corpus ID.
@@ -114,6 +119,8 @@ CREATE TABLE anatomy_rule_simulations (
  pass_count integer NOT NULL CHECK (pass_count >= 0), fail_count integer NOT NULL CHECK (fail_count >= 0),
  partial_count integer NOT NULL CHECK (partial_count >= 0), cancelled_count integer NOT NULL CHECK (cancelled_count >= 0),
  inconclusive_count integer NOT NULL CHECK (inconclusive_count >= 0),
+ -- Seal (B1-R1-02): the number of execution rows is fixed at insert; no row can be added once it is reached.
+ example_count integer NOT NULL CHECK (example_count BETWEEN 1 AND 20),
  requested_by uuid NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (id, candidate_id)
 );
 -- What each example execution actually produced (R2 criterion 1): compared against the comparison envelopes.
@@ -191,6 +198,7 @@ BEGIN
  PERFORM anat_assert_examples(NEW.examples);
  IF TG_OP = 'UPDATE' AND (NEW.id, NEW.author, NEW.base_rule_set_id, NEW.base_rule_hash) IS DISTINCT FROM (OLD.id, OLD.author, OLD.base_rule_set_id, OLD.base_rule_hash)
   THEN PERFORM anat_fail('IMMUTABLE', '42501'); END IF;
+ IF TG_OP = 'UPDATE' AND OLD.author <> anat_actor() THEN PERFORM anat_fail('ACTOR_MISMATCH', '42501'); END IF;
  IF TG_OP = 'UPDATE' AND NEW.revision <> OLD.revision + 1 THEN PERFORM anat_fail('STALE_REVISION'); END IF;
  RETURN NEW;
 END $$;
@@ -319,6 +327,7 @@ CREATE FUNCTION anat_guard_activation_insert() RETURNS trigger LANGUAGE plpgsql 
 BEGIN
  IF NOT EXISTS (SELECT 1 FROM anatomy_rule_reviews WHERE id = NEW.review_id AND candidate_id = NEW.candidate_id AND outcome = 'approved')
     OR NEW.superseded_at IS NOT NULL THEN PERFORM anat_fail('REVIEW_INCOMPLETE', '23514'); END IF;
+ PERFORM anat_assert_approval(NEW.review_id); -- the approved label is never taken as proof on its own
  RETURN NEW;
 END $$;
 CREATE TRIGGER anat_guard_activation_insert BEFORE INSERT ON anatomy_rule_activations FOR EACH ROW EXECUTE FUNCTION anat_guard_activation_insert();
@@ -327,9 +336,85 @@ BEGIN
  IF OLD.consumed_at IS NOT NULL OR NEW.consumed_at IS NULL
     OR (to_jsonb(NEW) - 'consumed_at' - 'consumed_activation_id') IS DISTINCT FROM (to_jsonb(OLD) - 'consumed_at' - 'consumed_activation_id')
   THEN PERFORM anat_fail('IMMUTABLE', '42501'); END IF;
+ IF OLD.actor <> anat_actor() OR OLD.expires_at <= now() THEN PERFORM anat_fail('PREVIEW_EXPIRED'); END IF;
+ IF NOT EXISTS (SELECT 1 FROM anatomy_rule_activations a WHERE a.id = NEW.consumed_activation_id AND a.preview_id = OLD.id
+                AND a.candidate_id = OLD.candidate_id AND a.review_id = OLD.review_id AND a.scope = OLD.scope AND a.kind = OLD.action
+                AND a.actor = OLD.actor AND a.previous_activation_id IS NOT DISTINCT FROM OLD.observed_activation_id)
+  THEN PERFORM anat_fail('PREVIEW_STALE'); END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER anat_guard_preview_update BEFORE UPDATE ON anatomy_rule_activation_previews FOR EACH ROW EXECUTE FUNCTION anat_guard_preview_update();
+
+-- B1-R1-01: authorship and provenance fields are the session's admin, whatever the path (defence in depth: radar_app
+-- has no direct DML; only the entry functions below write).
+CREATE FUNCTION anat_bind_actor() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+ IF to_jsonb(NEW) ->> TG_ARGV[0] IS DISTINCT FROM anat_actor()::text THEN PERFORM anat_fail('ACTOR_MISMATCH', '42501'); END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_drafts FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('author');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_sets FOR EACH ROW WHEN (NEW.snapshot_id IS NOT NULL) EXECUTE FUNCTION anat_bind_actor('author');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_example_sets FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('created_by');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_candidates FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('created_by');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_simulations FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('requested_by');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_comparisons FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('created_by');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_reviews FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('reviewer');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_activation_previews FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('actor');
+CREATE TRIGGER anat_bind_actor BEFORE INSERT ON anatomy_rule_activations FOR EACH ROW EXECUTE FUNCTION anat_bind_actor('actor');
+
+-- B1-R1-02: a simulation is a sealed aggregate. Rows are accepted only up to example_count, only for examples of the
+-- candidate's set and its engine; at COMMIT the rows, counters and report hash must agree.
+CREATE FUNCTION anat_guard_simulation_example() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE s anatomy_rule_simulations; c anatomy_rule_candidates;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended('anat-simulation:' || NEW.simulation_id::text, 0));
+ SELECT * INTO s FROM anatomy_rule_simulations WHERE id = NEW.simulation_id;
+ SELECT * INTO c FROM anatomy_rule_candidates WHERE id = s.candidate_id;
+ IF (SELECT count(*) FROM anatomy_rule_simulation_examples WHERE simulation_id = NEW.simulation_id) >= s.example_count
+  THEN PERFORM anat_fail('SIMULATION_SEALED', '23514'); END IF;
+ IF NOT EXISTS (SELECT 1 FROM anatomy_rule_example_sets x, jsonb_array_elements(x.examples) e WHERE x.id = c.example_set_id AND e ->> 'id' = NEW.example_id)
+  THEN PERFORM anat_fail('INVALID_EXAMPLE', '22023'); END IF;
+ IF NEW.engine_hash <> c.engine_hash THEN PERFORM anat_fail('ENGINE_MISMATCH'); END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER anat_guard_simulation_example BEFORE INSERT ON anatomy_rule_simulation_examples FOR EACH ROW EXECUTE FUNCTION anat_guard_simulation_example();
+CREATE FUNCTION anat_check_simulation_at_commit() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE v record;
+BEGIN
+ SELECT count(*) AS n, count(*) FILTER (WHERE outcome = 'pass') AS pass, count(*) FILTER (WHERE outcome IN ('fail','failed')) AS fail,
+  count(*) FILTER (WHERE outcome = 'partial') AS partial, count(*) FILTER (WHERE outcome = 'cancelled') AS cancelled,
+  count(*) FILTER (WHERE outcome = 'inconclusive') AS inconclusive
+  INTO v FROM anatomy_rule_simulation_examples WHERE simulation_id = NEW.id;
+ IF v.n <> NEW.example_count OR (v.pass, v.fail, v.partial, v.cancelled, v.inconclusive)
+    <> (NEW.pass_count, NEW.fail_count, NEW.partial_count, NEW.cancelled_count, NEW.inconclusive_count)
+    OR NEW.report_hash <> anat_sha256(NEW.report)
+  THEN PERFORM anat_fail('SIMULATION_INCONSISTENT', '23514'); END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER anat_simulation_sealed AFTER INSERT ON anatomy_rule_simulations DEFERRABLE INITIALLY DEFERRED
+ FOR EACH ROW EXECUTE FUNCTION anat_check_simulation_at_commit();
+
+-- Previews: created only for a review that still passes every approval rule.
+CREATE FUNCTION anat_guard_preview_insert() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+ IF NEW.consumed_at IS NOT NULL THEN PERFORM anat_fail('PREVIEW_CONSUMED'); END IF;
+ PERFORM anat_assert_approval(NEW.review_id);
+ IF NOT EXISTS (SELECT 1 FROM anatomy_rule_reviews WHERE id = NEW.review_id AND outcome = 'approved') THEN PERFORM anat_fail('REVIEW_INCOMPLETE'); END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER anat_guard_preview_insert BEFORE INSERT ON anatomy_rule_activation_previews FOR EACH ROW EXECUTE FUNCTION anat_guard_preview_insert();
+-- An activation exists only together with the consumption of its own preview (checked at COMMIT); the current
+-- activation is superseded only by a replacement that names it as previous (no scope left without its successor).
+CREATE FUNCTION anat_check_activation_at_commit() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+ IF TG_OP = 'INSERT' AND NOT EXISTS (SELECT 1 FROM anatomy_rule_activation_previews WHERE id = NEW.preview_id AND consumed_activation_id = NEW.id)
+  THEN PERFORM anat_fail('PREVIEW_REQUIRED', '23514'); END IF;
+ IF TG_OP = 'UPDATE' AND NOT EXISTS (SELECT 1 FROM anatomy_rule_activations WHERE scope = NEW.scope AND previous_activation_id = NEW.id)
+  THEN PERFORM anat_fail('REPLACEMENT_REQUIRED', '23514'); END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER anat_activation_flow AFTER INSERT OR UPDATE ON anatomy_rule_activations DEFERRABLE INITIALLY DEFERRED
+ FOR EACH ROW EXECUTE FUNCTION anat_check_activation_at_commit();
 
 -- Append-only: no UPDATE (except the two transitions above), no DELETE, no TRUNCATE, for every role (owner included).
 DO $$ DECLARE t text; BEGIN
@@ -350,7 +435,9 @@ DO $$ DECLARE t text; BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
--- Transactional functions (SECURITY INVOKER: they run with radar_app's own grants; audit in the same transaction)
+-- Transactional functions. The eight entry points are the ONLY write path for radar_app (B1-R1-01): they are
+-- SECURITY DEFINER owned by the dedicated NOLOGIN role anat_rules_writer (no BYPASSRLS, no superuser), with a fixed
+-- search_path; helpers are not executable by radar_app. Audit is written in the same transaction.
 -- ---------------------------------------------------------------------------------------------------------------
 CREATE FUNCTION anat_audit(p_action text, p_entity uuid, p_payload jsonb, p_correlation uuid) RETURNS void
 LANGUAGE sql SET search_path = pg_catalog, public AS $$
@@ -421,8 +508,9 @@ BEGIN
  SELECT count(*) FILTER (WHERE e ->> 'outcome' = 'pass') AS pass, count(*) FILTER (WHERE e ->> 'outcome' IN ('fail','failed')) AS fail,
   count(*) FILTER (WHERE e ->> 'outcome' = 'partial') AS partial, count(*) FILTER (WHERE e ->> 'outcome' = 'cancelled') AS cancelled,
   count(*) FILTER (WHERE e ->> 'outcome' = 'inconclusive') AS inconclusive INTO v_counts FROM jsonb_array_elements(p_examples) e;
- INSERT INTO anatomy_rule_simulations (candidate_id, report, report_hash, status, pass_count, fail_count, partial_count, cancelled_count, inconclusive_count, requested_by)
- VALUES (c.id, p_report, anat_sha256(p_report), p_status, v_counts.pass, v_counts.fail, v_counts.partial, v_counts.cancelled, v_counts.inconclusive, v_actor)
+ INSERT INTO anatomy_rule_simulations (candidate_id, report, report_hash, status, pass_count, fail_count, partial_count, cancelled_count, inconclusive_count, example_count, requested_by)
+ VALUES (c.id, p_report, anat_sha256(p_report), p_status, v_counts.pass, v_counts.fail, v_counts.partial, v_counts.cancelled, v_counts.inconclusive,
+  jsonb_array_length(p_examples), v_actor)
  RETURNING id INTO v_id;
  INSERT INTO anatomy_rule_simulation_examples (simulation_id, example_id, outcome, input_text_hash, output_hash, analysis_id, rule_set_hash, engine_hash)
  SELECT v_id, e ->> 'exampleId', e ->> 'outcome', e ->> 'inputTextHash', e ->> 'outputHash', e ->> 'analysisId', e ->> 'ruleSetHash', e ->> 'engineHash'
@@ -540,24 +628,47 @@ LANGUAGE sql SET search_path = pg_catalog, public AS $$
   jsonb_build_object('operation', p_operation, 'code', p_code, 'targetId', p_target), p_correlation) $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
--- Privileges (P3 §2.3). PUBLIC has nothing; radar_taxonomy_curator has nothing.
+-- Privileges (P3 §2.3, revised by B1-R1-01/03). PUBLIC and radar_taxonomy_curator have nothing. radar_app: SELECT
+-- (RLS: platform admins only) and EXECUTE on the entry points. anat_rules_writer: the DML the entry points need.
 -- ---------------------------------------------------------------------------------------------------------------
 DO $$ DECLARE t text; BEGIN
  FOREACH t IN ARRAY ARRAY['anatomy_rule_drafts','anatomy_rule_sets','anatomy_rule_example_sets','anatomy_rule_candidates',
   'anatomy_rule_simulations','anatomy_rule_simulation_examples','anatomy_rule_comparison_envelopes','anatomy_rule_comparisons',
   'anatomy_rule_reviews','anatomy_rule_review_comparisons','anatomy_rule_review_decisions','anatomy_rule_activations',
   'anatomy_rule_activation_previews'] LOOP
-  EXECUTE format('REVOKE ALL ON %I FROM PUBLIC, radar_app, radar_worker, radar_taxonomy_curator', t);
-  EXECUTE format('GRANT SELECT, INSERT ON %I TO radar_app', t);
+  EXECUTE format('REVOKE ALL ON %I FROM PUBLIC, radar_app, radar_worker, radar_taxonomy_curator, anat_rules_writer', t);
+  EXECUTE format('GRANT SELECT ON %I TO radar_app', t);
+  EXECUTE format('GRANT SELECT, INSERT ON %I TO anat_rules_writer', t);
+  EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+  EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+  EXECUTE format('CREATE POLICY anat_admin_select ON %I FOR SELECT TO radar_app USING (app_user_is_platform_admin())', t);
+  EXECUTE format('CREATE POLICY anat_writer_all ON %I TO anat_rules_writer USING (true) WITH CHECK (true)', t);
  END LOOP;
 END $$;
-GRANT UPDATE (profiles, examples, revision, updated_at) ON anatomy_rule_drafts TO radar_app;
-GRANT UPDATE (consumed_at, consumed_activation_id) ON anatomy_rule_activation_previews TO radar_app;
-GRANT UPDATE (superseded_at) ON anatomy_rule_activations TO radar_app;
+GRANT UPDATE (profiles, examples, revision, updated_at) ON anatomy_rule_drafts TO anat_rules_writer;
+GRANT UPDATE (consumed_at, consumed_activation_id) ON anatomy_rule_activation_previews TO anat_rules_writer;
+GRANT UPDATE (superseded_at) ON anatomy_rule_activations TO anat_rules_writer;
 GRANT SELECT ON anatomy_rule_sets, anatomy_rule_activations TO radar_worker;
-DO $$ DECLARE f regprocedure; BEGIN
+CREATE POLICY anat_worker_select ON anatomy_rule_sets FOR SELECT TO radar_worker USING (true);
+CREATE POLICY anat_worker_select ON anatomy_rule_activations FOR SELECT TO radar_worker USING (true);
+GRANT EXECUTE ON FUNCTION app_current_user_id(), app_user_is_platform_admin() TO anat_rules_writer;
+DO $$ DECLARE f regprocedure; entry text[] := ARRAY['anat_save_draft','anat_freeze','anat_record_simulation','anat_record_comparison',
+  'anat_record_review','anat_preview','anat_confirm','anat_audit_attempt']; BEGIN
  FOR f IN SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname LIKE 'anat\_%' LOOP
   EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
-  EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO radar_app', f);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anat_rules_writer', f);
+ END LOOP;
+ FOR f IN SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = ANY (entry) LOOP
+  EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp', f);
+  EXECUTE format('ALTER FUNCTION %s OWNER TO anat_rules_writer', f);
+  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO radar_app, anat_rules_writer', f);
+ END LOOP;
+ -- Commit-time (deferred) checks run as the role active at COMMIT (radar_app): they run as the writer instead. They are
+ -- trigger functions, so nobody can call them directly; radar_app gets no EXECUTE on them.
+ FOR f IN SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = ANY (ARRAY[
+   'anat_check_simulation_at_commit','anat_check_review_at_commit','anat_check_approval_at_commit','anat_check_activation_at_commit']) LOOP
+  EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp', f);
+  EXECUTE format('ALTER FUNCTION %s OWNER TO anat_rules_writer', f);
  END LOOP;
 END $$;
