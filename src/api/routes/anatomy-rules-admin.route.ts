@@ -13,8 +13,8 @@ import { isPlatformAdmin } from '../../modules/auth/platform-role.js';
 
 /**
  * ANAT-ADMIN-01 P3-D (issue #116): administrative API for anatomy rules (P3 §3).
- * NOT registered in `buildApp()`: the feature stays unavailable to real users until a reviewed integration package
- * wires it (with its own pool and executor). Every route requires an authenticated PLATFORM_ADMIN; the identity is
+ * Registered by `registerAnatomyRulesAdmin` (rules-admin.wiring.ts) only when the server flag ANAT_RULES_ADMIN_ENABLED
+ * is 'true' (off by default), with its own pool and executor. Every route requires an authenticated PLATFORM_ADMIN; the identity is
  * taken from authentication only, never from the body.
  */
 export interface AnatomyRulesAdminDeps { pool: Pool; executor: SimulationExecutor | null }

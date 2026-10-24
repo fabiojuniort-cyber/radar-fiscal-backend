@@ -25,6 +25,8 @@ on:
     paths:
       - 'src/modules/anatomy/**'
       - 'src/api/routes/anatomy-rules-admin.route.ts'
+      - 'src/app.ts'
+      - 'src/config/env.ts'
       - 'src/modules/auth/**'
       - 'test/anatomy.*'
       - 'test/fixtures/anatomy/**'
@@ -195,7 +197,7 @@ jobs:
       fail-fast: false
       matrix:
         postgres: ['16', '18']
-        suite: ['admin-migrations', 'admin-schema', 'admin-api']
+        suite: ['admin-migrations', 'admin-schema', 'admin-api', 'admin-wiring']
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}
