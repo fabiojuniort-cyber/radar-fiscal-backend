@@ -72,3 +72,29 @@ Kept as in the CI schema: the composite FKs that bind run items to analyses by (
 - `ON DELETE` behaviour for `publication_versions` (§3).
 - Whether `family` should be constrained to a closed list once the taxonomy front defines one (not assumed here).
 - The migration number, assigned at integration time.
+
+## Implementation (integration package 1, after COORD R3)
+`migrations/077_anat_base.sql`. 077 was the next free number on `main` @ `c7a8df1`, and no other remote branch carried a migration ≥ 077 when it was reserved. Re-check before any merge.
+
+| Point | Decision as implemented |
+|---|---|
+| `ON DELETE` (§3) | **RESTRICT** (COORD R3) on `publication_anatomies` and `anatomy_run_items`. Operational effect: once analyses exist, any purge of `publications`/`publication_versions` (L17 purges, cascades from `publications`) fails for versions with analyses, until a purge handles those rows explicitly. No analyses exist today, so there is no effect now |
+| `family` (§4) | `anatomy_profile_literal_ok(text)`, the ANAT-PROFILE/1 literal: 1–64 UTF-16 units, no control characters, trimmed, single U+0020 only, NFC. Verified against `resolveEffectiveProfile` on the same 20 vectors. The `^[a-z0-9]…` pattern proposed in §4 was **dropped** because it diverged from the contract |
+| `source` | CHECK on `PROFILE_SOURCES` (`CONFAZ`, `DOU`, `DOE-SP`, `RFB`) |
+| Pairing | `family IS NULL OR effective_profile_hash IS NOT NULL` |
+| Immutability | Trigger refusing UPDATE on the analysis tables for every role, the owner included. Runtime roles have no UPDATE or DELETE on them |
+| Counting function | None (it belongs to the administrative package) |
+| `anatomy_rule_sets` | RLS on; `radar_worker` SELECT (policy `anat_worker_select`, which the administrative package therefore does not recreate); nothing for `radar_app` here |
+
+Tests: `test/anatomy.base-migration.integration.test.ts`. The real runner applies the chain, then 077. The test checks:
+- the catalog outside the new tables is unchanged, and re-running is a no-op;
+- the diff against the CI schema is exactly §2/§4;
+- the privilege matrix;
+- the family vectors;
+- worker writes and a round-trip of the hash and family;
+- immutability;
+- in-scope reads for any tenant;
+- RESTRICT;
+- the drop order.
+
+CI job `anatomy-base-migration` runs on PG16 and PG18.
