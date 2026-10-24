@@ -146,7 +146,7 @@ export async function currentOperationalPlan(client:PoolClient, releaseId?:strin
   `);
   return buildOperationalPlan({
     sourceSha256:imported.contentSha256,
-    sources:snapshot.segments.map(row=>({cnae:row.cnae_code,segment:row.raw_cells[1]??'',
+    sources:snapshot.segments.map(row=>({cnae:row.cnae_code,segment:row.raw_cells[0]??'',
       line:row.source_line,rowSha256:row.row_sha256,products:row.raw_cells[6]??'',ncms:row.raw_cells[7]??''})),
     concepts:view.concepts.map(c=>({code:c.code,dimensionCode:c.dimensionCode,label:c.label,
       membershipStatus:c.membershipStatus,officialCodes:c.officialCodes,
@@ -180,7 +180,9 @@ try {
     basis:draft?'DRAFT':'PUBLISHED_PREVIEW_ONLY',version:basis.version,
     proposed:plan.links.length,products:plan.links.filter(l=>l.kind==='PRODUCT').length,
     ncms:plan.links.filter(l=>l.kind==='NCM').length,excluded:plan.exclusions.length,
-    bySegment:plan.bySegment,published:false,profilesModified:false,
+    bySegment:plan.bySegment,
+    excludedByReason:Object.fromEntries([...new Set(plan.exclusions.map(e=>e.reason))].sort().map(reason=>
+      [reason,plan.exclusions.filter(e=>e.reason===reason).length])),published:false,profilesModified:false,
   }));
 } catch(error) {
   console.error('F2_LINK_PLAN_FAILED'); process.exitCode=1;

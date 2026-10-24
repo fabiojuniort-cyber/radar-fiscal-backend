@@ -23,7 +23,7 @@ export async function currentOperationalPlan(client:PoolClient, releaseId?:strin
   `);
   return buildOperationalPlan({
     sourceSha256:imported.contentSha256,
-    sources:snapshot.segments.map(row=>({cnae:row.cnae_code,segment:row.raw_cells[1]??'',
+    sources:snapshot.segments.map(row=>({cnae:row.cnae_code,segment:row.raw_cells[0]??'',
       line:row.source_line,rowSha256:row.row_sha256,products:row.raw_cells[6]??'',ncms:row.raw_cells[7]??''})),
     concepts:view.concepts.map(c=>({code:c.code,dimensionCode:c.dimensionCode,label:c.label,
       membershipStatus:c.membershipStatus,officialCodes:c.officialCodes,

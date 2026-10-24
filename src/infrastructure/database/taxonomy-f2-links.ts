@@ -30,7 +30,9 @@ try {
     basis:draft?'DRAFT':'PUBLISHED_PREVIEW_ONLY',version:basis.version,
     proposed:plan.links.length,products:plan.links.filter(l=>l.kind==='PRODUCT').length,
     ncms:plan.links.filter(l=>l.kind==='NCM').length,excluded:plan.exclusions.length,
-    bySegment:plan.bySegment,published:false,profilesModified:false,
+    bySegment:plan.bySegment,
+    excludedByReason:Object.fromEntries([...new Set(plan.exclusions.map(e=>e.reason))].sort().map(reason=>
+      [reason,plan.exclusions.filter(e=>e.reason===reason).length])),published:false,profilesModified:false,
   }));
 } catch(error) {
   console.error('F2_LINK_PLAN_FAILED'); process.exitCode=1;
