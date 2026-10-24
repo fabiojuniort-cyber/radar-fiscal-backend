@@ -8,10 +8,10 @@
 |---|---|---|---|---|---|
 | P3 design R2 | radar-fiscal-backend#256 | `feat/anat-admin-p3-design` | `b92af41` | P2 stack | PASS (documentation) |
 | P3-B1 persistence and audit (rehearsal) | #258 | `feat/anat-admin-p3b1-persistence` | `20519eb` | `b92af41` | **APPROVED R3** (disposable rehearsal) |
-| P3-C executor + `inconclusive` | #259 | `feat/anat-admin-p3c-executor` | `28e07d4` | `20519eb` | Implemented, CI green; **not independently reviewed** |
-| P3-D API (+ dev harness) | #260 | `feat/anat-admin-p3d-api` | `a44efed` | `28e07d4` | Implemented; **not independently reviewed** |
-| P4 screens (behind a flag) | radar-fiscal-web#131 | `feat/anat-admin-p4-screens` | `1269b69` | web `main` `6df732c` | Implemented; **not independently reviewed** |
-| This report and rehearsal script | radar-fiscal-backend (this PR) | `feat/anat-admin-integration-readiness` | — | `a44efed` | — |
+| P3-C executor + `inconclusive` | #259 | `feat/anat-admin-p3c-executor` | `28e07d4` | `20519eb` | **APPROVED R1** (isolated use) |
+| P3-D API (+ dev harness) | #260 | `feat/anat-admin-p3d-api` | `2e8a15a` | `28e07d4` | R2 corrections delivered; awaiting R3 |
+| P4 screens (behind a flag) | radar-fiscal-web#131 | `feat/anat-admin-p4-screens` | `52e41d2` | web `main` `6df732c` | R2 corrections delivered; awaiting R3 |
+| This report and rehearsal script | radar-fiscal-backend (this PR) | `feat/anat-admin-integration-readiness` | see the PR | `2e8a15a` (merged in) | — |
 
 The backend stack is linear: … → #256 → #258 → #259 → #260 → this report. The web PR depends on #260's API contract, not on a backend branch.
 
@@ -36,7 +36,7 @@ Test merge of the whole stack into `main` @ `e4d6639` (local, discarded): **no c
 - 88 main commits are not in the stack; 50 stack commits are not in main; merge base `30e7490`.
 - The stack changes nothing in `migrations/`.
 
-**Not done here:** PostgreSQL 18 with the real chain (PG18 only ran the vendored chain, in CI); the full B1/P3-D suites over the real chain (they need a fresh database with the vendored chain by design).
+**Superseded:** the full B1 and API suites now run over the real chain on PostgreSQL 16 and 18 (see the updates below).
 
 ## 3. Differences between the rehearsal and production schema
 
@@ -108,3 +108,33 @@ PostgreSQL 18 over the real chain runs in CI (see the run on this PR's HEAD).
 **Proposed remedy, for authorisation:**
 1. Add a read-only deploy key of `radar-fiscal-web` as a secret of the backend repository.
 2. Add a backend job that builds the web with the flag, starts the harness on a fresh database, and runs `e2e/anatomy-rules-real.spec.ts`.
+
+## Update after the COORD R2 round (P3-D `2e8a15a`, web `52e41d2`)
+
+- **D-R2-01** (backend): save and freeze use the executor's own `EXECUTOR_LIMITS`. 20 000 catalog codes are accepted; 20 001 are refused with 422 and nothing is persisted. API suite: 14/14 locally (PG16, real chain and vendored chain); PG16/PG18 in the `anatomy-admin-main-chain` jobs of this PR's HEAD.
+- **P4-R2-01** (web): each save is bound to its source draft and edit session. Web suite 257/257; real e2e against the harness on `2e8a15a`: 4 passed, 4 skipped by design.
+- **`M_ANAT_BASE` design:** `docs/anatomy/ADMIN-01-M_ANAT_BASE-DESIGN.md`. Design only, no numbered migration, no invented hashes or families for existing records.
+
+### Proposal: real e2e across the two private repositories in CI (not implemented)
+
+**Existing mechanism checked first:** none. No workflow in either repository uses a secret or checks out another repository, and the control repository records no approved cross-repository credential. So a new credential is needed, which this batch does not create.
+
+**Proposal:**
+1. **Credential.** A read-only **deploy key** on `radar-fiscal-web`, stored as one secret of `radar-fiscal-backend` (e.g. `ANAT_WEB_READ_KEY`).
+   - It reads that single repository and cannot write or reach anything else.
+   - A fine-grained token scoped to one repository with `contents: read` is the alternative.
+2. **Trusted code only.** A new job in `anatomy-ci.yml` that never runs for `pull_request` from forks or for `pull_request_target`.
+   - It runs on `push` to the backend's protected branches and on `workflow_dispatch` by maintainers.
+   - Secrets are not exposed to untrusted refs.
+3. **Pinned SHAs.**
+   - The web checkout uses an explicit SHA input (default: the SHA recorded in the readiness report), never a moving branch.
+   - Third-party actions are pinned by commit SHA.
+4. **Non-persisted credential.** `actions/checkout` with `ssh-key: ${{ secrets.ANAT_WEB_READ_KEY }}` and `persist-credentials: false`. The key lives only in that step, and the job has `permissions: contents: read`.
+5. **Steps.**
+   - Start PostgreSQL 16 on a fresh `anat04_ci` and start the dev harness.
+   - Build the web with `VITE_ENABLE_ANAT_RULES_ADMIN=true`, serve it with `vite preview` proxied to the harness.
+   - Run `e2e/anatomy-rules-real.spec.ts` with `--workers=1`.
+   - Upload the screenshots as an artifact.
+6. **Draft gate unchanged:** the web's `DRAFT_FAST_ONLY` step is not touched; this job lives in the backend repository.
+
+**Authorisation needed:** creating the deploy key and the secret (repository owner).
