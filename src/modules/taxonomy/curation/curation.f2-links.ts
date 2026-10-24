@@ -59,7 +59,14 @@ export async function saveOperationalApproval(client:PoolClient,actor:CuratorAct
 export async function validateOperationalPublication(client:PoolClient,releaseId:string,manifest:unknown):Promise<LinkApproval|null> {
   const raw=manifest && typeof manifest==='object' ? (manifest as Record<string,unknown>).f2Operational : undefined;
   if(raw===undefined) return null; // Existing releases/curation are unchanged until explicitly opted in.
-  try { return checkedOperationalApproval(await currentOperationalPlan(client,releaseId),raw); }
+  try {
+    // Catalog imports own a separate transaction. Hold the CURRENT edition rows
+    // until publication commits so their replacement cannot race this validation.
+    await client.query(`SELECT ed.id FROM official_catalog_editions ed
+      JOIN official_catalogs c ON c.id=ed.catalog_id
+      WHERE c.code='NCM' AND ed.status='CURRENT' FOR SHARE OF ed`);
+    return checkedOperationalApproval(await currentOperationalPlan(client,releaseId),raw);
+  }
   catch(error) { throw new CurationError(error instanceof Error && /^F2_LINK_[A-Z_]+$/.test(error.message)
     ?error.message:'F2_LINK_PUBLICATION_INVALID',409); }
 }
