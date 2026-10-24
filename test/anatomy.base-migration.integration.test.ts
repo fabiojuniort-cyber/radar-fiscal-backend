@@ -229,8 +229,9 @@ test('077_anat_base through the real migration runner (fresh disposable database
     });
 
     await t.test('ON DELETE RESTRICT: a version (or publication) with analyses or run items cannot be deleted', async () => {
-      await refused(db.query('DELETE FROM publication_versions WHERE id = $1', [v1]), /violates foreign key constraint/u);
-      await refused(db.query('DELETE FROM publications WHERE id = $1', [p1]), /violates foreign key constraint/u);
+      // PG16: "violates foreign key constraint"; PG18: "violates RESTRICT setting of foreign key constraint".
+      await refused(db.query('DELETE FROM publication_versions WHERE id = $1', [v1]), /violates (RESTRICT setting of )?foreign key constraint/u);
+      await refused(db.query('DELETE FROM publications WHERE id = $1', [p1]), /violates (RESTRICT setting of )?foreign key constraint/u);
       const v3 = await version(await pub(3));
       await db.query('DELETE FROM publication_versions WHERE id = $1', [v3]); // no dependency: unchanged behaviour
       assert.equal((await db.query('SELECT count(*)::int AS n FROM publication_anatomies')).rows[0].n, 2);
