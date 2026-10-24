@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../build-identity.js';
 import { canonicalJson } from '../contract.js';
-import { DEFAULT_PROFILES, PROFILE_SOURCES, resolveEffectiveProfile } from '../profile.js';
+import { DEFAULT_PROFILES, PROFILE_LIMITS, PROFILE_SOURCES, ProfileValidationError, resolveEffectiveProfile } from '../profile.js';
+import { parseExample, RESERVED_ENTRY_IDS, SIMULATION_LIMITS } from '../rules-simulation.js';
 import { ExecutorError, type SimulationExecutor } from '../simulation-executor.js';
 
 /**
@@ -21,7 +22,7 @@ export class AdminError extends Error {
   get attempt(): AttemptCode | null { return (ATTEMPT_CODES as readonly string[]).includes(this.code) ? (this.code as AttemptCode) : null; }
 }
 const NOT_FOUND = new Set(['DRAFT_NOT_FOUND', 'CANDIDATE_NOT_FOUND', 'REVIEW_NOT_FOUND', 'SIMULATION_NOT_FOUND']);
-const VALIDATION = new Set(['INVALID_EXAMPLE', 'RESERVED_EXAMPLE_ID', 'DUPLICATE_EXAMPLE_ID', 'CANONICAL_KEY_UNSUPPORTED', 'CANONICAL_NUMBER_UNSUPPORTED', 'HASH_MISMATCH']);
+const VALIDATION = new Set(['INVALID_PROFILE', 'INVALID_EXAMPLE', 'RESERVED_EXAMPLE_ID', 'DUPLICATE_EXAMPLE_ID', 'CANONICAL_KEY_UNSUPPORTED', 'CANONICAL_NUMBER_UNSUPPORTED', 'HASH_MISMATCH']);
 
 /** Maps a database error to a sanitised AdminError. Unknown errors become a generic 500 (the cause is not echoed). */
 export function mapDbError(error: unknown, targetId: string | null = null): AdminError {
@@ -160,13 +161,46 @@ export async function listAudit(c: PoolClient) {
 // ---------------------------------------------------------------------------------------------------------------
 // Mutations (SQL entry points only)
 // ---------------------------------------------------------------------------------------------------------------
+/**
+ * D-R1-01: full P1/P2 validation BEFORE anything is persisted (drafts and freeze): examples against the strict P2
+ * schema (limits, reserved IDs, unique IDs), profiles as ANAT-PROFILE/1 (size, schema, protection floor) for every
+ * source and for every example's source/family target. Refusals are 422 codes only, never the offending content.
+ */
+export function assertDraftContent(profiles: unknown, examples: unknown): void {
+  if (!Array.isArray(examples) || examples.length < 1 || examples.length > SIMULATION_LIMITS.maxExamples) throw new AdminError(422, 'LIMIT_EXCEEDED');
+  const ids = new Set<string>();
+  const targets: { source: string; family: string | null }[] = PROFILE_SOURCES.map((source) => ({ source, family: null }));
+  for (const raw of examples) {
+    const id = (raw as { id?: unknown })?.id;
+    if (typeof id === 'string' && (RESERVED_ENTRY_IDS as readonly string[]).includes(id)) throw new AdminError(422, 'RESERVED_EXAMPLE_ID');
+    let e;
+    try { e = parseExample(raw); } catch { throw new AdminError(422, 'INVALID_EXAMPLE'); }
+    if (ids.has(e.id)) throw new AdminError(422, 'DUPLICATE_EXAMPLE_ID');
+    ids.add(e.id); targets.push({ source: e.source, family: e.family });
+  }
+  if (!Array.isArray(profiles) || profiles.length === 0) throw new AdminError(422, 'INVALID_PROFILE');
+  let bytes: number;
+  try { bytes = Buffer.byteLength(canonicalJson(profiles), 'utf8'); } catch { throw new AdminError(422, 'INVALID_PROFILE'); }
+  if (bytes > PROFILE_LIMITS.maxProfileBytes) throw new AdminError(422, 'LIMIT_EXCEEDED');
+  for (const target of targets) {
+    try { resolveEffectiveProfile(structuredClone(profiles), target); } catch (error) {
+      if (error instanceof ProfileValidationError) throw new AdminError(422, 'INVALID_PROFILE');
+      throw error;
+    }
+  }
+}
+
 export async function saveDraft(c: PoolClient, input: { id: string | null; revision: number | null; profiles: unknown[]; examples: unknown[] }, corr: string) {
   assertCanonicalSubset(input.profiles); assertCanonicalSubset(input.examples);
+  assertDraftContent(input.profiles, input.examples);
   const r = (await c.query('SELECT draft_id AS id, revision FROM anat_save_draft($1,$2,$3::jsonb,$4::jsonb,$5)',
     [input.id, input.revision, JSON.stringify(input.profiles), JSON.stringify(input.examples), corr])).rows[0];
   return r as { id: string; revision: number };
 }
 export async function freeze(c: PoolClient, draftId: string, revision: number, corr: string) {
+  // A draft saved before this validation existed (or written by any other path) is re-validated before freezing.
+  const draft = (await c.query('SELECT profiles, examples FROM anatomy_rule_drafts WHERE id = $1', [draftId])).rows[0];
+  if (draft) { assertCanonicalSubset(draft.profiles); assertCanonicalSubset(draft.examples); assertDraftContent(draft.profiles, draft.examples); }
   return (await c.query('SELECT candidate_id AS "candidateId", created FROM anat_freeze($1,$2,$3,$4)', [draftId, revision, ANATOMY_ENGINE_BUILD_HASH, corr])).rows[0] as { candidateId: string; created: boolean };
 }
 
@@ -255,8 +289,11 @@ export function affectedScope(current: unknown[], candidate: unknown[], currentL
 }
 
 export async function preview(c: PoolClient, input: { action: 'activate' | 'rollback'; candidateId: string; reviewId: string; scope: string }, corr: string) {
+  // D-R1-02: serialise with confirm (same advisory key as anat_confirm) BEFORE reading the active rule, so the rule the
+  // affected scope is computed from is the one anat_preview records as observed; the link is re-checked below.
+  await c.query("SELECT pg_advisory_xact_lock(hashtextextended('anat-activation:' || $1, 0))", [input.scope]);
   const cand = await readCandidate(c, input.candidateId);
-  const active = (await c.query(`SELECT s.profiles FROM anatomy_rule_activations a JOIN anatomy_rule_candidates k ON k.id = a.candidate_id
+  const active = (await c.query(`SELECT a.id, s.profiles FROM anatomy_rule_activations a JOIN anatomy_rule_candidates k ON k.id = a.candidate_id
     JOIN anatomy_rule_sets s ON s.id = k.rule_set_id AND s.rule_hash = k.rule_hash WHERE a.scope = $1 AND a.superseded_at IS NULL`, [input.scope])).rows[0];
   const scope = affectedScope(active ? active.profiles : structuredClone([...DEFAULT_PROFILES]), cand.profiles, active ? 'active_candidate' : 'shipped_defaults');
   // Random token; only its SHA-256 reaches the database; the raw value is returned once and never logged.
@@ -264,6 +301,8 @@ export async function preview(c: PoolClient, input: { action: 'activate' | 'roll
   const tokenHash = createHash('sha256').update(token, 'utf8').digest('hex');
   const r = (await c.query('SELECT preview_id AS "previewId", intent_hash AS "intentHash", expires_at AS "expiresAt" FROM anat_preview($1,$2,$3,$4,$5,$6,$7::jsonb,$8)',
     [input.action, input.candidateId, input.reviewId, input.scope, ANATOMY_ENGINE_BUILD_HASH, tokenHash, JSON.stringify(scope), corr])).rows[0];
+  const observed = (await c.query('SELECT observed_activation_id AS id FROM anatomy_rule_activation_previews WHERE id = $1', [r.previewId])).rows[0]?.id ?? null;
+  if (observed !== (active?.id ?? null)) throw new AdminError(409, 'PREVIEW_STALE'); // never persist a scope computed on another rule
   return { ...r, token, affectedScope: scope } as { previewId: string; intentHash: string; expiresAt: string; token: string; affectedScope: ReturnType<typeof affectedScope> };
 }
 

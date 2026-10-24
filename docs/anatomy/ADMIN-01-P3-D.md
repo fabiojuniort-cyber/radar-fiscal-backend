@@ -72,3 +72,10 @@
   - switching between two synthetic platform admins, author and reviewer;
   - synthetic fixtures.
 - The web P4 real-flow e2e (radar-fiscal-web#131) ran against it.
+
+## R1 corrections (COORD review of `a44efed`)
+
+| Finding | Correction | Evidence |
+|---|---|---|
+| **D-R1-01:** incomplete validation on save | `assertDraftContent` applies the strict P2 example schema (limits, reserved and unique IDs) and the ANAT-PROFILE/1 validation (size ≤ 64 KiB, schema, protection floor) for every source and every example target. It runs **before** `anat_save_draft`, and also before `anat_freeze` for drafts saved earlier. The result is 422 (`INVALID_PROFILE`, `INVALID_EXAMPLE`, `LIMIT_EXCEEDED`, …): no row, no revision increment, no success audit | Test `D-R1-01`. **Reproduced on `a44efed`:** an invalid profile version was saved (`revision: 1`) |
+| **D-R1-02:** affected scope and preview could see different active rules | The preview takes the same advisory lock as `anat_confirm` (`anat-activation:<scope>`) before reading the active rule. After `anat_preview` it checks that `observed_activation_id` equals the rule the scope was computed on; otherwise 409 `PREVIEW_STALE` with rollback | Test `D-R1-02` covers the first activation and a preview requested while a confirm is in flight: it waits, then observes the new rule with `basis = active_candidate`. On `a44efed` the preview did **not** wait. The inconsistent pair itself was not reproduced deterministically (static analysis) |
