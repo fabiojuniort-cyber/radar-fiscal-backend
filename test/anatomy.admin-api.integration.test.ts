@@ -35,7 +35,7 @@ test('P3-D admin API end to end (fresh disposable database)', { skip }, async (t
   // env.ts (imported by the auth plugin) requires these; both are local to this process and never real secrets.
   process.env.DATABASE_URL = url; process.env.JWT_ACCESS_SECRET = randomBytes(48).toString('hex'); process.env.LOG_LEVEL = 'info';
   const [{ default: Fastify }, { serializerCompiler, validatorCompiler }, { Kysely, PostgresDialect }, { registerAuthSupport }, { anatomyRulesAdminRoutes },
-    { SimulationExecutor }, { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION }, contract, { assertCanonicalSubset, AdminError }, { ANATOMY_ENGINE_BUILD_HASH: ENGINE }] = await Promise.all([
+    { SimulationExecutor, EXECUTOR_LIMITS }, { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION }, contract, { assertCanonicalSubset, AdminError }, { ANATOMY_ENGINE_BUILD_HASH: ENGINE }] = await Promise.all([
     import('fastify'), import('fastify-type-provider-zod'), import('kysely'), import('../src/modules/auth/auth.plugin.js'),
     import('../src/api/routes/anatomy-rules-admin.route.js'), import('../src/modules/anatomy/simulation-executor.js'),
     import('../src/modules/anatomy/profile.js'), import('../src/modules/anatomy/contract.js'), import('../src/modules/anatomy/admin/rules-admin.service.js'),
@@ -159,6 +159,33 @@ test('P3-D admin API end to end (fresh disposable database)', { skip }, async (t
       const f = await call('A', 'POST', `/drafts/${legacy.body.id}/freeze`, { revision: 1 });
       assert.equal(f.status, 422, JSON.stringify(f.body));
       assert.equal(Number((await owner.query('SELECT count(*) FROM anatomy_rule_candidates')).rows[0].count), frozenBefore, 'nothing frozen');
+    });
+
+    await t.test('D-R2-01: the executor catalog limit (20 000 codes) is enforced on save and on freeze', async () => {
+      const codes = (n: number) => Array.from({ length: n }, (_, i) => String(10000 + i).padStart(5, '0'));
+      const withCatalog = (n: number) => ({ ...article, catalog: { edition: 'synthetic', codes: codes(n) } });
+      const drafts = async () => Number((await owner.query('SELECT count(*) FROM anatomy_rule_drafts')).rows[0].count);
+      const saved = async () => await audit("action='ANAT_RULES_DRAFT_SAVED'");
+      const ok = await call('A', 'POST', '/drafts', { profiles: defaults(), examples: [withCatalog(EXECUTOR_LIMITS.maxCatalogCodes)] });
+      assert.equal(ok.status, 201, `20 000 accepted: ${JSON.stringify(ok.body)}`);
+      const before = [await drafts(), await saved()];
+      const over = await call('A', 'POST', '/drafts', { profiles: defaults(), examples: [withCatalog(EXECUTOR_LIMITS.maxCatalogCodes + 1)] });
+      assert.deepEqual([over.status, over.body.error], [422, 'LIMIT_EXCEEDED']);
+      const put = await call('A', 'PUT', `/drafts/${ok.body.id}`, { revision: 1, profiles: defaults(), examples: [withCatalog(EXECUTOR_LIMITS.maxCatalogCodes + 1)] });
+      assert.deepEqual([put.status, put.body.error], [422, 'LIMIT_EXCEEDED']);
+      assert.deepEqual((await owner.query('SELECT revision FROM anatomy_rule_drafts WHERE id=$1', [ok.body.id])).rows[0], { revision: 1 }, 'revision not incremented');
+      assert.deepEqual([await drafts(), await saved()], before, 'nothing persisted or audited');
+      // A pre-existing draft over the limit cannot be frozen.
+      const legacy = await call('A', 'POST', '/drafts', { profiles: defaults(), examples: [article] });
+      await owner.query('ALTER TABLE anatomy_rule_drafts DISABLE TRIGGER anat_guard_draft');
+      await owner.query('UPDATE anatomy_rule_drafts SET examples = $2::jsonb WHERE id=$1', [legacy.body.id, JSON.stringify([withCatalog(EXECUTOR_LIMITS.maxCatalogCodes + 1)])]);
+      await owner.query('ALTER TABLE anatomy_rule_drafts ENABLE TRIGGER anat_guard_draft');
+      const frozenBefore = Number((await owner.query('SELECT count(*) FROM anatomy_rule_candidates')).rows[0].count);
+      const frozenAudit = await audit("action='ANAT_RULES_CANDIDATE_FROZEN'");
+      const f = await call('A', 'POST', `/drafts/${legacy.body.id}/freeze`, { revision: 1 });
+      assert.deepEqual([f.status, f.body.error], [422, 'LIMIT_EXCEEDED']);
+      assert.equal(Number((await owner.query('SELECT count(*) FROM anatomy_rule_candidates')).rows[0].count), frozenBefore, 'nothing frozen');
+      assert.equal(await audit("action='ANAT_RULES_CANDIDATE_FROZEN'"), frozenAudit, 'no success audit');
     });
 
     await t.test('simulation and comparison through the real executor; author cannot review; the full proof approves', async () => {
