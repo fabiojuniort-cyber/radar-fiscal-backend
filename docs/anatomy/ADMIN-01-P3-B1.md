@@ -26,6 +26,35 @@ Every SQL file starts with the `ANAT04_DISPOSABLE_CI_ONLY` guard. The test commi
 | **B1-R1-02**: an approved proof could gain rows | Each simulation is a sealed aggregate. `example_count` is fixed at insert, and rows beyond it are refused (`SIMULATION_SEALED`), the owner included. Rows must belong to the candidate's example set and engine. At COMMIT, rows, counters and `report_hash` must agree (`SIMULATION_INCONSISTENT`). Preview and activation re-run every approval rule instead of trusting the `approved` label | `B1-R1-02` test: extra `failed` row, extra row with a valid id (completing a partial run), forged counters, missing row, forged report hash, unknown example, other engine |
 | **B1-R1-03**: global audit policy not admin-only | The platform-admin predicate of `main` (036, verbatim body) is required by every entry point (`PLATFORM_ADMIN_REQUIRED`) and by the policies. ANAT audit INSERT is allowed only to `anat_rules_writer`, for the session user and only when that user is an admin. ANAT audit SELECT, and SELECT on all 13 admin tables (RLS forced), is limited to `radar_app` with an admin session; the worker keeps SELECT on rule sets and activations (§2.3). Policies 009 and 018 already give the worker and the curator broad `tenant_id NULL` access; they are unchanged. Two **RESTRICTIVE** policies scoped to ANAT rows block their writes and reads of ANAT rows (the curator could otherwise write `ANAT_RULES_*`; found by the new test). Their own events are unaffected (tested) | `B1-R1-03` test: no session user, authenticated non-admin, revoked admin and admin; worker and curator; `radar_app` direct ANAT insert refused even for an admin |
 
+## R2 correction (review `5637021187` on `9ce09ff`)
+
+**B1-R2-01: TEMP schema precedence in the privileged chain. Reproduced, then fixed.**
+
+**Reproduction on `9ce09ff`** (local PostgreSQL 16.15, fresh disposable database, new psql connection; synthetic data):
+
+| Case | Result |
+|---|---|
+| Control, no TEMP table: `anat_record_review` approving a simulation with `fail_count = 1` | Refused (`SIMULATION_NOT_PASSING`) |
+| `radar_app`, admin session, ran `CREATE TEMP TABLE anatomy_rule_reviews (LIKE public.anatomy_rule_reviews INCLUDING DEFAULTS)` and `GRANT SELECT ... TO anat_rules_writer`, then the same call with no comparisons or decisions | Approval **persisted after COMMIT**, alongside `fail_count = 1` |
+
+**Cause:**
+- The entry points had `pg_temp` last, but each helper and trigger had its own `SET search_path = pg_catalog, public`. Without `pg_temp` listed, the temporary schema is searched first for relations and types.
+- `anat_assert_approval` read the empty TEMP `anatomy_rule_reviews`. With no `FOUND` check, every comparison evaluated to NULL and no rule refused. The commit-time check called the same helper.
+
+**Fix:**
+- Every `anat_*` function (helpers, triggers, entry points) now has `search_path = pg_catalog, public, pg_temp`, with `pg_temp` explicitly last; the test checks this for every function. Functions are never looked up in `pg_temp`.
+- `anat_assert_approval` and the simulation-row guard fail explicitly when a required record is missing: `REVIEW_NOT_FOUND`, `CANDIDATE_NOT_FOUND`, `SIMULATION_*`, `INVALID_EXAMPLE`. Rejected reviews return early, as before.
+- No privilege was widened: no grant on the schema, no change to TEMP, no change to the writer's membership.
+
+**Regression** (test `B1-R2-01`, PostgreSQL 16 and 18, one **fresh connection per case**):
+- Each of 13 tables (the 12 admin tables used by the chain plus `audit_log`) is shadowed by an empty TEMP copy granted to the writer, one at a time and then all together.
+- The invalid approval is refused every time, and no approval is persisted.
+- A valid approval with every table shadowed still succeeds once, with its audit row.
+- A missing review is refused (`REVIEW_NOT_FOUND`), and a rejected review still works.
+- Run against the `9ce09ff` schema, the test fails exactly on the `anatomy_rule_reviews` case.
+
+**Observation, outside scope:** vendored 074 `audit_allowlist_guard` has `search_path = pg_catalog, public` and reads `pg_class` only in its UPDATE (owner backfill) branch. The INSERT branch used here calls functions only. 074 is kept byte-identical and is not changed.
+
 ## Decisions (R1 outcome)
 
 1. **Confirm mapping (accepted by COORD):**

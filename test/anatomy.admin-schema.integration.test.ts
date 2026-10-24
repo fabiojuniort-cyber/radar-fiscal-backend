@@ -393,6 +393,49 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       assert.equal(await auditCount("after_data::text LIKE '%Revisão%'"), 0, 'rationale never reaches audit_log');
     });
 
+    await t.test('B1-R2-01: a session TEMP table cannot shadow any domain table of the privileged chain (fresh connections)', async () => {
+      const s = await scenario();
+      const failing = await simulate(A, s.cand, [{ ...s.rows[0]!, outcome: 'fail' }, s.rows[1]!]);
+      const shadowable = ['anatomy_rule_reviews', 'anatomy_rule_simulations', 'anatomy_rule_simulation_examples', 'anatomy_rule_candidates',
+        'anatomy_rule_example_sets', 'anatomy_rule_comparisons', 'anatomy_rule_comparison_envelopes', 'anatomy_rule_review_comparisons',
+        'anatomy_rule_review_decisions', 'anatomy_rule_sets', 'anatomy_rule_activations', 'anatomy_rule_activation_previews', 'audit_log'];
+      /** New connection; as radar_app (admin R) create empty TEMP copies granted to the writer, then run `sql` in one transaction. */
+      async function shadowed(tables: string[], sql: string, params: unknown[]): Promise<Row[]> {
+        const c = new pg.Client({ connectionString, connectionTimeoutMillis: 5000 });
+        await c.connect();
+        try {
+          await c.query('SET ROLE radar_app');
+          await c.query("SELECT set_config('app.user_id', $1, false)", [R]);
+          for (const table of tables) {
+            await c.query(`CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS)`);
+            await c.query(`GRANT SELECT, INSERT ON pg_temp.${table} TO anat_rules_writer`);
+          }
+          await c.query('BEGIN');
+          try { const r = (await c.query(sql, params)).rows; await c.query('COMMIT'); return r; } catch (error) { await c.query('ROLLBACK'); throw error; }
+        } finally { await c.end(); }
+      }
+      const approve = 'SELECT anat_record_review($1,$2,$3,$4,$5::uuid[],$6::jsonb,$7) AS id';
+      const invalid = [s.cand, failing, 'approved', 'Aprovação indevida via TEMP.', [], '[]', randomUUID()];
+      const approvedOn = async (sim: string) => Number((await db.query("SELECT count(*) FROM anatomy_rule_reviews WHERE simulation_id=$1 AND outcome='approved'", [sim])).rows[0].count);
+      // Control without TEMP: refused.
+      await fails(review(R, s.cand, failing, [], []), 'SIMULATION_NOT_PASSING');
+      // The reproduced case (anatomy_rule_reviews shadowed; it approved and committed on 9ce09ff) and every other table.
+      for (const table of shadowable) {
+        await assert.rejects(shadowed([table], approve, invalid), /anat:/u, `${table} shadow`);
+        assert.equal(await approvedOn(failing), 0, `${table}: no approval persisted`);
+      }
+      await assert.rejects(shadowed(shadowable, approve, invalid), /anat:/u, 'all tables shadowed at once');
+      assert.equal(await approvedOn(failing), 0);
+      // Valid control with every table shadowed: the real (public) proof is used and the approval is recorded once.
+      const ok = await shadowed(shadowable, approve, [s.cand, s.sim, 'approved', 'Revisão sintética suficiente.', s.comps, JSON.stringify(s.decisions), randomUUID()]);
+      assert.equal(await approvedOn(s.sim), 1);
+      assert.equal((await db.query('SELECT reviewer FROM anatomy_rule_reviews WHERE id=$1', [ok[0]!.id])).rows[0].reviewer, R);
+      assert.equal(await auditCount("action='ANAT_RULES_REVIEWED' AND entity_id=$1", [ok[0]!.id]), 1);
+      // Missing required records are explicit refusals (no NULL pass-through), and rejected reviews keep working.
+      await fails(asWriter(R, 'SELECT anat_assert_approval($1)', [randomUUID()]), 'REVIEW_NOT_FOUND');
+      assert.ok(await review(R, s.cand, failing, [], [], 'rejected'));
+    });
+
     await t.test('criterion 2: identical envelopes are stored once; every candidate keeps its own association', async () => {
       const p = profiles('dedupe'); const ruleHash = sha256(canonicalJson(p));
       const base = await scenario();
@@ -677,6 +720,8 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
         assert.equal(r.prosecdef, definer, `${r.proname} SECURITY DEFINER`);
         if (definer) { assert.equal(r.owner, 'anat_rules_writer', r.proname); assert.deepEqual(r.proconfig, ['search_path=pg_catalog, public, pg_temp'], r.proname); }
       }
+      // B1-R2-01: every anat_* function (helpers, triggers, entry points) resolves names with pg_temp explicitly last.
+      for (const r of fn) assert.deepEqual(r.proconfig, ['search_path=pg_catalog, public, pg_temp'], `${r.proname} search_path`);
       const writer = (await db.query("SELECT rolsuper, rolbypassrls, rolcanlogin, rolinherit FROM pg_roles WHERE rolname='anat_rules_writer'")).rows[0];
       assert.deepEqual(writer, { rolsuper: false, rolbypassrls: false, rolcanlogin: false, rolinherit: false });
       const creators = (await db.query(`SELECT r.rolname FROM pg_roles r WHERE has_schema_privilege(r.oid, 'public', 'CREATE') AND NOT r.rolsuper
