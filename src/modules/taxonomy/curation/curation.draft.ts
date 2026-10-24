@@ -145,7 +145,7 @@ async function writeAudit(
         entity_type, entity_id, after_data, correlation_id
       ) VALUES (
         NULL, 'ADMIN', $1, $2,
-        'taxonomy_curation', $3::uuid, $4::jsonb, $5::uuid
+        'taxonomy_curation', $3::uuid, public.audit_project($2,'taxonomy_curation',$4::jsonb), $5::uuid
       )
     `,
     [

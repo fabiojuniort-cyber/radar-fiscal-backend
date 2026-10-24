@@ -487,10 +487,10 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
       await client.query(
         `
           INSERT INTO audit_log (
-            id, tenant_id, actor_type, action, entity_type
+            id, tenant_id, actor_type, actor_id, action, entity_type
           )
           VALUES (
-            $1, $2, 'ADMIN', 'TENANT_PRIVATE_TEST', 'taxonomy_test'
+            $1, $2, 'ADMIN', gen_random_uuid()::text, 'COMPANY_UPDATED', 'company'
           )
         `,
         [tenantAuditId, tenantId],
@@ -500,10 +500,10 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
         await client.query(
           `
             INSERT INTO audit_log (
-              id, tenant_id, actor_type, action, entity_type
+              id, tenant_id, actor_type, actor_id, action, entity_type
             )
             VALUES (
-              $1, NULL, 'ADMIN', 'TAXONOMY_TEST', 'taxonomy_release'
+              $1, NULL, 'ADMIN', gen_random_uuid()::text, 'TAXONOMY_RELEASE_CREATED', 'taxonomy_release'
             )
           `,
           [globalAuditId],
@@ -528,10 +528,10 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
           client.query(
             `
               INSERT INTO audit_log (
-                tenant_id, actor_type, action, entity_type
+                tenant_id, actor_type, actor_id, action, entity_type
               )
               VALUES (
-                $1, 'ADMIN', 'FORBIDDEN_TENANT_AUDIT', 'taxonomy_test'
+                $1, 'ADMIN', gen_random_uuid()::text, 'COMPANY_UPDATED', 'company'
               )
             `,
             [tenantId],
@@ -542,10 +542,10 @@ test('taxonomy privileges preserve global read-only runtimes and tenant RLS', as
           client.query(
             `
               INSERT INTO audit_log (
-                tenant_id, actor_type, action, entity_type
+                tenant_id, actor_type, actor_id, action, entity_type
               )
               VALUES (
-                NULL, 'USER', 'FORBIDDEN_USER_AUDIT', 'taxonomy_test'
+                NULL, 'USER', gen_random_uuid()::text, 'TAXONOMY_RELEASE_CREATED', 'taxonomy_release'
               )
             `,
           ),

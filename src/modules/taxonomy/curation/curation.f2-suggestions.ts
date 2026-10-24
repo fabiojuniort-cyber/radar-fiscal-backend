@@ -51,7 +51,7 @@ export async function updateF2DraftSuggestions(
  `,[row.id,values.suggestedProducts,values.suggestedNcms,draft.id]);
  await client.query(`
   INSERT INTO audit_log(tenant_id,actor_type,actor_id,action,entity_type,entity_id,after_data,correlation_id)
-  VALUES (NULL,'ADMIN',$1,'TAXONOMY_F2_SUGGESTIONS_CHANGED','taxonomy_curation',$2::uuid,$3::jsonb,gen_random_uuid())
+  VALUES (NULL,'ADMIN',$1,'TAXONOMY_F2_SUGGESTIONS_CHANGED','taxonomy_curation',$2::uuid,public.audit_project('TAXONOMY_F2_SUGGESTIONS_CHANGED','taxonomy_curation',$3::jsonb),gen_random_uuid())
  `,[actor.userId,draft.id,JSON.stringify({
    conceptCode,productsCount:values.suggestedProducts.length,ncmsCount:values.suggestedNcms.length,
    justification:actor.justification,

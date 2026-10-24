@@ -222,96 +222,12 @@ test(
         },
       });
 
-      assert.equal(
-        reactivated.statusCode,
-        201,
-      );
-
-      const reactivatedBranch =
-        reactivated.json<{
-          establishment: {
-            id: string;
-            businessLocationCode:
-              string | null;
-            stateRegistration:
-              string | null;
-            stateRegistrationSource:
-              string | null;
-          };
-        }>().establishment;
-
-      assert.equal(
-        reactivatedBranch.id,
-        branch.id,
-      );
-      assert.equal(
-        reactivatedBranch
-          .businessLocationCode,
-        'FILIAL-003',
-      );
-      assert.equal(
-        reactivatedBranch.stateRegistration,
-        '109998887',
-      );
-      assert.equal(
-        reactivatedBranch
-          .stateRegistrationSource,
-        'MANUAL',
-      );
-
-      const establishments = await app.inject({
-        method: 'GET',
-        url:
-          '/api/v1/companies/' +
-          company.id +
-          '/establishments',
-        headers,
-      });
-
-      assert.equal(
-        establishments.statusCode,
-        200,
-      );
-
-      const persisted =
-        establishments.json<{
-          items: Array<{
-            id: string;
-            businessLocationCode:
-              string | null;
-            stateRegistration:
-              string | null;
-            stateRegistrationSource:
-              string | null;
-            cnaes: Array<{
-              code: string;
-              isPrimary: boolean;
-            }>;
-          }>;
-        }>().items.find(
-          (item) => item.id === branch.id,
-        );
-
-      assert.equal(
-        persisted?.businessLocationCode,
-        'FILIAL-003',
-      );
-      assert.equal(
-        persisted?.stateRegistration,
-        '109998887',
-      );
-      assert.equal(
-        persisted?.stateRegistrationSource,
-        'MANUAL',
-      );
-      assert.equal(
-        persisted?.cnaes[0]?.code,
-        '4632001',
-      );
-      assert.equal(
-        persisted?.cnaes[0]?.isPrimary,
-        true,
-      );
+      assert.equal(reactivated.statusCode,410,reactivated.body);
+      assert.equal(reactivated.json<{error:string}>().error,'reactivation_removed');
+      const inactive=await admin.query<{is_active:boolean;business_location_code:string}>(
+        'SELECT is_active,business_location_code FROM establishments WHERE id=$1',[branch.id]);
+      assert.equal(inactive.rows[0]?.is_active,false);
+      assert.equal(inactive.rows[0]?.business_location_code,'FILIAL-003');
 
       const headOfficeConflict =
         await app.inject({

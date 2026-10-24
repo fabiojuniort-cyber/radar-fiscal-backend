@@ -109,7 +109,7 @@ export async function initializeF2Actuacao(
   }
 
   await client.query(
-    "INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id) VALUES (NULL, 'ADMIN', $1, 'F2_T02_ACTUACAO_INITIALIZED', 'taxonomy_curation', $2::uuid, $3::jsonb, gen_random_uuid())",
+    "INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id) VALUES (NULL, 'ADMIN', $1, 'F2_T02_ACTUACAO_INITIALIZED', 'taxonomy_curation', $2::uuid, public.audit_project('F2_T02_ACTUACAO_INITIALIZED','taxonomy_curation',$3::jsonb), gen_random_uuid())",
     [actor.userId, draft.id, JSON.stringify({
       justification: actor.justification,
       seedSha256: F2_ACTUACAO_SOURCE_SHA256,
@@ -243,7 +243,7 @@ export async function persistF2ActuacaoCnaeOrigins(
     `INSERT INTO audit_log
        (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
      VALUES (NULL, 'ADMIN', $1, 'F2_T02_ACTUACAO_CNAE_ORIGINS_IMPORTED',
-             'taxonomy_curation', $2::uuid, $3::jsonb, $4::uuid)`,
+             'taxonomy_curation', $2::uuid, public.audit_project('F2_T02_ACTUACAO_CNAE_ORIGINS_IMPORTED','taxonomy_curation',$3::jsonb), $4::uuid)`,
     [actor.userId, draft.id, JSON.stringify({
       justification: actor.justification, sourceSha256, projectionSha256,
       originCount: rows.length, publicationRequested: false,

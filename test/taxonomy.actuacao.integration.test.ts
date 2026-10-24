@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { Pool } from 'pg';
@@ -29,7 +30,7 @@ test('F2-T02 on isolated PostgreSQL 18: draft Atuação and source origins are d
       "INSERT INTO taxonomy_releases (version_major, version_minor, version_patch, status, manifest, created_by_actor) SELECT COALESCE(max(version_major), 0) + 100, 0, 0, 'DRAFT', '{\"kind\":\"TAX-11_CURATED_RELEASE\"}'::jsonb, 'f2-t02-test' FROM taxonomy_releases RETURNING id",
     );
     const releaseId = release.rows[0]!.id;
-    const actor = { userId: 'f2:integration', justification: 'Prova F2 de persistência e origem' };
+    const actor = { userId: randomUUID(), justification: 'Prova F2 de persistência e origem' };
 
     const first = await withCuratorTransaction(curator, client => initializeF2Actuacao(client, actor));
     assert.equal(first.sourceRows, 1332);

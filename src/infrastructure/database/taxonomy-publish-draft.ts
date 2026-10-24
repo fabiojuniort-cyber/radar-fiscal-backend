@@ -38,7 +38,7 @@ if (!connectionString) {
 }
 
 const actor: CuratorActor = {
-  userId: 'ops:taxonomy-publish-draft',
+  userId: 'system:taxonomy-publish-draft',
   justification: 'Publicação pedida pelo curador',
 };
 

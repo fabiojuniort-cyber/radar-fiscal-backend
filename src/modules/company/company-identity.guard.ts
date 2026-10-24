@@ -6,7 +6,8 @@ export class CompanyIdentityError extends Error {
     | 'head_office_conflict'
     | 'company_cnpj_exists'
     | 'establishment_conflict'
-    | 'reactivation_required') {
+    | 'company_inactive_requires_deletion'
+    | 'establishment_inactive_requires_deletion') {
     super(code);
   }
 }

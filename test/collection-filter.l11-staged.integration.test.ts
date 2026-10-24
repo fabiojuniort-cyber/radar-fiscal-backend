@@ -109,7 +109,7 @@ test('L11: 520 DOU acts in bounded steps, drift, resume and per-step audit', asy
     assert.equal((await pool.query('SELECT id FROM publications WHERE id=ANY($1::uuid[])',[ids])).rowCount,0);
     const audit=await pool.query<{n:string;deleted:string}>(
       "SELECT count(*)::text AS n,COALESCE(sum((after_data->>'deletedCount')::int),0)::text AS deleted "+
-      "FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' AND after_data->>'canonicalType'=$1",[type]);
+      "FROM audit_log WHERE action='COLLECTION_FILTER_DIRECT_PURGE' AND actor_id=$1",[adminId]);
     assert.equal(Number(audit.rows[0]?.deleted),521);
     assert.ok(Number(audit.rows[0]?.n)>=times.length);
     console.log('L11_STAGED_TIMINGS='+JSON.stringify({synthetic:true,total,perStepMs:times,maxPerCall:500}));

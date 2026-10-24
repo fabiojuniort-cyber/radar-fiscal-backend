@@ -46,7 +46,7 @@ if (!connectionString) {
 
 const sheet = parseProductSheet(readFileSync(file, 'utf8'));
 const actor: CuratorActor = {
-  userId: 'ops:taxonomy-load-products',
+  userId: 'system:taxonomy-load-products',
   justification: `Carga da planilha de classificação de produtos (${sheet.length} itens)`,
 };
 

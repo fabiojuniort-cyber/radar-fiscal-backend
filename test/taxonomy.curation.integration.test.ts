@@ -619,7 +619,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         await client.query('SET LOCAL ROLE radar_taxonomy_curator');
         const load = await loadProductSheet(
           client,
-          { userId: 'ops:test', justification: 'Carga da planilha' },
+          { userId: randomUUID(), justification: 'Carga da planilha' },
           parseProductSheet(
             [
               '\uFEFFSegmento;Grupo;Item',
@@ -665,7 +665,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       try {
         await client.query('BEGIN');
         await client.query('SET LOCAL ROLE radar_taxonomy_curator');
-        const actor = { userId: 'ops:test', justification: 'Segmentos antigos' };
+        const actor = { userId: randomUUID(), justification: 'Segmentos antigos' };
         const { createConcept } = await import('../src/modules/taxonomy/curation/curation.draft.js');
         const { retireLegacySegments, LEGACY_SEGMENT_TARGETS } = await import(
           '../src/modules/taxonomy/curation/curation.legacy-segments.js'
@@ -1208,7 +1208,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       try {
         await client.query('BEGIN');
         await client.query('SET LOCAL ROLE radar_taxonomy_curator');
-        const actor = { userId: 'ops:test', justification: 'Dimensões redundantes com os metadados do ato' };
+        const actor = { userId: randomUUID(), justification: 'Dimensões redundantes com os metadados do ato' };
         // (this fixture release has no "sphere" dimension; production does)
         const actType = await retireDimension(client, actor, 'act_type');
         assert.ok(actType.retiredConcepts.length > 0);

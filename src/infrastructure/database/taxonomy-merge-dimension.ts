@@ -45,7 +45,7 @@ if (!connectionString) {
 }
 
 const actor: CuratorActor = {
-  userId: 'ops:taxonomy-merge-dimension',
+  userId: 'system:taxonomy-merge-dimension',
   justification: `Dimensão "${from}" unificada em "${into}" (itens repetidos entre as duas)`,
 };
 
