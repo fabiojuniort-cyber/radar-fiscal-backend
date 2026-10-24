@@ -1,3 +1,4 @@
+import { validateOperationalPublication } from './curation.f2-links.js';
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { Pool, PoolClient } from 'pg';
@@ -793,6 +794,7 @@ export async function createDraft(
         sourceReleaseId: source.id,
         sourceVersion: source.version,
         taxonomyCompatibility: inheritedCompatibility,
+        ...((sourceManifest.rows[0]?.manifest as Record<string,unknown> | undefined)?.f2Operational ? {f2Operational:(sourceManifest.rows[0]!.manifest as Record<string,unknown>).f2Operational} : {}),
       }),
       `curator:${actor.userId}`,
     ],
@@ -2674,7 +2676,9 @@ export async function publishDraft(
   const sourceView = latest ? await loadReleaseView(run, latest.id) : null;
   const diff = diffReleaseViews(sourceView, view);
 
-  const snapshot = releaseSnapshot(view);
+  const approvalManifest = await client.query<{manifest:unknown}>('SELECT manifest FROM taxonomy_releases WHERE id=$1::uuid',[draft.id]);
+  const operational = await validateOperationalPublication(client,draft.id,approvalManifest.rows[0]?.manifest);
+  const snapshot = {...releaseSnapshot(view), ...(operational?{f2Operational:operational}:{})};
   const snapshotJson = canonicalJson(snapshot);
   const snapshotSha256 = createHash('sha256').update(snapshotJson, 'utf8').digest('hex');
   const gitSha =
@@ -2693,6 +2697,7 @@ export async function publishDraft(
   const manifest = {
     kind: CURATED_RELEASE_KIND,
     taxonomyCompatibility,
+    ...(operational?{f2Operational:operational}:{}),
     sourceReleaseId: draft.previousReleaseId,
     sourceVersion: latest?.version ?? null,
     snapshotSha256,
