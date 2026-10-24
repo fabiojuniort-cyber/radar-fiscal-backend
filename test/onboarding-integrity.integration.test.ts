@@ -1,3 +1,4 @@
+import { applyAuditBackfill } from '../src/modules/audit/audit-backfill.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
@@ -27,6 +28,8 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
   const tenants: string[] = [];
   try {
     await app.ready();
+    // Isolated fixture setup: production cleanup remains a separate authorization.
+    await applyAuditBackfill(admin);
     await ensureCnaeFixture(admin);
 
     const newOwner = async () => {
@@ -45,7 +48,7 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
       });
       assert.equal(logged.statusCode, 200, logged.body);
       const token = logged.json<{ accessToken: string }>().accessToken;
-      return { headers: { authorization: 'Bearer ' + token, 'x-tenant-id': identity.tenant.id } };
+      return { headers: { authorization: 'Bearer ' + token, 'x-tenant-id': identity.tenant.id, 'x-company-delete-intent': 'permanent-v1' } };
     };
 
     const a = await newOwner();
@@ -171,43 +174,114 @@ test('ONB-01 registration: official CNAE integrity, tenant isolation, root, dupl
         uf: 'GO', typeCode: 'OTHER' },
     });
     assert.equal(implicit.statusCode, 409, implicit.body);
-    assert.equal(implicit.json<{ error: string }>().error, 'reactivation_required');
+    assert.equal(implicit.json<{ error: string }>().error, 'establishment_inactive_requires_deletion');
 
     const reactivation = await app.inject({
       method: 'POST', url: '/api/v1/establishments/manual', headers: a.headers,
       payload: { companyId, cnpj: branchCnpj, name: 'Não reescrever',
         uf: 'GO', typeCode: 'OTHER', reactivateInactive: true },
     });
-    assert.equal(reactivation.statusCode, 201, reactivation.body);
-    await assertReadback(reactivation.json());
-    assert.equal(reactivation.json().establishment.name, 'Filial autorizada');
-    assert.equal(reactivation.json<{ establishment: { id: string } }>().establishment.id, branchId);
+    assert.equal(reactivation.statusCode,410,reactivation.body);
+    assert.equal(reactivation.json<{error:string}>().error,'reactivation_removed');
     const afterReactivation = await admin.query<{ name: string; is_active: boolean }>(
       'SELECT name, is_active FROM establishments WHERE id = $1', [branchId]
     );
     assert.equal(afterReactivation.rows[0]?.name, 'Filial autorizada');
-    assert.equal(afterReactivation.rows[0]?.is_active, true);
+    assert.equal(afterReactivation.rows[0]?.is_active, false);
 
-    const deleteCompany = await app.inject({ method: 'DELETE',
-      url: '/api/v1/companies/' + companyId, headers: a.headers });
+    // R3 contract: company purge removes private profile/establishment data.
+    const otherTenantCompany = await app.inject({
+      method: 'POST', url: '/api/v1/companies/manual',
+      headers: b.headers, payload: headPayload,
+    });
+    assert.equal(otherTenantCompany.statusCode, 201, otherTenantCompany.body);
+    const otherTenantCompanyId =
+      otherTenantCompany.json<{ company: { id: string } }>().company.id;
+
+    await admin.query(
+      "INSERT INTO company_tax_profiles (company_id,version_no,tax_regime,personalization) VALUES ($1,1,'LUCRO_REAL',$2::jsonb)",
+      [companyId, JSON.stringify({ keywords: ['only-first-tenant'] })],
+    );
+    await admin.query(
+      "INSERT INTO company_product_profiles (company_id,product_label) VALUES ($1,'Produto do tenant apagado')",
+      [companyId],
+    );
+    await admin.query(
+      "INSERT INTO monitoring_profiles (company_id,name) VALUES ($1,'Monitoramento removido')",
+      [companyId],
+    );
+
+    const crossTenantDelete = await app.inject({
+      method: 'DELETE', url: '/api/v1/companies/' + otherTenantCompanyId,
+      headers: a.headers,
+    });
+    assert.equal(crossTenantDelete.statusCode, 404, crossTenantDelete.body);
+
+    const deleteCompany = await app.inject({
+      method: 'DELETE', url: '/api/v1/companies/' + companyId, headers: a.headers,
+    });
     assert.equal(deleteCompany.statusCode, 204, deleteCompany.body);
-    const reactivateCompany = await app.inject({ method: 'POST', url: '/api/v1/companies/manual',
-      headers: a.headers, payload: { cnpj: headCnpj, legalName: 'Não substituir razão social',
-        establishmentName: 'Não substituir matriz', uf: 'SP', municipalityName: 'Não substituir endereço',
-        cnaes: [{ code: '9999999', description: 'Não substituir CNAE', isPrimary: true }],
-        reactivateInactive: true } });
-    assert.equal(reactivateCompany.statusCode, 201, reactivateCompany.body);
-    await assertReadback(reactivateCompany.json());
-    assert.equal(reactivateCompany.json().company.legalName, persisted.rows[0]?.legal_name);
-    assert.equal(reactivateCompany.json().establishment.cnaes[0].description, afterCnae.rows[0]?.description);
-    const companySql = await admin.query('SELECT legal_name, trade_name, head_office_cnpj FROM companies WHERE id = $1', [companyId]);
-    assert.equal(reactivateCompany.json().company.legalName, companySql.rows[0].legal_name);
-    assert.equal(reactivateCompany.json().company.tradeName, companySql.rows[0].trade_name);
-    assert.equal(reactivateCompany.json().company.cnpj, companySql.rows[0].head_office_cnpj);
+
+    const count = async (query: string, id: string) => {
+      const res = await admin.query<{ total: number }>(query, [id]);
+      return Number(res.rows[0]?.total ?? -1);
+    };
+    for (const table of ['companies', 'company_tax_profiles', 'company_cnaes',
+      'company_product_profiles', 'monitoring_profiles', 'company_publications',
+      'company_cnae_ncms'] as const) {
+      const column = table === 'companies' ? 'id' : 'company_id';
+      assert.equal(await count(
+        'SELECT count(*)::int AS total FROM ' + table + ' WHERE ' + column + ' = $1',
+        companyId,
+      ), 0, table + ' must be removed');
+    }
+    assert.equal(await count(
+      'SELECT count(*)::int AS total FROM establishments WHERE company_id = $1',
+      companyId,
+    ), 0, 'all establishments must be removed');
+    assert.equal(await count(
+      'SELECT count(*)::int AS total FROM establishment_cnaes WHERE establishment_id = $1',
+      branchId,
+    ), 0);
+    assert.equal(await count(
+      'SELECT count(*)::int AS total FROM companies WHERE id = $1',
+      otherTenantCompanyId,
+    ), 1, 'another tenant must remain intact');
+
+    const missingDelete = await app.inject({
+      method: 'DELETE', url: '/api/v1/companies/' + companyId, headers: a.headers,
+    });
+    assert.equal(missingDelete.statusCode, 404, missingDelete.body);
+
+    // Same CNPJ creates a NEW identity/profile rather than resurrecting history.
+    const fresh = await app.inject({
+      method: 'POST', url: '/api/v1/companies/manual',
+      headers: a.headers, payload: {
+        ...headPayload,
+        legalName: 'Nova Empresa Criada do Zero',
+        uf: 'SP', municipalityName: 'Nova unidade',
+      },
+    });
+    assert.equal(fresh.statusCode, 201, fresh.body);
+    const freshId = fresh.json<{ company: { id: string; legalName: string } }>().company.id;
+    assert.notEqual(freshId, companyId);
+    assert.equal(fresh.json().company.legalName, 'Nova Empresa Criada do Zero');
+    assert.equal(await count(
+      'SELECT count(*)::int AS total FROM company_tax_profiles WHERE company_id = $1',
+      freshId,
+    ), 0, 'new company profile must start empty');
+    assert.equal(await count(
+      'SELECT count(*)::int AS total FROM company_product_profiles WHERE company_id = $1',
+      freshId,
+    ), 0, 'new company products must start empty');
+
   } finally {
     await app.close();
     if (users.length) await admin.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);
-    if (tenants.length) await admin.query('DELETE FROM tenants WHERE id = ANY($1::uuid[])', [tenants]);
+    if (tenants.length) {
+      await admin.query("DELETE FROM audit_log WHERE action = 'COMPANY_PURGED' AND tenant_id = ANY($1::uuid[])", [tenants]);
+      await admin.query('DELETE FROM tenants WHERE id = ANY($1::uuid[])', [tenants]);
+    }
     await admin.end();
   }
 });

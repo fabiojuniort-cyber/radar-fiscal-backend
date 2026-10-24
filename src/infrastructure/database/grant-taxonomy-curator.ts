@@ -64,7 +64,7 @@ try {
       if (existing.rowCount && !dryRun) {
         await client.query(
           `UPDATE platform_user_roles
-           SET revoked_at = now(), revoked_by = 'ops:grant-taxonomy-curator'
+           SET revoked_at = now(), revoked_by = 'system:grant-taxonomy-curator'
            WHERE id = $1`,
           [existing.rows[0]!.id],
         );
@@ -74,7 +74,7 @@ try {
       if (!existing.rowCount && !dryRun) {
         await client.query(
           `INSERT INTO platform_user_roles (user_id, role, granted_by)
-           VALUES ($1, 'TAXONOMY_CURATOR', 'ops:grant-taxonomy-curator')`,
+           VALUES ($1, 'TAXONOMY_CURATOR', 'system:grant-taxonomy-curator')`,
           [userId],
         );
       }
@@ -86,7 +86,7 @@ try {
            tenant_id, actor_type, actor_id, action, entity_type, entity_id,
            after_data, correlation_id
          ) VALUES (
-           NULL, 'SYSTEM', 'ops:grant-taxonomy-curator',
+           NULL, 'SYSTEM', 'system:grant-taxonomy-curator',
            $1, 'app_user', $2::uuid, $3::jsonb, gen_random_uuid()
          )`,
         [

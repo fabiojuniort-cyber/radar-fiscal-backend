@@ -30,7 +30,6 @@ export type ManualEstablishmentRegistrationInput = {
   stateRegistration?: string | null | undefined;
   businessLocationCode?: string | null | undefined;
   cnaes?: CnpjRegistryCnae[] | undefined;
-  reactivateInactive?: boolean | undefined;
 };
 
 export type ManualEstablishmentRegistrationResult = {
@@ -40,7 +39,7 @@ export type ManualEstablishmentRegistrationResult = {
   stateRegistrationSource: string | null;
 };
 
-export async function createOrReactivateManualEstablishment(
+export async function createManualEstablishment(
   trx: Transaction<DB>,
   input: ManualEstablishmentRegistrationInput,
 ): Promise<ManualEstablishmentRegistrationResult> {
@@ -82,18 +81,7 @@ export async function createOrReactivateManualEstablishment(
     );
   }
   if (existing?.is_active) throw new CompanyIdentityError('establishment_conflict');
-  if (existing && !input.reactivateInactive) throw new CompanyIdentityError('reactivation_required');
-  if (existing) {
-    await trx.updateTable('establishments').set({ is_active: true })
-      .where('id', '=', existing.id).execute();
-    await rebuildCompanyCnaes(trx, input.companyId);
-    return {
-      establishmentId: existing.id,
-      businessLocationCode: existing.business_location_code,
-      stateRegistration: existing.state_registration,
-      stateRegistrationSource: existing.state_registration_source,
-    };
-  }
+  if (existing) throw new CompanyIdentityError('establishment_inactive_requires_deletion');
   if (!input.cnaes?.length) throw new ManualCnaeValidationError('invalid_cnae');
 
 

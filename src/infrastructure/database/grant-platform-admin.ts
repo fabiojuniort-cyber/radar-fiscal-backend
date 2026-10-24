@@ -113,7 +113,7 @@ try {
           await client.query(
             `UPDATE platform_user_roles
              SET revoked_at = now(),
-                 revoked_by = 'ops:grant-platform-admin'
+                 revoked_by = 'system:grant-platform-admin'
              WHERE id = $1`,
             [existing.rows[0]!.id],
           );
@@ -128,7 +128,7 @@ try {
           `INSERT INTO platform_user_roles (
              user_id, role, granted_by
            ) VALUES (
-             $1, 'PLATFORM_ADMIN', 'ops:grant-platform-admin'
+             $1, 'PLATFORM_ADMIN', 'system:grant-platform-admin'
            )`,
           [target.id],
         );
@@ -146,7 +146,7 @@ try {
            entity_type, entity_id, before_data, after_data,
            correlation_id
          ) VALUES (
-           NULL, 'SYSTEM', 'ops:grant-platform-admin', $1,
+           NULL, 'SYSTEM', 'system:grant-platform-admin', $1,
            'platform_user_role', $2::text, $3::jsonb, $4::jsonb,
            gen_random_uuid()
          )`,

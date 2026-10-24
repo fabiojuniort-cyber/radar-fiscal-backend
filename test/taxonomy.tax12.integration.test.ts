@@ -531,7 +531,7 @@ test('TAX-12 merge keeps concept identity and retires dimensions without graph r
     }
 
     const actor = {
-      userId: 'ops:tax-12-test',
+      userId: randomUUID(),
       justification: 'TAX-12 integration gate',
     };
 

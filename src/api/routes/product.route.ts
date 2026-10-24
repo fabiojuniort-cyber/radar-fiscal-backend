@@ -1,3 +1,4 @@
+import { purgeCompany } from '../../modules/company/company-purge.service.js';
 import { readCompanyRegistration, readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
@@ -75,7 +76,7 @@ const companyFromCnpjBodySchema = z.object({
   cnpj: cnpjValueSchema,
   businessLocationCode:
     businessLocationCodeSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 const companyUpdateBodySchema = z.object({
@@ -90,7 +91,7 @@ const establishmentFromCnpjBodySchema = z.object({
   typeCode: z.string().trim().min(1).max(50).default('OTHER'),
   businessLocationCode:
     businessLocationCodeSchema,
-  reactivateInactive: z.boolean().default(false),
+  reactivateInactive: z.boolean().optional(),
 });
 
 const cnaeBodySchema = z.object({
@@ -256,6 +257,20 @@ const taxProfileBodySchema = z.object({
       })
       .nullable()
       .default(null),
+    // Scoped per establishment; persisted in the same versioned company profile.
+    // Old clients may omit this field without erasing previously configured units.
+    establishmentOverrides: z.array(z.object({
+      establishmentId: z.string().uuid(),
+      taxRegime: z.enum([
+        'SIMPLES_NACIONAL', 'LUCRO_PRESUMIDO', 'LUCRO_REAL',
+        'IMUNE_ISENTA', 'OUTRO', 'NAO_INFORMADO',
+      ]),
+      conceptCodes: z.array(z.string().trim()
+        .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/)).max(500).default([]),
+      ncmCodes: z.array(z.string().trim()
+        .transform((value) => value.replace(/\D/g, ''))
+        .refine((value) => /^\d{8}$/.test(value))).max(500).default([]),
+    })).max(250).optional(),
   }),
 });
 
@@ -560,8 +575,10 @@ export async function productRoutes(
               },
               onboarding: onboarding
                 ? {
-                    companyName: onboarding.company_name,
-                    cnpj: onboarding.cnpj,
+                    // R4: account identity/consent is retained, but the legacy
+                    // onboarding identity is NEVER offered as a new company's preset.
+                    companyName: null,
+                    cnpj: null,
                     createdAt: new Date(onboarding.created_at).toISOString(),
                   }
                 : null,
@@ -682,6 +699,11 @@ export async function productRoutes(
         return reply.status(400).send({ error: 'tenant_required' });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const registry = await lookupCnpjRegistry(
           request.body.cnpj,
@@ -713,7 +735,6 @@ export async function productRoutes(
               registry,
               stateRegistration,
               request.body.businessLocationCode,
-              request.body.reactivateInactive,
             );
             return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
           },
@@ -926,35 +947,26 @@ export async function productRoutes(
               return null;
             }
 
-            const company = await trx
-              .selectFrom('companies')
-              .select('id')
-              .where('id', '=', request.params.companyId)
-              .where('is_active', '=', true)
-              .executeTakeFirst();
-
-            if (!company) {
-              return 'COMPANY_NOT_FOUND' as const;
+            // Reject old browser tabs that still promise a soft-delete.
+            if (request.headers['x-company-delete-intent'] !== 'permanent-v1') {
+              return 'CONFIRMATION_REQUIRED' as const;
             }
-
-            await trx
-              .updateTable('establishments')
-              .set({ is_active: false })
-              .where('company_id', '=', request.params.companyId)
-              .execute();
-
-            await trx
-              .updateTable('companies')
-              .set({ is_active: false })
-              .where('id', '=', request.params.companyId)
-              .execute();
-
-            return 'DELETED' as const;
+            // ONB-02-R3: the SECURITY DEFINER function rechecks tenant/admin
+            // authorization and atomically removes all company-owned records.
+            // No direct companies DELETE grant is added to radar_app.
+            const removed = await purgeCompany(trx, request.params.companyId);
+            return removed
+              ? 'DELETED' as const
+              : 'COMPANY_NOT_FOUND' as const;
           },
         );
 
         if (result === null) {
           return reply.status(403).send({ error: 'admin_required' });
+        }
+
+        if (result === 'CONFIRMATION_REQUIRED') {
+          return reply.status(409).send({ error: 'permanent_delete_confirmation_required' });
         }
 
         if (result === 'COMPANY_NOT_FOUND') {
@@ -963,6 +975,17 @@ export async function productRoutes(
 
         return reply.status(204).send();
       } catch (error) {
+        // Inconsistent references or ambiguous legacy ownership are a
+        // recoverable business conflict, never a silent partial deletion.
+        // Do not leak internal identifiers or CNPJ to the client.
+        if (error instanceof Error && (
+          error.message === 'company_purge_audit_backfill_required' ||
+          error.message === 'company_purge_cross_company_link' ||
+          error.message === 'company_purge_legacy_identity_ambiguous' ||
+          error.message === 'company_purge_historical_identity_ambiguous'
+        )) {
+          return reply.status(409).send({ error: 'company_purge_review_required' });
+        }
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
         throw error;
@@ -1380,6 +1403,11 @@ export async function productRoutes(
         return reply.status(400).send({ error: 'tenant_required' });
       }
 
+      // R4: a retired reactivation request must never touch a legacy inactive record.
+      if (request.body.reactivateInactive === true) {
+        return reply.status(410).send({ error: 'reactivation_removed' });
+      }
+
       try {
         const registry = await lookupCnpjRegistry(request.body.cnpj);
         const stateRegistration =
@@ -1433,7 +1461,6 @@ export async function productRoutes(
                 request.body.typeCode,
                 stateRegistration,
                 request.body.businessLocationCode,
-                request.body.reactivateInactive,
               );
 
             return readRegistrationEstablishment(trx, establishmentId);
@@ -2438,14 +2465,56 @@ export async function productRoutes(
               .selectFrom('companies')
               .select('id')
               .where('id', '=', request.params.companyId)
+              .forUpdate()
               .executeTakeFirst();
 
             if (!company) {
               return 'COMPANY_NOT_FOUND' as const;
             }
 
+            const current = await trx
+              .selectFrom('company_tax_profiles')
+              .select(['id', 'version_no', 'personalization'])
+              .where('company_id', '=', request.params.companyId)
+              .where('is_current', '=', true)
+              .executeTakeFirst();
+
+            const storedOverrides = recordValue(current?.personalization)?.establishmentOverrides;
+            const overrides = request.body.personalization.establishmentOverrides ??
+              (Array.isArray(storedOverrides)
+                ? storedOverrides as Array<{
+                    establishmentId: string; taxRegime: string;
+                    conceptCodes: string[]; ncmCodes: string[];
+                  }>
+                : []);
+            if (overrides) {
+              const ids = overrides.map((item) => item.establishmentId);
+              const unique = [...new Set(ids)];
+              if (unique.length !== ids.length) {
+                return 'INVALID_ESTABLISHMENT_OVERRIDES' as const;
+              }
+              if (unique.length > 0) {
+                const activeUnits = await trx
+                  .selectFrom('establishments')
+                  .select('id')
+                  .where('company_id', '=', request.params.companyId)
+                  .where('is_active', '=', true)
+                  .where('id', 'in', unique)
+                  .forShare()
+                  .execute();
+                if (activeUnits.length !== unique.length) {
+                  return 'INVALID_ESTABLISHMENT_OVERRIDES' as const;
+                }
+              }
+            }
+
             const taxonomy =
               request.body.personalization.taxonomy;
+            const unitCodes = (overrides ?? [])
+              .flatMap((item) => item.conceptCodes);
+            if (!taxonomy && unitCodes.length > 0) {
+              return 'INVALID_TAXONOMY_RELEASE' as const;
+            }
 
             if (taxonomy) {
               const release = await trx
@@ -2465,7 +2534,11 @@ export async function productRoutes(
                 return 'INVALID_TAXONOMY_RELEASE' as const;
               }
 
-              if (taxonomy.conceptCodes.length > 0) {
+              const allConceptCodes = [...new Set([
+                ...taxonomy.conceptCodes,
+                ...unitCodes,
+              ])];
+              if (allConceptCodes.length > 0) {
                 const concepts = await trx
                   .selectFrom('taxonomy_release_concepts as rc')
                   .innerJoin(
@@ -2476,12 +2549,12 @@ export async function productRoutes(
                   .select('c.code')
                   .where('rc.release_id', '=', taxonomy.releaseId)
                   .where('rc.membership_status', '=', 'INCLUDED')
-                  .where('c.code', 'in', taxonomy.conceptCodes)
+                  .where('c.code', 'in', allConceptCodes)
                   .execute();
 
                 if (
                   new Set(concepts.map((concept) => concept.code)).size !==
-                  new Set(taxonomy.conceptCodes).size
+                  allConceptCodes.length
                 ) {
                   return 'INVALID_TAXONOMY_SELECTION' as const;
                 }
@@ -2515,7 +2588,10 @@ export async function productRoutes(
             }
 
             // NCMs of the card NCM: assignable entries of the current catalog.
-            const ncmCodes = [...new Set(request.body.personalization.ncmCodes)];
+            const ncmCodes = [...new Set([
+              ...request.body.personalization.ncmCodes,
+              ...(overrides ?? []).flatMap((item) => item.ncmCodes),
+            ])];
             if (ncmCodes.length > 0) {
               const found = await sql<{ code: string }>`
                 SELECT DISTINCT regexp_replace(e.official_code, '[^0-9]', '', 'g') AS code
@@ -2529,13 +2605,6 @@ export async function productRoutes(
               `.execute(trx);
               if (found.rows.length !== ncmCodes.length) return 'INVALID_NCM_CODES' as const;
             }
-
-            const current = await trx
-              .selectFrom('company_tax_profiles')
-              .select(['id', 'version_no'])
-              .where('company_id', '=', request.params.companyId)
-              .where('is_current', '=', true)
-              .executeTakeFirst();
 
             const today = new Date().toISOString().slice(0, 10);
 
@@ -2558,7 +2627,10 @@ export async function productRoutes(
                 tax_regime: request.body.taxRegime,
                 segments: request.body.segments,
                 activities: JSON.stringify(request.body.activities),
-                personalization: JSON.stringify(request.body.personalization),
+                personalization: JSON.stringify({
+                  ...request.body.personalization,
+                  establishmentOverrides: overrides,
+                }),
                 valid_from: today,
                 valid_to: null,
                 is_current: true,
@@ -2591,6 +2663,10 @@ export async function productRoutes(
 
         if (profile === 'INVALID_TAXONOMY_SELECTION') {
           return reply.status(400).send({ error: 'invalid_taxonomy_selection' });
+        }
+
+        if (profile === 'INVALID_ESTABLISHMENT_OVERRIDES') {
+          return reply.status(400).send({ error: 'invalid_establishment_overrides' });
         }
 
         if (profile === 'INVALID_NCM_CODES') {

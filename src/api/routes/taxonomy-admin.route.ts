@@ -64,6 +64,7 @@ import {
   pgRunner,
 } from '../../modules/taxonomy/curation/curation.read.js';
 import { initializeF2Actuacao, persistF2ActuacaoCnaeOrigins } from '../../modules/taxonomy/curation/curation.actuacao.js';
+import {updateCnaeActuacoes} from '../../modules/taxonomy/curation/curation.f2-multi-actuacao.js';
 import { loadPublicationTaxonomy } from '../../modules/taxonomy/curation/curation.tags.js';
 import { collectionFilterCatalogVisibility } from '../../modules/collection/collection-filter.catalog-visibility.js';
 import { importNcmCatalog } from '../../modules/taxonomy/ncm/ncm-catalog.importer.js';
@@ -497,6 +498,25 @@ export async function taxonomyAdminRoutes(
     },
   );
 
+  // F2-TAB-03: editable, 1:N CNAE → Atuação in the v1.8.0 DRAFT ONLY.
+  // Never changes signed F2 XLSX, v1.7.0 publication or source origins.
+  typed.patch(
+    '/api/v1/admin/taxonomy/drafts/current/cnaes/:code/actuacoes',
+    {preHandler:requirePlatformAdmin,schema:{
+      params:z.object({code:z.string().startsWith('sector.').min(8).max(250)}),
+      body:z.object({
+        justification:z.string().trim().min(3),
+        atuacaoCodes:z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/)).min(1).max(12),
+      }).strict(),
+    }},
+    async(request,reply)=>{
+      const updated=await withCuratorTransaction(curatorPool(),client=>
+        updateCnaeActuacoes(client,actorFrom(request,request.body.justification),
+          request.params.code,request.body.atuacaoCodes));
+      return reply.send(updated);
+    },
+  );
+
   // F2-T02: initialize seven curated Atuação labels in the open DRAFT only.
   // Uses the existing platform-admin auth, dedicated curator role and lock.
   // Does not publish, classify, alter sector aliases or write tenant profiles.
@@ -659,6 +679,7 @@ export async function taxonomyAdminRoutes(
                 group: z.string().trim().max(200).nullable().optional(),
                 label: z.string().max(300),
                 officialCodes: z.array(z.string().trim().min(1).max(40)).max(500),
+                atuacaoCodes:z.array(z.string().regex(/^actuacao\.[a-z0-9_]+$/)).min(1).max(12).optional(),
                 aliases: z
                   .array(
                     z.object({
@@ -949,7 +970,7 @@ export async function taxonomyAdminRoutes(
         await withCuratorTransaction(curatorPool(), async (tx) => {
           await tx.query(
             `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-             VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, $3::jsonb, gen_random_uuid())`,
+             VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, public.audit_project('OFFICIAL_CATALOG_IMPORTED','official_catalog_edition',$3::jsonb), gen_random_uuid())`,
             [actor.userId, result.editionId, JSON.stringify({ catalog, ...result, justification: actor.justification })],
           );
         });
@@ -981,7 +1002,7 @@ export async function taxonomyAdminRoutes(
         });
         await client.query(
           `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-           VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, $3::jsonb, gen_random_uuid())`,
+           VALUES (NULL, 'ADMIN', $1, 'OFFICIAL_CATALOG_IMPORTED', 'official_catalog_edition', $2::uuid, public.audit_project('OFFICIAL_CATALOG_IMPORTED','official_catalog_edition',$3::jsonb), gen_random_uuid())`,
           [actor.userId, imported.editionId, JSON.stringify({ catalog, ...imported, justification: actor.justification })],
         );
         return imported;
@@ -1097,7 +1118,7 @@ export async function taxonomyAdminRoutes(
 
         await client.query(
           `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, correlation_id)
-           VALUES (NULL, 'ADMIN', $1, 'PUBLICATION_TAG_CURATED', 'publication', $2::uuid, $3::jsonb, gen_random_uuid())`,
+           VALUES (NULL, 'ADMIN', $1, 'PUBLICATION_TAG_CURATED', 'publication', $2::uuid, public.audit_project('PUBLICATION_TAG_CURATED','publication',$3::jsonb), gen_random_uuid())`,
           [
             actor.userId,
             request.params.publicationId,

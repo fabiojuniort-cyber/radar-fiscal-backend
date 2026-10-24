@@ -134,6 +134,10 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run db:prepare
 
+      - name: Clean synthetic legacy audit fixtures before regression (isolated CI only)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7
+
       - name: NEWS worker privilege policy
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: node dist/infrastructure/database/verify-news-worker-runtime-role.js
@@ -160,6 +164,10 @@ jobs:
       - name: ONB-01 adversarial tenant/CNAE/company integration
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
+
+      - name: ONB-02 R3 full graph and adversarial hard-delete tests
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/onb02-company-purge-graph.integration.test.ts
 
       - name: News API integration test
         if: steps.ci-plan.outputs.full_regression == 'true'
@@ -303,6 +311,8 @@ jobs:
       - run: npm run build
       - name: Apply complete migrations including ONB-01 042 and 043
         run: npm run db:prepare
+      - name: Clean synthetic legacy audit fixtures (isolated PG18 only)
+        run: node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7
       - name: Verify onboarding migration on PostgreSQL 18
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 -Atc "
@@ -320,3 +330,20 @@ jobs:
         run: npx tsx --test test/public-signup.integration.test.ts
       - name: Adversarial CNAE/branch/isolation on PG18
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
+      - name: ONB-02 R3 hard-delete full graph on PG18
+        run: npx tsx --test test/onb02-company-purge-graph.integration.test.ts
+      - name: ONB-02 R7 graph-only purge and timeout rollback on PG18
+        run: npx tsx --test test/onb02-r6-purge.integration.test.ts
+      - name: ONB-02 R7.1 unknown event preflight and actual CLI on PG18
+        run: npx tsx --test test/onb02-r71-backfill.integration.test.ts
+      - name: ONB-02 R7.4 historical contracts and direct-rule lock isolation on PG18
+        run: npx tsx --test test/onb02-r74-historical-events.integration.test.ts
+      - name: ONB-02 R7.3 documented TAX-10 CLI on a separate synthetic PG18 database
+        run: npx tsx --test test/onb02-r73-tax10-cli.integration.test.ts
+      - name: ONB-02 R7.2 authors and six historical simulation contexts on PG18
+        run: npx tsx --test test/onb02-r72-backfill.integration.test.ts
+      - name: ONB-02 R7 audit allowlist and resumable backfill 150k on PG18
+        run: timeout --signal=TERM --kill-after=10s 300s npx tsx --test test/onb02-r7-audit.integration.test.ts
+      - name: ONB-02 R3 semantic SQL evidence on isolated PG18
+        shell: bash
+        run: bash ops/onb02/ci-evidence-pg18.sh

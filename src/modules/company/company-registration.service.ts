@@ -105,7 +105,6 @@ export async function createCompanyFromRegistry(
   record: CnpjRegistryRecord,
   stateRegistration?: StateRegistrationLookup,
   businessLocationCode?: string | null,
-  reactivateInactive = false,
 ): Promise<{
   companyId: string;
   establishmentId: string;
@@ -122,22 +121,7 @@ export async function createCompanyFromRegistry(
   if (existingCompany?.is_active) {
     throw new CompanyIdentityError('company_cnpj_exists');
   }
-  if (existingCompany) {
-    if (!reactivateInactive) throw new CompanyIdentityError('reactivation_required');
-    await trx.updateTable('companies')
-      .set({ is_active: true })
-      .where('id', '=', existingCompany.id).execute();
-    await trx.updateTable('establishments')
-      .set({ is_active: true })
-      .where('company_id', '=', existingCompany.id)
-      .where('is_head_office', '=', true).execute();
-    const headOffice = await trx.selectFrom('establishments')
-      .select('id').where('company_id', '=', existingCompany.id)
-      .where('is_head_office', '=', true).executeTakeFirst();
-    if (!headOffice) throw new CompanyIdentityError('head_office_conflict');
-    await rebuildCompanyCnaes(trx, existingCompany.id);
-    return { companyId: existingCompany.id, establishmentId: headOffice.id };
-  }
+  if (existingCompany) throw new CompanyIdentityError('company_inactive_requires_deletion');
   // Registry providers are data sources, not authorities for the shared CNAE catalog.
   // Resolve all identifiers and descriptions against the CURRENT official edition.
   const officialCnaes = await validateAndEnsureOfficialCnaes(trx, record.cnaes);
@@ -218,7 +202,6 @@ export async function createEstablishmentFromRegistry(
   typeCode: string,
   stateRegistration?: StateRegistrationLookup,
   businessLocationCode?: string | null,
-  reactivateInactive = false,
 ): Promise<string> {
   const company = await trx.selectFrom('companies')
     .select('head_office_cnpj').where('id', '=', companyId)
@@ -242,13 +225,7 @@ export async function createEstablishmentFromRegistry(
   if (existingEstablishment?.is_active) {
     throw new CompanyIdentityError('establishment_conflict');
   }
-  if (existingEstablishment) {
-    if (!reactivateInactive) throw new CompanyIdentityError('reactivation_required');
-    await trx.updateTable('establishments')
-      .set({ is_active: true }).where('id', '=', existingEstablishment.id).execute();
-    await rebuildCompanyCnaes(trx, companyId);
-    return existingEstablishment.id;
-  }
+  if (existingEstablishment) throw new CompanyIdentityError('establishment_inactive_requires_deletion');
   // Registry providers are data sources, not authorities for the shared CNAE catalog.
   // Resolve all identifiers and descriptions against the CURRENT official edition.
   const officialCnaes = await validateAndEnsureOfficialCnaes(trx, record.cnaes);
