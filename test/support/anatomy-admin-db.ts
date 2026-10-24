@@ -43,6 +43,17 @@ export async function latestRealPolicyJson(dir: string): Promise<string> {
  * Integration package 2: with ANAT_PROJECT_MIGRATIONS=1 the project's REAL runner applies this branch's migrations
  * (main's chain + 077_anat_base + 078_anat_audit_policy + 079_anat_rules_admin) INSTEAD of every rehearsal SQL file.
  */
+/**
+ * Integration deltas authorised after the accepted rehearsal (COORD integration R1). They live ONLY in the numbered
+ * migration 079, between markers; the rehearsal modes (vendored chain, real chain of main) apply the same block on top
+ * of the unchanged rehearsal SQL, so every mode exercises the integration boundary.
+ */
+export async function integrationDeltaSql(): Promise<string> {
+  const sql = await readFile(new URL('../../migrations/079_anat_rules_admin.sql', import.meta.url), 'utf8');
+  const m = /-- BEGIN INTEGRATION DELTA P-INT-01[^\n]*\n([\s\S]*?)-- END INTEGRATION DELTA P-INT-01/u.exec(sql);
+  if (!m) throw new Error('integration delta P-INT-01 not found in 079');
+  return m[1]!;
+}
 export const PROJECT_MIGRATIONS = process.env.ANAT_PROJECT_MIGRATIONS === '1';
 const BOOTSTRAPS = new Set(['anatomy-api-ci-bootstrap.sql']); // the real chain carries the real auth tables and grants
 
@@ -73,6 +84,7 @@ export async function prepareAdminDatabase(client: pg.Client, extra: string[] = 
     await client.query(await read('anatomy-ci-schema.sql'));
     await client.query(await read('anatomy-admin-audit-policy.sql'));
     await client.query(await read('anatomy-admin-ci-schema.sql'));
+    await client.query(await integrationDeltaSql());
     for (const name of extra) if (!(REAL_CHAIN_DIR && BOOTSTRAPS.has(name))) await client.query(await read(name));
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK'); throw error; }
