@@ -33,7 +33,7 @@ test('P2 simulation: positive and negative examples against a candidate profile,
   assert.notEqual(after.profileSetHash, before.profileSetHash);
   assert.notEqual(after.outcomes[0]!.effectiveProfileHash, before.outcomes[0]!.effectiveProfileHash, 'RFB effective profile changed');
   assert.equal(after.outcomes[1]!.effectiveProfileHash, before.outcomes[1]!.effectiveProfileHash, 'DOU effective profile unchanged');
-  assert.deepEqual(after.summary, { pass: 3, fail: 0, partial: 0 });
+  assert.deepEqual(after.summary, { pass: 3, fail: 0, partial: 0, inconclusive: 0 });
   for (const o of after.outcomes) assert.equal(o.positiveSelections, 0);
 });
 

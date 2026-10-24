@@ -46,16 +46,30 @@ export class SimulationError extends Error {
 
 export interface ExampleOutcome {
   id: string; polarity: 'positive' | 'negative'; source: string; family: string | null;
-  status: 'pass' | 'fail' | 'partial';
+  /**
+   * `inconclusive` (P3 §2.5, ANAT-ADMIN-01 P3-C): the expectations held, but the engine result is not `complete`
+   * (containment/extraction limits), so an absence or presence may only reflect suspended extraction. It counts as `pass`
+   * only when the example is positive and declares EVERY limitation of the result with a `{ kind: 'limitation' }` matcher.
+   */
+  status: 'pass' | 'fail' | 'partial' | 'inconclusive';
   checks: { matcher: ExpectationMatcher; found: boolean; ok: boolean }[];
   /** Identity of what produced the result. */
   ruleSetHash: string; effectiveProfileHash: string; outputHash: string; resultStatus: AnatomyResult['status'];
+  /** What was executed (persisted per example by the admin schema to bind comparisons to this run). */
+  analysisId: string; inputTextHash: string;
   limitations: string[]; positiveSelections: 0; timedOut: boolean;
 }
-export interface SimulationReport { engineHash: string; profileSetHash: string; outcomes: ExampleOutcome[]; summary: { pass: number; fail: number; partial: number } }
+export interface SimulationReport { engineHash: string; profileSetHash: string; outcomes: ExampleOutcome[]; summary: { pass: number; fail: number; partial: number; inconclusive: number } }
 
 const FIXED = { referenceDate: '2000-01-01', ruleSet: { id: 'simulation', version: '1' } } as const;
-function requestFor(e: z.output<typeof example>, profiles: unknown[]): AnatomyRequest {
+export type ParsedExample = z.output<typeof example>;
+/** Strict P2 example validation (reserved IDs, limits); used by the isolated executor for every message. */
+export function parseExample(raw: unknown): ParsedExample {
+  const e = example.safeParse(raw);
+  if (!e.success) throw new SimulationError('invalid_input', e.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+  return e.data;
+}
+export function requestFor(e: ParsedExample, profiles: unknown[]): AnatomyRequest {
   return { publicationVersionId: `simulation:${e.id}`, referenceDate: FIXED.referenceDate, ruleSet: { ...FIXED.ruleSet },
     input: { source: e.source, representationId: `simulation://${e.id}`, ...(e.input.html !== undefined ? { html: e.input.html } : { text: e.input.text! }) },
     ...(e.catalog ? { catalog: structuredClone(e.catalog) } : {}), profiles: structuredClone(profiles), family: e.family };
@@ -85,18 +99,26 @@ export function simulateProfiles(raw: { profiles: unknown[]; examples: Simulatio
   const outcomes = examples.map((e): ExampleOutcome => {
     const started = clock();
     const result = analyzeAnatomy(requestFor(e, profiles));
-    const timedOut = clock() - started > SIMULATION_LIMITS.maxMillisPerExample;
-    if (result.eligibility.some((x) => x.eligible)) throw new SimulationError('positive_selection', `${e.id}: a positive selection was produced without legal evidence`);
-    const checks = e.expect.map((m) => { const found = matches(result, m); return { matcher: m, found, ok: e.polarity === 'positive' ? found : !found }; });
-    const effective = resolveEffectiveProfile(structuredClone(profiles), { source: e.source, family: e.family });
-    return { id: e.id, polarity: e.polarity, source: e.source, family: e.family,
-      status: timedOut ? 'partial' : checks.every((c) => c.ok) ? 'pass' : 'fail', checks,
-      ruleSetHash: result.identity.ruleSetHash, effectiveProfileHash: effective.effectiveHash, outputHash: result.outputHash, resultStatus: result.status,
-      limitations: result.limitations.map((l) => l.code), positiveSelections: 0, timedOut };
+    return evaluateExample(e, profiles, result, clock() - started > SIMULATION_LIMITS.maxMillisPerExample);
   });
   const count = (s: ExampleOutcome['status']) => outcomes.filter((o) => o.status === s).length;
   return { engineHash: ANATOMY_ENGINE_BUILD_HASH, profileSetHash: sha256(canonicalJson(profiles)), outcomes,
-    summary: { pass: count('pass'), fail: count('fail'), partial: count('partial') } };
+    summary: { pass: count('pass'), fail: count('fail'), partial: count('partial'), inconclusive: count('inconclusive') } };
+}
+
+/** Outcome of one example from its (already valid) engine result; pure, shared by the in-process and isolated paths. */
+export function evaluateExample(e: ParsedExample, profiles: unknown[], result: AnatomyResult, timedOut: boolean): ExampleOutcome {
+  if (result.eligibility.some((x) => x.eligible)) throw new SimulationError('positive_selection', `${e.id}: a positive selection was produced without legal evidence`);
+  const checks = e.expect.map((m) => { const found = matches(result, m); return { matcher: m, found, ok: e.polarity === 'positive' ? found : !found }; });
+  const effective = resolveEffectiveProfile(structuredClone(profiles), { source: e.source, family: e.family });
+  const limitations = result.limitations.map((l) => l.code);
+  const declared = new Set(e.polarity === 'positive' ? e.expect.flatMap((m) => (m.kind === 'limitation' ? [m.code] : [])) : []);
+  const held = checks.every((c) => c.ok);
+  const status: ExampleOutcome['status'] = timedOut ? 'partial' : !held ? 'fail'
+    : result.status === 'complete' || (limitations.length > 0 && limitations.every((code) => declared.has(code))) ? 'pass' : 'inconclusive';
+  return { id: e.id, polarity: e.polarity, source: e.source, family: e.family, status, checks,
+    ruleSetHash: result.identity.ruleSetHash, effectiveProfileHash: effective.effectiveHash, outputHash: result.outputHash, resultStatus: result.status,
+    analysisId: result.analysisId, inputTextHash: result.identity.inputTextHash, limitations, positiveSelections: 0, timedOut };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -144,7 +166,7 @@ function itemsOf(r: AnatomyResult): Record<DiffCategory, Map<string, unknown[]>>
 }
 
 /** Valid, untampered contract result: schema/cross-references, outputHash and analysisId recomputed (P2-R1-03). */
-function assertValidResult(r: AnatomyResult, side: string): AnatomyResult {
+export function assertValidResult(r: AnatomyResult, side: string): AnatomyResult {
   let valid: AnatomyResult;
   try { valid = validateAnatomyResult(r); } catch (error) {
     throw new SimulationError('invalid_input', `${side} result violates the contract: ${error instanceof Error ? error.message.slice(0, 300) : 'invalid'}`, error);
