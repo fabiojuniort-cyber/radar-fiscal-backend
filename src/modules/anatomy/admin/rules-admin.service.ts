@@ -2,9 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../build-identity.js';
 import { canonicalJson } from '../contract.js';
-import { DEFAULT_PROFILES, PROFILE_LIMITS, PROFILE_SOURCES, ProfileValidationError, resolveEffectiveProfile } from '../profile.js';
+import { DEFAULT_PROFILES, PROFILE_SOURCES, ProfileValidationError, resolveEffectiveProfile } from '../profile.js';
 import { parseExample, RESERVED_ENTRY_IDS, SIMULATION_LIMITS } from '../rules-simulation.js';
-import { ExecutorError, type SimulationExecutor } from '../simulation-executor.js';
+import { EXECUTOR_LIMITS, ExecutorError, type SimulationExecutor } from '../simulation-executor.js';
 
 /**
  * ANAT-ADMIN-01 P3-D (issue #116): administrative service over the P3-B1 persistence (SQL entry points only — never
@@ -165,6 +165,8 @@ export async function listAudit(c: PoolClient) {
  * D-R1-01: full P1/P2 validation BEFORE anything is persisted (drafts and freeze): examples against the strict P2
  * schema (limits, reserved IDs, unique IDs), profiles as ANAT-PROFILE/1 (size, schema, protection floor) for every
  * source and for every example's source/family target. Refusals are 422 codes only, never the offending content.
+ * D-R2-01: the size limits are the executor's own (EXECUTOR_LIMITS), so a saved or frozen draft is never one the
+ * executor refuses; the catalog limit is checked here as well as in the executor.
  */
 export function assertDraftContent(profiles: unknown, examples: unknown): void {
   if (!Array.isArray(examples) || examples.length < 1 || examples.length > SIMULATION_LIMITS.maxExamples) throw new AdminError(422, 'LIMIT_EXCEEDED');
@@ -176,12 +178,13 @@ export function assertDraftContent(profiles: unknown, examples: unknown): void {
     let e;
     try { e = parseExample(raw); } catch { throw new AdminError(422, 'INVALID_EXAMPLE'); }
     if (ids.has(e.id)) throw new AdminError(422, 'DUPLICATE_EXAMPLE_ID');
+    if ((e.catalog?.codes.length ?? 0) > EXECUTOR_LIMITS.maxCatalogCodes) throw new AdminError(422, 'LIMIT_EXCEEDED');
     ids.add(e.id); targets.push({ source: e.source, family: e.family });
   }
   if (!Array.isArray(profiles) || profiles.length === 0) throw new AdminError(422, 'INVALID_PROFILE');
   let bytes: number;
   try { bytes = Buffer.byteLength(canonicalJson(profiles), 'utf8'); } catch { throw new AdminError(422, 'INVALID_PROFILE'); }
-  if (bytes > PROFILE_LIMITS.maxProfileBytes) throw new AdminError(422, 'LIMIT_EXCEEDED');
+  if (bytes > EXECUTOR_LIMITS.maxProfilesBytes) throw new AdminError(422, 'LIMIT_EXCEEDED');
   for (const target of targets) {
     try { resolveEffectiveProfile(structuredClone(profiles), target); } catch (error) {
       if (error instanceof ProfileValidationError) throw new AdminError(422, 'INVALID_PROFILE');
