@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import test from 'node:test';
 import pg from 'pg';
@@ -35,10 +35,11 @@ test('P3-D admin API end to end (fresh disposable database)', { skip }, async (t
   // env.ts (imported by the auth plugin) requires these; both are local to this process and never real secrets.
   process.env.DATABASE_URL = url; process.env.JWT_ACCESS_SECRET = randomBytes(48).toString('hex'); process.env.LOG_LEVEL = 'info';
   const [{ default: Fastify }, { serializerCompiler, validatorCompiler }, { Kysely, PostgresDialect }, { registerAuthSupport }, { anatomyRulesAdminRoutes },
-    { SimulationExecutor }, { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION }, contract, { assertCanonicalSubset, AdminError }] = await Promise.all([
+    { SimulationExecutor }, { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION }, contract, { assertCanonicalSubset, AdminError }, { ANATOMY_ENGINE_BUILD_HASH: ENGINE }] = await Promise.all([
     import('fastify'), import('fastify-type-provider-zod'), import('kysely'), import('../src/modules/auth/auth.plugin.js'),
     import('../src/api/routes/anatomy-rules-admin.route.js'), import('../src/modules/anatomy/simulation-executor.js'),
-    import('../src/modules/anatomy/profile.js'), import('../src/modules/anatomy/contract.js'), import('../src/modules/anatomy/admin/rules-admin.service.js')]);
+    import('../src/modules/anatomy/profile.js'), import('../src/modules/anatomy/contract.js'), import('../src/modules/anatomy/admin/rules-admin.service.js'),
+    import('../src/modules/anatomy/build-identity.js')]);
   delete process.env.DATABASE_URL;
 
   const owner = new pg.Client({ connectionString: url }); await owner.connect();
@@ -126,6 +127,40 @@ test('P3-D admin API end to end (fresh disposable database)', { skip }, async (t
       assert.equal((await call('A', 'GET', `/candidates/${cand}`)).body.candidate.state, 'frozen');
     });
 
+    await t.test('D-R1-01: invalid profiles/examples are refused with 422 before persisting, on save and on freeze', async () => {
+      const drafts = async () => Number((await owner.query('SELECT count(*) FROM anatomy_rule_drafts')).rows[0].count);
+      const saved = async () => await audit("action='ANAT_RULES_DRAFT_SAVED'");
+      const before = [await drafts(), await saved()];
+      const cases: [string, unknown][] = [
+        ['unknown profile version', { profiles: [{ profileVersion: 'NOPE', scope: { level: 'default' }, fields: {} }], examples: [article] }],
+        ['profile with unknown field', { profiles: [...defaults(), { profileVersion: PROFILE_FORMAT_VERSION, scope: { level: 'source', source: 'DOU' }, fields: { bogus: 1 } }], examples: [article] }],
+        ['example missing required fields', { profiles: defaults(), examples: [{ id: 'only-id' }] }],
+        ['example with unknown field', { profiles: defaults(), examples: [{ ...article, extra: true }] }],
+        ['example with both html and text', { profiles: defaults(), examples: [{ ...article, input: { html: '<p>x</p>', text: 'x' } }] }],
+        ['example over the input limit', { profiles: defaults(), examples: [{ ...article, input: { text: 'x'.repeat(256 * 1024 + 1) } }] }],
+        ['profiles over 64 KiB', { profiles: [...defaults(), { pad: 'x'.repeat(70 * 1024) }], examples: [article] }],
+      ];
+      for (const [label, body] of cases) {
+        const r = await call('A', 'POST', '/drafts', body);
+        assert.equal(r.status, 422, `${label}: ${JSON.stringify(r.body)}`);
+        assert.deepEqual(Object.keys(r.body).sort(), ['correlationId', 'error'], label);
+      }
+      const d = await call('A', 'POST', '/drafts', { profiles: defaults(), examples: [article] });
+      const bad = await call('A', 'PUT', `/drafts/${d.body.id}`, { revision: 1, profiles: defaults(), examples: [{ id: 'only-id' }] });
+      assert.equal(bad.status, 422);
+      assert.deepEqual((await owner.query('SELECT revision FROM anatomy_rule_drafts WHERE id=$1', [d.body.id])).rows[0], { revision: 1 }, 'revision not incremented');
+      assert.deepEqual([await drafts(), await saved()], [before[0]! + 1, before[1]! + 1], 'only the valid save persisted and was audited');
+      // A pre-existing invalid draft (written before this validation existed) cannot be frozen.
+      const legacy = await call('A', 'POST', '/drafts', { profiles: defaults(), examples: [article] });
+      await owner.query("ALTER TABLE anatomy_rule_drafts DISABLE TRIGGER anat_guard_draft");
+      await owner.query("UPDATE anatomy_rule_drafts SET examples = '[{\"id\":\"only-id\"}]' WHERE id=$1", [legacy.body.id]);
+      await owner.query("ALTER TABLE anatomy_rule_drafts ENABLE TRIGGER anat_guard_draft");
+      const frozenBefore = Number((await owner.query('SELECT count(*) FROM anatomy_rule_candidates')).rows[0].count);
+      const f = await call('A', 'POST', `/drafts/${legacy.body.id}/freeze`, { revision: 1 });
+      assert.equal(f.status, 422, JSON.stringify(f.body));
+      assert.equal(Number((await owner.query('SELECT count(*) FROM anatomy_rule_candidates')).rows[0].count), frozenBefore, 'nothing frozen');
+    });
+
     await t.test('simulation and comparison through the real executor; author cannot review; the full proof approves', async () => {
       const s = await call('A', 'POST', `/candidates/${cand}/simulate`);
       assert.equal(s.status, 200, JSON.stringify(s.body));
@@ -192,6 +227,32 @@ test('P3-D admin API end to end (fresh disposable database)', { skip }, async (t
       assert.equal((await call('R', 'GET', '/activations')).body.length, 1);
       assert.ok(!logs.join('\n').includes(token), 'token never logged');
       assert.equal(Number((await owner.query('SELECT count(*) FROM publication_anatomies')).rows[0].count) + Number((await owner.query('SELECT count(*) FROM anatomy_runs')).rows[0].count), 0, 'nothing reprocessed');
+    });
+
+    await t.test('D-R1-02: preview scope and observed activation come from the same rule, also against a concurrent confirm', async () => {
+      const S = 'scope-preview-race';
+      const first = await call('R', 'POST', '/activation/preview', { action: 'activate', candidateId: cand, reviewId: rev, scope: S });
+      assert.equal(first.body.affectedScope.basis, 'shipped_defaults', 'first activation: no active rule');
+      assert.equal((await owner.query('SELECT observed_activation_id FROM anatomy_rule_activation_previews WHERE id=$1', [first.body.previewId])).rows[0].observed_activation_id, null);
+      // A confirm holds the scope lock (open transaction, not yet committed) while a new preview is requested.
+      const racer = new pg.Client({ connectionString: runtimeUrl }); await racer.connect();
+      try {
+        await racer.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+        await racer.query("SELECT set_config('app.user_id', $1, true)", [users.R!.id]);
+        const tokenHash = createHash('sha256').update(first.body.token, 'utf8').digest('hex');
+        const activation = (await racer.query('SELECT activation_id AS id FROM anat_confirm($1,$2,$3,$4,$5)',
+          [tokenHash, first.body.intentHash, ENGINE, 'Ativação concorrente sintética.', randomUUID()])).rows[0].id as string;
+        let settled = false;
+        const pending = call('R', 'POST', '/activation/preview', { action: 'activate', candidateId: cand, reviewId: rev, scope: S }).finally(() => { settled = true; });
+        await new Promise((r) => setTimeout(r, 400));
+        assert.equal(settled, false, 'the preview waits for the in-flight confirm');
+        await racer.query('COMMIT');
+        const second = await pending;
+        assert.equal(second.status, 201, JSON.stringify(second.body));
+        assert.equal(second.body.affectedScope.basis, 'active_candidate', 'scope computed on the rule activated concurrently');
+        const observed = (await owner.query('SELECT observed_activation_id FROM anatomy_rule_activation_previews WHERE id=$1', [second.body.previewId])).rows[0].observed_activation_id;
+        assert.equal(observed, activation, 'observed activation = the rule the scope was computed on');
+      } finally { await racer.end(); }
     });
 
     await t.test('session context never leaks through the pool; audit unavailable means no mutation', async () => {
