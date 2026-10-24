@@ -98,11 +98,12 @@ test('077_anat_base through the real migration runner (fresh disposable database
       await runProjectMigrations(url, before);
       assert.equal((await db.query("SELECT count(*)::int AS n FROM schema_migrations WHERE filename = $1", [BASE])).rows[0].n, 0);
       snapshot = (await db.query(CATALOG, [TABLES])).rows;
-      const out = await runProjectMigrations(url);
+      // Stops at 077 even on branches that carry later migrations: this suite checks the base package alone.
+      const out = await runProjectMigrations(url, BASE);
       assert.match(out, new RegExp(`Applying migration: ${BASE}`, 'u'));
-      assert.deepEqual((await db.query('SELECT filename FROM schema_migrations ORDER BY filename')).rows.map((r) => r.filename), files);
+      assert.deepEqual((await db.query('SELECT filename FROM schema_migrations ORDER BY filename')).rows.map((r) => r.filename), files.slice(0, files.indexOf(BASE) + 1));
       assert.deepEqual((await db.query(CATALOG, [TABLES])).rows, snapshot, 'existing policies, grants, functions, columns, triggers and roles are unchanged');
-      const again = await runProjectMigrations(url);
+      const again = await runProjectMigrations(url, BASE);
       assert.doesNotMatch(again, /Applying migration/u, 're-running is a no-op (checksums match)');
     });
 
