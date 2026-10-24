@@ -486,7 +486,7 @@ test(
       const laterBranch = await app.inject({
         method:'POST',url:'/api/v1/establishments',headers:firstHeaders,
         payload:{companyId:company.id,cnpj:cnpjFromSeed('123450000002'),
-          name:'Synthetic later branch',typeCode:'BRANCH',isHeadOffice:false,uf:'GO'},
+          name:'Synthetic later branch',typeCode:'OTHER',isHeadOffice:false,uf:'GO'},
       });
       assert.equal(laterBranch.statusCode,201);
       const laterBranchId=laterBranch.json<{establishment:{id:string}}>().establishment.id;
