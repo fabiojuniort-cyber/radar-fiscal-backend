@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type pg from 'pg';
 
 /**
@@ -9,23 +10,56 @@ import type pg from 'pg';
 const read = (name: string) => readFile(new URL(`./${name}`, import.meta.url), 'utf8');
 export const DISPOSABLE_URL = 'postgresql://postgres:postgres@localhost:5432/anat04_ci';
 
+/**
+ * Real-chain mode (integration readiness): ANAT_MAIN_MIGRATIONS_DIR points to verified, unedited copies of main's
+ * migrations (the CI job exports them from a checkout of main and records its SHA). They are applied in order, one
+ * transaction per file like src/infrastructure/database/migrate.ts, INSTEAD of the vendored audit chain and bootstraps.
+ */
+export const REAL_CHAIN_DIR = process.env.ANAT_MAIN_MIGRATIONS_DIR || null;
+export async function applyRealChain(client: pg.Client, dir: string): Promise<string[]> {
+  const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/u.test(f)).sort();
+  if (files.length === 0) throw new Error('no migrations in ANAT_MAIN_MIGRATIONS_DIR');
+  for (const f of files) {
+    await client.query('BEGIN');
+    try { await client.query(await readFile(join(dir, f), 'utf8')); await client.query('COMMIT'); } catch (error) {
+      await client.query('ROLLBACK'); throw new Error(`real migration ${f} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return files;
+}
+/** The audit policy JSON of the LAST real migration that (re)defines audit_event_policy. */
+export async function latestRealPolicyJson(dir: string): Promise<string> {
+  const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/u.test(f)).sort();
+  let json: string | null = null;
+  for (const f of files) {
+    const sql = await readFile(join(dir, f), 'utf8');
+    if (/FUNCTION public\.audit_event_policy/u.test(sql)) json = /\$json\$(.*?)\$json\$/su.exec(sql)?.[1] ?? json;
+  }
+  if (!json) throw new Error('no audit_event_policy in the real chain');
+  return json;
+}
+const BOOTSTRAPS = new Set(['anatomy-api-ci-bootstrap.sql']); // the real chain carries the real auth tables and grants
+
 export async function prepareAdminDatabase(client: pg.Client, extra: string[] = []): Promise<void> {
   const fresh = await client.query("SELECT to_regclass('public.audit_log') IS NULL AND to_regclass('public.anatomy_rule_sets') IS NULL AS fresh");
   if (fresh.rows[0].fresh !== true) throw new Error('requires a fresh disposable database (the dedicated CI job provides one)');
   const chain = (f: string) => read(`anatomy-audit-chain/${f}`);
   const audit074 = (await chain('074_audit_allowlist_and_backfill.sql')).split('\n').slice(0, 160).join('\n');
+  if (REAL_CHAIN_DIR) await applyRealChain(client, REAL_CHAIN_DIR);
   await client.query('BEGIN');
   try {
     await client.query("SET LOCAL anatomy.ci_disposable = 'true'");
-    await client.query(await read('anatomy-audit-bootstrap-pre.sql'));
-    await client.query(await chain('006_audit.sql'));
-    await client.query(audit074);
-    await client.query(await chain('075_audit_historical_event_rules.sql'));
-    await client.query(await read('anatomy-audit-bootstrap-post.sql'));
+    if (!REAL_CHAIN_DIR) {
+      await client.query(await read('anatomy-audit-bootstrap-pre.sql'));
+      await client.query(await chain('006_audit.sql'));
+      await client.query(audit074);
+      await client.query(await chain('075_audit_historical_event_rules.sql'));
+      await client.query(await read('anatomy-audit-bootstrap-post.sql'));
+    }
     await client.query(await read('anatomy-ci-schema.sql'));
     await client.query(await read('anatomy-admin-audit-policy.sql'));
     await client.query(await read('anatomy-admin-ci-schema.sql'));
-    for (const name of extra) await client.query(await read(name));
+    for (const name of extra) if (!(REAL_CHAIN_DIR && BOOTSTRAPS.has(name))) await client.query(await read(name));
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK'); throw error; }
 }

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import pg from 'pg';
 import { canonicalJson, sha256 } from '../src/modules/anatomy/contract.js';
+import { applyRealChain, latestRealPolicyJson } from './support/anatomy-admin-db.js';
 
 /**
  * ANAT-ADMIN-01 / P3-B1 (issue #116): persistence and audit rehearsal in the DISPOSABLE CI database only.
@@ -168,13 +169,18 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       }
     });
     let oldPolicy: Row = {};
+    // Integration readiness: with ANAT_MAIN_MIGRATIONS_DIR the REAL chain of main replaces the vendored excerpt.
+    const realDir = process.env.ANAT_MAIN_MIGRATIONS_DIR || null;
+    if (realDir) await applyRealChain(db, realDir);
     await db.query('BEGIN');
     await db.query("SET LOCAL anatomy.ci_disposable = 'true'");
-    await db.query(await read('anatomy-audit-bootstrap-pre.sql'));
-    await db.query(await chain('006_audit.sql'));
-    await db.query(audit074);
-    await db.query(await chain('075_audit_historical_event_rules.sql'));
-    await db.query(await read('anatomy-audit-bootstrap-post.sql'));
+    if (!realDir) {
+      await db.query(await read('anatomy-audit-bootstrap-pre.sql'));
+      await db.query(await chain('006_audit.sql'));
+      await db.query(audit074);
+      await db.query(await chain('075_audit_historical_event_rules.sql'));
+      await db.query(await read('anatomy-audit-bootstrap-post.sql'));
+    }
     const oldKeys = Object.keys(JSON.parse(policyJson(await chain('075_audit_historical_event_rules.sql'))));
     const snapshotPolicy = async () => (await db.query(`SELECT k, audit_event_policy(split_part(k,'|',1), split_part(k,'|',2)) AS rule,
       audit_project(split_part(k,'|',1), split_part(k,'|',2), '{"company_id":"00000000-0000-4000-8000-000000000000","is_active":true,"version":3,"x":"free text"}') AS projected
@@ -190,6 +196,11 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       await db.query("INSERT INTO app_users (id, email) VALUES ($1, $2)", [id, `${id}@example.test`]);
       if (admin) await db.query("INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ($1, 'PLATFORM_ADMIN', 'system:ci')", [id]);
     }
+
+    await t.test('real chain (when used): the latest real audit policy is still the one M_AUDIT_ANAT extends', { skip: realDir ? false : 'vendored chain' }, async () => {
+      assert.equal(await latestRealPolicyJson(realDir!), policyJson(await chain('075_audit_historical_event_rules.sql')),
+        'main changed audit_event_policy after 075: M_AUDIT_ANAT must be rebased');
+    });
 
     await t.test('M_AUDIT_ANAT: every pre-existing event has the same rule and the same projection', () => {
       assert.equal(oldPolicy.length, oldKeys.length);

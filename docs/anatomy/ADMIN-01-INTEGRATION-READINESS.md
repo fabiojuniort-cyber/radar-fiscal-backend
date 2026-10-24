@@ -86,3 +86,25 @@ Test merge of the whole stack into `main` @ `e4d6639` (local, discarded): **no c
 - Independent reviews of P3-C, P3-D and P4.
 - The P4 real-flow e2e in an automated environment (today local, against the dev harness).
 - Release criteria: green CI on all of the above, approved reviews, migrations numbered against main, and explicit production authorisation. `BLOCK_CORPUS_INPUTS_AND_GOLD` stays in force.
+
+## Update after the COORD R1 round (P3-D `1196cd6`, web `2852d69`)
+
+**The full suites run over the real chain.**
+- `test/support/anatomy-admin-db.ts` and the B1 test accept `ANAT_MAIN_MIGRATIONS_DIR`. It must point to verified, unedited copies of main's migrations, applied one transaction per file like `migrate.ts`, **instead of** the vendored excerpt and bootstraps.
+- The B1 suite gains a check: the latest real `audit_event_policy` must still equal the 075 JSON that `M_AUDIT_ANAT` extends. If main changes the policy, this test fails and `M_AUDIT_ANAT` must be rebased.
+- The new CI job `anatomy-admin-main-chain` runs on the matrix PostgreSQL 16/18 × {B1 suite, API suite}. It uses a second checkout of `main` and prints the exact SHA.
+
+**Local results** (main `e4d6639`, PostgreSQL 16.15, fresh disposable database per suite, synthetic data):
+
+| Suite | Real chain | Vendored chain (unchanged) |
+|---|---|---|
+| B1 admin schema | **24/24** | 23 pass + 1 skip (the real-chain check, by design) |
+| API | **13/13** | 13/13 |
+
+PostgreSQL 18 over the real chain runs in CI (see the run on this PR's HEAD).
+
+**Real-API e2e in CI: blocked.** Both repositories are private, so neither workflow's `GITHUB_TOKEN` can check out the other repository. Automating the e2e needs a cross-repository read credential, either a read-only deploy key or a fine-grained token stored as a secret. Creating credentials is outside this authorisation, so nothing was added. The e2e keeps running locally against the dev harness; the last run, against `1196cd6`/`2852d69`, passed 12 of 12.
+
+**Proposed remedy, for authorisation:**
+1. Add a read-only deploy key of `radar-fiscal-web` as a secret of the backend repository.
+2. Add a backend job that builds the web with the flag, starts the harness on a fresh database, and runs `e2e/anatomy-rules-real.spec.ts`.
