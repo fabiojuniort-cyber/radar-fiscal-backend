@@ -157,6 +157,10 @@ jobs:
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/doe-sp.ncm-rebuild-guard.integration.test.ts
 
+      - name: DOE-SP rebuild guard for ANAT analyses and run items (P-INT-02)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/doe-sp.anatomy-guard.integration.test.ts
+
       - name: Authentication and RLS integration tests
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run test:integration
