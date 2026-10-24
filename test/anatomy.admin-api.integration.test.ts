@@ -259,6 +259,8 @@ test('P3-D admin API end to end (fresh disposable database)', { skip }, async (t
       assert.deepEqual(bad.body, { error: 'invalid_request' });
     });
   } finally {
-    await app.close(); await executor.close(); await pool.end(); await owner.end();
+    await app.close(); await executor.close(); await pool.end();
+    await owner.query(`DROP ROLE IF EXISTS ${login}`).catch(() => undefined); // the cluster outlives this database locally
+    await owner.end();
   }
 });

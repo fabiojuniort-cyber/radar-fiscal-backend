@@ -64,3 +64,11 @@
 ## Limits
 - Mocks are not used for the critical boundaries. The authentication tables are a minimal copy of main, not the full chain.
 - Publication and analysis counts depend on `M_ANAT_BASE` (integration package).
+
+## Local dev harness (P4 support)
+`test/support/anatomy-admin-dev-server.ts` serves this plugin with the real executor and the real JWT and session check on a fresh disposable database.
+- It refuses to start outside the disposable environment.
+- Its only extras are harness endpoints under `/auth/__dev-*`:
+  - switching between two synthetic platform admins, author and reviewer;
+  - synthetic fixtures.
+- The web P4 real-flow e2e (radar-fiscal-web#131) ran against it.
