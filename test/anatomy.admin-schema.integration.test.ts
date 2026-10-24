@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import pg from 'pg';
 import { canonicalJson, sha256 } from '../src/modules/anatomy/contract.js';
-import { applyRealChain, latestRealPolicyJson } from './support/anatomy-admin-db.js';
+import { applyRealChain, latestRealPolicyJson, PROJECT_MIGRATIONS } from './support/anatomy-admin-db.js';
+import { runProjectMigrations } from './support/anatomy-migrations.js';
 
 /**
  * ANAT-ADMIN-01 / P3-B1 (issue #116): persistence and audit rehearsal in the DISPOSABLE CI database only.
@@ -171,26 +172,35 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
     let oldPolicy: Row = {};
     // Integration readiness: with ANAT_MAIN_MIGRATIONS_DIR the REAL chain of main replaces the vendored excerpt.
     const realDir = process.env.ANAT_MAIN_MIGRATIONS_DIR || null;
-    if (realDir) await applyRealChain(db, realDir);
-    await db.query('BEGIN');
-    await db.query("SET LOCAL anatomy.ci_disposable = 'true'");
-    if (!realDir) {
-      await db.query(await read('anatomy-audit-bootstrap-pre.sql'));
-      await db.query(await chain('006_audit.sql'));
-      await db.query(audit074);
-      await db.query(await chain('075_audit_historical_event_rules.sql'));
-      await db.query(await read('anatomy-audit-bootstrap-post.sql'));
-    }
     const oldKeys = Object.keys(JSON.parse(policyJson(await chain('075_audit_historical_event_rules.sql'))));
     const snapshotPolicy = async () => (await db.query(`SELECT k, audit_event_policy(split_part(k,'|',1), split_part(k,'|',2)) AS rule,
       audit_project(split_part(k,'|',1), split_part(k,'|',2), '{"company_id":"00000000-0000-4000-8000-000000000000","is_active":true,"version":3,"x":"free text"}') AS projected
       FROM unnest($1::text[]) k ORDER BY k`, [oldKeys])).rows;
-    oldPolicy = await snapshotPolicy();
-    await db.query(await read('anatomy-ci-schema.sql'));
-    await db.query(await read('anatomy-admin-audit-policy.sql'));
-    const newPolicy = await snapshotPolicy();
-    await db.query(await read('anatomy-admin-ci-schema.sql'));
-    await db.query('COMMIT');
+    let newPolicy: Row[] = [];
+    if (PROJECT_MIGRATIONS) {
+      // Integration package 2: the real runner applies the real chain and 077, then 078 (M_AUDIT_ANAT) and 079 (M_ANAT_ADMIN).
+      await runProjectMigrations(connectionString, '077_anat_base.sql');
+      oldPolicy = await snapshotPolicy();
+      await runProjectMigrations(connectionString);
+      newPolicy = await snapshotPolicy();
+    } else {
+      if (realDir) await applyRealChain(db, realDir);
+      await db.query('BEGIN');
+      await db.query("SET LOCAL anatomy.ci_disposable = 'true'");
+      if (!realDir) {
+        await db.query(await read('anatomy-audit-bootstrap-pre.sql'));
+        await db.query(await chain('006_audit.sql'));
+        await db.query(audit074);
+        await db.query(await chain('075_audit_historical_event_rules.sql'));
+        await db.query(await read('anatomy-audit-bootstrap-post.sql'));
+      }
+      oldPolicy = await snapshotPolicy();
+      await db.query(await read('anatomy-ci-schema.sql'));
+      await db.query(await read('anatomy-admin-audit-policy.sql'));
+      newPolicy = await snapshotPolicy();
+      await db.query(await read('anatomy-admin-ci-schema.sql'));
+      await db.query('COMMIT');
+    }
     // Platform admins A, B, R, R2 (active, unrevoked) and ordinary user N (036 predicate inputs).
     for (const [id, admin] of [[A, true], [B, true], [R, true], [R2, true], [N, false]] as const) {
       await db.query("INSERT INTO app_users (id, email) VALUES ($1, $2)", [id, `${id}@example.test`]);

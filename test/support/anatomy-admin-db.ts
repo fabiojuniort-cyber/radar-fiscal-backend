@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type pg from 'pg';
+import { runProjectMigrations } from './anatomy-migrations.js';
 
 /**
  * ANAT-ADMIN-01 (P3-D onward): prepares a FRESH disposable database with the accepted P3-B1 chain, in the same order as
@@ -38,6 +39,11 @@ export async function latestRealPolicyJson(dir: string): Promise<string> {
   if (!json) throw new Error('no audit_event_policy in the real chain');
   return json;
 }
+/**
+ * Integration package 2: with ANAT_PROJECT_MIGRATIONS=1 the project's REAL runner applies this branch's migrations
+ * (main's chain + 077_anat_base + 078_anat_audit_policy + 079_anat_rules_admin) INSTEAD of every rehearsal SQL file.
+ */
+export const PROJECT_MIGRATIONS = process.env.ANAT_PROJECT_MIGRATIONS === '1';
 const BOOTSTRAPS = new Set(['anatomy-api-ci-bootstrap.sql']); // the real chain carries the real auth tables and grants
 
 export async function prepareAdminDatabase(client: pg.Client, extra: string[] = []): Promise<void> {
@@ -45,6 +51,14 @@ export async function prepareAdminDatabase(client: pg.Client, extra: string[] = 
   if (fresh.rows[0].fresh !== true) throw new Error('requires a fresh disposable database (the dedicated CI job provides one)');
   const chain = (f: string) => read(`anatomy-audit-chain/${f}`);
   const audit074 = (await chain('074_audit_allowlist_and_backfill.sql')).split('\n').slice(0, 160).join('\n');
+  if (PROJECT_MIGRATIONS) {
+    await runProjectMigrations(DISPOSABLE_URL);
+    for (const name of extra) if (!BOOTSTRAPS.has(name)) {
+      await client.query('BEGIN'); await client.query("SET LOCAL anatomy.ci_disposable = 'true'");
+      await client.query(await read(name)); await client.query('COMMIT');
+    }
+    return;
+  }
   if (REAL_CHAIN_DIR) await applyRealChain(client, REAL_CHAIN_DIR);
   await client.query('BEGIN');
   try {
