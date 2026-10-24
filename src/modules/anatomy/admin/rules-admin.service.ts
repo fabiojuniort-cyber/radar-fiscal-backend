@@ -153,9 +153,10 @@ export async function listActivations(c: PoolClient) {
     preview_id AS "previewId", affected_scope AS "affectedScope", actor, justification, activated_at AS "activatedAt", superseded_at AS "supersededAt"
     FROM anatomy_rule_activations ORDER BY activated_at DESC LIMIT 200`)).rows;
 }
+/** P-INT-01: the ANAT audit is read only through the audited entry point (no radar_app policy on audit_log). */
 export async function listAudit(c: PoolClient) {
-  return (await c.query(`SELECT id, action, entity_id AS "entityId", actor_id AS "actorId", after_data AS data, correlation_id AS "correlationId", occurred_at AS "occurredAt"
-    FROM audit_log WHERE tenant_id IS NULL AND entity_type = 'anatomy_rules' ORDER BY occurred_at DESC LIMIT 500`)).rows;
+  return (await c.query(`SELECT id, action, entity_id AS "entityId", actor_id AS "actorId", data, correlation_id AS "correlationId", occurred_at AS "occurredAt"
+    FROM public.anat_list_audit(500)`)).rows;
 }
 
 // ---------------------------------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@ function assertDisposableEnvironment(env: NodeJS.ProcessEnv): string {
   return DISPOSABLE_URL;
 }
 type Row = { kind: string; name: string; def: string };
-const ENTRY = ['anat_audit_attempt', 'anat_confirm', 'anat_freeze', 'anat_preview', 'anat_record_comparison', 'anat_record_review',
+const ENTRY = ['anat_audit_attempt', 'anat_confirm', 'anat_freeze', 'anat_list_audit', 'anat_preview', 'anat_record_comparison', 'anat_record_review',
   'anat_record_simulation', 'anat_save_draft'];
 const CATALOG = `
  SELECT 'policy' AS kind, tablename||'.'||policyname AS name, concat_ws('|', permissive, roles::text, cmd, qual, with_check) AS def
@@ -45,18 +45,36 @@ test('078/079 through the real migration runner (fresh disposable database)', { 
     await runProjectMigrations(url, '077_anat_base.sql');
     const applied = async () => (await db.query("SELECT filename FROM schema_migrations WHERE filename > '077_anat_base.sql' ORDER BY 1")).rows.map((r) => r.filename);
 
-    await t.test('078 refuses to run over an audit policy it does not extend (another front changed it): nothing applied', async () => {
-      const policy = (await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d as string;
-      const tampered = policy.replace('{"COMPANY_CREATED|company"', '{"OTHER_FRONT_EVENT|other":{"x":"int"},"COMPANY_CREATED|company"');
-      assert.notEqual(tampered, policy);
-      await db.query(tampered);
-      await assert.rejects(runProjectMigrations(url), /rebase it/u);
-      assert.deepEqual(await applied(), []);
-      // Rolled back: no ANAT policy on audit_log, no admin table (the role is cluster-wide and may pre-exist; 078 creates it IF NOT EXISTS).
-      assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_policies WHERE tablename = 'audit_log' AND policyname LIKE 'audit_log_anat%'")).rows[0].n, 0);
-      assert.equal((await db.query("SELECT to_regclass('public.anatomy_rule_drafts') IS NULL AS ok")).rows[0].ok, true);
-      await db.query(policy); // restore exactly what 075 installed
-    });
+    // P-INT-03: every refusal leaves the policy in force intact, registers no migration and creates no object.
+    const policy = (await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d as string;
+    const body = (sql: string) => `CREATE OR REPLACE FUNCTION public.audit_event_policy(p_action text, p_type text) RETURNS jsonb
+      LANGUAGE sql IMMUTABLE SET search_path = pg_catalog AS $policy$ ${sql} $policy$`;
+    const json075 = /\$json\$(.*)\$json\$/su.exec(policy)![1]!;
+    const tampers: [string, string, RegExp][] = [
+      ['an event added by another front', policy.replace('{"COMPANY_CREATED|company"', '{"OTHER_FRONT_EVENT|other":{"x":"int"},"COMPANY_CREATED|company"'), /in force differs/u],
+      ['an existing event changed', policy.replace('"COMPANY_CREATED|company":{"company_id":"uuid"', '"COMPANY_CREATED|company":{"company_id":"text"'), /in force differs/u],
+      ['an existing event removed', policy.replace(/"COMPANY_CREATED\|company":\{[^}]*\},/u, ''), /in force differs/u],
+      ['no $json$ delimiter', body(`SELECT '${json075.replace(/'/gu, "''")}'::jsonb -> (p_action||'|'||p_type)`), /unrecognised format/u],
+      ['unrecognised format (different lookup)', body(`SELECT $json$${json075}$json$::jsonb -> lower(p_action||'|'||p_type)`), /unrecognised format/u],
+      ['invalid JSON between the delimiters', body("SELECT $json${broken$json$::jsonb -> (p_action||'|'||p_type)"), /JSON is invalid/u],
+      ['JSON that is not an object', body("SELECT $json$[1,2]$json$::jsonb -> (p_action||'|'||p_type)"), /not an object/u],
+      ['JSON null', body("SELECT $json$null$json$::jsonb -> (p_action||'|'||p_type)"), /not an object/u],
+    ];
+    for (const [label, tampered, refusal] of tampers) {
+      await t.test(`078 refuses (${label}): policy intact, nothing registered, no partial object`, async () => {
+        assert.notEqual(tampered, policy, label);
+        await db.query('SET check_function_bodies = off'); // lets the test install a deliberately broken body
+        try { await db.query(tampered); } finally { await db.query('RESET check_function_bodies'); }
+        const installed = (await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d;
+        await assert.rejects(runProjectMigrations(url), refusal);
+        assert.deepEqual(await applied(), [], 'no migration registered');
+        assert.equal((await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d, installed, 'policy in force intact');
+        assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_policies WHERE tablename = 'audit_log' AND policyname LIKE 'audit_log_anat%'")).rows[0].n, 0);
+        assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname LIKE 'anat\\_%'")).rows[0].n, 0, 'no anat_* function');
+        assert.equal((await db.query("SELECT to_regclass('public.anatomy_rule_drafts') IS NULL AS ok")).rows[0].ok, true, 'no admin table');
+        await db.query(policy); // restore exactly what 075 installed
+      });
+    }
 
     let before: Row[] = []; let after: Row[] = [];
     await t.test('078 then 079 apply; re-running is a no-op', async () => {
@@ -84,8 +102,8 @@ test('078/079 through the real migration runner (fresh disposable database)', { 
       const added = [...a.keys()].filter((k) => !b.has(k));
       const foreign = added.filter((k) => !/^(policy anatomy_rule_\w+\.|policy audit_log\.audit_log_anat_rules_|policy anatomy_rule_sets\.anat_|function anat_|table anatomy_rule_|column anatomy_rule_|trigger anatomy_rule_|role anat_rules_writer$)/u.test(k));
       assert.deepEqual(foreign, [], 'every new object is an ANAT object');
-      assert.deepEqual(added.filter((k) => k.startsWith('policy audit_log.')).sort(), ['policy audit_log.audit_log_anat_rules_admin_select',
-        'policy audit_log.audit_log_anat_rules_hidden', 'policy audit_log.audit_log_anat_rules_writer_insert', 'policy audit_log.audit_log_anat_rules_writer_only']);
+      assert.deepEqual(added.filter((k) => k.startsWith('policy audit_log.')).sort(), ['policy audit_log.audit_log_anat_rules_hidden',
+        'policy audit_log.audit_log_anat_rules_writer_insert', 'policy audit_log.audit_log_anat_rules_writer_only', 'policy audit_log.audit_log_anat_rules_writer_select']);
       assert.deepEqual(added.filter((k) => k.startsWith('column anatomy_rule_sets.')).sort(), ['column anatomy_rule_sets.frozen_at',
         'column anatomy_rule_sets.frozen_from_draft', 'column anatomy_rule_sets.snapshot_id']);
     });

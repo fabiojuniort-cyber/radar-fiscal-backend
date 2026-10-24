@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import pg from 'pg';
 import { canonicalJson, sha256 } from '../src/modules/anatomy/contract.js';
-import { applyRealChain, latestRealPolicyJson, PROJECT_MIGRATIONS } from './support/anatomy-admin-db.js';
+import { applyRealChain, integrationDeltaSql, latestRealPolicyJson, PROJECT_MIGRATIONS } from './support/anatomy-admin-db.js';
 import { runProjectMigrations } from './support/anatomy-migrations.js';
 
 /**
@@ -199,6 +199,7 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       await db.query(await read('anatomy-admin-audit-policy.sql'));
       newPolicy = await snapshotPolicy();
       await db.query(await read('anatomy-admin-ci-schema.sql'));
+      await db.query(await integrationDeltaSql()); // integration R1 deltas (same block as migration 079)
       await db.query('COMMIT');
     }
     // Platform admins A, B, R, R2 (active, unrevoked) and ordinary user N (036 predicate inputs).
@@ -253,16 +254,56 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       await fails(asApp(db, A, ins, [A, 'ANAT_RULES_REVIEWED', randomUUID(), JSON.stringify({ outcome: 'APPROVED' })]), /row-level security/u);
     });
 
+    await t.test('P-INT-01: anat_list_audit is the only ANAT audit read path (fixed output, bounded limit, definer hygiene)', async () => {
+      const fn = (await db.query(`SELECT p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proconfig, pg_get_function_result(p.oid) AS result,
+        has_function_privilege('public', p.oid, 'EXECUTE') AS pub, has_function_privilege('radar_app', p.oid, 'EXECUTE') AS app,
+        has_function_privilege('radar_worker', p.oid, 'EXECUTE') AS worker, has_function_privilege('radar_taxonomy_curator', p.oid, 'EXECUTE') AS curator
+        FROM pg_proc p WHERE p.oid = 'public.anat_list_audit(integer)'::regprocedure`)).rows[0];
+      assert.deepEqual(fn, { prosecdef: true, owner: 'anat_rules_writer', proconfig: ['search_path=pg_catalog, public, pg_temp'],
+        result: 'TABLE(id uuid, action text, entity_id text, actor_id text, data jsonb, correlation_id uuid, occurred_at timestamp with time zone)',
+        pub: false, app: true, worker: false, curator: false });
+      const writer = (await db.query("SELECT rolcanlogin, rolbypassrls, rolsuper FROM pg_roles WHERE rolname='anat_rules_writer'")).rows[0];
+      assert.deepEqual(writer, { rolcanlogin: false, rolbypassrls: false, rolsuper: false });
+      assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_policies WHERE tablename='audit_log' AND 'radar_app' = ANY(roles) AND policyname LIKE '%anat%'")).rows[0].n, 0,
+        'no ANAT policy for radar_app on audit_log');
+      for (const bad of [0, -1, 501, null]) await fails(asApp(db, A, 'SELECT * FROM anat_list_audit($1)', [bad]), 'LIMIT_EXCEEDED');
+      await saveDraft(A, profiles('list'), [example('ex-list')]);
+      assert.equal((await asApp(db, A, 'SELECT * FROM anat_list_audit(1)')).length, 1, 'limit honoured');
+      // Worker and curator: no EXECUTE; and their direct reads never include ANAT rows (RESTRICTIVE policies of 078).
+      await fails(asRole('radar_worker', db, A, 'SELECT * FROM anat_list_audit(10)'), /permission denied/u);
+      await fails(asRole('radar_taxonomy_curator', db, A, 'SELECT * FROM anat_list_audit(10)'), /permission denied/u);
+      for (const role of ['radar_worker', 'radar_taxonomy_curator']) assert.equal(await (async () => Number((await asRole(role, db, null,
+        "SELECT count(*) AS n FROM audit_log WHERE entity_type='anatomy_rules'"))[0]!.n))(), 0, role);
+      // TEMP shadowing: a session table named audit_log (and a hostile search_path) never reaches the entry point.
+      const real = (await asApp(db, A, 'SELECT id FROM anat_list_audit(500)')).map((r) => r.id).sort();
+      await db.query('BEGIN');
+      try {
+        await db.query('SET LOCAL ROLE radar_app');
+        await db.query("SELECT set_config('app.user_id', $1, true)", [A]);
+        await db.query(`CREATE TEMP TABLE audit_log ON COMMIT DROP AS SELECT gen_random_uuid() AS id, 'ANAT_RULES_DRAFT_SAVED'::text AS action,
+          'x'::text AS entity_id, 'x'::text AS actor_id, '{}'::jsonb AS after_data, NULL::uuid AS correlation_id, now() AS occurred_at,
+          NULL::uuid AS tenant_id, 'anatomy_rules'::text AS entity_type`);
+        await db.query('SET LOCAL search_path = pg_temp, public');
+        const seen = (await db.query('SELECT id FROM public.anat_list_audit(500)')).rows.map((r) => r.id).sort();
+        assert.deepEqual(seen, real, 'the temporary table is ignored');
+      } finally { await db.query('ROLLBACK'); }
+    });
+
     await t.test('B1-R1-03: ANAT audit and admin tables are readable only by an active platform admin', async () => {
       const rd = await saveDraft(A, profiles('rls'), [example('ex-r')]);
       await freeze(A, rd.draft_id, 1);
-      const visible = async (role: string, actor: string | null) => Number((await asRole(role, db, actor,
-        "SELECT (SELECT count(*) FROM audit_log WHERE entity_type='anatomy_rules') + (SELECT count(*) FROM anatomy_rule_drafts) AS n"))[0]!.n);
-      assert.ok(await visible('radar_app', A) > 0, 'admin sees');
-      assert.equal(await visible('radar_app', null), 0, 'no session user');
-      assert.equal(await visible('radar_app', N), 0, 'authenticated, not admin');
+      // P-INT-01: nobody reads ANAT audit rows of audit_log directly (radar_app has no policy for them); admins read them
+      // only through anat_list_audit. Admin tables keep the B1 boundary (admin-only SELECT policy).
+      const direct = async (role: string, actor: string | null) => Number((await asRole(role, db, actor,
+        "SELECT count(*) AS n FROM audit_log WHERE entity_type='anatomy_rules'"))[0]!.n);
+      const drafts = async (actor: string | null) => Number((await asApp(db, actor, 'SELECT count(*) AS n FROM anatomy_rule_drafts'))[0]!.n);
+      const listed = async (actor: string | null) => (await asApp(db, actor, 'SELECT * FROM anat_list_audit(500)')).length;
+      for (const actor of [A, null, N, R2]) assert.equal(await direct('radar_app', actor), 0, `direct audit read, actor ${actor}`);
+      assert.ok(await listed(A) > 0 && await drafts(A) > 0, 'admin sees through the entry point and the admin tables');
+      assert.equal(await drafts(null), 0, 'no session user'); await fails(listed(null), 'ACTOR_REQUIRED');
+      assert.equal(await drafts(N), 0, 'authenticated, not admin'); await fails(listed(N), 'PLATFORM_ADMIN_REQUIRED');
       await db.query("UPDATE platform_user_roles SET revoked_at=now(), revoked_by='system:ci' WHERE user_id=$1", [R2]);
-      assert.equal(await visible('radar_app', R2), 0, 'revoked admin');
+      assert.equal(await drafts(R2), 0, 'revoked admin'); await fails(listed(R2), 'PLATFORM_ADMIN_REQUIRED');
       await fails(saveDraft(R2, profiles('rls'), [example('ex-r')]), 'PLATFORM_ADMIN_REQUIRED');
       await db.query("UPDATE platform_user_roles SET revoked_at=NULL, revoked_by=NULL WHERE user_id=$1", [R2]);
       await fails(saveDraft(N, profiles('rls'), [example('ex-r')]), 'PLATFORM_ADMIN_REQUIRED');
@@ -728,7 +769,8 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       }
       // Functions: radar_app executes only the eight entry points; those (and the four commit-time checks) are the only
       // SECURITY DEFINER ones, owned by the NOLOGIN writer, with a fixed search_path; nobody else has CREATE on public.
-      const entry = ['anat_audit_attempt', 'anat_confirm', 'anat_freeze', 'anat_preview', 'anat_record_comparison', 'anat_record_review', 'anat_record_simulation', 'anat_save_draft'];
+      // Eight accepted entry points plus anat_list_audit (integration delta P-INT-01: the ninth, read-only).
+      const entry = ['anat_audit_attempt', 'anat_confirm', 'anat_freeze', 'anat_list_audit', 'anat_preview', 'anat_record_comparison', 'anat_record_review', 'anat_record_simulation', 'anat_save_draft'];
       const commitChecks = ['anat_check_activation_at_commit', 'anat_check_approval_at_commit', 'anat_check_review_at_commit', 'anat_check_simulation_at_commit'];
       const fn = (await db.query(`SELECT p.proname, p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proconfig,
         has_function_privilege('radar_app', p.oid, 'EXECUTE') AS app, has_function_privilege('radar_worker', p.oid, 'EXECUTE') AS worker,

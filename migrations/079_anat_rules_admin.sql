@@ -688,3 +688,33 @@ DO $$ DECLARE f regprocedure; entry text[] := ARRAY['anat_save_draft','anat_free
   EXECUTE format('ALTER FUNCTION %s OWNER TO anat_rules_writer', f);
  END LOOP;
 END $$;
+
+-- ===============================================================================================================
+-- BEGIN INTEGRATION DELTA P-INT-01 (COORD integration R1). Not part of the accepted rehearsal: the ANAT audit is read
+-- through a dedicated entry point instead of a permissive radar_app policy on audit_log. A permissive radar_app SELECT
+-- policy is OR'ed with the tenant policy of 009 and made ordinary tenant reads lose their index plan (measured,
+-- docs/anatomy/ADMIN-01-INTEGRATION-OPS.md §3.2). Visibility is unchanged: active platform admins only.
+-- ===============================================================================================================
+DROP POLICY audit_log_anat_rules_admin_select ON public.audit_log;
+-- The writer reads exactly the global ANAT rows, nothing else (it already inserts them, 078).
+GRANT SELECT ON public.audit_log TO anat_rules_writer;
+CREATE POLICY audit_log_anat_rules_writer_select ON public.audit_log FOR SELECT TO anat_rules_writer
+ USING (tenant_id IS NULL AND entity_type = 'anatomy_rules' AND action LIKE 'ANAT\_RULES\_%');
+-- Fixed output, bounded limit (1..500), no free SQL, filter or object name. The caller must be an active platform admin
+-- in the authenticated context of the transaction (anat_actor: app.user_id + the 036 predicate).
+CREATE FUNCTION anat_list_audit(p_limit integer)
+RETURNS TABLE (id uuid, action text, entity_id text, actor_id text, data jsonb, correlation_id uuid, occurred_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+BEGIN
+ PERFORM public.anat_actor();
+ IF p_limit IS NULL OR p_limit < 1 OR p_limit > 500 THEN PERFORM public.anat_fail('LIMIT_EXCEEDED', '22023'); END IF;
+ RETURN QUERY SELECT a.id, a.action, a.entity_id, a.actor_id, a.after_data, a.correlation_id, a.occurred_at
+  FROM public.audit_log a
+  WHERE a.tenant_id IS NULL AND a.entity_type = 'anatomy_rules' AND a.action LIKE 'ANAT\_RULES\_%'
+  ORDER BY a.occurred_at DESC, a.id DESC
+  LIMIT p_limit;
+END $$;
+ALTER FUNCTION anat_list_audit(integer) OWNER TO anat_rules_writer;
+REVOKE ALL ON FUNCTION anat_list_audit(integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION anat_list_audit(integer) TO radar_app;
+-- END INTEGRATION DELTA P-INT-01
