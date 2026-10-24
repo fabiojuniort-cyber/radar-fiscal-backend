@@ -293,6 +293,8 @@ test(
         establishmentResponse.statusCode,
         201,
       );
+      const unitId = establishmentResponse.json<{ establishment: { id: string } }>()
+        .establishment.id;
 
       const profileResponse =
         await app.inject({
@@ -325,6 +327,12 @@ test(
               keywords: [
                 'crédito presumido',
               ],
+              establishmentOverrides: [{
+                establishmentId: unitId,
+                taxRegime: 'LUCRO_PRESUMIDO',
+                conceptCodes: [],
+                ncmCodes: [],
+              }],
             },
           },
         });
@@ -374,6 +382,38 @@ test(
         'LUCRO_REAL',
       );
 
+      assert.deepEqual(
+        profile.json<{ profile: { personalization: { establishmentOverrides: unknown[] } } }>()
+          .profile.personalization.establishmentOverrides,
+        [{
+          establishmentId: unitId,
+          taxRegime: 'LUCRO_PRESUMIDO',
+          conceptCodes: [],
+          ncmCodes: [],
+        }],
+        'an establishment must have its own profile distinct from company regime',
+      );
+
+      const invalidUnit = await app.inject({
+        method: 'PUT',
+        url: '/api/v1/companies/' + company.id + '/tax-profile',
+        headers: firstHeaders,
+        payload: {
+          taxRegime: 'LUCRO_REAL',
+          personalization: {
+            establishmentOverrides: [{
+              establishmentId: randomUUID(),
+              taxRegime: 'SIMPLES_NACIONAL',
+              conceptCodes: [],
+              ncmCodes: [],
+            }],
+          },
+        },
+      });
+      assert.equal(invalidUnit.statusCode, 400, invalidUnit.body);
+      assert.equal(invalidUnit.json<{ error: string }>().error,
+        'invalid_establishment_overrides');
+
       const after = await app.inject({
         method: 'GET',
         url: '/api/v1/account',
@@ -391,6 +431,78 @@ test(
           ?.establishmentCount,
         1,
       );
+
+      // ONB-03: unit selections never become defaults for later branches.
+      const retained = [{
+        establishmentId: unitId, taxRegime: 'LUCRO_PRESUMIDO',
+        conceptCodes: [], ncmCodes: [],
+      }];
+      const saveUnits = (units: unknown[], headers: Record<string, string> = firstHeaders) => app.inject({
+        method: 'PUT', url: '/api/v1/companies/' + company.id + '/tax-profile',
+        headers, payload: { taxRegime: 'LUCRO_REAL',
+          personalization: { establishmentOverrides: units } },
+      });
+      const readUnits = async () => {
+        const result = await app.inject({
+          method: 'GET', url: '/api/v1/companies/' + company.id + '/tax-profile',
+          headers: firstHeaders,
+        });
+        assert.equal(result.statusCode, 200);
+        return result.json<{ profile: { personalization: { establishmentOverrides: unknown[] } } }>()
+          .profile.personalization.establishmentOverrides;
+      };
+      assert.equal((await saveUnits([retained[0], retained[0]])).statusCode, 400);
+      assert.equal((await saveUnits([{
+        ...retained[0], ncmCodes: ['99999999'],
+      }])).statusCode, 400);
+      assert.equal((await saveUnits([{
+        ...retained[0], conceptCodes: ['product.synthetic_missing'],
+      }])).statusCode, 409);
+      assert.equal((await saveUnits(retained, analystHeaders)).statusCode, 403);
+      assert.deepEqual(await readUnits(), retained, 'rejected writes preserve the saved unit');
+
+      const otherCompanyResponse = await app.inject({
+        method: 'POST', url: '/api/v1/companies', headers: firstHeaders,
+        payload: { legalName: 'Synthetic sibling', cnpj: cnpjFromSeed('912340000001') },
+      });
+      assert.equal(otherCompanyResponse.statusCode, 201);
+      const otherCompanyId = otherCompanyResponse.json<{company:{id:string}}>().company.id;
+      const otherUnitResponse = await app.inject({
+        method: 'POST', url: '/api/v1/establishments', headers: firstHeaders,
+        payload: { companyId: otherCompanyId, cnpj: cnpjFromSeed('912340000001'),
+          name: 'Synthetic sibling unit', typeCode: 'HEAD_OFFICE', isHeadOffice: true, uf: 'GO' },
+      });
+      assert.equal(otherUnitResponse.statusCode, 201);
+      const otherUnitId = otherUnitResponse.json<{establishment:{id:string}}>().establishment.id;
+      assert.equal((await saveUnits([{...retained[0], establishmentId:otherUnitId}])).statusCode, 400);
+      const foreignWrite = await app.inject({
+        method: 'PUT', url: '/api/v1/companies/' + company.id + '/tax-profile',
+        headers: {authorization:'Bearer ' + second.accessToken,'x-tenant-id':second.tenantId},
+        payload: {taxRegime:'LUCRO_REAL',personalization:{establishmentOverrides:retained}},
+      });
+      assert.equal(foreignWrite.statusCode, 404);
+      assert.deepEqual(await readUnits(), retained, 'other company/tenant cannot overwrite a unit');
+
+      const laterBranch = await app.inject({
+        method:'POST',url:'/api/v1/establishments',headers:firstHeaders,
+        payload:{companyId:company.id,cnpj:cnpjFromSeed('123450000002'),
+          name:'Synthetic later branch',typeCode:'OTHER',isHeadOffice:false,uf:'GO'},
+      });
+      assert.equal(laterBranch.statusCode,201);
+      const laterBranchId=laterBranch.json<{establishment:{id:string}}>().establishment.id;
+      assert.deepEqual(await readUnits(),retained,'adding a branch does not copy any profile');
+      const legacySave=await app.inject({
+        method:'PUT',url:'/api/v1/companies/'+company.id+'/tax-profile',headers:firstHeaders,
+        payload:{taxRegime:'LUCRO_REAL',personalization:{keywords:['synthetic']}},
+      });
+      assert.equal(legacySave.statusCode,200);
+      assert.deepEqual(await readUnits(),retained,'omitted overrides preserve prior unit selections');
+      const bothUnits=[...retained,{establishmentId:laterBranchId,taxRegime:'SIMPLES_NACIONAL',
+        conceptCodes:[],ncmCodes:[]}];
+      assert.equal((await saveUnits(bothUnits)).statusCode,200);
+      assert.deepEqual(await readUnits(),bothUnits,'separate unit regimes persist and reload');
+      // Reset only this disposable fixture so later legacy assertions stay unchanged.
+      assert.equal((await saveUnits(retained)).statusCode,200);
 
       const archivePublication =
         await admin.query<{
