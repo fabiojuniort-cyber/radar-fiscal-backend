@@ -2,7 +2,8 @@
  * ANAT-ADMIN-01 integration package 4: memory of the simulation executor under synthetic load (issue tribusca-control#116).
  * No database, no corpus, no network. Runs N rounds of `concurrency + queueLimit` simultaneous simulations, each with
  * 20 synthetic examples near the per-example input limit, and samples the process RSS (main thread + worker threads)
- * every 25 ms. Prints one JSON line. Usage: node --import tsx ops/anatomy/measure-executor-memory.ts [rounds] [inputKiB]
+ * every 25 ms. Prints one JSON line. The peak is what THIS run observed, not a guaranteed ceiling (RSS also depends on
+ * the allocator, the Node version and the input shape); outcomes are counted with the reason each row recorded. Usage: node --import tsx ops/anatomy/measure-executor-memory.ts [rounds] [inputKiB]
  */
 import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
 import { DEFAULT_PROFILES } from '../../src/modules/anatomy/profile.js';
@@ -30,8 +31,9 @@ for (let r = 0; r < rounds; r += 1) {
   const runs = await Promise.allSettled(Array.from({ length: parallel }, () =>
     executor.simulate({ profiles: structuredClone(DEFAULT_PROFILES), examples, expectedEngineHash: ANATOMY_ENGINE_BUILD_HASH })));
   for (const run of runs) {
-    if (run.status === 'rejected') { const code = String((run.reason as { code?: string }).code ?? 'error'); outcomes[code] = (outcomes[code] ?? 0) + 1; continue; }
-    for (const row of run.value.rows) outcomes[row.outcome] = (outcomes[row.outcome] ?? 0) + 1;
+    if (run.status === 'rejected') { const k = `rejected:${String((run.reason as { code?: string }).code ?? 'error')}`; outcomes[k] = (outcomes[k] ?? 0) + 1; continue; }
+    // Outcome together with the reason the executor recorded for it (null reason = completed normally).
+    for (const row of run.value.rows) { const k = `${row.outcome}:${row.reason ?? 'none'}`; outcomes[k] = (outcomes[k] ?? 0) + 1; }
   }
 }
 await executor.close();

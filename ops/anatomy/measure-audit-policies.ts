@@ -49,19 +49,31 @@ await db.query(`INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, 
 await db.query('ALTER TABLE audit_log ENABLE TRIGGER USER');
 await db.query('VACUUM ANALYZE audit_log');
 
-type Path = { name: string; role: string; user: string | null; tenant: string | null; sql: string; after?: boolean };
+type State = 'before' | 'legacy' | 'current';
+type Path = { name: string; role: string; user: string | null; tenant: string | null; sql: string; states?: State[] };
 const PATHS: Path[] = [
   { name: 'worker: count global rows', role: 'radar_worker', user: null, tenant: null, sql: 'SELECT count(*) FROM audit_log WHERE tenant_id IS NULL' },
   { name: 'worker: latest 100 of a tenant', role: 'radar_worker', user: null, tenant: tenants[0]!, sql: `SELECT id FROM audit_log WHERE tenant_id = '${tenants[0]}' ORDER BY occurred_at DESC LIMIT 100` },
   { name: 'curator: count global rows', role: 'radar_taxonomy_curator', user: null, tenant: null, sql: 'SELECT count(*) FROM audit_log WHERE tenant_id IS NULL' },
   { name: 'app: tenant member, latest 100', role: 'radar_app', user: members[0]!, tenant: tenants[0]!, sql: `SELECT id FROM audit_log WHERE tenant_id = '${tenants[0]}' ORDER BY occurred_at DESC LIMIT 100` },
   { name: 'app: tenant member, count', role: 'radar_app', user: members[0]!, tenant: tenants[0]!, sql: 'SELECT count(*) FROM audit_log' },
-  { name: 'app: platform admin, ANAT audit list (P3-D)', role: 'radar_app', user: admin, tenant: null, after: true,
+  { name: 'app: platform admin, ANAT audit list — direct SELECT (rehearsal policy)', role: 'radar_app', user: admin, tenant: null, states: ['legacy'],
     sql: "SELECT id FROM audit_log WHERE tenant_id IS NULL AND entity_type = 'anatomy_rules' ORDER BY occurred_at DESC LIMIT 500" },
+  { name: 'app: platform admin, ANAT audit list — anat_list_audit(500) (P-INT-01)', role: 'radar_app', user: admin, tenant: null, states: ['current'],
+    sql: 'SELECT * FROM public.anat_list_audit(500)' },
+  { name: 'write: app tenant member inserts a tenant audit row (009 policy + ANAT RESTRICTIVE check)', role: 'radar_app', user: members[0]!, tenant: tenants[0]!,
+    sql: `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data)
+      VALUES ('${tenants[0]}', 'USER', '${members[0]}', 'COMPANY_UPDATED', 'company', gen_random_uuid()::text,
+      jsonb_build_object('company_id', gen_random_uuid(), 'is_active', true, 'version', 1))` },
+  { name: 'write: admin saves a draft (anat_save_draft, audited ANAT insert)', role: 'radar_app', user: admin, tenant: null, states: ['legacy', 'current'],
+    sql: `SELECT * FROM public.anat_save_draft(NULL::uuid, NULL::integer, '[{"source":"DOU","tag":"bench"}]'::jsonb, '[{"id":"ex-bench"}]'::jsonb, gen_random_uuid())` },
 ];
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return Math.round(s[Math.floor(s.length / 2)]! * 100) / 100; };
-async function time(p: Path): Promise<{ ms: number; rows: number }> {
-  const ms: number[] = []; let n = 0;
+type PlanNode = { 'Node Type': string; 'Relation Name'?: string; Plans?: PlanNode[] };
+const auditScan = (n: PlanNode): string | null => n['Relation Name'] === 'audit_log' ? n['Node Type']
+  : (n.Plans ?? []).map(auditScan).find((x) => x !== null) ?? null;
+async function time(p: Path): Promise<{ ms: number; rows: number; auditScan: string | null } | { error: string }> {
+  const ms: number[] = []; let n = 0; let scan: string | null = null;
   for (let i = 0; i < repeats; i += 1) {
     await db.query('BEGIN');
     try {
@@ -69,17 +81,27 @@ async function time(p: Path): Promise<{ ms: number; rows: number }> {
       if (p.user) await db.query("SELECT set_config('app.user_id', $1, true)", [p.user]);
       if (p.tenant) await db.query("SELECT set_config('app.tenant_id', $1, true)", [p.tenant]);
       const plan = (await db.query(`EXPLAIN (ANALYZE, FORMAT JSON) ${p.sql}`)).rows[0]['QUERY PLAN'][0];
-      ms.push(plan['Execution Time']); n = plan.Plan['Actual Rows'];
-    } finally { await db.query('ROLLBACK'); }
+      ms.push(plan['Execution Time']); n = plan.Plan['Actual Rows']; scan = auditScan(plan.Plan);
+    } catch (error) { return { error: error instanceof Error ? error.message : String(error) }; } finally { await db.query('ROLLBACK'); }
   }
-  return { ms: median(ms), rows: n };
+  return { ms: median(ms), rows: n, auditScan: scan };
 }
-const before: Record<string, unknown> = {};
-for (const p of PATHS.filter((x) => !x.after)) before[p.name] = await time(p);
+const measure = async (state: State) => {
+  const out: Record<string, unknown> = {};
+  for (const p of PATHS.filter((x) => !x.states || x.states.includes(state))) out[p.name] = await time(p);
+  return out;
+};
+// before: 077 only (no ANAT policy). current: 078/079 as they are now (P-INT-01). legacy: the same plus the accepted
+// rehearsal's permissive radar_app policy, i.e. the previous integration HEAD, to show the plan regression and recovery.
+const before = await measure('before');
 await runProjectMigrations(DISPOSABLE_URL);
-const after: Record<string, unknown> = {};
-for (const p of PATHS) after[p.name] = await time(p);
+const current = await measure('current');
+await db.query(`CREATE POLICY audit_log_anat_rules_admin_select ON audit_log FOR SELECT TO radar_app
+  USING (tenant_id IS NULL AND entity_type = 'anatomy_rules' AND app_user_is_platform_admin())`);
+const legacy = await measure('legacy');
+await db.query('DROP POLICY audit_log_anat_rules_admin_select ON audit_log');
+const isolation = (await db.query(`SELECT policyname, permissive FROM pg_policies WHERE tablename = 'audit_log' ORDER BY 1`)).rows;
 const version = (await db.query('SHOW server_version')).rows[0].server_version;
 await db.end();
 console.log(JSON.stringify({ postgres: version, auditRows: rows, tenants: TENANTS, anatShare: ANAT_SHARE, otherGlobalShare: GLOBAL_SHARE,
-  repeats, metric: 'EXPLAIN ANALYZE execution time, median, ms', before, after }));
+  repeats, metric: 'EXPLAIN ANALYZE execution time, median, ms (writes rolled back)', before, legacy, current, auditLogPoliciesNow: isolation }));

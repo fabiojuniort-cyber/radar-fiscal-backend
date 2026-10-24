@@ -231,6 +231,47 @@ jobs:
         run: node --import tsx --test test/anatomy.admin-migrations.unit.test.ts
       - name: ${{ matrix.suite }} suite over the project's migrations (real runner)
         run: node --import tsx --test test/anatomy.${{ matrix.suite }}.integration.test.ts
+  # Integration package 4: audit_log policy benchmark (synthetic, disposable): before 078, the previous integration
+  # (rehearsal's permissive radar_app policy) and the current one (P-INT-01), PG16 and PG18. Result: one JSON line.
+  anatomy-audit-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Benchmark (500 000 synthetic audit rows, median of 5)
+        run: node --import tsx ops/anatomy/measure-audit-policies.ts 500000 5 | tee benchmark.json
+      - name: The app tenant read keeps its index plan after 078/079 (isolation policies unchanged)
+        run: >-
+          node -e "const d=JSON.parse(require('fs').readFileSync('benchmark.json','utf8').trim().split('\n').pop());
+          const k='app: tenant member, latest 100'; const c=d.current[k]; console.log(JSON.stringify({before:d.before[k],legacy:d.legacy[k],current:c}));
+          if (c.auditScan!=='Index Scan') process.exit(1)"
   # Integration readiness: the full B1 and API suites over the REAL migration chain of main (verified checkout of main,
   # files exported unedited; its SHA is printed) instead of the vendored audit excerpt. Fresh database per job.
   anatomy-admin-main-chain:
