@@ -437,7 +437,7 @@ test(
         establishmentId: unitId, taxRegime: 'LUCRO_PRESUMIDO',
         conceptCodes: [], ncmCodes: [],
       }];
-      const saveUnits = (units: unknown[], headers = firstHeaders) => app.inject({
+      const saveUnits = (units: unknown[], headers: Record<string, string> = firstHeaders) => app.inject({
         method: 'PUT', url: '/api/v1/companies/' + company.id + '/tax-profile',
         headers, payload: { taxRegime: 'LUCRO_REAL',
           personalization: { establishmentOverrides: units } },
