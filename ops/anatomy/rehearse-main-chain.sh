@@ -21,7 +21,7 @@ psql -q -h localhost -U postgres -d anat04_ci -tAc "SELECT 'anatomy tables on ma
 echo "rehearsal admin SQL applied on top of the real chain"
 psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d anat04_ci -tA <<'SQL'
 INSERT INTO app_users (id, email, name) VALUES ('aaaaaaaa-0000-4000-8000-000000000001','a@example.test','A'),('aaaaaaaa-0000-4000-8000-000000000003','n@example.test','N');
-INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ('aaaaaaaa-0000-4000-8000-000000000001','PLATFORM_ADMIN','system:ci');
+INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ('aaaaaaaa-0000-4000-8000-000000000001','PLATFORM_ADMIN','aaaaaaaa-0000-4000-8000-0000000000ff');
 BEGIN; SET LOCAL ROLE radar_app; SELECT set_config('app.user_id','aaaaaaaa-0000-4000-8000-000000000001',true) \g /dev/null
 SELECT 'draft saved: ' || (SELECT revision FROM anat_save_draft(NULL,NULL,'[{"profileVersion":"ANAT-PROFILE/1","scope":{"level":"default"},"fields":{}}]'::jsonb,'[{"id":"ex-a"}]'::jsonb,gen_random_uuid()));
 SELECT 'frozen: ' || (SELECT created FROM anat_freeze((SELECT id FROM anatomy_rule_drafts LIMIT 1),1,repeat('e',64),gen_random_uuid()));

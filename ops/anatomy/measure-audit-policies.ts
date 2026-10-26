@@ -36,16 +36,18 @@ for (let i = 0; i < TENANTS; i += 1) {
   tenants.push(t); members.push(u);
 }
 const admin = randomUUID();
+// Synthetic seeding actor: a fresh UUID, never a static system identity (R7.3 registry of audit actors).
+const seedActor = randomUUID();
 await db.query('INSERT INTO app_users (id, email) VALUES ($1, $2)', [admin, `${admin}@example.test`]);
-await db.query("INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ($1, 'PLATFORM_ADMIN', 'system:ci')", [admin]);
+await db.query("INSERT INTO platform_user_roles (user_id, role, granted_by) VALUES ($1, 'PLATFORM_ADMIN', $2)", [admin, seedActor]);
 await db.query('ALTER TABLE audit_log DISABLE TRIGGER USER');
 await db.query(`INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data, occurred_at)
   SELECT CASE WHEN g % 1000 < $2::numeric * 1000 THEN NULL WHEN g % 1000 < $3::numeric * 1000 THEN NULL ELSE ($4::uuid[])[1 + g % $5::int] END,
-         CASE WHEN g % 1000 < $2::numeric * 1000 THEN 'ADMIN' ELSE 'SYSTEM' END, 'system:ci',
+         CASE WHEN g % 1000 < $2::numeric * 1000 THEN 'ADMIN' ELSE 'SYSTEM' END, $6::text,
          CASE WHEN g % 1000 < $2::numeric * 1000 THEN 'ANAT_RULES_DRAFT_SAVED' WHEN g % 1000 < $3::numeric * 1000 THEN 'TAXONOMY_CURATION_PUBLISHED' ELSE 'COMPANY_UPDATED' END,
          CASE WHEN g % 1000 < $2::numeric * 1000 THEN 'anatomy_rules' WHEN g % 1000 < $3::numeric * 1000 THEN 'taxonomy_curation' ELSE 'company' END,
          gen_random_uuid()::text, '{}'::jsonb, now() - (g || ' seconds')::interval
-  FROM generate_series(1, $1) g`, [rows, ANAT_SHARE, ANAT_SHARE + GLOBAL_SHARE, tenants, TENANTS]);
+  FROM generate_series(1, $1) g`, [rows, ANAT_SHARE, ANAT_SHARE + GLOBAL_SHARE, tenants, TENANTS, seedActor]);
 await db.query('ALTER TABLE audit_log ENABLE TRIGGER USER');
 await db.query('VACUUM ANALYZE audit_log');
 
@@ -63,7 +65,7 @@ const PATHS: Path[] = [
     sql: 'SELECT * FROM public.anat_list_audit(500)' },
   { name: 'write: app tenant member inserts a tenant audit row (009 policy + ANAT RESTRICTIVE check)', role: 'radar_app', user: members[0]!, tenant: tenants[0]!,
     sql: `INSERT INTO audit_log (tenant_id, actor_type, actor_id, action, entity_type, entity_id, after_data)
-      VALUES ('${tenants[0]}', 'USER', '${members[0]}', 'COMPANY_UPDATED', 'company', gen_random_uuid()::text,
+      VALUES ('${tenants[0]}', 'USER', app_current_user_id()::text, 'COMPANY_UPDATED', 'company', gen_random_uuid()::text,
       jsonb_build_object('company_id', gen_random_uuid(), 'is_active', true, 'version', 1))` },
   { name: 'write: admin saves a draft (anat_save_draft, audited ANAT insert)', role: 'radar_app', user: admin, tenant: null, states: ['legacy', 'current'],
     sql: `SELECT * FROM public.anat_save_draft(NULL::uuid, NULL::integer, '[{"source":"DOU","tag":"bench"}]'::jsonb, '[{"id":"ex-bench"}]'::jsonb, gen_random_uuid())` },
