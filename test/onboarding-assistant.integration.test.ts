@@ -22,7 +22,7 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   const after=await admin.query('SELECT count(*)::int AS n FROM company_tax_profiles WHERE company_id=$1',[company]);assert.deepEqual(after.rows,before.rows,'GET never creates a profile');
   assert.equal((await app.inject({method:'GET',url:path,headers:b})).statusCode,404);
   const save=(cardId:string,version:number,extra:Record<string,unknown>={})=>app.inject({method:'PUT',url:path,headers:a,payload:{expectedVersion:version,releaseId:data.release.id,cardId,status:'CONFIRMED',...extra}});
-  const first=await save('company',0);assert.equal(first.statusCode,200,first.body);
+  const concurrent=await Promise.all([save('company',0),save('company',0)]);assert.deepEqual(concurrent.map(r=>r.statusCode).sort(),[200,409]);
   assert.equal((await save('establishments',0)).statusCode,409,'second screen retains stale version');
   assert.equal((await save('establishments',1)).statusCode,200);
   const legacy=await app.inject({method:'PUT',url:'/api/v1/companies/'+company+'/tax-profile',headers:a,payload:{expectedVersion:1,taxRegime:'LUCRO_REAL',personalization:{establishmentOverrides:[]}}});assert.equal(legacy.statusCode,409,legacy.body);
@@ -41,5 +41,15 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   data=await read();assert.equal(data.state.completed,true);assert.equal(data.version,5);
   const phrases=await app.inject({method:'GET',url:'/api/v1/onboarding/phrases',headers:a});assert.equal(phrases.statusCode,200,phrases.body);assert.equal(phrases.json().items.length,19);assert.ok(phrases.json().items.every((p:{phrases:string[]})=>p.phrases.length===20));
   const forbidden=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:1,phrases:['Unauthorized']}});assert.equal(forbidden.statusCode,403);
- }finally{await app.close();for(const tenant of tenants){await admin.query('DELETE FROM tenant_memberships WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant])}for(const user of users)await admin.query('DELETE FROM app_users WHERE id=$1',[user]);await admin.end()}
+  await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN',$2)",[users[0],users[0]]);
+  const original=phrases.json().items.find((row:{segment:string})=>row.segment==='generico');
+  try {
+    const edit=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:original.version_no,phrases:['Frase sintética de integração.']}});
+    assert.equal(edit.statusCode,200,edit.body);
+    const stale=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:original.version_no,phrases:['Não deve sobrescrever.']}});
+    assert.equal(stale.statusCode,409,stale.body);
+    const empty=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:original.version_no+1,phrases:[]}});
+    assert.equal(empty.statusCode,400,empty.body);
+  } finally { await admin.query('UPDATE onboarding_phrases SET phrases=$1::jsonb,version_no=version_no+1 WHERE segment=$2',[JSON.stringify(original.phrases),'generico']); }
+ }finally{await app.close();for(const tenant of tenants){await admin.query('DELETE FROM tenant_memberships WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant])}for(const user of users){await admin.query('DELETE FROM platform_user_roles WHERE user_id=$1',[user]);await admin.query('DELETE FROM app_users WHERE id=$1',[user]);}await admin.end()}
 });

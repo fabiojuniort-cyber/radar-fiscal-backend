@@ -43,6 +43,8 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const profile = profiles[0];
           const personalization = profile?.personalization ?? {};
           let state = (personalization.onboarding as AssistantState | undefined) ?? emptyAssistant();
+          // Share the curator transaction lock: publication cannot race a card save.
+          if(method==='PUT') await run('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',['tribusca.taxonomy.curation']);
           const release = await findLatestPublishedRelease(run);
           if (!release) throw new AssistantError(409, 'taxonomy_release_not_available');
           if(state.releaseId && state.releaseId!==release.id) state=emptyAssistant();
@@ -68,6 +70,8 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const currentCodes = new Set(view.concepts.filter(c=>['sector','product'].includes(c.dimensionCode)&&!isCnaeActivity(c.officialCodes)).map(c=>c.code));
           if (body.conceptCodes.some(code=>!currentCodes.has(code))) throw new AssistantError(400,'invalid_taxonomy_selection');
           if (body.ncmCodes.length) {
+            await run(`SELECT ed.id FROM official_catalog_editions ed JOIN official_catalogs cat ON cat.id=ed.catalog_id
+              WHERE cat.code='NCM' AND ed.status='CURRENT' FOR SHARE OF ed`);
             const found = await run<{code:string}>(`SELECT DISTINCT input.code FROM unnest($1::text[]) input(code)
               WHERE EXISTS(SELECT 1 FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id
                 JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT'
