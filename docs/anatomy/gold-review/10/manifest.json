@@ -1,0 +1,62 @@
+{
+ "id": "10",
+ "purpose": "Leitura em partes para revisão; o gold completo e o texto canônico congelado continuam sendo a fonte.",
+ "goldFile": "test/fixtures/anatomy/gold/10.json",
+ "goldFileSha256Lf": "6f35dcdd24acc9b8e086feb9e665cf96351c1b162ed21244d35e1adf2e7a48cc",
+ "goldCanonicalJsonSha256": "3ad1fa743b0a63bab2271a659061fe638cdbee5605ce4b6a01a2893a52255623",
+ "goldContentSha256": "c4602fddaecf5ba89c77a38d1e9c23ef2d2b89205061910ebf2f21d10df43083",
+ "canonicalTextSha256": "525a7604c9344e6b1ee7895c3ca382e1a184492e1bffa97be23f75e35a3f94b1",
+ "canonicalTextUtf16Length": 23246,
+ "reassembly": "gold = { ...header, parts: concat(parts-*), entities: concat(entities-*), relations: concat(relations-*) }; canonicalText = concat(canonical-*.text); file-name order; ranges [from, to) (UTF-16 for canonical text).",
+ "chunks": [
+  {
+   "file": "00-header.json",
+   "section": "header",
+   "from": 0,
+   "to": 0,
+   "sha256": "21ff3c3f19b340fa4f60ab3e49eaf9d84df5a55c209bb0e46b4ccb58555e3bc3"
+  },
+  {
+   "file": "parts-001.json",
+   "section": "parts",
+   "from": 0,
+   "to": 250,
+   "sha256": "0d82df3b51f6214b7d3c5ef3e2eeedb724b62fcacaeb76fb82f0c13608a09999"
+  },
+  {
+   "file": "parts-002.json",
+   "section": "parts",
+   "from": 250,
+   "to": 500,
+   "sha256": "45a55a2754aba2121f115acd497b44b57c35bef7b53d6b7b40f198b41590d693"
+  },
+  {
+   "file": "parts-003.json",
+   "section": "parts",
+   "from": 500,
+   "to": 750,
+   "sha256": "bf28d7adc3c30a81a196f2d236b15adf72774ac6b0bd84d750ae718872a97911"
+  },
+  {
+   "file": "parts-004.json",
+   "section": "parts",
+   "from": 750,
+   "to": 789,
+   "sha256": "3e2bb95da5678dc27dde75e44168e5820735ee13742c5e760aaa3c987b8d2ac8"
+  },
+  {
+   "file": "entities-001.json",
+   "section": "entities",
+   "from": 0,
+   "to": 211,
+   "sha256": "94f2ab3976a1853bb1789dcdaef82c68886678e1a11b5b945a94943b216afd89"
+  },
+  {
+   "file": "canonical-001.json",
+   "section": "canonicalText",
+   "from": 0,
+   "to": 23246,
+   "sha256": "aa467c7c66f33c05a18818df77345c0121c5beee683e9a7b27144deec73de937"
+  }
+ ]
+}

@@ -48,9 +48,21 @@ SELECT
       false, true, '')))[1]::text::bigint END AS blocker_ncm_mentions,
   (SELECT count(*) FROM publication_scope_events pse JOIN doe_pub d ON d.id = pse.publication_id) AS blocker_scope_events,
   (SELECT count(*) FROM publication_scope_state pss JOIN doe_pub d ON d.id = pss.publication_id) AS blocker_scope_state,
-  (SELECT count(*) FROM pg_constraint WHERE contype = 'f'
-     AND confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
-     AND conname NOT IN (
+  (SELECT count(*) FROM pg_constraint c WHERE c.contype = 'f'
+     AND c.confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
+     AND NOT (
+       -- ANAT-ADMIN-01 (077_anat_base): the only two ANAT foreign keys recognised, by EXACT definition, never by name alone:
+       -- table public.publication_anatomies / public.anatomy_run_items, single column publication_version_id,
+       -- referencing publication_versions(id), ON DELETE RESTRICT. Their rows are counted by the anatomy blockers below.
+       c.confrelid = 'publication_versions'::regclass AND c.confdeltype = 'r'
+       AND array_length(c.conkey, 1) = 1 AND array_length(c.confkey, 1) = 1
+       AND EXISTS (SELECT 1 FROM pg_class r JOIN pg_namespace n ON n.oid = r.relnamespace
+                   WHERE r.oid = c.conrelid AND n.nspname = 'public'
+                   AND (r.relname, c.conname) IN (('publication_anatomies', 'publication_anatomies_publication_version_id_fkey'),
+                                                  ('anatomy_run_items', 'anatomy_run_items_publication_version_id_fkey')))
+       AND (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = c.conrelid AND a.attnum = c.conkey[1]) = 'publication_version_id'
+       AND (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = c.confrelid AND a.attnum = c.confkey[1]) = 'id')
+     AND c.conname NOT IN (
        'publication_origins_publication_id_fkey',
        'publication_versions_publication_id_fkey',
        'publication_files_publication_version_id_fkey',
@@ -64,6 +76,22 @@ SELECT
        'norma_clara_translations_publication_version_id_fkey',
        'publication_scope_events_publication_id_fkey',
        'publication_scope_state_publication_id_fkey')) AS blocker_unknown_foreign_keys,
+  -- ANAT-ADMIN-01: analyses and run items of scope versions (RESTRICT): the rebuild must stop before deleting.
+  -- Before 077 the tables do not exist: 0, without resolving any ANAT name.
+  CASE WHEN to_regclass('public.publication_anatomies') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml(
+      'SELECT count(*) AS c FROM public.publication_anatomies a WHERE a.publication_version_id IN (
+         SELECT pv.id FROM publication_versions pv WHERE pv.publication_id IN (
+           SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id
+           WHERE s.code = ''doe-sp'' AND s.connector_key = ''doe-sp''))',
+      false, true, '')))[1]::text::bigint END AS blocker_anatomy_analyses,
+  CASE WHEN to_regclass('public.anatomy_run_items') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml(
+      'SELECT count(*) AS c FROM public.anatomy_run_items i WHERE i.publication_version_id IN (
+         SELECT pv.id FROM publication_versions pv WHERE pv.publication_id IN (
+           SELECT po.publication_id FROM publication_origins po JOIN sources s ON s.id = po.source_id
+           WHERE s.code = ''doe-sp'' AND s.connector_key = ''doe-sp''))',
+      false, true, '')))[1]::text::bigint END AS blocker_anatomy_run_items,
   -- global totals before (30 asserts totals after = before - deleted)
   (SELECT count(*) FROM publications) AS global_publications,
   (SELECT count(*) FROM publication_versions) AS global_versions,
@@ -97,6 +125,8 @@ SELECT 'DOE_SP_DRY_RUN=' || jsonb_build_object(
     'scope_events', :blocker_scope_events,
     'scope_state', :blocker_scope_state,
     'unknown_foreign_keys', :blocker_unknown_foreign_keys,
+    'anatomy_analyses', :blocker_anatomy_analyses,
+    'anatomy_run_items', :blocker_anatomy_run_items,
     -- 30 aborts: deleting old AI translations has no preservation design yet.
     'scope_translations', :expected_translations_deleted),
   'globalBefore', jsonb_build_object(

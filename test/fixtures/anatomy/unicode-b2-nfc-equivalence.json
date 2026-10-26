@@ -1,0 +1,777 @@
+{
+ "note": "Engine output WITHOUT identity/analysisId/outputHash for NFC synthetic documents, generated on the pre-B2 engine (317d177, PR #252). B2 must reproduce it: the NFC path never uses the shadow.",
+ "documents": [
+  {
+   "id": "q-mark",
+   "s": {
+    "contractVersion": "ANAT-TAX/1.0.0",
+    "canonicalText": "Art. 1\u00ba q\u0301 NCM 8471.30.12, exceto 8471.41.00.\n",
+    "referenceDate": "2026-10-21",
+    "status": "complete",
+    "parts": [
+     {
+      "id": "part-0",
+      "parentId": null,
+      "order": 0,
+      "type": "document",
+      "label": "",
+      "span": {
+       "start": 0,
+       "end": 46
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://q-mark",
+        "representation": "html",
+        "locator": "/",
+        "sourceSpan": null
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/document",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "document"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-1",
+      "parentId": "part-0",
+      "order": 0,
+      "type": "article",
+      "label": "Art. 1\u00ba q\u0301 NCM 8471.30.12, exceto 8471.41.00.",
+      "span": {
+       "start": 0,
+       "end": 46
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://q-mark",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 52
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/article_marker",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "article_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     }
+    ],
+    "entities": [
+     {
+      "id": "entity:OTHER:0:7",
+      "partId": "part-1",
+      "domain": "OTHER",
+      "literal": "Art. 1\u00ba",
+      "normalized": "Art. 1\u00ba",
+      "span": {
+       "start": 0,
+       "end": 7
+      },
+      "ruleId": "anat.entities.v1.legal_device_identifier_not_ncm",
+      "confidence": 1,
+      "validation": {
+       "status": "unknown",
+       "method": "none",
+       "catalogEdition": null,
+       "reason": "legal_device_identifier_not_ncm"
+      },
+      "relation": null
+     },
+     {
+      "id": "entity:NCM:15:25",
+      "partId": "part-1",
+      "domain": "NCM",
+      "literal": "8471.30.12",
+      "normalized": "84713012",
+      "span": {
+       "start": 15,
+       "end": 25
+      },
+      "ruleId": "anat.entities.v1.explicit_ncm_context",
+      "confidence": 1,
+      "validation": {
+       "status": "valid",
+       "method": "catalog",
+       "catalogEdition": "s",
+       "reason": "exact_catalog_match"
+      },
+      "relation": {
+       "kind": "exception_target",
+       "groupId": "entity:NCM_EXCEPTION:27:44",
+       "targetEntityIds": [
+        "entity:NCM_EXCEPTION:27:44"
+       ],
+       "operator": "exceto",
+       "scopePartId": "part-1",
+       "condition": "exceto 8471.41.00",
+       "expansion": []
+      }
+     },
+     {
+      "id": "entity:NCM_EXCEPTION:27:44",
+      "partId": "part-1",
+      "domain": "NCM_EXCEPTION",
+      "literal": "exceto 8471.41.00",
+      "normalized": "exceto:84714100",
+      "span": {
+       "start": 27,
+       "end": 44
+      },
+      "ruleId": "anat.entities.v1.M02_scoped_exception",
+      "confidence": 1,
+      "validation": {
+       "status": "unknown",
+       "method": "none",
+       "catalogEdition": null,
+       "reason": "M02_scoped_exception"
+      },
+      "relation": {
+       "kind": "exception",
+       "groupId": "entity:NCM_EXCEPTION:27:44",
+       "targetEntityIds": [
+        "entity:NCM:15:25",
+        "entity:NCM:34:44"
+       ],
+       "operator": "exceto",
+       "scopePartId": "part-1",
+       "condition": "exceto 8471.41.00",
+       "expansion": []
+      }
+     },
+     {
+      "id": "entity:NCM:34:44",
+      "partId": "part-1",
+      "domain": "NCM",
+      "literal": "8471.41.00",
+      "normalized": "84714100",
+      "span": {
+       "start": 34,
+       "end": 44
+      },
+      "ruleId": "anat.entities.v1.explicit_ncm_context",
+      "confidence": 1,
+      "validation": {
+       "status": "valid",
+       "method": "catalog",
+       "catalogEdition": "s",
+       "reason": "exact_catalog_match"
+      },
+      "relation": {
+       "kind": "exception_target",
+       "groupId": "entity:NCM_EXCEPTION:27:44",
+       "targetEntityIds": [
+        "entity:NCM_EXCEPTION:27:44"
+       ],
+       "operator": "exceto",
+       "scopePartId": "part-1",
+       "condition": "exceto 8471.41.00",
+       "expansion": []
+      }
+     }
+    ],
+    "evidence": [],
+    "eligibility": [
+     {
+      "id": "text:part-1",
+      "purpose": "thematic_text",
+      "partId": "part-1",
+      "entityId": null,
+      "span": {
+       "start": 0,
+       "end": 46
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM:15:25",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM:15:25",
+      "span": {
+       "start": 15,
+       "end": 25
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence",
+       "compound_or_exception_scope"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM_EXCEPTION:27:44",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM_EXCEPTION:27:44",
+      "span": {
+       "start": 27,
+       "end": 44
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence",
+       "compound_or_exception_scope",
+       "validation_unknown"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM:34:44",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM:34:44",
+      "span": {
+       "start": 34,
+       "end": 44
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence",
+       "compound_or_exception_scope"
+      ]
+     }
+    ],
+    "sourceMap": [
+     {
+      "span": {
+       "start": 0,
+       "end": 45
+      },
+      "pointer": {
+       "resourceId": "s://q-mark",
+       "representation": "html",
+       "locator": "/p[1]/text()[1]",
+       "sourceSpan": {
+        "start": 3,
+        "end": 48
+       }
+      }
+     },
+     {
+      "span": {
+       "start": 45,
+       "end": 46
+      },
+      "pointer": {
+       "resourceId": "s://q-mark",
+       "representation": "html",
+       "locator": "/p[1]/separator",
+       "sourceSpan": null
+      }
+     }
+    ],
+    "coverage": {
+     "unit": "UTF-16",
+     "textLength": 46,
+     "accountedLength": 46,
+     "recognizedLength": 46,
+     "segments": [
+      {
+       "span": {
+        "start": 0,
+        "end": 46
+       },
+       "partId": "part-1",
+       "classification": "recognized"
+      }
+     ],
+     "missingResources": []
+    },
+    "limitations": []
+   }
+  },
+  {
+   "id": "lone-surrogate-mark",
+   "s": {
+    "contractVersion": "ANAT-TAX/1.0.0",
+    "canonicalText": "Art. 1\u00ba \ud800\u0301 NCM 8471.30.12 at\u00e9 8471.41.00.\n",
+    "referenceDate": "2026-10-21",
+    "status": "complete",
+    "parts": [
+     {
+      "id": "part-0",
+      "parentId": null,
+      "order": 0,
+      "type": "document",
+      "label": "",
+      "span": {
+       "start": 0,
+       "end": 42
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://lone-surrogate-mark",
+        "representation": "html",
+        "locator": "/",
+        "sourceSpan": null
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/document",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "document"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-1",
+      "parentId": "part-0",
+      "order": 0,
+      "type": "article",
+      "label": "Art. 1\u00ba \ud800\u0301 NCM 8471.30.12 at\u00e9 8471.41.00.",
+      "span": {
+       "start": 0,
+       "end": 42
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://lone-surrogate-mark",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 48
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/article_marker",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "article_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     }
+    ],
+    "entities": [
+     {
+      "id": "entity:OTHER:0:7",
+      "partId": "part-1",
+      "domain": "OTHER",
+      "literal": "Art. 1\u00ba",
+      "normalized": "Art. 1\u00ba",
+      "span": {
+       "start": 0,
+       "end": 7
+      },
+      "ruleId": "anat.entities.v1.legal_device_identifier_not_ncm",
+      "confidence": 1,
+      "validation": {
+       "status": "unknown",
+       "method": "none",
+       "catalogEdition": null,
+       "reason": "legal_device_identifier_not_ncm"
+      },
+      "relation": null
+     },
+     {
+      "id": "entity:NCM:15:25",
+      "partId": "part-1",
+      "domain": "NCM",
+      "literal": "8471.30.12",
+      "normalized": "84713012",
+      "span": {
+       "start": 15,
+       "end": 25
+      },
+      "ruleId": "anat.entities.v1.explicit_ncm_context",
+      "confidence": 1,
+      "validation": {
+       "status": "valid",
+       "method": "catalog",
+       "catalogEdition": "s",
+       "reason": "exact_catalog_match"
+      },
+      "relation": {
+       "kind": "range_start",
+       "groupId": "entity:NCM_RANGE:15:40",
+       "targetEntityIds": [
+        "entity:NCM:30:40"
+       ],
+       "operator": "at\u00e9",
+       "scopePartId": "part-1",
+       "condition": null,
+       "expansion": []
+      }
+     },
+     {
+      "id": "entity:NCM_RANGE:15:40",
+      "partId": "part-1",
+      "domain": "NCM_RANGE",
+      "literal": "8471.30.12 at\u00e9 8471.41.00",
+      "normalized": "84713012..84714100",
+      "span": {
+       "start": 15,
+       "end": 40
+      },
+      "ruleId": "anat.entities.v1.M01_bounded_range_no_expansion",
+      "confidence": 1,
+      "validation": {
+       "status": "unknown",
+       "method": "none",
+       "catalogEdition": "s",
+       "reason": "range_membership_not_expanded"
+      },
+      "relation": {
+       "kind": "range",
+       "groupId": "entity:NCM_RANGE:15:40",
+       "targetEntityIds": [
+        "entity:NCM:15:25",
+        "entity:NCM:30:40"
+       ],
+       "operator": "at\u00e9",
+       "scopePartId": "part-1",
+       "condition": null,
+       "expansion": []
+      }
+     },
+     {
+      "id": "entity:NCM:30:40",
+      "partId": "part-1",
+      "domain": "NCM",
+      "literal": "8471.41.00",
+      "normalized": "84714100",
+      "span": {
+       "start": 30,
+       "end": 40
+      },
+      "ruleId": "anat.entities.v1.explicit_ncm_context",
+      "confidence": 1,
+      "validation": {
+       "status": "valid",
+       "method": "catalog",
+       "catalogEdition": "s",
+       "reason": "exact_catalog_match"
+      },
+      "relation": {
+       "kind": "range_end",
+       "groupId": "entity:NCM_RANGE:15:40",
+       "targetEntityIds": [
+        "entity:NCM:15:25"
+       ],
+       "operator": "at\u00e9",
+       "scopePartId": "part-1",
+       "condition": null,
+       "expansion": []
+      }
+     }
+    ],
+    "evidence": [],
+    "eligibility": [
+     {
+      "id": "text:part-1",
+      "purpose": "thematic_text",
+      "partId": "part-1",
+      "entityId": null,
+      "span": {
+       "start": 0,
+       "end": 42
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM:15:25",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM:15:25",
+      "span": {
+       "start": 15,
+       "end": 25
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence",
+       "compound_or_exception_scope"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM_RANGE:15:40",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM_RANGE:15:40",
+      "span": {
+       "start": 15,
+       "end": 40
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence",
+       "compound_or_exception_scope",
+       "validation_unknown"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM:30:40",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM:30:40",
+      "span": {
+       "start": 30,
+       "end": 40
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence",
+       "compound_or_exception_scope"
+      ]
+     }
+    ],
+    "sourceMap": [
+     {
+      "span": {
+       "start": 0,
+       "end": 41
+      },
+      "pointer": {
+       "resourceId": "s://lone-surrogate-mark",
+       "representation": "html",
+       "locator": "/p[1]/text()[1]",
+       "sourceSpan": {
+        "start": 3,
+        "end": 44
+       }
+      }
+     },
+     {
+      "span": {
+       "start": 41,
+       "end": 42
+      },
+      "pointer": {
+       "resourceId": "s://lone-surrogate-mark",
+       "representation": "html",
+       "locator": "/p[1]/separator",
+       "sourceSpan": null
+      }
+     }
+    ],
+    "coverage": {
+     "unit": "UTF-16",
+     "textLength": 42,
+     "accountedLength": 42,
+     "recognizedLength": 42,
+     "segments": [
+      {
+       "span": {
+        "start": 0,
+        "end": 42
+       },
+       "partId": "part-1",
+       "classification": "recognized"
+      }
+     ],
+     "missingResources": []
+    },
+    "limitations": []
+   }
+  },
+  {
+   "id": "emoji-zwj",
+   "s": {
+    "contractVersion": "ANAT-TAX/1.0.0",
+    "canonicalText": "Cl\u00e1usula primeira \ud83d\udc69\u200d\ud83d\udcbb NCM 8471.30.12.\n",
+    "referenceDate": "2026-10-21",
+    "status": "complete",
+    "parts": [
+     {
+      "id": "part-0",
+      "parentId": null,
+      "order": 0,
+      "type": "document",
+      "label": "",
+      "span": {
+       "start": 0,
+       "end": 40
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://emoji-zwj",
+        "representation": "html",
+        "locator": "/",
+        "sourceSpan": null
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/document",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "document"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-1",
+      "parentId": "part-0",
+      "order": 0,
+      "type": "clause",
+      "label": "Cl\u00e1usula primeira \ud83d\udc69\u200d\ud83d\udcbb NCM 8471.30.12.",
+      "span": {
+       "start": 0,
+       "end": 40
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://emoji-zwj",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 46
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/clause_marker",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "clause_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     }
+    ],
+    "entities": [
+     {
+      "id": "entity:NCM:28:38",
+      "partId": "part-1",
+      "domain": "NCM",
+      "literal": "8471.30.12",
+      "normalized": "84713012",
+      "span": {
+       "start": 28,
+       "end": 38
+      },
+      "ruleId": "anat.entities.v1.explicit_ncm_context",
+      "confidence": 1,
+      "validation": {
+       "status": "valid",
+       "method": "catalog",
+       "catalogEdition": "s",
+       "reason": "exact_catalog_match"
+      },
+      "relation": null
+     }
+    ],
+    "evidence": [],
+    "eligibility": [
+     {
+      "id": "text:part-1",
+      "purpose": "thematic_text",
+      "partId": "part-1",
+      "entityId": null,
+      "span": {
+       "start": 0,
+       "end": 40
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence"
+      ]
+     },
+     {
+      "id": "ncm:entity:NCM:28:38",
+      "purpose": "ncm",
+      "partId": "part-1",
+      "entityId": "entity:NCM:28:38",
+      "span": {
+       "start": 28,
+       "end": 38
+      },
+      "eligible": false,
+      "evidenceIds": [],
+      "exclusionReasons": [
+       "missing_approved_evidence"
+      ]
+     }
+    ],
+    "sourceMap": [
+     {
+      "span": {
+       "start": 0,
+       "end": 39
+      },
+      "pointer": {
+       "resourceId": "s://emoji-zwj",
+       "representation": "html",
+       "locator": "/p[1]/text()[1]",
+       "sourceSpan": {
+        "start": 3,
+        "end": 42
+       }
+      }
+     },
+     {
+      "span": {
+       "start": 39,
+       "end": 40
+      },
+      "pointer": {
+       "resourceId": "s://emoji-zwj",
+       "representation": "html",
+       "locator": "/p[1]/separator",
+       "sourceSpan": null
+      }
+     }
+    ],
+    "coverage": {
+     "unit": "UTF-16",
+     "textLength": 40,
+     "accountedLength": 40,
+     "recognizedLength": 40,
+     "segments": [
+      {
+       "span": {
+        "start": 0,
+        "end": 40
+       },
+       "partId": "part-1",
+       "classification": "recognized"
+      }
+     ],
+     "missingResources": []
+    },
+    "limitations": []
+   }
+  }
+ ]
+}

@@ -115,6 +115,9 @@ jobs:
           git diff --exit-code -- docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json
           test -z "$(git status --porcelain -- docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json)"
 
+      - name: ANAT-04 isolated core checks (offline)
+        run: npm run anatomy:verify-build && npm run test:anatomy
+
       - name: Unit tests
         run: npm test
 
@@ -153,6 +156,10 @@ jobs:
       - name: DOE-SP NCM evidence rebuild guard
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npx tsx --test test/doe-sp.ncm-rebuild-guard.integration.test.ts
+
+      - name: DOE-SP rebuild guard for ANAT analyses and run items (P-INT-02)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        run: npx tsx --test test/doe-sp.anatomy-guard.integration.test.ts
 
       - name: Authentication and RLS integration tests
         if: steps.ci-plan.outputs.full_regression == 'true'

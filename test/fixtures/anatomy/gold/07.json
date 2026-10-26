@@ -1,0 +1,183 @@
+{
+ "goldVersion": "ANAT-GOLD/1.0.0",
+ "id": "07",
+ "partition": "development",
+ "preparation": "dou-xml-cdata/1.0.0",
+ "canonicalTextSha256": "6f9fd606a8ec136ff6ce14edb3353608b5ccfe2accc861c0580967d7a1bf48e2",
+ "canonicalTextUtf16Length": 1222,
+ "status": "reviewed",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "parts": [
+  {
+   "id": "doc",
+   "parentId": null,
+   "order": 0,
+   "type": "document",
+   "span": {
+    "start": 0,
+    "end": 1222
+   },
+   "context": "unknown",
+   "contextReason": "document",
+   "table": null
+  },
+  {
+   "id": "ep",
+   "parentId": "doc",
+   "order": 0,
+   "type": "epigraph",
+   "span": {
+    "start": 0,
+    "end": 34
+   },
+   "context": "prohibited",
+   "contextReason": "dou_identifica",
+   "table": null
+  },
+  {
+   "id": "h1",
+   "parentId": "doc",
+   "order": 1,
+   "type": "publication_header",
+   "span": {
+    "start": 35,
+    "end": 67
+   },
+   "context": "prohibited",
+   "contextReason": "despacho_header",
+   "table": null
+  },
+  {
+   "id": "h2",
+   "parentId": "doc",
+   "order": 2,
+   "type": "publication_header",
+   "span": {
+    "start": 68,
+    "end": 115
+   },
+   "context": "prohibited",
+   "contextReason": "despacho_header",
+   "table": null
+  },
+  {
+   "id": "h3",
+   "parentId": "doc",
+   "order": 3,
+   "type": "publication_header",
+   "span": {
+    "start": 116,
+    "end": 609
+   },
+   "context": "prohibited",
+   "contextReason": "despacho_header",
+   "table": null
+  },
+  {
+   "id": "dec",
+   "parentId": "doc",
+   "order": 4,
+   "type": "body",
+   "span": {
+    "start": 610,
+    "end": 1176
+   },
+   "context": "operative_candidate",
+   "contextReason": "despacho_decision",
+   "table": null
+  },
+  {
+   "id": "sig",
+   "parentId": "doc",
+   "order": 5,
+   "type": "signature",
+   "span": {
+    "start": 1177,
+    "end": 1201
+   },
+   "context": "prohibited",
+   "contextReason": "dou_assina",
+   "table": null
+  },
+  {
+   "id": "cargo",
+   "parentId": "doc",
+   "order": 6,
+   "type": "signature",
+   "span": {
+    "start": 1202,
+    "end": 1220
+   },
+   "context": "prohibited",
+   "contextReason": "dou_cargo",
+   "table": null
+  }
+ ],
+ "entities": [
+  {
+   "id": "e1",
+   "partId": "h1",
+   "span": {
+    "start": 47,
+    "end": 67
+   },
+   "literal": "17944.003839/2025-17",
+   "domain": "PROCESS",
+   "note": ""
+  },
+  {
+   "id": "e2",
+   "partId": "dec",
+   "span": {
+    "start": 755,
+    "end": 800
+   },
+   "literal": "Lei Complementar nº 101, de 4 de maio de 2000",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e3",
+   "partId": "dec",
+   "span": {
+    "start": 805,
+    "end": 847
+   },
+   "literal": "Resolução nº 48, de 21 de dezembro de 2007",
+   "domain": "CITATION",
+   "note": ""
+  },
+  {
+   "id": "e4",
+   "partId": "dec",
+   "span": {
+    "start": 867,
+    "end": 897
+   },
+   "literal": "nº 26, de 14 de agosto de 2026",
+   "domain": "CITATION",
+   "note": "Resolução do Senado nº 26 (elipse)"
+  },
+  {
+   "id": "e5",
+   "partId": "dec",
+   "span": {
+    "start": 977,
+    "end": 1025
+   },
+   "literal": "Decreto-Lei nº 1.312, de 15 de fevereiro de 1974",
+   "domain": "CITATION",
+   "note": ""
+  }
+ ],
+ "relations": [],
+ "gaps": [],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d",
+  "notes": "Despacho MF: cabeçalho (processo/interessado/assunto) não operativo; decisão no parágrafo 5. 'nº 26, de 14 de agosto de 2026' é Resolução do Senado elíptica. Valores monetários fora do escopo de entidades v1.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
+}

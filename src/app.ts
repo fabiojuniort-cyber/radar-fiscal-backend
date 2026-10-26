@@ -26,7 +26,9 @@ import { publicationTaxonomyRoutes } from './api/routes/publication-taxonomy.rou
 import { createDatabase } from './infrastructure/database/client.js';
 import { createCuratorPool } from './infrastructure/database/curator-client.js';
 import { loggerOptions } from './infrastructure/logging/logger.js';
+import { registerAnatomyRulesAdmin } from './modules/anatomy/admin/rules-admin.wiring.js';
 import { registerAuthSupport } from './modules/auth/auth.plugin.js';
+import { env } from './config/env.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -67,6 +69,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(collectionFilterAdminRoutes);
   await app.register(taxonomyAdminRoutes);
   await app.register(publicationTaxonomyRoutes);
+  await registerAnatomyRulesAdmin(app, {
+    enabled: env.ANAT_RULES_ADMIN_ENABLED === 'true', connectionString: env.DATABASE_URL,
+    idleTimeoutMillis: env.DB_IDLE_TIMEOUT_MS, connectionTimeoutMillis: env.DB_CONNECTION_TIMEOUT_MS,
+  });
 
   return app;
 }

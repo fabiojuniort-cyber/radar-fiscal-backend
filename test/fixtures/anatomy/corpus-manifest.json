@@ -1,0 +1,1187 @@
+{
+  "manifestVersion": "1.0.0",
+  "scope": "ANAT-04 corpus inventory; not a benchmark or gold annotation",
+  "origin": "CLAUDE-COORD -> GPT-EXEC",
+  "recordedDate": "2026-10-16",
+  "coordinateSystemRequired": "UTF-16 code units, start inclusive, end exclusive; not yet annotated",
+  "design": {
+    "url": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+    "sections": [
+      "7.2",
+      "7.3",
+      "7.4",
+      "7.5"
+    ]
+  },
+  "holdoutPolicy": {
+    "ids": [
+      "04",
+      "06",
+      "08",
+      "09",
+      "12",
+      "14",
+      "16",
+      "18",
+      "24",
+      "28"
+    ],
+    "rulesExecution": "not-performed",
+    "tuningAfterFinalResults": "forbidden",
+    "copyAndHashOnly": true
+  },
+  "counts": {
+    "publicationsRequired": 30,
+    "publicationsWithExactAvailableInputs": 12,
+    "inputFilesFrozen": 14,
+    "publicationsMissingOriginalInputs": 18,
+    "publicationsWithCompleteReviewedGold": 0
+  },
+  "status": "BLOCK_CORPUS_INPUTS_AND_GOLD",
+  "entries": [
+    {
+      "id": "01",
+      "label": "Convênio ICMS 52/91",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/confaz/CV052_91.sanitized.html",
+          "sha256": "bd035220215bf691ce6dd1c6f8c9d8b8e8c3180f9df43f97f0debd3a3ac1dd83",
+          "bytes": 394092,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "originalSnapshot": {
+              "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+              "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+              "path": "ops/confaz/acts/CV052_91.html"
+            },
+            "sanitizationEvidence": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat/anat-02-sanitizacao-local.json",
+            "persistedEqualityProof": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat/anat-02-dashboard-resultado.json",
+            "proofScope": "presentation HTML hash only; content_text and its hash were not independently read"
+          }
+        }
+      ],
+      "source": "CONFAZ",
+      "sourceId": "52/91",
+      "availability": "available",
+      "representation": "SANITIZED_HTML",
+      "publicationVersionId": "ec18e755-128c-41ca-8cd3-2bdad7d9d9eb",
+      "limitations": [
+        "No source content_text snapshot was independently confirmed.",
+        "Prior DOM annotation describes the original HTML, not complete UTF-16 spans of this sanitized input.",
+        "No legal eligibility is approved by this corpus entry."
+      ]
+    },
+    {
+      "id": "02",
+      "label": "Convênio ICMS 100/97",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/confaz/CV100_97.sanitized.html",
+          "sha256": "fe90af8fb89645b2bf40e8e3f8f6cd2cb4c6c15ef044ce58f1683482de5999f7",
+          "bytes": 45548,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "originalSnapshot": {
+              "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+              "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+              "path": "ops/confaz/acts/CV100_97.html"
+            },
+            "sanitizationEvidence": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat/anat-02-sanitizacao-local.json",
+            "persistedEqualityProof": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat/anat-02-dashboard-resultado.json",
+            "proofScope": "presentation HTML hash only; content_text and its hash were not independently read"
+          }
+        }
+      ],
+      "source": "CONFAZ",
+      "sourceId": "100/97",
+      "availability": "available",
+      "representation": "SANITIZED_HTML",
+      "publicationVersionId": "8f1a2386-30fc-4f11-a88a-e96a65807793",
+      "limitations": [
+        "No source content_text snapshot was independently confirmed.",
+        "Prior DOM annotation describes the original HTML, not complete UTF-16 spans of this sanitized input.",
+        "No legal eligibility is approved by this corpus entry."
+      ]
+    },
+    {
+      "id": "03",
+      "label": "DOU Retificação MDHC",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/515_20260918_24377394.xml",
+          "sha256": "6a2e0999fa3548bf446a3afe3a78812215b462c8a056ad03fd89d6443c1faa86",
+          "bytes": 1395,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/515_20260918_24377394.xml",
+            "archive": "2026-09-18-DO1.zip",
+            "archiveSha256": "4333ca101c8aec328fcb3e31fc38a70efbeeba79d148014ac4cc34f263e41093",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24377394",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "04",
+      "label": "SC Disit 2.004, 17/08/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/515_20260918_24382389.xml",
+          "sha256": "e140292de72e819a2b47e2e1bbbd21b10dd7e7976a8232728fea9cfdc46965ca",
+          "bytes": 4859,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/515_20260918_24382389.xml",
+            "archive": "2026-09-18-DO1.zip",
+            "archiveSha256": "4333ca101c8aec328fcb3e31fc38a70efbeeba79d148014ac4cc34f263e41093",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24382389",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "05",
+      "label": "ADE Coana 119/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/515_20260918_24382400.xml",
+          "sha256": "f458b2983e0663d5b3a1449c711763abb9fb318faee6343c3d13decae68df6b5",
+          "bytes": 2309,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/515_20260918_24382400.xml",
+            "archive": "2026-09-18-DO1.zip",
+            "archiveSha256": "4333ca101c8aec328fcb3e31fc38a70efbeeba79d148014ac4cc34f263e41093",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24382400",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "06",
+      "label": "ADE Coana 120/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/515_20260918_24382401.xml",
+          "sha256": "76d6e590a09a195e114a648882a4f6128a234169eae79756c0f51bda7ef32c2b",
+          "bytes": 2281,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/515_20260918_24382401.xml",
+            "archive": "2026-09-18-DO1.zip",
+            "archiveSha256": "4333ca101c8aec328fcb3e31fc38a70efbeeba79d148014ac4cc34f263e41093",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24382401",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "07",
+      "label": "Despacho MF",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/600_20260918_24382325.xml",
+          "sha256": "a76ad2b705941d32b2e80b11b637d3b17a97127b6d18f12c9ec47fb75c0fe19c",
+          "bytes": 2175,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/600_20260918_24382325.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24382325",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "08",
+      "label": "Despacho MF",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/600_20260918_24382380.xml",
+          "sha256": "5acf2c2e1b38b52ec5df4cbf6234e9940d689943c7fb00f0c1f63a04739f123a",
+          "bytes": 2022,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/600_20260918_24382380.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24382380",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "09",
+      "label": "Despacho MF",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/600_20260918_24382412.xml",
+          "sha256": "1e0245271a3e07a54d7ece926de2a22c665622f0de132c1801bea45e68efe951",
+          "bytes": 1879,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/600_20260918_24382412.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24382412",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "10",
+      "label": "Portaria SAES/MS 4.940/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24378456-1.xml",
+          "sha256": "3da9af6459fb41d0a0488197e3fd6bb3e4b4763132d79f49fe2108f27ab8e081",
+          "bytes": 19931,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/602_20260918_24378456-1.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        },
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24378456-2.xml",
+          "sha256": "1533c17798d3938f56d0c36ee3bce3532840540f5312e1c99ffcc1a830a235b7",
+          "bytes": 15835,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/602_20260918_24378456-2.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        },
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24378456-3.xml",
+          "sha256": "f7870fc68470cddf5cf55bf372dc674e1cb49836d8eedb4d5ef80c05b432099b",
+          "bytes": 12443,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/602_20260918_24378456-3.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24378456",
+      "availability": "available",
+      "representation": "INLABS_XML_MULTIPART",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "11",
+      "label": "IN RFB 2.342/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24380292.xml",
+          "sha256": "9f0b1aa9ef9d7b7957e549a51c9415d49b5e28f59c9eb14875e27b6b7973c29f",
+          "bytes": 19585,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/602_20260918_24380292.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24380292",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "12",
+      "label": "Portaria GM/MS 12.157/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/603_20260918_24359694.xml",
+          "sha256": "d983f6fa3f0fdf23978d53010a31e0d734a5f1c9035b47e10898605d137f8de7",
+          "bytes": 10609,
+          "encoding": "UTF-8",
+          "transformation": "none; byte-for-byte copy",
+          "provenance": {
+            "repository": "fabiojuniort-cyber/radar-fiscal-backend",
+            "commit": "fb880354fbbbc90f681290e57dc905bde9ce9c08",
+            "path": "test/fixtures/dou/603_20260918_24359694.xml",
+            "archive": "2026-09-18-DO1E.zip",
+            "archiveSha256": "cce7d9dc02a31c531b087ef4cf325f9251a2d4d8d86fb371e6d2c86b31b94bc7",
+            "manifestPath": "test/fixtures/dou/manifest.json"
+          }
+        }
+      ],
+      "source": "DOU",
+      "sourceId": "24359694",
+      "availability": "available",
+      "representation": "INLABS_XML",
+      "limitations": [
+        "XML files copied and hashed without executing anatomy rules.",
+        "No complete gold annotation or final evaluation exists."
+      ]
+    },
+    {
+      "id": "13",
+      "label": "DOE-SP Decreto 70.843/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "b768399b-6638-460d-bce0-08df049590c6",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "6a695d3e2ab156572c9c852175255905a5c891a5f05561da3f1b648250083d1f",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Decreto 70.843"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/b768399b-6638-460d-bce0-08df049590c6",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "not-frozen-as-original",
+        "note": "Truncated body: articles 2-6 missing."
+      }
+    },
+    {
+      "id": "14",
+      "label": "DOE-SP Decreto sem número de 03/09/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "1445d0d3-e469-4d7f-ed0b-08df081b20d4",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "f56381e7076e0e4f26f70e4a4dc0b1c657871c6218037e2d9f4b50e728cd1527",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Decreto sem número"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/1445d0d3-e469-4d7f-ed0b-08df081b20d4",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "metadata-only",
+        "note": "ID/excerpt is not a complete source body."
+      }
+    },
+    {
+      "id": "15",
+      "label": "DOE-SP Despacho do Governador de 03/09/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "a2e9bf6e-6d2f-430e-23cc-08df09ae1af9",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "b2e012ede2228d65c41b9e387410a1c1d0a69f28477e0fe635c4e5d541a85d8a",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Despacho Governador"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/a2e9bf6e-6d2f-430e-23cc-08df09ae1af9",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "metadata-only",
+        "note": "ID/excerpt is not a complete source body."
+      }
+    },
+    {
+      "id": "16",
+      "label": "DOE-SP Pauta da 35ª Sessão PGE, biênio 2025/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "b8fb1bba-1e31-407d-ab7f-08df0495b84e",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "19585b9ab7edbbcf527c0fc4966c54a86fcf677351d23dbdce96bddd3fe9bfb8",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Pauta PGE"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/b8fb1bba-1e31-407d-ab7f-08df0495b84e",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "metadata-only",
+        "note": "ID/excerpt is not a complete source body."
+      }
+    },
+    {
+      "id": "17",
+      "label": "DOE-SP Resolução Seduc 86/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "9716c5c2-7f22-46eb-a80d-08df0495b6f6",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "043449c800d2c72e6f7f9ae472c943784d3340786179bf8724cb3bf089c875b1",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Seduc 86"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/9716c5c2-7f22-46eb-a80d-08df0495b6f6",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "metadata-only",
+        "note": "ID/excerpt is not a complete source body."
+      }
+    },
+    {
+      "id": "18",
+      "label": "DOE-SP Portaria URE 66/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "91174000-076a-4029-bc7f-08df049590c6",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "05d941844a919981864ea7e57d271fa95feaa401953c35344503c6c89de856a6",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE URE 66"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/91174000-076a-4029-bc7f-08df049590c6",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "metadata-only",
+        "note": "ID/excerpt is not a complete source body."
+      }
+    },
+    {
+      "id": "19",
+      "label": "DOE-SP Cassação de IE",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "ffe36bfd-ee7d-487b-d449-08df09ac2b13",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "f95802e72f55bf77f7e8357d8858ec02e8ef7453f3f643403495c096d6166866",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Cassação IE"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/ffe36bfd-ee7d-487b-d449-08df09ac2b13",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "metadata-only",
+        "note": "ID/excerpt is not a complete source body."
+      }
+    },
+    {
+      "id": "20",
+      "label": "DOE-SP Portaria SRE 43/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "70413500-3dd4-4b9b-a88a-08df0495b6f6",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "c9de38fdb4b5d254bcb755d4205c448a984c8169013671f9c55009c69bf48469",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE SRE 43"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/70413500-3dd4-4b9b-a88a-08df0495b6f6",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "not-frozen-as-original",
+        "note": "Derived fixture, not original JSON bytes; separate hash and review would be required."
+      }
+    },
+    {
+      "id": "21",
+      "label": "DOE-SP Comunicado Dicar 59/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "d7eb71ec-9daf-4804-7eae-08df0817934e",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "1cc461fc6b77eaa6546cb150d5d1ac0baaf1c3e257acc50fcda7bbdee1d85c62",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Dicar 59"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/d7eb71ec-9daf-4804-7eae-08df0817934e",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "not-frozen-as-original",
+        "note": "Derived fixture, not original JSON bytes; separate hash and review would be required."
+      }
+    },
+    {
+      "id": "22",
+      "label": "DOE-SP Retificação do DOESP 26/08/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "DOE-SP",
+      "sourceId": "a1f3e33f-e962-4ae9-ed58-08df04981eb4",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "79c4267ed711f30da6e54e4c9a46132996ba65ece3988d9343de7c9d2e41eb27",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "DOE Retificação"
+      },
+      "officialUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/a1f3e33f-e962-4ae9-ed58-08df04981eb4",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ],
+      "existingVariant": {
+        "path": "test/doe-sp.fixtures.ts",
+        "status": "not-frozen-as-original",
+        "note": "Redacted/simplified table; different representation."
+      }
+    },
+    {
+      "id": "23",
+      "label": "RFB ADE Corat 79/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153836",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "84d788bb314510166cb70aade948f49c1606915056bf452c1619c15727a135ac",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153836"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153836/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "24",
+      "label": "RFB SC Cosit 188/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153828",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "5397923095b1eb29669eb68a2a22aac5f9a066cc9f73ef582030d3b010f31a03",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153828"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153828/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "25",
+      "label": "RFB SC Cosit 193/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153829",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "b9c737dc353c52c9ae5e32f5180e86f45c2f8d419e5de64cee165ad0a4b240bd",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153829"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153829/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "26",
+      "label": "RFB SC Cosit 187/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153819",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "e9c21d1e289cdffe1a37a9db5c62f82e96512c012dd403721f134dd92b132b56",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153819"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153819/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "27",
+      "label": "RFB SC Cosit 189/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153820",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "254d91ef371696d0367d33ebe066eabcd1d3773d77ba232986a6c835f7f5b6f2",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153820"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153820/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "28",
+      "label": "RFB SC Cosit 191/2026",
+      "partition": "reserved-final",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153821",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "7dbe7bce751bed280e1bf8cbf9e4857ce3050e679a39915b0e41bc49c61d3263",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153821"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153821/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "29",
+      "label": "RFB SC Cosit 192/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153822",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "0fd21cff718b2c15e0839257c913c8252f3c61c3193ae89669d9cc6aa43ad424",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153822"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153822/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    },
+    {
+      "id": "30",
+      "label": "RFB Retificação da Portaria 725/2026",
+      "partition": "development",
+      "gold": {
+        "status": "missing",
+        "path": null,
+        "utf16SpansComplete": false,
+        "independentReview": "not-performed"
+      },
+      "evaluation": {
+        "executed": false,
+        "result": null
+      },
+      "inputs": [],
+      "source": "RFB",
+      "sourceId": "153743",
+      "availability": "missing",
+      "representation": "OFFICIAL_JSON",
+      "documentedExpectedSha256": "2ac5537168fff4dcda5ce5bbae1861b38c890a5c42941c3442687530373100a3",
+      "actualSha256": null,
+      "hashEvidence": {
+        "document": "https://github.com/fabiojuniort-cyber/tribusca-control/blob/c83f3c69958827ef69ecef9b54417693a6bd398d/docs/anat-desenho.md",
+        "section": "7.3",
+        "label": "RFB 153743"
+      },
+      "officialUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/153743/visao/original",
+      "limitations": [
+        "Original response bytes were not found locally. No refetch was performed.",
+        "Documented expected hash is not a verified available-file hash."
+      ]
+    }
+  ]
+}

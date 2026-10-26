@@ -1,0 +1,417 @@
+name: ANAT-04 disposable CI
+on:
+  pull_request:
+    # main plus the bases of the stacked ANAT PRs (#244 → #248 → #249 → #250 → #252 → #253 → …; P3-B1 stacks on
+    # feat/anat-admin-p3-design), so a PR in the
+    # stack runs this workflow when its head carries this file. Event types (draft behaviour) are unchanged.
+    branches:
+      - main
+      - feat/anat-04-core
+      - feat/anat-p1a-profiles
+      - feat/anat-p1b-engine-profiles
+      - feat/anat-unicode-01a
+      - feat/anat-unicode-01b-map
+      - feat/anat-unicode-01b-integration
+      - feat/anat-ci-stack
+      - feat/anat-admin-p3-design
+      - feat/anat-admin-p3b1-persistence
+      - feat/anat-admin-p3c-executor
+      - feat/anat-admin-p3d-api
+      - feat/anat-admin-integration-readiness
+      - feat/anat-int-base
+      - feat/anat-int-admin
+      - feat/anat-int-wiring
+      - feat/anat-int-doesp-compat
+      - feat/anat-admin-consolidated
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/modules/anatomy/**'
+      - 'src/api/routes/anatomy-rules-admin.route.ts'
+      - 'src/app.ts'
+      - 'src/config/env.ts'
+      - 'src/modules/auth/**'
+      - 'test/anatomy.*'
+      - 'test/fixtures/anatomy/**'
+      - 'test/support/anatomy-ci-schema.sql'
+      - 'test/support/anatomy-*.sql'
+      - 'test/support/anatomy-audit-chain/**'
+      - 'test/support/anatomy-*.ts'
+      - 'ops/anatomy/**'
+      - 'migrations/*_anat_*.sql'
+      - 'ops/doe-sp/sql/**'
+      - 'test/doe-sp.*'
+      - 'docs/anatomy/**'
+      - '.github/workflows/anatomy-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: read
+concurrency:
+  group: anatomy-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  anatomy-disposable-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Offline isolation guards and disposable schema integration
+        run: node --import tsx --test test/anatomy.schema.integration.test.ts
+  # ANAT-ADMIN-01 / P3-B1: admin persistence and audit rehearsal. Needs a FRESH database (the test commits so two
+  # clients can race), hence its own job and service per PostgreSQL major. Test SQL only (test/support); no migrations.
+  anatomy-admin-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server version
+        run: node -e "const pg=require('pg'); const c=new pg.Client(process.env.ANAT04_CI_DATABASE_URL); c.connect().then(()=>c.query('SHOW server_version')).then(r=>{console.log(r.rows[0].server_version); if(!r.rows[0].server_version.startsWith('${{ matrix.postgres }}.')) process.exit(1); return c.end();})"
+      - name: Admin schema, audit chain, tokens and concurrency (disposable database)
+        run: node --import tsx --test test/anatomy.admin-schema.integration.test.ts
+  # ANAT-ADMIN-01 / P3-D: HTTP API (real JWT/session check, real workers) on its own fresh database per major.
+  anatomy-admin-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server version
+        run: node -e "const pg=require('pg'); const c=new pg.Client(process.env.ANAT04_CI_DATABASE_URL); c.connect().then(()=>c.query('SHOW server_version')).then(r=>{console.log(r.rows[0].server_version); if(!r.rows[0].server_version.startsWith('${{ matrix.postgres }}.')) process.exit(1); return c.end();})"
+      - name: Admin API over persistence and isolated executor (disposable database)
+        run: node --import tsx --test test/anatomy.admin-api.integration.test.ts
+  # Integration package 1: migration 077_anat_base through the project's real runner on a fresh database.
+  anatomy-base-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server version
+        run: node -e "const pg=require('pg'); const c=new pg.Client(process.env.ANAT04_CI_DATABASE_URL); c.connect().then(()=>c.query('SHOW server_version')).then(r=>{console.log(r.rows[0].server_version); if(!r.rows[0].server_version.startsWith('${{ matrix.postgres }}.')) process.exit(1); return c.end();})"
+      - name: 077_anat_base via the real runner (catalog, privileges, RLS, RESTRICT, immutability)
+        run: node --import tsx --test test/anatomy.base-migration.integration.test.ts
+  # Integration package 2: 078 (M_AUDIT_ANAT) + 079 (M_ANAT_ADMIN) through the real runner. The B1 and API suites run on
+  # the project's migrations instead of the rehearsal SQL (ANAT_PROJECT_MIGRATIONS=1). Fresh database per job.
+  anatomy-admin-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+        suite: ['admin-migrations', 'admin-schema', 'admin-api', 'admin-wiring']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+      ANAT_PROJECT_MIGRATIONS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server version
+        run: node -e "const pg=require('pg'); const c=new pg.Client(process.env.ANAT04_CI_DATABASE_URL); c.connect().then(()=>c.query('SHOW server_version')).then(r=>{console.log(r.rows[0].server_version); if(!r.rows[0].server_version.startsWith('${{ matrix.postgres }}.')) process.exit(1); return c.end();})"
+      - name: Migrations equal the accepted rehearsal (offline)
+        if: matrix.suite == 'admin-migrations'
+        run: node --import tsx --test test/anatomy.admin-migrations.unit.test.ts
+      - name: ${{ matrix.suite }} suite over the project's migrations (real runner)
+        run: node --import tsx --test test/anatomy.${{ matrix.suite }}.integration.test.ts
+  # Integration package 4: audit_log policy benchmark (synthetic, disposable): before 078, the previous integration
+  # (rehearsal's permissive radar_app policy) and the current one (P-INT-01), PG16 and PG18. Result: one JSON line.
+  anatomy-audit-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Benchmark (500 000 synthetic audit rows, median of 5)
+        run: node --import tsx ops/anatomy/measure-audit-policies.ts 500000 5 | tee benchmark.json
+      - name: The app tenant read keeps its index plan after 078/079 (isolation policies unchanged)
+        run: >-
+          node -e "const d=JSON.parse(require('fs').readFileSync('benchmark.json','utf8').trim().split('\n').pop());
+          const k='app: tenant member, latest 100'; const c=d.current[k]; console.log(JSON.stringify({before:d.before[k],legacy:d.legacy[k],current:c}));
+          if (c.auditScan!=='Index Scan') process.exit(1)"
+  # P-INT-02 (forwarded to the DOE-SP front): DOE-SP rebuild guards with the ANAT tables of 077, on a fresh database
+  # prepared exactly like the backend full regression (real runner, runtime roles, privilege verifiers). Scratch copies
+  # only; synthetic data; the rebuild runs only inside those scratch databases.
+  anatomy-doesp-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      DB_POOL_MAX: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: PostgreSQL client matching the server major (pg_dump/psql of the scratch copies)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-${{ matrix.postgres }}
+          echo "/usr/lib/postgresql/${{ matrix.postgres }}/bin" >> "$GITHUB_PATH"
+      - run: npm run build
+      - name: Prepare (real runner, runtime roles, privilege verifiers)
+        run: npm run db:prepare
+      - name: DOE-SP guards with ANAT (P-INT-02) and DOE-SP rebuild regressions
+        run: >-
+          npx tsx --test --test-concurrency=1 test/doe-sp.anatomy-guard.integration.test.ts
+          test/doe-sp.ncm-rebuild-guard.integration.test.ts test/doe-sp.rebuild-ops.integration.test.ts
+  # Integration readiness: the full B1 and API suites over the REAL migration chain of main (verified checkout of main,
+  # files exported unedited; its SHA is printed) instead of the vendored audit excerpt. Fresh database per job.
+  anatomy-admin-main-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+        suite: ['admin-schema', 'admin-api']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: anat04_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      ANAT04_CI_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anat04_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-src
+          persist-credentials: false
+      - name: Export main's migrations (unedited) and record the SHA
+        run: |
+          echo "main: $(git -C main-src rev-parse HEAD)"
+          mkdir -p "$RUNNER_TEMP/main-migrations"
+          cp main-src/migrations/*.sql "$RUNNER_TEMP/main-migrations/"
+          ls "$RUNNER_TEMP/main-migrations" | wc -l
+          ls "$RUNNER_TEMP/main-migrations" | tail -1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server version
+        run: node -e "const pg=require('pg'); const c=new pg.Client(process.env.ANAT04_CI_DATABASE_URL); c.connect().then(()=>c.query('SHOW server_version')).then(r=>{console.log(r.rows[0].server_version); if(!r.rows[0].server_version.startsWith('${{ matrix.postgres }}.')) process.exit(1); return c.end();})"
+      - name: ${{ matrix.suite }} suite over the real chain of main
+        env:
+          ANAT_MAIN_MIGRATIONS_DIR: ${{ runner.temp }}/main-migrations
+        run: node --import tsx --test test/anatomy.${{ matrix.suite }}.integration.test.ts
+  # Synthetic-only checks. Corpus/gold readers are excluded on purpose: anatomy.dev-canonical, anatomy.gold,
+  # anatomy.corpus-integrity and anatomy.evaluation (and the aggregate test:anatomy that includes them) are NOT run.
+  anatomy-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Runtime (the NFC shadow requires Unicode 17.0)
+        run: node -e "const v=process.versions; console.log(v.node, v.icu, v.unicode); if (v.unicode !== '17.0') process.exit(1)"
+      - name: Synthetic unit tests (no corpus or gold)
+        run: >-
+          node --import tsx --test
+          test/anatomy.contract.unit.test.ts test/anatomy.consumer.unit.test.ts test/anatomy.engine.unit.test.ts
+          test/anatomy.entities.unit.test.ts test/anatomy.readers.unit.test.ts test/anatomy.dou-preparation.unit.test.ts
+          test/anatomy.json-preparation.unit.test.ts test/anatomy.evaluation-adapter.unit.test.ts test/anatomy.profile.unit.test.ts
+          test/anatomy.profile-engine.unit.test.ts test/anatomy.unicode.unit.test.ts test/anatomy.unicode-recovery.unit.test.ts
+          test/anatomy.nfc-shadow.unit.test.ts test/anatomy.rules-simulation.unit.test.ts
+          test/anatomy.simulation-executor.unit.test.ts
+      - name: Engine identity
+        run: node ops/anatomy/build-identity.mjs
+      - name: NFC shadow table (generator verification)
+        run: node ops/anatomy/nfc-shadow-table.mjs
+      - name: Synthetic structural snapshot
+        run: node --import tsx ops/anatomy/synthetic-snapshot.ts

@@ -1,0 +1,4218 @@
+{
+ "goldVersion": "ANAT-GOLD/1.0.0",
+ "id": "02",
+ "partition": "development",
+ "preparation": "confaz-sanitized-html/1.0.0",
+ "canonicalTextSha256": "e8625c2705b652eaeec2551bf9fc9ab1aa6ed70047b159c687ca6aa1aa33e561",
+ "canonicalTextUtf16Length": 30591,
+ "status": "reviewed",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "parts": [
+  {
+   "id": "doc",
+   "parentId": null,
+   "order": 0,
+   "type": "document",
+   "span": {
+    "start": 0,
+    "end": 30591
+   },
+   "context": "unknown",
+   "contextReason": "document",
+   "table": null
+  },
+  {
+   "id": "epigraph-0",
+   "parentId": "doc",
+   "order": 0,
+   "type": "epigraph",
+   "span": {
+    "start": 0,
+    "end": 20
+   },
+   "context": "prohibited",
+   "contextReason": "confaz_title",
+   "table": null
+  },
+  {
+   "id": "editorial_note-1",
+   "parentId": "doc",
+   "order": 1,
+   "type": "editorial_note",
+   "span": {
+    "start": 22,
+    "end": 51
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-2",
+   "parentId": "doc",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 53,
+    "end": 117
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-3",
+   "parentId": "doc",
+   "order": 3,
+   "type": "editorial_note",
+   "span": {
+    "start": 119,
+    "end": 356
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-4",
+   "parentId": "doc",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 358,
+    "end": 406
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-5",
+   "parentId": "doc",
+   "order": 5,
+   "type": "editorial_note",
+   "span": {
+    "start": 408,
+    "end": 456
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-6",
+   "parentId": "doc",
+   "order": 6,
+   "type": "editorial_note",
+   "span": {
+    "start": 458,
+    "end": 506
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-7",
+   "parentId": "doc",
+   "order": 7,
+   "type": "editorial_note",
+   "span": {
+    "start": 508,
+    "end": 556
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-8",
+   "parentId": "doc",
+   "order": 8,
+   "type": "editorial_note",
+   "span": {
+    "start": 558,
+    "end": 773
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-9",
+   "parentId": "doc",
+   "order": 9,
+   "type": "editorial_note",
+   "span": {
+    "start": 775,
+    "end": 823
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-10",
+   "parentId": "doc",
+   "order": 10,
+   "type": "editorial_note",
+   "span": {
+    "start": 825,
+    "end": 870
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-11",
+   "parentId": "doc",
+   "order": 11,
+   "type": "editorial_note",
+   "span": {
+    "start": 872,
+    "end": 997
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-12",
+   "parentId": "doc",
+   "order": 12,
+   "type": "editorial_note",
+   "span": {
+    "start": 999,
+    "end": 1144
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-13",
+   "parentId": "doc",
+   "order": 13,
+   "type": "editorial_note",
+   "span": {
+    "start": 1146,
+    "end": 1194
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-14",
+   "parentId": "doc",
+   "order": 14,
+   "type": "editorial_note",
+   "span": {
+    "start": 1196,
+    "end": 1244
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-15",
+   "parentId": "doc",
+   "order": 15,
+   "type": "editorial_note",
+   "span": {
+    "start": 1246,
+    "end": 1295
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-16",
+   "parentId": "doc",
+   "order": 16,
+   "type": "editorial_note",
+   "span": {
+    "start": 1297,
+    "end": 1345
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-17",
+   "parentId": "doc",
+   "order": 17,
+   "type": "editorial_note",
+   "span": {
+    "start": 1347,
+    "end": 1396
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-18",
+   "parentId": "doc",
+   "order": 18,
+   "type": "editorial_note",
+   "span": {
+    "start": 1398,
+    "end": 1446
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-19",
+   "parentId": "doc",
+   "order": 19,
+   "type": "editorial_note",
+   "span": {
+    "start": 1448,
+    "end": 1555
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-20",
+   "parentId": "doc",
+   "order": 20,
+   "type": "editorial_note",
+   "span": {
+    "start": 1557,
+    "end": 1690
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-21",
+   "parentId": "doc",
+   "order": 21,
+   "type": "editorial_note",
+   "span": {
+    "start": 1692,
+    "end": 1741
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-22",
+   "parentId": "doc",
+   "order": 22,
+   "type": "editorial_note",
+   "span": {
+    "start": 1743,
+    "end": 1857
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-23",
+   "parentId": "doc",
+   "order": 23,
+   "type": "editorial_note",
+   "span": {
+    "start": 1859,
+    "end": 1907
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-24",
+   "parentId": "doc",
+   "order": 24,
+   "type": "editorial_note",
+   "span": {
+    "start": 1909,
+    "end": 1958
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-25",
+   "parentId": "doc",
+   "order": 25,
+   "type": "editorial_note",
+   "span": {
+    "start": 1960,
+    "end": 2008
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-26",
+   "parentId": "doc",
+   "order": 26,
+   "type": "editorial_note",
+   "span": {
+    "start": 2010,
+    "end": 2059
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-27",
+   "parentId": "doc",
+   "order": 27,
+   "type": "editorial_note",
+   "span": {
+    "start": 2061,
+    "end": 2109
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-28",
+   "parentId": "doc",
+   "order": 28,
+   "type": "editorial_note",
+   "span": {
+    "start": 2111,
+    "end": 2227
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-29",
+   "parentId": "doc",
+   "order": 29,
+   "type": "editorial_note",
+   "span": {
+    "start": 2229,
+    "end": 2278
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-30",
+   "parentId": "doc",
+   "order": 30,
+   "type": "editorial_note",
+   "span": {
+    "start": 2280,
+    "end": 2328
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-31",
+   "parentId": "doc",
+   "order": 31,
+   "type": "editorial_note",
+   "span": {
+    "start": 2330,
+    "end": 2374
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-32",
+   "parentId": "doc",
+   "order": 32,
+   "type": "editorial_note",
+   "span": {
+    "start": 2376,
+    "end": 2424
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-33",
+   "parentId": "doc",
+   "order": 33,
+   "type": "editorial_note",
+   "span": {
+    "start": 2426,
+    "end": 2474
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-34",
+   "parentId": "doc",
+   "order": 34,
+   "type": "editorial_note",
+   "span": {
+    "start": 2476,
+    "end": 2524
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-35",
+   "parentId": "doc",
+   "order": 35,
+   "type": "editorial_note",
+   "span": {
+    "start": 2526,
+    "end": 2655
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-36",
+   "parentId": "doc",
+   "order": 36,
+   "type": "editorial_note",
+   "span": {
+    "start": 2657,
+    "end": 2705
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "summary-37",
+   "parentId": "doc",
+   "order": 37,
+   "type": "summary",
+   "span": {
+    "start": 2713,
+    "end": 2823
+   },
+   "context": "prohibited",
+   "contextReason": "confaz_ementa",
+   "table": null
+  },
+  {
+   "id": "preamble-38",
+   "parentId": "doc",
+   "order": 38,
+   "type": "preamble",
+   "span": {
+    "start": 2825,
+    "end": 3182
+   },
+   "context": "prohibited",
+   "contextReason": "preamble",
+   "table": null
+  },
+  {
+   "id": "body-39",
+   "parentId": "doc",
+   "order": 39,
+   "type": "body",
+   "span": {
+    "start": 3184,
+    "end": 3192
+   },
+   "context": "prohibited",
+   "contextReason": "act_type_heading",
+   "table": null
+  },
+  {
+   "id": "clause-40",
+   "parentId": "doc",
+   "order": 40,
+   "type": "clause",
+   "span": {
+    "start": 3194,
+    "end": 19369
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "clause-137",
+   "parentId": "doc",
+   "order": 41,
+   "type": "clause",
+   "span": {
+    "start": 19371,
+    "end": 22251
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-158",
+   "parentId": "doc",
+   "order": 42,
+   "type": "editorial_note",
+   "span": {
+    "start": 22253,
+    "end": 22343
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-159",
+   "parentId": "doc",
+   "order": 43,
+   "type": "clause",
+   "span": {
+    "start": 22345,
+    "end": 26406
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-187",
+   "parentId": "doc",
+   "order": 44,
+   "type": "editorial_note",
+   "span": {
+    "start": 26408,
+    "end": 26492
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-188",
+   "parentId": "doc",
+   "order": 45,
+   "type": "clause",
+   "span": {
+    "start": 26494,
+    "end": 27967
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-199",
+   "parentId": "doc",
+   "order": 46,
+   "type": "editorial_note",
+   "span": {
+    "start": 27969,
+    "end": 28053
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-200",
+   "parentId": "doc",
+   "order": 47,
+   "type": "clause",
+   "span": {
+    "start": 28055,
+    "end": 28472
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "clause-201",
+   "parentId": "doc",
+   "order": 48,
+   "type": "clause",
+   "span": {
+    "start": 28474,
+    "end": 28892
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "clause-202",
+   "parentId": "doc",
+   "order": 49,
+   "type": "clause",
+   "span": {
+    "start": 28894,
+    "end": 29575
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "clause-208",
+   "parentId": "doc",
+   "order": 50,
+   "type": "clause",
+   "span": {
+    "start": 29577,
+    "end": 29867
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-209",
+   "parentId": "doc",
+   "order": 51,
+   "type": "editorial_note",
+   "span": {
+    "start": 29869,
+    "end": 29957
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-210",
+   "parentId": "doc",
+   "order": 52,
+   "type": "clause",
+   "span": {
+    "start": 29959,
+    "end": 30401
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "footer-213",
+   "parentId": "doc",
+   "order": 53,
+   "type": "footer",
+   "span": {
+    "start": 30403,
+    "end": 30439
+   },
+   "context": "prohibited",
+   "contextReason": "place_and_date",
+   "table": null
+  },
+  {
+   "id": "editorial_note-214",
+   "parentId": "doc",
+   "order": 54,
+   "type": "editorial_note",
+   "span": {
+    "start": 30441,
+    "end": 30590
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "editorial_note-41",
+   "parentId": "clause-40",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 3331,
+    "end": 3444
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-42",
+   "parentId": "clause-40",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 3446,
+    "end": 4250
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-45",
+   "parentId": "clause-40",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 4252,
+    "end": 4353
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-46",
+   "parentId": "clause-40",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 4355,
+    "end": 4922
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-53",
+   "parentId": "clause-40",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 4924,
+    "end": 5038
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-54",
+   "parentId": "clause-40",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 5040,
+    "end": 6488
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-65",
+   "parentId": "clause-40",
+   "order": 6,
+   "type": "inciso",
+   "span": {
+    "start": 6490,
+    "end": 6595
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-66",
+   "parentId": "clause-40",
+   "order": 7,
+   "type": "editorial_note",
+   "span": {
+    "start": 6597,
+    "end": 6710
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-67",
+   "parentId": "clause-40",
+   "order": 8,
+   "type": "inciso",
+   "span": {
+    "start": 6712,
+    "end": 8759
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-72",
+   "parentId": "clause-40",
+   "order": 9,
+   "type": "editorial_note",
+   "span": {
+    "start": 8761,
+    "end": 8874
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-73",
+   "parentId": "clause-40",
+   "order": 10,
+   "type": "inciso",
+   "span": {
+    "start": 8876,
+    "end": 13477
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-86",
+   "parentId": "clause-40",
+   "order": 11,
+   "type": "inciso",
+   "span": {
+    "start": 13479,
+    "end": 13500
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-87",
+   "parentId": "clause-40",
+   "order": 12,
+   "type": "inciso",
+   "span": {
+    "start": 13502,
+    "end": 13526
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-88",
+   "parentId": "clause-40",
+   "order": 13,
+   "type": "editorial_note",
+   "span": {
+    "start": 13528,
+    "end": 13636
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-89",
+   "parentId": "clause-40",
+   "order": 14,
+   "type": "inciso",
+   "span": {
+    "start": 13638,
+    "end": 14183
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-94",
+   "parentId": "clause-40",
+   "order": 15,
+   "type": "inciso",
+   "span": {
+    "start": 14185,
+    "end": 14361
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-95",
+   "parentId": "clause-40",
+   "order": 16,
+   "type": "editorial_note",
+   "span": {
+    "start": 14363,
+    "end": 14468
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-96",
+   "parentId": "clause-40",
+   "order": 17,
+   "type": "inciso",
+   "span": {
+    "start": 14470,
+    "end": 14560
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-97",
+   "parentId": "clause-40",
+   "order": 18,
+   "type": "editorial_note",
+   "span": {
+    "start": 14562,
+    "end": 14667
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-98",
+   "parentId": "clause-40",
+   "order": 19,
+   "type": "inciso",
+   "span": {
+    "start": 14669,
+    "end": 14723
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-99",
+   "parentId": "clause-40",
+   "order": 20,
+   "type": "editorial_note",
+   "span": {
+    "start": 14725,
+    "end": 14831
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-100",
+   "parentId": "clause-40",
+   "order": 21,
+   "type": "inciso",
+   "span": {
+    "start": 14833,
+    "end": 14899
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-101",
+   "parentId": "clause-40",
+   "order": 22,
+   "type": "editorial_note",
+   "span": {
+    "start": 14901,
+    "end": 15005
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-102",
+   "parentId": "clause-40",
+   "order": 23,
+   "type": "inciso",
+   "span": {
+    "start": 15007,
+    "end": 15123
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-103",
+   "parentId": "clause-40",
+   "order": 24,
+   "type": "editorial_note",
+   "span": {
+    "start": 15125,
+    "end": 15229
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-104",
+   "parentId": "clause-40",
+   "order": 25,
+   "type": "inciso",
+   "span": {
+    "start": 15231,
+    "end": 15299
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-105",
+   "parentId": "clause-40",
+   "order": 26,
+   "type": "editorial_note",
+   "span": {
+    "start": 15301,
+    "end": 15407
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-106",
+   "parentId": "clause-40",
+   "order": 27,
+   "type": "inciso",
+   "span": {
+    "start": 15409,
+    "end": 15644
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-107",
+   "parentId": "clause-40",
+   "order": 28,
+   "type": "editorial_note",
+   "span": {
+    "start": 15646,
+    "end": 15752
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-108",
+   "parentId": "clause-40",
+   "order": 29,
+   "type": "inciso",
+   "span": {
+    "start": 15754,
+    "end": 16099
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-109",
+   "parentId": "clause-40",
+   "order": 30,
+   "type": "editorial_note",
+   "span": {
+    "start": 16101,
+    "end": 16191
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-110",
+   "parentId": "clause-40",
+   "order": 31,
+   "type": "paragraph",
+   "span": {
+    "start": 16193,
+    "end": 16516
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "paragraph-115",
+   "parentId": "clause-40",
+   "order": 32,
+   "type": "paragraph",
+   "span": {
+    "start": 16518,
+    "end": 18192
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "paragraph-126",
+   "parentId": "clause-40",
+   "order": 33,
+   "type": "paragraph",
+   "span": {
+    "start": 18194,
+    "end": 18518
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "paragraph-127",
+   "parentId": "clause-40",
+   "order": 34,
+   "type": "paragraph",
+   "span": {
+    "start": 18520,
+    "end": 18804
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "paragraph-128",
+   "parentId": "clause-40",
+   "order": 35,
+   "type": "paragraph",
+   "span": {
+    "start": 18806,
+    "end": 19052
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-135",
+   "parentId": "clause-40",
+   "order": 36,
+   "type": "editorial_note",
+   "span": {
+    "start": 19054,
+    "end": 19143
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-136",
+   "parentId": "clause-40",
+   "order": 37,
+   "type": "paragraph",
+   "span": {
+    "start": 19145,
+    "end": 19369
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-138",
+   "parentId": "clause-137",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 19505,
+    "end": 19625
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-139",
+   "parentId": "clause-137",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 19627,
+    "end": 20576
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-146",
+   "parentId": "clause-137",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 20578,
+    "end": 20691
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-147",
+   "parentId": "clause-137",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 20693,
+    "end": 21464
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-152",
+   "parentId": "clause-137",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 21466,
+    "end": 21558
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-153",
+   "parentId": "clause-137",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 21562,
+    "end": 22037
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-156",
+   "parentId": "clause-137",
+   "order": 6,
+   "type": "editorial_note",
+   "span": {
+    "start": 22039,
+    "end": 22143
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-157",
+   "parentId": "clause-137",
+   "order": 7,
+   "type": "inciso",
+   "span": {
+    "start": 22145,
+    "end": 22251
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-160",
+   "parentId": "clause-159",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 22612,
+    "end": 22711
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-161",
+   "parentId": "clause-159",
+   "order": 1,
+   "type": "paragraph",
+   "span": {
+    "start": 22713,
+    "end": 24921
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-177",
+   "parentId": "clause-159",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 24923,
+    "end": 25022
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-178",
+   "parentId": "clause-159",
+   "order": 3,
+   "type": "paragraph",
+   "span": {
+    "start": 25024,
+    "end": 25495
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "paragraph-181",
+   "parentId": "clause-159",
+   "order": 4,
+   "type": "paragraph",
+   "span": {
+    "start": 25497,
+    "end": 25627
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-182",
+   "parentId": "clause-159",
+   "order": 5,
+   "type": "editorial_note",
+   "span": {
+    "start": 25629,
+    "end": 25725
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-183",
+   "parentId": "clause-159",
+   "order": 6,
+   "type": "clause",
+   "span": {
+    "start": 25727,
+    "end": 26135
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-185",
+   "parentId": "clause-159",
+   "order": 7,
+   "type": "editorial_note",
+   "span": {
+    "start": 26137,
+    "end": 26176
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-186",
+   "parentId": "clause-159",
+   "order": 8,
+   "type": "clause",
+   "span": {
+    "start": 26178,
+    "end": 26406
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-189",
+   "parentId": "clause-188",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 26761,
+    "end": 27271
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-194",
+   "parentId": "clause-188",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 27273,
+    "end": 27606
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-195",
+   "parentId": "clause-188",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 27608,
+    "end": 27711
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-196",
+   "parentId": "clause-188",
+   "order": 3,
+   "type": "paragraph",
+   "span": {
+    "start": 27713,
+    "end": 27967
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-203",
+   "parentId": "clause-202",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 28964,
+    "end": 29053
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-204",
+   "parentId": "clause-202",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 29057,
+    "end": 29324
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-207",
+   "parentId": "clause-202",
+   "order": 2,
+   "type": "inciso",
+   "span": {
+    "start": 29326,
+    "end": 29575
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-211",
+   "parentId": "clause-210",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 30162,
+    "end": 30201
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "clause-212",
+   "parentId": "clause-210",
+   "order": 1,
+   "type": "clause",
+   "span": {
+    "start": 30203,
+    "end": 30401
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-43",
+   "parentId": "inciso-42",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 3840,
+    "end": 3879
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-44",
+   "parentId": "inciso-42",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 3881,
+    "end": 4250
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-47",
+   "parentId": "inciso-46",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 4370,
+    "end": 4409
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-48",
+   "parentId": "inciso-46",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 4411,
+    "end": 4922
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-55",
+   "parentId": "inciso-54",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 5262,
+    "end": 5379
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-56",
+   "parentId": "inciso-54",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 5381,
+    "end": 5589
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-57",
+   "parentId": "inciso-54",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 5591,
+    "end": 5630
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-58",
+   "parentId": "inciso-54",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 5632,
+    "end": 5840
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-59",
+   "parentId": "inciso-54",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 5842,
+    "end": 5969
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "alinea-60",
+   "parentId": "inciso-54",
+   "order": 5,
+   "type": "alinea",
+   "span": {
+    "start": 5971,
+    "end": 6359
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "alinea-63",
+   "parentId": "inciso-54",
+   "order": 6,
+   "type": "alinea",
+   "span": {
+    "start": 6361,
+    "end": 6425
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "alinea-64",
+   "parentId": "inciso-54",
+   "order": 7,
+   "type": "alinea",
+   "span": {
+    "start": 6427,
+    "end": 6488
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-68",
+   "parentId": "inciso-67",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 7439,
+    "end": 7557
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-69",
+   "parentId": "inciso-67",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 7559,
+    "end": 8183
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-70",
+   "parentId": "inciso-67",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 8185,
+    "end": 8224
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-71",
+   "parentId": "inciso-67",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 8226,
+    "end": 8759
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-74",
+   "parentId": "inciso-73",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 9607,
+    "end": 9727
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-75",
+   "parentId": "inciso-73",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 9729,
+    "end": 10356
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-76",
+   "parentId": "inciso-73",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 10358,
+    "end": 10477
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-77",
+   "parentId": "inciso-73",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 10479,
+    "end": 11049
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-78",
+   "parentId": "inciso-73",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 11051,
+    "end": 11171
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-79",
+   "parentId": "inciso-73",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 11173,
+    "end": 11728
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-80",
+   "parentId": "inciso-73",
+   "order": 6,
+   "type": "editorial_note",
+   "span": {
+    "start": 11730,
+    "end": 11851
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-81",
+   "parentId": "inciso-73",
+   "order": 7,
+   "type": "inciso",
+   "span": {
+    "start": 11853,
+    "end": 12353
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-82",
+   "parentId": "inciso-73",
+   "order": 8,
+   "type": "editorial_note",
+   "span": {
+    "start": 12355,
+    "end": 12472
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-83",
+   "parentId": "inciso-73",
+   "order": 9,
+   "type": "inciso",
+   "span": {
+    "start": 12474,
+    "end": 12962
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-84",
+   "parentId": "inciso-73",
+   "order": 10,
+   "type": "editorial_note",
+   "span": {
+    "start": 12964,
+    "end": 13003
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-85",
+   "parentId": "inciso-73",
+   "order": 11,
+   "type": "inciso",
+   "span": {
+    "start": 13005,
+    "end": 13477
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-90",
+   "parentId": "inciso-89",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 13778,
+    "end": 13893
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-91",
+   "parentId": "inciso-89",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 13895,
+    "end": 14023
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-92",
+   "parentId": "inciso-89",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 14025,
+    "end": 14064
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-93",
+   "parentId": "inciso-89",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 14066,
+    "end": 14183
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-111",
+   "parentId": "paragraph-110",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 16208,
+    "end": 16247
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-112",
+   "parentId": "paragraph-110",
+   "order": 1,
+   "type": "paragraph",
+   "span": {
+    "start": 16249,
+    "end": 16516
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-116",
+   "parentId": "paragraph-115",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 16626,
+    "end": 16799
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-117",
+   "parentId": "paragraph-115",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 16801,
+    "end": 16981
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-118",
+   "parentId": "paragraph-115",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 16983,
+    "end": 17096
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-119",
+   "parentId": "paragraph-115",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 17098,
+    "end": 17477
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-122",
+   "parentId": "paragraph-115",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 17479,
+    "end": 17582
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-123",
+   "parentId": "paragraph-115",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 17584,
+    "end": 17860
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-124",
+   "parentId": "paragraph-115",
+   "order": 6,
+   "type": "editorial_note",
+   "span": {
+    "start": 17862,
+    "end": 17964
+   },
+   "context": "prohibited",
+   "contextReason": "editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-125",
+   "parentId": "paragraph-115",
+   "order": 7,
+   "type": "inciso",
+   "span": {
+    "start": 17966,
+    "end": 18192
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-129",
+   "parentId": "paragraph-128",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 18943,
+    "end": 18958
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-130",
+   "parentId": "paragraph-128",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 18960,
+    "end": 18977
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-131",
+   "parentId": "paragraph-128",
+   "order": 2,
+   "type": "inciso",
+   "span": {
+    "start": 18979,
+    "end": 18996
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-132",
+   "parentId": "paragraph-128",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 18998,
+    "end": 19015
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-133",
+   "parentId": "paragraph-128",
+   "order": 4,
+   "type": "inciso",
+   "span": {
+    "start": 19017,
+    "end": 19033
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-134",
+   "parentId": "paragraph-128",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 19035,
+    "end": 19052
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-140",
+   "parentId": "inciso-139",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 19836,
+    "end": 19954
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-141",
+   "parentId": "inciso-139",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 19956,
+    "end": 20140
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-142",
+   "parentId": "inciso-139",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 20142,
+    "end": 20256
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-143",
+   "parentId": "inciso-139",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 20258,
+    "end": 20408
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-144",
+   "parentId": "inciso-139",
+   "order": 4,
+   "type": "editorial_note",
+   "span": {
+    "start": 20410,
+    "end": 20449
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-145",
+   "parentId": "inciso-139",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 20451,
+    "end": 20576
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-148",
+   "parentId": "inciso-147",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 20892,
+    "end": 21010
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-149",
+   "parentId": "inciso-147",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 21012,
+    "end": 21222
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-150",
+   "parentId": "inciso-147",
+   "order": 2,
+   "type": "editorial_note",
+   "span": {
+    "start": 21224,
+    "end": 21263
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-151",
+   "parentId": "inciso-147",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 21265,
+    "end": 21464
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-154",
+   "parentId": "inciso-153",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 21578,
+    "end": 21701
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-155",
+   "parentId": "inciso-153",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 21703,
+    "end": 22037
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-162",
+   "parentId": "paragraph-161",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 22863,
+    "end": 22985
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-163",
+   "parentId": "paragraph-161",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 22987,
+    "end": 23130
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-164",
+   "parentId": "paragraph-161",
+   "order": 2,
+   "type": "inciso",
+   "span": {
+    "start": 23132,
+    "end": 23327
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-165",
+   "parentId": "paragraph-161",
+   "order": 3,
+   "type": "inciso",
+   "span": {
+    "start": 23329,
+    "end": 23433
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-166",
+   "parentId": "paragraph-161",
+   "order": 4,
+   "type": "inciso",
+   "span": {
+    "start": 23435,
+    "end": 23498
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-167",
+   "parentId": "paragraph-161",
+   "order": 5,
+   "type": "editorial_note",
+   "span": {
+    "start": 23500,
+    "end": 23605
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-168",
+   "parentId": "paragraph-161",
+   "order": 6,
+   "type": "paragraph",
+   "span": {
+    "start": 23607,
+    "end": 24921
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-179",
+   "parentId": "paragraph-178",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 25203,
+    "end": 25308
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "paragraph-180",
+   "parentId": "paragraph-178",
+   "order": 1,
+   "type": "paragraph",
+   "span": {
+    "start": 25310,
+    "end": 25495
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "paragraph-184",
+   "parentId": "clause-183",
+   "order": 0,
+   "type": "paragraph",
+   "span": {
+    "start": 25994,
+    "end": 26135
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "alinea-190",
+   "parentId": "inciso-189",
+   "order": 0,
+   "type": "alinea",
+   "span": {
+    "start": 26923,
+    "end": 27065
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "alinea-191",
+   "parentId": "inciso-189",
+   "order": 1,
+   "type": "alinea",
+   "span": {
+    "start": 27067,
+    "end": 27108
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "alinea-192",
+   "parentId": "inciso-189",
+   "order": 2,
+   "type": "alinea",
+   "span": {
+    "start": 27110,
+    "end": 27175
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "alinea-193",
+   "parentId": "inciso-189",
+   "order": 3,
+   "type": "alinea",
+   "span": {
+    "start": 27177,
+    "end": 27271
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-197",
+   "parentId": "paragraph-196",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 27776,
+    "end": 27861
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "inciso-198",
+   "parentId": "paragraph-196",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 27863,
+    "end": 27967
+   },
+   "context": "operative_candidate",
+   "contextReason": "current_wording_candidate",
+   "table": null
+  },
+  {
+   "id": "editorial_note-205",
+   "parentId": "inciso-204",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 29071,
+    "end": 29191
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-206",
+   "parentId": "inciso-204",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 29193,
+    "end": 29324
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "alinea-49",
+   "parentId": "inciso-48",
+   "order": 0,
+   "type": "alinea",
+   "span": {
+    "start": 4574,
+    "end": 4716
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "alinea-50",
+   "parentId": "inciso-48",
+   "order": 1,
+   "type": "alinea",
+   "span": {
+    "start": 4718,
+    "end": 4759
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "alinea-51",
+   "parentId": "inciso-48",
+   "order": 2,
+   "type": "alinea",
+   "span": {
+    "start": 4761,
+    "end": 4826
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "alinea-52",
+   "parentId": "inciso-48",
+   "order": 3,
+   "type": "alinea",
+   "span": {
+    "start": 4828,
+    "end": 4922
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-61",
+   "parentId": "alinea-60",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 6156,
+    "end": 6195
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "alinea-62",
+   "parentId": "alinea-60",
+   "order": 1,
+   "type": "alinea",
+   "span": {
+    "start": 6197,
+    "end": 6359
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-113",
+   "parentId": "paragraph-112",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 16325,
+    "end": 16410
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-114",
+   "parentId": "paragraph-112",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 16412,
+    "end": 16516
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-120",
+   "parentId": "inciso-119",
+   "order": 0,
+   "type": "editorial_note",
+   "span": {
+    "start": 17273,
+    "end": 17319
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-121",
+   "parentId": "inciso-119",
+   "order": 1,
+   "type": "inciso",
+   "span": {
+    "start": 17321,
+    "end": 17477
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-169",
+   "parentId": "paragraph-168",
+   "order": 0,
+   "type": "inciso",
+   "span": {
+    "start": 23757,
+    "end": 23883
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-170",
+   "parentId": "paragraph-168",
+   "order": 1,
+   "type": "editorial_note",
+   "span": {
+    "start": 23885,
+    "end": 24012
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-171",
+   "parentId": "paragraph-168",
+   "order": 2,
+   "type": "inciso",
+   "span": {
+    "start": 24014,
+    "end": 24253
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "editorial_note-172",
+   "parentId": "paragraph-168",
+   "order": 3,
+   "type": "editorial_note",
+   "span": {
+    "start": 24255,
+    "end": 24382
+   },
+   "context": "historical",
+   "contextReason": "historical_editorial_note",
+   "table": null
+  },
+  {
+   "id": "inciso-173",
+   "parentId": "paragraph-168",
+   "order": 4,
+   "type": "inciso",
+   "span": {
+    "start": 24384,
+    "end": 24598
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-174",
+   "parentId": "paragraph-168",
+   "order": 5,
+   "type": "inciso",
+   "span": {
+    "start": 24600,
+    "end": 24750
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-175",
+   "parentId": "paragraph-168",
+   "order": 6,
+   "type": "inciso",
+   "span": {
+    "start": 24752,
+    "end": 24856
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  },
+  {
+   "id": "inciso-176",
+   "parentId": "paragraph-168",
+   "order": 7,
+   "type": "inciso",
+   "span": {
+    "start": 24858,
+    "end": 24921
+   },
+   "context": "historical",
+   "contextReason": "previous_wording",
+   "table": null
+  }
+ ],
+ "entities": [
+  {
+   "id": "e115",
+   "partId": "editorial_note-2",
+   "span": {
+    "start": 95,
+    "end": 116
+   },
+   "literal": "Ato COTEPE-ICMS 17/97",
+   "domain": "CITATION",
+   "note": "ato COTEPE citado"
+  },
+  {
+   "id": "e1",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 134,
+    "end": 151
+   },
+   "literal": "Convs. ICMS 40/98",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e87",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 153,
+    "end": 158
+   },
+   "literal": "97/99",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e88",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 160,
+    "end": 165
+   },
+   "literal": "08/00",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e89",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 167,
+    "end": 172
+   },
+   "literal": "58/01",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e90",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 174,
+    "end": 179
+   },
+   "literal": "89/01",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e91",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 181,
+    "end": 186
+   },
+   "literal": "20/02",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e92",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 188,
+    "end": 194
+   },
+   "literal": "106/02",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e93",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 196,
+    "end": 202
+   },
+   "literal": "152/02",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e94",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 204,
+    "end": 209
+   },
+   "literal": "25/03",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e95",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 211,
+    "end": 216
+   },
+   "literal": "57/03",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e96",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 218,
+    "end": 223
+   },
+   "literal": "93/03",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e97",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 225,
+    "end": 230
+   },
+   "literal": "99/04",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e98",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 232,
+    "end": 237
+   },
+   "literal": "16/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e99",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 239,
+    "end": 244
+   },
+   "literal": "63/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e100",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 246,
+    "end": 252
+   },
+   "literal": "149/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e101",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 254,
+    "end": 260
+   },
+   "literal": "150/05",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e102",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 262,
+    "end": 267
+   },
+   "literal": "54/06",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e103",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 269,
+    "end": 274
+   },
+   "literal": "93/06",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e104",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 276,
+    "end": 282
+   },
+   "literal": "156/08",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e105",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 284,
+    "end": 289
+   },
+   "literal": "55/09",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e106",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 291,
+    "end": 297
+   },
+   "literal": "195/10",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e107",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 299,
+    "end": 304
+   },
+   "literal": "17/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e108",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 306,
+    "end": 311
+   },
+   "literal": "49/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e109",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 313,
+    "end": 318
+   },
+   "literal": "62/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e110",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 320,
+    "end": 326
+   },
+   "literal": "123/11",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e111",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 328,
+    "end": 333
+   },
+   "literal": "21/16",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e112",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 335,
+    "end": 340
+   },
+   "literal": "26/21",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e113",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 342,
+    "end": 348
+   },
+   "literal": "104/21",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e114",
+   "partId": "editorial_note-3",
+   "span": {
+    "start": 350,
+    "end": 355
+   },
+   "literal": "79/25",
+   "domain": "CITATION",
+   "note": "convênio citado (item de lista)"
+  },
+  {
+   "id": "e2",
+   "partId": "editorial_note-4",
+   "span": {
+    "start": 389,
+    "end": 405
+   },
+   "literal": "Conv. ICMS 05/99",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e3",
+   "partId": "editorial_note-5",
+   "span": {
+    "start": 439,
+    "end": 455
+   },
+   "literal": "Conv. ICMS 10/01",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e4",
+   "partId": "editorial_note-6",
+   "span": {
+    "start": 489,
+    "end": 505
+   },
+   "literal": "Conv. ICMS 58/01",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e5",
+   "partId": "editorial_note-7",
+   "span": {
+    "start": 539,
+    "end": 555
+   },
+   "literal": "Conv. ICMS 21/02",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e6",
+   "partId": "editorial_note-8",
+   "span": {
+    "start": 760,
+    "end": 772
+   },
+   "literal": "Conv. 126/03",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e7",
+   "partId": "editorial_note-9",
+   "span": {
+    "start": 806,
+    "end": 822
+   },
+   "literal": "Conv. ICMS 18/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e8",
+   "partId": "editorial_note-10",
+   "span": {
+    "start": 852,
+    "end": 869
+   },
+   "literal": "Conv. ICMS 150/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e9",
+   "partId": "editorial_note-11",
+   "span": {
+    "start": 899,
+    "end": 915
+   },
+   "literal": "Conv. ICMS 93/06",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e10",
+   "partId": "editorial_note-12",
+   "span": {
+    "start": 1031,
+    "end": 1042
+   },
+   "literal": "Conv. 74/07",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e11",
+   "partId": "editorial_note-13",
+   "span": {
+    "start": 1177,
+    "end": 1193
+   },
+   "literal": "Conv. ICMS 53/08",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e12",
+   "partId": "editorial_note-14",
+   "span": {
+    "start": 1227,
+    "end": 1243
+   },
+   "literal": "Conv. ICMS 71/08",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e13",
+   "partId": "editorial_note-15",
+   "span": {
+    "start": 1277,
+    "end": 1294
+   },
+   "literal": "Conv. ICMS 138/08",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e14",
+   "partId": "editorial_note-16",
+   "span": {
+    "start": 1328,
+    "end": 1344
+   },
+   "literal": "Conv. ICMS 69/09",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e15",
+   "partId": "editorial_note-17",
+   "span": {
+    "start": 1378,
+    "end": 1395
+   },
+   "literal": "Conv. ICMS 119/09",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e16",
+   "partId": "editorial_note-18",
+   "span": {
+    "start": 1429,
+    "end": 1445
+   },
+   "literal": "Conv. ICMS 01/10",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e17",
+   "partId": "editorial_note-19",
+   "span": {
+    "start": 1475,
+    "end": 1491
+   },
+   "literal": "Conv. ICMS 17/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e18",
+   "partId": "editorial_note-20",
+   "span": {
+    "start": 1672,
+    "end": 1689
+   },
+   "literal": "Conv. ICMS 123/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e19",
+   "partId": "editorial_note-21",
+   "span": {
+    "start": 1723,
+    "end": 1740
+   },
+   "literal": "Conv. ICMS 101/12",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e116",
+   "partId": "editorial_note-22",
+   "span": {
+    "start": 1748,
+    "end": 1767
+   },
+   "literal": "Ajuste SINIEF 10/12",
+   "domain": "CITATION",
+   "note": "ajuste citado"
+  },
+  {
+   "id": "e20",
+   "partId": "editorial_note-23",
+   "span": {
+    "start": 1890,
+    "end": 1906
+   },
+   "literal": "Conv. ICMS 14/13",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e21",
+   "partId": "editorial_note-24",
+   "span": {
+    "start": 1940,
+    "end": 1957
+   },
+   "literal": "Conv. ICMS 191/13",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e22",
+   "partId": "editorial_note-25",
+   "span": {
+    "start": 1991,
+    "end": 2007
+   },
+   "literal": "Conv. ICMS 27/15",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e23",
+   "partId": "editorial_note-26",
+   "span": {
+    "start": 2041,
+    "end": 2058
+   },
+   "literal": "Conv. ICMS 107/15",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e24",
+   "partId": "editorial_note-27",
+   "span": {
+    "start": 2092,
+    "end": 2108
+   },
+   "literal": "Conv. ICMS 49/17",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e25",
+   "partId": "editorial_note-28",
+   "span": {
+    "start": 2137,
+    "end": 2153
+   },
+   "literal": "Conv. ICMS 49/17",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e26",
+   "partId": "editorial_note-28",
+   "span": {
+    "start": 2195,
+    "end": 2211
+   },
+   "literal": "Conv. ICMS 42/16",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e27",
+   "partId": "editorial_note-29",
+   "span": {
+    "start": 2260,
+    "end": 2277
+   },
+   "literal": "Conv. ICMS 133/17",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e28",
+   "partId": "editorial_note-30",
+   "span": {
+    "start": 2311,
+    "end": 2327
+   },
+   "literal": "Conv. ICMS 28/19",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e29",
+   "partId": "editorial_note-31",
+   "span": {
+    "start": 2356,
+    "end": 2373
+   },
+   "literal": "Conv. ICMS 198/19",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e30",
+   "partId": "editorial_note-32",
+   "span": {
+    "start": 2407,
+    "end": 2423
+   },
+   "literal": "Conv. ICMS 22/20",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e31",
+   "partId": "editorial_note-33",
+   "span": {
+    "start": 2456,
+    "end": 2473
+   },
+   "literal": "Conv. ICMS 133/20",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e32",
+   "partId": "editorial_note-34",
+   "span": {
+    "start": 2507,
+    "end": 2523
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e33",
+   "partId": "editorial_note-35",
+   "span": {
+    "start": 2552,
+    "end": 2568
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e34",
+   "partId": "editorial_note-36",
+   "span": {
+    "start": 2688,
+    "end": 2704
+   },
+   "literal": "Conv. ICMS 79/25",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e117",
+   "partId": "preamble-38",
+   "span": {
+    "start": 3105,
+    "end": 3152
+   },
+   "literal": "Lei Complementar n° 24, de 7 de janeiro de 1997",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e35",
+   "partId": "editorial_note-41",
+   "span": {
+    "start": 3397,
+    "end": 3413
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e36",
+   "partId": "editorial_note-45",
+   "span": {
+    "start": 4306,
+    "end": 4322
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e37",
+   "partId": "editorial_note-53",
+   "span": {
+    "start": 4991,
+    "end": 5007
+   },
+   "literal": "Conv. ICMS 93/06",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e38",
+   "partId": "editorial_note-55",
+   "span": {
+    "start": 5330,
+    "end": 5346
+   },
+   "literal": "Conv. ICMS 54/06",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e39",
+   "partId": "editorial_note-59",
+   "span": {
+    "start": 5922,
+    "end": 5938
+   },
+   "literal": "Conv. ICMS 17/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e40",
+   "partId": "editorial_note-66",
+   "span": {
+    "start": 6663,
+    "end": 6679
+   },
+   "literal": "Conv. ICMS 16/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e118",
+   "partId": "inciso-67",
+   "span": {
+    "start": 7098,
+    "end": 7136
+   },
+   "literal": "Lei nº 10.711, de 05 de agosto de 2003",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e119",
+   "partId": "inciso-67",
+   "span": {
+    "start": 7157,
+    "end": 7197
+   },
+   "literal": "Decreto nº 5.153, de 23 de julho de 2004",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e41",
+   "partId": "editorial_note-68",
+   "span": {
+    "start": 7508,
+    "end": 7524
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e120",
+   "partId": "inciso-69",
+   "span": {
+    "start": 7845,
+    "end": 7883
+   },
+   "literal": "Lei nº 10.711, de 05 de agosto de 2003",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e121",
+   "partId": "inciso-69",
+   "span": {
+    "start": 7904,
+    "end": 7944
+   },
+   "literal": "Decreto nº 5.153, de 23 de julho de 2004",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e122",
+   "partId": "inciso-71",
+   "span": {
+    "start": 8425,
+    "end": 8464
+   },
+   "literal": "Lei nº 6.507, de 19 de dezembro de 1977",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e123",
+   "partId": "inciso-71",
+   "span": {
+    "start": 8485,
+    "end": 8525
+   },
+   "literal": "Decreto nº 81.771, de 7 de junho de 1978",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e42",
+   "partId": "editorial_note-72",
+   "span": {
+    "start": 8827,
+    "end": 8843
+   },
+   "literal": "Conv. ICMS 21/16",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e43",
+   "partId": "editorial_note-74",
+   "span": {
+    "start": 9677,
+    "end": 9694
+   },
+   "literal": "Conv. ICMS 123/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e44",
+   "partId": "editorial_note-76",
+   "span": {
+    "start": 10428,
+    "end": 10444
+   },
+   "literal": "Conv. ICMS 55/09",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e45",
+   "partId": "editorial_note-78",
+   "span": {
+    "start": 11121,
+    "end": 11138
+   },
+   "literal": "Conv. ICMS 152/02",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e46",
+   "partId": "editorial_note-80",
+   "span": {
+    "start": 11800,
+    "end": 11816
+   },
+   "literal": "Conv. ICMS 97/99",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e47",
+   "partId": "editorial_note-82",
+   "span": {
+    "start": 12425,
+    "end": 12441
+   },
+   "literal": "Conv. ICMS 40/98",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e48",
+   "partId": "editorial_note-88",
+   "span": {
+    "start": 13589,
+    "end": 13605
+   },
+   "literal": "Conv. ICMS 89/01",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e49",
+   "partId": "editorial_note-90",
+   "span": {
+    "start": 13844,
+    "end": 13860
+   },
+   "literal": "Conv. ICMS 08/00",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e126",
+   "partId": "inciso-94",
+   "span": {
+    "start": 14278,
+    "end": 14287
+   },
+   "literal": "3507.90.4",
+   "domain": "NBM",
+   "note": "código NBM/SH citado no inciso X; nomenclatura histórica, não convertido para NCM"
+  },
+  {
+   "id": "e50",
+   "partId": "editorial_note-95",
+   "span": {
+    "start": 14420,
+    "end": 14437
+   },
+   "literal": "Conv. ICMS 106/02",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e51",
+   "partId": "editorial_note-97",
+   "span": {
+    "start": 14620,
+    "end": 14636
+   },
+   "literal": "Conv. ICMS 25/03",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e52",
+   "partId": "editorial_note-99",
+   "span": {
+    "start": 14784,
+    "end": 14800
+   },
+   "literal": "Conv. ICMS 93/03",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e53",
+   "partId": "editorial_note-101",
+   "span": {
+    "start": 14957,
+    "end": 14974
+   },
+   "literal": "Conv. ICMS 156/08",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e54",
+   "partId": "editorial_note-103",
+   "span": {
+    "start": 15182,
+    "end": 15198
+   },
+   "literal": "Conv. ICMS 55/09",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e55",
+   "partId": "editorial_note-105",
+   "span": {
+    "start": 15359,
+    "end": 15376
+   },
+   "literal": "Conv. ICMS 195/10",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e56",
+   "partId": "editorial_note-107",
+   "span": {
+    "start": 15705,
+    "end": 15721
+   },
+   "literal": "Conv. ICMS 49/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e57",
+   "partId": "editorial_note-109",
+   "span": {
+    "start": 16143,
+    "end": 16160
+   },
+   "literal": "Conv. ICMS 104/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e58",
+   "partId": "editorial_note-118",
+   "span": {
+    "start": 17049,
+    "end": 17065
+   },
+   "literal": "Conv. ICMS 20/02",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e59",
+   "partId": "editorial_note-122",
+   "span": {
+    "start": 17535,
+    "end": 17551
+   },
+   "literal": "Conv. ICMS 54/06",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e60",
+   "partId": "editorial_note-124",
+   "span": {
+    "start": 17917,
+    "end": 17933
+   },
+   "literal": "Conv. ICMS 54/06",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e61",
+   "partId": "editorial_note-135",
+   "span": {
+    "start": 19096,
+    "end": 19112
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e124",
+   "partId": "paragraph-136",
+   "span": {
+    "start": 19346,
+    "end": 19359
+   },
+   "literal": "Lei no 10.711",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e62",
+   "partId": "editorial_note-138",
+   "span": {
+    "start": 19578,
+    "end": 19594
+   },
+   "literal": "Conv. ICMS 62/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e63",
+   "partId": "editorial_note-140",
+   "span": {
+    "start": 19904,
+    "end": 19921
+   },
+   "literal": "Conv. ICMS 150/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e64",
+   "partId": "editorial_note-142",
+   "span": {
+    "start": 20210,
+    "end": 20226
+   },
+   "literal": "Conv. ICMS 89/01",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e65",
+   "partId": "editorial_note-146",
+   "span": {
+    "start": 20643,
+    "end": 20660
+   },
+   "literal": "Conv. ICMS 123/11",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e66",
+   "partId": "editorial_note-148",
+   "span": {
+    "start": 20961,
+    "end": 20977
+   },
+   "literal": "Conv. ICMS 57/03",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e67",
+   "partId": "editorial_note-152",
+   "span": {
+    "start": 21511,
+    "end": 21527
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e68",
+   "partId": "editorial_note-154",
+   "span": {
+    "start": 21649,
+    "end": 21665
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e69",
+   "partId": "editorial_note-156",
+   "span": {
+    "start": 22095,
+    "end": 22112
+   },
+   "literal": "Conv. ICMS 149/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e70",
+   "partId": "editorial_note-158",
+   "span": {
+    "start": 22296,
+    "end": 22312
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e71",
+   "partId": "editorial_note-160",
+   "span": {
+    "start": 22664,
+    "end": 22680
+   },
+   "literal": "Conv. ICMS 63/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e72",
+   "partId": "editorial_note-167",
+   "span": {
+    "start": 23556,
+    "end": 23572
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e73",
+   "partId": "editorial_note-170",
+   "span": {
+    "start": 23963,
+    "end": 23979
+   },
+   "literal": "Conv. ICMS 16/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e74",
+   "partId": "editorial_note-172",
+   "span": {
+    "start": 24333,
+    "end": 24349
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e75",
+   "partId": "editorial_note-177",
+   "span": {
+    "start": 24975,
+    "end": 24991
+   },
+   "literal": "Conv. ICMS 63/05",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e76",
+   "partId": "editorial_note-179",
+   "span": {
+    "start": 25259,
+    "end": 25275
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e77",
+   "partId": "editorial_note-182",
+   "span": {
+    "start": 25676,
+    "end": 25692
+   },
+   "literal": "Conv. ICMS 58/01",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e78",
+   "partId": "editorial_note-187",
+   "span": {
+    "start": 26445,
+    "end": 26461
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e79",
+   "partId": "editorial_note-195",
+   "span": {
+    "start": 27663,
+    "end": 27680
+   },
+   "literal": "Conv. ICMS 104/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e80",
+   "partId": "editorial_note-199",
+   "span": {
+    "start": 28006,
+    "end": 28022
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e81",
+   "partId": "clause-200",
+   "span": {
+    "start": 28424,
+    "end": 28444
+   },
+   "literal": "Convênio ICMS 190/17",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e82",
+   "partId": "editorial_note-203",
+   "span": {
+    "start": 29006,
+    "end": 29022
+   },
+   "literal": "Conv. ICMS 26/21",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e83",
+   "partId": "editorial_note-205",
+   "span": {
+    "start": 29141,
+    "end": 29157
+   },
+   "literal": "Conv. ICMS 99/04",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e125",
+   "partId": "inciso-206",
+   "span": {
+    "start": 29274,
+    "end": 29323
+   },
+   "literal": "Lei Complementar nº 87, de 13 de setembro de 1996",
+   "domain": "CITATION",
+   "note": "lei/decreto/resolução citada"
+  },
+  {
+   "id": "e84",
+   "partId": "clause-208",
+   "span": {
+    "start": 29739,
+    "end": 29758
+   },
+   "literal": "Convênio ICMS 36/92",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e85",
+   "partId": "editorial_note-209",
+   "span": {
+    "start": 29910,
+    "end": 29926
+   },
+   "literal": "Conv. ICMS 79/25",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  },
+  {
+   "id": "e86",
+   "partId": "editorial_note-214",
+   "span": {
+    "start": 30477,
+    "end": 30488
+   },
+   "literal": "Conv. 74/07",
+   "domain": "CITATION",
+   "note": "convênio citado"
+  }
+ ],
+ "relations": [],
+ "gaps": [],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a",
+  "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; cada número de lista (\", 97/99 e 08/00\") anotado como citação própria. Único código de nomenclatura explícito: 3507.90.4, que a fonte identifica como código da Nomenclatura Brasileira de Mercadorias (NBM/SH) no inciso X da cláusula primeira. Anotado como NBM, sem conversão para NCM (correção do parecer GOLD-01 de GPT/Codex, 17/10/2026). Anos de 4 dígitos e percentuais não são códigos de nomenclatura e não constam como entidade.\n\nR2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
+}
