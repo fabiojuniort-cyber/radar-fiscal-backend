@@ -1,11 +1,10 @@
-import { isCnaeActivity } from '../../modules/taxonomy/curation/curation.constants.js';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { withTenantContext, TenantAccessDeniedError } from '../../infrastructure/database/tenant-context.js';
 import { findLatestPublishedRelease, loadReleaseView, kyselyRunner } from '../../modules/taxonomy/curation/curation.read.js';
 import { publishedOperationalLinks } from '../../modules/taxonomy/curation/curation.f2-links.js';
-import { emptyAssistant, mergeUnitCard, phraseSegment, type AssistantState } from '../../modules/onboarding/assistant.model.js';
+import { emptyAssistant, mergeUnitCard, selectableAssistantConcept, phraseSegment, phraseSegments, type AssistantState } from '../../modules/onboarding/assistant.model.js';
 
 const params = z.object({ companyId: z.string().uuid() });
 const selection = z.object({
@@ -57,12 +56,16 @@ export async function onboardingRoutes(app: FastifyInstance) {
             LEFT JOIN cnaes c ON c.code=ec.cnae_code WHERE e.company_id=$1 AND e.is_active=true GROUP BY e.id ORDER BY e.is_head_office DESC,e.id`,[company.id]);
           const cards = await Promise.all(units.flatMap(unit => unit.cnaes.map(async cnae => {
             const links = await publishedOperationalLinks(run,cnae.code);
+            const activity=view.concepts.find(c=>c.dimensionCode==='sector'&&c.officialCodes.some(code=>code.replace(/\D/g,'')===cnae.code));
+            const group=view.groups.find(g=>g.id===activity?.groupId);
+            const parents=view.concepts.filter(c=>c.dimensionCode==='sector'&&group?.segmentCodes.includes(c.code));
+            const parent=links[0]?.segment??parents[0]?.label??'';
             return { establishmentId: unit.id, cnaeCode: cnae.code, description: cnae.description,
-              suggestions: links.map(link => ({ kind:link.kind,target:link.target,segment:link.segment })),
-              phraseSegment: phraseSegment(links[0]?.segment ?? '') };
+              suggestions: [...parents.map(c=>({kind:'SEGMENT',target:c.code,segment:c.label})),...links.map(link => ({ kind:link.kind,target:link.target,segment:link.segment }))],
+              phraseSegment: phraseSegment(parent), phraseSegments: phraseSegments(parent) };
           })));
           if (method === 'GET') return { version:profile?.version_no ?? 0,release,state,cards,
-            concepts:view.concepts.filter(c=>['sector','product'].includes(c.dimensionCode)&&!isCnaeActivity(c.officialCodes)).map(c => ({code:c.code,label:c.label,dimensionCode:c.dimensionCode})),
+            concepts:view.concepts.filter(selectableAssistantConcept).map(c => ({code:c.code,label:c.label,dimensionCode:c.dimensionCode})),
             companyName:company.legal_name };
           const body = selection.parse(request.body);
           if (body.expectedVersion !== (profile?.version_no ?? 0)) throw new AssistantError(409,'profile_version_conflict');

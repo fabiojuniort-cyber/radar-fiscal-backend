@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mergeUnitCard,phraseMapping,phraseSegment} from '../src/modules/onboarding/assistant.model.js';
+import {mergeUnitCard,selectableAssistantConcept,phraseMapping,phraseSegment,phraseSegments} from '../src/modules/onboarding/assistant.model.js';
 test('card removal preserves overlapping choices of another CNAE and preexisting manual choices',()=>{
  const base={baseConceptCodes:['product.manual'],baseNcmCodes:['1213'],cards:{}};
  const a=mergeUnitCard(base,'cnae:0111301',{status:'CONFIRMED',conceptCodes:['product.rice'],ncmCodes:['230240']});
@@ -22,4 +22,13 @@ test('32 explicit F2 parent mappings; unknown/no corresponding domain uses gener
  assert.equal(phraseSegment('Agropecuária, pesca e insumos agrícolas'),'agro');
  assert.equal(phraseSegment('Jurídico, contabilidade e auditoria'),'generico');
  assert.equal(phraseSegment('future segment'),'generico');
+ assert.deepEqual(phraseSegments('Energia, petróleo, gás e combustíveis'),['energia','combustiveis']);
+ assert.deepEqual(phraseSegments('Mineração, metalurgia e produtos metálicos'),['mineracao','metalurgia']);
+ assert.equal(new Set(Object.values(phraseMapping).flat()).size,19);
+});
+
+test('a product with a seven-digit NCM is selectable; a CNAE activity is not a segment',()=>{
+ assert.equal(selectableAssistantConcept({dimensionCode:'product',officialCodes:['1234567']}),true);
+ assert.equal(selectableAssistantConcept({dimensionCode:'sector',officialCodes:['6201501']}),false);
+ assert.equal(selectableAssistantConcept({dimensionCode:'sector',officialCodes:[]}),true);
 });

@@ -12,16 +12,16 @@ As NCMs dos cards aceitam prefixos existentes ou com descendentes CURRENT, sem c
 
 Migration 080 cria somente onboarding_phrases e importa as 380 frases do CSV em ops/onb03-frases.csv. As posições 077–079 ficam reservadas à frente ANAT. Runtime pode ler; UPDATE exige PLATFORM_ADMIN via RLS e contexto de usuário. Edição administrativa usa CAS da versão da linha, mantém ao menos uma frase por segmento e não permite remover generico. A página de administradores expõe o editor. Desfazer uma edição usa a lista anterior com a versão corrente. Rollback de código preserva a tabela e os dados; nenhum rollback/backfill de perfis é automático.
 
-Mapeamento F2 → CSV (uma categoria de apresentação por pai F2; categorias compostas usam a primeira correspondência temática abaixo). Não altera identidades da taxonomia. Os 19 grupos originais são preservados na tabela, mesmo os sem pai exclusivo. Desconhecidos usam generico. O mapeamento explícito completo está em src/modules/onboarding/assistant.model.ts; não há inferência por CNAE nem rótulos de clientes.
+Mapeamento F2 → CSV (categorias de apresentação por pai F2; pais compostos combinam as frases das correspondências temáticas abaixo). Não altera identidades da taxonomia. Os 19 grupos originais são preservados na tabela, inclusive os usados em pais compostos. Desconhecidos usam generico. O mapeamento explícito completo está em src/modules/onboarding/assistant.model.ts; não há inferência por CNAE nem rótulos de clientes.
 
 Validação: teste unitário de composição de escolhas sobrepostas e filial vazia; teste de integração HTTP para GET sem escrita, isolamento tenant/empresa/unidade, CNAE inválido, versão concorrente, snapshot legado obsoleto, NCM inexistente, release obsoleta, retomada, nova filial, pular/concluir e acesso administrativo; testes React de retomada, confirmação explícita, prefixo sem zeros e conflito sem avanço/retry. Regressões existentes de CNPJ/manual/IE/perfil continuam nos gates completos. A integração local está bloqueada por EACCES no TCP de loopback desta sessão; executar na CI com PostgreSQL descartável.
 
-| Segmento F2 | Grupo CSV |
+| Segmento F2 | Grupos CSV |
 | --- | --- |
-| Agropecuária, pesca e insumos agrícolas | agro |
+| Agropecuária, pesca e insumos agrícolas | agro, pecuaria |
 | Veterinário e pets | generico |
-| Energia, petróleo, gás e combustíveis | combustiveis |
-| Mineração, metalurgia e produtos metálicos | mineracao |
+| Energia, petróleo, gás e combustíveis | energia, combustiveis |
+| Mineração, metalurgia e produtos metálicos | mineracao, metalurgia |
 | Alimentos, bebidas e tabaco | alimentos |
 | Moda, têxtil, calçados e acessórios | textil |
 | Casa, madeira, móveis e utilidades | florestal |
@@ -38,7 +38,7 @@ Validação: teste unitário de composição de escolhas sobrepostas e filial va
 | Água, saneamento, resíduos e reciclagem | generico |
 | Marketing, publicidade e design | generico |
 | Imobiliário | generico |
-| Comércio multissetorial, holdings e atividades transversais | generico |
+| Comércio multissetorial, holdings e atividades transversais | atacado, varejo |
 | Transporte e logística | transporte |
 | Turismo e hospedagem | generico |
 | Restaurantes e serviços de alimentação | alimentos |
