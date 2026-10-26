@@ -13,7 +13,7 @@
 | Stack included | ANAT stack up to #266 @ `749098c` (… #258 → #259 → #260 `2e8a15a` → #261 → #263 → #264 `27147ad` → #265 `fc1a0a9` → #266) |
 | DOE-SP patch | #267 @ `927b18e`, files identical |
 | Merge conflicts | one, mechanical: `anatomy-ci.yml`, where both sides added jobs |
-| Consolidation-only commit | `578ba43`: two ANAT ops scripts used the unregistered static actor `system:ci` (rule R7.3 of `npm test`); now synthetic UUIDs or `app_current_user_id()`, and no registry of another front changed |
+| Consolidation-only commit | `578ba43`: two ANAT ops scripts used an unregistered static system-actor literal (rule R7.3 of `npm test`); now synthetic UUIDs or `app_current_user_id()`, and no registry of another front changed |
 | Web | radar-fiscal-web#131 @ `52e41d2` (unchanged), marked ready for review to run the full browser regression |
 | Earlier PRs | still open, HEADs unchanged |
 
