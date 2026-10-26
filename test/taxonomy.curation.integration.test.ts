@@ -1028,7 +1028,9 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       // Profile keeps the user's segment per CNAE; a CNAE activity or an
       // unknown item is refused.
       const profileUrl = `/api/v1/companies/${companyId}/tax-profile`;
-      let profileVersion=0;
+      const baseProfile=await app.inject({method:'GET',url:profileUrl,headers:customer.headers});
+      assert.equal(baseProfile.statusCode,200,baseProfile.body);
+      let profileVersion=baseProfile.json().profile?.versionNo??0;
       const profileBody = (cnaeSegments: Array<{ cnaeCode: string; segmentCode: string }>) => ({
         expectedVersion: profileVersion,
         taxRegime: 'LUCRO_REAL',
