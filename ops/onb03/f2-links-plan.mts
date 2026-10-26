@@ -11,7 +11,7 @@ const {loadReleaseView,pgRunner,findOpenDraft,findLatestPublishedRelease}=await 
 
 
 
-export const F2_LINK_RULE = 'onb03-t07-t08-v2';
+export const F2_LINK_RULE = 'onb03-t07-t08-v3';
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const textKey = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
 export interface LinkConcept {
@@ -39,16 +39,16 @@ export interface OperationalPlan {
 }
 
 /** Preserve zeros; never pad, truncate or expand a suggestion to eight digits.
- * Any length is inspected; unsupported shapes remain evidence, not a link.
+ * Any digit length is accepted only with exact CURRENT catalog or descendant evidence.
  */
 export function operationalNcm(raw: string): string | null {
   if (!/^[0-9.\s]+$/.test(raw.trim())) return null;
   const digits = raw.replace(/[.\s]/g, '');
-  return [2,3,4,5,6,7,8].includes(digits.length) && /^\d+$/.test(digits) ? digits : null;
+  return /^\d+$/.test(digits) ? digits : null;
 }
 export function buildOperationalPlan(input: {
   sourceSha256: string; sources: LinkSource[]; concepts: LinkConcept[];
-  /** Exact prefixes present in a CURRENT NCM edition, including non-leaves. */
+  /** Codes from CURRENT NCM editions; ancestors are supported by catalog descendants. */
   catalogNcms: string[]; catalogIdentity: string;
 }): OperationalPlan {
   const active = input.concepts.filter(c => c.membershipStatus === 'INCLUDED');
@@ -58,7 +58,13 @@ export function buildOperationalPlan(input: {
     const key = textKey(product.label);
     productIndex.set(key, [...productIndex.get(key) ?? [], product]);
   }
-  const catalog = new Set(input.catalogNcms);
+  const catalog = new Set(input.catalogNcms.filter(code=>/^\d+$/.test(code)));
+  // Include each ancestor as evidence of a strict descendant, retaining the
+  // original digit prefix as the target (never pad or expand to a child).
+  const supportedNcms = new Set<string>();
+  for (const code of catalog) {
+    for (let length=1;length<=code.length;length++) supportedNcms.add(code.slice(0,length));
+  }
   const links = new Map<string, ProposedLink>();
   const exclusions: LinkExclusion[] = [];
   const segments = new Map<string, {segment:string; products:number; ncms:number; excluded:number}>();
@@ -95,7 +101,7 @@ export function buildOperationalPlan(input: {
         } else {
           const code=operationalNcm(token);
           if(!code) { exclude(kind,'NCM_UNSUPPORTED_SHAPE',token,curated==null?'STAGING':'CURATED'); continue; }
-          if(!catalog.has(code)) { exclude(kind,'NCM_NOT_IN_CURRENT_CATALOG',token,curated==null?'STAGING':'CURATED'); continue; }
+          if(!supportedNcms.has(code)) { exclude(kind,'NCM_NOT_IN_CURRENT_CATALOG',token,curated==null?'STAGING':'CURATED'); continue; }
           target=code;
         }
         const identity={cnae:source.cnae,sectorCode:sector.code,kind,target};

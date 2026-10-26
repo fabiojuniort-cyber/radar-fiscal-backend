@@ -24,8 +24,8 @@ test('T07/T08 resolves only unique products and explicit source NCMs, independen
   assert.ok(plan.links.every(l=>l.cnae==='0111301'&&l.evidence.origin==='STAGING'&&l.evidence.sourceLine===2));
 });
 test('NCM examines all lengths preserving zeros; malformed or unsupported values are excluded, never padded',()=>{
-  for(const value of ['01','010','0101','01012','010121','0101210','01012100']) assert.equal(operationalNcm(value),value);
-  for(const value of ['','0','010121000','1e6','0101/21','01-01','abc0101']) assert.equal(operationalNcm(value),null);
+  for(const value of ['0','01','010','0101','01012','010121','0101210','01012100','010121000']) assert.equal(operationalNcm(value),value);
+  for(const value of ['','1e6','0101/21','01-01','abc0101']) assert.equal(operationalNcm(value),null);
   assert.equal(operationalNcm('0101.21.00'),'01012100');
 });
 test('ambiguous product, missing CNAE, duplicate source CNAE and retired products cannot become links',()=>{
@@ -79,12 +79,12 @@ test('legacy publication without explicit operational approval performs no stagi
   assert.deepEqual(await publishedOperationalLinks(async<T>()=>[{approval:null}] as T[],'0111301'),[]);
 });
 
-test('three-digit NCM is proposed only on an exact CURRENT catalog match, with exclusion evidence otherwise',()=>{
+test('three-digit and other prefixes require exact CURRENT catalog or strict descendant evidence',()=>{
   const data=input();data.sources[0]!.ncms='010;0100;012';
   data.catalogNcms=['010','01000'];
   const plan=buildOperationalPlan(data);
-  assert.deepEqual(plan.links.filter(l=>l.kind==='NCM').map(l=>l.target),['010']);
-  assert.ok(plan.exclusions.some(e=>e.token==='0100'&&e.normalized==='0100'&&e.sourceLine===2&&e.rowSha256==='b'.repeat(64)));
+  assert.deepEqual(plan.links.filter(l=>l.kind==='NCM').map(l=>l.target).sort(),['010','0100']);
+  assert.ok(plan.links.some(l=>l.target==='0100'&&l.evidence.token==='0100'&&l.evidence.sourceLine===2));
   assert.ok(plan.exclusions.some(e=>e.token==='012'&&e.reason==='NCM_NOT_IN_CURRENT_CATALOG'));
   assert.ok(!plan.links.some(l=>l.target==='01000'),'never invent a descendant from a short token');
 });
@@ -99,4 +99,28 @@ test('approval survives JSONB key ordering but rejects changes to persisted evid
   assert.deepEqual(checkedOperationalApproval(plan,persisted),approval);
   const tampered=structuredClone(approval);tampered.links[0]!.evidence.token='changed';
   assert.throws(()=>checkedOperationalApproval(plan,tampered),/STALE/);
+});
+
+test('1213, 2302.40 and 2716 keep their digit prefixes when only CURRENT descendants exist',()=>{
+  const data=input();data.sources[0]!.products='';data.sources[0]!.ncms='1213;2302.40;2716;9999';
+  data.catalogNcms=['12130000','23024000','27160000'];
+  const plan=buildOperationalPlan(data);
+  assert.deepEqual(plan.links.map(l=>l.target).sort(),['1213','230240','2716'].sort());
+  assert.equal(plan.links.find(l=>l.target==='230240')!.evidence.token,'2302.40');
+  assert.deepEqual(plan.exclusions.map(e=>[e.token,e.reason]),[['9999','NCM_NOT_IN_CURRENT_CATALOG']]);
+  assert.ok(!plan.links.some(l=>data.catalogNcms.includes(l.target)),'no expansion to descendants');
+  data.catalogNcms=[];assert.equal(buildOperationalPlan(data).links.length,0);
+});
+test('any digit length needs exact or descendant evidence; siblings and ancestors cannot validate a longer code',()=>{
+  const data=input();data.sources[0]!.products='';data.sources[0]!.ncms='0;0123456789;271600;230241;123';
+  data.catalogNcms=['01010101','0123456789','2716','23024000','1234'];
+  assert.deepEqual(buildOperationalPlan(data).links.map(l=>l.target).sort(),['0','0123456789','123']);
+});
+test('removing the last CURRENT descendant invalidates approval; legacy rule approvals require reapproval',()=>{
+  const data=input();data.sources[0]!.ncms='1213';data.catalogNcms=['12130000'];
+  const plan=buildOperationalPlan(data),approval=approveOperationalPlan(plan,{planSha256:plan.planSha256,
+    candidateIds:plan.links.map(l=>l.id),approvedBy:'curator-test',justification:'Prefix evidence'});
+  data.catalogNcms=['12140000'];
+  assert.throws(()=>checkedOperationalApproval(buildOperationalPlan(data),approval),/STALE/);
+  assert.throws(()=>checkedOperationalApproval(plan,{...approval,ruleVersion:'onb03-t07-t08-v2'}),/INVALID/);
 });

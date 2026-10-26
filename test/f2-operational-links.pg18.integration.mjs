@@ -48,7 +48,7 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   await admin.query("UPDATE official_catalog_editions SET status='SUPERSEDED' WHERE catalog_id=$1 AND status='CURRENT'",[catalog]);
   const edition=(await admin.query(`INSERT INTO official_catalog_editions(catalog_id,edition_code,status,source_url,source_sha256)
    VALUES($1,'onb03-ci','CURRENT','https://example.test/catalog',$2) RETURNING id`,[catalog,'a'.repeat(64)])).rows[0].id;
-  for(const code of ['010','1001','1002','1003'])await admin.query(
+  for(const code of ['01012100','1001','1002','1003','12130000','23024000','27160000'])await admin.query(
    'INSERT INTO official_catalog_entries(catalog_edition_id,official_code,description,metadata) VALUES($1,$2,$3,$4::jsonb)',
    [edition,code,'Entrada sintética '+code,JSON.stringify({normalizedDigits:code,assignable:false})]);
   const major=(await admin.query('SELECT coalesce(max(version_major),0)+100 major FROM taxonomy_releases')).rows[0].major;
@@ -96,7 +96,7 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   const auditBefore=await auditCount();
   const before=(await admin.query("SELECT manifest FROM taxonomy_releases WHERE status='DRAFT' AND manifest->>'kind'='TAX-11_CURATED_RELEASE'")).rows[0].manifest;
   let plan=await call('GET',root+'/current/f2-links/plan');
-  assert.equal(plan.ruleVersion,'onb03-t07-t08-v2');
+  assert.equal(plan.ruleVersion,'onb03-t07-t08-v3');
   assert.ok(plan.links.some(l=>l.kind==='NCM'&&l.target==='010'));
   assert.equal(await auditCount(),auditBefore,'plan must not write audit');
   assert.deepEqual((await admin.query("SELECT manifest FROM taxonomy_releases WHERE status='DRAFT' AND manifest->>'kind'='TAX-11_CURATED_RELEASE'")).rows[0].manifest,before);
@@ -115,15 +115,17 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   assert.equal(await auditCount(),auditBefore+1);
   assert.deepEqual(await publishedOperationalLinks(pgRunner(admin),'1000000'),[],'DRAFT approval cannot leak');
   await call('PATCH',root+'/current/f2-suggestions/sector.onb03_test',
-   {justification:'Alteração após aprovação',suggestedProducts:['Prod A'],suggestedNcms:['010']});
+   {justification:'Alteração após aprovação',suggestedProducts:['Prod A'],suggestedNcms:['010','1213','2302.40','2716']});
   await call('POST',root+'/current/publish',{justification:'Publicação obsoleta',changeNotes:'Deve rejeitar hash antigo'},409);
   plan=await call('GET',root+'/current/f2-links/plan');
   await approve(plan.links.map(l=>l.id));
   const published=await call('POST',root+'/current/publish',{justification:'Publicação sintética',changeNotes:'Teste isolado ONB03'});
   const publishedId=published.release.id;
   const sealed=(await admin.query('SELECT manifest,artifact_sha256 FROM taxonomy_releases WHERE id=$1',[publishedId])).rows[0];
-  assert.equal((await publishedOperationalLinks(pgRunner(admin),'1000000')).length,2);
+  assert.equal((await publishedOperationalLinks(pgRunner(admin),'1000000')).length,5);
   assert.ok((await publishedOperationalLinks(pgRunner(admin),'1000000')).some(l=>l.target==='010'));
+  assert.deepEqual((await publishedOperationalLinks(pgRunner(admin),'1000000')).filter(l=>l.kind==='NCM').map(l=>l.target).sort(),
+   ['010','1213','230240','2716'].sort());
   assert.equal(await snapshot(),profiles);
   await call('POST',root,{justification:'Nova release de reversão'},201);
   plan=await call('GET',root+'/current/f2-links/plan');

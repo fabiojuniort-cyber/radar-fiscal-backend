@@ -79,6 +79,6 @@ export async function publishedOperationalLinks(run:SqlRunner,cnae:string):Promi
     ORDER BY version_major DESC,version_minor DESC,version_patch DESC LIMIT 1
   `);
   const approval=rows[0]?.approval;
-  if(!approval || !['onb03-t07-t08-v1','onb03-t07-t08-v2'].includes(approval.ruleVersion) || !Array.isArray(approval.links)) return [];
+  if(!approval || !['onb03-t07-t08-v1','onb03-t07-t08-v2','onb03-t07-t08-v3'].includes(approval.ruleVersion) || !Array.isArray(approval.links)) return [];
   return approval.links.filter(link=>link.cnae===cnae);
 }
