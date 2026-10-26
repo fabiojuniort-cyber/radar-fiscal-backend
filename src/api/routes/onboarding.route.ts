@@ -73,8 +73,6 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const currentCodes = new Set(view.concepts.filter(selectableAssistantConcept).map(c=>c.code));
           if (body.conceptCodes.some(code=>!currentCodes.has(code))) throw new AssistantError(400,'invalid_taxonomy_selection');
           if (body.ncmCodes.length) {
-            await run(`SELECT ed.id FROM official_catalog_editions ed JOIN official_catalogs cat ON cat.id=ed.catalog_id
-              WHERE cat.code='NCM' AND ed.status='CURRENT' FOR SHARE OF ed`);
             const found = await run<{code:string}>(`SELECT DISTINCT input.code FROM unnest($1::text[]) input(code)
               WHERE EXISTS(SELECT 1 FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id
                 JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT'
