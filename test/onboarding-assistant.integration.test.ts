@@ -39,6 +39,9 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   assert.equal((await save('cnae:6201501',3,{establishmentId:branchId,status:'SKIPPED'})).statusCode,200);
   assert.equal((await save('summary',4)).statusCode,200);
   data=await read();assert.equal(data.state.completed,true);assert.equal(data.version,5);
+  await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(personalization,'{taxonomy}', $1::jsonb) WHERE company_id=$2 AND is_current=true",[JSON.stringify({releaseId:randomUUID(),releaseVersion:'v0.0.1',conceptCodes:['product.unknown_historical']}),company]);
+  const historical=await save('company',5);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
+  assert.equal((await read()).version,5,'historical selections cannot be relabeled implicitly');
   const phrases=await app.inject({method:'GET',url:'/api/v1/onboarding/phrases',headers:a});assert.equal(phrases.statusCode,200,phrases.body);assert.equal(phrases.json().items.length,19);assert.ok(phrases.json().items.every((p:{phrases:string[]})=>p.phrases.length===20));
   const forbidden=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:1,phrases:['Unauthorized']}});assert.equal(forbidden.statusCode,403);
   await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN',$2)",[users[0],users[0]]);

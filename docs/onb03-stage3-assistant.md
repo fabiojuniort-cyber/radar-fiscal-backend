@@ -50,3 +50,5 @@ Validação: teste unitário de composição de escolhas sobrepostas e filial va
 | Administração pública e instituições | generico |
 | Educação e treinamento | generico |
 | Serviços pessoais, domésticos e funerários | generico |
+
+Se a release mudou e existem códigos históricos que não pertencem à release atual, o card retorna taxonomy_selection_review_required (409): revisar/salvar o perfil no editor existente antes de retomar. Não relabelar escolhas desconhecidas como membros da nova release. A versão do editor legado é capturada junto com os valores do formulário, evitando aceitar dados antigos com uma versão recém-refeita por refetch. O salvamento de card compartilha o advisory lock da curadoria para serializar com publicação.

@@ -78,6 +78,13 @@ export async function onboardingRoutes(app: FastifyInstance) {
                 AND regexp_replace(e.official_code,'[^0-9]','','g') LIKE input.code || '%')`,[body.ncmCodes]);
             if (found.length !== new Set(body.ncmCodes).size) throw new AssistantError(400,'invalid_ncm_codes');
           }
+          // Do not relabel unknown historical selections as members of a newer release.
+          const priorTaxonomy=(personalization.taxonomy??{}) as {releaseId?:string;conceptCodes?:string[]};
+          const priorOverrides=(personalization.establishmentOverrides??[]) as Override[];
+          const knownCodes=new Set(view.concepts.map(c=>c.code));
+          if(priorTaxonomy.releaseId && priorTaxonomy.releaseId!==release.id &&
+            [...(priorTaxonomy.conceptCodes??[]),...priorOverrides.flatMap(unit=>unit.conceptCodes)].some(code=>!knownCodes.has(code)))
+            throw new AssistantError(409,'taxonomy_selection_review_required');
           const next: AssistantState = {...structuredClone(state),releaseId:release.id};
           const item = { status:body.status,conceptCodes:body.conceptCodes,ncmCodes:body.ncmCodes };
           const overrides = structuredClone((personalization.establishmentOverrides ?? []) as Override[]);
