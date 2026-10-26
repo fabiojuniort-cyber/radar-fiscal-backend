@@ -70,7 +70,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const body = selection.parse(request.body);
           if (body.expectedVersion !== (profile?.version_no ?? 0)) throw new AssistantError(409,'profile_version_conflict');
           if (body.releaseId !== release.id) throw new AssistantError(409,'taxonomy_release_changed');
-          const currentCodes = new Set(view.concepts.filter(c=>['sector','product'].includes(c.dimensionCode)&&!isCnaeActivity(c.officialCodes)).map(c=>c.code));
+          const currentCodes = new Set(view.concepts.filter(selectableAssistantConcept).map(c=>c.code));
           if (body.conceptCodes.some(code=>!currentCodes.has(code))) throw new AssistantError(400,'invalid_taxonomy_selection');
           if (body.ncmCodes.length) {
             await run(`SELECT ed.id FROM official_catalog_editions ed JOIN official_catalogs cat ON cat.id=ed.catalog_id
