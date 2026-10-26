@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 const {Pool}=await import('pg');
@@ -136,7 +137,7 @@ export function checkedOperationalApproval(plan:OperationalPlan, raw:unknown):Li
      !value.candidateIds.every(id=>typeof id==='string') || typeof value.approvedBy!=='string' ||
      typeof value.justification!=='string') throw new Error('F2_LINK_APPROVAL_INVALID');
   const checked=approveOperationalPlan(plan,value);
-  if(JSON.stringify(checked.links)!==JSON.stringify(value.links)) throw new Error('F2_LINK_APPROVAL_STALE');
+  if(!isDeepStrictEqual(checked.links,value.links)) throw new Error('F2_LINK_APPROVAL_STALE');
   return checked;
 }
 export async function currentOperationalPlan(client:PoolClient, releaseId?:string):Promise<OperationalPlan> {

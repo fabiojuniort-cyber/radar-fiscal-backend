@@ -88,3 +88,15 @@ test('three-digit NCM is proposed only on an exact CURRENT catalog match, with e
   assert.ok(plan.exclusions.some(e=>e.token==='012'&&e.reason==='NCM_NOT_IN_CURRENT_CATALOG'));
   assert.ok(!plan.links.some(l=>l.target==='01000'),'never invent a descendant from a short token');
 });
+
+test('approval survives JSONB key ordering but rejects changes to persisted evidence',()=>{
+  const plan=buildOperationalPlan(input());
+  const approval=approveOperationalPlan(plan,{planSha256:plan.planSha256,candidateIds:plan.links.map(l=>l.id),
+    approvedBy:'curator-test',justification:'JSONB roundtrip'});
+  const reorder=(v:unknown):unknown=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'
+    ?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,reorder(x)])):v;
+  const persisted=reorder(approval);
+  assert.deepEqual(checkedOperationalApproval(plan,persisted),approval);
+  const tampered=structuredClone(approval);tampered.links[0]!.evidence.token='changed';
+  assert.throws(()=>checkedOperationalApproval(plan,tampered),/STALE/);
+});
