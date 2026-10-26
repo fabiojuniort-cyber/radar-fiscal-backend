@@ -1028,7 +1028,9 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       // Profile keeps the user's segment per CNAE; a CNAE activity or an
       // unknown item is refused.
       const profileUrl = `/api/v1/companies/${companyId}/tax-profile`;
+      let profileVersion=0;
       const profileBody = (cnaeSegments: Array<{ cnaeCode: string; segmentCode: string }>) => ({
+        expectedVersion: profileVersion,
         taxRegime: 'LUCRO_REAL',
         segments: [],
         activities: [],
@@ -1055,6 +1057,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         payload: profileBody([{ cnaeCode: '0111301', segmentCode: 'sector.agribusiness' }]),
       });
       assert.ok(savedProfile.statusCode < 300, savedProfile.body);
+      profileVersion=savedProfile.json().profile.versionNo;
       // The user may also remove the CNAE's segment (null).
       const noSegment = await app.inject({
         method: 'PUT',
@@ -1063,6 +1066,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         payload: profileBody([{ cnaeCode: '0111301', segmentCode: null as unknown as string }]),
       });
       assert.ok(noSegment.statusCode < 300, noSegment.body);
+      profileVersion=noSegment.json().profile.versionNo;
       const restored = await app.inject({
         method: 'PUT',
         url: profileUrl,
@@ -1070,6 +1074,7 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         payload: profileBody([{ cnaeCode: '0111301', segmentCode: 'sector.agribusiness' }]),
       });
       assert.ok(restored.statusCode < 300, restored.body);
+      profileVersion=restored.json().profile.versionNo;
 
       // Product parametrized per CNAE, linked to the Produtos table.
       const badProduct = await app.inject({

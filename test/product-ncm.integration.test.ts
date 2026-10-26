@@ -365,6 +365,7 @@ test('product/NCM API uses the current official catalog and preserves tenant iso
 
     // Card NCM of the tax profile: only catalog NCMs; matches the act's NCMs.
     const profileBody = (ncmCodes: string[]) => ({
+      expectedVersion: 0,
       taxRegime: 'LUCRO_REAL',
       segments: [],
       activities: [],
