@@ -1,3 +1,4 @@
+import {currentOperationalPlan, saveOperationalApproval} from '../../modules/taxonomy/curation/curation.f2-links.js';
 import type {
   FastifyInstance,
   FastifyReply,
@@ -781,6 +782,23 @@ export async function taxonomyAdminRoutes(
         .send(body);
     },
   );
+
+  // T07/T08: preview and explicit subset approval; publication remains a separate existing action.
+  typed.get('/api/v1/admin/taxonomy/drafts/current/f2-links/plan',
+    {preHandler:requirePlatformAdmin}, async(_request,reply)=>{
+      const plan=await withCuratorTransaction(curatorPool(),client=>currentOperationalPlan(client));
+      return reply.send({...plan,published:false,profilesModified:false});
+    });
+  typed.post('/api/v1/admin/taxonomy/drafts/current/f2-links/approve',
+    {preHandler:requirePlatformAdmin,schema:{body:z.object({
+      justification,planSha256:z.string().regex(/^[a-f0-9]{64}$/),
+      candidateIds:z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(100000),
+    })}},async(request,reply)=>{
+      const {justification,...input}=request.body;
+      const approval=await withCuratorTransaction(curatorPool(),client=>
+        saveOperationalApproval(client,actorFrom(request,justification),input));
+      return reply.send({approval,published:false,profilesModified:false});
+    });
 
   typed.post(
     '/api/v1/admin/taxonomy/drafts/current/publish',
