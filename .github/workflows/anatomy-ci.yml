@@ -369,6 +369,10 @@ jobs:
           echo "main: $(git -C main-src rev-parse HEAD)"
           mkdir -p "$RUNNER_TEMP/main-migrations"
           cp main-src/migrations/*.sql "$RUNNER_TEMP/main-migrations/"
+          # Since #268, main carries 077–079 itself. This job checks the rehearsal schema over main's OTHER migrations
+          # (the ANAT ones are covered by anatomy-admin-migrations), so only those three files are left out.
+          rm -f "$RUNNER_TEMP/main-migrations/077_anat_base.sql" "$RUNNER_TEMP/main-migrations/078_anat_audit_policy.sql" \
+            "$RUNNER_TEMP/main-migrations/079_anat_rules_admin.sql"
           ls "$RUNNER_TEMP/main-migrations" | wc -l
           ls "$RUNNER_TEMP/main-migrations" | tail -1
       - uses: actions/setup-node@v4
