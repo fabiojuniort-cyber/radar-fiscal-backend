@@ -25,6 +25,9 @@
 --            (derived tax evidence must be preserved or recomputed explicitly)
 --   ABORT    if any publication scope event/state references a DOE-SP
 --            publication (SUPPRESS/RESTORE audit must remain append-only)
+--   ABORT    if any publication_anatomies / anatomy_run_items row references a
+--            scope version (ANAT-ADMIN-01, FK ON DELETE RESTRICT: analyses and
+--            run integrity are never deleted by this rebuild)
 --   ABORT    if any norma_clara_translations row references a scope version
 --            (prototype AI cache, FK ON DELETE CASCADE): deleting it would
 --            lose data whose preservation is not designed yet
@@ -43,6 +46,8 @@
 SELECT to_regclass('public.norma_clara_translations') IS NOT NULL AS has_translations \gset
 SELECT to_regclass('public.publication_taxonomy_runs') IS NOT NULL AS has_taxonomy_classification \gset
 SELECT to_regclass('public.publication_ncm_mentions') IS NOT NULL AS has_ncm_mentions \gset
+SELECT to_regclass('public.publication_anatomies') IS NOT NULL AS has_anatomy_analyses \gset
+SELECT to_regclass('public.anatomy_run_items') IS NOT NULL AS has_anatomy_run_items \gset
 
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout = '300s';
@@ -66,6 +71,13 @@ LOCK TABLE publication_taxonomy_runs IN SHARE ROW EXCLUSIVE MODE;
 \endif
 \if :has_ncm_mentions
 LOCK TABLE publication_ncm_mentions IN SHARE ROW EXCLUSIVE MODE;
+\endif
+-- ANAT-ADMIN-01 (077): analyses/run items written while 30 waits must be visible to the anatomy guards.
+\if :has_anatomy_analyses
+LOCK TABLE publication_anatomies IN SHARE ROW EXCLUSIVE MODE;
+\endif
+\if :has_anatomy_run_items
+LOCK TABLE anatomy_run_items IN SHARE ROW EXCLUSIVE MODE;
 \endif
 
 -- Serialize with pause/resume and manual triggers (trigger-doe-sp-run takes
@@ -150,9 +162,33 @@ BEGIN
     IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % norma_clara_translations reference scope versions (preservation not designed; do not delete)', v_n; END IF;
   END IF;
 
-  SELECT count(*) INTO v_n FROM pg_constraint WHERE contype = 'f'
-    AND confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
-    AND conname NOT IN (
+  -- ANAT-ADMIN-01 (077_anat_base): analyses and run items reference versions ON DELETE RESTRICT; never delete them here.
+  IF to_regclass('public.publication_anatomies') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.publication_anatomies a JOIN publication_versions pv ON pv.id = a.publication_version_id
+             JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % anatomy analyses reference scope versions (ANAT history; do not delete)', v_n; END IF;
+  END IF;
+  IF to_regclass('public.anatomy_run_items') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.anatomy_run_items i JOIN publication_versions pv ON pv.id = i.publication_version_id
+             JOIN doe_sp_rebuild_scope d ON d.id = pv.publication_id' INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'guard: % anatomy run items reference scope versions (ANAT run integrity; do not delete)', v_n; END IF;
+  END IF;
+
+  SELECT count(*) INTO v_n FROM pg_constraint c WHERE c.contype = 'f'
+    AND c.confrelid IN ('publications'::regclass, 'publication_versions'::regclass)
+    AND NOT (
+      -- ANAT-ADMIN-01 (077_anat_base): the only two ANAT foreign keys recognised, by EXACT definition, never by name alone:
+      -- table public.publication_anatomies / public.anatomy_run_items, single column publication_version_id,
+      -- referencing publication_versions(id), ON DELETE RESTRICT. Their rows are counted by the anatomy blockers below.
+      c.confrelid = 'publication_versions'::regclass AND c.confdeltype = 'r'
+      AND array_length(c.conkey, 1) = 1 AND array_length(c.confkey, 1) = 1
+      AND EXISTS (SELECT 1 FROM pg_class r JOIN pg_namespace n ON n.oid = r.relnamespace
+                  WHERE r.oid = c.conrelid AND n.nspname = 'public'
+                  AND (r.relname, c.conname) IN (('publication_anatomies', 'publication_anatomies_publication_version_id_fkey'),
+                                                 ('anatomy_run_items', 'anatomy_run_items_publication_version_id_fkey')))
+      AND (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = c.conrelid AND a.attnum = c.conkey[1]) = 'publication_version_id'
+      AND (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = c.confrelid AND a.attnum = c.confkey[1]) = 'id')
+    AND c.conname NOT IN (
       'publication_origins_publication_id_fkey', 'publication_versions_publication_id_fkey',
       'publication_files_publication_version_id_fkey', 'collection_run_publications_publication_id_fkey',
       'collection_run_publications_publication_version_id_fkey', 'fk_collection_item_publication',

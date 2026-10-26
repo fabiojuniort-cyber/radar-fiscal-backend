@@ -30,6 +30,7 @@ link de run ou item de outra fonte **aborta** o processo.
 | `collection_runs`, `collection_attempts`, `collection_items` | **mantidas** | histórico operacional |
 | `collection_checkpoints` do conector `doe-sp` | apagados | o próximo run faz bootstrap desde `DOE_SP_BOOTSTRAP_START_DATE` |
 | `norma_clara_translations` das versões do escopo | **`30` aborta se houver qualquer linha** | tabela criada em runtime pelo serviço `tribusca-site-prototype` (fora das migrations deste repositório), com FK `ON DELETE CASCADE` para a versão. Não há desenho aprovado para preservar traduções antigas numa versão nova, então nenhuma é apagada. Com contagem > 0, a fase destrutiva para até existir esse desenho |
+| `publication_anatomies` e `anatomy_run_items` (ANAT-ADMIN-01, migration 077) das versões do escopo | **`20` bloqueia e `30` aborta se houver qualquer linha** | FK `ON DELETE RESTRICT` para a versão: análises e integridade dos runs da Anatomia nunca são apagadas por este rebuild. Antes da 077 (tabelas ausentes) a contagem é 0 sem resolver nome algum. Só as duas FKs ANAT com a definição exata da 077 (tabela, coluna `publication_version_id`, destino `publication_versions(id)`, RESTRICT) são reconhecidas; o mesmo nome com outra definição continua sendo FK desconhecida |
 | `sources` (`doe-sp`) | mantida; `is_active` alternado pela pausa/retomada | — |
 | demais fontes | intocadas; totais globais verificados dentro da transação | — |
 
@@ -108,7 +109,10 @@ efeitos são esperados e devem ser comunicados antes do passo 7 do §6.
 - Guardas: fonte pausada; zero runs `PENDING/RUNNING`; zero origens de outra
   fonte; zero `company_publications`; zero links de run **e zero
   `collection_items`** de runs de outra fonte apontando para o escopo; **zero
-  `norma_clara_translations`** em versões do escopo; nenhuma FK desconhecida
+  `norma_clara_translations`** em versões do escopo; **zero
+  `publication_anatomies`/`anatomy_run_items`** em versões do escopo (blockers
+  `anatomy_analyses`, `anatomy_run_items`; tabelas travadas antes do snapshot
+  quando existem); nenhuma FK desconhecida
   apontando para `publications`/`publication_versions` (proteção contra
   desvio de esquema).
 - As contagens esperadas do dry-run (`-v expected_*`) são comparadas com o
