@@ -1,0 +1,17 @@
+{
+ "notes": "Único código de nomenclatura explícito: 3507.90.4, que a fonte identifica como código da Nomenclatura Brasileira de Mercadorias (NBM/SH) no inciso X da cláusula primeira. Anotado como NBM, sem conversão para NCM (correção do parecer GOLD-01 de GPT/Codex, 17/10/2026). Anos de 4 dígitos e percentuais não são códigos de nomenclatura e não constam como entidade.",
+ "textEntities": [
+  {
+   "pattern": "(?<![\\d.])3507\\.90\\.4(?![\\d.])",
+   "domain": "NBM",
+   "note": "código NBM/SH citado no inciso X; nomenclatura histórica, não convertido para NCM"
+  }
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "256dfcb9624069abeca683e7943799659f4196ec7fc1f368adebb12b69b47b8a",
+  "notes": "R2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
+}

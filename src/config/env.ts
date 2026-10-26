@@ -50,6 +50,9 @@ const envSchema = z.object({
   // Commit deployed by Railway; recorded on curated taxonomy releases.
   RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
 
+  // ANAT-ADMIN-01: server flag of the administrative anatomy-rules API. Off unless explicitly 'true'.
+  ANAT_RULES_ADMIN_ENABLED: z.enum(['true', 'false']).default('false'),
+
   JWT_ACCESS_SECRET: z.string().min(32),
 
   AUTH_REFRESH_COOKIE_NAME: z

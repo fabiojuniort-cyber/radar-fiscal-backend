@@ -1,0 +1,2752 @@
+[
+ {
+  "id": "e1127",
+  "partId": "t1-r393c2",
+  "span": {
+   "start": 54199,
+   "end": 54209
+  },
+  "literal": "8460.11.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1128",
+  "partId": "t1-r394c2",
+  "span": {
+   "start": 54380,
+   "end": 54390
+  },
+  "literal": "8460.19.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1129",
+  "partId": "t1-r395c2",
+  "span": {
+   "start": 54563,
+   "end": 54573
+  },
+  "literal": "8460.21.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1130",
+  "partId": "t1-r396c2",
+  "span": {
+   "start": 54725,
+   "end": 54735
+  },
+  "literal": "8460.29.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1131",
+  "partId": "t1-r397c2",
+  "span": {
+   "start": 54795,
+   "end": 54805
+  },
+  "literal": "8460.31.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1132",
+  "partId": "t1-r398c2",
+  "span": {
+   "start": 54851,
+   "end": 54861
+  },
+  "literal": "8460.39.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1133",
+  "partId": "t1-r399c2",
+  "span": {
+   "start": 54965,
+   "end": 54975
+  },
+  "literal": "8460.40.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1134",
+  "partId": "t1-r400c2",
+  "span": {
+   "start": 55032,
+   "end": 55042
+  },
+  "literal": "8460.40.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1135",
+  "partId": "t1-r401c2",
+  "span": {
+   "start": 55125,
+   "end": 55135
+  },
+  "literal": "8460.40.91",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1136",
+  "partId": "t1-r402c2",
+  "span": {
+   "start": 55173,
+   "end": 55183
+  },
+  "literal": "8460.40.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1137",
+  "partId": "t1-r403c2",
+  "span": {
+   "start": 55306,
+   "end": 55316
+  },
+  "literal": "8460.90.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1138",
+  "partId": "t1-r404c2",
+  "span": {
+   "start": 55442,
+   "end": 55452
+  },
+  "literal": "8460.90.12",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1139",
+  "partId": "t1-r405c2",
+  "span": {
+   "start": 55641,
+   "end": 55651
+  },
+  "literal": "8460.90.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1140",
+  "partId": "t1-r406c2",
+  "span": {
+   "start": 55819,
+   "end": 55829
+  },
+  "literal": "8460.90.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1141",
+  "partId": "t1-r408c2",
+  "span": {
+   "start": 56210,
+   "end": 56220
+  },
+  "literal": "8461.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1142",
+  "partId": "t1-r409c2",
+  "span": {
+   "start": 56290,
+   "end": 56300
+  },
+  "literal": "8461.20.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1143",
+  "partId": "t1-r410c2",
+  "span": {
+   "start": 56362,
+   "end": 56372
+  },
+  "literal": "8461.30.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1144",
+  "partId": "t1-r411c2",
+  "span": {
+   "start": 56406,
+   "end": 56416
+  },
+  "literal": "8461.30.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1145",
+  "partId": "t1-r412c2",
+  "span": {
+   "start": 56499,
+   "end": 56509
+  },
+  "literal": "8461.40.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1146",
+  "partId": "t1-r413c2",
+  "span": {
+   "start": 56552,
+   "end": 56562
+  },
+  "literal": "8461.40.91",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1147",
+  "partId": "t1-r414c2",
+  "span": {
+   "start": 56631,
+   "end": 56641
+  },
+  "literal": "8461.40.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1148",
+  "partId": "t1-r415c2",
+  "span": {
+   "start": 56712,
+   "end": 56722
+  },
+  "literal": "8461.50.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1149",
+  "partId": "t1-r416c2",
+  "span": {
+   "start": 56787,
+   "end": 56797
+  },
+  "literal": "8461.50.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1150",
+  "partId": "t1-r417c2",
+  "span": {
+   "start": 56899,
+   "end": 56909
+  },
+  "literal": "8461.50.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1151",
+  "partId": "t1-r418c2",
+  "span": {
+   "start": 56992,
+   "end": 57002
+  },
+  "literal": "8461.90.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1152",
+  "partId": "t1-r419c2",
+  "span": {
+   "start": 57094,
+   "end": 57104
+  },
+  "literal": "8461.90.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1153",
+  "partId": "t1-r421c2",
+  "span": {
+   "start": 57511,
+   "end": 57521
+  },
+  "literal": "8462.10.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1154",
+  "partId": "t1-r422c2",
+  "span": {
+   "start": 57664,
+   "end": 57674
+  },
+  "literal": "8462.10.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1155",
+  "partId": "t1-r423c2",
+  "span": {
+   "start": 57796,
+   "end": 57806
+  },
+  "literal": "8462.10.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1156",
+  "partId": "t1-r424c2",
+  "span": {
+   "start": 57931,
+   "end": 57941
+  },
+  "literal": "8462.21.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1157",
+  "partId": "t1-r425c2",
+  "span": {
+   "start": 58052,
+   "end": 58062
+  },
+  "literal": "8462.29.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1158",
+  "partId": "t1-r426c2",
+  "span": {
+   "start": 58203,
+   "end": 58213
+  },
+  "literal": "8462.31.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1159",
+  "partId": "t1-r427c2",
+  "span": {
+   "start": 58350,
+   "end": 58360
+  },
+  "literal": "8462.39.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1160",
+  "partId": "t1-r428c2",
+  "span": {
+   "start": 58487,
+   "end": 58497
+  },
+  "literal": "8462.39.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1161",
+  "partId": "t1-r429c2",
+  "span": {
+   "start": 58659,
+   "end": 58669
+  },
+  "literal": "8462.41.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1162",
+  "partId": "t1-r430c2",
+  "span": {
+   "start": 58818,
+   "end": 58828
+  },
+  "literal": "8462.49.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1163",
+  "partId": "t1-r431c2",
+  "span": {
+   "start": 58960,
+   "end": 58970
+  },
+  "literal": "8462.91.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1164",
+  "partId": "t1-r432c2",
+  "span": {
+   "start": 59066,
+   "end": 59076
+  },
+  "literal": "8462.91.91",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1165",
+  "partId": "t1-r433c2",
+  "span": {
+   "start": 59166,
+   "end": 59176
+  },
+  "literal": "8462.91.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1166",
+  "partId": "t1-r434c2",
+  "span": {
+   "start": 59223,
+   "end": 59233
+  },
+  "literal": "8462.91.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1167",
+  "partId": "t1-r435c2",
+  "span": {
+   "start": 59309,
+   "end": 59319
+  },
+  "literal": "8462.99.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1168",
+  "partId": "t1-r436c2",
+  "span": {
+   "start": 59361,
+   "end": 59371
+  },
+  "literal": "8462.99.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1169",
+  "partId": "t1-r437c2",
+  "span": {
+   "start": 59406,
+   "end": 59416
+  },
+  "literal": "8462.99.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1170",
+  "partId": "t1-r439c2",
+  "span": {
+   "start": 59594,
+   "end": 59604
+  },
+  "literal": "8463.10.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1171",
+  "partId": "t1-r440c2",
+  "span": {
+   "start": 59686,
+   "end": 59696
+  },
+  "literal": "8463.10.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1172",
+  "partId": "t1-r441c2",
+  "span": {
+   "start": 59800,
+   "end": 59810
+  },
+  "literal": "8463.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1173",
+  "partId": "t1-r442c2",
+  "span": {
+   "start": 60030,
+   "end": 60040
+  },
+  "literal": "8463.20.91",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1174",
+  "partId": "t1-r443c2",
+  "span": {
+   "start": 60128,
+   "end": 60138
+  },
+  "literal": "8463.20.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1175",
+  "partId": "t1-r444c2",
+  "span": {
+   "start": 60204,
+   "end": 60214
+  },
+  "literal": "8463.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1176",
+  "partId": "t1-r445c2",
+  "span": {
+   "start": 60316,
+   "end": 60326
+  },
+  "literal": "8463.90.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1177",
+  "partId": "t1-r446c2",
+  "span": {
+   "start": 60407,
+   "end": 60417
+  },
+  "literal": "8463.90.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1178",
+  "partId": "t1-r448c2",
+  "span": {
+   "start": 60630,
+   "end": 60640
+  },
+  "literal": "8464.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1179",
+  "partId": "t1-r449c2",
+  "span": {
+   "start": 60704,
+   "end": 60714
+  },
+  "literal": "8464.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1180",
+  "partId": "t1-r450c2",
+  "span": {
+   "start": 60834,
+   "end": 60844
+  },
+  "literal": "8464.20.21",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1181",
+  "partId": "t1-r451c2",
+  "span": {
+   "start": 60918,
+   "end": 60928
+  },
+  "literal": "8464.20.29",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1182",
+  "partId": "t1-r452c2",
+  "span": {
+   "start": 60987,
+   "end": 60997
+  },
+  "literal": "8464.20.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1183",
+  "partId": "t1-r453c2",
+  "span": {
+   "start": 61125,
+   "end": 61135
+  },
+  "literal": "8464.90.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1184",
+  "partId": "t1-r454c2",
+  "span": {
+   "start": 61214,
+   "end": 61224
+  },
+  "literal": "8464.90.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1185",
+  "partId": "t1-r455c2",
+  "span": {
+   "start": 61369,
+   "end": 61379
+  },
+  "literal": "8464.90.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1186",
+  "partId": "t1-r457c2",
+  "span": {
+   "start": 61777,
+   "end": 61787
+  },
+  "literal": "8465.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1187",
+  "partId": "t1-r458c2",
+  "span": {
+   "start": 61841,
+   "end": 61851
+  },
+  "literal": "8465.91.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1188",
+  "partId": "t1-r459c2",
+  "span": {
+   "start": 61900,
+   "end": 61910
+  },
+  "literal": "8465.91.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1189",
+  "partId": "t1-r460c2",
+  "span": {
+   "start": 62003,
+   "end": 62013
+  },
+  "literal": "8465.91.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1190",
+  "partId": "t1-r461c2",
+  "span": {
+   "start": 62043,
+   "end": 62053
+  },
+  "literal": "8465.92.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1191",
+  "partId": "t1-r462c2",
+  "span": {
+   "start": 62170,
+   "end": 62180
+  },
+  "literal": "8465.92.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1192",
+  "partId": "t1-r463c2",
+  "span": {
+   "start": 62352,
+   "end": 62362
+  },
+  "literal": "8465.92.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1193",
+  "partId": "t1-r464c2",
+  "span": {
+   "start": 62392,
+   "end": 62402
+  },
+  "literal": "8465.93.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1194",
+  "partId": "t1-r465c2",
+  "span": {
+   "start": 62468,
+   "end": 62478
+  },
+  "literal": "8465.93.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1195",
+  "partId": "t1-r466c2",
+  "span": {
+   "start": 62613,
+   "end": 62623
+  },
+  "literal": "8465.94.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1196",
+  "partId": "t1-r467c2",
+  "span": {
+   "start": 62684,
+   "end": 62694
+  },
+  "literal": "8465.95.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1197",
+  "partId": "t1-r468c2",
+  "span": {
+   "start": 62759,
+   "end": 62769
+  },
+  "literal": "8465.95.12",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1198",
+  "partId": "t1-r469c2",
+  "span": {
+   "start": 62816,
+   "end": 62826
+  },
+  "literal": "8465.95.91",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1199",
+  "partId": "t1-r470c2",
+  "span": {
+   "start": 62877,
+   "end": 62887
+  },
+  "literal": "8465.95.92",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1200",
+  "partId": "t1-r471c2",
+  "span": {
+   "start": 62953,
+   "end": 62963
+  },
+  "literal": "8465.96.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1201",
+  "partId": "t1-r472c2",
+  "span": {
+   "start": 63254,
+   "end": 63264
+  },
+  "literal": "8465.99.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e96",
+  "partId": "t1-r473",
+  "span": {
+   "start": 63346,
+   "end": 63362
+  },
+  "literal": "Conv. ICMS 89/09",
+  "domain": "CITATION",
+  "note": "convênio citado"
+ },
+ {
+  "id": "e97",
+  "partId": "t1-r473",
+  "span": {
+   "start": 63397,
+   "end": 63414
+  },
+  "literal": "Conv. ICMS 112/10",
+  "domain": "CITATION",
+  "note": "convênio citado"
+ },
+ {
+  "id": "e2167",
+  "partId": "t1-r474c1",
+  "span": {
+   "start": 63561,
+   "end": 63566
+  },
+  "literal": "84.56",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e2168",
+  "partId": "t1-r474c1",
+  "span": {
+   "start": 63569,
+   "end": 63574
+  },
+  "literal": "84.65",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1202",
+  "partId": "t1-r475c2",
+  "span": {
+   "start": 63853,
+   "end": 63863
+  },
+  "literal": "8466.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1203",
+  "partId": "t1-r476c2",
+  "span": {
+   "start": 63964,
+   "end": 63974
+  },
+  "literal": "8466.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2169",
+  "partId": "t1-r477c1",
+  "span": {
+   "start": 64040,
+   "end": 64045
+  },
+  "literal": "84.64",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1204",
+  "partId": "t1-r477c2",
+  "span": {
+   "start": 64050,
+   "end": 64060
+  },
+  "literal": "8466.91.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2170",
+  "partId": "t1-r478c1",
+  "span": {
+   "start": 64127,
+   "end": 64132
+  },
+  "literal": "84.65",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1205",
+  "partId": "t1-r478c2",
+  "span": {
+   "start": 64137,
+   "end": 64147
+  },
+  "literal": "8466.92.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2171",
+  "partId": "t1-r479c1",
+  "span": {
+   "start": 64262,
+   "end": 64267
+  },
+  "literal": "84.56",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1206",
+  "partId": "t1-r479c2",
+  "span": {
+   "start": 64272,
+   "end": 64282
+  },
+  "literal": "8466.93.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2172",
+  "partId": "t1-r480c1",
+  "span": {
+   "start": 64350,
+   "end": 64355
+  },
+  "literal": "84.57",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1207",
+  "partId": "t1-r480c2",
+  "span": {
+   "start": 64360,
+   "end": 64370
+  },
+  "literal": "8466.93.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2173",
+  "partId": "t1-r481c1",
+  "span": {
+   "start": 64438,
+   "end": 64443
+  },
+  "literal": "84.58",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1208",
+  "partId": "t1-r481c2",
+  "span": {
+   "start": 64448,
+   "end": 64458
+  },
+  "literal": "8466.93.30",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2174",
+  "partId": "t1-r482c1",
+  "span": {
+   "start": 64526,
+   "end": 64531
+  },
+  "literal": "84.59",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1209",
+  "partId": "t1-r482c2",
+  "span": {
+   "start": 64536,
+   "end": 64546
+  },
+  "literal": "8466.93.40",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2175",
+  "partId": "t1-r483c1",
+  "span": {
+   "start": 64614,
+   "end": 64619
+  },
+  "literal": "84.60",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1210",
+  "partId": "t1-r483c2",
+  "span": {
+   "start": 64624,
+   "end": 64634
+  },
+  "literal": "8466.93.50",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2176",
+  "partId": "t1-r484c1",
+  "span": {
+   "start": 64703,
+   "end": 64708
+  },
+  "literal": "84.61",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1211",
+  "partId": "t1-r484c2",
+  "span": {
+   "start": 64713,
+   "end": 64723
+  },
+  "literal": "8466.93.60",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2105",
+  "partId": "t1-r485c1",
+  "span": {
+   "start": 64792,
+   "end": 64799
+  },
+  "literal": "8462.10",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e1212",
+  "partId": "t1-r485c2",
+  "span": {
+   "start": 64804,
+   "end": 64814
+  },
+  "literal": "8466.94.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2106",
+  "partId": "t1-r486c1",
+  "span": {
+   "start": 64879,
+   "end": 64886
+  },
+  "literal": "8462.21",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e2107",
+  "partId": "t1-r486c1",
+  "span": {
+   "start": 64890,
+   "end": 64897
+  },
+  "literal": "8462.29",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e1213",
+  "partId": "t1-r486c2",
+  "span": {
+   "start": 64902,
+   "end": 64912
+  },
+  "literal": "8466.94.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1214",
+  "partId": "t1-r487c2",
+  "span": {
+   "start": 64987,
+   "end": 64997
+  },
+  "literal": "8466.94.30",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2177",
+  "partId": "t1-r488c1",
+  "span": {
+   "start": 65467,
+   "end": 65472
+  },
+  "literal": "84.63",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1215",
+  "partId": "t1-r488c2",
+  "span": {
+   "start": 65496,
+   "end": 65506
+  },
+  "literal": "8466.94.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e98",
+  "partId": "t1-r489",
+  "span": {
+   "start": 65595,
+   "end": 65611
+  },
+  "literal": "Conv. ICMS 89/09",
+  "domain": "CITATION",
+  "note": "convênio citado"
+ },
+ {
+  "id": "e2178",
+  "partId": "t1-r490c1",
+  "span": {
+   "start": 65760,
+   "end": 65765
+  },
+  "literal": "84.56",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e2179",
+  "partId": "t1-r490c1",
+  "span": {
+   "start": 65768,
+   "end": 65773
+  },
+  "literal": "84.65",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1216",
+  "partId": "t1-r491c2",
+  "span": {
+   "start": 66052,
+   "end": 66062
+  },
+  "literal": "8466.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1217",
+  "partId": "t1-r492c2",
+  "span": {
+   "start": 66163,
+   "end": 66173
+  },
+  "literal": "8466.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2180",
+  "partId": "t1-r493c1",
+  "span": {
+   "start": 66248,
+   "end": 66253
+  },
+  "literal": "84.64",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1218",
+  "partId": "t1-r493c2",
+  "span": {
+   "start": 66258,
+   "end": 66268
+  },
+  "literal": "8466.91.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2181",
+  "partId": "t1-r494c1",
+  "span": {
+   "start": 66308,
+   "end": 66313
+  },
+  "literal": "84.65",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1219",
+  "partId": "t1-r494c2",
+  "span": {
+   "start": 66318,
+   "end": 66328
+  },
+  "literal": "8466.92.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2182",
+  "partId": "t1-r495c1",
+  "span": {
+   "start": 66451,
+   "end": 66456
+  },
+  "literal": "84.56",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1220",
+  "partId": "t1-r495c2",
+  "span": {
+   "start": 66461,
+   "end": 66471
+  },
+  "literal": "8466.93.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2183",
+  "partId": "t1-r496c1",
+  "span": {
+   "start": 66546,
+   "end": 66551
+  },
+  "literal": "84.57",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1221",
+  "partId": "t1-r496c2",
+  "span": {
+   "start": 66556,
+   "end": 66566
+  },
+  "literal": "8466.93.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2184",
+  "partId": "t1-r497c1",
+  "span": {
+   "start": 66641,
+   "end": 66646
+  },
+  "literal": "84.58",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1222",
+  "partId": "t1-r497c2",
+  "span": {
+   "start": 66651,
+   "end": 66661
+  },
+  "literal": "8466.93.30",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2185",
+  "partId": "t1-r498c1",
+  "span": {
+   "start": 66736,
+   "end": 66741
+  },
+  "literal": "84.59",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1223",
+  "partId": "t1-r498c2",
+  "span": {
+   "start": 66746,
+   "end": 66756
+  },
+  "literal": "8466.93.40",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2186",
+  "partId": "t1-r499c1",
+  "span": {
+   "start": 66831,
+   "end": 66836
+  },
+  "literal": "84.60",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1224",
+  "partId": "t1-r499c2",
+  "span": {
+   "start": 66841,
+   "end": 66851
+  },
+  "literal": "8466.93.50",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2187",
+  "partId": "t1-r500c1",
+  "span": {
+   "start": 66927,
+   "end": 66932
+  },
+  "literal": "84.61",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1225",
+  "partId": "t1-r500c2",
+  "span": {
+   "start": 66937,
+   "end": 66947
+  },
+  "literal": "8466.93.60",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2108",
+  "partId": "t1-r501c1",
+  "span": {
+   "start": 67023,
+   "end": 67030
+  },
+  "literal": "8462.10",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e1226",
+  "partId": "t1-r501c2",
+  "span": {
+   "start": 67035,
+   "end": 67045
+  },
+  "literal": "8466.94.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2109",
+  "partId": "t1-r502c1",
+  "span": {
+   "start": 67117,
+   "end": 67124
+  },
+  "literal": "8462.21",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e2110",
+  "partId": "t1-r502c1",
+  "span": {
+   "start": 67128,
+   "end": 67135
+  },
+  "literal": "8462.29",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e1227",
+  "partId": "t1-r502c2",
+  "span": {
+   "start": 67140,
+   "end": 67150
+  },
+  "literal": "8466.94.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1228",
+  "partId": "t1-r503c2",
+  "span": {
+   "start": 67232,
+   "end": 67242
+  },
+  "literal": "8466.94.30",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2188",
+  "partId": "t1-r504c1",
+  "span": {
+   "start": 67719,
+   "end": 67724
+  },
+  "literal": "84.63",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1229",
+  "partId": "t1-r504c2",
+  "span": {
+   "start": 67748,
+   "end": 67758
+  },
+  "literal": "8466.94.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1230",
+  "partId": "t1-r506c2",
+  "span": {
+   "start": 67910,
+   "end": 67920
+  },
+  "literal": "8467.11.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1231",
+  "partId": "t1-r507c2",
+  "span": {
+   "start": 67980,
+   "end": 67990
+  },
+  "literal": "8467.11.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1232",
+  "partId": "t1-r508c2",
+  "span": {
+   "start": 68109,
+   "end": 68119
+  },
+  "literal": "8467.19.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1233",
+  "partId": "t1-r509c2",
+  "span": {
+   "start": 68156,
+   "end": 68166
+  },
+  "literal": "8467.81.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e99",
+  "partId": "t1-r510",
+  "span": {
+   "start": 68222,
+   "end": 68238
+  },
+  "literal": "Conv. ICMS 51/10",
+  "domain": "CITATION",
+  "note": "convênio citado"
+ },
+ {
+  "id": "e2111",
+  "partId": "t1-r511c2",
+  "span": {
+   "start": 68369,
+   "end": 68376
+  },
+  "literal": "8467.29",
+  "domain": "NCM",
+  "note": "NCM 6 dígitos (subposição)"
+ },
+ {
+  "id": "e1234",
+  "partId": "t1-r511c2",
+  "span": {
+   "start": 68378,
+   "end": 68388
+  },
+  "literal": "8467.89.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e100",
+  "partId": "t1-r512",
+  "span": {
+   "start": 68448,
+   "end": 68464
+  },
+  "literal": "Conv. ICMS 89/09",
+  "domain": "CITATION",
+  "note": "convênio citado"
+ },
+ {
+  "id": "e1235",
+  "partId": "t1-r513c2",
+  "span": {
+   "start": 68581,
+   "end": 68591
+  },
+  "literal": "8467.89.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2189",
+  "partId": "t1-r514c1",
+  "span": {
+   "start": 68675,
+   "end": 68680
+  },
+  "literal": "85.15",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1236",
+  "partId": "t1-r515c2",
+  "span": {
+   "start": 68783,
+   "end": 68793
+  },
+  "literal": "8468.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1237",
+  "partId": "t1-r516c2",
+  "span": {
+   "start": 69036,
+   "end": 69046
+  },
+  "literal": "8468.20.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1238",
+  "partId": "t1-r517c2",
+  "span": {
+   "start": 69117,
+   "end": 69127
+  },
+  "literal": "8468.80.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1239",
+  "partId": "t1-r518c2",
+  "span": {
+   "start": 69186,
+   "end": 69196
+  },
+  "literal": "8468.80.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1240",
+  "partId": "t1-r520c2",
+  "span": {
+   "start": 69685,
+   "end": 69695
+  },
+  "literal": "8474.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1241",
+  "partId": "t1-r521c2",
+  "span": {
+   "start": 69778,
+   "end": 69788
+  },
+  "literal": "8474.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1242",
+  "partId": "t1-r522c2",
+  "span": {
+   "start": 69868,
+   "end": 69878
+  },
+  "literal": "8474.20.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1243",
+  "partId": "t1-r523c2",
+  "span": {
+   "start": 69941,
+   "end": 69951
+  },
+  "literal": "8474.31.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1244",
+  "partId": "t1-r524c2",
+  "span": {
+   "start": 70022,
+   "end": 70032
+  },
+  "literal": "8474.32.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1245",
+  "partId": "t1-r525c2",
+  "span": {
+   "start": 70104,
+   "end": 70114
+  },
+  "literal": "8474.39.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1246",
+  "partId": "t1-r526c2",
+  "span": {
+   "start": 70210,
+   "end": 70220
+  },
+  "literal": "8474.80.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1247",
+  "partId": "t1-r527c2",
+  "span": {
+   "start": 70441,
+   "end": 70451
+  },
+  "literal": "8474.80.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1248",
+  "partId": "t1-r529c2",
+  "span": {
+   "start": 70870,
+   "end": 70880
+  },
+  "literal": "8475.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1249",
+  "partId": "t1-r530c2",
+  "span": {
+   "start": 70960,
+   "end": 70970
+  },
+  "literal": "8475.21.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2190",
+  "partId": "t1-r531c1",
+  "span": {
+   "start": 71042,
+   "end": 71047
+  },
+  "literal": "70.10",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1250",
+  "partId": "t1-r531c2",
+  "span": {
+   "start": 71068,
+   "end": 71078
+  },
+  "literal": "8475.29.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1251",
+  "partId": "t1-r532c2",
+  "span": {
+   "start": 71237,
+   "end": 71247
+  },
+  "literal": "8475.29.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1252",
+  "partId": "t1-r534c2",
+  "span": {
+   "start": 71606,
+   "end": 71616
+  },
+  "literal": "8477.10.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1253",
+  "partId": "t1-r535c2",
+  "span": {
+   "start": 71707,
+   "end": 71717
+  },
+  "literal": "8477.10.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1254",
+  "partId": "t1-r536c2",
+  "span": {
+   "start": 71882,
+   "end": 71892
+  },
+  "literal": "8477.10.21",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1255",
+  "partId": "t1-r537c2",
+  "span": {
+   "start": 71962,
+   "end": 71972
+  },
+  "literal": "8477.10.29",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1256",
+  "partId": "t1-r538c2",
+  "span": {
+   "start": 72050,
+   "end": 72060
+  },
+  "literal": "8477.10.91",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1257",
+  "partId": "t1-r539c2",
+  "span": {
+   "start": 72117,
+   "end": 72127
+  },
+  "literal": "8477.10.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1258",
+  "partId": "t1-r540c2",
+  "span": {
+   "start": 72237,
+   "end": 72247
+  },
+  "literal": "8477.20.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1259",
+  "partId": "t1-r541c2",
+  "span": {
+   "start": 72284,
+   "end": 72294
+  },
+  "literal": "8477.20.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1260",
+  "partId": "t1-r542c2",
+  "span": {
+   "start": 72533,
+   "end": 72543
+  },
+  "literal": "8477.30.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1261",
+  "partId": "t1-r543c2",
+  "span": {
+   "start": 72604,
+   "end": 72614
+  },
+  "literal": "8477.30.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1262",
+  "partId": "t1-r544c2",
+  "span": {
+   "start": 72722,
+   "end": 72732
+  },
+  "literal": "8477.40.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1263",
+  "partId": "t1-r545c2",
+  "span": {
+   "start": 72819,
+   "end": 72829
+  },
+  "literal": "8477.40.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1264",
+  "partId": "t1-r546c2",
+  "span": {
+   "start": 72940,
+   "end": 72950
+  },
+  "literal": "8477.51.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1265",
+  "partId": "t1-r547c2",
+  "span": {
+   "start": 73021,
+   "end": 73031
+  },
+  "literal": "8477.59.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1266",
+  "partId": "t1-r548c2",
+  "span": {
+   "start": 73066,
+   "end": 73076
+  },
+  "literal": "8477.59.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1267",
+  "partId": "t1-r549c2",
+  "span": {
+   "start": 73149,
+   "end": 73159
+  },
+  "literal": "8477.59.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1268",
+  "partId": "t1-r550c2",
+  "span": {
+   "start": 73284,
+   "end": 73294
+  },
+  "literal": "8477.80.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1269",
+  "partId": "t1-r551c2",
+  "span": {
+   "start": 73426,
+   "end": 73436
+  },
+  "literal": "8477.80.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1270",
+  "partId": "t1-r552c2",
+  "span": {
+   "start": 73886,
+   "end": 73896
+  },
+  "literal": "8478.10.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1271",
+  "partId": "t1-r554c2",
+  "span": {
+   "start": 74171,
+   "end": 74181
+  },
+  "literal": "8479.20.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1272",
+  "partId": "t1-r555c2",
+  "span": {
+   "start": 74374,
+   "end": 74384
+  },
+  "literal": "8479.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1273",
+  "partId": "t1-r556c2",
+  "span": {
+   "start": 74447,
+   "end": 74457
+  },
+  "literal": "8479.40.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1274",
+  "partId": "t1-r557c2",
+  "span": {
+   "start": 74576,
+   "end": 74586
+  },
+  "literal": "8479.81.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1275",
+  "partId": "t1-r558c2",
+  "span": {
+   "start": 74713,
+   "end": 74723
+  },
+  "literal": "8479.81.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1276",
+  "partId": "t1-r559c2",
+  "span": {
+   "start": 74810,
+   "end": 74820
+  },
+  "literal": "8479.89.22",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1277",
+  "partId": "t1-r560c2",
+  "span": {
+   "start": 74887,
+   "end": 74897
+  },
+  "literal": "8479.89.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1278",
+  "partId": "t1-r562c2",
+  "span": {
+   "start": 75134,
+   "end": 75144
+  },
+  "literal": "8480.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1279",
+  "partId": "t1-r563c2",
+  "span": {
+   "start": 75307,
+   "end": 75317
+  },
+  "literal": "8480.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1280",
+  "partId": "t1-r564c2",
+  "span": {
+   "start": 75424,
+   "end": 75434
+  },
+  "literal": "8480.41.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1281",
+  "partId": "t1-r565c2",
+  "span": {
+   "start": 75463,
+   "end": 75473
+  },
+  "literal": "8480.49.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1282",
+  "partId": "t1-r566c2",
+  "span": {
+   "start": 75564,
+   "end": 75574
+  },
+  "literal": "8480.49.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1283",
+  "partId": "t1-r567c2",
+  "span": {
+   "start": 75611,
+   "end": 75621
+  },
+  "literal": "8480.50.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1284",
+  "partId": "t1-r568c2",
+  "span": {
+   "start": 75670,
+   "end": 75680
+  },
+  "literal": "8480.60.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1285",
+  "partId": "t1-r569c2",
+  "span": {
+   "start": 75778,
+   "end": 75788
+  },
+  "literal": "8480.71.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1286",
+  "partId": "t1-r570c2",
+  "span": {
+   "start": 75848,
+   "end": 75858
+  },
+  "literal": "8480.79.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1287",
+  "partId": "t1-r572c2",
+  "span": {
+   "start": 76090,
+   "end": 76100
+  },
+  "literal": "8481.80.93",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1288",
+  "partId": "t1-r573c2",
+  "span": {
+   "start": 76140,
+   "end": 76150
+  },
+  "literal": "8481.80.95",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1289",
+  "partId": "t1-r574c2",
+  "span": {
+   "start": 76193,
+   "end": 76203
+  },
+  "literal": "8481.80.97",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1290",
+  "partId": "t1-r575c2",
+  "span": {
+   "start": 76331,
+   "end": 76341
+  },
+  "literal": "8481.80.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1291",
+  "partId": "t1-r577c2",
+  "span": {
+   "start": 76908,
+   "end": 76918
+  },
+  "literal": "8483.40.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1292",
+  "partId": "t1-r578c2",
+  "span": {
+   "start": 77007,
+   "end": 77017
+  },
+  "literal": "8483.40.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1293",
+  "partId": "t1-r580c2",
+  "span": {
+   "start": 77211,
+   "end": 77221
+  },
+  "literal": "8504.40.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1294",
+  "partId": "t1-r581c2",
+  "span": {
+   "start": 77427,
+   "end": 77437
+  },
+  "literal": "8504.40.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1295",
+  "partId": "t1-r583c2",
+  "span": {
+   "start": 77769,
+   "end": 77779
+  },
+  "literal": "8514.10.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1296",
+  "partId": "t1-r584c2",
+  "span": {
+   "start": 77844,
+   "end": 77854
+  },
+  "literal": "8514.20.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1297",
+  "partId": "t1-r585c2",
+  "span": {
+   "start": 77917,
+   "end": 77927
+  },
+  "literal": "8514.20.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1298",
+  "partId": "t1-r586c2",
+  "span": {
+   "start": 78004,
+   "end": 78014
+  },
+  "literal": "8514.30.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1299",
+  "partId": "t1-r587c2",
+  "span": {
+   "start": 78070,
+   "end": 78080
+  },
+  "literal": "8514.30.21",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1300",
+  "partId": "t1-r588c2",
+  "span": {
+   "start": 78209,
+   "end": 78219
+  },
+  "literal": "8514.30.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1301",
+  "partId": "t1-r589c2",
+  "span": {
+   "start": 78497,
+   "end": 78507
+  },
+  "literal": "8514.90.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1302",
+  "partId": "t1-r591c2",
+  "span": {
+   "start": 78956,
+   "end": 78966
+  },
+  "literal": "8515.21.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1303",
+  "partId": "t1-r592c2",
+  "span": {
+   "start": 79125,
+   "end": 79135
+  },
+  "literal": "8515.31.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1304",
+  "partId": "t1-r593c2",
+  "span": {
+   "start": 79265,
+   "end": 79275
+  },
+  "literal": "8515.31.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1305",
+  "partId": "t1-r594c2",
+  "span": {
+   "start": 79368,
+   "end": 79378
+  },
+  "literal": "8515.39.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1306",
+  "partId": "t1-r595c2",
+  "span": {
+   "start": 79447,
+   "end": 79457
+  },
+  "literal": "8515.80.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1307",
+  "partId": "t1-r596c2",
+  "span": {
+   "start": 79516,
+   "end": 79526
+  },
+  "literal": "8515.80.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1308",
+  "partId": "t1-r597c2",
+  "span": {
+   "start": 79750,
+   "end": 79760
+  },
+  "literal": "8543.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1309",
+  "partId": "t1-r598c2",
+  "span": {
+   "start": 79810,
+   "end": 79820
+  },
+  "literal": "8607.19.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1310",
+  "partId": "t1-r599c2",
+  "span": {
+   "start": 79937,
+   "end": 79947
+  },
+  "literal": "9024.10.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e101",
+  "partId": "t1-r600",
+  "span": {
+   "start": 80015,
+   "end": 80031
+  },
+  "literal": "Conv. ICMS 95/13",
+  "domain": "CITATION",
+  "note": "convênio citado"
+ },
+ {
+  "id": "e1311",
+  "partId": "t1-r602c2",
+  "span": {
+   "start": 80258,
+   "end": 80268
+  },
+  "literal": "8543.70.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1312",
+  "partId": "t1-r603c2",
+  "span": {
+   "start": 80297,
+   "end": 80307
+  },
+  "literal": "8543.70.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1313",
+  "partId": "t2-r1c1",
+  "span": {
+   "start": 80567,
+   "end": 80577
+  },
+  "literal": "8481.80.99",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1314",
+  "partId": "t2-r2c1",
+  "span": {
+   "start": 80639,
+   "end": 80649
+  },
+  "literal": "7307.19.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1315",
+  "partId": "t2-r3c1",
+  "span": {
+   "start": 80666,
+   "end": 80676
+  },
+  "literal": "8207.50.11",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1316",
+  "partId": "t2-r3c1",
+  "span": {
+   "start": 80679,
+   "end": 80689
+  },
+  "literal": "8207.50.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1317",
+  "partId": "t2-r4c1",
+  "span": {
+   "start": 80751,
+   "end": 80761
+  },
+  "literal": "8207.30.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1318",
+  "partId": "t2-r6c1",
+  "span": {
+   "start": 80922,
+   "end": 80932
+  },
+  "literal": "8402.11.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1319",
+  "partId": "t2-r6c1",
+  "span": {
+   "start": 80935,
+   "end": 80945
+  },
+  "literal": "8402.20.20",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e2191",
+  "partId": "t2-r7c0",
+  "span": {
+   "start": 81010,
+   "end": 81014
+  },
+  "literal": "8402",
+  "domain": "NCM",
+  "note": "posição (NNNN ou NN.NN, isolada ou em lista) sem qualificação NBM"
+ },
+ {
+  "id": "e1320",
+  "partId": "t2-r7c1",
+  "span": {
+   "start": 81019,
+   "end": 81029
+  },
+  "literal": "8404.10.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1321",
+  "partId": "t2-r8c1",
+  "span": {
+   "start": 81087,
+   "end": 81097
+  },
+  "literal": "8404.20.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1322",
+  "partId": "t2-r9c1",
+  "span": {
+   "start": 81173,
+   "end": 81183
+  },
+  "literal": "8405.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1323",
+  "partId": "t2-r10c1",
+  "span": {
+   "start": 81212,
+   "end": 81222
+  },
+  "literal": "8405.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1324",
+  "partId": "t2-r12c1",
+  "span": {
+   "start": 81307,
+   "end": 81317
+  },
+  "literal": "8406.10.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1325",
+  "partId": "t2-r13c1",
+  "span": {
+   "start": 81346,
+   "end": 81356
+  },
+  "literal": "8406.81.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1326",
+  "partId": "t2-r13c1",
+  "span": {
+   "start": 81359,
+   "end": 81369
+  },
+  "literal": "8406.82.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1327",
+  "partId": "t2-r15c1",
+  "span": {
+   "start": 81493,
+   "end": 81503
+  },
+  "literal": "8410.11.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1328",
+  "partId": "t2-r15c1",
+  "span": {
+   "start": 81506,
+   "end": 81516
+  },
+  "literal": "8410.13.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1329",
+  "partId": "t2-r16c1",
+  "span": {
+   "start": 81550,
+   "end": 81560
+  },
+  "literal": "8410.90.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1330",
+  "partId": "t2-r18c1",
+  "span": {
+   "start": 81687,
+   "end": 81697
+  },
+  "literal": "8412.80.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1331",
+  "partId": "t2-r19c1",
+  "span": {
+   "start": 81726,
+   "end": 81736
+  },
+  "literal": "8412.80.00",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1332",
+  "partId": "t2-r20c1",
+  "span": {
+   "start": 81772,
+   "end": 81782
+  },
+  "literal": "8413.70.10",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1333",
+  "partId": "t2-r20c1",
+  "span": {
+   "start": 81785,
+   "end": 81795
+  },
+  "literal": "8413.70.90",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1334",
+  "partId": "t2-r23c1",
+  "span": {
+   "start": 81951,
+   "end": 81961
+  },
+  "literal": "8414.80.12",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1335",
+  "partId": "t2-r24c1",
+  "span": {
+   "start": 82005,
+   "end": 82015
+  },
+  "literal": "8414.80.13",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1336",
+  "partId": "t2-r25c1",
+  "span": {
+   "start": 82044,
+   "end": 82054
+  },
+  "literal": "8414.80.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1337",
+  "partId": "t2-r26c1",
+  "span": {
+   "start": 82082,
+   "end": 82092
+  },
+  "literal": "8414.80.19",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ },
+ {
+  "id": "e1338",
+  "partId": "t2-r28c1",
+  "span": {
+   "start": 82195,
+   "end": 82205
+  },
+  "literal": "8414.80.31",
+  "domain": "NCM",
+  "note": "NCM 8 dígitos"
+ }
+]

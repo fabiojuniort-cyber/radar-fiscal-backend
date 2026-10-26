@@ -1,0 +1,32 @@
+{
+ "goldVersion": "ANAT-GOLD/1.0.0",
+ "id": "01",
+ "partition": "development",
+ "preparation": "confaz-sanitized-html/1.0.0",
+ "canonicalTextSha256": "465186b95fbd52e3d771257d80105c0408e77b61f7192860802907334ddfbeb8",
+ "canonicalTextUtf16Length": 194470,
+ "status": "reviewed",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "gaps": [
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Escopo de códigos (definido antes da medição): todo código de nomenclatura com ponto (6, 8, 10 dígitos e atípico dddd.dddd) e toda posição introduzida por 'posição/posições' nos formatos NNNN ou NN.NN, isolada ou em lista (vírgula, 'a', 'ou', 'e'); 'X a Y' é faixa M01; 'exceto/exclusive/salvo' gera uma relação de exceção por operador com todos os alvos; capítulos de 2 dígitos ('Capítulo 84') são anotados como informativos (correção R2, GPT/Codex, 18/10/2026). Fora do escopo, por definição: anos, datas, números de item/subitem e números de atos. Domínio pela qualificação explícita (cabeçalho 'CÓDIGO DA NBM/SH' ou 'da NBM'); sem qualificação, NCM."
+  },
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Linhas 'Redação anterior' em tabelas: considerada histórica apenas a sequência de linhas imediatamente seguinte com o mesmo nº de item; casos de múltiplos itens dependem de revisão."
+  }
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "d6ba1bbf0bb1fe232df79337fcc87ed9576d024e92337d68e83acc833526b48a",
+  "notes": "CONFAZ: contexto histórico segue a marcação editorial oficial (RedaoAnt/RemissoAnt); notas de remissão/publicação proibidas; hierarquia por marcadores de cláusula/§/inciso/alínea; redações anteriores são irmãs da vigente candidata. Citações de convênios/atos enumeradas por padrão; cada número de lista (\", 97/99 e 08/00\") anotado como citação própria. Anexos: I e II vigentes candidatos (Conv. 89/09); versões anteriores do Anexo I (Conv. 112/08) e do Anexo II (Conv. 112/08) e redação original dos Anexos I e II (NBM/SH) são irmãs históricas no nível do documento, por estarem separadas no texto. Linhas de nota dentro das tabelas são notas editoriais; a linha imediatamente seguinte a uma nota 'Redação anterior' (RemissoAnt) é a redação anterior do mesmo subitem (histórica). Coluna NCM/SH: códigos NCM (8 e 6 dígitos; 4 casos atípicos dddd.dddd anotados como NCM com nota); tabelas originais: códigos NBM/SH de 10 dígitos como NBM. Faixas 'X a Y' anotadas como relação range sem expansão. Ocorrências históricas (ex.: 8450.11.00) permanecem anotadas com contexto histórico.\n\nR3 (GPT/Codex) no SHA 04d896e5f6ab6a7c95c9a813e4f41280f48650f3: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5566220164 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6258080394"
+ }
+}

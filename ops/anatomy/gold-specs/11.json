@@ -1,0 +1,598 @@
+{
+ "id": "11",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "notes": "IN que altera a IN RFB 2.228/2024. Cada redação citada (de \" até (NR)) é um único quoted_text proibido; a estrutura interna da redação citada (arts. 143-A a 143-L, §§, incisos) não é anotada como dispositivo próprio. Remissões internas (art. 143-J etc.) e percentuais fora do escopo de entidades v1. Sem NCM.",
+ "blocks": [
+  {
+   "id": "ep",
+   "type": "epigraph",
+   "at": {
+    "line": 1
+   },
+   "context": "prohibited",
+   "reason": "dou_identifica"
+  },
+  {
+   "id": "em",
+   "type": "summary",
+   "at": {
+    "line": 2
+   },
+   "context": "prohibited",
+   "reason": "dou_ementa"
+  },
+  {
+   "id": "pre",
+   "type": "preamble",
+   "at": {
+    "line": 3
+   },
+   "context": "prohibited",
+   "reason": "preamble"
+  },
+  {
+   "id": "a1",
+   "type": "article",
+   "at": {
+    "lines": [
+     4,
+     90
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a1-q1",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     5,
+     7
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q2",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     8,
+     12
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q3",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     13,
+     18
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q4",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     19,
+     22
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q5",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     23,
+     32
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q6",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     33,
+     34
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q7",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     35,
+     41
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q8",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     42,
+     49
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q9",
+   "type": "quoted_text",
+   "at": {
+    "line": 50
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q10",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     51,
+     53
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q11",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     54,
+     58
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q12",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     59,
+     62
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q13",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     63,
+     73
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q14",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     74,
+     82
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a1-q15",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     83,
+     90
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a1"
+  },
+  {
+   "id": "a2",
+   "type": "article",
+   "at": {
+    "line": 91
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a3",
+   "type": "article",
+   "at": {
+    "lines": [
+     92,
+     94
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a3-q1",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     93,
+     94
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a3"
+  },
+  {
+   "id": "a4",
+   "type": "article",
+   "at": {
+    "lines": [
+     95,
+     107
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a4-i1",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     96,
+     98
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a4"
+  },
+  {
+   "id": "a4-i1-q",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     97,
+     98
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a4-i1"
+  },
+  {
+   "id": "a4-i2",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     99,
+     101
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a4"
+  },
+  {
+   "id": "a4-i2-q",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     100,
+     101
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a4-i2"
+  },
+  {
+   "id": "a4-i3",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     102,
+     104
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a4"
+  },
+  {
+   "id": "a4-i3-q",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     103,
+     104
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a4-i3"
+  },
+  {
+   "id": "a4-i4",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     105,
+     107
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a4"
+  },
+  {
+   "id": "a4-i4-q",
+   "type": "quoted_text",
+   "at": {
+    "lines": [
+     106,
+     107
+    ]
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a4-i4"
+  },
+  {
+   "id": "a5",
+   "type": "article",
+   "at": {
+    "lines": [
+     108,
+     118
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "a5-i1",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     109,
+     110
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a5"
+  },
+  {
+   "id": "a5-i1-q",
+   "type": "quoted_text",
+   "at": {
+    "line": 110
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a5-i1"
+  },
+  {
+   "id": "a5-i2",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     111,
+     112
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a5"
+  },
+  {
+   "id": "a5-i2-q",
+   "type": "quoted_text",
+   "at": {
+    "line": 112
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a5-i2"
+  },
+  {
+   "id": "a5-i3",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     113,
+     114
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a5"
+  },
+  {
+   "id": "a5-i3-q",
+   "type": "quoted_text",
+   "at": {
+    "line": 114
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a5-i3"
+  },
+  {
+   "id": "a5-i4",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     115,
+     116
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a5"
+  },
+  {
+   "id": "a5-i4-q",
+   "type": "quoted_text",
+   "at": {
+    "line": 116
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a5-i4"
+  },
+  {
+   "id": "a5-i5",
+   "type": "inciso",
+   "at": {
+    "lines": [
+     117,
+     118
+    ]
+   },
+   "context": "operative_candidate",
+   "reason": "inciso_marker",
+   "parent": "a5"
+  },
+  {
+   "id": "a5-i5-q",
+   "type": "quoted_text",
+   "at": {
+    "line": 118
+   },
+   "context": "prohibited",
+   "reason": "amended_wording",
+   "parent": "a5-i5"
+  },
+  {
+   "id": "a6",
+   "type": "article",
+   "at": {
+    "line": 119
+   },
+   "context": "operative_candidate",
+   "reason": "article_marker"
+  },
+  {
+   "id": "sig",
+   "type": "signature",
+   "at": {
+    "line": 120
+   },
+   "context": "prohibited",
+   "reason": "dou_assina"
+  }
+ ],
+ "entities": [
+  {
+   "part": "em",
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION"
+  },
+  {
+   "part": "pre",
+   "literal": "Portaria ME nº 284, de 27 de julho de 2020",
+   "domain": "CITATION"
+  },
+  {
+   "part": "pre",
+   "literal": "Lei nº 15.079, de 27 de dezembro de 2024",
+   "domain": "CITATION"
+  },
+  {
+   "part": "a1",
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION",
+   "note": "ato alterado"
+  },
+  {
+   "part": "a2",
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION"
+  },
+  {
+   "part": "a3",
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION"
+  },
+  {
+   "part": "a4",
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION"
+  },
+  {
+   "part": "a5",
+   "literal": "Instrução Normativa RFB nº 2.228, de 3 de outubro de 2024",
+   "domain": "CITATION"
+  }
+ ],
+ "gaps": [
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Bloco citado do art. 143-L (linhas 83-90) termina em \". (NR)\" sem aspas de fechamento na fonte; o gold fecha a redação citada no (NR)."
+  },
+  {
+   "kind": "other",
+   "span": null,
+   "resource": null,
+   "note": "Estrutura interna das redações citadas não anotada (zona proibida)."
+  }
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "678bf7e0823ac148a55da75c5f5c681ebb3571d8fd298ea7e5bdbc5858c6ad79",
+  "notes": "R2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
+}

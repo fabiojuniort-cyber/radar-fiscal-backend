@@ -1,0 +1,85 @@
+{
+ "id": "03",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "notes": "Retificação: introdução operativa; 'Onde se lê' e 'Leia-se' citam o ato retificado e ficam proibidos. O bloco 'Leia-se' inclui por inteiro 'mantidas as demais condições' e o processo SEI (exclusão conservadora). Números de requerimento/processo não são NCM.",
+ "blocks": [
+  {
+   "id": "ep",
+   "type": "epigraph",
+   "at": {
+    "line": 1
+   },
+   "context": "prohibited",
+   "reason": "dou_identifica"
+  },
+  {
+   "id": "intro",
+   "type": "body",
+   "at": {
+    "line": 2
+   },
+   "context": "operative_candidate",
+   "reason": "rectification_intro"
+  },
+  {
+   "id": "orig",
+   "type": "quoted_text",
+   "at": {
+    "line": 3
+   },
+   "context": "prohibited",
+   "reason": "rectification_original"
+  },
+  {
+   "id": "corr",
+   "type": "quoted_text",
+   "at": {
+    "line": 4
+   },
+   "context": "prohibited",
+   "reason": "rectification_corrected"
+  }
+ ],
+ "entities": [
+  {
+   "part": "intro",
+   "literal": "Portaria nº 340, de 25 de agosto de 2026",
+   "domain": "CITATION",
+   "note": "ato retificado"
+  },
+  {
+   "part": "intro",
+   "literal": "Diário Oficial da União, nº 161, de 26 de agosto de 2026, Seção 1, página 25",
+   "domain": "OTHER",
+   "note": "referência de publicação"
+  },
+  {
+   "part": "orig",
+   "literal": "344/2026/DRIN/CA/ADMV/GM.MDHC/MDHC",
+   "domain": "OTHER",
+   "note": "nº de requerimento (redação original); não é NCM"
+  },
+  {
+   "part": "corr",
+   "literal": "2003.01.26732",
+   "nth": 0,
+   "domain": "OTHER",
+   "note": "nº de requerimento (redação corrigida); formato pontuado, não é NCM"
+  },
+  {
+   "part": "corr",
+   "literal": "2003.01.26732",
+   "nth": 1,
+   "domain": "PROCESS",
+   "note": "Processo SEI; não é NCM"
+  }
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "a4c9e445b71772064298afab7edc18fa7dc4a36804c7926a24a57806aed6b48b",
+  "notes": "R2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
+}

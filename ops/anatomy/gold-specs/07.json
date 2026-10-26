@@ -1,0 +1,106 @@
+{
+ "id": "07",
+ "annotator": "CLAUDE-EXEC",
+ "annotatedAt": "2026-10-17",
+ "notes": "Despacho MF: cabeçalho (processo/interessado/assunto) não operativo; decisão no parágrafo 5. 'nº 26, de 14 de agosto de 2026' é Resolução do Senado elíptica. Valores monetários fora do escopo de entidades v1.",
+ "blocks": [
+  {
+   "id": "ep",
+   "type": "epigraph",
+   "at": {
+    "line": 1
+   },
+   "context": "prohibited",
+   "reason": "dou_identifica"
+  },
+  {
+   "id": "h1",
+   "type": "publication_header",
+   "at": {
+    "line": 2
+   },
+   "context": "prohibited",
+   "reason": "despacho_header"
+  },
+  {
+   "id": "h2",
+   "type": "publication_header",
+   "at": {
+    "line": 3
+   },
+   "context": "prohibited",
+   "reason": "despacho_header"
+  },
+  {
+   "id": "h3",
+   "type": "publication_header",
+   "at": {
+    "line": 4
+   },
+   "context": "prohibited",
+   "reason": "despacho_header"
+  },
+  {
+   "id": "dec",
+   "type": "body",
+   "at": {
+    "line": 5
+   },
+   "context": "operative_candidate",
+   "reason": "despacho_decision"
+  },
+  {
+   "id": "sig",
+   "type": "signature",
+   "at": {
+    "line": 6
+   },
+   "context": "prohibited",
+   "reason": "dou_assina"
+  },
+  {
+   "id": "cargo",
+   "type": "signature",
+   "at": {
+    "line": 7
+   },
+   "context": "prohibited",
+   "reason": "dou_cargo"
+  }
+ ],
+ "entities": [
+  {
+   "part": "h1",
+   "literal": "17944.003839/2025-17",
+   "domain": "PROCESS"
+  },
+  {
+   "part": "dec",
+   "literal": "Lei Complementar nº 101, de 4 de maio de 2000",
+   "domain": "CITATION"
+  },
+  {
+   "part": "dec",
+   "literal": "Resolução nº 48, de 21 de dezembro de 2007",
+   "domain": "CITATION"
+  },
+  {
+   "part": "dec",
+   "literal": "nº 26, de 14 de agosto de 2026",
+   "domain": "CITATION",
+   "note": "Resolução do Senado nº 26 (elipse)"
+  },
+  {
+   "part": "dec",
+   "literal": "Decreto-Lei nº 1.312, de 15 de fevereiro de 1974",
+   "domain": "CITATION"
+  }
+ ],
+ "review": {
+  "reviewer": "GPT/Codex",
+  "status": "approved",
+  "reviewedAt": "2026-10-18",
+  "approvedContentSha256": "59867895a15ab35d4cec3612430da22d9896c7ebd7b7846d9a27daed69e1687d",
+  "notes": "R2 (GPT/Codex) no SHA c8ee0fe4fca3a76cd0e216bb6e3a088c9cad0c17: approved no escopo estrutural v1 e no hash exato. Parecer: https://github.com/fabiojuniort-cyber/radar-fiscal-backend/pull/244#pullrequestreview-5563875392 ; registro: https://github.com/fabiojuniort-cyber/tribusca-control/issues/116#issuecomment-6252319710"
+ }
+}

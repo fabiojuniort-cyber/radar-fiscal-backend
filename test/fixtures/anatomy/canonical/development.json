@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "partition": "development",
+  "unit": "UTF-16",
+  "hash": "SHA-256 of UTF-8 bytes of canonicalText",
+  "note": "Hashes and lengths only. Changing the preparation or reader text extraction requires explicit regeneration and manual re-anchoring of gold.",
+  "entries": [
+    {
+      "id": "01",
+      "source": "CONFAZ",
+      "preparation": "confaz-sanitized-html/1.0.0",
+      "preparationId": null,
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/confaz/CV052_91.sanitized.html",
+          "sha256": "bd035220215bf691ce6dd1c6f8c9d8b8e8c3180f9df43f97f0debd3a3ac1dd83"
+        }
+      ],
+      "canonicalTextSha256": "465186b95fbd52e3d771257d80105c0408e77b61f7192860802907334ddfbeb8",
+      "canonicalTextUtf16Length": 194470
+    },
+    {
+      "id": "02",
+      "source": "CONFAZ",
+      "preparation": "confaz-sanitized-html/1.0.0",
+      "preparationId": null,
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/confaz/CV100_97.sanitized.html",
+          "sha256": "fe90af8fb89645b2bf40e8e3f8f6cd2cb4c6c15ef044ce58f1683482de5999f7"
+        }
+      ],
+      "canonicalTextSha256": "e8625c2705b652eaeec2551bf9fc9ab1aa6ed70047b159c687ca6aa1aa33e561",
+      "canonicalTextUtf16Length": 30591
+    },
+    {
+      "id": "03",
+      "source": "DOU",
+      "preparation": "dou-xml-cdata/1.0.0",
+      "preparationId": "a45d190b13c3fb30b2eb0ed3e732a58f9325ca14b04c4d448cc698bbb7fde44f",
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/515_20260918_24377394.xml",
+          "sha256": "6a2e0999fa3548bf446a3afe3a78812215b462c8a056ad03fd89d6443c1faa86"
+        }
+      ],
+      "canonicalTextSha256": "c9af5e182931961d75e6ae1cc1b4dab158e82b0bbbdc2428ee69a31d800b9d41",
+      "canonicalTextUtf16Length": 433
+    },
+    {
+      "id": "05",
+      "source": "DOU",
+      "preparation": "dou-xml-cdata/1.0.0",
+      "preparationId": "8a17c0d16b281f3eca7840f2a6241505f3fa98f07594edc417ed3aafe84db8da",
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/515_20260918_24382400.xml",
+          "sha256": "f458b2983e0663d5b3a1449c711763abb9fb318faee6343c3d13decae68df6b5"
+        }
+      ],
+      "canonicalTextSha256": "7dc6c74fc357f2ff303cf84fcc8f31b003969795235e871ee2d27f24266b9276",
+      "canonicalTextUtf16Length": 1099
+    },
+    {
+      "id": "07",
+      "source": "DOU",
+      "preparation": "dou-xml-cdata/1.0.0",
+      "preparationId": "50963ceccdfe9a635d9fbe7e04eeb8dbc36efba3fd095067b8fd452ecaad11f3",
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/600_20260918_24382325.xml",
+          "sha256": "a76ad2b705941d32b2e80b11b637d3b17a97127b6d18f12c9ec47fb75c0fe19c"
+        }
+      ],
+      "canonicalTextSha256": "6f9fd606a8ec136ff6ce14edb3353608b5ccfe2accc861c0580967d7a1bf48e2",
+      "canonicalTextUtf16Length": 1222
+    },
+    {
+      "id": "10",
+      "source": "DOU",
+      "preparation": "dou-xml-cdata/1.0.0",
+      "preparationId": "2d156a3ee9caac83be5ce5c8430a1126bf3870ad48844ef301c6f8745c828171",
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24378456-1.xml",
+          "sha256": "3da9af6459fb41d0a0488197e3fd6bb3e4b4763132d79f49fe2108f27ab8e081"
+        },
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24378456-2.xml",
+          "sha256": "1533c17798d3938f56d0c36ee3bce3532840540f5312e1c99ffcc1a830a235b7"
+        },
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24378456-3.xml",
+          "sha256": "f7870fc68470cddf5cf55bf372dc674e1cb49836d8eedb4d5ef80c05b432099b"
+        }
+      ],
+      "canonicalTextSha256": "525a7604c9344e6b1ee7895c3ca382e1a184492e1bffa97be23f75e35a3f94b1",
+      "canonicalTextUtf16Length": 23246
+    },
+    {
+      "id": "11",
+      "source": "DOU",
+      "preparation": "dou-xml-cdata/1.0.0",
+      "preparationId": "19c10bf8dc3b935b20aad8802ca41b885171374d73b9c2fc4df030f03df33b05",
+      "inputs": [
+        {
+          "path": "test/fixtures/anatomy/inputs/dou/602_20260918_24380292.xml",
+          "sha256": "9f0b1aa9ef9d7b7957e549a51c9415d49b5e28f59c9eb14875e27b6b7973c29f"
+        }
+      ],
+      "canonicalTextSha256": "f34ce3ce4ede15770ba1420763f80c3a83e76d252f6326b19920fde4a65a17ef",
+      "canonicalTextUtf16Length": 17021
+    }
+  ]
+}
