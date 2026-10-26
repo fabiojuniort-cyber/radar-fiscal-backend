@@ -64,6 +64,12 @@ Everything else is ANAT module, tests, docs and synthetic or reviewed fixtures a
   - backend `578ba43` harness on the **project migrations through 079** (`ANAT_PROJECT_MIGRATIONS=1`), web#131 `52e41d2` built with the flag: **4 passed, 4 skipped by design** (the mutating flow runs on one viewport, the others check its result);
   - the regenerated screenshots were discarded, so web#131 is unchanged.
 
+- **Final HEAD `9608bd6`** (approved), green on every workflow:
+  - CI `verify` run 40274230995;
+  - ANAT run 40274231004;
+  - LOTE-2 PG18 run 40274231002.
+  - The only differences from `578ba43` are documentation (this matrix).
+
 ## 4. TAX-09 (taxonomy front): evidence, no change
 - **Command:** `npm run test:integration` after `npm run db:prepare`, on a fresh `radar_fiscal_test`, with the backend CI's full-regression environment. Same container and order, 5 alternating runs:
 
@@ -90,9 +96,9 @@ Everything else is ANAT module, tests, docs and synthetic or reviewed fixtures a
 ## 6. Remaining items before any deployment
 1. Final integration review of #268 and web#131.
 2. TAX-09 decision by COORD and the taxonomy front.
-3. Operational rehearsal in a separate environment (specific authorisation):
+3. Operational rehearsal: executed in local disposable containers (no staging available); see `ADMIN-01-OPS-REHEARSAL.md`. Still open:
    - real `audit_log` statistics;
-   - container RSS limit;
-   - the staging e2e with the flag on.
+   - sizing the target container from the observed ~700 MiB peak (512 MiB was OOM-killed);
+   - a staging run if one becomes available.
 4. Cross-repository e2e in CI: needs the credential authorisation of the readiness proposal.
 5. Re-check numbering and the audit policy at merge time.
