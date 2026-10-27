@@ -3,7 +3,7 @@
 **Status:** preparation only (issue tribusca-control#116).
 
 The feature is **installed and off** in production:
-- backend `e4fbcf0` (migrations 077–079 applied, verifiers green);
+- backend: production runs `fd568acc` (deployed 2026-10-27 02:45 UTC; it contains the ANAT install from `e4fbcf0`: migrations 077–079 applied, verifiers green). `main` is at `e385113` (#274, test-only, not deployed);
 - web `bea201d`;
 - `ANAT_RULES_ADMIN_ENABLED` and `VITE_ENABLE_ANAT_RULES_ADMIN` absent.
 
@@ -44,7 +44,8 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
      - It found **one active (unrevoked) `PLATFORM_ADMIN`**: that person is the only one who would gain technical access if the flag were turned on today.
    - **Pilot admins: two people** (author and reviewer; the author cannot review their own candidate).
      - The one active admin is the first participant.
-     - **The second participant is still pending.** They would need the role first, which is a separate authorisation.
+     - **The second participant is still pending.** They are needed **only to test review/approval**: the author cannot review their own candidate, so draft → freeze → simulate → compare can run with one admin, but the review step cannot.
+     - They would need the `PLATFORM_ADMIN` role first, which is a separate authorisation.
      - Until then, the review step of the pilot cannot run.
 2. **Capacity.**
    - Rehearsal: peak process RSS ~700 MiB with 2 concurrent near-limit simulations; at 512 MiB and below, the whole process was OOM-killed.
@@ -79,10 +80,10 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
 | Signal | Source | Stop threshold |
 |---|---|---|
 | Backend restarts / OOM | Railway deployments and logs | any unexplained restart |
-| Backend memory | Railway metrics | > 2 GB sustained, or any OOM |
+| Backend memory | Railway metrics (1-minute samples) | > 2 GB for **5 consecutive minutes**, or any OOM |
 | 5xx on any route | Railway HTTP metrics | any new 5xx |
 | 429 `QUEUE_FULL` / `QUEUE_TIMEOUT` on simulate/compare | HTTP logs (`/api/v1/admin/anatomy-rules`) | repeated refusals in normal use (capacity review) |
-| Latency of non-ANAT routes | HTTP logs | p95 regression clearly above baseline while simulations run |
+| Latency of non-ANAT routes | HTTP logs | p95 > **2× the baseline p95** (§2.4, last 24 h before activation) **and** > 500 ms, sustained over **10 consecutive minutes** |
 | Audit | `GET /audit` (`anat_list_audit`) | an action without its audit event; **any `ANAT_RULES_ACTIVATED` during the pilot** |
 | Actors | `GET /audit` actor ids | any actor outside the two named admins |
 
