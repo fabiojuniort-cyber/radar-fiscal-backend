@@ -40,7 +40,12 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
      (Unrevoked roles only. Nothing else is read.)
    - COORD confirms each listed person is acceptable for the pilot. If anyone is not, removing the role is a **separate authorisation** and happens before activation.
    - **No development is added for this**: no per-admin allowlist, no configurable limits (COORD guidance).
-   - **Pilot admins: two people named by Fábio** (author and reviewer; the author cannot review their own candidate). Pending.
+   - **Inventory: done** (read-only query above, run by Fábio; result kept in a restricted channel, no e-mail published here).
+     - It found **one active (unrevoked) `PLATFORM_ADMIN`**: that person is the only one who would gain technical access if the flag were turned on today.
+   - **Pilot admins: two people** (author and reviewer; the author cannot review their own candidate).
+     - The one active admin is the first participant.
+     - **The second participant is still pending.** They would need the role first, which is a separate authorisation.
+     - Until then, the review step of the pilot cannot run.
 2. **Capacity.**
    - Rehearsal: peak process RSS ~700 MiB with 2 concurrent near-limit simulations; at 512 MiB and below, the whole process was OOM-killed.
    - Production backend today: limit 24 GB, use 68–274 MB, 1 replica. **OK**, but record that the API shares this process: an OOM takes every route down.
@@ -91,7 +96,7 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
 5. Verify: ANAT 404, `/health` 200, no restart loop; record on #116.
 
 ## 6. Open decisions for COORD
-- **Fábio:** the two pilot admins (the only personal definition pending).
+- **Fábio:** the second pilot participant (the inventory is done; one active admin).
 - **COORD:**
   - confirm the full `PLATFORM_ADMIN` roster (§2.1), and whether any role is removed first (separate authorisation);
   - the pilot window.
