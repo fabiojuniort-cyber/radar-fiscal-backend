@@ -63,7 +63,8 @@ test('migration order: base, then audit policy (creates anat_rules_writer), then
   const { readdir } = await import('node:fs/promises');
   const files = (await readdir(new URL('../migrations/', import.meta.url))).filter((f) => /^\d{3}_/u.test(f)).sort();
   const at = (f: string) => files.indexOf(f);
-  assert.deepEqual(files.slice(-3), ['077_anat_base.sql', '078_anat_audit_policy.sql', '079_anat_rules_admin.sql']);
+  assert.ok(at('077_anat_base.sql') >= 0, 'ANAT base is present');
+  assert.deepEqual(files.slice(at('077_anat_base.sql'), at('077_anat_base.sql') + 3), ['077_anat_base.sql', '078_anat_audit_policy.sql', '079_anat_rules_admin.sql']);
   assert.ok(at('077_anat_base.sql') < at('078_anat_audit_policy.sql') && at('078_anat_audit_policy.sql') < at('079_anat_rules_admin.sql'));
   assert.match(await file('migrations/078_anat_audit_policy.sql'), /CREATE ROLE anat_rules_writer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT/u);
 });

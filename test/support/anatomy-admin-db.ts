@@ -13,12 +13,15 @@ export const DISPOSABLE_URL = 'postgresql://postgres:postgres@localhost:5432/ana
 
 /**
  * Real-chain mode (integration readiness): ANAT_MAIN_MIGRATIONS_DIR points to verified, unedited copies of main's
- * migrations (the CI job exports them from a checkout of main and records its SHA). They are applied in order, one
+ * migrations (the CI job exports them from a checkout of main and records its SHA). Rehearsal mode uses the historical
+ * base before 077 because it applies the accepted ANAT SQL separately; it must not apply 077–079 twice after their
+ * integration into main. PROJECT_MIGRATIONS uses the real runner and the complete chain, including later migrations.
+ * The historical base is applied in order, one
  * transaction per file like src/infrastructure/database/migrate.ts, INSTEAD of the vendored audit chain and bootstraps.
  */
 export const REAL_CHAIN_DIR = process.env.ANAT_MAIN_MIGRATIONS_DIR || null;
 export async function applyRealChain(client: pg.Client, dir: string): Promise<string[]> {
-  const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/u.test(f)).sort();
+  const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/u.test(f) && f < '077_anat_base.sql').sort();
   if (files.length === 0) throw new Error('no migrations in ANAT_MAIN_MIGRATIONS_DIR');
   for (const f of files) {
     await client.query('BEGIN');
@@ -30,7 +33,7 @@ export async function applyRealChain(client: pg.Client, dir: string): Promise<st
 }
 /** The audit policy JSON of the LAST real migration that (re)defines audit_event_policy. */
 export async function latestRealPolicyJson(dir: string): Promise<string> {
-  const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/u.test(f)).sort();
+  const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/u.test(f) && f < '077_anat_base.sql').sort();
   let json: string | null = null;
   for (const f of files) {
     const sql = await readFile(join(dir, f), 'utf8');

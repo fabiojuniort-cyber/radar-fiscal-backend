@@ -305,6 +305,7 @@ test(
             '/tax-profile',
           headers: firstHeaders,
           payload: {
+            expectedVersion: 0,
             taxRegime: 'LUCRO_REAL',
             segments: ['AGRONEGOCIO'],
             activities: [
@@ -399,6 +400,7 @@ test(
         url: '/api/v1/companies/' + company.id + '/tax-profile',
         headers: firstHeaders,
         payload: {
+          expectedVersion: 1,
           taxRegime: 'LUCRO_REAL',
           personalization: {
             establishmentOverrides: [{
@@ -437,9 +439,10 @@ test(
         establishmentId: unitId, taxRegime: 'LUCRO_PRESUMIDO',
         conceptCodes: [], ncmCodes: [],
       }];
-      const saveUnits = (units: unknown[], headers: Record<string, string> = firstHeaders) => app.inject({
+      const profileVersion = async () => (await app.inject({method:'GET',url:'/api/v1/companies/'+company.id+'/tax-profile',headers:firstHeaders})).json().profile.versionNo;
+      const saveUnits = async (units: unknown[], headers: Record<string, string> = firstHeaders) => app.inject({
         method: 'PUT', url: '/api/v1/companies/' + company.id + '/tax-profile',
-        headers, payload: { taxRegime: 'LUCRO_REAL',
+        headers, payload: { expectedVersion: await profileVersion(), taxRegime: 'LUCRO_REAL',
           personalization: { establishmentOverrides: units } },
       });
       const readUnits = async () => {
@@ -493,7 +496,7 @@ test(
       assert.deepEqual(await readUnits(),retained,'adding a branch does not copy any profile');
       const legacySave=await app.inject({
         method:'PUT',url:'/api/v1/companies/'+company.id+'/tax-profile',headers:firstHeaders,
-        payload:{taxRegime:'LUCRO_REAL',personalization:{keywords:['synthetic']}},
+        payload:{expectedVersion:await profileVersion(),taxRegime:'LUCRO_REAL',personalization:{keywords:['synthetic']}},
       });
       assert.equal(legacySave.statusCode,200);
       assert.deepEqual(await readUnits(),retained,'omitted overrides preserve prior unit selections');

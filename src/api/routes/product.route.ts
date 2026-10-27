@@ -207,6 +207,7 @@ const REGIME_LABELS: Record<string, string[]> = {
 };
 
 const taxProfileBodySchema = z.object({
+  expectedVersion: z.number().int().min(0).optional(),
   taxRegime: z.enum([
     'SIMPLES_NACIONAL',
     'LUCRO_PRESUMIDO',
@@ -227,7 +228,7 @@ const taxProfileBodySchema = z.object({
     // NCMs the company works with (card NCM), compared with the NCMs that
     // legislation mentions.
     ncmCodes: z
-      .array(z.string().trim().transform((value) => value.replace(/\D/g, '')).refine((value) => /^\d{8}$/.test(value)))
+      .array(z.string().trim().transform((value) => value.replace(/\D/g, '')).refine((value) => /^\d{1,8}$/.test(value)))
       .max(500)
       .default([]),
     taxonomy: z
@@ -269,7 +270,7 @@ const taxProfileBodySchema = z.object({
         .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/)).max(500).default([]),
       ncmCodes: z.array(z.string().trim()
         .transform((value) => value.replace(/\D/g, ''))
-        .refine((value) => /^\d{8}$/.test(value))).max(500).default([]),
+        .refine((value) => /^\d{1,8}$/.test(value))).max(500).default([]),
     })).max(250).optional(),
   }),
 });
@@ -2479,6 +2480,7 @@ export async function productRoutes(
               .where('is_current', '=', true)
               .executeTakeFirst();
 
+            if (request.body.expectedVersion !== (current?.version_no ?? 0)) return 'PROFILE_VERSION_CONFLICT' as const;
             const storedOverrides = recordValue(current?.personalization)?.establishmentOverrides;
             const overrides = request.body.personalization.establishmentOverrides ??
               (Array.isArray(storedOverrides)
@@ -2594,14 +2596,14 @@ export async function productRoutes(
             ])];
             if (ncmCodes.length > 0) {
               const found = await sql<{ code: string }>`
-                SELECT DISTINCT regexp_replace(e.official_code, '[^0-9]', '', 'g') AS code
-                FROM official_catalog_entries e
-                JOIN official_catalog_editions ed ON ed.id = e.catalog_edition_id
-                JOIN official_catalogs c ON c.id = ed.catalog_id
-                WHERE c.code = 'NCM'
-                  AND ed.status = 'CURRENT'
-                  AND COALESCE((e.metadata ->> 'assignable')::boolean, FALSE) = TRUE
-                  AND regexp_replace(e.official_code, '[^0-9]', '', 'g') = ANY(${ncmCodes}::text[])
+                SELECT DISTINCT input.code FROM unnest(${ncmCodes}::text[]) input(code)
+                WHERE EXISTS (
+                  SELECT 1 FROM official_catalog_entries e
+                  JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id
+                  JOIN official_catalogs c ON c.id=ed.catalog_id
+                  WHERE c.code='NCM' AND ed.status='CURRENT'
+                    AND regexp_replace(e.official_code,'[^0-9]','','g') LIKE input.code || '%'
+                )
               `.execute(trx);
               if (found.rows.length !== ncmCodes.length) return 'INVALID_NCM_CODES' as const;
             }
@@ -2652,6 +2654,8 @@ export async function productRoutes(
         if (profile === null) {
           return reply.status(403).send({ error: 'admin_required' });
         }
+
+        if (profile === 'PROFILE_VERSION_CONFLICT') return reply.status(409).send({ error: 'profile_version_conflict' });
 
         if (profile === 'COMPANY_NOT_FOUND') {
           return reply.status(404).send({ error: 'company_not_found' });
