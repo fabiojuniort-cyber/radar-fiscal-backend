@@ -98,3 +98,31 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
 - **Out of this plan (COORD guidance):**
   - no per-admin allowlist, no configurable limits;
   - no activation of rules in the pilot. Any later activation needs its own decision and scope.
+
+## 7. CI coverage of the migration chain (for reviewers)
+Since #271 (main `fd568acc`), the ANAT CI has two kinds of job.
+
+**`anatomy-admin-main-chain` (rehearsal over main's chain).**
+- `test/support/anatomy-admin-db.ts` applies only main's migrations **before `077_anat_base.sql`**, then the accepted rehearsal ANAT SQL.
+- This is an **adapted** chain. It does **not** prove compatibility of 077–079 with 080 or any later migration.
+
+**`anatomy-admin-migrations` (project runner, `ANAT_PROJECT_MIGRATIONS=1`).** This is where the real chain is proven. How far each suite applies:
+
+| Suite | Chain applied before its checks |
+|---|---|
+| `admin-schema` | up to 077, policy snapshot, then **the complete chain (080 included)** |
+| `admin-api` | **complete chain** (`prepareAdminDatabase`) |
+| `admin-wiring` | **complete chain** (`prepareAdminDatabase`) |
+| `admin-migrations` | **only up to 079** (`runProjectMigrations(url, '079_anat_rules_admin.sql')` since #271) |
+| `anatomy-base-migration` | only up to 077 (by design) |
+
+**What limiting `admin-migrations` to 078–079 stops checking:**
+- the P-INT-03 refusals of 078 (tampered audit policy) are exercised with **080+ absent**;
+- "078 then 079 apply; re-running is a no-op" and the before/after catalog delta are measured **only up to 079**;
+- this suite therefore does not show that later migrations leave the ANAT catalog, privileges and audit policy unchanged.
+
+That property is still asserted over the complete chain by `admin-schema`:
+- every pre-existing audit event keeps its rule and projection;
+- privileges, RLS and search_path checks.
+
+`080_onb03_assistant_phrases.sql` creates only `onboarding_phrases` (its own grants and RLS) and touches no ANAT object or audit policy.
