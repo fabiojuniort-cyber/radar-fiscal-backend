@@ -84,6 +84,10 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   await admin.query(`INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,personalization)
    VALUES($1,1,'LUCRO_REAL','{"testMarker":"preserve-onb03"}')`,[company]);
   const snapshot=async()=> (await admin.query("SELECT md5(coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.id)::text,'[]')) hash FROM company_tax_profiles p")).rows[0].hash;
+  // A real onboarding GET must consume published links even without a mapped parent.
+  await admin.query("INSERT INTO cnaes(code,description) VALUES('1000000','CNAE sintético ONB03') ON CONFLICT(code) DO NOTHING");
+  const unit=(await admin.query("INSERT INTO establishments(company_id,cnpj,name,establishment_type_code,is_head_office,uf) VALUES($1,'00000000000000','Matriz sintética','HEAD_OFFICE',true,'GO') RETURNING id",[company])).rows[0].id;
+  await admin.query("INSERT INTO establishment_cnaes(establishment_id,cnae_code,is_primary) VALUES($1,'1000000',true)",[unit]);
   const profiles=await snapshot();
   const auditCount=async()=> (await admin.query('SELECT count(*)::int n FROM audit_log')).rows[0].n;
   const root='/api/v1/admin/taxonomy/drafts';
@@ -126,12 +130,21 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   assert.ok((await publishedOperationalLinks(pgRunner(admin),'1000000')).some(l=>l.target==='010'));
   assert.deepEqual((await publishedOperationalLinks(pgRunner(admin),'1000000')).filter(l=>l.kind==='NCM').map(l=>l.target).sort(),
    ['010','1213','230240','2716'].sort());
-  assert.equal(await snapshot(),profiles);
+  const onboarding=await call('GET','/api/v1/companies/'+company+'/onboarding',null,200,customer.headers);
+  assert.equal(onboarding.release.id,publishedId);
+  const activity=onboarding.cards.find(c=>c.establishmentId===unit&&c.cnaeCode==='1000000');
+  assert.ok(activity);
+  assert.equal(activity.segmentCode,'sector.sem_segmento');
+  assert.ok(activity.suggestions.some(s=>s.kind==='PRODUCT'&&s.target==='product.onb03_test'));
+  assert.ok(activity.suggestions.some(s=>s.kind==='NCM'&&s.target==='010'));
+  assert.equal(await snapshot(),profiles,'onboarding GET cannot write existing profiles');
   await call('POST',root,{justification:'Nova release de reversão'},201);
   plan=await call('GET',root+'/current/f2-links/plan');
   await approve([]);
   await call('POST',root+'/current/publish',{justification:'Reverter sugestões',changeNotes:'Retirar todos os vínculos operacionais'});
   assert.deepEqual(await publishedOperationalLinks(pgRunner(admin),'1000000'),[]);
+  const reversed=await call('GET','/api/v1/companies/'+company+'/onboarding',null,200,customer.headers);
+  assert.ok(reversed.cards.every(c=>c.suggestions.every(s=>s.kind==='SEGMENT')),'onboarding cannot show withdrawn links');
   assert.deepEqual((await admin.query('SELECT manifest,artifact_sha256 FROM taxonomy_releases WHERE id=$1',[publishedId])).rows[0],sealed,'old PUBLISHED remains immutable');
   assert.equal(await snapshot(),profiles,'profiles unchanged across approval/publication/reversal');
   console.log('ONB03_PG18_LIFECYCLE=PASS: plan readonly; approval rejection rollback/audit; stale publish409; published-only read; reversal by new release; profiles invariant');

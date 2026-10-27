@@ -61,12 +61,14 @@ export async function onboardingRoutes(app: FastifyInstance) {
             const group=view.groups.find(g=>g.id===activity?.groupId);
             const parents=view.concepts.filter(c=>c.dimensionCode==='sector'&&group?.segmentCodes.includes(c.code));
             const related=[...new Map([...parents,...view.concepts.filter(c=>c.dimensionCode==='sector'&&links.some(link=>link.segment===c.label))].map(c=>[c.code,c])).values()];
-            const segments=related.length?related:[{code:'sector.sem_segmento',label:'Outras atividades'}];
+            const labels=new Set(related.map(c=>c.label));
+            const fallback={code:'sector.sem_segmento',label:'Outras atividades'};
+            const segments=[...related,...(!related.length||links.some(link=>!labels.has(link.segment))?[fallback]:[])];
             return segments.map(segment=>({
               establishmentId:unit.id,cnaeCode:cnae.code,description:cnae.description,
               segmentCode:segment.code,segmentLabel:segment.label,
               suggestions:[{kind:'SEGMENT',target:segment.code,segment:segment.label},
-                ...links.filter(link=>link.segment===segment.label).map(link=>({kind:link.kind,target:link.target,segment:link.segment}))],
+                ...links.filter(link=>segment.code==='sector.sem_segmento'?!labels.has(link.segment):link.segment===segment.label).map(link=>({kind:link.kind,target:link.target,segment:link.segment}))],
               phraseSegment:phraseSegment(segment.label),phraseSegments:phraseSegments(segment.label),
             }));
           })))).flat();
