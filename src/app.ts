@@ -1,3 +1,5 @@
+import { onboardingPhraseRoutes } from './api/routes/onboarding-phrases.route.js';
+import { onboardingRoutes } from './api/routes/onboarding.route.js';
 import { auditHistoryRoutes } from './api/routes/audit-history.route.js';
 import {closeCollectionFilterActNameInventory} from './modules/collection/collection-filter.act-name-inventory.js';
 import Fastify, {
@@ -55,6 +57,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(publicRoutes);
   await app.register(authRoutes);
   await app.register(productRoutes);
+  await app.register(onboardingRoutes);
+  await app.register(onboardingPhraseRoutes);
   await app.register(auditHistoryRoutes);
   await app.register(productNcmRoutes);
   await app.register(newsRoutes);

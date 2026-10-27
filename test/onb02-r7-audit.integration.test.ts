@@ -13,7 +13,7 @@ function isolated(){
  assert.ok(['localhost','127.0.0.1'].includes(u.hostname));
  assert.equal(u.pathname,'/radar_fiscal_test');
  assert.equal(u.search,'');
- return new Pool({connectionString:url,max:2,options:'-c statement_timeout=45000 -c lock_timeout=5000'});
+ return new Pool({connectionString:url,max:2,options:'-c jit=off -c statement_timeout=45000 -c lock_timeout=5000'});
 }
 test('R7: allowlist rejects unregistered events, unknown keys, nested payloads, names and CNPJ',async()=>{
  const pool=isolated();

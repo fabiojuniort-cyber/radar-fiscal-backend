@@ -43,7 +43,7 @@ test('078/079 through the real migration runner (fresh disposable database)', { 
     const fresh = await db.query("SELECT to_regclass('public.schema_migrations') IS NULL AS fresh");
     assert.equal(fresh.rows[0].fresh, true, 'requires a fresh disposable database (the dedicated CI job provides one)');
     await runProjectMigrations(url, '077_anat_base.sql');
-    const applied = async () => (await db.query("SELECT filename FROM schema_migrations WHERE filename > '077_anat_base.sql' ORDER BY 1")).rows.map((r) => r.filename);
+    const applied = async () => (await db.query("SELECT filename FROM schema_migrations WHERE filename > '077_anat_base.sql' AND filename <= '079_anat_rules_admin.sql' ORDER BY 1")).rows.map((r) => r.filename);
 
     // P-INT-03: every refusal leaves the policy in force intact, registers no migration and creates no object.
     const policy = (await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d as string;
@@ -66,7 +66,7 @@ test('078/079 through the real migration runner (fresh disposable database)', { 
         await db.query('SET check_function_bodies = off'); // lets the test install a deliberately broken body
         try { await db.query(tampered); } finally { await db.query('RESET check_function_bodies'); }
         const installed = (await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d;
-        await assert.rejects(runProjectMigrations(url), refusal);
+        await assert.rejects(runProjectMigrations(url, '079_anat_rules_admin.sql'), refusal);
         assert.deepEqual(await applied(), [], 'no migration registered');
         assert.equal((await db.query("SELECT pg_get_functiondef('public.audit_event_policy(text,text)'::regprocedure) AS d")).rows[0].d, installed, 'policy in force intact');
         assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_policies WHERE tablename = 'audit_log' AND policyname LIKE 'audit_log_anat%'")).rows[0].n, 0);
@@ -79,10 +79,10 @@ test('078/079 through the real migration runner (fresh disposable database)', { 
     let before: Row[] = []; let after: Row[] = [];
     await t.test('078 then 079 apply; re-running is a no-op', async () => {
       before = (await db.query(CATALOG)).rows;
-      const out = await runProjectMigrations(url);
+      const out = await runProjectMigrations(url, '079_anat_rules_admin.sql');
       assert.match(out, /Applying migration: 078_anat_audit_policy\.sql[\s\S]*Applying migration: 079_anat_rules_admin\.sql/u);
       assert.deepEqual(await applied(), ['078_anat_audit_policy.sql', '079_anat_rules_admin.sql']);
-      assert.doesNotMatch(await runProjectMigrations(url), /Applying migration/u);
+      assert.doesNotMatch(await runProjectMigrations(url, '079_anat_rules_admin.sql'), /Applying migration/u);
       after = (await db.query(CATALOG)).rows;
     });
 
