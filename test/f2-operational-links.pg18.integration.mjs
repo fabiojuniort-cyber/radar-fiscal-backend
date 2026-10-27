@@ -139,6 +139,8 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   assert.equal(activity.segmentCode,'sector.sem_segmento');
   assert.ok(activity.suggestions.some(s=>s.kind==='PRODUCT'&&s.target==='product.onb03_test'));
   assert.ok(activity.suggestions.some(s=>s.kind==='NCM'&&s.target==='010'));
+  assert.deepEqual(onboarding.concepts.find(c=>c.code==='product.onb03_test').ncmCodes,['1001'],'product evidence comes from its own published official codes, not the independent CNAE NCM links');
+  assert.deepEqual(onboarding.effectiveProfiles.find(p=>p.establishmentId===unit).conceptCodes,[],'published suggestions never preselect a profile');
   assert.equal(await snapshot(),profiles,'onboarding GET cannot write existing profiles');
   await call('POST',root,{justification:'Nova release de reversão'},201);
   plan=await call('GET',root+'/current/f2-links/plan');
@@ -152,3 +154,4 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
   console.log('ONB03_PG18_LIFECYCLE=PASS: plan readonly; approval rejection rollback/audit; stale publish409; published-only read; reversal by new release; profiles invariant');
  }finally{if(app)await app.close();await admin.end();}
 });
+
