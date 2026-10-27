@@ -39,6 +39,37 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   assert.equal((await save('cnae:6201501',3,{establishmentId:branchId,status:'SKIPPED'})).statusCode,200);
   assert.equal((await save('summary',4)).statusCode,200);
   data=await read();assert.equal(data.state.completed,true);assert.equal(data.version,5);
+
+  // Inline IE writes neither profile versions nor other establishment fields.
+  const snapshot=async()=> (await admin.query(
+    'SELECT to_jsonb(e) AS unit,(SELECT jsonb_agg(to_jsonb(ec) ORDER BY ec.cnae_code) FROM establishment_cnaes ec WHERE ec.establishment_id=e.id) AS cnaes,(SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) FROM company_tax_profiles p WHERE p.company_id=e.company_id) AS profiles FROM establishments e WHERE e.id=$1',[branchId])).rows[0];
+  const beforeIe=await snapshot();
+  const ieUrl='/api/v1/companies/'+company+'/establishments/'+branchId+'/state-registration';
+  const patchIe=(expected:string|null,value:string|null,headers=a,url=ieUrl)=>app.inject({
+    method:'PATCH',url,headers,payload:{expectedStateRegistration:expected,stateRegistration:value}});
+  assert.equal((await patchIe(null,'123456789',b)).statusCode,404,'tenant cannot reach another company');
+  assert.equal((await patchIe(null,'123456789',a,ieUrl.replace(branchId,randomUUID()))).statusCode,404);
+  await admin.query("INSERT INTO tenant_memberships(tenant_id,user_id,role) VALUES($1,$2,'VIEWER')",[tenants[0],users[1]]);
+  assert.equal((await patchIe(null,'123456789',{...b,'x-tenant-id':tenants[0]!})).statusCode,403,'member cannot edit IE');
+  const ieWrites=await Promise.all([patchIe(null,'123456789'),patchIe(null,'987654321')]);
+  assert.deepEqual(ieWrites.map(r=>r.statusCode).sort(),[200,409],'stale IE must not overwrite');
+  const savedIe=ieWrites.find(r=>r.statusCode===200)!.json();
+  assert.equal(savedIe.establishmentId,branchId);
+  assert.equal(savedIe.stateRegistrationSource,'MANUAL');
+  assert.equal((await patchIe(null,'111111111')).statusCode,409);
+  assert.equal((await app.inject({method:'PATCH',url:ieUrl,headers:a,payload:{expectedStateRegistration:savedIe.stateRegistration,stateRegistration:'X'.repeat(31)}})).statusCode,400);
+  assert.equal((await app.inject({method:'PATCH',url:ieUrl,headers:a,payload:{expectedStateRegistration:savedIe.stateRegistration,stateRegistration:'123',name:'must not write'}})).statusCode,400);
+  const afterIe=await snapshot();
+  assert.deepEqual(afterIe.profiles,beforeIe.profiles,'all profile rows byte-equivalent');
+  assert.deepEqual(afterIe.cnaes,beforeIe.cnaes,'CNAEs untouched');
+  const ieFields=new Set(['state_registration','state_registration_source','state_registration_status','state_registration_checked_at','state_registration_lookup_status','updated_at']);
+  for(const key of Object.keys(beforeIe.unit)) if(!ieFields.has(key)) assert.deepEqual(afterIe.unit[key],beforeIe.unit[key],key+' preserved');
+  const unitsAfter=await app.inject({method:'GET',url:'/api/v1/companies/'+company+'/establishments',headers:a});
+  assert.equal(unitsAfter.json().items.find((u:{id:string})=>u.id===branchId).stateRegistration,savedIe.stateRegistration);
+  assert.equal(unitsAfter.json().items.find((u:{id:string})=>u.id===head).stateRegistration,null,'matrix unchanged');
+  const unchanged=await snapshot();assert.equal((await patchIe(savedIe.stateRegistration,savedIe.stateRegistration)).statusCode,200);assert.deepEqual(await snapshot(),unchanged,'no-op does not change timestamps/provenance');
+  const cleared=await patchIe(savedIe.stateRegistration,'   ');assert.equal(cleared.statusCode,200);assert.equal(cleared.json().stateRegistration,null);
+
   await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(personalization,'{taxonomy}', $1::jsonb) WHERE company_id=$2 AND is_current=true",[JSON.stringify({releaseId:randomUUID(),releaseVersion:'v0.0.1',conceptCodes:['product.unknown_historical']}),company]);
   const historical=await save('company',5);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
   assert.equal((await read()).version,5,'historical selections cannot be relabeled implicitly');

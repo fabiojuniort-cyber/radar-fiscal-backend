@@ -1523,6 +1523,65 @@ export async function productRoutes(
     },
   );
 
+
+  // ONB-03.1: update only IE, never replay an entire establishment snapshot.
+  typed.patch(
+    '/api/v1/companies/:companyId/establishments/:establishmentId/state-registration',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: z.object({ companyId: z.string().uuid(), establishmentId: z.string().uuid() }),
+        body: z.object({
+          expectedStateRegistration: z.string().max(30).nullable(),
+          stateRegistration: z.string().trim().max(30).nullable(),
+        }).strict(),
+      },
+    },
+    async (request, reply) => {
+      if (!request.auth) return reply.status(401).send({ error: 'unauthorized' });
+      const tenantId = tenantIdFromRequest(request);
+      if (!tenantId) return reply.status(400).send({ error: 'tenant_required' });
+      try {
+        const result = await withTenantContext(app.db, request.auth.userId, tenantId, async trx => {
+          if (!(await requireTenantAdmin(trx, request.auth!.userId, tenantId))) return 'FORBIDDEN' as const;
+          const company = await trx.selectFrom('companies').select('id')
+            .where('id', '=', request.params.companyId).where('is_active', '=', true)
+            .forUpdate().executeTakeFirst();
+          if (!company) return 'NOT_FOUND' as const;
+          const current = await trx.selectFrom('establishments').select(['id', 'state_registration'])
+            .where('company_id', '=', company.id).where('id', '=', request.params.establishmentId)
+            .where('is_active', '=', true).forUpdate().executeTakeFirst();
+          if (!current) return 'NOT_FOUND' as const;
+          if (current.state_registration !== request.body.expectedStateRegistration) return 'CONFLICT' as const;
+          const registration = request.body.stateRegistration?.trim() || null;
+          // An unchanged value must not relabel an official result as MANUAL.
+          if (registration !== current.state_registration) {
+            await trx.updateTable('establishments').set({
+              state_registration: registration,
+              state_registration_source: registration ? 'MANUAL' : null,
+              state_registration_status: null,
+              state_registration_checked_at: null,
+              state_registration_lookup_status: null,
+            }).where('id', '=', current.id).execute();
+          }
+          const saved = await trx.selectFrom('establishments')
+            .select(['id', 'state_registration', 'state_registration_source'])
+            .where('id', '=', current.id).executeTakeFirstOrThrow();
+          return { establishmentId: saved.id, stateRegistration: saved.state_registration,
+            stateRegistrationSource: saved.state_registration_source };
+        });
+        if (result === 'FORBIDDEN') return reply.status(403).send({ error: 'admin_required' });
+        if (result === 'NOT_FOUND') return reply.status(404).send({ error: 'establishment_not_found' });
+        if (result === 'CONFLICT') return reply.status(409).send({ error: 'state_registration_conflict' });
+        return reply.status(200).send(result);
+      } catch (error) {
+        const handled = handleTenantError(error, reply);
+        if (handled) return handled;
+        throw error;
+      }
+    },
+  );
+
   typed.put(
     '/api/v1/establishments/:establishmentId',
     {
