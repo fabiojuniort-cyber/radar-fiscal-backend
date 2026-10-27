@@ -51,3 +51,27 @@ export function phraseSegment(parent: string): string { return phraseSegments(pa
 export function selectableAssistantConcept(c:{dimensionCode:string;officialCodes:string[]}):boolean {
   return c.dimensionCode==='product'||(c.dimensionCode==='sector'&&!isCnaeActivity(c.officialCodes));
 }
+
+/** Conversion occurs only during an explicit save, never GET or migration. */
+export function upgradeLegacyUnit(unit:AssistantUnit,activities:{cnaeCode:string;segmentCode:string;suggestions:{target:string}[]}[]):AssistantUnit{
+ const next=structuredClone(unit);
+ for(const [key,choice] of Object.entries(unit.cards)){
+  if(!key.startsWith('cnae:'))continue;
+  const related=activities.filter(a=>a.cnaeCode===key.slice(5));
+  if(!related.length)continue;
+  const known=new Set(related.flatMap(a=>a.suggestions.map(s=>s.target)));
+  if(choice.status==='CONFIRMED'){
+   next.baseConceptCodes=[...new Set([...next.baseConceptCodes,...choice.conceptCodes.filter(c=>!known.has(c))])];
+   next.baseNcmCodes=[...new Set([...next.baseNcmCodes,...choice.ncmCodes.filter(c=>!known.has(c))])];
+  }
+  for(const activity of related){
+   const id='segment:'+activity.segmentCode,prior=next.cards[id];
+   const targets=new Set(activity.suggestions.map(s=>s.target));
+   next.cards[id]={status:prior?.status==='CONFIRMED'||choice.status==='CONFIRMED'?'CONFIRMED':'SKIPPED',
+    conceptCodes:[...new Set([...(prior?.conceptCodes??[]),...(choice.status==='CONFIRMED'?choice.conceptCodes.filter(c=>targets.has(c)):[])])],
+    ncmCodes:[...new Set([...(prior?.ncmCodes??[]),...(choice.status==='CONFIRMED'?choice.ncmCodes.filter(c=>targets.has(c)):[])])]};
+  }
+  delete next.cards[key];
+ }
+ return next;
+}

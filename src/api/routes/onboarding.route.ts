@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { withTenantContext, TenantAccessDeniedError } from '../../infrastructure/database/tenant-context.js';
 import { findLatestPublishedRelease, loadReleaseView, kyselyRunner } from '../../modules/taxonomy/curation/curation.read.js';
 import { publishedOperationalLinks } from '../../modules/taxonomy/curation/curation.f2-links.js';
-import { emptyAssistant, mergeUnitCard, selectableAssistantConcept, phraseSegment, phraseSegments, type AssistantState } from '../../modules/onboarding/assistant.model.js';
+import { emptyAssistant, mergeUnitCard, upgradeLegacyUnit, selectableAssistantConcept, phraseSegment, phraseSegments, type AssistantState } from '../../modules/onboarding/assistant.model.js';
 
 const params = z.object({ companyId: z.string().uuid() });
 const selection = z.object({
@@ -55,18 +55,21 @@ export async function onboardingRoutes(app: FastifyInstance) {
               FILTER(WHERE c.code IS NOT NULL),'[]'::jsonb) AS cnaes
             FROM establishments e LEFT JOIN establishment_cnaes ec ON ec.establishment_id=e.id
             LEFT JOIN cnaes c ON c.code=ec.cnae_code WHERE e.company_id=$1 AND e.is_active=true GROUP BY e.id ORDER BY e.is_head_office DESC,e.id`,[company.id]);
-          const cards = await Promise.all(units.flatMap(unit => unit.cnaes.map(async cnae => {
+          const cards = (await Promise.all(units.flatMap(unit => unit.cnaes.map(async cnae => {
             const links = await publishedOperationalLinks(run,cnae.code);
             const activity=view.concepts.find(c=>c.dimensionCode==='sector'&&c.officialCodes.some(code=>code.replace(/\D/g,'')===cnae.code));
             const group=view.groups.find(g=>g.id===activity?.groupId);
             const parents=view.concepts.filter(c=>c.dimensionCode==='sector'&&group?.segmentCodes.includes(c.code));
-            const parent=links[0]?.segment??parents[0]?.label??'';
-            const segment=parents.find(p=>p.label===parent)??parents[0];
-            return { establishmentId: unit.id, cnaeCode: cnae.code, description: cnae.description,
-              segmentCode:segment?.code??'sector.sem_segmento',segmentLabel:segment?.label??'Outras atividades',
-              suggestions: [...parents.map(c=>({kind:'SEGMENT',target:c.code,segment:c.label})),...links.map(link => ({ kind:link.kind,target:link.target,segment:link.segment }))],
-              phraseSegment: phraseSegment(parent), phraseSegments: phraseSegments(parent) };
-          })));
+            const related=[...new Map([...parents,...view.concepts.filter(c=>c.dimensionCode==='sector'&&links.some(link=>link.segment===c.label))].map(c=>[c.code,c])).values()];
+            const segments=related.length?related:[{code:'sector.sem_segmento',label:'Outras atividades'}];
+            return segments.map(segment=>({
+              establishmentId:unit.id,cnaeCode:cnae.code,description:cnae.description,
+              segmentCode:segment.code,segmentLabel:segment.label,
+              suggestions:[{kind:'SEGMENT',target:segment.code,segment:segment.label},
+                ...links.filter(link=>link.segment===segment.label).map(link=>({kind:link.kind,target:link.target,segment:link.segment}))],
+              phraseSegment:phraseSegment(segment.label),phraseSegments:phraseSegments(segment.label),
+            }));
+          })))).flat();
           if (method === 'GET') return { version:profile?.version_no ?? 0,release,state,cards,
             concepts:view.concepts.filter(selectableAssistantConcept).map(c => ({code:c.code,label:c.label,dimensionCode:c.dimensionCode})),
             companyName:company.legal_name,companyCnpj:company.head_office_cnpj };
@@ -107,9 +110,8 @@ export async function onboardingRoutes(app: FastifyInstance) {
               if(body.status==='SKIPPED'&&(unit.conceptCodes.length||unit.ncmCodes.length))throw new AssistantError(400,'invalid_card_payload');
               const existing=overrides.find(o=>o.establishmentId===unit.establishmentId);
               const baseline=next.units[unit.establishmentId]??{baseConceptCodes:existing?.conceptCodes??[],baseNcmCodes:existing?.ncmCodes??[],cards:{}};
-              // Replace this segment's old CNAE contributions only on an explicit save.
-              const previous={...baseline,cards:{...baseline.cards}};
-              for(const c of members.filter(c=>c.establishmentId===unit.establishmentId)) delete previous.cards['cnae:'+c.cnaeCode];
+              // Convert old CNAE contributions without losing their other segments or manual extras.
+              const previous=upgradeLegacyUnit(baseline,cards.filter(c=>c.establishmentId===unit.establishmentId));
               const merged=mergeUnitCard(previous,body.cardId,{status:body.status,conceptCodes:unit.conceptCodes,ncmCodes:unit.ncmCodes});
               next.units[unit.establishmentId]=merged.unit;
               const replacement={establishmentId:unit.establishmentId,taxRegime:existing?.taxRegime??'NAO_INFORMADO',conceptCodes:merged.conceptCodes,ncmCodes:merged.ncmCodes};
