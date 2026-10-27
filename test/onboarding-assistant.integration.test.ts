@@ -90,6 +90,28 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(personalization,'{taxonomy}', $1::jsonb) WHERE company_id=$2 AND is_current=true",[JSON.stringify({releaseId:randomUUID(),releaseVersion:'v0.0.1',conceptCodes:['product.unknown_historical']}),company]);
   const historical=await save('company',7);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
   assert.equal((await read()).version,7,'historical selections cannot be relabeled implicitly');
+  // ONB-03.4: legacy choices are projected without writes and can be explicitly reviewed.
+  await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(jsonb_set(personalization,'{products}', '[\"Produto livre legado\"]'::jsonb),'{ncmCodes}', '[\"2716\"]'::jsonb) WHERE company_id=$1 AND is_current=true",[company]);
+  const legacyBefore=(await admin.query('SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) AS snapshot FROM company_tax_profiles p WHERE company_id=$1',[company])).rows;
+  data=await read();await read();
+  const legacyHead=data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===head);
+  assert.deepEqual(legacyHead.conceptCodes,['product.unknown_historical']);assert.deepEqual(legacyHead.ncmCodes,['2716']);assert.deepEqual(legacyHead.legacyFields.products,['Produto livre legado']);
+  assert.deepEqual(legacyHead.historicalCodes,['product.unknown_historical']);
+  const legacyBranch=data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===branchId);
+  assert.deepEqual(legacyBranch.conceptCodes,[]);assert.deepEqual(legacyBranch.ncmCodes,[]);
+  assert.deepEqual((await admin.query('SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) AS snapshot FROM company_tax_profiles p WHERE company_id=$1',[company])).rows,legacyBefore,'GET projection never backfills or mutates history');
+  assert.equal((await save('company',7,{selectionMode:'EFFECTIVE'})).statusCode,200,'company card does not relabel historical codes');
+  data=await read();assert.equal(data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===head).releaseVersion,'v0.0.1');
+  const edit={selectionMode:'EFFECTIVE',establishmentId:head,conceptCodes:[],ncmCodes:[],legacyFields:{products:[]},cnaeSegments:[],taxRegime:'LUCRO_REAL'};
+  assert.equal((await save('profile',8,{...edit,establishmentId:randomUUID()})).statusCode,400,'foreign unit cannot be edited');
+  assert.equal((await save('profile',8,{...edit,conceptCodes:['product.unknown_historical']})).statusCode,409,'retired codes cannot be silently relabeled');
+  const explicit=await save('profile',8,edit);assert.equal(explicit.statusCode,200,explicit.body);
+  assert.equal((await save('profile',8,edit)).statusCode,409,'full legacy review is also version protected');
+  data=await read();const reviewedHead=data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===head);
+  assert.deepEqual(reviewedHead.conceptCodes,[]);assert.deepEqual(reviewedHead.ncmCodes,[]);assert.deepEqual(reviewedHead.legacyFields.products,[]);assert.equal(reviewedHead.taxRegime,'LUCRO_REAL');
+  const history=(await admin.query('SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) AS snapshot FROM company_tax_profiles p WHERE company_id=$1 AND version_no<=7',[company])).rows[0].snapshot;
+  assert.equal(history.length,7);assert.ok(history.some((p:{personalization:{products?:string[]}})=>p.personalization.products?.includes('Produto livre legado')),'explicit correction preserves historical data');
+  assert.equal((await save('summary',9,{selectionMode:'EFFECTIVE'})).statusCode,200,'review path permits completion after correction');
   const phrases=await app.inject({method:'GET',url:'/api/v1/onboarding/phrases',headers:a});assert.equal(phrases.statusCode,200,phrases.body);assert.equal(phrases.json().items.length,19);assert.ok(phrases.json().items.every((p:{phrases:string[]})=>p.phrases.length===20));
   const forbidden=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:1,phrases:['Unauthorized']}});assert.equal(forbidden.statusCode,403);
   await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN',$2)",[users[0],users[0]]);
@@ -104,3 +126,4 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   } finally { await admin.query('UPDATE onboarding_phrases SET phrases=$1::jsonb,version_no=version_no+1 WHERE segment=$2',[JSON.stringify(original.phrases),'generico']); }
  }finally{await app.close();for(const tenant of tenants){await admin.query('DELETE FROM tenant_memberships WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant])}for(const user of users){await admin.query('DELETE FROM platform_user_roles WHERE user_id=$1',[user]);await admin.query('DELETE FROM app_users WHERE id=$1',[user]);}await admin.end()}
 });
+
