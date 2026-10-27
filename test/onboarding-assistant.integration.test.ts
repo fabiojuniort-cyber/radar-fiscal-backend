@@ -40,6 +40,23 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   assert.equal((await save('summary',4)).statusCode,200);
   data=await read();assert.equal(data.state.completed,true);assert.equal(data.version,5);
 
+
+  // A segment is one atomic version, with exact and tenant-scoped unit membership.
+  const segmentId='segment:'+data.cards[0].segmentCode;
+  const segmentPayload={units:[{establishmentId:head,conceptCodes:[],ncmCodes:[]},{establishmentId:branchId,conceptCodes:[],ncmCodes:[]}]};
+  const stable=JSON.stringify(data.state);
+  assert.equal((await save(segmentId,5,{units:[segmentPayload.units[0]]})).statusCode,400,'cannot omit a unit');
+  assert.equal((await save(segmentId,5,{units:[segmentPayload.units[0],segmentPayload.units[0]]})).statusCode,400,'cannot duplicate a unit');
+  assert.equal((await save(segmentId,5,{units:[segmentPayload.units[0],{establishmentId:randomUUID(),conceptCodes:[],ncmCodes:[]}]})).statusCode,400,'foreign unit rejected');
+  assert.equal((await save(segmentId,5,{units:segmentPayload.units.map(u=>({...u,ncmCodes:['99999999']}))})).statusCode,400);
+  assert.equal(JSON.stringify((await read()).state),stable,'invalid segment writes are atomic no-ops');
+  const segmentWrites=await Promise.all([save(segmentId,5,segmentPayload),save(segmentId,5,segmentPayload)]);
+  assert.deepEqual(segmentWrites.map(r=>r.statusCode).sort(),[200,409]);
+  data=await read();assert.equal(data.version,6);
+  for(const id of [head,branchId]){assert.deepEqual(data.state.units[id].cards[segmentId],{status:'CONFIRMED',conceptCodes:[],ncmCodes:[]});assert.equal(data.state.units[id].cards['cnae:6201501'],undefined);}
+  assert.equal((await save('summary',6)).statusCode,200);
+  data=await read();assert.equal(data.version,7);assert.equal(data.state.completed,true);
+
   // Inline IE writes neither profile versions nor other establishment fields.
   const snapshot=async()=> (await admin.query(
     'SELECT to_jsonb(e) AS unit,(SELECT jsonb_agg(to_jsonb(ec) ORDER BY ec.cnae_code) FROM establishment_cnaes ec WHERE ec.establishment_id=e.id) AS cnaes,(SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) FROM company_tax_profiles p WHERE p.company_id=e.company_id) AS profiles FROM establishments e WHERE e.id=$1',[branchId])).rows[0];
@@ -71,8 +88,8 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   const cleared=await patchIe(savedIe.stateRegistration,'   ');assert.equal(cleared.statusCode,200);assert.equal(cleared.json().stateRegistration,null);
 
   await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(personalization,'{taxonomy}', $1::jsonb) WHERE company_id=$2 AND is_current=true",[JSON.stringify({releaseId:randomUUID(),releaseVersion:'v0.0.1',conceptCodes:['product.unknown_historical']}),company]);
-  const historical=await save('company',5);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
-  assert.equal((await read()).version,5,'historical selections cannot be relabeled implicitly');
+  const historical=await save('company',7);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
+  assert.equal((await read()).version,7,'historical selections cannot be relabeled implicitly');
   const phrases=await app.inject({method:'GET',url:'/api/v1/onboarding/phrases',headers:a});assert.equal(phrases.statusCode,200,phrases.body);assert.equal(phrases.json().items.length,19);assert.ok(phrases.json().items.every((p:{phrases:string[]})=>p.phrases.length===20));
   const forbidden=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:1,phrases:['Unauthorized']}});assert.equal(forbidden.statusCode,403);
   await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN',$2)",[users[0],users[0]]);

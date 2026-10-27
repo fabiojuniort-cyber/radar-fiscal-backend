@@ -9,8 +9,9 @@ import { emptyAssistant, mergeUnitCard, selectableAssistantConcept, phraseSegmen
 const params = z.object({ companyId: z.string().uuid() });
 const selection = z.object({
   expectedVersion: z.number().int().min(0), releaseId: z.string().uuid(),
-  cardId: z.string().regex(/^(company|establishments|summary|cnae:[0-9]{7})$/),
+  cardId: z.string().regex(/^(company|establishments|summary|cnae:[0-9]{7}|segment:[a-z0-9_.]+)$/),
   establishmentId: z.string().uuid().optional(),
+  units: z.array(z.object({establishmentId:z.string().uuid(),conceptCodes:z.array(z.string()).max(500),ncmCodes:z.array(z.string().regex(/^[0-9]{1,8}$/)).max(500)})).max(200).optional(),
   status: z.enum(['CONFIRMED', 'SKIPPED']),
   conceptCodes: z.array(z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/)).max(500).default([]),
   ncmCodes: z.array(z.string().regex(/^[0-9]{1,8}$/)).max(500).default([]),
@@ -35,7 +36,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const member = await trx.selectFrom('tenant_memberships').select('role')
             .where('tenant_id', '=', tenant.data).where('user_id', '=', request.auth!.userId).executeTakeFirst();
           if (!['OWNER', 'ADMIN'].includes(member?.role ?? '')) throw new AssistantError(403, 'admin_required');
-          const company = await trx.selectFrom('companies').select(['id', 'legal_name'])
+          const company = await trx.selectFrom('companies').select(['id', 'legal_name', 'head_office_cnpj'])
             .where('id', '=', request.params.companyId).where('is_active', '=', true).forUpdate().executeTakeFirst();
           if (!company) throw new AssistantError(404, 'company_not_found');
           const profiles = await run<Profile>('SELECT * FROM company_tax_profiles WHERE company_id=$1 AND is_current=true', [company.id]);
@@ -60,24 +61,28 @@ export async function onboardingRoutes(app: FastifyInstance) {
             const group=view.groups.find(g=>g.id===activity?.groupId);
             const parents=view.concepts.filter(c=>c.dimensionCode==='sector'&&group?.segmentCodes.includes(c.code));
             const parent=links[0]?.segment??parents[0]?.label??'';
+            const segment=parents.find(p=>p.label===parent)??parents[0];
             return { establishmentId: unit.id, cnaeCode: cnae.code, description: cnae.description,
+              segmentCode:segment?.code??'sector.sem_segmento',segmentLabel:segment?.label??'Outras atividades',
               suggestions: [...parents.map(c=>({kind:'SEGMENT',target:c.code,segment:c.label})),...links.map(link => ({ kind:link.kind,target:link.target,segment:link.segment }))],
               phraseSegment: phraseSegment(parent), phraseSegments: phraseSegments(parent) };
           })));
           if (method === 'GET') return { version:profile?.version_no ?? 0,release,state,cards,
             concepts:view.concepts.filter(selectableAssistantConcept).map(c => ({code:c.code,label:c.label,dimensionCode:c.dimensionCode})),
-            companyName:company.legal_name };
+            companyName:company.legal_name,companyCnpj:company.head_office_cnpj };
           const body = selection.parse(request.body);
           if (body.expectedVersion !== (profile?.version_no ?? 0)) throw new AssistantError(409,'profile_version_conflict');
           if (body.releaseId !== release.id) throw new AssistantError(409,'taxonomy_release_changed');
           const currentCodes = new Set(view.concepts.filter(selectableAssistantConcept).map(c=>c.code));
-          if (body.conceptCodes.some(code=>!currentCodes.has(code))) throw new AssistantError(400,'invalid_taxonomy_selection');
-          if (body.ncmCodes.length) {
+          const chosenConcepts=[...body.conceptCodes,...(body.units??[]).flatMap(u=>u.conceptCodes)];
+          const chosenNcms=[...new Set([...body.ncmCodes,...(body.units??[]).flatMap(u=>u.ncmCodes)])];
+          if (chosenConcepts.some(code=>!currentCodes.has(code))) throw new AssistantError(400,'invalid_taxonomy_selection');
+          if (chosenNcms.length) {
             const found = await run<{code:string}>(`SELECT DISTINCT input.code FROM unnest($1::text[]) input(code)
               WHERE EXISTS(SELECT 1 FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id
                 JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT'
-                AND regexp_replace(e.official_code,'[^0-9]','','g') LIKE input.code || '%')`,[body.ncmCodes]);
-            if (found.length !== new Set(body.ncmCodes).size) throw new AssistantError(400,'invalid_ncm_codes');
+                AND regexp_replace(e.official_code,'[^0-9]','','g') LIKE input.code || '%')`,[chosenNcms]);
+            if (found.length !== chosenNcms.length) throw new AssistantError(400,'invalid_ncm_codes');
           }
           // Do not relabel unknown historical selections as members of a newer release.
           const priorTaxonomy=(personalization.taxonomy??{}) as {releaseId?:string;conceptCodes?:string[]};
@@ -89,7 +94,30 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const next: AssistantState = {...structuredClone(state),releaseId:release.id};
           const item = { status:body.status,conceptCodes:body.conceptCodes,ncmCodes:body.ncmCodes };
           const overrides = structuredClone((personalization.establishmentOverrides ?? []) as Override[]);
-          if (body.cardId.startsWith('cnae:')) {
+          if (body.cardId.startsWith('segment:')) {
+            const segment=body.cardId.slice(8);
+            const members=cards.filter(c=>c.segmentCode===segment);
+            const ids=[...new Set(members.map(c=>c.establishmentId))];
+            if(!members.length || body.establishmentId || body.conceptCodes.length || body.ncmCodes.length ||
+              !body.units || body.units.length!==ids.length ||
+              new Set(body.units.map(u=>u.establishmentId)).size!==ids.length ||
+              body.units.some(u=>!ids.includes(u.establishmentId)))
+              throw new AssistantError(400,'invalid_segment_units');
+            for(const unit of body.units){
+              if(body.status==='SKIPPED'&&(unit.conceptCodes.length||unit.ncmCodes.length))throw new AssistantError(400,'invalid_card_payload');
+              const existing=overrides.find(o=>o.establishmentId===unit.establishmentId);
+              const baseline=next.units[unit.establishmentId]??{baseConceptCodes:existing?.conceptCodes??[],baseNcmCodes:existing?.ncmCodes??[],cards:{}};
+              // Replace this segment's old CNAE contributions only on an explicit save.
+              const previous={...baseline,cards:{...baseline.cards}};
+              for(const c of members.filter(c=>c.establishmentId===unit.establishmentId)) delete previous.cards['cnae:'+c.cnaeCode];
+              const merged=mergeUnitCard(previous,body.cardId,{status:body.status,conceptCodes:unit.conceptCodes,ncmCodes:unit.ncmCodes});
+              next.units[unit.establishmentId]=merged.unit;
+              const replacement={establishmentId:unit.establishmentId,taxRegime:existing?.taxRegime??'NAO_INFORMADO',conceptCodes:merged.conceptCodes,ncmCodes:merged.ncmCodes};
+              const index=overrides.findIndex(o=>o.establishmentId===unit.establishmentId);
+              if(index<0)overrides.push(replacement);else overrides[index]=replacement;
+            }
+          } else if (body.cardId.startsWith('cnae:')) {
+            if(body.units)throw new AssistantError(400,'invalid_card_payload');
             const cnae = body.cardId.slice(5);
             if (!body.establishmentId || !cards.some(c=>c.establishmentId===body.establishmentId && c.cnaeCode===cnae))
               throw new AssistantError(400,'invalid_establishment_cnae');
@@ -103,9 +131,9 @@ export async function onboardingRoutes(app: FastifyInstance) {
             const index = overrides.findIndex(o=>o.establishmentId===body.establishmentId);
             if(index<0) overrides.push(replacement); else overrides[index]=replacement;
           } else {
-            if(body.establishmentId || body.conceptCodes.length || body.ncmCodes.length) throw new AssistantError(400,'invalid_card_payload');
+            if(body.units || body.establishmentId || body.conceptCodes.length || body.ncmCodes.length) throw new AssistantError(400,'invalid_card_payload');
             if(body.cardId==='summary' && body.status==='CONFIRMED') {
-              if(!next.cards.company || !next.cards.establishments || cards.some(card=>!next.units[card.establishmentId]?.cards['cnae:'+card.cnaeCode]))
+              if(!next.cards.company || !next.cards.establishments || cards.some(card=>!next.units[card.establishmentId]?.cards['segment:'+card.segmentCode]&&!next.units[card.establishmentId]?.cards['cnae:'+card.cnaeCode]))
                 throw new AssistantError(409,'onboarding_cards_pending');
               next.completed=true;
             }
