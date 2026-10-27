@@ -28,7 +28,8 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
 
 ## 2. Pre-activation checklist (all required)
 1. **Admin roster: every `PLATFORM_ADMIN` who would get access.**
-   - Turning the flag on opens the API to **all** of them, not only to the two pilot admins.
+   - **Turning the flag on gives technical access to EVERY unrevoked `PLATFORM_ADMIN`.** There is no per-admin list. Naming two participants decides who conducts the pilot; it does **not** technically restrict anyone else.
+   - The roles are not changed by this plan. The inventory below exists only so COORD and Fábio can see exactly who would gain access.
    - The operator lists them read-only, returning ids and e-mails only to COORD and Fábio, never in the issue:
      ```sql
      BEGIN TRANSACTION READ ONLY; SET LOCAL statement_timeout = '5s';
@@ -60,7 +61,8 @@ Turning it on needs a separate COORD decision. RESTRICT and `BLOCK_CORPUS_INPUTS
    - other routes unchanged (`/api/v1/admin/me` 401 without token).
 3. Web: set `VITE_ENABLE_ANAT_RULES_ADMIN=true` on `web05-preview` and redeploy. Site 200; the screen is visible only to admins.
 4. **Pilot scope: the smallest possible.**
-   - **Who:** only the two named admins. Every other `PLATFORM_ADMIN` is told not to use the screen.
+   - **Who conducts it:** the two named admins.
+     - Every other unrevoked `PLATFORM_ADMIN` **keeps technical access** while the flag is on (§2.1). For them it is an organisational instruction not to use the screen, checked afterwards through the audit actors (§4).
    - **Inputs:** synthetic or already-reviewed examples only, typed in the draft. No corpus, gold or reserve material (`BLOCK_CORPUS_INPUTS_AND_GOLD`), and no bulk or batch processing (the API has none; it is not added).
    - **Operations allowed:** draft → freeze → simulate → compare → review (one rejection and one approval, by the other admin).
    - **Not in the pilot: no activation.** `activation/preview` and `confirm` are **not used**, so the **rules in force do not change**.
