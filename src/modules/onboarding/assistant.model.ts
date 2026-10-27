@@ -75,3 +75,15 @@ export function upgradeLegacyUnit(unit:AssistantUnit,activities:{cnaeCode:string
  }
  return next;
 }
+
+/** Keep the original one-row-per-CNAE GET contract for already loaded clients. */
+export function legacyActivityCards<T extends {establishmentId:string;cnaeCode:string;suggestions:{kind:string;target:string;segment:string}[]}>(cards:T[]):T[]{
+ const result=new Map<string,T>();
+ for(const card of cards){
+  const key=card.establishmentId+':'+card.cnaeCode,prior=result.get(key);
+  if(!prior){result.set(key,structuredClone(card));continue;}
+  const existing=new Set(prior.suggestions.map(s=>s.kind+':'+s.target+':'+s.segment));
+  for(const suggestion of card.suggestions){const id=suggestion.kind+':'+suggestion.target+':'+suggestion.segment;if(!existing.has(id)){prior.suggestions.push({...suggestion});existing.add(id);}}
+ }
+ return [...result.values()];
+}

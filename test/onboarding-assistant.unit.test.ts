@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {upgradeLegacyUnit,mergeUnitCard,selectableAssistantConcept,phraseMapping,phraseSegment,phraseSegments} from '../src/modules/onboarding/assistant.model.js';
+import {legacyActivityCards,upgradeLegacyUnit,mergeUnitCard,selectableAssistantConcept,phraseMapping,phraseSegment,phraseSegments} from '../src/modules/onboarding/assistant.model.js';
 test('card removal preserves overlapping choices of another CNAE and preexisting manual choices',()=>{
  const base={baseConceptCodes:['product.manual'],baseNcmCodes:['1213'],cards:{}};
  const a=mergeUnitCard(base,'cnae:0111301',{status:'CONFIRMED',conceptCodes:['product.rice'],ncmCodes:['230240']});
@@ -44,4 +44,16 @@ test('legacy multi-segment CNAE conversion preserves other segments and manual e
  assert.deepEqual(removed.ncmCodes,['1213','2716','999']);
  assert.ok(original.cards['cnae:0111301'],'source snapshot not mutated');
  assert.equal(upgraded.cards['cnae:0111301'],undefined);
+});
+
+test('GET legacy cards deduplicate the same CNAE while retaining all published segment suggestions',()=>{
+ const rows=[
+  {establishmentId:'head',cnaeCode:'0111301',segmentCode:'sector.agro',suggestions:[{kind:'PRODUCT',target:'product.rice',segment:'Agro'}]},
+  {establishmentId:'head',cnaeCode:'0111301',segmentCode:'sector.food',suggestions:[{kind:'NCM',target:'1006',segment:'Food'}]},
+  {establishmentId:'branch',cnaeCode:'0111301',segmentCode:'sector.agro',suggestions:[]},
+ ];
+ const legacy=legacyActivityCards(rows);
+ assert.equal(legacy.length,2);
+ assert.deepEqual(legacy[0].suggestions.map(s=>s.target),['product.rice','1006']);
+ assert.equal(rows[0].suggestions.length,1,'GET conversion never mutates segment rows');
 });

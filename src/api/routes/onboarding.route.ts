@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { withTenantContext, TenantAccessDeniedError } from '../../infrastructure/database/tenant-context.js';
 import { findLatestPublishedRelease, loadReleaseView, kyselyRunner } from '../../modules/taxonomy/curation/curation.read.js';
 import { publishedOperationalLinks } from '../../modules/taxonomy/curation/curation.f2-links.js';
-import { emptyAssistant, mergeUnitCard, upgradeLegacyUnit, selectableAssistantConcept, phraseSegment, phraseSegments, type AssistantState } from '../../modules/onboarding/assistant.model.js';
+import { emptyAssistant, mergeUnitCard, upgradeLegacyUnit, legacyActivityCards, selectableAssistantConcept, phraseSegment, phraseSegments, type AssistantState } from '../../modules/onboarding/assistant.model.js';
 
 const params = z.object({ companyId: z.string().uuid() });
 const selection = z.object({
@@ -72,7 +72,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
               phraseSegment:phraseSegment(segment.label),phraseSegments:phraseSegments(segment.label),
             }));
           })))).flat();
-          if (method === 'GET') return { version:profile?.version_no ?? 0,release,state,cards,
+          if (method === 'GET') return { version:profile?.version_no ?? 0,release,state,cards:legacyActivityCards(cards),segmentCards:cards,
             concepts:view.concepts.filter(selectableAssistantConcept).map(c => ({code:c.code,label:c.label,dimensionCode:c.dimensionCode})),
             companyName:company.legal_name,companyCnpj:company.head_office_cnpj };
           const body = selection.parse(request.body);

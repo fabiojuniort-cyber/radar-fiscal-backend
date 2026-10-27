@@ -132,6 +132,8 @@ test('ONB03 PG18 real API: readonly plan, approval rollback/staleness, publicati
    ['010','1213','230240','2716'].sort());
   const onboarding=await call('GET','/api/v1/companies/'+company+'/onboarding',null,200,customer.headers);
   assert.equal(onboarding.release.id,publishedId);
+  assert.equal(onboarding.cards.length,1,'old client contract remains one CNAE per unit');
+  assert.equal(onboarding.segmentCards.length,1,'new client receives explicit segment cards');
   const activity=onboarding.cards.find(c=>c.establishmentId===unit&&c.cnaeCode==='1000000');
   assert.ok(activity);
   assert.equal(activity.segmentCode,'sector.sem_segmento');
