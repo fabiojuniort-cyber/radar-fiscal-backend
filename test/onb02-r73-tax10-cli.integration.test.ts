@@ -118,7 +118,13 @@ test('R7.3 TAX-10 documented entrypoint commits publication and audit on real is
     console.log('ONB02_R73_TAX10_CLI pg18=true first_run=PUBLISHED committed_audit=true separate_connection=true replay=ALREADY_PUBLISHED actors='+registry.systemActors.length);
   }finally{
     if(pool)await pool.end();
-    if(created)await admin.query('DROP DATABASE '+database+' WITH (FORCE)');
+    if(created) {
+      // pg-pool's end() resolves before its connections finish closing; dropping WITH (FORCE) at that moment
+      // terminates a still-open client and surfaces as an uncaught pool error. Wait for the server to drop them.
+      for(let i=0;i<250&&Number((await admin.query('SELECT count(*) n FROM pg_stat_activity WHERE datname=$1',[database])).rows[0].n)>0;i++)
+        await new Promise(resolve=>setTimeout(resolve,20));
+      await admin.query('DROP DATABASE '+database+' WITH (FORCE)');
+    }
     await admin.end();
   }
 });
