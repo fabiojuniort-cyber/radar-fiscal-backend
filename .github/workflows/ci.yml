@@ -396,5 +396,8 @@ jobs:
         run: npm run db:prepare
       - name: Clean synthetic legacy audit fixtures (isolated PG18 only)
         run: node ops/onb02/audit-backfill.mjs --apply --ack-irreversible-r7
+      - name: ONB-03.6 unit flow, loaded save performance and atomic root purge on PG18
+        run: node --import tsx --test test/onboarding-unit-flow.integration.test.ts
       - name: ONB-03 real API approval publication reversal and profile invariance
         run: node --test test/f2-operational-links.pg18.integration.mjs
+
