@@ -78,7 +78,7 @@ test('ONB-03.6: root-confirmed purge removes linked and legacy separate branches
   const target=await create(a,'0001'),linked=await create(a,'0002'),remote=await create(b,'0001'),unrelated=await create(a,'0001',root==='12345678'?'87654321':'12345678');assert.equal(linked.company.id,target.company.id);
   // Reproduce a pre-unified registration: a branch CNPJ exists as a separate company.
   const legacy=(await admin.query("INSERT INTO companies(tenant_id,head_office_cnpj,legal_name) VALUES($1,$2,'Legacy separate branch') RETURNING id",[a.tenant,cnpj(root+'0003')])).rows[0].id;
-  const legacyUnit=(await admin.query("INSERT INTO establishments(company_id,name,cnpj,type_code,uf,is_head_office) VALUES($1,'Legacy branch',$2,'OTHER','GO',true) RETURNING id",[legacy,cnpj(root+'0003')])).rows[0].id;
+  const legacyUnit=(await admin.query("INSERT INTO establishments(company_id,name,cnpj,establishment_type_code,uf,is_head_office) VALUES($1,'Legacy branch',$2,'OTHER','GO',true) RETURNING id",[legacy,cnpj(root+'0003')])).rows[0].id;
   await admin.query("INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,valid_from,is_current) VALUES($1,1,'NAO_INFORMADO',CURRENT_DATE,true)",[legacy]);
   const path='/api/v1/companies/'+target.company.id;
   const old=await app.inject({method:'DELETE',url:path,headers:{...a.headers,'x-company-delete-intent':'permanent-v1'}});assert.equal(old.statusCode,409,old.body);assert.equal(old.json().error,'company_root_delete_confirmation_required');assert.equal((await admin.query('SELECT count(*) FROM companies WHERE tenant_id=$1',[a.tenant])).rows[0].count,'3');
