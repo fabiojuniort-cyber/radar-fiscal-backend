@@ -39,9 +39,79 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   assert.equal((await save('cnae:6201501',3,{establishmentId:branchId,status:'SKIPPED'})).statusCode,200);
   assert.equal((await save('summary',4)).statusCode,200);
   data=await read();assert.equal(data.state.completed,true);assert.equal(data.version,5);
+
+
+  // A segment is one atomic version, with exact and tenant-scoped unit membership.
+  const segmentId='segment:'+data.cards[0].segmentCode;
+  const segmentPayload={units:[{establishmentId:head,conceptCodes:[],ncmCodes:[]},{establishmentId:branchId,conceptCodes:[],ncmCodes:[]}]};
+  const stable=JSON.stringify(data.state);
+  assert.equal((await save(segmentId,5,{units:[segmentPayload.units[0]]})).statusCode,400,'cannot omit a unit');
+  assert.equal((await save(segmentId,5,{units:[segmentPayload.units[0],segmentPayload.units[0]]})).statusCode,400,'cannot duplicate a unit');
+  assert.equal((await save(segmentId,5,{units:[segmentPayload.units[0],{establishmentId:randomUUID(),conceptCodes:[],ncmCodes:[]}]})).statusCode,400,'foreign unit rejected');
+  assert.equal((await save(segmentId,5,{units:segmentPayload.units.map(u=>({...u,ncmCodes:['99999999']}))})).statusCode,400);
+  assert.equal(JSON.stringify((await read()).state),stable,'invalid segment writes are atomic no-ops');
+  const segmentWrites=await Promise.all([save(segmentId,5,segmentPayload),save(segmentId,5,segmentPayload)]);
+  assert.deepEqual(segmentWrites.map(r=>r.statusCode).sort(),[200,409]);
+  data=await read();assert.equal(data.version,6);
+  for(const id of [head,branchId]){assert.deepEqual(data.state.units[id].cards[segmentId],{status:'CONFIRMED',conceptCodes:[],ncmCodes:[]});assert.equal(data.state.units[id].cards['cnae:6201501'],undefined);}
+  assert.equal((await save('summary',6)).statusCode,200);
+  data=await read();assert.equal(data.version,7);assert.equal(data.state.completed,true);
+
+  // Inline IE writes neither profile versions nor other establishment fields.
+  const snapshot=async()=> (await admin.query(
+    'SELECT to_jsonb(e) AS unit,(SELECT jsonb_agg(to_jsonb(ec) ORDER BY ec.cnae_code) FROM establishment_cnaes ec WHERE ec.establishment_id=e.id) AS cnaes,(SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) FROM company_tax_profiles p WHERE p.company_id=e.company_id) AS profiles FROM establishments e WHERE e.id=$1',[branchId])).rows[0];
+  const beforeIe=await snapshot();
+  const ieUrl='/api/v1/companies/'+company+'/establishments/'+branchId+'/state-registration';
+  const patchIe=(expected:string|null,value:string|null,headers=a,url=ieUrl)=>app.inject({
+    method:'PATCH',url,headers,payload:{expectedStateRegistration:expected,stateRegistration:value}});
+  assert.equal((await patchIe(null,'123456789',b)).statusCode,404,'tenant cannot reach another company');
+  assert.equal((await patchIe(null,'123456789',a,ieUrl.replace(branchId,randomUUID()))).statusCode,404);
+  await admin.query("INSERT INTO tenant_memberships(tenant_id,user_id,role) VALUES($1,$2,'VIEWER')",[tenants[0],users[1]]);
+  assert.equal((await patchIe(null,'123456789',{...b,'x-tenant-id':tenants[0]!})).statusCode,403,'member cannot edit IE');
+  const ieWrites=await Promise.all([patchIe(null,'123456789'),patchIe(null,'987654321')]);
+  assert.deepEqual(ieWrites.map(r=>r.statusCode).sort(),[200,409],'stale IE must not overwrite');
+  const savedIe=ieWrites.find(r=>r.statusCode===200)!.json();
+  assert.equal(savedIe.establishmentId,branchId);
+  assert.equal(savedIe.stateRegistrationSource,'MANUAL');
+  assert.equal((await patchIe(null,'111111111')).statusCode,409);
+  assert.equal((await app.inject({method:'PATCH',url:ieUrl,headers:a,payload:{expectedStateRegistration:savedIe.stateRegistration,stateRegistration:'X'.repeat(31)}})).statusCode,400);
+  assert.equal((await app.inject({method:'PATCH',url:ieUrl,headers:a,payload:{expectedStateRegistration:savedIe.stateRegistration,stateRegistration:'123',name:'must not write'}})).statusCode,400);
+  const afterIe=await snapshot();
+  assert.deepEqual(afterIe.profiles,beforeIe.profiles,'all profile rows byte-equivalent');
+  assert.deepEqual(afterIe.cnaes,beforeIe.cnaes,'CNAEs untouched');
+  const ieFields=new Set(['state_registration','state_registration_source','state_registration_status','state_registration_checked_at','state_registration_lookup_status','updated_at']);
+  for(const key of Object.keys(beforeIe.unit)) if(!ieFields.has(key)) assert.deepEqual(afterIe.unit[key],beforeIe.unit[key],key+' preserved');
+  const unitsAfter=await app.inject({method:'GET',url:'/api/v1/companies/'+company+'/establishments',headers:a});
+  assert.equal(unitsAfter.json().items.find((u:{id:string})=>u.id===branchId).stateRegistration,savedIe.stateRegistration);
+  assert.equal(unitsAfter.json().items.find((u:{id:string})=>u.id===head).stateRegistration,null,'matrix unchanged');
+  const unchanged=await snapshot();assert.equal((await patchIe(savedIe.stateRegistration,savedIe.stateRegistration)).statusCode,200);assert.deepEqual(await snapshot(),unchanged,'no-op does not change timestamps/provenance');
+  const cleared=await patchIe(savedIe.stateRegistration,'   ');assert.equal(cleared.statusCode,200);assert.equal(cleared.json().stateRegistration,null);
+
   await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(personalization,'{taxonomy}', $1::jsonb) WHERE company_id=$2 AND is_current=true",[JSON.stringify({releaseId:randomUUID(),releaseVersion:'v0.0.1',conceptCodes:['product.unknown_historical']}),company]);
-  const historical=await save('company',5);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
-  assert.equal((await read()).version,5,'historical selections cannot be relabeled implicitly');
+  const historical=await save('company',7);assert.equal(historical.statusCode,409,historical.body);assert.equal(historical.json().error,'taxonomy_selection_review_required');
+  assert.equal((await read()).version,7,'historical selections cannot be relabeled implicitly');
+  // ONB-03.4: legacy choices are projected without writes and can be explicitly reviewed.
+  await admin.query("UPDATE company_tax_profiles SET personalization=jsonb_set(jsonb_set(personalization,'{products}', '[\"Produto livre legado\"]'::jsonb),'{ncmCodes}', '[\"2716\"]'::jsonb) WHERE company_id=$1 AND is_current=true",[company]);
+  const legacyBefore=(await admin.query('SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) AS snapshot FROM company_tax_profiles p WHERE company_id=$1',[company])).rows;
+  data=await read();await read();
+  const legacyHead=data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===head);
+  assert.deepEqual(legacyHead.conceptCodes,['product.unknown_historical']);assert.deepEqual(legacyHead.ncmCodes,['2716']);assert.deepEqual(legacyHead.legacyFields.products,['Produto livre legado']);
+  assert.deepEqual(legacyHead.historicalCodes,['product.unknown_historical']);
+  const legacyBranch=data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===branchId);
+  assert.deepEqual(legacyBranch.conceptCodes,[]);assert.deepEqual(legacyBranch.ncmCodes,[]);
+  assert.deepEqual((await admin.query('SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) AS snapshot FROM company_tax_profiles p WHERE company_id=$1',[company])).rows,legacyBefore,'GET projection never backfills or mutates history');
+  assert.equal((await save('company',7,{selectionMode:'EFFECTIVE'})).statusCode,200,'company card does not relabel historical codes');
+  data=await read();assert.equal(data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===head).releaseVersion,'v0.0.1');
+  const edit={selectionMode:'EFFECTIVE',establishmentId:head,conceptCodes:[],ncmCodes:[],legacyFields:{products:[]},cnaeSegments:[],taxRegime:'LUCRO_REAL'};
+  assert.equal((await save('profile',8,{...edit,establishmentId:randomUUID()})).statusCode,400,'foreign unit cannot be edited');
+  assert.equal((await save('profile',8,{...edit,conceptCodes:['product.unknown_historical']})).statusCode,409,'retired codes cannot be silently relabeled');
+  const explicit=await save('profile',8,edit);assert.equal(explicit.statusCode,200,explicit.body);
+  assert.equal((await save('profile',8,edit)).statusCode,409,'full legacy review is also version protected');
+  data=await read();const reviewedHead=data.effectiveProfiles.find((u:{establishmentId:string})=>u.establishmentId===head);
+  assert.deepEqual(reviewedHead.conceptCodes,[]);assert.deepEqual(reviewedHead.ncmCodes,[]);assert.deepEqual(reviewedHead.legacyFields.products,[]);assert.equal(reviewedHead.taxRegime,'LUCRO_REAL');
+  const history=(await admin.query('SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) AS snapshot FROM company_tax_profiles p WHERE company_id=$1 AND version_no<=7',[company])).rows[0].snapshot;
+  assert.equal(history.length,7);assert.ok(history.some((p:{personalization:{products?:string[]}})=>p.personalization.products?.includes('Produto livre legado')),'explicit correction preserves historical data');
+  assert.equal((await save('summary',9,{selectionMode:'EFFECTIVE'})).statusCode,200,'review path permits completion after correction');
   const phrases=await app.inject({method:'GET',url:'/api/v1/onboarding/phrases',headers:a});assert.equal(phrases.statusCode,200,phrases.body);assert.equal(phrases.json().items.length,19);assert.ok(phrases.json().items.every((p:{phrases:string[]})=>p.phrases.length===20));
   const forbidden=await app.inject({method:'PUT',url:'/api/v1/admin/onboarding/phrases/generico',headers:a,payload:{expectedVersion:1,phrases:['Unauthorized']}});assert.equal(forbidden.statusCode,403);
   await admin.query("INSERT INTO platform_user_roles(user_id,role,granted_by) VALUES($1,'PLATFORM_ADMIN',$2)",[users[0],users[0]]);
@@ -56,3 +126,4 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   } finally { await admin.query('UPDATE onboarding_phrases SET phrases=$1::jsonb,version_no=version_no+1 WHERE segment=$2',[JSON.stringify(original.phrases),'generico']); }
  }finally{await app.close();for(const tenant of tenants){await admin.query('DELETE FROM tenant_memberships WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant])}for(const user of users){await admin.query('DELETE FROM platform_user_roles WHERE user_id=$1',[user]);await admin.query('DELETE FROM app_users WHERE id=$1',[user]);}await admin.end()}
 });
+

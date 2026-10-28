@@ -55,7 +55,9 @@ test('L-11: PLATFORM_ADMIN applies DOU rule and physically purges unlinked act w
         "INSERT INTO sources(code,name,jurisdiction_level,base_url,connector_key) "+
         "VALUES('dou','Diário Oficial','FEDERAL','https://in.gov.br','dou') RETURNING id"
       )).rows[0]!.id;
-    canonicalType='AVISO L11 '+randomUUID().slice(0,8).toUpperCase();
+    // A digit-only UUID prefix is an act number to the real title parser.
+    // Keep the synthetic act-name token alphabetic-prefixed for every UUID.
+    canonicalType='AVISO L11 T'+randomUUID().slice(0,8).toUpperCase();
     const identifier=createHash('sha256').update(randomUUID()).digest('hex');
     const inserted=await admin.query<{id:string}>(
       "INSERT INTO publications(identity_hash,identity_strength,identity_basis,jurisdiction_level,"+
