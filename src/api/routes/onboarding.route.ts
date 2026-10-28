@@ -25,6 +25,13 @@ const selection = z.object({
   conceptCodes: z.array(z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/)).max(500).default([]),
   ncmCodes: z.array(z.string().regex(/^[0-9]{1,8}$/)).max(500).default([]),
 });
+// Normalize the CURRENT catalog once per statement, rather than once per selected prefix.
+const validCurrentNcms=`WITH catalog AS MATERIALIZED (
+ SELECT regexp_replace(e.official_code,'[^0-9]','','g') AS code
+ FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id
+ JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT'
+) SELECT DISTINCT input.code FROM unnest($1::text[]) input(code)
+WHERE EXISTS(SELECT 1 FROM catalog WHERE catalog.code LIKE input.code||'%')`;
 type Profile = { id: string; version_no: number; tax_regime: string; segments: string[]; activities: unknown;
   personalization: Record<string, unknown> };
 type Override = { establishmentId: string; taxRegime: string; conceptCodes: string[]; ncmCodes: string[] };
@@ -153,7 +160,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
               }else{
                 if(codes.some(c=>!known.has(c)))throw new AssistantError(409,'taxonomy_selection_review_required');
                 if(ncms.length){
-                  const valid=await run<{code:string}>(`SELECT DISTINCT input.code FROM unnest($1::text[]) input(code) WHERE EXISTS(SELECT 1 FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT' AND regexp_replace(e.official_code,'[^0-9]','','g') LIKE input.code||'%')`,[ncms]);
+                  const valid=await run<{code:string}>(validCurrentNcms,[ncms]);
                   if(valid.length!==ncms.length)throw new AssistantError(400,'invalid_ncm_codes');
                 }
                 if((body.legacyFields||body.cnaeSegments)&&(!prior.isHeadOffice||body.cardId!=='profile'))throw new AssistantError(400,'invalid_card_payload');
@@ -194,10 +201,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const chosenNcms=[...new Set([...body.ncmCodes,...(body.units??[]).flatMap(u=>u.ncmCodes)])];
           if (chosenConcepts.some(code=>!currentCodes.has(code))) throw new AssistantError(400,'invalid_taxonomy_selection');
           if (chosenNcms.length) {
-            const found = await run<{code:string}>(`SELECT DISTINCT input.code FROM unnest($1::text[]) input(code)
-              WHERE EXISTS(SELECT 1 FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id
-                JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT'
-                AND regexp_replace(e.official_code,'[^0-9]','','g') LIKE input.code || '%')`,[chosenNcms]);
+            const found = await run<{code:string}>(validCurrentNcms,[chosenNcms]);
             if (found.length !== chosenNcms.length) throw new AssistantError(400,'invalid_ncm_codes');
           }
           // Do not relabel unknown historical selections as members of a newer release.
