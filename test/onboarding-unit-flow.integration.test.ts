@@ -8,7 +8,7 @@ import {ensureCnaeFixture} from './onboarding-cnae-fixture.js';
 function cnpj(base:string){let out=base;for(const weights of [[5,4,3,2,9,8,7,6,5,4,3,2],[6,5,4,3,2,9,8,7,6,5,4,3,2]]){const mod=weights.reduce((n,w,i)=>n+w*Number(out[i]),0)%11;out+=String(mod<2?0:11-mod)}return out;}
 test('ONB-03.5 unified CNPJ, scoped CNAEs, dimension CAS and minimal inline correction',async()=>{
  assert.ok(process.env.DATABASE_ADMIN_URL);
- const admin=new Pool({connectionString:process.env.DATABASE_ADMIN_URL,max:1}),app=await buildApp();let tenant='',user='';
+ const admin=new Pool({connectionString:process.env.DATABASE_ADMIN_URL,max:1}),app=await buildApp();let tenant='',user='',performanceEdition='';const performanceEntryIds:string[]=[];
  try{
   await app.ready();await ensureCnaeFixture(admin);
   const email=`onb035-${randomUUID()}@example.test`,password='ONB035-Synthetic-Secure-2026!';
@@ -32,15 +32,20 @@ test('ONB-03.5 unified CNPJ, scoped CNAEs, dimension CAS and minimal inline corr
   for(let i=0;i<12;i++){const begin=performance.now();const r=await app.inject({method:'PUT',url:perfPath,headers,payload:{selectionMode:'EFFECTIVE',expectedVersion:perfData.version,releaseId:perfData.release.id,cardId:'company',status:'CONFIRMED'}});assert.equal(r.statusCode,200,r.body);perfData=r.json();assert.ok(Array.isArray(perfData.effectiveProfiles),'save response replaces a full GET');durations.push(performance.now()-begin);}
   const sorted=durations.toSorted((a,b)=>a-b),p95=sorted[Math.ceil(sorted.length*.95)-1]!;
   console.log('ONB036_SAVE_PERFORMANCE '+JSON.stringify({environment:'disposable PostgreSQL / app.inject, warm immutable release',card:'company',cnaes:35,samples:durations.length,p50Ms:sorted[Math.floor(sorted.length*.5)],p95Ms:p95,maxMs:sorted.at(-1),putOnly:true}));assert.ok(p95<1000,`warm 35-CNAE card save p95 ${p95.toFixed(1)}ms must be <1000ms`);
-  // Exercise the heavier explicit profile save too, with real CURRENT catalog codes.
-  // This is synthetic load, not an assertion of production Agrex's 116/135 counts.
+  // Self-contained disposable catalog load: 135 synthetic assignable codes.
+  // Never imports/mutates a production catalog or asserts Agrex's real 116/135 counts.
+  await admin.query("INSERT INTO official_catalogs(code,name,maintainer) VALUES('NCM','NCM','Synthetic CI') ON CONFLICT(code) DO NOTHING");
+  const createdEdition=await admin.query(`INSERT INTO official_catalog_editions(catalog_id,edition_code,source_url,status) SELECT id,'onb036-ci-only','https://example.invalid/onb036-ncm','CURRENT' FROM official_catalogs c WHERE code='NCM' AND NOT EXISTS(SELECT 1 FROM official_catalog_editions ed WHERE ed.catalog_id=c.id AND ed.status='CURRENT') ON CONFLICT(catalog_id,edition_code) DO NOTHING RETURNING id`);
+  performanceEdition=createdEdition.rows[0]?.id??'';
+  const currentEdition=(await admin.query("SELECT ed.id FROM official_catalog_editions ed JOIN official_catalogs c ON c.id=ed.catalog_id WHERE c.code='NCM' AND ed.status='CURRENT'")).rows[0].id;
+  const insertedEntries=await admin.query(`INSERT INTO official_catalog_entries(catalog_edition_id,official_code,description,metadata) SELECT $1,(10060000+n)::text,'Synthetic ONB036 performance only','{"assignable":true,"synthetic":true}'::jsonb FROM generate_series(0,134) n ON CONFLICT(catalog_edition_id,official_code) DO NOTHING RETURNING id`,[currentEdition]);performanceEntryIds.push(...insertedEntries.rows.map(r=>r.id));
   const loadNcms=(await admin.query(`SELECT DISTINCT regexp_replace(e.official_code,'[^0-9]','','g') AS code FROM official_catalog_entries e JOIN official_catalog_editions ed ON ed.id=e.catalog_edition_id JOIN official_catalogs cat ON cat.id=ed.catalog_id WHERE cat.code='NCM' AND ed.status='CURRENT' AND regexp_replace(e.official_code,'[^0-9]','','g') ~ '^[0-9]{8}$' ORDER BY code LIMIT 135`)).rows.map(r=>r.code);
-  assert.ok(loadNcms.length,'published test catalog has CURRENT NCMs');
+  assert.equal(loadNcms.length,135,'synthetic load exercises 135 CURRENT catalog codes');
   const loadProducts=initialPerf.json().concepts.filter((c:{dimensionCode:string})=>c.dimensionCode==='product').slice(0,116).map((c:{code:string})=>c.code);
   const loadedTimes:number[]=[];
   for(let i=0;i<6;i++){const begin=performance.now();const r=await app.inject({method:'PUT',url:perfPath,headers,payload:{selectionMode:'EFFECTIVE',expectedVersion:perfData.version,releaseId:perfData.release.id,cardId:'profile',status:'CONFIRMED',establishmentId:head.id,conceptCodes:loadProducts,ncmCodes:loadNcms}});assert.equal(r.statusCode,200,r.body);perfData=r.json();loadedTimes.push(performance.now()-begin);}
   const loadedSorted=loadedTimes.toSorted((a,b)=>a-b),loadedP95=loadedSorted[Math.ceil(loadedSorted.length*.95)-1]!;
-  console.log('ONB036_SAVE_PERFORMANCE '+JSON.stringify({environment:'disposable PostgreSQL / app.inject, warm immutable release',card:'profile',cnaes:35,products:loadProducts.length,ncms:loadNcms.length,samples:loadedTimes.length,p50Ms:loadedSorted[Math.floor(loadedSorted.length*.5)],p95Ms:loadedP95,maxMs:loadedSorted.at(-1),putOnly:true}));assert.ok(loadedP95<1000,`loaded profile save p95 ${loadedP95.toFixed(1)}ms must be <1000ms`);
+  console.log('ONB036_SAVE_PERFORMANCE '+JSON.stringify({environment:'disposable PostgreSQL / app.inject, warm immutable release',card:'profile',catalog:'synthetic CI load only',cnaes:35,products:loadProducts.length,ncms:loadNcms.length,samples:loadedTimes.length,p50Ms:loadedSorted[Math.floor(loadedSorted.length*.5)],p95Ms:loadedP95,maxMs:loadedSorted.at(-1),putOnly:true}));assert.ok(loadedP95<1000,`loaded profile save p95 ${loadedP95.toFixed(1)}ms must be <1000ms`);
   const reset=await app.inject({method:'PUT',url:perfPath,headers,payload:{selectionMode:'EFFECTIVE',expectedVersion:perfData.version,releaseId:perfData.release.id,cardId:'profile',status:'CONFIRMED',establishmentId:head.id,conceptCodes:[],ncmCodes:[]}});assert.equal(reset.statusCode,200,reset.body);perfData=reset.json();
   const path=`/api/v1/companies/${company}/onboarding?establishmentId=${branch.id}`;
   const read=async()=>{const r=await app.inject({method:'GET',url:path,headers});assert.equal(r.statusCode,200,r.body);return r.json();};
@@ -74,7 +79,7 @@ test('ONB-03.5 unified CNPJ, scoped CNAEs, dimension CAS and minimal inline corr
   const ie=await app.inject({method:'PATCH',url:correctionPath,headers,payload:{expected:currentExpected,values:{...currentExpected,stateRegistration:'123456789'}}});assert.equal(ie.statusCode,200,ie.body);assert.equal(ie.json().stateRegistrationSource,'MANUAL');
   assert.equal((await app.inject({method:'PATCH',url:correctionPath,headers,payload:{expected:currentExpected,values:{...currentExpected,stateRegistration:'999'}}})).statusCode,409,'IE CAS protects the whole atomic correction');
   assert.deepEqual((await snapshot()).profiles,before.profiles,'IE correction never migrates profiles');
- }finally{await app.close();if(tenant){await admin.query('DELETE FROM tenant_memberships WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant]);}if(user)await admin.query('DELETE FROM app_users WHERE id=$1',[user]);await admin.end();}
+ }finally{await app.close();if(performanceEntryIds.length)await admin.query('DELETE FROM official_catalog_entries WHERE id=ANY($1::uuid[])',[performanceEntryIds]);if(performanceEdition)await admin.query('DELETE FROM official_catalog_editions WHERE id=$1 AND NOT EXISTS(SELECT 1 FROM official_catalog_entries WHERE catalog_edition_id=$1)',[performanceEdition]);if(tenant){await admin.query('DELETE FROM tenant_memberships WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant]);}if(user)await admin.query('DELETE FROM app_users WHERE id=$1',[user]);await admin.end();}
 });
 
 
