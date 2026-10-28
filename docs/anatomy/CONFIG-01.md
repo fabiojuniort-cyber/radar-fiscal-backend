@@ -78,14 +78,14 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
 
 **Correção pontual (alcance documento):**
 - Fica vinculada a `documentId`, a `documentHash` (SHA-256 da versão exata) e a `partKey` (SHA-256 de documento + texto próprio do trecho). Não usa posição na tela.
-- Ao salvar, o servidor define autor (usuário da sessão), data e versão. A 081 recusa uma correção nova com outro autor (`ACTOR_MISMATCH`).
+- Ao salvar, o servidor define autor (usuário da sessão), data e versão. A 082 recusa uma correção nova com outro autor (`ACTOR_MISMATCH`).
 - **Outro documento** nunca recebe a correção.
 - **Mesmo documento, outra versão** (hash diferente) ou **trecho inexistente:** a correção é marcada como desatualizada, não é aplicada e aparece na conferência.
 - Salvar e restaurar carregam as correções junto com os perfis. Uma correção nunca vira regra.
 
 ## 5. Contratos alterados
 
-- **Migration `081_anat_config_direct_apply.sql`** (numeração conferida com a main faa019c4; nenhum branch aberto usa 081; aplicada só em bancos descartáveis, por isso editável até o merge):
+- **Migration `082_anat_config_direct_apply.sql`** (renumerada de 081 para 082 em 28/10: a main 6b810fb8 recebeu `081_onb036_root_purge.sql`, já aplicada em produção; numeração conferida de novo contra essa main. A 082 só foi aplicada em bancos descartáveis: nenhum deploy do Railway usou este branch, por isso ela pode ser editada até o merge):
   - `anatomy_config_versions` são imutáveis (UPDATE e DELETE dão `anat:IMMUTABLE`). Guardam perfis e correções de trecho;
   - `anatomy_config_current` é um ponteiro único e só avança;
   - `anatomy_config_analyses` registra as novas análises de um documento. É imutável e só aceita a versão em vigor (`STALE_VERSION`);
@@ -97,7 +97,7 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
   - **concorrência:**
     - salvar e restaurar tomam o lock consultivo `anat-config` em modo exclusivo, mais `FOR UPDATE` e `expected_version`. A divergência devolve `STALE_VERSION` (409), que é auditado;
     - o registro de análise toma o **mesmo lock em modo compartilhado**. Isso serializa o registro com salvamentos também antes do primeiro salvamento, quando não há linha para travar (CONFIG-R2-03);
-  - **correções:** a 081 confere o formato e recusa, ao salvar, uma correção nova cujo autor não seja o usuário da sessão (`ACTOR_MISMATCH`);
+  - **correções:** a 082 confere o formato e recusa, ao salvar, uma correção nova cujo autor não seja o usuário da sessão (`ACTOR_MISMATCH`);
   - a versão, o ponteiro e a auditoria vão na mesma transação, então qualquer falha mantém a versão anterior;
   - **RLS:** `radar_app` lê só se for administrador de plataforma, `radar_worker` lê, e PUBLIC e o curador não têm acesso;
   - a política de auditoria estende **exatamente** a da 078 com **três eventos**: `ANAT_RULES_CONFIG_SAVED`, `ANAT_RULES_CONFIG_REJECTED` e `ANAT_RULES_CONFIG_ANALYZED`. O bloqueio fail-closed atua caso a política em vigor seja diferente;
@@ -130,7 +130,7 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
 | Segunda conferência explícita, divergências documentadas | `secondCheck` | unit (campo obrigatório) | Não é revisão independente |
 | Ato e estrutura relacionados | web: árvore ↔ texto | e2e passo 2 (`aria-current`) | — |
 | Correção de trecho separada de regra para semelhantes | `corrections` (versionadas) vs `changes` | unit "corrections: applied…"; vitest; e2e passos 3 e 4 | — |
-| Correção aplicada ao resultado, preservando o original; vinculada à versão e ao trecho; desatualizada sinalizada | `describeResult` (overlay), `documentHash`, `passageKey`, `prepareCorrections`, 081 (formato + autor) | unit; integração "the real consumer AFTER save…", "correction input…"; e2e passos 7–9 | Identidade = documento + texto próprio + ocorrência; mudar o documento torna a correção desatualizada |
+| Correção aplicada ao resultado, preservando o original; vinculada à versão e ao trecho; desatualizada sinalizada | `describeResult` (overlay), `documentHash`, `passageKey`, `prepareCorrections`, 082 (formato + autor) | unit; integração "the real consumer AFTER save…", "correction input…"; e2e passos 7–9 | Identidade = documento + texto próprio + ocorrência; mudar o documento torna a correção desatualizada |
 | Resultado original, correção, autor, motivo e versão mostrados à parte | painel "Trecho" (Resultado do motor + Correção administrativa aplicada) | vitest; e2e passo 7 | — |
 | Alcance explícito (padrão geral, fonte, família) | `Scope` em `rules.ts`; seletor na tela | unit "guided change…" | Escopo "documento" só como correção |
 | Prévia antes/depois com contagens reais | `analyze()` no executor isolado | integração "analysis…"; e2e passo 4 | Contagens sobre os atos da amostra |
@@ -158,8 +158,8 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
 
 1. Revisão técnica independente dos dois PRs; merge só com autorização do COORD.
 2. **Backend:**
-   - o merge na main faz o deploy automático, e o pré-deploy `db:prepare` aplica a 081;
-   - antes, conferir que a política de auditoria em produção é a da 078; se não for, a 081 recusa e nada muda;
+   - o merge na main faz o deploy automático, e o pré-deploy `db:prepare` aplica a 082;
+   - antes, conferir que a política de auditoria em produção é a da 078; se não for, a 082 recusa e nada muda;
    - backup pgBackRest recente confirmado.
 3. Conferir: health 200 com database up e `GET /api/v1/admin/anatomy-config` = 404 (flag desligada).
 4. Ligar `ANAT_CONFIG_ENABLED=true` (backend). Com o backend nessa mudança, a rota antiga deixa de existir. Conferir 401 sem token e 403 para não-admin.

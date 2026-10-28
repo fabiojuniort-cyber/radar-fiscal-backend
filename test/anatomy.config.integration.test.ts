@@ -6,7 +6,7 @@ import { DISPOSABLE_URL, prepareAdminDatabase, PROJECT_MIGRATIONS } from './supp
 
 /**
  * ANAT-CONFIG-01 (issue tribusca-control#116): accessible anatomy configuration over the REAL buildApp(), the project's
- * migrations (real runner, 081 included) and the isolated executor. Fresh disposable database, synthetic samples only.
+ * migrations (real runner, 082 included) and the isolated executor. Fresh disposable database, synthetic samples only.
  * Covers: flag, authorisation, guided changes, validation in Portuguese, before/after counts, save = apply in one
  * action, optimistic concurrency, audit, failure keeps the version in force, restore (audited), the consumer reading
  * the saved version, privileges/RLS, no rewrite of stored analyses, and the legacy double approval being replaced.

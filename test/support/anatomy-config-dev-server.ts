@@ -4,7 +4,7 @@ import { DISPOSABLE_URL, prepareAdminDatabase, PROJECT_MIGRATIONS } from './anat
 
 /**
  * TEST/DEV HARNESS ONLY (ANAT-CONFIG-01, issue #116): serves the REAL accessible-configuration API (routes, SQL entry
- * points of 081, isolated executor, JWT + session check) over a FRESH disposable database with the project's
+ * points of 082, isolated executor, JWT + session check) over a FRESH disposable database with the project's
  * migrations, so the web screen can be exercised end to end in a browser. The only non-production pieces are the
  * harness endpoints under /auth/__dev-* (switch between synthetic users: two platform admins and one non-admin).
  * It refuses to start outside the disposable environment.

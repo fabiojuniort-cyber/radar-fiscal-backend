@@ -12,7 +12,7 @@ import { describeResult, diffDescribed, documentHash, NATURE_PT, type Correction
 /**
  * ANAT-CONFIG-01 (issue tribusca-control#116): accessible anatomy configuration. "Salvar configuração" validates and
  * applies in ONE administrative action (COORD decision 28/10/2026, replaces the 079 double approval for this flow).
- * Writes go only through the audited SQL entry points of 081; reads use RLS (platform admins only).
+ * Writes go only through the audited SQL entry points of 082; reads use RLS (platform admins only).
  */
 export const OFFICIAL_SAMPLES: readonly SampleInput[] = Object.freeze([]); // pending: official sources not reachable (docs/anatomy/CONFIG-01.md)
 export const ALL_SAMPLES: readonly SampleInput[] = Object.freeze([...OFFICIAL_SAMPLES, ...SYNTHETIC_SAMPLES]);
