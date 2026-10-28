@@ -110,9 +110,10 @@ export async function onboardingRoutes(app: FastifyInstance) {
             }
             return { version:profile?.version_no??0,release,state:scopedState,cards:legacyActivityCards(cards),segmentCards:cards,
               dimensions,dimensionGroups,
+              taxonomyGroups:view.groups.filter(g=>dimensionCodes.includes(g.dimensionCode)).map(g=>({code:g.code,label:g.label,dimensionCode:g.dimensionCode,displayOrder:g.displayOrder})),
               effectiveProfiles:effective.filter(u=>!scopeId||u.establishmentId===scopeId).map(unit=>({...unit,historicalCodes:unique([...unit.conceptCodes,...unit.cnaeSegments.flatMap(c=>c.segmentCode?[c.segmentCode]:[])]).filter(code=>!known.has(code))})),
               historicalConcepts:[...historicalConcepts.values()],
-              concepts:included.map(c=>({code:c.code,label:c.label,dimensionCode:c.dimensionCode,ncmCodes:productNcmCodes(c)})),
+              concepts:included.map(c=>({code:c.code,label:c.label,dimensionCode:c.dimensionCode,groupCode:c.groupCode,ncmCodes:productNcmCodes(c)})),
               companyName:company.legal_name,companyCnpj:company.head_office_cnpj };
           }
           const body = selection.parse(request.body);

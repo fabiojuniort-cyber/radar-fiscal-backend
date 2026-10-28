@@ -19,6 +19,11 @@ test('assistant: read-only resume, tenant/unit boundaries, stale card and legacy
   const read=async()=>{const r=await app.inject({method:'GET',url:path,headers:a});assert.equal(r.statusCode,200,r.body);return r.json()};
   const before=await admin.query('SELECT count(*)::int AS n FROM company_tax_profiles WHERE company_id=$1',[company]);
   let data=await read();await read();assert.equal(data.version,0);assert.deepEqual(data.state.units,{});
+  // ONB-03.7: taxonomy groups are release-scoped metadata, never tenant identifiers.
+  assert.ok(Array.isArray(data.taxonomyGroups));
+  const expectedGroups=await admin.query(`SELECT g.code,g.label,d.code AS "dimensionCode",g.display_order AS "displayOrder" FROM taxonomy_release_groups g JOIN taxonomy_dimensions d ON d.id=g.dimension_id WHERE g.release_id=$1 AND d.code=ANY($2::text[]) ORDER BY d.code,g.display_order,g.label`,[data.release.id,['tax','regime','operation','operation_purpose','document','obligation','actuacao','subject','theme']]);
+  assert.deepEqual(data.taxonomyGroups,expectedGroups.rows);
+  assert.ok(data.concepts.every((c:Record<string,unknown>)=>Object.hasOwn(c,'groupCode')));
   const after=await admin.query('SELECT count(*)::int AS n FROM company_tax_profiles WHERE company_id=$1',[company]);assert.deepEqual(after.rows,before.rows,'GET never creates a profile');
   assert.equal((await app.inject({method:'GET',url:path,headers:b})).statusCode,404);
   const save=(cardId:string,version:number,extra:Record<string,unknown>={})=>app.inject({method:'PUT',url:path,headers:a,payload:{expectedVersion:version,releaseId:data.release.id,cardId,status:'CONFIRMED',...extra}});
