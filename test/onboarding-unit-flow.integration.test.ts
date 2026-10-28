@@ -1,3 +1,4 @@
+import {dimensionGroups} from '../src/modules/onboarding/assistant.dimensions.js';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import test from 'node:test';
@@ -29,11 +30,16 @@ test('ONB-03.5 unified CNPJ, scoped CNAEs, dimension CAS and minimal inline corr
   for(const card of ['company','establishments']){const r=await save(card);assert.equal(r.statusCode,200,r.body);data=await read();assert.ok(data.state.cards[card]);}
   assert.equal((await save('summary')).statusCode,409,'cannot conclude before segment/dimension review');
   for(const segment of new Set<string>(data.segmentCards.map((c:{segmentCode:string})=>c.segmentCode))){const r=await save('segment:'+segment,{units:[{establishmentId:branch.id,conceptCodes:[],ncmCodes:[]}]});assert.equal(r.statusCode,200,r.body);data=await read();}
-  for(const dim of data.dimensions as {code:string}[]){
-   const concept=data.concepts.find((c:{dimensionCode:string})=>c.dimensionCode===dim.code);
-   const extra={establishmentId:branch.id,conceptCodes:concept?[concept.code]:[],ncmCodes:[]};
-   const attempts=await Promise.all([save('dimension:'+dim.code,extra),save('dimension:'+dim.code,extra)]);assert.deepEqual(attempts.map(r=>r.statusCode).sort(),[200,409]);data=await read();assert.ok(data.state.cards['dimension:'+dim.code]);
-   if(concept)assert.ok(data.effectiveProfiles[0].conceptCodes.includes(concept.code));
+  for(const group of dimensionGroups){
+   const prior=structuredClone(data.effectiveProfiles[0]);
+   const selected=group.dimensions.flatMap(code=>{const c=data.concepts.find((c:{dimensionCode:string})=>c.dimensionCode===code);return c?[c.code]:[]});
+   const extra={establishmentId:branch.id,conceptCodes:selected,ncmCodes:[]};
+   const outsider=data.concepts.find((c:{dimensionCode:string})=>!group.dimensions.includes(c.dimensionCode));
+   if(outsider){const rejected=await save('dimension-group:'+group.code,{...extra,conceptCodes:[outsider.code]});assert.equal(rejected.statusCode,400,rejected.body);assert.equal((await read()).version,data.version,'invalid group is an atomic no-op');}
+   const attempts=await Promise.all([save('dimension-group:'+group.code,extra),save('dimension-group:'+group.code,extra)]);assert.deepEqual(attempts.map(r=>r.statusCode).sort(),[200,409]);data=await read();assert.ok(data.state.cards['dimension-group:'+group.code]);
+   for(const code of selected)assert.ok(data.effectiveProfiles[0].conceptCodes.includes(code));
+   for(const code of prior.conceptCodes.filter((code:string)=>!data.concepts.some((c:{code:string;dimensionCode:string})=>c.code===code&&group.dimensions.includes(c.dimensionCode))))assert.ok(data.effectiveProfiles[0].conceptCodes.includes(code),'another group preserved');
+   assert.deepEqual(data.effectiveProfiles[0].ncmCodes,prior.ncmCodes);
   }
   const done=await save('summary');assert.equal(done.statusCode,200,done.body);data=await read();assert.equal(data.state.completed,true);
   const global=await app.inject({method:'GET',url:path.split('?')[0]!,headers});assert.equal(global.json().state.completed,false,'a branch completion cannot complete the matrix');assert.deepEqual(global.json().effectiveProfiles.find((p:{establishmentId:string})=>p.establishmentId===head.id).conceptCodes,[]);

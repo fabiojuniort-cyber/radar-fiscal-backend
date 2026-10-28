@@ -1,3 +1,4 @@
+import {dimensionGroups,dimensionGroupReviewed} from '../../modules/onboarding/assistant.dimensions.js';
 import {onboardingCorrectionRoutes} from './onboarding-correction.route.js';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -13,7 +14,7 @@ const params = z.object({ companyId: z.string().uuid() });
 const query = z.object({establishmentId:z.string().uuid().optional()});
 const selection = z.object({
   expectedVersion: z.number().int().min(0), releaseId: z.string().uuid(),
-  cardId: z.string().regex(/^(company|establishments|summary|profile|dimension:[a-z_]+|cnae:[0-9]{7}|segment:[a-z0-9_.]+)$/),
+  cardId: z.string().regex(/^(company|establishments|summary|profile|dimension-group:[a-z_]+|dimension:[a-z_]+|cnae:[0-9]{7}|segment:[a-z0-9_.]+)$/),
   selectionMode: z.literal('EFFECTIVE').optional(),
   taxRegime: z.enum(['SIMPLES_NACIONAL','LUCRO_PRESUMIDO','LUCRO_REAL','IMUNE_ISENTA','OUTRO','NAO_INFORMADO']).optional(),
   legacyFields: z.object(Object.fromEntries(legacyFieldNames.map(key=>[key,z.array(z.string()).max(500).optional()]))).optional(),
@@ -98,7 +99,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
               for(const c of old?.concepts??[])if(!known.has(c.code))historicalConcepts.set(c.code,{code:c.code,label:c.label,dimensionCode:c.dimensionCode});
             }
             return { version:profile?.version_no??0,release,state:scopedState,cards:legacyActivityCards(cards),segmentCards:cards,
-              dimensions,
+              dimensions,dimensionGroups,
               effectiveProfiles:effective.filter(u=>!scopeId||u.establishmentId===scopeId).map(unit=>({...unit,historicalCodes:unique([...unit.conceptCodes,...unit.cnaeSegments.flatMap(c=>c.segmentCode?[c.segmentCode]:[])]).filter(code=>!known.has(code))})),
               historicalConcepts:[...historicalConcepts.values()],
               concepts:included.map(c=>({code:c.code,label:c.label,dimensionCode:c.dimensionCode,ncmCodes:productNcmCodes(c)})),
@@ -117,12 +118,14 @@ export async function onboardingRoutes(app: FastifyInstance) {
               if(!body.establishmentId||body.units)throw new AssistantError(400,'invalid_card_payload');
               if(scopeId&&body.establishmentId!==scopeId)throw new AssistantError(400,'invalid_card_payload');
               selected=[{establishmentId:body.establishmentId,conceptCodes:body.conceptCodes,ncmCodes:body.ncmCodes}];
-            }else if(body.cardId.startsWith('dimension:')){
+            }else if(body.cardId.startsWith('dimension:')||body.cardId.startsWith('dimension-group:')){
               if(!scopeId||body.establishmentId!==scopeId||body.units||body.ncmCodes.length||body.legacyFields||body.cnaeSegments||body.taxRegime)throw new AssistantError(400,'invalid_card_payload');
               const prior=effective.find(u=>u.establishmentId===scopeId)!;
-              const dimension=body.cardId.slice(10);
-              if(!dimensions.some(d=>d.code===dimension)||body.conceptCodes.some(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)))throw new AssistantError(400,'invalid_taxonomy_selection');
-              selected=body.status==='SKIPPED'?[{establishmentId:scopeId,conceptCodes:prior.conceptCodes,ncmCodes:prior.ncmCodes}]:[{establishmentId:scopeId,conceptCodes:unique([...prior.conceptCodes.filter(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)),...body.conceptCodes]),ncmCodes:prior.ncmCodes}];
+              const group=dimensionGroups.find(g=>'dimension-group:'+g.code===body.cardId);
+              const codes=group?group.dimensions:body.cardId.startsWith('dimension:')?[body.cardId.slice(10)]:[];
+              const allowed=codes.filter(code=>dimensions.some(d=>d.code===code));
+              if(!codes.length||(!group&&!allowed.length)||body.conceptCodes.some(c=>!included.some(v=>v.code===c&&allowed.includes(v.dimensionCode))))throw new AssistantError(400,'invalid_taxonomy_selection');
+              selected=body.status==='SKIPPED'?[{establishmentId:scopeId,conceptCodes:prior.conceptCodes,ncmCodes:prior.ncmCodes}]:[{establishmentId:scopeId,conceptCodes:unique([...prior.conceptCodes.filter(c=>!included.some(v=>v.code===c&&allowed.includes(v.dimensionCode))),...body.conceptCodes]),ncmCodes:prior.ncmCodes}];
             }else if(body.cardId.startsWith('segment:')){
               const ids=unique(cards.filter(c=>'segment:'+c.segmentCode===body.cardId).map(c=>c.establishmentId));
               if(!ids.length||body.establishmentId||body.conceptCodes.length||body.ncmCodes.length||!body.units||body.units.length!==ids.length||new Set(body.units.map(u=>u.establishmentId)).size!==ids.length||body.units.some(u=>!ids.includes(u.establishmentId)))throw new AssistantError(400,'invalid_segment_units');
@@ -132,7 +135,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
               if(body.cardId==='summary'&&body.status==='CONFIRMED'){
                 if(effective.filter(u=>!scopeId||u.establishmentId===scopeId).some(u=>u.conceptCodes.some(code=>!known.has(code))||u.cnaeSegments.some(c=>c.segmentCode&&!known.has(c.segmentCode))))throw new AssistantError(409,'taxonomy_selection_review_required');
                 const completion=scopeId?next.units[scopeId]?.cards??{}:next.cards;
-                if(!completion.company||!completion.establishments||(scopeId&&dimensions.some(d=>!completion['dimension:'+d.code]))||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
+                if(!completion.company||!completion.establishments||(scopeId&&dimensionGroups.some(g=>!dimensionGroupReviewed(completion,g,dimensions.map(d=>d.code))))||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
                 next.completed=scopeId?units.every(u=>u.id===scopeId||next.units[u.id]?.cards.summary?.status==='CONFIRMED'):true;
               }
               const progress={status:body.status,conceptCodes:[],ncmCodes:[]};
