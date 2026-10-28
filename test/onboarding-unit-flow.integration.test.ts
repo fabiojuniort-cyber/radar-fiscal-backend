@@ -82,6 +82,16 @@ test('ONB-03.6: root-confirmed purge removes linked and legacy separate branches
   await admin.query("INSERT INTO company_tax_profiles(company_id,version_no,tax_regime,valid_from,is_current) VALUES($1,1,'NAO_INFORMADO',CURRENT_DATE,true)",[legacy]);
   const path='/api/v1/companies/'+target.company.id;
   const old=await app.inject({method:'DELETE',url:path,headers:{...a.headers,'x-company-delete-intent':'permanent-v1'}});assert.equal(old.statusCode,409,old.body);assert.equal(old.json().error,'company_root_delete_confirmation_required');assert.equal((await admin.query('SELECT count(*) FROM companies WHERE tenant_id=$1',[a.tenant])).rows[0].count,'3');
+  // Make the LAST family graph fail the existing legacy-identity guard, after
+  // an earlier graph would already have cascaded. The outer transaction must undo all of it.
+  const accountName=(await admin.query('SELECT name FROM tenants WHERE id=$1',[a.tenant])).rows[0].name;
+  const last=(await admin.query('SELECT legal_name FROM companies WHERE id=ANY($1::uuid[]) ORDER BY id DESC LIMIT 1',[[target.company.id,legacy]])).rows[0].legal_name;
+  await admin.query('UPDATE tenants SET name=$1 WHERE id=$2',[last,a.tenant]);
+  const blocked=await app.inject({method:'DELETE',url:path,headers:{...a.headers,'x-company-delete-intent':'permanent-root-v1'}});assert.equal(blocked.statusCode,409,blocked.body);
+  assert.equal((await admin.query('SELECT count(*) FROM companies WHERE id=ANY($1::uuid[])',[[target.company.id,legacy]])).rows[0].count,'2','root purge rolls back an earlier graph');
+  assert.equal((await admin.query('SELECT count(*) FROM establishments WHERE id=ANY($1::uuid[])',[[target.establishment.id,linked.establishment.id,legacyUnit]])).rows[0].count,'3','cascade is rolled back atomically');
+  assert.equal((await admin.query("SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND action='COMPANY_PURGED'",[a.tenant])).rows[0].count,'0','no partial success audit survives');
+  await admin.query('UPDATE tenants SET name=$1 WHERE id=$2',[accountName,a.tenant]);
   const deleted=await app.inject({method:'DELETE',url:path,headers:{...a.headers,'x-company-delete-intent':'permanent-root-v1'}});assert.equal(deleted.statusCode,204,deleted.body);
   assert.equal((await admin.query('SELECT count(*) FROM companies WHERE id=ANY($1::uuid[])',[[target.company.id,legacy]])).rows[0].count,'0');
   assert.equal((await admin.query('SELECT count(*) FROM establishments WHERE id=ANY($1::uuid[])',[[target.establishment.id,linked.establishment.id,legacyUnit]])).rows[0].count,'0');
