@@ -5,7 +5,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { withTenantContext, TenantAccessDeniedError } from '../../infrastructure/database/tenant-context.js';
 import { findLatestPublishedRelease, loadReleaseView, kyselyRunner } from '../../modules/taxonomy/curation/curation.read.js';
-import { publishedOperationalLinks } from '../../modules/taxonomy/curation/curation.f2-links.js';
+import {publishedAssistantReader} from '../../modules/onboarding/assistant.release.js';
 import { emptyAssistant, mergeUnitCard, upgradeLegacyUnit, legacyActivityCards, selectableAssistantConcept, phraseSegment, phraseSegments, type AssistantState } from '../../modules/onboarding/assistant.model.js';
 
 import { effectiveSelections, productNcmCodes, synchronizeUnit, strings, record, unique, legacyFieldNames, type UnitSelection } from '../../modules/onboarding/assistant.profile.js';
@@ -31,6 +31,7 @@ type Override = { establishmentId: string; taxRegime: string; conceptCodes: stri
 class AssistantError extends Error { constructor(public status: number, public code: string) { super(code); } }
 export async function onboardingRoutes(app: FastifyInstance) {
   await onboardingCorrectionRoutes(app);
+  const readPublished=publishedAssistantReader();
   const typed = app.withTypeProvider<ZodTypeProvider>();
   const path = '/api/v1/companies/:companyId/onboarding';
   for (const method of ['GET', 'PUT'] as const) typed.route({ method, url: path,
@@ -40,6 +41,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
       if (!request.auth) return reply.code(401).send({ error: 'unauthorized' });
       const tenant = z.string().uuid().safeParse(request.headers['x-tenant-id']);
       if (!tenant.success) return reply.code(400).send({ error: 'tenant_required' });
+      const started=performance.now();
       try {
         const result = await withTenantContext(app.db, request.auth.userId, tenant.data, async trx => {
           const run = kyselyRunner(trx);
@@ -58,7 +60,8 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const release = await findLatestPublishedRelease(run);
           if (!release) throw new AssistantError(409, 'taxonomy_release_not_available');
           if(state.releaseId && state.releaseId!==release.id) state=emptyAssistant();
-          const view = await loadReleaseView(run, release.id);
+          const snapshot = await readPublished(run, release.id);
+          const view = snapshot?.view;
           if (!view) throw new AssistantError(409, 'taxonomy_release_not_available');
           const units = await run<{id:string; name:string; is_head_office:boolean; cnaes:{code:string;description:string}[]}>(`
             SELECT e.id,e.name,e.is_head_office,COALESCE(jsonb_agg(jsonb_build_object('code',c.code,'description',c.description) ORDER BY ec.is_primary DESC,c.code)
@@ -69,7 +72,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
           if(scopeId&&!units.some(u=>u.id===scopeId))throw new AssistantError(404,'establishment_not_found');
           const scopedUnits=scopeId?units.filter(u=>u.id===scopeId):units;
           const cards = (await Promise.all(scopedUnits.flatMap(unit => unit.cnaes.map(async cnae => {
-            const links = await publishedOperationalLinks(run,cnae.code);
+            const links = snapshot!.links.filter(link=>link.cnae===cnae.code);
             const activity=view.concepts.find(c=>c.dimensionCode==='sector'&&c.officialCodes.some(code=>code.replace(/\D/g,'')===cnae.code));
             const group=view.groups.find(g=>g.id===activity?.groupId);
             const parents=view.concepts.filter(c=>c.dimensionCode==='sector'&&group?.segmentCodes.includes(c.code));
@@ -135,7 +138,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
               if(body.cardId==='summary'&&body.status==='CONFIRMED'){
                 if(effective.filter(u=>!scopeId||u.establishmentId===scopeId).some(u=>u.conceptCodes.some(code=>!known.has(code))||u.cnaeSegments.some(c=>c.segmentCode&&!known.has(c.segmentCode))))throw new AssistantError(409,'taxonomy_selection_review_required');
                 const completion=scopeId?next.units[scopeId]?.cards??{}:next.cards;
-                if(!completion.company||!completion.establishments||(scopeId&&dimensionGroups.some(g=>!dimensionGroupReviewed(completion,g,dimensions.map(d=>d.code))))||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
+                if(!completion.company||(scopeId&&dimensionGroups.some(g=>!dimensionGroupReviewed(completion,g,dimensions.map(d=>d.code))))||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
                 next.completed=scopeId?units.every(u=>u.id===scopeId||next.units[u.id]?.cards.summary?.status==='CONFIRMED'):true;
               }
               const progress={status:body.status,conceptCodes:[],ncmCodes:[]};
@@ -183,7 +186,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
             const today=new Date().toISOString().slice(0,10);
             if(profile)await trx.updateTable('company_tax_profiles').set({is_current:false,valid_to:today}).where('id','=',profile.id).execute();
             await trx.insertInto('company_tax_profiles').values({company_id:company.id,version_no:(profile?.version_no??0)+1,tax_regime:newRegime,segments:newSegments,activities:JSON.stringify(newActivities),personalization:JSON.stringify({...newPersonalization,establishmentOverrides:overrides,onboarding:next}),valid_from:today,valid_to:null,is_current:true}).execute();
-            return {version:(profile?.version_no??0)+1,release,state:next};
+            return {version:(profile?.version_no??0)+1,release,state:next,effectiveProfiles:effectiveSelections({tax_regime:newRegime,segments:newSegments,activities:newActivities,personalization:{...newPersonalization,establishmentOverrides:overrides}},units).filter(u=>!scopeId||u.establishmentId===scopeId).map(unit=>({...unit,historicalCodes:unique([...unit.conceptCodes,...unit.cnaeSegments.flatMap(c=>c.segmentCode?[c.segmentCode]:[])]).filter(code=>!known.has(code))}))};
           }
           if(scopeId)throw new AssistantError(400,'effective_selection_required');
           const currentCodes = new Set(view.concepts.filter(selectableAssistantConcept).map(c=>c.code));
@@ -245,7 +248,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
           } else {
             if(body.units || body.establishmentId || body.conceptCodes.length || body.ncmCodes.length) throw new AssistantError(400,'invalid_card_payload');
             if(body.cardId==='summary' && body.status==='CONFIRMED') {
-              if(!next.cards.company || !next.cards.establishments || cards.some(card=>!next.units[card.establishmentId]?.cards['segment:'+card.segmentCode]&&!next.units[card.establishmentId]?.cards['cnae:'+card.cnaeCode]))
+              if(!next.cards.company || cards.some(card=>!next.units[card.establishmentId]?.cards['segment:'+card.segmentCode]&&!next.units[card.establishmentId]?.cards['cnae:'+card.cnaeCode]))
                 throw new AssistantError(409,'onboarding_cards_pending');
               next.completed=true;
             }
@@ -262,6 +265,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
             valid_from:today,valid_to:null,is_current:true}).execute();
           return {version:(profile?.version_no??0)+1,release,state:next};
         });
+        reply.header('Server-Timing',`onboarding;dur=${(performance.now()-started).toFixed(1)}`);
         return reply.send(result);
       } catch(error) {
         if(error instanceof TenantAccessDeniedError) return reply.code(403).send({error:'tenant_access_denied'});
@@ -271,4 +275,5 @@ export async function onboardingRoutes(app: FastifyInstance) {
     }
   });
 }
+
 
