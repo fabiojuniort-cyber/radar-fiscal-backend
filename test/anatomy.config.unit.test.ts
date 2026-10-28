@@ -6,15 +6,15 @@ import { RESERVED_ENTRY_IDS } from '../src/modules/anatomy/rules-simulation.js';
 import { SAMPLE_ANNOTATIONS } from '../src/modules/anatomy/config/sample-annotations.js';
 import { SYNTHETIC_SAMPLES } from '../src/modules/anatomy/config/sample-inputs.js';
 import { applyChanges, ConfigValidationError, FIELD_CATALOG, styleOf, suggestRules, validateConfiguration, type Change } from '../src/modules/anatomy/config/rules.js';
-import { describeResult, diffDescribed } from '../src/modules/anatomy/config/view.js';
+import { describeResult, diffDescribed, documentHash, type Correction } from '../src/modules/anatomy/config/view.js';
 
 /** ANAT-CONFIG-01: pure parts of the accessible configuration (guided changes, validation, translation, samples). */
 const shipped = () => structuredClone([...DEFAULT_PROFILES]) as unknown[];
-const run = (id: string, profiles: unknown[]) => {
+const run = (id: string, profiles: unknown[], corrections: Correction[] = []) => {
   const s = SYNTHETIC_SAMPLES.find((x) => x.id === id)!;
   const r = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-10-28', ruleSet: { id: 't', version: '1' }, profiles,
     input: { source: s.source, representationId: id, ...(s.format === 'html' ? { html: s.content } : { text: s.content }) } });
-  return describeResult(id, r, SAMPLE_ANNOTATIONS[id] ?? []);
+  return describeResult(s, r, SAMPLE_ANNOTATIONS[id] ?? [], corrections);
 };
 const NOTE: Change = { scope: { level: 'source', source: 'CONFAZ' }, path: 'classes.editorialNote', action: 'add', literal: 'NotaAlteracao' };
 
@@ -79,15 +79,28 @@ test('describeResult: structure, nature and validity are separate; a note never 
   assert.ok(run('sint-doe-sp-resolucao', shipped()).review.some((r) => r.kind === 'limitation' && /limitação do motor/u.test(r.title)));
 });
 
-test('corrections: a passage correction is an expectation; unmet corrections are listed, met ones are not', () => {
-  const before = run('sint-confaz-estilo-novo', shipped());
-  const key = before.passages.find((p) => p.text.startsWith('Acrescentado'))!.key;
-  const s = SYNTHETIC_SAMPLES.find((x) => x.id === 'sint-confaz-estilo-novo')!;
-  const r = analyzeAnatomy({ publicationVersionId: s.id, referenceDate: '2026-10-28', ruleSet: { id: 't', version: '1' }, profiles: shipped(), input: { source: 'CONFAZ', representationId: s.id, html: s.content } });
-  const withCorr = describeResult(s.id, r, SAMPLE_ANNOTATIONS[s.id]!, [{ sampleId: s.id, partKey: key, expected: 'editorial_note' }]);
-  assert.ok(withCorr.review.some((x) => x.kind === 'correction_unmet' && x.partKey === key));
-  const r2 = analyzeAnatomy({ publicationVersionId: s.id, referenceDate: '2026-10-28', ruleSet: { id: 't', version: '1' }, profiles: applyChanges(shipped(), [NOTE]), input: { source: 'CONFAZ', representationId: s.id, html: s.content } });
-  assert.equal(describeResult(s.id, r2, SAMPLE_ANNOTATIONS[s.id]!, [{ sampleId: s.id, partKey: key, expected: 'editorial_note' }]).review.some((x) => x.partKey === key), false);
+test('corrections: applied on top of the engine result to the exact document version and passage only', () => {
+  const conv = SYNTHETIC_SAMPLES.find((x) => x.id === 'sint-confaz-convenio')!;
+  const sig = run(conv.id, shipped()).passages.find((p) => p.text.startsWith('Presidente do CONFAZ'))!;
+  assert.equal(sig.nature, 'operative');
+  const c: Correction = { documentId: conv.documentId, documentHash: documentHash(conv.content), partKey: sig.key, expected: 'structure', reason: 'É a assinatura', author: 'u1', createdAt: 't', sinceVersion: 1 };
+  // Applied: the engine result is kept and the correction is shown apart.
+  const d = run(conv.id, shipped(), [c]);
+  const p = d.passages.find((x) => x.key === sig.key)!;
+  assert.deepEqual([p.nature, p.effectiveNature, p.correction?.reason, p.correction?.sinceVersion], ['operative', 'structure', 'É a assinatura', 1]);
+  assert.equal(d.corrections.applied.length, 1); assert.equal(d.review.some((r) => r.partKey === sig.key), false);
+  // A similar document with the same line is NOT corrected (a correction is never widened).
+  const other = run('sint-confaz-convenio-outro', shipped(), [c]);
+  const sig2 = other.passages.find((x) => x.text.startsWith('Presidente do CONFAZ'))!;
+  assert.deepEqual([sig2.effectiveNature, sig2.correction, other.corrections.applied.length, other.corrections.stale.length], ['operative', null, 0, 0]);
+  // A modified version of the same document does not receive it silently: it is reported stale.
+  const v2 = run('sint-confaz-convenio-v2', shipped(), [c]);
+  assert.equal(v2.passages.some((x) => x.correction), false);
+  assert.deepEqual(v2.corrections.stale.map((x) => x.why), ['document_changed']);
+  assert.ok(v2.review.some((r) => r.kind === 'stale_correction' && /O documento mudou/u.test(r.detail)));
+  // Same version but a passage that no longer exists: stale, not applied.
+  const gone = run(conv.id, shipped(), [{ ...c, partKey: '0'.repeat(16) }]);
+  assert.deepEqual(gone.corrections.stale.map((x) => x.why), ['passage_not_found']);
 });
 
 test('suggestions come from the passage itself and only use supported mechanisms', () => {

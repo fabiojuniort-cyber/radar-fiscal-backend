@@ -52,22 +52,38 @@ function ownText(result: AnatomyResult, part: Part): string {
   if (part.span.end > at) out += result.canonicalText.slice(at, part.span.end);
   return out.trim();
 }
-export const passageKey = (sampleId: string, text: string) => createHash('sha256').update(`${sampleId}|${text}`, 'utf8').digest('hex').slice(0, 16);
+/** Stable identity of a passage: the document identity plus the passage's own text (independent of rules and of screen position). */
+export const passageKey = (documentId: string, text: string) => createHash('sha256').update(`${documentId}|${text}`, 'utf8').digest('hex').slice(0, 16);
+/** Identity of one exact version of a document: SHA-256 of its content. */
+export const documentHash = (content: string) => createHash('sha256').update(content, 'utf8').digest('hex');
 
 export interface Passage {
   key: string; partId: string; parentKey: string | null; depth: number; type: string; structure: string; label: string; text: string;
+  /** Engine result (never modified). */
   nature: Nature; natureLabel: string; validity: string; validityLabel: string; reasons: string[]; references: string[]; ncm: string[];
   ai: (Annotation & { natureLabel: string; validityLabel: string }) | null;
+  /** Administrative correction applied on top of the engine result (null = none), and the resulting nature. */
+  correction: AppliedCorrection | null; effectiveNature: Nature; effectiveNatureLabel: string;
 }
-export interface Correction { sampleId: string; partKey: string; expected: Nature; note?: string | undefined }
-export interface ReviewItem { sampleId: string; partKey: string | null; kind: 'not_recognized' | 'ai_differs' | 'ai_ambiguous' | 'correction_unmet' | 'limitation'; title: string; detail: string }
+/**
+ * A passage correction (document scope). Bound to the exact document version (documentHash) and to the passage identity
+ * (partKey). author/createdAt/version are set by the server, never trusted from the client.
+ */
+export interface Correction { documentId: string; documentHash: string; partKey: string; expected: Nature; reason: string;
+  author?: string | undefined; createdAt?: string | undefined; sinceVersion?: number | undefined }
+export interface AppliedCorrection { expected: Nature; expectedLabel: string; reason: string; author: string | null; createdAt: string | null; sinceVersion: number | null }
+export interface StaleCorrection { correction: Correction; why: 'document_changed' | 'passage_not_found' }
+export interface ReviewItem { sampleId: string; partKey: string | null; kind: 'not_recognized' | 'ai_differs' | 'ai_ambiguous' | 'stale_correction' | 'limitation'; title: string; detail: string }
+export interface DocumentRef { id: string; documentId: string; content: string }
 
-export function describeResult(sampleId: string, result: AnatomyResult, annotations: readonly Annotation[], corrections: readonly Correction[] = []) {
+export function describeResult(doc: DocumentRef, result: AnatomyResult, annotations: readonly Annotation[], corrections: readonly Correction[] = []) {
+  const sampleId = doc.id; const hash = documentHash(doc.content);
+  const mine = corrections.filter((c) => c.documentId === doc.documentId);
   const visible = result.parts.filter((p) => !HIDDEN.has(p.type));
   const keyOf = new Map<string, string>();
   const used = new Set<Annotation>();
   const passages: Passage[] = visible.map((p) => {
-    const text = ownText(result, p); const key = passageKey(sampleId, text); keyOf.set(p.id, key);
+    const text = ownText(result, p); const key = passageKey(doc.documentId, text); keyOf.set(p.id, key);
     let depth = 0; for (let q = p; q.parentId; ) { const parent = result.parts.find((x) => x.id === q.parentId)!; if (!HIDDEN.has(parent.type)) depth++; q = parent; }
     const nature = natureOf(p);
     const ann = annotations.find((a) => !used.has(a) && text.startsWith(a.anchor)) ?? null;
@@ -77,17 +93,31 @@ export function describeResult(sampleId: string, result: AnatomyResult, annotati
       validity: p.legalStatus, validityLabel: VALIDITY_PT[p.legalStatus] ?? p.legalStatus, reasons: p.contextReasons.map(reasonPt),
       references: inPart.filter((e) => e.domain === 'CITATION' || e.domain === 'LAW_NUMBER').map((e) => e.literal),
       ncm: inPart.filter((e) => e.domain === 'NCM').map((e) => e.literal),
-      ai: ann && { ...ann, natureLabel: NATURE_PT[ann.nature], validityLabel: VALIDITY_PT[ann.validity] ?? ann.validity } };
+      ai: ann && { ...ann, natureLabel: NATURE_PT[ann.nature], validityLabel: VALIDITY_PT[ann.validity] ?? ann.validity },
+      correction: null, effectiveNature: nature, effectiveNatureLabel: NATURE_PT[nature] } as Passage;
   });
+  // Corrections apply only to the exact version they were made on and to a passage that still exists; otherwise they
+  // are reported as stale and NOT applied. A correction never reaches another document.
+  const applied: { partKey: string; correction: Correction }[] = []; const stale: StaleCorrection[] = [];
+  for (const c of mine) {
+    if (c.documentHash !== hash) { stale.push({ correction: c, why: 'document_changed' }); continue; }
+    const p = passages.find((x) => x.key === c.partKey);
+    if (!p) { stale.push({ correction: c, why: 'passage_not_found' }); continue; }
+    p.correction = { expected: c.expected, expectedLabel: NATURE_PT[c.expected], reason: c.reason, author: c.author ?? null, createdAt: c.createdAt ?? null, sinceVersion: c.sinceVersion ?? null };
+    p.effectiveNature = c.expected; p.effectiveNatureLabel = NATURE_PT[c.expected];
+    applied.push({ partKey: c.partKey, correction: c });
+  }
   for (const p of passages) {
     let q = result.parts.find((x) => x.id === p.partId)!;
     while (q.parentId) { q = result.parts.find((x) => x.id === q.parentId)!; if (!HIDDEN.has(q.type)) { p.parentKey = keyOf.get(q.id) ?? null; break; } }
   }
   const review: ReviewItem[] = [];
+  for (const s of stale) review.push({ sampleId, partKey: s.correction.partKey, kind: 'stale_correction', title: 'Correção desatualizada (não aplicada)',
+    detail: s.why === 'document_changed' ? `O documento mudou desde a correção ("${NATURE_PT[s.correction.expected]}", motivo: ${s.correction.reason}). Ela não foi aplicada a esta versão; confira o trecho e corrija de novo se ainda valer.`
+      : `O trecho corrigido ("${NATURE_PT[s.correction.expected]}", motivo: ${s.correction.reason}) não existe mais nesta análise. A correção não foi aplicada.` });
   for (const p of passages) {
-    const corr = corrections.find((c) => c.sampleId === sampleId && c.partKey === p.key);
-    if (corr && corr.expected !== p.nature) review.push({ sampleId, partKey: p.key, kind: 'correction_unmet', title: `Sua correção ainda não é atendida: ${p.structure}`,
-      detail: `Você marcou "${NATURE_PT[corr.expected]}", e a configuração produz "${p.natureLabel}". Crie ou ajuste uma regra para casos semelhantes, se for o caso.` });
+    const corr = p.correction;
+    if (corr) continue; // corrected by an administrator: not pending review
     else if (p.nature === 'ambiguous') review.push({ sampleId, partKey: p.key, kind: 'not_recognized', title: `Trecho não reconhecido: "${p.text.slice(0, 60)}"`,
       detail: p.ai ? `Leitura da IA: ${p.ai.natureLabel} — ${p.ai.explanation}${p.ai.ambiguity ? ` Por que continua a conferir: ${p.ai.ambiguity}` : ''}` : 'Nenhuma regra reconheceu este trecho e a IA não tem leitura para ele.' });
     else if (p.ai && p.ai.nature !== 'ambiguous' && p.ai.nature !== p.nature && !corr) review.push({ sampleId, partKey: p.key, kind: 'ai_differs', title: `A IA lê diferente: ${p.structure}`,
@@ -98,8 +128,9 @@ export function describeResult(sampleId: string, result: AnatomyResult, annotati
     if (l.code === 'unidentified_content') continue; // already listed passage by passage
     review.push({ sampleId, partKey: l.partId ? keyOf.get(l.partId) ?? null : null, kind: 'limitation', title: limitationTitle(l.code), detail: l.message });
   }
-  const counts = Object.fromEntries((Object.keys(NATURE_PT) as Nature[]).map((n) => [n, passages.filter((p) => p.nature === n).length])) as Record<Nature, number>;
-  return { status: result.status, statusLabel: result.status === 'complete' ? 'Completo' : result.status === 'partial' ? 'Parcial' : 'Falhou', passages, review, counts };
+  const counts = Object.fromEntries((Object.keys(NATURE_PT) as Nature[]).map((n) => [n, passages.filter((p) => p.effectiveNature === n).length])) as Record<Nature, number>;
+  return { status: result.status, statusLabel: result.status === 'complete' ? 'Completo' : result.status === 'partial' ? 'Parcial' : 'Falhou', documentHash: hash, passages, review, counts,
+    corrections: { applied, stale } };
 }
 function limitationTitle(code: string): string {
   if (code === 'plain_text_unidentified') return 'Texto corrido: o motor não divide este ato em partes (limitação do motor, não da configuração)';
@@ -111,8 +142,9 @@ export type Described = ReturnType<typeof describeResult>;
 export function diffDescribed(before: Described, after: Described) {
   const b = new Map(before.passages.map((p) => [p.key, p]));
   const a = new Map(after.passages.map((p) => [p.key, p]));
-  const changed = after.passages.filter((p) => b.has(p.key) && b.get(p.key)!.nature !== p.nature)
-    .map((p) => ({ key: p.key, structure: p.structure, text: p.text.slice(0, 120), from: b.get(p.key)!.nature, fromLabel: b.get(p.key)!.natureLabel, to: p.nature, toLabel: p.natureLabel }));
+  const changed = after.passages.filter((p) => b.has(p.key) && b.get(p.key)!.effectiveNature !== p.effectiveNature)
+    .map((p) => ({ key: p.key, structure: p.structure, text: p.text.slice(0, 120), from: b.get(p.key)!.effectiveNature, fromLabel: b.get(p.key)!.effectiveNatureLabel,
+      to: p.effectiveNature, toLabel: p.effectiveNatureLabel, byCorrection: !!p.correction && !b.get(p.key)!.correction }));
   const appeared = after.passages.filter((p) => !b.has(p.key)).length;
   const disappeared = before.passages.filter((p) => !a.has(p.key)).length;
   return { changed, appeared, disappeared, reviewBefore: before.review.length, reviewAfter: after.review.length };

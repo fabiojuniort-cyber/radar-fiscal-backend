@@ -34,7 +34,11 @@ test('ANAT-CONFIG-01: save validates and applies, with history, audit, concurren
   process.env.DATABASE_URL = runtimeUrl; process.env.JWT_ACCESS_SECRET = randomBytes(48).toString('hex'); process.env.LOG_LEVEL = 'silent';
   const { buildApp } = await import('../src/app.js');
   const { env } = await import('../src/config/env.js');
-  const { analyzeWithActiveConfiguration } = await import('../src/modules/anatomy/config/config.service.js');
+  const { SYNTHETIC_SAMPLES } = await import('../src/modules/anatomy/config/sample-inputs.js');
+  const { documentHash, passageKey } = await import('../src/modules/anatomy/config/view.js');
+  const conv = SYNTHETIC_SAMPLES.find((s) => s.id === 'sint-confaz-convenio')!;
+  const SIGNATURE = 'Presidente do CONFAZ - Fulano Exemplo';
+  const CORR = { documentId: conv.documentId, documentHash: documentHash(conv.content), partKey: passageKey(conv.documentId, SIGNATURE), expected: 'structure', reason: 'É a assinatura do ato' };
   delete process.env.DATABASE_URL;
   const P = '/api/v1/admin/anatomy-config';
   const user = async (admin: boolean) => {
@@ -126,30 +130,91 @@ test('ANAT-CONFIG-01: save validates and applies, with history, audit, concurren
       });
 
       let v1 = '';
-      await t.test('save = validate + apply in one action by ONE administrator; audited; the consumer uses it', async () => {
-        const corrections = [{ sampleId: 'sint-confaz-convenio', partKey: 'a'.repeat(16), expected: 'structure', note: 'assinatura' }];
-        const r = await app.inject({ method: 'POST', url: `${P}/save`, headers: adminA.as(app), payload: { basedOnVersion: 0, changes: [NOTE_STYLE], corrections, note: 'Estilo de nota do CONFAZ' } });
+      const analyzeDoc = async (id: string, who = adminA) => {
+        const r = await app.inject({ method: 'POST', url: `${P}/documents/${id}/analyses`, headers: who.as(app) });
+        assert.equal(r.statusCode, 201, r.body); return r.json();
+      };
+      const sigOf = (out: { described: { passages: { text: string; nature: string; effectiveNature: string; correction: unknown }[] } }) =>
+        out.described.passages.find((p) => p.text === SIGNATURE)!;
+
+      await t.test('the real consumer BEFORE any save: a new analysis of one document with the shipped configuration (v0), recorded', async () => {
+        const out = await analyzeDoc('sint-confaz-estilo-novo');
+        assert.deepEqual([out.configVersion, out.configVersionId, out.documentVersion], [0, null, 'v1']);
+        assert.equal(out.described.passages.find((p: { text: string }) => p.text.startsWith('Acrescentado')).nature, 'ambiguous');
+        const before = await analyzeDoc('sint-confaz-convenio');
+        assert.deepEqual([sigOf(before).nature, sigOf(before).effectiveNature, sigOf(before).correction], ['operative', 'operative', null]);
+      });
+
+      await t.test('correction input: reason required, document version must be current, the author is the session user', async () => {
+        const noReason = await app.inject({ method: 'POST', url: `${P}/save`, headers: adminA.as(app), payload: { basedOnVersion: 0, changes: [], corrections: [{ ...CORR, reason: ' ' }] } });
+        assert.equal(noReason.statusCode, 422); assert.match(noReason.json().issues[0].message, /Informe o motivo/u);
+        const oldVersion = await app.inject({ method: 'POST', url: `${P}/save`, headers: adminA.as(app), payload: { basedOnVersion: 0, changes: [], corrections: [{ ...CORR, documentHash: 'f'.repeat(64) }] } });
+        assert.equal(oldVersion.statusCode, 422); assert.match(oldVersion.json().issues[0].message, /O documento mudou/u);
+        // Direct SQL with a correction authored by someone else is refused (author is bound to the session user).
+        const c = new pg.Client({ connectionString: runtimeUrl }); await c.connect();
+        try {
+          await c.query('BEGIN'); await c.query("SELECT set_config('app.user_id', $1, true)", [adminA.id]);
+          const { DEFAULT_PROFILES } = await import('../src/modules/anatomy/profile.js'); const { canonicalJson, sha256 } = await import('../src/modules/anatomy/contract.js');
+          const prof = JSON.stringify(DEFAULT_PROFILES);
+          await assert.rejects(c.query('SELECT anat_config_save(0, $1::jsonb, $2::jsonb, $3, null, $4)', [prof,
+            JSON.stringify([{ ...CORR, author: adminB.id, createdAt: 'x' }]), sha256(canonicalJson(DEFAULT_PROFILES)), randomUUID()]), /anat:ACTOR_MISMATCH/u);
+          await c.query('ROLLBACK');
+        } finally { await c.end(); }
+        assert.equal((await owner.query('SELECT count(*)::int AS n FROM anatomy_config_versions')).rows[0].n, 0);
+      });
+
+      await t.test('save = validate + apply in one action by ONE administrator (rule + passage correction); audited', async () => {
+        const r = await app.inject({ method: 'POST', url: `${P}/save`, headers: adminA.as(app), payload: { basedOnVersion: 0, changes: [NOTE_STYLE], corrections: [CORR], note: 'Estilo de nota do CONFAZ' } });
         assert.equal(r.statusCode, 201, r.body);
         v1 = r.json().versionId; assert.equal(r.json().version, 1);
         const cur = (await app.inject({ method: 'GET', url: P, headers: adminA.as(app) })).json().current;
-        assert.deepEqual([cur.version, cur.origin, cur.corrections.length], [1, 'saved', 1]);
+        assert.deepEqual([cur.version, cur.origin, cur.corrections.length, cur.corrections[0].author, cur.corrections[0].authorEmail, cur.corrections[0].sinceVersion],
+          [1, 'saved', 1, adminA.id, `${adminA.id}@example.test`, 1]);
         const rows = await audit('ANAT_RULES_CONFIG_SAVED');
         assert.equal(rows.length, 1); assert.equal(rows[0].actor_id, adminA.id);
         assert.deepEqual([rows[0].after_data.kind, rows[0].after_data.version, rows[0].after_data.versionId], ['SAVE', 1, v1]);
-        // The consumer, as the worker role, reads the version in force and records it in the analysis identity.
+      });
+
+      await t.test('the real consumer AFTER save: new analyses use v1 — rule applied, correction applied, similar document unchanged, modified version not corrected', async () => {
+        const rule = await analyzeDoc('sint-confaz-estilo-novo');
+        assert.equal(rule.configVersion, 1); assert.equal(rule.configVersionId, v1);
+        const note = rule.described.passages.find((p: { text: string }) => p.text.startsWith('Acrescentado'));
+        assert.deepEqual([note.nature, note.validity], ['editorial_note', 'unknown'], 'the saved rule is what the processing applies; a note never decides validity');
+        const corrected = await analyzeDoc('sint-confaz-convenio');
+        const sig = sigOf(corrected);
+        assert.deepEqual([sig.nature, sig.effectiveNature], ['operative', 'structure'], 'engine result preserved, correction applied on top');
+        assert.deepEqual((sig.correction as { reason: string; author: string; sinceVersion: number }), { expected: 'structure', expectedLabel: 'Elemento estrutural', reason: CORR.reason,
+          author: adminA.id, createdAt: (sig.correction as { createdAt: string }).createdAt, sinceVersion: 1 });
+        assert.deepEqual(corrected.correctionsApplied, [{ partKey: CORR.partKey, expected: 'structure', author: adminA.id }]);
+        const similar = await analyzeDoc('sint-confaz-convenio-outro');
+        assert.deepEqual([sigOf(similar).effectiveNature, sigOf(similar).correction, similar.correctionsApplied.length], ['operative', null, 0]);
+        const modified = await analyzeDoc('sint-confaz-convenio-v2');
+        assert.equal(modified.described.passages.some((p: { correction: unknown }) => p.correction), false);
+        assert.deepEqual(modified.correctionsStale, [{ partKey: CORR.partKey, why: 'document_changed' }]);
+        // Records: every analysis kept, each with document version, configuration version and corrections used.
+        const hist = (await app.inject({ method: 'GET', url: `${P}/documents/sint-confaz-convenio/analyses`, headers: adminA.as(app) })).json();
+        assert.deepEqual(hist.map((h: { configVersion: number; documentVersion: string; correctionsApplied: unknown[]; correctionsStale: unknown[] }) =>
+          [h.configVersion, h.documentVersion, h.correctionsApplied.length, h.correctionsStale.length]), [[1, 'v2', 0, 1], [1, 'v1', 1, 0], [0, 'v1', 0, 0]]);
+        const analyzed = await audit('ANAT_RULES_CONFIG_ANALYZED');
+        assert.equal(analyzed.length, 6); assert.equal(analyzed.at(-1).after_data.staleCorrectionCount, 1);
+        await assert.rejects(owner.query("UPDATE anatomy_config_analyses SET document_version = 'x'"), /anat:IMMUTABLE/u);
+        // The worker role can read what the consumer recorded, and cannot write configuration or analyses.
         const w = new pg.Client({ connectionString: url }); await w.connect();
         try {
           await w.query('BEGIN'); await w.query('SET LOCAL ROLE radar_worker');
-          const sample = (await import('../src/modules/anatomy/config/sample-inputs.js')).SYNTHETIC_SAMPLES.find((s) => s.id === 'sint-confaz-estilo-novo')!;
-          const out = await analyzeWithActiveConfiguration(w as unknown as pg.PoolClient, { publicationVersionId: 'ci', referenceDate: '2026-10-28',
-            input: { source: 'CONFAZ', representationId: 'ci', html: sample.content } });
-          assert.deepEqual([out.configVersion, out.configVersionId, out.result.identity.ruleSetId, out.result.identity.ruleSetVersion], [1, v1, 'anatomy-config', '1']);
-          const note = out.result.parts.find((p) => out.result.canonicalText.slice(p.span.start, p.span.end).startsWith('Acrescentado'))!;
-          assert.equal(note.type, 'editorial_note', 'the saved rule is what the processing applies');
-          assert.equal(note.legalStatus, 'unknown', 'a note never decides validity');
+          assert.equal((await w.query('SELECT version FROM anatomy_config_current')).rows[0].version, 1);
           await assert.rejects(w.query("SELECT anat_config_save(1, '[]'::jsonb, '[]'::jsonb, $1, null, $2)", ['a'.repeat(64), randomUUID()]), /permission denied/u);
+          await w.query('ROLLBACK'); await w.query('BEGIN'); await w.query('SET LOCAL ROLE radar_worker');
+          await assert.rejects(w.query("SELECT anat_config_record_analysis(1,'d','v1',$1,$1,$1,'[]','[]','{}',$2)", ['a'.repeat(64), randomUUID()]), /permission denied/u);
           await w.query('ROLLBACK');
         } finally { await w.end(); }
+        // An analysis made under a version that is no longer in force is not recorded.
+        const c = new pg.Client({ connectionString: runtimeUrl }); await c.connect();
+        try {
+          await c.query('BEGIN'); await c.query("SELECT set_config('app.user_id', $1, true)", [adminA.id]);
+          await assert.rejects(c.query("SELECT anat_config_record_analysis(0,'d','v1',$1,$1,$1,'[]','[]','{}',$2)", ['a'.repeat(64), randomUUID()]), /anat:STALE_VERSION/u);
+          await c.query('ROLLBACK');
+        } finally { await c.end(); }
       });
 
       await t.test('concurrency: two administrators saving on the same version → exactly one wins, the other gets 409 (audited)', async () => {
@@ -164,6 +229,11 @@ test('ANAT-CONFIG-01: save validates and applies, with history, audit, concurren
         assert.equal((await owner.query('SELECT version FROM anatomy_config_current')).rows[0].version, 2);
         const rejected = await audit('ANAT_RULES_CONFIG_REJECTED');
         assert.equal(rejected.length, 1); assert.deepEqual([rejected[0].after_data.operation, rejected[0].after_data.code], ['SAVE', 'STALE_VERSION']);
+      });
+
+      await t.test('version 2 has no correction: a new analysis no longer applies it', async () => {
+        const out = await analyzeDoc('sint-confaz-convenio');
+        assert.deepEqual([out.configVersion, sigOf(out).effectiveNature, sigOf(out).correction], [2, 'operative', null]);
       });
 
       await t.test('a persistence failure (audit unavailable) keeps the version in force and writes nothing', async () => {
@@ -187,6 +257,9 @@ test('ANAT-CONFIG-01: save validates and applies, with history, audit, concurren
         assert.equal(three.profile_set_hash, one.profile_set_hash); assert.deepEqual([three.kind, three.restored_from], ['restore', v1]);
         const row = (await audit('ANAT_RULES_CONFIG_SAVED')).at(-1);
         assert.deepEqual([row.actor_id, row.after_data.kind, row.after_data.restoredFromVersionId], [adminB.id, 'RESTORE', v1]);
+        // Version 2 (concurrency winner) saved no correction; restoring v1 brings rule AND correction back.
+        const after = await analyzeDoc('sint-confaz-convenio', adminB);
+        assert.deepEqual([after.configVersion, sigOf(after).effectiveNature, sigOf(after).correction !== null], [3, 'structure', true]);
         const stale = await app.inject({ method: 'POST', url: `${P}/restore`, headers: adminB.as(app), payload: { basedOnVersion: 2, versionId: v1 } });
         assert.equal(stale.statusCode, 409);
         const missing = await app.inject({ method: 'POST', url: `${P}/restore`, headers: adminB.as(app), payload: { basedOnVersion: 3, versionId: randomUUID() } });

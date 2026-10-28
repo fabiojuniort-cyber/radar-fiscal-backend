@@ -770,9 +770,9 @@ test('P3-B1 admin persistence and audit (fresh disposable database)', { skip }, 
       // Functions: radar_app executes only the eight entry points; those (and the four commit-time checks) are the only
       // SECURITY DEFINER ones, owned by the NOLOGIN writer, with a fixed search_path; nobody else has CREATE on public.
       // Eight accepted entry points plus anat_list_audit (integration delta P-INT-01: the ninth, read-only).
-      // ANAT-CONFIG-01 (081): three more audited entry points of the accessible configuration, only with the project's migrations.
+      // ANAT-CONFIG-01 (081): four more audited entry points of the accessible configuration, only with the project's migrations.
       const entry = ['anat_audit_attempt', 'anat_confirm', 'anat_freeze', 'anat_list_audit', 'anat_preview', 'anat_record_comparison', 'anat_record_review', 'anat_record_simulation', 'anat_save_draft',
-        ...(PROJECT_MIGRATIONS ? ['anat_config_audit_attempt', 'anat_config_restore', 'anat_config_save'] : [])];
+        ...(PROJECT_MIGRATIONS ? ['anat_config_audit_attempt', 'anat_config_record_analysis', 'anat_config_restore', 'anat_config_save'] : [])];
       const commitChecks = ['anat_check_activation_at_commit', 'anat_check_approval_at_commit', 'anat_check_review_at_commit', 'anat_check_simulation_at_commit'];
       const fn = (await db.query(`SELECT p.proname, p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proconfig,
         has_function_privilege('radar_app', p.oid, 'EXECUTE') AS app, has_function_privilege('radar_worker', p.oid, 'EXECUTE') AS worker,

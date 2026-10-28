@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { AdminError, mapDbError, withAdminTx } from '../../modules/anatomy/admin/rules-admin.service.js';
 import {
-  analyze, auditConfigAttempt, ConfigValidationError, listConfigAudit, listVersions, readActive, readVersion, restore, rulesView, sampleSummaries, save, suggestions,
+  analyze, analyzeWithActiveConfiguration, auditConfigAttempt, authorEmails, listDocumentAnalyses, ConfigValidationError, listConfigAudit, listVersions, readActive, readVersion, restore, rulesView, sampleSummaries, save, suggestions,
 } from '../../modules/anatomy/config/config.service.js';
 import { FIELD_CATALOG, SOURCE_PT } from '../../modules/anatomy/config/rules.js';
 import { NATURE_PT } from '../../modules/anatomy/config/view.js';
@@ -28,7 +28,8 @@ const scope = z.discriminatedUnion('level', [
   z.strictObject({ level: z.literal('family'), source: z.enum(PROFILE_SOURCES), family: z.string().min(1).max(64) }),
 ]);
 const change = z.strictObject({ scope, path: z.string().min(3).max(64), action: z.enum(['add', 'remove']), literal: z.string().max(200) });
-const correction = z.strictObject({ sampleId: z.string().min(1).max(64), partKey: z.string().regex(/^[a-f0-9]{16}$/u), expected: z.enum(NATURES), note: z.string().max(500).optional() });
+const correction = z.strictObject({ documentId: z.string().min(1).max(64), documentHash: z.string().regex(/^[a-f0-9]{64}$/u), partKey: z.string().regex(/^[a-f0-9]{16}$/u),
+  expected: z.enum(NATURES), reason: z.string().max(500) });
 const changes = z.array(change).max(100).default([]);
 const corrections = z.array(correction).max(500);
 const analysisBody = z.strictObject({ sampleIds: z.array(z.string().min(1).max(64)).max(50).optional(), changes, corrections: corrections.optional() });
@@ -74,7 +75,9 @@ export async function anatomyConfigRoutes(app: FastifyInstance, deps: AnatomyCon
 
   typed.get(PREFIX, guard, (req, rep) => handle(req, rep, null, null, (_c, user) => withAdminTx(deps.pool, user, async (c) => {
     const active = await readActive(c);
-    return { current: { ...active, profiles: undefined, rules: rulesView(active.profiles) }, catalog: FIELD_CATALOG, samples: sampleSummaries(),
+    const emails = await authorEmails(c, active.corrections.map((x) => x.author).filter((x): x is string => !!x));
+    const corrections = active.corrections.map((x) => ({ ...x, authorEmail: x.author ? emails[x.author] ?? null : null }));
+    return { current: { ...active, corrections, profiles: undefined, rules: rulesView(active.profiles) }, catalog: FIELD_CATALOG, samples: sampleSummaries(),
       natures: NATURE_PT, sources: SOURCE_PT };
   })));
   typed.get(`${PREFIX}/versions`, guard, (req, rep) => handle(req, rep, null, null, (_c, user) => withAdminTx(deps.pool, user, listVersions)));
@@ -87,5 +90,11 @@ export async function anatomyConfigRoutes(app: FastifyInstance, deps: AnatomyCon
     handle(req, rep, 'SAVE', null, (corr, user) => save(deps.pool, user, req.body, corr), 201));
   typed.post(`${PREFIX}/restore`, { ...guard, schema: { body: restoreBody } }, (req, rep) =>
     handle(req, rep, 'RESTORE', req.body.versionId, (corr, user) => restore(deps.pool, user, req.body, corr), 201));
+  // ANAT-CONFIG-01 R2: the real consumer. A new analysis of ONE document with the configuration in force, recorded.
+  const docParams = z.strictObject({ sampleId: z.string().min(1).max(64) });
+  typed.post(`${PREFIX}/documents/:sampleId/analyses`, { ...guard, schema: { params: docParams } }, (req, rep) =>
+    handle(req, rep, null, null, (corr, user) => analyzeWithActiveConfiguration(deps.pool, deps.executor, user, req.params.sampleId, corr, abortOn(rep)), 201));
+  typed.get(`${PREFIX}/documents/:documentId/analyses`, { ...guard, schema: { params: z.strictObject({ documentId: z.string().min(1).max(64) }) } }, (req, rep) =>
+    handle(req, rep, null, null, (_c, user) => withAdminTx(deps.pool, user, (c) => listDocumentAnalyses(c, req.params.documentId))));
   typed.get(`${PREFIX}/audit`, guard, (req, rep) => handle(req, rep, null, null, (_c, user) => withAdminTx(deps.pool, user, listConfigAudit)));
 }

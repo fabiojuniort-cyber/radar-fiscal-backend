@@ -22,7 +22,7 @@ export interface Annotation {
 }
 const ok = (note = 'Releitura confirma a leitura inicial.') => ({ agrees: true, note });
 
-export const SAMPLE_ANNOTATIONS: Readonly<Record<string, readonly Annotation[]>> = Object.freeze({
+const BASE: Record<string, readonly Annotation[]> = {
   'sint-confaz-convenio': [
     { anchor: 'CONVÊNIO ICMS EXEMPLO', structure: 'Epígrafe', nature: 'structure', validity: 'not_determined',
       evidence: 'estilo "TituloAcordo"; texto "CONVÊNIO ICMS EXEMPLO Nº 901, DE 4 DE MAIO DE 2099"',
@@ -47,6 +47,15 @@ export const SAMPLE_ANNOTATIONS: Readonly<Record<string, readonly Annotation[]>>
       explanation: 'Assinatura. O motor trata como corpo porque o estilo é o mesmo do texto; não há palavra que a separe com segurança.',
       ambiguity: 'O estilo é igual ao do corpo; separar assinatura exigiria regra por posição, que a configuração não oferece.',
       secondCheck: { agrees: true, note: 'Mantido como caso para conferência: a IA não propõe regra porque "Presidente" também pode iniciar um dispositivo.' } },
+  ],
+  'sint-confaz-convenio-outro': [
+    { anchor: 'CONVÊNIO ICMS EXEMPLO', structure: 'Epígrafe', nature: 'structure', validity: 'not_determined', evidence: 'estilo "TituloAcordo"', explanation: 'Identificação do ato.', secondCheck: ok() },
+    { anchor: 'Autoriza procedimento', structure: 'Ementa', nature: 'structure', validity: 'not_determined', evidence: 'estilo "Ementa"', explanation: 'Resumo do ato.', secondCheck: ok() },
+    { anchor: 'Cláusula primeira', structure: 'Cláusula primeira', nature: 'operative', validity: 'not_determined', evidence: 'rótulo "Cláusula primeira"', explanation: 'Dispositivo do ato.', secondCheck: ok() },
+    { anchor: 'Cláusula segunda', structure: 'Cláusula segunda', nature: 'operative', validity: 'not_determined', evidence: 'rótulo "Cláusula segunda"', explanation: 'Cláusula de vigência.', secondCheck: ok() },
+    { anchor: 'Presidente do CONFAZ', structure: 'Assinatura', nature: 'structure', validity: 'not_determined', evidence: 'nome e cargo ao final; estilo "TextoAcordo"',
+      explanation: 'Assinatura com o mesmo estilo do corpo, como no Convênio 901.', ambiguity: 'O estilo é igual ao do corpo; a configuração não tem regra por posição.',
+      secondCheck: { agrees: true, note: 'Mantido para conferência. Uma correção feita no Convênio 901 não vale para este ato.' } },
   ],
   'sint-dou-portaria': [
     { anchor: 'PORTARIA EXEMPLO', structure: 'Epígrafe', nature: 'structure', validity: 'not_determined', evidence: 'estilo "identifica"', explanation: 'Identificação do ato.', secondCheck: ok() },
@@ -104,4 +113,6 @@ export const SAMPLE_ANNOTATIONS: Readonly<Record<string, readonly Annotation[]>>
       explanation: 'Nota do editor. Sugestão: tratar o estilo "NotaAlteracao" como nota editorial nos atos do CONFAZ.', references: ['Ajuste SINIEF Exemplo 45/99'], secondCheck: ok() },
     { anchor: 'Cláusula segunda', structure: 'Cláusula segunda', nature: 'operative', validity: 'not_determined', evidence: 'rótulo "Cláusula segunda"', explanation: 'Cláusula de vigência.', secondCheck: ok() },
   ],
-});
+};
+/** The second version of the convênio is read like the first (same structure); its own text decides the match. */
+export const SAMPLE_ANNOTATIONS: Readonly<Record<string, readonly Annotation[]>> = Object.freeze({ ...BASE, 'sint-confaz-convenio-v2': BASE['sint-confaz-convenio']! });

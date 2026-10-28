@@ -57,16 +57,31 @@ A tela já mostra a procedência de cada ato. Nenhum conteúdo de corpus, gold o
   1. Na cláusula com redação anterior do convênio, a vigência passou de "não determinada" para "substituída", só nesse trecho histórico.
   2. No Art. 2º da IN fictícia, a releitura identificou faixa de códigos (8471.30.11 a 8471.30.13). O motor também não marca essa faixa; o caso fica na conferência.
 
-## 4. Consumidores da configuração
+## 4. Consumidores da configuração (revisão R2)
 
-`analyzeWithActiveConfiguration(client, request)` (`config.service.ts`) é o ponto único de consumo. Ele lê a versão em vigor na mesma transação e grava a versão na identidade da análise (`ruleSet = anatomy-config / <versão>`).
+**Serviço único:** `configuredAnalysis(executor, {profiles, corrections}, documento)` em `src/modules/anatomy/config/config.service.ts`.
+- Roda o motor no executor isolado (`SimulationExecutor.analyze`) com os perfis da configuração.
+- Depois aplica as correções de trecho **sobre** o resultado (`view.ts`, `describeResult`).
+- O resultado original do motor não é alterado; o serviço devolve as duas coisas.
 
-Hoje a configuração salva é consumida por:
+Esse serviço é usado por dois caminhos:
+1. **Prévia da tela** (`POST /analysis`). O lado "antes" usa a configuração em vigor (perfis e correções); o lado "depois" usa a proposta.
+   - Correção de afirmação anterior: na versão `c1f0f054` esse caminho lia os perfis em vigor, mas **não** chamava um serviço compartilhado nem aplicava correções. Agora chama `configuredAnalysis`.
+2. **Consumidor real: nova análise de um documento** (`POST /documents/:id/analyses`, botão "Nova análise deste documento").
+   - `analyzeWithActiveConfiguration` lê a versão em vigor e chama `configuredAnalysis`.
+   - Registra a análise em `anatomy_config_analyses` com o documento, a versão do documento (hash), a versão da configuração e as correções aplicadas ou desatualizadas.
+   - A tabela é imutável; análises anteriores ficam preservadas e são listadas por documento.
+   - Se a configuração mudar durante a análise, nada é registrado (`STALE_VERSION`).
+   - Auditoria: `ANAT_RULES_CONFIG_ANALYZED`.
 
-- **a análise da tela** (`POST /analysis`), que usa a versão em vigor como "antes";
-- **qualquer chamada a `analyzeWithActiveConfiguration`**, provada no teste de integração com o papel `radar_worker`.
+Não existe processamento em lote, coleta automática nem reprocessamento. Nada grava `publication_anatomies` nem `anatomy_runs`. As análises são individuais, disparadas pela tela, e só sobre os documentos da amostra.
 
-Não há processamento em lote de anatomia no código: nada grava `publication_anatomies` e `anatomy_runs`. Por isso **salvar não muda nenhuma publicação nem análise armazenada**, e a tela diz isso. Um processamento futuro deve usar esta função; não deve ler perfis por conta própria.
+**Correção pontual (alcance documento):**
+- Fica vinculada a `documentId`, a `documentHash` (SHA-256 da versão exata) e a `partKey` (SHA-256 de documento + texto próprio do trecho). Não usa posição na tela.
+- Ao salvar, o servidor define autor (usuário da sessão), data e versão. A 081 recusa uma correção nova com outro autor (`ACTOR_MISMATCH`).
+- **Outro documento** nunca recebe a correção.
+- **Mesmo documento, outra versão** (hash diferente) ou **trecho inexistente:** a correção é marcada como desatualizada, não é aplicada e aparece na conferência.
+- Salvar e restaurar carregam as correções junto com os perfis. Uma correção nunca vira regra.
 
 ## 5. Contratos alterados
 
@@ -100,7 +115,9 @@ Não há processamento em lote de anatomia no código: nada grava `publication_a
 | Ambiguidade sinalizada, sem inventar | `ambiguity` + lista de conferência | unit; e2e passo 9 | — |
 | Segunda conferência explícita, divergências documentadas | `secondCheck` | unit (campo obrigatório) | Não é revisão independente |
 | Ato e estrutura relacionados | web: árvore ↔ texto | e2e passo 2 (`aria-current`) | — |
-| Correção de trecho separada de regra para semelhantes | `corrections` (versionadas) vs `changes` | unit "corrections…"; vitest; e2e passo 3 | Correção é expectativa; não muda o processamento |
+| Correção de trecho separada de regra para semelhantes | `corrections` (versionadas) vs `changes` | unit "corrections: applied…"; vitest; e2e passos 3 e 4 | — |
+| Correção aplicada ao resultado, preservando o original; vinculada à versão e ao trecho; desatualizada sinalizada | `describeResult` (overlay), `documentHash`, `passageKey`, `prepareCorrections`, 081 (formato + autor) | unit; integração "the real consumer AFTER save…", "correction input…"; e2e passos 7–9 | Identidade do trecho = texto próprio: mudar o texto do trecho invalida a correção, que fica desatualizada |
+| Resultado original, correção, autor, motivo e versão mostrados à parte | painel "Trecho" (Resultado do motor + Correção administrativa aplicada) | vitest; e2e passo 7 | — |
 | Alcance explícito (padrão geral, fonte, família) | `Scope` em `rules.ts`; seletor na tela | unit "guided change…" | Escopo "documento" só como correção |
 | Prévia antes/depois com contagens reais | `analyze()` no executor isolado | integração "analysis…"; e2e passo 4 | Contagens sobre os atos da amostra |
 | Desfazer edição; restaurar versão | desfazer por item; `anat_config_restore` | vitest; integração "restore…"; e2e passos 3 e 8 | — |
@@ -113,7 +130,8 @@ Não há processamento em lote de anatomia no código: nada grava `publication_a
 | Edições concorrentes | lock + `expected_version` | integração "concurrency…"; e2e passo 7 | — |
 | Histórico de versões e auditoria; restauração auditada | `anatomy_config_versions` + audit | integração "restore…"; e2e (`/__dev-state`) | — |
 | Falha mantém a versão anterior | transação única | integração "a persistence failure…" | — |
-| Consumidor usa a configuração salva | `analyzeWithActiveConfiguration` | integração "save…" (worker; ruleSet = versão; nota vira `editorial_note`) | Não há lote de anatomia no código |
+| Consumidor real na interface, mesmo serviço da tela | `configuredAnalysis` + `POST /documents/:id/analyses` + `anatomy_config_analyses` | integração "the real consumer BEFORE/AFTER save…", "version 2…", "restore…"; vitest; e2e passos 2, 7–11 | Só análises individuais da amostra; sem lote |
+| Restauração recupera o comportamento anterior | `anat_config_restore` (perfis + correções) | integração "restore…" (nova análise v3 aplica a correção de novo); e2e passo 11 | — |
 | Acervo preservado | sem escrita fora das tabelas de configuração | integração "nothing stored is reprocessed…" | — |
 | Dupla aprovação substituída | rotas da 079 não registradas | integração "legacy … not registered"; privilégios em admin-schema | Tabelas da 079 permanecem como histórico |
 | Desligada por padrão | `ANAT_CONFIG_ENABLED`, `VITE_ENABLE_ANAT_CONFIG` | integração "flag off"; vitest da flag | — |
@@ -142,8 +160,9 @@ Não há processamento em lote de anatomia no código: nada grava `publication_a
 
 1. Menu do usuário → **Anatomia dos atos**.
 2. Escolher um ato no topo e clicar num trecho: ver estrutura, natureza, vigência, o porquê e a leitura da IA.
-3. Se só aquele trecho está errado: **Corrigir só este trecho**.
+3. Se só aquele trecho está errado: **Corrigir só este trecho**, escolhendo o que ele é e informando o motivo.
 4. Para tratar casos parecidos: **Criar regra para trechos semelhantes** → **Ver sugestão** → escolher o alcance → **Adicionar à proposta**. Também dá para usar a aba **Regras** (tipo, alcance, texto; × para retirar).
 5. **Testar alterações:** conferir quantos trechos mudam e os casos a conferir antes → depois. Use **Antes/Depois** para comparar.
 6. **Salvar configuração** → **Confirmar e salvar**. A configuração passa a valer para as novas análises.
-7. Para voltar atrás: aba **Histórico** → **Restaurar esta versão**.
+7. Para ver o efeito num documento: **Nova análise deste documento**. A análise fica registrada com a versão usada.
+8. Para voltar atrás: aba **Histórico** → **Restaurar esta versão**.

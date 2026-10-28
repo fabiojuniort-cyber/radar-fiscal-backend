@@ -126,6 +126,17 @@ export class SimulationExecutor {
     } finally { release(); }
   }
 
+  /** ANAT-CONFIG-01: one example under one profile set, in its own worker (the shared analysis of the configuration screen). */
+  async analyze(input: { example: unknown; profiles: unknown; expectedEngineHash: string }, signal?: AbortSignal): Promise<{ status: 'complete'; result: AnatomyResult }
+    | { status: 'cancelled' | 'failed'; reason: StopReason }> {
+    const v = this.validate(input.profiles, [input.example], input.expectedEngineHash);
+    const release = await this.acquire(signal);
+    try {
+      const w = await this.runWorker(v.examples[0]!, v.profiles, this.now() + this.limits.totalMs, signal);
+      return w.kind === 'ok' ? { status: 'complete', result: w.result } : { status: w.kind, reason: w.reason };
+    } finally { release(); }
+  }
+
   /** One example under two profile sets; both sides run in their own workers within the same slot and deadline. */
   async compare(input: { example: unknown; before: unknown; after: unknown; expectedEngineHash: string }, signal?: AbortSignal): Promise<ComparisonRun> {
     const before = this.validate(input.before, [input.example], input.expectedEngineHash);

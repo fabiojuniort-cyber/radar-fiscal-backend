@@ -65,6 +65,7 @@ app.get('/auth/__dev-state', async () => ({
   current: (await owner.query('SELECT version FROM anatomy_config_current')).rows[0] ?? null,
   versions: (await owner.query('SELECT version, kind FROM anatomy_config_versions ORDER BY version')).rows,
   audit: (await owner.query("SELECT action, after_data AS data FROM audit_log WHERE action LIKE 'ANAT_RULES_CONFIG_%' ORDER BY occurred_at, id")).rows,
+  analyses: (await owner.query('SELECT document_id AS "documentId", document_version AS "documentVersion", config_version AS "configVersion", jsonb_array_length(corrections_applied) AS applied, jsonb_array_length(corrections_stale) AS stale FROM anatomy_config_analyses ORDER BY created_at')).rows,
 }));
 const port = Number(process.argv[2] ?? 3998);
 await app.listen({ host: '127.0.0.1', port });
