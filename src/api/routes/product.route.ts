@@ -1,4 +1,4 @@
-import { purgeCompany } from '../../modules/company/company-purge.service.js';
+import { purgeCompany,CompanyRootDeleteConfirmationError } from '../../modules/company/company-purge.service.js';
 import { readCompanyRegistration, readRegistrationEstablishment } from '../../modules/company/registration-response.service.js';
 import type {
   FastifyInstance,
@@ -634,6 +634,9 @@ export async function productRoutes(
               return null;
             }
 
+            await sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId+':'+request.body.cnpj.slice(0,8)},0))`.execute(trx);
+            const sameRoot=await trx.selectFrom('companies').select('id').where('tenant_id','=',tenantId).where(sql<boolean>`left(head_office_cnpj,8)=${request.body.cnpj.slice(0,8)}`).executeTakeFirst();
+            if(sameRoot)throw new CompanyIdentityError('company_cnpj_exists');
             return trx
               .insertInto('companies')
               .values({
@@ -963,13 +966,13 @@ export async function productRoutes(
             }
 
             // Reject old browser tabs that still promise a soft-delete.
-            if (request.headers['x-company-delete-intent'] !== 'permanent-v1') {
+            if (!['permanent-v1','permanent-root-v1'].includes(String(request.headers['x-company-delete-intent']))) {
               return 'CONFIRMATION_REQUIRED' as const;
             }
             // ONB-02-R3: the SECURITY DEFINER function rechecks tenant/admin
             // authorization and atomically removes all company-owned records.
             // No direct companies DELETE grant is added to radar_app.
-            const removed = await purgeCompany(trx, request.params.companyId);
+            const removed = await purgeCompany(trx, request.params.companyId,request.headers['x-company-delete-intent']==='permanent-root-v1');
             return removed
               ? 'DELETED' as const
               : 'COMPANY_NOT_FOUND' as const;
@@ -990,6 +993,7 @@ export async function productRoutes(
 
         return reply.status(204).send();
       } catch (error) {
+        if(error instanceof CompanyRootDeleteConfirmationError)return reply.status(409).send({error:'company_root_delete_confirmation_required'});
         // Inconsistent references or ambiguous legacy ownership are a
         // recoverable business conflict, never a silent partial deletion.
         // Do not leak internal identifiers or CNPJ to the client.
@@ -3042,3 +3046,4 @@ export async function productRoutes(
   );
 
 }
+
