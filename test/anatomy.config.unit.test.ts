@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { analyzeAnatomy } from '../src/modules/anatomy/engine.js';
 import { DEFAULT_PROFILES, resolveEffectiveProfile } from '../src/modules/anatomy/profile.js';
@@ -101,6 +102,30 @@ test('corrections: applied on top of the engine result to the exact document ver
   // Same version but a passage that no longer exists: stale, not applied.
   const gone = run(conv.id, shipped(), [{ ...c, partKey: '0'.repeat(16) }]);
   assert.deepEqual(gone.corrections.stale.map((x) => x.why), ['passage_not_found']);
+});
+
+test('CONFIG-R2-01: repeated identical passages get distinct identities; a correction hits only the intended occurrence', () => {
+  const content = '<html><body><p class="TituloAcordo">CONVÊNIO ICMS EXEMPLO Nº 903, DE 1 DE JUNHO DE 2099</p>'
+    + '<p class="TextoAcordo">Cláusula primeira Fica autorizado o teste.</p><p class="TextoAcordo">Assinatura</p>'
+    + '<p class="TextoAcordo">Cláusula segunda Este convênio entra em vigor na data da publicação.</p><p class="TextoAcordo">Assinatura</p></body></html>';
+  const doc = { id: 'rep', documentId: 'rep', content };
+  const r = analyzeAnatomy({ publicationVersionId: 'rep', referenceDate: '2026-10-28', ruleSet: { id: 't', version: '1' }, profiles: shipped(), input: { source: 'CONFAZ', representationId: 'rep', html: content } });
+  const base = describeResult(doc, r, []);
+  const sigs = base.passages.filter((p) => p.text === 'Assinatura');
+  assert.equal(sigs.length, 2);
+  assert.notEqual(sigs[0]!.key, sigs[1]!.key, 'identical text, different identity');
+  assert.equal(new Set(base.passages.map((p) => p.key)).size, base.passages.length, 'every passage key is unique');
+  const c: Correction = { documentId: 'rep', documentHash: documentHash(content), partKey: sigs[1]!.key, expected: 'structure', reason: 'Segunda assinatura', author: 'u', createdAt: 't' };
+  const out = describeResult(doc, r, [], [c]);
+  const [first, second] = out.passages.filter((p) => p.text === 'Assinatura');
+  assert.deepEqual([first!.correction, first!.effectiveNature], [null, first!.nature], 'the first occurrence is untouched');
+  assert.equal(second!.effectiveNature, 'structure');
+  assert.equal(second!.nature, sigs[1]!.nature, 'engine result kept');
+  // The pre-fix key (document + text only) no longer resolves: it is reported, never applied to the first occurrence.
+  const legacy = createHash('sha256').update(`rep|Assinatura`, 'utf8').digest('hex').slice(0, 16);
+  const old = describeResult(doc, r, [], [{ ...c, partKey: legacy }]);
+  assert.equal(old.passages.some((p) => p.correction), false);
+  assert.deepEqual(old.corrections.stale.map((x) => x.why), ['passage_not_found']);
 });
 
 test('suggestions come from the passage itself and only use supported mechanisms', () => {

@@ -52,8 +52,14 @@ function ownText(result: AnatomyResult, part: Part): string {
   if (part.span.end > at) out += result.canonicalText.slice(at, part.span.end);
   return out.trim();
 }
-/** Stable identity of a passage: the document identity plus the passage's own text (independent of rules and of screen position). */
-export const passageKey = (documentId: string, text: string) => createHash('sha256').update(`${documentId}|${text}`, 'utf8').digest('hex').slice(0, 16);
+/**
+ * Stable identity of a passage (CONFIG-R2-01): the document identity, the passage's own text and its OCCURRENCE number
+ * among passages with that same text in document order (1 for the first). Two identical passages ("Assinatura" twice)
+ * get different keys; the key does not depend on screen position or on rules. Corrections are also bound to the exact
+ * document version (documentHash), so a key is only ever resolved against the version it was made on.
+ */
+export const passageKey = (documentId: string, text: string, occurrence = 1) =>
+  createHash('sha256').update(`${documentId}|${occurrence}|${text}`, 'utf8').digest('hex').slice(0, 16);
 /** Identity of one exact version of a document: SHA-256 of its content. */
 export const documentHash = (content: string) => createHash('sha256').update(content, 'utf8').digest('hex');
 
@@ -72,7 +78,7 @@ export interface Passage {
 export interface Correction { documentId: string; documentHash: string; partKey: string; expected: Nature; reason: string;
   author?: string | undefined; createdAt?: string | undefined; sinceVersion?: number | undefined }
 export interface AppliedCorrection { expected: Nature; expectedLabel: string; reason: string; author: string | null; createdAt: string | null; sinceVersion: number | null }
-export interface StaleCorrection { correction: Correction; why: 'document_changed' | 'passage_not_found' }
+export interface StaleCorrection { correction: Correction; why: 'document_changed' | 'passage_not_found' | 'ambiguous_passage' }
 export interface ReviewItem { sampleId: string; partKey: string | null; kind: 'not_recognized' | 'ai_differs' | 'ai_ambiguous' | 'stale_correction' | 'limitation'; title: string; detail: string }
 export interface DocumentRef { id: string; documentId: string; content: string }
 
@@ -80,10 +86,11 @@ export function describeResult(doc: DocumentRef, result: AnatomyResult, annotati
   const sampleId = doc.id; const hash = documentHash(doc.content);
   const mine = corrections.filter((c) => c.documentId === doc.documentId);
   const visible = result.parts.filter((p) => !HIDDEN.has(p.type));
-  const keyOf = new Map<string, string>();
+  const keyOf = new Map<string, string>(); const seenText = new Map<string, number>();
   const used = new Set<Annotation>();
   const passages: Passage[] = visible.map((p) => {
-    const text = ownText(result, p); const key = passageKey(doc.documentId, text); keyOf.set(p.id, key);
+    const text = ownText(result, p); const occurrence = (seenText.get(text) ?? 0) + 1; seenText.set(text, occurrence)
+    const key = passageKey(doc.documentId, text, occurrence); keyOf.set(p.id, key);
     let depth = 0; for (let q = p; q.parentId; ) { const parent = result.parts.find((x) => x.id === q.parentId)!; if (!HIDDEN.has(parent.type)) depth++; q = parent; }
     const nature = natureOf(p);
     const ann = annotations.find((a) => !used.has(a) && text.startsWith(a.anchor)) ?? null;
@@ -101,8 +108,11 @@ export function describeResult(doc: DocumentRef, result: AnatomyResult, annotati
   const applied: { partKey: string; correction: Correction }[] = []; const stale: StaleCorrection[] = [];
   for (const c of mine) {
     if (c.documentHash !== hash) { stale.push({ correction: c, why: 'document_changed' }); continue; }
-    const p = passages.find((x) => x.key === c.partKey);
-    if (!p) { stale.push({ correction: c, why: 'passage_not_found' }); continue; }
+    const matches = passages.filter((x) => x.key === c.partKey);
+    if (matches.length === 0) { stale.push({ correction: c, why: 'passage_not_found' }); continue; }
+    // Defensive: keys include the occurrence number, so this cannot happen; an ambiguous identity is refused, never guessed.
+    if (matches.length > 1) { stale.push({ correction: c, why: 'ambiguous_passage' }); continue; }
+    const p = matches[0]!;
     p.correction = { expected: c.expected, expectedLabel: NATURE_PT[c.expected], reason: c.reason, author: c.author ?? null, createdAt: c.createdAt ?? null, sinceVersion: c.sinceVersion ?? null };
     p.effectiveNature = c.expected; p.effectiveNatureLabel = NATURE_PT[c.expected];
     applied.push({ partKey: c.partKey, correction: c });
@@ -114,6 +124,7 @@ export function describeResult(doc: DocumentRef, result: AnatomyResult, annotati
   const review: ReviewItem[] = [];
   for (const s of stale) review.push({ sampleId, partKey: s.correction.partKey, kind: 'stale_correction', title: 'Correção desatualizada (não aplicada)',
     detail: s.why === 'document_changed' ? `O documento mudou desde a correção ("${NATURE_PT[s.correction.expected]}", motivo: ${s.correction.reason}). Ela não foi aplicada a esta versão; confira o trecho e corrija de novo se ainda valer.`
+      : s.why === 'ambiguous_passage' ? `Mais de um trecho corresponde à correção ("${NATURE_PT[s.correction.expected]}"). Ela não foi aplicada para não atingir o trecho errado.`
       : `O trecho corrigido ("${NATURE_PT[s.correction.expected]}", motivo: ${s.correction.reason}) não existe mais nesta análise. A correção não foi aplicada.` });
   for (const p of passages) {
     const corr = p.correction;

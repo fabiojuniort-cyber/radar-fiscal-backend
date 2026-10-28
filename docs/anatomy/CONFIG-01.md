@@ -85,24 +85,38 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
 
 ## 5. Contratos alterados
 
-- **Migration `081_anat_config_direct_apply.sql`** (numeração conferida com a main faa019c4; nenhum branch aberto usa 081):
-  - `anatomy_config_versions` são imutáveis (UPDATE e DELETE dão `anat:IMMUTABLE`);
+- **Migration `081_anat_config_direct_apply.sql`** (numeração conferida com a main faa019c4; nenhum branch aberto usa 081; aplicada só em bancos descartáveis, por isso editável até o merge):
+  - `anatomy_config_versions` são imutáveis (UPDATE e DELETE dão `anat:IMMUTABLE`). Guardam perfis e correções de trecho;
   - `anatomy_config_current` é um ponteiro único e só avança;
-  - as entradas `anat_config_save`, `anat_config_restore` e `anat_config_audit_attempt` são SECURITY DEFINER, pertencem a `anat_rules_writer`, têm search_path fixo e exigem administrador de plataforma (`anat_actor`);
-  - concorrência: lock consultivo, `FOR UPDATE` e `expected_version`; a divergência devolve `STALE_VERSION` (409), que é auditado;
+  - `anatomy_config_analyses` registra as novas análises de um documento. É imutável e só aceita a versão em vigor (`STALE_VERSION`);
+  - **quatro entradas** SECURITY DEFINER, com owner `anat_rules_writer`, search_path fixo e exigência de administrador de plataforma (`anat_actor`):
+    - `anat_config_save`;
+    - `anat_config_restore`;
+    - `anat_config_record_analysis`;
+    - `anat_config_audit_attempt`;
+  - **concorrência:**
+    - salvar e restaurar tomam o lock consultivo `anat-config` em modo exclusivo, mais `FOR UPDATE` e `expected_version`. A divergência devolve `STALE_VERSION` (409), que é auditado;
+    - o registro de análise toma o **mesmo lock em modo compartilhado**. Isso serializa o registro com salvamentos também antes do primeiro salvamento, quando não há linha para travar (CONFIG-R2-03);
+  - **correções:** a 081 confere o formato e recusa, ao salvar, uma correção nova cujo autor não seja o usuário da sessão (`ACTOR_MISMATCH`);
   - a versão, o ponteiro e a auditoria vão na mesma transação, então qualquer falha mantém a versão anterior;
-  - RLS: `radar_app` lê só se for administrador de plataforma, `radar_worker` lê, e PUBLIC e o curador não têm acesso;
-  - a política de auditoria estende **exatamente** a da 078 com `ANAT_RULES_CONFIG_SAVED` e `ANAT_RULES_CONFIG_REJECTED`, com o mesmo bloqueio fail-closed caso a política em vigor seja diferente;
+  - **RLS:** `radar_app` lê só se for administrador de plataforma, `radar_worker` lê, e PUBLIC e o curador não têm acesso;
+  - a política de auditoria estende **exatamente** a da 078 com **três eventos**: `ANAT_RULES_CONFIG_SAVED`, `ANAT_RULES_CONFIG_REJECTED` e `ANAT_RULES_CONFIG_ANALYZED`. O bloqueio fail-closed atua caso a política em vigor seja diferente;
   - as migrations aplicadas não foram alteradas.
 - **Substituição da dupla aprovação:** com `ANAT_CONFIG_ENABLED=true`, as rotas da 079 (`/api/v1/admin/anatomy-rules`) **não são registradas**, e o web redireciona `/admin/anatomia-regras`. As tabelas e funções da 079 ficam como histórico. Nada lê ativações da 079.
-- **API `/api/v1/admin/anatomy-config`:**
-  - `GET` mostra a configuração, o catálogo e os atos;
+- **API `/api/v1/admin/anatomy-config`** (só administradores de plataforma):
+  - `GET /`: configuração em uso (regras em português, correções com autor), catálogo e atos;
   - `GET /versions` e `GET /versions/:id`;
-  - `POST /analysis`, `POST /suggestions`, `POST /save` e `POST /restore`;
+  - `POST /analysis`: prévia antes/depois, pelo serviço compartilhado; devolve `basedOnVersion`;
+  - `POST /suggestions`;
+  - `POST /save`: `basedOnVersion` deve ser a versão do teste; a tela envia a versão devolvida pela prévia (CONFIG-R2-02);
+  - `POST /restore`;
+  - `POST /documents/:sampleId/analyses`: nova análise registrada;
+  - `GET /documents/:documentId/analyses`: análises registradas do documento;
   - `GET /audit`.
+- **Identidade do trecho** (CONFIG-R2-01): é o documento, o texto próprio do trecho e o **número da ocorrência** desse texto na ordem do documento. Dois trechos idênticos ("Assinatura" duas vezes) têm chaves diferentes. Uma chave ambígua é recusada (`ambiguous_passage`) e nunca adivinhada.
 - **Proteções preservadas:**
   - o validador do motor (piso e teto de proteções, limites, conflitos) roda antes da prévia e antes de salvar;
-  - o executor isolado roda a prévia;
+  - o executor isolado roda as análises;
   - o isolamento entre tenants não muda (eventos globais, `tenant_id` NULL);
   - RESTRICT não foi removido.
 
@@ -116,7 +130,7 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
 | Segunda conferência explícita, divergências documentadas | `secondCheck` | unit (campo obrigatório) | Não é revisão independente |
 | Ato e estrutura relacionados | web: árvore ↔ texto | e2e passo 2 (`aria-current`) | — |
 | Correção de trecho separada de regra para semelhantes | `corrections` (versionadas) vs `changes` | unit "corrections: applied…"; vitest; e2e passos 3 e 4 | — |
-| Correção aplicada ao resultado, preservando o original; vinculada à versão e ao trecho; desatualizada sinalizada | `describeResult` (overlay), `documentHash`, `passageKey`, `prepareCorrections`, 081 (formato + autor) | unit; integração "the real consumer AFTER save…", "correction input…"; e2e passos 7–9 | Identidade do trecho = texto próprio: mudar o texto do trecho invalida a correção, que fica desatualizada |
+| Correção aplicada ao resultado, preservando o original; vinculada à versão e ao trecho; desatualizada sinalizada | `describeResult` (overlay), `documentHash`, `passageKey`, `prepareCorrections`, 081 (formato + autor) | unit; integração "the real consumer AFTER save…", "correction input…"; e2e passos 7–9 | Identidade = documento + texto próprio + ocorrência; mudar o documento torna a correção desatualizada |
 | Resultado original, correção, autor, motivo e versão mostrados à parte | painel "Trecho" (Resultado do motor + Correção administrativa aplicada) | vitest; e2e passo 7 | — |
 | Alcance explícito (padrão geral, fonte, família) | `Scope` em `rules.ts`; seletor na tela | unit "guided change…" | Escopo "documento" só como correção |
 | Prévia antes/depois com contagens reais | `analyze()` no executor isolado | integração "analysis…"; e2e passo 4 | Contagens sobre os atos da amostra |
@@ -127,7 +141,10 @@ Não existe processamento em lote, coleta automática nem reprocessamento. Nada 
 | Mensagens específicas | `validateConfiguration`, `applyChanges`, `MESSAGES` | unit "specific messages…"; integração "validation…"; e2e passo 5 | — |
 | Só administradores | `requirePlatformAdmin` + `anat_actor` + RLS | integração "authorisation…"; e2e passo 0 | — |
 | Validar antes de aplicar; aplicação atômica | TS + `anat_config_write` | integração "validation…" e "save…" | — |
-| Edições concorrentes | lock + `expected_version` | integração "concurrency…"; e2e passo 7 | — |
+| Edições concorrentes | lock + `expected_version` | integração "concurrency…"; e2e passo 10 | — |
+| Trechos com texto repetido (CONFIG-R2-01) | ocorrência no `passageKey`; recusa de identidade ambígua | unit "CONFIG-R2-01…" (falha sem a correção) | — |
+| Teste vinculado à versão-base (CONFIG-R2-02) | assinatura do teste inclui a versão; salvar envia `basedOnVersion` da prévia; aviso e bloqueio quando a base muda | vitest "CONFIG-R2-02…" (falha sem a correção) | — |
+| Registro de análise × primeiro salvamento (CONFIG-R2-03) | lock consultivo compartilhado em `anat_config_record_analysis` | integração "CONFIG-R2-03…", nos dois sentidos (falha sem a correção) | — |
 | Histórico de versões e auditoria; restauração auditada | `anatomy_config_versions` + audit | integração "restore…"; e2e (`/__dev-state`) | — |
 | Falha mantém a versão anterior | transação única | integração "a persistence failure…" | — |
 | Consumidor real na interface, mesmo serviço da tela | `configuredAnalysis` + `POST /documents/:id/analyses` + `anatomy_config_analyses` | integração "the real consumer BEFORE/AFTER save…", "version 2…", "restore…"; vitest; e2e passos 2, 7–11 | Só análises individuais da amostra; sem lote |

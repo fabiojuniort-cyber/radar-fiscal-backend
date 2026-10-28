@@ -163,6 +163,42 @@ test('ANAT-CONFIG-01: save validates and applies, with history, audit, concurren
         assert.equal((await owner.query('SELECT count(*)::int AS n FROM anatomy_config_versions')).rows[0].n, 0);
       });
 
+      await t.test('CONFIG-R2-03: recording a v0 analysis and the FIRST save are serialised (deterministic, both directions)', async () => {
+        const { DEFAULT_PROFILES } = await import('../src/modules/anatomy/profile.js'); const { canonicalJson, sha256 } = await import('../src/modules/anatomy/contract.js');
+        const prof = JSON.stringify(DEFAULT_PROFILES); const hash = sha256(canonicalJson(DEFAULT_PROFILES)); const h = 'a'.repeat(64);
+        assert.equal((await owner.query('SELECT count(*)::int AS n FROM anatomy_config_current')).rows[0].n, 0, 'no configuration saved yet: no row to lock');
+        const open = async () => { const c = new pg.Client({ connectionString: runtimeUrl }); await c.connect(); await c.query('BEGIN');
+          await c.query("SELECT set_config('app.user_id', $1, true)", [adminA.id]); return c; };
+        const waiting = async (pid: number) => { for (let i = 0; i < 200; i++) {
+          const r = (await owner.query('SELECT wait_event_type, wait_event FROM pg_stat_activity WHERE pid = $1', [pid])).rows[0];
+          if (r?.wait_event_type === 'Lock' && r?.wait_event === 'advisory') return true; await new Promise((res) => setTimeout(res, 25)); } return false; };
+        const record = (c: pg.Client) => c.query("SELECT anat_config_record_analysis(0,'race','v1',$1,$1,$1,'[]','[]','{}',$2) AS id", [h, randomUUID()]);
+        const save = (c: pg.Client) => c.query('SELECT version FROM anat_config_save(0, $1::jsonb, \'[]\'::jsonb, $2, null, $3)', [prof, hash, randomUUID()]);
+        // 1. First save in progress (uncommitted): a v0 record must WAIT for it, not read "no row" and slip through.
+        const s1 = await open(); const r1 = await open();
+        try {
+          await save(s1);
+          const pending = record(r1);
+          assert.equal(await waiting((r1 as unknown as { processID: number }).processID), true, 'the record waits on the save lock');
+          await s1.query('ROLLBACK'); // disposable: keep version 0 for the rest of the suite
+          assert.ok((await pending).rows[0].id); await r1.query('ROLLBACK');
+        } finally { await s1.end(); await r1.end(); }
+        // 2. A v0 record in progress (uncommitted): the first save must WAIT for it.
+        const r2 = await open(); const s2 = await open();
+        try {
+          await record(r2);
+          const pending = save(s2);
+          assert.equal(await waiting((s2 as unknown as { processID: number }).processID), true, 'the save waits on the record lock');
+          await r2.query('ROLLBACK');
+          assert.equal((await pending).rows[0].version, 1); await s2.query('ROLLBACK');
+        } finally { await r2.end(); await s2.end(); }
+        // 3. Two records do not block each other (shared lock).
+        const a = await open(); const b = await open();
+        try { await record(a); await record(b); } finally { await a.query('ROLLBACK'); await b.query('ROLLBACK'); await a.end(); await b.end(); }
+        assert.equal((await owner.query('SELECT count(*)::int AS n FROM anatomy_config_versions')).rows[0].n, 0);
+        assert.equal((await owner.query("SELECT count(*)::int AS n FROM anatomy_config_analyses WHERE document_id = 'race'")).rows[0].n, 0);
+      });
+
       await t.test('save = validate + apply in one action by ONE administrator (rule + passage correction); audited', async () => {
         const r = await app.inject({ method: 'POST', url: `${P}/save`, headers: adminA.as(app), payload: { basedOnVersion: 0, changes: [NOTE_STYLE], corrections: [CORR], note: 'Estilo de nota do CONFAZ' } });
         assert.equal(r.statusCode, 201, r.body);

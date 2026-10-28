@@ -176,6 +176,10 @@ CREATE FUNCTION anat_config_record_analysis(p_expected_version integer, p_docume
 LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE v_actor uuid := anat_actor(); v_cur anatomy_config_current; v_id uuid;
 BEGIN
+ -- CONFIG-R2-03: the SAME advisory key as anat_config_write, in shared mode. Saves (exclusive) and records (shared)
+ -- are serialised even before the first save, when there is no anatomy_config_current row for FOR SHARE to lock;
+ -- concurrent records do not block each other.
+ PERFORM pg_advisory_xact_lock_shared(hashtextextended('anat-config', 0));
  SELECT * INTO v_cur FROM anatomy_config_current WHERE singleton FOR SHARE;
  IF coalesce(v_cur.version, 0) IS DISTINCT FROM p_expected_version THEN PERFORM anat_fail('STALE_VERSION'); END IF;
  INSERT INTO anatomy_config_analyses (document_id, document_version, document_hash, config_version, config_version_id, engine_analysis_id, output_hash,
