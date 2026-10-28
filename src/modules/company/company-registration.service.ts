@@ -105,11 +105,13 @@ export async function createCompanyFromRegistry(
   record: CnpjRegistryRecord,
   stateRegistration?: StateRegistrationLookup,
   businessLocationCode?: string | null,
+  typeCode = 'HEAD_OFFICE',
+  accountRootRegistration = false,
 ): Promise<{
   companyId: string;
   establishmentId: string;
 }> {
-  ensureHeadOfficeCnpj(record.cnpj, record.isHeadOffice);
+  if(!accountRootRegistration)ensureHeadOfficeCnpj(record.cnpj, record.isHeadOffice);
   const existingCompany = await trx
     .selectFrom('companies')
     .select(['id', 'is_active'])
@@ -146,8 +148,7 @@ export async function createCompanyFromRegistry(
           name:
             record.tradeName ??
             record.legalName,
-          establishment_type_code:
-            'HEAD_OFFICE',
+          establishment_type_code: typeCode,
           is_head_office: true,
           uf: record.uf,
           municipality_name:

@@ -73,6 +73,7 @@ const businessLocationCodeSchema = z
   .optional();
 
 const companyFromCnpjBodySchema = z.object({
+  typeCode: z.string().trim().min(1).max(50).default('HEAD_OFFICE'),
   cnpj: cnpjValueSchema,
   businessLocationCode:
     businessLocationCodeSchema,
@@ -667,7 +668,7 @@ export async function productRoutes(
         });
       } catch (error) {
         if (error instanceof CompanyIdentityError) {
-          return reply.status(409).send({ error: error.code });
+          return reply.status(error.code==='establishment_type_not_found'?400:409).send({ error: error.code });
         }
         const handled = handleTenantError(error, reply);
         if (handled) return handled;
@@ -730,12 +731,25 @@ export async function productRoutes(
               return null;
             }
 
+            await sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId + ':' + registry.cnpj.slice(0,8)},0))`.execute(trx);
+            const type = await trx.selectFrom('establishment_types').select('code').where('code','=',request.body.typeCode).where('is_active','=',true).executeTakeFirst();
+            if(!type) throw new CompanyIdentityError('establishment_type_not_found');
+            const matches = await trx.selectFrom('companies').select(['id','is_active']).where('tenant_id','=',tenantId).where(sql<boolean>`left(head_office_cnpj,8)=${registry.cnpj.slice(0,8)}`).forUpdate().execute();
+            if(matches.length>1) throw new CompanyIdentityError('company_cnpj_exists');
+            const existing=matches[0];
+            if(existing && !existing.is_active)throw new CompanyIdentityError('company_inactive_requires_deletion');
+            if(existing){
+              const id=await createEstablishmentFromRegistry(trx,existing.id,registry,request.body.typeCode,stateRegistration,request.body.businessLocationCode);
+              return readCompanyRegistration(trx,existing.id,id);
+            }
             const registered = await createCompanyFromRegistry(
               trx,
               tenantId,
               registry,
               stateRegistration,
               request.body.businessLocationCode,
+              request.body.typeCode,
+              true, // ONB-03.5: the first CNPJ of a root is the account matrix.
             );
             return readCompanyRegistration(trx, registered.companyId, registered.establishmentId);
           },

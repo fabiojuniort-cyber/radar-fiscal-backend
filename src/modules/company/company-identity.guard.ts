@@ -1,6 +1,7 @@
 /** Fail closed on ambiguous company identity. A branch is never a new company. */
 export class CompanyIdentityError extends Error {
   constructor(public readonly code:
+    | 'establishment_type_not_found'
     | 'head_office_cnpj_required'
     | 'establishment_cnpj_root_mismatch'
     | 'head_office_conflict'

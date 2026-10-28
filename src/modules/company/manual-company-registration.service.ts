@@ -1,3 +1,5 @@
+import {sql} from 'kysely';
+import {createManualEstablishment} from './manual-establishment-registration.service.js';
 import type { Transaction } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
@@ -7,6 +9,8 @@ import { CompanyIdentityError, ensureHeadOfficeCnpj } from './company-identity.g
 import { ManualCnaeValidationError } from './manual-cnae-validation.service.js';
 
 export type ManualCompanyRegistrationInput = {
+  typeCode?:string|undefined;
+  resolveCompanyByRoot?:boolean|undefined;
   cnpj: string;
   legalName: string;
   establishmentName?: string | null | undefined;
@@ -37,7 +41,19 @@ export async function createManualCompanyRegistration(
   tenantId: string,
   input: ManualCompanyRegistrationInput,
 ): Promise<ManualCompanyRegistrationResult> {
-  ensureHeadOfficeCnpj(input.cnpj);
+  if(input.resolveCompanyByRoot){
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId+':'+input.cnpj.slice(0,8)},0))`.execute(trx);
+    const type=await trx.selectFrom('establishment_types').select('code').where('code','=',input.typeCode??'HEAD_OFFICE').where('is_active','=',true).executeTakeFirst();
+    if(!type)throw new CompanyIdentityError('establishment_type_not_found');
+    const matches=await trx.selectFrom('companies').select(['id','is_active']).where('tenant_id','=',tenantId).where(sql<boolean>`left(head_office_cnpj,8)=${input.cnpj.slice(0,8)}`).forUpdate().execute();
+    if(matches.length>1)throw new CompanyIdentityError('company_cnpj_exists');
+    const company=matches[0];
+    if(company&&!company.is_active)throw new CompanyIdentityError('company_inactive_requires_deletion');
+    if(company){
+      const registered=await createManualEstablishment(trx,{...input,companyId:company.id,name:input.establishmentName?.trim()||input.legalName,typeCode:input.typeCode??'HEAD_OFFICE'});
+      return {...registered,companyId:company.id,establishmentName:input.establishmentName?.trim()||input.legalName};
+    }
+  }else ensureHeadOfficeCnpj(input.cnpj);
   const existingCompany = await trx
     .selectFrom('companies')
     .select(['id', 'is_active'])
@@ -135,8 +151,7 @@ export async function createManualCompanyRegistration(
         .updateTable('establishments')
         .set({
           name: establishmentName,
-          establishment_type_code:
-            'HEAD_OFFICE',
+          establishment_type_code:input.typeCode??'HEAD_OFFICE',
           is_head_office: true,
           uf: input.uf,
           municipality_name: preserve(
@@ -188,8 +203,7 @@ export async function createManualCompanyRegistration(
           company_id: company.id,
           cnpj: input.cnpj,
           name: establishmentName,
-          establishment_type_code:
-            'HEAD_OFFICE',
+          establishment_type_code:input.typeCode??'HEAD_OFFICE',
           is_head_office: true,
           uf: input.uf,
           municipality_name:

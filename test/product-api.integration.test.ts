@@ -1068,9 +1068,7 @@ test(
           await app.inject({
             method: 'POST',
             url:
-              '/api/v1/companies/' +
-              registryBody.company.id +
-              '/establishments/from-cnpj',
+              '/api/v1/companies/from-cnpj',
             headers: firstHeaders,
             payload: {
               cnpj: branchRegistryCnpj,
