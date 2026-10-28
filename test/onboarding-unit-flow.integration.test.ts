@@ -92,6 +92,11 @@ test('ONB-03.6: root-confirmed purge removes linked and legacy separate branches
   assert.equal((await admin.query('SELECT count(*) FROM establishments WHERE id=ANY($1::uuid[])',[[target.establishment.id,linked.establishment.id,legacyUnit]])).rows[0].count,'3','cascade is rolled back atomically');
   assert.equal((await admin.query("SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND action='COMPANY_PURGED'",[a.tenant])).rows[0].count,'0','no partial success audit survives');
   await admin.query('UPDATE tenants SET name=$1 WHERE id=$2',[accountName,a.tenant]);
+  // Same legal name is normal for branches; verified signup CNPJ/root must
+  // distinguish that case from an unrelated custom account label.
+  await admin.query('UPDATE companies SET legal_name=$1 WHERE id=$2',['Synthetic ONB036',legacy]);
+  await admin.query("UPDATE tenant_onboarding_profiles SET cnpj=$1,company_name='Synthetic ONB036' WHERE tenant_id=$2",[target.company.cnpj??cnpj(root+'0001'),a.tenant]);
+  await admin.query("UPDATE tenants SET name='Synthetic ONB036' WHERE id=$1",[a.tenant]);
   const deleted=await app.inject({method:'DELETE',url:path,headers:{...a.headers,'x-company-delete-intent':'permanent-root-v1'}});assert.equal(deleted.statusCode,204,deleted.body);
   assert.equal((await admin.query('SELECT count(*) FROM companies WHERE id=ANY($1::uuid[])',[[target.company.id,legacy]])).rows[0].count,'0');
   assert.equal((await admin.query('SELECT count(*) FROM establishments WHERE id=ANY($1::uuid[])',[[target.establishment.id,linked.establishment.id,legacyUnit]])).rows[0].count,'0');

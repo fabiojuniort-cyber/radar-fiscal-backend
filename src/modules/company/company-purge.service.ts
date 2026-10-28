@@ -20,7 +20,9 @@ export async function purgeCompany(trx: Transaction<DB>, companyId: string, incl
   if(!family.some(c=>c.id===companyId))return false;
   if(family.length>1&&!includeLegacyRoot)throw new CompanyRootDeleteConfirmationError();
   for(const company of family){
-    const result=await sql<{removed:boolean}>`SELECT public.app_purge_company(${company.id}::uuid) AS removed`.execute(trx);
+    const result=includeLegacyRoot
+      ?await sql<{removed:boolean}>`SELECT public.app_purge_company(${company.id}::uuid,${root}::text) AS removed`.execute(trx)
+      :await sql<{removed:boolean}>`SELECT public.app_purge_company(${company.id}::uuid) AS removed`.execute(trx);
     if(result.rows[0]?.removed!==true)throw new Error('company_root_purge_incomplete');
   }
   return true;
