@@ -52,6 +52,9 @@ const envSchema = z.object({
 
   // ANAT-ADMIN-01: server flag of the administrative anatomy-rules API. Off unless explicitly 'true'.
   ANAT_RULES_ADMIN_ENABLED: z.enum(['true', 'false']).default('false'),
+  // ANAT-CONFIG-01: server flag of the accessible anatomy configuration (save = validate + apply). Off unless 'true'.
+  // When on, it replaces the double-approval flow above: the legacy anatomy-rules routes are not registered.
+  ANAT_CONFIG_ENABLED: z.enum(['true', 'false']).default('false'),
 
   JWT_ACCESS_SECRET: z.string().min(32),
 
