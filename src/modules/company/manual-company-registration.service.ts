@@ -41,8 +41,8 @@ export async function createManualCompanyRegistration(
   tenantId: string,
   input: ManualCompanyRegistrationInput,
 ): Promise<ManualCompanyRegistrationResult> {
+  await sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId+':'+input.cnpj.slice(0,8)},0))`.execute(trx);
   if(input.resolveCompanyByRoot){
-    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId+':'+input.cnpj.slice(0,8)},0))`.execute(trx);
     const type=await trx.selectFrom('establishment_types').select('code').where('code','=',input.typeCode??'HEAD_OFFICE').where('is_active','=',true).executeTakeFirst();
     if(!type)throw new CompanyIdentityError('establishment_type_not_found');
     const matches=await trx.selectFrom('companies').select(['id','is_active']).where('tenant_id','=',tenantId).where(sql<boolean>`left(head_office_cnpj,8)=${input.cnpj.slice(0,8)}`).forUpdate().execute();
@@ -58,7 +58,7 @@ export async function createManualCompanyRegistration(
     .selectFrom('companies')
     .select(['id', 'is_active'])
     .where('tenant_id', '=', tenantId)
-    .where('head_office_cnpj', '=', input.cnpj)
+    .where(sql<boolean>`left(head_office_cnpj,8)=${input.cnpj.slice(0,8)}`)
     .forUpdate()
     .executeTakeFirst();
 
@@ -253,3 +253,4 @@ export async function createManualCompanyRegistration(
       establishment.state_registration_source,
   };
 }
+

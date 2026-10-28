@@ -1,4 +1,4 @@
-import type { Transaction } from 'kysely';
+import {sql,type Transaction} from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
 import type {
@@ -112,11 +112,12 @@ export async function createCompanyFromRegistry(
   establishmentId: string;
 }> {
   if(!accountRootRegistration)ensureHeadOfficeCnpj(record.cnpj, record.isHeadOffice);
+  await sql`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId+':'+record.cnpj.slice(0,8)},0))`.execute(trx);
   const existingCompany = await trx
     .selectFrom('companies')
     .select(['id', 'is_active'])
     .where('tenant_id', '=', tenantId)
-    .where('head_office_cnpj', '=', record.cnpj)
+    .where(sql<boolean>`left(head_office_cnpj,8)=${record.cnpj.slice(0,8)}`)
     .forUpdate()
     .executeTakeFirst();
 
@@ -302,3 +303,4 @@ export async function replaceManualEstablishmentCnaes(
     companyId,
   );
 }
+
