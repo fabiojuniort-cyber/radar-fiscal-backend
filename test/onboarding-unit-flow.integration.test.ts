@@ -76,6 +76,7 @@ test('ONB-03.6: root-confirmed purge removes linked and legacy separate branches
   const a=await owner(),b=await owner(),root=randomUUID().replace(/\D/g,'').padEnd(8,'6').slice(0,8);
   const create=async(account:typeof a,n:string,companyRoot=root)=>{const r=await app.inject({method:'POST',url:'/api/v1/companies/manual',headers:account.headers,payload:{cnpj:cnpj(companyRoot+n),legalName:'Synthetic ONB036',uf:'GO',typeCode:'OTHER',resolveCompanyByRoot:true,cnaes:[{code:'6201501',description:'ignored',isPrimary:true}]}});assert.equal(r.statusCode,201,r.body);return r.json();};
   const target=await create(a,'0001'),linked=await create(a,'0002'),remote=await create(b,'0001'),unrelated=await create(a,'0001',root==='12345678'?'87654321':'12345678');assert.equal(linked.company.id,target.company.id);
+  await admin.query("UPDATE companies SET legal_name='Different root preserved' WHERE id=$1",[unrelated.company.id]);
   // Reproduce a pre-unified registration: a branch CNPJ exists as a separate company.
   const legacy=(await admin.query("INSERT INTO companies(tenant_id,head_office_cnpj,legal_name) VALUES($1,$2,'Legacy separate branch') RETURNING id",[a.tenant,cnpj(root+'0003')])).rows[0].id;
   const legacyUnit=(await admin.query("INSERT INTO establishments(company_id,name,cnpj,establishment_type_code,uf,is_head_office) VALUES($1,'Legacy branch',$2,'OTHER','GO',true) RETURNING id",[legacy,cnpj(root+'0003')])).rows[0].id;

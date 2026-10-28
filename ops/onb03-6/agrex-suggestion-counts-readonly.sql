@@ -3,10 +3,12 @@
 WITH release AS (
  SELECT id,manifest FROM public.taxonomy_releases WHERE status='PUBLISHED'
  ORDER BY version_major DESC,version_minor DESC,version_patch DESC LIMIT 1
+), matching_units AS (
+ SELECT id FROM public.establishments WHERE cnpj='10515785000199' AND is_active
 ), unit_cnaes AS (
  SELECT DISTINCT ec.cnae_code FROM public.establishment_cnaes ec
  JOIN public.establishments e ON e.id=ec.establishment_id
- WHERE e.cnpj='10515785000199' AND e.is_active
+ WHERE e.id IN (SELECT id FROM matching_units) AND (SELECT count(*) FROM matching_units)=1
 ), links AS (
  SELECT DISTINCT l->>'segment' AS segment,l->>'kind' AS kind,l->>'target' AS target,l->>'cnae' AS cnae
  FROM release r CROSS JOIN LATERAL jsonb_array_elements(r.manifest->'f2Operational'->'links') l
@@ -26,6 +28,8 @@ SELECT s.segment,
  (SELECT count(DISTINCT target) FROM all_ncms n WHERE n.segment=s.segment) AS ncms
 FROM segments s
 UNION ALL
-SELECT 'TOTAL_UNICO',(SELECT count(*) FROM unit_cnaes),
+SELECT CASE WHEN (SELECT count(*) FROM matching_units)=1 THEN 'TOTAL_UNICO' ELSE 'NOT_PROVEN_UNIT_AMBIGUOUS' END,(SELECT count(*) FROM unit_cnaes),
  (SELECT count(DISTINCT target) FROM links WHERE kind='PRODUCT'),(SELECT count(DISTINCT target) FROM all_ncms)
+UNION ALL
+SELECT 'AUDIT_ACTIVE_UNIT_MATCHES',(SELECT count(*) FROM matching_units),NULL::bigint,NULL::bigint
 ORDER BY segment;
