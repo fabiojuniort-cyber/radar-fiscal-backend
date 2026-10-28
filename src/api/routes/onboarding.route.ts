@@ -9,9 +9,10 @@ import { emptyAssistant, mergeUnitCard, upgradeLegacyUnit, legacyActivityCards, 
 import { effectiveSelections, productNcmCodes, synchronizeUnit, strings, record, unique, legacyFieldNames, type UnitSelection } from '../../modules/onboarding/assistant.profile.js';
 
 const params = z.object({ companyId: z.string().uuid() });
+const query = z.object({establishmentId:z.string().uuid().optional()});
 const selection = z.object({
   expectedVersion: z.number().int().min(0), releaseId: z.string().uuid(),
-  cardId: z.string().regex(/^(company|establishments|summary|profile|cnae:[0-9]{7}|segment:[a-z0-9_.]+)$/),
+  cardId: z.string().regex(/^(company|establishments|summary|profile|dimension:[a-z_]+|cnae:[0-9]{7}|segment:[a-z0-9_.]+)$/),
   selectionMode: z.literal('EFFECTIVE').optional(),
   taxRegime: z.enum(['SIMPLES_NACIONAL','LUCRO_PRESUMIDO','LUCRO_REAL','IMUNE_ISENTA','OUTRO','NAO_INFORMADO']).optional(),
   legacyFields: z.object(Object.fromEntries(legacyFieldNames.map(key=>[key,z.array(z.string()).max(500).optional()]))).optional(),
@@ -31,7 +32,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
   const path = '/api/v1/companies/:companyId/onboarding';
   for (const method of ['GET', 'PUT'] as const) typed.route({ method, url: path,
     preHandler: app.authenticate,
-    schema: { params, ...(method === 'PUT' ? { body: selection } : {}) },
+    schema: { params, querystring:query, ...(method === 'PUT' ? { body: selection } : {}) },
     handler: async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: 'unauthorized' });
       const tenant = z.string().uuid().safeParse(request.headers['x-tenant-id']);
@@ -61,7 +62,10 @@ export async function onboardingRoutes(app: FastifyInstance) {
               FILTER(WHERE c.code IS NOT NULL),'[]'::jsonb) AS cnaes
             FROM establishments e LEFT JOIN establishment_cnaes ec ON ec.establishment_id=e.id
             LEFT JOIN cnaes c ON c.code=ec.cnae_code WHERE e.company_id=$1 AND e.is_active=true GROUP BY e.id ORDER BY e.is_head_office DESC,e.id`,[company.id]);
-          const cards = (await Promise.all(units.flatMap(unit => unit.cnaes.map(async cnae => {
+          const scopeId=query.parse(request.query).establishmentId;
+          if(scopeId&&!units.some(u=>u.id===scopeId))throw new AssistantError(404,'establishment_not_found');
+          const scopedUnits=scopeId?units.filter(u=>u.id===scopeId):units;
+          const cards = (await Promise.all(scopedUnits.flatMap(unit => unit.cnaes.map(async cnae => {
             const links = await publishedOperationalLinks(run,cnae.code);
             const activity=view.concepts.find(c=>c.dimensionCode==='sector'&&c.officialCodes.some(code=>code.replace(/\D/g,'')===cnae.code));
             const group=view.groups.find(g=>g.id===activity?.groupId);
@@ -89,7 +93,8 @@ export async function onboardingRoutes(app: FastifyInstance) {
               for(const c of old?.concepts??[])if(!known.has(c.code))historicalConcepts.set(c.code,{code:c.code,label:c.label,dimensionCode:c.dimensionCode});
             }
             return { version:profile?.version_no??0,release,state,cards:legacyActivityCards(cards),segmentCards:cards,
-              effectiveProfiles:effective.map(unit=>({...unit,historicalCodes:unique([...unit.conceptCodes,...unit.cnaeSegments.flatMap(c=>c.segmentCode?[c.segmentCode]:[])]).filter(code=>!known.has(code))})),
+              dimensions:view.dimensions.map(d=>({code:d.code,name:d.name})),
+              effectiveProfiles:effective.filter(u=>!scopeId||u.establishmentId===scopeId).map(unit=>({...unit,historicalCodes:unique([...unit.conceptCodes,...unit.cnaeSegments.flatMap(c=>c.segmentCode?[c.segmentCode]:[])]).filter(code=>!known.has(code))})),
               historicalConcepts:[...historicalConcepts.values()],
               concepts:included.map(c=>({code:c.code,label:c.label,dimensionCode:c.dimensionCode,ncmCodes:productNcmCodes(c)})),
               companyName:company.legal_name,companyCnpj:company.head_office_cnpj };
@@ -105,7 +110,14 @@ export async function onboardingRoutes(app: FastifyInstance) {
             let selected:{establishmentId:string;conceptCodes:string[];ncmCodes:string[]}[]=[];
             if(body.cardId==='profile'){
               if(!body.establishmentId||body.units)throw new AssistantError(400,'invalid_card_payload');
+              if(scopeId&&body.establishmentId!==scopeId)throw new AssistantError(400,'invalid_card_payload');
               selected=[{establishmentId:body.establishmentId,conceptCodes:body.conceptCodes,ncmCodes:body.ncmCodes}];
+            }else if(body.cardId.startsWith('dimension:')){
+              if(!scopeId||body.establishmentId!==scopeId||body.units)throw new AssistantError(400,'invalid_card_payload');
+              const prior=effective.find(u=>u.establishmentId===scopeId)!;
+              const dimension=body.cardId.slice(10);
+              if(!view.dimensions.some(d=>d.code===dimension)||body.conceptCodes.some(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)))throw new AssistantError(400,'invalid_taxonomy_selection');
+              selected=[{establishmentId:scopeId,conceptCodes:unique([...prior.conceptCodes.filter(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)),...body.conceptCodes]),ncmCodes:prior.ncmCodes}];
             }else if(body.cardId.startsWith('segment:')){
               const ids=unique(cards.filter(c=>'segment:'+c.segmentCode===body.cardId).map(c=>c.establishmentId));
               if(!ids.length||body.establishmentId||body.conceptCodes.length||body.ncmCodes.length||!body.units||body.units.length!==ids.length||new Set(body.units.map(u=>u.establishmentId)).size!==ids.length||body.units.some(u=>!ids.includes(u.establishmentId)))throw new AssistantError(400,'invalid_segment_units');
@@ -113,7 +125,7 @@ export async function onboardingRoutes(app: FastifyInstance) {
             }else{
               if(!['company','establishments','summary'].includes(body.cardId)||body.establishmentId||body.units||body.conceptCodes.length||body.ncmCodes.length||body.legacyFields||body.cnaeSegments||body.taxRegime)throw new AssistantError(400,'invalid_card_payload');
               if(body.cardId==='summary'&&body.status==='CONFIRMED'){
-                if(effective.some(u=>u.conceptCodes.some(code=>!known.has(code))||u.cnaeSegments.some(c=>c.segmentCode&&!known.has(c.segmentCode))))throw new AssistantError(409,'taxonomy_selection_review_required');
+                if(effective.filter(u=>!scopeId||u.establishmentId===scopeId).some(u=>u.conceptCodes.some(code=>!known.has(code))||u.cnaeSegments.some(c=>c.segmentCode&&!known.has(c.segmentCode))))throw new AssistantError(409,'taxonomy_selection_review_required');
                 if(!next.cards.company||!next.cards.establishments||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
                 next.completed=true;
               }

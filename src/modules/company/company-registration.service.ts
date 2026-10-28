@@ -105,6 +105,7 @@ export async function createCompanyFromRegistry(
   record: CnpjRegistryRecord,
   stateRegistration?: StateRegistrationLookup,
   businessLocationCode?: string | null,
+  typeCode = 'HEAD_OFFICE',
 ): Promise<{
   companyId: string;
   establishmentId: string;
@@ -146,8 +147,7 @@ export async function createCompanyFromRegistry(
           name:
             record.tradeName ??
             record.legalName,
-          establishment_type_code:
-            'HEAD_OFFICE',
+          establishment_type_code: typeCode,
           is_head_office: true,
           uf: record.uf,
           municipality_name:
