@@ -1,3 +1,4 @@
+import {onboardingCorrectionRoutes} from './onboarding-correction.route.js';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ type Profile = { id: string; version_no: number; tax_regime: string; segments: s
 type Override = { establishmentId: string; taxRegime: string; conceptCodes: string[]; ncmCodes: string[] };
 class AssistantError extends Error { constructor(public status: number, public code: string) { super(code); } }
 export async function onboardingRoutes(app: FastifyInstance) {
+  await onboardingCorrectionRoutes(app);
   const typed = app.withTypeProvider<ZodTypeProvider>();
   const path = '/api/v1/companies/:companyId/onboarding';
   for (const method of ['GET', 'PUT'] as const) typed.route({ method, url: path,
@@ -85,6 +87,9 @@ export async function onboardingRoutes(app: FastifyInstance) {
           const effective = effectiveSelections(profile,units);
           const included = view.concepts.filter(c=>c.membershipStatus==='INCLUDED');
           const known = new Set(included.map(c=>c.code));
+          const dimensionCodes=['tax','regime','operation','operation_purpose','document','obligation','actuacao','subject','theme'];
+          const dimensions=dimensionCodes.flatMap(code=>view.dimensions.filter(d=>d.code===code&&d.membershipStatus==='INCLUDED').map(d=>({code:d.code,name:d.name})));
+          const scopedState=scopeId?{...state,cards:state.units[scopeId]?.cards??{},completed:state.units[scopeId]?.cards.summary?.status==='CONFIRMED'}:state;
           if (method === 'GET') {
             const historicalConcepts = new Map<string,{code:string;label:string;dimensionCode:string}>();
             for(const id of unique(effective.flatMap(u=>u.releaseId?[u.releaseId]:[]))){
@@ -92,8 +97,8 @@ export async function onboardingRoutes(app: FastifyInstance) {
               const old=await loadReleaseView(run,id);
               for(const c of old?.concepts??[])if(!known.has(c.code))historicalConcepts.set(c.code,{code:c.code,label:c.label,dimensionCode:c.dimensionCode});
             }
-            return { version:profile?.version_no??0,release,state,cards:legacyActivityCards(cards),segmentCards:cards,
-              dimensions:view.dimensions.map(d=>({code:d.code,name:d.name})),
+            return { version:profile?.version_no??0,release,state:scopedState,cards:legacyActivityCards(cards),segmentCards:cards,
+              dimensions,
               effectiveProfiles:effective.filter(u=>!scopeId||u.establishmentId===scopeId).map(unit=>({...unit,historicalCodes:unique([...unit.conceptCodes,...unit.cnaeSegments.flatMap(c=>c.segmentCode?[c.segmentCode]:[])]).filter(code=>!known.has(code))})),
               historicalConcepts:[...historicalConcepts.values()],
               concepts:included.map(c=>({code:c.code,label:c.label,dimensionCode:c.dimensionCode,ncmCodes:productNcmCodes(c)})),
@@ -113,11 +118,11 @@ export async function onboardingRoutes(app: FastifyInstance) {
               if(scopeId&&body.establishmentId!==scopeId)throw new AssistantError(400,'invalid_card_payload');
               selected=[{establishmentId:body.establishmentId,conceptCodes:body.conceptCodes,ncmCodes:body.ncmCodes}];
             }else if(body.cardId.startsWith('dimension:')){
-              if(!scopeId||body.establishmentId!==scopeId||body.units)throw new AssistantError(400,'invalid_card_payload');
+              if(!scopeId||body.establishmentId!==scopeId||body.units||body.ncmCodes.length||body.legacyFields||body.cnaeSegments||body.taxRegime)throw new AssistantError(400,'invalid_card_payload');
               const prior=effective.find(u=>u.establishmentId===scopeId)!;
               const dimension=body.cardId.slice(10);
-              if(!view.dimensions.some(d=>d.code===dimension)||body.conceptCodes.some(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)))throw new AssistantError(400,'invalid_taxonomy_selection');
-              selected=[{establishmentId:scopeId,conceptCodes:unique([...prior.conceptCodes.filter(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)),...body.conceptCodes]),ncmCodes:prior.ncmCodes}];
+              if(!dimensions.some(d=>d.code===dimension)||body.conceptCodes.some(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)))throw new AssistantError(400,'invalid_taxonomy_selection');
+              selected=body.status==='SKIPPED'?[{establishmentId:scopeId,conceptCodes:prior.conceptCodes,ncmCodes:prior.ncmCodes}]:[{establishmentId:scopeId,conceptCodes:unique([...prior.conceptCodes.filter(c=>!included.some(v=>v.code===c&&v.dimensionCode===dimension)),...body.conceptCodes]),ncmCodes:prior.ncmCodes}];
             }else if(body.cardId.startsWith('segment:')){
               const ids=unique(cards.filter(c=>'segment:'+c.segmentCode===body.cardId).map(c=>c.establishmentId));
               if(!ids.length||body.establishmentId||body.conceptCodes.length||body.ncmCodes.length||!body.units||body.units.length!==ids.length||new Set(body.units.map(u=>u.establishmentId)).size!==ids.length||body.units.some(u=>!ids.includes(u.establishmentId)))throw new AssistantError(400,'invalid_segment_units');
@@ -126,10 +131,12 @@ export async function onboardingRoutes(app: FastifyInstance) {
               if(!['company','establishments','summary'].includes(body.cardId)||body.establishmentId||body.units||body.conceptCodes.length||body.ncmCodes.length||body.legacyFields||body.cnaeSegments||body.taxRegime)throw new AssistantError(400,'invalid_card_payload');
               if(body.cardId==='summary'&&body.status==='CONFIRMED'){
                 if(effective.filter(u=>!scopeId||u.establishmentId===scopeId).some(u=>u.conceptCodes.some(code=>!known.has(code))||u.cnaeSegments.some(c=>c.segmentCode&&!known.has(c.segmentCode))))throw new AssistantError(409,'taxonomy_selection_review_required');
-                if(!next.cards.company||!next.cards.establishments||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
-                next.completed=true;
+                const completion=scopeId?next.units[scopeId]?.cards??{}:next.cards;
+                if(!completion.company||!completion.establishments||(scopeId&&dimensions.some(d=>!completion['dimension:'+d.code]))||cards.some(c=>!next.units[c.establishmentId]?.cards.profile&&!next.units[c.establishmentId]?.cards['segment:'+c.segmentCode]&&!next.units[c.establishmentId]?.cards['cnae:'+c.cnaeCode]))throw new AssistantError(409,'onboarding_cards_pending');
+                next.completed=scopeId?units.every(u=>u.id===scopeId||next.units[u.id]?.cards.summary?.status==='CONFIRMED'):true;
               }
-              next.cards[body.cardId]={status:body.status,conceptCodes:[],ncmCodes:[]};
+              const progress={status:body.status,conceptCodes:[],ncmCodes:[]};
+              if(scopeId){const unit=next.units[scopeId]??{baseConceptCodes:[],baseNcmCodes:[],cards:{}};next.units[scopeId]={...unit,cards:{...unit.cards,[body.cardId]:progress}};}else next.cards[body.cardId]=progress;
             }
             for(const chosen of selected){
               const prior=effective.find(u=>u.establishmentId===chosen.establishmentId);
@@ -169,12 +176,13 @@ export async function onboardingRoutes(app: FastifyInstance) {
               for(const n of ncms)if(!prior.ncmCodes.includes(n))related.add(n);
               next.units[prior.establishmentId]=synchronizeUnit(previous,body.cardId,body.status,{conceptCodes:codes,ncmCodes:ncms},related);
             }
-            if(body.cardId!=='summary')next.completed=false;
+            if(body.cardId!=='summary'){next.completed=false;if(scopeId&&next.units[scopeId])delete next.units[scopeId]!.cards.summary;}
             const today=new Date().toISOString().slice(0,10);
             if(profile)await trx.updateTable('company_tax_profiles').set({is_current:false,valid_to:today}).where('id','=',profile.id).execute();
             await trx.insertInto('company_tax_profiles').values({company_id:company.id,version_no:(profile?.version_no??0)+1,tax_regime:newRegime,segments:newSegments,activities:JSON.stringify(newActivities),personalization:JSON.stringify({...newPersonalization,establishmentOverrides:overrides,onboarding:next}),valid_from:today,valid_to:null,is_current:true}).execute();
             return {version:(profile?.version_no??0)+1,release,state:next};
           }
+          if(scopeId)throw new AssistantError(400,'effective_selection_required');
           const currentCodes = new Set(view.concepts.filter(selectableAssistantConcept).map(c=>c.code));
           const chosenConcepts=[...body.conceptCodes,...(body.units??[]).flatMap(u=>u.conceptCodes)];
           const chosenNcms=[...new Set([...body.ncmCodes,...(body.units??[]).flatMap(u=>u.ncmCodes)])];

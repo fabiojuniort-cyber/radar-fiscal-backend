@@ -85,6 +85,8 @@ const cnaesSchema = z
   .optional();
 
 const manualCompanyBodySchema = z.object({
+  typeCode:z.string().trim().min(1).max(50).optional(),
+  resolveCompanyByRoot:z.boolean().optional(),
   cnpj: cnpjValueSchema,
   legalName: z.string().trim().min(2).max(200),
   establishmentName: nullableText(200),
@@ -259,7 +261,7 @@ export async function companyManualRoutes(
         });
       } catch (error) {
         if (error instanceof CompanyIdentityError) {
-          return reply.status(409).send({ error: error.code });
+          return reply.status(error.code==='establishment_type_not_found'?400:409).send({ error: error.code });
         }
         if (error instanceof ManualCnaeValidationError) {
           return reply.status(error.code === 'cnae_catalog_unavailable' ? 503 : 400)
