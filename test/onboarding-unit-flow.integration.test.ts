@@ -104,5 +104,5 @@ test('ONB-03.6: root-confirmed purge removes linked and legacy separate branches
   assert.equal((await admin.query('SELECT count(*) FROM company_tax_profiles WHERE company_id=$1',[legacy])).rows[0].count,'0');
   assert.equal((await admin.query('SELECT count(*) FROM companies WHERE id=ANY($1::uuid[])',[[remote.company.id,unrelated.company.id]])).rows[0].count,'2');
   assert.equal((await admin.query("SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND action='COMPANY_PURGED'",[a.tenant])).rows[0].count,'2');
- }finally{await app.close();for(const tenant of tenants)await admin.query('DELETE FROM tenants WHERE id=$1',[tenant]);for(const user of users)await admin.query('DELETE FROM app_users WHERE id=$1',[user]);await admin.end();}
+ }finally{await app.close();for(const tenant of tenants){await admin.query('DELETE FROM audit_log WHERE tenant_id=$1',[tenant]);await admin.query('DELETE FROM tenants WHERE id=$1',[tenant]);}for(const user of users)await admin.query('DELETE FROM app_users WHERE id=$1',[user]);await admin.end();}
 });
