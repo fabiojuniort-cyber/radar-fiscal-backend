@@ -201,7 +201,7 @@ jobs:
       fail-fast: false
       matrix:
         postgres: ['16', '18']
-        suite: ['admin-migrations', 'admin-schema', 'admin-api', 'admin-wiring']
+        suite: ['admin-migrations', 'admin-schema', 'admin-api', 'admin-wiring', 'config']
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}
