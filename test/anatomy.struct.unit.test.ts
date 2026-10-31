@@ -71,24 +71,86 @@ test('a numbered date or value inside prose is not an item, and legal status sta
   assert.ok(r2.parts.every((p) => p.legalStatus === 'unknown'), 'structure never sets validity');
 });
 
-test('review (a): an annex closes open groups and becomes a root sibling; groups after it nest inside the annex', () => {
-  const r = read(html('CAPÍTULO I', 'Art. 1º Texto.', 'ANEXO I', 'CAPÍTULO I', 'Art. 1º Texto do anexo.'));
-  const byId = new Map(r.parts.map((p) => [p.id, p]));
-  const at = (prefix: string, n = 0) => r.parts.filter((p) => r.canonicalText.slice(p.span.start).startsWith(prefix) && !['document', 'body'].includes(p.type))[n]!;
-  const annex = at('ANEXO I'); const firstChapter = at('CAPÍTULO I', 0); const annexChapter = at('CAPÍTULO I', 1);
-  assert.equal(annex.type, 'annex');
-  assert.equal(byId.get(annex.parentId!)!.type, 'document', 'annex is not a child of the chapter before it');
-  assert.equal(byId.get(firstChapter.parentId!)!.type, 'document');
-  assert.equal(annexChapter.parentId, annex.id, 'chapter after the annex belongs to the annex');
-  assert.ok(firstChapter.span.end <= annex.span.start, 'the first chapter closes before the annex');
-  assert.equal(byId.get(at('Art. 1º Texto do anexo.').parentId!)!.id, annexChapter.id);
+const at = (r: AnatomyResult, prefix: string, n = 0) => r.parts.filter((p) => r.canonicalText.slice(p.span.start).startsWith(prefix) && !['document', 'body', 'caput'].includes(p.type))[n]!;
+const parentOf = (r: AnatomyResult, id: string) => r.parts.find((p) => p.id === r.parts.find((x) => x.id === id)!.parentId)!;
+
+test('R1-A: a body-level group after an annex closes the annex and returns to the root', () => {
+  const r = read(html('LIVRO I', 'Art. 1º Corpo.', 'ANEXO I', 'Item do anexo.', 'LIVRO II', 'Art. 2º Corpo de novo.'));
+  const annex = at(r, 'ANEXO I'); const livro2 = at(r, 'LIVRO II'); const art2 = at(r, 'Art. 2º');
+  assert.equal(parentOf(r, annex.id).type, 'document');
+  assert.equal(parentOf(r, livro2.id).type, 'document', 'LIVRO II is not inside the annex');
+  assert.ok(annex.span.end <= livro2.span.start, 'the annex closes at LIVRO II');
+  assert.equal(art2.parentId, livro2.id);
 });
 
-test('review (b): "1." and "1.1." are siblings at item level (no sub-item nesting); numbers inside table cells are not items', () => {
-  const r = read(html('Art. 1º Lista:', '1. primeiro;', '1.1. subprimeiro;', '2. segundo.'));
-  const items = r.parts.filter((p) => p.type === 'item');
-  assert.equal(items.length, 3);
-  assert.ok(items.every((i) => i.parentId === items[0]!.parentId), 'declared limitation: 1.1. is not nested under 1.');
-  const t = readAnatomyInput({ source: 'DOU', representationId: 't', html: '<table><tr><th>Item</th><th>NCM</th></tr><tr><td>1.</td><td>8471.30.12</td></tr></table>' });
-  assert.ok(!t.parts.some((p) => p.type === 'item'), 'table cells keep the table structure');
+test('R1-A: groups of a lower level than the body top level stay inside the annex', () => {
+  const r = read(html('TÍTULO I', 'Art. 1º Corpo.', 'ANEXO I', 'CAPÍTULO I', 'Art. 1º Do anexo.', 'TÍTULO II', 'Art. 2º Corpo.'));
+  const annex = at(r, 'ANEXO I');
+  assert.equal(at(r, 'CAPÍTULO I').parentId, annex.id, 'chapter (below body top level TÍTULO) belongs to the annex');
+  assert.equal(parentOf(r, at(r, 'TÍTULO II').id).type, 'document', 'TÍTULO II returns to the body');
+});
+
+test('R1-A: a historical annex never passes its historical context to body provisions after it', () => {
+  const r = read(`<html><body><p>CAPÍTULO I</p><p>Art. 1º Corpo.</p><p class="RedaoAnt">ANEXO I</p><p class="RedaoAnt">Texto anterior.</p><p>CAPÍTULO II</p><p>Art. 2º Corpo atual.</p></body></html>`, 'CONFAZ');
+  const annex = at(r, 'ANEXO I');
+  assert.equal(annex.context, 'historical');
+  const art2 = at(r, 'Art. 2º');
+  assert.equal(art2.context, 'operative_candidate', 'not contaminated by the historical annex');
+  assert.ok(!art2.contextReasons.includes('historical_ancestor'));
+  assert.equal(parentOf(r, at(r, 'CAPÍTULO II').id).type, 'document');
+});
+
+test('R1-A: groups before, inside and with no body grouping (annex keeps them); a second annex closes the first', () => {
+  const r = read(html('Art. 1º Sem agrupamento.', 'ANEXO I', 'CAPÍTULO I', 'Art. 1º Anexo I.', 'ANEXO II', 'CAPÍTULO I', 'Art. 1º Anexo II.'));
+  const a1 = at(r, 'ANEXO I'); const a2 = at(r, 'ANEXO II');
+  assert.equal(parentOf(r, a2.id).type, 'document');
+  assert.equal(at(r, 'CAPÍTULO I', 0).parentId, a1.id);
+  assert.equal(at(r, 'CAPÍTULO I', 1).parentId, a2.id);
+});
+
+test('R1-B: 1. > 1.1. > 1.1.1. nest by depth; a shallower level closes the deeper ones', () => {
+  const r = read(html('Art. 1º Lista:', '1. um;', '1.1. um-um;', '1.1.1. um-um-um;', '1.2. um-dois;', '2. dois;', '2.1. dois-um.', 'Art. 2º Fim.'));
+  const id = (p: string) => at(r, p).id;
+  assert.equal(at(r, '1.1. ').parentId, id('1. um'));
+  assert.equal(at(r, '1.1.1. ').parentId, id('1.1. '));
+  assert.equal(at(r, '1.2. ').parentId, id('1. um'), '1.2. closes 1.1.1. and 1.1.');
+  assert.equal(at(r, '2. dois').parentId, at(r, '1. um').parentId, '2. is a sibling of 1.');
+  assert.equal(at(r, '2.1. ').parentId, id('2. dois'));
+  assert.equal(parentOf(r, at(r, 'Art. 2º').id).type, 'document');
+  assert.deepEqual(['1. um', '1.1. ', '1.1.1. '].map((p) => at(r, p).contextReasons[0]), ['item_marker', 'item_level_2', 'item_level_3']);
+});
+
+test('R1-B: items inside an alínea, and numbers that are not items (prose, dates, values, table cells)', () => {
+  const r = read(html('Art. 1º Exemplo:', 'a) alínea:', '1. item;', '1.1. subitem;', 'b) outra.'));
+  assert.equal(parentOf(r, at(r, '1. item').id).type, 'alinea');
+  assert.equal(at(r, '1.1. subitem').parentId, at(r, '1. item').id);
+  assert.equal(parentOf(r, at(r, 'b) outra').id).type, 'article', 'b) closes the items of a) and returns to the article');
+  const n = read(html('Art. 1º O valor é 1.000,00 reais.', '31.12.2026 é a data.', '2026 ano.'));
+  assert.ok(!n.parts.some((p) => p.type === 'item'), 'values/dates/years are not items');
+  const t = readAnatomyInput({ source: 'DOU', representationId: 't', html: '<table><tr><td>1.1.</td><td>x</td></tr></table>' });
+  assert.ok(!t.parts.some((p) => p.type === 'item'));
+});
+
+test('R1-C: exact fidelity — canonical text, UTF-16 spans, sourceMap continuity, source pointers and hashes (non-BMP, NFC, mixed annex)', () => {
+  const html1 = html('CAPÍTULO I', 'Art. 1º 𝔄𝔫𝔞𝔱𝔬𝔪𝔦𝔞 😀 ção.', 'ANEXO I', '1. item 𐐷;', '1.1. sub 🇧🇷.');
+  const r = read(html1);
+  assert.equal(r.canonicalText, 'CAPÍTULO I\nArt. 1º 𝔄𝔫𝔞𝔱𝔬𝔪𝔦𝔞 😀 ção.\nANEXO I\n1. item 𐐷;\n1.1. sub 🇧🇷.\n');
+  let at0 = 0;
+  for (const m of r.sourceMap) { assert.equal(m.span.start, at0); at0 = m.span.end; }
+  assert.equal(at0, r.canonicalText.length, 'sourceMap covers the text contiguously in UTF-16 units');
+  for (const p of r.parts.filter((x) => x.type !== 'document')) {
+    const t = r.canonicalText.slice(p.span.start, p.span.end);
+    assert.ok(!/^[\uDC00-\uDFFF]/u.test(t) && !/[\uD800-\uDBFF]$/u.test(t), `span of ${p.id} does not split a surrogate pair`);
+    assert.ok(p.sourcePointers.length >= 1 && p.sourcePointers.every((s) => !s.sourceSpan || html1.slice(s.sourceSpan.start, s.sourceSpan.end).length > 0));
+  }
+  const again = read(html1);
+  assert.equal(again.outputHash, r.outputHash, 'deterministic output hash');
+  assert.equal(again.identity.inputTextHash, sha256(r.canonicalText));
+});
+
+test('R1-C: decomposed (NFD) text is kept as supplied and flagged, never silently normalised', () => {
+  const nfd = 'Art. 1º Disposição.';
+  const raw = readAnatomyInput({ source: 'DOU', representationId: 'n', html: `<p>${nfd}</p>` });
+  assert.ok(raw.canonicalText.includes(nfd), 'NFD text preserved byte for byte');
+  assert.ok(raw.limitations.some((l) => /nfc/u.test(l.code)), 'flagged as non-NFC');
 });

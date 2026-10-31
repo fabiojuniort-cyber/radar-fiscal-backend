@@ -92,7 +92,10 @@ function describe(node: Node, rules: CompiledRules, matchText: (node: Node) => s
   if (/^[IVXLCDM]+\s*[-–—]/u.test(text)) return { type: 'inciso', context, reason: 'inciso_marker', rank: 5 };
   if (/^[a-z]\)\s/u.test(text)) return { type: 'alinea', context, reason: 'alinea_marker', rank: 6 };
   // Items numbered "1." / "1)" / "1.1." under an alínea or a device (ANAT-STRUCT-01).
-  if (/^\d{1,3}(?:\.\d{1,3})*[.)]\s+\S/u.test(text)) return { type: 'item', context, reason: 'item_marker', rank: 7 };
+  // R1-B: the depth (number of dot-separated levels) nests 1.1. under 1. and 1.1.1. under 1.1.; a shallower or equal
+  // level closes the deeper ones.
+  const item = /^(\d{1,3}(?:\.\d{1,3}){0,5})[.)]\s+\S/u.exec(text);
+  if (item) { const depth = item[1]!.split('.').length - 1; return { type: 'item', context, reason: depth ? `item_level_${depth + 1}` : 'item_marker', rank: 7 + depth / 100 }; }
   if (classes.some((name) => c.body.has(name))) return { type: 'body', context, reason: hist ? `${p}_historical_wording` : `${p}_text_class`, rank: 100 };
   return { type: 'unidentified', context: 'unknown', reason: 'unrecognized_block', rank: 100 };
 }
@@ -280,7 +283,17 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   let annexHistorical = false;
   const ownership: { start: number; end: number; part: AnatomyPart }[] = [];
   const addOwnership = (part: AnatomyPart): void => { if (part.span.end > part.span.start) ownership.push({ ...part.span, part }); };
+  // ANAT-STRUCT-01 R1-A: the highest grouping level used in the body (outside any annex). A grouping heading of that
+  // level or above, met while an annex is open, belongs to the body again: it closes the annex (and its historical
+  // context) and attaches at the root. Lower levels stay inside the annex. Without a body grouping, the annex keeps them.
+  let bodyTopGroupRank: number | null = null;
+  const insideAnnex = () => logical.some((entry) => entry.part.type === 'annex');
   const attach = (node: Node, desc: Descriptor): AnatomyPart => {
+    if (desc.type === 'group' && insideAnnex() && bodyTopGroupRank !== null && desc.rank <= bodyTopGroupRank) {
+      while (logical.length > 1) logical.pop()!.part.span.end = node.span.start;
+      annexHistorical = false;
+    }
+    if (desc.type === 'group' && !insideAnnex()) bodyTopGroupRank = Math.min(bodyTopGroupRank ?? desc.rank, desc.rank);
     if (desc.rank < 100) {
       while (logical.length > 1 && logical[logical.length - 1]!.rank >= desc.rank) logical.pop()!.part.span.end = node.span.start;
     }
