@@ -14,6 +14,7 @@ on:
       - feat/anat-unicode-01b-integration
       - feat/anat-ci-stack
       - feat/anat-admin-p3-design
+      - claude/anat-struct-01
       - feat/anat-admin-p3b1-persistence
       - feat/anat-admin-p3c-executor
       - feat/anat-admin-p3d-api
