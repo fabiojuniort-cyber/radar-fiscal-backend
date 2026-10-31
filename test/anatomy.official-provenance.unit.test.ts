@@ -8,8 +8,8 @@ import { SYNTHETIC_SAMPLES, type SampleInput } from '../src/modules/anatomy/conf
 const official = (over: Partial<SampleInput> = {}, prov: Record<string, string> = {}): SampleInput => ({
   id: 'ofc-confaz-teste', documentId: 'ofc-confaz-teste', version: 'v1', title: 'Forma de teste', source: 'CONFAZ', family: null,
   format: 'html', content: '<p>conteúdo de forma</p>', covers: ['forma'],
-  provenance: { kind: 'official', url: 'https://www.confaz.fazenda.gov.br/legislacao/x', consultedAt: '2026-10-30', version: 'texto compilado',
-    reason: 'Exercita notas de alteração do CONFAZ.', ...prov } as SampleInput['provenance'],
+  provenance: { kind: 'official', act: 'Convênio ICMS 142/2018', url: 'https://www.confaz.fazenda.gov.br/legislacao/x', consultedAt: '2026-10-30', version: 'texto compilado',
+    reason: 'Exercita notas de alteração do CONFAZ.', snapshotSha256: 'a'.repeat(64), ...prov } as SampleInput['provenance'],
   ...over,
 });
 const msgs = (s: SampleInput) => validateOfficialSamples([s], '2026-10-31').map((i) => i.message);
@@ -34,11 +34,27 @@ test('each missing or wrong provenance field is reported in Portuguese', () => {
 test('ids: official prefix, no reserved corpus ids, no ANAT-03 base acts, no duplicates', () => {
   assert.match(msgs(official({ id: 'confaz-x' })).join(), /"ofc-"/u);
   assert.match(msgs(official({ documentId: '04' })).join(), /reservado/u);
-  assert.match(msgs(official({ documentId: 'ofc-convenio-icms-52-91' })).join(), /ANAT-03/u);
+  assert.match(msgs(official({}, { act: 'Convênio ICMS 52/91' })).join(), /corpus reservado/u);
   assert.match(validateOfficialSamples([official(), official()], '2026-10-31').map((i) => i.message).join(), /repetido/u);
 });
 
 test('the gate fails closed and the shipped OFFICIAL_SAMPLES pass it', () => {
   assert.throws(() => assertOfficialSamples([official({}, { url: 'https://example.invalid/x' })]), /procedência incompleta/u);
   assert.deepEqual(validateOfficialSamples(OFFICIAL_SAMPLES), []);
+});
+
+test('R1-1: reserved acts are refused under any alias (inventory keys), and unreadable identities fail closed', () => {
+  for (const act of ['Convênio ICMS 52/91', 'Conv. ICMS 52/1991', 'CONVENIO ICMS Nº 52, DE 26 DE SETEMBRO DE 1991', 'convênio 100/97', 'Instrução Normativa RFB nº 2.342, de 2026', 'IN RFB 2342/2026'])
+    assert.match(msgs(official({ title: act }, { act })).join(' | '), /corpus reservado/u, act);
+  for (const act of ['Convênio sem número', 'Ato qualquer', '']) assert.match(msgs(official({}, { act })).join(), /ilegível/u, `"${act}"`);
+  assert.match(msgs(official({ title: 'Convênio ICMS 52/91 (cópia)' })).join(), /título indica outro ato/u, 'title naming a reserved act while act says otherwise');
+});
+
+test('R1-1: an official URL naming a corpus portal id is refused even when the act name differs', () => {
+  assert.match(msgs(official({ source: 'RFB' }, { act: 'IN RFB 9999/2026', url: 'https://normas.receita.fazenda.gov.br/sijut2consulta/link.action?idAto=153828' })).join(), /corpus reservado/u);
+});
+
+test('R1-4: the snapshot SHA-256 is mandatory and well-formed', () => {
+  assert.match(msgs(official({}, { snapshotSha256: '' })).join(), /SHA-256 do snapshot/u);
+  assert.match(msgs(official({}, { snapshotSha256: 'XYZ' })).join(), /SHA-256 do snapshot/u);
 });

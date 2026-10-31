@@ -1,26 +1,100 @@
 {
   "purpose": "ANAT-OFFICIAL-01: selection of public official acts for the configuration screen. Identification only: no text below was copied from any act. Each entry is consulted on the official host, one by one, by ops/anatomy/fetch-official.ts; a URL is confirmed only after the page is opened.",
-  "excluded": ["Convênio ICMS 52/91 and 100/97 (base of ANAT-03, tribusca-control#116)", "corpus, gold and reserve entries (BLOCK_CORPUS_INPUTS_AND_GOLD)"],
+  "excluded": [
+    "Convênio ICMS 52/91 and 100/97 (base of ANAT-03, tribusca-control#116)",
+    "corpus, gold and reserve entries (BLOCK_CORPUS_INPUTS_AND_GOLD)"
+  ],
   "acts": [
-    { "id": "ofc-confaz-conv-142-18", "source": "CONFAZ", "act": "Convênio ICMS 142/2018", "host": "www.confaz.fazenda.gov.br", "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18", "urlStatus": "to-confirm",
-      "reason": "Long CONFAZ convênio with many later wordings and change notes: exercises editorial notes, previous wordings (RedaoAnt) and validity notes kept apart from structure." },
-    { "id": "ofc-confaz-ajuste-sinief-07-05", "source": "CONFAZ", "act": "Ajuste SINIEF 07/2005", "host": "www.confaz.fazenda.gov.br", "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ_007_05", "urlStatus": "to-confirm",
-      "reason": "Ajuste SINIEF family (different from convênio): clause numbering with letters (cláusula quarta-A), revoked clauses and effect dates in notes." },
-    { "id": "ofc-confaz-conv-190-17", "source": "CONFAZ", "act": "Convênio ICMS 190/2017", "host": "www.confaz.fazenda.gov.br", "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2017/CV190_17", "urlStatus": "to-confirm",
-      "reason": "Short convênio that references other acts and deadlines: exercises citations and temporal clauses without NCM tables." },
-    { "id": "ofc-confaz-ato-cotepe", "source": "CONFAZ", "act": "One recent Ato COTEPE/ICMS with an attached table", "host": "www.confaz.fazenda.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "Technical act with table annex: exercises table geometry and code columns in CONFAZ HTML." },
-    { "id": "ofc-rfb-in-2121-22", "source": "RFB", "act": "Instrução Normativa RFB 2.121/2022", "host": "normas.receita.fazenda.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "Very long consolidated IN (PIS/Cofins) with books, chapters, sections and annexes: exercises deep structure and multiple amendments." },
-    { "id": "ofc-rfb-ade-coana", "source": "RFB", "act": "One recent Ato Declaratório Executivo COANA", "host": "normas.receita.fazenda.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "Short executive declaratory act: minimal structure, signature and publication data; checks the engine does not invent parts." },
-    { "id": "ofc-dou-lc-214-25", "source": "DOU", "act": "Lei Complementar 214/2025 as published in the DOU", "host": "www.in.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "Long law in DOU HTML (identifica/ementa/assina) with titles, chapters and articles: exercises DOU layout at scale." },
-    { "id": "ofc-dou-portaria-retificacao", "source": "DOU", "act": "One DOU rectification (Onde se lê / Leia-se) of a tax act", "host": "www.in.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "Rectification: original and corrected text must stay separate and not be read as new provisions." },
-    { "id": "ofc-doesp-ricms-trecho", "source": "DOE-SP", "act": "RICMS-SP (Decreto 45.490/2000), one article with later wordings", "host": "legislacao.fazenda.sp.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "São Paulo compiled regulation: plain text style, 'Artigo'/'Parágrafo único', notes of new wording with dates." },
-    { "id": "ofc-doesp-portaria-cat", "source": "DOE-SP", "act": "One recent Portaria CAT / SRE", "host": "legislacao.fazenda.sp.gov.br", "url": null, "urlStatus": "to-locate",
-      "reason": "SP executive act with considerandos and revocation article: exercises nature (revocation) apart from validity." }
-  ]
+    {
+      "id": "ofc-confaz-conv-142-18",
+      "source": "CONFAZ",
+      "act": "Convênio ICMS 142/2018",
+      "host": "www.confaz.fazenda.gov.br",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18",
+      "urlStatus": "candidate",
+      "reason": "Long CONFAZ convênio with many later wordings and change notes: exercises editorial notes, previous wordings (RedaoAnt) and validity notes kept apart from structure."
+    },
+    {
+      "id": "ofc-confaz-ajuste-sinief-07-05",
+      "source": "CONFAZ",
+      "act": "Ajuste SINIEF 07/2005",
+      "host": "www.confaz.fazenda.gov.br",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ_007_05",
+      "urlStatus": "candidate",
+      "reason": "Ajuste SINIEF family (different from convênio): clause numbering with letters (cláusula quarta-A), revoked clauses and effect dates in notes."
+    },
+    {
+      "id": "ofc-confaz-conv-190-17",
+      "source": "CONFAZ",
+      "act": "Convênio ICMS 190/2017",
+      "host": "www.confaz.fazenda.gov.br",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2017/CV190_17",
+      "urlStatus": "candidate",
+      "reason": "Short convênio that references other acts and deadlines: exercises citations and temporal clauses without NCM tables."
+    },
+    {
+      "id": "ofc-confaz-ato-cotepe",
+      "source": "CONFAZ",
+      "act": "One recent Ato COTEPE/ICMS with an attached table",
+      "host": "www.confaz.fazenda.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "Technical act with table annex: exercises table geometry and code columns in CONFAZ HTML."
+    },
+    {
+      "id": "ofc-rfb-in-2121-22",
+      "source": "RFB",
+      "act": "Instrução Normativa RFB 2.121/2022",
+      "host": "normas.receita.fazenda.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "Very long consolidated IN (PIS/Cofins) with books, chapters, sections and annexes: exercises deep structure and multiple amendments."
+    },
+    {
+      "id": "ofc-rfb-ade-coana",
+      "source": "RFB",
+      "act": "One recent Ato Declaratório Executivo COANA",
+      "host": "normas.receita.fazenda.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "Short executive declaratory act: minimal structure, signature and publication data; checks the engine does not invent parts."
+    },
+    {
+      "id": "ofc-dou-lc-214-25",
+      "source": "DOU",
+      "act": "Lei Complementar 214/2025 as published in the DOU",
+      "host": "www.in.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "Long law in DOU HTML (identifica/ementa/assina) with titles, chapters and articles: exercises DOU layout at scale."
+    },
+    {
+      "id": "ofc-dou-portaria-retificacao",
+      "source": "DOU",
+      "act": "One DOU rectification (Onde se lê / Leia-se) of a tax act",
+      "host": "www.in.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "Rectification: original and corrected text must stay separate and not be read as new provisions."
+    },
+    {
+      "id": "ofc-doesp-ricms-trecho",
+      "source": "DOE-SP",
+      "act": "RICMS-SP (Decreto 45.490/2000), one article with later wordings",
+      "host": "legislacao.fazenda.sp.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "São Paulo compiled regulation: plain text style, 'Artigo'/'Parágrafo único', notes of new wording with dates."
+    },
+    {
+      "id": "ofc-doesp-portaria-cat",
+      "source": "DOE-SP",
+      "act": "One recent Portaria CAT / SRE",
+      "host": "legislacao.fazenda.sp.gov.br",
+      "url": null,
+      "urlStatus": "to-locate",
+      "reason": "SP executive act with considerandos and revocation article: exercises nature (revocation) apart from validity."
+    }
+  ],
+  "urlStatusLegend": "candidate = URL proposta, ainda não aberta e conferida; verified = página aberta e identidade do ato conferida na própria fonte (só estas podem ser promovidas a OFFICIAL_SAMPLES); to-locate = URL ainda não encontrada."
 }

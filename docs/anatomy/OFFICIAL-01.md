@@ -62,3 +62,15 @@ Resultado de 31/10:
 - o inventário lista o **Convênio ICMS 52/91 (entrada 01)** e o **100/97 (entrada 02)**, ambos na partição *development*, e a **IN RFB 2.342/2026 (entrada 11)**.
 
 Esses atos ficam fora da amostra oficial até decisão do COORD. A prioridade do Product Owner pelo 52/91 é atendida por alternativas oficiais de mesma fonte e tipo, como outros convênios ICMS com anexos de NCM.
+
+## 5. Correções da revisão R1 (#116 c.6543169799)
+
+| Achado R1 | Correção | Arquivos | Teste de regressão |
+|---|---|---|---|
+| ALTO 1: sobreposição fora do gate | O gate exige a identidade do ato (`provenance.act`), calcula a chave espécie+número+ano (`act-key.ts`) e recusa as chaves do corpus. Também recusa título que indique outro ato e URL com um `sourceId` do corpus. Identidade ilegível é recusada (fail-closed). As chaves e ids saem só do inventário (`reserved-act-keys.ts`, gerado por `ops/anatomy/reserved-act-keys.ts`; o teste falha se houver deriva). | `official-provenance.ts`, `act-key.ts`, `reserved-act-keys.ts`, `sample-inputs.ts` | `official-provenance` (aliases: "Conv. ICMS 52/1991", "Nº 52, DE 26 DE SETEMBRO DE 1991", IN 2.342; idAto do corpus); `official-overlap` (deriva) |
+| ALTO 2: `redirect: 'follow'` | Redirecionamento manual, com protocolo e host validados **antes** de cada requisição seguinte; https obrigatório; no máximo 5 saltos. | `fetch-official-core.ts`, `fetch-official.ts` | `official-fetch`: o host externo nunca é requisitado; downgrade para http; laço de redirecionamentos; redirecionamento relativo aceito |
+| ALTO 3: snapshot de erro | Só uma resposta 2xx com HTML ou PDF vira snapshot. O resto vai para `failures.json`, sem corpo. | `fetch-official-core.ts`, `fetch-official.ts` | `official-fetch`: 404, 500, JSON, texto e tipo ausente |
+| MÉDIO 4: vínculo com o snapshot | `provenance.snapshotSha256` é obrigatório. A promoção exige metadados com a mesma URL e o mesmo hash, bytes do arquivo íntegros e conteúdo como recorte exato. | `official-binding.ts` | `official-fetch`: recorte alterado, hash diferente, arquivo adulterado; as amostras publicadas passam |
+| MÉDIO 5: URL candidata × confirmada | `urlStatus`: `candidate` / `verified` / `to-locate`. O coletor grava `verified=false` para candidata, e a promoção exige `verified`. | `official-manifest.json`, `fetch-official-core.ts`, `official-binding.ts` | `official-fetch`: candidata não promovível |
+
+Execução real em 31/10: todas as URLs deram `FAIL network: getaddrinfo ENOTFOUND` e foram para `failures.json`. **Nenhum snapshot foi gravado.**

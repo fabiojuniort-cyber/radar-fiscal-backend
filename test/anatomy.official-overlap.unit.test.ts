@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { actKey } from '../src/modules/anatomy/config/act-key.js';
+import { render, TARGET } from '../ops/anatomy/reserved-act-keys.js';
 
 /**
  * ANAT-OFFICIAL-01: no act of the official selection may be an entry of the reserved corpus (BLOCK_CORPUS_INPUTS_AND_GOLD).
@@ -11,14 +13,7 @@ const inventory = (JSON.parse(readFileSync(new URL('./fixtures/anatomy/corpus-ma
 const selection = (JSON.parse(readFileSync(new URL('../ops/anatomy/official-manifest.json', import.meta.url), 'utf8')) as
   { acts: { id: string; source: string; act: string; url: string | null }[] }).acts;
 
-/** "Convênio ICMS 52/91" and "Conv. ICMS 52/1991" → "icms 52/91"; numbers keep their dots stripped. */
-const key = (raw: string) => {
-  const s = raw.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-  const m = /(convenio|conv\.|ajuste sinief|protocolo|instrucao normativa|in|ade|portaria|decreto|resolucao|lei complementar|lei)[^0-9]*([0-9.]+)\s*\/\s*(\d{2,4})/u.exec(s);
-  if (!m) return null;
-  const kind = ({ convenio: 'conv', 'conv.': 'conv', 'instrucao normativa': 'in' } as Record<string, string>)[m[1]!] ?? m[1]!;
-  return `${kind} ${m[2]!.replace(/\./gu, '')}/${m[3]!.slice(-2)}`;
-};
+const key = actKey;
 
 test('the official selection does not reuse any corpus entry (inventory comparison only)', () => {
   const corpusKeys = new Map(inventory.map((e) => [key(e.label), e]).filter(([k]) => k) as [string, (typeof inventory)[number]][]);
@@ -33,4 +28,8 @@ test('the comparison key recognises the known corpus conflicts (52/91, 100/97)',
   const corpus = new Set(inventory.map((e) => key(e.label)));
   assert.ok(corpus.has('conv 52/91') && corpus.has('conv 100/97'), 'inventory still lists 52/91 and 100/97');
   assert.equal(key('Instrução Normativa RFB 2.342/2026'), 'in 2342/26');
+});
+
+test('R1-1: the gate reserved keys are exactly those derived from the inventory (no drift)', () => {
+  assert.equal(readFileSync(TARGET, 'utf8'), render());
 });
