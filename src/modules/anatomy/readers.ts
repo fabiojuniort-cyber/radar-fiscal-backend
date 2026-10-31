@@ -21,6 +21,7 @@ type Node = { tag: string; attrs: Record<string, string>; path: string; start: n
 const GROUP_RANK: Record<string, [string, number]> = {
   LIVRO: ['book', 2.1], TITULO: ['title', 2.2], CAPITULO: ['chapter', 2.3], SECAO: ['section', 2.4], SUBSECAO: ['subsection', 2.5],
 };
+const SOLE_PARAGRAPH = /^par[áa]grafo\s+[úu]nico(?![\p{L}\p{N}_])/iu;
 const CONSIDERANDO = /^considerando(?![\p{L}\p{N}_])/iu;
 const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase()]!;
 const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
@@ -87,7 +88,8 @@ function describe(node: Node, rules: CompiledRules, matchText: (node: Node) => s
   if (g) { const [level, rank] = groupLevel(g[1]!); return { type: 'group', context, reason: `group_${level}`, rank }; }
   if (rules.clause.test(text)) return { type: 'clause', context, reason: 'clause_marker', rank: 3 };
   if (rules.article.test(text)) return { type: 'article', context, reason: 'article_marker', rank: 3 };
-  if (rules.paragraph.test(text)) return { type: 'paragraph', context, reason: 'paragraph_marker', rank: 4 };
+  // ANAT-STRUCT-02: "Parágrafo único" keeps the paragraph type with its own reason (single paragraph of the device).
+  if (rules.paragraph.test(text)) return { type: 'paragraph', context, reason: SOLE_PARAGRAPH.test(text) ? 'paragraph_sole' : 'paragraph_marker', rank: 4 };
   // Inciso and alínea numbering is built-in grammar, not a profile label.
   if (/^[IVXLCDM]+\s*[-–—]/u.test(text)) return { type: 'inciso', context, reason: 'inciso_marker', rank: 5 };
   if (/^[a-z]\)\s/u.test(text)) return { type: 'alinea', context, reason: 'alinea_marker', rank: 6 };
@@ -179,9 +181,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   const limitation = (code: string, message: string, span: { start: number; end: number } | null = null): void => {
     result.limitations.push({ code, message, partId: null, span }); result.status = 'partial';
   };
+  // Sequential ids exclude derived caput parts (ANAT-STRUCT-02), so adding a caput never renumbers other parts.
+  let partSeq = 0;
   const newPart = (type: AnatomyPart['type'], start: number, end: number, parentId: string | null,
     context: AnatomyPart['context'], reason: string, origin: Pointer, label = ''): AnatomyPart => {
-    const part: AnatomyPart = { id: `part-${result.parts.length}`, parentId,
+    const part: AnatomyPart = { id: `part-${partSeq++}`, parentId,
       order: childOrders.get(parentId) ?? 0, type, label,
       span: { start, end }, sourcePointers: [origin], recognition: type === 'unidentified' ? 'unidentified' : 'explicit',
       ruleId: `reader/v1/${reason}`, confidence: type === 'unidentified' ? 0 : 1,
@@ -296,6 +300,14 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       context, desc.reason, pointer(node.path, node.start, node.end), textOf(node).trim().slice(0, 256));
     part.contextReasons = reasons;
     if (desc.rank < 100) logical.push({ part, rank: desc.rank });
+    // ANAT-STRUCT-02: the opening block of an article or clause is its caput, a structural child over exactly that
+    // block. Ownership (entities, selections) stays with the article/clause, so their partIds do not change.
+    if ((desc.type === 'article' || desc.type === 'clause') && node.span.end > node.span.start) {
+      const caput: AnatomyPart = { ...part, id: `${part.id}-caput`, parentId: part.id, order: childOrders.get(part.id) ?? 0, type: 'caput',
+        span: { ...node.span }, sourcePointers: [pointer(node.path, node.start, node.end)], ruleId: 'reader/v1/caput_block',
+        contextReasons: [...reasons.filter((r) => r !== desc.reason), 'caput_block'], table: null };
+      childOrders.set(part.id, caput.order + 1); result.parts.push(caput);
+    }
     // The marker owns only its own text, not the whole future logical container.
     if (node.span.end > node.span.start) ownership.push({ ...node.span, part });
     return part;

@@ -303,7 +303,7 @@ test('#249 R2 / B: document text is never normalised; matchers equal the pre-int
   const nfd = analyzeAnatomy(base('<p>Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.</p>'));
   assert.equal(nfd.canonicalText, 'Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.\n');
   assert.notEqual(nfd.canonicalText, nfd.canonicalText.normalize('NFC'));
-  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'clause:operative_candidate:0-54']);
+  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'clause:operative_candidate:0-54', 'caput:operative_candidate:0-54']); // ANAT-STRUCT-02: + caput of the clause
   assert.equal(nfd.status, 'partial');
   assert.ok(nfd.limitations.some((l) => l.code === 'nfc_shadow_matching'));
   assert.equal(nfd.eligibility.filter((e) => e.eligible).length, 0);
