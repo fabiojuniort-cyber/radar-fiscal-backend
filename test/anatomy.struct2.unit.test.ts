@@ -54,3 +54,15 @@ test('fidelity: canonical text, coverage and spans unchanged by caput; validated
   const reader = readAnatomyInput({ source: 'DOU', representationId: 'x', html });
   assert.equal(r.canonicalText, reader.canonicalText);
 });
+
+test('with STRUCT-01 R1: caput coexists with nested items and with the annex return; ids not renumbered', () => {
+  const r = run('<p>LIVRO I</p><p>Art. 1º Lista:</p><p>1. um;</p><p>1.1. sub;</p><p>ANEXO I</p><p>Texto.</p><p>LIVRO II</p><p>Art. 2º Fim.</p>');
+  const byText = (pre: string) => r.parts.find((p) => p.type !== 'caput' && p.type !== 'document' && r.canonicalText.slice(p.span.start).startsWith(pre))!;
+  const art1 = byText('Art. 1º');
+  assert.ok(r.parts.some((p) => p.id === `${art1.id}-caput` && p.parentId === art1.id));
+  assert.equal(byText('1. um').parentId, art1.id, 'items hang from the article, not from its caput');
+  assert.equal(byText('1.1. sub').parentId, byText('1. um').id);
+  assert.equal(r.parts.find((p) => p.id === byText('LIVRO II').parentId)!.type, 'document');
+  const seq = r.parts.filter((p) => p.type !== 'caput').map((p) => p.id);
+  assert.deepEqual(seq, seq.map((_, i) => `part-${i}`));
+});

@@ -40,7 +40,7 @@ Legenda de situação:
 | C14 | Documentos extensos e anexos separados | limites do leitor; manifesto de anexos, com anexo ausente → parcial | `anatomy.readers` | CI | PARCIAL; sem teste oficial extenso (BLOQ) |
 | C15 | Rastreabilidade trecho → origem | `sourcePointers`, `sourceMap`, hashes de apresentação | `anatomy.readers` | CI | MAIN |
 | C16 | Não inferir vigência por estilo ou nota | `legalStatus` sempre `unknown`; classes não definem status | `profile-engine`, `struct` | CI | MAIN |
-| D1–D8 | Relações temporais (altera, revoga parcialmente, nova redação, prorroga, retifica, datas distintas, condição) | só contexto `historical` e `quoted_text`; não há modelo de relação entre atos | — | — | LACUNA (desenho necessário) |
+| D1–D8 | Relações temporais (desenho R2 no #282) (altera, revoga parcialmente, nova redação, prorroga, retifica, datas distintas, condição) | só contexto `historical` e `quoted_text`; não há modelo de relação entre atos | — | — | LACUNA (desenho necessário) |
 | E1 | Tela `/admin/anatomia`: prévia, correção pontual, regra, histórico, restauração, nova análise | web `anatomy-config.tsx`; backend `config/*` e rota | vitest e e2e real (4 viewports) | `docs/evidence/anat-config-01` | PROD-OFF |
 | E2 | Hierarquia navegável na tela | lista de trechos por tipo; sem árvore de navegação | vitest | capturas | PARCIAL |
 | E3 | Origem de cada trecho e original × interpretação | resultado do motor e correção exibidos à parte | e2e | vídeo | PROD-OFF |

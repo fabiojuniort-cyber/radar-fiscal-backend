@@ -23,11 +23,17 @@ Regras e limites:
 - **Vigência:** nenhum tipo novo altera `legalStatus`. Estrutura nunca define vigência.
 - **Fidelidade:** a cobertura continua completa (`accountedLength = canonicalText.length`), sem perda ou reordenação de texto.
 
-## Limitações declaradas (pontos da revisão, #116 c.6542971547)
+## Correções da revisão R1 (#116 c.6543169799)
 
-- **Anexo e agrupamentos:** um `ANEXO` fecha os agrupamentos abertos e fica como irmão na raiz. Capítulos e seções depois dele pertencem ao anexo. Coberto por teste.
-- **`1.` e `1.1.`** ficam no mesmo nível de item. Não há aninhamento de subitem nesta versão; os números são preservados no texto.
-- **Números em células de tabela** não viram item: a tabela mantém a estrutura `table/row/cell`. Coberto por teste.
+- **R1-A, anexo × agrupamentos:**
+  - o leitor guarda o nível de agrupamento mais alto usado no corpo, fora de anexos;
+  - um agrupamento desse nível ou superior, encontrado com um anexo aberto, **fecha o anexo** e volta para a raiz, e o contexto histórico do anexo deixa de valer;
+  - níveis inferiores continuam dentro do anexo;
+  - sem agrupamento no corpo, o anexo mantém os seus;
+  - um novo anexo fecha o anterior.
+- **R1-B, itens:** a profundidade (`1.`, `1.1.`, `1.1.1.`, até 6 níveis) define o aninhamento, com motivos `item_marker`, `item_level_2`, `item_level_3` e assim por diante. Um nível menor ou igual fecha os mais profundos. Valores (`1.000,00`), datas (`31.12.2026`), anos e células de tabela não viram item.
+- **R1-C, fidelidade:** testes de texto canônico exato com caracteres fora do BMP e emoji, continuidade do `sourceMap` em UTF-16, spans que não partem pares substitutos, ponteiros de origem, hash determinístico e NFD preservado e sinalizado.
+- **Delta:** nenhum documento sintético congelado mudou com as correções R1. A identidade do motor foi regenerada.
 
 ## Efeito em artefatos congelados
 
