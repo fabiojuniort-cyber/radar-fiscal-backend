@@ -35,6 +35,7 @@ DeviceRef  { version: VersionRef, path: string[] /* ['art. 5', '§ 2º', 'inciso
 
 - **Origem:** sempre resolvida. É o próprio documento analisado (`documentHash` + `partId` + `span`).
 - **Destino:** o texto citado literal fica sempre preservado (`citedText`). `ActRef`, `VersionRef` e `DeviceRef` só são preenchidos quando a resolução alcança esse nível; nada é completado por suposição.
+- **R2.2, identidade exata obrigatória para `resolution: 'resolved'`:** o alvo resolvido **precisa** ter `VersionRef.documentHash` (versão exata analisada no acervo), `DeviceRef.path` e `DeviceRef.partId`, e a parte precisa existir naquela versão. Sem esses três campos, a validação rebaixa a relação para `ambiguous` ou `unresolved`, nunca a aceita como `resolved`. A resolução contra "o ato em geral" sem versão é sempre `unresolved`.
 
 ## 4. Relação
 
@@ -55,14 +56,30 @@ Relation {
 
 ```
 TemporalEvent {
+  id: string,                  // R2.1: identidade própria, determinística:
+                               // sha256(origin.documentHash | origin.partId | originSpan | kind | appliesTo-canônico)
+  provenance: {                // R2.1: procedência versionada obrigatória
+    documentHash, partId, span,                     // trecho que estabelece o evento
+    engineHash, ruleSetHash, extractedAt            // versão exata do motor e das regras que o extraíram
+  },
   kind: 'publication' | 'in_force' | 'effects' | 'deadline' | 'ratification' | 'incorporation',
   appliesTo: DeviceRef | 'whole_act',
   value?: date, rule?: 'on_publication' | 'first_day_next_month' | 'days_after:<n>' | …,
   extraction, evidenceBasis, originSpan,
   condition?: { text, status: 'open' | 'met' | 'unproven' },   // ex.: ratificação, incorporação estadual
-  supersedes?: TemporalEvent['id']                             // cadeia: prorrogação sobre prorrogação
+  supersedes?: TemporalEvent['id'],                            // cadeia: prorrogação sobre prorrogação
+  dependsOn?: TemporalEvent['id'][]                             // ex.: efeitos dependem da ratificação
 }
 ```
+
+### 5.1 Validade das cadeias (R2.4)
+
+O contrato de validação recusa, sem gravar nada:
+- **ciclos** em `supersedes` ou `dependsOn`, verificados por busca em profundidade sobre o grafo de eventos;
+- `supersedes` entre eventos de `kind` diferentes, ou com `appliesTo` incompatível (a prorrogação de um prazo do art. 5º não substitui o vigor do art. 6º);
+- `supersedes` apontando para um evento de origem **posterior** ao do evento que substitui, comparando a data de publicação da versão de origem;
+- mais de um sucessor para o mesmo evento vindo da mesma versão de origem: é ambiguidade, e o evento fica `resolution: 'ambiguous'`, sem escolha automática;
+- referência a um id inexistente.
 
 - Publicação, vigor e efeitos são **eventos distintos**, mesmo quando caem na mesma data.
 - Um prazo derivado (`rule`) guarda a regra e o span. A data calculada é marcada `derived`.
@@ -81,6 +98,27 @@ TemporalEvent {
 | D6 retificação | `rectifies` (Onde se lê / Leia-se); o original e o corrigido continuam `quoted_text` | republicação × retificação ficam distintas |
 | D7 datas distintas | três `TemporalEvent` separados | `derived` quando há cálculo |
 | D8 condição não comprovada | `conditions_on` + `condition.status = 'unproven'` | nunca promovida a vigência |
+
+## 6.1 Situação jurídica independente (R2.5)
+
+```
+LegalState {                         // camada própria; nunca escrita por extração
+  subject: DeviceRef,                // dispositivo de uma versão exata
+  asOf: date,
+  value: 'unknown' | 'current' | 'repealed' | 'replaced' | 'future' | 'suspended',
+  basis: { relationIds: string[], eventIds: string[] },   // asserções que sustentam a conclusão
+  decidedBy: 'rule' | 'reviewer',
+  review?: { reviewer, at, note }    // obrigatório quando value ≠ 'unknown'
+}
+```
+
+- **Valor padrão:** `unknown`. Relações e eventos **nunca** alteram `LegalState` por si sós. `parts[].legalStatus` do contrato v1 continua `unknown`.
+- **Transição:** sai de `unknown` só por uma etapa de decisão separada, com aceite próprio, que exige:
+  - `basis` não vazia;
+  - todas as relações citadas com `evidenceBasis: 'normative'` e `resolution: 'resolved'`;
+  - todos os eventos sem condição aberta;
+  - revisão registrada.
+- **Prova insuficiente:** se qualquer requisito faltar, o valor permanece `unknown`, com a lista do que falta. Ausência de evidência nunca vira `repealed` nem `current`.
 
 ## 7. Persistência (quando houver código)
 
