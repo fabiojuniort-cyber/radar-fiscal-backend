@@ -51,4 +51,14 @@ Documentação: https://code.claude.com/docs/en/cloud-environments#network-acces
 4. Testes do motor, prévia, correções e consumidor; evidências visuais da tela em ZIP.
 5. Entregar para revisão independente, sem autoaprovação.
 
-Mantidos: BLOCK_CORPUS_INPUTS_AND_GOLD e RESTRICT. O corpus, o gold e a reserva não são lidos, nem para checar sobreposição. Essa checagem fica com o revisor independente.
+Mantidos: BLOCK_CORPUS_INPUTS_AND_GOLD e RESTRICT. O corpus, o gold e a reserva não são lidos.
+
+## 4. Sobreposição com o corpus (direcionamento de 30/10)
+
+`test/anatomy.official-overlap.unit.test.ts` compara a seleção com o **inventário** `corpus-manifest.json`. Usa só os campos id, fonte, rótulo e sourceId, nunca entradas, gold ou reserva. A chave de comparação é a espécie do ato com número e ano.
+
+Resultado de 31/10:
+- nenhuma sobreposição na seleção atual;
+- o inventário lista o **Convênio ICMS 52/91 (entrada 01)** e o **100/97 (entrada 02)**, ambos na partição *development*, e a **IN RFB 2.342/2026 (entrada 11)**.
+
+Esses atos ficam fora da amostra oficial até decisão do COORD. A prioridade do Product Owner pelo 52/91 é atendida por alternativas oficiais de mesma fonte e tipo, como outros convênios ICMS com anexos de NCM.
