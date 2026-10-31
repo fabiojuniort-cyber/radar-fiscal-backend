@@ -17,6 +17,13 @@ export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, 
 type Pointer = AnatomyPart['sourcePointers'][number];
 type Node = { tag: string; attrs: Record<string, string>; path: string; start: number; end: number;
   children: Node[]; text: string | null; span: { start: number; end: number }; blocked: boolean };
+/** ANAT-STRUCT-01: grouping levels nest inside an annex (rank 2) and above articles/clauses (rank 3). */
+const GROUP_RANK: Record<string, [string, number]> = {
+  LIVRO: ['book', 2.1], TITULO: ['title', 2.2], CAPITULO: ['chapter', 2.3], SECAO: ['section', 2.4], SUBSECAO: ['subsection', 2.5],
+};
+const CONSIDERANDO = /^considerando(?![\p{L}\p{N}_])/iu;
+const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase()]!;
+const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
 type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
@@ -66,15 +73,26 @@ function describe(node: Node, rules: CompiledRules, matchText: (node: Node) => s
   if (rules.rectificationOriginal.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: `${p}_rectification_original`, rank: 100 };
   if (rules.rectificationCorrected.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: `${p}_rectification_corrected`, rank: 100 };
   if (rules.quoteBlockOpen.test(text)) return { type: 'quoted_text', context: hist ? 'historical' : 'prohibited', reason: 'quoted_block', rank: 100 };
-  if (rules.preamble.test(text)) return { type: 'preamble', context: hist ? 'historical' : 'prohibited', reason: 'preamble_marker', rank: 100 };
+  if (rules.preamble.test(text)) {
+    // ANAT-STRUCT-01: a preamble block that is a considerando (the whole word, any case) is typed as such; the
+    // preamble matcher itself is unchanged, so context and every non-considerando preamble stay as before.
+    const consideration = CONSIDERANDO.test(text);
+    return { type: consideration ? 'consideration' : 'preamble', context: hist ? 'historical' : 'prohibited', reason: consideration ? 'consideration_marker' : 'preamble_marker', rank: 100 };
+  }
   // Only block-initial markers are recognized. A reference to an annex in prose is not a heading.
   if (rules.annex.test(text)) return { type: 'annex', context, reason: 'annex_heading', rank: 2 };
+  // Grouping headings (Livro > Título > Capítulo > Seção > Subseção) are built-in grammar: an upper-case or
+  // capitalised heading word, then a roman/arabic number or "Único/Única", alone at the start of the block.
+  const g = GROUP.exec(text);
+  if (g) { const [level, rank] = groupLevel(g[1]!); return { type: 'group', context, reason: `group_${level}`, rank }; }
   if (rules.clause.test(text)) return { type: 'clause', context, reason: 'clause_marker', rank: 3 };
   if (rules.article.test(text)) return { type: 'article', context, reason: 'article_marker', rank: 3 };
   if (rules.paragraph.test(text)) return { type: 'paragraph', context, reason: 'paragraph_marker', rank: 4 };
   // Inciso and alínea numbering is built-in grammar, not a profile label.
   if (/^[IVXLCDM]+\s*[-–—]/u.test(text)) return { type: 'inciso', context, reason: 'inciso_marker', rank: 5 };
   if (/^[a-z]\)\s/u.test(text)) return { type: 'alinea', context, reason: 'alinea_marker', rank: 6 };
+  // Items numbered "1." / "1)" / "1.1." under an alínea or a device (ANAT-STRUCT-01).
+  if (/^\d{1,3}(?:\.\d{1,3})*[.)]\s+\S/u.test(text)) return { type: 'item', context, reason: 'item_marker', rank: 7 };
   if (classes.some((name) => c.body.has(name))) return { type: 'body', context, reason: hist ? `${p}_historical_wording` : `${p}_text_class`, rank: 100 };
   return { type: 'unidentified', context: 'unknown', reason: 'unrecognized_block', rank: 100 };
 }
