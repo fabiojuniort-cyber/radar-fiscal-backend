@@ -23,6 +23,12 @@ Regras e limites:
 - **Vigência:** nenhum tipo novo altera `legalStatus`. Estrutura nunca define vigência.
 - **Fidelidade:** a cobertura continua completa (`accountedLength = canonicalText.length`), sem perda ou reordenação de texto.
 
+## Limitações declaradas (pontos da revisão, #116 c.6542971547)
+
+- **Anexo e agrupamentos:** um `ANEXO` fecha os agrupamentos abertos e fica como irmão na raiz. Capítulos e seções depois dele pertencem ao anexo. Coberto por teste.
+- **`1.` e `1.1.`** ficam no mesmo nível de item. Não há aninhamento de subitem nesta versão; os números são preservados no texto.
+- **Números em células de tabela** não viram item: a tabela mantém a estrutura `table/row/cell`. Coberto por teste.
+
 ## Efeito em artefatos congelados
 
 - `test/fixtures/anatomy/synthetic-equivalence.json`: regenerado. O único delta é o bloco CONSIDERANDO do documento sintético `preamble-variants`, que passa de `preamble` a `consideration` com o mesmo contexto. Conferido parte a parte antes de regravar.

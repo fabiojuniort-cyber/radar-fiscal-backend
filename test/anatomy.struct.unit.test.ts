@@ -70,3 +70,25 @@ test('a numbered date or value inside prose is not an item, and legal status sta
   const r2 = read(html('CAPÍTULO I', 'CONSIDERANDO x;', 'Art. 1º a:', 'a) b:', '1. c.'));
   assert.ok(r2.parts.every((p) => p.legalStatus === 'unknown'), 'structure never sets validity');
 });
+
+test('review (a): an annex closes open groups and becomes a root sibling; groups after it nest inside the annex', () => {
+  const r = read(html('CAPÍTULO I', 'Art. 1º Texto.', 'ANEXO I', 'CAPÍTULO I', 'Art. 1º Texto do anexo.'));
+  const byId = new Map(r.parts.map((p) => [p.id, p]));
+  const at = (prefix: string, n = 0) => r.parts.filter((p) => r.canonicalText.slice(p.span.start).startsWith(prefix) && !['document', 'body'].includes(p.type))[n]!;
+  const annex = at('ANEXO I'); const firstChapter = at('CAPÍTULO I', 0); const annexChapter = at('CAPÍTULO I', 1);
+  assert.equal(annex.type, 'annex');
+  assert.equal(byId.get(annex.parentId!)!.type, 'document', 'annex is not a child of the chapter before it');
+  assert.equal(byId.get(firstChapter.parentId!)!.type, 'document');
+  assert.equal(annexChapter.parentId, annex.id, 'chapter after the annex belongs to the annex');
+  assert.ok(firstChapter.span.end <= annex.span.start, 'the first chapter closes before the annex');
+  assert.equal(byId.get(at('Art. 1º Texto do anexo.').parentId!)!.id, annexChapter.id);
+});
+
+test('review (b): "1." and "1.1." are siblings at item level (no sub-item nesting); numbers inside table cells are not items', () => {
+  const r = read(html('Art. 1º Lista:', '1. primeiro;', '1.1. subprimeiro;', '2. segundo.'));
+  const items = r.parts.filter((p) => p.type === 'item');
+  assert.equal(items.length, 3);
+  assert.ok(items.every((i) => i.parentId === items[0]!.parentId), 'declared limitation: 1.1. is not nested under 1.');
+  const t = readAnatomyInput({ source: 'DOU', representationId: 't', html: '<table><tr><th>Item</th><th>NCM</th></tr><tr><td>1.</td><td>8471.30.12</td></tr></table>' });
+  assert.ok(!t.parts.some((p) => p.type === 'item'), 'table cells keep the table structure');
+});
