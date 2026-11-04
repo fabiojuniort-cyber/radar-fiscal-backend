@@ -186,6 +186,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   };
   // Sequential ids exclude derived caput parts (ANAT-STRUCT-02), so adding a caput never renumbers other parts.
   let partSeq = 0;
+  // ANAT-D02 (decided by Fábio: fix now): unmarked continuation blocks right after the caput block belong to the caput,
+  // until the article/clause receives any other child (§, inciso, table, note...); R2-08: any
+  // new child created through newPart (tables included) closes it, so the rule does not depend on the attach path. Keyed by the article/clause id.
+  const openCaput = new Map<string, AnatomyPart>();
   const newPart = (type: AnatomyPart['type'], start: number, end: number, parentId: string | null,
     context: AnatomyPart['context'], reason: string, origin: Pointer, label = ''): AnatomyPart => {
     const part: AnatomyPart = { id: `part-${partSeq++}`, parentId,
@@ -193,6 +197,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       span: { start, end }, sourcePointers: [origin], recognition: type === 'unidentified' ? 'unidentified' : 'explicit',
       ruleId: `reader/v1/${reason}`, confidence: type === 'unidentified' ? 0 : 1,
       coverage: type === 'unidentified' ? 'unidentified' : 'complete', context, contextReasons: [reason], legalStatus: 'unknown', table: null };
+    if (parentId !== null) openCaput.delete(parentId);
     childOrders.set(parentId, part.order + 1); result.parts.push(part); return part;
   };
   const fallback = (code: string, message: string): AnatomyReaderResult => {
@@ -291,9 +296,6 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // level or above, met while an annex is open, belongs to the body again: it closes the annex (and its historical
   // context) and attaches at the root. Lower levels stay inside the annex. Without a body grouping, the annex keeps them.
   let bodyTopGroupRank: number | null = null;
-  // ANAT-D02 (decided by Fábio: fix now): unmarked continuation blocks right after the caput block belong to the caput,
-  // until the article/clause receives any other child (§, inciso, table, note...). Keyed by the article/clause id.
-  const openCaput = new Map<string, AnatomyPart>();
   const insideAnnex = () => logical.some((entry) => entry.part.type === 'annex');
   const attach = (node: Node, desc: Descriptor): AnatomyPart => {
     if (desc.type === 'group' && insideAnnex() && bodyTopGroupRank !== null && desc.rank <= bodyTopGroupRank) {
@@ -315,7 +317,6 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const caputOpen = openCaput.get(parent.id);
     const continuesCaput = caputOpen !== undefined && desc.rank >= 100 && (desc.type === 'unidentified' || desc.type === 'body')
       && desc.context !== 'prohibited' && node.span.end > node.span.start;
-    if (!continuesCaput) openCaput.delete(parent.id);
     if (continuesCaput) {
       caputOpen.span.end = node.span.end;
       caputOpen.sourcePointers.push(pointer(node.path, node.start, node.end));
