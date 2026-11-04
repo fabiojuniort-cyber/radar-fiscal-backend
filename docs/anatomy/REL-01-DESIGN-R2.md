@@ -29,12 +29,19 @@ ActRef {                       // ato de origem ou de destino
   species: string, number: string, year: number,
   source: { portal: 'CONFAZ'|'DOU'|'DOE-SP'|'RFB'|…, url?: string }
 }
-VersionRef { act: ActRef, documentId?: string, documentHash?: sha256, consultedAt?: date }   // versão exata
+VersionRef { act: ActRef, documentId?: string, documentHash?: sha256, consultedAt?: date,   // versão exata
+             publishedOn: PublicationDate }                        // R2-07: data de publicação, com procedência
+PublicationDate =                                                  // R2-07: nunca preenchida por suposição
+  | { status: 'known', value: date,
+      source: 'explicit_in_text' | 'publication_header' | 'official_metadata',
+      provenance: { documentHash: sha256, partId?: string, span?: Span, field?: string } }
+  | { status: 'unknown', reason: 'not_in_representation' | 'conflicting_sources' | 'not_yet_extracted' }
 DeviceRef  { version: VersionRef, path: string[] /* ['art. 5', '§ 2º', 'inciso III'] */, partId?: string }
 ```
 
 - **Origem:** sempre resolvida. É o próprio documento analisado (`documentHash` + `partId` + `span`).
 - **Destino:** o texto citado literal fica sempre preservado (`citedText`). `ActRef`, `VersionRef` e `DeviceRef` só são preenchidos quando a resolução alcança esse nível; nada é completado por suposição.
+- **R2-07, data de publicação ≠ data de consulta:** `consultedAt` registra quando o acervo obteve a representação e **nunca** é usado como data de publicação. `publishedOn` só é `known` quando há procedência rastreável: (a) `explicit_in_text`, data literal num trecho do próprio ato (`partId` + `span`); (b) `publication_header`, cabeçalho de publicação do diário (parte `publication_header` do STRUCT, com span); (c) `official_metadata`, campo de metadados da fonte oficial gravado com o snapshot (`field`, sob o mesmo `documentHash`). Fontes divergentes resultam em `unknown` com motivo `conflicting_sources`, sem escolha automática.
 - **R2.2, identidade exata obrigatória para `resolution: 'resolved'`:** o alvo resolvido **precisa** ter `VersionRef.documentHash` (versão exata analisada no acervo), `DeviceRef.path` e `DeviceRef.partId`, e a parte precisa existir naquela versão. Sem esses três campos, a validação rebaixa a relação para `ambiguous` ou `unresolved`, nunca a aceita como `resolved`. A resolução contra "o ato em geral" sem versão é sempre `unresolved`.
 
 ## 4. Relação
@@ -68,7 +75,12 @@ TemporalEvent {
   extraction, evidenceBasis, originSpan,
   condition?: { text, status: 'open' | 'met' | 'unproven' },   // ex.: ratificação, incorporação estadual
   supersedes?: TemporalEvent['id'],                            // cadeia: prorrogação sobre prorrogação
-  dependsOn?: TemporalEvent['id'][]                             // ex.: efeitos dependem da ratificação
+  dependsOn?: TemporalEvent['id'][],                            // ex.: efeitos dependem da ratificação
+  resolution: 'resolved' | 'ambiguous' | 'unresolved',          // R2-07: estado do próprio evento na cadeia
+  ambiguity?: {                                                 // obrigatório quando resolution = 'ambiguous'
+    reason: 'multiple_successors' | 'unknown_publication_order' | 'same_publication_date',
+    candidates: TemporalEvent['id'][]                           // todos os eventos em disputa, sem escolha
+  }
 }
 ```
 
@@ -77,14 +89,36 @@ TemporalEvent {
 O contrato de validação recusa, sem gravar nada:
 - **ciclos** em `supersedes` ou `dependsOn`, verificados por busca em profundidade sobre o grafo de eventos;
 - `supersedes` entre eventos de `kind` diferentes, ou com `appliesTo` incompatível (a prorrogação de um prazo do art. 5º não substitui o vigor do art. 6º);
-- `supersedes` apontando para um evento de origem **posterior** ao do evento que substitui, comparando a data de publicação da versão de origem;
-- mais de um sucessor para o mesmo evento vindo da mesma versão de origem: é ambiguidade, e o evento fica `resolution: 'ambiguous'`, sem escolha automática;
+- `supersedes` em que **as duas** datas de publicação (`VersionRef.publishedOn`) das versões de origem são `known` e o substituto é **anterior** ao substituído;
+- `resolution: 'ambiguous'` sem `ambiguity`, ou `ambiguity` com menos de dois `candidates`; `resolution: 'resolved'` com `ambiguity` preenchido;
 - referência a um id inexistente.
+
+Não recusa, mas **marca** (R2-07), também sem gravar inferência:
+- **data de publicação desconhecida:** se a data de qualquer um dos dois lados de um `supersedes` for `unknown`, a ordem não é verificada nem presumida. O elo fica registrado e o evento substituto recebe `resolution: 'ambiguous'`, com `ambiguity.reason: 'unknown_publication_order'` e `candidates` = [substituto, substituído]. `consultedAt` não serve como substituta;
+- **mesma data de publicação** em versões de origem diferentes: a ordem não é decidível pela data. O substituto fica `ambiguous` com `same_publication_date`;
+- **mais de um sucessor** para o mesmo evento: cada sucessor fica `resolution: 'ambiguous'`, com `ambiguity.reason: 'multiple_successors'` e `candidates` = todos os sucessores. O evento substituído não muda, e nenhum sucessor é escolhido;
+- um evento `ambiguous` **não sustenta vigência**, como uma condição `open`/`unproven`.
 
 - Publicação, vigor e efeitos são **eventos distintos**, mesmo quando caem na mesma data.
 - Um prazo derivado (`rule`) guarda a regra e o span. A data calculada é marcada `derived`.
 - **Cadeia temporal:** cada prorrogação aponta, por `supersedes`, para o evento que prorroga. A cadeia é exibida inteira, nunca colapsada no último valor.
 - Uma condição não comprovada (`unproven`, `open`) **impede** que o evento sustente vigência.
+
+### 5.2 Exemplos documentais (R2-07), sintéticos
+
+**E1, data de publicação desconhecida.** O Convênio Exemplo A/2099 prorroga o prazo da cláusula segunda do Convênio Exemplo B/2098. A representação de A não tem cabeçalho de publicação nem data no texto (`publishedOn: { status: 'unknown', reason: 'not_in_representation' }`). B tem data no cabeçalho (`known`, `publication_header`, span do cabeçalho).
+- O evento `deadline` de A tem `supersedes` igual ao `deadline` de B. Como um dos lados é `unknown`, a validação não verifica a ordem.
+- O evento de A fica `resolution: 'ambiguous'`, com `ambiguity: { reason: 'unknown_publication_order', candidates: [A.deadline, B.deadline] }`.
+- O `consultedAt` de A (ex.: 2026-11-04) **não** é usado. A cadeia aparece inteira, com o aviso de ordem não comprovada, e A não sustenta vigência até ter `publishedOn` conhecido.
+
+**E2, dois sucessores.** As Portarias Exemplo C/2099 e D/2099, com datas `known` diferentes, alteram ambas o vigor do art. 3º da Portaria Exemplo E/2098.
+- Os dois eventos `in_force` (de C e de D) têm `supersedes` igual a E.in_force.
+- Cada um fica `ambiguous`, com `ambiguity: { reason: 'multiple_successors', candidates: [C.in_force, D.in_force] }`.
+- E.in_force continua como estava. Mesmo sabendo qual é posterior, o sistema não escolhe: a decisão é jurídica e cabe à revisão humana (REL-01 não aplica "lei posterior revoga anterior").
+
+**E3, ordem comprovada.** F/2099 (`known`, 2099-03-01, `explicit_in_text`) prorroga G/2098 (`known`, 2098-05-10, `official_metadata`).
+- A ordem é verificada (2099-03-01 > 2098-05-10) e F.deadline fica `resolution: 'resolved'`.
+- Se as datas estivessem invertidas, a validação recusaria o elo.
 
 ## 6. Casos D1–D8
 
