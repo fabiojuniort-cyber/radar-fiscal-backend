@@ -74,20 +74,38 @@ test('a numbered date or value inside prose is not an item, and legal status sta
 const at = (r: AnatomyResult, prefix: string, n = 0) => r.parts.filter((p) => r.canonicalText.slice(p.span.start).startsWith(prefix) && !['document', 'body', 'caput'].includes(p.type))[n]!;
 const parentOf = (r: AnatomyResult, id: string) => r.parts.find((p) => p.id === r.parts.find((x) => x.id === id)!.parentId)!;
 
-test('R1-A: a body-level group after an annex closes the annex and returns to the root', () => {
-  const r = read(html('LIVRO I', 'Art. 1º Corpo.', 'ANEXO I', 'Item do anexo.', 'LIVRO II', 'Art. 2º Corpo de novo.'));
-  const annex = at(r, 'ANEXO I'); const livro2 = at(r, 'LIVRO II'); const art2 = at(r, 'Art. 2º');
-  assert.equal(parentOf(r, annex.id).type, 'document');
-  assert.equal(parentOf(r, livro2.id).type, 'document', 'LIVRO II is not inside the annex');
-  assert.ok(annex.span.end <= livro2.span.start, 'the annex closes at LIVRO II');
-  assert.equal(art2.parentId, livro2.id);
+test('R2-01: a heading at the body top level inside a flat annex is NOT moved out on level alone; the ambiguity is recorded', () => {
+  const r = read(html('CAPÍTULO I', 'Art. 1º Corpo.', 'ANEXO I', 'CAPÍTULO I', 'Art. 1º Dentro do anexo.'));
+  const annex = at(r, 'ANEXO I'); const cap2 = at(r, 'CAPÍTULO I', 1); const art = at(r, 'Art. 1º Dentro');
+  assert.equal(cap2.parentId, annex.id, 'second chapter stays inside the annex');
+  assert.equal(art.parentId, cap2.id);
+  assert.equal(annex.span.end, r.canonicalText.length, 'annex span runs to the end');
+  const amb = r.limitations.filter((l) => l.code === 'annex_return_ambiguous');
+  assert.equal(amb.length, 1);
+  assert.equal(r.canonicalText.slice(amb[0]!.span!.start, amb[0]!.span!.end).trim(), 'CAPÍTULO I');
+  assert.equal(r.coverage.accountedLength, r.canonicalText.length, 'no text lost');
 });
 
-test('R1-A: groups of a lower level than the body top level stay inside the annex', () => {
-  const r = read(html('TÍTULO I', 'Art. 1º Corpo.', 'ANEXO I', 'CAPÍTULO I', 'Art. 1º Do anexo.', 'TÍTULO II', 'Art. 2º Corpo.'));
-  const annex = at(r, 'ANEXO I');
-  assert.equal(at(r, 'CAPÍTULO I').parentId, annex.id, 'chapter (below body top level TÍTULO) belongs to the annex');
-  assert.equal(parentOf(r, at(r, 'TÍTULO II').id).type, 'document', 'TÍTULO II returns to the body');
+test('R2-01: same flat case with LIVRO/TÍTULO levels also stays inside the annex (formerly closed by level)', () => {
+  const r = read(html('LIVRO I', 'Art. 1º Corpo.', 'ANEXO I', 'Item do anexo.', 'LIVRO II', 'Art. 2º Texto.'));
+  assert.equal(at(r, 'LIVRO II').parentId, at(r, 'ANEXO I').id);
+  assert.ok(r.limitations.some((l) => l.code === 'annex_return_ambiguous'));
+});
+
+test('R2-01: structural evidence (annex in its own container, heading outside it) returns to the body', () => {
+  const r = read('<html><body><p>LIVRO I</p><p>Art. 1º Corpo.</p><div><p>ANEXO I</p><p>CAPÍTULO I</p><p>Item do anexo.</p></div><p>LIVRO II</p><p>Art. 2º Corpo de novo.</p></body></html>');
+  const annex = at(r, 'ANEXO I'); const livro2 = at(r, 'LIVRO II');
+  assert.equal(parentOf(r, livro2.id).type, 'document', 'LIVRO II is outside the annex container');
+  assert.ok(annex.span.end <= livro2.span.start);
+  assert.equal(at(r, 'CAPÍTULO I').parentId, annex.id, 'lower level inside the container stays in the annex');
+  assert.equal(at(r, 'Art. 2º').parentId, livro2.id);
+  assert.ok(!r.limitations.some((l) => l.code === 'annex_return_ambiguous'));
+});
+
+test('R2-01: inside the annex container, a body-level heading stays in the annex even when levels match', () => {
+  const r = read('<html><body><p>TÍTULO I</p><p>Art. 1º Corpo.</p><div><p>ANEXO I</p><p>TÍTULO I</p><p>Art. 1º Do anexo.</p></div></body></html>');
+  assert.equal(at(r, 'TÍTULO I', 1).parentId, at(r, 'ANEXO I').id);
+  assert.ok(r.limitations.some((l) => l.code === 'annex_return_ambiguous'));
 });
 
 test('R1-A: a historical annex never passes its historical context to body provisions after it', () => {
@@ -153,4 +171,40 @@ test('R1-C: decomposed (NFD) text is kept as supplied and flagged, never silentl
   const raw = readAnatomyInput({ source: 'DOU', representationId: 'n', html: `<p>${nfd}</p>` });
   assert.ok(raw.canonicalText.includes(nfd), 'NFD text preserved byte for byte');
   assert.ok(raw.limitations.some((l) => /nfc/u.test(l.code)), 'flagged as non-NFC');
+});
+
+test('R2-02: a sub-item never takes a parent with an incompatible number; missing parent is recorded', () => {
+  const r = read(html('Art. 1º Lista:', '1. Primeiro.', '2.1. Subitem do item 2 ausente.'));
+  const art = at(r, 'Art. 1º'); const i1 = at(r, '1. Primeiro'); const i21 = at(r, '2.1.');
+  assert.notEqual(i21.parentId, i1.id, '2.1 is not a child of 1');
+  assert.equal(i21.parentId, art.id, 'attached to the enclosing device');
+  assert.ok(i21.contextReasons.includes('item_parent_missing'));
+  const lim = r.limitations.find((l) => l.code === 'item_parent_missing')!;
+  assert.equal(r.canonicalText.slice(lim.span!.start, lim.span!.end).trim(), '2.1. Subitem do item 2 ausente.');
+  assert.equal(r.canonicalText.slice(i21.span.start, i21.span.end).trim(), '2.1. Subitem do item 2 ausente.', 'text and span preserved');
+  assert.ok(i1.span.end <= i21.span.start);
+});
+
+test('R2-02: valid sequences 1 / 1.1 / 1.1.1 and sibling changes nest by exact prefix, with no limitation', () => {
+  const r = read(html('Art. 1º Lista:', '1. Um.', '1.1. Um-um.', '1.1.1. Um-um-um.', '1.2. Um-dois.', '2. Dois.', '2.1. Dois-um.'));
+  const id = (p: string) => at(r, p).id;
+  assert.equal(at(r, '1.1. Um-um').parentId, id('1. Um'));
+  assert.equal(at(r, '1.1.1.').parentId, id('1.1. Um-um'));
+  assert.equal(at(r, '1.2.').parentId, id('1. Um'));
+  assert.equal(at(r, '2.1.').parentId, id('2. Dois'));
+  assert.equal(at(r, '2. Dois').parentId, id('Art. 1º'));
+  assert.ok(!r.limitations.some((l) => l.code === 'item_parent_missing'));
+});
+
+test('R2-02: a deeper sub-item under the wrong branch (1.1 open, then 2.1.1) is not grafted onto 1.1', () => {
+  const r = read(html('Art. 1º Lista:', '1. Um.', '1.1. Um-um.', '2.1.1. Órfão.'));
+  assert.equal(at(r, '2.1.1.').parentId, at(r, 'Art. 1º').id);
+  assert.ok(r.limitations.some((l) => l.code === 'item_parent_missing'));
+});
+
+test('R2-01: container evidence also works for a fragment without <html>/<body>', () => {
+  const r = read('<p>LIVRO I</p><p>Art. 1º Corpo.</p><div><p>ANEXO I</p><p>Item.</p></div><p>LIVRO II</p><p>Art. 2º Corpo.</p>');
+  assert.equal(parentOf(r, at(r, 'LIVRO II').id).type, 'document');
+  const flat = read('<p>LIVRO I</p><p>Art. 1º Corpo.</p><p>ANEXO I</p><p>Item.</p><p>LIVRO II</p>');
+  assert.equal(at(flat, 'LIVRO II').parentId, at(flat, 'ANEXO I').id, 'flat fragment: no evidence, stays');
 });

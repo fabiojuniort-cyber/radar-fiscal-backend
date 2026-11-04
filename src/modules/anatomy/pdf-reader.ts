@@ -3,22 +3,31 @@ import { readAnatomyInput, type AnatomyReaderInput, type AnatomyReaderResult } f
 
 /**
  * ANAT-PDF-01: read a PDF with a text layer into the anatomy. The PDF text is extracted line by line in reading order
- * (top→bottom, left→right per page) WITHOUT editing it (no hyphen joining, no whitespace collapsing beyond the single
- * space that separates text runs on a line), then handed to the existing plain-text reader. Every source pointer is
+ * (top→bottom, left→right per page). The reader itself edits nothing: no hyphen joining, no whitespace collapsing, no
+ * trimming. The only text it adds is ONE space between two runs of the same line, and only when neither side already
+ * has whitespace at that boundary. Fidelity limit (R2, measured): pdfjs-dist's text layer itself reports a run of
+ * spaces inside the drawn text as a single space ("A  B" → "A B"), so repeated spaces of the original drawing are NOT
+ * preserved by this reader; this is documented and tested, not hidden. Lines are handed to the structural reader. Every source pointer is
  * rewritten to the PDF origin: representation 'attachment', locator `pdf:sha256=<file>;page=<n>;line=<m>`, so each
  * passage is traceable to page and line without a contract change. A PDF without a text layer (scanned) yields no
  * invented text: the result carries the limitation `pdf_without_text_layer` (OCR is outside this reader).
+ * R2-05: coverage is assessed PER PAGE. A page with no text but with painted images is `no_text_layer` and yields the
+ * limitation `pdf_page_without_text_layer` (page number in the message) and a partial status; a page with neither
+ * text nor images is `empty` (evidence: no text items and no image operators), which is reported but is not a loss.
  */
 export interface PdfLine { page: number; line: number; text: string; start: number; end: number }
-export interface PdfReadResult extends AnatomyReaderResult { pdf: { sha256: string; pages: number; lines: PdfLine[] } }
+export type PdfPageState = 'text' | 'no_text_layer' | 'empty';
+export interface PdfReadResult extends AnatomyReaderResult { pdf: { sha256: string; pages: number; lines: PdfLine[]; pageCoverage: { page: number; state: PdfPageState }[] } }
 
 interface TextItem { str: string; transform: number[]; width: number; hasEOL?: boolean }
 
 /** Extract the text layer as lines, in reading order. Exported for tests. */
-export async function extractPdfLines(bytes: Uint8Array): Promise<{ pages: number; lines: Omit<PdfLine, 'start' | 'end'>[] }> {
+export async function extractPdfLines(bytes: Uint8Array): Promise<{ pages: number; lines: Omit<PdfLine, 'start' | 'end'>[]; pageCoverage: { page: number; state: PdfPageState }[] }> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, useSystemFonts: false, verbosity: 0 }).promise;
   const lines: Omit<PdfLine, 'start' | 'end'>[] = [];
+  const pageCoverage: { page: number; state: PdfPageState }[] = [];
+  const IMAGE_OPS = new Set([pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject, pdfjs.OPS.paintImageXObjectRepeat].filter((o) => typeof o === 'number'));
   try {
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
@@ -34,12 +43,18 @@ export async function extractPdfLines(bytes: Uint8Array): Promise<{ pages: numbe
       rows.sort((a, b) => b.y - a.y);
       let m = 0;
       for (const r of rows) {
-        const text = r.runs.sort((a, b) => a.x - b.x).map((run) => run.str).join(' ').replace(/ {2,}/gu, ' ').trimEnd();
+        const runs = r.runs.sort((a, b) => a.x - b.x).map((run) => run.str);
+        const text = runs.reduce((acc, run) => (acc && !/\s$/u.test(acc) && !/^\s/u.test(run) ? `${acc} ${run}` : acc + run), '');
         if (text.trim()) lines.push({ page: n, line: ++m, text });
+      }
+      if (m > 0) pageCoverage.push({ page: n, state: 'text' });
+      else {
+        const ops = await page.getOperatorList();
+        pageCoverage.push({ page: n, state: ops.fnArray.some((f: number) => IMAGE_OPS.has(f)) ? 'no_text_layer' : 'empty' });
       }
       page.cleanup();
     }
-    return { pages: doc.numPages, lines };
+    return { pages: doc.numPages, lines, pageCoverage };
   } finally { await doc.cleanup(); }
 }
 
@@ -47,7 +62,7 @@ const escapeHtml = (t: string) => t.replace(/&/gu, '&amp;').replace(/</gu, '&lt;
 
 export async function readPdfInput(bytes: Uint8Array, input: Omit<AnatomyReaderInput, 'html' | 'text'>): Promise<PdfReadResult> {
   const sha256 = createHash('sha256').update(bytes).digest('hex');
-  const { pages, lines } = await extractPdfLines(bytes);
+  const { pages, lines, pageCoverage } = await extractPdfLines(bytes);
   // Each extracted line becomes one block, so the existing structural grammar applies; the text is escaped, not edited.
   const html = lines.length ? `<html><body>${lines.map((l) => `<p>${escapeHtml(l.text)}</p>`).join('')}</body></html>` : '';
   const result = (html ? readAnatomyInput({ ...input, html }) : readAnatomyInput({ ...input, text: '' })) as PdfReadResult;
@@ -71,6 +86,11 @@ export async function readPdfInput(bytes: Uint8Array, input: Omit<AnatomyReaderI
   for (const part of result.parts) part.sourcePointers = part.sourcePointers.map((ptr) => toPdf(ptr, part.span.start));
   for (const m of result.sourceMap) m.pointer = toPdf(m.pointer, m.span.start);
   if (!lines.length) result.limitations.push({ code: 'pdf_without_text_layer', message: `PDF with ${pages} page(s) and no extractable text layer; OCR is outside this reader, no text was invented.`, partId: null, span: null });
-  result.pdf = { sha256, pages, lines: mapped };
+  else for (const pc of pageCoverage.filter((c) => c.state === 'no_text_layer')) {
+    result.limitations.push({ code: 'pdf_page_without_text_layer', message: `PDF page ${pc.page} has images but no extractable text layer; its content was not read (OCR is outside this reader).`, partId: null, span: null });
+    result.status = 'partial';
+  }
+  if (!lines.length) result.status = 'partial';
+  result.pdf = { sha256, pages, lines: mapped, pageCoverage };
   return result;
 }

@@ -28,3 +28,8 @@ Governança: tribusca-control#116, entrega 5 da matriz de progresso (comentário
 - **Colunas múltiplas e tabelas em PDF:** a ordem por linha de base mistura colunas lado a lado, e células de tabela viram texto corrido de uma linha. Isso fica para o lote de documentos extensos e anexos (entrega 6), com PDFs oficiais reais.
 - **Cabeçalhos e rodapés repetidos por página** continuam no texto, sem marcação. A marcação (`publication_header`/`footer`) depende do layout oficial (entrega 4, rede bloqueada).
 - **Homologação com PDFs oficiais** (DOU, DOE-SP): depende da liberação de rede.
+
+## R2 (correções do parecer R2 do COORD)
+
+- **R2-05, cobertura por página:** `result.pdf.pageCoverage` informa `text`, `no_text_layer` (página com imagem e sem camada de texto) ou `empty` (sem itens de texto e sem operador de imagem). Uma página `no_text_layer` num PDF com texto gera a limitação `pdf_page_without_text_layer`, com o número da página, e o status `partial`. Uma página `empty` é informada, mas não conta como perda. Não há OCR.
+- **Fidelidade de espaços (medida):** o leitor não colapsa nem apara nada. Ele só insere um espaço entre trechos da mesma linha, quando nenhum dos dois lados já tem espaço. Limite: a camada de texto do pdfjs-dist já entrega uma sequência de espaços como um único espaço ("A  B" vira "A B"), então espaços repetidos do original não são preservados. Isso está documentado e coberto por teste.
