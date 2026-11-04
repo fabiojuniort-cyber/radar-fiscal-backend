@@ -17,6 +17,7 @@ on:
       - claude/anat-struct-01
       - claude/anat-struct-02
       - claude/anat-pdf-01
+      - claude/compassionate-turing-n9g5hu
       - feat/anat-admin-p3b1-persistence
       - feat/anat-admin-p3c-executor
       - feat/anat-admin-p3d-api
