@@ -185,8 +185,8 @@ test('077_anat_base through the real migration runner (fresh disposable database
     const A1 = sha('a1'); const A2 = sha('a2');
 
     await t.test('the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented', async () => {
-      // ANAT-STRUCT-01 (groups, considerandos, items) b6ccf583… → 0481229a…; R1 fixes → 9bab0682…; ANAT-STRUCT-02 (caput, parágrafo único) on top → 4f3256e6…; ANAT-D02 caput continuation → da144681…; R2-08 table closes continuation → 461fb40d…; R2-01/R2-02 merged → cb30cd73…, regenerated with --write.
-      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), 'cb30cd73', 'engine identity is the current build');
+      // ANAT-STRUCT-01 (groups, considerandos, items) b6ccf583… → 0481229a…; R1 fixes → 9bab0682…; ANAT-STRUCT-02 (caput, parágrafo único) on top → 4f3256e6…; ANAT-D02 caput continuation → da144681…; R2-08 table closes continuation → 461fb40d…; R2-01/R2-02 merged → cb30cd73…; R2-01 fragment fix merged → b180ff47…, regenerated with --write.
+      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), 'b180ff47', 'engine identity is the current build');
       await asRole('radar_worker', ...analysis(A1, v1, { effective_profile_hash: effectiveHash, family: 'Instrução Normativa' }));
       await asRole('radar_worker', ...analysis(A2, v2));
       await asRole('radar_worker', `INSERT INTO anatomy_parts (anatomy_id, id, parent_id, sibling_order, type, label, start_utf16, end_utf16,

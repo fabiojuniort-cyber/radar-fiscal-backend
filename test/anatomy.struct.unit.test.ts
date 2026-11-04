@@ -201,3 +201,10 @@ test('R2-02: a deeper sub-item under the wrong branch (1.1 open, then 2.1.1) is 
   assert.equal(at(r, '2.1.1.').parentId, at(r, 'Art. 1º').id);
   assert.ok(r.limitations.some((l) => l.code === 'item_parent_missing'));
 });
+
+test('R2-01: container evidence also works for a fragment without <html>/<body>', () => {
+  const r = read('<p>LIVRO I</p><p>Art. 1º Corpo.</p><div><p>ANEXO I</p><p>Item.</p></div><p>LIVRO II</p><p>Art. 2º Corpo.</p>');
+  assert.equal(parentOf(r, at(r, 'LIVRO II').id).type, 'document');
+  const flat = read('<p>LIVRO I</p><p>Art. 1º Corpo.</p><p>ANEXO I</p><p>Item.</p><p>LIVRO II</p>');
+  assert.equal(at(flat, 'LIVRO II').parentId, at(flat, 'ANEXO I').id, 'flat fragment: no evidence, stays');
+});
