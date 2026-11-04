@@ -1,10 +1,10 @@
 /**
  * ANAT-OFFICIAL-01 R2-04: traceable text of a PDF snapshot, for binding an official sample to its binary original.
- * Same reading order as src/modules/anatomy/pdf-reader.ts (baseline tolerance 2pt, top→bottom, left→right; runs on a
- * line joined by one space), lines joined by "\n". The binary hash stays the identity of the original; this text is
+ * Same reading order and joining rule as src/modules/anatomy/pdf-reader.ts (R2): baseline tolerance 2pt, top→bottom,
+ * left→right; one space inserted between runs only when neither side already has whitespace; lines joined by "\n". The binary hash stays the identity of the original; this text is
  * a derived, re-computable view whose hash is recorded as `extraction.textSha256` in the snapshot metadata.
  */
-export const PDF_TEXT_TOOL = 'pdfjs-dist@6.3.289/lines-v1';
+export const PDF_TEXT_TOOL = 'pdfjs-dist@6.3.289/lines-v2';
 
 interface TextItem { str: string; transform: number[] }
 
@@ -23,7 +23,7 @@ export async function pdfText(bytes: Uint8Array): Promise<string> {
         if (row) row.runs.push({ x, str: it.str }); else rows.push({ y, runs: [{ x, str: it.str }] });
       }
       rows.sort((a, b) => b.y - a.y);
-      for (const r of rows) { const t = r.runs.sort((a, b) => a.x - b.x).map((run) => run.str).join(' '); if (t.trim()) out.push(t); }
+      for (const r of rows) { const t = r.runs.sort((a, b) => a.x - b.x).map((run) => run.str).reduce((acc, run) => (acc && !/\s$/u.test(acc) && !/^\s/u.test(run) ? `${acc} ${run}` : acc + run), ''); if (t.trim()) out.push(t); }
       page.cleanup();
     }
   } finally { await doc.cleanup(); }
