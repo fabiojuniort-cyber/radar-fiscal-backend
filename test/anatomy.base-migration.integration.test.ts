@@ -185,7 +185,8 @@ test('077_anat_base through the real migration runner (fresh disposable database
     const A1 = sha('a1'); const A2 = sha('a2');
 
     await t.test('the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented', async () => {
-      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), 'b6ccf583', 'engine identity unchanged');
+      // ANAT-STRUCT-01 changed the reader (groups, considerandos, items): identity b6ccf583… → 0481229a…; R1 fixes (annex return, item depth) → 9bab0682…; R2-01/R2-02 → ebccc173…; fragment container → 1469ed7a…, regenerated with --write.
+      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), '1469ed7a', 'engine identity is the current build');
       await asRole('radar_worker', ...analysis(A1, v1, { effective_profile_hash: effectiveHash, family: 'Instrução Normativa' }));
       await asRole('radar_worker', ...analysis(A2, v2));
       await asRole('radar_worker', `INSERT INTO anatomy_parts (anatomy_id, id, parent_id, sibling_order, type, label, start_utf16, end_utf16,

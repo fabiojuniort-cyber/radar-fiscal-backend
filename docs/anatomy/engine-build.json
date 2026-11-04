@@ -1,5 +1,5 @@
 {
-  "engineHash": "b6ccf583621e647e6861204dfa7a2761afe801a3a2173dedc1abdd025d9bf918",
+  "engineHash": "1469ed7a29f56b7f7daf561cade0513be7fb3c8172cdee5057df1df80ba9c765",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
@@ -17,6 +17,6 @@
     "src/modules/anatomy/nfc-shadow.ts": "92424d7c1f17c35197a3a1254f91ffe0d64918b32df87ce4b98b49091dfc9e49",
     "src/modules/anatomy/profile-rules.ts": "c033e3e117d822df4a271a47b853a7b3b9d9651b35fe2fa9f4eb45646672f9fa",
     "src/modules/anatomy/profile.ts": "79138d91af4abda2ac28b072db958ba877d75889d3725c9752421c95cd6c2a32",
-    "src/modules/anatomy/readers.ts": "bbfa902affc2247542a141d0c18d19ef58946cbddb0420281242a8914373d297"
+    "src/modules/anatomy/readers.ts": "ce84a252656de625a083bbcf086d67ee83ed0cfd17a96051af21a0294093624e"
   }
 }
