@@ -104,3 +104,23 @@ test('R2 fidelity (documented limit): repeated spaces come out as ONE space, fro
   const split = await extractPdfLines(buildSyntheticPdf([[{ text: 'Art. 2º', y: 700, x: 72 }, { text: 'Texto', y: 700, x: 200 }]]));
   assert.equal(split.lines[0]!.text, 'Art. 2º Texto', 'one space inserted between runs of a line');
 });
+
+test('R3 R2-05: a page with text AND an image is not complete; the unread visual content is named by page', async () => {
+  const r = await readPdfInput(buildSyntheticPdf([PAGE2], { imagePages: [0] }), { source: 'DOU', representationId: 'pdf-txt-img' });
+  assert.equal(r.status, 'partial');
+  assert.deepEqual(r.pdf.pageCoverage, [{ page: 1, state: 'text_with_visual' }]);
+  const lim = r.limitations.filter((l) => l.code === 'pdf_page_visual_not_read');
+  assert.equal(lim.length, 1); assert.match(lim[0]!.message, /page 1\b/u);
+});
+
+test('R3 R2-05: a vector drawing is visual content, never "empty"; a clip-only path does not count as painted', async () => {
+  const vec = await readPdfInput(buildSyntheticPdf([PAGE2, []], { vectorPages: [1] }), { source: 'DOU', representationId: 'pdf-vetor' });
+  assert.equal(vec.status, 'partial');
+  assert.deepEqual(vec.pdf.pageCoverage, [{ page: 1, state: 'text' }, { page: 2, state: 'no_text_layer' }]);
+  assert.ok(vec.limitations.some((l) => l.code === 'pdf_page_without_text_layer' && /page 2\b/u.test(l.message)));
+  const clip = await readPdfInput(buildSyntheticPdf([PAGE2, []], { clipPages: [1] }), { source: 'DOU', representationId: 'pdf-clip' });
+  assert.deepEqual(clip.pdf.pageCoverage, [{ page: 1, state: 'text' }, { page: 2, state: 'empty' }]);
+  assert.equal(clip.status, 'complete');
+  const textVec = await readPdfInput(buildSyntheticPdf([PAGE2], { vectorPages: [0] }), { source: 'DOU', representationId: 'pdf-txt-vetor' });
+  assert.deepEqual(textVec.pdf.pageCoverage, [{ page: 1, state: 'text_with_visual' }]);
+});

@@ -9,7 +9,8 @@ export interface SyntheticLine { text: string; x?: number; y: number }
 const esc = (s: string) => s.replace(/[\\()]/gu, (c) => `\\${c}`);
 
 /** `imagePages` (0-based) also paint a 1×1 gray image XObject on those pages (an image without a text layer). */
-export function buildSyntheticPdf(pages: SyntheticLine[][], opts: { imagePages?: number[] } = {}): Uint8Array {
+/** `vectorPages` (0-based) paint a filled rectangle (vector drawing); `clipPages` define a clip-only path (nothing painted). */
+export function buildSyntheticPdf(pages: SyntheticLine[][], opts: { imagePages?: number[]; vectorPages?: number[]; clipPages?: number[] } = {}): Uint8Array {
   const objects: string[] = [];
   const add = (body: string) => { objects.push(body); return objects.length; };
   const font = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
@@ -18,7 +19,8 @@ export function buildSyntheticPdf(pages: SyntheticLine[][], opts: { imagePages?:
   const pageIds: number[] = [];
   const contentIds: number[] = [];
   pages.forEach((lines, index) => {
-    const img = opts.imagePages?.includes(index) ? ['q 200 0 0 200 72 400 cm /Im1 Do Q'] : [];
+    const img = [...(opts.imagePages?.includes(index) ? ['q 200 0 0 200 72 400 cm /Im1 Do Q'] : []),
+      ...(opts.vectorPages?.includes(index) ? ['0 0 1 rg 100 100 200 50 re f'] : []), ...(opts.clipPages?.includes(index) ? ['q 0 0 595 842 re W n Q'] : [])];
     const stream = [...img, ...lines.map((l) => `BT /F1 11 Tf ${l.x ?? 72} ${l.y} Td (${esc(l.text)}) Tj ET`)].join('\n');
     const bytes = Buffer.from(stream, 'latin1');
     contentIds.push(add(`<< /Length ${bytes.length} >>\nstream\n${stream}\nendstream`));
