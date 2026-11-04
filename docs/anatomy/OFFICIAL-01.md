@@ -74,3 +74,8 @@ Esses atos ficam fora da amostra oficial até decisão do COORD. A prioridade do
 | MÉDIO 5: URL candidata × confirmada | `urlStatus`: `candidate` / `verified` / `to-locate`. O coletor grava `verified=false` para candidata, e a promoção exige `verified`. | `official-manifest.json`, `fetch-official-core.ts`, `official-binding.ts` | `official-fetch`: candidata não promovível |
 
 Execução real em 31/10: todas as URLs deram `FAIL network: getaddrinfo ENOTFOUND` e foram para `failures.json`. **Nenhum snapshot foi gravado.**
+
+## R2 (correções do parecer R2 do COORD)
+
+- **R2-03:** URL verificada não é o mesmo que representação válida. O corpo precisa corresponder ao formato declarado: um PDF tem a assinatura `%PDF-` no início e o marcador `%%EOF`; um HTML não é vazio, contém marcação e não é um PDF. Se não corresponder, a resposta vira a falha `invalid_representation`, sem corpo, e nunca um snapshot. Os metadados passam a separar `urlVerified` de `representation`. A proteção dos redirecionamentos não mudou.
+- **R2-04:** o vínculo de amostra com snapshot em PDF usa o texto extraído de forma rastreável (`ops/anatomy/pdf-text.ts`, ferramenta `pdfjs-dist@6.3.289/lines-v1`), com o hash do texto registrado em `extraction.textSha256` no meta. O PDF nunca é decodificado como UTF-8. O hash binário continua sendo a identidade do original. O HTML continua com a conferência byte a byte.
