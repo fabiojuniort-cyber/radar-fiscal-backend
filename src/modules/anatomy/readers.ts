@@ -302,7 +302,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   let annexContainer: string | null = null;
   const containerOf = (path: string): string | null => {
     const parentPath = path.slice(0, path.lastIndexOf('/'));
-    return /\/body\[\d+\]$/u.test(parentPath) || !/\/body\[\d+\]/u.test(parentPath) ? null : parentPath;
+    // The annex container is its DOM parent unless that parent is the document root, <html> or <body> (no own container).
+    return parentPath === '' || /\/(?:body|html)\[\d+\]$/u.test(parentPath) ? null : parentPath;
   };
   const insideAnnex = () => logical.some((entry) => entry.part.type === 'annex');
   const attach = (node: Node, desc: Descriptor): AnatomyPart => {
