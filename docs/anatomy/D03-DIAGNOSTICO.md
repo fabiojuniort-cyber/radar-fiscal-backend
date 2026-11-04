@@ -15,6 +15,20 @@ Pedido pelo COORD depois do aceite técnico R2 (#279 @ `103639d8`). **É só dia
 
 Nenhum texto se perde: tudo é contabilizado (cobertura 100%). A perda é de **estrutura**.
 
+### 1.1 O que a pilha STRUCT já corrige e o que resta (medido)
+
+Mesmos 4 JSON e mesma preparação, lidos pelo leitor da pilha #280 → #281 → #283 → #284 (`df54d62e`):
+
+| IN | Não identificado neste ramo (pré-STRUCT) | Com a pilha STRUCT | Corrigido pela STRUCT |
+|---|---|---|---|
+| 2.237/2024 | 12.271 | **11.990** | 281 (os 2 itens "1.") |
+| 2.005/2021 | 1.015 | 1.015 | 0 |
+| 2.162/2023 | 511 | 511 | 0 |
+| 1.932/2020 | 325 | 325 | 0 |
+
+- **Os agrupamentos NÃO são corrigidos pela STRUCT.** No JSON da RFB, título e nome vêm no mesmo bloco, separados por quebras de linha (`"CAPÍTULO I \n\n\n DISPOSIÇÕES PRELIMINARES"`), e esse formato não casa com a gramática de agrupamento do STRUCT-01. É uma **limitação restante**, nova e específica da RFB. Não foi corrigida: fica para a decisão da P1/P3.
+- **Também restam:** incisos sem travessão (11.279), ementas, signatários e agrupamentos.
+
 ## 2. Propostas (🔴 aguardam decisão do Fábio)
 
 ### P1. Inciso sem travessão no JSON da RFB
@@ -28,6 +42,10 @@ Nenhum texto se perde: tudo é contabilizado (cobertura 100%). A perda é de **e
 - **TO BE:** a preparação grava a marcação de origem (`data-rfb-tachado`, com o ponteiro JSON), e o leitor atribui contexto `historical`, com o motivo `rfb_tachado_source`, só com essa evidência. **Sem inferir vigência:** `legalStatus` continua `unknown`.
 - **Impacto:** muda a preparação e o leitor (identidade do motor). Em compensação, a anatomia deixa de apresentar redação riscada como operativa.
 - **Alternativa:** manter só a recusa no vínculo.
+
+### P1b. Agrupamento com título no mesmo bloco (RFB)
+- **AS IS:** 15 + 22 agrupamentos ficam `unidentified` mesmo com a STRUCT.
+- **TO BE:** reconhecê-los pelo tipo de segmento declarado pelo portal (como na P1), ou aceitar quebra de linha entre designação e nome. Os dois caminhos exigem revisão.
 
 ### P3. Ementa e assinatura
 O texto já está contabilizado. Reconhecer esses blocos pelo tipo de segmento do portal, como na P1, é opcional e de baixo impacto. A recomendação é tratar junto com a P1, se a P1 for aprovada.
