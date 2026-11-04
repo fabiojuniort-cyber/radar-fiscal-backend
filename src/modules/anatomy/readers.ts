@@ -291,6 +291,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // level or above, met while an annex is open, belongs to the body again: it closes the annex (and its historical
   // context) and attaches at the root. Lower levels stay inside the annex. Without a body grouping, the annex keeps them.
   let bodyTopGroupRank: number | null = null;
+  // ANAT-D02 (decided by Fábio: fix now): unmarked continuation blocks right after the caput block belong to the caput,
+  // until the article/clause receives any other child (§, inciso, table, note...). Keyed by the article/clause id.
+  const openCaput = new Map<string, AnatomyPart>();
   const insideAnnex = () => logical.some((entry) => entry.part.type === 'annex');
   const attach = (node: Node, desc: Descriptor): AnatomyPart => {
     if (desc.type === 'group' && insideAnnex() && bodyTopGroupRank !== null && desc.rank <= bodyTopGroupRank) {
@@ -309,7 +312,16 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       reasons.push('historical_ancestor');
       if (context === 'operative_candidate') context = 'historical';
     }
-    const part = newPart(desc.type, node.span.start, desc.rank < 100 ? length : node.span.end, parent.id,
+    const caputOpen = openCaput.get(parent.id);
+    const continuesCaput = caputOpen !== undefined && desc.rank >= 100 && (desc.type === 'unidentified' || desc.type === 'body')
+      && desc.context !== 'prohibited' && node.span.end > node.span.start;
+    if (!continuesCaput) openCaput.delete(parent.id);
+    if (continuesCaput) {
+      caputOpen.span.end = node.span.end;
+      caputOpen.sourcePointers.push(pointer(node.path, node.start, node.end));
+      if (!caputOpen.contextReasons.includes('caput_continuation')) caputOpen.contextReasons.push('caput_continuation');
+    }
+    const part = newPart(desc.type, node.span.start, desc.rank < 100 ? length : node.span.end, continuesCaput ? caputOpen.id : parent.id,
       context, desc.reason, pointer(node.path, node.start, node.end), textOf(node).trim().slice(0, 256));
     part.contextReasons = reasons;
     if (desc.rank < 100) logical.push({ part, rank: desc.rank });
@@ -319,7 +331,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       const caput: AnatomyPart = { ...part, id: `${part.id}-caput`, parentId: part.id, order: childOrders.get(part.id) ?? 0, type: 'caput',
         span: { ...node.span }, sourcePointers: [pointer(node.path, node.start, node.end)], ruleId: 'reader/v1/caput_block',
         contextReasons: [...reasons.filter((r) => r !== desc.reason), 'caput_block'], table: null };
-      childOrders.set(part.id, caput.order + 1); result.parts.push(caput);
+      childOrders.set(part.id, caput.order + 1); result.parts.push(caput); openCaput.set(part.id, caput);
     }
     // The marker owns only its own text, not the whole future logical container.
     if (node.span.end > node.span.start) ownership.push({ ...node.span, part });

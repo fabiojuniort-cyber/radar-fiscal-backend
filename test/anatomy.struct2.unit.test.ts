@@ -66,3 +66,18 @@ test('with STRUCT-01 R1: caput coexists with nested items and with the annex ret
   const seq = r.parts.filter((p) => p.type !== 'caput').map((p) => p.id);
   assert.deepEqual(seq, seq.map((_, i) => `part-${i}`));
 });
+
+test('ANAT-D02: unmarked continuation blocks extend the caput until the next marker', () => {
+  const html = '<html><body><p>Art. 1º Fica instituído o regime exemplo,</p><p>observadas as condições deste ato.</p><p>§ 1º Primeiro parágrafo.</p><p>Texto solto do parágrafo.</p><p>Art. 2º Outro.</p></body></html>';
+  const r = readAnatomyInput({ source: 'DOU', representationId: 'd02', html });
+  const caput = r.parts.find((p) => p.type === 'caput' && r.canonicalText.slice(p.span.start).startsWith('Art. 1º'))!;
+  assert.equal(r.canonicalText.slice(caput.span.start, caput.span.end).replace(/\n/gu, ' ').trimEnd(), 'Art. 1º Fica instituído o regime exemplo, observadas as condições deste ato.');
+  assert.ok(caput.contextReasons.includes('caput_continuation'));
+  assert.equal(caput.sourcePointers.length, 2);
+  const cont = r.parts.find((p) => r.canonicalText.slice(p.span.start).startsWith('observadas'))!;
+  assert.equal(cont.parentId, caput.id, 'continuation nests under the caput');
+  const loose = r.parts.find((p) => r.canonicalText.slice(p.span.start).startsWith('Texto solto'))!;
+  assert.notEqual(r.parts.find((p) => p.id === loose.parentId)!.type, 'caput', 'after a marker, blocks are not caput');
+  const caput2 = r.parts.find((p) => p.type === 'caput' && r.canonicalText.slice(p.span.start).startsWith('Art. 2º'))!;
+  assert.equal(caput2.sourcePointers.length, 1);
+});
