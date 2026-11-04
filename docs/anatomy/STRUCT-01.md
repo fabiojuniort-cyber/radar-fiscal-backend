@@ -52,3 +52,8 @@ Regras e limites:
 - números em prosa e `legalStatus` sempre desconhecido.
 
 Também incluído em `test:anatomy` e na lista sintética do `anatomy-ci.yml`.
+
+## R2 (correções do parecer R2 do COORD)
+
+- **R2-01:** o nível do título, sozinho, não fecha mais um anexo. O anexo só fecha com evidência estrutural: (a) o cabeçalho do anexo está num contêiner DOM próprio e o novo título está fora dele, ou (b) o anexo é zona histórica, pela classe, e o título não é. Sem evidência, o título fica dentro do anexo e a limitação `annex_return_ambiguous` é registrada com o span do título. Os dois testes R1-A planos que fechavam por nível passaram a esperar ambiguidade; há testes novos de retorno por contêiner.
+- **R2-02:** um subitem (1.1., 2.1.1.) só se aninha sob o item cujo número é o seu prefixo exato. Sem pai compatível, fecha os itens abertos, liga-se ao dispositivo envolvente e registra `item_parent_missing` (limitação e motivo). Texto e span preservados.
