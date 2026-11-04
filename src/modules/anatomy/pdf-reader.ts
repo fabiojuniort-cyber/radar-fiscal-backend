@@ -11,12 +11,16 @@ import { readAnatomyInput, type AnatomyReaderInput, type AnatomyReaderResult } f
  * rewritten to the PDF origin: representation 'attachment', locator `pdf:sha256=<file>;page=<n>;line=<m>`, so each
  * passage is traceable to page and line without a contract change. A PDF without a text layer (scanned) yields no
  * invented text: the result carries the limitation `pdf_without_text_layer` (OCR is outside this reader).
- * R2-05: coverage is assessed PER PAGE. A page with no text but with painted images is `no_text_layer` and yields the
- * limitation `pdf_page_without_text_layer` (page number in the message) and a partial status; a page with neither
- * text nor images is `empty` (evidence: no text items and no image operators), which is reported but is not a loss.
+ * R2-05 (R3): coverage is assessed PER PAGE from the page's operator list, never from the text alone. Visual content is
+ * any image paint, shading fill, or path that is actually painted (fill/stroke; a clip-only path is not). States:
+ *   `text`              text and no visual content: complete;
+ *   `text_with_visual`  text AND visual content: the visual part is unread → limitation `pdf_page_visual_not_read`;
+ *   `no_text_layer`     visual content and no text: nothing read → limitation `pdf_page_without_text_layer`;
+ *   `empty`             neither text nor any painted content: proven empty, reported, not a loss.
+ * Any unread page makes the status `partial`. No OCR; visual content is never interpreted.
  */
 export interface PdfLine { page: number; line: number; text: string; start: number; end: number }
-export type PdfPageState = 'text' | 'no_text_layer' | 'empty';
+export type PdfPageState = 'text' | 'text_with_visual' | 'no_text_layer' | 'empty';
 export interface PdfReadResult extends AnatomyReaderResult { pdf: { sha256: string; pages: number; lines: PdfLine[]; pageCoverage: { page: number; state: PdfPageState }[] } }
 
 interface TextItem { str: string; transform: number[]; width: number; hasEOL?: boolean }
@@ -27,7 +31,12 @@ export async function extractPdfLines(bytes: Uint8Array): Promise<{ pages: numbe
   const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, useSystemFonts: false, verbosity: 0 }).promise;
   const lines: Omit<PdfLine, 'start' | 'end'>[] = [];
   const pageCoverage: { page: number; state: PdfPageState }[] = [];
-  const IMAGE_OPS = new Set([pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject, pdfjs.OPS.paintImageXObjectRepeat].filter((o) => typeof o === 'number'));
+  const O = pdfjs.OPS as Record<string, number>;
+  const PAINT = new Set(['paintImageXObject', 'paintInlineImageXObject', 'paintImageMaskXObject', 'paintImageXObjectRepeat', 'paintImageMaskXObjectGroup',
+    'paintImageMaskXObjectRepeat', 'paintInlineImageXObjectGroup', 'paintSolidColorImageMask', 'shadingFill', 'fill', 'eoFill', 'fillStroke', 'eoFillStroke',
+    'closeFillStroke', 'closeEOFillStroke', 'stroke', 'closeStroke'].map((k) => O[k]).filter((v): v is number => typeof v === 'number'));
+  const hasVisual = (fnArray: number[], argsArray: unknown[]): boolean => fnArray.some((f, i) =>
+    PAINT.has(f) || (f === O.constructPath && (argsArray[i] as unknown[] | undefined)?.[0] !== O.endPath));
   try {
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
@@ -47,11 +56,9 @@ export async function extractPdfLines(bytes: Uint8Array): Promise<{ pages: numbe
         const text = runs.reduce((acc, run) => (acc && !/\s$/u.test(acc) && !/^\s/u.test(run) ? `${acc} ${run}` : acc + run), '');
         if (text.trim()) lines.push({ page: n, line: ++m, text });
       }
-      if (m > 0) pageCoverage.push({ page: n, state: 'text' });
-      else {
-        const ops = await page.getOperatorList();
-        pageCoverage.push({ page: n, state: ops.fnArray.some((f: number) => IMAGE_OPS.has(f)) ? 'no_text_layer' : 'empty' });
-      }
+      const ops = await page.getOperatorList();
+      const visual = hasVisual(ops.fnArray, ops.argsArray);
+      pageCoverage.push({ page: n, state: m > 0 ? (visual ? 'text_with_visual' : 'text') : (visual ? 'no_text_layer' : 'empty') });
       page.cleanup();
     }
     return { pages: doc.numPages, lines, pageCoverage };
@@ -86,8 +93,10 @@ export async function readPdfInput(bytes: Uint8Array, input: Omit<AnatomyReaderI
   for (const part of result.parts) part.sourcePointers = part.sourcePointers.map((ptr) => toPdf(ptr, part.span.start));
   for (const m of result.sourceMap) m.pointer = toPdf(m.pointer, m.span.start);
   if (!lines.length) result.limitations.push({ code: 'pdf_without_text_layer', message: `PDF with ${pages} page(s) and no extractable text layer; OCR is outside this reader, no text was invented.`, partId: null, span: null });
-  else for (const pc of pageCoverage.filter((c) => c.state === 'no_text_layer')) {
-    result.limitations.push({ code: 'pdf_page_without_text_layer', message: `PDF page ${pc.page} has images but no extractable text layer; its content was not read (OCR is outside this reader).`, partId: null, span: null });
+  else for (const pc of pageCoverage) {
+    if (pc.state === 'no_text_layer') result.limitations.push({ code: 'pdf_page_without_text_layer', message: `PDF page ${pc.page} has visual content but no extractable text layer; its content was not read (OCR is outside this reader).`, partId: null, span: null });
+    else if (pc.state === 'text_with_visual') result.limitations.push({ code: 'pdf_page_visual_not_read', message: `PDF page ${pc.page} has text and also visual content (image or drawing) that was not read; only its text layer is covered.`, partId: null, span: null });
+    else continue;
     result.status = 'partial';
   }
   if (!lines.length) result.status = 'partial';
