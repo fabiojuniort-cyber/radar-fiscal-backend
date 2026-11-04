@@ -1,9 +1,9 @@
 {
-  "engineHash": "b180ff4799392dd154ff13ac38563b6301064d895816e751f0a64a3297714071",
+  "engineHash": "512073f7e893c1fc703d8cfbc62c83f9d4d7777160ea1e87009a434c9df7ca8f",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
-    "ops/anatomy/build-identity.mjs": "1b9c091bd466574508e35f7b1d66075d8c9bf13fcb9a6bafebe96fefc6c5e178",
+    "ops/anatomy/build-identity.mjs": "77e68cfa9c5caf20c1df6030c4a016408e1a96fe53e0c1e4a390f68dd1264d12",
     "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
     "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
     "src/modules/anatomy/contract.ts": "e294eb6fb50c2fc2b624c13bc68f281f3271a88f4a00d98f1a7a923928893c2a",
@@ -15,6 +15,7 @@
     "src/modules/anatomy/nfc-recovery.ts": "043077c6636182cbcbc1870675337a5703845ff6290b8e46aa75e0a773de5a5a",
     "src/modules/anatomy/nfc-shadow-table.ts": "a9074dad75bcd1f328769451c00715d2483f2e4a06c863b67cfcd382ac37d153",
     "src/modules/anatomy/nfc-shadow.ts": "92424d7c1f17c35197a3a1254f91ffe0d64918b32df87ce4b98b49091dfc9e49",
+    "src/modules/anatomy/pdf-reader.ts": "c6464899099cc4c310a335302a2982d1a22d434720f93afd7a4d112e2c545b2f",
     "src/modules/anatomy/profile-rules.ts": "c033e3e117d822df4a271a47b853a7b3b9d9651b35fe2fa9f4eb45646672f9fa",
     "src/modules/anatomy/profile.ts": "79138d91af4abda2ac28b072db958ba877d75889d3725c9752421c95cd6c2a32",
     "src/modules/anatomy/readers.ts": "7e8db69a8ebbe9aa321ab57bef3d36fa3b392265f08731a834c506dc7fcdf311"
