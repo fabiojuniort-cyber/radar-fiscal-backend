@@ -220,3 +220,30 @@ test('D03: struck-through (tachado) segments are recorded and a sample drawing o
   assert.deepEqual(await bindingIssues([sample('<p>Art. 1º Redação vigente.</p>')], dir, [rfbAct()]), []);
   assert.match((await bindingIssues([sample('<p>Art. 2º Redação superada.</p>')], dir, [rfbAct()])).join(), /segmento tachado/u);
 });
+
+test('D03-R1-01: the struck set is re-derived from the original JSON; tampered metadata never hides a tachado excerpt', async () => {
+  const body = rfbJson({ outrosSegmentos: [{ ordemSegmentoAto: 2, tachado: true, textoIntegra: '<p>Art. 1º Redação superada.</p>' },
+    { ordemSegmentoAto: 3, textoIntegra: '<p>Art. 2º Redação vigente.</p>' }, { ordemSegmentoAto: 4, tachado: true, textoIntegra: '<p>Art. 3º Outra superada.</p>' }] });
+  const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(body)).f);
+  assert.ok(r.ok);
+  const dir = mkdtempSync(join(tmpdir(), 'ofc-r1-'));
+  writeFileSync(join(dir, 'ofc-rfb-x.json'), r.body);
+  const sample = (content: string): SampleInput => ({ id: 'ofc-rfb-x', documentId: 'ofc-rfb-x', version: 'v1', title: 't', source: 'RFB', family: null, format: 'html', content, covers: ['x'],
+    provenance: { kind: 'official', act: 'Instrução Normativa RFB 9.999/2099', url: RFB_URL, consultedAt: '2026-11-04', version: 'multivigente', reason: 'motivo suficiente', snapshotSha256: r.meta.sha256 } as SampleInput['provenance'] });
+  const struckSample = sample('<p>Art. 1º Redação superada.</p>');
+  const control = sample('<p>Art. 2º Redação vigente.</p>');
+  const real = r.meta.preparation!.struckSegments;
+  assert.deepEqual(real.map((x) => x.pointer), ['/outrosSegmentos/0', '/outrosSegmentos/2']);
+  const withStruck = (list: unknown) => writeFileSync(join(dir, 'ofc-rfb-x.meta.json'), JSON.stringify({ ...r.meta, preparation: { ...r.meta.preparation, struckSegments: list } }));
+  withStruck(real);
+  assert.deepEqual(await bindingIssues([control], dir, [rfbAct()]), [], 'valid non-struck control');
+  assert.match((await bindingIssues([struckSample], dir, [rfbAct()])).join(), /segmento tachado/u);
+  for (const [label, list] of [['lista vazia', []], ['segmento removido', [real[1]]], ['ponteiro alterado', [{ ...real[0], pointer: '/outrosSegmentos/1' }, real[1]]]] as const) {
+    withStruck(list);
+    const issues = (await bindingIssues([struckSample], dir, [rfbAct()])).join();
+    assert.match(issues, /segmento tachado/u, `${label}: refusal still driven by the original JSON`);
+    assert.match(issues, /diverge do JSON original/u, `${label}: divergence reported`);
+    assert.match((await bindingIssues([control], dir, [rfbAct()])).join(), /diverge do JSON original/u, `${label}: tampered metadata flagged even for a clean excerpt`);
+  }
+  assert.equal(createHash('sha256').update(readFileSync(join(dir, 'ofc-rfb-x.json'))).digest('hex'), r.meta.sha256, 'original untouched');
+});

@@ -94,7 +94,7 @@ Execução real em 31/10: todas as URLs deram `FAIL network: getaddrinfo ENOTFOU
   - URL, `consultedAt`, SHA-256 e bytes;
   - a identificação do ato e da versão: `idAto`, epígrafe, número, data do ato, `dataPublicacao`, `dadosPublicacao`, `visao`, e o `vigente` **declarado pelo portal**, não inferido;
   - a preparação: versão, `preparationId`, `htmlSha256`, número de trechos, segmentos ausentes, anexos e campos excluídos.
-- **Vínculo** (`bindingIssues`): o JSON é preparado de novo, o `htmlSha256` precisa conferir e a amostra precisa ser recorte exato do HTML preparado. A rastreabilidade ponteiro JSON ↔ texto preparado ↔ anatomia passa por `locateJsonHtmlSpan`, coberta por teste.
+- **Vínculo** (`bindingIssues`): o JSON é preparado de novo (e, desde D03-R1-01, os segmentos tachados são **derivados de novo do JSON original**, sem confiar no metadado; divergência do metadado é registrada como problema), o `htmlSha256` precisa conferir e a amostra precisa ser recorte exato do HTML preparado. A rastreabilidade ponteiro JSON ↔ texto preparado ↔ anatomia passa por `locateJsonHtmlSpan`, coberta por teste.
 - **Perdas de estrutura declaradas:**
   - `epigrafeCompleta` fica excluída como metadado;
   - segmentos com `omitir` ou sem texto são listados como ausentes (ex.: IN 2.005/2021, `/outrosSegmentos/104`, `no_text`);

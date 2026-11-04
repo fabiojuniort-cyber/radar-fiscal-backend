@@ -20,6 +20,7 @@ import type { SampleInput } from '../../src/modules/anatomy/config/sample-inputs
 import type { ManifestAct } from './fetch-official-core.js';
 import { PDF_TEXT_TOOL, pdfText } from './pdf-text.js';
 import { prepareRfbRepresentation } from '../../src/modules/anatomy/json-preparation.js';
+import { validateRfbJson } from './fetch-official-core.js';
 
 export async function bindingIssues(samples: readonly SampleInput[], dir: string, manifest: readonly ManifestAct[], extract: (bytes: Uint8Array) => Promise<string> = pdfText): Promise<string[]> {
   const issues: string[] = [];
@@ -51,9 +52,14 @@ export async function bindingIssues(samples: readonly SampleInput[], dir: string
       catch (e) { bad(`JSON da RFB não preparável: ${(e as Error).message}`); continue; }
       const at = html.indexOf(s.content);
       if (at < 0) { bad('conteúdo da amostra não é recorte exato do texto preparado do JSON'); continue; }
-      // A sample must not draw on struck-through (superseded) wording presented as plain text by the preparation.
-      if (!meta.preparation.struckSegments) { bad('preparação sem registro de segmentos tachados'); continue; }
-      const struck = new Set(meta.preparation.struckSegments.map((x) => `${x.pointer}/textoIntegra`));
+      // D03-R1-01: the struck (tachado) set is DERIVED again from the original JSON, never trusted from the metadata;
+      // a divergent or missing metadata list is itself an issue, and the derived set drives the refusal.
+      const derived = validateRfbJson(bytes, meta.identification.idAto);
+      if ('problem' in derived) { bad(`JSON da RFB inválido na revalidação: ${derived.problem}`); continue; }
+      const key = (xs: { pointer: string }[]) => xs.map((x) => x.pointer).sort().join('|');
+      if (!meta.preparation.struckSegments) bad('preparação sem registro de segmentos tachados');
+      else if (key(meta.preparation.struckSegments) !== key(derived.preparation.struckSegments)) bad('struckSegments do metadado diverge do JSON original');
+      const struck = new Set(derived.preparation.struckSegments.map((x) => `${x.pointer}/textoIntegra`));
       if (prep!.pieces.some((piece) => struck.has(piece.pointer) && piece.htmlSpan.start < at + s.content.length && at < piece.htmlSpan.end)) bad('amostra inclui segmento tachado (redação superada) do JSON da RFB');
       continue;
     }
