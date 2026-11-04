@@ -30,6 +30,1723 @@
         "reason": "no_text"
       }
     ],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/0",
+        "order": 2,
+        "chars": 1734
+      },
+      {
+        "pointer": "/outrosSegmentos/1",
+        "order": 3,
+        "chars": 266
+      },
+      {
+        "pointer": "/outrosSegmentos/2",
+        "order": 4,
+        "chars": 36
+      },
+      {
+        "pointer": "/outrosSegmentos/3",
+        "order": 5,
+        "chars": 218
+      },
+      {
+        "pointer": "/outrosSegmentos/4",
+        "order": 6,
+        "chars": 159
+      },
+      {
+        "pointer": "/outrosSegmentos/5",
+        "order": 7,
+        "chars": 311
+      },
+      {
+        "pointer": "/outrosSegmentos/6",
+        "order": 8,
+        "chars": 199
+      },
+      {
+        "pointer": "/outrosSegmentos/7",
+        "order": 9,
+        "chars": 184
+      },
+      {
+        "pointer": "/outrosSegmentos/8",
+        "order": 10,
+        "chars": 274
+      },
+      {
+        "pointer": "/outrosSegmentos/9",
+        "order": 11,
+        "chars": 37
+      },
+      {
+        "pointer": "/outrosSegmentos/10",
+        "order": 12,
+        "chars": 22
+      },
+      {
+        "pointer": "/outrosSegmentos/11",
+        "order": 13,
+        "chars": 54
+      },
+      {
+        "pointer": "/outrosSegmentos/12",
+        "order": 14,
+        "chars": 103
+      },
+      {
+        "pointer": "/outrosSegmentos/13",
+        "order": 15,
+        "chars": 176
+      },
+      {
+        "pointer": "/outrosSegmentos/14",
+        "order": 16,
+        "chars": 219
+      },
+      {
+        "pointer": "/outrosSegmentos/15",
+        "order": 17,
+        "chars": 158
+      },
+      {
+        "pointer": "/outrosSegmentos/16",
+        "order": 18,
+        "chars": 197
+      },
+      {
+        "pointer": "/outrosSegmentos/17",
+        "order": 19,
+        "chars": 51
+      },
+      {
+        "pointer": "/outrosSegmentos/18",
+        "order": 20,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/19",
+        "order": 21,
+        "chars": 200
+      },
+      {
+        "pointer": "/outrosSegmentos/20",
+        "order": 22,
+        "chars": 26
+      },
+      {
+        "pointer": "/outrosSegmentos/21",
+        "order": 23,
+        "chars": 45
+      },
+      {
+        "pointer": "/outrosSegmentos/22",
+        "order": 24,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/23",
+        "order": 25,
+        "chars": 87
+      },
+      {
+        "pointer": "/outrosSegmentos/24",
+        "order": 26,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/25",
+        "order": 27,
+        "chars": 219
+      },
+      {
+        "pointer": "/outrosSegmentos/26",
+        "order": 28,
+        "chars": 86
+      },
+      {
+        "pointer": "/outrosSegmentos/27",
+        "order": 29,
+        "chars": 65
+      },
+      {
+        "pointer": "/outrosSegmentos/28",
+        "order": 30,
+        "chars": 53
+      },
+      {
+        "pointer": "/outrosSegmentos/29",
+        "order": 31,
+        "chars": 227
+      },
+      {
+        "pointer": "/outrosSegmentos/30",
+        "order": 32,
+        "chars": 53
+      },
+      {
+        "pointer": "/outrosSegmentos/31",
+        "order": 33,
+        "chars": 65
+      },
+      {
+        "pointer": "/outrosSegmentos/32",
+        "order": 34,
+        "chars": 135
+      },
+      {
+        "pointer": "/outrosSegmentos/33",
+        "order": 35,
+        "chars": 49
+      },
+      {
+        "pointer": "/outrosSegmentos/34",
+        "order": 36,
+        "chars": 44
+      },
+      {
+        "pointer": "/outrosSegmentos/35",
+        "order": 37,
+        "chars": 61
+      },
+      {
+        "pointer": "/outrosSegmentos/36",
+        "order": 38,
+        "chars": 50
+      },
+      {
+        "pointer": "/outrosSegmentos/37",
+        "order": 39,
+        "chars": 207
+      },
+      {
+        "pointer": "/outrosSegmentos/38",
+        "order": 40,
+        "chars": 52
+      },
+      {
+        "pointer": "/outrosSegmentos/39",
+        "order": 41,
+        "chars": 47
+      },
+      {
+        "pointer": "/outrosSegmentos/40",
+        "order": 42,
+        "chars": 162
+      },
+      {
+        "pointer": "/outrosSegmentos/41",
+        "order": 43,
+        "chars": 163
+      },
+      {
+        "pointer": "/outrosSegmentos/42",
+        "order": 44,
+        "chars": 146
+      },
+      {
+        "pointer": "/outrosSegmentos/43",
+        "order": 45,
+        "chars": 414
+      },
+      {
+        "pointer": "/outrosSegmentos/44",
+        "order": 46,
+        "chars": 136
+      },
+      {
+        "pointer": "/outrosSegmentos/45",
+        "order": 47,
+        "chars": 197
+      },
+      {
+        "pointer": "/outrosSegmentos/46",
+        "order": 48,
+        "chars": 92
+      },
+      {
+        "pointer": "/outrosSegmentos/47",
+        "order": 49,
+        "chars": 62
+      },
+      {
+        "pointer": "/outrosSegmentos/48",
+        "order": 50,
+        "chars": 47
+      },
+      {
+        "pointer": "/outrosSegmentos/49",
+        "order": 51,
+        "chars": 22
+      },
+      {
+        "pointer": "/outrosSegmentos/50",
+        "order": 52,
+        "chars": 60
+      },
+      {
+        "pointer": "/outrosSegmentos/51",
+        "order": 53,
+        "chars": 455
+      },
+      {
+        "pointer": "/outrosSegmentos/52",
+        "order": 54,
+        "chars": 57
+      },
+      {
+        "pointer": "/outrosSegmentos/53",
+        "order": 55,
+        "chars": 275
+      },
+      {
+        "pointer": "/outrosSegmentos/54",
+        "order": 56,
+        "chars": 211
+      },
+      {
+        "pointer": "/outrosSegmentos/55",
+        "order": 57,
+        "chars": 29
+      },
+      {
+        "pointer": "/outrosSegmentos/56",
+        "order": 58,
+        "chars": 209
+      },
+      {
+        "pointer": "/outrosSegmentos/57",
+        "order": 59,
+        "chars": 173
+      },
+      {
+        "pointer": "/outrosSegmentos/58",
+        "order": 60,
+        "chars": 90
+      },
+      {
+        "pointer": "/outrosSegmentos/59",
+        "order": 61,
+        "chars": 201
+      },
+      {
+        "pointer": "/outrosSegmentos/60",
+        "order": 62,
+        "chars": 65
+      },
+      {
+        "pointer": "/outrosSegmentos/61",
+        "order": 63,
+        "chars": 237
+      },
+      {
+        "pointer": "/outrosSegmentos/62",
+        "order": 64,
+        "chars": 255
+      },
+      {
+        "pointer": "/outrosSegmentos/63",
+        "order": 65,
+        "chars": 86
+      },
+      {
+        "pointer": "/outrosSegmentos/64",
+        "order": 66,
+        "chars": 247
+      },
+      {
+        "pointer": "/outrosSegmentos/65",
+        "order": 67,
+        "chars": 211
+      },
+      {
+        "pointer": "/outrosSegmentos/66",
+        "order": 68,
+        "chars": 168
+      },
+      {
+        "pointer": "/outrosSegmentos/67",
+        "order": 69,
+        "chars": 260
+      },
+      {
+        "pointer": "/outrosSegmentos/68",
+        "order": 70,
+        "chars": 511
+      },
+      {
+        "pointer": "/outrosSegmentos/69",
+        "order": 71,
+        "chars": 54
+      },
+      {
+        "pointer": "/outrosSegmentos/70",
+        "order": 72,
+        "chars": 482
+      },
+      {
+        "pointer": "/outrosSegmentos/71",
+        "order": 73,
+        "chars": 12
+      },
+      {
+        "pointer": "/outrosSegmentos/72",
+        "order": 74,
+        "chars": 340
+      },
+      {
+        "pointer": "/outrosSegmentos/73",
+        "order": 75,
+        "chars": 163
+      },
+      {
+        "pointer": "/outrosSegmentos/74",
+        "order": 76,
+        "chars": 111
+      },
+      {
+        "pointer": "/outrosSegmentos/75",
+        "order": 77,
+        "chars": 114
+      },
+      {
+        "pointer": "/outrosSegmentos/76",
+        "order": 78,
+        "chars": 261
+      },
+      {
+        "pointer": "/outrosSegmentos/77",
+        "order": 79,
+        "chars": 57
+      },
+      {
+        "pointer": "/outrosSegmentos/78",
+        "order": 80,
+        "chars": 393
+      },
+      {
+        "pointer": "/outrosSegmentos/79",
+        "order": 81,
+        "chars": 138
+      },
+      {
+        "pointer": "/outrosSegmentos/80",
+        "order": 82,
+        "chars": 157
+      },
+      {
+        "pointer": "/outrosSegmentos/81",
+        "order": 83,
+        "chars": 184
+      },
+      {
+        "pointer": "/outrosSegmentos/82",
+        "order": 84,
+        "chars": 662
+      },
+      {
+        "pointer": "/outrosSegmentos/83",
+        "order": 85,
+        "chars": 359
+      },
+      {
+        "pointer": "/outrosSegmentos/84",
+        "order": 86,
+        "chars": 266
+      },
+      {
+        "pointer": "/outrosSegmentos/85",
+        "order": 87,
+        "chars": 26
+      },
+      {
+        "pointer": "/outrosSegmentos/86",
+        "order": 88,
+        "chars": 63
+      },
+      {
+        "pointer": "/outrosSegmentos/87",
+        "order": 89,
+        "chars": 77
+      },
+      {
+        "pointer": "/outrosSegmentos/88",
+        "order": 90,
+        "chars": 193
+      },
+      {
+        "pointer": "/outrosSegmentos/89",
+        "order": 91,
+        "chars": 111
+      },
+      {
+        "pointer": "/outrosSegmentos/90",
+        "order": 92,
+        "chars": 114
+      },
+      {
+        "pointer": "/outrosSegmentos/91",
+        "order": 93,
+        "chars": 193
+      },
+      {
+        "pointer": "/outrosSegmentos/92",
+        "order": 94,
+        "chars": 35
+      },
+      {
+        "pointer": "/outrosSegmentos/93",
+        "order": 95,
+        "chars": 239
+      },
+      {
+        "pointer": "/outrosSegmentos/94",
+        "order": 96,
+        "chars": 117
+      },
+      {
+        "pointer": "/outrosSegmentos/95",
+        "order": 97,
+        "chars": 205
+      },
+      {
+        "pointer": "/outrosSegmentos/96",
+        "order": 98,
+        "chars": 159
+      },
+      {
+        "pointer": "/outrosSegmentos/97",
+        "order": 99,
+        "chars": 170
+      },
+      {
+        "pointer": "/outrosSegmentos/98",
+        "order": 100,
+        "chars": 284
+      },
+      {
+        "pointer": "/outrosSegmentos/99",
+        "order": 101,
+        "chars": 141
+      },
+      {
+        "pointer": "/outrosSegmentos/100",
+        "order": 102,
+        "chars": 210
+      },
+      {
+        "pointer": "/outrosSegmentos/101",
+        "order": 103,
+        "chars": 180
+      },
+      {
+        "pointer": "/outrosSegmentos/102",
+        "order": 104,
+        "chars": 178
+      },
+      {
+        "pointer": "/outrosSegmentos/103",
+        "order": 105,
+        "chars": 49
+      },
+      {
+        "pointer": "/outrosSegmentos/104",
+        "order": 106,
+        "chars": 0
+      },
+      {
+        "pointer": "/outrosSegmentos/105",
+        "order": 107,
+        "chars": 22
+      },
+      {
+        "pointer": "/outrosSegmentos/106",
+        "order": 108,
+        "chars": 320
+      },
+      {
+        "pointer": "/outrosSegmentos/107",
+        "order": 109,
+        "chars": 165
+      },
+      {
+        "pointer": "/outrosSegmentos/108",
+        "order": 110,
+        "chars": 242
+      },
+      {
+        "pointer": "/outrosSegmentos/109",
+        "order": 111,
+        "chars": 121
+      },
+      {
+        "pointer": "/outrosSegmentos/110",
+        "order": 112,
+        "chars": 123
+      },
+      {
+        "pointer": "/outrosSegmentos/111",
+        "order": 113,
+        "chars": 26
+      },
+      {
+        "pointer": "/outrosSegmentos/112",
+        "order": 114,
+        "chars": 362
+      },
+      {
+        "pointer": "/outrosSegmentos/113",
+        "order": 115,
+        "chars": 135
+      },
+      {
+        "pointer": "/outrosSegmentos/114",
+        "order": 116,
+        "chars": 67
+      },
+      {
+        "pointer": "/outrosSegmentos/115",
+        "order": 117,
+        "chars": 38
+      },
+      {
+        "pointer": "/outrosSegmentos/116",
+        "order": 118,
+        "chars": 152
+      },
+      {
+        "pointer": "/outrosSegmentos/117",
+        "order": 119,
+        "chars": 204
+      },
+      {
+        "pointer": "/outrosSegmentos/118",
+        "order": 120,
+        "chars": 315
+      },
+      {
+        "pointer": "/outrosSegmentos/119",
+        "order": 121,
+        "chars": 179
+      },
+      {
+        "pointer": "/outrosSegmentos/120",
+        "order": 122,
+        "chars": 170
+      },
+      {
+        "pointer": "/outrosSegmentos/121",
+        "order": 123,
+        "chars": 44
+      },
+      {
+        "pointer": "/outrosSegmentos/122",
+        "order": 124,
+        "chars": 22
+      },
+      {
+        "pointer": "/outrosSegmentos/123",
+        "order": 125,
+        "chars": 140
+      },
+      {
+        "pointer": "/outrosSegmentos/124",
+        "order": 126,
+        "chars": 115
+      },
+      {
+        "pointer": "/outrosSegmentos/125",
+        "order": 127,
+        "chars": 238
+      },
+      {
+        "pointer": "/outrosSegmentos/126",
+        "order": 128,
+        "chars": 144
+      },
+      {
+        "pointer": "/outrosSegmentos/127",
+        "order": 129,
+        "chars": 393
+      },
+      {
+        "pointer": "/outrosSegmentos/128",
+        "order": 130,
+        "chars": 265
+      },
+      {
+        "pointer": "/outrosSegmentos/129",
+        "order": 131,
+        "chars": 65
+      },
+      {
+        "pointer": "/outrosSegmentos/130",
+        "order": 132,
+        "chars": 291
+      },
+      {
+        "pointer": "/outrosSegmentos/131",
+        "order": 133,
+        "chars": 232
+      },
+      {
+        "pointer": "/outrosSegmentos/132",
+        "order": 134,
+        "chars": 106
+      },
+      {
+        "pointer": "/outrosSegmentos/133",
+        "order": 135,
+        "chars": 361
+      },
+      {
+        "pointer": "/outrosSegmentos/134",
+        "order": 136,
+        "chars": 286
+      },
+      {
+        "pointer": "/outrosSegmentos/135",
+        "order": 137,
+        "chars": 330
+      },
+      {
+        "pointer": "/outrosSegmentos/136",
+        "order": 138,
+        "chars": 374
+      },
+      {
+        "pointer": "/outrosSegmentos/137",
+        "order": 139,
+        "chars": 260
+      },
+      {
+        "pointer": "/outrosSegmentos/138",
+        "order": 140,
+        "chars": 26
+      },
+      {
+        "pointer": "/outrosSegmentos/139",
+        "order": 141,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/140",
+        "order": 142,
+        "chars": 144
+      },
+      {
+        "pointer": "/outrosSegmentos/141",
+        "order": 143,
+        "chars": 152
+      },
+      {
+        "pointer": "/outrosSegmentos/142",
+        "order": 144,
+        "chars": 308
+      },
+      {
+        "pointer": "/outrosSegmentos/143",
+        "order": 145,
+        "chars": 301
+      },
+      {
+        "pointer": "/outrosSegmentos/144",
+        "order": 146,
+        "chars": 289
+      },
+      {
+        "pointer": "/outrosSegmentos/145",
+        "order": 147,
+        "chars": 289
+      },
+      {
+        "pointer": "/outrosSegmentos/146",
+        "order": 148,
+        "chars": 205
+      },
+      {
+        "pointer": "/outrosSegmentos/147",
+        "order": 149,
+        "chars": 50
+      },
+      {
+        "pointer": "/outrosSegmentos/148",
+        "order": 150,
+        "chars": 83
+      },
+      {
+        "pointer": "/outrosSegmentos/149",
+        "order": 151,
+        "chars": 153
+      },
+      {
+        "pointer": "/outrosSegmentos/150",
+        "order": 152,
+        "chars": 161
+      },
+      {
+        "pointer": "/outrosSegmentos/151",
+        "order": 153,
+        "chars": 159
+      },
+      {
+        "pointer": "/outrosSegmentos/152",
+        "order": 154,
+        "chars": 312
+      },
+      {
+        "pointer": "/outrosSegmentos/153",
+        "order": 155,
+        "chars": 314
+      },
+      {
+        "pointer": "/outrosSegmentos/154",
+        "order": 156,
+        "chars": 173
+      },
+      {
+        "pointer": "/outrosSegmentos/155",
+        "order": 157,
+        "chars": 137
+      },
+      {
+        "pointer": "/outrosSegmentos/156",
+        "order": 158,
+        "chars": 178
+      },
+      {
+        "pointer": "/outrosSegmentos/157",
+        "order": 159,
+        "chars": 108
+      },
+      {
+        "pointer": "/outrosSegmentos/158",
+        "order": 160,
+        "chars": 128
+      },
+      {
+        "pointer": "/outrosSegmentos/159",
+        "order": 161,
+        "chars": 50
+      },
+      {
+        "pointer": "/outrosSegmentos/160",
+        "order": 162,
+        "chars": 28
+      },
+      {
+        "pointer": "/outrosSegmentos/161",
+        "order": 163,
+        "chars": 114
+      },
+      {
+        "pointer": "/outrosSegmentos/162",
+        "order": 164,
+        "chars": 15
+      },
+      {
+        "pointer": "/outrosSegmentos/163",
+        "order": 165,
+        "chars": 50
+      },
+      {
+        "pointer": "/outrosSegmentos/164",
+        "order": 166,
+        "chars": 52
+      },
+      {
+        "pointer": "/outrosSegmentos/165",
+        "order": 167,
+        "chars": 110
+      },
+      {
+        "pointer": "/outrosSegmentos/166",
+        "order": 168,
+        "chars": 9
+      },
+      {
+        "pointer": "/outrosSegmentos/167",
+        "order": 169,
+        "chars": 35
+      },
+      {
+        "pointer": "/outrosSegmentos/168",
+        "order": 170,
+        "chars": 13
+      },
+      {
+        "pointer": "/outrosSegmentos/169",
+        "order": 171,
+        "chars": 213
+      },
+      {
+        "pointer": "/outrosSegmentos/170",
+        "order": 172,
+        "chars": 171
+      },
+      {
+        "pointer": "/outrosSegmentos/171",
+        "order": 173,
+        "chars": 72
+      },
+      {
+        "pointer": "/outrosSegmentos/172",
+        "order": 174,
+        "chars": 70
+      },
+      {
+        "pointer": "/outrosSegmentos/173",
+        "order": 175,
+        "chars": 197
+      },
+      {
+        "pointer": "/outrosSegmentos/174",
+        "order": 176,
+        "chars": 199
+      },
+      {
+        "pointer": "/outrosSegmentos/175",
+        "order": 177,
+        "chars": 262
+      },
+      {
+        "pointer": "/outrosSegmentos/176",
+        "order": 178,
+        "chars": 364
+      },
+      {
+        "pointer": "/outrosSegmentos/177",
+        "order": 179,
+        "chars": 121
+      },
+      {
+        "pointer": "/outrosSegmentos/178",
+        "order": 180,
+        "chars": 150
+      },
+      {
+        "pointer": "/outrosSegmentos/179",
+        "order": 181,
+        "chars": 427
+      },
+      {
+        "pointer": "/outrosSegmentos/180",
+        "order": 182,
+        "chars": 638
+      },
+      {
+        "pointer": "/outrosSegmentos/181",
+        "order": 183,
+        "chars": 458
+      },
+      {
+        "pointer": "/outrosSegmentos/182",
+        "order": 184,
+        "chars": 402
+      },
+      {
+        "pointer": "/outrosSegmentos/183",
+        "order": 185,
+        "chars": 273
+      },
+      {
+        "pointer": "/outrosSegmentos/184",
+        "order": 186,
+        "chars": 333
+      },
+      {
+        "pointer": "/outrosSegmentos/185",
+        "order": 187,
+        "chars": 301
+      },
+      {
+        "pointer": "/outrosSegmentos/186",
+        "order": 188,
+        "chars": 451
+      },
+      {
+        "pointer": "/outrosSegmentos/187",
+        "order": 189,
+        "chars": 407
+      },
+      {
+        "pointer": "/outrosSegmentos/188",
+        "order": 190,
+        "chars": 283
+      },
+      {
+        "pointer": "/outrosSegmentos/189",
+        "order": 191,
+        "chars": 190
+      },
+      {
+        "pointer": "/outrosSegmentos/190",
+        "order": 192,
+        "chars": 69
+      },
+      {
+        "pointer": "/outrosSegmentos/191",
+        "order": 193,
+        "chars": 181
+      },
+      {
+        "pointer": "/outrosSegmentos/192",
+        "order": 194,
+        "chars": 147
+      },
+      {
+        "pointer": "/outrosSegmentos/193",
+        "order": 195,
+        "chars": 170
+      },
+      {
+        "pointer": "/outrosSegmentos/194",
+        "order": 196,
+        "chars": 444
+      },
+      {
+        "pointer": "/outrosSegmentos/195",
+        "order": 197,
+        "chars": 260
+      },
+      {
+        "pointer": "/outrosSegmentos/196",
+        "order": 198,
+        "chars": 154
+      },
+      {
+        "pointer": "/outrosSegmentos/197",
+        "order": 199,
+        "chars": 246
+      },
+      {
+        "pointer": "/outrosSegmentos/198",
+        "order": 200,
+        "chars": 166
+      },
+      {
+        "pointer": "/outrosSegmentos/199",
+        "order": 201,
+        "chars": 26
+      },
+      {
+        "pointer": "/outrosSegmentos/200",
+        "order": 202,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/201",
+        "order": 203,
+        "chars": 123
+      },
+      {
+        "pointer": "/outrosSegmentos/202",
+        "order": 204,
+        "chars": 199
+      },
+      {
+        "pointer": "/outrosSegmentos/203",
+        "order": 205,
+        "chars": 213
+      },
+      {
+        "pointer": "/outrosSegmentos/204",
+        "order": 206,
+        "chars": 271
+      },
+      {
+        "pointer": "/outrosSegmentos/205",
+        "order": 207,
+        "chars": 274
+      },
+      {
+        "pointer": "/outrosSegmentos/206",
+        "order": 208,
+        "chars": 47
+      },
+      {
+        "pointer": "/outrosSegmentos/207",
+        "order": 209,
+        "chars": 61
+      },
+      {
+        "pointer": "/outrosSegmentos/208",
+        "order": 210,
+        "chars": 10
+      },
+      {
+        "pointer": "/outrosSegmentos/209",
+        "order": 211,
+        "chars": 9
+      },
+      {
+        "pointer": "/outrosSegmentos/210",
+        "order": 212,
+        "chars": 10
+      },
+      {
+        "pointer": "/outrosSegmentos/211",
+        "order": 213,
+        "chars": 38
+      },
+      {
+        "pointer": "/outrosSegmentos/212",
+        "order": 214,
+        "chars": 14
+      },
+      {
+        "pointer": "/outrosSegmentos/213",
+        "order": 215,
+        "chars": 170
+      },
+      {
+        "pointer": "/outrosSegmentos/214",
+        "order": 216,
+        "chars": 339
+      },
+      {
+        "pointer": "/outrosSegmentos/215",
+        "order": 217,
+        "chars": 90
+      },
+      {
+        "pointer": "/outrosSegmentos/216",
+        "order": 218,
+        "chars": 508
+      },
+      {
+        "pointer": "/outrosSegmentos/217",
+        "order": 219,
+        "chars": 285
+      },
+      {
+        "pointer": "/outrosSegmentos/218",
+        "order": 220,
+        "chars": 352
+      },
+      {
+        "pointer": "/outrosSegmentos/219",
+        "order": 221,
+        "chars": 316
+      },
+      {
+        "pointer": "/outrosSegmentos/220",
+        "order": 222,
+        "chars": 336
+      },
+      {
+        "pointer": "/outrosSegmentos/221",
+        "order": 223,
+        "chars": 35
+      },
+      {
+        "pointer": "/outrosSegmentos/222",
+        "order": 224,
+        "chars": 361
+      },
+      {
+        "pointer": "/outrosSegmentos/223",
+        "order": 225,
+        "chars": 348
+      },
+      {
+        "pointer": "/outrosSegmentos/224",
+        "order": 226,
+        "chars": 319
+      },
+      {
+        "pointer": "/outrosSegmentos/225",
+        "order": 227,
+        "chars": 94
+      },
+      {
+        "pointer": "/outrosSegmentos/226",
+        "order": 228,
+        "chars": 335
+      },
+      {
+        "pointer": "/outrosSegmentos/227",
+        "order": 229,
+        "chars": 61
+      },
+      {
+        "pointer": "/outrosSegmentos/228",
+        "order": 230,
+        "chars": 135
+      },
+      {
+        "pointer": "/outrosSegmentos/229",
+        "order": 231,
+        "chars": 107
+      },
+      {
+        "pointer": "/outrosSegmentos/230",
+        "order": 232,
+        "chars": 43
+      },
+      {
+        "pointer": "/outrosSegmentos/231",
+        "order": 233,
+        "chars": 52
+      },
+      {
+        "pointer": "/outrosSegmentos/232",
+        "order": 234,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/233",
+        "order": 235,
+        "chars": 24
+      },
+      {
+        "pointer": "/outrosSegmentos/234",
+        "order": 236,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/235",
+        "order": 237,
+        "chars": 55
+      },
+      {
+        "pointer": "/outrosSegmentos/236",
+        "order": 238,
+        "chars": 51
+      },
+      {
+        "pointer": "/outrosSegmentos/237",
+        "order": 239,
+        "chars": 28
+      },
+      {
+        "pointer": "/outrosSegmentos/238",
+        "order": 240,
+        "chars": 147
+      },
+      {
+        "pointer": "/outrosSegmentos/239",
+        "order": 241,
+        "chars": 53
+      },
+      {
+        "pointer": "/outrosSegmentos/240",
+        "order": 242,
+        "chars": 187
+      },
+      {
+        "pointer": "/outrosSegmentos/241",
+        "order": 243,
+        "chars": 218
+      },
+      {
+        "pointer": "/outrosSegmentos/242",
+        "order": 244,
+        "chars": 125
+      },
+      {
+        "pointer": "/outrosSegmentos/243",
+        "order": 245,
+        "chars": 82
+      },
+      {
+        "pointer": "/outrosSegmentos/244",
+        "order": 246,
+        "chars": 66
+      },
+      {
+        "pointer": "/outrosSegmentos/245",
+        "order": 247,
+        "chars": 109
+      },
+      {
+        "pointer": "/outrosSegmentos/246",
+        "order": 248,
+        "chars": 189
+      },
+      {
+        "pointer": "/outrosSegmentos/247",
+        "order": 249,
+        "chars": 85
+      },
+      {
+        "pointer": "/outrosSegmentos/248",
+        "order": 250,
+        "chars": 333
+      },
+      {
+        "pointer": "/outrosSegmentos/249",
+        "order": 251,
+        "chars": 184
+      },
+      {
+        "pointer": "/outrosSegmentos/250",
+        "order": 252,
+        "chars": 269
+      },
+      {
+        "pointer": "/outrosSegmentos/251",
+        "order": 253,
+        "chars": 259
+      },
+      {
+        "pointer": "/outrosSegmentos/252",
+        "order": 254,
+        "chars": 76
+      },
+      {
+        "pointer": "/outrosSegmentos/253",
+        "order": 255,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/254",
+        "order": 256,
+        "chars": 511
+      },
+      {
+        "pointer": "/outrosSegmentos/255",
+        "order": 257,
+        "chars": 268
+      },
+      {
+        "pointer": "/outrosSegmentos/256",
+        "order": 258,
+        "chars": 38
+      },
+      {
+        "pointer": "/outrosSegmentos/257",
+        "order": 259,
+        "chars": 198
+      },
+      {
+        "pointer": "/outrosSegmentos/258",
+        "order": 260,
+        "chars": 169
+      },
+      {
+        "pointer": "/outrosSegmentos/259",
+        "order": 261,
+        "chars": 51
+      },
+      {
+        "pointer": "/outrosSegmentos/260",
+        "order": 262,
+        "chars": 268
+      },
+      {
+        "pointer": "/outrosSegmentos/261",
+        "order": 263,
+        "chars": 264
+      },
+      {
+        "pointer": "/outrosSegmentos/262",
+        "order": 264,
+        "chars": 87
+      },
+      {
+        "pointer": "/outrosSegmentos/263",
+        "order": 265,
+        "chars": 31
+      },
+      {
+        "pointer": "/outrosSegmentos/264",
+        "order": 266,
+        "chars": 111
+      },
+      {
+        "pointer": "/outrosSegmentos/265",
+        "order": 267,
+        "chars": 300
+      },
+      {
+        "pointer": "/outrosSegmentos/266",
+        "order": 268,
+        "chars": 354
+      },
+      {
+        "pointer": "/outrosSegmentos/267",
+        "order": 269,
+        "chars": 70
+      },
+      {
+        "pointer": "/outrosSegmentos/268",
+        "order": 270,
+        "chars": 67
+      },
+      {
+        "pointer": "/outrosSegmentos/269",
+        "order": 271,
+        "chars": 64
+      },
+      {
+        "pointer": "/outrosSegmentos/270",
+        "order": 272,
+        "chars": 64
+      },
+      {
+        "pointer": "/outrosSegmentos/271",
+        "order": 273,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/272",
+        "order": 274,
+        "chars": 159
+      },
+      {
+        "pointer": "/outrosSegmentos/273",
+        "order": 275,
+        "chars": 466
+      },
+      {
+        "pointer": "/outrosSegmentos/274",
+        "order": 276,
+        "chars": 485
+      },
+      {
+        "pointer": "/outrosSegmentos/275",
+        "order": 277,
+        "chars": 576
+      },
+      {
+        "pointer": "/outrosSegmentos/276",
+        "order": 278,
+        "chars": 340
+      },
+      {
+        "pointer": "/outrosSegmentos/277",
+        "order": 279,
+        "chars": 184
+      },
+      {
+        "pointer": "/outrosSegmentos/278",
+        "order": 280,
+        "chars": 261
+      },
+      {
+        "pointer": "/outrosSegmentos/279",
+        "order": 281,
+        "chars": 145
+      },
+      {
+        "pointer": "/outrosSegmentos/280",
+        "order": 282,
+        "chars": 367
+      },
+      {
+        "pointer": "/outrosSegmentos/281",
+        "order": 283,
+        "chars": 154
+      },
+      {
+        "pointer": "/outrosSegmentos/282",
+        "order": 284,
+        "chars": 216
+      },
+      {
+        "pointer": "/outrosSegmentos/283",
+        "order": 285,
+        "chars": 481
+      },
+      {
+        "pointer": "/outrosSegmentos/284",
+        "order": 286,
+        "chars": 167
+      },
+      {
+        "pointer": "/outrosSegmentos/285",
+        "order": 287,
+        "chars": 197
+      },
+      {
+        "pointer": "/outrosSegmentos/286",
+        "order": 288,
+        "chars": 280
+      },
+      {
+        "pointer": "/outrosSegmentos/287",
+        "order": 289,
+        "chars": 173
+      },
+      {
+        "pointer": "/outrosSegmentos/288",
+        "order": 290,
+        "chars": 81
+      },
+      {
+        "pointer": "/outrosSegmentos/289",
+        "order": 291,
+        "chars": 140
+      },
+      {
+        "pointer": "/outrosSegmentos/290",
+        "order": 292,
+        "chars": 237
+      },
+      {
+        "pointer": "/outrosSegmentos/291",
+        "order": 293,
+        "chars": 44
+      },
+      {
+        "pointer": "/outrosSegmentos/292",
+        "order": 294,
+        "chars": 36
+      },
+      {
+        "pointer": "/outrosSegmentos/293",
+        "order": 295,
+        "chars": 21
+      },
+      {
+        "pointer": "/outrosSegmentos/294",
+        "order": 296,
+        "chars": 325
+      },
+      {
+        "pointer": "/outrosSegmentos/295",
+        "order": 297,
+        "chars": 442
+      },
+      {
+        "pointer": "/outrosSegmentos/296",
+        "order": 298,
+        "chars": 359
+      },
+      {
+        "pointer": "/outrosSegmentos/297",
+        "order": 299,
+        "chars": 261
+      },
+      {
+        "pointer": "/outrosSegmentos/298",
+        "order": 300,
+        "chars": 36
+      },
+      {
+        "pointer": "/outrosSegmentos/299",
+        "order": 301,
+        "chars": 343
+      },
+      {
+        "pointer": "/outrosSegmentos/300",
+        "order": 302,
+        "chars": 219
+      },
+      {
+        "pointer": "/outrosSegmentos/301",
+        "order": 303,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/302",
+        "order": 304,
+        "chars": 416
+      },
+      {
+        "pointer": "/outrosSegmentos/303",
+        "order": 305,
+        "chars": 541
+      },
+      {
+        "pointer": "/outrosSegmentos/304",
+        "order": 306,
+        "chars": 127
+      },
+      {
+        "pointer": "/outrosSegmentos/305",
+        "order": 307,
+        "chars": 129
+      },
+      {
+        "pointer": "/outrosSegmentos/306",
+        "order": 308,
+        "chars": 127
+      },
+      {
+        "pointer": "/outrosSegmentos/307",
+        "order": 309,
+        "chars": 390
+      },
+      {
+        "pointer": "/outrosSegmentos/308",
+        "order": 310,
+        "chars": 394
+      },
+      {
+        "pointer": "/outrosSegmentos/309",
+        "order": 311,
+        "chars": 261
+      },
+      {
+        "pointer": "/outrosSegmentos/310",
+        "order": 312,
+        "chars": 259
+      },
+      {
+        "pointer": "/outrosSegmentos/311",
+        "order": 313,
+        "chars": 249
+      },
+      {
+        "pointer": "/outrosSegmentos/312",
+        "order": 314,
+        "chars": 251
+      },
+      {
+        "pointer": "/outrosSegmentos/313",
+        "order": 315,
+        "chars": 716
+      },
+      {
+        "pointer": "/outrosSegmentos/314",
+        "order": 316,
+        "chars": 423
+      },
+      {
+        "pointer": "/outrosSegmentos/315",
+        "order": 317,
+        "chars": 515
+      },
+      {
+        "pointer": "/outrosSegmentos/316",
+        "order": 318,
+        "chars": 298
+      },
+      {
+        "pointer": "/outrosSegmentos/317",
+        "order": 319,
+        "chars": 200
+      },
+      {
+        "pointer": "/outrosSegmentos/318",
+        "order": 320,
+        "chars": 48
+      },
+      {
+        "pointer": "/outrosSegmentos/319",
+        "order": 321,
+        "chars": 46
+      },
+      {
+        "pointer": "/outrosSegmentos/320",
+        "order": 322,
+        "chars": 90
+      },
+      {
+        "pointer": "/outrosSegmentos/321",
+        "order": 323,
+        "chars": 92
+      },
+      {
+        "pointer": "/outrosSegmentos/322",
+        "order": 324,
+        "chars": 72
+      },
+      {
+        "pointer": "/outrosSegmentos/323",
+        "order": 325,
+        "chars": 109
+      },
+      {
+        "pointer": "/outrosSegmentos/324",
+        "order": 326,
+        "chars": 337
+      },
+      {
+        "pointer": "/outrosSegmentos/325",
+        "order": 327,
+        "chars": 148
+      },
+      {
+        "pointer": "/outrosSegmentos/326",
+        "order": 328,
+        "chars": 270
+      },
+      {
+        "pointer": "/outrosSegmentos/327",
+        "order": 329,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/328",
+        "order": 330,
+        "chars": 250
+      },
+      {
+        "pointer": "/outrosSegmentos/329",
+        "order": 331,
+        "chars": 25
+      },
+      {
+        "pointer": "/outrosSegmentos/330",
+        "order": 332,
+        "chars": 66
+      },
+      {
+        "pointer": "/outrosSegmentos/331",
+        "order": 333,
+        "chars": 63
+      },
+      {
+        "pointer": "/outrosSegmentos/332",
+        "order": 334,
+        "chars": 64
+      },
+      {
+        "pointer": "/outrosSegmentos/333",
+        "order": 335,
+        "chars": 63
+      },
+      {
+        "pointer": "/outrosSegmentos/334",
+        "order": 336,
+        "chars": 62
+      },
+      {
+        "pointer": "/outrosSegmentos/335",
+        "order": 337,
+        "chars": 67
+      },
+      {
+        "pointer": "/outrosSegmentos/336",
+        "order": 338,
+        "chars": 65
+      },
+      {
+        "pointer": "/outrosSegmentos/337",
+        "order": 339,
+        "chars": 68
+      },
+      {
+        "pointer": "/outrosSegmentos/338",
+        "order": 340,
+        "chars": 64
+      },
+      {
+        "pointer": "/outrosSegmentos/339",
+        "order": 341,
+        "chars": 66
+      },
+      {
+        "pointer": "/outrosSegmentos/340",
+        "order": 342,
+        "chars": 63
+      },
+      {
+        "pointer": "/outrosSegmentos/341",
+        "order": 343,
+        "chars": 122
+      },
+      {
+        "pointer": "/outrosSegmentos/342",
+        "order": 344,
+        "chars": 24
+      }
+    ],
     "attachments": [],
     "excluded": [
       "/epigrafeCompleta"
@@ -47,7 +1764,23 @@
       "inciso": 143,
       "alinea": 32
     },
+    "canonicalChars": 57179,
+    "accountedChars": 57179,
     "unidentifiedChars": 1015,
-    "canonicalChars": 57179
+    "unidentifiedCauses": {
+      "incisoWithoutDashInPortalText": 0,
+      "other": 1015
+    },
+    "struckSegments": 343,
+    "struckRawHtmlChars": 63245,
+    "struckMarkedHistoricalByReader": false,
+    "missingSegments": [
+      {
+        "pointer": "/outrosSegmentos/104",
+        "order": 106,
+        "reason": "no_text"
+      }
+    ],
+    "attachmentsWithoutContent": 0
   }
 }

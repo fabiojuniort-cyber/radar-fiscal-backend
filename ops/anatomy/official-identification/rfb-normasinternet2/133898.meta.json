@@ -24,6 +24,103 @@
     "htmlSha256": "279d5b501da5226e42ab904eb184f8a75f5d974223f45813cb0169ea4ce19ac0",
     "pieces": 28,
     "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/1",
+        "order": 3,
+        "chars": 114
+      },
+      {
+        "pointer": "/outrosSegmentos/2",
+        "order": 4,
+        "chars": 124
+      },
+      {
+        "pointer": "/outrosSegmentos/3",
+        "order": 5,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/4",
+        "order": 6,
+        "chars": 193
+      },
+      {
+        "pointer": "/outrosSegmentos/5",
+        "order": 7,
+        "chars": 129
+      },
+      {
+        "pointer": "/outrosSegmentos/6",
+        "order": 8,
+        "chars": 180
+      },
+      {
+        "pointer": "/outrosSegmentos/7",
+        "order": 9,
+        "chars": 184
+      },
+      {
+        "pointer": "/outrosSegmentos/8",
+        "order": 10,
+        "chars": 124
+      },
+      {
+        "pointer": "/outrosSegmentos/9",
+        "order": 11,
+        "chars": 152
+      },
+      {
+        "pointer": "/outrosSegmentos/10",
+        "order": 12,
+        "chars": 125
+      },
+      {
+        "pointer": "/outrosSegmentos/11",
+        "order": 13,
+        "chars": 124
+      },
+      {
+        "pointer": "/outrosSegmentos/12",
+        "order": 14,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/13",
+        "order": 15,
+        "chars": 444
+      },
+      {
+        "pointer": "/outrosSegmentos/14",
+        "order": 16,
+        "chars": 266
+      },
+      {
+        "pointer": "/outrosSegmentos/15",
+        "order": 17,
+        "chars": 123
+      },
+      {
+        "pointer": "/outrosSegmentos/16",
+        "order": 18,
+        "chars": 46
+      },
+      {
+        "pointer": "/outrosSegmentos/17",
+        "order": 19,
+        "chars": 92
+      },
+      {
+        "pointer": "/outrosSegmentos/18",
+        "order": 20,
+        "chars": 78
+      },
+      {
+        "pointer": "/outrosSegmentos/24",
+        "order": 26,
+        "chars": 96
+      }
+    ],
     "attachments": [],
     "excluded": [
       "/epigrafeCompleta"
@@ -39,7 +136,17 @@
       "article": 4,
       "quoted_text": 21
     },
+    "canonicalChars": 4540,
+    "accountedChars": 4540,
     "unidentifiedChars": 511,
-    "canonicalChars": 4540
+    "unidentifiedCauses": {
+      "incisoWithoutDashInPortalText": 0,
+      "other": 511
+    },
+    "struckSegments": 19,
+    "struckRawHtmlChars": 2854,
+    "struckMarkedHistoricalByReader": false,
+    "missingSegments": [],
+    "attachmentsWithoutContent": 0
   }
 }

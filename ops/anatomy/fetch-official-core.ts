@@ -33,7 +33,9 @@ const RFB_JSON_PATH = /^\/api\/consulta-externa\/ato\/(\d{1,10})\/visao\/[a-z-]{
 export interface RfbIdentification { idAto: number; epigrafe: string | null; numeroAto: string | null; dataAto: string | null;
   dataPublicacao: string | null; dadosPublicacao: string | null; visao: string | null; portalDeclaresVigente: boolean | null }
 export interface RfbPreparationSummary { preparationVersion: string; preparationId: string; htmlSha256: string; pieces: number;
-  missingSegments: { pointer: string; order: number; reason: string }[]; attachments: { id: string; name: string | null; status: string }[]; excluded: string[] }
+  missingSegments: { pointer: string; order: number; reason: string }[];
+  /** Segments the portal marks `tachado` (struck-through = superseded wording). The preparation does NOT mark them as historical. */
+  struckSegments: { pointer: string; order: number; chars: number }[]; attachments: { id: string; name: string | null; status: string }[]; excluded: string[] }
 
 /** The idAto an RFB JSON URL names, or null when the URL is not the accepted RFB JSON endpoint. */
 export function rfbJsonIdAto(url: URL, rfbHosts: readonly string[]): number | null {
@@ -62,7 +64,11 @@ export function validateRfbJson(body: Buffer, expectedIdAto: number): { problem:
       dataPublicacao: s(root.dataPublicacao), dadosPublicacao: s(root.dadosPublicacao), visao: s(root.visao),
       portalDeclaresVigente: typeof root.vigente === 'boolean' ? root.vigente : null },
     preparation: { preparationVersion: prep.preparationVersion, preparationId: prep.preparationId, htmlSha256: prep.htmlSha256, pieces: prep.pieces.length,
-      missingSegments: prep.missingSegments, attachments: prep.attachments.map((a) => ({ id: a.id, name: a.name, status: a.status })), excluded: prep.excluded.map((x) => x.pointer) },
+      missingSegments: prep.missingSegments,
+      struckSegments: (['ementas', 'outrosSegmentos'] as const).flatMap((k) => (Array.isArray(root[k]) ? root[k] as Record<string, unknown>[] : [])
+        .map((seg, i) => ({ seg, pointer: `/${k}/${i}` })).filter(({ seg }) => seg && seg.tachado === true)
+        .map(({ seg, pointer }) => ({ pointer, order: Number(seg.ordemSegmentoAto), chars: typeof seg.textoIntegra === 'string' ? seg.textoIntegra.length : 0 }))),
+      attachments: prep.attachments.map((a) => ({ id: a.id, name: a.name, status: a.status })), excluded: prep.excluded.map((x) => x.pointer) },
   };
 }
 

@@ -207,3 +207,16 @@ test('D03: the four collected RFB JSON snapshots validate, match their recorded 
     assert.ok(!('problem' in v), `${id}: ${'problem' in v ? v.problem : ''}`);
   }
 });
+
+test('D03: struck-through (tachado) segments are recorded and a sample drawing on them is refused', async () => {
+  const body = rfbJson({ outrosSegmentos: [{ ordemSegmentoAto: 2, textoIntegra: '<p>Art. 1º Redação vigente.</p>' }, { ordemSegmentoAto: 3, tachado: true, textoIntegra: '<p>Art. 2º Redação superada.</p>' }] });
+  const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(body)).f);
+  assert.ok(r.ok);
+  assert.deepEqual(r.meta.preparation!.struckSegments, [{ pointer: '/outrosSegmentos/1', order: 3, chars: '<p>Art. 2º Redação superada.</p>'.length }]);
+  const dir = mkdtempSync(join(tmpdir(), 'ofc-tach-'));
+  writeFileSync(join(dir, 'ofc-rfb-x.json'), r.body); writeFileSync(join(dir, 'ofc-rfb-x.meta.json'), JSON.stringify(r.meta));
+  const sample = (content: string): SampleInput => ({ id: 'ofc-rfb-x', documentId: 'ofc-rfb-x', version: 'v1', title: 't', source: 'RFB', family: null, format: 'html', content, covers: ['x'],
+    provenance: { kind: 'official', act: 'Instrução Normativa RFB 9.999/2099', url: RFB_URL, consultedAt: '2026-11-04', version: 'multivigente', reason: 'motivo suficiente', snapshotSha256: r.meta.sha256 } as SampleInput['provenance'] });
+  assert.deepEqual(await bindingIssues([sample('<p>Art. 1º Redação vigente.</p>')], dir, [rfbAct()]), []);
+  assert.match((await bindingIssues([sample('<p>Art. 2º Redação superada.</p>')], dir, [rfbAct()])).join(), /segmento tachado/u);
+});

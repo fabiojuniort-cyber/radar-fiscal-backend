@@ -33,7 +33,7 @@ export async function bindingIssues(samples: readonly SampleInput[], dir: string
     const metaPath = join(dir, `${s.id}.meta.json`);
     if (!existsSync(metaPath)) { bad('sem metadados de snapshot'); continue; }
     const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { url: string; sha256: string; verified: boolean; contentType: string; extraction?: { tool: string; textSha256: string };
-      representation?: string; identification?: { idAto: number }; preparation?: { htmlSha256: string } };
+      representation?: string; identification?: { idAto: number }; preparation?: { htmlSha256: string; struckSegments?: { pointer: string }[] } };
     if (!meta.verified) bad('snapshot de URL candidata, não promovível');
     if (meta.url !== p.url) bad('URL difere do snapshot');
     if (meta.sha256 !== p.snapshotSha256) bad('SHA-256 difere do snapshot registrado');
@@ -45,11 +45,16 @@ export async function bindingIssues(samples: readonly SampleInput[], dir: string
     if (createHash('sha256').update(bytes).digest('hex') !== meta.sha256) bad('snapshot adulterado: hash do arquivo não confere');
     if (isJson) {
       if (!meta.identification || !meta.preparation) { bad('JSON da RFB sem identificação/preparação registradas'); continue; }
-      let html: string;
-      try { const p = prepareRfbRepresentation({ resourceId: s.id, bytes: new Uint8Array(bytes) }, meta.identification.idAto); html = p.html;
+      let html: string; let prep;
+      try { const p = prepareRfbRepresentation({ resourceId: s.id, bytes: new Uint8Array(bytes) }, meta.identification.idAto); html = p.html; prep = p;
         if (p.htmlSha256 !== meta.preparation.htmlSha256) bad('texto preparado do JSON não confere com preparation.htmlSha256'); }
       catch (e) { bad(`JSON da RFB não preparável: ${(e as Error).message}`); continue; }
-      if (!html.includes(s.content)) bad('conteúdo da amostra não é recorte exato do texto preparado do JSON');
+      const at = html.indexOf(s.content);
+      if (at < 0) { bad('conteúdo da amostra não é recorte exato do texto preparado do JSON'); continue; }
+      // A sample must not draw on struck-through (superseded) wording presented as plain text by the preparation.
+      if (!meta.preparation.struckSegments) { bad('preparação sem registro de segmentos tachados'); continue; }
+      const struck = new Set(meta.preparation.struckSegments.map((x) => `${x.pointer}/textoIntegra`));
+      if (prep!.pieces.some((piece) => struck.has(piece.pointer) && piece.htmlSpan.start < at + s.content.length && at < piece.htmlSpan.end)) bad('amostra inclui segmento tachado (redação superada) do JSON da RFB');
       continue;
     }
     if (!isPdf) { if (!bytes.toString('utf8').includes(s.content)) bad('conteúdo da amostra não é recorte exato do snapshot'); continue; }

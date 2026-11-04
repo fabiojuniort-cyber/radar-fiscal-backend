@@ -24,6 +24,7 @@
     "htmlSha256": "6bf1f2682f2aed73e6d511873927e044e854f454842ca6d80215aabbd8bf92ec",
     "pieces": 7,
     "missingSegments": [],
+    "struckSegments": [],
     "attachments": [],
     "excluded": [
       "/epigrafeCompleta"
@@ -39,7 +40,17 @@
       "article": 2,
       "inciso": 2
     },
+    "canonicalChars": 2003,
+    "accountedChars": 2003,
     "unidentifiedChars": 325,
-    "canonicalChars": 2003
+    "unidentifiedCauses": {
+      "incisoWithoutDashInPortalText": 0,
+      "other": 325
+    },
+    "struckSegments": 0,
+    "struckRawHtmlChars": 0,
+    "struckMarkedHistoricalByReader": false,
+    "missingSegments": [],
+    "attachmentsWithoutContent": 0
   }
 }
