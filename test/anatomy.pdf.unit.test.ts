@@ -75,3 +75,32 @@ test('characters special to HTML (&, <, >) are preserved verbatim, never interpr
   assert.equal(r.canonicalText, `${line}\n`);
   assert.equal(r.pdf.lines[0]!.start, 0);
 });
+
+test('R2-05: a mixed PDF (text page + image-only page) is partial and names the unread page; no OCR, no invented text', async () => {
+  const r = await readPdfInput(buildSyntheticPdf([PAGE1, []], { imagePages: [1] }), { source: 'DOU', representationId: 'pdf-misto' });
+  assert.equal(r.status, 'partial');
+  assert.deepEqual(r.pdf.pageCoverage, [{ page: 1, state: 'text' }, { page: 2, state: 'no_text_layer' }]);
+  const lim = r.limitations.filter((l) => l.code === 'pdf_page_without_text_layer');
+  assert.equal(lim.length, 1); assert.match(lim[0]!.message, /page 2\b/u);
+  assert.ok(r.pdf.lines.every((l) => l.page === 1));
+});
+
+test('R2-05: all-text PDF stays complete; an image-only PDF is without text layer; a blank page is "empty", not a loss', async () => {
+  const full = await readPdfInput(buildSyntheticPdf([PAGE2, PAGE2]), { source: 'DOU', representationId: 'pdf-txt' });
+  assert.equal(full.status, 'complete', 'fully recognized text pages are not degraded by page coverage');
+  assert.ok(full.pdf.pageCoverage.every((c) => c.state === 'text'));
+  const scan = await readPdfInput(buildSyntheticPdf([[]], { imagePages: [0] }), { source: 'DOU', representationId: 'pdf-scan' });
+  assert.ok(scan.limitations.some((l) => l.code === 'pdf_without_text_layer'));
+  assert.deepEqual(scan.pdf.pageCoverage, [{ page: 1, state: 'no_text_layer' }]);
+  const blank = await readPdfInput(buildSyntheticPdf([PAGE1, []]), { source: 'DOU', representationId: 'pdf-branco' });
+  assert.deepEqual(blank.pdf.pageCoverage, [{ page: 1, state: 'text' }, { page: 2, state: 'empty' }]);
+  assert.ok(!blank.limitations.some((l) => l.code === 'pdf_page_without_text_layer'));
+});
+
+test('R2 fidelity (documented limit): repeated spaces come out as ONE space, from the pdfjs text layer; nothing else is edited or added', async () => {
+  const { lines } = await extractPdfLines(buildSyntheticPdf([[{ text: 'Art. 1º  Valor   exemplo.', y: 700 }, { text: 'Sem-hífen- unido', y: 680 }]]));
+  assert.equal(lines[0]!.text, 'Art. 1º Valor exemplo.', 'measured pdfjs normalization of space runs');
+  assert.equal(lines[1]!.text, 'Sem-hífen- unido', 'hyphens and words kept as drawn');
+  const split = await extractPdfLines(buildSyntheticPdf([[{ text: 'Art. 2º', y: 700, x: 72 }, { text: 'Texto', y: 700, x: 200 }]]));
+  assert.equal(split.lines[0]!.text, 'Art. 2º Texto', 'one space inserted between runs of a line');
+});
