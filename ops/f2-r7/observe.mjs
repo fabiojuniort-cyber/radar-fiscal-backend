@@ -16,6 +16,11 @@ const snapshotSQL=`SELECT jsonb_build_object(
  'triggers',(SELECT jsonb_agg(jsonb_build_object('name',tgname,'enabled',tgenabled,'definition_md5',md5(pg_get_triggerdef(oid)))) FROM pg_trigger WHERE tgrelid='public.audit_log'::regclass AND NOT tgisinternal),
  'statistics',(SELECT jsonb_agg(jsonb_build_object('column',attname,'distinct',n_distinct,'null_fraction',null_frac,'correlation',correlation)) FROM pg_stats WHERE schemaname='public' AND tablename='audit_log')
 ) AS data`;
+export async function queryWithRelease(pool,args){
+ const c=await pool.connect();
+ try{const result=await c.query(...args);c.release();return result;}
+ catch(error){c.release(error);throw error;}
+}
 let ordinal=0,connections=0;
 export function instrumentPool(pool){
  guard();
@@ -51,7 +56,7 @@ export function instrumentPool(pool){
  };
  // Every checkout is awaited and verified, including after pool re-open.
  // This test uses the promise API only. No global pg hooks or app pools change.
- pool.query=async(...args)=>{const c=await pool.connect();try{return await c.query(...args);}finally{c.release();}};
+ pool.query=(...args)=>queryWithRelease(pool,args);
  return pool;
 }
 

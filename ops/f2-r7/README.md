@@ -1,5 +1,15 @@
 # F2 R7 - par observacional autorizado
 
+## Limita��o descoberta na execu��o inicial
+
+O run41930483691 usa o HEAD23c9226f. O wrapper inicial pool.query liberava
+conex�es sem o erro no finally, diferente do pg-pool que chama release(err).
+Isso pode conservar sess�o/cache que seriam descartados. Os resultados desse
+par n�o constituem compara��o equivalente nem prova causal, mesmo se verdes.
+Esta revis�o corrige a passagem do erro e adiciona teste espec�fico de descarte.
+N�o repete o par: o workflow responde somente ao primeiro opened, attempt1.
+Nova execu��o exige decis�o espec�fica ap�s o limite original de duas �rvores.
+
 Autoriza��o: tribusca-control#127 coment�rio6642909200, reiterada pelo F�bio.
 N�o mergear esta prepara��o; nenhum deploy/ambiente produtivo envolvido.
 
