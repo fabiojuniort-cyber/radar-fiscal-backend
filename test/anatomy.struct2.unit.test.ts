@@ -55,8 +55,8 @@ test('fidelity: canonical text, coverage and spans unchanged by caput; validated
   assert.equal(r.canonicalText, reader.canonicalText);
 });
 
-test('with STRUCT-01 R1: caput coexists with nested items and with the annex return; ids not renumbered', () => {
-  const r = run('<p>LIVRO I</p><p>Art. 1º Lista:</p><p>1. um;</p><p>1.1. sub;</p><p>ANEXO I</p><p>Texto.</p><p>LIVRO II</p><p>Art. 2º Fim.</p>');
+test('with STRUCT-01 R1: caput coexists with nested items and with the annex return (R2-01: annex in its own container); ids not renumbered', () => {
+  const r = run('<p>LIVRO I</p><p>Art. 1º Lista:</p><p>1. um;</p><p>1.1. sub;</p><div><p>ANEXO I</p><p>Texto.</p></div><p>LIVRO II</p><p>Art. 2º Fim.</p>');
   const byText = (pre: string) => r.parts.find((p) => p.type !== 'caput' && p.type !== 'document' && r.canonicalText.slice(p.span.start).startsWith(pre))!;
   const art1 = byText('Art. 1º');
   assert.ok(r.parts.some((p) => p.id === `${art1.id}-caput` && p.parentId === art1.id));
