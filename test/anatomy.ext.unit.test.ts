@@ -24,10 +24,12 @@ test('separate annex files link by declared designation only; unmatched or repea
   const main = read(MAIN);
   const sep = (label: string, body: string[]) => ({ declaredLabel: label, representationId: `sep-${label}`, bytesSha256: sha(body.join()), result: read(body, label) });
   const m = linkSeparateAnnexes(main, [sep('Anexo  i', ['ANEXO I', 'Campo um.']), sep('ANEXO III', ['ANEXO III', 'x.']), sep('ANEXO I', ['ANEXO I', 'y.'])]);
-  assert.equal(m.separate[0]!.inlinePartId, buildAnnexManifest(main)[0]!.partId);
+  assert.equal(m.separate[0]!.inlinePartId, null, 'R2-06: repeated designation, no file of the group is linked');
   assert.equal(m.separate[1]!.inlinePartId, null);
   assert.equal(m.separate[2]!.inlinePartId, null);
-  assert.deepEqual(m.issues, [{ code: 'annex_separate_without_heading', label: 'ANEXO III' }, { code: 'annex_label_duplicate', label: 'ANEXO I' }]);
+  assert.deepEqual(m.issues, [{ code: 'annex_label_duplicate', label: 'ANEXO I' }, { code: 'annex_separate_without_heading', label: 'ANEXO III' }]);
+  const single = linkSeparateAnnexes(main, [sep('ANEXO I', ['ANEXO I', 'Campo um.'])]);
+  assert.equal(single.separate[0]!.inlinePartId, buildAnnexManifest(main)[0]!.partId, 'a unique designation still links');
   assert.equal(m.separate[0]!.textSha256, sha(read(['ANEXO I', 'Campo um.'], 'x').canonicalText), 'separate annex keeps its own text hash');
 });
 
@@ -67,4 +69,18 @@ test('deep nesting beyond the depth limit is reported, not dropped silently', ()
   const r = readAnatomyInput({ source: 'DOU', representationId: 'deep', html: deep });
   assert.ok(r.limitations.length > 0, 'explicit limitation');
   assert.ok(r.canonicalText.includes('Art. 1º Fundo.'), 'text retained');
+});
+
+test('R2-06: two separate files declared ANEXO I give the same result in either order; none is preferred', () => {
+  const main = read(MAIN);
+  const sep = (id: string, body: string[]) => ({ declaredLabel: 'ANEXO I', representationId: id, bytesSha256: sha(id), result: read(body, id) });
+  const a = sep('arquivo-a', ['ANEXO I', 'Versão A.']); const b = sep('arquivo-b', ['ANEXO I', 'Versão B.']);
+  const ab = linkSeparateAnnexes(main, [a, b]); const ba = linkSeparateAnnexes(main, [b, a]);
+  for (const m of [ab, ba]) {
+    assert.ok(m.separate.every((x) => x.inlinePartId === null), 'no arbitrary winner');
+    assert.deepEqual(m.issues, [{ code: 'annex_label_duplicate', label: 'ANEXO I' }]);
+    assert.equal(m.separate.length, 2, 'all files kept');
+  }
+  const key = (m: typeof ab) => m.separate.map((x) => `${x.representationId}:${x.bytesSha256}:${x.textSha256}:${x.inlinePartId}`).sort();
+  assert.deepEqual(key(ab), key(ba), 'order-independent, hashes preserved');
 });
