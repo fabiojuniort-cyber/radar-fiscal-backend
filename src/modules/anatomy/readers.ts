@@ -17,7 +17,15 @@ export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, 
 type Pointer = AnatomyPart['sourcePointers'][number];
 type Node = { tag: string; attrs: Record<string, string>; path: string; start: number; end: number;
   children: Node[]; text: string | null; span: { start: number; end: number }; blocked: boolean };
-type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number };
+/** ANAT-STRUCT-01: grouping levels nest inside an annex (rank 2) and above articles/clauses (rank 3). */
+const GROUP_RANK: Record<string, [string, number]> = {
+  LIVRO: ['book', 2.1], TITULO: ['title', 2.2], CAPITULO: ['chapter', 2.3], SECAO: ['section', 2.4], SUBSECAO: ['subsection', 2.5],
+};
+const SOLE_PARAGRAPH = /^par[áa]grafo\s+[úu]nico(?![\p{L}\p{N}_])/iu;
+const CONSIDERANDO = /^considerando(?![\p{L}\p{N}_])/iu;
+const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase()]!;
+const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
+type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number; itemNumber?: string };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
 const textOf = (node: Node): string => {
@@ -66,15 +74,30 @@ function describe(node: Node, rules: CompiledRules, matchText: (node: Node) => s
   if (rules.rectificationOriginal.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: `${p}_rectification_original`, rank: 100 };
   if (rules.rectificationCorrected.test(text)) return { type: 'quoted_text', context: 'prohibited', reason: `${p}_rectification_corrected`, rank: 100 };
   if (rules.quoteBlockOpen.test(text)) return { type: 'quoted_text', context: hist ? 'historical' : 'prohibited', reason: 'quoted_block', rank: 100 };
-  if (rules.preamble.test(text)) return { type: 'preamble', context: hist ? 'historical' : 'prohibited', reason: 'preamble_marker', rank: 100 };
+  if (rules.preamble.test(text)) {
+    // ANAT-STRUCT-01: a preamble block that is a considerando (the whole word, any case) is typed as such; the
+    // preamble matcher itself is unchanged, so context and every non-considerando preamble stay as before.
+    const consideration = CONSIDERANDO.test(text);
+    return { type: consideration ? 'consideration' : 'preamble', context: hist ? 'historical' : 'prohibited', reason: consideration ? 'consideration_marker' : 'preamble_marker', rank: 100 };
+  }
   // Only block-initial markers are recognized. A reference to an annex in prose is not a heading.
   if (rules.annex.test(text)) return { type: 'annex', context, reason: 'annex_heading', rank: 2 };
+  // Grouping headings (Livro > Título > Capítulo > Seção > Subseção) are built-in grammar: an upper-case or
+  // capitalised heading word, then a roman/arabic number or "Único/Única", alone at the start of the block.
+  const g = GROUP.exec(text);
+  if (g) { const [level, rank] = groupLevel(g[1]!); return { type: 'group', context, reason: `group_${level}`, rank }; }
   if (rules.clause.test(text)) return { type: 'clause', context, reason: 'clause_marker', rank: 3 };
   if (rules.article.test(text)) return { type: 'article', context, reason: 'article_marker', rank: 3 };
-  if (rules.paragraph.test(text)) return { type: 'paragraph', context, reason: 'paragraph_marker', rank: 4 };
+  // ANAT-STRUCT-02: "Parágrafo único" keeps the paragraph type with its own reason (single paragraph of the device).
+  if (rules.paragraph.test(text)) return { type: 'paragraph', context, reason: SOLE_PARAGRAPH.test(text) ? 'paragraph_sole' : 'paragraph_marker', rank: 4 };
   // Inciso and alínea numbering is built-in grammar, not a profile label.
   if (/^[IVXLCDM]+\s*[-–—]/u.test(text)) return { type: 'inciso', context, reason: 'inciso_marker', rank: 5 };
   if (/^[a-z]\)\s/u.test(text)) return { type: 'alinea', context, reason: 'alinea_marker', rank: 6 };
+  // Items numbered "1." / "1)" / "1.1." under an alínea or a device (ANAT-STRUCT-01).
+  // R1-B: the depth (number of dot-separated levels) nests 1.1. under 1. and 1.1.1. under 1.1.; a shallower or equal
+  // level closes the deeper ones.
+  const item = /^(\d{1,3}(?:\.\d{1,3}){0,5})[.)]\s+\S/u.exec(text);
+  if (item) { const depth = item[1]!.split('.').length - 1; return { type: 'item', context, reason: depth ? `item_level_${depth + 1}` : 'item_marker', rank: 7 + depth / 100, itemNumber: item[1]! }; }
   if (classes.some((name) => c.body.has(name))) return { type: 'body', context, reason: hist ? `${p}_historical_wording` : `${p}_text_class`, rank: 100 };
   return { type: 'unidentified', context: 'unknown', reason: 'unrecognized_block', rank: 100 };
 }
@@ -161,13 +184,20 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   const limitation = (code: string, message: string, span: { start: number; end: number } | null = null): void => {
     result.limitations.push({ code, message, partId: null, span }); result.status = 'partial';
   };
+  // Sequential ids exclude derived caput parts (ANAT-STRUCT-02), so adding a caput never renumbers other parts.
+  let partSeq = 0;
+  // ANAT-D02 (decided by Fábio: fix now): unmarked continuation blocks right after the caput block belong to the caput,
+  // until the article/clause receives any other child (§, inciso, table, note...); R2-08: any
+  // new child created through newPart (tables included) closes it, so the rule does not depend on the attach path. Keyed by the article/clause id.
+  const openCaput = new Map<string, AnatomyPart>();
   const newPart = (type: AnatomyPart['type'], start: number, end: number, parentId: string | null,
     context: AnatomyPart['context'], reason: string, origin: Pointer, label = ''): AnatomyPart => {
-    const part: AnatomyPart = { id: `part-${result.parts.length}`, parentId,
+    const part: AnatomyPart = { id: `part-${partSeq++}`, parentId,
       order: childOrders.get(parentId) ?? 0, type, label,
       span: { start, end }, sourcePointers: [origin], recognition: type === 'unidentified' ? 'unidentified' : 'explicit',
       ruleId: `reader/v1/${reason}`, confidence: type === 'unidentified' ? 0 : 1,
       coverage: type === 'unidentified' ? 'unidentified' : 'complete', context, contextReasons: [reason], legalStatus: 'unknown', table: null };
+    if (parentId !== null) openCaput.delete(parentId);
     childOrders.set(parentId, part.order + 1); result.parts.push(part); return part;
   };
   const fallback = (code: string, message: string): AnatomyReaderResult => {
@@ -262,22 +292,78 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   let annexHistorical = false;
   const ownership: { start: number; end: number; part: AnatomyPart }[] = [];
   const addOwnership = (part: AnatomyPart): void => { if (part.span.end > part.span.start) ownership.push({ ...part.span, part }); };
+  // ANAT-STRUCT-01 R1-A / R2-01: the highest grouping level used in the body (outside any annex). A grouping heading of
+  // that level or above, met while an annex is open, is a CANDIDATE return to the body. The level alone is not proof:
+  // the annex closes only on structural evidence — (a) the annex heading sits inside its own DOM container and the new
+  // heading is outside it, or (b) the annex is a historical zone (by class) and the new heading is not. Without evidence
+  // the heading stays inside the annex and the ambiguity is recorded (`annex_return_ambiguous`), never resolved silently.
+  let bodyTopGroupRank: number | null = null;
+  const itemNumbers = new Map<string, string>();
+  let annexContainer: string | null = null;
+  const containerOf = (path: string): string | null => {
+    const parentPath = path.slice(0, path.lastIndexOf('/'));
+    // The annex container is its DOM parent unless that parent is the document root, <html> or <body> (no own container).
+    return parentPath === '' || /\/(?:body|html)\[\d+\]$/u.test(parentPath) ? null : parentPath;
+  };
+  const insideAnnex = () => logical.some((entry) => entry.part.type === 'annex');
   const attach = (node: Node, desc: Descriptor): AnatomyPart => {
+    if (desc.type === 'group' && insideAnnex() && bodyTopGroupRank !== null && desc.rank <= bodyTopGroupRank) {
+      const leftContainer = annexContainer !== null && !node.path.startsWith(`${annexContainer}/`);
+      const leftHistorical = annexHistorical && desc.context !== 'historical';
+      if (leftContainer || leftHistorical) {
+        while (logical.length > 1) logical.pop()!.part.span.end = node.span.start;
+        annexHistorical = false; annexContainer = null;
+      } else {
+        limitation('annex_return_ambiguous', 'A grouping heading at the body top level appears inside an open annex with no structural evidence of a return to the body; it was kept inside the annex.', { ...node.span });
+      }
+    }
+    if (desc.type === 'group' && !insideAnnex()) bodyTopGroupRank = Math.min(bodyTopGroupRank ?? desc.rank, desc.rank);
     if (desc.rank < 100) {
       while (logical.length > 1 && logical[logical.length - 1]!.rank >= desc.rank) logical.pop()!.part.span.end = node.span.start;
     }
+    // R2-02: a sub-item (1.1., 2.1.1.) nests only under the item whose number is its exact prefix. Depth alone is not
+    // proof: with no matching parent the open items are closed, the sub-item attaches to the enclosing device and the
+    // missing parent is recorded (`item_parent_missing`); the text is never lost or given an incompatible parent.
+    let itemParentMissing = false;
+    if (desc.type === 'item' && desc.itemNumber?.includes('.')) {
+      const expected = desc.itemNumber.slice(0, desc.itemNumber.lastIndexOf('.'));
+      const top = logical[logical.length - 1]!.part;
+      if (top.type !== 'item' || itemNumbers.get(top.id) !== expected) {
+        while (logical.length > 1 && logical[logical.length - 1]!.part.type === 'item') logical.pop()!.part.span.end = node.span.start;
+        itemParentMissing = true;
+        limitation('item_parent_missing', `Item ${desc.itemNumber} has no open parent item ${expected}; attached to the enclosing device.`, { ...node.span });
+      }
+    }
     const parent = logical[logical.length - 1]!.part;
-    if (desc.type === 'annex') annexHistorical = desc.context === 'historical';
+    if (desc.type === 'annex') { annexHistorical = desc.context === 'historical'; annexContainer = containerOf(node.path); }
     let context = desc.context;
     const reasons = [desc.reason];
     if (annexHistorical || parent.context === 'historical') {
       reasons.push('historical_ancestor');
       if (context === 'operative_candidate') context = 'historical';
     }
-    const part = newPart(desc.type, node.span.start, desc.rank < 100 ? length : node.span.end, parent.id,
+    const caputOpen = openCaput.get(parent.id);
+    const continuesCaput = caputOpen !== undefined && desc.rank >= 100 && (desc.type === 'unidentified' || desc.type === 'body')
+      && desc.context !== 'prohibited' && node.span.end > node.span.start;
+    if (continuesCaput) {
+      caputOpen.span.end = node.span.end;
+      caputOpen.sourcePointers.push(pointer(node.path, node.start, node.end));
+      if (!caputOpen.contextReasons.includes('caput_continuation')) caputOpen.contextReasons.push('caput_continuation');
+    }
+    const part = newPart(desc.type, node.span.start, desc.rank < 100 ? length : node.span.end, continuesCaput ? caputOpen.id : parent.id,
       context, desc.reason, pointer(node.path, node.start, node.end), textOf(node).trim().slice(0, 256));
+    if (itemParentMissing) reasons.push('item_parent_missing');
     part.contextReasons = reasons;
+    if (desc.itemNumber) itemNumbers.set(part.id, desc.itemNumber);
     if (desc.rank < 100) logical.push({ part, rank: desc.rank });
+    // ANAT-STRUCT-02: the opening block of an article or clause is its caput, a structural child over exactly that
+    // block. Ownership (entities, selections) stays with the article/clause, so their partIds do not change.
+    if ((desc.type === 'article' || desc.type === 'clause') && node.span.end > node.span.start) {
+      const caput: AnatomyPart = { ...part, id: `${part.id}-caput`, parentId: part.id, order: childOrders.get(part.id) ?? 0, type: 'caput',
+        span: { ...node.span }, sourcePointers: [pointer(node.path, node.start, node.end)], ruleId: 'reader/v1/caput_block',
+        contextReasons: [...reasons.filter((r) => r !== desc.reason), 'caput_block'], table: null };
+      childOrders.set(part.id, caput.order + 1); result.parts.push(caput); openCaput.set(part.id, caput);
+    }
     // The marker owns only its own text, not the whole future logical container.
     if (node.span.end > node.span.start) ownership.push({ ...node.span, part });
     return part;
