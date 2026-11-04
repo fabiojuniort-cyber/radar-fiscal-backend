@@ -23,7 +23,7 @@ export const VALIDITY_PT: Record<string, string> = {
 };
 const STRUCTURAL = new Set(['epigraph', 'summary', 'preamble', 'consideration', 'signature', 'footer', 'publication_header']);
 /** Parts that are containers or table internals: shown through their parent, not as passages. */
-const HIDDEN = new Set(['document', 'row', 'cell']);
+const HIDDEN = new Set(['caput', 'document', 'row', 'cell']);
 
 export function natureOf(part: Part): Nature {
   if (part.type === 'editorial_note') return 'editorial_note';
