@@ -1,1 +1,47 @@
-{"url":"https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/141910/visao/multivigente","consultedAt":"2026-11-04T21:00:11Z","http":"200|application/json","sha256":"d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e","bytes":144575,"origin":"automated fetch, official RFB API (normasinternet2), visao=multivigente","promoted":false}
+{
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/141910/visao/multivigente",
+  "consultedAt": "2026-11-04T21:00:11Z",
+  "http": "200|application/json",
+  "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+  "bytes": 144575,
+  "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+  "promoted": false,
+  "representation": "json",
+  "contentType": "application/json",
+  "identification": {
+    "idAto": 141910,
+    "epigrafe": "Instrução Normativa RFB nº 2237, de 4 de dezembro de 2024",
+    "numeroAto": "2237",
+    "dataAto": "2024-12-04",
+    "dataPublicacao": "2024-12-05",
+    "dadosPublicacao": "Publicado(a) no DOU de 05/12/2024, seção 1, página 57",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.1.0-provisional",
+    "preparationId": "8cc8b3f0faeda7097a14fcf52dc5484ec96a0b77b91cd2d1936c6a0b1b998da8",
+    "htmlSha256": "870330847bce5742b1dcd517b5b339609db95f91d214263e31f75ea009d36713",
+    "pieces": 223,
+    "missingSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "anatomyOnThisBranch": {
+    "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "unidentified": 104,
+      "preamble": 1,
+      "article": 22,
+      "paragraph": 66,
+      "alinea": 27,
+      "inciso": 3
+    },
+    "unidentifiedChars": 12271,
+    "canonicalChars": 31389
+  }
+}

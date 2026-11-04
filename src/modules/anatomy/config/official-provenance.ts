@@ -15,7 +15,8 @@ export const OFFICIAL_HOSTS: Readonly<Record<SampleInput['source'], readonly str
   CONFAZ: ['www.confaz.fazenda.gov.br'],
   DOU: ['www.in.gov.br'],
   'DOE-SP': ['legislacao.fazenda.sp.gov.br', 'www.doe.sp.gov.br'],
-  RFB: ['normas.receita.fazenda.gov.br'],
+  // ANAT-D03: normasinternet2 serves the RFB's official structured JSON of each act (consulta-externa API).
+  RFB: ['normas.receita.fazenda.gov.br', 'normasinternet2.receita.fazenda.gov.br'],
 });
 
 export interface ProvenanceIssue { id: string; message: string }

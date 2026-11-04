@@ -1,1 +1,45 @@
-{"url":"https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/133898/visao/multivigente","consultedAt":"2026-11-04T21:00:13Z","http":"200|application/json","sha256":"6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408","bytes":31143,"origin":"automated fetch, official RFB API (normasinternet2), visao=multivigente","promoted":false}
+{
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/133898/visao/multivigente",
+  "consultedAt": "2026-11-04T21:00:13Z",
+  "http": "200|application/json",
+  "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+  "bytes": 31143,
+  "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+  "promoted": false,
+  "representation": "json",
+  "contentType": "application/json",
+  "identification": {
+    "idAto": 133898,
+    "epigrafe": "Instrução Normativa RFB nº 2162, de 4 de outubro de 2023",
+    "numeroAto": "2162",
+    "dataAto": "2023-10-04",
+    "dataPublicacao": "2023-10-06",
+    "dadosPublicacao": "Publicado(a) no DOU de 06/10/2023, seção 1, página 55",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.1.0-provisional",
+    "preparationId": "48cf07945a6404a2ec1bd66951cf14491d7a9fd1f38e1b58ab5484bac61109b9",
+    "htmlSha256": "279d5b501da5226e42ab904eb184f8a75f5d974223f45813cb0169ea4ce19ac0",
+    "pieces": 28,
+    "missingSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "anatomyOnThisBranch": {
+    "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "unidentified": 2,
+      "preamble": 1,
+      "article": 4,
+      "quoted_text": 21
+    },
+    "unidentifiedChars": 511,
+    "canonicalChars": 4540
+  }
+}

@@ -1,1 +1,53 @@
-{"url":"https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/115131/visao/multivigente","consultedAt":"2026-11-04T21:00:10Z","http":"200|application/json","sha256":"c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2","bytes":234565,"origin":"automated fetch, official RFB API (normasinternet2), visao=multivigente","promoted":false}
+{
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/115131/visao/multivigente",
+  "consultedAt": "2026-11-04T21:00:10Z",
+  "http": "200|application/json",
+  "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2",
+  "bytes": 234565,
+  "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+  "promoted": false,
+  "representation": "json",
+  "contentType": "application/json",
+  "identification": {
+    "idAto": 115131,
+    "epigrafe": "Instrução Normativa RFB nº 2005, de 29 de janeiro de 2021",
+    "numeroAto": "2005",
+    "dataAto": "2021-01-29",
+    "dataPublicacao": "2021-02-01",
+    "dadosPublicacao": "Publicado(a) no DOU de 01/02/2021, seção 1, página 43",
+    "visao": "multivigente",
+    "portalDeclaresVigente": false
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.1.0-provisional",
+    "preparationId": "413154b42f2716a05bfee37b794506c649015ed75b8b7eb993eabcdd8e53008a",
+    "htmlSha256": "1e1d8ca4642517233fde2d938d508a2dec3b1e796f2ba4e664dbd7a4f8715a7f",
+    "pieces": 343,
+    "missingSegments": [
+      {
+        "pointer": "/outrosSegmentos/104",
+        "order": 106,
+        "reason": "no_text"
+      }
+    ],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "anatomyOnThisBranch": {
+    "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "unidentified": 24,
+      "preamble": 1,
+      "article": 25,
+      "paragraph": 118,
+      "inciso": 143,
+      "alinea": 32
+    },
+    "unidentifiedChars": 1015,
+    "canonicalChars": 57179
+  }
+}

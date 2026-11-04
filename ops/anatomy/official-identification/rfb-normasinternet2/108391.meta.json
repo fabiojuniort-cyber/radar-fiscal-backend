@@ -1,1 +1,45 @@
-{"url":"https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/108391/visao/multivigente","consultedAt":"2026-11-04T21:00:12Z","http":"200|application/json","sha256":"b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4","bytes":7914,"origin":"automated fetch, official RFB API (normasinternet2), visao=multivigente","promoted":false}
+{
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/108391/visao/multivigente",
+  "consultedAt": "2026-11-04T21:00:12Z",
+  "http": "200|application/json",
+  "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4",
+  "bytes": 7914,
+  "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+  "promoted": false,
+  "representation": "json",
+  "contentType": "application/json",
+  "identification": {
+    "idAto": 108391,
+    "epigrafe": "Instrução Normativa RFB nº 1932, de 3 de abril de 2020",
+    "numeroAto": "1932",
+    "dataAto": "2020-04-03",
+    "dataPublicacao": "2020-04-03",
+    "dadosPublicacao": "Publicado(a) no DOU de 03/04/2020, seção 1A, página 1",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.1.0-provisional",
+    "preparationId": "448fcc94323ba6333d27bb1c9284b37302c5046be93dbf6f45f3371362c0c08e",
+    "htmlSha256": "6bf1f2682f2aed73e6d511873927e044e854f454842ca6d80215aabbd8bf92ec",
+    "pieces": 7,
+    "missingSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "anatomyOnThisBranch": {
+    "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "unidentified": 2,
+      "preamble": 1,
+      "article": 2,
+      "inciso": 2
+    },
+    "unidentifiedChars": 325,
+    "canonicalChars": 2003
+  }
+}

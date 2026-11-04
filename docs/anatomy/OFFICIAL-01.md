@@ -79,3 +79,25 @@ Execução real em 31/10: todas as URLs deram `FAIL network: getaddrinfo ENOTFOU
 
 - **R2-03:** URL verificada não é o mesmo que representação válida. O corpo precisa corresponder ao formato declarado: um PDF tem a assinatura `%PDF-` no início e o marcador `%%EOF`; um HTML não é vazio, contém marcação e não é um PDF. Se não corresponder, a resposta vira a falha `invalid_representation`, sem corpo, e nunca um snapshot. Os metadados passam a separar `urlVerified` de `representation`. A proteção dos redirecionamentos não mudou.
 - **R2-04:** o vínculo de amostra com snapshot em PDF usa o texto extraído de forma rastreável (`ops/anatomy/pdf-text.ts`, ferramenta `pdfjs-dist@6.3.289/lines-v2`), com o hash do texto registrado em `extraction.textSha256` no meta. O PDF nunca é decodificado como UTF-8. O hash binário continua sendo a identidade do original. O HTML continua com a conferência byte a byte.
+
+## ANAT-D03 — JSON estruturado da Receita (aprovado pelo Fábio, via COORD)
+
+- **Aceitação restrita:** `application/json` só é aceito em host oficial da RFB (`normasinternet2.receita.fazenda.gov.br`, adicionado a `OFFICIAL_HOSTS.RFB`) e no caminho `/api/consulta-externa/ato/<idAto>/visao/<visao>`, sem query string. Qualquer outro JSON continua sendo falha `content_type`.
+- **Validação da representação** (`validateRfbJson`): o Content-Type sozinho não prova nada. O corpo precisa ser:
+  - JSON UTF-8 com objeto raiz;
+  - diferente de payload de erro (com `status`, `erro` ou `mensagem` e sem `idAto`);
+  - com o `idAto` igual ao da URL;
+  - estruturalmente compatível com `prepareRfbRepresentation`: segmentos ordenados, sem ordem duplicada, com pelo menos um texto legível.
+
+  Caso contrário, a resposta vira `invalid_representation`, sem corpo.
+- **Preservação:** o arquivo original fica intacto (`<id>.json`). O meta registra:
+  - URL, `consultedAt`, SHA-256 e bytes;
+  - a identificação do ato e da versão: `idAto`, epígrafe, número, data do ato, `dataPublicacao`, `dadosPublicacao`, `visao`, e o `vigente` **declarado pelo portal**, não inferido;
+  - a preparação: versão, `preparationId`, `htmlSha256`, número de trechos, segmentos ausentes, anexos e campos excluídos.
+- **Vínculo** (`bindingIssues`): o JSON é preparado de novo, o `htmlSha256` precisa conferir e a amostra precisa ser recorte exato do HTML preparado. A rastreabilidade ponteiro JSON ↔ texto preparado ↔ anatomia passa por `locateJsonHtmlSpan`, coberta por teste.
+- **Perdas de estrutura declaradas:**
+  - `epigrafeCompleta` fica excluída como metadado;
+  - segmentos com `omitir` ou sem texto são listados como ausentes (ex.: IN 2.005/2021, `/outrosSegmentos/104`, `no_text`);
+  - anexos binários são referenciados, sem conteúdo;
+  - nesta branch o leitor é anterior ao STRUCT: agrupamentos e itens não são reconhecidos, e o texto correspondente fica `unidentified`, mas contabilizado (IN 2.237/2024: 12.271 de 31.389 caracteres). Os números por ato estão em `anatomyOnThisBranch` de cada meta.
+- **`promoted: false`** nas 4 INs até o aceite independente da validação.
