@@ -32,3 +32,18 @@ URL de visualização de cada ato: `https://normasinternet2.receita.fazenda.gov.
 ## Arquivos recebidos manualmente
 
 Cada arquivo entra com URL, data da consulta, SHA-256 dos bytes recebidos e origem `obtido manualmente pelo Fábio`. Um arquivo salvo manualmente nunca é chamado de "original" sem prova de procedência: fica registrado como **reprodução salva pelo navegador**, que pode diferir dos bytes servidos pelo portal (o navegador reescreve o HTML).
+
+## Atualização (2026-11-04): domínio `normasinternet2` liberado, quatro INs coletadas
+
+A aplicação de consulta da Receita expõe a API pública `GET /api/consulta-externa/ato/<idAto>/visao/multivigente`. A resposta é **JSON estruturado do próprio portal**: epígrafe, `dadosPublicacao` com a referência ao DOU, segmentos com o texto e o histórico. Snapshots gravados sem edição em `ops/anatomy/official-identification/rfb-normasinternet2/<idAto>.json`, cada um com `<idAto>.meta.json` (URL, consultedAt, HTTP, SHA-256, bytes e origem).
+
+| idAto | Ato (epígrafe do portal) | Publicação (texto do portal) | SHA-256 |
+|---|---|---|---|
+| 115131 | IN RFB nº 2005, de 29/01/2021 | DOU 01/02/2021, seção 1, p. 43 | `c07760b3…` |
+| 141910 | IN RFB nº 2237, de 04/12/2024 | DOU 05/12/2024, seção 1, p. 57 | `d80a3ba0…` |
+| 108391 | IN RFB nº 1932, de 03/04/2020 | DOU 03/04/2020, seção 1A, p. 1 | `b4042dee…` |
+| 133898 | IN RFB nº 2162, de 04/10/2023 | DOU 06/10/2023, seção 1, p. 55 | `6428ea94…` |
+
+- O campo `vigente` é uma **declaração do portal**, registrada como dado. Nenhuma vigência é inferida pela anatomia.
+- **Não promovido a amostra (`promoted: false`).** O gate OFFICIAL-01 aceita só HTML e PDF, e esta representação é JSON. Aceitar JSON da RFB, aproveitando o leitor `json-preparation.ts` já existente, é uma mudança do gate aceito e depende de decisão do COORD.
+- A "publicação original" continua sendo o DOU; o JSON é a representação oficial da RFB que aponta para ela (`dadosPublicacao`).
