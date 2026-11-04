@@ -33,5 +33,5 @@ Resultado com Node 24: 177/177 nas suítes ANAT sintéticas.
 
 ## Limitações
 
-- O caput cobre o bloco de abertura. Num artigo cujo caput se estende por vários blocos sem marcador, só o primeiro bloco é o caput; os demais continuam filhos diretos do artigo.
+- ANAT-D02 (decidido pelo Fábio: corrigir): o caput cobre o bloco de abertura **e** os blocos seguintes sem marcador, até o artigo receber outro filho (§, inciso, tabela, nota). Os blocos de continuação ficam aninhados sob o caput (motivo `caput_continuation`, um ponteiro de origem por bloco). Snapshots sintéticos sem delta; identidade do motor 4f3256e6 → da144681.
 - `publication_header` e `footer` continuam bloqueados pela rede (ver acima).
