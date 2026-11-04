@@ -81,3 +81,16 @@ test('ANAT-D02: unmarked continuation blocks extend the caput until the next mar
   const caput2 = r.parts.find((p) => p.type === 'caput' && r.canonicalText.slice(p.span.start).startsWith('Art. 2º'))!;
   assert.equal(caput2.sourcePointers.length, 1);
 });
+
+test('R2-08: a table (or any other new child) closes the caput continuation', () => {
+  const html = '<html><body><p>Art. 1º Ficam fixados os valores exemplo</p><table><tr><td>A</td><td>1</td></tr></table><p>conforme a tabela acima.</p><p>Art. 2º Outro.</p></body></html>';
+  const r = readAnatomyInput({ source: 'DOU', representationId: 'r208', html });
+  const caput = r.parts.find((p) => p.type === 'caput' && r.canonicalText.slice(p.span.start).startsWith('Art. 1º'))!;
+  assert.equal(r.canonicalText.slice(caput.span.start, caput.span.end).trimEnd(), 'Art. 1º Ficam fixados os valores exemplo');
+  assert.equal(caput.sourcePointers.length, 1);
+  assert.ok(!caput.contextReasons.includes('caput_continuation'));
+  const after = r.parts.find((p) => r.canonicalText.slice(p.span.start).startsWith('conforme'))!;
+  assert.notEqual(after.parentId, caput.id, 'block after the table is not caput');
+  const tbl = r.parts.find((p) => p.type === 'table')!;
+  assert.ok(tbl.span.start >= caput.span.end, 'table is outside the caput');
+});
