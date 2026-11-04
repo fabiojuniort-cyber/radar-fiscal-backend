@@ -1,0 +1,37 @@
+name: F2 R7 approved observational pair
+on:
+  pull_request:
+    types: [opened]
+    paths:
+      - ops/f2-r7/**
+      - .github/workflows/f2-r7-observation.yml
+permissions:
+  contents: read
+jobs:
+  pair:
+    if: github.head_ref == 'diag/f2-r7-observation-20261104' && github.event.pull_request.draft == true && github.event.pull_request.head.repo.full_name == github.repository && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+      - name: Harness guard and sanitizer tests
+        run: node --test ops/f2-r7/harness.test.mjs
+      - name: One observational attempt per approved source tree
+        env:
+          CI: 'true'
+        run: node ops/f2-r7/run-pair.mjs
+      - name: Preserve sanitized observations including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f2-r7-observational-pair-${{ github.event.pull_request.head.sha }}
+          path: f2-r7-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
