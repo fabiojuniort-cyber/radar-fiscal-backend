@@ -24,7 +24,7 @@ const GROUP_RANK: Record<string, [string, number]> = {
 const CONSIDERANDO = /^considerando(?![\p{L}\p{N}_])/iu;
 const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase()]!;
 const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
-type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number };
+type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number; itemNumber?: string };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
 const textOf = (node: Node): string => {
@@ -95,7 +95,7 @@ function describe(node: Node, rules: CompiledRules, matchText: (node: Node) => s
   // R1-B: the depth (number of dot-separated levels) nests 1.1. under 1. and 1.1.1. under 1.1.; a shallower or equal
   // level closes the deeper ones.
   const item = /^(\d{1,3}(?:\.\d{1,3}){0,5})[.)]\s+\S/u.exec(text);
-  if (item) { const depth = item[1]!.split('.').length - 1; return { type: 'item', context, reason: depth ? `item_level_${depth + 1}` : 'item_marker', rank: 7 + depth / 100 }; }
+  if (item) { const depth = item[1]!.split('.').length - 1; return { type: 'item', context, reason: depth ? `item_level_${depth + 1}` : 'item_marker', rank: 7 + depth / 100, itemNumber: item[1]! }; }
   if (classes.some((name) => c.body.has(name))) return { type: 'body', context, reason: hist ? `${p}_historical_wording` : `${p}_text_class`, rank: 100 };
   return { type: 'unidentified', context: 'unknown', reason: 'unrecognized_block', rank: 100 };
 }
@@ -283,22 +283,49 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   let annexHistorical = false;
   const ownership: { start: number; end: number; part: AnatomyPart }[] = [];
   const addOwnership = (part: AnatomyPart): void => { if (part.span.end > part.span.start) ownership.push({ ...part.span, part }); };
-  // ANAT-STRUCT-01 R1-A: the highest grouping level used in the body (outside any annex). A grouping heading of that
-  // level or above, met while an annex is open, belongs to the body again: it closes the annex (and its historical
-  // context) and attaches at the root. Lower levels stay inside the annex. Without a body grouping, the annex keeps them.
+  // ANAT-STRUCT-01 R1-A / R2-01: the highest grouping level used in the body (outside any annex). A grouping heading of
+  // that level or above, met while an annex is open, is a CANDIDATE return to the body. The level alone is not proof:
+  // the annex closes only on structural evidence — (a) the annex heading sits inside its own DOM container and the new
+  // heading is outside it, or (b) the annex is a historical zone (by class) and the new heading is not. Without evidence
+  // the heading stays inside the annex and the ambiguity is recorded (`annex_return_ambiguous`), never resolved silently.
   let bodyTopGroupRank: number | null = null;
+  const itemNumbers = new Map<string, string>();
+  let annexContainer: string | null = null;
+  const containerOf = (path: string): string | null => {
+    const parentPath = path.slice(0, path.lastIndexOf('/'));
+    return /\/body\[\d+\]$/u.test(parentPath) || !/\/body\[\d+\]/u.test(parentPath) ? null : parentPath;
+  };
   const insideAnnex = () => logical.some((entry) => entry.part.type === 'annex');
   const attach = (node: Node, desc: Descriptor): AnatomyPart => {
     if (desc.type === 'group' && insideAnnex() && bodyTopGroupRank !== null && desc.rank <= bodyTopGroupRank) {
-      while (logical.length > 1) logical.pop()!.part.span.end = node.span.start;
-      annexHistorical = false;
+      const leftContainer = annexContainer !== null && !node.path.startsWith(`${annexContainer}/`);
+      const leftHistorical = annexHistorical && desc.context !== 'historical';
+      if (leftContainer || leftHistorical) {
+        while (logical.length > 1) logical.pop()!.part.span.end = node.span.start;
+        annexHistorical = false; annexContainer = null;
+      } else {
+        limitation('annex_return_ambiguous', 'A grouping heading at the body top level appears inside an open annex with no structural evidence of a return to the body; it was kept inside the annex.', { ...node.span });
+      }
     }
     if (desc.type === 'group' && !insideAnnex()) bodyTopGroupRank = Math.min(bodyTopGroupRank ?? desc.rank, desc.rank);
     if (desc.rank < 100) {
       while (logical.length > 1 && logical[logical.length - 1]!.rank >= desc.rank) logical.pop()!.part.span.end = node.span.start;
     }
+    // R2-02: a sub-item (1.1., 2.1.1.) nests only under the item whose number is its exact prefix. Depth alone is not
+    // proof: with no matching parent the open items are closed, the sub-item attaches to the enclosing device and the
+    // missing parent is recorded (`item_parent_missing`); the text is never lost or given an incompatible parent.
+    let itemParentMissing = false;
+    if (desc.type === 'item' && desc.itemNumber?.includes('.')) {
+      const expected = desc.itemNumber.slice(0, desc.itemNumber.lastIndexOf('.'));
+      const top = logical[logical.length - 1]!.part;
+      if (top.type !== 'item' || itemNumbers.get(top.id) !== expected) {
+        while (logical.length > 1 && logical[logical.length - 1]!.part.type === 'item') logical.pop()!.part.span.end = node.span.start;
+        itemParentMissing = true;
+        limitation('item_parent_missing', `Item ${desc.itemNumber} has no open parent item ${expected}; attached to the enclosing device.`, { ...node.span });
+      }
+    }
     const parent = logical[logical.length - 1]!.part;
-    if (desc.type === 'annex') annexHistorical = desc.context === 'historical';
+    if (desc.type === 'annex') { annexHistorical = desc.context === 'historical'; annexContainer = containerOf(node.path); }
     let context = desc.context;
     const reasons = [desc.reason];
     if (annexHistorical || parent.context === 'historical') {
@@ -307,7 +334,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     }
     const part = newPart(desc.type, node.span.start, desc.rank < 100 ? length : node.span.end, parent.id,
       context, desc.reason, pointer(node.path, node.start, node.end), textOf(node).trim().slice(0, 256));
+    if (itemParentMissing) reasons.push('item_parent_missing');
     part.contextReasons = reasons;
+    if (desc.itemNumber) itemNumbers.set(part.id, desc.itemNumber);
     if (desc.rank < 100) logical.push({ part, rank: desc.rank });
     // The marker owns only its own text, not the whole future logical container.
     if (node.span.end > node.span.start) ownership.push({ ...node.span, part });
