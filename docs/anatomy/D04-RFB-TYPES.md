@@ -30,3 +30,9 @@ Aprovado expressamente pelo Fábio (via COORD, tribusca-control#116). PR própri
 
 ## Identidade do motor
 `512073f7` (#285/#284) → **`e7afa9f0`**, com a guarda da base-migration atualizada. Snapshots sintéticos (`synthetic-equivalence`, B2) **sem delta**: nenhuma amostra sintética é RFB com tipos.
+
+## R1 (revisão do COORD no HEAD `adec6abc`)
+- **D04-R1-01, corrigido:** tabela dentro de segmento tachado não recebia o contexto histórico, porque o caminho de tabela era tratado antes do estado RFB. Agora o estado do segmento é lido antes, e a tabela entra como zona `historical` (conteúdo `prohibited` continua `prohibited`). Tabela, linhas e células recebem `rfb_tachado_source`. As células passam a ter a exclusão `context_historical` na elegibilidade; a mesma tabela não tachada continua operativa; a fonte DOU com os mesmos atributos não é afetada.
+  - **Antes/depois:** os 2 testes novos falham antes da correção e passam depois. O caso é isolado: artigo vigente com tabela tachada, para não haver herança de um pai tachado.
+- **D04-R1-02, NÃO aplicado: depende do contrato.** O contrato da anatomia (`contract.ts`, regra "Unidentified part cannot assert operative context") exige `context: unknown` para toda parte `unidentified`. Com `historical`, o motor **rejeita a análise inteira** (reproduzido). Por isso, um bloco tachado de tipo não identificado mantém `unidentified`/`unknown` e carrega a evidência como motivo `rfb_tachado_source` (comportamento coberto por teste, e o motor aceita). Dar contexto `historical` a esses blocos exige mudar o contrato e fica para decisão.
+- **Identidade:** `e7afa9f0` → **`ae26c438`**. Snapshots sintéticos sem delta. As 4 INs ficam sem mudança numérica (não têm tabela tachada).

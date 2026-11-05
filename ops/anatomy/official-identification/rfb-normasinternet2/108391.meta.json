@@ -54,7 +54,7 @@
     "attachmentsWithoutContent": 0
   },
   "anatomyD04": {
-    "readerBase": "ANAT-D04 (claude/anat-d04-rfb-types)",
+    "readerBase": "ANAT-D04 + R1 (claude/anat-d04-rfb-types)",
     "status": "complete",
     "partTypes": {
       "document": 1,

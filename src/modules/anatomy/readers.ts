@@ -470,11 +470,19 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   };
   const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null): void => {
     if (node.blocked || node.text !== null) return;
-    const context = domContext(node, inheritedContext);
-    if (node.tag === 'table') { table(node, undefined, context); return; }
-    const hasBlock = node.children.some((child) => blocks.has(child.tag));
     if (input.source === 'RFB' && node.attrs['data-rfb-segment'] !== undefined) rfbSeg = { type: node.attrs['data-rfb-type'] ?? null, issue: node.attrs['data-rfb-type-issue'] ?? null,
       tachado: node.attrs['data-rfb-tachado'] === 'true', pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
+    let context = domContext(node, inheritedContext);
+    // D04-R1-01: tables of a tachado segment take the historical zone like any block (prohibited stays prohibited).
+    if (node.tag === 'table') {
+      const struckTable = rfbSeg?.tachado === true && context === 'operative_candidate';
+      if (struckTable) context = 'historical';
+      const before = result.parts.length;
+      table(node, undefined, context);
+      if (rfbSeg?.tachado) for (const x of result.parts.slice(before)) if (x.context === 'historical' && !x.contextReasons.includes('rfb_tachado_source')) x.contextReasons.push('rfb_tachado_source');
+      return;
+    }
+    const hasBlock = node.children.some((child) => blocks.has(child.tag));
     const quotedDom = quotedAncestor || node.tag === 'blockquote' || node.tag === 'q';
     if (blocks.has(node.tag) && !hasBlock && node.span.end > node.span.start) {
       const text = matchText(node).trim();
@@ -486,6 +494,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         : describe(node, rules, matchText);
       if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
       const rfbStruck = rfbSeg?.tachado === true;
+      // D04-R1-02: the contract requires context 'unknown' for unidentified parts (contract.ts), so an unidentified struck
+      // block keeps 'unknown' and carries the tachado evidence as the reason rfb_tachado_source (pending decision).
       if (rfbStruck && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';

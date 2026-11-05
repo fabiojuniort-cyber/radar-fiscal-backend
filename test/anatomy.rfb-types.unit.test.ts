@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { locateJsonHtmlSpan, prepareRfbRepresentation } from '../src/modules/anatomy/json-preparation.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
+import { analyzeAnatomy } from '../src/modules/anatomy/engine.js';
 
 // ANAT-D04 — RFB segment types declared by the document's own tiposSegmento. Synthetic payloads only.
 const TYPES = [{ idTipoSegmento: 1, siglaTipoSegmento: 'ementa' }, { idTipoSegmento: 3, siglaTipoSegmento: 'artigo' }, { idTipoSegmento: 4, siglaTipoSegmento: 'fecho' },
@@ -82,4 +83,45 @@ test('D04: data-rfb-* attributes are honoured only for source RFB (other sources
   assert.equal(dou.parts.find((x) => x.type !== 'document')!.type, 'unidentified');
   assert.ok(!dou.parts.some((x) => x.contextReasons.includes('rfb_tachado_source')));
   assert.ok(!dou.limitations.some((l) => l.code.startsWith('rfb_')));
+});
+
+test('D04-R1-01: a table inside a tachado segment is historical (table, rows, cells), equivalent non-struck table stays operative, DOU control unaffected', () => {
+  const tbl = '<table><tr><td>NCM</td><td>Descrição</td></tr><tr><td>8471.30.12</td><td>Equipamento exemplo</td></tr></table>';
+  const { r } = read(doc([seg(2, 3, '<p>Art. 1º Tabela vigente:</p>'), seg(3, 3, tbl), seg(4, 3, '<p>Art. 2º Artigo vigente, tabela superada:</p>'), seg(5, 3, tbl, { tachado: true })]));
+  const tables = r.parts.filter((x) => x.type === 'table');
+  assert.equal(tables.length, 2);
+  const kids = (t: { id: string }) => { const ids = new Set([t.id]); let grew = true; while (grew) { grew = false; for (const x of r.parts) if (x.parentId && ids.has(x.parentId) && !ids.has(x.id)) { ids.add(x.id); grew = true; } } return r.parts.filter((x) => ids.has(x.id)); };
+  const [live, struck] = tables;
+  assert.ok(kids(live!).every((x) => x.context === 'operative_candidate'), 'non-struck table operative');
+  for (const x of kids(struck!)) { assert.equal(x.context, 'historical', `${x.type} historical`); assert.ok(x.contextReasons.includes('rfb_tachado_source'), `${x.type} reason`); assert.equal(x.legalStatus, 'unknown'); }
+  assert.ok(r.canonicalText.includes('8471.30.12'));
+  const html = `<html><body><section data-rfb-segment="1" data-rfb-tachado="true">${tbl}</section></body></html>`;
+  const dou = readAnatomyInput({ source: 'DOU', representationId: 'x', html });
+  assert.ok(dou.parts.filter((x) => x.type === 'cell').every((x) => x.context === 'operative_candidate' && !x.contextReasons.includes('rfb_tachado_source')));
+});
+
+test('D04-R1-02 (contract-bound): a tachado unidentified block keeps type unidentified and context unknown (contract), with the tachado evidence as reason; quoted stays prohibited; the engine accepts it', () => {
+  const d = doc([seg(2, 3, '<p>Art. 1º Vigente.</p>'), seg(3, 999, 'III texto superado não classificado.', { tachado: true }), seg(4, 3, '<blockquote><p>Art. 5º texto citado.</p></blockquote>', { tachado: true })]);
+  const { r, p } = read(d);
+  const iii = at(r, 'III texto superado');
+  assert.equal(iii.type, 'unidentified', 'type not guessed');
+  assert.equal(iii.context, 'unknown', 'contract: unidentified cannot assert another context');
+  assert.ok(iii.contextReasons.includes('rfb_tachado_source'), 'tachado evidence preserved'); assert.equal(iii.legalStatus, 'unknown');
+  assert.equal(r.parts.find((x) => x.type === 'quoted_text')!.context, 'prohibited');
+  assert.doesNotThrow(() => analyzeAnatomy({ publicationVersionId: 's', referenceDate: '2026-11-05', ruleSet: { id: 's', version: '1' },
+    input: { source: 'RFB', representationId: 'x', html: p.html }, catalog: { edition: 's', codes: [] } }));
+});
+
+test('D04-R1-01 (selection): cells of a tachado table carry exclusion context_historical; the same cells in a non-struck table do not', () => {
+  const t = (code: string) => `<table><tr><td>NCM</td><td>Descrição</td></tr><tr><td>${code}</td><td>Equipamento exemplo</td></tr></table>`;
+  const { p } = read(doc([seg(2, 3, '<p>Art. 1º Tabela vigente:</p>'), seg(3, 3, t('8471.30.12')), seg(4, 3, '<p>Art. 2º Artigo vigente com tabela superada:</p>'), seg(5, 3, t('8471.41.10'), { tachado: true })]));
+  const a = analyzeAnatomy({ publicationVersionId: 's', referenceDate: '2026-11-05', ruleSet: { id: 's', version: '1' },
+    input: { source: 'RFB', representationId: 'x', html: p.html }, catalog: { edition: 's', codes: ['84713012', '84714110'] } });
+  const cellOf = (code: string) => a.parts.find((x) => x.type === 'cell' && a.canonicalText.slice(x.span.start, x.span.end).includes(code))!;
+  const elig = (id: string) => a.eligibility.find((e) => e.partId === id && e.purpose === 'thematic_text')!;
+  const live = cellOf('8471.30.12'); const struck = cellOf('8471.41.10');
+  assert.equal(live.context, 'operative_candidate'); assert.ok(!elig(live.id).exclusionReasons.includes('context_historical'));
+  assert.equal(struck.context, 'historical'); assert.ok(elig(struck.id).exclusionReasons.includes('context_historical'));
+  assert.ok(a.eligibility.every((e) => e.eligible === false), 'no positive selection without approved evidence');
+  assert.ok(a.parts.every((x) => x.legalStatus === 'unknown'));
 });
