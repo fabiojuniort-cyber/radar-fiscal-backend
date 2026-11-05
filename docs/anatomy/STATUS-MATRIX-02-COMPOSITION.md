@@ -176,3 +176,10 @@ Total: no máximo 7 atos ou páginas mais metadados. Tudo vai para `promoted:fal
 | 🟡 L19 | Persistência da `SEFAZ-SP-PORTAL` | **Não autorizada** (migration) | — | — | — | — | Autorização |
 
 Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = adiado; LOTE-RFB+ = aprovado".
+
+## 12. Adendo após o parecer do COORD (#293 c.6671592095)
+
+- **L20:** a alternativa A (encerrar sempre no fim do segmento) **pode liberar uma continuação legítima** de citação. **Recomendação revista: manter a regra atual** até definir um critério conservador com contracasos (ex.: só encerrar quando o segmento seguinte declara tipo estrutural **e** não começa com marcador de continuação, com teste multissegmento real). 🔴 L20 continua pendente, sem proposta pronta para decisão.
+- **Prontas para decisão expressa do Fábio:** 🔴 **L21 = A**; 🔴 **L22** (restrito ao tipo `anexo` declarado pela tabela do próprio documento); 🔴 **LOTE-RFB+** (lote de 5 para 7 INs).
+- **L2/L12:** pendente até haver desenho de limites, procedência, spans e reconciliação da preparação; não vai à decisão agora.
+- L18 adiada; L19 não autorizada. Frente 1 = 50,2%; Frente 2 = 10%.
