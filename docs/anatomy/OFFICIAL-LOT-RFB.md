@@ -31,3 +31,12 @@ Um gate futuro de vínculo/promoção deve usar a preparação reexecutada **com
 **Portabilidade (R1-LOT-02).** Caminhos via `fileURLToPath` (não `URL.pathname`); detecção do ponto de entrada por caminho resolvido (`isCliEntry`), não por sufixo do nome. `--write` aceita `--baseline <arquivo>`; o teste executa o CLI de verdade com `--write` num arquivo temporário e compara com a baseline. `historicalByTachado` conta o motivo `rfb_tachado_source`; o novo `historicalContextParts` conta `context === 'historical'`.
 
 Delta da baseline: somente campos novos; `outputHash`, status e métricas dos 5 atos inalterados. Identidade do motor inalterada (nenhum arquivo do motor mudou).
+
+## LOTE-RFB+ — de 5 para 7 INs (decisão do Fábio, #116 c.6671833324)
+
+- Entram a **IN RFB 1.911/2019** (104314) e a **IN RFB 2.021/2021** (116968), coletadas no #295 (COLETA-02). Os snapshots continuam na pasta `rfb-normasinternet2-coleta02/`: **os originais, os metadados de procedência e o `promoted:false` não foram alterados**. `analyzeLot()` lê as duas pastas (`LOT_DIRS`) e recusa idAto repetido entre pastas.
+- **5 INs anteriores:** o registro de cada uma na baseline é **idêntico byte a byte**, inclusive o `outputHash`. Esta mudança não altera o motor (identidade `afb275ec` inalterada); não há diferença a explicar.
+- **2 INs novas:** reconciliação de preparação `identical` (capturadas já com a preparação `0.2.0`). Na identidade `afb275ec`, sem L21/L22:
+  - IN 1.911: partial; 809.136 caracteres; 1.823 não identificados; 30 anexos sem conteúdo; 6 PARTEs reconhecidas;
+  - IN 2.021: partial; 151.963 caracteres; 160 não identificados; 35 anexos sem conteúdo.
+- A interação com a L22 (#297/branch `claude/anat-l22-rfb-anexo`) aparece quando os PRs forem compostos: a L22 reduz o não identificado dessas duas INs (1.823 → 1.819 e 160 → 103).

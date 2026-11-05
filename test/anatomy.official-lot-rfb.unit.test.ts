@@ -14,7 +14,7 @@ test('OFFICIAL-LOT-RFB: re-analysis of the official RFB lot matches the committe
 
 test('OFFICIAL-LOT-RFB: invariants — never promoted, legalStatus unknown (checked in the run), text fully accounted', () => {
   const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as { acts: { promoted: boolean; unidentifiedChars: number; canonicalChars: number; idAto: number }[] };
-  assert.equal(baseline.acts.length, 5);
+  assert.equal(baseline.acts.length, 7, 'LOTE-RFB+: 5 original INs + IN 1.911 and IN 2.021 (#295)');
   for (const a of baseline.acts) { assert.equal(a.promoted, false, `${a.idAto} not promoted`); assert.ok(a.unidentifiedChars <= a.canonicalChars); }
 });
 
@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { LOT_DIR, analyzeLot as lot, isCliEntry } from '../ops/anatomy/official-lot-rfb.js';
+import { LOT_DIR, analyzeLot as lot, isCliEntry, snapshotDirOf } from '../ops/anatomy/official-lot-rfb.js';
 
 function copyLot(mutate?: (meta: Record<string, any>) => void, id = '127905'): string {
   const dir = mkdtempSync(join(tmpdir(), 'lot-rfb-'));
@@ -36,7 +36,7 @@ function copyLot(mutate?: (meta: Record<string, any>) => void, id = '127905'): s
 test('R2-LOT-01: each act records the captured preparation untouched and a proven reconciliation', () => {
   const now = lot();
   for (const a of now.acts) {
-    const meta = JSON.parse(readFileSync(join(LOT_DIR, `${a.idAto}.meta.json`), 'utf8'));
+    const meta = JSON.parse(readFileSync(join(snapshotDirOf(a.idAto), `${a.idAto}.meta.json`), 'utf8'));
     assert.deepEqual(a.capturedPreparation, { preparationVersion: meta.preparation.preparationVersion, htmlSha256: meta.preparation.htmlSha256, pieces: meta.preparation.pieces });
   }
   const in2121 = now.acts.find((a) => a.idAto === 127905)!;

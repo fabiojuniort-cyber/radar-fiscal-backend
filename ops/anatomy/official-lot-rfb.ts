@@ -17,6 +17,15 @@ import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-ident
 
 // R1-LOT-02: portable paths (fileURLToPath handles Windows drive letters and percent-encoding; URL.pathname does not).
 export const LOT_DIR = fileURLToPath(new URL('./official-identification/rfb-normasinternet2/', import.meta.url));
+/** LOTE-RFB+ (decisão do Fábio, #116 c.6671833324): the 2 acts collected by COLETA-02 (#295) join the lot from their own folder. */
+export const LOT_DIR_PLUS = fileURLToPath(new URL('./official-identification/rfb-normasinternet2-coleta02/', import.meta.url));
+export const LOT_DIRS = [LOT_DIR, LOT_DIR_PLUS] as const;
+/** Folder that holds the snapshot of an act (the lot never has the same idAto in two folders). */
+export function snapshotDirOf(id: number, dirs: readonly string[] = LOT_DIRS): string {
+  const found = dirs.filter((d) => readdirSync(d).includes(`${id}.json`));
+  if (found.length !== 1) throw new Error(`${id}: expected exactly one snapshot folder, found ${found.length}`);
+  return found[0]!;
+}
 export const BASELINE = fileURLToPath(new URL('../../docs/anatomy/official-lot-rfb.json', import.meta.url));
 
 /** Preparation recorded in the snapshot meta at capture time (historical; never rewritten). */
@@ -56,9 +65,12 @@ export interface ActMetrics {
   attachmentsWithoutContent: number; missingSegments: number; outputHash: string;
 }
 
-export function analyzeLot(dir = LOT_DIR): { engineBuildHash: string; acts: ActMetrics[] } {
-  const ids = readdirSync(dir).filter((f) => /^\d+\.json$/u.test(f)).map((f) => Number(f.slice(0, -5))).sort((a, b) => a - b);
+export function analyzeLot(dirOrDirs: string | readonly string[] = LOT_DIRS): { engineBuildHash: string; acts: ActMetrics[] } {
+  const dirs = typeof dirOrDirs === 'string' ? [dirOrDirs] : dirOrDirs;
+  const ids = dirs.flatMap((d) => readdirSync(d).filter((f) => /^\d+\.json$/u.test(f)).map((f) => Number(f.slice(0, -5)))).sort((a, b) => a - b);
+  if (new Set(ids).size !== ids.length) throw new Error('the same idAto appears in more than one lot folder');
   const acts = ids.map((id): ActMetrics => {
+    const dir = snapshotDirOf(id, dirs);
     const body = readFileSync(join(dir, `${id}.json`));
     const meta = JSON.parse(readFileSync(join(dir, `${id}.meta.json`), 'utf8')) as { sha256: string; promoted?: boolean; preparation?: CapturedPreparation };
     const sha256 = sha(body);
