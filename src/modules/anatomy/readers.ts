@@ -469,7 +469,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // (rfb_tachado_source); legalStatus is never touched.
   type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null };
   const RFB_TYPE: Record<string, Descriptor['type']> = { artigo: 'article', paragrafo: 'paragraph', inciso: 'inciso', alinea: 'alinea',
-    item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group', parte: 'group' };
+    item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group', parte: 'group', anexo: 'annex' };
   const RFB_GROUP_WORD: Record<string, string> = { parte: 'PARTE', capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
   const RFB_RANK: Partial<Record<Descriptor['type'], number>> = { article: 3, paragraph: 4, inciso: 5, alinea: 6, item: 7, summary: 100, signature: 100 };
   const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }): Descriptor => {
@@ -480,6 +480,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const mapped = RFB_TYPE[sig];
     if (!mapped) { if (current.type === 'unidentified') limitation('rfb_segment_type_unmapped', `RFB segment ${seg.pointer ?? '?'}: declared type "${seg.type}" has no structural mapping.`, span); return current; }
     if (current.type === 'unidentified') {
+      // ANAT-L22 (decisão do Fábio, #116 c.6671833324): `anexo` declared by THIS document's tiposSegmento fills a block the
+      // grammar left unidentified as an annex heading (rank 2, like the grammar's annex_heading); never overrides grammar.
+      if (mapped === 'annex') return { type: 'annex', context: current.context === 'unknown' ? 'operative_candidate' : current.context, reason: 'rfb_declared_anexo', rank: 2 };
       if (mapped === 'group') { const [level, rank] = groupLevel(RFB_GROUP_WORD[sig]!); return { type: 'group', context: current.context === 'unknown' ? 'operative_candidate' : current.context, reason: `rfb_declared_group_${level}`, rank }; }
       const ctx = mapped === 'summary' || mapped === 'signature' ? 'prohibited' as const : 'operative_candidate' as const;
       return { type: mapped, context: ctx, reason: `rfb_declared_${sig}`, rank: RFB_RANK[mapped]! };

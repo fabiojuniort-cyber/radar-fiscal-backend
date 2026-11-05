@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "afb275ecb59be0f7958b2af32fbcd9542b15a989599a5652691a02e122bb979a",
+  "engineBuildHash": "fb5059a8daac3c3297d464801432895285cea03c3b3de685f7c28bbe00706dc5",
   "acts": [
     {
       "idAto": 108391,
@@ -34,7 +34,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "e691cbfa4658741855ab230ed1845a6ebb92bb7aae417d327edb50596b04aa0c"
+      "outputHash": "92b23f537e10999d1f609cea491d9bcdd9c3075b69e540738e1662e9bc35edcf"
     },
     {
       "idAto": 115131,
@@ -72,7 +72,7 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "814e8543d8bffd1c01ef5afbb59debfe4ae6afd30aca998c252e430e367ae858"
+      "outputHash": "24fd0724cb9a7c3340676d51466783703cf47cd1bade0ec82c24878edd1f73ff"
     },
     {
       "idAto": 127905,
@@ -107,6 +107,7 @@
       },
       "limitations": {
         "rfb_segment_type_unidentified_by_source": 1,
+        "rfb_segment_type_conflict": 1,
         "unidentified_content": 1
       },
       "historicalByTachado": 608,
@@ -114,7 +115,7 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "52fe3f81c93da6335943e23c80e82a50c0d780468b55c5856b6339f1aba25818"
+      "outputHash": "bdcb7bb4ae34ff77612cc4e5aaf9a6aa001113a3c735dd9e26e8bb2bf3aa11e9"
     },
     {
       "idAto": 133898,
@@ -149,7 +150,7 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "8a9f953f25eef30094e75623cb455baf8b903252919f441bf43bef556196dc02"
+      "outputHash": "c1833b6db3479ba55a0c7e943261415502730fe606bf1327a9590e7b15f99455"
     },
     {
       "idAto": 141910,
@@ -193,7 +194,7 @@
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "2b9721d6bb880b759e76a073e5fef1f226901e5b0f661f7405506c051b7ff9f5"
+      "outputHash": "51091aaf29f6be80c8ec3bc41a1b92830443035d47de87bb0e3c73f82f854db9"
     }
   ]
 }
