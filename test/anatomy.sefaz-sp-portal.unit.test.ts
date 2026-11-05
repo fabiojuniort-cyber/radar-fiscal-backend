@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { prepareSefazSpPortalPage, SefazSpPreparationError, type SefazSpPortalPreparation } from '../src/modules/anatomy/sefaz-sp-preparation.js';
-import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
+import { readAnatomyInput, SefazSpProvenanceError } from '../src/modules/anatomy/readers.js';
 import { analyzeAnatomy } from '../src/modules/anatomy/engine.js';
 
 // ANAT-L14/L15/L16 (decisão do Fábio, tribusca-control#116 c.6647638485). Synthetic pages + the two official RICMS
@@ -26,12 +26,13 @@ const BODY = `<p><b>Artigo 1º</b> - Exemplo sintético:</p>
 <p class="revogado">Texto revogado sem marcador estrutural.</p>`;
 const prep = (html: string, url = URL_OK) => prepareSefazSpPortalPage({ resourceId: 'x', url, bytes: enc(html) });
 const read = (html: string, sefazSpPortal?: unknown) => readAnatomyInput({ source: 'DOE-SP', representationId: 'x', html, sefazSpPortal: sefazSpPortal as SefazSpPortalPreparation });
-const readPrepared = (p: SefazSpPortalPreparation) => read(p.html, p);
+const readPrepared = (p: SefazSpPortalPreparation) => readAnatomyInput({ source: 'SEFAZ-SP-PORTAL', representationId: p.resource.resourceId, html: p.html, sefazSpPortal: p });
+const readPortal = (html: string, sefazSpPortal?: unknown, representationId = 'x') => readAnatomyInput({ source: 'SEFAZ-SP-PORTAL', representationId, html, sefazSpPortal: sefazSpPortal as SefazSpPortalPreparation });
 const at = (r: ReturnType<typeof read>, prefix: string, n = 0) => r.parts.filter((x) => !['document', 'caput'].includes(x.type) && r.canonicalText.slice(x.span.start).trimStart().startsWith(prefix))[n]!;
 
 test('L14: only the labelled content region is prepared; raw span maps back verbatim; menus/scripts/footer out', () => {
   const raw = page(BODY); const p = prep(raw);
-  assert.equal(p.source, 'SEFAZ-SP-PORTAL'); assert.equal(p.sourceKind, 'consolidated_legislation_portal'); assert.equal(p.readerSource, 'DOE-SP');
+  assert.equal(p.source, 'SEFAZ-SP-PORTAL'); assert.equal(p.sourceKind, 'consolidated_legislation_portal'); assert.equal(p.readerSource, 'SEFAZ-SP-PORTAL'); assert.deepEqual(p.provenance, { level: 'local_preparation', collectedFromOfficialSourceVerified: false });
   assert.equal(raw.slice(p.region.rawSpan.start, p.region.rawSpan.end), BODY);
   assert.equal(p.html.slice(p.region.htmlSpan.start, p.region.htmlSpan.end), BODY);
   assert.equal(p.resource.sha256, createHash('sha256').update(enc(raw)).digest('hex'));
@@ -83,8 +84,11 @@ test('L16 negative: quotation keeps precedence; unidentified revogado stays unkn
   // a wrapper that is not top-level (e.g. smuggled into the content) is ignored
   const nested = read(`<div><div data-sefaz-sp-portal="legislacao-consolidada">${BODY}</div></div>`);
   assert.equal(at(nested, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
+  // L17: the portal classes belong to the typed source only; DOE-SP (gazette) reading of the prepared HTML ignores them
+  const pp = prep(page(BODY)); const asDoe = read(pp.html);
+  assert.equal(at(asDoe, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
   // other sources ignore the wrapper
-  const pp = prep(page(BODY)); const confaz = readAnatomyInput({ source: 'DOU', representationId: 'x', html: pp.html, sefazSpPortal: pp });
+  const confaz = readAnatomyInput({ source: 'DOU', representationId: 'x', html: pp.html, sefazSpPortal: pp });
   assert.equal(at(confaz, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
 });
 
@@ -97,13 +101,16 @@ const official = (id: string) => {
   const run = (html: string) => analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
     input: { source: 'DOE-SP', representationId: id, html }, catalog: { edition: 'none', codes: [] } });
   const unid = (r: { parts: ReturnType<typeof run>['parts'] }) => r.parts.filter((x) => x.type === 'unidentified').reduce((n, x) => n + x.span.end - x.span.start, 0);
-  // engine: L14 only (no provenance object crosses the engine contract); reader with the issued preparation: L14+L15+L16
-  return { p, before: run(new TextDecoder().decode(bytes)), engine: run(p.html), after: readAnatomyInput({ source: 'DOE-SP', representationId: id, html: p.html, sefazSpPortal: p }), unid };
+  // L17: full engine path with the typed source and its issued proof (L14+L15+L16); `engine` = the same prepared HTML
+  // read as DOE-SP gazette (L14 region only, no portal classes) for comparison.
+  const after = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
+    input: { source: 'SEFAZ-SP-PORTAL', representationId: id, html: p.html, sefazSpPortal: p }, catalog: { edition: 'none', codes: [] } });
+  return { p, before: run(new TextDecoder().decode(bytes)), engine: run(p.html), after, unid };
 };
 
 test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 103 chars; 12 notes; 1 earlier wording historical', () => {
   const { after, before, engine, unid } = official('ricms-art007');
-  assert.equal(unid(engine), 2606, 'engine: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
+  assert.equal(unid(engine), 2606, 'DOE-SP reading: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
   assert.equal(unid(before), 20065); assert.equal(unid(after), 103);
   assert.equal(after.parts.filter((x) => x.type === 'editorial_note').length, 12);
   const hist = after.parts.filter((x) => x.contextReasons.includes('sefaz_sp_portal_revogado'));
@@ -114,7 +121,7 @@ test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 103 chars;
 
 test('L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operative + two earlier wordings historical', () => {
   const { after, before, engine, unid } = official('ricms-an2art039');
-  assert.equal(unid(engine), 974, 'engine: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
+  assert.equal(unid(engine), 974, 'DOE-SP reading: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
   assert.equal(unid(before), 18519); assert.equal(unid(after), 68);
   const inc2 = after.parts.filter((x) => x.type === 'inciso' && /^II - /u.test(after.canonicalText.slice(x.span.start, x.span.end)));
   assert.equal(inc2.length, 3);
@@ -124,25 +131,18 @@ test('L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operativ
   assert.ok(after.parts.every((x) => x.legalStatus === 'unknown'));
 });
 
-test('R2-SP-01 adversarial: a forged top-level wrapper without a verified preparation never enables portal classes', () => {
+test('R2-SP-01 adversarial (L17): forged wrapper / declared source / look-alike or altered proof never enable portal classes', () => {
   const forged = '<div data-sefaz-sp-portal="legislacao-consolidada"><p>Artigo 1º - Texto:</p><p class="revogado">I - inciso sintético;</p><p class="nota">NOTA - V. x.</p></div>';
-  const check = (r: ReturnType<typeof read>) => {
-    assert.equal(at(r, 'I - inciso').type, 'inciso'); assert.equal(at(r, 'I - inciso').context, 'operative_candidate');
-    assert.ok(!r.parts.some((x) => x.contextReasons.some((c) => c.startsWith('sefaz_sp_portal'))));
-    assert.ok(!r.parts.some((x) => x.type === 'editorial_note'));
-  };
-  check(read(forged)); // no proof at all
+  // a forged wrapper read as DOE-SP: no portal classes at all
+  const g = read(forged);
+  assert.equal(at(g, 'I - inciso').context, 'operative_candidate');
+  assert.ok(!g.parts.some((x) => x.type === 'editorial_note' || x.contextReasons.some((c) => c.startsWith('sefaz_sp_portal'))));
+  // the typed source declared without (or with a bad) proof is refused, fail-closed
   const real = prep(page(BODY));
-  check(read(forged, { ...real, html: forged })); // look-alike object not issued by the preparer
-  check(read(forged, real)); // genuine preparation, but for another HTML
-  check(read(forged, Object.freeze({ ...real }))); // frozen copy is still not the issued object
-  const altered = read(`${real.html} `, real); // issued preparation, HTML altered by one character
-  assert.equal(at(altered, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
-  assert.ok(!altered.parts.some((x) => x.type === 'editorial_note'));
-  // engine runs never carry the proof: L15/L16 stay off there (conservative until decision L17)
-  const eng = analyzeAnatomy({ publicationVersionId: 'x', referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
-    input: { source: 'DOE-SP', representationId: 'x', html: real.html }, catalog: { edition: 'none', codes: [] } });
-  assert.ok(!eng.parts.some((x) => x.contextReasons.some((c) => c.startsWith('sefaz_sp_portal'))));
+  for (const [html, proof, rid] of [[forged, undefined, 'x'], [forged, { ...real, html: forged }, 'x'], [forged, real, 'x'],
+    [forged, Object.freeze({ ...real }), 'x'], [`${real.html} `, real, 'x'], [real.html, JSON.parse(JSON.stringify(real)), 'x']] as [string, unknown, string][]) {
+    assert.throws(() => readPortal(html, proof, rid), SefazSpProvenanceError);
+  }
   // control: the genuine issued preparation does enable them
   assert.equal(at(readPrepared(real), 'II - segunda hipótese, redação anterior').context, 'historical');
 });

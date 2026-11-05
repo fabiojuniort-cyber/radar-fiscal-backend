@@ -4,8 +4,13 @@ import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, typ
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 import { verifySefazSpPortalProvenance, type SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
 
+export class SefazSpProvenanceError extends TypeError {
+  readonly code = 'sefaz_sp_portal_provenance_unverified';
+  constructor(message: string) { super(message); this.name = 'SefazSpProvenanceError'; }
+}
+
 export interface AnatomyReaderInput {
-  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB';
+  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
   representationId: string;
   html?: string | undefined;
   text?: string | undefined;
@@ -13,11 +18,10 @@ export interface AnatomyReaderInput {
   /** Compiled effective profile for this source; defaults to the shipped DEFAULT_PROFILES. */
   rules?: CompiledRules;
   /**
-   * ANAT-L15/L16 (R2-SP-01): out-of-band proof that `html` is the output of prepareSefazSpPortalPage in this process.
-   * Without it (or if verification fails) the portal classes have no effect. Not part of the engine request contract:
-   * analyzeAnatomy never passes it, so engine runs stay conservative until a typed source exists (decision L17).
+   * ANAT-L15/L16/L17: out-of-band proof that `html` is the output of prepareSefazSpPortalPage in this process for
+   * resource `representationId`. Required (fail-closed) for source SEFAZ-SP-PORTAL; ignored for every other source.
    */
-  sefazSpPortal?: SefazSpPortalPreparation;
+  sefazSpPortal?: SefazSpPortalPreparation | undefined;
 }
 export type AnatomyReaderResult = Pick<AnatomyResult, 'canonicalText' | 'parts' | 'sourceMap' | 'coverage' | 'limitations' | 'status'>;
 export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, maxDepth: 128, maxNodes: 50_000 });
@@ -178,6 +182,12 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   const rules = input.rules ?? defaultRules(input.source);
   assertCompiledRules(rules);
   if (rules.source !== input.source) throw new TypeError(`Rules compiled for ${rules.source} cannot read ${input.source}`);
+  // ANAT-L17 (fail-closed): the typed portal source is never accepted on the caller's word or the document's own
+  // marking; it needs the issued preparation for this exact HTML and resource id (R1-SP-03).
+  if (input.source === 'SEFAZ-SP-PORTAL' && (input.html === undefined
+    || !verifySefazSpPortalProvenance(input.sefazSpPortal, input.html, input.representationId))) {
+    throw new SefazSpProvenanceError('SEFAZ-SP-PORTAL requires the preparation issued by prepareSefazSpPortalPage for this exact HTML and representationId');
+  }
   const result: AnatomyReaderResult = { canonicalText: '', parts: [], sourceMap: [],
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
     limitations: [], status: 'complete' };
@@ -483,8 +493,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // (plain DOE-SP gazette HTML) nothing changes.
   const SP_NOTE_CLASS = 'nota'; const SP_HISTORICAL_CLASSES = ['revogado', 'sefazElement-TextoRevogado'];
   const SP_NOTE_TEXT = /^NOTA\s*[-–—]\s*V\./u;
-  // R2-SP-01: the attribute alone proves nothing; the wrapper counts only with a verified preparation for this exact HTML.
-  const spProven = input.source === 'DOE-SP' && input.html !== undefined && verifySefazSpPortalProvenance(input.sefazSpPortal, input.html);
+  // R2-SP-01/L17: the attribute alone proves nothing; the wrapper counts only for the typed source with a verified
+  // preparation for this exact HTML and resource (checked fail-closed at the top of readAnatomyInput).
+  const spProven = input.source === 'SEFAZ-SP-PORTAL';
   const spPortalWrapper = (node: Node) => spProven && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
     && dom.children.length === 1 && dom.children[0] === node;
   const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null, spPortal = false): void => {
@@ -568,6 +579,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     }
   }
   result.coverage.textLength = length; result.coverage.accountedLength = length;
+  // R1-SP-03: the proof is local (preparation ↔ HTML ↔ resource), not a verification of the official collection.
+  if (input.source === 'SEFAZ-SP-PORTAL') limitation('sefaz_sp_portal_local_preparation_only', 'Sefaz-SP portal provenance is a local preparation proof (bytes, URL, hash, region); the official collection of these bytes is not verified here.');
   if (unidentified || result.coverage.segments.some((segment) => segment.classification === 'unidentified')) limitation('unidentified_content', 'Unrecognized text is fully accounted for and is not a successful identification.');
   if (result.coverage.missingResources.length) limitation('missing_resources', 'Referenced resources were not supplied; no fetch was attempted.');
   return result;

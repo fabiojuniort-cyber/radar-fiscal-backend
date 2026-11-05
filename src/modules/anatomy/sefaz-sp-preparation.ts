@@ -12,11 +12,12 @@ import { Parser } from 'htmlparser2';
  * left out of the prepared representation; the raw page (bytes, SHA-256, URL) is preserved by the caller's snapshot
  * and the prepared interval maps back to the raw HTML. Missing, duplicated or ambiguous regions fail closed.
  *
- * The reader still reads the prepared HTML with the DOE-SP rules (the engine contract has no separate source yet);
- * only blocks inside the wrapper get the portal classes `nota` (editorial note, L15) and `revogado` (earlier
- * wording, L16). Plain DOE-SP gazette HTML has no wrapper and is unaffected.
+ * ANAT-L17: the engine reads the prepared HTML as its own typed source `SEFAZ-SP-PORTAL` (never `DOE-SP`), and only
+ * with this preparation object as out-of-band proof (verifySefazSpPortalProvenance). The proof is LOCAL: it binds
+ * the HTML to a preparation of the supplied bytes/URL in this process; it does not prove that those bytes were
+ * collected from the official portal (that is the snapshot's own provenance: urlVerified/verified).
  */
-export const SEFAZ_SP_PORTAL_PREPARATION_VERSION = 'sefaz-sp-portal/0.1.0-provisional' as const;
+export const SEFAZ_SP_PORTAL_PREPARATION_VERSION = 'sefaz-sp-portal/0.2.0-provisional' as const;
 export const SEFAZ_SP_PORTAL_HOST = 'legislacao.fazenda.sp.gov.br' as const;
 export const SEFAZ_SP_PORTAL_WRAPPER = 'legislacao-consolidada' as const;
 
@@ -28,8 +29,10 @@ export interface SefazSpPortalPreparation {
   /** The consolidated-legislation portal of Sefaz-SP; distinct from the DOE-SP gazette. */
   source: 'SEFAZ-SP-PORTAL';
   sourceKind: 'consolidated_legislation_portal';
-  /** Reader rules used for the prepared HTML (the engine contract has no own source for the portal yet). */
-  readerSource: 'DOE-SP';
+  /** ANAT-L17: typed engine/reader source for the prepared HTML. */
+  readerSource: 'SEFAZ-SP-PORTAL';
+  /** R1-SP-03: what this object proves — a local preparation, not the official collection of the bytes. */
+  provenance: { level: 'local_preparation'; collectedFromOfficialSourceVerified: false };
   url: string;
   resource: { resourceId: string; sha256: string; byteLength: number; bomPresent: boolean };
   /** The selected region, as proof of the selection. */
@@ -104,10 +107,13 @@ export function prepareSefazSpPortalPage(input: SefazSpPortalResource): SefazSpP
   const htmlSpan = { start: open.length, end: open.length + inner.length };
   const htmlSha256 = sha(html);
   const resource = { resourceId: input.resourceId, sha256: sha(input.bytes), byteLength: input.bytes.byteLength, bomPresent };
-  const preparationId = sha(JSON.stringify({ version: SEFAZ_SP_PORTAL_PREPARATION_VERSION, url: input.url, resource: resource.sha256, htmlSha256 }));
+  const preparationId = sha(JSON.stringify({ version: SEFAZ_SP_PORTAL_PREPARATION_VERSION, url: input.url, resourceId: input.resourceId, resource: resource.sha256, htmlSha256 }));
   const prepared: SefazSpPortalPreparation = Object.freeze({ preparationVersion: SEFAZ_SP_PORTAL_PREPARATION_VERSION, provisional: true, source: 'SEFAZ-SP-PORTAL', sourceKind: 'consolidated_legislation_portal',
-    readerSource: 'DOE-SP', url: input.url, resource,
-    region: { selector: '#areaComentario .ms-rtestate-field[aria-labelledby → "Conteúdo da Página"]', labelText: LABEL, rawSpan, htmlSpan, sha256: sha(inner) },
+    readerSource: 'SEFAZ-SP-PORTAL', provenance: Object.freeze({ level: 'local_preparation' as const, collectedFromOfficialSourceVerified: false as const }),
+    url: input.url, resource: Object.freeze(resource),
+    // R1-SP-03: nested metadata is frozen too (region, its spans and the resource), not only the top-level object.
+    region: Object.freeze({ selector: '#areaComentario .ms-rtestate-field[aria-labelledby → "Conteúdo da Página"]', labelText: LABEL,
+      rawSpan: Object.freeze(rawSpan), htmlSpan: Object.freeze(htmlSpan), sha256: sha(inner) }),
     excludedRawLength: raw.length - inner.length, html, htmlSha256, preparationId }) as SefazSpPortalPreparation;
   ISSUED.add(prepared);
   return prepared;
@@ -120,13 +126,21 @@ export function prepareSefazSpPortalPage(input: SefazSpPortalResource): SefazSpP
  * a modified HTML or a non-HTTPS / non-portal URL is refused.
  */
 const ISSUED = new WeakSet<object>();
-export function verifySefazSpPortalProvenance(prep: unknown, html: string): prep is SefazSpPortalPreparation {
-  if (!prep || typeof prep !== 'object' || !ISSUED.has(prep) || !Object.isFrozen(prep)) return false;
+const deepFrozen = (v: unknown): boolean => v === null || typeof v !== 'object' || (Object.isFrozen(v) && Object.values(v).every(deepFrozen));
+/**
+ * R1-SP-03: `representationId` (the reader writes it into every sourcePointers[].resourceId) must be the prepared
+ * resource's own id, so document identity, prepared resource and source pointers are one and the same.
+ */
+export function verifySefazSpPortalProvenance(prep: unknown, html: string, representationId: string): prep is SefazSpPortalPreparation {
+  if (!prep || typeof prep !== 'object' || !ISSUED.has(prep) || !deepFrozen(prep)) return false;
   const p = prep as SefazSpPortalPreparation;
+  if (p.resource.resourceId !== representationId || p.readerSource !== 'SEFAZ-SP-PORTAL' || p.provenance.level !== 'local_preparation') return false;
+  if (html.slice(p.region.htmlSpan.start, p.region.htmlSpan.end).length !== p.region.htmlSpan.end - p.region.htmlSpan.start
+    || sha(html.slice(p.region.htmlSpan.start, p.region.htmlSpan.end)) !== p.region.sha256) return false;
   let url: URL; try { url = new URL(p.url); } catch { return false; }
   const open = `<div data-sefaz-sp-portal="${SEFAZ_SP_PORTAL_WRAPPER}">`;
   return p.preparationVersion === SEFAZ_SP_PORTAL_PREPARATION_VERSION && p.source === 'SEFAZ-SP-PORTAL' && p.sourceKind === 'consolidated_legislation_portal'
     && url.protocol === 'https:' && url.hostname.toLowerCase() === SEFAZ_SP_PORTAL_HOST
     && p.html === html && sha(html) === p.htmlSha256 && html.startsWith(open) && html.endsWith('</div>')
-    && p.preparationId === sha(JSON.stringify({ version: SEFAZ_SP_PORTAL_PREPARATION_VERSION, url: p.url, resource: p.resource.sha256, htmlSha256: p.htmlSha256 }));
+    && p.preparationId === sha(JSON.stringify({ version: SEFAZ_SP_PORTAL_PREPARATION_VERSION, url: p.url, resourceId: p.resource.resourceId, resource: p.resource.sha256, htmlSha256: p.htmlSha256 }));
 }
