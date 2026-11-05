@@ -2,6 +2,7 @@ import { Parser } from 'htmlparser2';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
 import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, type RecoveryDecision, type ShadowContext } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
+import { verifySefazSpPortalProvenance, type SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
 
 export interface AnatomyReaderInput {
   source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB';
@@ -11,6 +12,12 @@ export interface AnatomyReaderInput {
   missingResources?: string[];
   /** Compiled effective profile for this source; defaults to the shipped DEFAULT_PROFILES. */
   rules?: CompiledRules;
+  /**
+   * ANAT-L15/L16 (R2-SP-01): out-of-band proof that `html` is the output of prepareSefazSpPortalPage in this process.
+   * Without it (or if verification fails) the portal classes have no effect. Not part of the engine request contract:
+   * analyzeAnatomy never passes it, so engine runs stay conservative until a typed source exists (decision L17).
+   */
+  sefazSpPortal?: SefazSpPortalPreparation;
 }
 export type AnatomyReaderResult = Pick<AnatomyResult, 'canonicalText' | 'parts' | 'sourceMap' | 'coverage' | 'limitations' | 'status'>;
 export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, maxDepth: 128, maxNodes: 50_000 });
@@ -476,8 +483,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // (plain DOE-SP gazette HTML) nothing changes.
   const SP_NOTE_CLASS = 'nota'; const SP_HISTORICAL_CLASSES = ['revogado', 'sefazElement-TextoRevogado'];
   const SP_NOTE_TEXT = /^NOTA\s*[-–—]\s*V\./u;
-  const spPortalWrapper = (node: Node) => input.source === 'DOE-SP' && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
-    && dom.children.includes(node);
+  // R2-SP-01: the attribute alone proves nothing; the wrapper counts only with a verified preparation for this exact HTML.
+  const spProven = input.source === 'DOE-SP' && input.html !== undefined && verifySefazSpPortalProvenance(input.sefazSpPortal, input.html);
+  const spPortalWrapper = (node: Node) => spProven && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
+    && dom.children.length === 1 && dom.children[0] === node;
   const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null, spPortal = false): void => {
     if (node.blocked || node.text !== null) return;
     if (!spPortal && spPortalWrapper(node)) spPortal = true;

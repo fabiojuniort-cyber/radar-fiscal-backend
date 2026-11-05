@@ -42,7 +42,7 @@ export interface SefazSpPortalPreparation {
 }
 
 export class SefazSpPreparationError extends Error {
-  constructor(readonly code: 'not_portal_host' | 'not_utf8' | 'region_missing' | 'region_duplicated' | 'region_ambiguous' | 'region_empty', message: string) {
+  constructor(readonly code: 'not_https' | 'not_portal_host' | 'not_utf8' | 'region_missing' | 'region_duplicated' | 'region_ambiguous' | 'region_empty', message: string) {
     super(message); this.name = 'SefazSpPreparationError';
   }
 }
@@ -76,8 +76,11 @@ const hasClass = (el: El, name: string) => (el.attrs.class ?? '').split(/\s+/u).
 const within = (el: El, ancestor: El) => { for (let p = el.parent; p; p = p.parent) if (p === ancestor) return true; return false; };
 
 export function prepareSefazSpPortalPage(input: SefazSpPortalResource): SefazSpPortalPreparation {
-  let host: string;
-  try { host = new URL(input.url).hostname.toLowerCase(); } catch { throw new SefazSpPreparationError('not_portal_host', 'invalid URL'); }
+  let parsed: URL;
+  try { parsed = new URL(input.url); } catch { throw new SefazSpPreparationError('not_portal_host', 'invalid URL'); }
+  // R1-SP-02: the official collector only accepts HTTPS; the preparation refuses anything else too.
+  if (parsed.protocol !== 'https:') throw new SefazSpPreparationError('not_https', `protocol ${parsed.protocol} is not HTTPS`);
+  const host = parsed.hostname.toLowerCase();
   if (host !== SEFAZ_SP_PORTAL_HOST) throw new SefazSpPreparationError('not_portal_host', `host ${host} is not the Sefaz-SP legislation portal (DOE-SP gazette and others are not prepared here)`);
   let raw: string;
   try { raw = new TextDecoder('utf-8', { fatal: true }).decode(input.bytes); } catch { throw new SefazSpPreparationError('not_utf8', 'page is not valid UTF-8'); }
@@ -102,8 +105,28 @@ export function prepareSefazSpPortalPage(input: SefazSpPortalResource): SefazSpP
   const htmlSha256 = sha(html);
   const resource = { resourceId: input.resourceId, sha256: sha(input.bytes), byteLength: input.bytes.byteLength, bomPresent };
   const preparationId = sha(JSON.stringify({ version: SEFAZ_SP_PORTAL_PREPARATION_VERSION, url: input.url, resource: resource.sha256, htmlSha256 }));
-  return { preparationVersion: SEFAZ_SP_PORTAL_PREPARATION_VERSION, provisional: true, source: 'SEFAZ-SP-PORTAL', sourceKind: 'consolidated_legislation_portal',
+  const prepared: SefazSpPortalPreparation = Object.freeze({ preparationVersion: SEFAZ_SP_PORTAL_PREPARATION_VERSION, provisional: true, source: 'SEFAZ-SP-PORTAL', sourceKind: 'consolidated_legislation_portal',
     readerSource: 'DOE-SP', url: input.url, resource,
     region: { selector: '#areaComentario .ms-rtestate-field[aria-labelledby → "Conteúdo da Página"]', labelText: LABEL, rawSpan, htmlSpan, sha256: sha(inner) },
-    excludedRawLength: raw.length - inner.length, html, htmlSha256, preparationId };
+    excludedRawLength: raw.length - inner.length, html, htmlSha256, preparationId }) as SefazSpPortalPreparation;
+  ISSUED.add(prepared);
+  return prepared;
+}
+
+/**
+ * R2-SP-01: provenance of the portal classification is never read from the HTML (a `data-sefaz-sp-portal` attribute
+ * is forgeable). Only a frozen preparation object issued by THIS module in this process, whose fields are consistent
+ * and whose hash matches the exact HTML being read, enables the portal classes. A look-alike object built elsewhere,
+ * a modified HTML or a non-HTTPS / non-portal URL is refused.
+ */
+const ISSUED = new WeakSet<object>();
+export function verifySefazSpPortalProvenance(prep: unknown, html: string): prep is SefazSpPortalPreparation {
+  if (!prep || typeof prep !== 'object' || !ISSUED.has(prep) || !Object.isFrozen(prep)) return false;
+  const p = prep as SefazSpPortalPreparation;
+  let url: URL; try { url = new URL(p.url); } catch { return false; }
+  const open = `<div data-sefaz-sp-portal="${SEFAZ_SP_PORTAL_WRAPPER}">`;
+  return p.preparationVersion === SEFAZ_SP_PORTAL_PREPARATION_VERSION && p.source === 'SEFAZ-SP-PORTAL' && p.sourceKind === 'consolidated_legislation_portal'
+    && url.protocol === 'https:' && url.hostname.toLowerCase() === SEFAZ_SP_PORTAL_HOST
+    && p.html === html && sha(html) === p.htmlSha256 && html.startsWith(open) && html.endsWith('</div>')
+    && p.preparationId === sha(JSON.stringify({ version: SEFAZ_SP_PORTAL_PREPARATION_VERSION, url: p.url, resource: p.resource.sha256, htmlSha256: p.htmlSha256 }));
 }

@@ -40,3 +40,35 @@ Anexo II, art. 39, inciso II: a redação corrente fica `operative_candidate` e 
 ## Pendências (decisão do Fábio)
 - Fonte própria `SEFAZ-SP-PORTAL` no contrato do motor/banco (hoje lida com regras DOE-SP).
 - `blockquote` como recuo no portal (hoje = citação).
+
+## Correção R2-SP-01 e R1-SP-02 (revisão COORD c.6648168530)
+
+**R2-SP-01 (marcador forjável), reproduzido no `00e60ca7`:** um HTML DOE-SP qualquer com `<div data-sefaz-sp-portal="legislacao-consolidada">` na raiz e `<p class="revogado">I - …</p>` recebia `historical`, e um `p.nota` recebia `editorial_note`, sem nenhuma prova de origem.
+
+**Correção (sem mudar o contrato do motor nem o banco):**
+- O atributo no HTML deixa de ser prova. O leitor só aplica L15/L16 quando recebe, **fora do HTML**, `sefazSpPortal`, o objeto emitido por `prepareSefazSpPortalPage` neste processo. Ele é verificado por `verifySefazSpPortalProvenance`:
+  - pertence a um `WeakSet` privado do preparador e está congelado; uma cópia ou um objeto parecido não passa;
+  - versão, `source`, `sourceKind`, URL HTTPS do host do portal e `preparationId` recalculado conferem;
+  - `htmlSha256` é igual ao SHA do HTML lido, e o invólucro é o único nó raiz.
+- O `analyzeAnatomy` **não** repassa esse objeto (o schema da requisição do motor não mudou). No motor, portanto, vale só o L14 (recorte da região); L15/L16 ficam desligados ali até existir fonte tipada (**decisão L17, pendente**). Esse é o comportamento conservador.
+
+**R1-SP-02:** o preparador recusa protocolo diferente de HTTPS (`not_https`).
+
+**Testes negativos novos** (falham no `00e60ca7` e passam agora):
+- invólucro falso na raiz sem prova;
+- objeto parecido, não emitido pelo preparador;
+- cópia congelada do objeto;
+- preparação verdadeira apresentada com outro HTML;
+- HTML alterado em 1 caractere;
+- execução pelo motor sem a prova;
+- `http://` e `ftp://` recusados.
+
+**Números (amostras #279):**
+
+| | art. 7º | An. II art. 39 |
+|---|---|---|
+| não identificado: HTML bruto | 20.065 | 18.519 |
+| motor (L14 apenas) | 2.606 | 974 |
+| leitor com preparação comprovada (L14 + L15 + L16) | 103 | 68 |
+
+**Identidade:** `dba9fc5e` → `adebe95c`. Snapshot sintético inalterado.

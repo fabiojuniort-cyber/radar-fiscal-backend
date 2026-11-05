@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { prepareSefazSpPortalPage, SefazSpPreparationError } from '../src/modules/anatomy/sefaz-sp-preparation.js';
+import { prepareSefazSpPortalPage, SefazSpPreparationError, type SefazSpPortalPreparation } from '../src/modules/anatomy/sefaz-sp-preparation.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
 import { analyzeAnatomy } from '../src/modules/anatomy/engine.js';
 
@@ -25,7 +25,8 @@ const BODY = `<p><b>Artigo 1º</b> - Exemplo sintético:</p>
 <blockquote><p class="revogado">a) alínea citada revogada;</p></blockquote>
 <p class="revogado">Texto revogado sem marcador estrutural.</p>`;
 const prep = (html: string, url = URL_OK) => prepareSefazSpPortalPage({ resourceId: 'x', url, bytes: enc(html) });
-const read = (html: string) => readAnatomyInput({ source: 'DOE-SP', representationId: 'x', html });
+const read = (html: string, sefazSpPortal?: unknown) => readAnatomyInput({ source: 'DOE-SP', representationId: 'x', html, sefazSpPortal: sefazSpPortal as SefazSpPortalPreparation });
+const readPrepared = (p: SefazSpPortalPreparation) => read(p.html, p);
 const at = (r: ReturnType<typeof read>, prefix: string, n = 0) => r.parts.filter((x) => !['document', 'caput'].includes(x.type) && r.canonicalText.slice(x.span.start).trimStart().startsWith(prefix))[n]!;
 
 test('L14: only the labelled content region is prepared; raw span maps back verbatim; menus/scripts/footer out', () => {
@@ -43,6 +44,9 @@ test('L14 fail-closed: wrong host (DOE-SP gazette), missing, duplicated, unlabel
   const code = (f: () => unknown) => { try { f(); return 'none'; } catch (e) { assert.ok(e instanceof SefazSpPreparationError); return (e as SefazSpPreparationError).code; } };
   assert.equal(code(() => prep(page(BODY), 'https://www.doe.sp.gov.br/executivo/x')), 'not_portal_host');
   assert.equal(code(() => prep(page(BODY), 'https://legislacao.fazenda.sp.gov.br.evil.example/x')), 'not_portal_host');
+  // R1-SP-02: the official collector is HTTPS-only; so is the preparation
+  assert.equal(code(() => prep(page(BODY), 'http://legislacao.fazenda.sp.gov.br/Paginas/exemplo.aspx')), 'not_https');
+  assert.equal(code(() => prep(page(BODY), 'ftp://legislacao.fazenda.sp.gov.br/x')), 'not_https');
   assert.equal(code(() => prep('<html><body><p>Artigo 1º - x</p></body></html>')), 'region_missing');
   assert.equal(code(() => prep(page(BODY, { extra: '<div class="ms-rtestate-field">outro</div>' }))), 'region_duplicated');
   assert.equal(code(() => prep(page(BODY, { label: 'Menu' }))), 'region_ambiguous');
@@ -51,7 +55,7 @@ test('L14 fail-closed: wrong host (DOE-SP gazette), missing, duplicated, unlabel
 });
 
 test('L15: p.nota and "NOTA - V." are editorial notes (prohibited), links kept, never operative', () => {
-  const r = read(prep(page(BODY)).html);
+  const r = readPrepared(prep(page(BODY)));
   const n1 = at(r, 'NOTA - V. PORTARIA'); assert.equal(n1.type, 'editorial_note'); assert.equal(n1.context, 'prohibited'); assert.deepEqual(n1.contextReasons, ['sefaz_sp_portal_nota']);
   const n2 = at(r, 'NOTA - V. DECISÃO'); assert.equal(n2.type, 'editorial_note'); assert.deepEqual(n2.contextReasons, ['sefaz_sp_portal_nota_text']);
   assert.ok(r.sourceMap.length > 0 && r.canonicalText.includes('X-1/99'), 'note text and reference preserved');
@@ -59,7 +63,7 @@ test('L15: p.nota and "NOTA - V." are editorial notes (prohibited), links kept, 
 });
 
 test('L16: p.revogado → historical with portal evidence; current wording stays operative candidate; legalStatus unknown', () => {
-  const r = read(prep(page(BODY)).html);
+  const r = readPrepared(prep(page(BODY)));
   const cur = at(r, 'II - segunda hipótese, redação atual'); assert.equal(cur.type, 'inciso'); assert.equal(cur.context, 'operative_candidate');
   for (const old of ['II - segunda hipótese, redação anterior', 'II - segunda hipótese, redação original']) {
     const h = at(r, old); assert.equal(h.type, 'inciso'); assert.equal(h.context, 'historical'); assert.ok(h.contextReasons.includes('sefaz_sp_portal_revogado'));
@@ -69,7 +73,7 @@ test('L16: p.revogado → historical with portal evidence; current wording stays
 });
 
 test('L16 negative: quotation keeps precedence; unidentified revogado stays unknown with a limitation; no evidence → no historical', () => {
-  const r = read(prep(page(BODY)).html);
+  const r = readPrepared(prep(page(BODY)));
   assert.equal(at(r, 'a) alínea citada').context, 'prohibited');
   const u = at(r, 'Texto revogado sem'); assert.equal(u.type, 'unidentified'); assert.equal(u.context, 'unknown');
   assert.ok(r.limitations.some((l) => l.code === 'sefaz_sp_revogado_unidentified'));
@@ -80,7 +84,7 @@ test('L16 negative: quotation keeps precedence; unidentified revogado stays unkn
   const nested = read(`<div><div data-sefaz-sp-portal="legislacao-consolidada">${BODY}</div></div>`);
   assert.equal(at(nested, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
   // other sources ignore the wrapper
-  const confaz = readAnatomyInput({ source: 'DOU', representationId: 'x', html: prep(page(BODY)).html });
+  const pp = prep(page(BODY)); const confaz = readAnatomyInput({ source: 'DOU', representationId: 'x', html: pp.html, sefazSpPortal: pp });
   assert.equal(at(confaz, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
 });
 
@@ -92,12 +96,14 @@ const official = (id: string) => {
   const p = prepareSefazSpPortalPage({ resourceId: id, url: meta.url, bytes });
   const run = (html: string) => analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
     input: { source: 'DOE-SP', representationId: id, html }, catalog: { edition: 'none', codes: [] } });
-  const unid = (r: ReturnType<typeof run>) => r.parts.filter((x) => x.type === 'unidentified').reduce((n, x) => n + x.span.end - x.span.start, 0);
-  return { p, before: run(new TextDecoder().decode(bytes)), after: run(p.html), unid };
+  const unid = (r: { parts: ReturnType<typeof run>['parts'] }) => r.parts.filter((x) => x.type === 'unidentified').reduce((n, x) => n + x.span.end - x.span.start, 0);
+  // engine: L14 only (no provenance object crosses the engine contract); reader with the issued preparation: L14+L15+L16
+  return { p, before: run(new TextDecoder().decode(bytes)), engine: run(p.html), after: readAnatomyInput({ source: 'DOE-SP', representationId: id, html: p.html, sefazSpPortal: p }), unid };
 };
 
 test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 103 chars; 12 notes; 1 earlier wording historical', () => {
-  const { after, before, unid } = official('ricms-art007');
+  const { after, before, engine, unid } = official('ricms-art007');
+  assert.equal(unid(engine), 2606, 'engine: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
   assert.equal(unid(before), 20065); assert.equal(unid(after), 103);
   assert.equal(after.parts.filter((x) => x.type === 'editorial_note').length, 12);
   const hist = after.parts.filter((x) => x.contextReasons.includes('sefaz_sp_portal_revogado'));
@@ -107,7 +113,8 @@ test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 103 chars;
 });
 
 test('L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operative + two earlier wordings historical', () => {
-  const { after, before, unid } = official('ricms-an2art039');
+  const { after, before, engine, unid } = official('ricms-an2art039');
+  assert.equal(unid(engine), 974, 'engine: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
   assert.equal(unid(before), 18519); assert.equal(unid(after), 68);
   const inc2 = after.parts.filter((x) => x.type === 'inciso' && /^II - /u.test(after.canonicalText.slice(x.span.start, x.span.end)));
   assert.equal(inc2.length, 3);
@@ -115,4 +122,27 @@ test('L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operativ
   for (const h of inc2.slice(1)) assert.ok(h.contextReasons.includes('sefaz_sp_portal_revogado'));
   assert.equal(after.parts.filter((x) => x.contextReasons.includes('sefaz_sp_portal_revogado')).length, 14);
   assert.ok(after.parts.every((x) => x.legalStatus === 'unknown'));
+});
+
+test('R2-SP-01 adversarial: a forged top-level wrapper without a verified preparation never enables portal classes', () => {
+  const forged = '<div data-sefaz-sp-portal="legislacao-consolidada"><p>Artigo 1º - Texto:</p><p class="revogado">I - inciso sintético;</p><p class="nota">NOTA - V. x.</p></div>';
+  const check = (r: ReturnType<typeof read>) => {
+    assert.equal(at(r, 'I - inciso').type, 'inciso'); assert.equal(at(r, 'I - inciso').context, 'operative_candidate');
+    assert.ok(!r.parts.some((x) => x.contextReasons.some((c) => c.startsWith('sefaz_sp_portal'))));
+    assert.ok(!r.parts.some((x) => x.type === 'editorial_note'));
+  };
+  check(read(forged)); // no proof at all
+  const real = prep(page(BODY));
+  check(read(forged, { ...real, html: forged })); // look-alike object not issued by the preparer
+  check(read(forged, real)); // genuine preparation, but for another HTML
+  check(read(forged, Object.freeze({ ...real }))); // frozen copy is still not the issued object
+  const altered = read(`${real.html} `, real); // issued preparation, HTML altered by one character
+  assert.equal(at(altered, 'II - segunda hipótese, redação anterior').context, 'operative_candidate');
+  assert.ok(!altered.parts.some((x) => x.type === 'editorial_note'));
+  // engine runs never carry the proof: L15/L16 stay off there (conservative until decision L17)
+  const eng = analyzeAnatomy({ publicationVersionId: 'x', referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
+    input: { source: 'DOE-SP', representationId: 'x', html: real.html }, catalog: { edition: 'none', codes: [] } });
+  assert.ok(!eng.parts.some((x) => x.contextReasons.some((c) => c.startsWith('sefaz_sp_portal'))));
+  // control: the genuine issued preparation does enable them
+  assert.equal(at(readPrepared(real), 'II - segunda hipótese, redação anterior').context, 'historical');
 });
