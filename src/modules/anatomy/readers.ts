@@ -18,8 +18,10 @@ type Pointer = AnatomyPart['sourcePointers'][number];
 type Node = { tag: string; attrs: Record<string, string>; path: string; start: number; end: number;
   children: Node[]; text: string | null; span: { start: number; end: number }; blocked: boolean };
 /** ANAT-STRUCT-01: grouping levels nest inside an annex (rank 2) and above articles/clauses (rank 3). */
+// ANAT-L11: PARTE (above LIVRO, as LC 95/98 art. 10 VIII and the RFB tiposSegmento hierarchy declare) is reachable only
+// through a type declared by the RFB document itself; the free-text grammar (GROUP) does not recognise it.
 const GROUP_RANK: Record<string, [string, number]> = {
-  LIVRO: ['book', 2.1], TITULO: ['title', 2.2], CAPITULO: ['chapter', 2.3], SECAO: ['section', 2.4], SUBSECAO: ['subsection', 2.5],
+  PARTE: ['part', 2.05], LIVRO: ['book', 2.1], TITULO: ['title', 2.2], CAPITULO: ['chapter', 2.3], SECAO: ['section', 2.4], SUBSECAO: ['subsection', 2.5],
 };
 const SOLE_PARAGRAPH = /^par[áa]grafo\s+[úu]nico(?![\p{L}\p{N}_])/iu;
 const CONSIDERANDO = /^considerando(?![\p{L}\p{N}_])/iu;
@@ -450,8 +452,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // (rfb_tachado_source); legalStatus is never touched.
   type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null };
   const RFB_TYPE: Record<string, Descriptor['type']> = { artigo: 'article', paragrafo: 'paragraph', inciso: 'inciso', alinea: 'alinea',
-    item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group' };
-  const RFB_GROUP_WORD: Record<string, string> = { capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
+    item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group', parte: 'group' };
+  const RFB_GROUP_WORD: Record<string, string> = { parte: 'PARTE', capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
   const RFB_RANK: Partial<Record<Descriptor['type'], number>> = { article: 3, paragraph: 4, inciso: 5, alinea: 6, item: 7, summary: 100, signature: 100 };
   const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }): Descriptor => {
     if (seg.issue) { limitation(`rfb_segment_${seg.issue}`, `RFB segment ${seg.pointer ?? '?'}: declared type ${seg.issue.replace(/_/gu, ' ')}; no type was guessed.`, span); return current; }

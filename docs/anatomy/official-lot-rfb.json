@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "5a43204362e5156a69adcac2b06a277e8aaa40ff27c60132ea4e3e4c578f487c",
+  "engineBuildHash": "525e9466b57c5f8c63dc516697324b1a41bed04ee547bb4ec9bf7ed672deb8ef",
   "acts": [
     {
       "idAto": 108391,
@@ -34,7 +34,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "601d3d00d843e7c006cc2d48251ef4aa83131bc1dbf4ea938cb5c62f477e63a7"
+      "outputHash": "9ec36c919ebcc80c79662a146d0ef27e6dca132c06f748ae6c2291deb1e8733b"
     },
     {
       "idAto": 115131,
@@ -72,7 +72,7 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "c54e3819bbd0ea7de3f9d03e91d147fcf87d1f6540122ed466a7f706b9f3a5da"
+      "outputHash": "c208bdc52f186499a130c9d22c4e8e5605bb222556ebd85f80033a5963e997fb"
     },
     {
       "idAto": 127905,
@@ -91,7 +91,7 @@
       "preparedHtmlSha256": "c223c99d03dc08bdcb53ddefbfc5e7624b011aa1c63aa21e93e0656a42455791",
       "status": "partial",
       "canonicalChars": 1009001,
-      "unidentifiedChars": 437,
+      "unidentifiedChars": 14,
       "partTypes": {
         "document": 1,
         "summary": 2,
@@ -100,13 +100,12 @@
         "caput": 928,
         "inciso": 1333,
         "paragraph": 901,
-        "unidentified": 6,
-        "group": 647,
+        "group": 652,
         "alinea": 189,
+        "unidentified": 1,
         "quoted_text": 556
       },
       "limitations": {
-        "rfb_segment_type_unmapped": 5,
         "rfb_segment_type_unidentified_by_source": 1,
         "unidentified_content": 1
       },
@@ -115,7 +114,7 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "2bace0972cd4ad285e9a54bbabc800ab432b2f1bbbf737dd038dbed029842455"
+      "outputHash": "18044fb950d23dd5074ceb2adf902bea8018210997c53b74de6bb6a83d398d3c"
     },
     {
       "idAto": 133898,
@@ -150,7 +149,7 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "44c02e21a17c263feadbfee3049d47eb26b89809286237992549c63c0040e3da"
+      "outputHash": "65e6400e3b22a3cd70d743cce3d0cefde2d30dc1e053da9ce593740f9f52d101"
     },
     {
       "idAto": 141910,
@@ -194,7 +193,7 @@
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "57bd0ca8819dfc281b3b353d2fd5bf7f30aa4d2f4dd7e02e18dd270d612ef4b7"
+      "outputHash": "1ef5296c57863a242a9e6de7c1424473a50b9f517ae64ec30a6e03ae92e6b05b"
     }
   ]
 }
