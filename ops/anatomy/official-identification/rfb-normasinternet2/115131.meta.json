@@ -19,9 +19,9 @@
     "portalDeclaresVigente": false
   },
   "preparation": {
-    "preparationVersion": "rfb-api-original/0.1.0-provisional",
-    "preparationId": "413154b42f2716a05bfee37b794506c649015ed75b8b7eb993eabcdd8e53008a",
-    "htmlSha256": "1e1d8ca4642517233fde2d938d508a2dec3b1e796f2ba4e664dbd7a4f8715a7f",
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "e57822050bfc590c57dee2eceb2ba16691b49b8538c492e8b3e70820e5081f32",
+    "htmlSha256": "cf977ccf18f7397d7c8f823a061bda2ece7e487d5c62fb809303892bc30840ac",
     "pieces": 343,
     "missingSegments": [
       {
@@ -1752,7 +1752,7 @@
       "/epigrafeCompleta"
     ]
   },
-  "anatomyOnThisBranch": {
+  "anatomyBeforeD04": {
     "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
     "status": "partial",
     "partTypes": {
@@ -1782,5 +1782,29 @@
       }
     ],
     "attachmentsWithoutContent": 0
+  },
+  "anatomyD04": {
+    "readerBase": "ANAT-D04 (claude/anat-d04-rfb-types)",
+    "status": "complete",
+    "partTypes": {
+      "document": 1,
+      "summary": 1,
+      "preamble": 1,
+      "article": 25,
+      "caput": 25,
+      "group": 22,
+      "paragraph": 118,
+      "inciso": 143,
+      "alinea": 32,
+      "signature": 1
+    },
+    "canonicalChars": 57179,
+    "accountedChars": 57179,
+    "unidentifiedChars": 0,
+    "historicalByTachado": 342,
+    "limitations": {},
+    "legalStatusValues": [
+      "unknown"
+    ]
   }
 }

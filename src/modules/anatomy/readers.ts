@@ -443,29 +443,60 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     });
   };
   let openQuotation = false;
-  const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false): void => {
+  // ANAT-D04: RFB segment types declared by the source document (`data-rfb-*` written by prepareRfbRepresentation from
+  // its own tiposSegmento table). The text grammar stays first; a declared type only fills a block the grammar left
+  // unidentified. A declared type that contradicts the grammar, a missing/unknown/conflicting type, or the source's own
+  // "não identificado" type is recorded as a limitation, never guessed. tachado → context historical
+  // (rfb_tachado_source); legalStatus is never touched.
+  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null };
+  const RFB_TYPE: Record<string, Descriptor['type']> = { artigo: 'article', paragrafo: 'paragraph', inciso: 'inciso', alinea: 'alinea',
+    item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group' };
+  const RFB_GROUP_WORD: Record<string, string> = { capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
+  const RFB_RANK: Partial<Record<Descriptor['type'], number>> = { article: 3, paragraph: 4, inciso: 5, alinea: 6, item: 7, summary: 100, signature: 100 };
+  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }): Descriptor => {
+    if (seg.issue) { limitation(`rfb_segment_${seg.issue}`, `RFB segment ${seg.pointer ?? '?'}: declared type ${seg.issue.replace(/_/gu, ' ')}; no type was guessed.`, span); return current; }
+    const sig = (seg.type ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+    if (!sig) return current;
+    if (sig.startsWith('nao identific')) { if (current.type === 'unidentified') limitation('rfb_segment_type_unidentified_by_source', `RFB segment ${seg.pointer ?? '?'}: the source itself declares the type as not identified.`, span); return current; }
+    const mapped = RFB_TYPE[sig];
+    if (!mapped) { if (current.type === 'unidentified') limitation('rfb_segment_type_unmapped', `RFB segment ${seg.pointer ?? '?'}: declared type "${seg.type}" has no structural mapping.`, span); return current; }
+    if (current.type === 'unidentified') {
+      if (mapped === 'group') { const [level, rank] = groupLevel(RFB_GROUP_WORD[sig]!); return { type: 'group', context: current.context === 'unknown' ? 'operative_candidate' : current.context, reason: `rfb_declared_group_${level}`, rank }; }
+      const ctx = mapped === 'summary' || mapped === 'signature' ? 'prohibited' as const : 'operative_candidate' as const;
+      return { type: mapped, context: ctx, reason: `rfb_declared_${sig}`, rank: RFB_RANK[mapped]! };
+    }
+    if (current.type !== mapped && !(current.type === 'preamble' && mapped === 'summary')) limitation('rfb_segment_type_conflict', `RFB segment ${seg.pointer ?? '?'}: text grammar found ${current.type}, source declares "${seg.type}"; the text grammar result is kept.`, span);
+    return current;
+  };
+  const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null): void => {
     if (node.blocked || node.text !== null) return;
     const context = domContext(node, inheritedContext);
     if (node.tag === 'table') { table(node, undefined, context); return; }
     const hasBlock = node.children.some((child) => blocks.has(child.tag));
+    if (input.source === 'RFB' && node.attrs['data-rfb-segment'] !== undefined) rfbSeg = { type: node.attrs['data-rfb-type'] ?? null, issue: node.attrs['data-rfb-type-issue'] ?? null,
+      tachado: node.attrs['data-rfb-tachado'] === 'true', pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
     const quotedDom = quotedAncestor || node.tag === 'blockquote' || node.tag === 'q';
     if (blocks.has(node.tag) && !hasBlock && node.span.end > node.span.start) {
       const text = matchText(node).trim();
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
       if (rules.quoteOpen.test(text)) openQuotation = true;
-      const descriptor = wasQuoted || openQuotation
+      let descriptor: Descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
         : describe(node, rules, matchText);
+      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
+      const rfbStruck = rfbSeg?.tachado === true;
+      if (rfbStruck && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
       const part = attach(node, descriptor);
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
+      if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
       if (inlineQuote) { part.contextReasons.push('inline_quote_conservative_exclusion'); limitation('inline_quote_conservative_exclusion', 'Inline quoted content excludes its entire containing block; no operative selection is inferred.', node.span); }
       if (rules.quoteClose.test(text) && !rules.quoteOnly.test(text)) openQuotation = false;
       return;
     }
-    for (const child of node.children) walk(child, context, quotedDom);
+    for (const child of node.children) walk(child, context, quotedDom, rfbSeg);
   };
   walk(dom);
   // Logical containers extend until their next sibling marker; all open containers end with the document.
