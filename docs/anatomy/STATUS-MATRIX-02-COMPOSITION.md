@@ -183,3 +183,57 @@ Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = ad
 - **Prontas para decisão expressa do Fábio:** 🔴 **L21 = A**; 🔴 **L22** (restrito ao tipo `anexo` declarado pela tabela do próprio documento); 🔴 **LOTE-RFB+** (lote de 5 para 7 INs).
 - **L2/L12:** pendente até haver desenho de limites, procedência, spans e reconciliação da preparação; não vai à decisão agora.
 - L18 adiada; L19 não autorizada. Frente 1 = 50,2%; Frente 2 = 10%.
+
+## 13. Desenhos pedidos (só desenho; nada implementado) — COORD/Fábio, #116 c.6671833324
+
+### 13.1 L20 — critério conservador para aspas abertas em segmento RFB
+
+**Evidência nova (somente leitura, nos snapshots oficiais):**
+- **IN 2.021/2021 (116968): 18 citações legítimas atravessam segmentos.** Exemplo: o segmento 678 (tipo 999, `"Art. 142. …`) abre a citação, e ela só fecha no segmento 682 (tipo `inciso`), 4 segmentos depois. Outro: 683 → 686. A antiga alternativa A (fechar sempre no fim do segmento) **liberaria esses incisos citados como operativos**. Por isso foi descartada.
+- **IN 2.121 (127905):** 1 abertura (segmento 4008, tipo 999) **sem nenhum fechamento até o fim do ato**. Os segmentos seguintes são os §§ do art. 706 citado (4009 `paragrafo` tachado, 4010 `paragrafo`, …).
+- IN 1.911 (104314): nenhuma abertura sem fechamento.
+
+**Critério proposto (todas as condições, só para RFB):**
+1. **(a) Ausência de fechamento:** só se considera encerrar uma citação aberta no segmento S se **nenhum** segmento posterior do mesmo ato contiver fechamento (aspa de fim ou `(NR)`) antes da próxima abertura. A preparação conhece todos os segmentos; o leitor recebe isso como atributo de prova (`data-rfb-quote-unclosed="true"`) gravado pela preparação, nunca deduzido do texto da página.
+2. **(b) Continuação protegida:** mesmo com (a), os segmentos seguintes que pertencem ao dispositivo citado (`paragrafo`, `inciso`, `alinea`, `item` ou 999) **continuam `prohibited`**. A citação só termina **antes do próximo segmento declarado `artigo` ou agrupamento (`parte`, `livro`, `titulo`, `capitulo`, `secao`, `subsecao`)** que não comece com aspas.
+3. **(c) Evidência:** o bloco de abertura continua `quoted_text`/`prohibited`. É registrada a limitação `rfb_quote_unclosed_bounded`, com o segmento de abertura e o de retomada.
+4. Outras fontes: sem mudança. `legalStatus` `unknown`.
+
+**Efeito esperado:**
+- IN 2.121: os §§ do art. 706 citado continuam proibidos; o texto volta ao normal a partir do próximo artigo **declarado** depois do 4008. Recupera a maior parte dos 556 blocos; o número exato será medido.
+- IN 2.021: **nenhuma mudança**, porque as 18 citações têm fechamento e falham em (a).
+
+**Contracasos obrigatórios:**
+1. **Citação legítima multissegmento** (modelo real 116968, 678 → 682): abre em 999, fecha num inciso posterior. Deve continuar `quoted_text` em todos os segmentos.
+2. Abertura sem fechamento seguida só de §§ e incisos até o fim: tudo continua `prohibited` (não há artigo declarado para retomar).
+3. Abertura sem fechamento seguida de artigo declarado **que começa com aspas**: não retoma.
+4. Fechamento só por `(NR)`: conta como fechamento.
+5. Tachado dentro da citação: continua `historical`/`prohibited`, conforme as regras atuais.
+6. DOU, DOE-SP, portal SP e CONFAZ com o mesmo HTML: sem mudança.
+7. Lote de 7 INs antes/depois, com cada diferença explicada.
+
+**Risco residual:** uma citação legítima cujo fechamento a fonte omitiu **e** que contenha um artigo inteiro citado seria encerrada antes desse artigo. Mitigação: (b) exige tipo **declarado** pela fonte, e a limitação deixa o caso auditável. 🔴 **Requer decisão expressa** depois da revisão deste desenho.
+
+### 13.2 L2/L12 — leitura do anexo HTML embutido no JSON RFB
+
+**Evidência:** IN 2.121, segmento **702** (o mesmo do conflito da L22: declarado `anexo`, texto do art. 137), `arquivoBinario.idTipoArquivo = 5`, nome `IN1.html`, **5.643 bytes** em base64, `charset=windows-1252` declarado no próprio HTML, sem `<script>`. Os outros 30 anexos (tipo 6, PDF) não trazem conteúdo no JSON.
+
+**Desenho:**
+1. **Seleção:** só `idTipoArquivo` cujo conteúdo base64 decodifica para HTML (assinatura `<!DOCTYPE`/`<html`) e declara charset suportado (`windows-1252`, `iso-8859-1`, `utf-8`). Caso contrário, o anexo continua `missing`, com motivo.
+2. **Limites:** no máximo 512 KiB decodificados por anexo e 1 MiB por ato. O HTML preparado total continua sujeito ao limite do leitor (2 MiB; hoje a IN 2.121 usa 88%, então anexos grandes podem levar a `input_size_limit`, com degradação explícita). Acima disso: `attachment_too_large`, sem leitura parcial silenciosa.
+3. **Procedência:** ponteiro `/outrosSegmentos/<i>/arquivoBinario/arquivoBinario`, SHA-256 dos bytes decodificados, charset usado e `idArquivoBinario`/nome. O texto vem só da representação oficial já capturada (sem nova coleta).
+4. **Posições no original:** o anexo entra como `<section data-rfb-attachment="<idArquivoBinario>">` depois do segmento que o referencia. O `PreparedPiece` registra o intervalo no HTML preparado **e** o intervalo nos bytes decodificados do anexo, que é reproduzível a partir do base64 do JSON.
+5. **Saneamento:** o leitor já exclui `script`, `style`, `iframe` etc. O `<head>` do anexo fica fora. Nenhum recurso externo é buscado.
+6. **Versão e reconciliação:** a preparação RFB sobe para `0.3.0`. No lote, a reconciliação ganha o modo `inline_attachment_added`: remover exatamente as `<section data-rfb-attachment>` inseridas deve reproduzir o hash `0.2.0` (mesma técnica do R2-LOT-01). Atos sem anexo embutido continuam `identical`. A preparação capturada nunca é reescrita.
+7. **Contexto:** o conteúdo do anexo herda o contexto do segmento que o referencia (tachado → `historical`; citação → `prohibited`); `legalStatus` `unknown`.
+
+**Testes necessários:**
+- anexo HTML válido lido, com ponteiro e SHA;
+- base64 inválido, charset não suportado e conteúdo que não é HTML → `missing` com motivo;
+- limite por anexo e por ato;
+- PDF tipo 6 continua `missing`;
+- reconciliação `inline_attachment_added` e falha se outra coisa mudar;
+- HTML com `<script>`/`<iframe>` não executado nem lido;
+- lote de 7 INs antes/depois.
+
+🔴 **Requer decisão expressa** depois da revisão deste desenho.
