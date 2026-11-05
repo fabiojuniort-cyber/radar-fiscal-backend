@@ -79,3 +79,47 @@ Execução real em 31/10: todas as URLs deram `FAIL network: getaddrinfo ENOTFOU
 
 - **R2-03:** URL verificada não é o mesmo que representação válida. O corpo precisa corresponder ao formato declarado: um PDF tem a assinatura `%PDF-` no início e o marcador `%%EOF`; um HTML não é vazio, contém marcação e não é um PDF. Se não corresponder, a resposta vira a falha `invalid_representation`, sem corpo, e nunca um snapshot. Os metadados passam a separar `urlVerified` de `representation`. A proteção dos redirecionamentos não mudou.
 - **R2-04:** o vínculo de amostra com snapshot em PDF usa o texto extraído de forma rastreável (`ops/anatomy/pdf-text.ts`, ferramenta `pdfjs-dist@6.3.289/lines-v2`), com o hash do texto registrado em `extraction.textSha256` no meta. O PDF nunca é decodificado como UTF-8. O hash binário continua sendo a identidade do original. O HTML continua com a conferência byte a byte.
+
+## ANAT-D03 — JSON estruturado da Receita (aprovado pelo Fábio, via COORD)
+
+- **Aceitação restrita:** `application/json` só é aceito em host oficial da RFB (`normasinternet2.receita.fazenda.gov.br`, adicionado a `OFFICIAL_HOSTS.RFB`) e no caminho `/api/consulta-externa/ato/<idAto>/visao/<visao>`, sem query string. Qualquer outro JSON continua sendo falha `content_type`.
+- **Validação da representação** (`validateRfbJson`): o Content-Type sozinho não prova nada. O corpo precisa ser:
+  - JSON UTF-8 com objeto raiz;
+  - diferente de payload de erro (com `status`, `erro` ou `mensagem` e sem `idAto`);
+  - com o `idAto` igual ao da URL;
+  - estruturalmente compatível com `prepareRfbRepresentation`: segmentos ordenados, sem ordem duplicada, com pelo menos um texto legível.
+
+  Caso contrário, a resposta vira `invalid_representation`, sem corpo.
+- **Preservação:** o arquivo original fica intacto (`<id>.json`). O meta registra:
+  - URL, `consultedAt`, SHA-256 e bytes;
+  - a identificação do ato e da versão: `idAto`, epígrafe, número, data do ato, `dataPublicacao`, `dadosPublicacao`, `visao`, e o `vigente` **declarado pelo portal**, não inferido;
+  - a preparação: versão, `preparationId`, `htmlSha256`, número de trechos, segmentos ausentes, anexos e campos excluídos.
+- **Vínculo** (`bindingIssues`): o JSON é preparado de novo (e, desde D03-R1-01, os segmentos tachados são **derivados de novo do JSON original**, sem confiar no metadado; divergência do metadado é registrada como problema), o `htmlSha256` precisa conferir e a amostra precisa ser recorte exato do HTML preparado. A rastreabilidade ponteiro JSON ↔ texto preparado ↔ anatomia passa por `locateJsonHtmlSpan`, coberta por teste.
+- **Perdas de estrutura declaradas:**
+  - `epigrafeCompleta` fica excluída como metadado;
+  - segmentos com `omitir` ou sem texto são listados como ausentes (ex.: IN 2.005/2021, `/outrosSegmentos/104`, `no_text`);
+  - anexos binários são referenciados, sem conteúdo;
+  - nesta branch o leitor é anterior ao STRUCT: agrupamentos e itens não são reconhecidos, e o texto correspondente fica `unidentified`, mas contabilizado (IN 2.237/2024: 12.271 de 31.389 caracteres). Os números por ato estão em `anatomyOnThisBranch` de cada meta.
+- **`promoted: false`** nas 4 INs até o aceite independente da validação.
+
+### ANAT-D03, conferência pré-revisão: visão multivigente e perdas por IN
+
+**A visão `multivigente` MISTURA redações superadas.** O portal marca segmentos com `tachado: true` (riscados, redação superada) e os entrega no mesmo vetor dos vigentes. `prepareRfbRepresentation` os inclui como texto comum, e o leitor **não** os marca como históricos.
+
+Tratamento nesta entrega, sem mudar o leitor nem a preparação:
+- a validação registra `preparation.struckSegments` (ponteiro, ordem e tamanho);
+- o vínculo **recusa** amostra que inclua segmento tachado;
+- as 4 INs seguem `promoted: false`.
+
+Marcar o tachado como contexto histórico na anatomia é mudança de leitor/preparação e **depende de decisão**.
+
+| IN | Canônico (chars) | Contabilizado | Não identificado | causa: inciso sem travessão no texto do portal | outras | Segmentos tachados | Ausentes | Anexos |
+|---|---|---|---|---|---|---|---|---|
+| 2.005/2021 (115131) | 57.179 | 57.179 | 1.015 | 0 | 1.015 | **343 de 344** (o portal declara o ato não vigente) | 1 (`no_text`) | 0 |
+| 2.237/2024 (141910) | 31.389 | 31.389 | **12.271** | **11.279** | 992 | 10 de 223 | 0 | 0 |
+| 2.162/2023 (133898) | 4.540 | 4.540 | 511 | 0 | 511 | 19 de 28 | 0 | 0 |
+| 1.932/2020 (108391) | 2.003 | 2.003 | 325 | 0 | 325 | 0 | 0 | 0 |
+
+- **IN 2.237, os 12.271 caracteres:** 11.279 são incisos que o portal guarda **sem o travessão** ("I que ocorrerem…"); o travessão só aparece na exibição. A gramática de inciso exige o separador, então esses blocos ficam `unidentified`. Os 992 restantes são de outra natureza (preâmbulo e blocos de transição) e ficam para a revisão. O texto está todo **preservado e contabilizado**; o que se perde é a **estrutura**.
+- **Coletar o arquivo com sucesso não comprova anatomia completa.** O status das 4 é `partial`.
+- O detalhe por IN está em `anatomyOnThisBranch` de cada `<id>.meta.json`.

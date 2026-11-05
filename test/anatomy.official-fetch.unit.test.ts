@@ -4,7 +4,9 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { consultOfficial, type FetchLike, type ManifestAct } from '../ops/anatomy/fetch-official-core.js';
+import { consultOfficial, rfbJsonIdAto, validateRfbJson, type FetchLike, type ManifestAct } from '../ops/anatomy/fetch-official-core.js';
+import { locateJsonHtmlSpan, prepareRfbRepresentation } from '../src/modules/anatomy/json-preparation.js';
+import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
 import { bindingIssues } from '../ops/anatomy/official-binding.js';
 import { PDF_TEXT_TOOL, pdfText } from '../ops/anatomy/pdf-text.js';
 import { buildSyntheticPdf } from './support/synthetic-pdf.js';
@@ -116,4 +118,132 @@ test('R2-04: a PDF sample binds through traceable extraction, never through UTF-
   meta();
   writeFileSync(join(dir, 'ofc-x.pdf'), buildSyntheticPdf([[{ text: 'Art. 1º Outra ação.', y: 700 }]]));
   assert.match((await bindingIssues([sample('Art. 1º Ação exemplo.')], dir, [act()])).join(), /adulterado/u, 'tampered PDF refused');
+});
+
+// ANAT-D03 — RFB structured JSON. Synthetic payloads shaped like the portal; never official text.
+const RFB_HOSTS = ['normasinternet2.receita.fazenda.gov.br'];
+const RFB_URL = 'https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/900001/visao/multivigente';
+const rfbAct = (over: Partial<ManifestAct> = {}): ManifestAct => act({ id: 'ofc-rfb-x', source: 'RFB', act: 'Instrução Normativa RFB 9.999/2099', url: RFB_URL, ...over });
+const rfbJson = (over: Record<string, unknown> = {}) => JSON.stringify({ idAto: 900001, epigrafeCompleta: 'Instrução Normativa RFB nº 9999, de 1 de janeiro de 2099',
+  epigrafe: { numeroAto: '9999', dataAto: '2099-01-01' }, dataPublicacao: '2099-01-02', dadosPublicacao: 'Publicado(a) no DOU de 02/01/2099, seção 1, página 1',
+  visao: 'multivigente', vigente: true,
+  ementas: [{ ordemSegmentoAto: 1, textoIntegra: '<p>Dispõe sobre o exemplo sintético.</p>' }],
+  outrosSegmentos: [{ ordemSegmentoAto: 2, textoIntegra: '<p>Art. 1º Fica instituída a ação exemplo.</p>' }, { ordemSegmentoAto: 3, textoIntegra: '<p>Art. 2º Vigência na publicação.</p>' }], ...over });
+const jres = (body: string, ct = 'application/json') => res(200, { 'content-type': ct }, body);
+
+test('D03: a valid RFB JSON becomes a json snapshot with identification and preparation (traceable)', async () => {
+  const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(rfbJson())).f);
+  assert.ok(r.ok, JSON.stringify(!r.ok && r.failure));
+  assert.equal(r.meta.representation, 'json');
+  assert.equal(r.meta.sha256, createHash('sha256').update(r.body).digest('hex'));
+  assert.deepEqual({ ...r.meta.identification }, { idAto: 900001, epigrafe: 'Instrução Normativa RFB nº 9999, de 1 de janeiro de 2099', numeroAto: '9999', dataAto: '2099-01-01',
+    dataPublicacao: '2099-01-02', dadosPublicacao: 'Publicado(a) no DOU de 02/01/2099, seção 1, página 1', visao: 'multivigente', portalDeclaresVigente: true });
+  assert.equal(r.meta.preparation!.pieces, 3);
+  assert.deepEqual(r.meta.preparation!.excluded, ['/epigrafeCompleta'], 'metadata exclusion declared');
+  // JSON pointer ↔ prepared text ↔ anatomy
+  const prep = prepareRfbRepresentation({ resourceId: 'x', bytes: new Uint8Array(r.body) }, 900001);
+  assert.equal(prep.htmlSha256, r.meta.preparation!.htmlSha256);
+  const an = readAnatomyInput({ source: 'RFB', representationId: 'x', html: prep.html });
+  const art1 = an.parts.find((p) => p.type === 'article' && an.canonicalText.slice(p.span.start).startsWith('Art. 1º'))!;
+  const ptr = art1.sourcePointers[0]!; assert.ok(ptr.sourceSpan, 'html source span');
+  assert.equal(locateJsonHtmlSpan(prep, ptr.sourceSpan!)!.pointer, '/outrosSegmentos/0/textoIntegra');
+});
+
+test('D03 (R2-03 equivalents): error payloads, empty, non-JSON, wrong act and incompatible structure never become snapshots', async () => {
+  const cases: [string, string][] = [
+    ['erro', JSON.stringify({ status: 500, mensagem: 'Erro interno' })],
+    ['vazio', ''],
+    ['html com MIME json', '<html>Página de erro</html>'],
+    ['array', '[]'],
+    ['ato errado', rfbJson({ idAto: 900002 })],
+    ['sem segmentos', rfbJson({ ementas: [], outrosSegmentos: [] })],
+    ['segmentos sem texto', rfbJson({ ementas: [{ ordemSegmentoAto: 1, textoIntegra: ' ' }], outrosSegmentos: [] })],
+    ['ordem duplicada', rfbJson({ ementas: [{ ordemSegmentoAto: 1, textoIntegra: '<p>a</p>' }], outrosSegmentos: [{ ordemSegmentoAto: 1, textoIntegra: '<p>b</p>' }] })],
+  ];
+  for (const [label, body] of cases) {
+    const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(body)).f);
+    assert.ok(!r.ok && r.failure.code === 'invalid_representation' && !('body' in r), label);
+  }
+  // application/json outside the RFB JSON endpoint is still refused by type.
+  const other = await consultOfficial(act({ url: 'https://www.confaz.fazenda.gov.br/a.json' }), HOSTS, scripted(jres(rfbJson())).f);
+  assert.ok(!other.ok && other.failure.code === 'content_type');
+  const wrongPath = await consultOfficial(rfbAct({ url: 'https://normasinternet2.receita.fazenda.gov.br/api/ato/900001' }), RFB_HOSTS, scripted(jres(rfbJson())).f);
+  assert.ok(!wrongPath.ok && wrongPath.failure.code === 'content_type');
+  const { f, calls } = scripted(res(302, { location: 'https://evil.example/x' }));
+  assert.ok(!(await consultOfficial(rfbAct(), RFB_HOSTS, f)).ok && calls.length === 1, 'redirect protection preserved');
+});
+
+test('D03: binding of an RFB JSON sample goes through the prepared text, never the raw bytes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ofc-json-'));
+  const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(rfbJson())).f);
+  assert.ok(r.ok);
+  writeFileSync(join(dir, 'ofc-rfb-x.json'), r.body);
+  const writeMeta = (over: Record<string, unknown> = {}) => writeFileSync(join(dir, 'ofc-rfb-x.meta.json'), JSON.stringify({ ...r.meta, ...over }));
+  writeMeta();
+  const sample = (content: string): SampleInput => ({ id: 'ofc-rfb-x', documentId: 'ofc-rfb-x', version: 'v1', title: 't', source: 'RFB', family: null, format: 'html', content, covers: ['x'],
+    provenance: { kind: 'official', act: 'Instrução Normativa RFB 9.999/2099', url: RFB_URL, consultedAt: '2026-11-04', version: 'multivigente', reason: 'motivo suficiente', snapshotSha256: r.meta.sha256 } as SampleInput['provenance'] });
+  const ok = '<p>Art. 1º Fica instituída a ação exemplo.</p>';
+  assert.deepEqual(await bindingIssues([sample(ok)], dir, [rfbAct()]), []);
+  assert.match((await bindingIssues([sample('<p>Art. 1º Texto ALTERADO.</p>')], dir, [rfbAct()])).join(), /texto preparado do JSON/u);
+  writeMeta({ preparation: { ...r.meta.preparation, htmlSha256: 'e'.repeat(64) } });
+  assert.match((await bindingIssues([sample(ok)], dir, [rfbAct()])).join(), /não confere com preparation\.htmlSha256/u);
+  writeMeta({ preparation: undefined });
+  assert.match((await bindingIssues([sample(ok)], dir, [rfbAct()])).join(), /sem identificação\/preparação/u);
+  writeMeta();
+  writeFileSync(join(dir, 'ofc-rfb-x.json'), rfbJson({ visao: 'outra' }));
+  assert.match((await bindingIssues([sample(ok)], dir, [rfbAct()])).join(), /adulterado/u);
+});
+
+test('D03: the four collected RFB JSON snapshots validate, match their recorded hashes and stay not promoted', () => {
+  const dir = new URL('../ops/anatomy/official-identification/rfb-normasinternet2/', import.meta.url).pathname;
+  for (const id of [115131, 141910, 108391, 133898]) {
+    const body = readFileSync(join(dir, `${id}.json`));
+    const meta = JSON.parse(readFileSync(join(dir, `${id}.meta.json`), 'utf8')) as { sha256: string; bytes: number; promoted: boolean; url: string };
+    assert.equal(createHash('sha256').update(body).digest('hex'), meta.sha256, `${id} hash`);
+    assert.equal(body.length, meta.bytes);
+    assert.equal(meta.promoted, false);
+    assert.equal(rfbJsonIdAto(new URL(meta.url), ['normasinternet2.receita.fazenda.gov.br']), id);
+    const v = validateRfbJson(body, id);
+    assert.ok(!('problem' in v), `${id}: ${'problem' in v ? v.problem : ''}`);
+  }
+});
+
+test('D03: struck-through (tachado) segments are recorded and a sample drawing on them is refused', async () => {
+  const body = rfbJson({ outrosSegmentos: [{ ordemSegmentoAto: 2, textoIntegra: '<p>Art. 1º Redação vigente.</p>' }, { ordemSegmentoAto: 3, tachado: true, textoIntegra: '<p>Art. 2º Redação superada.</p>' }] });
+  const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(body)).f);
+  assert.ok(r.ok);
+  assert.deepEqual(r.meta.preparation!.struckSegments, [{ pointer: '/outrosSegmentos/1', order: 3, chars: '<p>Art. 2º Redação superada.</p>'.length }]);
+  const dir = mkdtempSync(join(tmpdir(), 'ofc-tach-'));
+  writeFileSync(join(dir, 'ofc-rfb-x.json'), r.body); writeFileSync(join(dir, 'ofc-rfb-x.meta.json'), JSON.stringify(r.meta));
+  const sample = (content: string): SampleInput => ({ id: 'ofc-rfb-x', documentId: 'ofc-rfb-x', version: 'v1', title: 't', source: 'RFB', family: null, format: 'html', content, covers: ['x'],
+    provenance: { kind: 'official', act: 'Instrução Normativa RFB 9.999/2099', url: RFB_URL, consultedAt: '2026-11-04', version: 'multivigente', reason: 'motivo suficiente', snapshotSha256: r.meta.sha256 } as SampleInput['provenance'] });
+  assert.deepEqual(await bindingIssues([sample('<p>Art. 1º Redação vigente.</p>')], dir, [rfbAct()]), []);
+  assert.match((await bindingIssues([sample('<p>Art. 2º Redação superada.</p>')], dir, [rfbAct()])).join(), /segmento tachado/u);
+});
+
+test('D03-R1-01: the struck set is re-derived from the original JSON; tampered metadata never hides a tachado excerpt', async () => {
+  const body = rfbJson({ outrosSegmentos: [{ ordemSegmentoAto: 2, tachado: true, textoIntegra: '<p>Art. 1º Redação superada.</p>' },
+    { ordemSegmentoAto: 3, textoIntegra: '<p>Art. 2º Redação vigente.</p>' }, { ordemSegmentoAto: 4, tachado: true, textoIntegra: '<p>Art. 3º Outra superada.</p>' }] });
+  const r = await consultOfficial(rfbAct(), RFB_HOSTS, scripted(jres(body)).f);
+  assert.ok(r.ok);
+  const dir = mkdtempSync(join(tmpdir(), 'ofc-r1-'));
+  writeFileSync(join(dir, 'ofc-rfb-x.json'), r.body);
+  const sample = (content: string): SampleInput => ({ id: 'ofc-rfb-x', documentId: 'ofc-rfb-x', version: 'v1', title: 't', source: 'RFB', family: null, format: 'html', content, covers: ['x'],
+    provenance: { kind: 'official', act: 'Instrução Normativa RFB 9.999/2099', url: RFB_URL, consultedAt: '2026-11-04', version: 'multivigente', reason: 'motivo suficiente', snapshotSha256: r.meta.sha256 } as SampleInput['provenance'] });
+  const struckSample = sample('<p>Art. 1º Redação superada.</p>');
+  const control = sample('<p>Art. 2º Redação vigente.</p>');
+  const real = r.meta.preparation!.struckSegments;
+  assert.deepEqual(real.map((x) => x.pointer), ['/outrosSegmentos/0', '/outrosSegmentos/2']);
+  const withStruck = (list: unknown) => writeFileSync(join(dir, 'ofc-rfb-x.meta.json'), JSON.stringify({ ...r.meta, preparation: { ...r.meta.preparation, struckSegments: list } }));
+  withStruck(real);
+  assert.deepEqual(await bindingIssues([control], dir, [rfbAct()]), [], 'valid non-struck control');
+  assert.match((await bindingIssues([struckSample], dir, [rfbAct()])).join(), /segmento tachado/u);
+  for (const [label, list] of [['lista vazia', []], ['segmento removido', [real[1]]], ['ponteiro alterado', [{ ...real[0], pointer: '/outrosSegmentos/1' }, real[1]]]] as const) {
+    withStruck(list);
+    const issues = (await bindingIssues([struckSample], dir, [rfbAct()])).join();
+    assert.match(issues, /segmento tachado/u, `${label}: refusal still driven by the original JSON`);
+    assert.match(issues, /diverge do JSON original/u, `${label}: divergence reported`);
+    assert.match((await bindingIssues([control], dir, [rfbAct()])).join(), /diverge do JSON original/u, `${label}: tampered metadata flagged even for a clean excerpt`);
+  }
+  assert.equal(createHash('sha256').update(readFileSync(join(dir, 'ofc-rfb-x.json'))).digest('hex'), r.meta.sha256, 'original untouched');
 });
