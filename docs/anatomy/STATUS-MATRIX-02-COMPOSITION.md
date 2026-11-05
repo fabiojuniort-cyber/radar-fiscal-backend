@@ -162,3 +162,17 @@ Total: no máximo 7 atos ou páginas mais metadados. Tudo vai para `promoted:fal
 | C | Manter | — | 1 bloco não identificado | — |
 
 **Recomendação:** A (só tolerância no casamento, sem alterar o texto). Muda a gramática; **requer decisão expressa**.
+
+## 11. 🔴 DECISÕES DO FÁBIO — AGUARDANDO (nada implementado)
+
+| ID | Assunto | AS IS | TO BE recomendado | Benefício | Risco | Testes necessários | Etapa dependente |
+|---|---|---|---|---|---|---|---|
+| 🔴 **L20** | Aspas sem fechamento em segmento RFB tipo 999 | IN 2.121: 556 blocos (10,6%) `prohibited` até o fim; IN 2.021: 68 blocos (8,2%) (COLETA-02) | Alternativa A do §10: só para RFB, encerrar a citação aberta no fim do segmento JSON que a abriu, com limitação explícita | Recupera a estrutura (118 artigos e a PARTE VI na 2.121) sem tocar as outras fontes | Citação RFB legítima que atravesse segmentos | Multissegmento com fechamento; outras fontes sem mudança; tachado + citação; `(NR)`; lote RFB antes/depois | E9 (qualidade da cobertura RFB) |
+| 🔴 **L21** | U+200B no início do bloco (portal SP) | 1 bloco afetado (art. 7º, inciso XV); 0 nas 4 páginas novas | Alternativa A do §10: tolerar U+200B **no início**, só para casar a gramática; texto, spans e hashes literais | 1 bloco reconhecido; nenhum efeito no texto | Mínimo | Início × meio do bloco; outros invisíveis fora; DOU/RFB sem mudança | — |
+| 🔴 **L22** (nova) | Tipo RFB `anexo` declarado e sem mapeamento | 2 e 4 limitações nas INs 1.911 e 2.021 | Mapear `anexo` declarado → `annex`, só quando a gramática deixou o bloco não identificado (mesmo modelo da L11) | Menos limitações; anexos estruturados | Igual à L11 (conflito com a gramática fica registrado) | Contracasos da L11 aplicados a `anexo` | E9 |
+| 🔴 **L2/L12** (atualizada) | Anexo HTML embutido no JSON RFB | 1 de 31 anexos da IN 2.121 está no JSON (base64) e não é lido | Preparação RFB passa a ler o anexo HTML embutido, com spans próprios; PDFs (tipo 6) continuam `missing` | Conteúdo de anexo oficial sem nova coleta | Muda a preparação RFB (nova versão; reconciliação de preparação como no #289) | Preparação capturada × reexecutada; HTML do anexo sem execução de script; tamanho | E9 |
+| 🔴 **LOTE-RFB+** | Incluir IN 1.911 e IN 2.021 no lote de regressão | Coletadas em pasta separada, fora do lote aprovado | Ampliar o lote de 5 para 7 INs (nova baseline) | Regressão cobre L11 em 2 atos e L20 | Nenhum funcional; a baseline muda | Teste do lote com 7 atos | — |
+| 🟡 L18 | `blockquote` como recuo (portal SP) | **Adiada** (D-074); amostras novas: An. I art. 41 (25) e An. II art. 3º (7) | — | — | — | — | Nova aprovação |
+| 🟡 L19 | Persistência da `SEFAZ-SP-PORTAL` | **Não autorizada** (migration) | — | — | — | — | Autorização |
+
+Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = adiado; LOTE-RFB+ = aprovado".
