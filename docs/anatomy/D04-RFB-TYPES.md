@@ -36,3 +36,17 @@ Aprovado expressamente pelo Fábio (via COORD, tribusca-control#116). PR própri
   - **Antes/depois:** os 2 testes novos falham antes da correção e passam depois. O caso é isolado: artigo vigente com tabela tachada, para não haver herança de um pai tachado.
 - **D04-R1-02, NÃO aplicado: depende do contrato.** O contrato da anatomia (`contract.ts`, regra "Unidentified part cannot assert operative context") exige `context: unknown` para toda parte `unidentified`. Com `historical`, o motor **rejeita a análise inteira** (reproduzido). Por isso, um bloco tachado de tipo não identificado mantém `unidentified`/`unknown` e carrega a evidência como motivo `rfb_tachado_source` (comportamento coberto por teste, e o motor aceita). Dar contexto `historical` a esses blocos exige mudar o contrato e fica para decisão.
 - **Identidade:** `e7afa9f0` → **`ae26c438`**. Snapshots sintéticos sem delta. As 4 INs ficam sem mudança numérica (não têm tabela tachada).
+
+## ANAT-D05 — contrato: `unidentified` + `historical` com evidência (aprovado pelo Fábio)
+- **Contrato** (`contract.ts`): uma parte `unidentified` só pode ter contexto diferente de `unknown` quando:
+  - o contexto é `historical`;
+  - **e** tem o motivo `rfb_tachado_source`;
+  - **e** existe o registro `rfb_tachado_evidence` com o **mesmo `partId` e o mesmo span**.
+
+  Ficam recusados: motivo sem evidência, evidência de outra parte ou de outro span, evidência sem motivo, `operative_candidate` (mesmo com evidência) e `prohibited`. `legalStatus` não muda.
+- **Leitor:** o bloco tachado não identificado mantém o tipo `unidentified` (sem adivinhação), passa a `historical` e grava o registro de evidência, que só é criado a partir do atributo de tachado da fonte RFB. Citação continua `prohibited`. Blocos não tachados e outras fontes continuam `unknown`.
+- **Consumidor** (`config/view.ts`): a parte `unidentified` com tachado evidenciado aparece como "Histórico". Os novos motivos e limitações RFB têm rótulos em português.
+- **4 INs, pelo motor completo:** todas aceitas.
+  - IN 2.237: 4 dos 85 blocos não identificados são tachados e passam a `historical` com evidência; os outros 81 continuam `unknown`.
+  - As demais não mudam.
+- **Identidade:** `ae26c438` → **`5a432043`**. Snapshots sintéticos sem delta.

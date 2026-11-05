@@ -28,6 +28,8 @@ const HIDDEN = new Set(['caput', 'document', 'row', 'cell']);
 export function natureOf(part: Part): Nature {
   if (part.type === 'editorial_note') return 'editorial_note';
   if (part.type === 'quoted_text') return 'amendment';
+  // ANAT-D05: an unidentified part with source-evidenced tachado is shown as historical (its type stays unidentified).
+  if (part.type === 'unidentified' && part.context === 'historical' && part.contextReasons.includes('rfb_tachado_source')) return 'historical';
   if (part.type === 'unidentified' || part.context === 'unknown') return 'ambiguous';
   if (part.context === 'historical') return 'historical';
   if (STRUCTURAL.has(part.type)) return 'structure';
@@ -36,7 +38,7 @@ export function natureOf(part: Part): Nature {
 const REASONS_PT: Record<string, string> = {
   clause_marker: 'começa com o rótulo de cláusula', article_marker: 'começa com o rótulo de artigo', paragraph_marker: 'começa com o rótulo de parágrafo',
   preamble_marker: 'começa com uma fórmula de preâmbulo', quoted_block: 'está entre aspas de texto citado', inherited_dom_zone: 'herda a marcação do bloco',
-  historical_ancestor: 'está dentro de um trecho histórico', unrecognized_block: 'nenhuma regra reconheceu este bloco', raw_fallback: 'o texto não foi dividido em partes',
+  historical_ancestor: 'está dentro de um trecho histórico', rfb_tachado_source: 'a fonte (Receita) marca este trecho como riscado — redação superada', unrecognized_block: 'nenhuma regra reconheceu este bloco', raw_fallback: 'o texto não foi dividido em partes',
   confaz_editorial_note: 'tem estilo de nota editorial', confaz_epigraph: 'tem estilo de epígrafe', confaz_summary: 'tem estilo de ementa', confaz_text_class: 'tem estilo de corpo de texto',
   dou_identifica: 'tem estilo de identificação do DOU', dou_ementa: 'tem estilo de ementa do DOU', dou_assina: 'tem estilo de assinatura do DOU', dou_cargo: 'tem estilo de cargo do DOU',
   dou_rectification_original: 'começa com "Onde se lê"', dou_rectification_corrected: 'começa com "Leia-se"', table: 'é uma tabela', table_row: 'linha de tabela', table_cell: 'célula de tabela',
@@ -144,6 +146,14 @@ export function describeResult(doc: DocumentRef, result: AnatomyResult, annotati
     corrections: { applied, stale } };
 }
 function limitationTitle(code: string): string {
+  const RFB: Record<string, string> = {
+    rfb_tachado_evidence: 'Evidência da fonte: trecho riscado (redação superada) sem tipo reconhecido; mostrado como histórico, sem conclusão de vigência',
+    rfb_segment_type_unidentified_by_source: 'A própria fonte (Receita) não classifica o tipo deste trecho',
+    rfb_segment_type_conflict: 'O tipo declarado pela fonte difere do reconhecido pelo texto; mantido o do texto',
+    rfb_segment_type_missing: 'A fonte não informa o tipo deste trecho', rfb_segment_type_unknown_in_document_table: 'Tipo informado pela fonte não consta da tabela do próprio documento',
+    rfb_segment_type_table_conflict: 'A tabela de tipos do documento é contraditória para este trecho', rfb_segment_type_unmapped: 'Tipo informado pela fonte sem correspondência estrutural',
+  };
+  if (RFB[code]) return RFB[code]!;
   if (code === 'plain_text_unidentified') return 'Texto corrido: o motor não divide este ato em partes (limitação do motor, não da configuração)';
   return `Limitação do motor: ${code}`;
 }

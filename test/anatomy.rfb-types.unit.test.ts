@@ -3,6 +3,7 @@ import test from 'node:test';
 import { locateJsonHtmlSpan, prepareRfbRepresentation } from '../src/modules/anatomy/json-preparation.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
 import { analyzeAnatomy } from '../src/modules/anatomy/engine.js';
+import { validateAnatomyResult } from '../src/modules/anatomy/contract.js';
 
 // ANAT-D04 — RFB segment types declared by the document's own tiposSegmento. Synthetic payloads only.
 const TYPES = [{ idTipoSegmento: 1, siglaTipoSegmento: 'ementa' }, { idTipoSegmento: 3, siglaTipoSegmento: 'artigo' }, { idTipoSegmento: 4, siglaTipoSegmento: 'fecho' },
@@ -100,16 +101,47 @@ test('D04-R1-01: a table inside a tachado segment is historical (table, rows, ce
   assert.ok(dou.parts.filter((x) => x.type === 'cell').every((x) => x.context === 'operative_candidate' && !x.contextReasons.includes('rfb_tachado_source')));
 });
 
-test('D04-R1-02 (contract-bound): a tachado unidentified block keeps type unidentified and context unknown (contract), with the tachado evidence as reason; quoted stays prohibited; the engine accepts it', () => {
-  const d = doc([seg(2, 3, '<p>Art. 1º Vigente.</p>'), seg(3, 999, 'III texto superado não classificado.', { tachado: true }), seg(4, 3, '<blockquote><p>Art. 5º texto citado.</p></blockquote>', { tachado: true })]);
-  const { r, p } = read(d);
-  const iii = at(r, 'III texto superado');
-  assert.equal(iii.type, 'unidentified', 'type not guessed');
-  assert.equal(iii.context, 'unknown', 'contract: unidentified cannot assert another context');
-  assert.ok(iii.contextReasons.includes('rfb_tachado_source'), 'tachado evidence preserved'); assert.equal(iii.legalStatus, 'unknown');
-  assert.equal(r.parts.find((x) => x.type === 'quoted_text')!.context, 'prohibited');
-  assert.doesNotThrow(() => analyzeAnatomy({ publicationVersionId: 's', referenceDate: '2026-11-05', ruleSet: { id: 's', version: '1' },
-    input: { source: 'RFB', representationId: 'x', html: p.html }, catalog: { edition: 's', codes: [] } }));
+const analyze = (html: string, source: 'RFB' | 'DOU' = 'RFB') => analyzeAnatomy({ publicationVersionId: 's', referenceDate: '2026-11-05', ruleSet: { id: 's', version: '1' },
+  input: { source, representationId: 'x', html }, catalog: { edition: 's', codes: [] } });
+
+test('D05: a tachado unidentified block is unidentified/historical with matching evidence; the engine accepts it; quoted stays prohibited', () => {
+  const d = doc([seg(2, 3, '<p>Art. 1º Vigente.</p>'), seg(3, 999, 'III texto superado não classificado.', { tachado: true }), seg(4, 999, 'IV texto vigente não classificado.'),
+    seg(5, 3, '<blockquote><p>Art. 5º texto citado.</p></blockquote>', { tachado: true })]);
+  const { p } = read(d);
+  const a = analyze(p.html);
+  const iii = a.parts.find((x) => x.type === 'unidentified' && a.canonicalText.slice(x.span.start).trimStart().startsWith('III'))!;
+  assert.equal(iii.context, 'historical'); assert.ok(iii.contextReasons.includes('rfb_tachado_source')); assert.equal(iii.legalStatus, 'unknown');
+  const ev = a.limitations.filter((l) => l.code === 'rfb_tachado_evidence');
+  assert.equal(ev.length, 1); assert.equal(ev[0]!.partId, iii.id); assert.deepEqual(ev[0]!.span, iii.span);
+  const iv = a.parts.find((x) => x.type === 'unidentified' && a.canonicalText.slice(x.span.start).trimStart().startsWith('IV'))!;
+  assert.equal(iv.context, 'unknown', 'non-struck unidentified control unchanged');
+  assert.equal(a.parts.find((x) => x.type === 'quoted_text')!.context, 'prohibited', 'quotation exclusion preserved');
+  assert.ok(a.eligibility.find((e) => e.partId === iii.id)!.exclusionReasons.includes('context_historical'));
+  assert.ok(a.eligibility.every((e) => !e.eligible));
+});
+
+test('D05 contract: reason without evidence, mismatched evidence, operative unidentified and evidence without reason are all refused', () => {
+  const { p } = read(doc([seg(2, 3, '<p>Art. 1º Vigente.</p>'), seg(3, 999, 'III texto superado.', { tachado: true })]));
+  const base = analyze(p.html);
+  const iii = base.parts.find((x) => x.type === 'unidentified' && x.context === 'historical')!;
+  const mutate = (f: (r: typeof base) => void) => { const r = structuredClone(base); f(r); return () => validateAnatomyResult(r); };
+  assert.doesNotThrow(mutate(() => {}), 'valid evidence accepted');
+  assert.throws(mutate((r) => { r.limitations = r.limitations.filter((l) => l.code !== 'rfb_tachado_evidence'); }), /Unidentified part cannot assert/u, 'reason alone');
+  assert.throws(mutate((r) => { const l = r.limitations.find((x) => x.code === 'rfb_tachado_evidence')!; l.span = { start: l.span!.start, end: l.span!.end - 1 }; }), /Unidentified part cannot assert/u, 'span mismatch');
+  assert.throws(mutate((r) => { r.limitations.find((x) => x.code === 'rfb_tachado_evidence')!.partId = 'part-0'; }), /Unidentified part cannot assert/u, 'other part');
+  assert.throws(mutate((r) => { const x = r.parts.find((q) => q.id === iii.id)!; x.contextReasons = x.contextReasons.filter((c) => c !== 'rfb_tachado_source'); }), /Unidentified part cannot assert/u, 'evidence without reason');
+  assert.throws(mutate((r) => { r.parts.find((q) => q.id === iii.id)!.context = 'operative_candidate'; }), /Unidentified part cannot assert/u, 'operative refused even with evidence');
+  assert.throws(mutate((r) => { r.parts.find((q) => q.id === iii.id)!.context = 'prohibited'; }), /Unidentified part cannot assert/u, 'only historical is admitted');
+});
+
+test('D05: no source evidence → no historical: DOU with the same attributes and RFB without tachado stay unknown', () => {
+  const html = '<html><body><section data-rfb-segment="1" data-rfb-type="nao identificado" data-rfb-tachado="true"><p>III texto exemplo.</p></section></body></html>';
+  const dou = analyze(html, 'DOU');
+  assert.ok(dou.parts.filter((x) => x.type === 'unidentified').every((x) => x.context === 'unknown'));
+  assert.ok(!dou.limitations.some((l) => l.code === 'rfb_tachado_evidence'));
+  const { p } = read(doc([seg(2, 999, 'III texto sem tachado.')]));
+  const rfb = analyze(p.html);
+  assert.ok(rfb.parts.filter((x) => x.type === 'unidentified').every((x) => x.context === 'unknown'));
 });
 
 test('D04-R1-01 (selection): cells of a tachado table carry exclusion context_historical; the same cells in a non-struck table do not', () => {
@@ -124,4 +156,12 @@ test('D04-R1-01 (selection): cells of a tachado table carry exclusion context_hi
   assert.equal(struck.context, 'historical'); assert.ok(elig(struck.id).exclusionReasons.includes('context_historical'));
   assert.ok(a.eligibility.every((e) => e.eligible === false), 'no positive selection without approved evidence');
   assert.ok(a.parts.every((x) => x.legalStatus === 'unknown'));
+});
+
+test('D05 consumer: the configuration view shows an evidenced tachado unidentified part as historical and labels the evidence in Portuguese', async () => {
+  const { natureOf } = await import('../src/modules/anatomy/config/view.js');
+  const { p } = read(doc([seg(2, 999, 'III texto superado.', { tachado: true }), seg(3, 999, 'IV texto comum.')]));
+  const a = analyze(p.html);
+  const unid = a.parts.filter((x) => x.type === 'unidentified');
+  assert.deepEqual(unid.map((x) => natureOf(x as never)), ['historical', 'ambiguous']);
 });

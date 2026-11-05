@@ -494,14 +494,17 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         : describe(node, rules, matchText);
       if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
       const rfbStruck = rfbSeg?.tachado === true;
-      // D04-R1-02: the contract requires context 'unknown' for unidentified parts (contract.ts), so an unidentified struck
-      // block keeps 'unknown' and carries the tachado evidence as the reason rfb_tachado_source (pending decision).
-      if (rfbStruck && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
+      // ANAT-D05: a struck block becomes historical; an unidentified struck block keeps its type (no guess) and becomes
+      // historical too, backed by an rfb_tachado_evidence record tied to the part (contract.ts). Prohibited stays.
+      const struckUnidentified = rfbStruck && descriptor.type === 'unidentified' && descriptor.context === 'unknown';
+      if (rfbStruck && (descriptor.context === 'operative_candidate' || struckUnidentified)) descriptor = { ...descriptor, context: 'historical' };
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
       const part = attach(node, descriptor);
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
+      if (struckUnidentified) result.limitations.push({ code: 'rfb_tachado_evidence', partId: part.id, span: { ...part.span },
+        message: `RFB ${rfbSeg!.pointer}: the source marks this unidentified block as struck-through (tachado); context historical, type and legalStatus unchanged.` });
       if (inlineQuote) { part.contextReasons.push('inline_quote_conservative_exclusion'); limitation('inline_quote_conservative_exclusion', 'Inline quoted content excludes its entire containing block; no operative selection is inferred.', node.span); }
       if (rules.quoteClose.test(text) && !rules.quoteOnly.test(text)) openQuotation = false;
       return;

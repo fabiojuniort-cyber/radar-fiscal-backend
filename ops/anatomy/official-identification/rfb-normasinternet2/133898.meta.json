@@ -150,7 +150,7 @@
     "attachmentsWithoutContent": 0
   },
   "anatomyD04": {
-    "readerBase": "ANAT-D04 + R1 (claude/anat-d04-rfb-types)",
+    "readerBase": "ANAT-D04 + R1 + D05 (claude/anat-d04-rfb-types), full engine",
     "status": "complete",
     "partTypes": {
       "document": 1,
@@ -168,6 +168,8 @@
     "limitations": {},
     "legalStatusValues": [
       "unknown"
-    ]
+    ],
+    "unidentifiedHistoricalWithEvidence": 0,
+    "engineAccepted": true
   }
 }
