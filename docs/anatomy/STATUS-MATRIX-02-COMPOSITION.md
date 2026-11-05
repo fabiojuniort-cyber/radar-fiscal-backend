@@ -131,3 +131,34 @@ Invariantes: `legalStatus` `unknown`; `promoted:false`; recusa de tachados no v�
 | 6 | Portal Sefaz-SP | 2 artigos do RICMS sem escolha dirigida | L21 (frequência de U+200B) e regressão L14–L17 | 2 páginas |
 
 Total: no máximo 7 atos ou páginas mais metadados. Tudo vai para `promoted:false`, com URL, data, SHA e procedência. Planalto, CONFAZ e DOU continuam dependentes de M1–M5 e M9.
+
+## 9. Adendo de estado (05/11, após as revisões do COORD; §1–§8 preservados como histórico)
+
+- **§4 (reconciliação):** a tabela de pesos **está versionada** em `PROGRESS-BASELINE-13.md`. O COORD validou a reconstrução (24,0 + 11,2 + 12,0 + 1,5 + 1,5 = 50,2; E10 sem o marco "testado") e **não reconhece** os marcos de E9 (c.6665613398). **Frente 1 = 50,2%; Frente 2 = 10%.**
+- **E9, critério de conclusão (COORD):** completar e demonstrar a matriz oficial de cobertura — fontes, tipos e portes (pequeno, médio, grande, quando aplicável), incluindo as categorias ainda ausentes. Sem pontuação fracionária. A promoção é registrada à parte e não é condição dos marcos offline.
+- **§5/§6 (composição):** a composição **foi executada** como candidato entregue: **#294 @ `871ed557`** (merge normal de #292 `023f7c46` + #290 `48240b98`), com APPROVED técnico OFFLINE (c.6665602892). A "prova local" do §5 foi uma worktree **temporária e descartada**. O candidato entregue é o #294; os dois não se confundem. O #294 herda o #285 e **não** está liberado para a `main`.
+- **Próximo executável:** a coleta finita do §8 (6 itens, com os limites publicados), sem promover, sem corpus/gold/reserva e sem contornar desafios ou recusas de rede.
+
+## 10. Propostas L20 e L21 (AS IS / TO BE; nada implementado; decisão do Fábio)
+
+### L20 — aspa sem fechamento em segmento RFB tipo 999 (IN 2.121, segmento 4008)
+**AS IS:** o leitor abre `openQuotation` numa aspa de início de bloco e só fecha com aspa de fim (ou `(NR)`). No RFB, o segmento 4008 (tipo 999, 370 caracteres) abre e não fecha. Resultado: 556 blocos (106.841 caracteres, 10,6%) ficam `quoted_text`/`prohibited` até o fim do ato, incluindo 118 artigos e a PARTE VI.
+
+| Alternativa | TO BE | Efeito na rastreabilidade | Risco | Contracasos obrigatórios |
+|---|---|---|---|---|
+| A (recomendada) | **Só para RFB:** a citação aberta dentro de um segmento JSON (`<section data-rfb-segment>`) é encerrada no fim **desse** segmento, com limitação `rfb_quote_unclosed_in_segment` apontando o segmento. O bloco que abre continua `quoted_text`/`prohibited`. | Inalterada: o limite vem da fronteira do segmento da própria fonte, já rastreada | Uma citação RFB legítima que continue em vários segmentos deixaria de ser citação nos segmentos seguintes | (1) citação multissegmento real com aspa de fechamento no segmento N+k (deve continuar citação, ou ser recusada pela regra, e a escolha deve ser explícita); (2) DOU/DOE-SP/CONFAZ sem mudança; (3) tachado + citação; (4) `(NR)` |
+| B | Encerrar só quando o segmento seguinte declara tipo estrutural (artigo, parte, livro…) | Inalterada | Depende dos tipos declarados; não resolve sequências de tipo 999 | Mesmos de A, mais sequências 999 |
+| C | Manter como está (só a limitação) | — | Perda de 10,6% da IN 2.121 | — |
+
+**Recomendação:** A, porque usa só a fronteira declarada pela fonte e não muda as outras fontes. Muda a regra de citação; **requer decisão expressa**.
+
+### L21 — U+200B (espaço de largura zero) no portal Sefaz-SP
+**AS IS:** 15 ocorrências nas 2 páginas; **1 bloco** não é reconhecido (inciso XV do art. 7º, 103 caracteres). O texto canônico é literal.
+
+| Alternativa | TO BE | Efeito na rastreabilidade | Risco | Contracasos obrigatórios |
+|---|---|---|---|---|
+| A (recomendada) | **Só para casar a gramática:** ignorar U+200B **no início** do bloco ao testar os marcadores (inciso, §, alínea, NOTA). O texto canônico, os spans e os hashes continuam **literais** (nada é removido). | Inalterada: nenhum caractere removido, spans iguais | Mínimo; vale só para o caractere U+200B no início | (1) bloco com U+200B no início vira inciso; (2) U+200B no meio do texto não muda nada; (3) outros invisíveis (U+200C/U+200D/U+2060/U+FEFF) **não** são tratados sem decisão; (4) DOU/RFB sem mudança |
+| B | Normalizar (remover) U+200B no texto canônico | **Muda** offsets e hashes; exige mapa de normalização (análogo ao UNICODE-01b) | Maior | — |
+| C | Manter | — | 1 bloco não identificado | — |
+
+**Recomendação:** A (só tolerância no casamento, sem alterar o texto). Muda a gramática; **requer decisão expressa**.
