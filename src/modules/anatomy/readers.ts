@@ -468,8 +468,19 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     if (current.type !== mapped && !(current.type === 'preamble' && mapped === 'summary')) limitation('rfb_segment_type_conflict', `RFB segment ${seg.pointer ?? '?'}: text grammar found ${current.type}, source declares "${seg.type}"; the text grammar result is kept.`, span);
     return current;
   };
-  const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null): void => {
+  // ANAT-L15/L16: inside the region prepared from the Sefaz-SP consolidated legislation portal (sefaz-sp-preparation.ts
+  // writes a top-level `<div data-sefaz-sp-portal>`), the portal's own block classes are evidence: `nota` (and a block
+  // that starts "NOTA - V.") is an editorial/remissive note, never operative; `revogado` / `sefazElement-TextoRevogado`
+  // marks an earlier wording kept by the portal → context historical with the class as evidence. legalStatus is never
+  // touched; an unidentified block stays unknown; quotation/prohibited precedence is unchanged. Outside the wrapper
+  // (plain DOE-SP gazette HTML) nothing changes.
+  const SP_NOTE_CLASS = 'nota'; const SP_HISTORICAL_CLASSES = ['revogado', 'sefazElement-TextoRevogado'];
+  const SP_NOTE_TEXT = /^NOTA\s*[-–—]\s*V\./u;
+  const spPortalWrapper = (node: Node) => input.source === 'DOE-SP' && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
+    && dom.children.includes(node);
+  const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null, spPortal = false): void => {
     if (node.blocked || node.text !== null) return;
+    if (!spPortal && spPortalWrapper(node)) spPortal = true;
     if (input.source === 'RFB' && node.attrs['data-rfb-segment'] !== undefined) rfbSeg = { type: node.attrs['data-rfb-type'] ?? null, issue: node.attrs['data-rfb-type-issue'] ?? null,
       tachado: node.attrs['data-rfb-tachado'] === 'true', pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
     let context = domContext(node, inheritedContext);
@@ -493,6 +504,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
         : describe(node, rules, matchText);
       if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
+      const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
+      const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(text));
+      if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
+      const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
+      if (spEarlier && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
       const rfbStruck = rfbSeg?.tachado === true;
       // ANAT-D05: a struck block becomes historical; an unidentified struck block keeps its type (no guess) and becomes
       // historical too, backed by an rfb_tachado_evidence record tied to the part (contract.ts). Prohibited stays.
@@ -503,13 +519,15 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       const part = attach(node, descriptor);
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
+      if (spEarlier && part.context === 'historical') part.contextReasons.push('sefaz_sp_portal_revogado');
+      if (spEarlier && part.type === 'unidentified') limitation('sefaz_sp_revogado_unidentified', 'Sefaz-SP portal marks an earlier wording on a block that was not identified; context stays unknown, nothing is guessed.', node.span);
       if (struckUnidentified) result.limitations.push({ code: 'rfb_tachado_evidence', partId: part.id, span: { ...part.span },
         message: `RFB ${rfbSeg!.pointer}: the source marks this unidentified block as struck-through (tachado); context historical, type and legalStatus unchanged.` });
       if (inlineQuote) { part.contextReasons.push('inline_quote_conservative_exclusion'); limitation('inline_quote_conservative_exclusion', 'Inline quoted content excludes its entire containing block; no operative selection is inferred.', node.span); }
       if (rules.quoteClose.test(text) && !rules.quoteOnly.test(text)) openQuotation = false;
       return;
     }
-    for (const child of node.children) walk(child, context, quotedDom, rfbSeg);
+    for (const child of node.children) walk(child, context, quotedDom, rfbSeg, spPortal);
   };
   walk(dom);
   // Logical containers extend until their next sibling marker; all open containers end with the document.
