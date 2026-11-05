@@ -26,15 +26,20 @@ export const ITEMS = [
 ];
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  let failures = 0; let captured = 0;
   for (const it of ITEMS) {
     const key = it.a.id.toLowerCase();
     if ((RESERVED_ACT_KEYS as readonly string[]).includes(key) || (RESERVED_SOURCE_IDS as readonly string[]).includes(key)) throw new Error(`${key} is reserved`);
     const r = await consultOfficial(it.a as ManifestAct, OFFICIAL_HOSTS[it.source], fetch as unknown as FetchLike);
-    if (!r.ok) { console.log(`FAIL ${it.a.id}: ${r.failure.code} — ${r.failure.detail}`); continue; }
+    if (!r.ok) { failures++; console.log(`FAIL ${it.a.id}: ${r.failure.code} — ${r.failure.detail}`); continue; }
     const dir = join(base, it.dir); await mkdir(dir, { recursive: true });
     const ext = r.meta.representation === 'json' ? 'json' : 'html';
     await writeFile(join(dir, `${it.a.id}.${ext}`), r.body);
     await writeFile(join(dir, `${it.a.id}.meta.json`), `${JSON.stringify({ ...r.meta, origin: 'automated fetch via consultOfficial (COLETA-02)', promoted: false }, null, 2)}\n`);
+    captured++;
     console.log(`OK   ${it.a.id}: ${r.meta.status} ${r.meta.bytes} bytes sha256=${r.meta.sha256.slice(0, 12)}…`);
   }
+  // R1 (COORD #295): a run is complete only when EVERY target was captured; any failure makes the exit code non-zero.
+  console.log(`captured ${captured}/${ITEMS.length}, failures ${failures}`);
+  process.exitCode = failures === 0 && captured === ITEMS.length ? 0 : 2;
 }

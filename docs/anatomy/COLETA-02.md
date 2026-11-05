@@ -21,7 +21,7 @@ SHA completo, URL, cadeia de redirecionamento, `lastModified` e (RFB) identifica
 
 | # | Lacuna | Consultas usadas / limite | Resultado |
 |---|---|---|---|
-| 1 | L11 (`parte` em 2º ato) | 9 / 10 | **IN 1.911/2019** declara 6 PARTEs: **todas reconhecidas** como `group` nível `part`. Há 15 segmentos 999 (limitação), 30 conflitos de tipo × gramática (gramática mantida) e 2 limitações `rfb_segment_type_unmapped` |
+| 1 | L11 (`parte` em 2º ato) | 10 / 10 (ver inventário) | **IN 1.911/2019** declara 6 PARTEs: **todas reconhecidas** como `group` nível `part`. Há 15 segmentos 999 (limitação), 30 conflitos de tipo × gramática (gramática mantida) e 2 limitações `rfb_segment_type_unmapped` |
 | 2 | L20 (aspas em segmento 999) | 1 (busca compartilhada) | **IN 2.021/2021**: 20 segmentos 999 começam com aspas. Ficam `quoted_text` 68 blocos (12.409 caracteres, **8,2%**), com sequência máxima de 39 blocos. **Não** chega ao fim do ato como na IN 2.121. O padrão se repete, com efeito menor |
 | 3 | L13 (limite de 2 MiB) | 0 extra (metadados das sondagens) | HTML preparado / limite: **IN 2.121 = 88%** (o "92%" registrado antes usava 2 MB decimais; corrigido), IN 1.911 = 57%, IN 2.110 = 39%, IN 1.700 = 32%, IN 2.021 = 11%, IN 2.161 = 10%. **Nenhum ato ultrapassa** o limite |
 | 4 | L2/L12 (anexos RFB) | 1 verificação (JS do portal) | Na IN 2.121, **1 de 31** anexos vem **embutido no JSON** (`arquivoBinario.arquivoBinario`, HTML em base64, 5.643 bytes, tipo 5). Os outros 30 são PDFs (tipo 6) **sem conteúdo no JSON** e sem endpoint oficial identificado. Nenhum anexo foi coletado |
@@ -47,3 +47,24 @@ Elegibilidade positiva: 0. `legalStatus` `unknown` em todas as partes dos 6 atos
 
 ## Efeito sobre E9 (cobertura oficial)
 A amostra oficial passa a ter **RFB 7 INs** (pequeno → muito grande) e **Sefaz-SP portal 6 páginas** (artigos e anexos). Continuam ausentes: Planalto, CONFAZ, DOU e DOE-SP diário (dependem de M1–M5 e M9). Sem pontuação; a avaliação de E9 é do COORD.
+
+## Inventário das consultas (pedido do COORD, #295 c.6671591751)
+
+**O script reproduz só a captura dos 6 alvos.** A triagem que levou à escolha deles foi feita antes, com `curl`, e seus corpos foram descartados (não versionados). Inventário completo dessa triagem, contada nos limites por item:
+
+| # | Host | Requisição | Finalidade | Conta no limite de |
+|---|---|---|---|---|
+| T1 | normas.receita | POST pesquisar `{"termo":"parte"}` e `{"termoBusca":"parte"}` | Descobrir o formato da busca (sem resultado útil) | Nenhum item (descoberta da API) |
+| T2 | normas.receita | POST pesquisar ×3 (`termoBusca`, variações de página) e ×8 (variações de tamanho de página) | Descobrir a paginação (sem resultado útil) | Nenhum item (descoberta da API) |
+| T3 | normas.receita | GET `/` e `main-*.js` | Ler o formato da busca no JS público | Nenhum item (descoberta da API) |
+| T4 | normas.receita | POST pesquisar "consolida" (5 resultados) | Validar o formato descoberto | Nenhum item (descoberta da API) |
+| 1.1 | normas.receita | POST pesquisar "consolida as normas" (IN, vigentes) | Candidatos | Item 1 (1/10) |
+| 1.2–1.3 | normasinternet2 | GET JSON 126687 e 116968 | Tipo `parte`? (116968 serviu ao item 2) | Item 1 (3/10) |
+| 1.4–1.5 | normas.receita | POST pesquisar "Parte Geral" e número 1700 | Candidatos | Item 1 (5/10) |
+| 1.6–1.7 | normasinternet2 | GET JSON 133782 e 81268 | Tipo `parte`? (81268 também deu o tamanho do item 3) | Item 1 (7/10) |
+| 1.8 | normas.receita | POST pesquisar "Parte Especial" | Candidatos | Item 1 (8/10) |
+| 1.9–1.10 | normas.receita / normasinternet2 | POST pesquisar número 1911 + GET JSON 104314 | Achado: 6 PARTEs | Item 1 (**10/10**; o registro anterior dizia 9, ao contar busca e JSON como uma só) |
+| 4.1 | normasinternet2 | GET `/` e `main.*.js` | Endpoint de anexo (não encontrado) | Item 4 (1 verificação, com 2 requisições) |
+| 5.1–5.4 | legislacao.fazenda.sp.gov.br | GET an1art041, an2art003, an2art018, an1art015 | Contar `revogado` em `blockquote` | Item 5 (4 sondagens; 2 escolhidas) |
+
+As capturas versionadas (6) foram feitas **depois**, pelo `collect-02.ts`, e repetem o GET dos 6 alvos. Os 4 GETs de triagem de alvos não escolhidos (126687, 133782, 81268, an2art018/an1art015) **não** foram versionados; seus números (tamanho, tipos) estão no relatório como metadados de triagem. Correção: o item 1 usou **10/10** consultas (o limite foi atingido, não excedido). O script agora termina com código ≠ 0 se algum alvo falhar, e imprime `captured N/6`; o código de saída sozinho não é gate de aceite.
