@@ -19,7 +19,18 @@
 `5a432043…` → `525e9466…` (`build-identity.mjs --write`; guarda do teste de integração atualizada). Snapshot sintético: sem alteração.
 
 ## Antes × depois (lote oficial RFB, `docs/anatomy/official-lot-rfb.json`)
-Só a IN 2.121/2022 (127905) muda; as outras 4 INs têm `outputHash` idêntico.
+**Correção R1-L11-DOC-01 (revisão COORD c.6648168530):** os **cinco** `outputHash` mudam, porque o `outputHash` inclui a identidade do motor (`5a432043` → `525e9466`). A mudança **estrutural** fica só na IN 2.121/2022 (127905). Provas, separadas do `outputHash`:
+
+1. **Baseline do lote, sem o `outputHash`** (`57df900f` × `be36d7f4`): nas INs 108391, 115131, 133898 e 141910, **nenhum campo** difere (status, caracteres, não identificados, tipos de parte, limitações, históricos, anexos, preparação). Na 127905 diferem só `unidentifiedChars`, `partTypes` e `limitations`.
+2. **Saída completa do leitor** (`readAnatomyInput`, que não contém identidade: texto canônico, partes, mapa de origem, cobertura e limitações), com SHA-256 do JSON calculado nos dois commits:
+
+| idAto | `outputHash` antes → depois | Leitor em `57df900f` | Leitor em `be36d7f4` |
+|---|---|---|---|
+| 108391 | `601d3d00` → `9ec36c91` | `d0b30141a3810736` | `d0b30141a3810736` (igual) |
+| 115131 | `c54e3819` → `c208bdc5` | `4da42f18b9b531a0` | `4da42f18b9b531a0` (igual) |
+| 127905 | `2bace097` → `18044fb9` | `86fd6219a68e16f8` | `7ebad3a81e549479` (**muda**) |
+| 133898 | `44c02e21` → `65e6400e` | `061fa137291fb2bd` | `061fa137291fb2bd` (igual) |
+| 141910 | `57bd0ca8` → `1ef5296c` | `5126448b1f8f30b7` | `5126448b1f8f30b7` (igual) |
 
 | IN 2.121 | Antes | Depois |
 |---|---|---|
