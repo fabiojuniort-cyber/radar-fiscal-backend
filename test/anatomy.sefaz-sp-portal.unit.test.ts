@@ -108,10 +108,10 @@ const official = (id: string) => {
   return { p, before: run(new TextDecoder().decode(bytes)), engine: run(p.html), after, unid };
 };
 
-test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 103 chars; 12 notes; 1 earlier wording historical', () => {
+test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 0 chars (103 before L21); 12 notes; 1 earlier wording historical', () => {
   const { after, before, engine, unid } = official('ricms-art007');
   assert.equal(unid(engine), 2606, 'DOE-SP reading: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
-  assert.equal(unid(before), 20065); assert.equal(unid(after), 103);
+  assert.equal(unid(before), 20065); assert.equal(unid(after), 0, 'L21: the inciso XV hidden by a leading U+200B (103 chars) is now recognized');
   assert.equal(after.parts.filter((x) => x.type === 'editorial_note').length, 12);
   const hist = after.parts.filter((x) => x.contextReasons.includes('sefaz_sp_portal_revogado'));
   assert.equal(hist.length, 1); assert.match(after.canonicalText.slice(hist[0]!.span.start), /^XVIII - /u);

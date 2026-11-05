@@ -522,12 +522,18 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
       if (rules.quoteOpen.test(text)) openQuotation = true;
+      // ANAT-L21 (decisão do Fábio, #116 c.6671833324): in the proven Sefaz-SP portal only, a run of U+200B (zero-width
+      // space) at the very START of a block is ignored when recognising the block's marker. It is a matching view only:
+      // the canonical text, spans and hashes keep every character. U+200B elsewhere, other invisible characters and
+      // other sources are unchanged; quotation detection is unchanged.
+      const leadingZwsp = spPortal && /^[\s\u200B]*\u200B/u.test(matchText(node));
+      const markerText = leadingZwsp ? (n: Node) => matchText(n).replace(/^[\s\u200B]+/u, '') : matchText;
       let descriptor: Descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
-        : describe(node, rules, matchText);
+        : describe(node, rules, markerText);
       if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
       const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
-      const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(text));
+      const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
       const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
       if (spEarlier && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
@@ -542,6 +548,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
       if (spEarlier && part.context === 'historical') part.contextReasons.push('sefaz_sp_portal_revogado');
+      if (leadingZwsp && part.type !== 'unidentified' && !(wasQuoted || openQuotation)) part.contextReasons.push('sefaz_sp_portal_leading_zwsp_tolerated');
       if (spEarlier && part.type === 'unidentified') limitation('sefaz_sp_revogado_unidentified', 'Sefaz-SP portal marks an earlier wording on a block that was not identified; context stays unknown, nothing is guessed.', node.span);
       if (struckUnidentified) result.limitations.push({ code: 'rfb_tachado_evidence', partId: part.id, span: { ...part.span },
         message: `RFB ${rfbSeg!.pointer}: the source marks this unidentified block as struck-through (tachado); context historical, type and legalStatus unchanged.` });
