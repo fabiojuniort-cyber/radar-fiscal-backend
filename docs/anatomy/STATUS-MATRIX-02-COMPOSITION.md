@@ -45,8 +45,8 @@ Nenhum desses aceites é integração ou liberação: **nada foi mergeado na `ma
 | L13 | IN 2.121 usa 92% do limite de 2 MB | Risco de volume | Decisão sobre o limite, se surgir ato maior |
 | L18 | `blockquote` como recuo no portal SP | **Adiada** (D-074) | Novas amostras + aprovação |
 | L19 | Persistência da fonte `SEFAZ-SP-PORTAL` (CHECK da migration 077), perfis administrativos e coletor | Não implementado | **Decisão futura + migration** |
-| L20 | PARTE VI da IN 2.121 dentro de uma citação aberta (`prohibited`) | Achado; precedência mantida | Diagnóstico (executável) e eventual decisão |
-| L21 | Caractere invisível U+200B impede reconhecer blocos no portal SP (ex.: "​XV -", "§ 6º", 1 "NOTA - V.") | `unidentified`, sem adivinhação | Diagnóstico (executável) e eventual decisão (normalização) |
+| L20 | Citação aberta no segmento 4008 (tipo 999) da IN 2.121 | Diagnóstico feito (§7): 556 blocos, 106.841 caracteres (10,6%), 118 artigos e a PARTE VI até o fim do ato ficam `prohibited` | Decisão sobre aspas sem fechamento em segmento 999 |
+| L21 | Caractere invisível U+200B no portal SP | Diagnóstico feito (§7): 15 ocorrências; **só 1 bloco** não é reconhecido por causa dele (inciso XV do art. 7º, 103 caracteres). Os outros 68 caracteres do art. 39 têm outra causa | Decisão (normalização), se desejada |
 
 ## 4. Reconciliação do percentual (fórmula vigente)
 
@@ -104,3 +104,30 @@ Os dois ramos já contêm o #288, portanto também o conteúdo do #285 `2c41fbab
 **Bloqueados:** M1–M5 e M9 (arquivos manuais do Fábio); L19 (migration); L18; integração e R7; promoção (L3).
 
 Invariantes: `legalStatus` `unknown`; `promoted:false`; recusa de tachados no vínculo; `BLOCK_CORPUS_INPUTS_AND_GOLD`; `RESTRICT`; 52/91 e 100/97 fora do desenvolvimento.
+
+## 7. Diagnósticos L20 e L21 (somente leitura; nada corrigido)
+
+**L20, IN RFB 2.121/2022 (127905):**
+- O segmento `ordemSegmentoAto` 4008 (`/outrosSegmentos`, tipo **999** "não identificado" pela fonte, não tachado) começa com aspa reta: `"Art. 706. O projeto de investimentos…`. Ele não tem aspa de fechamento nem `(NR)` (370 caracteres). O segmento anterior, 4007, é o mesmo art. 706 tachado (histórico).
+- Efeito: o leitor abre `openQuotation` e nunca fecha. Dali até o fim do ato, **556 blocos** viram `quoted_text`/`prohibited`: 106.841 de 1.009.001 caracteres (10,6%), com 118 blocos que começam por "Art. N", a PARTE VI e o último trecho ("ANEXO XXIX").
+- Esses 556 blocos são **todos** os `quoted_text` da IN 2.121.
+- Natureza: o resultado é conservador (nada indevido vira operativo), mas perde estrutura. Uma correção (ex.: limitar a citação ao segmento RFB que a abriu, ou exigir fechamento) muda a regra de citação. **Não autorizada; depende de decisão.**
+
+**L21, portal Sefaz-SP (caminho L17 com prova):**
+- art. 7º: 5 × U+200B no texto canônico. 1 bloco não identificado por causa dele: "​XV - a saída, com destino a outro estabelecimento…" (103 caracteres), que seria inciso sem o caractere.
+- An. II art. 39: 10 × U+200B, sem bloco afetado. Os 68 caracteres não identificados são "(Relação a que se refere o artigo 51…)" (66) e 2 restos de 1 caractere.
+- **Correção do registro anterior:** os casos "§ 6º" e "NOTA - V. DECRETO 54.006" citados na L14–L16 não aparecem mais como não identificados no caminho atual.
+- Normalização não autorizada; o texto continua literal.
+
+## 8. Coleta finita priorizada (fontes já autorizadas; sem promover; sem corpus/gold)
+
+| # | Fonte | O que buscar | Lacuna que alimenta | Critério de parada |
+|---|---|---|---|---|
+| 1 | API RFB | 1 ato além da IN 2.121 cuja tabela `tiposSegmento` declare `parte` | L11 (regressão em 2º ato) | 1 ato encontrado ou 10 consultas sem achado |
+| 2 | API RFB | 1 ato com segmento 999 que abre aspas | L20 (recorrência) | idem |
+| 3 | API RFB | Metadados de tamanho dos maiores atos consolidados | L13 (limite de 2 MB) | Só metadados; no máximo 10 atos |
+| 4 | API RFB | Verificar se o anexo binário da IN 2.121 tem endpoint oficial | L2/L12 | 1 consulta de verificação; coletar 1 anexo só se acessível |
+| 5 | Portal Sefaz-SP | 2 artigos do RICMS com alíneas `revogado` dentro de `blockquote` | L18 (amostras para decisão futura) | 2 páginas |
+| 6 | Portal Sefaz-SP | 2 artigos do RICMS sem escolha dirigida | L21 (frequência de U+200B) e regressão L14–L17 | 2 páginas |
+
+Total: no máximo 7 atos ou páginas mais metadados. Tudo vai para `promoted:false`, com URL, data, SHA e procedência. Planalto, CONFAZ e DOU continuam dependentes de M1–M5 e M9.
