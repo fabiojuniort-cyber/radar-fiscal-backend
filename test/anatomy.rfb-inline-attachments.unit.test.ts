@@ -157,3 +157,32 @@ test('R2 official IN 2.121: the real attachment pointers map to its original byt
   assertPointersMatchBytes(a, original);
   assert.equal(a.referenceContext, 'operative_candidate');
 });
+
+// ---- R3 (COORD #300 @b9ffa9d8): text-less referencing segment — quotation prevails over tachado; undetermined → prohibited ----
+test('R3: text-less tachado segment referencing the attachment — inside an open quotation → prohibited; outside → historical; undetermined → prohibited', () => {
+  const att = { idArquivoBinario: 77, idTipoArquivo: 5, arquivoBinario: b64(enc8(html('<p>Art. 1º Texto do anexo.</p>'))) };
+  const run = (segs: Record<string, unknown>[]) => readRfbInlineAttachments(bytesOf({ idAto: 900004, tiposSegmento: [{ idTipoSegmento: 3, siglaTipoSegmento: 'artigo' }], outrosSegmentos: segs }), 900004)[0]!;
+  const ref = (o: number, extra: Record<string, unknown> = {}) => ({ ordemSegmentoAto: o, idTipoSegmento: 3, tachado: true, arquivoBinario: att, ...extra });
+  const txt = (o: number, t: string) => ({ ordemSegmentoAto: o, idTipoSegmento: 3, textoIntegra: t });
+  const noOperative = (a: ReturnType<typeof run>) => a.reading!.parts.every((x) => x.context !== 'operative_candidate');
+  // 1. inside an open quotation (opened in the previous segment, closed after): quotation prevails over tachado
+  const inQuote = run([txt(1, '<p>Art. 1º O ato passa a vigorar:</p><p>“Art. 10. Texto citado</p>'), ref(2), txt(3, '<p>Art. 11. Continua citado.”</p>')]);
+  assert.equal(inQuote.referenceContext, 'prohibited'); assert.match(inQuote.referenceContextEvidence, /quotation prevails over tachado/u);
+  assert.ok(inQuote.reading!.parts.filter((x) => x.type !== 'document').every((x) => x.context === 'prohibited'));
+  // 2. quotation opening right after the gap also prevails
+  const quoteAfter = run([txt(1, '<p>Art. 1º Texto operativo.</p>'), ref(2), txt(3, '<p>“Art. 10. Citado”</p>')]);
+  assert.equal(quoteAfter.referenceContext, 'prohibited');
+  // 3. explicit expectation outside any quotation: tachado → historical, nothing operative
+  const outside = run([txt(1, '<p>Art. 1º Texto operativo.</p>'), ref(2), txt(3, '<p>Art. 2º Texto operativo.</p>')]);
+  assert.equal(outside.referenceContext, 'historical'); assert.ok(noOperative(outside));
+  assert.ok(outside.reading!.parts.filter((x) => x.type !== 'document').every((x) => x.context === 'historical'));
+  // 4. undetermined: no text neighbour on one side → prohibited (tachado alone is not enough)
+  const atEnd = run([txt(1, '<p>Art. 1º Texto operativo.</p>'), ref(2)]);
+  assert.equal(atEnd.referenceContext, 'prohibited');
+  const atStart = run([ref(1), txt(2, '<p>Art. 2º Texto operativo.</p>')]);
+  assert.equal(atStart.referenceContext, 'prohibited');
+  // 5. text-less and NOT tachado, neighbours operative → still undetermined → prohibited
+  const notStruck = run([txt(1, '<p>Art. 1º Texto.</p>'), ref(2, { tachado: false }), txt(3, '<p>Art. 2º Texto.</p>')]);
+  assert.equal(notStruck.referenceContext, 'prohibited');
+  for (const a of [inQuote, quoteAfter, outside, atEnd, atStart, notStruck]) assert.ok(a.reading!.parts.every((x) => x.legalStatus === 'unknown'));
+});

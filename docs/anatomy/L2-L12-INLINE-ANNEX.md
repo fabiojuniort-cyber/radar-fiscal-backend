@@ -40,3 +40,24 @@ Em todos os 7 atos muda **somente** o campo novo `inlineAttachments` (e o `outpu
 **Repetido:** corpo e mapa de origem do ato idênticos com anexo malformado; reconciliação histórica (hash 0.2.0 `c223c99d`; tirar os atributos D04 reproduz o capturado 0.1.0 `8fc9f206`); lote de 7 INs.
 
 **Delta do lote contra `e636bc14`:** só o campo novo `inlineAttachments.read[].referenceContext` (`operative_candidate` na IN 2.121) e o `outputHash` (identidade). Identidade `85fd1426` → `d6ada5f6`. Local: ANAT 319/319, `tsc`, `verify-build`, PG16 12/12.
+
+## R3 (COORD sobre `b9ffa9d8`) — segmento sem texto que referencia o anexo
+
+**Reprodução em `b9ffa9d8`:** um anexo referenciado por um segmento **sem texto e tachado** recebia `historical` só pela marca de tachado, **mesmo dentro de uma citação aberta**. Por exemplo, com a citação aberta no segmento 1 (`“Art. 10. …`) e fechada no 3: resultado `historical`, esperado `prohibited`.
+
+**Correção:** um segmento sem texto é decidido pelos **vizinhos com texto** (o anterior e o seguinte, na ordem dos segmentos), olhando a parte do ato no fim do anterior e no começo do seguinte:
+- algum vizinho `prohibited` (citação) → **`prohibited`**: a citação prevalece sobre o tachado;
+- falta vizinho de algum lado, vizinho sem parte ou vizinho `unknown` → **`prohibited`** (indeterminado);
+- vizinhos determinados e não proibidos, e o segmento tachado → **`historical`**;
+- vizinhos determinados, segmento sem texto e **não** tachado → `prohibited` (indeterminado).
+
+**Teste com resultado explícito** (falha em `b9ffa9d8`, passa agora):
+| Caso | Resultado |
+|---|---|
+| Dentro de citação aberta | `prohibited` |
+| Citação começando logo depois | `prohibited` |
+| Fora de citação, tachado | `historical` |
+| Sem vizinho antes ou depois | `prohibited` |
+| Sem texto, não tachado | `prohibited` |
+
+**Preservados:** offsets em bytes (BOM, fora do BMP, windows-1252/iso-8859-1, anexo oficial); corpo e mapa de origem do ato; reconciliação histórica. **Lote de 7 INs:** só o `outputHash` (identidade); nenhum ato oficial tem anexo referenciado por segmento sem texto. Identidade `d6ada5f6` → `04af1bfd`. Local: ANAT 320/320, `tsc`, `verify-build`, PG16 12/12.

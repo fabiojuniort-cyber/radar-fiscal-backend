@@ -86,18 +86,46 @@ export function attachmentByteOffset(att: Pick<InlineAttachment, 'charset' | 'ht
 
 const RESTRICT: Record<AnatomyPart['context'], number> = { operative_candidate: 0, unknown: 1, historical: 2, prohibited: 3 };
 /** Most restrictive context of the act's parts that cover the referencing segment's text (R2). */
-function referenceContextOf(main: { prep: Pick<JsonPreparation, 'pieces'>; parts: readonly AnatomyPart[] }, pointer: string, tachado: boolean):
+type MainAct = { prep: Pick<JsonPreparation, 'pieces'>; parts: readonly AnatomyPart[] };
+type Piece = JsonPreparation['pieces'][number];
+const coveringOf = (main: MainAct, piece: Piece) => main.parts.filter((x) => x.type !== 'document' && x.type !== 'caput'
+  && x.sourcePointers.some((sp) => sp.sourceSpan && sp.sourceSpan.start < piece.htmlSpan.end && sp.sourceSpan.end > piece.htmlSpan.start));
+const strictest = (parts: readonly AnatomyPart[]): AnatomyPart['context'] => {
+  let ctx: AnatomyPart['context'] = 'operative_candidate';
+  for (const x of parts) if (RESTRICT[x.context] > RESTRICT[ctx]) ctx = x.context;
+  return ctx;
+};
+/**
+ * Most restrictive context of the act at the referencing segment (R2/R3).
+ * - Segment with text: the strictest context of the act's parts covering it (unknown → prohibited).
+ * - R3: segment WITHOUT text: decided from the nearest text segments before and after it in segment order. A
+ *   quotation (prohibited) on either side prevails over tachado; a missing or undetermined neighbour → prohibited;
+ *   only with both neighbours determined and not prohibited does tachado give historical (else prohibited).
+ */
+function referenceContextOf(main: MainAct, pointer: string, tachado: boolean, order: number, pieceOrder: Map<string, number>):
   { context: AnatomyPart['context']; evidence: string } {
   const piece = main.prep.pieces.find((x) => x.pointer === `${pointer}/textoIntegra`);
-  if (!piece) return tachado ? { context: 'historical', evidence: 'segment has no text; source marks it tachado' }
-    : { context: 'prohibited', evidence: 'segment has no text in the act: context undetermined, conservative prohibited' };
-  const covering = main.parts.filter((x) => x.type !== 'document' && x.sourcePointers.some((sp) => sp.sourceSpan
-    && sp.sourceSpan.start < piece.htmlSpan.end && sp.sourceSpan.end > piece.htmlSpan.start));
-  if (!covering.length) return { context: 'prohibited', evidence: 'no act part covers the referencing segment: conservative prohibited' };
-  let ctx: AnatomyPart['context'] = 'operative_candidate';
-  for (const x of covering) if (RESTRICT[x.context] > RESTRICT[ctx]) ctx = x.context;
-  if (ctx === 'unknown') ctx = 'prohibited';
-  return { context: ctx, evidence: `context of ${covering.length} act part(s) covering ${pointer}` };
+  if (piece) {
+    const covering = coveringOf(main, piece);
+    if (!covering.length) return { context: 'prohibited', evidence: 'no act part covers the referencing segment: conservative prohibited' };
+    let ctx = strictest(covering); if (ctx === 'unknown') ctx = 'prohibited';
+    return { context: ctx, evidence: `context of ${covering.length} act part(s) covering ${pointer}` };
+  }
+  const ordered = main.prep.pieces.map((x) => ({ x, o: pieceOrder.get(x.pointer) })).filter((e): e is { x: Piece; o: number } => typeof e.o === 'number');
+  const before = ordered.filter((e) => e.o < order).sort((a, b) => b.o - a.o)[0];
+  const after = ordered.filter((e) => e.o > order).sort((a, b) => a.o - b.o)[0];
+  if (!before || !after) return { context: 'prohibited', evidence: 'segment has no text and lacks a text neighbour on one side: context undetermined, prohibited' };
+  // the part at the END of the previous segment and at the START of the next one decide whether a quotation spans the gap
+  const lastOf = (ps: AnatomyPart[]) => ps.sort((a, b) => b.span.start - a.span.start)[0];
+  const firstOf = (ps: AnatomyPart[]) => ps.sort((a, b) => a.span.start - b.span.start)[0];
+  const prevPart = lastOf(coveringOf(main, before.x)); const nextPart = firstOf(coveringOf(main, after.x));
+  if (!prevPart || !nextPart) return { context: 'prohibited', evidence: 'segment has no text and a neighbour has no act part: context undetermined, prohibited' };
+  if (prevPart.context === 'prohibited' || nextPart.context === 'prohibited') {
+    return { context: 'prohibited', evidence: `segment has no text; neighbour segment ${prevPart.context === 'prohibited' ? before.o : after.o} is prohibited (quotation prevails over tachado)` };
+  }
+  if (prevPart.context === 'unknown' || nextPart.context === 'unknown') return { context: 'prohibited', evidence: 'segment has no text; a neighbour is undetermined: prohibited' };
+  if (tachado) return { context: 'historical', evidence: `segment has no text; source marks it tachado; neighbours ${before.o}/${after.o} are not quoted` };
+  return { context: 'prohibited', evidence: 'segment has no text and is not tachado: context undetermined, prohibited' };
 }
 
 export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: number,
@@ -108,6 +136,10 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
   const root = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^﻿/u, '')) as Record<string, unknown>;
   if (root.idAto !== expectedIdAto) throw new TypeError('RFB idAto differs from the expected act');
   const out: InlineAttachment[] = []; let actBytes = 0;
+  // R3: segment order of every piece, so a text-less referencing segment can be placed between its neighbours.
+  const pieceOrder = new Map<string, number>();
+  for (const key of ['ementas', 'outrosSegmentos'] as const) (Array.isArray(root[key]) ? root[key] as Record<string, unknown>[] : [])
+    .forEach((seg, i) => { if (typeof seg?.ordemSegmentoAto === 'number') pieceOrder.set(`/${key}/${i}/textoIntegra`, seg.ordemSegmentoAto); });
   for (const key of ['ementas', 'outrosSegmentos'] as const) {
     const list = Array.isArray(root[key]) ? root[key] as Record<string, unknown>[] : [];
     list.forEach((seg, i) => {
@@ -120,7 +152,7 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
         pointer: `/${key}/${i}/arquivoBinario/arquivoBinario`, segmentOrder: typeof seg.ordemSegmentoAto === 'number' ? seg.ordemSegmentoAto : -1,
         resourceId: `rfb:${expectedIdAto}:anexo:${id}`, state: 'missing_no_content', reason: 'no embedded content in the official JSON',
         byteLength: null, sha256: null, charset: null, html: null, reading: null, referenceContext: 'operative_candidate', referenceContextEvidence: '' };
-      const rc = referenceContextOf(act, `/${key}/${i}`, seg.tachado === true);
+      const rc = referenceContextOf(act, `/${key}/${i}`, seg.tachado === true, typeof seg.ordemSegmentoAto === 'number' ? seg.ordemSegmentoAto : -1, pieceOrder);
       base.referenceContext = rc.context; base.referenceContextEvidence = rc.evidence;
       const done = (state: InlineAttachmentState, reason: string, extra: Partial<InlineAttachment> = {}) => { out.push(Object.freeze({ ...base, ...extra, state, reason })); };
       const payload = file.arquivoBinario;
