@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "029514bba233f3de86f7bd1366f026bf182843ec3244cb2e46e1e96263f47959",
+  "engineBuildHash": "050602a35194c8ab8e22285ad9891638bb2cd4ef0b001ad8ceb17d79fa33b105",
   "acts": [
     {
       "idAto": 104314,
@@ -18,7 +18,7 @@
       "preparedHtmlSha256": "23146b8a6ecdf5cc35ff7fd09ac9fe08ba0babf5d69e64333b480423769eaaca",
       "status": "partial",
       "canonicalChars": 809136,
-      "unidentifiedChars": 1823,
+      "unidentifiedChars": 1819,
       "partTypes": {
         "document": 1,
         "summary": 1,
@@ -29,15 +29,14 @@
         "paragraph": 962,
         "group": 643,
         "alinea": 146,
-        "unidentified": 17,
+        "unidentified": 15,
         "signature": 1,
-        "annex": 30
+        "annex": 32
       },
       "limitations": {
         "rfb_segment_type_unidentified_by_source": 15,
-        "rfb_tachado_evidence": 17,
+        "rfb_tachado_evidence": 15,
         "rfb_segment_type_conflict": 30,
-        "rfb_segment_type_unmapped": 2,
         "unidentified_content": 1
       },
       "historicalByTachado": 3974,
@@ -45,7 +44,7 @@
       "struckSegments": 4002,
       "attachmentsWithoutContent": 30,
       "missingSegments": 0,
-      "outputHash": "e3b452f190d688a4197adb8b1422c972d5979d3e03713f6400bd3101f9694f54"
+      "outputHash": "0dfa780b5bcb1a1657ffa25708f86c9350af711e050014c19c629387ec14555a"
     },
     {
       "idAto": 108391,
@@ -80,7 +79,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "33a6ee440c3b0cd26e93fefafd8b6008190bf59022fc662422a18c40310bbb09"
+      "outputHash": "e2ae5293f63c61d4a9c65484a30a5d8e3a9e36461927fbd4107b88c0305bd9f9"
     },
     {
       "idAto": 115131,
@@ -118,7 +117,7 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "3e2555061de0fa754be94f93ba7b89463eb6b891cbe41ad4c5e91a48c2870977"
+      "outputHash": "c9bfe75b82f4b42d5e1ed7b9a61f8fdd3b17a043c151a4991287a0dc9dd8e329"
     },
     {
       "idAto": 116968,
@@ -137,7 +136,7 @@
       "preparedHtmlSha256": "527306ca00e6b6e3da77e96cf0b9f3479499376ccf44a26a7218adb28d0979d3",
       "status": "partial",
       "canonicalChars": 151963,
-      "unidentifiedChars": 160,
+      "unidentifiedChars": 103,
       "partTypes": {
         "document": 1,
         "summary": 1,
@@ -149,15 +148,14 @@
         "inciso": 322,
         "alinea": 92,
         "quoted_text": 68,
-        "unidentified": 5,
+        "unidentified": 1,
         "signature": 1,
-        "annex": 56
+        "annex": 60
       },
       "limitations": {
         "rfb_segment_type_unidentified_by_source": 1,
         "rfb_tachado_evidence": 1,
         "rfb_segment_type_conflict": 25,
-        "rfb_segment_type_unmapped": 4,
         "unidentified_content": 1
       },
       "historicalByTachado": 136,
@@ -165,7 +163,7 @@
       "struckSegments": 136,
       "attachmentsWithoutContent": 35,
       "missingSegments": 0,
-      "outputHash": "608ab7807b0e6664c3c4e37dad17a8b3ea694d862c76febb37017e051043dc83"
+      "outputHash": "486e8aa423c6547259082ea798f15fbdae76c5cd7caeb140ad74a0cffa13e46a"
     },
     {
       "idAto": 127905,
@@ -200,6 +198,7 @@
       },
       "limitations": {
         "rfb_segment_type_unidentified_by_source": 1,
+        "rfb_segment_type_conflict": 1,
         "unidentified_content": 1
       },
       "historicalByTachado": 608,
@@ -207,7 +206,7 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "3d470784599c0248f8a68f334a5f0535893f692dacabb2bc14f6ac4e8dc9f99f"
+      "outputHash": "fa1431d3a48f5ef400baa384fd9c5d9ffaaed7767824b43f322328fa3781358a"
     },
     {
       "idAto": 133898,
@@ -242,7 +241,7 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "5f1a3947187dbd84b01ab35093d521bbe8f2198017e18b1db27f6113ca238643"
+      "outputHash": "5e796f8eef642f8f1798ffa0fc1fb9a1801501cd1c05229dd6afc49bc5398d31"
     },
     {
       "idAto": 141910,
@@ -286,7 +285,7 @@
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "d0191acd218a43b24b7b6e019125970827610c84c37058b405894416d50ab8dd"
+      "outputHash": "ba3e24e31e3ca8b51745efe26fced4b65813ead34740745cc40e96453838102c"
     }
   ]
 }
