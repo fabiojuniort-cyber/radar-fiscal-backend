@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { validateRfbJson } from './fetch-official-core.js';
 import { prepareRfbRepresentation, RFB_PREPARATION_VERSION, type JsonPreparation } from '../../src/modules/anatomy/json-preparation.js';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
+import { readRfbInlineAttachments } from '../../src/modules/anatomy/rfb-inline-attachments.js';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
 
 // R1-LOT-02: portable paths (fileURLToPath handles Windows drive letters and percent-encoding; URL.pathname does not).
@@ -63,6 +64,17 @@ export interface ActMetrics {
   partTypes: Record<string, number>; limitations: Record<string, number>; /** Parts carrying the `rfb_tachado_source` reason (source evidence), not a count of `context === 'historical'`. */
   historicalByTachado: number; historicalContextParts: number; struckSegments: number;
   attachmentsWithoutContent: number; missingSegments: number; outputHash: string;
+  /** ANAT-L2/L12: embedded attachments read as separate resources (the act's own metrics above are unaffected). */
+  inlineAttachments: { total: number; states: Record<string, number>; read: { id: number; sha256: string; charset: string; bytes: number; chars: number; unidentifiedChars: number }[] };
+}
+
+function inline(id: number, body: Buffer): ActMetrics['inlineAttachments'] {
+  const all = readRfbInlineAttachments(new Uint8Array(body), id); const states: Record<string, number> = {};
+  for (const a of all) states[a.state] = (states[a.state] ?? 0) + 1;
+  const read = all.filter((a) => a.state === 'read').map((a) => ({ id: a.idArquivoBinario, sha256: a.sha256!, charset: a.charset!, bytes: a.byteLength!,
+    chars: a.reading!.canonicalText.length, unidentifiedChars: a.reading!.parts.filter((x) => x.type === 'unidentified').reduce((n, x) => n + x.span.end - x.span.start, 0) }));
+  if (all.some((a) => a.reading?.parts.some((x) => x.legalStatus !== 'unknown'))) throw new Error(`${id}: attachment legalStatus must stay unknown`);
+  return { total: all.length, states, read };
 }
 
 export function analyzeLot(dirOrDirs: string | readonly string[] = LOT_DIRS): { engineBuildHash: string; acts: ActMetrics[] } {
@@ -91,7 +103,7 @@ export function analyzeLot(dirOrDirs: string | readonly string[] = LOT_DIRS): { 
       historicalByTachado: r.parts.filter((x) => x.contextReasons.includes('rfb_tachado_source')).length,
       historicalContextParts: r.parts.filter((x) => x.context === 'historical').length,
       struckSegments: v.preparation.struckSegments.length, attachmentsWithoutContent: v.preparation.attachments.length,
-      missingSegments: v.preparation.missingSegments.length, outputHash: r.outputHash };
+      missingSegments: v.preparation.missingSegments.length, outputHash: r.outputHash, inlineAttachments: inline(id, body) };
   });
   return { engineBuildHash: ANATOMY_ENGINE_BUILD_HASH, acts };
 }

@@ -1,9 +1,9 @@
 {
-  "engineHash": "afb275ecb59be0f7958b2af32fbcd9542b15a989599a5652691a02e122bb979a",
+  "engineHash": "85fd14264c001e5370d7b20b4e0a2fcbd14c604787c70baa1d016cb45ba28a77",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
-    "ops/anatomy/build-identity.mjs": "010fe5f6567c6ca192a74f7d532fe40c05a3d1643c5652d928e28bc7d64fef06",
+    "ops/anatomy/build-identity.mjs": "88fd27a7ce5ef338955505f77791fd24878ed7308410a100139245faa2db0171",
     "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
     "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
     "src/modules/anatomy/contract.ts": "2afbf15e978be2383f25f807dd50425a1934f533cfaadd76c17bf9bb5271d3fd",
@@ -19,6 +19,7 @@
     "src/modules/anatomy/profile-rules.ts": "721778b256bb07e87afd2b9045246b6bd8cb393a749091f6e2a5f93aa7f0b272",
     "src/modules/anatomy/profile.ts": "db505e9d46e35110b16094478d02e6b4d5c1ce475561d08f458cf3f2991b455c",
     "src/modules/anatomy/readers.ts": "18ac50ee6e8e94afd0a45ad43d66af587e9409ff2f7dacb5e47e025dab3b8370",
+    "src/modules/anatomy/rfb-inline-attachments.ts": "1828ae10082890f0a8a8b1681e4e35133de7d366d5aa15c4de6df5fd7ba61bb8",
     "src/modules/anatomy/sefaz-sp-preparation.ts": "e5c24a28d4ac1e630eaca1cb31fd8d9e26e6270b42e69f37b3e7e099358b3d35"
   }
 }
