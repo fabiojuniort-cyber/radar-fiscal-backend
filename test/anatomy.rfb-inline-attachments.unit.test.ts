@@ -90,3 +90,70 @@ test('L2/L12 official IN 2.121 (127905, promoted:false): 1 embedded HTML read se
   assert.equal(meta.preparation.preparationVersion, 'rfb-api-original/0.1.0-provisional');
   assert.equal(sha(p.html.replace(/ data-rfb-type="[^"]*"| data-rfb-type-issue="[^"]*"| data-rfb-tachado="true"/gu, '')), meta.preparation.htmlSha256);
 });
+
+// ---- R2 (COORD #300): BOM, non-BMP, the reader's real pointers against the original bytes, protected context ----
+const readOnly = (bytes: Uint8Array) => readRfbInlineAttachments(bytesOf(doc(b64(bytes))), 900004)[0]!;
+/** Every sourceSpan the reader produced, mapped to bytes, must decode back to the exact same text. */
+function assertPointersMatchBytes(a: ReturnType<typeof readOnly>, bytes: Uint8Array) {
+  let n = 0;
+  for (const part of a.reading!.parts) for (const ptr of part.sourcePointers) {
+    if (!ptr.sourceSpan) continue; n++;
+    const bs = attachmentByteOffset(a, ptr.sourceSpan.start); const be = attachmentByteOffset(a, ptr.sourceSpan.end);
+    assert.equal(new TextDecoder(a.charset!, { ignoreBOM: true }).decode(bytes.subarray(bs, be)), a.html!.slice(ptr.sourceSpan.start, ptr.sourceSpan.end), `${part.type} ${ptr.locator}`);
+  }
+  assert.ok(n > 0, 'the reader produced source spans');
+}
+
+test('R2: UTF-8 with BOM — BOM kept in the body, the reader\'s real pointers map to the original bytes', () => {
+  const text = html('<p>Art. 1º Tabela ação: 1,5 × Rx.</p><table><tr><td>ção</td></tr></table>');
+  const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...enc8(text)]);
+  const a = readOnly(bytes);
+  assert.equal(a.state, 'read'); assert.equal(a.html!.charCodeAt(0), 0xfeff, 'BOM kept as U+FEFF'); assert.equal(a.sha256, sha(bytes));
+  assert.equal(attachmentByteOffset(a, 1), 3, 'the BOM is 3 bytes');
+  assertPointersMatchBytes(a, bytes);
+  const at = a.html!.indexOf('ação'); assert.equal(new TextDecoder().decode(bytes.subarray(attachmentByteOffset(a, at), attachmentByteOffset(a, at + 4))), 'ação');
+});
+
+test('R2: characters outside the BMP — pointers map exactly; an offset inside a surrogate pair is refused', () => {
+  const text = html('<p>Art. 1º 𝔉 = 0,0365 × 𝑅𝑥 😀 fim.</p>');
+  const bytes = enc8(text); const a = readOnly(bytes);
+  assert.equal(a.state, 'read'); assertPointersMatchBytes(a, bytes);
+  const at = a.html!.indexOf('𝔉'); assert.equal(attachmentByteOffset(a, at + 2) - attachmentByteOffset(a, at), 4, 'one non-BMP character = 4 bytes');
+  assert.throws(() => attachmentByteOffset(a, at + 1), /surrogate/u);
+  for (const charset of ['windows-1252', 'iso-8859-1'] as const) {
+    const t = html('<p>Art. 1º Fórmula ação.</p><table><tr><td>célula</td></tr></table>', charset); const lb = latin(t);
+    assertPointersMatchBytes(readOnly(lb), lb);
+  }
+});
+
+const ctxDoc = (refSegment: Record<string, unknown>, pre: Record<string, unknown>[] = []) => ({ idAto: 900004, tiposSegmento: [{ idTipoSegmento: 3, siglaTipoSegmento: 'artigo' }],
+  outrosSegmentos: [...pre, { ordemSegmentoAto: 9, idTipoSegmento: 3, arquivoBinario: { idArquivoBinario: 77, idTipoArquivo: 5, arquivoBinario: b64(enc8(html('<p>Art. 1º Texto do anexo.</p><table><tr><td>valor</td></tr></table>'))) }, ...refSegment }] });
+const ctxOf = (d: unknown) => readRfbInlineAttachments(bytesOf(d), 900004)[0]!;
+
+test('R2: the attachment inherits the protected context of the referencing segment (quotation, tachado), never becoming more permissive', () => {
+  const op = ctxOf(ctxDoc({ textoIntegra: '<p>Art. 2º Fica aprovado o anexo.</p>' }));
+  assert.equal(op.referenceContext, 'operative_candidate'); assert.ok(op.reading!.parts.some((x) => x.context === 'operative_candidate'));
+  const st = ctxOf(ctxDoc({ textoIntegra: '<p>Art. 2º Redação antiga com anexo.</p>', tachado: true }));
+  assert.equal(st.referenceContext, 'historical');
+  assert.ok(st.reading!.parts.every((x) => x.context !== 'operative_candidate'), 'tachado reference: nothing operative in the attachment');
+  assert.ok(st.reading!.parts.some((x) => x.contextReasons.includes('rfb_inline_attachment_reference_context')));
+  const q = ctxOf(ctxDoc({ textoIntegra: '<p>“Art. 2º Texto citado com anexo”</p>' }));
+  assert.equal(q.referenceContext, 'prohibited');
+  assert.ok(q.reading!.parts.every((x) => x.context === 'prohibited' || x.type === 'unidentified' || x.type === 'document'), 'quoted reference: attachment prohibited');
+  const open = ctxOf(ctxDoc({ textoIntegra: '<p>Art. 3º Texto dentro da citação aberta.</p>' }, [{ ordemSegmentoAto: 8, idTipoSegmento: 3, textoIntegra: '<p>Art. 2º O ato passa a vigorar:</p><p>“Art. 10. Texto citado</p>' }]));
+  assert.equal(open.referenceContext, 'prohibited', 'inside an open quotation carried from a previous segment');
+  const noText = ctxOf(ctxDoc({}, [{ ordemSegmentoAto: 8, idTipoSegmento: 3, textoIntegra: '<p>Art. 1º Texto.</p>' }]));
+  assert.equal(noText.referenceContext, 'prohibited', 'undetermined → conservative prohibited');
+  for (const a of [op, st, q, open, noText]) assert.ok(a.reading!.parts.every((x) => x.legalStatus === 'unknown'));
+});
+
+test('R2 official IN 2.121: the real attachment pointers map to its original bytes; referencing segment 702 (art. 137) is operative', () => {
+  const dir = new URL('../ops/anatomy/official-identification/rfb-normasinternet2/', import.meta.url);
+  const json = new Uint8Array(readFileSync(new URL('127905.json', dir)));
+  const a = readRfbInlineAttachments(json, 127905).find((x) => x.state === 'read')!;
+  const raw = JSON.parse(new TextDecoder().decode(json)) as { outrosSegmentos: { arquivoBinario?: { idArquivoBinario: number; arquivoBinario?: string } }[] };
+  const original = new Uint8Array(Buffer.from(raw.outrosSegmentos.find((s) => s.arquivoBinario?.idArquivoBinario === 67992)!.arquivoBinario!.arquivoBinario!, 'base64'));
+  assert.equal(sha(original), a.sha256);
+  assertPointersMatchBytes(a, original);
+  assert.equal(a.referenceContext, 'operative_candidate');
+});

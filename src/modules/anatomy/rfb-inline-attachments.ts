@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import type { AnatomyPart } from './contract.js';
+import { prepareRfbRepresentation, type JsonPreparation } from './json-preparation.js';
 import { readAnatomyInput, type AnatomyReaderResult } from './readers.js';
 
 /**
@@ -15,6 +17,11 @@ import { readAnatomyInput, type AnatomyReaderResult } from './readers.js';
  *    (windows-1252 / iso-8859-1 / utf-8 only), never normalised or repaired; UTF-16 offsets map back to bytes;
  *  - size limits: 512 KiB decoded per attachment, 1 MiB per act. PDFs (or any non-HTML content) stay `missing`.
  * Nothing is fetched. legalStatus stays unknown (the reader never sets it).
+ *
+ * R2 (COORD #300): (1) a UTF-8 BOM is KEPT in `html` (decoded with ignoreBOM), so UTF-16 offsets of the reader's own
+ * sourcePointers map to the original bytes including the 3 BOM bytes; (2) an offset inside a surrogate pair (non-BMP
+ * character) is refused; (3) the attachment inherits the protected context of the segment that references it in the
+ * act: quotation/prohibited → prohibited, tachado/historical → historical, undetermined → prohibited (conservative).
  */
 export const RFB_INLINE_ATTACHMENT_VERSION = 'rfb-inline-attachment/0.1.0-provisional' as const;
 export const RFB_INLINE_ATTACHMENT_LIMITS = Object.freeze({ maxBytesPerAttachment: 512 * 1024, maxBytesPerAct: 1024 * 1024 });
@@ -42,8 +49,11 @@ export interface InlineAttachment {
   charset: Charset | null;
   /** The decoded HTML (state 'read' only), verbatim. */
   html: string | null;
-  /** The separate reader pass (state 'read' only). */
+  /** The separate reader pass (state 'read' only), with the referencing segment's protected context applied. */
   reading: AnatomyReaderResult | null;
+  /** Context of the segment that references the attachment in the act (R2). */
+  referenceContext: AnatomyPart['context'];
+  referenceContextEvidence: string;
 }
 
 const sha = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
@@ -67,10 +77,34 @@ export function attachmentByteOffset(att: Pick<InlineAttachment, 'charset' | 'ht
   if (utf16Offset < 0 || utf16Offset > att.html.length) throw new RangeError('offset outside the attachment');
   // windows-1252 (WHATWG) maps every byte to exactly one BMP code point: byte offset = UTF-16 offset.
   if (att.charset === 'windows-1252') return utf16Offset;
+  // R2: never split a surrogate pair (characters outside the BMP take 2 UTF-16 units and 4 UTF-8 bytes).
+  const prev = att.html.charCodeAt(utf16Offset - 1);
+  if (utf16Offset > 0 && utf16Offset < att.html.length && prev >= 0xd800 && prev <= 0xdbff) throw new RangeError('offset splits a surrogate pair');
+  // The BOM, when present, is part of `html` (decoded with ignoreBOM), so it is counted like any other character.
   return Buffer.byteLength(att.html.slice(0, utf16Offset), 'utf8');
 }
 
-export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: number): InlineAttachment[] {
+const RESTRICT: Record<AnatomyPart['context'], number> = { operative_candidate: 0, unknown: 1, historical: 2, prohibited: 3 };
+/** Most restrictive context of the act's parts that cover the referencing segment's text (R2). */
+function referenceContextOf(main: { prep: Pick<JsonPreparation, 'pieces'>; parts: readonly AnatomyPart[] }, pointer: string, tachado: boolean):
+  { context: AnatomyPart['context']; evidence: string } {
+  const piece = main.prep.pieces.find((x) => x.pointer === `${pointer}/textoIntegra`);
+  if (!piece) return tachado ? { context: 'historical', evidence: 'segment has no text; source marks it tachado' }
+    : { context: 'prohibited', evidence: 'segment has no text in the act: context undetermined, conservative prohibited' };
+  const covering = main.parts.filter((x) => x.type !== 'document' && x.sourcePointers.some((sp) => sp.sourceSpan
+    && sp.sourceSpan.start < piece.htmlSpan.end && sp.sourceSpan.end > piece.htmlSpan.start));
+  if (!covering.length) return { context: 'prohibited', evidence: 'no act part covers the referencing segment: conservative prohibited' };
+  let ctx: AnatomyPart['context'] = 'operative_candidate';
+  for (const x of covering) if (RESTRICT[x.context] > RESTRICT[ctx]) ctx = x.context;
+  if (ctx === 'unknown') ctx = 'prohibited';
+  return { context: ctx, evidence: `context of ${covering.length} act part(s) covering ${pointer}` };
+}
+
+export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: number,
+  main?: { prep: Pick<JsonPreparation, 'pieces'>; parts: readonly AnatomyPart[] }): InlineAttachment[] {
+  // R2: the referencing segment's context comes from the act itself; without a supplied reading it is computed here.
+  const act = main ?? (() => { const prep = prepareRfbRepresentation({ resourceId: `rfb:${expectedIdAto}`, bytes }, expectedIdAto);
+    return { prep, parts: readAnatomyInput({ source: 'RFB', representationId: `rfb:${expectedIdAto}`, html: prep.html }).parts }; })();
   const root = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^﻿/u, '')) as Record<string, unknown>;
   if (root.idAto !== expectedIdAto) throw new TypeError('RFB idAto differs from the expected act');
   const out: InlineAttachment[] = []; let actBytes = 0;
@@ -85,7 +119,9 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
         idTipoArquivo: typeof file.idTipoArquivo === 'number' ? file.idTipoArquivo : null,
         pointer: `/${key}/${i}/arquivoBinario/arquivoBinario`, segmentOrder: typeof seg.ordemSegmentoAto === 'number' ? seg.ordemSegmentoAto : -1,
         resourceId: `rfb:${expectedIdAto}:anexo:${id}`, state: 'missing_no_content', reason: 'no embedded content in the official JSON',
-        byteLength: null, sha256: null, charset: null, html: null, reading: null };
+        byteLength: null, sha256: null, charset: null, html: null, reading: null, referenceContext: 'operative_candidate', referenceContextEvidence: '' };
+      const rc = referenceContextOf(act, `/${key}/${i}`, seg.tachado === true);
+      base.referenceContext = rc.context; base.referenceContextEvidence = rc.evidence;
       const done = (state: InlineAttachmentState, reason: string, extra: Partial<InlineAttachment> = {}) => { out.push(Object.freeze({ ...base, ...extra, state, reason })); };
       const payload = file.arquivoBinario;
       if (typeof payload !== 'string' || !payload.length) return done('missing_no_content', 'no embedded content in the official JSON');
@@ -102,12 +138,17 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
       const charset = charsetOf(label);
       if (!charset) return done('charset_unsupported', `charset ${label} is not supported`, meta);
       let html: string;
-      try { html = new TextDecoder(charset, { fatal: charset === 'utf-8' }).decode(decoded); }
+      // R2: ignoreBOM keeps a UTF-8 BOM as U+FEFF in `html`, so offsets stay aligned with the original bytes.
+      try { html = new TextDecoder(charset, { fatal: charset === 'utf-8', ignoreBOM: true }).decode(decoded); }
       catch { return done('charset_unsupported', `bytes are not valid ${charset}`, { ...meta, charset }); }
       actBytes += decoded.byteLength;
       let reading: AnatomyReaderResult;
       try { reading = readAnatomyInput({ source: 'RFB', representationId: base.resourceId, html }); }
       catch (e) { return done('unreadable', `reader refused the attachment: ${(e as Error).message}`, { ...meta, charset }); }
+      // R2: the attachment never becomes more permissive than the segment that references it.
+      if (base.referenceContext !== 'operative_candidate') for (const x of reading.parts) {
+        if (RESTRICT[x.context] < RESTRICT[base.referenceContext] && x.type !== 'unidentified') { x.context = base.referenceContext; x.contextReasons.push('rfb_inline_attachment_reference_context'); }
+      }
       done('read', null as unknown as string, { ...meta, charset, html, reading });
     });
   }

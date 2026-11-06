@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "85fd14264c001e5370d7b20b4e0a2fcbd14c604787c70baa1d016cb45ba28a77",
+  "engineBuildHash": "d6ada5f6c247799a828be1821cadcb1f6a6c4f6321a787779f4d6f33d1efba94",
   "acts": [
     {
       "idAto": 104314,
@@ -45,7 +45,7 @@
       "struckSegments": 4002,
       "attachmentsWithoutContent": 30,
       "missingSegments": 0,
-      "outputHash": "b2310b4d120ddad4d9e2688828ace6950515f6a50af5ece333b8af64f729add4",
+      "outputHash": "4f1e14d9bed8a6d6771a39fcd53c1de5f5bdfab5ffacc03725971c8a4495cb4e",
       "inlineAttachments": {
         "total": 30,
         "states": {
@@ -87,7 +87,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "f76fdf905f11ebefb4c2f92b3a2005551e5a6eb204226ec0007c6cde2c0220f8",
+      "outputHash": "50ec92b1b7c46e95dcc95e6b60f98b29abc3fbe45915c3306f6065e34235a098",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -130,7 +130,7 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "4d264049222ef22e79b064e3209f9d1dd22f4cd35537e9bdbaf93a0c3a6981df",
+      "outputHash": "d716235a6f6a51c18ca718ccae878f9de253e776f429f7f93a3c6932572ec919",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -182,7 +182,7 @@
       "struckSegments": 136,
       "attachmentsWithoutContent": 35,
       "missingSegments": 0,
-      "outputHash": "c65c15c161b3351d225a8c0024852b12fd649f8875e5fc02f0e2b69431237196",
+      "outputHash": "77df841ce1d39bdc12f43baf4f73aa4ff82615ad73c6d1033c3d2a0e5256ef21",
       "inlineAttachments": {
         "total": 35,
         "states": {
@@ -231,7 +231,7 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "6b4cb2f9587a83c82fb2ebd43172b0dd5bd79b34af1d6541cb2d494eaa626e46",
+      "outputHash": "19fdeac33ad75ece267e962f582d42d08b433483039ccbe7c77382f993d987d0",
       "inlineAttachments": {
         "total": 31,
         "states": {
@@ -245,7 +245,8 @@
             "charset": "windows-1252",
             "bytes": 5643,
             "chars": 516,
-            "unidentifiedChars": 5
+            "unidentifiedChars": 5,
+            "referenceContext": "operative_candidate"
           }
         ]
       }
@@ -283,7 +284,7 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "0e6ee2e738edf73b64114f9ef976e1fe52a10372789ff0ecf593d1d27f9bb7c5",
+      "outputHash": "90ad1b06d2ba5cc4daafecdf7bbb78e60c9f4ae819986742c81c6d36d24d6543",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -332,7 +333,7 @@
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "a4a9fb16959180f9f800b7fa476377106d88bf02f5459a9ff945f6b87edd3e47",
+      "outputHash": "9bc5416cbce71795916e6bc6e32026b350a5c5c38f005eb7a31d5c401e07ca26",
       "inlineAttachments": {
         "total": 0,
         "states": {},
