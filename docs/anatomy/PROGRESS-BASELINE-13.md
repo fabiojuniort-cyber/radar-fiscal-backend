@@ -50,4 +50,24 @@ Os totais registrados por etapa (24,0 / 11,2 / 12,0 / 1,5 / 1,5) são reproduzid
 | #288 D04/D05; #289 lote RFB; #290 L11; #291 L14–L16; #292 L17 | **E9 Cobertura oficial (15)** e/ou **E8** | E8 já tem impl./testado/aceito. Em E9 os pacotes cobrem fontes oficiais (RFB 5 INs; Sefaz-SP 2 páginas) com testes e revisão aceita, mas **sem promoção (L3), sem Planalto/CONFAZ/DOU (M1–M5, M9) e sem homologação**. Se o COORD considerar cumpridos os marcos impl./testado/aceito de E9, o ganho seria 15 × 0,8 = 12,0 pontos (total 62,2%). **O EXEC não marca isso:** o critério de conclusão de E9 não está escrito e não deve ser inventado. |
 | #293 matriz; #294 COMPOSE-01 | Nenhuma entrega própria | Composição não é integração (herda #285, sem `main`) |
 
-**Percentual mantido:** **Frente 1 = 50,2%** até validação do COORD. Frente 2 = 10%.
+## 4. Matriz E9 — Cobertura oficial (peso 15)
+
+Critério aplicado: a fórmula vigente (§ topo). Cada marco só conta com uma evidência aceita pelo COORD. **Nenhum marco de E9 é contabilizado hoje.** Uma célula "parcial" registra evidência e lacuna, mas não soma pontos.
+
+| Marco (fração) | Situação | Evidência | Lacuna |
+|---|---|---|---|
+| Implementado (0,40) | Parcial | RFB: lote de 7 INs (#289; coleta 02), anexo HTML embutido como recurso separado (#300, 1 de 31 anexos da IN 2.121); Sefaz-SP portal: 2 páginas (#291 L14–L16, #292 L17); D04/D05 (#288); L11 (#290) | Planalto, CONFAZ e DOU (M1–M5, M9) sem cobertura; anexos PDF da RFB ficam `missing_no_content`; promoção L3 não autorizada (`promoted:false`) |
+| Testado (0,20) | Parcial (offline) | Testes ANAT 320/320 no #300 @9a6a9ec9; COMPOSE-02 #299 PASS offline; PG16 12/12; LOTE-2 PG18 PASS no #300 (run 42159441668) | Sem teste em fonte oficial além de RFB e Sefaz-SP; `verify` do CI vermelho por uma corrida externa à ANAT (COLL-TEST-ISO-01, #301) |
+| Revisão aceita (0,20) | Parcial | Aceites de #288–#292; #299 PASS offline; **#300 R3 PASS técnico offline** (COORD, 06/11); **#293 §17 APPROVED documental** (COORD, 06/11) | Critério de conclusão de E9 ainda não escrito pelo COORD |
+| Integrado (0,10) | Não | — | Nenhum incremento em `main` (herda #285, congelado) |
+| Liberado (0,10) | Não | — | Sem homologação nem ativação (E13) |
+
+**Pontos E9 contabilizados:** 0. **Projeção (não validada):** impl., testado e aceito completos dariam 15 × 0,8 = 12,0 p.p. (62,2%). Isso depende de o COORD escrever o critério de conclusão de E9 e de as lacunas acima serem aceitas ou fechadas.
+
+## 5. Registro de 06/11 (fora do cálculo)
+
+- **#300 R3 @9a6a9ec9 — PASS técnico offline.** Delta do lote de 7 INs: contra a base, entram `inlineAttachments` com o `referenceContext` (R2) e muda o `outputHash`; o R3 sozinho muda só o `outputHash`.
+- **#293 §17 (L20) — APPROVED documental.** Classificação `prohibited` mantida; `rfb_quote_unclosed_resume_candidate` apenas para revisão humana; L20 segue em desenho.
+- **COLL-TEST-ISO-01 (#301)** é tarefa de Backend/CI, fora do cálculo da ANAT.
+
+**Percentual mantido:** **Frente 1 = 50,2%**, delta 0 p.p., até validação do COORD. Frente 2 = 10%.
