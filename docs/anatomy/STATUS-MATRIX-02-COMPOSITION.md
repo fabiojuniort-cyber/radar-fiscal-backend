@@ -318,3 +318,32 @@ Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = ad
 6. revisão independente R2 do candidato.
 
 **Execução:** só com decisão expressa.
+
+## 15. L20 — complemento do desenho: citação que abrange os arts. 706 e 707 (só desenho; decisão de 06/11, #116 c.6673604188)
+
+**Problema:** pelo §14.1(b'), a retomada no "sucessor numérico declarado sem aspas" falharia se a citação **legítima** abrangesse os arts. 706 **e** 707 e a fonte declarasse o 707 sem aspas. O 707 citado seria liberado como operativo.
+
+**Evidência real que distingue os cenários** (somente leitura):
+- **IN 2.121 (127905):**
+  - 4005 = "Art. 705…" (`artigo`, não tachado);
+  - 4006 = "Seção II…";
+  - **4007 = "Art. 706…" (`artigo`, tachado)**, redação anterior do **próprio** art. 706;
+  - **4008 = `"Art. 706…`** (999), mesmo texto, com aspa inicial solta e terminando com a mesma remissão legal do 4007.
+  - É a nova redação do artigo do próprio ato, não uma citação de outro ato.
+- **IN 2.021 (116968):** 677 = "…a Instrução Normativa RFB nº 971, de 2009, **passa a vigorar com as seguintes alterações:**" (tachado); 678 = `"Art. 142. …` (999). É uma citação legítima de **outro ato**, que fecha em 682.
+
+**Critério complementar — "evidência suficiente de retomada"** (todas as condições; senão, `prohibited` é preservado):
+- **E0:** as condições (a) e (b') do §14.1 valem (sem fechamento em todo o ato; sucessor N+1 declarado, sem aspas, não tachado).
+- **E1 (artigo do próprio ato):** o segmento imediatamente anterior à abertura é um `artigo` **tachado com o mesmo número N** (redação anterior do próprio artigo). Sem isso, não há retomada.
+- **E2 (sem introdução de alteração de outro ato):** nenhum dos segmentos entre o último artigo operativo e a abertura contém fórmula de alteração ("passa a vigorar", "com as seguintes alterações", "fica acrescido", "nova redação", "com a seguinte redação"). Havendo uma, a citação é de outro ato: **sem retomada**.
+- **E3 (sucessor também do próprio ato):** se o sucessor N+1 for imediatamente precedido por um `artigo` N+1 tachado, isso reforça; sem esse par, a retomada só ocorre com E1 e E2 satisfeitas.
+- **E4 (procedência):** E0–E3 são calculadas pela preparação a partir do JSON oficial (`rfbQuoteBounds`, com a evidência de cada condição) e entregues por referência com prova, como no §14.1(c). Nada vem de atributo HTML.
+
+**Contracasos obrigatórios (sintéticos, modelados nos reais):**
+1. **Citação de 706 e 707, com 707 declarado sem aspas, introduzida por "passa a vigorar com as seguintes alterações:"** (modelo IN 2.021): E2 falha. **706 e 707 continuam `prohibited`**, inclusive o 707 sem aspas.
+2. **Mesma citação sem fórmula de introdução e sem 706 tachado antes da abertura:** E1 falha. **`prohibited` preservado.**
+3. **Caso real IN 2.121** (4007 tachado = 706; 4008 abre `"Art. 706`; sucessor 707 em 4014): E0–E2 satisfeitas. Retoma no **707**; os §§ do 706 (4009–4013) continuam protegidos; limitação `rfb_quote_unclosed_bounded` com a evidência.
+4. Abertura com aspas e fechamento em segmento posterior (IN 2.021, 678 → 682): (a) falha; **sem mudança**.
+5. Plano `rfbQuoteBounds` forjado, copiado ou de outro HTML: ignorado (regra atual).
+
+**Efeito esperado:** só a IN 2.121 muda entre os 7 atos do lote (a ser medido na implementação). IN 2.021 e IN 1.911: sem mudança. 🔴 A implementação depende de decisão expressa.
