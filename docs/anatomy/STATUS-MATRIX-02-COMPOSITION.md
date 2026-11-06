@@ -347,3 +347,30 @@ Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = ad
 5. Plano `rfbQuoteBounds` forjado, copiado ou de outro HTML: ignorado (regra atual).
 
 **Efeito esperado:** só a IN 2.121 muda entre os 7 atos do lote (a ser medido na implementação). IN 2.021 e IN 1.911: sem mudança. 🔴 A implementação depende de decisão expressa.
+
+## 16. L20 — caso "706 tachado antes, sem fórmula de alteração, 707 sem aspas ainda dentro da citação" (só desenho; parecer COORD de 06/11)
+
+**Problema:** E1 (706 tachado antes da abertura) e E2 (nenhuma fórmula de alteração reconhecida) podem ser satisfeitas **e** o 707 declarado sem aspas ainda estar dentro da citação. E0–E2 sozinhas **não distinguem** esse caso do caso real da IN 2.121. Pelo parecer, o resultado tem de continuar `prohibited` quando faltar evidência.
+
+**Evidência real verificada (somente leitura, IN 2.121):**
+- **E5 descartada:** o texto do segmento de abertura (4008), sem a aspa, **difere** do 706 tachado (4007): 383 × 368 caracteres. É uma nova redação, não uma cópia. A igualdade de texto não serve como prova.
+- **E6, pares do próprio ato:** entre a abertura e o sucessor, os dispositivos aparecem em **pares tachado + vigente do mesmo dispositivo**: 4009 § 1º (tachado) / 4010 § 1º; 4011 § 2º (tachado) / 4012 § 2º. Esse é o padrão da consolidação multivigente **do próprio ato**; uma citação de outro ato não traz as versões tachadas do ato que cita.
+- **E7, fechamento estrutural declarado:** imediatamente antes do sucessor há um **agrupamento declarado pelo ato** (4013 = `secao` "Seção III – Da Habilitação Definitiva"), sem aspas e não tachado. O sucessor 707 (4014) vem logo depois.
+
+**Critério revisado (substitui a retomada do §15; todas as condições):**
+1. E0 (§14.1: sem fechamento no ato; sucessor N+1 declarado, sem aspas, não tachado), E1 e E2 (§15);
+2. **E6:** todo segmento entre a abertura e o sucessor é `paragrafo`/`inciso`/`alinea`/`item` em **par tachado + vigente do mesmo rótulo**, ou um agrupamento declarado (E7). Um único segmento fora desse padrão (999, rótulo sem par, artigo com número ≠ N) faz a regra **falhar**;
+3. **E7:** o segmento imediatamente anterior ao sucessor é um **agrupamento declarado** (`secao`, `subsecao`, `capitulo`, `titulo`, `livro`, `parte`), sem aspas e não tachado, **ou** o próprio sucessor é precedido do seu par tachado (N+1 tachado + N+1 vigente);
+4. **E4 (procedência):** E0–E7 calculadas pela preparação a partir do JSON oficial e entregues por referência com prova (§14.1(c)).
+
+**Se qualquer condição falhar, todos os segmentos depois da abertura continuam `prohibited`** (regra atual), com a limitação `rfb_quote_unclosed_unresolved` indicando a condição que faltou.
+
+**Contracasos obrigatórios (sintéticos):**
+1. **Caso pedido pelo COORD:** 706 tachado antes da abertura; nenhuma fórmula; abertura `"Art. 706…`; §§ do 706 **sem** pares tachados; **707 sem aspas** logo em seguida, sem agrupamento entre eles. E6 e E7 falham. **706 e 707 continuam `prohibited`.**
+2. O mesmo com um agrupamento declarado antes do 707, mas com §§ sem pares: E6 falha → `prohibited`.
+3. O mesmo com pares tachados nos §§, mas sem agrupamento e sem o par tachado do 707: E7 falha → `prohibited`.
+4. **Caso real IN 2.121** (4007 tachado; 4008 abre; 4009–4012 em pares; 4013 Seção III; 4014 Art. 707): todas as condições valem → retoma no 707; os §§ do 706 continuam `prohibited`.
+5. Citação legítima multissegmento com fechamento (IN 2.021, 678 → 682): E0 falha → sem mudança.
+6. Plano forjado, copiado ou de outro HTML: ignorado.
+
+**Risco residual declarado:** uma citação de outro ato que reproduzisse **exatamente** os pares tachado + vigente do próprio ato **e** um agrupamento declarado antes do sucessor seria indistinguível pelos dados da fonte. Nesse caso, a limitação `rfb_quote_unclosed_bounded` registra a retomada e a evidência usada, para auditoria. 🔴 A implementação continua dependendo de decisão expressa.
