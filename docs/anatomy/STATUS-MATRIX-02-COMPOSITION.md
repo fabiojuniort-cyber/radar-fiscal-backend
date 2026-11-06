@@ -374,3 +374,42 @@ Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = ad
 6. Plano forjado, copiado ou de outro HTML: ignorado.
 
 **Risco residual declarado:** uma citação de outro ato que reproduzisse **exatamente** os pares tachado + vigente do próprio ato **e** um agrupamento declarado antes do sucessor seria indistinguível pelos dados da fonte. Nesse caso, a limitação `rfb_quote_unclosed_bounded` registra a retomada e a evidência usada, para auditoria. 🔴 A implementação continua dependendo de decisão expressa.
+
+## 17. L20 — desenho final: classificação inalterada; candidato a retomada só para revisão humana (parecer COORD de 06/11)
+
+**Conclusão sobre E6/E7:** essas condições **ainda são compatíveis com uma citação legítima**. Um ato que transcreve outro pode reproduzir, **dentro da própria citação**:
+- dispositivos em pares tachado + vigente (por exemplo, ao transcrever um trecho já consolidado);
+- um agrupamento declarado ("Seção III…") antes do artigo seguinte;
+- um artigo sucessor sem aspas, quando a fonte omite as aspas de abertura de cada bloco.
+
+E0–E7 não excluem esses cenários. Pela regra do parecer, **`prohibited` é preservado em todos os casos**.
+
+**Desenho final:**
+1. **Classificação:** nenhuma mudança. Todos os segmentos depois de uma aspa aberta sem fechamento continuam `quoted_text`/`prohibited`, como hoje. **Não há retomada automática.**
+2. **Candidato a retomada (só sinal):** quando E0–E7 (§14.1, §15, §16) forem todas satisfeitas, a preparação registra no plano provado um `rfbQuoteResumeCandidate` com:
+   - o segmento de abertura e N;
+   - o segmento do sucessor;
+   - a evidência de cada condição (E1 artigo tachado, E2 sem fórmula, E6 pares, E7 agrupamento ou par).
+
+   O leitor emite a limitação `rfb_quote_unclosed_resume_candidate`, com essa evidência, **sem alterar o contexto, o tipo ou a elegibilidade de nenhuma parte**. O resultado continua `partial`.
+3. **Uso:** o candidato serve **apenas para revisão humana** (fila de revisão ou curadoria). Uma eventual decisão humana de retomada é outra etapa, com registro próprio, e **não** faz parte da L20.
+4. **Procedência:** o candidato vem só do plano emitido pela preparação a partir do JSON oficial (objeto por referência, ligado ao SHA do HTML e ao `representationId`). Atributos HTML são ignorados; com plano ausente, forjado ou copiado, não há sinal.
+
+**Efeito esperado:**
+- IN 2.121: **nenhuma mudança** de partes ou de não identificado. Uma limitação `rfb_quote_unclosed_resume_candidate` com abertura 4008/N=706, sucessor 4014/707 e evidências E1, E2, E6 (4009/4010, 4011/4012) e E7 (4013 Seção III).
+- IN 2.021 e IN 1.911: nenhuma limitação nova.
+- As outras INs: inalteradas.
+
+**Contracasos (o resultado é sempre `prohibited`; só varia a existência do sinal):**
+
+| Caso | Partes | Sinal |
+|---|---|---|
+| 706 tachado + sem fórmula + 707 sem aspas citado, sem pares nem agrupamento | `prohibited` | não |
+| Citação legítima que transcreve pares tachado + vigente e "Seção III" antes do 707 | `prohibited` | sim (revisão humana decide) |
+| Caso real IN 2.121 | `prohibited` | sim |
+| Citação com fechamento (IN 2.021, 678 → 682) | inalteradas | não |
+| Plano forjado, copiado ou de outro HTML | `prohibited` | não |
+
+**Teste de não regressão obrigatório:** o SHA da saída do leitor (partes, contextos, `sourceMap`) é idêntico antes e depois para os 7 atos. Só a lista de limitações pode ganhar o sinal.
+
+🔴 A implementação (só o sinal, sem mudar a classificação) depende de decisão expressa.
