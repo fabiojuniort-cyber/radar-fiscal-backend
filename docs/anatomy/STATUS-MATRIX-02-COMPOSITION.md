@@ -237,3 +237,84 @@ Formato da resposta: por exemplo, "L20 = A; L21 = A; L22 = aprovado; L2/L12 = ad
 - lote de 7 INs antes/depois.
 
 🔴 **Requer decisão expressa** depois da revisão deste desenho.
+
+## 14. Revisão dos desenhos (parecer COORD de 06/11) e plano de composição — só desenho e planejamento
+
+### 14.1 L20 revisado — proteger o artigo citado inteiro; procedência da marca
+
+**Mudança em relação ao §13.1(b):** a retomada não depende só de haver um "próximo artigo declarado". O artigo citado inteiro fica protegido.
+
+1. **(a) Sem fechamento:** como no §13.1. Nenhum segmento posterior contém fechamento antes da próxima abertura.
+2. **(b') Artigo citado inteiro:** se o bloco de abertura começa por um rótulo de artigo (`"Art. N`), o número **N** é registrado. A citação só termina antes de um segmento declarado `artigo`, não tachado e sem aspas, cujo número é **o sucessor de N na numeração do ato** (N+1, ou N-A/N-B quando a sequência local os usa). Segmentos `paragrafo`, `inciso`, `alinea`, `item`, 999 e qualquer artigo com número ≤ N ficam `prohibited`. Se não houver rótulo de artigo na abertura, ou não existir sucessor, **nada é liberado** (regra atual).
+   - **Evidência (IN 2.121):** abertura no segmento 4008 = "Art. 706"; último artigo operativo antes = 705 (segmento 4005); próximo artigo declarado = **707** (4014), sem aspas e não tachado. Ficam protegidos os §§ do art. 706 (4009–4013); a leitura normal volta no 707.
+3. **(c) Procedência da marca (como na L17):** o leitor **não** lê nenhum atributo de HTML para isso.
+   - A preparação RFB calcula, a partir do JSON oficial, o plano `rfbQuoteBounds` (segmento de abertura, N, segmento de retomada, motivo).
+   - O plano é entregue **por referência** num objeto de preparação emitido pelo `prepareRfbRepresentation` (`WeakSet` privado, congelado em profundidade, ligado ao SHA do HTML e ao `representationId`).
+   - Sem prova válida, vale a regra atual. Uma marca escrita no HTML (`data-rfb-quote-*`) é ignorada. Teste negativo obrigatório: marca forjada, objeto copiado, HTML alterado, id divergente.
+4. **(d) Evidência:** a limitação `rfb_quote_unclosed_bounded` registra o segmento de abertura, N e o segmento de retomada. O bloco de abertura continua `quoted_text`/`prohibited`.
+
+**Contracasos (somam-se aos do §13.1):**
+- citação legítima multissegmento da IN 2.021 (678 → 682): **sem mudança**;
+- citação sem fechamento de um artigo que contém "Art. N+1" **dentro** da própria citação, mas entre aspas ou como 999: não retoma;
+- abertura sem rótulo de artigo: não retoma;
+- sucessor ausente até o fim: não retoma;
+- sucessor tachado: não retoma nele, só no seguinte não tachado.
+
+### 14.2 L2/L12 revisado — isolamento, corpo, mapa de origem e reconciliação desde 0.1.0
+
+**Mudança em relação ao §13.2(4):** o anexo **não** é inserido no HTML principal.
+
+1. **Isolamento de HTML malformado:** cada anexo HTML embutido vira um **recurso separado** (`resourceId = rfb:<idAto>:anexo:<idArquivoBinario>`), lido numa passada própria do leitor. Tags abertas, `</section>`, comentários ou entidades quebradas no anexo **não alteram** a árvore nem o texto do ato. A passada do anexo usa os mesmos limites do leitor (profundidade, nós, bytes). Se falhar, o anexo fica `unreadable`, com motivo, e o resto do ato não muda.
+2. **Preservação do corpo:** os bytes decodificados do base64 são guardados como estão (SHA-256 registrado). O charset é o declarado no próprio anexo; se não for suportado → `missing`. Nada é normalizado ou reparado. O `<head>` e scripts são excluídos pelo leitor, como em qualquer HTML.
+3. **Mapa de origem:** as partes do anexo têm `sourcePointers.resourceId` igual ao do recurso do anexo e spans nos bytes decodificados. A origem completa é JSON → `/outrosSegmentos/<i>/arquivoBinario/arquivoBinario` (base64) → bytes → spans. O ato ganha uma parte `annex` que referencia o recurso, sem copiar texto.
+4. **Reconciliação desde 0.1.0:**
+   - o **HTML principal não muda**, então a cadeia existente continua válida: 0.1.0 →(D04: só atributos)→ 0.2.0 → 0.3.0, com HTML principal **idêntico** ao 0.2.0;
+   - a 0.3.0 acrescenta só a lista `inlineAttachments` (id, ponteiro, SHA dos bytes, charset, tamanho, estado);
+   - no lote, a reconciliação vira `d04_annotation_only` (IN 2.121, captura 0.1.0) mais `inline_attachments: N`, com o hash da preparação principal provado igual;
+   - a preparação capturada no `.meta.json` **nunca é reescrita**.
+5. **Limites:** 512 KiB decodificados por anexo e 1 MiB por ato. Acima disso → `attachment_too_large`. PDFs (tipo 6) continuam `missing`.
+
+**Testes:**
+- HTML malformado (tags abertas, `</section>`, comentário aberto): o ato fica idêntico e o anexo é lido ou marcado `unreadable`;
+- base64 inválido; charset desconhecido; conteúdo que não é HTML;
+- limites por anexo e por ato;
+- a reconciliação prova HTML principal idêntico desde 0.1.0 (via 0.2.0);
+- ponteiros do anexo apontam para o recurso do anexo;
+- lote de 7 INs antes/depois.
+
+### 14.3 Plano de composição de #296 + #297 + #298 (não executado; aguarda decisão)
+
+**Ordem:** base = **#298 @ `47d166b4`** (contém #295 e #294) ← merge normal de **#296 @ `e6b0dbb0`** ← merge normal de **#297 @ `cb8a9773`**. Branch nova; #285, `main` e ramos do R7 intocados. O candidato herda o #285 e **não** é liberável para a `main`.
+
+**Prova local feita** (worktree temporária, descartada, sem push):
+
+| Passo | Resultado |
+|---|---|
+| #298 ← #296 | Sem conflito textual. Atenção: a baseline do lote vinda do #298 (identidade `afb275ec`) fica desatualizada; é regenerada no fim |
+| ← #297 | Conflitos em `engine-build.json`, `build-identity.ts`, `official-lot-rfb.json` e na guarda da integração |
+| `readers.ts` | **Combinou automaticamente**: L21 no bloco do portal SP; L22 no mapa de tipos RFB e em `rfbDeclared`. São trechos distintos |
+
+**Separação pedida:**
+1. **Resolução semântica em `readers.ts`** (primeiro commit do candidato, revisável isoladamente): conferir que o resultado do merge automático contém as duas mudanças sem interferência. A L21 só age com `spPortal`; a L22 só com `rfbSeg`. Nenhuma linha de uma toca a outra. Se o merge automático divergir disso, parar e reportar.
+2. **Regeneração da identidade** (commit próprio): `node ops/anatomy/build-identity.mjs --write` e guarda da integração com os dois históricos. Prova: `050602a3`.
+3. **Regeneração da baseline de 7 INs** (commit próprio): `official-lot-rfb.ts --write`, com o delta explicado por ato.
+
+**Delta esperado do lote (prova), comparado ao #298:**
+
+| Ato | Diferença | Causa |
+|---|---|---|
+| 108391, 115131, 133898, 141910 | Só `outputHash` | Identidade |
+| 127905 (IN 2.121) | +1 `rfb_segment_type_conflict` | L22 (segmento 702 declarado `anexo`, texto do art. 137) |
+| 104314 (IN 1.911) | annex 30→32; unidentified 17→15 (1.823→1.819 caracteres); `rfb_segment_type_unmapped` 2→0; `rfb_tachado_evidence` 17→15 | L22. Os 2 anexos declarados eram blocos não identificados tachados; agora são `annex` histórico, e a evidência específica de "não identificado tachado" deixa de ser necessária |
+| 116968 (IN 2.021) | annex 56→60; unidentified 5→1 (160→103 caracteres); unmapped 4→0 | L22 |
+| (portal SP) | art. 7º 103→0 | L21; nenhum efeito em RFB |
+
+**Testes a repetir no candidato combinado:**
+1. `tsc`; todos os `test/anatomy*.unit.test.ts` (prova: **317/317**), incluindo L21, L22, lote de 7 INs, L17, L14–L16 e L11;
+2. `anatomy:verify-build`; snapshot sintético inalterado;
+3. integração PG16 (prova: **12/12**);
+4. SHA da saída do leitor por ato, igual ao do PR de origem de cada mudança: SP = #296; RFB = #297; as 5 INs sem L22 = #298;
+5. CI completo no SHA unido. Falha conhecida do R7 (ONB-01 PG18), se ocorrer, documentada e sem nova execução;
+6. revisão independente R2 do candidato.
+
+**Execução:** só com decisão expressa.
