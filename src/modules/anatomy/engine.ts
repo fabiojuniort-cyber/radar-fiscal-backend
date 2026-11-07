@@ -71,7 +71,7 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   const result: AnatomyResult = { ...read, contractVersion: ANATOMY_CONTRACT_VERSION,
     analysisId: anatomyIdentityHash(identity), identity, referenceDate: request.referenceDate, entities, evidence: [],
     eligibility: [], outputHash: '' };
-  for (const part of result.parts.filter(part => !['document', 'table', 'row'].includes(part.type))) {
+  for (const part of result.parts.filter(part => !['document', 'table', 'row', 'caput'].includes(part.type))) {
     result.eligibility.push({ id: `text:${part.id}`, purpose: 'thematic_text', partId: part.id,
       entityId: null, span: part.span, eligible: false, evidenceIds: [],
       exclusionReasons: ['missing_approved_evidence', ...(part.context !== 'operative_candidate' ? [`context_${part.context}`] : [])] });
