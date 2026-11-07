@@ -14,7 +14,7 @@
  */
 import { createHash } from 'node:crypto';
 import { JsonPreparationError, prepareDoeSpRepresentation, prepareRfbRepresentation } from '../../src/modules/anatomy/json-preparation.js';
-import { officialApiEndpoint, OFFICIAL_HOSTS } from '../../src/modules/anatomy/config/official-provenance.js';
+import { officialApiEndpoint, OFFICIAL_HOSTS, type OfficialApiSource } from '../../src/modules/anatomy/config/official-provenance.js';
 
 export interface ManifestAct { id: string; source: string; act: string; url: string | null; urlStatus: 'candidate' | 'verified' | 'to-locate'; reason: string }
 export type FetchLike = (url: string, init: { redirect: 'manual'; signal: AbortSignal; headers: Record<string, string> }) => Promise<{
@@ -89,13 +89,26 @@ export function representationProblem(contentType: string, body: Buffer): string
   return null;
 }
 
-export async function consultOfficial(a: ManifestAct, allowedHosts: readonly string[], doFetch: FetchLike, now = () => new Date()): Promise<Outcome> {
+/**
+ * R3 of #304 (c.6709334482): an official API endpoint is admitted ONLY when (1) the caller explicitly authorizes that
+ * API source (`apiSources`, empty by default), (2) the manifest act is of that same source, and (3) the endpoint is an
+ * ACT capture (a publication by id). Discovery/listing endpoints (summary, journals, sections) have their own schema
+ * and scope and are never an act capture here. The identity of the first URL is pinned: a redirect may not switch
+ * between the API and a page host, turn a publication into a listing, or point at another publication id — refused
+ * BEFORE the target is requested.
+ */
+export async function consultOfficial(a: ManifestAct, allowedHosts: readonly string[], doFetch: FetchLike, now = () => new Date(),
+  apiSources: readonly OfficialApiSource[] = []): Promise<Outcome> {
   const fail = (code: Extract<Outcome, { ok: false }>['failure']['code'], detail: string, hops: string[]): Outcome =>
     ({ ok: false, failure: { id: a.id, url: a.url ?? '', hops, code, detail, at: now().toISOString() } });
   if (!a.url) return fail('no_url', `URL ainda não localizada (${a.urlStatus})`, []);
-  const allowed = (u: URL) => (u.protocol === 'https:' && u.port === '' && u.username === '' && u.password === '' && allowedHosts.includes(u.hostname)) || officialApiEndpoint(u) !== null;
+  const apiCapture = (u: URL) => { const api = officialApiEndpoint(u); return api && api.source === a.source && apiSources.includes(api.source) && api.publicationId ? api : null; };
+  const pageHost = (u: URL) => u.protocol === 'https:' && u.port === '' && u.username === '' && u.password === '' && allowedHosts.includes(u.hostname) && officialApiEndpoint(u) === null;
   let current = new URL(a.url); const hops = [current.href];
-  if (!allowed(current)) return fail('host_not_allowed', current.href, hops);
+  const pinned = apiCapture(current);
+  if (!pinned && !pageHost(current)) return fail('host_not_allowed', current.href, hops);
+  // Every hop keeps the kind of resource of the first URL (and, for a publication, its id).
+  const allowed = (u: URL) => { if (!pinned) return pageHost(u); const api = apiCapture(u); return api !== null && api.publicationId === pinned.publicationId; };
   for (let hop = 0; hop <= 5; hop++) {
     let res;
     try { res = await doFetch(current.href, { redirect: 'manual', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'TriBusca-ANAT-OFFICIAL-01 (consulta pontual)' } }); }
@@ -105,12 +118,12 @@ export async function consultOfficial(a: ManifestAct, allowedHosts: readonly str
       if (!location) return fail('http_error', `redirecionamento ${res.status} sem Location`, hops);
       const next = new URL(location, current);
       hops.push(next.href);
-      if (!allowed(next)) return fail('host_not_allowed', `redirecionamento para ${next.protocol}//${next.hostname} recusado antes da requisição`, hops);
+      if (!allowed(next)) return fail('host_not_allowed', `redirecionamento para ${next.protocol}//${next.hostname}${next.pathname} recusado antes da requisição (fora do host ou da identidade do pedido inicial)`, hops);
       current = next; continue;
     }
     if (res.status < 200 || res.status >= 300) return fail('http_error', `HTTP ${res.status}`, hops);
     const contentType = res.headers.get('content-type') ?? '';
-    const api = officialApiEndpoint(current);
+    const api = pinned ? apiCapture(current) : null;
     if (api) {
       // DOE-SP search API: JSON only; a publication must carry the id named in the URL (identity), errors are refused.
       if (!JSON_TYPE.test(contentType)) return fail('content_type', `API ${api.source}: tipo de conteúdo não aceito: ${contentType || '(ausente)'}`, hops);
