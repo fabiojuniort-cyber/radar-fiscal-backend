@@ -1,0 +1,29 @@
+{
+  "id": "lei-10637-2002-original",
+  "manualListItem": "M1",
+  "act": "Lei nº 10.637, de 30/12/2002 (PIS/Pasep não cumulativo)",
+  "urn": "urn:lex:br:federal:lei:2002-12-30;10637",
+  "version": "texto original",
+  "workUrl": "https://normas.leg.br/?urn=urn:lex:br:federal:lei:2002-12-30;10637",
+  "url": "https://normas.leg.br/api/public/binario/9acf341a-499d-4a7c-8f1c-f12051da7408/texto",
+  "finalUrl": "https://normas.leg.br/api/public/binario/9acf341a-499d-4a7c-8f1c-f12051da7408/texto",
+  "status": 200,
+  "contentType": "text/html",
+  "lastModified": null,
+  "sha256": "bb863c51cf4cabeed3ee34826137d6bf812e9b4fe05f8bfc9c4b45028efc71cc",
+  "bytes": 102382,
+  "consultedAt": "2026-11-07T03:34:24.063571Z",
+  "publisher": "Congresso Nacional (normas.leg.br)",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "representation": "html",
+  "titleCheck": {
+    "expected": "LEI N\\S*\\s*10\\.637\\s*[,–—-]?\\s*DE\\s+30\\s+DE\\s+DEZEMBRO\\s+DE\\s+2002",
+    "found": true,
+    "matched": "LEI N. 10.637 – DE 30 DE DEZEMBRO DE 2002"
+  },
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "verified": false,
+  "promoted": false,
+  "reason": "M1 (OFFICIAL-ARQUIVOS-MANUAIS): lei de PIS/Cofins, porte grande; Planalto recusa este ambiente, obtida pela fonte oficial alternativa normas.leg.br"
+}
