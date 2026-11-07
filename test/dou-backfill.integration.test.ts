@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 
 import type { DB } from '../src/infrastructure/database/database.types.js';
@@ -473,12 +473,22 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
 
     await t.test('a date that keeps failing does not block older dates; repeated failures stall the backfill', async () => {
       const tickArgs = { from: '2026-09-01', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1 };
+      // Deterministic fixture clock (#116 c.6709344912 §2). Every fixture row lies STRICTLY IN THE PAST and in the
+      // order the scenario needs: failure 1 → the run of the rotated tick → the repeated failures. The throttle
+      // compares the app clock with created_at (minIntervalMs: 1); a row created "just now" (database clock, µs) could
+      // read as less than 1 ms old, or ahead, and turn RAN/STALLED into SKIPPED (CI run 42384806991).
+      // Runs of the earlier subtests were stamped "now": shift that history 2 h back by the same constant (relative
+      // order kept), so this scenario's timeline (from 1 h ago) comes after it and still ends in the past.
+      await sql`update collection_runs set created_at = created_at - interval '2 hours', scheduled_for = scheduled_for - interval '2 hours',
+        started_at = started_at - interval '2 hours', finished_at = finished_at - interval '2 hours' where source_id = ${sourceId}`.execute(db);
+      const base = Date.now() - 3_600_000;
       let sequence = 0;
+      const nextAt = () => new Date(base + (sequence += 1) * 1_000);
       const failedRun = async () => {
         // Distinct scheduled_for: (source, scheduled_for, trigger) is unique.
-        const at = new Date(Date.now() + (sequence += 1));
+        const at = nextAt();
         await db.insertInto('collection_runs').values({
-          source_id: sourceId, scheduled_for: at, started_at: at, finished_at: at,
+          created_at: at, source_id: sourceId, scheduled_for: at, started_at: at, finished_at: at,
           status: 'SOURCE_UNAVAILABLE', trigger_type: 'BACKFILL', error_summary: 'DOU_BACKFILL_RETRY_LIMIT: 8 attempts',
         }).execute();
       };
@@ -489,13 +499,32 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
       await failedRun();
       const rotated = await runDouBackfillTick(runtimeDb, tickArgs);
       assert.deepEqual(rotated.state === 'RAN' && rotated.batch.dates, [missing[1]], 'after one failure the next date is tried');
+      // The rotated tick's own run was stamped by the real clocks: move it onto the fixture timeline, right after
+      // failure 1, so the repeated failures below follow it while staying in the past.
+      const ranRun = await db.selectFrom('collection_runs').select('id').where('source_id', '=', sourceId).where('trigger_type', '=', 'BACKFILL')
+        .where('status', '!=', 'SOURCE_UNAVAILABLE').orderBy('created_at', 'desc').limit(1).executeTakeFirstOrThrow();
+      const ranAt = nextAt();
+      await db.updateTable('collection_runs').set({ created_at: ranAt, scheduled_for: ranAt, started_at: ranAt, finished_at: ranAt }).where('id', '=', ranRun.id).execute();
 
       const remaining = planDouBackfillDates({ from: '2026-09-01', to: '2026-10-01', today: '2026-10-04', covered: (await readDouBackfillCoverage(db, sourceId)).covered });
       for (let i = 0; i < 2 * remaining.length; i += 1) await failedRun();
+      const timeline = await db.selectFrom('collection_runs').select(['id', 'created_at', 'finished_at']).where('source_id', '=', sourceId)
+        .where('trigger_type', '=', 'BACKFILL').where('created_at', '>=', new Date(base)).orderBy('finished_at').execute();
+      assert.ok(timeline.every((r) => r.finished_at!.getTime() < Date.now() && r.created_at.getTime() === r.finished_at!.getTime()), 'fixtures strictly in the past');
+      assert.equal(timeline[1]!.id, ranRun.id, 'order preserved: failure 1, the rotated run, then the repeated failures');
       const stalled = await runDouBackfillTick(runtimeDb, tickArgs);
       assert.equal(stalled.state, 'STALLED');
       assert.deepEqual(stalled.state === 'STALLED' && stalled.remainingDates, remaining);
       await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).where('status', '=', 'SOURCE_UNAVAILABLE').execute();
+    });
+
+    await t.test('cause, reproduced: a BACKFILL run stamped ahead of the app clock reads as current — the tick is THROTTLED, not RAN/STALLED', async () => {
+      const ahead = new Date(Date.now() + 5_000);
+      await db.insertInto('collection_runs').values({ created_at: ahead, source_id: sourceId, scheduled_for: ahead, started_at: ahead, finished_at: ahead,
+        status: 'SOURCE_UNAVAILABLE', trigger_type: 'BACKFILL', error_summary: 'clock-ahead fixture' }).execute();
+      const tick = await runDouBackfillTick(runtimeDb, { from: '2026-09-01', workerId: 'tick-worker', credentials, fetch, now, isCronDue, minIntervalMs: 1 });
+      assert.deepEqual(tick, { state: 'SKIPPED', reason: 'THROTTLED' });
+      await db.deleteFrom('collection_runs').where('source_id', '=', sourceId).where('error_summary', '=', 'clock-ahead fixture').execute();
     });
 
     await t.test('hourly tick never starts close to a scheduled DOU cycle', async () => {
