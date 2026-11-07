@@ -478,6 +478,11 @@ test('administrative DOU backfill runs explicit past dates through the engine wi
         // Distinct scheduled_for: (source, scheduled_for, trigger) is unique.
         const at = new Date(Date.now() + (sequence += 1));
         await db.insertInto('collection_runs').values({
+          // created_at defaults to the DATABASE clock (now(), microseconds) while the throttle compares it with the APP
+          // clock (Date.now(), milliseconds) against minIntervalMs: 1, so a just-inserted run could read as "less than
+          // 1 ms ago" (or ahead) and the next tick became SKIPPED/THROTTLED instead of RAN/STALLED (CI run 42384806991).
+          // These rows stand for runs of earlier ticks: date their creation in the past; finished_at keeps the order.
+          created_at: new Date(Date.now() - 3_600_000 + sequence),
           source_id: sourceId, scheduled_for: at, started_at: at, finished_at: at,
           status: 'SOURCE_UNAVAILABLE', trigger_type: 'BACKFILL', error_summary: 'DOU_BACKFILL_RETRY_LIMIT: 8 attempts',
         }).execute();

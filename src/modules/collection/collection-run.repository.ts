@@ -556,6 +556,9 @@ export async function finishCollectionAttempt(
   input: FinishAttemptInput,
 ): Promise<boolean> {
   const finishedAt = new Date();
+  // started_at comes from the database clock (now(), microseconds) and finishedAt from the app clock (milliseconds):
+  // never record a finish before the start (chk_attempt_dates), whatever the skew or truncation.
+  const finishedAtNotBeforeStart = sql<Date>`greatest(started_at, ${finishedAt}::timestamptz)`;
   if (input.workerId !== undefined && !input.runId) {
     throw new Error('runId is required to verify collection run ownership');
   }
@@ -611,7 +614,7 @@ export async function finishCollectionAttempt(
         .updateTable('collection_attempts')
         .set({
           status: 'SUCCESS',
-          finished_at: finishedAt,
+          finished_at: finishedAtNotBeforeStart,
           response_time_ms: outcome.durationMs,
           retryable: false,
           metadata: asJson({
@@ -640,7 +643,7 @@ export async function finishCollectionAttempt(
       .updateTable('collection_attempts')
       .set({
         status: input.outcome.status,
-        finished_at: finishedAt,
+        finished_at: finishedAtNotBeforeStart,
         response_time_ms: input.outcome.durationMs,
         http_status:
           input.outcome.httpStatus ?? null,
