@@ -1,0 +1,24 @@
+{
+  "item": "M5",
+  "act": "Ajuste SINIEF 07/05",
+  "source": "CONFAZ",
+  "type": "Ajuste SINIEF",
+  "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ007_05",
+  "savedAt": null,
+  "receivedAt": "2026-11-07T03:57:36.000Z",
+  "savedAtNote": "hora do salvamento não informada; receivedAt é o limite superior (recebimento do arquivo)",
+  "ingestedAt": "2026-11-07T04:01:28.150Z",
+  "fileName": "M5.html",
+  "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+  "bytes": 205981,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ007_05",
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "AJUSTE\\s+SINIEF\\s+N?\\S*\\s*0?7\\s*\\/\\s*(?:20)?05\\b",
+    "matched": "AJUSTE SINIEF 7/05"
+  },
+  "representation": "html",
+  "promoted": false
+}

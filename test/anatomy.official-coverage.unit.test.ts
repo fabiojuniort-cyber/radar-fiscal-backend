@@ -15,9 +15,9 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 5 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 6 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
-  assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['rfb--instrucao-normativa--grande',
+  assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'rfb--instrucao-normativa--grande',
     'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno']);
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
@@ -25,6 +25,7 @@ test('E9 current state: 5 cells covered, E9 incomplete; nothing promoted or acce
   assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
   assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
+  assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
   assert.deepEqual([sizeOf(9_999), sizeOf(10_000), sizeOf(49_999), sizeOf(50_000)], ['pequeno', 'médio', 'médio', 'grande']);
 });
 

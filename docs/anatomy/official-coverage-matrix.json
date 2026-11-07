@@ -443,6 +443,31 @@
       "notes": [
         "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
       ]
+    },
+    {
+      "id": "M5",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "chars": 119687,
+      "size": "grande",
+      "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+      "bytes": 205981,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "diagnostic": null,
+      "outputHash": "07753ae881c7450e18ef65f873a29abdbecc6890b1a6648b86b13cbf9e4df0a6",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
     }
   ],
   "cells": [
@@ -905,8 +930,10 @@
         "required": true
       },
       "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M5"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1415,7 +1442,6 @@
     "confaz--convenio-icms--grande",
     "confaz--ajuste-sinief--pequeno",
     "confaz--ajuste-sinief--medio",
-    "confaz--ajuste-sinief--grande",
     "confaz--protocolo-icms--pequeno",
     "confaz--protocolo-icms--medio",
     "confaz--protocolo-icms--grande",
@@ -1446,7 +1472,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 5,
+  "coveredRequired": 6,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }
