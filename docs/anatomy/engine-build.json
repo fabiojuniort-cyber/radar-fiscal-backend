@@ -1,22 +1,24 @@
 {
-  "engineHash": "b6ccf583621e647e6861204dfa7a2761afe801a3a2173dedc1abdd025d9bf918",
+  "engineHash": "029514bba233f3de86f7bd1366f026bf182843ec3244cb2e46e1e96263f47959",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
-    "ops/anatomy/build-identity.mjs": "1b9c091bd466574508e35f7b1d66075d8c9bf13fcb9a6bafebe96fefc6c5e178",
+    "ops/anatomy/build-identity.mjs": "010fe5f6567c6ca192a74f7d532fe40c05a3d1643c5652d928e28bc7d64fef06",
     "package-lock.json": "028496fa43daec1b9f9b3110670e76774bd787773f360f18842c98abf478d7a8",
     "src/modules/anatomy/consumer.ts": "9a504d15d9fa3a139368b4c1e3e5d65a947413d716666fe0512f26641f7fdae7",
-    "src/modules/anatomy/contract.ts": "e294eb6fb50c2fc2b624c13bc68f281f3271a88f4a00d98f1a7a923928893c2a",
+    "src/modules/anatomy/contract.ts": "2afbf15e978be2383f25f807dd50425a1934f533cfaadd76c17bf9bb5271d3fd",
     "src/modules/anatomy/dou-preparation.ts": "41827ee32c8b14bf0db9b56b3695ba06f40f7dd9a25658e2584ab16e435bb293",
-    "src/modules/anatomy/engine.ts": "e2ea7451da56973e369eb9297ae3741e61148c280489ae8088ce0811de6ff2d6",
-    "src/modules/anatomy/entities.ts": "c63498433722398a1dbf15b14a94f62359a4cd20da9696306e00feb017ff7661",
+    "src/modules/anatomy/engine.ts": "33c670d944d409c01d53391fc8674f28c4a9d742035ef1f5e8fb25c97cde5c4e",
+    "src/modules/anatomy/entities.ts": "851c9424e332bfc1cea52ad05877b7be3c17148e4309fd97b6611ca9d9246a11",
     "src/modules/anatomy/gold.ts": "e7491f75e5dabacac76ca858a3d0348820832bba4a53d22ef050e1a60d9b0c23",
-    "src/modules/anatomy/json-preparation.ts": "a9ec313236e869dad4be493648358d7fa5c2be1e74ad58fba895e2758adcb8bb",
+    "src/modules/anatomy/json-preparation.ts": "b1d100edb1165ccabd391459b4dd244764ee19822b749ef29c2b25816638039c",
     "src/modules/anatomy/nfc-recovery.ts": "043077c6636182cbcbc1870675337a5703845ff6290b8e46aa75e0a773de5a5a",
     "src/modules/anatomy/nfc-shadow-table.ts": "a9074dad75bcd1f328769451c00715d2483f2e4a06c863b67cfcd382ac37d153",
     "src/modules/anatomy/nfc-shadow.ts": "92424d7c1f17c35197a3a1254f91ffe0d64918b32df87ce4b98b49091dfc9e49",
-    "src/modules/anatomy/profile-rules.ts": "c033e3e117d822df4a271a47b853a7b3b9d9651b35fe2fa9f4eb45646672f9fa",
-    "src/modules/anatomy/profile.ts": "79138d91af4abda2ac28b072db958ba877d75889d3725c9752421c95cd6c2a32",
-    "src/modules/anatomy/readers.ts": "bbfa902affc2247542a141d0c18d19ef58946cbddb0420281242a8914373d297"
+    "src/modules/anatomy/pdf-reader.ts": "c6464899099cc4c310a335302a2982d1a22d434720f93afd7a4d112e2c545b2f",
+    "src/modules/anatomy/profile-rules.ts": "721778b256bb07e87afd2b9045246b6bd8cb393a749091f6e2a5f93aa7f0b272",
+    "src/modules/anatomy/profile.ts": "db505e9d46e35110b16094478d02e6b4d5c1ce475561d08f458cf3f2991b455c",
+    "src/modules/anatomy/readers.ts": "b08fa37999a4aa66acc3b0cf5b3d33432510cae5c9375deed9a0960021d8a934",
+    "src/modules/anatomy/sefaz-sp-preparation.ts": "e5c24a28d4ac1e630eaca1cb31fd8d9e26e6270b42e69f37b3e7e099358b3d35"
   }
 }
