@@ -42,7 +42,7 @@
 | Sefaz-SP portal × RICMS × pequeno | art. 8º, art. 9º |
 | Sefaz-SP portal × RICMS × médio | art. 7º; anexo I art. 41; anexo II arts. 3º e 39 |
 
-**Pendentes (52):**
+**Pendentes (51):**
 - RFB: Portaria, ADI e Resolução médias/grandes; ADE e Solução de Consulta (3 portes cada).
 - Planalto Lei (3 portes); normas.leg.br Lei (3 portes, sem perfil próprio).
 - CONFAZ: Convênio ICMS pequeno e médio, Ajuste SINIEF pequeno e médio, Protocolo ICMS (3 portes).
@@ -60,7 +60,7 @@
   - arquivo `.html` e o mesmo arquivo dentro de `1231.zip`, bytes idênticos `e4481fcd…`;
   - URL `…/ajustes/2005/AJ007_05` (endereço corrigido);
   - título "AJUSTE SINIEF 7/05"; validado.
-- **No ZIP:** M4 veio só com a pasta de recursos, **sem a página**. M3, M9 e o pacote da outra sessão (`cce00c19…`) não chegaram aqui.
+- **No `1231.zip` (enviado pelo Fábio):** M4 veio só com a pasta de recursos, sem a página. **Atualização:** M3, M4, M5, M1/M2 (Planalto) e M9 chegaram depois, no pacote HTTP da outra sessão (§3-b).
 
 ## 3-b. Pacote HTTP da outra sessão (`ops/anatomy/official-http-ingest.ts`; `official-identification/e9-http/`)
 
@@ -70,7 +70,7 @@
 - **M3, M4, M5 (CONFAZ):** UTF-8 declarado; lidos com o perfil CONFAZ; invariantes válidos; validados. M3 (922.008) e M4 (82.809) cobrem Convênio × grande; nenhum cobre pequeno ou médio.
 - **M9 (PDF, página 57 do DOU de 05/12/2024):**
   - **Identificado:** cabeçalho "Seção 1 · ISSN 1677-7042 · Nº 234, quinta-feira, 5 de dezembro de 2024"; rodapé com código de autenticidade `05152024120500057`; epígrafe da IN 2.237.
-  - **Alcance:** uma página. O ato **começa** nela (arts. 1º–6º) e **continua** nas seguintes; o topo traz o fim de outra publicação.
+  - **Alcance:** uma página. O ato **começa** nela e vai até o **art. 8º, inciso XIV**; **continua** na página 58, que a outra sessão informou ter obtido (continuação do XV do art. 8º até o art. 19 e a assinatura; bytes ainda não entregues aqui). O topo traz o fim de outra publicação. O campo `articlesOnPage` da meta lista só as linhas que **começam** com "Art.": a extração mistura colunas, e a lista não é exaustiva.
   - **Leitura:** a extração mistura colunas, então a anatomia **não** é validada.
   - **Conta só como evidência de cabeçalho/rodapé (E4).** As células de E9 (página PDF e IN em HTML no DOU) continuam pendentes.
 
@@ -104,7 +104,7 @@ Desenho e contracasos em `docs/anatomy/L-LEG-01-DESIGN.md`. Nenhuma classificaç
 
 | # | Ato | URL | Observação |
 |---|---|---|---|
-| M9 (HTML) | IN RFB 2.237/2024 no DOU | https://www.in.gov.br/consulta → resultado de 05/12/2024 | O PDF da página 57 chegou, mas só vale para E4; a célula de E9 pede a página HTML do ato |
+| M9 (HTML) | IN RFB 2.237/2024 no DOU | https://www.in.gov.br/web/dou/-/instrucao-normativa-rfb-n-2.237-de-4-de-dezembro-de-2024-599911204 (ou pela busca em https://www.in.gov.br/consulta) | O PDF da página 57 chegou, mas só vale para E4. A outra sessão recebeu 403 nessa URL, então só a captura pelo navegador resolve |
 | M1/M2 (charset) | Leis 10.637/2002 e 10.833/2003 (Planalto) | — | Os bytes HTTP chegaram sem charset declarado; para ler, é preciso decidir a fonte do charset (por exemplo, recapturar guardando o cabeçalho HTTP) |
 
 M3, M4 e M5 estão resolvidos. Não pedir de novo.
