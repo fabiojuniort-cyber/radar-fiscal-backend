@@ -252,4 +252,16 @@ O §2 estimava 7 e 14 dispositivos "só revogação". O número medido é maior,
   - Os textos originais não têm plano: só capturados e identificados, com a leitura DOU como diagnóstico.
   - Cobertura da matriz inalterada: 10/61.
 
-**Pendências:** CI do HEAD e recheck proporcional; decisão sobre `validated` das versões atualizadas.
+**Fechamento da célula normas.leg.br × Lei × HTML × grande (#305 c.6710099648):**
+- Nova linha de base `docs/anatomy/normas-leg-samples-baseline.json`, gerada por `official-coverage-matrix.ts --write` e **escrita só se as invariantes valem**. Cada amostra tem um digest por componente:
+  - bytes e identidade (SHA, tamanho, URN, versão, `representationId`);
+  - versão da preparação, HTML e plano;
+  - texto canônico, `sourceMap`, partes por região (tipo, span, contexto, motivos) e seleções candidatas por região;
+  - contagens.
+- Invariantes NORMAS-LEG no gerador:
+  - `legalStatus` sempre `unknown`; nenhum `historical`; nada elegível;
+  - nota sempre `prohibited`; placeholder ou bloco ambíguo nunca operativo; nenhuma seleção candidata dentro de nota;
+  - limitação de preparação local registrada; citação nunca operativa.
+- `validated` é **derivado**: a entrada calculada precisa ser igual à da linha de base e todas as invariantes precisam valer. Nada fica fixo no código.
+- O teste de drift altera cada componente (10 campos e 6 contagens) e confere que a amostra deixa de ser validada; sem linha de base, nenhuma é validada; bytes divergentes são recusados pela integridade.
+- Resultado: as 2 versões atualizadas ficam `validated`, **não** `accepted`. A célula **grande** fica coberta (matriz **11/61**). Pequeno e médio continuam pendentes, e os originais não usam esse plano. O recheck da célula é do COORD. E9 não é concluída.

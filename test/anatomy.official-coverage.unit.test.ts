@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
-import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
+import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, NORMAS_LEG_BASELINE, normasLegBaseline, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type NormasLegEntry, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
 import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anatomy/charset-policy.js';
@@ -15,19 +15,22 @@ import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anat
 const real = collectSamples();
 test('E9 matrix and samples baseline are regenerated identical to the committed files', () => {
   assert.deepEqual(samplesBaseline(collectSamples([])), JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
+  assert.deepEqual(normasLegBaseline(), JSON.parse(readFileSync(NORMAS_LEG_BASELINE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 10 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 11 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
-    'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+    'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'normas-leg-br--lei--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
-  assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
+  assert.ok(!m.requiredPending.includes('normas-leg-br--lei--grande'), '#305 c.6710099648: the grande cell closes through the NORMAS-LEG baseline');
+  assert.ok(['normas-leg-br--lei--pequeno', 'normas-leg-br--lei--medio'].every((c) => !m.cells.find((x) => x.id === c) || m.requiredPending.includes(c)), 'pequeno/médio stay pending');
   assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
-  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.validated && !s.stages.accepted));
+  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.accepted));
+  assert.deepEqual(leg.map((s) => [s.id, s.stages.validated]).sort(), [['lei-10637-2002-atualizada', true], ['lei-10637-2002-original', false], ['lei-10833-2003-atualizada', true], ['lei-10833-2003-original', false]]);
   // #305 c.6709334910: only the two "atualizada" versions are read, by NORMAS-LEG through the preparation; originals are not.
   for (const s of leg) {
     const upd = s.id.endsWith('-atualizada');
@@ -194,4 +197,24 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
   assert.throws(() => decodeWithPolicy(m1, { httpCharset: 'iso-8859-1' }), CharsetRefused, 'an HTTP charset is used as declared, not the fallback');
   assert.equal(decodeWithPolicy(new TextEncoder().encode('<meta charset="utf-8"><p>é</p>'), { httpCharset: null }).encodingSource, 'declared');
   assert.equal(decodeWithPolicy(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { httpCharset: null }).encodingSource, 'bom');
+});
+
+test('#305 c.6710099648: the NORMAS-LEG lock — validated is derived; any drift of bytes, plan, text, sourceMap, parts, selections or counts un-validates', () => {
+  const base = JSON.parse(readFileSync(NORMAS_LEG_BASELINE, 'utf8')) as { samples: NormasLegEntry[] };
+  const validated = (b: NormasLegEntry[]) => collectSamples(undefined, b).filter((s) => s.id.endsWith('-atualizada')).map((s) => s.stages.validated);
+  assert.deepEqual(validated(base.samples), [true, true]);
+  assert.deepEqual(validated([]), [false, false], 'no baseline ⇒ not validated (no hard-coded validated=true)');
+  const fields: (keyof NormasLegEntry)[] = ['sha256', 'planSha256', 'htmlSha256', 'textSha256', 'sourceMapSha256', 'partsSha256', 'selectionsSha256', 'urn', 'representationId', 'preparationVersion'];
+  for (const k of fields) {
+    const drift = base.samples.map((e, i) => (i === 0 ? { ...e, [k]: `${String(e[k])}x` } : e));
+    assert.deepEqual(validated(drift), [false, true], `drift of ${k}`);
+  }
+  for (const c of ['notes', 'anchors', 'placeholders', 'ambiguous', 'editorialNoteParts', 'candidateSelections'] as const) {
+    const drift = base.samples.map((e, i) => (i === 1 ? { ...e, counts: { ...e.counts, [c]: e.counts[c] + 1 } } : e));
+    assert.deepEqual(validated(drift), [true, false], `drift of counts.${c}`);
+  }
+  assert.deepEqual(base.samples.map((e) => [e.counts.notes, e.counts.placeholders, e.counts.ambiguous]), [[106, 23, 30], [314, 40, 3]]);
+  // Bytes drift is refused before any reading (integrity), never silently re-baselined.
+  const meta = JSON.parse(readFileSync('ops/anatomy/official-identification/leg-normas/lei-10637-2002-atualizada.meta.json', 'utf8')) as { sha256: string; bytes: number };
+  assert.throws(() => verifiedBytes('ops/anatomy/official-identification/leg-normas/lei-10637-2002-atualizada.html', { ...meta, sha256: '0'.repeat(64) }, 'x'), SampleIntegrityError);
 });

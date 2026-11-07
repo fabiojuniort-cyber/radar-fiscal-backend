@@ -12,7 +12,8 @@
  *   accepted   — independent review recorded for that sample (none yet: collection acceptance ≠ anatomy acceptance).
  *
  * Size criterion: canonical characters produced by the engine. pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000.
- * `--write` regenerates docs/anatomy/official-coverage-matrix.json and docs/anatomy/official-samples-baseline.json.
+ * `--write` regenerates docs/anatomy/official-coverage-matrix.json, docs/anatomy/official-samples-baseline.json and
+ * docs/anatomy/normas-leg-samples-baseline.json.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -28,6 +29,8 @@ import { APPROVED_FALLBACK, compareWithIndependent, decodeWithPolicy, PASSAGES }
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
 export const SAMPLES_BASELINE = fileURLToPath(new URL('../../docs/anatomy/official-samples-baseline.json', import.meta.url));
+/** #305 c.6710099648: baseline specific to the two normas.leg.br "atualizada" samples read by NORMAS-LEG. */
+export const NORMAS_LEG_BASELINE = fileURLToPath(new URL('../../docs/anatomy/normas-leg-samples-baseline.json', import.meta.url));
 const LOT_BASELINE = fileURLToPath(new URL('../../docs/anatomy/official-lot-rfb.json', import.meta.url));
 export type Size = 'pequeno' | 'médio' | 'grande';
 export const sizeOf = (chars: number): Size => (chars < 10_000 ? 'pequeno' : chars < 50_000 ? 'médio' : 'grande');
@@ -107,9 +110,43 @@ function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL' | 'NORMAS-LEG', i
   return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken };
 }
 type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
+/**
+ * NORMAS-LEG lock (#305 c.6710099648): one digest per component, so a drift is attributable — bytes/identity, the
+ * preparation plan, canonical text, sourceMap, parts by region, candidate selections by region, and the measured
+ * counts. `validated` is DERIVED: entry equal to the committed baseline AND no invariant broken. Never hard-coded.
+ */
+export interface NormasLegEntry {
+  id: string; sha256: string; bytes: number; urn: string; version: 'atualizada'; representationId: string; profile: 'NORMAS-LEG';
+  preparationVersion: string; htmlSha256: string; planSha256: string; textSha256: string; sourceMapSha256: string; partsSha256: string; selectionsSha256: string;
+  counts: { notes: number; anchors: number; placeholders: number; ambiguous: number; editorialNoteParts: number; candidateSelections: number }; chars: number;
+}
+const canonJson = (v: unknown): string => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, (x as Record<string, unknown>)[k]])) : x));
+export function readNormasLeg(m: { id: string; url: string; urn: string; sha256: string; bytes: number }, bytes: Uint8Array): { entry: NormasLegEntry; invariants: string[]; outputHash: string } {
+  const prep = prepareNormasLegPage({ resourceId: m.id, url: m.url, urn: m.urn, version: 'atualizada', bytes, expected: { sha256: m.sha256, bytes: m.bytes } });
+  const r = analyzeAnatomy({ publicationVersionId: m.id, referenceDate: '2026-11-07', ruleSet: { id: 'official-coverage-matrix', version: '2' },
+    input: { source: 'NORMAS-LEG', representationId: m.id, html: prep.html, normasLeg: prep }, catalog: { edition: 'none', codes: [] } });
+  const candidates = r.eligibility.filter((e) => e.exclusionReasons.every((x) => x === 'missing_approved_evidence')).map((e) => `${e.purpose}@${e.span.start}-${e.span.end}`).sort();
+  const notes = r.parts.filter((x) => x.type === 'editorial_note' && x.contextReasons.some((c) => c.startsWith('normas_leg_')));
+  const broken: string[] = [];
+  if (r.parts.some((x) => x.legalStatus !== 'unknown')) broken.push('legalStatus must stay unknown');
+  if (r.parts.some((x) => x.context === 'historical')) broken.push('NORMAS-LEG never produces historical');
+  if (notes.some((x) => x.context !== 'prohibited')) broken.push('every compilation note is prohibited');
+  if (r.parts.some((x) => (x.contextReasons.includes('normas_leg_revoked_placeholder') || x.contextReasons.includes('normas_leg_note_ambiguous')) && x.context === 'operative_candidate')) broken.push('placeholders/ambiguous blocks are never operative');
+  if (r.eligibility.some((e) => e.eligible)) broken.push('nothing is eligible');
+  if (candidates.some((c) => { const [a, b] = c.split('@')[1]!.split('-').map(Number); return notes.some((n) => n.span.start < b! && a! < n.span.end && a! >= n.span.start && b! <= n.span.end); })) broken.push('no candidate selection inside a note region');
+  if (!r.limitations.some((l) => l.code === 'normas_leg_local_preparation_only')) broken.push('the local-preparation limitation must be recorded');
+  if (r.parts.some((x) => x.type === 'quoted_text' && x.context === 'operative_candidate')) broken.push('quoted text must never be operative');
+  const regions = r.parts.map((x) => ({ type: x.type, span: x.span, context: x.context, reasons: x.contextReasons })).sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end || a.type.localeCompare(b.type));
+  const entry: NormasLegEntry = { id: m.id, sha256: m.sha256, bytes: m.bytes, urn: m.urn, version: 'atualizada', representationId: m.id, profile: 'NORMAS-LEG',
+    preparationVersion: prep.preparationVersion, htmlSha256: prep.htmlSha256, planSha256: prep.plan.planSha256, textSha256: sha(r.canonicalText),
+    sourceMapSha256: sha(canonJson(r.sourceMap)), partsSha256: sha(canonJson(regions)), selectionsSha256: sha(canonJson(candidates)),
+    counts: { ...prep.plan.counts, editorialNoteParts: notes.length, candidateSelections: candidates.length }, chars: r.canonicalText.length };
+  return { entry, invariants: broken, outputHash: r.outputHash };
+}
+const loadNormasLegBaseline = (): NormasLegEntry[] => (existsSync(NORMAS_LEG_BASELINE) ? (JSON.parse(readFileSync(NORMAS_LEG_BASELINE, 'utf8')) as { samples: NormasLegEntry[] }).samples : []);
 const loadBaseline = (): BaselineEntry[] => (existsSync(SAMPLES_BASELINE) ? (JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: BaselineEntry[] }).samples : []);
 
-export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Sample[] {
+export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), normasLegBaseline: NormasLegEntry[] = loadNormasLegBaseline()): Sample[] {
   const out: Sample[] = [];
   const locked = (id: string, s: string, profile: string, rd: Read) => {
     const b = baseline.find((x) => x.id === id);
@@ -153,11 +190,13 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
     const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; url: string; urn: string; sha256: string; bytes: number; titleCheck: { found: boolean } };
     const bytes = verifiedBytes(join(lg, `${m.id}.html`), m, m.id);
     if (m.id.endsWith('-atualizada')) {
-      const prep = prepareNormasLegPage({ resourceId: m.id, url: m.url, urn: m.urn, version: 'atualizada', bytes, expected: { sha256: m.sha256, bytes: m.bytes } });
-      const rd = readWith('NORMAS-LEG', m.id, prep.html, { normasLeg: prep });
-      out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
-        stages: { captured: true, identified: m.titleCheck.found, read: true, validated: false, accepted: false }, profile: 'NORMAS-LEG', diagnostic: null, outputHash: rd.outputHash,
-        evidence: ['test/anatomy.normas-leg.unit.test.ts'], notes: ['lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial); validação pendente de decisão (baseline/invariantes/teste)', ...rd.invariants] });
+      const rd = readNormasLeg(m, bytes);
+      const b = normasLegBaseline.find((x) => x.id === m.id);
+      const ok = rd.invariants.length === 0 && !!b && canonJson(b) === canonJson(rd.entry);
+      out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: rd.entry.chars, size: sizeOf(rd.entry.chars), sha256: m.sha256, bytes: m.bytes,
+        stages: { captured: true, identified: m.titleCheck.found, read: true, validated: ok, accepted: false }, profile: 'NORMAS-LEG', diagnostic: null, outputHash: rd.outputHash,
+        evidence: ok ? ['docs/anatomy/normas-leg-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts', 'test/anatomy.normas-leg.unit.test.ts'] : ['test/anatomy.normas-leg.unit.test.ts'],
+        notes: ['lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)', ...(ok ? [] : ['não validada: linha de base NORMAS-LEG ausente ou divergente']), ...rd.invariants] });
       continue;
     }
     const diag = readWith('DOU', m.id, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
@@ -210,6 +249,18 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
   return out;
 }
 
+/** The NORMAS-LEG lock, computed from the files (regenerated only with --write; written only when invariants hold). */
+export function normasLegBaseline(): { samples: NormasLegEntry[] } {
+  const lg = join(ROOT, 'leg-normas');
+  const samples = readdirSync(lg).filter((x) => /-atualizada\.meta\.json$/u.test(x)).sort().map((f) => {
+    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; url: string; urn: string; sha256: string; bytes: number };
+    const rd = readNormasLeg(m, verifiedBytes(join(lg, `${m.id}.html`), m, m.id));
+    if (rd.invariants.length) throw new Error(`${m.id}: invariants broken, baseline not written: ${rd.invariants.join('; ')}`);
+    return rd.entry;
+  });
+  return { samples };
+}
+
 /** The regression lock for non-RFB samples read with their own profile (regenerated only with --write). */
 export function samplesBaseline(samples: Sample[]): { samples: BaselineEntry[] } {
   return { samples: samples.filter((s) => s.profile && s.outputHash && s.source !== 'RFB' && s.notes.length === 0)
@@ -238,6 +289,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   if (process.argv.includes('--write')) {
     const first = collectSamples([]);
     writeFileSync(SAMPLES_BASELINE, `${JSON.stringify(samplesBaseline(first), null, 2)}\n`);
+    writeFileSync(NORMAS_LEG_BASELINE, `${JSON.stringify(normasLegBaseline(), null, 2)}\n`);
   }
   const m = buildMatrix();
   if (process.argv.includes('--write')) writeFileSync(MATRIX_FILE, `${JSON.stringify(m, null, 2)}\n`);

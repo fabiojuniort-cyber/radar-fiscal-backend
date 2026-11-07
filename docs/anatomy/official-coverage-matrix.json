@@ -430,17 +430,19 @@
         "captured": true,
         "identified": true,
         "read": true,
-        "validated": false,
+        "validated": true,
         "accepted": false
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
       "outputHash": "fd55a0e46deb03939639ba38fd33e6d1f1b8b0fc2684345e24dfddc6a2d5a8cf",
       "evidence": [
+        "docs/anatomy/normas-leg-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts",
         "test/anatomy.normas-leg.unit.test.ts"
       ],
       "notes": [
-        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial); validação pendente de decisão (baseline/invariantes/teste)"
+        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
       ]
     },
     {
@@ -483,17 +485,19 @@
         "captured": true,
         "identified": true,
         "read": true,
-        "validated": false,
+        "validated": true,
         "accepted": false
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
       "outputHash": "328f25997e4744fbd89ac112e89435753675a3f0867ccca2744563d097ff791c",
       "evidence": [
+        "docs/anatomy/normas-leg-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts",
         "test/anatomy.normas-leg.unit.test.ts"
       ],
       "notes": [
-        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial); validação pendente de decisão (baseline/invariantes/teste)"
+        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
       ]
     },
     {
@@ -1120,31 +1124,13 @@
         "required": true
       },
       "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "lei-10637-2002-atualizada",
+        "lei-10833-2003-atualizada"
+      ],
       "accepted": false,
-      "unvalidatedSamples": [
-        {
-          "id": "lei-10637-2002-atualizada",
-          "stages": {
-            "captured": true,
-            "identified": true,
-            "read": true,
-            "validated": false,
-            "accepted": false
-          }
-        },
-        {
-          "id": "lei-10833-2003-atualizada",
-          "stages": {
-            "captured": true,
-            "identified": true,
-            "read": true,
-            "validated": false,
-            "accepted": false
-          }
-        }
-      ]
+      "unvalidatedSamples": []
     },
     {
       "id": "confaz--convenio-icms--pequeno",
@@ -1759,7 +1745,6 @@
     "planalto--lei--grande",
     "normas-leg-br--lei--pequeno",
     "normas-leg-br--lei--medio",
-    "normas-leg-br--lei--grande",
     "confaz--convenio-icms--pequeno",
     "confaz--convenio-icms--medio",
     "confaz--ajuste-sinief--pequeno",
@@ -1794,7 +1779,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 10,
+  "coveredRequired": 11,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }
