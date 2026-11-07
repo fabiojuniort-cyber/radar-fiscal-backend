@@ -3,6 +3,7 @@ import type { AnatomyPart, AnatomyResult } from './contract.js';
 import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, type RecoveryDecision, type ShadowContext } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 import { verifySefazSpPortalProvenance, type SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
+import { verifyRfbQuoteResumePlan, type RfbQuoteResumePlan } from './rfb-quote-resume.js';
 
 export class SefazSpProvenanceError extends TypeError {
   readonly code = 'sefaz_sp_portal_provenance_unverified';
@@ -22,6 +23,11 @@ export interface AnatomyReaderInput {
    * resource `representationId`. Required (fail-closed) for source SEFAZ-SP-PORTAL; ignored for every other source.
    */
   sefazSpPortal?: SefazSpPortalPreparation | undefined;
+  /**
+   * ANAT-L20: plan issued by planRfbQuoteResume for this exact HTML and representationId (source RFB only). It can only
+   * add the review signal `rfb_quote_unclosed_resume_candidate`; parts, contexts, types and sourceMap never change.
+   */
+  rfbQuoteResume?: RfbQuoteResumePlan | undefined;
 }
 export type AnatomyReaderResult = Pick<AnatomyResult, 'canonicalText' | 'parts' | 'sourceMap' | 'coverage' | 'limitations' | 'status'>;
 export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, maxDepth: 128, maxNodes: 50_000 });
@@ -462,6 +468,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     });
   };
   let openQuotation = false;
+  const quoteOpened: { at: { start: number; end: number; span: { start: number; end: number } } | null } = { at: null };
   // ANAT-D04: RFB segment types declared by the source document (`data-rfb-*` written by prepareRfbRepresentation from
   // its own tiposSegmento table). The text grammar stays first; a declared type only fills a block the grammar left
   // unidentified. A declared type that contradicts the grammar, a missing/unknown/conflicting type, or the source's own
@@ -524,7 +531,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       const text = matchText(node).trim();
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
-      if (rules.quoteOpen.test(text)) openQuotation = true;
+      if (rules.quoteOpen.test(text)) { if (!openQuotation) quoteOpened.at = { start: node.start, end: node.end, span: { ...node.span } }; openQuotation = true; }
       // ANAT-L21 (decisão do Fábio, #116 c.6671833324): in the proven Sefaz-SP portal only, a run of U+200B (zero-width
       // space) at the very START of a block is ignored when recognising the block's marker. It is a matching view only:
       // the canonical text, spans and hashes keep every character. U+200B elsewhere, other invisible characters and
@@ -562,6 +569,20 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     for (const child of node.children) walk(child, context, quotedDom, rfbSeg, spPortal);
   };
   walk(dom);
+  // ANAT-L20 (#293 §17): review signal only. With a verified plan whose candidate opening is the segment where the
+  // reader's quotation opened and stayed open to the end, record the candidate and its evidence. No part is touched.
+  const resume = input.source === 'RFB' && input.html !== undefined
+    && verifyRfbQuoteResumePlan(input.rfbQuoteResume, input.html, input.representationId) ? input.rfbQuoteResume!.candidate : null;
+  const openedAt = quoteOpened.at;
+  if (resume && openQuotation && openedAt && openedAt.end > resume.opening.htmlSpan.start && openedAt.start < resume.opening.htmlSpan.end) {
+    const e = resume.evidence;
+    limitation('rfb_quote_unclosed_resume_candidate', `RFB quotation opened at ordemSegmentoAto ${resume.opening.order} ("Art. ${resume.opening.article}") is never closed; `
+      + `article ${resume.successor.article} (ordemSegmentoAto ${resume.successor.order}) is a resume candidate for HUMAN REVIEW ONLY. Evidence: `
+      + `E1 struck article ${resume.opening.article} at ${e.E1.struckArticleOrder}; E2 no amending formula in [${e.E2.checkedOrders.join(', ')}]; `
+      + `E6 pairs ${e.E6.pairs.map((x) => `${x.struckOrder}/${x.currentOrder} ${x.label}`).join('; ')}; `
+      + `E7 ${e.E7.kind === 'declared_grouping' ? `declared ${e.E7.type} at ${e.E7.order}` : `struck successor pair at ${e.E7.order}`}. `
+      + 'Every part after the opening stays quoted/prohibited; nothing is resumed.', { ...openedAt.span });
+  }
   // Logical containers extend until their next sibling marker; all open containers end with the document.
   for (const open of logical) open.part.span.end = length;
   // Exclusive ownership uses the smallest structural span; uncovered raw text stays explicitly unknown.

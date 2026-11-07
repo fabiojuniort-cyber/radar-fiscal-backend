@@ -8,6 +8,7 @@ import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TE
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
 import { compileProfileRules } from './profile-rules.js';
 import type { SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
+import type { RfbQuoteResumePlan } from './rfb-quote-resume.js';
 
 export const ANATOMY_ENGINE_VERSION = 'anatomy/0.1.0' as const;
 const requestSchema = z.strictObject({
@@ -18,7 +19,9 @@ const requestSchema = z.strictObject({
     html: z.string().optional(), text: z.string().optional(), missingResources: z.array(z.string().min(1)).optional(),
     // ANAT-L17: out-of-band provenance for SEFAZ-SP-PORTAL. Kept by reference (never cloned or rebuilt from data), so
     // only the object issued by prepareSefazSpPortalPage can pass verification; serialized JSON never does.
-    sefazSpPortal: z.custom<SefazSpPortalPreparation>((v) => typeof v === 'object' && v !== null).optional() }),
+    sefazSpPortal: z.custom<SefazSpPortalPreparation>((v) => typeof v === 'object' && v !== null).optional(),
+    // ANAT-L20: the RFB quotation-resume plan, kept by reference like the portal proof (verified in the reader).
+    rfbQuoteResume: z.custom<RfbQuoteResumePlan>((v) => typeof v === 'object' && v !== null).optional() }),
   // A manifest is not proof that attachment contents were read. Unread material is always partial.
   attachments: z.array(z.strictObject({ resourceId: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
     state: z.enum(['missing', 'unprocessed']) })).default([]),
@@ -35,6 +38,7 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   if (request.input.html !== undefined && request.input.text !== undefined) throw new TypeError('Choose one concrete input representation');
   // ANAT-L17: the portal proof belongs to its typed source only; any other source carrying it is refused (no mixing).
   if (request.input.sefazSpPortal !== undefined && request.input.source !== 'SEFAZ-SP-PORTAL') throw new TypeError('sefazSpPortal provenance is only valid for source SEFAZ-SP-PORTAL');
+  if (request.input.rfbQuoteResume !== undefined && request.input.source !== 'RFB') throw new TypeError('rfbQuoteResume plan is only valid for source RFB');
   if (new Set(request.attachments.map(item => item.resourceId)).size !== request.attachments.length) throw new TypeError('Duplicate attachment identity');
   const attachments = [...request.attachments].sort((a, b) => a.resourceId.localeCompare(b.resourceId, 'en'));
   const missingResources = [...new Set([...(request.input.missingResources ?? []),

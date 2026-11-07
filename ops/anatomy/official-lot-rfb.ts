@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { validateRfbJson } from './fetch-official-core.js';
 import { prepareRfbRepresentation, RFB_PREPARATION_VERSION, type JsonPreparation } from '../../src/modules/anatomy/json-preparation.js';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
+import { planRfbQuoteResume } from '../../src/modules/anatomy/rfb-quote-resume.js';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
 
 // R1-LOT-02: portable paths (fileURLToPath handles Windows drive letters and percent-encoding; URL.pathname does not).
@@ -80,7 +81,9 @@ export function analyzeLot(dirOrDirs: string | readonly string[] = LOT_DIRS): { 
     const preparationReconciliation = reconcilePreparation(id, meta.preparation, p);
     const capturedPreparation: CapturedPreparation = { preparationVersion: meta.preparation!.preparationVersion, htmlSha256: meta.preparation!.htmlSha256, pieces: meta.preparation!.pieces };
     const r = analyzeAnatomy({ publicationVersionId: `rfb:${id}`, referenceDate: '2026-11-05', ruleSet: { id: 'official-lot-rfb', version: '1' },
-      input: { source: 'RFB', representationId: `rfb:${id}`, html: p.html }, catalog: { edition: 'none', codes: [] } });
+      input: { source: 'RFB', representationId: `rfb:${id}`, html: p.html,
+        // ANAT-L20: review signal only (#293 §17); parts, contexts and sourceMap are unchanged by it.
+        rfbQuoteResume: planRfbQuoteResume({ resourceId: `rfb:${id}`, bytes: new Uint8Array(body) }, id) }, catalog: { edition: 'none', codes: [] } });
     const partTypes: Record<string, number> = {}; const limitations: Record<string, number> = {}; let unidentifiedChars = 0;
     for (const x of r.parts) { partTypes[x.type] = (partTypes[x.type] ?? 0) + 1; if (x.type === 'unidentified') unidentifiedChars += x.span.end - x.span.start; }
     for (const l of r.limitations) limitations[l.code] = (limitations[l.code] ?? 0) + 1;
