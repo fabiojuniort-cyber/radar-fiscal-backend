@@ -1,0 +1,22 @@
+{
+  "id": "ricms-an2art003",
+  "act": "RICMS/2000 (Decreto 45.490/2000), Anexo II, art. 3º",
+  "url": "https://legislacao.fazenda.sp.gov.br/Paginas/an2art003.aspx",
+  "finalUrl": "https://legislacao.fazenda.sp.gov.br/Paginas/an2art003.aspx",
+  "hops": [
+    "https://legislacao.fazenda.sp.gov.br/Paginas/an2art003.aspx"
+  ],
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "lastModified": "Thu, 05 Nov 2026 18:21:59 GMT",
+  "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+  "bytes": 176447,
+  "consultedAt": "2026-11-05T18:22:01.235Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "html",
+  "verified": false,
+  "reason": "COLETA-02 item 5 (L18): 7 p.revogado dentro de blockquote",
+  "origin": "automated fetch via consultOfficial (COLETA-02)",
+  "promoted": false
+}

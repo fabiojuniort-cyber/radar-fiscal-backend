@@ -13,6 +13,13 @@ export const PROFILE_FORMAT_VERSION = 'ANAT-PROFILE/1' as const;
 /** COORD decision of 19/10/2026. */
 export const PROFILE_LIMITS = Object.freeze({ maxItemsPerField: 64, maxLiteralUtf16: 64, maxProfileBytes: 64 * 1024 });
 export const PROFILE_SOURCES = ['CONFAZ', 'DOU', 'DOE-SP', 'RFB'] as const;
+/**
+ * ANAT-L17: sources the engine reads whose rules are NOT configurable yet (no admin scope, no persisted profile, no
+ * migration). They resolve the default-level profile only — a source/family override for another source (e.g. DOE-SP)
+ * never applies to them — and their protection floor is the shipped default.
+ */
+export const FIXED_PROFILE_SOURCES = ['SEFAZ-SP-PORTAL'] as const;
+export type EngineSource = (typeof PROFILE_SOURCES)[number] | (typeof FIXED_PROFILE_SOURCES)[number];
 
 // A literal is accepted only in its canonical form, so validation and compilation read it the same way (review of
 // PR #249): Unicode NFC, no control characters, no leading/trailing whitespace and, inside, only single U+0020 spaces.
@@ -192,7 +199,7 @@ const scopeKey = (s: ProfileScope) => (s.level === 'default' ? 'default' : s.lev
 
 export interface EffectiveProfile {
   profileVersion: typeof PROFILE_FORMAT_VERSION;
-  target: { source: (typeof PROFILE_SOURCES)[number]; family: string | null };
+  target: { source: EngineSource; family: string | null };
   fields: ProfileFields;
   /** Profiles applied, most general first, with their own hashes (provenance for audit). */
   chain: { scope: ProfileScope; profileHash: string }[];
@@ -206,9 +213,16 @@ export interface EffectiveProfile {
  * is inherited. Exactly one default; at most one profile per scope.
  */
 export function resolveEffectiveProfile(profiles: unknown[], target: { source: string; family?: string | null }): EffectiveProfile {
+  const family = target.family ?? null;
+  const fixed = z.enum(FIXED_PROFILE_SOURCES).safeParse(target.source);
+  if (fixed.success) {
+    if (family !== null) fail('invalid_target', `${fixed.data} has no configurable family profile`);
+    const resolved = resolveChain(profiles, fixed.data, null);
+    assertProtectionFloor(resolved.fields, fixed.data);
+    return resolved;
+  }
   const source = z.enum(PROFILE_SOURCES).safeParse(target.source);
   if (!source.success) fail('invalid_target', `unknown source ${String(target.source)}`);
-  const family = target.family ?? null;
   if (family !== null && !literal.safeParse(family).success) fail('invalid_target', 'invalid family');
   const resolved = resolveChain(profiles, source.data!, family);
   assertProtectionFloor(resolved.fields, source.data!);
@@ -219,20 +233,20 @@ export function resolveEffectiveProfile(profiles: unknown[], target: { source: s
  * The protection floor/ceiling check, also run by the rule compiler, so no caller (analyzeAnatomy, readAnatomyInput
  * with compiled rules, or a direct compileProfileRules call) can obtain matchers below the shipped protections.
  */
-export function assertProtectionFloor(fields: ProfileFields, source: (typeof PROFILE_SOURCES)[number]): void {
+export function assertProtectionFloor(fields: ProfileFields, source: EngineSource): void {
   const weakened = protectionIssues(fields, shippedFields(source));
   if (weakened.length) fail('protection_weakened', weakened.join('; '));
 }
 
 const shipped = new Map<string, ProfileFields>();
 /** The shipped DEFAULT_PROFILES resolved for a source: the protection floor/ceiling for any configuration. */
-function shippedFields(source: (typeof PROFILE_SOURCES)[number]): ProfileFields {
+function shippedFields(source: EngineSource): ProfileFields {
   let f = shipped.get(source);
   if (!f) { f = resolveChain([...DEFAULT_PROFILES], source, null).fields; shipped.set(source, f); }
   return f;
 }
 
-function resolveChain(profiles: unknown[], source: (typeof PROFILE_SOURCES)[number], family: string | null): EffectiveProfile {
+function resolveChain(profiles: unknown[], source: EngineSource, family: string | null): EffectiveProfile {
   const valid = profiles.map(validateProfile);
   const byScope = new Map<string, AnatomyProfile>();
   for (const p of valid) {
