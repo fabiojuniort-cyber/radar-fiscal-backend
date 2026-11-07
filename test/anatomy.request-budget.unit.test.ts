@@ -169,3 +169,18 @@ test('R3: before every send the grant is re-validated on disk — suspended, exp
   await assert.rejects(d.fetcher('Portaria', 'capture', ok.f)('https://x/3'), /changed outside this run/u); d.close();
   assert.equal(ok.calls(), 0, 'nothing was sent');
 });
+
+test('R4: acts already stored by an earlier session are skipped BEFORE any capture (no wasted request, no failed exclusive write)', async () => {
+  const f = fileWith(state(grant({ total: 3, perType: { Portaria: 3 } })));
+  const out = mkdtempSync(join(tmpdir(), 'p2c-'));
+  writeFileSync(join(out, '142967.json'), '{"stored":"earlier session"}');
+  const act = (idAto: number, ementa: string) => ({ idAto, numeroAto: String(idAto), anoAto: '2025', tipoAto: { nomeTipoAto: 'Portaria' }, ementa, internet: '1' });
+  const urls: string[] = [];
+  const t = (async (url: string) => { urls.push(String(url));
+    return String(url).includes('/indexacao/') ? new Response(JSON.stringify({ atos: [act(142967, 'x'.repeat(300)), act(5, 'y')] }), { status: 200 }) : new Response('{}', { status: 404 }); }) as unknown as typeof fetch;
+  const inv = await runP2c(t, { grantId: 'G-1', owner: 'exec-303', budgetFile: f, outDir: out, only: ['portaria'], plan: { portaria: 3 }, now: NOW });
+  assert.ok(!urls.some((u) => u.includes('/ato/142967/')), 'the stored act was never requested');
+  assert.deepEqual((inv.decisions[0] as { alreadyStored: number[] }).alreadyStored, [142967]);
+  assert.equal(readFileSync(join(out, '142967.json'), 'utf8'), '{"stored":"earlier session"}', 'stored bytes untouched');
+  assert.equal(read(f).used.total, urls.length, 'every request sent was debited');
+});

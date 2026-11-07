@@ -8,7 +8,7 @@
  * not found is recorded, never read as "does not exist". Nothing is promoted; no production write.
  *   NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=… npx tsx ops/anatomy/collect-p2c.ts
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { BudgetRefused, RequestBudget } from './request-budget.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,6 +62,9 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
   const log: Log[] = []; const decisions: Record<string, unknown>[] = []; let acts = 0;
   try {
     mkdirSync(outDir, { recursive: true });
+    // R4 (found before any request, #303): acts already stored in this folder (earlier sessions) are never captured
+    // again — that would spend a request and then fail the exclusive write. Checked offline, before any send.
+    const stored = new Set(readdirSync(outDir).filter((f) => /^\d+\.json$/u.test(f)).map((f) => Number(f.slice(0, -5))));
     for (const t0 of types) {
       const t = { ...t0, termo: opts.termo?.[t0.key] ?? t0.termo };
       const searchFetch = budget.fetcher(t.type, 'search', doFetch);
@@ -81,7 +84,8 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
         decisions.push({ type: t.type, outcome: e instanceof BudgetRefused ? `budget: ${e.message}` : `search failed: ${(e as Error).message} — debited, not read as absence` });
         if (e instanceof BudgetRefused && budget.remaining() === 0) break; continue;
       }
-      const eligible = found.filter((a) => !isReserved(t.key, a));
+      const alreadyStored = found.filter((a) => stored.has(a.idAto)).map((a) => a.idAto);
+      const eligible = found.filter((a) => !isReserved(t.key, a) && !stored.has(a.idAto));
       const byLen = [...eligible].sort((a, b) => (b.ementa?.length ?? 0) - (a.ementa?.length ?? 0));
       const order = [byLen[0], byLen[Math.floor(byLen.length / 2)], byLen[byLen.length - 1], byLen[1], byLen[byLen.length - 2]].filter((x, i, arr): x is Act => !!x && arr.findIndex((y) => y?.idAto === x.idAto) === i);
       const kept = new Map<Size, number>(); const tried: Record<string, unknown>[] = [];
@@ -99,12 +103,13 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
         } catch (e) { tried.push({ idAto: a.idAto, outcome: `captured but not preparable/readable: ${(e as Error).message.slice(0, 160)} (bytes not stored)` }); continue; }
         const size = sizeOf(chars);
         if (kept.has(size)) { tried.push({ idAto: a.idAto, chars, size, outcome: `captured but discarded: size ${size} already kept (bytes not stored)` }); continue; }
+        if (existsSync(join(outDir, `${a.idAto}.json`))) { tried.push({ idAto: a.idAto, outcome: 'captured but already stored (bytes not overwritten)' }); continue; }
         writeFileSync(join(outDir, `${a.idAto}.json`), r.body, { flag: 'wx' });
         writeFileSync(join(outDir, `${a.idAto}.meta.json`), `${JSON.stringify({ ...r.meta, origin: `automated fetch via consultOfficial (E9 P2-c, grant ${opts.grantId})`, promoted: false,
           p2c: { type: t.type, termo: t.termo, grantId: opts.grantId, measuredChars: chars, size } }, null, 2)}\n`, { flag: 'wx' });
         kept.set(size, a.idAto); acts++; tried.push({ idAto: a.idAto, chars, size, outcome: 'kept' });
       }
-      decisions.push({ type: t.type, termo: t.termo, remainingForType: budget.remaining(t.type), searchResultsOfType: found.length, eligibleAfterReservedCheck: eligible.length,
+      decisions.push({ type: t.type, termo: t.termo, remainingForType: budget.remaining(t.type), searchResultsOfType: found.length, alreadyStored, eligibleAfterReservedCheck: eligible.length,
         tried, kept: Object.fromEntries(kept), sizesNotFound: (['pequeno', 'médio', 'grande'] as const).filter((s) => !kept.has(s)) });
     }
   } finally { budget.close(); }
