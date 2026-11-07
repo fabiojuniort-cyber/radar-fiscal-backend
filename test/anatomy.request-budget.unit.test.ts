@@ -111,3 +111,61 @@ test('year filter (option b): if the API still returns 2026 acts the type stops 
   assert.equal(t.calls(), 1, 'only the search was sent'); assert.match(String(inv.decisions[0]!.outcome), /year filter NOT applied/u);
   assert.equal(read(f).used.total, 1);
 });
+
+// R3 of #303 (c.6709334225): lease before read; refused open releases its lease; closed instance; re-validation per send.
+test('R3: the lease is taken BEFORE the state is read — a concurrent open is refused and the run decides on the fresh state', () => {
+  const f = fileWith(state());
+  let inside = false;
+  const b = RequestBudget.open(f, who(1), NOW, () => {
+    inside = true;
+    assert.equal(existsSync(`${f}.lock`), true, 'lease held before the read');
+    assert.throws(() => RequestBudget.open(f, who(1), NOW), /lease/u, 'a concurrent open during the read is refused');
+    // A run that consumed balance just before this read (simulated write): the open must see it, never a stale snapshot.
+    const s = read(f); s.used = { total: 2, perType: { Portaria: 2 } };
+    s.attempts = [1, 2].map((n) => ({ n, type: 'Portaria', kind: 'capture', url: `https://x/${n}`, debitedAt: NOW().toISOString(), state: 'settled', outcome: 'HTTP 200', settledAt: NOW().toISOString() }));
+    writeFileSync(f, JSON.stringify(s));
+  });
+  assert.ok(inside); assert.equal(b.remaining(), 1, 'remaining computed from the state read under the lease');
+  assert.throws(() => b.debit('Portaria', 'capture', 'https://x/3'), /cap for Portaria exhausted/u, 'per-type cap from the fresh state');
+  b.close();
+});
+
+test('R3: a refused open releases the lease it took, and never removes a lease it did not take', () => {
+  const f = fileWith(state());
+  assert.throws(() => RequestBudget.open(f, who(25), NOW), /exceeds the remaining 3/u);
+  assert.equal(existsSync(`${f}.lock`), false, 'no lock left by a refused open');
+  const g = fileWith(state(grant({ status: 'suspended' })));
+  assert.throws(() => RequestBudget.open(g, who(1), NOW), /suspended/u); assert.equal(existsSync(`${g}.lock`), false);
+  writeFileSync(`${f}.lock`, '{"owner":"someone else"}');
+  assert.throws(() => RequestBudget.open(f, who(1), NOW), /lease/u); assert.equal(existsSync(`${f}.lock`), true, 'a foreign lock is kept');
+  unlinkSync(`${f}.lock`);
+  RequestBudget.open(f, who(1), NOW).close();
+});
+
+test('R3: a closed budget refuses every later debit, settle and send — zero network, ledger preserved', async () => {
+  const f = fileWith(state()); const b = RequestBudget.open(f, who(2), NOW);
+  const ok = fakeFetch(() => new Response('{}', { status: 200 }));
+  const send = b.fetcher('Portaria', 'capture', ok.f);
+  await send('https://x/1'); b.close();
+  const before = readFileSync(f, 'utf8');
+  assert.throws(() => b.debit('Portaria', 'capture', 'https://x/2'), /closed/u);
+  assert.throws(() => b.settle(1, 'HTTP 200'), /closed/u);
+  assert.throws(() => b.fetcher('Portaria', 'capture', ok.f), /closed/u);
+  await assert.rejects(send('https://x/3'), /closed/u, 'a fetcher obtained before close cannot send either');
+  assert.equal(ok.calls(), 1); assert.equal(readFileSync(f, 'utf8'), before, 'ledger unchanged after close');
+});
+
+test('R3: before every send the grant is re-validated on disk — suspended, expired or externally changed state refuses with zero network', async () => {
+  const ok = fakeFetch(() => new Response('{}', { status: 200 }));
+  const f = fileWith(state()); const b = RequestBudget.open(f, who(2), NOW);
+  const s = read(f); s.grant!.status = 'suspended'; writeFileSync(f, JSON.stringify(s));
+  await assert.rejects(b.fetcher('Portaria', 'capture', ok.f)('https://x/1'), /suspended/u); b.close();
+  let t = NOW(); const clock = () => t;
+  const g = fileWith(state()); const c = RequestBudget.open(g, who(2), clock);
+  t = new Date('2026-11-08T00:00:01Z');
+  await assert.rejects(c.fetcher('Portaria', 'capture', ok.f)('https://x/2'), /expired/u); c.close();
+  const h = fileWith(state()); const d = RequestBudget.open(h, who(2), NOW);
+  const x = read(h); x.used = { total: 1, perType: { Portaria: 1 } }; x.attempts = [{ n: 1, type: 'Portaria', kind: 'capture', url: 'https://x/z', debitedAt: NOW().toISOString(), state: 'sent', outcome: null, settledAt: null }]; writeFileSync(h, JSON.stringify(x));
+  await assert.rejects(d.fetcher('Portaria', 'capture', ok.f)('https://x/3'), /changed outside this run/u); d.close();
+  assert.equal(ok.calls(), 0, 'nothing was sent');
+});

@@ -10,6 +10,11 @@
  * - A local lease (exclusive lock file) refuses a concurrent or re-entrant run on this checkout. A stale lock after a
  *   crash is NOT broken automatically: it refuses until a person inspects the state. The lock does not coordinate
  *   different checkouts/machines — that is the single owner's job (the grant names one owner).
+ * - R3 (#303 c.6709334225): the lease is acquired BEFORE the state is read and validated, so no run can decide on a
+ *   stale snapshot; a refused open releases the lease it took (never a lease it did not take). Before EVERY debit the
+ *   state is re-read from disk under the lease and must be exactly the one this run last wrote, with the grant still
+ *   active, unexpired and the same grant/owner/package. close() invalidates the instance: any later debit, settle or
+ *   send is refused (nothing is sent).
  */
 import { closeSync, existsSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
 
@@ -44,33 +49,55 @@ export function invalidState(s: unknown): string | null {
   return null;
 }
 
-export class RequestBudget {
-  private constructor(private readonly file: string, private readonly lock: string, private state: BudgetState, private readonly now: () => Date) {}
+type Who = { grantId: string; owner: string; package: string };
+/** Reads and validates the state file; the grant must be active, unexpired and the caller's. Throws BudgetRefused. */
+function readActive(file: string, who: Who, now: () => Date): BudgetState {
+  if (!existsSync(file)) throw new BudgetRefused('budget state is missing');
+  let parsed: unknown;
+  try { parsed = JSON.parse(readFileSync(file, 'utf8')); } catch { throw new BudgetRefused('budget state is not valid JSON'); }
+  const bad = invalidState(parsed); if (bad) throw new BudgetRefused(`budget state is invalid: ${bad}`);
+  const s = parsed as BudgetState; const g = s.grant;
+  if (!g) throw new BudgetRefused('no grant: nothing may be sent');
+  if (g.status !== 'active') throw new BudgetRefused(`grant ${g.grantId} is ${g.status}`);
+  if (Date.parse(g.expiresAt) <= now().getTime()) throw new BudgetRefused(`grant ${g.grantId} expired at ${g.expiresAt}`);
+  if (g.grantId !== who.grantId || g.owner !== who.owner || g.package !== who.package) throw new BudgetRefused('grant id, owner or package differs from the caller');
+  return s;
+}
 
-  /** Opens the budget for one run. Refuses (throws BudgetRefused) unless everything holds; acquires the local lease. */
-  static open(file: string, who: { grantId: string; owner: string; package: string; requested: { total: number; perType?: Record<string, number> } }, now = () => new Date()): RequestBudget {
+export class RequestBudget {
+  private closed = false;
+  private constructor(private readonly file: string, private readonly lock: string, private state: BudgetState, private readonly who: Who, private readonly now: () => Date) {}
+
+  /**
+   * Opens the budget for one run. Acquires the local lease FIRST, then reads and validates the state under it; any
+   * refusal releases the lease this call took. `onLeased` is a test seam (deterministic interleaving), called right
+   * after the lease is taken and before the state is read.
+   */
+  static open(file: string, who: Who & { requested: { total: number; perType?: Record<string, number> } }, now = () => new Date(), onLeased?: () => void): RequestBudget {
     if (!existsSync(file)) throw new BudgetRefused('budget state is missing');
-    let parsed: unknown;
-    try { parsed = JSON.parse(readFileSync(file, 'utf8')); } catch { throw new BudgetRefused('budget state is not valid JSON'); }
-    const bad = invalidState(parsed); if (bad) throw new BudgetRefused(`budget state is invalid: ${bad}`);
-    const s = parsed as BudgetState; const g = s.grant;
-    if (!g) throw new BudgetRefused('no grant: nothing may be sent');
-    if (g.status !== 'active') throw new BudgetRefused(`grant ${g.grantId} is ${g.status}`);
-    if (Date.parse(g.expiresAt) <= now().getTime()) throw new BudgetRefused(`grant ${g.grantId} expired at ${g.expiresAt}`);
-    if (g.grantId !== who.grantId || g.owner !== who.owner || g.package !== who.package) throw new BudgetRefused('grant id, owner or package differs from the caller');
-    if (!isInt(who.requested.total) || who.requested.total < 1) throw new BudgetRefused('requested total must be a positive integer');
-    const remaining = g.total - s.used.total;
-    if (who.requested.total > remaining) throw new BudgetRefused(`requested ${who.requested.total} exceeds the remaining ${remaining} of grant ${g.grantId}`);
-    for (const [t, q] of Object.entries(who.requested.perType ?? {})) {
-      if (!isInt(q) || !(t in g.perType)) throw new BudgetRefused(`type ${t} is not in grant ${g.grantId}`);
-      if (q > g.perType[t]! - (s.used.perType[t] ?? 0)) throw new BudgetRefused(`requested ${q} for ${t} exceeds its remaining cap`);
-    }
     const lock = `${file}.lock`;
     let fd: number;
     try { fd = openSync(lock, 'wx'); } catch { throw new BudgetRefused('another run holds the lease (or a crashed run left it): inspect the state before removing the lock'); }
-    writeSync(fd, JSON.stringify({ owner: who.owner, grantId: who.grantId, pid: process.pid, at: now().toISOString() })); closeSync(fd);
-    return new RequestBudget(file, lock, s, now);
+    try {
+      writeSync(fd, JSON.stringify({ owner: who.owner, grantId: who.grantId, pid: process.pid, at: now().toISOString() })); closeSync(fd);
+      onLeased?.();
+      const s = readActive(file, who, now); const g = s.grant!;
+      if (!isInt(who.requested.total) || who.requested.total < 1) throw new BudgetRefused('requested total must be a positive integer');
+      const remaining = g.total - s.used.total;
+      if (who.requested.total > remaining) throw new BudgetRefused(`requested ${who.requested.total} exceeds the remaining ${remaining} of grant ${g.grantId}`);
+      for (const [t, q] of Object.entries(who.requested.perType ?? {})) {
+        if (!isInt(q) || !(t in g.perType)) throw new BudgetRefused(`type ${t} is not in grant ${g.grantId}`);
+        if (q > g.perType[t]! - (s.used.perType[t] ?? 0)) throw new BudgetRefused(`requested ${q} for ${t} exceeds its remaining cap`);
+      }
+      return new RequestBudget(file, lock, s, { grantId: who.grantId, owner: who.owner, package: who.package }, now);
+    } catch (e) {
+      // Release only the lease this call created (a refused open never leaves a lock behind).
+      try { unlinkSync(lock); } catch { /* already gone */ }
+      throw e;
+    }
   }
+
+  private assertOpen(): void { if (this.closed) throw new BudgetRefused('budget is closed: no further debit, settle or send'); }
 
   private persist(): void {
     const tmp = `${this.file}.tmp`;
@@ -79,6 +106,12 @@ export class RequestBudget {
 
   /** Debits one attempt and PERSISTS it before returning; refuses beyond the per-type or total cap. */
   debit(type: string, kind: string, url: string): number {
+    this.assertOpen();
+    if (!existsSync(this.lock)) throw new BudgetRefused('the lease is gone: nothing may be sent');
+    // Re-read under the lease: the grant must still be active/unexpired and the state exactly what this run wrote.
+    const disk = readActive(this.file, this.who, this.now);
+    if (JSON.stringify({ used: disk.used, attempts: disk.attempts }) !== JSON.stringify({ used: this.state.used, attempts: this.state.attempts })) throw new BudgetRefused('budget state changed outside this run');
+    this.state = disk;
     const g = this.state.grant!;
     if (!(type in g.perType)) throw new BudgetRefused(`type ${type} is not in the grant`);
     if (this.state.used.total + 1 > g.total) throw new BudgetRefused('grant total exhausted');
@@ -91,6 +124,7 @@ export class RequestBudget {
   }
 
   settle(n: number, outcome: string): void {
+    this.assertOpen();
     const a = this.state.attempts[n - 1]; if (!a || a.state !== 'sent') throw new Error(`attempt ${n} cannot be settled`);
     a.state = 'settled'; a.outcome = outcome.slice(0, 300); a.settledAt = this.now().toISOString(); this.persist();
   }
@@ -102,6 +136,7 @@ export class RequestBudget {
 
   /** fetch wrapper: debit → send with redirect:'manual' → settle (status, redirect target, error or timeout). */
   fetcher(type: string, kind: string, doFetch: typeof fetch): typeof fetch {
+    this.assertOpen();
     return (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input instanceof Request ? input.url : input);
       const n = this.debit(type, kind, url);
@@ -117,5 +152,5 @@ export class RequestBudget {
     }) as typeof fetch;
   }
 
-  close(): void { if (existsSync(this.lock)) unlinkSync(this.lock); }
+  close(): void { if (this.closed) return; this.closed = true; if (existsSync(this.lock)) unlinkSync(this.lock); }
 }
