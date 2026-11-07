@@ -16,7 +16,7 @@ Os bytes estão gravados sem edição. URL, data, HTTP, tipo, SHA-256, bytes, UR
 | lei-10833-2003-original | M2 | texto original | 308.155 | `60044e68…` | "LEI Nº 10.833, DE 29 DE DEZEMBRO DE 2003" |
 | lei-10833-2003-atualizada | M2 | versão atualizada | 388.543 | `c5ca0d93…` | "LEI Nº 10.833, DE 29 DE DEZEMBRO DE 2003" |
 
-**Leitura local** (motor `0e009431`, **perfil DOU**; métrica de diagnóstico, não baseline). Não existe perfil de leitura para esta fonte; criar um exige decisão e escopo próprios.
+**Leitura local histórica** (motor `0e009431`, **perfil DOU**; métrica de diagnóstico, não baseline). Desde a L-LEG-01 (#305), as **duas versões atualizadas** são lidas pela fonte tipada `NORMAS-LEG` (`prepareNormasLegPage`, prova local ligada a bytes/URN/versão/`representationId`): na matriz E9 ficam `read`, **não** `validated` nem `accepted`. Os **textos originais** não têm esse plano e continuam só com o diagnóstico DOU.
 
 | id | Caracteres | Não identificado | Artigos | Parágrafos | Incisos | Alíneas | `quoted_text` | `historical` |
 |---|---|---|---|---|---|---|---|---|
@@ -25,7 +25,7 @@ Os bytes estão gravados sem edição. URL, data, HTTP, tipo, SHA-256, bytes, UR
 | 10.833 original | 110.418 | 550 | 94 | 131 | 139 | 39 | 159 | 0 |
 | 10.833 atualizada | 167.570 | 908 | 115 | 222 | 236 | 54 | 148 | 0 |
 
-**Lacuna observada (sem correção; depende de decisão):**
-- **L-LEG-01:** na versão atualizada, as notas de redação ("(Redação dada pela Lei nº …)", "(Revogado pela …)", "(Vide …)") e os dispositivos revogados não são reconhecidos como nota editorial nem como redação anterior. Nenhuma parte fica `historical`.
+**Lacuna observada (tratada na L-LEG-01, #305 — ver `docs/anatomy/L-LEG-01-DESIGN.md` §12):**
+- **L-LEG-01 (antes da fonte própria):** na versão atualizada, as notas de redação ("(Redação dada pela Lei nº …)", "(Revogado pela …)", "(Vide …)") e os dispositivos revogados não são reconhecidos como nota editorial nem como redação anterior. Nenhuma parte fica `historical`.
 
 O texto em si não muda: a anatomia continua fiel (sem perda nem reordenação), mas a interpretação dessas notas fica pendente.
