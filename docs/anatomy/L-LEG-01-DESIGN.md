@@ -131,7 +131,7 @@ O texto canônico, a ordem, os offsets e o `sourceMap` não mudam. A nota vira u
 
 ## 10. Adendo — contracasos da outra sessão (rastreável; frente única)
 
-**Origem:** tribusca-control@`335160c7`, `docs/investigations/e9-inputs/20261107-night/overnight-review/L-LEG-01-ADDENDUM.md` e `lleg-lexical-proof.json`. Não substitui este desenho.
+**Origem:** tribusca-control@`335160c7`, republicado sem perda de encoding em `c90752ec`, `docs/investigations/e9-inputs/20261107-night/overnight-review/L-LEG-01-ADDENDUM.md` e `lleg-lexical-proof.json`. Não substitui este desenho.
 
 **Incorporado:**
 - **Lexemas por representação** (contagem lexical, não contagem de notas): 10.637 original 2/0/0, atualizada 34/20/15; 10.833 original 11/1/0, atualizada 94/37/37 ("Redação dada" / "Revogad" / "Vide").
@@ -154,4 +154,8 @@ O texto canônico, a ordem, os offsets e o `sourceMap` não mudam. A nota vira u
   Em todos: decisão explícita do escopo da região, ou ambiguidade declarada; nunca classificar o parágrafo inteiro por aproximação.
 - **Critérios extras:** decodificação sustentada pela captura (sem heurística); "Redação dada"/"Vide" sozinhos nunca produzem `historical`; redação anterior exige o texto anterior presente e uma fronteira demonstrada.
 
-**Achado na entrega:** `lleg-lexical-proof.json`, como está no commit `335160c7`, **não é JSON válido** (posição 2654: aspas curvas viraram aspas retas sem escape, e há acentos corrompidos). O teste `lleg-proof.test.cjs` da outra sessão falha aqui por isso. Os offsets transcritos no `L-LEG-01-ADDENDUM.md` foram usados na conferência cruzada acima. O arquivo da outra sessão não foi editado; pede-se uma nova publicação com encoding preservado.
+**Achado na entrega e resolução:**
+- No commit `335160c7`, o `lleg-lexical-proof.json` não era JSON válido (aspas curvas viraram retas sem escape; acentos corrompidos).
+- A outra sessão republicou com UTF-8 preservado no commit `c90752ec` (15/15 arquivos conferidos por ela).
+- Nesta sessão, o teste `lleg-proof.test.cjs` dela, executado contra os **nossos** bytes de `leg-normas/`, deu **4/4 PASS**: identidade (SHA e tamanho) e offsets lexicais em bytes e UTF-16, com BOM.
+- É conferência cruzada independente da identidade e dos offsets lexicais, **não** da classificação.

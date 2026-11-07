@@ -9,7 +9,7 @@
     },
     "session2": {
       "requests": 9,
-      "source": "radar-fiscal-backend#303 c.6702168770 (informado: 4 arquivos públicos de descoberta do SPA e 1 consulta por categoria; nenhuma captura; 5 respostas iguais ao shell do SPA) + per-request ledger: tribusca-control@335160c7 docs/investigations/e9-inputs/20261107-night/overnight-review/{p2c-ledger.json,p2c-discovery-manifest.json}",
+      "source": "radar-fiscal-backend#303 c.6702168770 (informado: 4 arquivos públicos de descoberta do SPA e 1 consulta por categoria; nenhuma captura; 5 respostas iguais ao shell do SPA) + per-request ledger: tribusca-control@335160c7 docs/investigations/e9-inputs/20261107-night/overnight-review/{p2c-ledger.json,p2c-discovery-manifest.json} ; definitive per-call file: tribusca-control@c90752ec docs/investigations/e9-inputs/20261107-night/overnight-review/p2c-requests-per-call.json",
       "conservativeDebitReportedBySession2": 25
     }
   },
@@ -354,7 +354,8 @@
   ],
   "gaps": [
     "sessão 2, requisição 1 (index.html, 60.644 bytes): a URL não foi gravada no log original da própria sessão 2 (urlRecordGap); não inferida do corpo",
-    "sessão 2: a \"descoberta compartilhada\" (4 requisições) foi debitada por ela a cada um dos 5 tipos (débito conservador 25); no total FÍSICO combinado contam 4 vezes, uma vez cada"
+    "sessão 2: a \"descoberta compartilhada\" (4 requisições) foi debitada por ela a cada um dos 5 tipos (débito conservador 25); no total FÍSICO combinado contam 4 vezes, uma vez cada",
+    "sessão 2: Content-Type não preservado em 8 das 9 chamadas (declarado pela própria sessão 2 como recordGaps; não reconstruído)"
   ],
   "cause": {
     "proven": "a sessão 2 fez consultas sem conferir o registro publicado pela sessão 1 (declarado pela própria sessão 2 em c.6702168770); as duas sessões consumiram o mesmo pacote sem reserva prévia",
@@ -480,6 +481,10 @@
           "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
         }
       ]
+    },
+    {
+      "at": "2026-11-07T04:40Z",
+      "what": "arquivo por chamada da sessão 2 recebido (c90752ec): 9 chamadas; total físico combinado mantido em 28/25; nenhum saldo"
     }
   ],
   "physicalCheck": {
