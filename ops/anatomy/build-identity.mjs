@@ -3,8 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 // Canonical source form matches Git's LF representation on Linux and Windows.
 // Generated identity is excluded from its own inputs to avoid a recursive hash.
-const files = ['package-lock.json', 'src/modules/anatomy/contract.ts', 'src/modules/anatomy/readers.ts',
-  'src/modules/anatomy/entities.ts', 'src/modules/anatomy/engine.ts', 'src/modules/anatomy/consumer.ts', 'src/modules/anatomy/dou-preparation.ts', 'src/modules/anatomy/gold.ts', 'src/modules/anatomy/json-preparation.ts', 'src/modules/anatomy/profile.ts', 'src/modules/anatomy/profile-rules.ts',
+const files = ['package-lock.json', 'src/modules/anatomy/contract.ts', 'src/modules/anatomy/readers.ts', 'src/modules/anatomy/pdf-reader.ts',
+  'src/modules/anatomy/entities.ts', 'src/modules/anatomy/engine.ts', 'src/modules/anatomy/consumer.ts', 'src/modules/anatomy/dou-preparation.ts', 'src/modules/anatomy/gold.ts', 'src/modules/anatomy/json-preparation.ts', 'src/modules/anatomy/sefaz-sp-preparation.ts', 'src/modules/anatomy/rfb-quote-resume.ts', 'src/modules/anatomy/profile.ts', 'src/modules/anatomy/profile-rules.ts',
   // UNICODE-01b/B2: NFC recovery path, its Unicode 17.0 table and the component manifest (Unicode version, UCD input hashes).
   'src/modules/anatomy/nfc-recovery.ts', 'src/modules/anatomy/nfc-shadow.ts', 'src/modules/anatomy/nfc-shadow-table.ts', 'docs/anatomy/nfc-shadow-manifest.json',
   'ops/anatomy/build-identity.mjs'];

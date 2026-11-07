@@ -11,7 +11,7 @@ export interface SampleInput {
   documentId: string; version: string;
   title: string; source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB'; family: string | null;
   format: 'html' | 'text'; content: string;
-  provenance: { kind: 'synthetic'; note: string } | { kind: 'official'; url: string; consultedAt: string; version: string; reason: string };
+  provenance: { kind: 'synthetic'; note: string } | { kind: 'official'; act: string; url: string; consultedAt: string; version: string; reason: string; snapshotSha256: string };
   /** What this sample exercises (why it is in the set). */
   covers: string[];
 }
