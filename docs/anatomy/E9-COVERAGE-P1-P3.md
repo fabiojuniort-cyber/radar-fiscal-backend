@@ -74,6 +74,18 @@
   - **Leitura:** a extração mistura colunas, então a anatomia **não** é validada.
   - **Conta só como evidência de cabeçalho/rodapé (E4).** As células de E9 (página PDF e IN em HTML no DOU) continuam pendentes.
 
+## 3-c. M9: páginas 57 e 58 (exame conjunto, 07/11 à noite)
+
+- **Página 58:** tribusca-control@`335160c7`, SHA-256 **`abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29`** (completo, conferido), 188.132 bytes, HTTP 200 `application/pdf`, URL `…INPDFViewer?…data=05/12/2024&jornal=515&pagina=58`, 04:18:15Z. Ingerida em `e9-http/M9-p58.*`, com criação exclusiva.
+- **Identidade e localização:** as duas páginas têm o mesmo cabeçalho ("Seção 1 · ISSN 1677-7042 · Nº 234 · quinta-feira, 5 de dezembro de 2024") e rodapés com códigos de autenticidade consecutivos (`…057` e `…058`). A epígrafe da IN 2.237 está na p. 57.
+- **Início, fim e continuação:**
+  - p. 57: fim de outra publicação (CARF) → epígrafe → arts. 1º–8º, até o inciso XIV;
+  - p. 58: começa no inciso XV do art. 8º → arts. 9–19 → assinatura (Robinson Sakiyama Barreirinhas);
+  - depois da assinatura há só o rodapé (0 linhas de conteúdo); nenhum anexo mencionado.
+- **O que não se conclui:** que as duas páginas sejam o ato completo. Anexos publicados em outro lugar, a ordem visual (a extração mistura colunas) e a assinatura criptográfica não foram verificados.
+- **E4:** as duas páginas são **candidatas** a amostra de cabeçalho e rodapé (identificados nas duas, com código e número de página). O aceite é do COORD; não é automático.
+- **E9:** a célula da página PDF do DOU continua **pendente**: não há leitura validada, porque a ordem de colunas exige preparação própria. A célula da IN em HTML no DOU também continua **pendente**: o HTML oficial retornou 403 (registro em `M9-article.error.json` da outra sessão), e a recusa não foi contornada. O PDF não substitui o HTML.
+
 ## 4. P2-c — RFB (`ops/anatomy/collect-p2c.ts`; inventário em `official-identification/rfb-p2c/inventory.json`)
 
 **Limites:** até 5 requisições por tipo e 25 no pacote (busca, captura e redirect contam); até 1 ato por porte; até 15 atos. Atos reservados conferidos antes da captura; atos de 2026 excluídos por margem.
@@ -86,7 +98,7 @@
 | ADE | 2 | rodada 1: só atos de 2026 (margem); rodada 2: falha de rede (registrada) |
 | Solução de Consulta | 2 | a busca devolve primeiro os atos de 2026 (98 de 100), excluídos pela margem |
 
-**Total desta sessão: 19.** Outra sessão informou mais 9 requisições, feitas sem conferir este registro (#303 c.6702168770; nenhum ato capturado). **Total combinado: 28 de 25, 3 acima do limite.** O P2-c está **suspenso**: não há saldo, e retomar exige nova decisão. Esta sessão não fez nenhuma requisição além das 19. "Não encontrado no limite" ≠ "inexistente".
+**Total desta sessão: 19.** O registro consolidado por requisição está em `rfb-p2c/ledger-combined.json`. Outra sessão informou mais 9 requisições, feitas sem conferir este registro (#303 c.6702168770; nenhum ato capturado). **Total combinado: 28 de 25, 3 acima do limite.** O P2-c está **suspenso**: não há saldo, e retomar exige nova decisão. Esta sessão não fez nenhuma requisição além das 19. "Não encontrado no limite" ≠ "inexistente".
 
 **Decisão para uma eventual retomada** (sem saldo hoje): aceitar atos de 2026 não reservados, ou usar o filtro de ano.
 

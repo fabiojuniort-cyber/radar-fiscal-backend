@@ -95,3 +95,37 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const metas = await ingestHttpPackage(dir, zipSha);
   for (const m of metas) console.log(`${m.item} ${m.source} | ${m.type} | ${m.sha256.slice(0, 12)} | charset ${m.declaredCharset} | readable ${m.readable} | ${JSON.stringify(m.identification).slice(0, 120)}`);
 }
+
+/**
+ * A single HTTP capture delivered later by the other session (tribusca-control@335160c7): DOU page 58 of the same
+ * edition. Checked against the full SHA-256 and size announced; the page's own header/footer/continuity are recorded
+ * as findings — the two pages together are NOT presumed to be the complete act.
+ */
+export const PACKAGE_NIGHT = Object.freeze({ repo: PACKAGE.repo, commit: '335160c7ea9f83b3687fb4ce4000448a354fe93e', branch: PACKAGE.branch,
+  path: 'docs/investigations/e9-inputs/20261107-night/official-access/M9-page58.pdf' });
+export async function ingestDouPage58(file: string, http: { url: string; at: string; status: number; headers: { contentType: string } }, expected: { sha256: string; bytes: number }, out = HTTP_DIR): Promise<HttpMeta> {
+  const bytes = new Uint8Array(readFileSync(file));
+  if (bytes.byteLength !== expected.bytes || sha(bytes) !== expected.sha256) throw new HttpIngestError('M9 page 58: bytes differ from the announced SHA-256/size');
+  const url = new URL(http.url);
+  if (url.protocol !== 'https:' || url.hostname !== 'pesquisa.in.gov.br' || url.searchParams.get('pagina') !== '58' || url.searchParams.get('data') !== '05/12/2024') throw new HttpIngestError('M9 page 58: URL is not the official page 58 of 05/12/2024');
+  if (http.status !== 200 || !/^application\/pdf\b/u.test(http.headers.contentType)) throw new HttpIngestError('M9 page 58: HTTP status/type not 200 application/pdf');
+  const r = await extractPdfLines(bytes); const L = r.lines.map((l) => l.text); const text = L.join('\n');
+  const header = L.find((t) => /Se[çc][ãa]o\s+1\b.*ISSN\s+1677-7042.*5\s+de\s+dezembro\s+de\s+2024/u.test(t)) ?? null;
+  const footer = L.find((t) => /in\.gov\.br\/autenticidade\.html,\s*pelo\s+c[óo]digo\s+05152024120500058/u.test(t)) ?? null;
+  const signatureLine = L.findIndex((t) => /ROBINSON SAKIYAMA BARREIRINHAS/u.test(t));
+  if (!header || !footer || r.pages !== 1) throw new HttpIngestError('M9 page 58: header/footer/1 page not confirmed');
+  const arts = [...new Set([...text.matchAll(/Art\.\s*(\d+)º?/gu)].map((m) => Number(m[1])))].sort((a, b) => a - b);
+  const fileName = 'M9-p58.pdf'; const p = join(out, fileName); const mp = join(out, 'M9-p58.meta.json');
+  if (existsSync(p) || existsSync(mp)) throw new HttpIngestError('M9 page 58: already present (never overwritten)');
+  const meta: HttpMeta = { item: 'M9-p58', act: 'IN RFB nº 2.237/2024 na página 58 do DOU', source: 'DOU', type: 'Página do jornal (cabeçalho e rodapé)', url: http.url, retrievedAt: http.at,
+    fileName, sha256: expected.sha256, bytes: expected.bytes, origin: 'resposta HTTP da origem oficial, capturada em outra sessão e entregue por git',
+    package: { ...PACKAGE, commit: PACKAGE_NIGHT.commit, path: PACKAGE_NIGHT.path } as unknown as typeof PACKAGE, manifestOrigin: `HTTP ${http.status} ${http.headers.contentType}`,
+    manifestCoverage: 'single DOU page 58 (continuation)', declaredCharset: null, readable: false, readableNote: null, representation: 'pdf',
+    identification: { pages: r.pages, header, footer, footerCode: '05152024120500058', startsWith: L[1]?.slice(0, 40) ?? null, continuesFromPage57: /^XV\b/u.test(L[1] ?? ''),
+      articlesOnPage: arts, signatureLine, contentAfterSignature: L.slice(signatureLine + 1).filter((t) => !/autenticidade|Documento assinado digitalmente|ICP-Brasil/u.test(t)).length },
+    reach: 'página 58: continua o art. 8º (inciso XV) e vai ao art. 19 e à assinatura; depois da assinatura só o rodapé. Com a página 57: epígrafe → arts. 1–19 → assinatura, sem anexo mencionado. NÃO se presume ato completo: anexos publicados em outro lugar, ordem visual (colunas misturadas na extração) e assinatura criptográfica não foram verificados',
+    promoted: false };
+  writeFileSync(p, bytes, { flag: 'wx' });
+  try { writeFileSync(mp, `${JSON.stringify(meta, null, 2)}\n`, { flag: 'wx' }); } catch (err) { unlinkSync(p); throw err; }
+  return meta;
+}

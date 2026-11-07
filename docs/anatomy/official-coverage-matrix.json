@@ -668,6 +668,30 @@
       "notes": []
     },
     {
+      "id": "http:M9-p58",
+      "source": "DOU",
+      "type": "Página do jornal (cabeçalho e rodapé)",
+      "sha256": "abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29",
+      "bytes": 188132,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "PDF da página do jornal (INPDFViewer)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "página 58: continua o art. 8º (inciso XV) e vai ao art. 19 e à assinatura; depois da assinatura só o rodapé. Com a página 57: epígrafe → arts. 1–19 → assinatura, sem anexo mencionado. NÃO se presume ato completo: anexos publicados em outro lugar, ordem visual (colunas misturadas na extração) e assinatura criptográfica não foram verificados"
+      ]
+    },
+    {
       "id": "http:M9",
       "source": "DOU",
       "type": "Página do jornal (cabeçalho e rodapé)",
@@ -1457,6 +1481,16 @@
       "validatedSamples": [],
       "accepted": false,
       "unvalidatedSamples": [
+        {
+          "id": "http:M9-p58",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": false,
+            "validated": false,
+            "accepted": false
+          }
+        },
         {
           "id": "http:M9",
           "stages": {

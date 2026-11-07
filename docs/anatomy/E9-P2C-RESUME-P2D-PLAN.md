@@ -17,7 +17,10 @@
 **Inventário por requisição:** `ops/anatomy/official-identification/rfb-p2c/ledger-combined.json`.
 - **Sessão 1:** 19 linhas, cada uma com horário, finalidade, tipo de ato, URL sanitizada, resposta, redirecionamentos e captura (do registro próprio `inventory.json`).
 - **Sessão 2:** 9 linhas com o que foi **informado** (4 arquivos públicos de descoberta do SPA + 1 consulta por categoria; nenhuma captura; 5 respostas iguais ao shell do SPA).
-- **Lacunas declaradas:** horário, URL, resposta e redirecionamentos de cada requisição da sessão 2 não foram publicados (pedido em #303 c.6702214892). A categoria das 4 requisições de descoberta também não foi informada. Todas contam no pacote: requisição sem captura não é descontada.
+- **Atualização (adendo):** a sessão 2 publicou o registro por requisição (tribusca-control@`335160c7`). As 9 linhas agora têm horário, URL sanitizada, resposta e hash do corpo.
+  - **Lacuna remanescente:** a URL da requisição 1 (`index.html`) não foi gravada pela própria sessão 2.
+  - Todas contam no pacote; requisição sem captura não é descontada.
+  - O "débito conservador" de 25 informado pela sessão 2 (descoberta debitada a cada tipo) não altera o total **físico** combinado de 28.
 
 **Causa comprovada:** a sessão 2 consultou sem conferir o registro publicado pela sessão 1, como ela mesma declarou, e as duas consumiram o mesmo pacote sem reserva prévia. Nenhuma outra causa ou responsabilidade é afirmada.
 
@@ -57,7 +60,7 @@
 
 ## 3. P2-d / DOE-SP: plano offline (não executar)
 
-**Gate:** só depois da validação de M9. Hoje o M9 tem só a identidade validada (PDF da página 57: cabeçalho, rodapé e epígrafe; alcance E4). A anatomia em HTML não foi validada: o HTML retornou 403, e a página 58 ainda não chegou aqui. **O recebimento do PDF não cumpre o gate. O P2-d fica parado.**
+**Gate:** só depois da validação de M9. Hoje o M9 tem só a identidade validada (PDF da página 57: cabeçalho, rodapé e epígrafe; alcance E4). A página 58 chegou depois e foi ingerida (exame conjunto em `E9-COVERAGE-P1-P3.md` §3-c). A anatomia em HTML não foi validada: o HTML retornou 403. **O recebimento do PDF não cumpre o gate. O P2-d fica parado.**
 
 **Bloqueio adicional:** a API v2 do DOE-SP (`do-api-web-search.doe.sp.gov.br`, usada pelo conector `src/modules/collection/doe-sp.client.ts`) **não está** nos hosts oficiais do gate OFFICIAL-01. O gate aceita `legislacao.fazenda.sp.gov.br` e `www.doe.sp.gov.br`. Executar P2-d pela API v2 exige decidir a inclusão desse host no gate, ou usar o HTML oficial de `www.doe.sp.gov.br`.
 

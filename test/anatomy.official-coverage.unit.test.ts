@@ -33,6 +33,9 @@ test('E9 current state: 10 cells covered, E9 incomplete; nothing promoted or acc
   for (const id of ['http:M1', 'http:M2']) { const x = real.find((s) => s.id === id)!; assert.deepEqual([x.source, x.stages.identified, x.stages.read], ['Planalto', true, false]); }
   const m9 = real.find((s) => s.id === 'http:M9')!;
   assert.deepEqual([m9.source, m9.layout, m9.stages.identified, m9.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]); assert.match(m9.notes[0]!, /CONTINUA/u);
+  const p58 = real.find((s) => s.id === 'http:M9-p58')!;
+  assert.deepEqual([p58.source, p58.layout, p58.stages.identified, p58.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]);
+  assert.match(p58.notes[0]!, /NÃO se presume ato completo/u, 'two pages are never presumed to complete the act');
   assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na') && m.requiredPending.includes('dou--instrucao-normativa--medio'), 'M9 PDF does not stand for the HTML act cell');
 });
 

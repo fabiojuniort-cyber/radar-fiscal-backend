@@ -129,6 +129,29 @@ O texto canônico, a ordem, os offsets e o `sourceMap` não mudam. A nota vira u
 - texto e `sourceMap` sem alteração;
 - nenhum `historical` novo.
 
-## 10. Adendo — contracasos da outra sessão
+## 10. Adendo — contracasos da outra sessão (rastreável; frente única)
 
-A outra sessão anunciou contracasos por bytes (#303 c.6702175097), com destaque para "Redação dada" no texto original e "Ficam revogados" do art. 94, já incorporados como casos 14 e 13. Quando os bytes e offsets dela forem publicados (pedido em #303 c.6702214892), entram aqui **como adendo rastreável** (origem, hash, offsets), sem desenho paralelo.
+**Origem:** tribusca-control@`335160c7`, `docs/investigations/e9-inputs/20261107-night/overnight-review/L-LEG-01-ADDENDUM.md` e `lleg-lexical-proof.json`. Não substitui este desenho.
+
+**Incorporado:**
+- **Lexemas por representação** (contagem lexical, não contagem de notas): 10.637 original 2/0/0, atualizada 34/20/15; 10.833 original 11/1/0, atualizada 94/37/37 ("Redação dada" / "Revogad" / "Vide").
+- **Ponto metodológico:** os spans lexicais provam só a ocorrência da palavra e **não** delimitam a nota. Isso coincide com o §6, que delimita a região da nota inteira.
+- **Conferência cruzada** (bytes da versão atualizada da 10.637): "redação dada" [17089, 17103) está dentro da nota do caso 1 [16846, 17162); "Vide" [17780, 17784) dentro da região do caso 5 [17540, 17835); "Revogada" [20771, 20779) dentro da nota do caso 2 [20590, 20921). **As duas fontes são consistentes.**
+- **Novos contracasos (18–29):**
+  - 18: host da Câmara enganoso por sufixo (`camara.leg.br.example`);
+  - 19: `href` relativo resolvido contra a origem real;
+  - 20: entidade HTML dentro da palavra;
+  - 21: BOM (só os arquivos *originais* têm; os offsets do §6 são das versões *atualizadas*, sem BOM);
+  - 22: caractere fora do BMP antes da região;
+  - 23: nota entre duas frases operativas;
+  - 24: parênteses aninhados ou aspas;
+  - 25: citação de redação antiga;
+  - 26: duas notas consecutivas;
+  - 27: texto revogado preservado × placeholder sem texto;
+  - 28: hash ou tamanho alterado;
+  - 29: mesma URN com representação diferente.
+
+  Em todos: decisão explícita do escopo da região, ou ambiguidade declarada; nunca classificar o parágrafo inteiro por aproximação.
+- **Critérios extras:** decodificação sustentada pela captura (sem heurística); "Redação dada"/"Vide" sozinhos nunca produzem `historical`; redação anterior exige o texto anterior presente e uma fronteira demonstrada.
+
+**Achado na entrega:** `lleg-lexical-proof.json`, como está no commit `335160c7`, **não é JSON válido** (posição 2654: aspas curvas viraram aspas retas sem escape, e há acentos corrompidos). O teste `lleg-proof.test.cjs` da outra sessão falha aqui por isso. Os offsets transcritos no `L-LEG-01-ADDENDUM.md` foram usados na conferência cruzada acima. O arquivo da outra sessão não foi editado; pede-se uma nova publicação com encoding preservado.

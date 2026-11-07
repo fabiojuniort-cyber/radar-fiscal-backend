@@ -164,7 +164,7 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
   }
   // HTTP response bytes captured by another session and delivered by git (official-http-ingest.ts): provenance of their
   // own; encoding never inferred; the DOU PDF page is header/footer evidence, not a validated act anatomy.
-  if (existsSync(HTTP_DIR)) for (const f of readdirSync(HTTP_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {
+  if (existsSync(HTTP_DIR)) for (const f of readdirSync(HTTP_DIR).filter((x) => /^M\d+(-p\d+)?\.meta\.json$/u.test(x)).sort()) {
     const m = JSON.parse(readFileSync(join(HTTP_DIR, f), 'utf8')) as HttpMeta;
     const bytes = verifiedBytes(join(HTTP_DIR, m.fileName), m, `http:${m.item}`);
     const id = `http:${m.item}`;

@@ -9,7 +9,8 @@
     },
     "session2": {
       "requests": 9,
-      "source": "radar-fiscal-backend#303 c.6702168770 (informado: 4 arquivos públicos de descoberta do SPA e 1 consulta por categoria; nenhuma captura; 5 respostas iguais ao shell do SPA)"
+      "source": "radar-fiscal-backend#303 c.6702168770 (informado: 4 arquivos públicos de descoberta do SPA e 1 consulta por categoria; nenhuma captura; 5 respostas iguais ao shell do SPA) + per-request ledger: tribusca-control@335160c7 docs/investigations/e9-inputs/20261107-night/overnight-review/{p2c-ledger.json,p2c-discovery-manifest.json}",
+      "conservativeDebitReportedBySession2": 25
     }
   },
   "combined": 28,
@@ -248,115 +249,112 @@
     {
       "session": "sessão 2 (outra sessão)",
       "n": 1,
-      "at": null,
-      "purpose": "descoberta: arquivo público do SPA",
+      "at": "2026-11-07T04:10:06.9475889Z",
+      "purpose": "descoberta: arquivo público do SPA (compartilhada entre os tipos)",
       "actType": "—",
       "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "response": "200 text/html",
+      "redirects": "nenhum (redirectsFollowed 0)",
+      "capture": "sem captura de ato; corpo 60644 bytes sha256 0e55949dfcf3ce82…",
+      "gap": "URL not stored in original first-request log; do not infer provenance solely from body"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 2,
-      "at": null,
-      "purpose": "descoberta: arquivo público do SPA",
+      "at": "2026-11-07T04:10:24.4915918Z",
+      "purpose": "descoberta: arquivo público do SPA (compartilhada entre os tipos)",
       "actType": "—",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "url": "https://normasinternet2.receita.fazenda.gov.br/main.60aa44047ffb2919.js",
+      "response": "200",
+      "redirects": "nenhum (redirectsFollowed 0)",
+      "capture": "sem captura de ato; corpo 2470816 bytes sha256 46905a069c1b610e…"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 3,
-      "at": null,
-      "purpose": "descoberta: arquivo público do SPA",
+      "at": "2026-11-07T04:11:45.3242621Z",
+      "purpose": "descoberta: arquivo público do SPA (compartilhada entre os tipos)",
       "actType": "—",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "url": "https://normasinternet2.receita.fazenda.gov.br/runtime.fdbb2a6fe41d0fb4.js",
+      "response": "200",
+      "redirects": "nenhum (redirectsFollowed 0)",
+      "capture": "sem captura de ato; corpo 3589 bytes sha256 08316bc64a70d906…"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 4,
-      "at": null,
-      "purpose": "descoberta: arquivo público do SPA",
+      "at": "2026-11-07T04:12:01.0059300Z",
+      "purpose": "descoberta: arquivo público do SPA (compartilhada entre os tipos)",
       "actType": "—",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "url": "https://normasinternet2.receita.fazenda.gov.br/961.fd09e7dba13a79d0.js",
+      "response": "200",
+      "redirects": "nenhum (redirectsFollowed 0)",
+      "capture": "sem captura de ato; corpo 4428 bytes sha256 4d643b6e14a774d5…"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 5,
-      "at": null,
-      "purpose": "consulta por categoria",
+      "at": "2026-11-07T04:12:31.6324592Z",
+      "purpose": "consulta por categoria (sijut2consulta)",
       "actType": "Portaria",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "url": "https://normas.receita.fazenda.gov.br/sijut2consulta/consulta.action?termoBusca=…",
+      "response": 200,
+      "redirects": "nenhum",
+      "capture": "sem captura: SPA_SHELL_NO_ACT_IDENTITY (shell SPA 45247 bytes sha256 9f9413e20884b246…; absenceProven false)",
+      "actTypeSource": "decodificado do parâmetro termoBusca da URL (o campo type do arquivo de origem tem caracteres corrompidos)"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 6,
-      "at": null,
-      "purpose": "consulta por categoria",
-      "actType": "ADI",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "at": "2026-11-07T04:12:31.7695641Z",
+      "purpose": "consulta por categoria (sijut2consulta)",
+      "actType": "Ato Declaratório Interpretativo",
+      "url": "https://normas.receita.fazenda.gov.br/sijut2consulta/consulta.action?termoBusca=…",
+      "response": 200,
+      "redirects": "nenhum",
+      "capture": "sem captura: SPA_SHELL_NO_ACT_IDENTITY (shell SPA 45247 bytes sha256 9f9413e20884b246…; absenceProven false)",
+      "actTypeSource": "decodificado do parâmetro termoBusca da URL (o campo type do arquivo de origem tem caracteres corrompidos)"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 7,
-      "at": null,
-      "purpose": "consulta por categoria",
-      "actType": "ADE",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "at": "2026-11-07T04:12:31.6332397Z",
+      "purpose": "consulta por categoria (sijut2consulta)",
+      "actType": "Ato Declaratório Executivo",
+      "url": "https://normas.receita.fazenda.gov.br/sijut2consulta/consulta.action?termoBusca=…",
+      "response": 200,
+      "redirects": "nenhum",
+      "capture": "sem captura: SPA_SHELL_NO_ACT_IDENTITY (shell SPA 45247 bytes sha256 9f9413e20884b246…; absenceProven false)",
+      "actTypeSource": "decodificado do parâmetro termoBusca da URL (o campo type do arquivo de origem tem caracteres corrompidos)"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 8,
-      "at": null,
-      "purpose": "consulta por categoria",
+      "at": "2026-11-07T04:12:31.7554795Z",
+      "purpose": "consulta por categoria (sijut2consulta)",
       "actType": "Solução de Consulta",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "url": "https://normas.receita.fazenda.gov.br/sijut2consulta/consulta.action?termoBusca=…",
+      "response": 200,
+      "redirects": "nenhum",
+      "capture": "sem captura: SPA_SHELL_NO_ACT_IDENTITY (shell SPA 45247 bytes sha256 9f9413e20884b246…; absenceProven false)",
+      "actTypeSource": "decodificado do parâmetro termoBusca da URL (o campo type do arquivo de origem tem caracteres corrompidos)"
     },
     {
       "session": "sessão 2 (outra sessão)",
       "n": 9,
-      "at": null,
-      "purpose": "consulta por categoria",
+      "at": "2026-11-07T04:12:31.4875879Z",
+      "purpose": "consulta por categoria (sijut2consulta)",
       "actType": "Resolução",
-      "url": null,
-      "response": null,
-      "redirects": null,
-      "capture": "sem captura (informado)",
-      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+      "url": "https://normas.receita.fazenda.gov.br/sijut2consulta/consulta.action?termoBusca=…",
+      "response": 200,
+      "redirects": "nenhum",
+      "capture": "sem captura: SPA_SHELL_NO_ACT_IDENTITY (shell SPA 45247 bytes sha256 9f9413e20884b246…; absenceProven false)",
+      "actTypeSource": "decodificado do parâmetro termoBusca da URL (o campo type do arquivo de origem tem caracteres corrompidos)"
     }
   ],
   "gaps": [
-    "sessão 2: horário, URL sanitizada, resposta e redirecionamentos de cada uma das 9 requisições não publicados; a atribuição \"1 consulta por categoria\" ao tipo de ato é a informada, não verificada",
-    "sessão 2: a categoria de cada uma das 4 requisições de descoberta (não são de tipo de ato) não foi informada; todas contam no pacote"
+    "sessão 2, requisição 1 (index.html, 60.644 bytes): a URL não foi gravada no log original da própria sessão 2 (urlRecordGap); não inferida do corpo",
+    "sessão 2: a \"descoberta compartilhada\" (4 requisições) foi debitada por ela a cada um dos 5 tipos (débito conservador 25); no total FÍSICO combinado contam 4 vezes, uma vez cada"
   ],
   "cause": {
     "proven": "a sessão 2 fez consultas sem conferir o registro publicado pela sessão 1 (declarado pela própria sessão 2 em c.6702168770); as duas sessões consumiram o mesmo pacote sem reserva prévia",
@@ -367,5 +365,125 @@
     "inventário compartilhado único: este arquivo, versionado no #303, é a única fonte do saldo",
     "reserva prévia: antes de cada conjunto de consultas, um commit registra a reserva (quantidade, finalidade, responsável); o coletor recusa executar se a reserva não cobrir o conjunto ou se o saldo combinado for ≤ 0",
     "o coletor lê o saldo combinado deste arquivo e para no limite (implementado em collect-p2c.ts: recusa com saldo zero)"
-  ]
+  ],
+  "addenda": [
+    {
+      "at": "2026-11-07T04:40Z",
+      "what": "sessão 2: linhas detalhadas substituem as linhas resumidas da versão anterior (preservadas abaixo)",
+      "previousRows": [
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 1,
+          "at": null,
+          "purpose": "descoberta: arquivo público do SPA",
+          "actType": "—",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 2,
+          "at": null,
+          "purpose": "descoberta: arquivo público do SPA",
+          "actType": "—",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 3,
+          "at": null,
+          "purpose": "descoberta: arquivo público do SPA",
+          "actType": "—",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 4,
+          "at": null,
+          "purpose": "descoberta: arquivo público do SPA",
+          "actType": "—",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 5,
+          "at": null,
+          "purpose": "consulta por categoria",
+          "actType": "Portaria",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 6,
+          "at": null,
+          "purpose": "consulta por categoria",
+          "actType": "ADI",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 7,
+          "at": null,
+          "purpose": "consulta por categoria",
+          "actType": "ADE",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 8,
+          "at": null,
+          "purpose": "consulta por categoria",
+          "actType": "Solução de Consulta",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        },
+        {
+          "session": "sessão 2 (outra sessão)",
+          "n": 9,
+          "at": null,
+          "purpose": "consulta por categoria",
+          "actType": "Resolução",
+          "url": null,
+          "response": null,
+          "redirects": null,
+          "capture": "sem captura (informado)",
+          "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+        }
+      ]
+    }
+  ],
+  "physicalCheck": {
+    "session1": 19,
+    "session2": 9
+  }
 }
