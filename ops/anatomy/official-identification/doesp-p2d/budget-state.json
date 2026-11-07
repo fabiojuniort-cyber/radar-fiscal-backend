@@ -1,0 +1,16 @@
+{
+  "schema": "request-budget/1",
+  "grant": {
+    "grantId": "E9-P2d-G1",
+    "owner": "EXEC #304 (claude/anat-doesp-gate)",
+    "package": "E9-P2-d",
+    "approvedBy": "tribusca-control#116 c.6708512598 §5 (P2-d: até 15 requisições, 5 por tipo, até 9 atos) + #304 c.6710099357 (gate) + #303 c.6710098997 (barreira). LAYOUT PROPOSTO, pendente de decisão: a descoberta (journals, sections, lista do dia) é contabilizada num balde próprio dentro dos 15",
+    "status": "suspended",
+    "expiresAt": "2026-11-21T23:59:59Z",
+    "total": 15,
+    "perType": { "Descoberta": 3, "Decreto": 4, "Resolução": 4, "Portaria CAT": 4 }
+  },
+  "used": { "total": 0, "perType": {} },
+  "attempts": [],
+  "note": "SUSPENDED: the per-type layout (discovery bucket of 3 + 4 per act type = 15) needs a COORD decision, and collect-p2d.ts needs a recheck (material delta). Nothing has been sent."
+}
