@@ -1,11 +1,11 @@
 {
- "note": "Engine output WITHOUT identity/analysisId/outputHash for NFC synthetic documents, generated on the pre-B2 engine (317d177, PR #252). B2 must reproduce it: the NFC path never uses the shadow.",
+ "note": "Engine output WITHOUT identity/analysisId/outputHash for NFC synthetic documents, generated on the pre-B2 engine (317d177, PR #252). B2 must reproduce it: the NFC path never uses the shadow. Regenerated for ANAT-STRUCT-02: only caput parts added (entities, eligibility and all other parts unchanged).",
  "documents": [
   {
    "id": "q-mark",
    "s": {
     "contractVersion": "ANAT-TAX/1.0.0",
-    "canonicalText": "Art. 1\u00ba q\u0301 NCM 8471.30.12, exceto 8471.41.00.\n",
+    "canonicalText": "Art. 1º q́ NCM 8471.30.12, exceto 8471.41.00.\n",
     "referenceDate": "2026-10-21",
     "status": "complete",
     "parts": [
@@ -43,7 +43,7 @@
       "parentId": "part-0",
       "order": 0,
       "type": "article",
-      "label": "Art. 1\u00ba q\u0301 NCM 8471.30.12, exceto 8471.41.00.",
+      "label": "Art. 1º q́ NCM 8471.30.12, exceto 8471.41.00.",
       "span": {
        "start": 0,
        "end": 46
@@ -69,6 +69,38 @@
       ],
       "legalStatus": "unknown",
       "table": null
+     },
+     {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 1º q́ NCM 8471.30.12, exceto 8471.41.00.",
+      "span": {
+       "start": 0,
+       "end": 46
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://q-mark",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 52
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
      }
     ],
     "entities": [
@@ -76,8 +108,8 @@
       "id": "entity:OTHER:0:7",
       "partId": "part-1",
       "domain": "OTHER",
-      "literal": "Art. 1\u00ba",
-      "normalized": "Art. 1\u00ba",
+      "literal": "Art. 1º",
+      "normalized": "Art. 1º",
       "span": {
        "start": 0,
        "end": 7
@@ -304,7 +336,7 @@
    "id": "lone-surrogate-mark",
    "s": {
     "contractVersion": "ANAT-TAX/1.0.0",
-    "canonicalText": "Art. 1\u00ba \ud800\u0301 NCM 8471.30.12 at\u00e9 8471.41.00.\n",
+    "canonicalText": "Art. 1º \ud800́ NCM 8471.30.12 até 8471.41.00.\n",
     "referenceDate": "2026-10-21",
     "status": "complete",
     "parts": [
@@ -342,7 +374,7 @@
       "parentId": "part-0",
       "order": 0,
       "type": "article",
-      "label": "Art. 1\u00ba \ud800\u0301 NCM 8471.30.12 at\u00e9 8471.41.00.",
+      "label": "Art. 1º \ud800́ NCM 8471.30.12 até 8471.41.00.",
       "span": {
        "start": 0,
        "end": 42
@@ -368,6 +400,38 @@
       ],
       "legalStatus": "unknown",
       "table": null
+     },
+     {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 1º \ud800́ NCM 8471.30.12 até 8471.41.00.",
+      "span": {
+       "start": 0,
+       "end": 42
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://lone-surrogate-mark",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 48
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
      }
     ],
     "entities": [
@@ -375,8 +439,8 @@
       "id": "entity:OTHER:0:7",
       "partId": "part-1",
       "domain": "OTHER",
-      "literal": "Art. 1\u00ba",
-      "normalized": "Art. 1\u00ba",
+      "literal": "Art. 1º",
+      "normalized": "Art. 1º",
       "span": {
        "start": 0,
        "end": 7
@@ -415,7 +479,7 @@
        "targetEntityIds": [
         "entity:NCM:30:40"
        ],
-       "operator": "at\u00e9",
+       "operator": "até",
        "scopePartId": "part-1",
        "condition": null,
        "expansion": []
@@ -425,7 +489,7 @@
       "id": "entity:NCM_RANGE:15:40",
       "partId": "part-1",
       "domain": "NCM_RANGE",
-      "literal": "8471.30.12 at\u00e9 8471.41.00",
+      "literal": "8471.30.12 até 8471.41.00",
       "normalized": "84713012..84714100",
       "span": {
        "start": 15,
@@ -446,7 +510,7 @@
         "entity:NCM:15:25",
         "entity:NCM:30:40"
        ],
-       "operator": "at\u00e9",
+       "operator": "até",
        "scopePartId": "part-1",
        "condition": null,
        "expansion": []
@@ -476,7 +540,7 @@
        "targetEntityIds": [
         "entity:NCM:15:25"
        ],
-       "operator": "at\u00e9",
+       "operator": "até",
        "scopePartId": "part-1",
        "condition": null,
        "expansion": []
@@ -603,7 +667,7 @@
    "id": "emoji-zwj",
    "s": {
     "contractVersion": "ANAT-TAX/1.0.0",
-    "canonicalText": "Cl\u00e1usula primeira \ud83d\udc69\u200d\ud83d\udcbb NCM 8471.30.12.\n",
+    "canonicalText": "Cláusula primeira 👩‍💻 NCM 8471.30.12.\n",
     "referenceDate": "2026-10-21",
     "status": "complete",
     "parts": [
@@ -641,7 +705,7 @@
       "parentId": "part-0",
       "order": 0,
       "type": "clause",
-      "label": "Cl\u00e1usula primeira \ud83d\udc69\u200d\ud83d\udcbb NCM 8471.30.12.",
+      "label": "Cláusula primeira 👩‍💻 NCM 8471.30.12.",
       "span": {
        "start": 0,
        "end": 40
@@ -664,6 +728,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "clause_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Cláusula primeira 👩‍💻 NCM 8471.30.12.",
+      "span": {
+       "start": 0,
+       "end": 40
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "s://emoji-zwj",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 46
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null

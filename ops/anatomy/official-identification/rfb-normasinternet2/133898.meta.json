@@ -1,0 +1,175 @@
+{
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/133898/visao/multivigente",
+  "consultedAt": "2026-11-04T21:00:13Z",
+  "http": "200|application/json",
+  "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+  "bytes": 31143,
+  "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+  "promoted": false,
+  "representation": "json",
+  "contentType": "application/json",
+  "identification": {
+    "idAto": 133898,
+    "epigrafe": "Instrução Normativa RFB nº 2162, de 4 de outubro de 2023",
+    "numeroAto": "2162",
+    "dataAto": "2023-10-04",
+    "dataPublicacao": "2023-10-06",
+    "dadosPublicacao": "Publicado(a) no DOU de 06/10/2023, seção 1, página 55",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "7d010d9b488d8be902d47ecfcf4413d129e1576863621d9376d8f201dad8f12e",
+    "htmlSha256": "fd5532b65f3245f1853636e08e3ee4046594c048443d973e955dfa055ce0383b",
+    "pieces": 28,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/1",
+        "order": 3,
+        "chars": 114
+      },
+      {
+        "pointer": "/outrosSegmentos/2",
+        "order": 4,
+        "chars": 124
+      },
+      {
+        "pointer": "/outrosSegmentos/3",
+        "order": 5,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/4",
+        "order": 6,
+        "chars": 193
+      },
+      {
+        "pointer": "/outrosSegmentos/5",
+        "order": 7,
+        "chars": 129
+      },
+      {
+        "pointer": "/outrosSegmentos/6",
+        "order": 8,
+        "chars": 180
+      },
+      {
+        "pointer": "/outrosSegmentos/7",
+        "order": 9,
+        "chars": 184
+      },
+      {
+        "pointer": "/outrosSegmentos/8",
+        "order": 10,
+        "chars": 124
+      },
+      {
+        "pointer": "/outrosSegmentos/9",
+        "order": 11,
+        "chars": 152
+      },
+      {
+        "pointer": "/outrosSegmentos/10",
+        "order": 12,
+        "chars": 125
+      },
+      {
+        "pointer": "/outrosSegmentos/11",
+        "order": 13,
+        "chars": 124
+      },
+      {
+        "pointer": "/outrosSegmentos/12",
+        "order": 14,
+        "chars": 130
+      },
+      {
+        "pointer": "/outrosSegmentos/13",
+        "order": 15,
+        "chars": 444
+      },
+      {
+        "pointer": "/outrosSegmentos/14",
+        "order": 16,
+        "chars": 266
+      },
+      {
+        "pointer": "/outrosSegmentos/15",
+        "order": 17,
+        "chars": 123
+      },
+      {
+        "pointer": "/outrosSegmentos/16",
+        "order": 18,
+        "chars": 46
+      },
+      {
+        "pointer": "/outrosSegmentos/17",
+        "order": 19,
+        "chars": 92
+      },
+      {
+        "pointer": "/outrosSegmentos/18",
+        "order": 20,
+        "chars": 78
+      },
+      {
+        "pointer": "/outrosSegmentos/24",
+        "order": 26,
+        "chars": 96
+      }
+    ],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "anatomyBeforeD04": {
+    "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "unidentified": 2,
+      "preamble": 1,
+      "article": 4,
+      "quoted_text": 21
+    },
+    "canonicalChars": 4540,
+    "accountedChars": 4540,
+    "unidentifiedChars": 511,
+    "unidentifiedCauses": {
+      "incisoWithoutDashInPortalText": 0,
+      "other": 511
+    },
+    "struckSegments": 19,
+    "struckRawHtmlChars": 2854,
+    "struckMarkedHistoricalByReader": false,
+    "missingSegments": [],
+    "attachmentsWithoutContent": 0
+  },
+  "anatomyD04": {
+    "readerBase": "ANAT-D04 + R1 + D05 (claude/anat-d04-rfb-types), full engine",
+    "status": "complete",
+    "partTypes": {
+      "document": 1,
+      "summary": 1,
+      "preamble": 1,
+      "article": 4,
+      "caput": 4,
+      "quoted_text": 21,
+      "signature": 1
+    },
+    "canonicalChars": 4540,
+    "accountedChars": 4540,
+    "unidentifiedChars": 0,
+    "historicalByTachado": 19,
+    "limitations": {},
+    "legalStatusValues": [
+      "unknown"
+    ],
+    "unidentifiedHistoricalWithEvidence": 0,
+    "engineAccepted": true
+  }
+}
