@@ -13,8 +13,8 @@
  *   `invalid_representation`, without body. `verified` requires BOTH a verified URL and a valid representation.
  */
 import { createHash } from 'node:crypto';
-import { JsonPreparationError, prepareRfbRepresentation } from '../../src/modules/anatomy/json-preparation.js';
-import { OFFICIAL_HOSTS } from '../../src/modules/anatomy/config/official-provenance.js';
+import { JsonPreparationError, prepareDoeSpRepresentation, prepareRfbRepresentation } from '../../src/modules/anatomy/json-preparation.js';
+import { officialApiEndpoint, OFFICIAL_HOSTS } from '../../src/modules/anatomy/config/official-provenance.js';
 
 export interface ManifestAct { id: string; source: string; act: string; url: string | null; urlStatus: 'candidate' | 'verified' | 'to-locate'; reason: string }
 export type FetchLike = (url: string, init: { redirect: 'manual'; signal: AbortSignal; headers: Record<string, string> }) => Promise<{
@@ -93,7 +93,7 @@ export async function consultOfficial(a: ManifestAct, allowedHosts: readonly str
   const fail = (code: Extract<Outcome, { ok: false }>['failure']['code'], detail: string, hops: string[]): Outcome =>
     ({ ok: false, failure: { id: a.id, url: a.url ?? '', hops, code, detail, at: now().toISOString() } });
   if (!a.url) return fail('no_url', `URL ainda não localizada (${a.urlStatus})`, []);
-  const allowed = (u: URL) => u.protocol === 'https:' && allowedHosts.includes(u.hostname);
+  const allowed = (u: URL) => (u.protocol === 'https:' && u.port === '' && u.username === '' && u.password === '' && allowedHosts.includes(u.hostname)) || officialApiEndpoint(u) !== null;
   let current = new URL(a.url); const hops = [current.href];
   if (!allowed(current)) return fail('host_not_allowed', current.href, hops);
   for (let hop = 0; hop <= 5; hop++) {
@@ -110,6 +110,24 @@ export async function consultOfficial(a: ManifestAct, allowedHosts: readonly str
     }
     if (res.status < 200 || res.status >= 300) return fail('http_error', `HTTP ${res.status}`, hops);
     const contentType = res.headers.get('content-type') ?? '';
+    const api = officialApiEndpoint(current);
+    if (api) {
+      // DOE-SP search API: JSON only; a publication must carry the id named in the URL (identity), errors are refused.
+      if (!JSON_TYPE.test(contentType)) return fail('content_type', `API ${api.source}: tipo de conteúdo não aceito: ${contentType || '(ausente)'}`, hops);
+      const body = Buffer.from(await res.arrayBuffer());
+      let parsed: unknown;
+      try { parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body)); } catch { return fail('invalid_representation', 'corpo não é JSON UTF-8 válido', hops); }
+      if (!parsed || typeof parsed !== 'object') return fail('invalid_representation', 'JSON sem objeto/lista raiz', hops);
+      if (!Array.isArray(parsed) && ['error', 'erro', 'errors', 'status', 'mensagem', 'message', 'title'].some((k) => k in (parsed as object)) && !('id' in (parsed as object)) && !('items' in (parsed as object)))
+        return fail('invalid_representation', 'resposta de erro da API (sem publicação)', hops);
+      if (api.publicationId) {
+        try { prepareDoeSpRepresentation({ resourceId: `doe-sp:${api.publicationId}`, bytes: new Uint8Array(body) }, api.publicationId); }
+        catch (e) { return fail('invalid_representation', `publicação sem a identidade da URL ou incompleta: ${e instanceof JsonPreparationError ? e.code : 'erro'}`, hops); }
+      }
+      return { ok: true, body, meta: { id: a.id, act: a.act, url: a.url, finalUrl: current.href, hops, status: res.status, contentType,
+        lastModified: res.headers.get('last-modified'), sha256: createHash('sha256').update(body).digest('hex'), bytes: body.length,
+        consultedAt: now().toISOString(), urlStatus: a.urlStatus, urlVerified: a.urlStatus === 'verified', representation: 'json', verified: a.urlStatus === 'verified', reason: a.reason } };
+    }
     const rfbId = JSON_TYPE.test(contentType) ? rfbJsonIdAto(current, OFFICIAL_HOSTS.RFB) : null;
     if (!ACCEPTED.test(contentType) && rfbId === null) return fail('content_type', `tipo de conteúdo não aceito: ${contentType || '(ausente)'}`, hops);
     if (rfbId !== null) {
