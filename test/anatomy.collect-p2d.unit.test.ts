@@ -12,7 +12,7 @@ const NOW = () => new Date('2026-11-07T12:00:00Z');
 const HOST = 'https://do-api-web-search.doe.sp.gov.br/';
 const G = (n: number) => `0b9b4578-91be-4da4-aaa8-${String(n).padStart(12, '0')}`;
 const J = G(900); const S = G(901);
-const budgetFile = (perType = { [DISCOVERY]: 3, Decreto: 4, Resolução: 4, 'Portaria CAT': 4 }) => { const d = mkdtempSync(join(tmpdir(), 'p2d-')); const f = join(d, 'budget-state.json');
+const budgetFile = (perType: Record<string, number> = { Decreto: 5, Resolução: 5, 'Portaria CAT': 5 }) => { const d = mkdtempSync(join(tmpdir(), 'p2d-')); const f = join(d, 'budget-state.json');
   writeFileSync(f, JSON.stringify({ schema: 'request-budget/1', grant: { grantId: 'G-D', owner: 'exec-304', package: P2D_PACKAGE, approvedBy: 'test', status: 'active', expiresAt: '2026-11-08T00:00:00Z',
     total: Object.values(perType).reduce((a, b) => a + b, 0), perType }, used: { total: 0, perType: {} }, attempts: [] })); return f; };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -57,7 +57,9 @@ test('P2-d run: discovery debited in its own bucket; reserved, 2026 and stored a
   const t = transport(list, pubs);
   const inv = await run(t.f, { grantId: 'G-D', owner: 'exec-304', date: '2025-03-10', budgetFile: f, outDir: out, now: NOW });
   const s = JSON.parse(readFileSync(f, 'utf8')) as BudgetState;
-  assert.equal(s.used.total, t.urls.length, 'every request sent was debited'); assert.equal(s.used.perType[DISCOVERY], 3);
+  assert.equal(s.used.total, t.urls.length, 'every request sent was debited');
+  assert.deepEqual(s.attempts.filter((a) => a.kind === DISCOVERY).map((a) => a.type), ['Decreto', 'Decreto', 'Decreto'], 'discovery debited on the declared type, recorded as discovery');
+  assert.ok(s.used.perType.Decreto! <= 5 && s.used.total <= 15);
   assert.ok(!t.urls.some((u) => u.includes(G(2))), '2026 act never requested'); assert.ok(!t.urls.some((u) => u.includes(`publications/${G(5)}`)), 'stored act never requested');
   const dec = inv.decisions.find((d) => d.type === 'Decreto') as { kept: Record<string, string>; tried: { outcome: string }[]; reserved: string[] };
   assert.ok(dec.reserved.includes(G(2)));

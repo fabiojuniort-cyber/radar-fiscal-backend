@@ -6,7 +6,9 @@
  *
  * - DISCOVERY is not an act capture: journals, sections and the day list (`v2/summary/list`) go through
  *   discoverOfficial — exact API host, listing endpoints only, JSON only, no redirect followed — and EVERY discovery
- *   request is debited before it is sent, in its own bucket (`Descoberta`).
+ *   request is debited before it is sent. Layout decided by the COORD (#116 c.6710109715 §3): 5 per type
+ *   (Decreto/Resolução/Portaria CAT) = 15, so discovery has no bucket of its own: it is debited, with kind
+ *   'discovery', against ONE declared type (`discoveryType`, default Decreto), which then has fewer captures left.
  * - CAPTURE goes through consultOfficial with apiSources ['DOE-SP']: publication by id only, identity pinned across
  *   redirects, publication JSON validated against the URL id. Every hop is debited.
  * - Before any capture: reserved acts (corpus/gold/reserve, by act key and by publication id), acts of 2026 (margin)
@@ -28,7 +30,8 @@ import { sizeOf, type Size } from './official-coverage-matrix.js';
 export const P2D_DIR = fileURLToPath(new URL('./official-identification/doesp-p2d/', import.meta.url));
 export const P2D_BUDGET_FILE = join(P2D_DIR, 'budget-state.json');
 export const P2D_PACKAGE = 'E9-P2-d';
-export const DISCOVERY = 'Descoberta';
+/** Attempt kind recorded for discovery debits (listing ≠ capture). */
+export const DISCOVERY = 'discovery';
 const API = 'https://do-api-web-search.doe.sp.gov.br/';
 /** Same catalogue names as the versioned connector (doe-sp.connector.ts DOE_SP_JOURNAL / DOE_SP_SECTION; checked in test). */
 export const JOURNAL = 'Executivo'; export const SECTION = 'Atos Normativos';
@@ -62,9 +65,11 @@ export const isReservedDoeSp = (k: string, item: Pick<DoeSpListItem, 'id' | 'dat
   RESERVED_ACT_KEYS.includes(k) || RESERVED_SOURCE_IDS.includes(item.id.toLowerCase()) || item.date.startsWith('2026');
 
 export async function run(doFetch: typeof fetch, opts: { grantId: string; owner: string; date: string; budgetFile?: string; outDir?: string;
-  plan?: Record<string, number>; now?: () => Date }) {
+  plan?: Record<string, number>; discoveryType?: string; now?: () => Date }) {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(opts.date) || opts.date.startsWith('2026')) throw new DiscoveryRefused('the day list date must be YYYY-MM-DD before 2026 (margin)');
-  const perType = opts.plan ?? { [DISCOVERY]: 3, Decreto: 4, Resolução: 4, 'Portaria CAT': 4 };
+  const perType = opts.plan ?? { Decreto: 5, Resolução: 5, 'Portaria CAT': 5 };
+  const discoveryType = opts.discoveryType ?? 'Decreto';
+  if (!(discoveryType in perType)) throw new DiscoveryRefused(`discovery type ${discoveryType} is not in the plan`);
   const budget = RequestBudget.open(opts.budgetFile ?? P2D_BUDGET_FILE, { grantId: opts.grantId, owner: opts.owner, package: P2D_PACKAGE,
     requested: { total: Object.values(perType).reduce((a, b) => a + b, 0), perType } }, opts.now);
   const outDir = opts.outDir ?? P2D_DIR;
@@ -72,7 +77,7 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
   try {
     mkdirSync(outDir, { recursive: true });
     const stored = new Set(readdirSync(outDir).filter((f) => /^[0-9a-f-]{36}\.json$/u.test(f)).map((f) => f.slice(0, -5)));
-    const disc = budget.fetcher(DISCOVERY, 'discovery', doFetch);
+    const disc = budget.fetcher(discoveryType, DISCOVERY, doFetch);
     let items: DoeSpListItem[];
     try {
       const journal = findDoeSpNamed(parseDoeSpNamedItems(await discoverOfficial(`${API}v2/journals`, disc), 'DOE_SP_INVALID_JOURNALS'), JOURNAL);
@@ -80,7 +85,7 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
       const section = findDoeSpNamed(parseDoeSpNamedItems(await discoverOfficial(`${API}v2/sections?JournalId=${encodeURIComponent(journal.id)}`, disc), 'DOE_SP_INVALID_SECTIONS'), SECTION);
       if (!section) throw new DiscoveryRefused(`section "${SECTION}" not in the catalogue`);
       const list = parseDoeSpList(await discoverOfficial(`${API}v2/summary/list?Date=${opts.date}&JournalId=${encodeURIComponent(journal.id)}&SectionId=${encodeURIComponent(section.id)}`, disc));
-      items = list.items; discovery = { date: opts.date, journal: journal.id, section: section.id, listed: list.items.length, malformed: list.malformed.length };
+      items = list.items; discovery = { date: opts.date, debitedTo: discoveryType, journal: journal.id, section: section.id, listed: list.items.length, malformed: list.malformed.length };
       writeFileSync(join(outDir, `list-${opts.date}-${opts.grantId}.json`), `${JSON.stringify(list, null, 2)}\n`, { flag: 'wx' });
     } catch (e) {
       discovery = { date: opts.date, outcome: `${e instanceof BudgetRefused ? 'budget' : 'discovery failed'}: ${(e as Error).message} — debited, not read as absence` };
