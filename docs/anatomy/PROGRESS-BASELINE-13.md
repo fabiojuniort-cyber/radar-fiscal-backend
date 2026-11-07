@@ -50,19 +50,51 @@ Os totais registrados por etapa (24,0 / 11,2 / 12,0 / 1,5 / 1,5) são reproduzid
 | #288 D04/D05; #289 lote RFB; #290 L11; #291 L14–L16; #292 L17 | **E9 Cobertura oficial (15)** e/ou **E8** | E8 já tem impl./testado/aceito. Em E9 os pacotes cobrem fontes oficiais (RFB 5 INs; Sefaz-SP 2 páginas) com testes e revisão aceita, mas **sem promoção (L3), sem Planalto/CONFAZ/DOU (M1–M5, M9) e sem homologação**. Se o COORD considerar cumpridos os marcos impl./testado/aceito de E9, o ganho seria 15 × 0,8 = 12,0 pontos (total 62,2%). **O EXEC não marca isso:** o critério de conclusão de E9 não está escrito e não deve ser inventado. |
 | #293 matriz; #294 COMPOSE-01 | Nenhuma entrega própria | Composição não é integração (herda #285, sem `main`) |
 
-## 4. Matriz E9 — Cobertura oficial (peso 15)
+## 4. Matriz E9 — Cobertura oficial (peso 15), reconciliada com o critério do COORD (07/11)
 
-Critério aplicado: a fórmula vigente (§ topo). Cada marco só conta com uma evidência aceita pelo COORD. **Nenhum marco de E9 é contabilizado hoje.** Uma célula "parcial" registra evidência e lacuna, mas não soma pontos.
+**Critério (COORD, registrado em `STATUS-MATRIX-02-COMPOSITION.md` §9; #116 c.6665613810):** "completar e demonstrar a matriz oficial de cobertura — fontes, tipos e portes (pequeno, médio, grande, quando aplicável), incluindo as categorias ainda ausentes. **Sem pontuação fracionária.** A promoção é registrada à parte e não é condição dos marcos offline."
 
-| Marco (fração) | Situação | Evidência | Lacuna |
+**Variedade oficial aprovada:** a lista M1–M10 de `OFFICIAL-ARQUIVOS-MANUAIS.md`, mais as fontes acrescentadas depois por decisão (portal Sefaz-SP, L14–L17). Cada marco de E9 só conta quando **todas** as células obrigatórias estão concluídas.
+
+### 4.1 Células da matriz
+
+| Célula (fonte × tipo × porte) | Situação | Evidência | Lacuna |
 |---|---|---|---|
-| Implementado (0,40) | Parcial | RFB: lote de 7 INs (#289; coleta 02), anexo HTML embutido como recurso separado (#300, 1 de 31 anexos da IN 2.121); Sefaz-SP portal: 2 páginas (#291 L14–L16, #292 L17); D04/D05 (#288); L11 (#290) | Planalto, CONFAZ e DOU (M1–M5, M9) sem cobertura; anexos PDF da RFB ficam `missing_no_content`; promoção L3 não autorizada (`promoted:false`) |
-| Testado (0,20) | Parcial (offline) | Testes ANAT 320/320 no #300 @9a6a9ec9; COMPOSE-02 #299 PASS offline; PG16 12/12; LOTE-2 PG18 PASS no #300 (run 42159441668) | Sem teste em fonte oficial além de RFB e Sefaz-SP; `verify` do CI vermelho por uma corrida externa à ANAT (COLL-TEST-ISO-01, #301) |
-| Revisão aceita (0,20) | Parcial | Aceites de #288–#292; #299 PASS offline; **#300 R3 PASS técnico offline** (COORD, 06/11); **#293 §17 APPROVED documental** (COORD, 06/11) | Critério de conclusão de E9 ainda não escrito pelo COORD |
-| Integrado (0,10) | Não | — | Nenhum incremento em `main` (herda #285, congelado) |
-| Liberado (0,10) | Não | — | Sem homologação nem ativação (E13) |
+| RFB × IN × grande (M6) | ✅ concluída | IN 2.005/2021, idAto 115131 (57.179 caracteres); lote de 7 INs (`official-lot-rfb.json`) | — |
+| RFB × IN × médio (M7) | ✅ concluída | IN 2.237/2024, idAto 141910 (31.389 caracteres) | — |
+| RFB × IN × pequeno (M8) | ✅ concluída | IN 1.932/2020, idAto 108391 (2.003 caracteres) | — |
+| RFB × IN × muito grande (extra) | ✅ concluída | IN 2.121/2022, 127905 (1.009.001); IN 1.911/2019, 104314 (809.136); anexo HTML embutido (#300); sinal L20 (#302) | Anexos PDF da RFB ficam `missing_no_content` (registrado, não bloqueia a célula) |
+| RFB × IN × médio/pequeno (extras) | ✅ concluída | IN 2.021/2021, 116968 (151.963); IN 2.162/2023, 133898 (4.540) | — |
+| Sefaz-SP portal × RICMS × artigos/anexos | ✅ concluída | 6 páginas (`doesp-ricms/`: art. 7º, 8º, 9º; anexo I art. 41; anexo II arts. 3º e 39); L14–L17 e L21 | — |
+| **Planalto × Lei × grande (M1, M2)** | ❌ pendente | — | O portal recusa a conexão deste ambiente (07/11: *empty reply from server*); depende dos arquivos manuais M1 e M2 |
+| **CONFAZ × Convênio (M3, M4)** | ❌ pendente | — | A origem recusa a conexão (07/11); depende de M3 e M4 |
+| **CONFAZ × Ajuste SINIEF × pequeno (M5)** | ❌ pendente | — | Depende de M5 |
+| **DOU × ato com cabeçalho/rodapé (M9)** | ❌ pendente | — | A origem recusa a conexão (07/11); depende de M9. Também alimenta E4 |
+| DOE-SP × diário (M10) | ⏸ fora desta fase | — | Opcional; lote 2, depois de M9 |
 
-**Pontos E9 contabilizados:** 0. **Projeção (não validada):** impl., testado e aceito completos dariam 15 × 0,8 = 12,0 p.p. (62,2%). Isso depende de o COORD escrever o critério de conclusão de E9 e de as lacunas acima serem aceitas ou fechadas.
+### 4.2 Marcos de E9
+
+| Marco (fração) | Concluído? | Motivo |
+|---|---|---|
+| Implementado (0,40) | **Não** | 4 células obrigatórias pendentes (M1–M5, M9) |
+| Testado (0,20) | **Não** | Segue o anterior. As células concluídas têm testes: ANAT 329/329 no #302, lote de 7 INs, PG16 12/12 |
+| Revisão aceita (0,20) | **Não** | Segue o anterior. Aceites parciais: #288–#292, #299, #300 R3 (PASS técnico offline), #293 §17 (APPROVED documental) |
+| Integrado (0,10) | **Não** | Nada em `main` (herda #285, congelado) |
+| Liberado (0,10) | **Não** | Sem homologação nem ativação (E13) |
+
+**Pontos E9 contabilizados: 0** (sem fração, conforme o critério). **Frente 1 = 50,2%, delta 0 p.p.** Os pesos originais ficam preservados. O recálculo será submetido ao COORD depois do fechamento dos marcos.
+
+### 4.3 Próximo pacote executável para reduzir as lacunas
+
+1. **P1 — arquivos manuais (Fábio, cerca de 15 min):** salvar M1–M5 e M9 pelo navegador, seguindo `OFFICIAL-ARQUIVOS-MANUAIS.md`. É a única via, porque as origens recusam este ambiente. Não enviar o 52/91 nem o 100/97.
+2. **P2 — ingestão (EXEC, depois de P1):**
+   - registrar URL, data, SHA-256 e origem "reprodução salva pelo navegador";
+   - validar o título de cada arquivo (recusa registrada se não bater);
+   - rodar o leitor (HTML: Planalto → nova família de leitura a definir; CONFAZ e DOU já são fontes do leitor);
+   - incluir as amostras num lote oficial reprodutível com baseline e teste de não piora, como o lote RFB;
+   - manter `promoted:false`.
+3. **P3 — demonstração da matriz completa:** quando todas as células obrigatórias estiverem ✅, submeter ao COORD o fechamento dos marcos Implementado e Testado de E9, com revisão independente para o marco Revisão aceita. Depois, recálculo pela fórmula vigente.
+4. **P4 — DOE-SP diário (M10):** lote 2, depois de M9.
 
 ## 5. Registro de 06/11 (fora do cálculo)
 
@@ -70,4 +102,11 @@ Critério aplicado: a fórmula vigente (§ topo). Cada marco só conta com uma e
 - **#293 §17 (L20) — APPROVED documental.** Classificação `prohibited` mantida; `rfb_quote_unclosed_resume_candidate` apenas para revisão humana; L20 segue em desenho.
 - **COLL-TEST-ISO-01 (#301)** é tarefa de Backend/CI, fora do cálculo da ANAT.
 
-**Percentual mantido:** **Frente 1 = 50,2%**, delta 0 p.p., até validação do COORD. Frente 2 = 10%.
+## 6. Registro de 07/11 (fora do cálculo)
+
+- **COLL-TEST-ISO-01 @`3f7564e4` — aprovada tecnicamente** (COORD): `verify` 2× PASS (run 42168045517), LOTE-2 PG18 PASS. Merge e deploy aguardam a decisão do Fábio.
+- **#300 @`22e8cc48` — mantém o PASS técnico offline** (COORD). O R3 continua sendo o de `9a6a9ec9`; o merge de COLL-TEST-ISO-01 não altera nenhum arquivo de anatomia (identidade `04af1bfd`).
+- **L20 implementada no #302** (só o sinal, conforme §17), aguardando revisão. Identidade `0e009431`.
+- **E9 reconciliada** com o critério do COORD (§4): 0 pontos; 4 células obrigatórias pendentes (M1–M5, M9).
+
+**Percentual mantido:** **Frente 1 = 50,2%**, delta 0 p.p. Frente 2 = 10%.
