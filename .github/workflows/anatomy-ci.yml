@@ -14,6 +14,10 @@ on:
       - feat/anat-unicode-01b-integration
       - feat/anat-ci-stack
       - feat/anat-admin-p3-design
+      - claude/anat-struct-01
+      - claude/anat-struct-02
+      - claude/anat-pdf-01
+      - claude/compassionate-turing-n9g5hu
       - feat/anat-admin-p3b1-persistence
       - feat/anat-admin-p3c-executor
       - feat/anat-admin-p3d-api
@@ -408,7 +412,7 @@ jobs:
           test/anatomy.json-preparation.unit.test.ts test/anatomy.evaluation-adapter.unit.test.ts test/anatomy.profile.unit.test.ts
           test/anatomy.profile-engine.unit.test.ts test/anatomy.unicode.unit.test.ts test/anatomy.unicode-recovery.unit.test.ts
           test/anatomy.nfc-shadow.unit.test.ts test/anatomy.rules-simulation.unit.test.ts
-          test/anatomy.simulation-executor.unit.test.ts
+          test/anatomy.simulation-executor.unit.test.ts test/anatomy.struct.unit.test.ts test/anatomy.struct2.unit.test.ts test/anatomy.pdf.unit.test.ts
       - name: Engine identity
         run: node ops/anatomy/build-identity.mjs
       - name: NFC shadow table (generator verification)
