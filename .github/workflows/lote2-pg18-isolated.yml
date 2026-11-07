@@ -85,7 +85,7 @@ jobs:
       - name: F2-TAB-01 membership-only retirement, tag and published history preservation (isolated PG18)
         run: npx tsx --test test/f2-tab-retirement.pg18.integration.test.ts
       - name: L-08 orphan integration and L-10 retention + L-05 collection
-        run: npx tsx --test test/publication.presentation.integration.test.ts test/collection-items-retention.integration.test.ts test/doe-sp.collection.integration.test.ts
+        run: npx tsx --test --test-concurrency=1 test/publication.presentation.integration.test.ts test/collection-items-retention.integration.test.ts test/doe-sp.collection.integration.test.ts
       - name: L-10 CLI default is dry-run
         run: npm run db:prune-collection-items
 
