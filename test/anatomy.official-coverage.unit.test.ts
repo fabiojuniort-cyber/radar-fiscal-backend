@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
+import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
@@ -15,9 +16,9 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 9 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 10 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
-  assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'rfb--instrucao-normativa--grande',
+  assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
@@ -27,6 +28,11 @@ test('E9 current state: 9 cells covered, E9 incomplete; nothing promoted or acce
   assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
   assert.deepEqual([sizeOf(9_999), sizeOf(10_000), sizeOf(49_999), sizeOf(50_000)], ['pequeno', 'médio', 'médio', 'grande']);
+  // HTTP captures of the other session: Planalto not decoded (no declared charset), DOU PDF page identified but not validated
+  for (const id of ['http:M1', 'http:M2']) { const x = real.find((s) => s.id === id)!; assert.deepEqual([x.source, x.stages.identified, x.stages.read], ['Planalto', true, false]); }
+  const m9 = real.find((s) => s.id === 'http:M9')!;
+  assert.deepEqual([m9.source, m9.layout, m9.stages.identified, m9.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]); assert.match(m9.notes[0]!, /CONTINUA/u);
+  assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na') && m.requiredPending.includes('dou--instrucao-normativa--medio'), 'M9 PDF does not stand for the HTML act cell');
 });
 
 const okStages = { captured: true, identified: true, read: true, validated: true, accepted: false };
@@ -117,4 +123,25 @@ test('E9 P2 ingest refusals: title, host, saved-from-url mismatch, encoding, res
   }
   assert.equal(readFileSync(join(out, 'refusals.jsonl'), 'utf8').trim().split('\n').length, cases.length);
   assert.equal(existsSync(join(out, 'M5.meta.json')), false);
+});
+
+test('E9 HTTP package ingest: manifest hash/size and ZIP hash enforced; foreign host refused; undeclared charset never inferred; no overwrite', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pkg-')); const out = join(dir, 'out');
+  const conv = Buffer.from('<html><head><meta charset="utf-8"></head><body><h1>CONVÊNIO ICMS 142/18</h1><p>Cláusula primeira.</p></body></html>');
+  const lei = Buffer.from([...Buffer.from('<html><body><p>LEI N'), 0xba, ...Buffer.from(' 10.637, DE 30 DE DEZEMBRO DE 2002</p></body></html>')]);
+  writeFileSync(join(dir, 'M3.html'), conv); writeFileSync(join(dir, 'M1.html'), lei);
+  const entry = (id: string, file: string, b: Buffer, url: string) => ({ id, sha256: createHash('sha256').update(b).digest('hex').toUpperCase(), bytes: b.length, url, retrieved_utc: '2026-11-07T03:52:05Z', origin: 'HTTP', coverage: 'HTML capture', file });
+  const write = (entries: object[]) => writeFileSync(join(dir, 'manifest.json'), JSON.stringify(entries));
+  write([entry('M3', 'M3.html', conv, 'https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18'), entry('M1', 'M1.html', lei, 'https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm')]);
+  await assert.rejects(ingestHttpPackage(dir, '0'.repeat(64), out), HttpIngestError, 'wrong ZIP hash');
+  const metas = await ingestHttpPackage(dir, PACKAGE.zipSha256, out);
+  assert.deepEqual(metas.map((m) => [m.item, m.declaredCharset, m.readable]), [['M3', 'utf-8', true], ['M1', null, false]]);
+  assert.match(metas[1]!.readableNote!, /não inferido/u); assert.match(String(metas[1]!.identification.method), /ASCII/u);
+  assert.equal(readFileSync(join(out, 'M1.html')).equals(lei), true, 'bytes unchanged');
+  await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out), /already present/u, 'never overwritten');
+  const out2 = join(dir, 'out2');
+  write([{ ...entry('M3', 'M3.html', conv, 'https://www.confaz.fazenda.gov.br/x'), bytes: conv.length + 1 }]);
+  await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out2), /differ from the manifest/u);
+  write([entry('M3', 'M3.html', conv, 'https://example.com/CV142_18')]);
+  await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out2), /not the official host/u);
 });

@@ -48,6 +48,27 @@
       "profile": "CONFAZ",
       "outputHash": "07753ae881c7450e18ef65f873a29abdbecc6890b1a6648b86b13cbf9e4df0a6",
       "chars": 119687
+    },
+    {
+      "id": "http:M3",
+      "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+      "profile": "CONFAZ",
+      "outputHash": "47acecb8f7d5f0b7889321f7186627c4016eda022a0aa95842d9416eaff32f68",
+      "chars": 922008
+    },
+    {
+      "id": "http:M4",
+      "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+      "profile": "CONFAZ",
+      "outputHash": "147d6e19e726c9152a20ed539bbf34d1b71850caa7ca15d5872df8449ad66b1d",
+      "chars": 82809
+    },
+    {
+      "id": "http:M5",
+      "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+      "profile": "CONFAZ",
+      "outputHash": "55c17c61628ca053333c6a8f08390127cac31610f255052c52255736e913b926",
+      "chars": 119682
     }
   ]
 }

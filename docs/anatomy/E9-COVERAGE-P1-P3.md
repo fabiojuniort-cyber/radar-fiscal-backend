@@ -27,7 +27,7 @@
 
 ## 2. Estado da matriz (`docs/anatomy/official-coverage-matrix.json`)
 
-**9 de 61 células cobertas; E9 incompleta.**
+**10 de 61 células cobertas; E9 incompleta.**
 
 | Célula coberta | Amostras validadas |
 |---|---|
@@ -37,14 +37,15 @@
 | RFB × Portaria × pequeno | 142967 (Portaria RFB 514/2025, P2-c) |
 | RFB × Ato Declaratório Interpretativo × pequeno | 37103 (ADI RFB 18/2011, P2-c) |
 | RFB × Resolução × pequeno | 122645 (Resolução CGSN 164/2022, P2-c) |
-| CONFAZ × Ajuste SINIEF × grande | M5 (Ajuste SINIEF 7/05) |
+| CONFAZ × Convênio ICMS × grande | http:M3 (Convênio ICMS 142/18, 922.008 caracteres), http:M4 (Convênio ICMS 190/17, 82.809) |
+| CONFAZ × Ajuste SINIEF × grande | M5 (navegador) e http:M5 (HTTP) — Ajuste SINIEF 7/05 |
 | Sefaz-SP portal × RICMS × pequeno | art. 8º, art. 9º |
 | Sefaz-SP portal × RICMS × médio | art. 7º; anexo I art. 41; anexo II arts. 3º e 39 |
 
 **Pendentes (52):**
 - RFB: Portaria, ADI e Resolução médias/grandes; ADE e Solução de Consulta (3 portes cada).
 - Planalto Lei (3 portes); normas.leg.br Lei (3 portes, sem perfil próprio).
-- CONFAZ: Convênio ICMS (3 portes), Ajuste SINIEF pequeno e médio, Protocolo ICMS (3 portes).
+- CONFAZ: Convênio ICMS pequeno e médio, Ajuste SINIEF pequeno e médio, Protocolo ICMS (3 portes).
 - DOU: IN, Decreto, Portaria, Resolução e Despacho (3 portes cada), mais a página PDF.
 - Sefaz-SP RICMS grande.
 - DOE-SP: Decreto, Resolução e Portaria CAT (3 portes cada).
@@ -60,6 +61,18 @@
   - URL `…/ajustes/2005/AJ007_05` (endereço corrigido);
   - título "AJUSTE SINIEF 7/05"; validado.
 - **No ZIP:** M4 veio só com a pasta de recursos, **sem a página**. M3, M9 e o pacote da outra sessão (`cce00c19…`) não chegaram aqui.
+
+## 3-b. Pacote HTTP da outra sessão (`ops/anatomy/official-http-ingest.ts`; `official-identification/e9-http/`)
+
+- **Origem:** tribusca-control@`fe60728d`, branch `evidence/e9-official-inputs-20261107`, ZIP SHA-256 `cce00c19…` (conferido). Seis arquivos conferidos contra o manifesto (hash e tamanho).
+- **Natureza:** respostas HTTP da origem oficial (não é captura manual nem reprodução do navegador); a meta diz isso.
+- **M1, M2 (Planalto):** não declaram charset, e o charset do cabeçalho HTTP não foi preservado. **Não inferido.** Identificados só pelas partes ASCII do título; ficam *captured + identified*, sem leitura (decisão pendente). A célula Planalto × Lei continua pendente.
+- **M3, M4, M5 (CONFAZ):** UTF-8 declarado; lidos com o perfil CONFAZ; invariantes válidos; validados. M3 (922.008) e M4 (82.809) cobrem Convênio × grande; nenhum cobre pequeno ou médio.
+- **M9 (PDF, página 57 do DOU de 05/12/2024):**
+  - **Identificado:** cabeçalho "Seção 1 · ISSN 1677-7042 · Nº 234, quinta-feira, 5 de dezembro de 2024"; rodapé com código de autenticidade `05152024120500057`; epígrafe da IN 2.237.
+  - **Alcance:** uma página. O ato **começa** nela (arts. 1º–6º) e **continua** nas seguintes; o topo traz o fim de outra publicação.
+  - **Leitura:** a extração mistura colunas, então a anatomia **não** é validada.
+  - **Conta só como evidência de cabeçalho/rodapé (E4).** As células de E9 (página PDF e IN em HTML no DOU) continuam pendentes.
 
 ## 4. P2-c — RFB (`ops/anatomy/collect-p2c.ts`; inventário em `official-identification/rfb-p2c/inventory.json`)
 
@@ -81,7 +94,7 @@ Os 3 atos entraram no lote reproduzível. Os 7 atos anteriores ficam **idêntico
 
 ## 5. DOE-SP / M10
 
-Incluído e pendente (decisão do COORD, c.6701950134 §4). **P2-d só depois da validação de M9.** M9 ainda não chegou a esta sessão, nem em HTML nem no PDF da outra sessão.
+Incluído e pendente (decisão do COORD, c.6701950134 §4). **P2-d só depois da validação de M9.** O M9 chegou em PDF e teve a identidade validada (cabeçalho, rodapé e epígrafe), mas a anatomia não foi validada. O EXEC **não iniciou o P2-d** e pede ao COORD que diga se a validação de identidade (alcance E4) satisfaz o gate.
 
 ## 6. L-LEG-01
 
@@ -91,9 +104,9 @@ Desenho e contracasos em `docs/anatomy/L-LEG-01-DESIGN.md`. Nenhuma classificaç
 
 | # | Ato | URL | Observação |
 |---|---|---|---|
-| M3 | Convênio ICMS 142/18 | https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18 | Não recebido |
-| M4 | Convênio ICMS 190/17 | https://www.confaz.fazenda.gov.br/legislacao/convenios/2017/CV190_17 | O ZIP trouxe só a pasta `_files`; falta o `.html` |
-| M9 | IN RFB 2.237/2024 no DOU | https://www.in.gov.br/consulta → resultado de 05/12/2024 | HTML da página do ato; ou o PDF da outra sessão |
-| M1/M2 Planalto | Leis 10.637/2002 e 10.833/2003 | https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm · https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm | Para o layout Planalto (o normas.leg.br não o substitui) |
+| M9 (HTML) | IN RFB 2.237/2024 no DOU | https://www.in.gov.br/consulta → resultado de 05/12/2024 | O PDF da página 57 chegou, mas só vale para E4; a célula de E9 pede a página HTML do ato |
+| M1/M2 (charset) | Leis 10.637/2002 e 10.833/2003 (Planalto) | — | Os bytes HTTP chegaram sem charset declarado; para ler, é preciso decidir a fonte do charset (por exemplo, recapturar guardando o cabeçalho HTTP) |
+
+M3, M4 e M5 estão resolvidos. Não pedir de novo.
 
 **Como salvar:** Ctrl+S → **"Página da Web, somente HTML"**, sem renomear. Envie o `.html`; a pasta `_files` não é necessária.

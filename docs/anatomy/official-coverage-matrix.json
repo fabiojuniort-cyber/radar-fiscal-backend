@@ -523,7 +523,7 @@
       "id": "M5",
       "source": "CONFAZ",
       "type": "Ajuste SINIEF",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 119687,
       "size": "grande",
       "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
@@ -543,6 +543,153 @@
         "test/anatomy.official-coverage.unit.test.ts"
       ],
       "notes": []
+    },
+    {
+      "id": "http:M1",
+      "source": "Planalto",
+      "type": "Lei",
+      "sha256": "fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36",
+      "bytes": 238160,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "charset não declarado no HTML e cabeçalho HTTP de charset não preservado: não inferido; leitura pendente de decisão"
+      ]
+    },
+    {
+      "id": "http:M2",
+      "source": "Planalto",
+      "type": "Lei",
+      "sha256": "25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9",
+      "bytes": 533449,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "charset não declarado no HTML e cabeçalho HTTP de charset não preservado: não inferido; leitura pendente de decisão"
+      ]
+    },
+    {
+      "id": "http:M3",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+      "bytes": 931597,
+      "diagnostic": null,
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 922008,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "outputHash": "47acecb8f7d5f0b7889321f7186627c4016eda022a0aa95842d9416eaff32f68",
+      "notes": []
+    },
+    {
+      "id": "http:M4",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+      "bytes": 234041,
+      "diagnostic": null,
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 82809,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "outputHash": "147d6e19e726c9152a20ed539bbf34d1b71850caa7ca15d5872df8449ad66b1d",
+      "notes": []
+    },
+    {
+      "id": "http:M5",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+      "bytes": 193059,
+      "diagnostic": null,
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 119682,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "outputHash": "55c17c61628ca053333c6a8f08390127cac31610f255052c52255736e913b926",
+      "notes": []
+    },
+    {
+      "id": "http:M9",
+      "source": "DOU",
+      "type": "Página do jornal (cabeçalho e rodapé)",
+      "sha256": "09726ebc6e21652ffde6023fb906ba5ecbb3c7fa49b164271c4c629efd49e3ee",
+      "bytes": 192477,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "PDF da página do jornal (INPDFViewer)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "uma página (57) do DOU: cabeçalho e rodapé identificados; o ato começa nesta página e CONTINUA nas seguintes (não é o ato completo); o topo da página traz o fim de outra publicação; a extração mistura colunas na mesma linha, então a leitura da anatomia não é validada"
+      ]
     }
   ],
   "cells": [
@@ -930,7 +1077,7 @@
       "id": "confaz--convenio-icms--pequeno",
       "source": "CONFAZ",
       "type": "Convênio ICMS",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "pequeno",
       "applicability": {
         "required": true
@@ -945,7 +1092,7 @@
       "id": "confaz--convenio-icms--medio",
       "source": "CONFAZ",
       "type": "Convênio ICMS",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "médio",
       "applicability": {
         "required": true
@@ -960,14 +1107,17 @@
       "id": "confaz--convenio-icms--grande",
       "source": "CONFAZ",
       "type": "Convênio ICMS",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "grande",
       "applicability": {
         "required": true
       },
       "route": "arquivo manual (M3, M4)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "http:M3",
+        "http:M4"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -975,7 +1125,7 @@
       "id": "confaz--ajuste-sinief--pequeno",
       "source": "CONFAZ",
       "type": "Ajuste SINIEF",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "pequeno",
       "applicability": {
         "required": true
@@ -990,7 +1140,7 @@
       "id": "confaz--ajuste-sinief--medio",
       "source": "CONFAZ",
       "type": "Ajuste SINIEF",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "médio",
       "applicability": {
         "required": true
@@ -1005,7 +1155,7 @@
       "id": "confaz--ajuste-sinief--grande",
       "source": "CONFAZ",
       "type": "Ajuste SINIEF",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "grande",
       "applicability": {
         "required": true
@@ -1013,7 +1163,8 @@
       "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
       "status": "covered",
       "validatedSamples": [
-        "M5"
+        "M5",
+        "http:M5"
       ],
       "accepted": false,
       "unvalidatedSamples": []
@@ -1022,7 +1173,7 @@
       "id": "confaz--protocolo-icms--pequeno",
       "source": "CONFAZ",
       "type": "Protocolo ICMS",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "pequeno",
       "applicability": {
         "required": true
@@ -1037,7 +1188,7 @@
       "id": "confaz--protocolo-icms--medio",
       "source": "CONFAZ",
       "type": "Protocolo ICMS",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "médio",
       "applicability": {
         "required": true
@@ -1052,7 +1203,7 @@
       "id": "confaz--protocolo-icms--grande",
       "source": "CONFAZ",
       "type": "Protocolo ICMS",
-      "layout": "HTML da página do CONFAZ (Plone), salvo pelo navegador",
+      "layout": "HTML da página do CONFAZ (Plone)",
       "size": "grande",
       "applicability": {
         "required": true
@@ -1305,7 +1456,18 @@
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
-      "unvalidatedSamples": []
+      "unvalidatedSamples": [
+        {
+          "id": "http:M9",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": false,
+            "validated": false,
+            "accepted": false
+          }
+        }
+      ]
     },
     {
       "id": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
@@ -1517,7 +1679,6 @@
     "normas-leg-br--lei--grande",
     "confaz--convenio-icms--pequeno",
     "confaz--convenio-icms--medio",
-    "confaz--convenio-icms--grande",
     "confaz--ajuste-sinief--pequeno",
     "confaz--ajuste-sinief--medio",
     "confaz--protocolo-icms--pequeno",
@@ -1550,7 +1711,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 9,
+  "coveredRequired": 10,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }

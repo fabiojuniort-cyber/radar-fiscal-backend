@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
 import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
+import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
@@ -37,7 +38,7 @@ export const LAYOUT = Object.freeze({
   RFB_JSON: 'JSON multivigente (API normasinternet2)',
   PLANALTO_HTML: 'HTML compilado do Planalto (ccivil_03)',
   NORMASLEG_HTML: 'HTML do normas.leg.br (exportado do Word)',
-  CONFAZ_HTML: 'HTML da página do CONFAZ (Plone), salvo pelo navegador',
+  CONFAZ_HTML: 'HTML da página do CONFAZ (Plone)',
   DOU_HTML: 'HTML da página do ato no in.gov.br',
   DOU_PDF_PAGE: 'PDF da página do jornal (INPDFViewer)',
   SP_PORTAL_HTML: 'HTML SharePoint, região "Conteúdo da Página"',
@@ -160,6 +161,23 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
     out.push({ id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile, diagnostic: null, outputHash: rd.outputHash,
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
+  }
+  // HTTP response bytes captured by another session and delivered by git (official-http-ingest.ts): provenance of their
+  // own; encoding never inferred; the DOU PDF page is header/footer evidence, not a validated act anatomy.
+  if (existsSync(HTTP_DIR)) for (const f of readdirSync(HTTP_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {
+    const m = JSON.parse(readFileSync(join(HTTP_DIR, f), 'utf8')) as HttpMeta;
+    const bytes = verifiedBytes(join(HTTP_DIR, m.fileName), m, `http:${m.item}`);
+    const id = `http:${m.item}`;
+    const base = { id, source: m.source, type: m.type, sha256: m.sha256, bytes: m.bytes, diagnostic: null, evidence: [] as string[] };
+    if (m.representation === 'pdf') { out.push({ ...base, layout: LAYOUT.DOU_PDF_PAGE, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
+      profile: null, outputHash: null, notes: [m.reach] }); continue; }
+    const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : LAYOUT.PLANALTO_HTML;
+    if (!m.readable || m.source !== 'CONFAZ') { out.push({ ...base, layout, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
+      profile: null, outputHash: null, notes: [m.readableNote ?? 'sem perfil de leitura próprio'] }); continue; }
+    const rd = readWith('CONFAZ', id, decodeDeclared(bytes, m.declaredCharset));
+    const ok = locked(id, m.sha256, 'CONFAZ', rd);
+    out.push({ ...base, layout, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',
+      outputHash: rd.outputHash, evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
   }
   return out;
 }
