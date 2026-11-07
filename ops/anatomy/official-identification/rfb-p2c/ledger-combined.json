@@ -1,0 +1,371 @@
+{
+  "package": "E9 P2-c (RFB, tipos ausentes)",
+  "authorization": "tribusca-control#116 c.6701950134",
+  "limit": 25,
+  "sessions": {
+    "session1": {
+      "requests": 19,
+      "source": "ops/anatomy/official-identification/rfb-p2c/inventory.json (registro próprio, por requisição)"
+    },
+    "session2": {
+      "requests": 9,
+      "source": "radar-fiscal-backend#303 c.6702168770 (informado: 4 arquivos públicos de descoberta do SPA e 1 consulta por categoria; nenhuma captura; 5 respostas iguais ao shell do SPA)"
+    }
+  },
+  "combined": 28,
+  "excess": 3,
+  "available": 0,
+  "status": "P2-c SUSPENSO",
+  "rows": [
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 1,
+      "round": 1,
+      "at": "2026-11-07T04:06:45.888Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Portaria",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": 200,
+      "redirects": "n/a",
+      "capture": "sem captura (resposta de busca gravada em search-*.json)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 2,
+      "round": 1,
+      "at": "2026-11-07T04:06:47.781Z",
+      "purpose": "captura do ato 142967 (consultOfficial)",
+      "actType": "Portaria",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e mantido"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 3,
+      "round": 1,
+      "at": "2026-11-07T04:06:49.329Z",
+      "purpose": "captura do ato 146467 (consultOfficial)",
+      "actType": "Portaria",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/146467/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 4,
+      "round": 1,
+      "at": "2026-11-07T04:06:49.518Z",
+      "purpose": "captura do ato 143234 (consultOfficial)",
+      "actType": "Portaria",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/143234/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 5,
+      "round": 1,
+      "at": "2026-11-07T04:06:49.708Z",
+      "purpose": "captura do ato 147411 (consultOfficial)",
+      "actType": "Portaria",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/147411/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 6,
+      "round": 1,
+      "at": "2026-11-07T04:06:50.101Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Ato Declaratório Interpretativo",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": 200,
+      "redirects": "n/a",
+      "capture": "sem captura (resposta de busca gravada em search-*.json)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 7,
+      "round": 1,
+      "at": "2026-11-07T04:06:50.507Z",
+      "purpose": "captura do ato 37103 (consultOfficial)",
+      "actType": "Ato Declaratório Interpretativo",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/37103/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e mantido"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 8,
+      "round": 1,
+      "at": "2026-11-07T04:06:50.689Z",
+      "purpose": "captura do ato 5727 (consultOfficial)",
+      "actType": "Ato Declaratório Interpretativo",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/5727/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 9,
+      "round": 1,
+      "at": "2026-11-07T04:06:50.866Z",
+      "purpose": "captura do ato 5552 (consultOfficial)",
+      "actType": "Ato Declaratório Interpretativo",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/5552/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 10,
+      "round": 1,
+      "at": "2026-11-07T04:06:51.037Z",
+      "purpose": "captura do ato 5655 (consultOfficial)",
+      "actType": "Ato Declaratório Interpretativo",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/5655/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 11,
+      "round": 1,
+      "at": "2026-11-07T04:06:51.313Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Ato Declaratório Executivo",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": 200,
+      "redirects": "n/a",
+      "capture": "sem captura (resposta de busca gravada em search-*.json)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 12,
+      "round": 1,
+      "at": "2026-11-07T04:06:52.790Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Solução de Consulta",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": 200,
+      "redirects": "n/a",
+      "capture": "sem captura (resposta de busca gravada em search-*.json)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 13,
+      "round": 1,
+      "at": "2026-11-07T04:06:53.451Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Resolução",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": 200,
+      "redirects": "n/a",
+      "capture": "sem captura (resposta de busca gravada em search-*.json)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 14,
+      "round": 1,
+      "at": "2026-11-07T04:06:53.875Z",
+      "purpose": "captura do ato 122645 (consultOfficial)",
+      "actType": "Resolução",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/122645/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e mantido"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 15,
+      "round": 1,
+      "at": "2026-11-07T04:06:54.062Z",
+      "purpose": "captura do ato 97284 (consultOfficial)",
+      "actType": "Resolução",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/97284/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 16,
+      "round": 1,
+      "at": "2026-11-07T04:06:54.617Z",
+      "purpose": "captura do ato 105449 (consultOfficial)",
+      "actType": "Resolução",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/105449/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 17,
+      "round": 1,
+      "at": "2026-11-07T04:06:54.809Z",
+      "purpose": "captura do ato 132603 (consultOfficial)",
+      "actType": "Resolução",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/132603/visao/multivigente",
+      "response": 200,
+      "redirects": "nenhum registrado (consultOfficial registraria cada salto como requisição)",
+      "capture": "capturado e descartado (porte já coberto; bytes não guardados)"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 18,
+      "round": 2,
+      "at": "2026-11-07T04:07:38.052Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Ato Declaratório Executivo",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": "network: fetch failed",
+      "redirects": "n/a",
+      "capture": "falha de rede; sem resposta"
+    },
+    {
+      "session": "sessão 1 (este EXEC)",
+      "n": 19,
+      "round": 2,
+      "at": "2026-11-07T04:07:39.126Z",
+      "purpose": "busca (POST pesquisar, termo do tipo)",
+      "actType": "Solução de Consulta",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "response": 200,
+      "redirects": "n/a",
+      "capture": "sem captura (resposta de busca gravada em search-*.json)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 1,
+      "at": null,
+      "purpose": "descoberta: arquivo público do SPA",
+      "actType": "—",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 2,
+      "at": null,
+      "purpose": "descoberta: arquivo público do SPA",
+      "actType": "—",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 3,
+      "at": null,
+      "purpose": "descoberta: arquivo público do SPA",
+      "actType": "—",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 4,
+      "at": null,
+      "purpose": "descoberta: arquivo público do SPA",
+      "actType": "—",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 5,
+      "at": null,
+      "purpose": "consulta por categoria",
+      "actType": "Portaria",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 6,
+      "at": null,
+      "purpose": "consulta por categoria",
+      "actType": "ADI",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 7,
+      "at": null,
+      "purpose": "consulta por categoria",
+      "actType": "ADE",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 8,
+      "at": null,
+      "purpose": "consulta por categoria",
+      "actType": "Solução de Consulta",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    },
+    {
+      "session": "sessão 2 (outra sessão)",
+      "n": 9,
+      "at": null,
+      "purpose": "consulta por categoria",
+      "actType": "Resolução",
+      "url": null,
+      "response": null,
+      "redirects": null,
+      "capture": "sem captura (informado)",
+      "gap": "detalhes por requisição não publicados (pedido em #303 c.6702214892)"
+    }
+  ],
+  "gaps": [
+    "sessão 2: horário, URL sanitizada, resposta e redirecionamentos de cada uma das 9 requisições não publicados; a atribuição \"1 consulta por categoria\" ao tipo de ato é a informada, não verificada",
+    "sessão 2: a categoria de cada uma das 4 requisições de descoberta (não são de tipo de ato) não foi informada; todas contam no pacote"
+  ],
+  "cause": {
+    "proven": "a sessão 2 fez consultas sem conferir o registro publicado pela sessão 1 (declarado pela própria sessão 2 em c.6702168770); as duas sessões consumiram o mesmo pacote sem reserva prévia",
+    "notClaimed": "nenhuma outra causa ou responsabilidade é afirmada"
+  },
+  "prevention": [
+    "um único responsável pelo consumo do pacote (o EXEC dono da branch #303); outra sessão não consome orçamento",
+    "inventário compartilhado único: este arquivo, versionado no #303, é a única fonte do saldo",
+    "reserva prévia: antes de cada conjunto de consultas, um commit registra a reserva (quantidade, finalidade, responsável); o coletor recusa executar se a reserva não cobrir o conjunto ou se o saldo combinado for ≤ 0",
+    "o coletor lê o saldo combinado deste arquivo e para no limite (implementado em collect-p2c.ts: recusa com saldo zero)"
+  ]
+}

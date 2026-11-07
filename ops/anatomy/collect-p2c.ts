@@ -35,9 +35,23 @@ export const reservedKey = (key: string, a: Pick<Act, 'numeroAto' | 'anoAto'>) =
 export const isReserved = (key: string, a: Pick<Act, 'idAto' | 'numeroAto' | 'anoAto'>) =>
   (RESERVED_ACT_KEYS as readonly string[]).includes(reservedKey(key, a)) || (RESERVED_SOURCE_IDS as readonly string[]).includes(String(a.idAto)) || a.anoAto === '2026';
 
+/**
+ * Prevention after the 28/25 overrun (#303 c.6702168770): the combined ledger is the ONLY source of the balance. A run
+ * needs a prior reservation recorded in it (quantity, purpose, owner) that fits the balance; otherwise nothing is sent.
+ */
+export const LEDGER_FILE = 'ledger-combined.json';
+export class BudgetRefused extends Error {}
+export function assertReservation(dir = P2C_DIR, requested = LIMITS.total): void {
+  let ledger: { available?: number; status?: string; reservation?: { quantity: number; owner: string; purpose: string } };
+  try { ledger = JSON.parse(readFileSync(join(dir, LEDGER_FILE), 'utf8')); } catch { return; }
+  if ((ledger.available ?? 0) <= 0 || /SUSPENS/u.test(ledger.status ?? '')) throw new BudgetRefused(`P2-c refused: combined balance ${ledger.available ?? 0}, status ${ledger.status ?? '?'}`);
+  if (!ledger.reservation || ledger.reservation.quantity > (ledger.available ?? 0) || ledger.reservation.quantity < Math.min(requested, 1))
+    throw new BudgetRefused('P2-c refused: no prior reservation that fits the combined balance');
+}
 type Log = { n: number; type: string; kind: 'search' | 'capture'; url: string; status: number | string; at: string; round?: number };
 /** Round 2 re-uses the counters of round 1 (read from the inventory): limits are per type and per package, not per run. */
 export async function run(doFetch: typeof fetch = fetch, opts: { round?: number; only?: string[]; termo?: Record<string, string>; prior?: { requests: Log[]; decisions: Record<string, unknown>[]; actsKept: number } } = {}) {
+  assertReservation();
   mkdirSync(P2C_DIR, { recursive: true });
   const log: Log[] = [...(opts.prior?.requests ?? [])];
   const decisions: Record<string, unknown>[] = [...(opts.prior?.decisions ?? [])]; let total = log.length; let acts = opts.prior?.actsKept ?? 0;

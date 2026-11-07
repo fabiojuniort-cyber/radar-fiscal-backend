@@ -35,7 +35,7 @@ Autorizado pelo COORD (#116 c.6701950134 §6): diagnóstico, desenho de prepara�
 
 1. **Fonte tipada e preparação própria** (`NORMAS-LEG`, no padrão L17): `prepareNormasLegPage(bytes, url, urn, versão)` emite a prova (WeakSet, congelada) ligada ao SHA do HTML e ao `representationId`. A preparação delimita, **por região exata** (spans UTF-16 no HTML preparado que voltam aos bytes), cada **nota** que atenda a todas estas condições:
    - (a) está num `<a>` com `href` em `camara.leg.br` ou `camara.gov.br` e caminho `/legin/`;
-   - (b) o texto começa com `(` e termina com `)`;
+   - (b) o texto começa com `(` e termina com `)`. **Uma nota pode ocupar âncoras consecutivas** (fato real, §6): âncoras de nota separadas só por espaço ou pontuação formam **uma** nota quando a primeira abre `(` e a última fecha `)`. Sequência sem fechamento → ambígua;
    - (c) a primeira palavra pertence à gramática de nota: Redação, Revogad, Inclu, Acrescid, Vide, Produção de efeito, Vigência, Vetad, Renumerad, "Caput", Parágrafo, Inciso, Alínea;
    - (d) é o último conteúdo do bloco (só espaço depois).
 
@@ -73,8 +73,62 @@ Autorizado pelo COORD (#116 c.6701950134 §6): diagnóstico, desenho de prepara�
 | 12 | Elegibilidade com catálogo NCM sintético | Conjunto elegível depois ⊆ antes |
 | 13 | Dispositivo **revogador** com texto próprio ("Art. 94. Ficam revogados …") | Texto operativo do próprio ato: **não** é nota editorial nem revogação do bloco; sem mudança |
 | 14 | "Redação dada …" no **texto original** (alteração de outra lei citada) | Regra atual de citação; não é nota editorial da compilação |
+| 15 | Nota **partida em duas âncoras** ("(“Caput” … MP nº 627, de 11/11/2013, " + "convertida na Lei nº 12.973 … 1/1/2015)"; real, §6) | **Uma** parte `editorial_note` cobrindo as duas âncoras; nunca duas notas nem texto operativo entre elas |
+| 16 | Nota de revogação com data ("(Revogado **a partir de** 1/10/2008 …)"; real, §6) | Mesmo tratamento do caso 2; **nenhuma** inferência de vigência ou data de efeito; `legalStatus` `unknown` |
+| 17 | Sequência de âncoras que abre `(` e não fecha | `normas_leg_note_ambiguous`; bloco `unknown`; nada recortado |
 
 ## 5. Prova pedida para a decisão de implementação
 
 - Diagnóstico reprodutível desta seção, com os números do §1 e do §2 regenerados por script.
 - Depois da decisão: testes dos 12 contracasos, SHA de partes/`sourceMap` das outras fontes inalterado e lote oficial sem regressão.
+
+## 6. Exemplos oficiais e regiões exatas (bytes dos arquivos versionados)
+
+Offsets no HTML **bruto** (`official-identification/leg-normas/*-atualizada.html`, UTF-8; SHA-256 dos arquivos nas metas). Intervalos semiabertos. O hash é o SHA-256 (prefixo de 16) dos bytes da região. Gerado por script offline; nenhuma requisição.
+
+| Caso | Arquivo | Região | Offsets | SHA-256 | Texto |
+|---|---|---|---|---|---|
+| caso 1 | lei-10637-2002-atualizada | nota de redação (fim do bloco) | UTF-16 [16797, 17105) · bytes [16846, 17162) | `0a9cc8521414ecd8…` | (“Caput” do artigo com redação dada pela Medida Provisória nº 627, de … |
+| caso 5 | lei-10637-2002-atualizada | nota "Vide" | UTF-16 [17482, 17776) · bytes [17540, 17835) | `9f2e3775696c460e…` | (Vide Lei Complementar nº 214, de 16/1/2025)… |
+| caso 2 | lei-10637-2002-atualizada | dispositivo só com rótulo + revogação (bloco inteiro) | UTF-16 [20365, 20817) · bytes [20466, 20925) | `b87b82803b7a8f47…` | IV - (Revogada pela Lei nº 11.727, de 23/6/2008, publicada no DOU de 2… |
+| caso 2 | lei-10637-2002-atualizada | nota de revogação | UTF-16 [20489, 20813) · bytes [20590, 20921) | `49057e79a3e71e6d…` | (Revogada pela Lei nº 11.727, de 23/6/2008, publicada no DOU de 24/6/2… |
+| caso 1 | lei-10833-2003-atualizada | nota de redação (fim do bloco) | UTF-16 [16558, 16866) · bytes [16586, 16902) | `0a9cc8521414ecd8…` | (“Caput” do artigo com redação dada pela Medida Provisória nº 627, de … |
+| caso 5 | lei-10833-2003-atualizada | nota "Vide" | UTF-16 [17228, 17522) · bytes [17265, 17560) | `9f2e3775696c460e…` | (Vide Lei Complementar nº 214, de 16/1/2025)… |
+| caso 2 | lei-10833-2003-atualizada | dispositivo só com rótulo + revogação (bloco inteiro) | UTF-16 [21216, 21660) · bytes [21306, 21756) | `4b1ed8d3eff05831…` | IV - (Revogado a partir de 1/10/2008, de acordo com o art. 42, inciso … |
+| caso 2 | lei-10833-2003-atualizada | nota de revogação | UTF-16 [21351, 21656) · bytes [21441, 21752) | `7b1bc248d40686ed…` | (Revogado a partir de 1/10/2008, de acordo com o art. 42, inciso III, … |
+| caso 13 | lei-10833-2003-atualizada | dispositivo revogador com texto próprio | UTF-16 [379758, 379883) · bytes [385958, 386083) | `430e8a9f0a0d629a…` | Art. 94. Ficam revogados:… |
+| caso 15 (nota partida) | lei-10637-2002-atualizada | 1ª âncora | UTF-16 [16797, 17105) · bytes [16846, 17162) | `0a9cc8521414ecd8…` | (“Caput” do artigo com redação dada pela Medida Provisória nº 627, de … |
+| caso 15 (nota partida) | lei-10637-2002-atualizada | 2ª âncora | UTF-16 [17145, 17427) · bytes [17202, 17485) | `eb342badc4232441…` | convertida na Lei nº 12.973, de 13/5/2014, em vigor a partir de 1/1/20… |
+| caso 15 (nota partida) | lei-10833-2003-atualizada | 1ª âncora | UTF-16 [16558, 16866) · bytes [16586, 16902) | `0a9cc8521414ecd8…` | (“Caput” do artigo com redação dada pela Medida Provisória nº 627, de … |
+| caso 15 (nota partida) | lei-10833-2003-atualizada | 2ª âncora | UTF-16 [16906, 17188) · bytes [16942, 17225) | `eb342badc4232441…` | convertida na Lei nº 12.973, de 13/5/2014, em vigor a partir de 1/1/20… |
+
+**Leitura:** os casos 1 e 15 são o **mesmo** texto nas duas leis (a nota do art. 1º se repete; o hash coincide). Uma nota real pode ocupar duas âncoras, e isso motivou a revisão da regra (b).
+
+## 7. Procedência ligada aos bytes e à representação
+
+- O plano de regiões é calculado pela preparação a partir dos **bytes** do arquivo cuja meta (URL, URN, versão, SHA-256, bytes, data) está registrada. Ele é emitido por referência (WeakSet, congelado) e ligado ao SHA do HTML preparado e ao `representationId`.
+- Vale **só** para a representação "versão atualizada" do normas.leg.br. O texto original e o HTML do Planalto não usam este plano: o Planalto tem layout próprio e, nos bytes HTTP recebidos, charset não declarado.
+- Atributos HTML sozinhos nunca valem como prova (contracaso 9).
+
+## 8. Preservação
+
+O texto canônico, a ordem, os offsets e o `sourceMap` não mudam. A nota vira uma parte filha com o próprio span (ou spans, no caso de nota partida). O dispositivo mantém o próprio span sem o trecho da nota. Teste de não regressão: o SHA de texto, partes e `sourceMap` das outras fontes (lote RFB, Sefaz-SP, CONFAZ) fica idêntico.
+
+## 9. Critérios de aceite e impactos esperados
+
+**Aceite:**
+- os 17 contracasos passam;
+- a elegibilidade depois é subconjunto da de antes;
+- `legalStatus` continua `unknown` em todas as partes;
+- as outras fontes ficam inalteradas;
+- os números do §2 são regenerados por script.
+
+**Impactos esperados (estimativa a medir na implementação):**
+- os dispositivos "só revogação" deixam de ser `operative_candidate` (7 e 14 hoje);
+- as notas passam a partes `editorial_note`. Fato contado: 175 e 470 âncoras da Câmara. O número de notas depois de unir as partidas **será medido** na implementação, e não é estimado aqui;
+- texto e `sourceMap` sem alteração;
+- nenhum `historical` novo.
+
+## 10. Adendo — contracasos da outra sessão
+
+A outra sessão anunciou contracasos por bytes (#303 c.6702175097), com destaque para "Redação dada" no texto original e "Ficam revogados" do art. 94, já incorporados como casos 14 e 13. Quando os bytes e offsets dela forem publicados (pedido em #303 c.6702214892), entram aqui **como adendo rastreável** (origem, hash, offsets), sem desenho paralelo.

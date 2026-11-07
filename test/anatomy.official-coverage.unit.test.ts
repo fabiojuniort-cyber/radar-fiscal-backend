@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
+import { assertReservation, BudgetRefused, run as runP2c } from '../ops/anatomy/collect-p2c.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
@@ -144,4 +145,21 @@ test('E9 HTTP package ingest: manifest hash/size and ZIP hash enforced; foreign 
   await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out2), /differ from the manifest/u);
   write([entry('M3', 'M3.html', conv, 'https://example.com/CV142_18')]);
   await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out2), /not the official host/u);
+});
+
+test('E9 P2-c guard: with the combined ledger at 28/25 (balance zero, suspended) the collector sends no request at all', async () => {
+  const ledger = JSON.parse(readFileSync(new URL('../ops/anatomy/official-identification/rfb-p2c/ledger-combined.json', import.meta.url), 'utf8'));
+  assert.deepEqual([ledger.limit, ledger.sessions.session1.requests, ledger.sessions.session2.requests, ledger.combined, ledger.excess, ledger.available], [25, 19, 9, 28, 3, 0]);
+  assert.throws(() => assertReservation(), BudgetRefused);
+  let calls = 0;
+  await assert.rejects(runP2c((async () => { calls++; throw new Error('must not be called'); }) as unknown as typeof fetch), BudgetRefused);
+  assert.equal(calls, 0);
+  // even with balance, a run without a prior reservation that fits it is refused
+  const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
+  writeFileSync(join(dir, 'ledger-combined.json'), JSON.stringify({ available: 5, status: 'ATIVO' }));
+  assert.throws(() => assertReservation(dir), /no prior reservation/u);
+  writeFileSync(join(dir, 'ledger-combined.json'), JSON.stringify({ available: 5, status: 'ATIVO', reservation: { quantity: 6, owner: 'x', purpose: 'y' } }));
+  assert.throws(() => assertReservation(dir), /no prior reservation/u);
+  writeFileSync(join(dir, 'ledger-combined.json'), JSON.stringify({ available: 5, status: 'ATIVO', reservation: { quantity: 4, owner: 'x', purpose: 'y' } }));
+  assert.doesNotThrow(() => assertReservation(dir));
 });
