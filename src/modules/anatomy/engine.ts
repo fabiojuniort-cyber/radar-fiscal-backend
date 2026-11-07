@@ -7,14 +7,18 @@ import { NfcQuarantineError } from './nfc-recovery.js';
 import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TEXT, shadowContextOf } from './readers.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
 import { compileProfileRules } from './profile-rules.js';
+import type { SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
 
 export const ANATOMY_ENGINE_VERSION = 'anatomy/0.1.0' as const;
 const requestSchema = z.strictObject({
   publicationVersionId: z.string().min(1).max(256),
   referenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   ruleSet: z.strictObject({ id: z.string().min(1).max(256), version: z.string().min(1).max(256) }),
-  input: z.strictObject({ source: z.enum(['CONFAZ', 'DOU', 'DOE-SP', 'RFB']), representationId: z.string().min(1).max(256),
-    html: z.string().optional(), text: z.string().optional(), missingResources: z.array(z.string().min(1)).optional() }),
+  input: z.strictObject({ source: z.enum(['CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL']), representationId: z.string().min(1).max(256),
+    html: z.string().optional(), text: z.string().optional(), missingResources: z.array(z.string().min(1)).optional(),
+    // ANAT-L17: out-of-band provenance for SEFAZ-SP-PORTAL. Kept by reference (never cloned or rebuilt from data), so
+    // only the object issued by prepareSefazSpPortalPage can pass verification; serialized JSON never does.
+    sefazSpPortal: z.custom<SefazSpPortalPreparation>((v) => typeof v === 'object' && v !== null).optional() }),
   // A manifest is not proof that attachment contents were read. Unread material is always partial.
   attachments: z.array(z.strictObject({ resourceId: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
     state: z.enum(['missing', 'unprocessed']) })).default([]),
@@ -29,6 +33,8 @@ export type AnatomyRequest = z.input<typeof requestSchema>;
 export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   const request = requestSchema.parse(rawRequest);
   if (request.input.html !== undefined && request.input.text !== undefined) throw new TypeError('Choose one concrete input representation');
+  // ANAT-L17: the portal proof belongs to its typed source only; any other source carrying it is refused (no mixing).
+  if (request.input.sefazSpPortal !== undefined && request.input.source !== 'SEFAZ-SP-PORTAL') throw new TypeError('sefazSpPortal provenance is only valid for source SEFAZ-SP-PORTAL');
   if (new Set(request.attachments.map(item => item.resourceId)).size !== request.attachments.length) throw new TypeError('Duplicate attachment identity');
   const attachments = [...request.attachments].sort((a, b) => a.resourceId.localeCompare(b.resourceId, 'en'));
   const missingResources = [...new Set([...(request.input.missingResources ?? []),
@@ -71,7 +77,7 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   const result: AnatomyResult = { ...read, contractVersion: ANATOMY_CONTRACT_VERSION,
     analysisId: anatomyIdentityHash(identity), identity, referenceDate: request.referenceDate, entities, evidence: [],
     eligibility: [], outputHash: '' };
-  for (const part of result.parts.filter(part => !['document', 'table', 'row'].includes(part.type))) {
+  for (const part of result.parts.filter(part => !['document', 'table', 'row', 'caput'].includes(part.type))) {
     result.eligibility.push({ id: `text:${part.id}`, purpose: 'thematic_text', partId: part.id,
       entityId: null, span: part.span, eligible: false, evidenceIds: [],
       exclusionReasons: ['missing_approved_evidence', ...(part.context !== 'operative_candidate' ? [`context_${part.context}`] : [])] });
