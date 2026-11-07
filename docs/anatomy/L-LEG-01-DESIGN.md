@@ -71,6 +71,8 @@ Autorizado pelo COORD (#116 c.6701950134 §6): diagnóstico, desenho de prepara�
 | 10 | Texto original (`*-original.html`) com "(NR)" de alterações citadas | Regra atual de citação; nenhuma nota nova |
 | 11 | Mesmo HTML lido como DOU | Inalterado (regra só na fonte tipada com prova) |
 | 12 | Elegibilidade com catálogo NCM sintético | Conjunto elegível depois ⊆ antes |
+| 13 | Dispositivo **revogador** com texto próprio ("Art. 94. Ficam revogados …") | Texto operativo do próprio ato: **não** é nota editorial nem revogação do bloco; sem mudança |
+| 14 | "Redação dada …" no **texto original** (alteração de outra lei citada) | Regra atual de citação; não é nota editorial da compilação |
 
 ## 5. Prova pedida para a decisão de implementação
 
