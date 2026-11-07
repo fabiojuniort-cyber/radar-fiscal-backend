@@ -22,6 +22,7 @@ import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
 import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
+import { APPROVED_FALLBACK, compareWithIndependent, decodeWithPolicy, PASSAGES } from './charset-policy.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
@@ -82,6 +83,8 @@ export interface Sample {
   id: string; source: string; type: string; layout: string; chars: number | null; size: Size | null; sha256: string; bytes: number;
   stages: { captured: boolean; identified: boolean; read: boolean; validated: boolean; accepted: boolean };
   profile: string | null; diagnostic: { profile: string; chars: number } | null; outputHash: string | null; evidence: string[]; notes: string[];
+  /** Only for snapshots decoded under the approved local fallback (charset-policy.ts); never a declared charset. */
+  decoding?: { encoding: string; encodingSource: string; confidence: string; declaredCharset: null; independentCheck: { passage: string; sentenceEqual: boolean }[] };
 }
 export class SampleIntegrityError extends Error {}
 
@@ -176,8 +179,18 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
     if (m.representation === 'pdf') { out.push({ ...base, layout: LAYOUT.DOU_PDF_PAGE, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
       profile: null, outputHash: null, notes: [m.reach] }); continue; }
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : LAYOUT.PLANALTO_HTML;
-    if (!m.readable || m.source !== 'CONFAZ') { out.push({ ...base, layout, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
-      profile: null, outputHash: null, notes: [m.readableNote ?? 'sem perfil de leitura próprio'] }); continue; }
+    if (!m.readable || m.source !== 'CONFAZ') {
+      let decoding: Sample['decoding'];
+      if (m.source === 'Planalto' && APPROVED_FALLBACK[m.sha256]) {
+        const d = decodeWithPolicy(bytes, { httpCharset: null });
+        const leg = m.item === 'M1' ? 'lei-10637-2002-atualizada' : 'lei-10833-2003-atualizada';
+        const indep = readFileSync(join(ROOT, 'leg-normas', `${leg}.html`), 'utf8');
+        decoding = { encoding: d.encoding, encodingSource: d.encodingSource, confidence: d.confidence, declaredCharset: null,
+          independentCheck: compareWithIndependent(d.text, indep, PASSAGES[m.item] ?? []).map((c) => ({ passage: c.passage, sentenceEqual: c.sentenceEqual })) };
+      }
+      out.push({ ...base, layout, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
+        profile: null, outputHash: null, notes: [decoding ? 'charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado' : (m.readableNote ?? 'sem perfil de leitura próprio')],
+        ...(decoding ? { decoding } : {}) }); continue; }
     const rd = readWith('CONFAZ', id, decodeDeclared(bytes, m.declaredCharset));
     const ok = locked(id, m.sha256, 'CONFAZ', rd);
     out.push({ ...base, layout, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',

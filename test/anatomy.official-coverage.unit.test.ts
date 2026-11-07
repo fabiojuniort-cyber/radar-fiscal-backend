@@ -8,6 +8,7 @@ import { crc32 } from 'node:zlib';
 import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
+import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anatomy/charset-policy.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
@@ -169,4 +170,21 @@ test('E9 HTTP package ingest: the ZIP FILE is hashed, entries are read from it (
 test('E9 P2-c historical ledger stays a record: 25 / 19 / 9 / 28 / 3 / 0 (never read as a budget)', () => {
   const ledger = JSON.parse(readFileSync(new URL('../ops/anatomy/official-identification/rfb-p2c/ledger-combined.json', import.meta.url), 'utf8'));
   assert.deepEqual([ledger.limit, ledger.sessions.session1.requests, ledger.sessions.session2.requests, ledger.combined, ledger.excess, ledger.available], [25, 19, 9, 28, 3, 0]);
+});
+
+test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; windows-1252 fallback ONLY for the two approved Planalto SHAs; tentative; never declared', () => {
+  const real = collectSamples();
+  for (const id of ['http:M1', 'http:M2']) {
+    const x = real.find((s) => s.id === id)!;
+    assert.deepEqual([x.decoding?.encoding, x.decoding?.encodingSource, x.decoding?.confidence, x.decoding?.declaredCharset, x.stages.read], ['windows-1252', 'approved_local_fallback', 'tentative', null, false]);
+    assert.ok(x.decoding!.independentCheck.length > 0 && x.decoding!.independentCheck.every((c) => c.sentenceEqual), `${id}: accented passage equal to the independent official representation`);
+  }
+  const m1 = new Uint8Array(readFileSync(new URL('../ops/anatomy/official-identification/e9-http/M1.html', import.meta.url)));
+  assert.equal(Object.keys(APPROVED_FALLBACK).length, 2);
+  const altered = new Uint8Array(m1); altered[600] = altered[600]! ^ 0x01;
+  assert.throws(() => decodeWithPolicy(altered, { httpCharset: null }), CharsetRefused, 'one changed byte leaves the policy');
+  assert.throws(() => decodeWithPolicy(new TextEncoder().encode('<p>sem charset</p>'), { httpCharset: null }), CharsetRefused);
+  assert.throws(() => decodeWithPolicy(m1, { httpCharset: 'iso-8859-1' }), CharsetRefused, 'an HTTP charset is used as declared, not the fallback');
+  assert.equal(decodeWithPolicy(new TextEncoder().encode('<meta charset="utf-8"><p>é</p>'), { httpCharset: null }).encodingSource, 'declared');
+  assert.equal(decodeWithPolicy(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { httpCharset: null }).encodingSource, 'bom');
 });

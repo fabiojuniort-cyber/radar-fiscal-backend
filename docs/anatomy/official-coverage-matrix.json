@@ -571,8 +571,20 @@
       "profile": null,
       "outputHash": null,
       "notes": [
-        "charset não declarado no HTML e cabeçalho HTTP de charset não preservado: não inferido; leitura pendente de decisão"
-      ]
+        "charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado"
+      ],
+      "decoding": {
+        "encoding": "windows-1252",
+        "encodingSource": "approved_local_fallback",
+        "confidence": "tentative",
+        "declaredCharset": null,
+        "independentCheck": [
+          {
+            "passage": "A Contribuição para o PIS/Pasep, com a incidência não cumulativa, incide sobre o total das receitas auferidas no mês pela pessoa jurídica",
+            "sentenceEqual": true
+          }
+        ]
+      }
     },
     {
       "id": "http:M2",
@@ -595,8 +607,20 @@
       "profile": null,
       "outputHash": null,
       "notes": [
-        "charset não declarado no HTML e cabeçalho HTTP de charset não preservado: não inferido; leitura pendente de decisão"
-      ]
+        "charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado"
+      ],
+      "decoding": {
+        "encoding": "windows-1252",
+        "encodingSource": "approved_local_fallback",
+        "confidence": "tentative",
+        "declaredCharset": null,
+        "independentCheck": [
+          {
+            "passage": "A Contribuição para o Financiamento da Seguridade Social - Cofins, com a incidência não cumulativa, incide sobre o total das receitas auferidas no mês pela pessoa jurídica",
+            "sentenceEqual": true
+          }
+        ]
+      }
     },
     {
       "id": "http:M3",
