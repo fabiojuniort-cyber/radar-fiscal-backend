@@ -159,3 +159,23 @@ O texto canônico, a ordem, os offsets e o `sourceMap` não mudam. A nota vira u
 - A outra sessão republicou com UTF-8 preservado no commit `c90752ec` (15/15 arquivos conferidos por ela).
 - Nesta sessão, o teste `lleg-proof.test.cjs` dela, executado contra os **nossos** bytes de `leg-normas/`, deu **4/4 PASS**: identidade (SHA e tamanho) e offsets lexicais em bytes e UTF-16, com BOM.
 - É conferência cruzada independente da identidade e dos offsets lexicais, **não** da classificação.
+
+## 11. Contrato de spans e ownership (fixado antes do código; #116 c.6708512598 §7)
+
+Esta seção substitui qualquer redação anterior ambígua sobre o "span do pai".
+
+1. **Texto canônico global, coordenadas de origem e `sourceMap`:** **idênticos** com e sem a L-LEG-01. A renderização do HTML não muda, e nada é recortado do texto.
+2. **Parte do dispositivo** (artigo, parágrafo, inciso, alínea, item): mantém **o mesmo span** de hoje, que cobre o bloco inteiro, nota incluída. O tipo não muda. O contexto só muda em dois casos:
+   - placeholder revogado comprovado → `prohibited` (`normas_leg_revoked_placeholder`);
+   - nota ambígua no bloco → `unknown` (`normas_leg_note_ambiguous`). Nunca promove.
+3. **Parte nova `editorial_note`:**
+   - uma por região de nota do plano; uma nota partida em âncoras consecutivas gera **uma** parte;
+   - span = `[início da 1ª âncora, fim da última âncora)` em coordenadas canônicas (os `span` dos próprios nós);
+   - `sourcePointers` = os intervalos brutos das âncoras;
+   - `parentId` = a parte do bloco que contém a nota;
+   - contexto `prohibited`; motivo `normas_leg_editorial_note` ou `normas_leg_vide`.
+4. **Ownership da cobertura:** vale a regra já existente do leitor (o menor span estrutural é o dono). O texto da nota passa a pertencer à parte `editorial_note`, e o resto do bloco continua com o dispositivo. A soma da cobertura não muda.
+5. **Identidade de partes:** a criação de partes novas **não** fecha a continuação do caput (regra D02). Os `id` e `order` sequenciais das partes **seguintes** podem mudar. **Não se promete identidade de partes que mudam.** As comparações usam regiões (spans canônicos), tipos e contextos.
+6. **Elegibilidade:** é comparada **por regiões e seleções**, nunca por ids. O conjunto de regiões elegíveis depois tem de estar contido no de antes, e nenhuma seleção nova pode surgir.
+7. **Regressão das demais fontes:** compara-se o payload (texto, partes sem ids, contextos, `sourceMap`, cobertura, elegibilidade por regiões), **sem** `outputHash` e identidade, que mudam legitimamente com o build.
+8. **Procedência:** o plano é emitido pela preparação (WeakSet, congelado) e ligado ao SHA dos bytes, ao HTML, à URN, à versão e ao `representationId`. Cópia, forja ou divergência → nenhuma regra aplicada (leitura igual à do perfil sem plano).
