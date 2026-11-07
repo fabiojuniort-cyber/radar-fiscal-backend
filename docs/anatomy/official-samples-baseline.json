@@ -1,0 +1,46 @@
+{
+  "samples": [
+    {
+      "id": "ricms-an1art041",
+      "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "4573054c5d797c21467caf6a0323bf05c6c29de5b9df2821a45e5c3fc73fc067",
+      "chars": 33383
+    },
+    {
+      "id": "ricms-an2art003",
+      "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "7a0be23deea5c7970d2f8b1923af759154caf19e13f1acd5ab1c93a2c9667d81",
+      "chars": 20457
+    },
+    {
+      "id": "ricms-an2art039",
+      "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "46bd68cd34eeb877dae4c7fcb0b370cb6ffe1aa38ed174e020873288cc1fe77c",
+      "chars": 12616
+    },
+    {
+      "id": "ricms-art007",
+      "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "e38b17934a429f37471a67aa97cbc4e8603fec74f4ef0db3737b2fd599ac5f56",
+      "chars": 11628
+    },
+    {
+      "id": "ricms-art008",
+      "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "7ec44bad10f8e276164c1f41958d914d0533252c31cd33b294881ba6ca666048",
+      "chars": 3219
+    },
+    {
+      "id": "ricms-art009",
+      "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "a56d81d6675e4289656b5f178c783b965f9372e382639d4323ae7ea1a8fac661",
+      "chars": 3340
+    }
+  ]
+}

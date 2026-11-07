@@ -1,109 +1,200 @@
 /**
- * E9 / P3 — the official coverage matrix "fonte × tipo de ato × variação de layout × porte" (direction approved by Fábio,
- * #116 c.6514510003; E9 criterion, STATUS-MATRIX-02 §9). It is COMPUTED from the official samples present in the
- * repository (never typed by hand): each sample is read by the engine to measure its size, then matched to the cells.
- * `--write` regenerates docs/anatomy/official-coverage-matrix.json; the unit test re-runs it and fails on drift.
+ * E9 / P3 — official coverage matrix "fonte × tipo de ato × variação de layout × porte" (direction approved by Fábio,
+ * #116 c.6514510003; E9 criterion STATUS-MATRIX-02 §9; R2 of #303 c.6701945748).
  *
- * Size criterion (documented, from the canonical text the engine produces): pequeno < 10.000 caracteres; médio 10.000 a
- * 49.999; grande ≥ 50.000. It reproduces the sizes assigned when the RFB samples were chosen (OFFICIAL-COLETA-01).
- * Promotion is recorded per sample and is not a condition of the offline milestones.
+ * ONE grid (`GRID`) is the single source of the mandatory categories: pending cells, absent categories and completeness
+ * are all derived from it, so a category with no proof can never let E9 be complete. A cell is covered only by a sample
+ * that matches ALL FOUR axes exactly AND reached the `validated` stage. Stages are kept apart:
+ *   captured   — bytes present and SHA-256 + size equal to the recorded provenance (checked before any use);
+ *   identified — the act's identity was checked in the bytes (title / idAto);
+ *   read       — read by the engine with the source's OWN profile (a diagnostic with another profile is not a read);
+ *   validated  — conservative invariants hold and the output is locked by a regression baseline run by a CI test;
+ *   accepted   — independent review recorded for that sample (none yet: collection acceptance ≠ anatomy acceptance).
+ *
+ * Size criterion: canonical characters produced by the engine. pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000.
+ * `--write` regenerates docs/anatomy/official-coverage-matrix.json and docs/anatomy/official-samples-baseline.json.
  */
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
-import { MANUAL_DIR, type ManualMeta } from './official-manual-ingest.js';
+import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
+export const SAMPLES_BASELINE = fileURLToPath(new URL('../../docs/anatomy/official-samples-baseline.json', import.meta.url));
+const LOT_BASELINE = fileURLToPath(new URL('../../docs/anatomy/official-lot-rfb.json', import.meta.url));
 export type Size = 'pequeno' | 'médio' | 'grande';
 export const sizeOf = (chars: number): Size => (chars < 10_000 ? 'pequeno' : chars < 50_000 ? 'médio' : 'grande');
+const SIZES: readonly Size[] = ['pequeno', 'médio', 'grande'];
+const sha = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
 
-export interface Sample { id: string; source: string; type: string; layout: string; chars: number; size: Size; sha256: string; promoted: boolean; origin: string; manualItem: string | null }
-export interface Cell {
-  id: string; source: string; type: string; layout: string; size: Size | 'n/a'; required: boolean; manualItems: string[];
-  status: 'covered' | 'pending'; samples: string[]; route: string; gap: string | null;
+// ---------------------------------------------------------------------------------------------------------------------
+// The single grid. Layout names are exact strings; a sample must carry the same string to match.
+export const LAYOUT = Object.freeze({
+  RFB_JSON: 'JSON multivigente (API normasinternet2)',
+  PLANALTO_HTML: 'HTML compilado do Planalto (ccivil_03)',
+  NORMASLEG_HTML: 'HTML do normas.leg.br (exportado do Word)',
+  CONFAZ_HTML: 'HTML da página do CONFAZ (Plone), salvo pelo navegador',
+  DOU_HTML: 'HTML da página do ato no in.gov.br',
+  DOU_PDF_PAGE: 'PDF da página do jornal (INPDFViewer)',
+  SP_PORTAL_HTML: 'HTML SharePoint, região "Conteúdo da Página"',
+  DOESP_JSON: 'JSON API v2 (HTML em content)',
+});
+export interface GridCell {
+  id: string; source: string; type: string; layout: string; size: Size | 'n/a';
+  /** n/a size or a non-required cell needs a verifiable justification. */
+  applicability: { required: true } | { required: false; justification: string; evidence: string };
+  sizeJustification?: string; route: string; manualItems?: string[];
 }
+const slug = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '');
+const bySize = (source: string, type: string, layout: string, route: string, manualItems: Record<string, string[]> = {}): GridCell[] =>
+  SIZES.map((size) => ({ id: `${slug(source)}--${slug(type)}--${slug(size)}`, source, type, layout, size, applicability: { required: true }, route,
+    ...(manualItems[size] ? { manualItems: manualItems[size] } : {}) }));
+export const GRID_STATUS = 'proposta do EXEC (07/11) — a aprovar pelo COORD; enquanto não aprovada, E9 não pode ser declarada completa';
+export const GRID: readonly GridCell[] = Object.freeze([
+  ...['Instrução Normativa', 'Portaria', 'Ato Declaratório Interpretativo', 'Ato Declaratório Executivo', 'Solução de Consulta', 'Resolução']
+    .flatMap((t) => bySize('RFB', t, LAYOUT.RFB_JSON, t === 'Instrução Normativa' ? 'API RFB (coletado)' : 'API RFB — P2-c (autorizada, c.6701950134)')),
+  ...bySize('Planalto', 'Lei', LAYOUT.PLANALTO_HTML, 'arquivo manual (a origem recusa este ambiente)', { grande: ['M1', 'M2'] }),
+  ...bySize('normas.leg.br', 'Lei', LAYOUT.NORMASLEG_HTML, 'normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)'),
+  // M3 and M4 are two Convênios ICMS; each is a SAMPLE whose measured size decides the cell it may cover — neither closes
+  // a cell by being received, and one never stands for the other (no OR between items).
+  ...bySize('CONFAZ', 'Convênio ICMS', LAYOUT.CONFAZ_HTML, 'arquivo manual (M3, M4)'),
+  // M5 was listed as "porte pequeno"; its measured size decides (Ajuste SINIEF 07/05 is long). The list label never closes a cell.
+  ...bySize('CONFAZ', 'Ajuste SINIEF', LAYOUT.CONFAZ_HTML, 'arquivo manual (M5 recebido; demais portes a selecionar)'),
+  ...bySize('CONFAZ', 'Protocolo ICMS', LAYOUT.CONFAZ_HTML, 'arquivo manual (a selecionar)'),
+  ...['Instrução Normativa', 'Decreto', 'Portaria', 'Resolução', 'Despacho'].flatMap((t) => bySize('DOU', t, LAYOUT.DOU_HTML, t === 'Instrução Normativa' ? 'arquivo manual (M9 em HTML)' : 'arquivo manual (a selecionar)')),
+  { id: 'dou--pagina-do-jornal--na', source: 'DOU', type: 'Página do jornal (cabeçalho e rodapé)', layout: LAYOUT.DOU_PDF_PAGE, size: 'n/a', applicability: { required: true },
+    sizeJustification: 'uma página do jornal não tem porte de ato; a célula prova cabeçalho/rodapé e não a completude do ato', route: 'M9 em PDF (obtido em outra sessão; bytes ainda não recebidos)', manualItems: ['M9'] },
+  ...bySize('SEFAZ-SP-PORTAL', 'Decreto consolidado (RICMS/2000), artigo', LAYOUT.SP_PORTAL_HTML, 'coletor oficial (coletado)'),
+  ...['Decreto', 'Resolução', 'Portaria CAT'].flatMap((t) => bySize('DOE-SP', t, LAYOUT.DOESP_JSON, 'P2-d (autorizada só depois da validação de M9)')),
+]);
 
-const read = (source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html: string, extra: object = {}) => analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-07',
-  ruleSet: { id: 'official-coverage-matrix', version: '1' }, input: { source, representationId: id, html, ...extra }, catalog: { edition: 'none', codes: [] } }).canonicalText.length;
+// ---------------------------------------------------------------------------------------------------------------------
+export interface Sample {
+  id: string; source: string; type: string; layout: string; chars: number | null; size: Size | null; sha256: string; bytes: number;
+  stages: { captured: boolean; identified: boolean; read: boolean; validated: boolean; accepted: boolean };
+  profile: string | null; diagnostic: { profile: string; chars: number } | null; outputHash: string | null; evidence: string[]; notes: string[];
+}
+export class SampleIntegrityError extends Error {}
 
-export function collectSamples(): Sample[] {
+/** Bytes are checked against the recorded provenance BEFORE any use; a divergence refuses the whole matrix. */
+export function verifiedBytes(path: string, expected: { sha256: string; bytes: number }, id: string): Uint8Array {
+  const b = new Uint8Array(readFileSync(path));
+  if (b.byteLength !== expected.bytes || sha(b) !== expected.sha256) throw new SampleIntegrityError(`${id}: bytes differ from the recorded provenance (${b.byteLength} bytes, ${sha(b).slice(0, 12)}…)`);
+  return b;
+}
+interface Read { chars: number; outputHash: string; invariants: string[] }
+/** Conservative invariants every validated sample must keep (protection, not interpretation). */
+function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html: string, extra: object = {}): Read {
+  const r = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-07', ruleSet: { id: 'official-coverage-matrix', version: '2' },
+    input: { source, representationId: id, html, ...extra }, catalog: { edition: 'none', codes: [] } });
+  const broken: string[] = [];
+  if (r.parts.some((p) => p.legalStatus !== 'unknown')) broken.push('legalStatus must stay unknown');
+  if (r.parts.some((p) => p.type === 'quoted_text' && p.context === 'operative_candidate')) broken.push('quoted text must never be operative');
+  if (r.parts.some((p) => p.type === 'unidentified') && r.status === 'complete') broken.push('unidentified content cannot be complete');
+  return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken };
+}
+type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
+const loadBaseline = (): BaselineEntry[] => (existsSync(SAMPLES_BASELINE) ? (JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: BaselineEntry[] }).samples : []);
+
+export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Sample[] {
   const out: Sample[] = [];
-  // RFB: the reproducible lot (JSON multivigente of the official API), canonical size from its own baseline.
-  const lot = JSON.parse(readFileSync(fileURLToPath(new URL('../../docs/anatomy/official-lot-rfb.json', import.meta.url)), 'utf8')) as { acts: { idAto: number; epigrafe: string; canonicalChars: number; sha256: string; promoted: boolean }[] };
-  for (const a of lot.acts) out.push({ id: `rfb:${a.idAto}`, source: 'RFB', type: /Instru[çc][ãa]o Normativa/iu.test(a.epigrafe) ? 'Instrução Normativa' : a.epigrafe, layout: 'JSON multivigente (API normasinternet2)',
-    chars: a.canonicalChars, size: sizeOf(a.canonicalChars), sha256: a.sha256, promoted: a.promoted, origin: 'coletor oficial (API RFB)', manualItem: null });
-  // Sefaz-SP consolidated legislation portal (RICMS pages), read through its proven preparation.
+  const locked = (id: string, s: string, profile: string, rd: Read) => {
+    const b = baseline.find((x) => x.id === id);
+    return rd.invariants.length === 0 && !!b && b.sha256 === s && b.profile === profile && b.outputHash === rd.outputHash;
+  };
+  // RFB — the reproducible lot: bytes checked against the snapshot meta AND the lot baseline; the lot test re-runs it.
+  const lot = JSON.parse(readFileSync(LOT_BASELINE, 'utf8')) as { acts: { idAto: number; epigrafe: string; canonicalChars: number; sha256: string; bytes: number; promoted: boolean; outputHash: string }[] };
+  for (const dir of ['rfb-normasinternet2', 'rfb-normasinternet2-coleta02', 'rfb-p2c']) {
+    const d = join(ROOT, dir); if (!existsSync(d)) continue;
+    for (const f of readdirSync(d).filter((x) => /^\d+\.meta\.json$/u.test(x)).sort()) {
+      const m = JSON.parse(readFileSync(join(d, f), 'utf8')) as { id: string; sha256: string; bytes: number; identification?: { epigrafe?: string }; p2c?: { type: string } };
+      m.id = f.slice(0, -'.meta.json'.length); // the file name is the identity (older metas carry no id field)
+      verifiedBytes(join(d, `${m.id}.json`), m, `rfb:${m.id}`);
+      const a = lot.acts.find((x) => String(x.idAto) === m.id);
+      const epi = m.identification?.epigrafe ?? a?.epigrafe ?? '';
+      const type = m.p2c?.type ?? (/^Instru[çc][ãa]o Normativa/iu.test(epi) ? 'Instrução Normativa' : epi);
+      const inLot = !!a && a.sha256 === m.sha256;
+      out.push({ id: `rfb:${m.id}`, source: 'RFB', type, layout: LAYOUT.RFB_JSON, chars: a?.canonicalChars ?? null, size: a ? sizeOf(a.canonicalChars) : null, sha256: m.sha256, bytes: m.bytes,
+        stages: { captured: true, identified: !!epi, read: inLot, validated: inLot, accepted: false }, profile: inLot ? 'RFB' : null, diagnostic: null, outputHash: a?.outputHash ?? null,
+        evidence: inLot ? ['docs/anatomy/official-lot-rfb.json', 'test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)'] : [], notes: inLot ? [] : ['not yet in the reproducible lot'] });
+    }
+  }
+  // Sefaz-SP consolidated legislation portal: read only through its proven preparation (typed source).
   const sp = join(ROOT, 'doesp-ricms');
   for (const f of readdirSync(sp).filter((x) => x.endsWith('.meta.json')).sort()) {
-    const m = JSON.parse(readFileSync(join(sp, f), 'utf8')) as { id: string; url: string; sha256: string; promoted: boolean };
-    const prep = prepareSefazSpPortalPage({ resourceId: m.id, url: m.url, bytes: new Uint8Array(readFileSync(join(sp, `${m.id}.html`))) });
-    const chars = read('SEFAZ-SP-PORTAL', m.id, prep.html, { sefazSpPortal: prep });
-    out.push({ id: m.id, source: 'SEFAZ-SP-PORTAL', type: 'Decreto consolidado (RICMS/2000), artigo', layout: 'HTML SharePoint (região "Conteúdo da Página")', chars, size: sizeOf(chars), sha256: m.sha256, promoted: m.promoted, origin: 'coletor oficial (gate OFFICIAL-01)', manualItem: null });
+    const m = JSON.parse(readFileSync(join(sp, f), 'utf8')) as { id: string; url: string; sha256: string; bytes: number };
+    const bytes = verifiedBytes(join(sp, `${m.id}.html`), m, m.id);
+    const prep = prepareSefazSpPortalPage({ resourceId: m.id, url: m.url, bytes });
+    const rd = readWith('SEFAZ-SP-PORTAL', m.id, prep.html, { sefazSpPortal: prep });
+    const ok = locked(m.id, m.sha256, 'SEFAZ-SP-PORTAL', rd);
+    out.push({ id: m.id, source: 'SEFAZ-SP-PORTAL', type: 'Decreto consolidado (RICMS/2000), artigo', layout: LAYOUT.SP_PORTAL_HTML, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
+      stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'SEFAZ-SP-PORTAL', diagnostic: null, outputHash: rd.outputHash,
+      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
   }
-  // Federal laws from the Congresso Nacional (normas.leg.br): official alternative to Planalto. No reader profile exists
-  // for this layout; the size is measured with the DOU profile (diagnostic, not a baseline).
+  // normas.leg.br: captured and identified; NO reader profile of its own → not read, not validated. The DOU-profile
+  // reading is kept as a diagnostic only (it never changes the source identity nor closes a cell).
   const lg = join(ROOT, 'leg-normas');
   for (const f of readdirSync(lg).filter((x) => /-(original|atualizada)\.meta\.json$/u.test(x)).sort()) {
-    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; promoted: boolean; manualListItem: string; titleCheck: { found: boolean } };
-    if (!m.titleCheck.found) continue;
-    const chars = read('DOU', m.id, readFileSync(join(lg, `${m.id}.html`), 'utf8'));
-    out.push({ id: m.id, source: 'Legislação federal (normas.leg.br)', type: 'Lei', layout: `HTML exportado do Word (${m.id.endsWith('atualizada') ? 'versão atualizada' : 'texto original'})`,
-      chars, size: sizeOf(chars), sha256: m.sha256, promoted: m.promoted, origin: 'fonte oficial alternativa (Congresso Nacional)', manualItem: m.manualListItem });
+    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; bytes: number; titleCheck: { found: boolean } };
+    const bytes = verifiedBytes(join(lg, `${m.id}.html`), m, m.id);
+    const diag = readWith('DOU', m.id, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
+      stages: { captured: true, identified: m.titleCheck.found, read: false, validated: false, accepted: false }, profile: null,
+      diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
   }
-  // Files saved by hand (P1) once ingested by official-manual-ingest.ts.
+  // Files saved by hand and ingested (official-manual-ingest.ts): bytes and declared encoding are checked first.
   if (existsSync(MANUAL_DIR)) for (const f of readdirSync(MANUAL_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {
     const m = JSON.parse(readFileSync(join(MANUAL_DIR, f), 'utf8')) as ManualMeta;
-    const html = readFileSync(join(MANUAL_DIR, m.fileName), 'utf8');
-    const chars = read(m.source === 'CONFAZ' ? 'CONFAZ' : 'DOU', m.item, html);
-    out.push({ id: m.item, source: m.source, type: m.type, layout: 'HTML salvo pelo navegador', chars, size: sizeOf(chars), sha256: m.sha256, promoted: false, origin: m.origin, manualItem: m.item });
+    const bytes = verifiedBytes(join(MANUAL_DIR, m.fileName), m, m.item);
+    const html = decodeDeclared(bytes, m.declaredCharset);
+    const profile = m.source === 'CONFAZ' ? 'CONFAZ' : m.source === 'DOU' ? 'DOU' : null;
+    const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : m.source === 'DOU' ? LAYOUT.DOU_HTML : LAYOUT.PLANALTO_HTML;
+    if (!profile) { out.push({ id: m.item, source: m.source, type: m.type, layout, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
+      stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio'] }); continue; }
+    const rd = readWith(profile, m.item, html);
+    const ok = locked(m.item, m.sha256, profile, rd);
+    out.push({ id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
+      stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile, diagnostic: null, outputHash: rd.outputHash,
+      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
   }
   return out;
 }
 
-interface CellSpec extends Omit<Cell, 'status' | 'samples' | 'gap'> { match: (s: Sample) => boolean; pendingGap: string }
-const ofItem = (...items: string[]) => (s: Sample) => s.manualItem !== null && items.includes(s.manualItem);
-const CELLS: CellSpec[] = [
-  ...(['pequeno', 'médio', 'grande'] as const).map((size): CellSpec => ({ id: `rfb-in-${size === 'médio' ? 'medio' : size}`, source: 'RFB', type: 'Instrução Normativa', layout: 'JSON multivigente', size,
-    required: true, manualItems: [], route: 'API RFB (acessível)', match: (s) => s.source === 'RFB' && s.type === 'Instrução Normativa' && s.size === size, pendingGap: 'sem amostra' })),
-  { id: 'lei-federal-grande', source: 'Legislação federal (Planalto ou normas.leg.br)', type: 'Lei', layout: 'HTML', size: 'grande', required: true, manualItems: ['M1', 'M2'],
-    route: 'normas.leg.br (acessível); Planalto recusa este ambiente', match: (s) => s.type === 'Lei' && s.size === 'grande', pendingGap: 'M1/M2' },
-  { id: 'confaz-convenio', source: 'CONFAZ', type: 'Convênio ICMS', layout: 'HTML', size: 'n/a', required: true, manualItems: ['M3', 'M4'],
-    route: 'arquivo manual (a origem recusa este ambiente)', match: ofItem('M3', 'M4'), pendingGap: 'M3 e M4 não recebidos' },
-  { id: 'confaz-ajuste-pequeno', source: 'CONFAZ', type: 'Ajuste SINIEF', layout: 'HTML', size: 'pequeno', required: true, manualItems: ['M5'],
-    route: 'arquivo manual (a origem recusa este ambiente)', match: ofItem('M5'), pendingGap: 'M5 não recebido' },
-  { id: 'dou-pagina-ato', source: 'DOU', type: 'Página de ato (cabeçalho e rodapé)', layout: 'HTML', size: 'n/a', required: true, manualItems: ['M9'],
-    route: 'arquivo manual (a origem recusa este ambiente)', match: ofItem('M9'), pendingGap: 'M9 não recebido' },
-  { id: 'sefazsp-ricms-medio', source: 'SEFAZ-SP-PORTAL', type: 'Decreto consolidado (RICMS/2000), artigo', layout: 'HTML SharePoint', size: 'médio', required: true, manualItems: [],
-    route: 'coletor oficial (acessível)', match: (s) => s.source === 'SEFAZ-SP-PORTAL' && s.size === 'médio', pendingGap: 'sem amostra' },
-  { id: 'doesp-diario', source: 'DOE-SP', type: 'Publicação do diário (decretos, resoluções, portarias)', layout: 'JSON API v2 (HTML em content)', size: 'n/a', required: true, manualItems: ['M10'],
-    route: 'doe.sp.gov.br responde; coleta depende de decisão (lote 2, depois de M9)', match: (s) => s.source === 'DOE-SP', pendingGap: 'pendente até reconciliação do M10 (fonte do projeto no escopo aprovado)' },
-];
+/** The regression lock for non-RFB samples read with their own profile (regenerated only with --write). */
+export function samplesBaseline(samples: Sample[]): { samples: BaselineEntry[] } {
+  return { samples: samples.filter((s) => s.profile && s.outputHash && s.source !== 'RFB' && s.notes.length === 0)
+    .map((s) => ({ id: s.id, sha256: s.sha256, profile: s.profile!, outputHash: s.outputHash!, chars: s.chars! })) };
+}
 
-/** Act types present in the project sources with no sample yet ("categorias ainda ausentes"), with the route. */
-export const ABSENT_CATEGORIES = Object.freeze([
-  { source: 'RFB', types: ['Portaria', 'Ato Declaratório (ADI/ADE)', 'Solução de Consulta', 'Resolução'], route: 'API RFB (acessível; nova coleta finita depende de decisão)' },
-  { source: 'DOU', types: ['Decreto', 'Portaria', 'Resolução', 'Despacho'], route: 'arquivo manual (a origem recusa este ambiente)' },
-  { source: 'CONFAZ', types: ['Protocolo ICMS'], route: 'arquivo manual (a origem recusa este ambiente)' },
-  { source: 'DOE-SP', types: ['Decreto', 'Resolução', 'Portaria CAT'], route: 'doe.sp.gov.br (acessível; depende de decisão)' },
-]);
-
-export function buildMatrix(samples = collectSamples()) {
-  const cells: Cell[] = CELLS.map(({ match, pendingGap, ...c }) => {
-    const hit = samples.filter(match).map((s) => s.id);
-    return { ...c, status: hit.length ? 'covered' : 'pending', samples: hit, gap: hit.length ? null : pendingGap };
+export const matches = (c: GridCell, s: Sample) => s.source === c.source && s.type === c.type && s.layout === c.layout && (c.size === 'n/a' || s.size === c.size);
+export function buildMatrix(samples = collectSamples(), grid: readonly GridCell[] = GRID, gridApproved = false) {
+  const cells = grid.map((c) => {
+    const hits = samples.filter((s) => matches(c, s));
+    const validated = hits.filter((s) => s.stages.validated).map((s) => s.id);
+    return { ...c, status: validated.length ? 'covered' as const : 'pending' as const, validatedSamples: validated, accepted: hits.some((s) => s.stages.accepted),
+      unvalidatedSamples: hits.filter((s) => !s.stages.validated).map((s) => ({ id: s.id, stages: s.stages })) };
   });
-  const pending = cells.filter((c) => c.required && c.status === 'pending').map((c) => c.id);
-  return { criterion: { approval: 'tribusca-control#116 c.6514510003 (fonte × tipo × layout × porte); E9: STATUS-MATRIX-02 §9 (sem fração)',
-    size: 'pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor' },
-    samples, cells, absentCategories: ABSENT_CATEGORIES, requiredPending: pending, e9MatrixComplete: pending.length === 0 };
+  const required = cells.filter((c) => c.applicability.required);
+  const pending = required.filter((c) => c.status === 'pending').map((c) => c.id);
+  const unmatched = samples.filter((s) => !grid.some((c) => matches(c, s)) && s.size !== null).map((s) => s.id);
+  return { criterion: { approval: 'tribusca-control#116 c.6514510003; E9: STATUS-MATRIX-02 §9 (sem fração); R2 #303 c.6701945748',
+    size: 'pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor', stages: 'captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)' },
+    grid: { status: GRID_STATUS, approved: gridApproved, cells: grid.length, required: required.length },
+    samples, cells, requiredPending: pending, coveredRequired: required.length - pending.length, samplesOutsideGrid: unmatched,
+    e9MatrixComplete: gridApproved && pending.length === 0 };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  if (process.argv.includes('--write')) {
+    const first = collectSamples([]);
+    writeFileSync(SAMPLES_BASELINE, `${JSON.stringify(samplesBaseline(first), null, 2)}\n`);
+  }
   const m = buildMatrix();
   if (process.argv.includes('--write')) writeFileSync(MATRIX_FILE, `${JSON.stringify(m, null, 2)}\n`);
-  for (const c of m.cells) console.log(`${c.status === 'covered' ? '✅' : '❌'} ${c.id} | ${c.source} × ${c.type} × ${c.layout} × ${c.size} | ${c.samples.join(', ') || c.gap}`);
-  console.log(`pending: ${m.requiredPending.join(', ') || 'none'}; complete: ${m.e9MatrixComplete}`);
+  for (const c of m.cells.filter((x) => x.status === 'covered' || x.unvalidatedSamples.length)) console.log(`${c.status === 'covered' ? '✅' : '…'} ${c.id} | validated: ${c.validatedSamples.join(', ') || '—'} | not validated: ${c.unvalidatedSamples.map((u) => u.id).join(', ') || '—'}`);
+  console.log(`grid ${m.grid.cells} cells (${m.grid.required} required); covered ${m.coveredRequired}; pending ${m.requiredPending.length}; complete: ${m.e9MatrixComplete}`);
 }
