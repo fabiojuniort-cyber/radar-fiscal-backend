@@ -1,0 +1,408 @@
+{
+  "criterion": {
+    "approval": "tribusca-control#116 c.6514510003 (fonte × tipo × layout × porte); E9: STATUS-MATRIX-02 §9 (sem fração)",
+    "size": "pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor"
+  },
+  "samples": [
+    {
+      "id": "rfb:104314",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 809136,
+      "size": "grande",
+      "sha256": "9005fddbc2df67e39127db7d34d2feb53ef8dfdc42bc59056862e97b9bb200b5",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "rfb:108391",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 2003,
+      "size": "pequeno",
+      "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "rfb:115131",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 57179,
+      "size": "grande",
+      "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "rfb:116968",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 151963,
+      "size": "grande",
+      "sha256": "4ca8d1d3179f32301ebaa34cc7f6eaa9936a0d20df7b44e1ead5d0b828664e78",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "rfb:127905",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 1009001,
+      "size": "grande",
+      "sha256": "9672e74829990edc5246b03eca3e65999499edd9d334cc988293133dbf66490b",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "rfb:133898",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 4540,
+      "size": "pequeno",
+      "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "rfb:141910",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 31389,
+      "size": "médio",
+      "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+      "promoted": false,
+      "origin": "coletor oficial (API RFB)",
+      "manualItem": null
+    },
+    {
+      "id": "ricms-an1art041",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint (região \"Conteúdo da Página\")",
+      "chars": 33383,
+      "size": "médio",
+      "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+      "promoted": false,
+      "origin": "coletor oficial (gate OFFICIAL-01)",
+      "manualItem": null
+    },
+    {
+      "id": "ricms-an2art003",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint (região \"Conteúdo da Página\")",
+      "chars": 20457,
+      "size": "médio",
+      "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+      "promoted": false,
+      "origin": "coletor oficial (gate OFFICIAL-01)",
+      "manualItem": null
+    },
+    {
+      "id": "ricms-an2art039",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint (região \"Conteúdo da Página\")",
+      "chars": 12616,
+      "size": "médio",
+      "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+      "promoted": false,
+      "origin": "coletor oficial (gate OFFICIAL-01)",
+      "manualItem": null
+    },
+    {
+      "id": "ricms-art007",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint (região \"Conteúdo da Página\")",
+      "chars": 11628,
+      "size": "médio",
+      "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+      "promoted": false,
+      "origin": "coletor oficial (gate OFFICIAL-01)",
+      "manualItem": null
+    },
+    {
+      "id": "ricms-art008",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint (região \"Conteúdo da Página\")",
+      "chars": 3219,
+      "size": "pequeno",
+      "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+      "promoted": false,
+      "origin": "coletor oficial (gate OFFICIAL-01)",
+      "manualItem": null
+    },
+    {
+      "id": "ricms-art009",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint (região \"Conteúdo da Página\")",
+      "chars": 3340,
+      "size": "pequeno",
+      "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+      "promoted": false,
+      "origin": "coletor oficial (gate OFFICIAL-01)",
+      "manualItem": null
+    },
+    {
+      "id": "lei-10637-2002-atualizada",
+      "source": "Legislação federal (normas.leg.br)",
+      "type": "Lei",
+      "layout": "HTML exportado do Word (versão atualizada)",
+      "chars": 74715,
+      "size": "grande",
+      "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
+      "promoted": false,
+      "origin": "fonte oficial alternativa (Congresso Nacional)",
+      "manualItem": "M1"
+    },
+    {
+      "id": "lei-10637-2002-original",
+      "source": "Legislação federal (normas.leg.br)",
+      "type": "Lei",
+      "layout": "HTML exportado do Word (texto original)",
+      "chars": 60422,
+      "size": "grande",
+      "sha256": "bb863c51cf4cabeed3ee34826137d6bf812e9b4fe05f8bfc9c4b45028efc71cc",
+      "promoted": false,
+      "origin": "fonte oficial alternativa (Congresso Nacional)",
+      "manualItem": "M1"
+    },
+    {
+      "id": "lei-10833-2003-atualizada",
+      "source": "Legislação federal (normas.leg.br)",
+      "type": "Lei",
+      "layout": "HTML exportado do Word (versão atualizada)",
+      "chars": 167570,
+      "size": "grande",
+      "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
+      "promoted": false,
+      "origin": "fonte oficial alternativa (Congresso Nacional)",
+      "manualItem": "M2"
+    },
+    {
+      "id": "lei-10833-2003-original",
+      "source": "Legislação federal (normas.leg.br)",
+      "type": "Lei",
+      "layout": "HTML exportado do Word (texto original)",
+      "chars": 110418,
+      "size": "grande",
+      "sha256": "60044e683ac4078fb90888db9986431fb96bc7b5316f0740ba638b43fd24f0d1",
+      "promoted": false,
+      "origin": "fonte oficial alternativa (Congresso Nacional)",
+      "manualItem": "M2"
+    }
+  ],
+  "cells": [
+    {
+      "id": "rfb-in-pequeno",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente",
+      "size": "pequeno",
+      "required": true,
+      "manualItems": [],
+      "route": "API RFB (acessível)",
+      "status": "covered",
+      "samples": [
+        "rfb:108391",
+        "rfb:133898"
+      ],
+      "gap": null
+    },
+    {
+      "id": "rfb-in-medio",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente",
+      "size": "médio",
+      "required": true,
+      "manualItems": [],
+      "route": "API RFB (acessível)",
+      "status": "covered",
+      "samples": [
+        "rfb:141910"
+      ],
+      "gap": null
+    },
+    {
+      "id": "rfb-in-grande",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente",
+      "size": "grande",
+      "required": true,
+      "manualItems": [],
+      "route": "API RFB (acessível)",
+      "status": "covered",
+      "samples": [
+        "rfb:104314",
+        "rfb:115131",
+        "rfb:116968",
+        "rfb:127905"
+      ],
+      "gap": null
+    },
+    {
+      "id": "lei-federal-grande",
+      "source": "Legislação federal (Planalto ou normas.leg.br)",
+      "type": "Lei",
+      "layout": "HTML",
+      "size": "grande",
+      "required": true,
+      "manualItems": [
+        "M1",
+        "M2"
+      ],
+      "route": "normas.leg.br (acessível); Planalto recusa este ambiente",
+      "status": "covered",
+      "samples": [
+        "lei-10637-2002-atualizada",
+        "lei-10637-2002-original",
+        "lei-10833-2003-atualizada",
+        "lei-10833-2003-original"
+      ],
+      "gap": null
+    },
+    {
+      "id": "confaz-convenio",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "layout": "HTML",
+      "size": "n/a",
+      "required": true,
+      "manualItems": [
+        "M3",
+        "M4"
+      ],
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "status": "pending",
+      "samples": [],
+      "gap": "M3 e M4 não recebidos"
+    },
+    {
+      "id": "confaz-ajuste-pequeno",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "layout": "HTML",
+      "size": "pequeno",
+      "required": true,
+      "manualItems": [
+        "M5"
+      ],
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "status": "pending",
+      "samples": [],
+      "gap": "M5 não recebido"
+    },
+    {
+      "id": "dou-pagina-ato",
+      "source": "DOU",
+      "type": "Página de ato (cabeçalho e rodapé)",
+      "layout": "HTML",
+      "size": "n/a",
+      "required": true,
+      "manualItems": [
+        "M9"
+      ],
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "status": "pending",
+      "samples": [],
+      "gap": "M9 não recebido"
+    },
+    {
+      "id": "sefazsp-ricms-medio",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint",
+      "size": "médio",
+      "required": true,
+      "manualItems": [],
+      "route": "coletor oficial (acessível)",
+      "status": "covered",
+      "samples": [
+        "ricms-an1art041",
+        "ricms-an2art003",
+        "ricms-an2art039",
+        "ricms-art007"
+      ],
+      "gap": null
+    },
+    {
+      "id": "doesp-diario",
+      "source": "DOE-SP",
+      "type": "Publicação do diário (decretos, resoluções, portarias)",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "n/a",
+      "required": true,
+      "manualItems": [
+        "M10"
+      ],
+      "route": "doe.sp.gov.br responde; coleta depende de decisão (lote 2, depois de M9)",
+      "status": "pending",
+      "samples": [],
+      "gap": "pendente até reconciliação do M10 (fonte do projeto no escopo aprovado)"
+    }
+  ],
+  "absentCategories": [
+    {
+      "source": "RFB",
+      "types": [
+        "Portaria",
+        "Ato Declaratório (ADI/ADE)",
+        "Solução de Consulta",
+        "Resolução"
+      ],
+      "route": "API RFB (acessível; nova coleta finita depende de decisão)"
+    },
+    {
+      "source": "DOU",
+      "types": [
+        "Decreto",
+        "Portaria",
+        "Resolução",
+        "Despacho"
+      ],
+      "route": "arquivo manual (a origem recusa este ambiente)"
+    },
+    {
+      "source": "CONFAZ",
+      "types": [
+        "Protocolo ICMS"
+      ],
+      "route": "arquivo manual (a origem recusa este ambiente)"
+    },
+    {
+      "source": "DOE-SP",
+      "types": [
+        "Decreto",
+        "Resolução",
+        "Portaria CAT"
+      ],
+      "route": "doe.sp.gov.br (acessível; depende de decisão)"
+    }
+  ],
+  "requiredPending": [
+    "confaz-convenio",
+    "confaz-ajuste-pequeno",
+    "dou-pagina-ato",
+    "doesp-diario"
+  ],
+  "e9MatrixComplete": false
+}

@@ -14,8 +14,8 @@ Para que servem: as amostras oficiais (entrega 9) e os cabeçalhos e rodapés (e
 
 | # | Para quê | Link | O que deve aparecer na página |
 |---|---|---|---|
-| M1 | Lei de PIS/Cofins, porte grande | https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm | Título "LEI Nº 10.637, DE 30 DE DEZEMBRO DE 2002" e texto compilado com notas de redação |
-| M2 | Lei de PIS/Cofins, porte grande | https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm | Título "LEI Nº 10.833, DE 29 DE DEZEMBRO DE 2003" |
+| ~~M1~~ ✅ obtido pela fonte oficial alternativa normas.leg.br (07/11; `official-identification/leg-normas/`) | Lei de PIS/Cofins, porte grande | https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm | Título "LEI Nº 10.637, DE 30 DE DEZEMBRO DE 2002" e texto compilado com notas de redação |
+| ~~M2~~ ✅ obtido pela fonte oficial alternativa normas.leg.br (07/11; `official-identification/leg-normas/`) | Lei de PIS/Cofins, porte grande | https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm | Título "LEI Nº 10.833, DE 29 DE DEZEMBRO DE 2003" |
 | M3 | Convênio alternativo | https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18 | "CONVÊNIO ICMS 142/18" |
 | M4 | Convênio alternativo | https://www.confaz.fazenda.gov.br/legislacao/convenios/2017/CV190_17 | "CONVÊNIO ICMS 190/17" |
 | M5 | Ajuste SINIEF, porte pequeno | https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ_007_05 | "AJUSTE SINIEF 07/05" |
@@ -28,3 +28,5 @@ Para que servem: as amostras oficiais (entrega 9) e os cabeçalhos e rodapés (e
 Os números de M1 e M2 serão conferidos no próprio arquivo salvo. Se o título não bater, o arquivo é recusado e registrado, sem presumir nada.
 
 **Atualização ANAT-D03:** só M6, M7 e M8 foram dispensados, porque suas INs foram coletadas pela API oficial da RFB com o mesmo idAto da lista (115131, 141910, 108391). A IN 2.162/2023 (133898) é extra. **M1 a M5 e M9 continuam necessários**: nenhum foi dispensado por presunção.
+
+**Atualização E9 (07/11/2026):** M1 e M2 foram obtidos pelo normas.leg.br (Congresso Nacional), fonte oficial alternativa com texto original e versão atualizada; o Planalto continua recusando este ambiente. **Continuam necessários: M3, M4, M5 e M9.** A lista única e a ingestão estão em `docs/anatomy/E9-COVERAGE-P1-P3.md`.

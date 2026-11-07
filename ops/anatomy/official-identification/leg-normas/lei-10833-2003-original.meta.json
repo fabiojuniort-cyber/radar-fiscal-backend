@@ -1,0 +1,29 @@
+{
+  "id": "lei-10833-2003-original",
+  "manualListItem": "M2",
+  "act": "Lei nº 10.833, de 29/12/2003 (Cofins não cumulativa)",
+  "urn": "urn:lex:br:federal:lei:2003-12-29;10833",
+  "version": "texto original",
+  "workUrl": "https://normas.leg.br/?urn=urn:lex:br:federal:lei:2003-12-29;10833",
+  "url": "https://normas.leg.br/api/public/binario/a4356381-ab3c-4fac-a081-bb5310a345b3/texto",
+  "finalUrl": "https://normas.leg.br/api/public/binario/a4356381-ab3c-4fac-a081-bb5310a345b3/texto",
+  "status": 200,
+  "contentType": "text/html",
+  "lastModified": null,
+  "sha256": "60044e683ac4078fb90888db9986431fb96bc7b5316f0740ba638b43fd24f0d1",
+  "bytes": 308155,
+  "consultedAt": "2026-11-07T03:34:27.443571Z",
+  "publisher": "Congresso Nacional (normas.leg.br)",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "representation": "html",
+  "titleCheck": {
+    "expected": "LEI N\\S*\\s*10\\.833\\s*[,–—-]?\\s*DE\\s+29\\s+DE\\s+DEZEMBRO\\s+DE\\s+2003",
+    "found": true,
+    "matched": "LEI Nº 10.833, DE 29 DE DEZEMBRO DE 2003"
+  },
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "verified": false,
+  "promoted": false,
+  "reason": "M2 (OFFICIAL-ARQUIVOS-MANUAIS): lei de PIS/Cofins, porte grande; Planalto recusa este ambiente, obtida pela fonte oficial alternativa normas.leg.br"
+}
