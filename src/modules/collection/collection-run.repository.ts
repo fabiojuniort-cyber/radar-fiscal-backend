@@ -63,6 +63,8 @@ export interface FinishAttemptInput {
   workerId?: string;
   sourceId?: string;
   connectorKey?: string;
+  /** App clock for finished_at (injectable for deterministic tests); defaults to the current time. */
+  now?: () => Date;
 }
 
 function asJson(value: unknown): Json {
@@ -555,7 +557,7 @@ export async function finishCollectionAttempt(
   db: Kysely<DB>,
   input: FinishAttemptInput,
 ): Promise<boolean> {
-  const finishedAt = new Date();
+  const finishedAt = input.now?.() ?? new Date();
   // started_at comes from the database clock (now(), microseconds) and finishedAt from the app clock (milliseconds):
   // never record a finish before the start (chk_attempt_dates), whatever the skew or truncation.
   const finishedAtNotBeforeStart = sql<Date>`greatest(started_at, ${finishedAt}::timestamptz)`;
