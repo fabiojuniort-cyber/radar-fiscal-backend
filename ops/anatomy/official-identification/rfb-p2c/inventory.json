@@ -353,6 +353,16 @@
     "ADE": "round 1: 32 ADE results, all of 2026 (excluded by the conservative 2026 margin; reserved list also covers ade 79/119/120/26); round 2: search failed (network) — not read as absence",
     "Solução de Consulta": "rounds 1 and 2: the search returns 2026 acts first (98 of 100 results), excluded by the 2026 margin; no case captured — not read as absence",
     "Portaria, ADI, Resolução": "5 requests each: only small acts among the 4 captures tried per type; médio/grande not found within the limit — not read as absence",
-    "nextDecision": "either accept 2026 acts that are not reserved (the reserved list stays the gate) or use the year facet (format unknown; costs a request to discover) — needs COORD decision"
+    "nextDecision": "either accept 2026 acts that are not reserved (the reserved list stays the gate) or use the year facet (format unknown; costs a request to discover) — needs COORD decision — superseded: the budget is exhausted (28/25 combined); any resumption needs a new decision",
+    "combinedLedger": {
+      "thisSession": 19,
+      "otherSessionReported": 9,
+      "combinedReported": 28,
+      "limit": 25,
+      "excess": 3,
+      "source": "radar-fiscal-backend#303 c.6702168770 (other session: 4 public SPA discovery files + 1 query per category; no act captured)",
+      "status": "P2-c SUSPENDED: no request remaining; resumption only by a new material decision",
+      "note": "the 6 requests previously reported as remaining do not exist; this session made no request after the 19 recorded here"
+    }
   }
 }

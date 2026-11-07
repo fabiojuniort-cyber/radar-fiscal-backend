@@ -86,9 +86,9 @@
 | ADE | 2 | rodada 1: só atos de 2026 (margem); rodada 2: falha de rede (registrada) |
 | Solução de Consulta | 2 | a busca devolve primeiro os atos de 2026 (98 de 100), excluídos pela margem |
 
-**Total: 19 de 25.** O EXEC parou de propósito: uma 3ª busca teria a mesma ordenação. "Não encontrado no limite" ≠ "inexistente".
+**Total desta sessão: 19.** Outra sessão informou mais 9 requisições, feitas sem conferir este registro (#303 c.6702168770; nenhum ato capturado). **Total combinado: 28 de 25, 3 acima do limite.** O P2-c está **suspenso**: não há saldo, e retomar exige nova decisão. Esta sessão não fez nenhuma requisição além das 19. "Não encontrado no limite" ≠ "inexistente".
 
-**Decisão pedida:** aceitar atos de 2026 não reservados (a lista de reservados continua sendo o filtro) ou usar o filtro de ano (formato desconhecido; descobrir custa uma requisição).
+**Decisão para uma eventual retomada** (sem saldo hoje): aceitar atos de 2026 não reservados, ou usar o filtro de ano.
 
 Os 3 atos entraram no lote reproduzível. Os 7 atos anteriores ficam **idênticos**.
 
