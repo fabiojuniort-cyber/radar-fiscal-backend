@@ -185,7 +185,8 @@ test('077_anat_base through the real migration runner (fresh disposable database
     const A1 = sha('a1'); const A2 = sha('a2');
 
     await t.test('the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented', async () => {
-      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), 'b6ccf583', 'engine identity unchanged');
+      // ANAT-STRUCT-01 (groups, considerandos, items) b6ccf583… → 0481229a…; R1 fixes → 9bab0682…; ANAT-STRUCT-02 (caput, parágrafo único) on top → 4f3256e6…; ANAT-PDF-01 (pdf-reader in the identity) → c00a7dd1…; ANAT-D02 caput continuation merged → 3bb569f9…; R2-08 merged → adbfc3c9…; R2-01/R2-02 merged → 5167e02a…; R2-01 fragment fix merged → 50807eac…; R2-05 page coverage → b84baddb…; R3 R2-05 visual coverage → 512073f7…; ANAT-D04 RFB declared types → e7afa9f0…; D04-R1-01 → ae26c438…; ANAT-D05 contract → 5a432043…; ANAT-L14/L15/L16 Sefaz-SP portal → dba9fc5e…; R2-SP-01/R1-SP-02 → adebe95c…; ANAT-L17 SEFAZ-SP-PORTAL typed source → 7a7c5fab…; parallel branch ANAT-L11 RFB parte (from 5a432043) → 525e9466…; COMPOSE-01 merge of L11 (#290) into L17 (#292) → afb275ec…; ANAT-L21 leading U+200B (portal) → 029514bb…; parallel ANAT-L22 RFB declared anexo (from afb275ec) → fb5059a8…; COMPOSE-02 (#298 ← #296 ← #297) → 050602a3…, regenerated with --write.
+      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), '050602a3', 'engine identity is the current build');
       await asRole('radar_worker', ...analysis(A1, v1, { effective_profile_hash: effectiveHash, family: 'Instrução Normativa' }));
       await asRole('radar_worker', ...analysis(A2, v2));
       await asRole('radar_worker', `INSERT INTO anatomy_parts (anatomy_id, id, parent_id, sibling_order, type, label, start_utf16, end_utf16,

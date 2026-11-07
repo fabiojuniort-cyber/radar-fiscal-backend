@@ -184,7 +184,14 @@ export const anatomyResultSchema = anatomyResultShapeSchema.superRefine((result,
     const group = siblings.get(part.parentId) ?? [];
     group.push(part); siblings.set(part.parentId, group);
     if ((part.coverage === 'unidentified' || part.recognition === 'unidentified') && part.type !== 'unidentified') issue(`Unidentified part must retain its explicit type: ${part.id}`);
-    if (part.type === 'unidentified' && part.context !== 'unknown') issue(`Unidentified part cannot assert operative context: ${part.id}`);
+    // ANAT-D05: an unidentified part is never operative. It may be 'historical' ONLY with traceable source evidence of
+    // struck-through wording: the reason rfb_tachado_source AND a matching rfb_tachado_evidence record (same partId and
+    // span). A reason alone, or evidence for another part/span, is refused. legalStatus is untouched (stays unknown).
+    if (part.type === 'unidentified' && part.context !== 'unknown') {
+      const evidenced = part.context === 'historical' && part.contextReasons.includes('rfb_tachado_source')
+        && result.limitations.some((l) => l.code === 'rfb_tachado_evidence' && l.partId === part.id && l.span !== null && l.span.start === part.span.start && l.span.end === part.span.end);
+      if (!evidenced) issue(`Unidentified part cannot assert operative context: ${part.id}`);
+    }
   }
   for (const group of siblings.values()) {
     group.forEach((part, index) => {
