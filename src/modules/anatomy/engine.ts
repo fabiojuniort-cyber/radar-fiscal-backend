@@ -9,19 +9,22 @@ import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } fro
 import { compileProfileRules } from './profile-rules.js';
 import type { SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
 import type { RfbQuoteResumePlan } from './rfb-quote-resume.js';
+import type { NormasLegPreparation } from './normas-leg-preparation.js';
 
 export const ANATOMY_ENGINE_VERSION = 'anatomy/0.1.0' as const;
 const requestSchema = z.strictObject({
   publicationVersionId: z.string().min(1).max(256),
   referenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   ruleSet: z.strictObject({ id: z.string().min(1).max(256), version: z.string().min(1).max(256) }),
-  input: z.strictObject({ source: z.enum(['CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL']), representationId: z.string().min(1).max(256),
+  input: z.strictObject({ source: z.enum(['CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL', 'NORMAS-LEG']), representationId: z.string().min(1).max(256),
     html: z.string().optional(), text: z.string().optional(), missingResources: z.array(z.string().min(1)).optional(),
     // ANAT-L17: out-of-band provenance for SEFAZ-SP-PORTAL. Kept by reference (never cloned or rebuilt from data), so
     // only the object issued by prepareSefazSpPortalPage can pass verification; serialized JSON never does.
     sefazSpPortal: z.custom<SefazSpPortalPreparation>((v) => typeof v === 'object' && v !== null).optional(),
     // ANAT-L20: the RFB quotation-resume plan, kept by reference like the portal proof (verified in the reader).
-    rfbQuoteResume: z.custom<RfbQuoteResumePlan>((v) => typeof v === 'object' && v !== null).optional() }),
+    rfbQuoteResume: z.custom<RfbQuoteResumePlan>((v) => typeof v === 'object' && v !== null).optional(),
+    // L-LEG-01: the normas.leg.br note plan, kept by reference like the portal proof (verified in the reader).
+    normasLeg: z.custom<NormasLegPreparation>((v) => typeof v === 'object' && v !== null).optional() }),
   // A manifest is not proof that attachment contents were read. Unread material is always partial.
   attachments: z.array(z.strictObject({ resourceId: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
     state: z.enum(['missing', 'unprocessed']) })).default([]),
@@ -39,6 +42,7 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
   // ANAT-L17: the portal proof belongs to its typed source only; any other source carrying it is refused (no mixing).
   if (request.input.sefazSpPortal !== undefined && request.input.source !== 'SEFAZ-SP-PORTAL') throw new TypeError('sefazSpPortal provenance is only valid for source SEFAZ-SP-PORTAL');
   if (request.input.rfbQuoteResume !== undefined && request.input.source !== 'RFB') throw new TypeError('rfbQuoteResume plan is only valid for source RFB');
+  if (request.input.normasLeg !== undefined && request.input.source !== 'NORMAS-LEG') throw new TypeError('normasLeg preparation is only valid for source NORMAS-LEG');
   if (new Set(request.attachments.map(item => item.resourceId)).size !== request.attachments.length) throw new TypeError('Duplicate attachment identity');
   const attachments = [...request.attachments].sort((a, b) => a.resourceId.localeCompare(b.resourceId, 'en'));
   const missingResources = [...new Set([...(request.input.missingResources ?? []),

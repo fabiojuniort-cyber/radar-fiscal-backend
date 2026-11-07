@@ -4,14 +4,19 @@ import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, typ
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
 import { verifySefazSpPortalProvenance, type SefazSpPortalPreparation } from './sefaz-sp-preparation.js';
 import { verifyRfbQuoteResumePlan, type RfbQuoteResumePlan } from './rfb-quote-resume.js';
+import { verifyNormasLegPreparation, type NormasLegBlock, type NormasLegPreparation } from './normas-leg-preparation.js';
 
 export class SefazSpProvenanceError extends TypeError {
   readonly code = 'sefaz_sp_portal_provenance_unverified';
   constructor(message: string) { super(message); this.name = 'SefazSpProvenanceError'; }
 }
+export class NormasLegProvenanceError extends TypeError {
+  readonly code = 'normas_leg_provenance_unverified';
+  constructor(message: string) { super(message); this.name = 'NormasLegProvenanceError'; }
+}
 
 export interface AnatomyReaderInput {
-  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
+  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL' | 'NORMAS-LEG';
   representationId: string;
   html?: string | undefined;
   text?: string | undefined;
@@ -28,6 +33,11 @@ export interface AnatomyReaderInput {
    * add the review signal `rfb_quote_unclosed_resume_candidate`; parts, contexts, types and sourceMap never change.
    */
   rfbQuoteResume?: RfbQuoteResumePlan | undefined;
+  /**
+   * L-LEG-01: preparation issued by prepareNormasLegPage for this exact HTML and representationId. Required
+   * (fail-closed) for source NORMAS-LEG; ignored for every other source.
+   */
+  normasLeg?: NormasLegPreparation | undefined;
 }
 export type AnatomyReaderResult = Pick<AnatomyResult, 'canonicalText' | 'parts' | 'sourceMap' | 'coverage' | 'limitations' | 'status'>;
 export const ANATOMY_READER_LIMITS = Object.freeze({ maxBytes: 2 * 1024 * 1024, maxDepth: 128, maxNodes: 50_000 });
@@ -196,6 +206,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     || !verifySefazSpPortalProvenance(input.sefazSpPortal, input.html, input.representationId))) {
     throw new SefazSpProvenanceError('SEFAZ-SP-PORTAL requires the preparation issued by prepareSefazSpPortalPage for this exact HTML and representationId');
   }
+  // L-LEG-01 (fail-closed, as L17): the typed normas.leg.br source needs the issued plan for this exact HTML and id.
+  if (input.source === 'NORMAS-LEG' && (input.html === undefined
+    || !verifyNormasLegPreparation(input.normasLeg, input.html, input.representationId))) {
+    throw new NormasLegProvenanceError('NORMAS-LEG requires the preparation issued by prepareNormasLegPage for this exact HTML and representationId');
+  }
   const result: AnatomyReaderResult = { canonicalText: '', parts: [], sourceMap: [],
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
     limitations: [], status: 'complete' };
@@ -241,6 +256,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   if (!raw) return fallback('missing_body', 'No readable body supplied.');
   if (representation === 'text') return fallback('plain_text_unidentified', 'Plain text is accounted for without inventing structural markup.');
 
+  // L-LEG-01: the verified plan, keyed by the raw start of each planned block; elements are found by raw offset.
+  const llegPlan = input.source === 'NORMAS-LEG' ? new Map(input.normasLeg!.plan.blocks.map((b) => [b.htmlSpan.start, b])) : null;
+  const nodeAt = new Map<number, Node>();
+  const llegSeen = new Set<NormasLegBlock>();
   const dom: Node = { tag: 'root', attrs: {}, path: '', start: 0, end: raw.length, children: [], text: null, span: { start: 0, end: 0 }, blocked: false };
   const stack = [dom]; let nodeCount = 0; let exceeded = false;
   const childCounts = new Map<Node, Map<string, number>>();
@@ -259,7 +278,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (parent.path.length + tag.length + 16 > 4096) { exceeded = true; parser.pause(); return; }
       const node: Node = { tag, attrs, path: `${parent.path}/${tag}[${index}]`, start: parser.startIndex,
         end: parser.endIndex + 1, children: [], text: null, span: { start: 0, end: 0 }, blocked: parent.blocked || excluded.has(tag) };
-      parent.children.push(node); stack.push(node);
+      parent.children.push(node); stack.push(node); if (llegPlan) nodeAt.set(node.start, node);
     },
     ontext(text) {
       if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes) { exceeded = true; parser.pause(); return; }
@@ -554,7 +573,43 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (rfbStruck && (descriptor.context === 'operative_candidate' || struckUnidentified)) descriptor = { ...descriptor, context: 'historical' };
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
+      // L-LEG-01 (design §3, §11): only through the verified plan, only for this exact block. Never promotes.
+      const lleg = llegPlan?.get(node.start);
+      let llegNotes: { note: NormasLegBlock['notes'][number]; nodes: Node[] }[] = [];
+      let llegAmbiguous: string | null = null; let llegPlaceholder = false;
+      if (lleg) {
+        llegSeen.add(lleg);
+        if (lleg.htmlSpan.end !== node.end) llegAmbiguous = 'the planned block does not coincide with the element read';
+        else if (lleg.ambiguous) llegAmbiguous = `${lleg.ambiguous.code}: ${lleg.ambiguous.detail}`;
+        else {
+          llegNotes = lleg.notes.map((note) => ({ note, nodes: note.anchors.map((a) => nodeAt.get(a.htmlSpan.start)).filter((n): n is Node => !!n && n.tag === 'a') }));
+          if (llegNotes.some((x, i) => x.nodes.length !== lleg.notes[i]!.anchors.length || x.nodes.some((n, k) => n.end !== lleg.notes[i]!.anchors[k]!.htmlSpan.end))) {
+            llegNotes = []; llegAmbiguous = 'a planned note does not coincide with the anchors read';
+          } else if (lleg.placeholder) {
+            if (['article', 'paragraph', 'inciso', 'alinea', 'item'].includes(descriptor.type)) { llegPlaceholder = true; descriptor = { ...descriptor, context: 'prohibited' }; }
+            else llegAmbiguous = `revoked placeholder on a block read as ${descriptor.type}, not as a device`;
+          }
+        }
+        if (llegAmbiguous && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'unknown' };
+      }
       const part = attach(node, descriptor);
+      if (llegPlaceholder) for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_revoked_placeholder');
+      if (llegAmbiguous) {
+        for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_note_ambiguous');
+        limitation('normas_leg_note_ambiguous', `normas.leg.br compilation note not proven (${llegAmbiguous}); the block is kept out of operative_candidate and nothing was cut.`, { ...node.span });
+      }
+      // §11.3/§11.5: one editorial_note per planned region, child of the part that IS the block (the caput, for an article
+      // or clause opening block, so siblings never overlap); creating it does not close the caput continuation.
+      const blockPart = result.parts.find((y) => y.id === `${part.id}-caput`) ?? part;
+      for (const { note, nodes } of llegNotes) {
+        const caput = openCaput.get(part.id);
+        const first = nodes[0]!; const last = nodes[nodes.length - 1]!;
+        const np = newPart('editorial_note', first.span.start, last.span.end, blockPart.id, 'prohibited', note.kind === 'vide' ? 'normas_leg_vide' : 'normas_leg_editorial_note',
+          pointer(first.path, first.start, first.end), note.text.slice(0, 256));
+        np.sourcePointers = nodes.map((n) => pointer(n.path, n.start, n.end));
+        if (caput) openCaput.set(part.id, caput);
+        addOwnership(np);
+      }
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
       if (spEarlier && part.context === 'historical') part.contextReasons.push('sefaz_sp_portal_revogado');
@@ -613,6 +668,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   }
   result.coverage.textLength = length; result.coverage.accountedLength = length;
   // R1-SP-03: the proof is local (preparation ↔ HTML ↔ resource), not a verification of the official collection.
+  if (llegPlan) {
+    const unmatched = [...llegPlan.values()].filter((b) => !llegSeen.has(b)).length;
+    if (unmatched) limitation('normas_leg_plan_block_unmatched', `${unmatched} planned normas.leg.br block(s) were not read as leaf blocks; no rule was applied to them.`);
+    limitation('normas_leg_local_preparation_only', 'normas.leg.br provenance is a local preparation proof (bytes, URL, URN, version, plan); the official collection of these bytes is not verified here.');
+  }
   if (input.source === 'SEFAZ-SP-PORTAL') limitation('sefaz_sp_portal_local_preparation_only', 'Sefaz-SP portal provenance is a local preparation proof (bytes, URL, hash, region); the official collection of these bytes is not verified here.');
   if (unidentified || result.coverage.segments.some((segment) => segment.classification === 'unidentified')) limitation('unidentified_content', 'Unrecognized text is fully accounted for and is not a successful identification.');
   if (result.coverage.missingResources.length) limitation('missing_resources', 'Referenced resources were not supplied; no fetch was attempted.');

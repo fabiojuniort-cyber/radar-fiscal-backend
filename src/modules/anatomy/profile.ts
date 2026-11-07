@@ -18,7 +18,7 @@ export const PROFILE_SOURCES = ['CONFAZ', 'DOU', 'DOE-SP', 'RFB'] as const;
  * migration). They resolve the default-level profile only — a source/family override for another source (e.g. DOE-SP)
  * never applies to them — and their protection floor is the shipped default.
  */
-export const FIXED_PROFILE_SOURCES = ['SEFAZ-SP-PORTAL'] as const;
+export const FIXED_PROFILE_SOURCES = ['SEFAZ-SP-PORTAL', 'NORMAS-LEG'] as const;
 export type EngineSource = (typeof PROFILE_SOURCES)[number] | (typeof FIXED_PROFILE_SOURCES)[number];
 
 // A literal is accepted only in its canonical form, so validation and compilation read it the same way (review of

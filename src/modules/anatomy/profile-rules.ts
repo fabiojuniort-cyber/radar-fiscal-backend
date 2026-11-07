@@ -7,7 +7,7 @@ import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, assertProtectionFloor, blocke
  * numeric list) is fixed here and never comes from a profile. Fixed protections (domain patterns, size limits,
  * excluded tags, the conservative table policy) stay in the engine and are not part of the profile.
  */
-export type ReaderSource = 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
+export type ReaderSource = 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL' | 'NORMAS-LEG';
 export interface CompiledRules {
   profileVersion: typeof PROFILE_FORMAT_VERSION;
   effectiveHash: string;

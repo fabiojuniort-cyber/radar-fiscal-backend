@@ -178,4 +178,70 @@ Esta seção substitui qualquer redação anterior ambígua sobre o "span do pai
 5. **Identidade de partes:** a criação de partes novas **não** fecha a continuação do caput (regra D02). Os `id` e `order` sequenciais das partes **seguintes** podem mudar. **Não se promete identidade de partes que mudam.** As comparações usam regiões (spans canônicos), tipos e contextos.
 6. **Elegibilidade:** é comparada **por regiões e seleções**, nunca por ids. O conjunto de regiões elegíveis depois tem de estar contido no de antes, e nenhuma seleção nova pode surgir.
 7. **Regressão das demais fontes:** compara-se o payload (texto, partes sem ids, contextos, `sourceMap`, cobertura, elegibilidade por regiões), **sem** `outputHash` e identidade, que mudam legitimamente com o build.
-8. **Procedência:** o plano é emitido pela preparação (WeakSet, congelado) e ligado ao SHA dos bytes, ao HTML, à URN, à versão e ao `representationId`. Cópia, forja ou divergência → nenhuma regra aplicada (leitura igual à do perfil sem plano).
+8. **Procedência:** o plano é emitido pela preparação (WeakSet, congelado) e ligado ao SHA dos bytes, ao HTML, à URN, à versão e ao `representationId`. Cópia, forja ou divergência → **a fonte tipada recusa a leitura** (`NormasLegProvenanceError`, como a L17 faz com o portal Sefaz-SP); nas demais fontes nada muda. *(Esclarecido na implementação, §12: "nenhuma regra aplicada" passou a ser recusa fail-closed, mais restritiva.)*
+
+## 12. Implementação offline (branch `claude/anat-lleg01`; #116 c.6708512598 §7)
+
+**O que existe agora:**
+- `src/modules/anatomy/normas-leg-preparation.ts`: `prepareNormasLegPage({resourceId, url, urn, version, bytes, expected?})` emite o plano congelado (WeakSet) e `verifyNormasLegPreparation` o confere. O HTML **não** é alterado.
+- Fonte tipada `NORMAS-LEG` (perfil fixo, como `SEFAZ-SP-PORTAL`): sem a prova emitida para este HTML e este `representationId`, o leitor **recusa** (fail-closed).
+- Leitor (`readers.ts`): só no bloco planejado e só pelo plano:
+  - nota → parte filha `editorial_note`/`prohibited` (motivo `normas_leg_editorial_note` ou `normas_leg_vide`), com o span canônico das âncoras e um `sourcePointer` por âncora;
+  - o pai é a parte que **é** o bloco (o `caput`, no bloco de abertura de artigo/cláusula), para que irmãos nunca se sobreponham. A nota não fecha a continuação do caput (D02);
+  - placeholder revogado comprovado em dispositivo → `prohibited` (`normas_leg_revoked_placeholder`);
+  - bloco ambíguo → `unknown` (`normas_leg_note_ambiguous`) e limitação. Nada é recortado.
+- Sem persistência, migration, API, flag ou promoção. `legalStatus` sempre `unknown`. Nenhum `historical`.
+
+**Medido nos arquivos reais (regenerado pelo teste `anatomy.normas-leg`):**
+
+| | 10.637 atualizada | 10.833 atualizada |
+|---|---|---|
+| Notas (regiões) | 106 | 314 |
+| Âncoras nas notas | 134 | 391 |
+| Notas partidas (mais de uma âncora) | 25 | 66 |
+| Placeholders revogados/vetados | 23 | 40 |
+| Blocos ambíguos → `unknown` | 30 | 3 |
+| `historical` | 0 | 0 |
+| Texto, `sourceMap` e cobertura contabilizada × leitura DOU | idênticos | idênticos |
+
+Os 30 ambíguos da 10.637 são, em sua maioria, "(VETADO)" em texto simples (sem âncora da Câmara, logo sem prova pela regra (a)). Também entram:
+- duas âncoras com `href` quebrado (o próprio texto da nota como `href`, que resolve para normas.leg.br);
+- uma nota de rodapé "[1]".
+
+O §2 estimava 7 e 14 dispositivos "só revogação". O número medido é maior, porque inclui os vetos com âncora ("(VETADO na Lei nº …)") e os incisos/alíneas de artigos revogados.
+
+**Refinamentos por medição (desvios do §3, declarados para a revisão; não autoaprovados):**
+1. **Gramática (c):** acrescentado `Artigo` ("(Artigo acrescido pela Lei …)": 1 e 10 ocorrências). Os substantivos estruturais (Caput, Parágrafo, Inciso, Alínea, Artigo) exigem também um verbo de nota dentro do grupo (redação, revogad, acrescid, incluíd, vetad, vide, renumerad, efeito, vigência, vigor). Assim, "(inciso I do art. 3º)" nunca é nota.
+2. **Separador da nota partida (b):** além de espaço e [,;.], é aceito **um** conectivo "e" isolado entre âncoras. Caso real: "(Parágrafo acrescido pela Lei nº 10.996" + " e " + "com nova redação dada pela Lei nº 11.307)".
+3. **Host (a):** além de `/legin/`, é aceito o visualizador antigo do LegIn **só** em `camara.gov.br` (`/internet/legislacao/legin.html/textos/visualizarTexto.html` e `/legislacao/legin.html/…`). Hosts parecidos (`camara.leg.br.example`, `evilcamara.leg.br`), `href` relativo e esquema não http(s) continuam recusados.
+   - *Efeito medido dos itens 2 e 3 juntos:* blocos ambíguos 37 → 30 (10.637) e 36 → 3 (10.833); notas 99 → 106 e 281 → 314.
+4. **Grupos numa âncora só:** "(Artigo acrescido …) (Vide …)" é uma região (a âncora), com classe `editorial`; casos reais: 1 + 2. A nota nunca é partida dentro de uma âncora.
+5. **Rótulo + só "Vide":** um dispositivo com rótulo e apenas uma nota que não é de revogação (real: "§3º (Vide Lei Complementar nº 214 …)") é ambíguo (`label_only_without_revocation`), não placeholder.
+6. **§11.8:** a falta, cópia ou divergência da prova faz a fonte tipada **recusar** a leitura, em vez de "nenhuma regra aplicada".
+
+**Contracasos → testes** (`test/anatomy.normas-leg.unit.test.ts`, 17 testes):
+
+| Casos | Teste |
+|---|---|
+| 1, 8, 15 | art. 1º real da 10.637: nota partida = uma parte; Vide separada; offsets e SHA do §6 |
+| 2, 16 | placeholders reais das duas leis; sem inferência de data; regiões do §6 |
+| 3, 4 | revogação não se estende a vizinhos nem aos parágrafos do artigo |
+| 5, 8, 24, 26 | Vide, duas notas, parênteses aninhados, dois grupos numa âncora |
+| 6, 7 | parênteses legítimos; nota sem âncora ou com host externo → `unknown` |
+| 9, 11, 28 | sem prova, cópia, objeto parecido, HTML alterado → recusa; lido como DOU, nada muda; hash/tamanho divergente → recusa |
+| 10, 14, 29 | texto original recusado na preparação e sem nota nova; outra representação recusada |
+| 12 | catálogo NCM sintético: candidatos depois ⊆ antes; o NCM dentro da nota deixa de ser candidato |
+| 13 | art. 94 real da 10.833 ("Ficam revogados"): inalterado |
+| 17, 23 | nota sem fechamento e nota no meio do período → ambíguas, nada recortado |
+| 18, 19 | host enganoso e `href` relativo; visualizador antigo do LegIn |
+| 20, 21, 22 | entidade, BOM, caractere fora do BMP: regiões exatas em UTF-16 e bytes |
+| 25 | citação de redação anterior ("(NR)") sem nota |
+| 27 | texto preservado + revogação ≠ placeholder |
+| §11 | arquivos reais: texto, `sourceMap`, cobertura e caput iguais; só blocos planejados mudam, e só para baixo; contagens acima |
+| regressão | 37 entradas das demais fontes (lote RFB, Sefaz-SP, CONFAZ, DOU, Planalto e normas.leg.br lido como DOU) **idênticas** à linha de base gravada antes da mudança (`docs/anatomy/lleg-regression-baseline.json`, sem `identity`/`analysisId`/`outputHash`) |
+
+**Identidade do motor:** `0e009431` → `9235a810` (`normas-leg-preparation.ts` entra na lista). O lote RFB, a matriz E9 e a linha de base das amostras foram regenerados: o delta é **só** `engineBuildHash`/`outputHash` (10 + 30 linhas).
+
+**Pendências:**
+- Revisão independente, incluindo os 6 refinamentos acima.
+- A matriz E9 continua tratando normas.leg.br como "obtido, não lido/validado" (diagnóstico pelo perfil DOU). Passar a célula a "lida" pela fonte `NORMAS-LEG` exige decisão própria.
