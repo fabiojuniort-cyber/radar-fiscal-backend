@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
+import { prepareNormasLegPage } from '../../src/modules/anatomy/normas-leg-preparation.js';
 import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
 import { APPROVED_FALLBACK, compareWithIndependent, decodeWithPolicy, PASSAGES } from './charset-policy.js';
@@ -64,7 +65,7 @@ export const GRID: readonly GridCell[] = Object.freeze([
   ...['Instrução Normativa', 'Portaria', 'Ato Declaratório Interpretativo', 'Ato Declaratório Executivo', 'Solução de Consulta', 'Resolução']
     .flatMap((t) => bySize('RFB', t, LAYOUT.RFB_JSON, t === 'Instrução Normativa' ? 'API RFB (coletado)' : 'API RFB — P2-c (autorizada, c.6701950134)')),
   ...bySize('Planalto', 'Lei', LAYOUT.PLANALTO_HTML, 'arquivo manual (a origem recusa este ambiente)', { grande: ['M1', 'M2'] }),
-  ...bySize('normas.leg.br', 'Lei', LAYOUT.NORMASLEG_HTML, 'normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)'),
+  ...bySize('normas.leg.br', 'Lei', LAYOUT.NORMASLEG_HTML, 'normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)'),
   // M3 and M4 are two Convênios ICMS; each is a SAMPLE whose measured size decides the cell it may cover — neither closes
   // a cell by being received, and one never stands for the other (no OR between items).
   ...bySize('CONFAZ', 'Convênio ICMS', LAYOUT.CONFAZ_HTML, 'arquivo manual (M3, M4)'),
@@ -96,7 +97,7 @@ export function verifiedBytes(path: string, expected: { sha256: string; bytes: n
 }
 interface Read { chars: number; outputHash: string; invariants: string[] }
 /** Conservative invariants every validated sample must keep (protection, not interpretation). */
-function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html: string, extra: object = {}): Read {
+function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL' | 'NORMAS-LEG', id: string, html: string, extra: object = {}): Read {
   const r = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-07', ruleSet: { id: 'official-coverage-matrix', version: '2' },
     input: { source, representationId: id, html, ...extra }, catalog: { edition: 'none', codes: [] } });
   const broken: string[] = [];
@@ -143,16 +144,26 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
       stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'SEFAZ-SP-PORTAL', diagnostic: null, outputHash: rd.outputHash,
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
   }
-  // normas.leg.br: captured and identified; NO reader profile of its own → not read, not validated. The DOU-profile
-  // reading is kept as a diagnostic only (it never changes the source identity nor closes a cell).
+  // normas.leg.br. The two "versão atualizada" files are READ by the typed source NORMAS-LEG through
+  // prepareNormasLegPage (#305 c.6709334910: hash, URN, version and representationId preserved) — read, NOT validated
+  // (validation needs its own baseline/invariants/test decision) and never accepted. The original texts have no plan:
+  // captured and identified only; the DOU-profile reading stays a diagnostic (never a read, never closes a cell).
   const lg = join(ROOT, 'leg-normas');
   for (const f of readdirSync(lg).filter((x) => /-(original|atualizada)\.meta\.json$/u.test(x)).sort()) {
-    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; bytes: number; titleCheck: { found: boolean } };
+    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; url: string; urn: string; sha256: string; bytes: number; titleCheck: { found: boolean } };
     const bytes = verifiedBytes(join(lg, `${m.id}.html`), m, m.id);
+    if (m.id.endsWith('-atualizada')) {
+      const prep = prepareNormasLegPage({ resourceId: m.id, url: m.url, urn: m.urn, version: 'atualizada', bytes, expected: { sha256: m.sha256, bytes: m.bytes } });
+      const rd = readWith('NORMAS-LEG', m.id, prep.html, { normasLeg: prep });
+      out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
+        stages: { captured: true, identified: m.titleCheck.found, read: true, validated: false, accepted: false }, profile: 'NORMAS-LEG', diagnostic: null, outputHash: rd.outputHash,
+        evidence: ['test/anatomy.normas-leg.unit.test.ts'], notes: ['lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial); validação pendente de decisão (baseline/invariantes/teste)', ...rd.invariants] });
+      continue;
+    }
     const diag = readWith('DOU', m.id, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: m.titleCheck.found, read: false, validated: false, accepted: false }, profile: null,
-      diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
+      diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, outputHash: null, evidence: [], notes: ['texto original: sem plano NORMAS-LEG (só a versão atualizada); porte não atribuído sem leitura própria'] });
   }
   // Files saved by hand and ingested (official-manual-ingest.ts): bytes and declared encoding are checked first.
   if (existsSync(MANUAL_DIR)) for (const f of readdirSync(MANUAL_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {

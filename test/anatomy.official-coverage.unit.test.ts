@@ -27,7 +27,14 @@ test('E9 current state: 10 cells covered, E9 incomplete; nothing promoted or acc
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
   assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
-  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
+  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.validated && !s.stages.accepted));
+  // #305 c.6709334910: only the two "atualizada" versions are read, by NORMAS-LEG through the preparation; originals are not.
+  for (const s of leg) {
+    const upd = s.id.endsWith('-atualizada');
+    assert.deepEqual([s.stages.read, s.profile, s.diagnostic?.profile ?? null], upd ? [true, 'NORMAS-LEG', null] : [false, null, 'DOU (diagnóstico)'], s.id);
+    const meta = JSON.parse(readFileSync(`ops/anatomy/official-identification/leg-normas/${s.id}.meta.json`, 'utf8')) as { sha256: string; bytes: number };
+    assert.deepEqual([s.sha256, s.bytes], [meta.sha256, meta.bytes], `${s.id}: identity preserved`);
+  }
   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
   assert.deepEqual([sizeOf(9_999), sizeOf(10_000), sizeOf(49_999), sizeOf(50_000)], ['pequeno', 'médio', 'médio', 'grande']);
   // HTTP captures of the other session: Planalto not decoded (no declared charset), DOU PDF page identified but not validated

@@ -422,26 +422,25 @@
       "source": "normas.leg.br",
       "type": "Lei",
       "layout": "HTML do normas.leg.br (exportado do Word)",
-      "chars": null,
-      "size": null,
+      "chars": 74715,
+      "size": "grande",
       "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
       "bytes": 180179,
       "stages": {
         "captured": true,
         "identified": true,
-        "read": false,
+        "read": true,
         "validated": false,
         "accepted": false
       },
-      "profile": null,
-      "diagnostic": {
-        "profile": "DOU (diagnóstico)",
-        "chars": 74715
-      },
-      "outputHash": null,
-      "evidence": [],
+      "profile": "NORMAS-LEG",
+      "diagnostic": null,
+      "outputHash": "fd55a0e46deb03939639ba38fd33e6d1f1b8b0fc2684345e24dfddc6a2d5a8cf",
+      "evidence": [
+        "test/anatomy.normas-leg.unit.test.ts"
+      ],
       "notes": [
-        "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial); validação pendente de decisão (baseline/invariantes/teste)"
       ]
     },
     {
@@ -468,7 +467,7 @@
       "outputHash": null,
       "evidence": [],
       "notes": [
-        "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        "texto original: sem plano NORMAS-LEG (só a versão atualizada); porte não atribuído sem leitura própria"
       ]
     },
     {
@@ -476,26 +475,25 @@
       "source": "normas.leg.br",
       "type": "Lei",
       "layout": "HTML do normas.leg.br (exportado do Word)",
-      "chars": null,
-      "size": null,
+      "chars": 167570,
+      "size": "grande",
       "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
       "bytes": 388543,
       "stages": {
         "captured": true,
         "identified": true,
-        "read": false,
+        "read": true,
         "validated": false,
         "accepted": false
       },
-      "profile": null,
-      "diagnostic": {
-        "profile": "DOU (diagnóstico)",
-        "chars": 167570
-      },
-      "outputHash": null,
-      "evidence": [],
+      "profile": "NORMAS-LEG",
+      "diagnostic": null,
+      "outputHash": "328f25997e4744fbd89ac112e89435753675a3f0867ccca2744563d097ff791c",
+      "evidence": [
+        "test/anatomy.normas-leg.unit.test.ts"
+      ],
       "notes": [
-        "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial); validação pendente de decisão (baseline/invariantes/teste)"
       ]
     },
     {
@@ -522,7 +520,7 @@
       "outputHash": null,
       "evidence": [],
       "notes": [
-        "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        "texto original: sem plano NORMAS-LEG (só a versão atualizada); porte não atribuído sem leitura própria"
       ]
     },
     {
@@ -1091,7 +1089,7 @@
       "applicability": {
         "required": true
       },
-      "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
@@ -1106,7 +1104,7 @@
       "applicability": {
         "required": true
       },
-      "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
@@ -1121,11 +1119,32 @@
       "applicability": {
         "required": true
       },
-      "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
-      "unvalidatedSamples": []
+      "unvalidatedSamples": [
+        {
+          "id": "lei-10637-2002-atualizada",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": true,
+            "validated": false,
+            "accepted": false
+          }
+        },
+        {
+          "id": "lei-10833-2003-atualizada",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": true,
+            "validated": false,
+            "accepted": false
+          }
+        }
+      ]
     },
     {
       "id": "confaz--convenio-icms--pequeno",

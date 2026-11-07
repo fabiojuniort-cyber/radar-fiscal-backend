@@ -202,7 +202,8 @@ Esta seção substitui qualquer redação anterior ambígua sobre o "span do pai
 | Placeholders revogados/vetados | 23 | 40 |
 | Blocos ambíguos → `unknown` | 30 | 3 |
 | `historical` | 0 | 0 |
-| Texto, `sourceMap` e cobertura contabilizada × leitura DOU | idênticos | idênticos |
+| Texto, `sourceMap` e cobertura **contabilizada** (`textLength`/`accountedLength`) × leitura DOU | idênticos | idênticos |
+| **Ownership** da cobertura (`segments`, `recognizedLength`) × leitura DOU | muda **de propósito**: o texto da nota passa à parte `editorial_note` (§11.4) | idem |
 
 Os 30 ambíguos da 10.637 são, em sua maioria, "(VETADO)" em texto simples (sem âncora da Câmara, logo sem prova pela regra (a)). Também entram:
 - duas âncoras com `href` quebrado (o próprio texto da nota como `href`, que resolve para normas.leg.br);
@@ -240,8 +241,15 @@ O §2 estimava 7 e 14 dispositivos "só revogação". O número medido é maior,
 | §11 | arquivos reais: texto, `sourceMap`, cobertura e caput iguais; só blocos planejados mudam, e só para baixo; contagens acima |
 | regressão | 37 entradas das demais fontes (lote RFB, Sefaz-SP, CONFAZ, DOU, Planalto e normas.leg.br lido como DOU) **idênticas** à linha de base gravada antes da mudança (`docs/anatomy/lleg-regression-baseline.json`, sem `identity`/`analysisId`/`outputHash`) |
 
-**Identidade do motor:** `0e009431` → `9235a810` (`normas-leg-preparation.ts` entra na lista). O lote RFB, a matriz E9 e a linha de base das amostras foram regenerados: o delta é **só** `engineBuildHash`/`outputHash` (10 + 30 linhas).
+**Identidade do motor:** `0e009431` → `9235a810`. A mudança vem de **código novo** (`normas-leg-preparation.ts` entra na lista; leitor, motor e perfis mudam), não é "só hash". Para as **demais fontes**, o lote RFB e a linha de base das amostras mudaram **só** em `engineBuildHash`/`outputHash`; o conteúdo delas é idêntico (regressão de 37 entradas).
 
-**Pendências:**
-- Revisão independente, incluindo os 6 refinamentos acima.
-- A matriz E9 continua tratando normas.leg.br como "obtido, não lido/validado" (diagnóstico pelo perfil DOU). Passar a célula a "lida" pela fonte `NORMAS-LEG` exige decisão própria.
+**Decisões da revisão (#305 c.6709334910):**
+- Os 6 refinamentos foram **aprovados** no escopo offline desta fonte. A preparação é evidência local, **não** prova de coleta oficial.
+- As contagens acima são medições do EXEC até a execução de CI conferida.
+- **Matriz E9:** as **duas versões atualizadas** passam a `read` porque `collectSamples` agora as lê de fato por `prepareNormasLegPage` + `NORMAS-LEG`, com hash, URN, versão e `representationId` preservados e conferidos no teste.
+  - Elas continuam `validated: false` e fora da linha de base das amostras: a validação exige baseline, invariantes e teste próprios.
+  - Nenhuma é `accepted`.
+  - Os textos originais não têm plano: só capturados e identificados, com a leitura DOU como diagnóstico.
+  - Cobertura da matriz inalterada: 10/61.
+
+**Pendências:** CI do HEAD e recheck proporcional; decisão sobre `validated` das versões atualizadas.
