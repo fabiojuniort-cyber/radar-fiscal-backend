@@ -2,6 +2,45 @@
   "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
   "acts": [
     {
+      "idAto": 37103,
+      "epigrafe": "Ato Declaratório Interpretativo RFB nº 18, de 23 de dezembro de 2011",
+      "dadosPublicacao": "Publicado(a) no DOU de 26/12/2011, página 213",
+      "bytes": 11168,
+      "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
+        "pieces": 10
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
+      "status": "partial",
+      "canonicalChars": 3106,
+      "unidentifiedChars": 31,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "preamble": 1,
+        "article": 3,
+        "caput": 3,
+        "paragraph": 1,
+        "inciso": 3,
+        "unidentified": 1
+      },
+      "limitations": {
+        "rfb_segment_type_unmapped": 1,
+        "unidentified_content": 1
+      },
+      "historicalByTachado": 2,
+      "historicalContextParts": 3,
+      "struckSegments": 2,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "42ce7bbabf3378f4b2b9f263e6adabcd4e7ee3a577b02838e8d8ac08a3abcd10"
+    },
+    {
       "idAto": 104314,
       "epigrafe": "Instrução Normativa RFB nº 1911, de 11 de outubro de 2019",
       "dadosPublicacao": "Publicado(a) no DOU de 15/10/2019, seção 1, página 27",
@@ -166,6 +205,44 @@
       "outputHash": "5e91eb5520b4de05ffddd5262cef636b05885c30d4989f82981695df2313ac0a"
     },
     {
+      "idAto": 122645,
+      "epigrafe": "Resolução CGSN nº 164, de 21 de janeiro de 2022",
+      "dadosPublicacao": "Publicado(a) no DOU de 24/01/2022, seção 1, página 65",
+      "bytes": 11110,
+      "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
+        "pieces": 10
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
+      "status": "partial",
+      "canonicalChars": 2167,
+      "unidentifiedChars": 272,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "unidentified": 1,
+        "article": 3,
+        "caput": 3,
+        "quoted_text": 4,
+        "signature": 1
+      },
+      "limitations": {
+        "rfb_segment_type_unidentified_by_source": 1,
+        "unidentified_content": 1
+      },
+      "historicalByTachado": 1,
+      "historicalContextParts": 2,
+      "struckSegments": 1,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "57d45f3914ec4e25654ed2f650158fa6a4d3c4f434bd37bffd3c526400a753a2"
+    },
+    {
       "idAto": 127905,
       "epigrafe": "Instrução Normativa RFB nº 2121, de 15 de dezembro de 2022",
       "dadosPublicacao": "Publicado(a) no DOU de 20/12/2022, seção 1, página 46",
@@ -287,6 +364,41 @@
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
       "outputHash": "81f16e2616d58b072fea9049a9a38798f7116a94fceafeb8e21a14beaace278b"
+    },
+    {
+      "idAto": 142967,
+      "epigrafe": "Portaria RFB nº 514, de 21 de fevereiro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 24/02/2025, seção 1, página 24",
+      "bytes": 24241,
+      "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
+        "pieces": 25
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
+      "status": "complete",
+      "canonicalChars": 4699,
+      "unidentifiedChars": 0,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "preamble": 1,
+        "article": 3,
+        "caput": 3,
+        "quoted_text": 19,
+        "signature": 1
+      },
+      "limitations": {},
+      "historicalByTachado": 0,
+      "historicalContextParts": 0,
+      "struckSegments": 0,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "fe2549edf073388484a3ab951cdbcfcf1b15950598537dcd9910eff840cdaed8"
     }
   ]
 }

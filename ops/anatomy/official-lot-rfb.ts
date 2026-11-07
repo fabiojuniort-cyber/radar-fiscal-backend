@@ -20,7 +20,9 @@ import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-ident
 export const LOT_DIR = fileURLToPath(new URL('./official-identification/rfb-normasinternet2/', import.meta.url));
 /** LOTE-RFB+ (decisão do Fábio, #116 c.6671833324): the 2 acts collected by COLETA-02 (#295) join the lot from their own folder. */
 export const LOT_DIR_PLUS = fileURLToPath(new URL('./official-identification/rfb-normasinternet2-coleta02/', import.meta.url));
-export const LOT_DIRS = [LOT_DIR, LOT_DIR_PLUS] as const;
+/** E9 P2-c (COORD #116 c.6701950134): RFB act types absent from the grid, finite collection (see rfb-p2c/inventory.json). */
+export const LOT_DIR_P2C = fileURLToPath(new URL('./official-identification/rfb-p2c/', import.meta.url));
+export const LOT_DIRS = [LOT_DIR, LOT_DIR_PLUS, LOT_DIR_P2C] as const;
 /** Folder that holds the snapshot of an act (the lot never has the same idAto in two folders). */
 export function snapshotDirOf(id: number, dirs: readonly string[] = LOT_DIRS): string {
   const found = dirs.filter((d) => readdirSync(d).includes(`${id}.json`));

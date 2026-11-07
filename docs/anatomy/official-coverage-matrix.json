@@ -187,6 +187,81 @@
       "notes": []
     },
     {
+      "id": "rfb:122645",
+      "source": "RFB",
+      "type": "Resolução",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 2167,
+      "size": "pequeno",
+      "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+      "bytes": 11110,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "57d45f3914ec4e25654ed2f650158fa6a4d3c4f434bd37bffd3c526400a753a2",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:142967",
+      "source": "RFB",
+      "type": "Portaria",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 4699,
+      "size": "pequeno",
+      "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+      "bytes": 24241,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "fe2549edf073388484a3ab951cdbcfcf1b15950598537dcd9910eff840cdaed8",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:37103",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 3106,
+      "size": "pequeno",
+      "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+      "bytes": 11168,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "42ce7bbabf3378f4b2b9f263e6adabcd4e7ee3a577b02838e8d8ac08a3abcd10",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
       "id": "ricms-an1art041",
       "source": "SEFAZ-SP-PORTAL",
       "type": "Decreto consolidado (RICMS/2000), artigo",
@@ -536,8 +611,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:142967"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -581,8 +658,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:37103"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -716,8 +795,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:122645"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1416,10 +1497,8 @@
     }
   ],
   "requiredPending": [
-    "rfb--portaria--pequeno",
     "rfb--portaria--medio",
     "rfb--portaria--grande",
-    "rfb--ato-declaratorio-interpretativo--pequeno",
     "rfb--ato-declaratorio-interpretativo--medio",
     "rfb--ato-declaratorio-interpretativo--grande",
     "rfb--ato-declaratorio-executivo--pequeno",
@@ -1428,7 +1507,6 @@
     "rfb--solucao-de-consulta--pequeno",
     "rfb--solucao-de-consulta--medio",
     "rfb--solucao-de-consulta--grande",
-    "rfb--resolucao--pequeno",
     "rfb--resolucao--medio",
     "rfb--resolucao--grande",
     "planalto--lei--pequeno",
@@ -1472,7 +1550,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 6,
+  "coveredRequired": 9,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }

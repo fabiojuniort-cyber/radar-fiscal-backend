@@ -96,7 +96,7 @@ test('L20 E4: forged, copied, other-HTML, other-id and HTML-attribute plans give
 
 test('L20 official lot: only IN 2.121 gets the signal (4008/706 → 4014/707; E1 4007; E6 4009/4010, 4011/4012; E7 Seção III 4013); reader output identical for the 7 acts', () => {
   const ids = LOT_DIRS.flatMap((d) => readdirSync(d).filter((f) => /^\d+\.json$/u.test(f)).map((f) => Number(f.slice(0, -5)))).sort((a, b) => a - b);
-  assert.equal(ids.length, 7);
+  assert.equal(ids.length, 10, '7 INs + 3 acts of E9 P2-c');
   for (const id of ids) {
     const bytes = new Uint8Array(readFileSync(join(snapshotDirOf(id), `${id}.json`)));
     const p = prepareRfbRepresentation({ resourceId: `rfb:${id}`, bytes }, id);

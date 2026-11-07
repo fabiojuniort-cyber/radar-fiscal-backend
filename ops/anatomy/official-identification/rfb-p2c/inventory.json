@@ -1,0 +1,358 @@
+{
+  "authorization": "tribusca-control#116 c.6701950134 (P2-c)",
+  "limits": {
+    "perType": 5,
+    "total": 25,
+    "perSize": 1,
+    "acts": 15
+  },
+  "requestsTotal": 19,
+  "actsKept": 3,
+  "requests": [
+    {
+      "n": 1,
+      "type": "Portaria",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": 200,
+      "at": "2026-11-07T04:06:45.888Z",
+      "round": 1
+    },
+    {
+      "n": 2,
+      "type": "Portaria",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:47.781Z",
+      "round": 1
+    },
+    {
+      "n": 3,
+      "type": "Portaria",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/146467/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:49.329Z",
+      "round": 1
+    },
+    {
+      "n": 4,
+      "type": "Portaria",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/143234/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:49.518Z",
+      "round": 1
+    },
+    {
+      "n": 5,
+      "type": "Portaria",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/147411/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:49.708Z",
+      "round": 1
+    },
+    {
+      "n": 6,
+      "type": "Ato Declaratório Interpretativo",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": 200,
+      "at": "2026-11-07T04:06:50.101Z",
+      "round": 1
+    },
+    {
+      "n": 7,
+      "type": "Ato Declaratório Interpretativo",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/37103/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:50.507Z",
+      "round": 1
+    },
+    {
+      "n": 8,
+      "type": "Ato Declaratório Interpretativo",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/5727/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:50.689Z",
+      "round": 1
+    },
+    {
+      "n": 9,
+      "type": "Ato Declaratório Interpretativo",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/5552/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:50.866Z",
+      "round": 1
+    },
+    {
+      "n": 10,
+      "type": "Ato Declaratório Interpretativo",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/5655/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:51.037Z",
+      "round": 1
+    },
+    {
+      "n": 11,
+      "type": "Ato Declaratório Executivo",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": 200,
+      "at": "2026-11-07T04:06:51.313Z",
+      "round": 1
+    },
+    {
+      "n": 12,
+      "type": "Solução de Consulta",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": 200,
+      "at": "2026-11-07T04:06:52.790Z",
+      "round": 1
+    },
+    {
+      "n": 13,
+      "type": "Resolução",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": 200,
+      "at": "2026-11-07T04:06:53.451Z",
+      "round": 1
+    },
+    {
+      "n": 14,
+      "type": "Resolução",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/122645/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:53.875Z",
+      "round": 1
+    },
+    {
+      "n": 15,
+      "type": "Resolução",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/97284/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:54.062Z",
+      "round": 1
+    },
+    {
+      "n": 16,
+      "type": "Resolução",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/105449/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:54.617Z",
+      "round": 1
+    },
+    {
+      "n": 17,
+      "type": "Resolução",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/132603/visao/multivigente",
+      "status": 200,
+      "at": "2026-11-07T04:06:54.809Z",
+      "round": 1
+    },
+    {
+      "n": 18,
+      "type": "Ato Declaratório Executivo",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": "network: fetch failed",
+      "at": "2026-11-07T04:07:38.052Z",
+      "round": 2
+    },
+    {
+      "n": 19,
+      "type": "Solução de Consulta",
+      "kind": "search",
+      "url": "https://normas.receita.fazenda.gov.br/api/indexacao/ato/pesquisar",
+      "status": 200,
+      "at": "2026-11-07T04:07:39.126Z",
+      "round": 2
+    }
+  ],
+  "decisions": [
+    {
+      "type": "Portaria",
+      "requestsUsed": 5,
+      "searchResultsOfType": 50,
+      "eligibleAfterReservedCheck": 32,
+      "tried": [
+        {
+          "idAto": 142967,
+          "chars": 4699,
+          "size": "pequeno",
+          "outcome": "kept"
+        },
+        {
+          "idAto": 146467,
+          "chars": 1124,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        },
+        {
+          "idAto": 143234,
+          "chars": 1723,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        },
+        {
+          "idAto": 147411,
+          "chars": 5613,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        }
+      ],
+      "kept": {
+        "pequeno": 142967
+      },
+      "sizesNotFound": [
+        "médio",
+        "grande"
+      ]
+    },
+    {
+      "type": "Ato Declaratório Interpretativo",
+      "requestsUsed": 5,
+      "searchResultsOfType": 50,
+      "eligibleAfterReservedCheck": 47,
+      "tried": [
+        {
+          "idAto": 37103,
+          "chars": 3106,
+          "size": "pequeno",
+          "outcome": "kept"
+        },
+        {
+          "idAto": 5727,
+          "chars": 1916,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        },
+        {
+          "idAto": 5552,
+          "chars": 258,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        },
+        {
+          "idAto": 5655,
+          "chars": 1620,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        }
+      ],
+      "kept": {
+        "pequeno": 37103
+      },
+      "sizesNotFound": [
+        "médio",
+        "grande"
+      ]
+    },
+    {
+      "type": "Ato Declaratório Executivo",
+      "requestsUsed": 1,
+      "searchResultsOfType": 32,
+      "eligibleAfterReservedCheck": 0,
+      "tried": [],
+      "kept": {},
+      "sizesNotFound": [
+        "pequeno",
+        "médio",
+        "grande"
+      ]
+    },
+    {
+      "type": "Solução de Consulta",
+      "requestsUsed": 1,
+      "searchResultsOfType": 50,
+      "eligibleAfterReservedCheck": 0,
+      "tried": [],
+      "kept": {},
+      "sizesNotFound": [
+        "pequeno",
+        "médio",
+        "grande"
+      ]
+    },
+    {
+      "type": "Resolução",
+      "requestsUsed": 5,
+      "searchResultsOfType": 50,
+      "eligibleAfterReservedCheck": 42,
+      "tried": [
+        {
+          "idAto": 122645,
+          "chars": 2167,
+          "size": "pequeno",
+          "outcome": "kept"
+        },
+        {
+          "idAto": 97284,
+          "chars": 1573,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        },
+        {
+          "idAto": 105449,
+          "chars": 536,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        },
+        {
+          "idAto": 132603,
+          "chars": 5349,
+          "size": "pequeno",
+          "outcome": "captured but discarded: size pequeno already kept (bytes not stored)"
+        }
+      ],
+      "kept": {
+        "pequeno": 122645
+      },
+      "sizesNotFound": [
+        "médio",
+        "grande"
+      ]
+    },
+    {
+      "type": "Ato Declaratório Executivo",
+      "outcome": "search failed (network); not read as absence"
+    },
+    {
+      "type": "Solução de Consulta",
+      "round": 2,
+      "termo": "Solução de Consulta Cosit 2022",
+      "requestsUsedTotalForType": 2,
+      "searchResultsOfType": 48,
+      "eligibleAfterReservedCheck": 0,
+      "tried": [],
+      "kept": {},
+      "sizesNotFound": [
+        "pequeno",
+        "médio",
+        "grande"
+      ]
+    }
+  ],
+  "note": "a size not found within the budget is recorded as not found — never as nonexistent",
+  "closure": {
+    "requestsUsed": 19,
+    "requestsLimit": 25,
+    "stoppedBy": "EXEC (07/11): a 3rd search per type would return the same 2026-first ordering; the remaining budget (ADE 3, SC 3, package 6) is NOT used",
+    "ADE": "round 1: 32 ADE results, all of 2026 (excluded by the conservative 2026 margin; reserved list also covers ade 79/119/120/26); round 2: search failed (network) — not read as absence",
+    "Solução de Consulta": "rounds 1 and 2: the search returns 2026 acts first (98 of 100 results), excluded by the 2026 margin; no case captured — not read as absence",
+    "Portaria, ADI, Resolução": "5 requests each: only small acts among the 4 captures tried per type; médio/grande not found within the limit — not read as absence",
+    "nextDecision": "either accept 2026 acts that are not reserved (the reserved list stays the gate) or use the year facet (format unknown; costs a request to discover) — needs COORD decision"
+  }
+}
