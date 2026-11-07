@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractPdfLines } from '../../src/modules/anatomy/pdf-reader.js';
+import { readZipEntries } from './zip-read.js';
 import { MANUAL_ITEMS, decodeDeclared } from './official-manual-ingest.js';
 
 export const HTTP_DIR = fileURLToPath(new URL('./official-identification/e9-http/', import.meta.url));
@@ -39,13 +40,23 @@ export interface HttpMeta {
   identification: Record<string, unknown>; reach: string; promoted: false;
 }
 
-export async function ingestHttpPackage(dir: string, zipSha256: string, out = HTTP_DIR, now = () => new Date().toISOString()): Promise<HttpMeta[]> {
-  if (zipSha256 !== PACKAGE.zipSha256) throw new HttpIngestError('ZIP hash differs from the delivered package');
-  const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) as ManifestEntry[];
+/**
+ * Integrity chain (R2 c.6708499687): (1) the ZIP FILE on disk is hashed and must equal the delivered package hash;
+ * (2) every entry is read from that archive (CRC-32 checked) — never from a loose folder; (3) each entry must match the
+ * manifest (SHA-256 + size). Provenance (HTTP capture from the official origin by another session) is as REPORTED in the
+ * manifest: it is recorded, not cryptographically proven here.
+ */
+export async function ingestHttpPackage(zipPath: string, out = HTTP_DIR, now = () => new Date().toISOString(), expectedZipSha256: string = PACKAGE.zipSha256): Promise<HttpMeta[]> {
+  const zipBytes = new Uint8Array(readFileSync(zipPath));
+  if (sha(zipBytes) !== expectedZipSha256) throw new HttpIngestError(`ZIP file hash ${sha(zipBytes).slice(0, 12)}… differs from the delivered package`);
+  const entries = readZipEntries(zipBytes);
+  const manifestBytes = entries.get('manifest.json'); if (!manifestBytes) throw new HttpIngestError('manifest.json is not in the archive');
+  const manifest = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes)) as ManifestEntry[];
   mkdirSync(out, { recursive: true });
   const metas: HttpMeta[] = [];
   for (const e of manifest) {
-    const bytes = new Uint8Array(readFileSync(join(dir, e.file)));
+    const fromZip = entries.get(e.file); if (!fromZip) throw new HttpIngestError(`${e.id}: ${e.file} is not in the archive`);
+    const bytes = fromZip;
     if (bytes.byteLength !== e.bytes || sha(bytes) !== e.sha256.toLowerCase()) throw new HttpIngestError(`${e.id}: bytes differ from the manifest`);
     const url = new URL(e.url);
     if (url.protocol !== 'https:' || !(HOSTS[e.id] ?? []).includes(url.hostname)) throw new HttpIngestError(`${e.id}: ${url.hostname} is not the official host of the item`);
@@ -91,8 +102,7 @@ export async function ingestHttpPackage(dir: string, zipSha256: string, out = HT
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const dir = process.argv[2]!; const zipSha = process.argv[3]!;
-  const metas = await ingestHttpPackage(dir, zipSha);
+  const metas = await ingestHttpPackage(process.argv[2]!);
   for (const m of metas) console.log(`${m.item} ${m.source} | ${m.type} | ${m.sha256.slice(0, 12)} | charset ${m.declaredCharset} | readable ${m.readable} | ${JSON.stringify(m.identification).slice(0, 120)}`);
 }
 

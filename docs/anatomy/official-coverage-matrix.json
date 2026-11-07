@@ -5,8 +5,14 @@
     "stages": "captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)"
   },
   "grid": {
-    "status": "proposta do EXEC (07/11) — a aprovar pelo COORD; enquanto não aprovada, E9 não pode ser declarada completa",
-    "approved": false,
+    "status": "aprovada (tribusca-control#116 c.6708512598 §2) — não aceita células, não fecha E9",
+    "approved": true,
+    "approval": {
+      "approved": true,
+      "ref": "tribusca-control#116 c.6708512598 §2",
+      "version": "v1",
+      "scope": "grade de planejamento e demonstração fonte × tipo × layout × porte; 61 células aplicáveis; N/A só com justificativa e decisão registrada"
+    },
     "cells": 61,
     "required": 61
   },
@@ -1473,7 +1479,7 @@
         "required": true
       },
       "sizeJustification": "uma página do jornal não tem porte de ato; a célula prova cabeçalho/rodapé e não a completude do ato",
-      "route": "M9 em PDF (obtido em outra sessão; bytes ainda não recebidos)",
+      "route": "M9: páginas 57 e 58 em PDF recebidas e identificadas; leitura da página não validada (ordem de colunas exige preparação própria)",
       "manualItems": [
         "M9"
       ],

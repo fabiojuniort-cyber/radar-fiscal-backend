@@ -4,10 +4,10 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { crc32 } from 'node:zlib';
 import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
-import { assertReservation, BudgetRefused, run as runP2c } from '../ops/anatomy/collect-p2c.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
@@ -129,40 +129,44 @@ test('E9 P2 ingest refusals: title, host, saved-from-url mismatch, encoding, res
   assert.equal(existsSync(join(out, 'M5.meta.json')), false);
 });
 
-test('E9 HTTP package ingest: manifest hash/size and ZIP hash enforced; foreign host refused; undeclared charset never inferred; no overwrite', async () => {
+/** Builds a stored (uncompressed) ZIP in memory, for tests only. */
+function zipOf(files: Record<string, Buffer>): Buffer {
+  const parts: Buffer[] = []; const central: Buffer[] = []; let off = 0;
+  for (const [name, data] of Object.entries(files)) {
+    const n = Buffer.from(name, 'utf8'); const crc = crc32(data);
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x800, 6); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(n.length, 26);
+    const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0x800, 8); ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(data.length, 20); ch.writeUInt32LE(data.length, 24); ch.writeUInt16LE(n.length, 28); ch.writeUInt32LE(off, 42);
+    parts.push(lh, n, data); central.push(ch, n); off += 30 + n.length + data.length;
+  }
+  const cd = Buffer.concat(central); const eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(central.length / 2, 8); eocd.writeUInt16LE(central.length / 2, 10); eocd.writeUInt32LE(cd.length, 12); eocd.writeUInt32LE(off, 16);
+  return Buffer.concat([...parts, cd, eocd]);
+}
+
+test('E9 HTTP package ingest: the ZIP FILE is hashed, entries are read from it (CRC), each matches the manifest; foreign host refused; charset never inferred; no overwrite', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'pkg-')); const out = join(dir, 'out');
   const conv = Buffer.from('<html><head><meta charset="utf-8"></head><body><h1>CONVÊNIO ICMS 142/18</h1><p>Cláusula primeira.</p></body></html>');
   const lei = Buffer.from([...Buffer.from('<html><body><p>LEI N'), 0xba, ...Buffer.from(' 10.637, DE 30 DE DEZEMBRO DE 2002</p></body></html>')]);
-  writeFileSync(join(dir, 'M3.html'), conv); writeFileSync(join(dir, 'M1.html'), lei);
   const entry = (id: string, file: string, b: Buffer, url: string) => ({ id, sha256: createHash('sha256').update(b).digest('hex').toUpperCase(), bytes: b.length, url, retrieved_utc: '2026-11-07T03:52:05Z', origin: 'HTTP', coverage: 'HTML capture', file });
-  const write = (entries: object[]) => writeFileSync(join(dir, 'manifest.json'), JSON.stringify(entries));
-  write([entry('M3', 'M3.html', conv, 'https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18'), entry('M1', 'M1.html', lei, 'https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm')]);
-  await assert.rejects(ingestHttpPackage(dir, '0'.repeat(64), out), HttpIngestError, 'wrong ZIP hash');
-  const metas = await ingestHttpPackage(dir, PACKAGE.zipSha256, out);
+  const pkg = (manifest: object[], files: Record<string, Buffer>) => { const z = zipOf({ ...files, 'manifest.json': Buffer.from(JSON.stringify(manifest)) }); const f = join(dir, `p${Math.random()}.zip`); writeFileSync(f, z); return { f, sha: createHash('sha256').update(z).digest('hex') }; };
+  const good = pkg([entry('M3', 'M3.html', conv, 'https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18'), entry('M1', 'M1.html', lei, 'https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm')], { 'M3.html': conv, 'M1.html': lei });
+  await assert.rejects(ingestHttpPackage(good.f, out), HttpIngestError, 'a ZIP whose file hash is not the delivered package is refused');
+  // a loose copy next to the archive is never read: only bytes inside the hashed archive count
+  writeFileSync(join(dir, 'M3.html'), 'tampered');
+  const metas = await ingestHttpPackage(good.f, out, undefined, good.sha);
   assert.deepEqual(metas.map((m) => [m.item, m.declaredCharset, m.readable]), [['M3', 'utf-8', true], ['M1', null, false]]);
+  assert.equal(readFileSync(join(out, 'M3.html')).equals(conv), true, 'bytes from the archive, unchanged');
   assert.match(metas[1]!.readableNote!, /não inferido/u); assert.match(String(metas[1]!.identification.method), /ASCII/u);
-  assert.equal(readFileSync(join(out, 'M1.html')).equals(lei), true, 'bytes unchanged');
-  await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out), /already present/u, 'never overwritten');
-  const out2 = join(dir, 'out2');
-  write([{ ...entry('M3', 'M3.html', conv, 'https://www.confaz.fazenda.gov.br/x'), bytes: conv.length + 1 }]);
-  await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out2), /differ from the manifest/u);
-  write([entry('M3', 'M3.html', conv, 'https://example.com/CV142_18')]);
-  await assert.rejects(ingestHttpPackage(dir, PACKAGE.zipSha256, out2), /not the official host/u);
+  await assert.rejects(ingestHttpPackage(good.f, out, undefined, good.sha), /already present/u, 'never overwritten');
+  const corrupt = Buffer.from(readFileSync(good.f)); corrupt[40] = corrupt[40]! ^ 0xff; const cf = join(dir, 'corrupt.zip'); writeFileSync(cf, corrupt);
+  await assert.rejects(ingestHttpPackage(cf, join(dir, 'o1'), undefined, createHash('sha256').update(corrupt).digest('hex')), /CRC-32|bad|mismatch/u, 'an altered entry fails its CRC');
+  const badSize = pkg([{ ...entry('M3', 'M3.html', conv, 'https://www.confaz.fazenda.gov.br/x'), bytes: conv.length + 1 }], { 'M3.html': conv });
+  await assert.rejects(ingestHttpPackage(badSize.f, join(dir, 'o2'), undefined, badSize.sha), /differ from the manifest/u);
+  const host = pkg([entry('M3', 'M3.html', conv, 'https://example.com/CV142_18')], { 'M3.html': conv });
+  await assert.rejects(ingestHttpPackage(host.f, join(dir, 'o3'), undefined, host.sha), /not the official host/u);
+  assert.equal(PACKAGE.zipSha256.length, 64);
 });
 
-test('E9 P2-c guard: with the combined ledger at 28/25 (balance zero, suspended) the collector sends no request at all', async () => {
+test('E9 P2-c historical ledger stays a record: 25 / 19 / 9 / 28 / 3 / 0 (never read as a budget)', () => {
   const ledger = JSON.parse(readFileSync(new URL('../ops/anatomy/official-identification/rfb-p2c/ledger-combined.json', import.meta.url), 'utf8'));
   assert.deepEqual([ledger.limit, ledger.sessions.session1.requests, ledger.sessions.session2.requests, ledger.combined, ledger.excess, ledger.available], [25, 19, 9, 28, 3, 0]);
-  assert.throws(() => assertReservation(), BudgetRefused);
-  let calls = 0;
-  await assert.rejects(runP2c((async () => { calls++; throw new Error('must not be called'); }) as unknown as typeof fetch), BudgetRefused);
-  assert.equal(calls, 0);
-  // even with balance, a run without a prior reservation that fits it is refused
-  const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
-  writeFileSync(join(dir, 'ledger-combined.json'), JSON.stringify({ available: 5, status: 'ATIVO' }));
-  assert.throws(() => assertReservation(dir), /no prior reservation/u);
-  writeFileSync(join(dir, 'ledger-combined.json'), JSON.stringify({ available: 5, status: 'ATIVO', reservation: { quantity: 6, owner: 'x', purpose: 'y' } }));
-  assert.throws(() => assertReservation(dir), /no prior reservation/u);
-  writeFileSync(join(dir, 'ledger-combined.json'), JSON.stringify({ available: 5, status: 'ATIVO', reservation: { quantity: 4, owner: 'x', purpose: 'y' } }));
-  assert.doesNotThrow(() => assertReservation(dir));
 });

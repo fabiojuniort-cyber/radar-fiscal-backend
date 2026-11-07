@@ -54,7 +54,11 @@ const slug = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCas
 const bySize = (source: string, type: string, layout: string, route: string, manualItems: Record<string, string[]> = {}): GridCell[] =>
   SIZES.map((size) => ({ id: `${slug(source)}--${slug(type)}--${slug(size)}`, source, type, layout, size, applicability: { required: true }, route,
     ...(manualItems[size] ? { manualItems: manualItems[size] } : {}) }));
-export const GRID_STATUS = 'proposta do EXEC (07/11) — a aprovar pelo COORD; enquanto não aprovada, E9 não pode ser declarada completa';
+/** Governance record (not a function parameter): the grid v1 was APPROVED by the COORD as the planning/demonstration
+ * grid (#116 c.6708512598 §2). Approval does not accept any cell, does not change project weights and does not close E9. */
+export const GRID_APPROVAL = Object.freeze({ approved: true as const, ref: 'tribusca-control#116 c.6708512598 §2', version: 'v1',
+  scope: 'grade de planejamento e demonstração fonte × tipo × layout × porte; 61 células aplicáveis; N/A só com justificativa e decisão registrada' });
+export const GRID_STATUS = `aprovada (${GRID_APPROVAL.ref}) — não aceita células, não fecha E9`;
 export const GRID: readonly GridCell[] = Object.freeze([
   ...['Instrução Normativa', 'Portaria', 'Ato Declaratório Interpretativo', 'Ato Declaratório Executivo', 'Solução de Consulta', 'Resolução']
     .flatMap((t) => bySize('RFB', t, LAYOUT.RFB_JSON, t === 'Instrução Normativa' ? 'API RFB (coletado)' : 'API RFB — P2-c (autorizada, c.6701950134)')),
@@ -68,7 +72,7 @@ export const GRID: readonly GridCell[] = Object.freeze([
   ...bySize('CONFAZ', 'Protocolo ICMS', LAYOUT.CONFAZ_HTML, 'arquivo manual (a selecionar)'),
   ...['Instrução Normativa', 'Decreto', 'Portaria', 'Resolução', 'Despacho'].flatMap((t) => bySize('DOU', t, LAYOUT.DOU_HTML, t === 'Instrução Normativa' ? 'arquivo manual (M9 em HTML)' : 'arquivo manual (a selecionar)')),
   { id: 'dou--pagina-do-jornal--na', source: 'DOU', type: 'Página do jornal (cabeçalho e rodapé)', layout: LAYOUT.DOU_PDF_PAGE, size: 'n/a', applicability: { required: true },
-    sizeJustification: 'uma página do jornal não tem porte de ato; a célula prova cabeçalho/rodapé e não a completude do ato', route: 'M9 em PDF (obtido em outra sessão; bytes ainda não recebidos)', manualItems: ['M9'] },
+    sizeJustification: 'uma página do jornal não tem porte de ato; a célula prova cabeçalho/rodapé e não a completude do ato', route: 'M9: páginas 57 e 58 em PDF recebidas e identificadas; leitura da página não validada (ordem de colunas exige preparação própria)', manualItems: ['M9'] },
   ...bySize('SEFAZ-SP-PORTAL', 'Decreto consolidado (RICMS/2000), artigo', LAYOUT.SP_PORTAL_HTML, 'coletor oficial (coletado)'),
   ...['Decreto', 'Resolução', 'Portaria CAT'].flatMap((t) => bySize('DOE-SP', t, LAYOUT.DOESP_JSON, 'P2-d (autorizada só depois da validação de M9)')),
 ]);
@@ -189,7 +193,7 @@ export function samplesBaseline(samples: Sample[]): { samples: BaselineEntry[] }
 }
 
 export const matches = (c: GridCell, s: Sample) => s.source === c.source && s.type === c.type && s.layout === c.layout && (c.size === 'n/a' || s.size === c.size);
-export function buildMatrix(samples = collectSamples(), grid: readonly GridCell[] = GRID, gridApproved = false) {
+export function buildMatrix(samples = collectSamples(), grid: readonly GridCell[] = GRID, gridApproved: boolean = GRID_APPROVAL.approved) {
   const cells = grid.map((c) => {
     const hits = samples.filter((s) => matches(c, s));
     const validated = hits.filter((s) => s.stages.validated).map((s) => s.id);
@@ -201,7 +205,7 @@ export function buildMatrix(samples = collectSamples(), grid: readonly GridCell[
   const unmatched = samples.filter((s) => !grid.some((c) => matches(c, s)) && s.size !== null).map((s) => s.id);
   return { criterion: { approval: 'tribusca-control#116 c.6514510003; E9: STATUS-MATRIX-02 §9 (sem fração); R2 #303 c.6701945748',
     size: 'pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor', stages: 'captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)' },
-    grid: { status: GRID_STATUS, approved: gridApproved, cells: grid.length, required: required.length },
+    grid: { status: GRID_STATUS, approved: gridApproved, approval: GRID_APPROVAL, cells: grid.length, required: required.length },
     samples, cells, requiredPending: pending, coveredRequired: required.length - pending.length, samplesOutsideGrid: unmatched,
     e9MatrixComplete: gridApproved && pending.length === 0 };
 }
