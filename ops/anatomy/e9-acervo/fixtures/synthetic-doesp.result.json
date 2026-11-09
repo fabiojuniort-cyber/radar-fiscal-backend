@@ -1,7 +1,7 @@
 {
- "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
+ "engineBuildHash": "b6ccf583621e647e6861204dfa7a2761afe801a3a2173dedc1abdd025d9bf918",
  "input": {
-  "file": "/home/user/radar-fiscal-backend/ops/anatomy/e9-acervo/fixtures/synthetic-doesp-detail.json",
+  "file": "ops/anatomy/e9-acervo/fixtures/synthetic-doesp-detail.json",
   "sha256": "c7f348e603ca38ec6bc4662866d05ad0e7ac059dee2a22881844bc5cb26fdc4d",
   "bytes": 878,
   "expectedId": "00000000-0000-4000-8000-000000000e91"
@@ -26,7 +26,6 @@
   "textSha256": "b2efad5c233ea4134a3f32e43ffef159009a92e49c76a7a7a466470b631660af",
   "partTypes": {
    "article": 5,
-   "caput": 5,
    "cell": 3,
    "document": 1,
    "row": 2,
@@ -34,7 +33,7 @@
    "unidentified": 2
   },
   "contexts": {
-   "operative_candidate": 17,
+   "operative_candidate": 12,
    "unknown": 2
   },
   "limitations": {
@@ -51,7 +50,6 @@
   "textSha256": "b2efad5c233ea4134a3f32e43ffef159009a92e49c76a7a7a466470b631660af",
   "partTypes": {
    "article": 5,
-   "caput": 5,
    "cell": 3,
    "document": 1,
    "row": 2,
@@ -59,7 +57,7 @@
    "unidentified": 2
   },
   "contexts": {
-   "operative_candidate": 17,
+   "operative_candidate": 12,
    "unknown": 2
   },
   "limitations": {
@@ -70,6 +68,443 @@
  },
  "differences": [
   "limitations"
+ ],
+ "alignment": {
+  "contained": true,
+  "offset": 0,
+  "officialOnly": {
+   "before": "\"\"",
+   "beforeChars": 0,
+   "after": "\"\"",
+   "afterChars": 0
+  },
+  "acervoOnly": {
+   "chars": 0
+  },
+  "extrasWhitespaceOnly": true,
+  "unidentified": {
+   "official": [
+    {
+     "start": 0,
+     "end": 48,
+     "chars": 48,
+     "text": "\"DECRETO SINTÉTICO Nº 1, DE 2 DE JANEIRO DE 2025\\n\""
+    },
+    {
+     "start": 48,
+     "end": 108,
+     "chars": 60,
+     "text": "\"Texto sintético escrito para este teste; não é ato oficial.\\n\""
+    }
+   ],
+   "acervo": [
+    {
+     "start": 0,
+     "end": 48,
+     "chars": 48,
+     "text": "\"DECRETO SINTÉTICO Nº 1, DE 2 DE JANEIRO DE 2025\\n\""
+    },
+    {
+     "start": 48,
+     "end": 108,
+     "chars": 60,
+     "text": "\"Texto sintético escrito para este teste; não é ato oficial.\\n\""
+    }
+   ]
+  }
+ },
+ "partComparison": [
+  {
+   "index": 0,
+   "type": [
+    "document",
+    "document"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 0,
+    "end": 346
+   },
+   "acervo": {
+    "start": 0,
+    "end": 346
+   },
+   "acervoRemapped": {
+    "start": 0,
+    "end": 346
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 1,
+   "type": [
+    "unidentified",
+    "unidentified"
+   ],
+   "context": [
+    "unknown",
+    "unknown"
+   ],
+   "official": {
+    "start": 0,
+    "end": 48
+   },
+   "acervo": {
+    "start": 0,
+    "end": 48
+   },
+   "acervoRemapped": {
+    "start": 0,
+    "end": 48
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap",
+   "unidentifiedText": [
+    "\"DECRETO SINTÉTICO Nº 1, DE 2 DE JANEIRO DE 2025\\n\"",
+    "\"DECRETO SINTÉTICO Nº 1, DE 2 DE JANEIRO DE 2025\\n\""
+   ]
+  },
+  {
+   "index": 2,
+   "type": [
+    "unidentified",
+    "unidentified"
+   ],
+   "context": [
+    "unknown",
+    "unknown"
+   ],
+   "official": {
+    "start": 48,
+    "end": 108
+   },
+   "acervo": {
+    "start": 48,
+    "end": 108
+   },
+   "acervoRemapped": {
+    "start": 48,
+    "end": 108
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap",
+   "unidentifiedText": [
+    "\"Texto sintético escrito para este teste; não é ato oficial.\\n\"",
+    "\"Texto sintético escrito para este teste; não é ato oficial.\\n\""
+   ]
+  },
+  {
+   "index": 3,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 108,
+    "end": 157
+   },
+   "acervo": {
+    "start": 108,
+    "end": 157
+   },
+   "acervoRemapped": {
+    "start": 108,
+    "end": 157
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 4,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 157,
+    "end": 197
+   },
+   "acervo": {
+    "start": 157,
+    "end": 197
+   },
+   "acervoRemapped": {
+    "start": 157,
+    "end": 197
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 5,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 197,
+    "end": 235
+   },
+   "acervo": {
+    "start": 197,
+    "end": 235
+   },
+   "acervoRemapped": {
+    "start": 197,
+    "end": 235
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 6,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 235,
+    "end": 287
+   },
+   "acervo": {
+    "start": 235,
+    "end": 287
+   },
+   "acervoRemapped": {
+    "start": 235,
+    "end": 287
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 7,
+   "type": [
+    "table",
+    "table"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 263,
+    "end": 287
+   },
+   "acervo": {
+    "start": 263,
+    "end": 287
+   },
+   "acervoRemapped": {
+    "start": 263,
+    "end": 287
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 8,
+   "type": [
+    "row",
+    "row"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 263,
+    "end": 281
+   },
+   "acervo": {
+    "start": 263,
+    "end": 281
+   },
+   "acervoRemapped": {
+    "start": 263,
+    "end": 281
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 9,
+   "type": [
+    "cell",
+    "cell"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 263,
+    "end": 280
+   },
+   "acervo": {
+    "start": 263,
+    "end": 280
+   },
+   "acervoRemapped": {
+    "start": 263,
+    "end": 280
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 10,
+   "type": [
+    "row",
+    "row"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 281,
+    "end": 286
+   },
+   "acervo": {
+    "start": 281,
+    "end": 286
+   },
+   "acervoRemapped": {
+    "start": 281,
+    "end": 286
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 11,
+   "type": [
+    "cell",
+    "cell"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 281,
+    "end": 283
+   },
+   "acervo": {
+    "start": 281,
+    "end": 283
+   },
+   "acervoRemapped": {
+    "start": 281,
+    "end": 283
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 12,
+   "type": [
+    "cell",
+    "cell"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 283,
+    "end": 285
+   },
+   "acervo": {
+    "start": 283,
+    "end": 285
+   },
+   "acervoRemapped": {
+    "start": 283,
+    "end": 285
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 13,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 287,
+    "end": 346
+   },
+   "acervo": {
+    "start": 287,
+    "end": 346
+   },
+   "acervoRemapped": {
+    "start": 287,
+    "end": 346
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  }
+ ],
+ "verdicts": [
+  "POSITION_ONLY: same parts, types, contexts and text; positions differ only by the edge whitespace the official side has beyond the Acervo text",
+  "LIMITATION_SIGNAL_LOST_IN_ACERVO: excluded_executable_content, image_without_ocr",
+  "COMMON_LIMITATION (both readings): unidentified_content; 2 unidentified part(s), 108 chars official / 108 Acervo"
  ],
  "verdict": "the Acervo representation loses what the reader uses for this sample"
 }
