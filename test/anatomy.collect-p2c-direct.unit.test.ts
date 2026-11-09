@@ -3,7 +3,7 @@ import test from 'node:test';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { P2C_PACKAGE, runDirect, directTargetProblem, multivigenteUrl, BUDGET_FILE, type DirectTarget } from '../ops/anatomy/collect-p2c.js';
+import { P2C_PACKAGE, runDirect, directTargetProblem, multivigenteUrl, BUDGET_FILE, pinnedRouteProblem, realIsoDate, type DirectTarget } from '../ops/anatomy/collect-p2c.js';
 import type { BudgetState } from '../ops/anatomy/request-budget.js';
 
 // E9-ACERVO-01 R3 (tribusca-control#116, D1–D3): P2-c direct capture by idAto. Simulated transport only — no request.
@@ -68,7 +68,7 @@ test('direct: every attempt is debited — redirect hop, HTTP failure and succes
   const meta = JSON.parse(readFileSync(join(o.outDir, '142967.meta.json'), 'utf8')) as { p2c: { size: string; acervoSize: string; mode: string } };
   assert.deepEqual([meta.p2c.mode, meta.p2c.size, meta.p2c.acervoSize], ['direct-by-idAto', 'pequeno', 'medio']);
   assert.match(JSON.stringify(inv.decisions), /kept for the MEASURED size pequeno \(Acervo said medio; D3\)/u);
-  assert.match(JSON.stringify(inv.decisions), /failed \(debited\)/u); assert.equal(inv.searches, 0);
+  assert.match(JSON.stringify(inv.decisions), /failed \(every request sent was debited\)/u); assert.equal(inv.searches, 0);
 });
 
 test('direct: per-type caps hold (no transfer); duplicates are skipped; the repository grant is SUSPENDED and refuses with zero requests', async () => {
@@ -79,4 +79,45 @@ test('direct: per-type caps hold (no transfer); duplicates are skipped; the repo
   const g = read(BUDGET_FILE).grant!; let calls = 0; const spy = (async () => { calls++; throw new Error('must not be called'); }) as unknown as typeof fetch;
   await assert.rejects(runDirect(spy, { grantId: g.grantId, owner: g.owner, targets: [{ type: 'Portaria', idAto: '900003', numeroAto: '1', anoAto: '2025' }], lotDirs: [], outDir: mkdtempSync(join(tmpdir(), 'x-')) }), /suspended/u);
   assert.equal(calls, 0); assert.equal(existsSync(`${BUDGET_FILE}.lock`), false);
+});
+
+// R4 (COORD E9-ACERVO-01 R4): host, idAto and the multivigente route are pinned on every hop; vision and real act date
+// are confirmed before storing. Simulated transport only.
+const json = (b: Buffer | string) => new Response(b, { status: 200, headers: { 'content-type': 'application/json' } });
+const withField = (mutate: (root: Record<string, any>) => void) => { const root = JSON.parse(REAL.toString('utf8')) as Record<string, any>; mutate(root); return Buffer.from(JSON.stringify(root)); };
+
+test('R4: a redirect to /visao/original of the SAME idAto is refused before the next request — 1 sent, 1 debited, nothing stored', async () => {
+  const f = budget(); const t = transport((url) => url.endsWith('/visao/multivigente')
+    ? new Response(null, { status: 302, headers: { location: 'https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/original' } }) : okReal());
+  const o = opts(f, [portaria514]); const inv = await runDirect(t.f, o);
+  assert.deepEqual(t.urls, [multivigenteUrl(142967)], 'the original route was never requested');
+  assert.equal(read(f).used.total, 1, 'the request actually sent stays debited; the refused hop is not');
+  assert.match(JSON.stringify(inv.decisions), /route_pinned: route changed to \/api\/consulta-externa\/ato\/142967\/visao\/original/u);
+  assert.equal(inv.actsKept, 0); assert.equal(existsSync(join(o.outDir, '142967.json')), false);
+});
+
+test('R4: every other route change is refused before sending — other idAto, query, port, host, http', async () => {
+  for (const location of ['https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142968/visao/multivigente',
+    'https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente?x=1',
+    'https://normasinternet2.receita.fazenda.gov.br:8443/api/consulta-externa/ato/142967/visao/multivigente',
+    'https://normas.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente',
+    'http://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente']) {
+    const f = budget(); const t = transport((url, n) => (n === 1 ? new Response(null, { status: 301, headers: { location } }) : okReal()));
+    const o = opts(f, [portaria514]); const inv = await runDirect(t.f, o);
+    assert.equal(t.urls.length, 1, location); assert.equal(read(f).used.total, 1, location);
+    assert.equal(inv.actsKept, 0, location); assert.equal(existsSync(join(o.outDir, '142967.json')), false, location);
+  }
+  assert.equal(pinnedRouteProblem(multivigenteUrl(142967), 142967), null);
+  // A redirect to the SAME pinned URL is followed and both requests are debited (covered with storage in the D3 test above).
+});
+
+test('R4: a response dated 2025-02-30, or a non-multivigente vision, is refused before storing — debited, nothing written', async () => {
+  for (const [label, body] of [['2025-02-30', withField((r) => { r.epigrafe.dataAto = '2025-02-30'; })], ['visao original', withField((r) => { r.visao = 'original'; })]] as const) {
+    const f = budget(); const t = transport(() => json(body)); const o = opts(f, [portaria514]);
+    const inv = await runDirect(t.f, o);
+    assert.equal(t.urls.length, 1, label); assert.equal(read(f).used.total, 1, `${label}: the request sent stays debited`);
+    assert.match(JSON.stringify(inv.decisions), label === '2025-02-30' ? /act date 2025-02-30 \(not a real date/u : /vision original \(multivigente required\)/u, label);
+    assert.equal(inv.actsKept, 0, label); assert.equal(existsSync(join(o.outDir, '142967.json')), false, label); assert.equal(existsSync(join(o.outDir, '142967.meta.json')), false, label);
+  }
+  assert.deepEqual(['2025-02-21', '2024-02-29', '2025-02-30', '2025-13-01', '2025-2-1', ''].map(realIsoDate), [true, true, false, false, false, false]);
 });

@@ -136,7 +136,33 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
 export interface DirectTarget { type: string; idAto: string; numeroAto: string; anoAto: string; acervoSize?: string }
 export const RFB_LOT_DIRS = ['rfb-normasinternet2', 'rfb-normasinternet2-coleta02', 'rfb-p2c']
   .map((d) => fileURLToPath(new URL(`./official-identification/${d}/`, import.meta.url)));
-export const multivigenteUrl = (idAto: number) => `https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/${idAto}/visao/multivigente`;
+export const MULTIVIGENTE_HOST = 'normasinternet2.receita.fazenda.gov.br';
+export const multivigenteUrl = (idAto: number) => `https://${MULTIVIGENTE_HOST}/api/consulta-externa/ato/${idAto}/visao/multivigente`;
+/**
+ * R4 (COORD E9-ACERVO-01 R4): in direct mode EVERY hop must be exactly the pinned resource — https, the official host,
+ * no port/credentials/query/fragment, and the path /api/consulta-externa/ato/<same idAto>/visao/multivigente. A redirect to
+ * another route (e.g. /visao/original of the same idAto) is refused BEFORE the next request is sent; this check wraps the
+ * budget fetcher from outside, so a refused hop is neither sent nor debited, and every hop actually sent stays debited.
+ */
+export class RouteRefused extends Error {}
+export function pinnedRouteProblem(url: string, idAto: number): string | null {
+  let u: URL; try { u = new URL(url); } catch { return 'not a URL'; }
+  if (u.protocol !== 'https:' || u.hostname !== MULTIVIGENTE_HOST || u.port !== '' || u.username !== '' || u.password !== '' || u.search !== '' || u.hash !== '')
+    return `not the pinned origin: ${u.protocol}//${u.host}${u.search}${u.hash}`;
+  if (u.pathname !== `/api/consulta-externa/ato/${idAto}/visao/multivigente`) return `route changed to ${u.pathname}`;
+  return null;
+}
+export const pinRoute = (idAto: number, inner: FetchLike): FetchLike => (async (url: string, init?: RequestInit) => {
+  const problem = pinnedRouteProblem(url, idAto);
+  if (problem) throw new RouteRefused(`route_pinned: ${problem} — refused before the request (not sent, not debited)`);
+  return inner(url, init);
+}) as FetchLike;
+/** Real calendar date YYYY-MM-DD (2025-02-30 is not a date). */
+export function realIsoDate(v: unknown): v is string {
+  if (typeof v !== 'string') return false; const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(v); if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+}
 export function directTargetProblem(t: DirectTarget): string | null {
   if (!P2C_TYPES.some((x) => x.type === t.type)) return `type "${t.type}" is not a P2-c type`;
   if (typeof t.idAto !== 'string' || !/^[1-9]\d{0,9}$/u.test(t.idAto)) return `idAto "${String(t.idAto)}" is not a canonical positive integer`;
@@ -172,11 +198,13 @@ export async function runDirect(doFetch: typeof fetch, opts: { grantId: string; 
   try {
     mkdirSync(outDir, { recursive: true });
     for (const t of queue) {
-      const capture = budget.fetcher(t.type, 'capture', doFetch) as unknown as FetchLike;
+      const capture = pinRoute(t.id, budget.fetcher(t.type, 'capture', doFetch) as unknown as FetchLike);
       const m: ManifestAct = { id: String(t.id), source: 'RFB', act: `${t.type} ${t.numeroAto}/${t.anoAto}`, url: multivigenteUrl(t.id), urlStatus: 'candidate',
         reason: `E9 P2-c direct (${t.type}, grant ${opts.grantId})` };
       const r = await consultOfficial(m, OFFICIAL_HOSTS.RFB, capture).catch((e: Error) => ({ ok: false as const, failure: { code: e instanceof BudgetRefused ? 'budget' : 'error', detail: e.message } }));
-      if (!r.ok) { decisions.push({ target: t, outcome: `failed (debited): ${r.failure.code} ${'detail' in r.failure ? r.failure.detail : ''}` }); continue; }
+      if (!r.ok) { decisions.push({ target: t, outcome: `failed (every request sent was debited): ${r.failure.code} ${'detail' in r.failure ? r.failure.detail : ''}` }); continue; }
+      const routeAtEnd = pinnedRouteProblem(r.meta.finalUrl, t.id);
+      if (routeAtEnd) { decisions.push({ target: t, outcome: `refused after capture (debited, not stored): final URL ${routeAtEnd}` }); continue; }
       const v = validateRfbJson(r.body, t.id);
       if ('problem' in v) { decisions.push({ target: t, outcome: `refused after capture (debited, not stored): ${v.problem}` }); continue; }
       const root = JSON.parse(r.body.toString('utf8')) as { epigrafe?: { tipoAto?: { nomeTipoAto?: unknown } } };
@@ -184,7 +212,8 @@ export async function runDirect(doFetch: typeof fetch, opts: { grantId: string; 
       const gotNumber = v.identification.numeroAto?.replace(/\D/gu, '') ?? null; const gotDate = v.identification.dataAto;
       const divergence = [gotType === null || norm(gotType) !== norm(t.type) ? `type ${String(gotType)}` : null,
         gotNumber === null || Number(gotNumber) !== Number(t.numeroAto) ? `number ${String(v.identification.numeroAto)}` : null,
-        !gotDate || !/^\d{4}-\d{2}-\d{2}$/u.test(gotDate) || gotDate.slice(0, 4) !== t.anoAto ? `act date ${String(gotDate)}` : null,
+        !realIsoDate(gotDate) || gotDate.slice(0, 4) !== t.anoAto ? `act date ${String(gotDate)} (not a real date or not ${t.anoAto})` : null,
+        v.identification.visao !== 'multivigente' ? `vision ${String(v.identification.visao)} (multivigente required)` : null,
         gotDate && gotDate >= '2026-01-01' ? 'act dated 2026 or later' : null].filter(Boolean);
       if (divergence.length) { decisions.push({ target: t, outcome: `refused after capture (debited, not stored): identity diverges from the target — ${divergence.join('; ')}` }); continue; }
       let chars: number;
