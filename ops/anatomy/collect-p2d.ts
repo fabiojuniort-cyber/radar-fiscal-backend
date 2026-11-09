@@ -154,11 +154,28 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
   }
 }
 
+/**
+ * R4 (COORD E9-ACERVO-01 R4): the command line is the DIAGNOSTIC collection — it REQUIRES `--stop-after 1` (the first
+ * suitable sample for the JSON × Acervo comparison) and passes it to run(). A missing or invalid limit (absent, 0, 2,
+ * non-integer) is refused before the budget is opened and before any request. Exported for tests (simulated transport).
+ */
+export const DIAGNOSTIC_STOP_AFTER = 1;
+export async function cli(argv: readonly string[], doFetch: typeof fetch, extra: { budgetFile?: string; outDir?: string; now?: () => Date } = {}):
+  Promise<{ code: 0 | 2; error?: string; inventory?: Awaited<ReturnType<typeof run>> }> {
+  const arg = (k: string) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
+  const grantId = arg('--grant'); const owner = arg('--owner'); const date = arg('--date'); const stop = arg('--stop-after');
+  const usage = 'usage: collect-p2d.ts --grant <grantId> --owner <owner> --date <YYYY-MM-DD before 2026> --stop-after 1  (refused without an active grant)';
+  if (!grantId || !owner || !date) return { code: 2, error: usage };
+  if (stop === undefined || !/^\d+$/u.test(stop) || Number(stop) !== DIAGNOSTIC_STOP_AFTER)
+    return { code: 2, error: `--stop-after must be exactly ${DIAGNOSTIC_STOP_AFTER} for the diagnostic collection (got ${stop === undefined ? 'nothing' : JSON.stringify(stop)}); nothing was sent. ${usage}` };
+  const inventory = await run(doFetch, { grantId, owner, date, stopAfter: DIAGNOSTIC_STOP_AFTER, ...extra });
+  return { code: 0, inventory };
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const arg = (k: string) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : undefined; };
-  const grantId = arg('--grant'); const owner = arg('--owner'); const date = arg('--date');
-  if (!grantId || !owner || !date) { console.error('usage: collect-p2d.ts --grant <grantId> --owner <owner> --date <YYYY-MM-DD before 2026>  (refused without an active grant)'); process.exit(2); }
-  const inv = await run(fetch, { grantId, owner, date });
+  const r = await cli(process.argv, fetch);
+  if (r.code !== 0) { console.error(r.error); process.exit(r.code); }
+  const inv = r.inventory!;
   console.log(JSON.stringify(inv.discovery)); for (const d of inv.decisions) console.log(JSON.stringify(d));
-  console.log(`acts kept ${inv.actsKept}; remaining ${inv.remainingTotal}`);
+  console.log(`acts kept ${inv.actsKept} (stopAfter ${inv.stopAfter}); remaining ${inv.remainingTotal}`);
 }

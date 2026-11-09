@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DISCOVERY, DiscoveryRefused, discoverOfficial, JOURNAL, P2D_BUDGET_FILE, P2D_PACKAGE, SECTION, actKey, P2D_TYPES, run, beforeMargin, isReservedDoeSp } from '../ops/anatomy/collect-p2d.js';
+import { DISCOVERY, DiscoveryRefused, discoverOfficial, JOURNAL, P2D_BUDGET_FILE, P2D_PACKAGE, SECTION, actKey, P2D_TYPES, run, beforeMargin, isReservedDoeSp, cli, DIAGNOSTIC_STOP_AFTER } from '../ops/anatomy/collect-p2d.js';
 import { DOE_SP_JOURNAL, DOE_SP_SECTION } from '../src/modules/collection/doe-sp.connector.js';
 import type { BudgetState } from '../ops/anatomy/request-budget.js';
 
@@ -121,4 +121,32 @@ test('R3 stopAfter: 1 stops the WHOLE run after the first suitable sample (for t
   assert.equal(t.urls.filter((u) => u.includes('/publications/')).length, 1, 'exactly one capture request');
   assert.match(JSON.stringify(inv.decisions), /not attempted: run stopped after 1 act/u);
   await assert.rejects(run(t.f, { grantId: 'G-D', owner: 'exec-304', date: '2025-03-10', budgetFile: budgetFile(), outDir: mkdtempSync(join(tmpdir(), 'p2d-out-')), now: NOW, stopAfter: 0 }), /positive integer/u);
+});
+
+// R4 (COORD E9-ACERVO-01 R4): the diagnostic command REQUIRES --stop-after 1 and passes it to run().
+test('R4 CLI: a missing or invalid --stop-after is refused before the budget is opened and before any request', async () => {
+  let calls = 0; const spy = (async () => { calls++; throw new Error('must not be called'); }) as unknown as typeof fetch;
+  const f = budgetFile(); const before = readFileSync(f, 'utf8');
+  const base = ['node', 'collect-p2d.ts', '--grant', 'G-D', '--owner', 'exec-304', '--date', '2025-03-10'];
+  for (const extra of [[], ['--stop-after'], ['--stop-after', '0'], ['--stop-after', '2'], ['--stop-after', '9'], ['--stop-after', '1.0'], ['--stop-after', 'x'], ['--stop-after', '-1']]) {
+    const r = await cli([...base, ...extra], spy, { budgetFile: f, outDir: mkdtempSync(join(tmpdir(), 'p2d-cli-')), now: NOW });
+    assert.equal(r.code, 2, JSON.stringify(extra)); assert.match(r.error!, /--stop-after must be exactly 1|usage/u);
+  }
+  assert.equal(calls, 0, 'nothing was sent'); assert.equal(readFileSync(f, 'utf8'), before, 'budget untouched'); assert.equal(existsSync(`${f}.lock`), false, 'budget never opened');
+  assert.equal(DIAGNOSTIC_STOP_AFTER, 1);
+});
+
+test('R4 CLI: --stop-after 1 reaches run() — one capture, the run stops, every request sent is debited', async () => {
+  const f = budgetFile(); const out = mkdtempSync(join(tmpdir(), 'p2d-cli-'));
+  const list = [item(1, 'DECRETO Nº 69.300, DE 10 DE MARÇO DE 2025', 'a'), item(2, 'PORTARIA CAT Nº 30, DE 10 DE MARÇO DE 2025'), item(3, 'RESOLUÇÃO SFP Nº 9, DE 10 DE MARÇO DE 2025')];
+  const pubs = { [G(1)]: pub(1, 'DECRETO Nº 69.300', 3), [G(2)]: pub(2, 'PORTARIA CAT Nº 30', 3), [G(3)]: pub(3, 'RESOLUÇÃO SFP Nº 9', 3) };
+  const t = transport(list, pubs);
+  const r = await cli(['node', 'collect-p2d.ts', '--grant', 'G-D', '--owner', 'exec-304', '--date', '2025-03-10', '--stop-after', '1'], t.f, { budgetFile: f, outDir: out, now: NOW });
+  assert.equal(r.code, 0); assert.equal(r.inventory!.stopAfter, 1); assert.equal(r.inventory!.actsKept, 1);
+  assert.equal(t.urls.filter((u) => u.includes('/publications/')).length, 1, 'exactly one capture');
+  assert.equal((JSON.parse(readFileSync(f, 'utf8')) as BudgetState).used.total, t.urls.length, 'every request sent was debited');
+  // Invalid date through the command: refused by run() before any request (margin unchanged by R4).
+  let calls = 0; const spy = (async () => { calls++; throw new Error('no'); }) as unknown as typeof fetch;
+  await assert.rejects(cli(['node', 'x', '--grant', 'G-D', '--owner', 'exec-304', '--date', '2027-01-10', '--stop-after', '1'], spy, { budgetFile: budgetFile(), outDir: mkdtempSync(join(tmpdir(), 'p2d-cli-')), now: NOW }), /before 2026/u);
+  assert.equal(calls, 0);
 });
