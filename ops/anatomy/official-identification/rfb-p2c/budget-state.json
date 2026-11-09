@@ -1,0 +1,16 @@
+{
+  "schema": "request-budget/1",
+  "grant": {
+    "grantId": "E9-P2c-G1",
+    "owner": "EXEC #303 (claude/anat-e9-coverage)",
+    "package": "E9-P2-c",
+    "approvedBy": "tribusca-control#116 c.6708512598 §3 — orçamento NOVO de até 16, condicionado ao PASS independente da guarda (#303 c.6708499687)",
+    "status": "suspended",
+    "expiresAt": "2026-11-21T23:59:59Z",
+    "total": 16,
+    "perType": { "Resolução": 3, "Portaria": 3, "Ato Declaratório Interpretativo": 2, "Ato Declaratório Executivo": 4, "Solução de Consulta": 4 }
+  },
+  "used": { "total": 0, "perType": {} },
+  "attempts": [],
+  "note": "SUSPENDED until the independent PASS of the budget barrier; the owner switches status to active only after that PASS is recorded. The historical record 28/25 (ledger-combined.json) is immutable and is not this budget."
+}

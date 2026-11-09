@@ -1,0 +1,189 @@
+{
+  "cases": [
+    {
+      "id": "RFB:108391",
+      "payload": "c0ecd1f7efe14d242b560963ecd0fa5373292c54344030d586cb6fb484d33e0d",
+      "regions": "93d188d3fa692dd798646c972c15773a0dcb7d19bfff5c1b047a4899561617da"
+    },
+    {
+      "id": "RFB:115131",
+      "payload": "b798206089d5e210b3faf1f6ad5887e1acaad4bfce5edd5bfea4d9adc0694bf3",
+      "regions": "6a21bd4521df063e93860747032873b44c256360679a15e7cbeff12f32d05c19"
+    },
+    {
+      "id": "RFB:127905",
+      "payload": "3701e432a7d1670fa6aadde6cff157c645f0e6770aa63bf5edf62c09bf95bd23",
+      "regions": "7a2367baf48155ef33bc184d228b40508c1f212e7890f27ea910449c20f352e8"
+    },
+    {
+      "id": "RFB:133898",
+      "payload": "71b345f6c0f5636339b7fe5d233f1bc1aaef7c6cbf2afdc2774b259283a7ebec",
+      "regions": "376ee7254a94b210d038ed932ac06af8d9967a8be607400186c3a4166714d4db"
+    },
+    {
+      "id": "RFB:141910",
+      "payload": "d77728d945ada9634885a7ebb88d8562d72adab8d2a3b27c1afc9c3bd7b7c6eb",
+      "regions": "c0b99e4feac47722258d5b0fbbd51321cb36839fa62782fa6595234339144e4d"
+    },
+    {
+      "id": "RFB:104314",
+      "payload": "5adabcda59dbe0a4bdf0237c39f592e088aa764c2ea144676f65337bf4d8d55d",
+      "regions": "3860aba773a73c708fd6c83a06877581c66d67e1611a39117c560d134cdc0170"
+    },
+    {
+      "id": "RFB:116968",
+      "payload": "a1f69e6293b4c0049dc48288da252eb697ae51143091144f27a74b46169d4d2e",
+      "regions": "16205306be88d8eb9a970b6dfef8bedb165a47f0e6203f76ebaa76bbe90b34bb"
+    },
+    {
+      "id": "RFB:122645",
+      "payload": "66d0b4416fa74e5c6b14e52f26bfe95d7c21e00dcc5b3cd4e8bb595b36f6c82a",
+      "regions": "bbfd783d34f2336332ed7899f92ff888c43e950eeb322b823b0ae4c7f565e093"
+    },
+    {
+      "id": "RFB:142967",
+      "payload": "d1f8e098da4e4be1b1ada87e7c5c8497c28319b57ad56a823a5176800a4a04a7",
+      "regions": "2302ebe64cc4d4d2b2a5fcefb318dcfb3d4df1e303f5671c7bb5d4de861a7e88"
+    },
+    {
+      "id": "RFB:37103",
+      "payload": "6edeaa805bcf93d807481846cc61cc1aee56a802c7836e2dfdfc9ddb725d2760",
+      "regions": "6fa84aa59192173fb7fed58784a4d9f7cc071cf668e785f662779cf7eeaa002b"
+    },
+    {
+      "id": "SEFAZ-SP-PORTAL:ricms-an1art041",
+      "payload": "be864bce16d497823db9c72082a1f3ebf60185a087e8fa7feda35b12382654ca",
+      "regions": "aaa02afe944f8db3df3a9655d718ee4fadeea3b3417afbd05998fec83dc3f044"
+    },
+    {
+      "id": "SEFAZ-SP-PORTAL:ricms-an2art003",
+      "payload": "13609bd7f3ed7c810bd6a12a81e98a7b1dcf71310f0c9664b32d9ffef8f66850",
+      "regions": "b3d54f865284a866c8bd9af955915401006d8ebea2f942b9dcdf681ae0f72595"
+    },
+    {
+      "id": "SEFAZ-SP-PORTAL:ricms-an2art039",
+      "payload": "d1e51f2cf642ca701b354c85dadd96faf42873579ddfb0f8038a957688e0caf1",
+      "regions": "cb17951b51c0b15496c27f67a05264c27a995f7da7b248bfcd00517b68d0bd59"
+    },
+    {
+      "id": "SEFAZ-SP-PORTAL:ricms-art007",
+      "payload": "a36a15de4bc907d62d3a610a1ea3014537e657e03891115ee5a9e5694f64a38f",
+      "regions": "29c731566acbaadb35d3617a27fe1951ffb1b2fbc1b0ce18dbe512cb3f7e3b52"
+    },
+    {
+      "id": "SEFAZ-SP-PORTAL:ricms-art008",
+      "payload": "fd7545482fc20c8e6a9ae00f02ab33f438f9af8da7a9f8c1f0148ecc3c2aa4c2",
+      "regions": "6fa0e79f030780ed69809279c6281a9275394dad65cff1afc39af9c53148e004"
+    },
+    {
+      "id": "SEFAZ-SP-PORTAL:ricms-art009",
+      "payload": "ef08978b35d470b353a955fe04f64d344155eff6f5b59bed9bc7c6f1de5c970d",
+      "regions": "1fcdd65910b553ce217c9e9d664ff7a0665eaf2500599bdf05734fdfc4f0ad15"
+    },
+    {
+      "id": "CONFAZ:e9-http/M3",
+      "payload": "bc75c4ea35bda80ab9c9553ec4ed485141eca2a4a1c5fbcb647835dd7dccd9ba",
+      "regions": "ebb32d153e8705826d99c1ff942170d30315233866e702631eb0c726333cba03"
+    },
+    {
+      "id": "CONFAZ:e9-http/M4",
+      "payload": "8d855105177ee5ba8218ac2a9987f90091a3c0b2633a05695a8985125f992ec0",
+      "regions": "0381d0dee0e8333f06ef7f48ba303fee243d160a53a756206213b438b98664be"
+    },
+    {
+      "id": "CONFAZ:e9-http/M5",
+      "payload": "47014a1feb40f670304f01359caf5bc0e89c97c364c4fe3ece49a3cc35fc1f6a",
+      "regions": "0d2037fa16812fb667aec95ec44657717e41afe6a52cdb17593c56054dce5828"
+    },
+    {
+      "id": "DOU:515_20260918_24377394.xml",
+      "payload": "07cd307ab7bad5c73bbe901b483ab720fb23bc046b576db5c03537b7217822f7",
+      "regions": "908f2c352f808215b218d31bfca503d2f75a00d41d88ab953b1775e6591d212d"
+    },
+    {
+      "id": "DOU:515_20260918_24382389.xml",
+      "payload": "24a4e85e650e832097a10f27d02207dc852fafb6c1048f8b0af8f1301aecdd65",
+      "regions": "9ca4919f155abc82e69e1a04b2266dba2049aacd9e77763d5bc87e822437f528"
+    },
+    {
+      "id": "DOU:515_20260918_24382400.xml",
+      "payload": "85b1af15ca95e774c6ef5c0abc3e55be1477fda367c740994fc194b39685f7d7",
+      "regions": "1be3137b3b0b1ccdc00ad4ed42e319459bb5a203c25d48f6f105aa552481933d"
+    },
+    {
+      "id": "DOU:515_20260918_24382401.xml",
+      "payload": "96684be3c572641ecda541bf0ed5156813ac656d26eb5a6a94dabec3461eaa14",
+      "regions": "8dac3471da8475912a41cb23842334c4006a61a7342396560f2594679dade321"
+    },
+    {
+      "id": "DOU:600_20260918_24382325.xml",
+      "payload": "38ee74a0da07a129e3c48f69817ebee68835ebeb36c1218295ef59c364d69896",
+      "regions": "71b70023afb01fc990fc3a073ba7bbaa7537fad84c87ac8243e4650c4f1ed1e2"
+    },
+    {
+      "id": "DOU:600_20260918_24382380.xml",
+      "payload": "e63b336dd406e62ef928a3b494a8ecd1b3ab0cb4aa339a96c3cf8899416a7602",
+      "regions": "839618a7b71a4912b822b5ee1ff07208cd3fa1072e82dd42cdd16a77c7d73b39"
+    },
+    {
+      "id": "DOU:600_20260918_24382412.xml",
+      "payload": "182242df3d4330c4e62ba064ea667c282484b04db9ab74184e2c8d79ede2234f",
+      "regions": "07db0a9bbf86f6194f89663be82ee0cc047652d62f36cb2939781ccb877155c7"
+    },
+    {
+      "id": "DOU:602_20260918_24378456-1.xml",
+      "payload": "c59851b0452b7d439726e8c19f047c5f16e87d05d8c676c269735a438984b3c4",
+      "regions": "2f90977bb81a823edf45991318796704baaa6f0b69abfff4be5b5d4c2b791313"
+    },
+    {
+      "id": "DOU:602_20260918_24378456-2.xml",
+      "payload": "1af2e7ac37f5515c39e691d658ae29a441ebd098027d22798a06c87120e57eab",
+      "regions": "f674f32bb41a81e31074e8da2792ffa60c1de13228e73f824e2df6740492ecd2"
+    },
+    {
+      "id": "DOU:602_20260918_24378456-3.xml",
+      "payload": "1070cafa276d001ee7c2036710d070211913822ad25c499ff8537b525da972b8",
+      "regions": "a0c68cbf317b38afc30397deab8a80d859d7d66190ab81b86570106041fcaf7c"
+    },
+    {
+      "id": "DOU:602_20260918_24380292.xml",
+      "payload": "230f8b1b2bc5a850ccf939cd2fe64fffb1411951a0c65b41bc6a237dc6f85e54",
+      "regions": "750493340c45c98c52a578d84898a8d59f9932cbf7620d61315b7dc33ea00475"
+    },
+    {
+      "id": "DOU:603_20260918_24359694.xml",
+      "payload": "ce9b224accdd1919d322f23ed4cc26d83f0a6667e763581e994fa2dc4dab2427",
+      "regions": "fe35e9f3ed18b840e885564b41b429c7938fb7ec507eb849fbc44d13140f8af0"
+    },
+    {
+      "id": "DOU:e9-http/M1 (Planalto)",
+      "payload": "f6bb1fceafc57cffeb411d5eed4129425c8204084176c2cf52fd81c20a80d937",
+      "regions": "24aec92bda621f1b112043470e403a47ed0df81a2e752c616379d0263d1b9c17"
+    },
+    {
+      "id": "DOU:e9-http/M2 (Planalto)",
+      "payload": "bec10d60115342c20b92b65eb8fbe19882bb457b3510a1ef8fe5791781ada823",
+      "regions": "5e7661ce7bf44927c19f93f17bebedb6641d07c3eee157f73482e5b2eafd7a25"
+    },
+    {
+      "id": "DOU:leg-normas/lei-10637-2002-atualizada.html",
+      "payload": "d761fda515774d4d968d5c76b03a3ac95100478a2faee1f2eaedadfeba3f3544",
+      "regions": "2f94b0cfdde05d0215a47ba0910900bf9eee8edb7ecefc9c4936b94d000cf460"
+    },
+    {
+      "id": "DOU:leg-normas/lei-10637-2002-original.html",
+      "payload": "92370f22cee9e1563d2bd1aa2e228e3611b562af3f7371e535c0af5f0c8a7242",
+      "regions": "4137a1af131354d5795b191834c323446878c70179640afc41e0057bcee75f6d"
+    },
+    {
+      "id": "DOU:leg-normas/lei-10833-2003-atualizada.html",
+      "payload": "c2627d24e6c2a6d8df37d3e84a1693253a6881ecd2115a245334c427b3246a15",
+      "regions": "283a9468e48aa5d6f4d60d3b381709eccce09bfc098ff3a92ab2094b4f977a93"
+    },
+    {
+      "id": "DOU:leg-normas/lei-10833-2003-original.html",
+      "payload": "fc00387810a79ad2e25d44f92e794f077e509ef459cf5cac5872de9e3c6e4c77",
+      "regions": "16f4353039200b1834e94079f855d6959d310df67b3a108ba3e1f785b3d145a2"
+    }
+  ]
+}
