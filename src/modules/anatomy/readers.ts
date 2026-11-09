@@ -590,7 +590,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // article). The rule needs POSITIVE STRUCTURAL EVIDENCE, kept by both the official JSON and the sanitized Acervo copy
   // (div survives sanitization; classes do not): the 1–4 final blocks sit together in their OWN container (div/section)
   // that holds no other block, comes after the last device, and does not contain it. On top of that, conservative
-  // guards: each block is a personal-name line, the last device line ends with a period, and it does not announce
+  // guards: each block is a personal-name line, the last device is the act's closing clause (vigência/revogação, R5.5),
+  // its line ends with a period, and it does not announce
   // content that follows ("abaixo", "a seguir", "seguinte", "indicad…/identificad… abaixo", ':'). Any doubt keeps the
   // previous reading: the line stays bound to the device. Text, spans of the signature blocks and the source map are
   // unchanged.
@@ -631,6 +632,13 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const before = result.canonicalText.slice(owner.span.start, tail[0]!.span.start);
     const lines = before.split(/[\r\n]+/u).map((l) => l.trim()).filter(Boolean);
     if (!lines.length || !/\.$/u.test(lines[lines.length - 1]!)) return;
+    // R5.5: the last device must be the act's CLOSING CLAUSE — vigência or revogação (LC 95/98 arts. 3º III, 8º, 9º):
+    // nothing normative follows it, so what follows in its own container is the signature block. After any other device
+    // (e.g. "…o programa de atenção primária." + div "PROGRAMA ESTADUAL DE SAÚDE") the line may be normative: keep it.
+    // Matching view only: invisible format characters (e.g. U+00AD soft hyphen in "vi\u00adgor") are ignored; the
+    // canonical text keeps every character.
+    const closingLine = lines[lines.length - 1]!.replace(/\p{Cf}/gu, '');
+    if (!/\b(?:entra(?:m|rá|rão)? em vigor|produz(?:irá|irão|em)? (?:seus )?efeitos|vigorará|revogam-se|ficam revogad[oa]s?|fica revogad[oa])\b/iu.test(closingLine)) return;
     // A device that announces what follows keeps it (ambiguous => preserve the bond).
     if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;
     const firstSig = tail[0]!.span.start;
