@@ -9,7 +9,9 @@
  *   identified — the act's identity was checked in the bytes (title / idAto);
  *   read       — read by the engine with the source's OWN profile (a diagnostic with another profile is not a read);
  *   validated  — conservative invariants hold and the output is locked by a regression baseline run by a CI test;
- *   accepted   — independent review recorded for that sample (none yet: collection acceptance ≠ anatomy acceptance).
+ *   accepted   — independent review recorded for that sample in docs/anatomy/e9-acceptances.json (DERIVED: the record must
+ *                pin the sample's current lock digest and engine identity; any drift voids it). Collection acceptance ≠
+ *                anatomy acceptance.
  *
  * Size criterion: canonical characters produced by the engine. pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000.
  * `--write` regenerates docs/anatomy/official-coverage-matrix.json, docs/anatomy/official-samples-baseline.json and
@@ -20,6 +22,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
+import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
 import { prepareNormasLegPage } from '../../src/modules/anatomy/normas-leg-preparation.js';
 import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
@@ -68,7 +71,7 @@ export const GRID: readonly GridCell[] = Object.freeze([
   ...['Instrução Normativa', 'Portaria', 'Ato Declaratório Interpretativo', 'Ato Declaratório Executivo', 'Solução de Consulta', 'Resolução']
     .flatMap((t) => bySize('RFB', t, LAYOUT.RFB_JSON, t === 'Instrução Normativa' ? 'API RFB (coletado)' : 'API RFB — P2-c (autorizada, c.6701950134)')),
   ...bySize('Planalto', 'Lei', LAYOUT.PLANALTO_HTML, 'arquivo manual (a origem recusa este ambiente)', { grande: ['M1', 'M2'] }),
-  ...bySize('normas.leg.br', 'Lei', LAYOUT.NORMASLEG_HTML, 'normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)'),
+  ...bySize('normas.leg.br', 'Lei', LAYOUT.NORMASLEG_HTML, 'normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)'),
   // M3 and M4 are two Convênios ICMS; each is a SAMPLE whose measured size decides the cell it may cover — neither closes
   // a cell by being received, and one never stands for the other (no OR between items).
   ...bySize('CONFAZ', 'Convênio ICMS', LAYOUT.CONFAZ_HTML, 'arquivo manual (M3, M4)'),
@@ -143,10 +146,19 @@ export function readNormasLeg(m: { id: string; url: string; urn: string; sha256:
     counts: { ...prep.plan.counts, editorialNoteParts: notes.length, candidateSelections: candidates.length }, chars: r.canonicalText.length };
   return { entry, invariants: broken, outputHash: r.outputHash };
 }
+/**
+ * E9-ACERVO-01 R3 (tribusca-control#116): formal acceptances are DATA, never a hard-coded `accepted: true`. A record
+ * counts only while it pins the sample's current lock digest (sha256 of the canonical baseline entry) and the engine
+ * identity it was reviewed on; a drift of either voids the acceptance (the sample stays validated or not on its own).
+ */
+export const ACCEPTANCES_FILE = fileURLToPath(new URL('../../docs/anatomy/e9-acceptances.json', import.meta.url));
+export interface Acceptance { sampleId: string; cellId: string; scope: 'offline'; entrySha256: string; engineBuildHash: string; decidedBy: string; decidedOn: string; ref: string; limits: string[] }
+const loadAcceptances = (): Acceptance[] => (existsSync(ACCEPTANCES_FILE) ? (JSON.parse(readFileSync(ACCEPTANCES_FILE, 'utf8')) as { acceptances: Acceptance[] }).acceptances : []);
+export const normasLegEntrySha256 = (e: NormasLegEntry) => sha(canonJson(e));
 const loadNormasLegBaseline = (): NormasLegEntry[] => (existsSync(NORMAS_LEG_BASELINE) ? (JSON.parse(readFileSync(NORMAS_LEG_BASELINE, 'utf8')) as { samples: NormasLegEntry[] }).samples : []);
 const loadBaseline = (): BaselineEntry[] => (existsSync(SAMPLES_BASELINE) ? (JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: BaselineEntry[] }).samples : []);
 
-export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), normasLegBaseline: NormasLegEntry[] = loadNormasLegBaseline()): Sample[] {
+export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), normasLegBaseline: NormasLegEntry[] = loadNormasLegBaseline(), acceptances: Acceptance[] = loadAcceptances()): Sample[] {
   const out: Sample[] = [];
   const locked = (id: string, s: string, profile: string, rd: Read) => {
     const b = baseline.find((x) => x.id === id);
@@ -182,8 +194,8 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), norma
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
   }
   // normas.leg.br. The two "versão atualizada" files are READ by the typed source NORMAS-LEG through
-  // prepareNormasLegPage (#305 c.6709334910: hash, URN, version and representationId preserved) — read, NOT validated
-  // (validation needs its own baseline/invariants/test decision) and never accepted. The original texts have no plan:
+  // prepareNormasLegPage (#305 c.6709334910: hash, URN, version and representationId preserved); validated by the
+  // NORMAS-LEG lock (#305 c.6710099648) and accepted only through a pinned record (E9-ACERVO-01 R3). The original texts have no plan:
   // captured and identified only; the DOU-profile reading stays a diagnostic (never a read, never closes a cell).
   const lg = join(ROOT, 'leg-normas');
   for (const f of readdirSync(lg).filter((x) => /-(original|atualizada)\.meta\.json$/u.test(x)).sort()) {
@@ -193,9 +205,11 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), norma
       const rd = readNormasLeg(m, bytes);
       const b = normasLegBaseline.find((x) => x.id === m.id);
       const ok = rd.invariants.length === 0 && !!b && canonJson(b) === canonJson(rd.entry);
+      const acc = acceptances.find((a) => a.sampleId === m.id);
+      const accepted = ok && !!acc && acc.scope === 'offline' && acc.entrySha256 === normasLegEntrySha256(rd.entry) && acc.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH;
       out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: rd.entry.chars, size: sizeOf(rd.entry.chars), sha256: m.sha256, bytes: m.bytes,
-        stages: { captured: true, identified: m.titleCheck.found, read: true, validated: ok, accepted: false }, profile: 'NORMAS-LEG', diagnostic: null, outputHash: rd.outputHash,
-        evidence: ok ? ['docs/anatomy/normas-leg-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts', 'test/anatomy.normas-leg.unit.test.ts'] : ['test/anatomy.normas-leg.unit.test.ts'],
+        stages: { captured: true, identified: m.titleCheck.found, read: true, validated: ok, accepted }, profile: 'NORMAS-LEG', diagnostic: null, outputHash: rd.outputHash,
+        evidence: ok ? ['docs/anatomy/normas-leg-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts', 'test/anatomy.normas-leg.unit.test.ts', ...(accepted ? ['docs/anatomy/e9-acceptances.json'] : [])] : ['test/anatomy.normas-leg.unit.test.ts'],
         notes: ['lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)', ...(ok ? [] : ['não validada: linha de base NORMAS-LEG ausente ou divergente']), ...rd.invariants] });
       continue;
     }

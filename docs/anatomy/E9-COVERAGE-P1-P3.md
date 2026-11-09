@@ -122,3 +122,9 @@ Desenho e contracasos em `docs/anatomy/L-LEG-01-DESIGN.md`. Nenhuma classificaç
 M3, M4 e M5 estão resolvidos. Não pedir de novo.
 
 **Como salvar:** Ctrl+S → **"Página da Web, somente HTML"**, sem renomear. Envie o `.html`; a pasta `_files` não é necessária.
+
+## Aceite formal (E9-ACERVO-01 R3, 09/11/2026)
+
+- Primeiro aceite formal: **normas.leg.br × Lei × HTML × grande**, decidido pelo COORD em revisão independente (tribusca-control#116), **só no escopo offline**: validação local das versões atualizadas das Leis 10.637 e 10.833 lidas pela fonte NORMAS-LEG (#305 @ `d6d991ef`).
+- O aceite fica em `docs/anatomy/e9-acceptances.json` e é **derivado**. Ele vale só enquanto o registro fixa o digest atual da entrada da linha de base NORMAS-LEG (`entrySha256`) e a identidade do motor (`9235a810…`). Se um dos dois mudar, ou se a amostra deixar de ser `validated`, o aceite cai (teste em `test/anatomy.official-coverage.unit.test.ts`).
+- Não altera cobertura (11/61) nem pontuação oficial. O CI integral do #305 segue vermelho no teste R7 de auditoria em PG18 (ONB-01). A etapa de Anatomia está verde. A integração continua bloqueada pela cadeia #285/#303.

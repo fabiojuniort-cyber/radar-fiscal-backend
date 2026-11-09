@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
-import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, NORMAS_LEG_BASELINE, normasLegBaseline, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type NormasLegEntry, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
+import { ACCEPTANCES_FILE, buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, NORMAS_LEG_BASELINE, normasLegEntrySha256, type Acceptance, normasLegBaseline, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type NormasLegEntry, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
 import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anatomy/charset-policy.js';
@@ -19,7 +19,7 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 11 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 11 cells covered, E9 incomplete; only the two normas.leg.br atualizada samples are accepted (offline, pinned record); identity kept', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'normas-leg-br--lei--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
@@ -27,9 +27,11 @@ test('E9 current state: 11 cells covered, E9 incomplete; nothing promoted or acc
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(!m.requiredPending.includes('normas-leg-br--lei--grande'), '#305 c.6710099648: the grande cell closes through the NORMAS-LEG baseline');
   assert.ok(['normas-leg-br--lei--pequeno', 'normas-leg-br--lei--medio'].every((c) => !m.cells.find((x) => x.id === c) || m.requiredPending.includes(c)), 'pequeno/médio stay pending');
-  assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
+  // E9-ACERVO-01 R3: the first formal acceptance — normas.leg.br × Lei × HTML × grande, offline scope only.
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['lei-10637-2002-atualizada', 'lei-10833-2003-atualizada']);
+  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id), ['normas-leg-br--lei--grande'], 'acceptance changes neither coverage nor score');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
-  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.accepted));
+  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && s.stages.accepted === s.id.endsWith('-atualizada')));
   assert.deepEqual(leg.map((s) => [s.id, s.stages.validated]).sort(), [['lei-10637-2002-atualizada', true], ['lei-10637-2002-original', false], ['lei-10833-2003-atualizada', true], ['lei-10833-2003-original', false]]);
   // #305 c.6709334910: only the two "atualizada" versions are read, by NORMAS-LEG through the preparation; originals are not.
   for (const s of leg) {
@@ -217,4 +219,19 @@ test('#305 c.6710099648: the NORMAS-LEG lock — validated is derived; any drift
   // Bytes drift is refused before any reading (integrity), never silently re-baselined.
   const meta = JSON.parse(readFileSync('ops/anatomy/official-identification/leg-normas/lei-10637-2002-atualizada.meta.json', 'utf8')) as { sha256: string; bytes: number };
   assert.throws(() => verifiedBytes('ops/anatomy/official-identification/leg-normas/lei-10637-2002-atualizada.html', { ...meta, sha256: '0'.repeat(64) }, 'x'), SampleIntegrityError);
+});
+
+test('E9-ACERVO-01 R3: acceptance is DERIVED from a pinned record — no record, another digest, another engine or a non-validated sample ⇒ not accepted', () => {
+  const recs = (JSON.parse(readFileSync(ACCEPTANCES_FILE, 'utf8')) as { acceptances: Acceptance[] }).acceptances;
+  const base = (JSON.parse(readFileSync(NORMAS_LEG_BASELINE, 'utf8')) as { samples: NormasLegEntry[] }).samples;
+  assert.deepEqual(recs.map((r) => [r.sampleId, r.entrySha256]), base.map((e) => [e.id, normasLegEntrySha256(e)]), 'records pin the committed lock');
+  assert.ok(recs.every((r) => r.scope === 'offline' && r.cellId === 'normas-leg-br--lei--grande' && /#116/u.test(r.ref) && r.limits.some((l) => /R7/u.test(l))));
+  const accepted = (a: Acceptance[], b: NormasLegEntry[] = base) => collectSamples(undefined, b, a).filter((s) => s.id.endsWith('-atualizada')).map((s) => s.stages.accepted);
+  assert.deepEqual(accepted(recs), [true, true]);
+  assert.deepEqual(accepted([]), [false, false], 'no record ⇒ not accepted (no hard-coded accepted=true)');
+  assert.deepEqual(accepted(recs.map((r, i) => (i === 0 ? { ...r, entrySha256: '0'.repeat(64) } : r))), [false, true], 'another digest voids it');
+  assert.deepEqual(accepted(recs.map((r, i) => (i === 1 ? { ...r, engineBuildHash: '0'.repeat(64) } : r))), [true, false], 'another engine voids it');
+  assert.deepEqual(accepted(recs.map((r) => ({ ...r, scope: 'production' as unknown as 'offline' }))), [false, false], 'only the offline scope is recorded');
+  const drift = base.map((e, i) => (i === 0 ? { ...e, textSha256: `${e.textSha256}x` } : e));
+  assert.deepEqual(accepted(recs, drift), [false, true], 'a sample that stops being validated stops being accepted');
 });

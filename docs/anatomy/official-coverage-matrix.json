@@ -431,7 +431,7 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
@@ -439,7 +439,8 @@
       "evidence": [
         "docs/anatomy/normas-leg-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
-        "test/anatomy.normas-leg.unit.test.ts"
+        "test/anatomy.normas-leg.unit.test.ts",
+        "docs/anatomy/e9-acceptances.json"
       ],
       "notes": [
         "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
@@ -486,7 +487,7 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
@@ -494,7 +495,8 @@
       "evidence": [
         "docs/anatomy/normas-leg-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
-        "test/anatomy.normas-leg.unit.test.ts"
+        "test/anatomy.normas-leg.unit.test.ts",
+        "docs/anatomy/e9-acceptances.json"
       ],
       "notes": [
         "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
@@ -1093,7 +1095,7 @@
       "applicability": {
         "required": true
       },
-      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)",
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
@@ -1108,7 +1110,7 @@
       "applicability": {
         "required": true
       },
-      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)",
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
@@ -1123,13 +1125,13 @@
       "applicability": {
         "required": true
       },
-      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; não validada)",
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)",
       "status": "covered",
       "validatedSamples": [
         "lei-10637-2002-atualizada",
         "lei-10833-2003-atualizada"
       ],
-      "accepted": false,
+      "accepted": true,
       "unvalidatedSamples": []
     },
     {
