@@ -1,0 +1,54 @@
+{
+  "schema": "e9-compose-laws-equivalence/1",
+  "purpose": "COORD E9-ACERVO-01 R5.5 §3: the two accepted laws read on the composed engine vs the accepted reference",
+  "reference": {
+    "ref": "#305 @ b58bfeb",
+    "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3"
+  },
+  "composed": {
+    "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1"
+  },
+  "laws": {
+    "lei-10637-2002-atualizada": {
+      "entrySha256": {
+        "reference": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+        "composed": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498"
+      },
+      "identityStrippedOutputSha256": {
+        "reference": "6601eb3b936c92786aae09a4355a891c871cb49d8674df0cdfbf68f68ff9d6aa",
+        "composed": "6601eb3b936c92786aae09a4355a891c871cb49d8674df0cdfbf68f68ff9d6aa"
+      },
+      "entryFieldsEqual": true,
+      "invariants": {
+        "reference": [],
+        "composed": []
+      },
+      "outputHash": {
+        "reference": "fd55a0e46deb03939639ba38fd33e6d1f1b8b0fc2684345e24dfddc6a2d5a8cf",
+        "composed": "aaa515688d5d0675a8e04eb488846857026673e6616ba037b26062a17fb430ba",
+        "note": "differs only because it embeds the engine identity"
+      }
+    },
+    "lei-10833-2003-atualizada": {
+      "entrySha256": {
+        "reference": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+        "composed": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5"
+      },
+      "identityStrippedOutputSha256": {
+        "reference": "af03d5a2c067b0789ed2d3e5913f636e620ca57d54ba94f7cf251ca0ff3ad1e7",
+        "composed": "af03d5a2c067b0789ed2d3e5913f636e620ca57d54ba94f7cf251ca0ff3ad1e7"
+      },
+      "entryFieldsEqual": true,
+      "invariants": {
+        "reference": [],
+        "composed": []
+      },
+      "outputHash": {
+        "reference": "328f25997e4744fbd89ac112e89435753675a3f0867ccca2744563d097ff791c",
+        "composed": "0d90d3b8ed8cbf80064fa8bfe00d840877ee33215bd1bdc486a7cf725e95bd56",
+        "note": "differs only because it embeds the engine identity"
+      }
+    }
+  },
+  "verdict": "equivalent: same lock digests, same identity-stripped output, no invariant broken; the acceptance record (pinned to the reference engine) is void on the composed engine until the COORD revalidates it on the composed hash"
+}

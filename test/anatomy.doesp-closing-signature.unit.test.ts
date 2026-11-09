@@ -99,3 +99,34 @@ test('R5.4 positive case and scope: own container after a closed last device => 
   assert.deepEqual(sigIds(read('DOE-SP', html)), ['TARCÍSIO DE FREITAS', 'Arthur Luis Pinho de Lima']);
   assert.deepEqual(sigIds(read('DOU', html)), []);
 });
+
+// R5.5 (COORD E9-ACERVO-01 R5.5): for every variant, two SEPARATE checks — (1) the line stays bound to the article
+// (inside its span), (2) it stays selectable (inside a candidate selection of the article). Plus normative final content
+// in its own div, name-looking, after a sentence ending with a period and without the guard expressions.
+const lineChecks = (r: ReturnType<typeof read>, line: string) => {
+  const i = r.canonicalText.indexOf(line); assert.ok(i >= 0, line); const span = { start: i, end: i + line.length };
+  const art = r.parts.filter((p) => p.type === 'article').at(-1)!;
+  return { bound: art.span.start <= span.start && span.end <= art.span.end,
+    selectable: candidates(r).some((e) => e.span.start <= span.start && span.end <= e.span.end),
+    signature: r.parts.some((p) => p.type === 'signature') };
+};
+test('R5.5 A/B in a loose line and in their own div: bound to the article AND selectable, checked separately', () => {
+  const A = 'Artigo 1º - Fica designada para a função a servidora identificada abaixo.';
+  const B = 'Artigo 1º - Fica instituído o programa com a denominação indicada abaixo.';
+  for (const [label, html, line] of [['A loose', H(A, 'MARIA DE SOUZA'), 'MARIA DE SOUZA'], ['A div', H(A) + BOX('MARIA DE SOUZA'), 'MARIA DE SOUZA'],
+    ['B loose', H(B, 'PROGRAMA ESTADUAL DE SAÚDE'), 'PROGRAMA ESTADUAL DE SAÚDE'], ['B div', H(B) + BOX('PROGRAMA ESTADUAL DE SAÚDE'), 'PROGRAMA ESTADUAL DE SAÚDE']] as const) {
+    const c = lineChecks(read('DOE-SP', html), line);
+    assert.equal(c.bound, true, `${label}: bound`); assert.equal(c.selectable, true, `${label}: selectable`); assert.equal(c.signature, false, label);
+  }
+});
+test('R5.5 new case: normative final content in its own div after an ordinary article (period, no guard words) stays bound and selectable', () => {
+  const html = H('Artigo 1º - Fica instituído, no âmbito da Secretaria da Saúde, o programa de atenção primária.') + BOX('PROGRAMA ESTADUAL DE SAÚDE');
+  const c = lineChecks(read('DOE-SP', html), 'PROGRAMA ESTADUAL DE SAÚDE');
+  assert.deepEqual(c, { bound: true, selectable: true, signature: false });
+});
+test('R5.5 structural evidence: the signature block follows the closing clause (vigência or revogação) only', () => {
+  for (const clause of ['Artigo 3º - Este decreto entra em vigor na data de sua publicação.', 'Artigo 3º - Ficam revogadas as disposições em contrário.']) {
+    assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
+  }
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', 'Artigo 2º - Compete à Secretaria executar o programa.') + BOX('TARCÍSIO DE FREITAS'))), [], 'no closing clause => no closing block');
+});

@@ -26,6 +26,20 @@ No Decreto 70.226 isso vale nas duas representações. No JSON oficial, os 7 par
 
 Identidade `dff55ce1 → 5087b949`. Regressão em 78 leituras com a saída sem identidade, contra `fc04aae`: só o 70.226 muda.
 
+## R5.5 — cláusula final do ato
+
+**Caso novo do COORD:** um conteúdo normativo final com aparência de nome, num `div` próprio, depois de um artigo comum terminado em ponto e sem as palavras da guarda. Exemplo: "…o programa de atenção primária." + `div` "PROGRAMA ESTADUAL DE SAÚDE". O motor `5087b949` **reproduziu o falso fecho**.
+
+**Correção estrutural:** o último dispositivo precisa ser a **cláusula final do ato**, de vigência ou de revogação (LC 95/98, arts. 3º, III, 8º e 9º). Depois dela não vem conteúdo normativo. Sem ela, o vínculo ao artigo fica.
+- A comparação ignora caracteres de formatação invisíveis, como o U+00AD em "vi­gor" do 70.226. O texto canônico fica intacto.
+
+**Testes R5.5:**
+- A e B em linha solta e em `div`, com **vínculo** e **seleção** verificados separadamente: verdadeiros nas 4 variantes;
+- o caso novo fica vinculado e selecionável;
+- o fecho acontece depois da cláusula de vigência **ou** de revogação, e não acontece sem cláusula final.
+
+Identidade `5087b949 → 9f45b30f`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
+
 ## Regra (R5.3; condições estruturais acima, a partir do R5.4)
 A regra é estrutural e não usa classes, porque a cópia do Acervo não as tem. Ela só se aplica quando **todas** as condições valem:
 1. O documento **termina** com 1 a 4 blocos `unidentified/unknown`, todos depois do início do último dispositivo (a cauda nunca atravessa a fronteira de um dispositivo).
