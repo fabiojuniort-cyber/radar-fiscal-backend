@@ -29,7 +29,9 @@ FROM v
 GROUP BY 1, 2, 3
 ORDER BY 1, 2, 3;
 
--- B. Candidatos: até 3 por fonte × tipo × porte, publicados antes de 2026 (margem dos reservados), mais recentes primeiro.
+-- B. Candidatos: até 5 por fonte × tipo × porte, publicados antes de 2026 (margem dos reservados), mais recentes primeiro.
+--    ambiguous_year: publicado de 01 a 15/01 — o ato pode ser do ano anterior, e a captura direta exige o ano do ato
+--    igual ao do alvo (identidade); esses ficam por último para não gastar captura com divergência previsível.
 WITH v AS (
   SELECT s.code AS source_code, p.id AS publication_id, o.external_id, p.act_type, p.act_number, p.agency,
          p.published_on, o.official_url, pv.id AS version_id, pv.content_hash,
@@ -45,17 +47,18 @@ WITH v AS (
 ), c AS (
   SELECT *,
          CASE WHEN chars < 10000 THEN 'pequeno' WHEN chars < 50000 THEN 'medio' ELSE 'grande' END AS size,
-         (abs(chars - 10000) <= 200 OR abs(chars - 50000) <= 1000) AS near_boundary
+         (abs(chars - 10000) <= 200 OR abs(chars - 50000) <= 1000) AS near_boundary,
+         (extract(month FROM published_on) = 1 AND extract(day FROM published_on) <= 15) AS ambiguous_year
   FROM v
 ), r AS (
   SELECT *, row_number() OVER (PARTITION BY source_code, act_type, size
-                               ORDER BY near_boundary, published_on DESC NULLS LAST, publication_id) AS rn
+                               ORDER BY near_boundary, ambiguous_year, published_on DESC NULLS LAST, publication_id) AS rn
   FROM c
 )
 SELECT source_code, act_type, size, rn, external_id, act_number, agency, published_on, official_url,
-       publication_id, version_id, content_hash, chars, near_boundary, presentation_format, presentation_html_bytes
+       publication_id, version_id, content_hash, chars, near_boundary, ambiguous_year, presentation_format, presentation_html_bytes
 FROM r
-WHERE rn <= 3
+WHERE rn <= 5
 ORDER BY source_code, act_type, size, rn;
 
 ROLLBACK;

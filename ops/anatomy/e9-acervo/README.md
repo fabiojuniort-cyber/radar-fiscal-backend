@@ -52,7 +52,12 @@ Motor `9235a810` (código do #305 @ `d6d991ef`), Node 22. Resultado completo em 
 `01_candidates_readonly.sql` é para o Fábio rodar no Dashboard: esta sessão não tem canal ao banco de produção.
 - Transação `READ ONLY` com `statement_timeout` de 15 s, terminando em `ROLLBACK`.
 - Lê só metadados globais (tipo, número, órgão, data, URL oficial, `external_id`), comprimento e hash. Não lê texto, tenant, empresa ou usuário.
-- Saída A: contagem por fonte × tipo × porte. Saída B: até 3 candidatos por célula, publicados antes de 2026 (margem dos reservados), com os casos perto de uma fronteira de porte por último.
+- Saída A: contagem por fonte × tipo × porte. Saída B: até 5 candidatos por célula, publicados antes de 2026 (margem dos reservados). Ficam por último os casos perto de uma fronteira de porte e os publicados de 01 a 15/01: nesses, o ato pode ser do ano anterior, e a captura direta exige o ano do ato igual ao do alvo.
+- **Revisão final (R3):**
+  - `external_id` do RFB é o `idAto` (`rfb-normas.connector.ts`);
+  - `act_number` fora de dígitos é recusado pelo seletor (falha fechada);
+  - linhas de status do `psql`, como `ROLLBACK`, são ignoradas;
+  - conferido de novo em PG16 descartável: o ato de 2026 fica fora e o de 05/01 cai para o fim.
 - Conferido em PostgreSQL 16 descartável local com todas as migrations da `main` e linhas sintéticas: porte, corte de 2026 e ordem conferem.
 
 **Antes de qualquer captura**, cada candidato precisa passar pela lista de reservados (`RESERVED_ACT_KEYS` e `RESERVED_SOURCE_IDS` da cadeia #303). A captura continua sendo da representação oficial (JSON multivigente RFB; JSON v2 DOE-SP), dentro dos tetos já aprovados, com o mesmo ledger e o mesmo dono.
@@ -84,7 +89,12 @@ Conferido com `fixtures/synthetic-candidates.csv` (dados sintéticos) contra o #
 - **D1 (método):** trocar a busca (opção b) pela seleção no Acervo. A captura passa a ser só da visão multivigente, por `idAto`, uma por célula. Os débitos (captura, redirect, retry, falha) continuam no mesmo ledger, com dono único.
 - **D2 (limites):** **não é preciso redistribuir.** O plano cabe nos tetos de cada tipo. Única alternativa: mover 1 de ADE ou SC para ADI, dando a ADI uma alternativa; recomendo manter os tetos.
 - **D3 (porte):** se a multivigente cair noutro porte, a captura conta para a célula onde cair, nunca para a planejada. A célula planejada só usa a alternativa dentro da folga do tipo.
-- **Execução** (fora desta rodada): Fábio roda o SQL, o EXEC roda o plano, o COORD decide D1 e D2, e só então vem o recheck do #303 e a ativação do G1. O coletor do #303 precisa aceitar uma lista de `idAto` em vez das buscas; é um delta pequeno, a revisar antes de qualquer rede.
+- **D1–D3 decididos pelo COORD (R3):** o Acervo substitui a busca, sem redistribuição; a célula só é coberta pelo porte medido na multivigente.
+- **Captura direta (R3, #303):** `runDirect` em `collect-p2c.ts` consome a lista `targets` deste seletor (`--targets`):
+  - a URL é gerada a partir do `idAto` validado;
+  - antes de qualquer requisição, saem o já armazenado, o reservado, o duplicado e o que passa do teto;
+  - depois da captura (debitada), saem identidade divergente (tipo, número ou data do ato) e ato de 2026.
+- **Execução** (fora desta rodada): depois do recheck do delta do #303, o Fábio roda o SQL, o EXEC gera `targets`, e então vem a ativação do G1.
 
 ## 6. DOE-SP — teste mínimo com uma amostra real (preparado)
 

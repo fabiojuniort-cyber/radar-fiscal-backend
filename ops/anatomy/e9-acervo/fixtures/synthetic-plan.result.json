@@ -46,7 +46,8 @@
     "published_on": "2025-03-01",
     "official_url": "https://synthetic.invalid/900001",
     "chars": 15000,
-    "near_boundary": false
+    "near_boundary": false,
+    "ambiguous_year": false
    },
    "fallbacks": [],
    "refused": [
@@ -69,7 +70,8 @@
     "published_on": "2025-03-03",
     "official_url": "https://synthetic.invalid/900003",
     "chars": 90000,
-    "near_boundary": false
+    "near_boundary": false,
+    "ambiguous_year": false
    },
    "fallbacks": [],
    "refused": [
@@ -116,7 +118,8 @@
     "published_on": "2018-11-22",
     "official_url": "https://synthetic.invalid/900007",
     "chars": 300000,
-    "near_boundary": false
+    "near_boundary": false,
+    "ambiguous_year": false
    },
    "fallbacks": [],
    "refused": [],
@@ -134,7 +137,8 @@
     "published_on": "2025-04-02",
     "official_url": "https://synthetic.invalid/900005",
     "chars": 3000,
-    "near_boundary": false
+    "near_boundary": false,
+    "ambiguous_year": false
    },
    "fallbacks": [],
    "refused": [
@@ -189,6 +193,36 @@
    "fallbacks": [],
    "refused": [],
    "state": "not found in the Acervo (≠ nonexistent)"
+  }
+ ],
+ "targets": [
+  {
+   "type": "Portaria",
+   "idAto": "900001",
+   "numeroAto": "9001",
+   "anoAto": "2025",
+   "acervoSize": "medio"
+  },
+  {
+   "type": "Portaria",
+   "idAto": "900003",
+   "numeroAto": "9003",
+   "anoAto": "2025",
+   "acervoSize": "grande"
+  },
+  {
+   "type": "Resolução",
+   "idAto": "900007",
+   "numeroAto": "140",
+   "anoAto": "2018",
+   "acervoSize": "grande"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "idAto": "900005",
+   "numeroAto": "9005",
+   "anoAto": "2025",
+   "acervoSize": "pequeno"
   }
  ]
 }

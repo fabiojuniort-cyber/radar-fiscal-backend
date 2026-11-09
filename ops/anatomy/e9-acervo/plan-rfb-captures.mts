@@ -15,7 +15,7 @@ export const PENDING: ReadonlyArray<readonly [CellType, Size]> = [
   ['Resolução', 'medio'], ['Resolução', 'grande'], ['Ato Declaratório Executivo', 'pequeno'], ['Ato Declaratório Executivo', 'medio'],
   ['Ato Declaratório Executivo', 'grande'], ['Solução de Consulta', 'pequeno'], ['Solução de Consulta', 'medio'], ['Solução de Consulta', 'grande'],
 ];
-export interface Row { source_code: string; act_type: string; size: string; external_id: string; act_number: string; published_on: string; official_url: string; chars: number; near_boundary: boolean }
+export interface Row { source_code: string; act_type: string; size: string; external_id: string; act_number: string; published_on: string; official_url: string; chars: number; near_boundary: boolean; ambiguous_year: boolean }
 export interface Rules { reservedActKeys: ReadonlySet<string>; reservedSourceIds: ReadonlySet<string>; alreadyCaptured: ReadonlySet<string>; actKey: (label: string) => string | null; perTypeCap: Record<CellType, number>; total: number }
 
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
@@ -31,7 +31,8 @@ export function cellType(actType: string): CellType | null {
 /** Why a candidate cannot be captured, or null. Fail closed: no readable act key ⇒ refused (as the #303 guard). */
 export function refusal(r: Row, rules: Rules): string | null {
   if (r.source_code !== 'rfb-normas') return 'not RFB';
-  if (!/^\d+$/u.test(r.external_id)) return 'external_id is not an idAto';
+  if (!/^[1-9]\d{0,9}$/u.test(r.external_id)) return 'external_id is not a canonical idAto';
+  if (!/^\d{1,9}$/u.test(r.act_number)) return 'act_number is not digits (identity check would be impossible)';
   if (rules.alreadyCaptured.has(r.external_id)) return 'already captured (bytes kept by an earlier session)';
   if (rules.reservedSourceIds.has(r.external_id)) return 'reserved source id';
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(r.published_on) || r.published_on >= '2026-01-01') return '2026 margin / no date';
@@ -48,6 +49,8 @@ export function plan(rows: readonly Row[], rules: Rules) {
     const mine = rows.filter((r) => cellType(r.act_type) === type && r.size === size);
     const refused = mine.map((r) => ({ external_id: r.external_id, reason: refusal(r, rules) })).filter((x): x is { external_id: string; reason: string } => !!x.reason);
     const ok = mine.filter((r) => !refusal(r, rules));
+    // Acts published 01–15 January may be dated the previous year: kept, but after every unambiguous candidate.
+    ok.sort((x, y) => Number(x.ambiguous_year) - Number(y.ambiguous_year));
     return { type, size, pick: ok[0] ?? null, fallbacks: ok.slice(1), refused,
       state: ok[0] ? 'candidate' : mine.length ? 'only refused candidates in the Acervo' : 'not found in the Acervo (≠ nonexistent)' };
   });
@@ -58,7 +61,11 @@ export function plan(rows: readonly Row[], rules: Rules) {
   }
   const planned = cells.filter((c) => c.pick).length;
   const overCap = (Object.keys(perType) as CellType[]).filter((t) => perType[t].planned > perType[t].cap);
-  return { requestsPlanned: planned, total: rules.total, remainingAfterPlan: rules.total - planned, searches: 0, perType, overCap, cells };
+  // Input for collect-p2c.ts --targets (runDirect, #303): one target per cell, in cell order; fallbacks are NOT included
+  // (each fallback is a separate COORD-visible decision inside the type's spare).
+  const targets = cells.filter((c) => c.pick).map((c) => ({ type: c.type, idAto: c.pick!.external_id, numeroAto: c.pick!.act_number,
+    anoAto: c.pick!.published_on.slice(0, 4), acervoSize: c.size }));
+  return { requestsPlanned: planned, total: rules.total, remainingAfterPlan: rules.total - planned, searches: 0, perType, overCap, cells, targets };
 }
 
 export function parseCsv(text: string): Row[] {
@@ -72,9 +79,10 @@ export function parseCsv(text: string): Row[] {
   if (field !== '' || row.length) { row.push(field); lines.push(row); }
   const [head, ...body] = lines; if (!head) return [];
   const ix = (k: string) => { const i = head.indexOf(k); if (i < 0) throw new Error(`CSV lacks column ${k}`); return i; };
-  return body.map((c) => ({ source_code: c[ix('source_code')]!, act_type: c[ix('act_type')]!, size: c[ix('size')]!, external_id: c[ix('external_id')]!,
+  // Rows shorter than the header (psql status lines such as ROLLBACK, blank tails) are not candidates.
+  return body.filter((c) => c.length >= head.length).map((c) => ({ source_code: c[ix('source_code')]!, act_type: c[ix('act_type')]!, size: c[ix('size')]!, external_id: c[ix('external_id')]!,
     act_number: c[ix('act_number')]!, published_on: c[ix('published_on')]!, official_url: c[ix('official_url')]!, chars: Number(c[ix('chars')]),
-    near_boundary: /^(t|true)$/iu.test(c[ix('near_boundary')]!) }));
+    near_boundary: /^(t|true)$/iu.test(c[ix('near_boundary')]!), ambiguous_year: head.includes('ambiguous_year') ? /^(t|true)$/iu.test(c[ix('ambiguous_year')]!) : false }));
 }
 
 const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!);
