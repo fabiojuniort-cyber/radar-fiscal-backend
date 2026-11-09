@@ -18,10 +18,10 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 10 cells covered, E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state (#304 chain): 11 cells covered incl. DOE-SP × Decreto × pequeno (R5.3), E9 incomplete; nothing promoted or accepted', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
-    'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+    'rfb--ato-declaratorio-interpretativo--pequeno', 'doe-sp--decreto--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
@@ -187,4 +187,14 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
   assert.throws(() => decodeWithPolicy(m1, { httpCharset: 'iso-8859-1' }), CharsetRefused, 'an HTTP charset is used as declared, not the fallback');
   assert.equal(decodeWithPolicy(new TextEncoder().encode('<meta charset="utf-8"><p>é</p>'), { httpCharset: null }).encodingSource, 'declared');
   assert.equal(decodeWithPolicy(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { httpCharset: null }).encodingSource, 'bom');
+});
+
+test('E9-ACERVO-01 R5.3: DOE-SP sample — validated is DERIVED (baseline + DOE-SP invariants); drift, missing baseline or a fallback un-validate', () => {
+  const base = JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: { id: string; outputHash: string }[] };
+  const doesp = (b: typeof base.samples) => collectSamples(b as never).filter((s) => s.source === 'DOE-SP').map((s) => [s.id, s.stages.read, s.stages.validated]);
+  assert.deepEqual(doesp(base.samples), [['doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d', false, false], ['doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea', true, true]]);
+  assert.deepEqual(doesp(base.samples.filter((x) => !x.id.startsWith('doesp:'))).map((x) => x[2]), [false, false], 'no baseline => not validated');
+  assert.deepEqual(doesp(base.samples.map((x) => (x.id.startsWith('doesp:') ? { ...x, outputHash: '0'.repeat(64) } : x))).map((x) => x[2]), [false, false], 'output drift => not validated');
+  const big = collectSamples().find((s) => s.id === 'doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d')!;
+  assert.deepEqual([big.size, big.profile, big.notes], ['grande', null, ['reader fallback (input_size_limit): the act was not read']], 'a reader fallback is not a read');
 });

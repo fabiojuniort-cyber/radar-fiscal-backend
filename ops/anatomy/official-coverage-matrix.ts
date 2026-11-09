@@ -19,6 +19,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
+import { prepareDoeSpRepresentation } from '../../src/modules/anatomy/json-preparation.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
 import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
@@ -96,13 +97,28 @@ export function verifiedBytes(path: string, expected: { sha256: string; bytes: n
 }
 interface Read { chars: number; outputHash: string; invariants: string[] }
 /** Conservative invariants every validated sample must keep (protection, not interpretation). */
-function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html: string, extra: object = {}): Read {
+function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL' | 'DOE-SP', id: string, html: string, extra: object = {}): Read {
   const r = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-07', ruleSet: { id: 'official-coverage-matrix', version: '2' },
     input: { source, representationId: id, html, ...extra }, catalog: { edition: 'none', codes: [] } });
   const broken: string[] = [];
   if (r.parts.some((p) => p.legalStatus !== 'unknown')) broken.push('legalStatus must stay unknown');
   if (r.parts.some((p) => p.type === 'quoted_text' && p.context === 'operative_candidate')) broken.push('quoted text must never be operative');
   if (r.parts.some((p) => p.type === 'unidentified') && r.status === 'complete') broken.push('unidentified content cannot be complete');
+  if (source === 'DOE-SP') {
+    // E9-ACERVO-01 R5.3: DOE-SP invariants. The reader must really read (no fallback); nothing is eligible; no candidate
+    // selection touches unidentified text (ementa, "Decreta:") or a signature; signatures are prohibited and lie outside
+    // every operative article/caput span.
+    if (r.limitations.some((l) => ['input_size_limit', 'html_parse_failure', 'html_complexity_limit'].includes(l.code))) broken.push('DOE-SP reader fallback (not read)');
+    if (r.eligibility.some((e) => e.eligible)) broken.push('nothing is eligible');
+    const closed = r.parts.filter((p) => p.type === 'unidentified' || p.type === 'signature' || p.context === 'prohibited');
+    const touches = (a: { start: number; end: number }, b: { start: number; end: number }) => a.start < b.end && b.start < a.end;
+    // A CANDIDATE selection is one excluded only for lack of approved evidence (same rule as NORMAS-LEG).
+    const candidates = r.eligibility.filter((e) => e.exclusionReasons.every((x) => x === 'missing_approved_evidence'));
+    if (candidates.some((e) => closed.some((p) => touches(e.span, p.span)))) broken.push('no candidate selection over unidentified, prohibited or signature text');
+    const sigs = r.parts.filter((p) => p.type === 'signature');
+    if (sigs.some((p) => p.context !== 'prohibited')) broken.push('signatures are prohibited');
+    if (sigs.some((sg) => r.parts.some((p) => (p.type === 'article' || p.type === 'caput') && p.context === 'operative_candidate' && touches(p.span, sg.span)))) broken.push('signatures lie outside operative articles/caputs');
+  }
   return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken };
 }
 type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
@@ -195,6 +211,27 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
     const ok = locked(id, m.sha256, 'CONFAZ', rd);
     out.push({ ...base, layout, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',
       outputHash: rd.outputHash, evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
+  }
+  // E9-ACERVO-01 R5.3: DOE-SP API v2 captures (P2-d), read by the DOE-SP profile through prepareDoeSpRepresentation
+  // (PROVISIONAL preparation — its scope is under independent recheck). A reader fallback (e.g. input_size_limit) is
+  // not a read. validated = DOE-SP invariants hold AND the output equals the committed samples baseline.
+  const dp = join(ROOT, 'doesp-p2d');
+  if (existsSync(dp)) for (const f of readdirSync(dp).filter((x) => /^[0-9a-f-]{36}\.meta\.json$/u.test(x)).sort()) {
+    const id = f.slice(0, -'.meta.json'.length);
+    const m = JSON.parse(readFileSync(join(dp, f), 'utf8')) as { sha256: string; bytes: number; act: string; p2d?: { type?: string } };
+    const bytes = verifiedBytes(join(dp, `${id}.json`), m, `doesp:${id}`);
+    const prep = prepareDoeSpRepresentation({ resourceId: `doesp:${id}`, bytes }, id);
+    const rd = readWith('DOE-SP', `doesp:${id}`, prep.html);
+    const base = { id: `doesp:${id}`, source: 'DOE-SP', type: m.p2d?.type ?? 'Decreto', layout: LAYOUT.DOESP_JSON, sha256: m.sha256, bytes: m.bytes, diagnostic: null };
+    if (rd.invariants.includes('DOE-SP reader fallback (not read)')) {
+      out.push({ ...base, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null,
+        outputHash: null, evidence: [], notes: ['reader fallback (input_size_limit): the act was not read'] });
+      continue;
+    }
+    const ok = locked(`doesp:${id}`, m.sha256, 'DOE-SP', rd);
+    out.push({ ...base, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'DOE-SP',
+      outputHash: rd.outputHash, evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts', 'test/anatomy.doesp-closing-signature.unit.test.ts', `preparation ${prep.preparationVersion} (provisional)`] : [],
+      notes: rd.invariants });
   }
   return out;
 }

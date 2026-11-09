@@ -585,6 +585,57 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   }
   // Logical containers extend until their next sibling marker; all open containers end with the document.
   for (const open of logical) open.part.span.end = length;
+  // E9-ACERVO-01 R5.3 (DOE-SP only, structural, no class evidence — the Acervo copy has none): the CLOSING SIGNATURE
+  // block ("fecho"). When the document ENDS with 1–4 unidentified blocks that are each a personal-name line, and the
+  // block right before them closes the last device with a period, those blocks are signatures, not a continuation of
+  // the last caput. They become `signature`/`prohibited` children of the document; the last article and its caput end
+  // before them. Text, spans of the signature blocks and the source map are unchanged. Anything that does not match
+  // EVERY condition (a device after them, a non-name line, digits, punctuation, ':' before them) keeps the previous
+  // reading — no device is closed early.
+  if (input.source === 'DOE-SP') closingSignatures();
+  function closingSignatures(): void {
+    const containers = new Set(['document', 'article', 'clause', 'caput']);
+    const leaves = result.parts.filter((x) => !containers.has(x.type)).sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end);
+    const lastText = result.canonicalText.trimEnd().length;
+    // The tail never crosses a device boundary: it lies entirely after the start of the last device (article, caput,
+    // paragraph, inciso…), so a continuation of an EARLIER device can never be taken as part of the closing block.
+    const deviceStarts = result.parts.filter((x) => x.type !== 'document' && x.type !== 'unidentified').map((x) => x.span.start);
+    const lastDeviceStart = deviceStarts.length ? Math.max(...deviceStarts) : 0;
+    const tail: AnatomyPart[] = [];
+    for (let i = leaves.length - 1; i >= 0; i--) {
+      const x = leaves[i]!;
+      if (x.type !== 'unidentified' || x.context !== 'unknown' || x.span.start < lastDeviceStart) break;
+      tail.unshift(x);
+    }
+    if (tail.length < 1 || tail.length > 4) return;
+    if (tail[tail.length - 1]!.span.end < lastText) return; // text after the tail: not a closing block
+    const NAME = /^(?=(?:.*\p{Lu}){2})[\p{L}][\p{L}.'’\- ]{1,78}[\p{L}.]$/u;
+    const isName = (t: string) => NAME.test(t) && !/[.;:,]$/u.test(t.replace(/(?:\b\p{Lu}\.)$/u, '')) && t.split(/\s+/u).length >= 2 && t.split(/\s+/u).length <= 8;
+    if (!tail.every((x) => isName(result.canonicalText.slice(x.span.start, x.span.end).trim()))) return;
+    const caput = result.parts.find((x) => x.type === 'caput' && tail[0]!.parentId === x.id);
+    const owner = caput ?? result.parts.find((x) => x.id === tail[0]!.parentId);
+    if (!owner || owner.context !== 'operative_candidate') return;
+    // The device text before the signatures must close with a period (a ':' would introduce more content).
+    const before = result.canonicalText.slice(owner.span.start, tail[0]!.span.start);
+    const lines = before.split(/[\r\n]+/u).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length || !/\.$/u.test(lines[lines.length - 1]!)) return;
+    const firstSig = tail[0]!.span.start;
+    // The device ends where its last owned block ends (a block span includes its own separator), never inside a block.
+    const cut = Math.max(owner.span.start, ...ownership.filter((o) => !tail.includes(o.part) && o.end <= firstSig).map((o) => o.end));
+    for (const x of result.parts) {
+      if (x.type === 'document' || tail.includes(x)) continue;
+      if (x.span.start < firstSig && x.span.end > cut) x.span.end = cut;
+    }
+    if (caput) {
+      caput.sourcePointers = caput.sourcePointers.filter((ptr) => !tail.some((t) => t.sourcePointers.some((q) => q.locator === ptr.locator && q.sourceSpan?.start === ptr.sourceSpan?.start)));
+      if (!result.parts.some((x) => x.parentId === caput.id && !tail.includes(x))) caput.contextReasons = caput.contextReasons.filter((r) => r !== 'caput_continuation');
+    }
+    for (const x of tail) {
+      x.type = 'signature'; x.context = 'prohibited'; x.coverage = 'complete'; x.parentId = root.id;
+      x.order = childOrders.get(root.id) ?? 0; childOrders.set(root.id, x.order + 1);
+      x.contextReasons = ['doe_sp_closing_signature']; x.ruleId = 'reader/v1/doe_sp_closing_signature'; x.recognition = 'inferred'; x.confidence = 1;
+    }
+  }
   // Exclusive ownership uses the smallest structural span; uncovered raw text stays explicitly unknown.
   const boundaries = [...new Set([0, length, ...ownership.flatMap((item) => [item.start, item.end])])].sort((a, b) => a - b);
   const starts = new Map<number, typeof ownership>(); const ends = new Map<number, typeof ownership>();

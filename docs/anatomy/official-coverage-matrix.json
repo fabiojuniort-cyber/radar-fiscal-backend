@@ -35,7 +35,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "7335c6f901b1e4abb6a947ea157a8e9c4de8fb943c03617a72f4a98867db9985",
+      "outputHash": "12a8adcce36e8d735924fca4ddf4b07d5ee0a9c99f36acd94251e79f35c34159",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -60,7 +60,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "e2dd7b3649e6bc41fdaabe44c2ae23affac579842268f32cc368c4e2f8f5cfce",
+      "outputHash": "aa310e2bb255d062954b7a56b279a46c44115bdc2cc36f141d2dfefd7bcb867f",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -85,7 +85,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "7b5a0988230bba234e67a5402fd89ea4db37a8661ed336d5efe7a33b80e98b92",
+      "outputHash": "8333bf06bf5d7afa13813c587ae1f17c985f00f35265b61629f147d9a3b02518",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -110,7 +110,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "7a3d884e35e6c3538491075a8af6e198033d91455fc2af2b8298882ce3c7f378",
+      "outputHash": "5c0a73dca2b0d8f57fe1a4788758dc7a895e192bc66b081dcea23a55db02fdf6",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -135,7 +135,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "81f16e2616d58b072fea9049a9a38798f7116a94fceafeb8e21a14beaace278b",
+      "outputHash": "cb2d7428e40e1d2a33db5d507ed4532548a3d0ec343f60ecdee433c3c571899f",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -160,7 +160,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "6db51507ec0976ca46f3190c232e0deeb557bcb1f9ed5f55659f75792d255c21",
+      "outputHash": "d1e9761bbeb5551d6bd153a5c6e8b868d406902117d5b6db3e5fe1b98456dd5a",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -185,7 +185,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "5e91eb5520b4de05ffddd5262cef636b05885c30d4989f82981695df2313ac0a",
+      "outputHash": "e1633c3d3c643be543732f7e89f738b6d3be3b127dfb6215ffa7ecd0aafe2b92",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -210,7 +210,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "57d45f3914ec4e25654ed2f650158fa6a4d3c4f434bd37bffd3c526400a753a2",
+      "outputHash": "c8ef7911829e6c196fb204f7907322ab10d7f56176012f97d22f723a3d2cbaf0",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -235,7 +235,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "fe2549edf073388484a3ab951cdbcfcf1b15950598537dcd9910eff840cdaed8",
+      "outputHash": "1450a474074251b4d51f0b1d10878d001cbd0e7b1ef65a75e567bc2764dbe946",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -260,7 +260,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "42ce7bbabf3378f4b2b9f263e6adabcd4e7ee3a577b02838e8d8ac08a3abcd10",
+      "outputHash": "0a619e464ddadf26687dae3cfc82fc17964004a247c22a04aa2c124387804e9f",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -285,7 +285,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "4573054c5d797c21467caf6a0323bf05c6c29de5b9df2821a45e5c3fc73fc067",
+      "outputHash": "8e6d9f58c6a7e621427d8569c8baaeea2402dbc8a04fc1b5cf38ac42f670b494",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -310,7 +310,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "7a0be23deea5c7970d2f8b1923af759154caf19e13f1acd5ab1c93a2c9667d81",
+      "outputHash": "aa1125722eb2f6cd7d893d189708dc498ff6cbc62bf5f1bb0d485fb2d5214452",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -335,7 +335,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "46bd68cd34eeb877dae4c7fcb0b370cb6ffe1aa38ed174e020873288cc1fe77c",
+      "outputHash": "a729bf848813092693bec8a88d80f574fe2d17b4a9c5c5d323fcbf7742a52826",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -360,7 +360,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "e38b17934a429f37471a67aa97cbc4e8603fec74f4ef0db3737b2fd599ac5f56",
+      "outputHash": "f281db475c5d5af8904be52045deea06874f8eac5908bad7c0f623d8ceb93578",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -385,7 +385,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "7ec44bad10f8e276164c1f41958d914d0533252c31cd33b294881ba6ca666048",
+      "outputHash": "e153288e040399aa07383a6665447f26ac2f317a8b51df0fa50e4ea0a4d90ee0",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -410,7 +410,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "a56d81d6675e4289656b5f178c783b965f9372e382639d4323ae7ea1a8fac661",
+      "outputHash": "5f08ad6f668a35d8b6c0d4f26bb8a05834565d09b575a7c3326d9239daefe0ae",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -543,7 +543,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "07753ae881c7450e18ef65f873a29abdbecc6890b1a6648b86b13cbf9e4df0a6",
+      "outputHash": "dec98f61157de70cbd3cc1626596de40e19c695f6b836d2f0d38b3adab310525",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -644,7 +644,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "47acecb8f7d5f0b7889321f7186627c4016eda022a0aa95842d9416eaff32f68",
+      "outputHash": "f9b0ba2458b674138c48e84474e5a3b667b15901dc6094f7c7cb44ae3cdde153",
       "notes": []
     },
     {
@@ -669,7 +669,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "147d6e19e726c9152a20ed539bbf34d1b71850caa7ca15d5872df8449ad66b1d",
+      "outputHash": "00cd8a34463154cf07aea61a0da95ecd50cd0eaedf15a70e3dd519f5ebe67e8e",
       "notes": []
     },
     {
@@ -694,7 +694,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "55c17c61628ca053333c6a8f08390127cac31610f255052c52255736e913b926",
+      "outputHash": "075fd65cec7ab87536ed2f71cab3914e97518642eff9f27546642f46ece80355",
       "notes": []
     },
     {
@@ -744,6 +744,57 @@
       "notes": [
         "uma página (57) do DOU: cabeçalho e rodapé identificados; o ato começa nesta página e CONTINUA nas seguintes (não é o ato completo); o topo da página traz o fim de outra publicação; a extração mistura colunas na mesma linha, então a leitura da anatomia não é validada"
       ]
+    },
+    {
+      "id": "doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "sha256": "e617b6a2ef837299b5b1c9c327ea76c3b91c5cc8f8b908fbfce1d78f8dbcacf3",
+      "bytes": 3563245,
+      "diagnostic": null,
+      "chars": 3532766,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "evidence": [],
+      "notes": [
+        "reader fallback (input_size_limit): the act was not read"
+      ]
+    },
+    {
+      "id": "doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+      "bytes": 15000,
+      "diagnostic": null,
+      "chars": 1527,
+      "size": "pequeno",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "DOE-SP",
+      "outputHash": "b1e93083a97eddc32debb0d38e63446676185ff8a912057388d211de995e88b3",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts",
+        "test/anatomy.doesp-closing-signature.unit.test.ts",
+        "preparation doe-sp-json/0.1.0-provisional (provisional)"
+      ],
+      "notes": []
     }
   ],
   "cells": [
@@ -1596,8 +1647,10 @@
         "required": true
       },
       "route": "P2-d (autorizada só depois da validação de M9)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1629,7 +1682,18 @@
       "status": "pending",
       "validatedSamples": [],
       "accepted": false,
-      "unvalidatedSamples": []
+      "unvalidatedSamples": [
+        {
+          "id": "doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": false,
+            "validated": false,
+            "accepted": false
+          }
+        }
+      ]
     },
     {
       "id": "doe-sp--resolucao--pequeno",
@@ -1765,7 +1829,6 @@
     "dou--despacho--grande",
     "dou--pagina-do-jornal--na",
     "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--grande",
-    "doe-sp--decreto--pequeno",
     "doe-sp--decreto--medio",
     "doe-sp--decreto--grande",
     "doe-sp--resolucao--pequeno",
@@ -1775,7 +1838,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 10,
+  "coveredRequired": 11,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }
