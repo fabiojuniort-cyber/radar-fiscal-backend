@@ -16,7 +16,7 @@
  *   and acts already stored are skipped. At most 1 act per size per type, at most 9 acts. A size not found, a failure
  *   or a type absent from the day list is recorded, never read as "does not exist". Nothing promoted; no production write.
  */
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { officialApiEndpoint, OFFICIAL_HOSTS } from '../../src/modules/anatomy/config/official-provenance.js';
@@ -155,16 +155,93 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
 }
 
 /**
+ * R5.1 (COORD E9-ACERVO-01 R5.1): DIRECT diagnostic capture of ONE DOE-SP act already identified in a PRESERVED day list
+ * (no discovery). Offline before any request: the id must be in the list file, its title must be a Decreto/Resolução/
+ * Portaria CAT title, its listing date a real date before 2026, it must not be reserved (act key or id) nor already
+ * stored. The budget is opened for exactly 1 request of that type. The fetch is ONE-SHOT: only
+ * `<API>v2/publications/<id>` may be sent, once; a redirect hop (or any second call) is refused before it is sent, so at
+ * most one request is sent and debited whatever the outcome. After the capture: id (prepareDoeSpRepresentation), the
+ * returned title equal to the listed one, and the returned date before 2026 — else refused and not stored. Output files
+ * are this run's own (`direct-<id>-<grant>…`); earlier list/inventory/diagnostic files are never touched.
+ */
+export class OneRequestRefused extends Error {}
+export const oneShot = (allowedUrl: string, inner: FetchLike): FetchLike => {
+  let sent = false;
+  return (async (url: string, init?: RequestInit) => {
+    if (sent) throw new OneRequestRefused(`one_request: a second request (${url}) was refused before it was sent (not debited)`);
+    if (url !== allowedUrl) throw new OneRequestRefused(`one_request: ${url} is not the pinned publication URL (not sent)`);
+    sent = true; return inner(url, init);
+  }) as FetchLike;
+};
+export async function runDirectOne(doFetch: typeof fetch, opts: { grantId: string; owner: string; id: string; listFile: string; budgetFile?: string; outDir?: string; now?: () => Date }) {
+  const id = opts.id.toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(id)) throw new DiscoveryRefused(`id ${opts.id} is not a GUID`);
+  const list = JSON.parse(readFileSync(opts.listFile, 'utf8')) as { items?: DoeSpListItem[] };
+  const item = (list.items ?? []).find((i) => typeof i.id === 'string' && i.id.toLowerCase() === id);
+  if (!item) throw new DiscoveryRefused(`id ${id} is not in the preserved list ${opts.listFile}`);
+  const t = P2D_TYPES.find((x) => actKey(x.key, x.title, item) !== null);
+  if (!t) throw new DiscoveryRefused(`listed title "${item.title}" is not a Decreto / Resolução / Portaria CAT`);
+  const key = actKey(t.key, t.title, item)!;
+  if (!beforeMargin(item.date)) throw new DiscoveryRefused(`listed date ${item.date} is not a valid date before 2026`);
+  if (isReservedDoeSp(key, item)) throw new DiscoveryRefused(`reserved act (${key} / ${id})`);
+  const outDir = opts.outDir ?? P2D_DIR;
+  if (existsSync(join(outDir, `${id}.json`))) throw new DiscoveryRefused(`act ${id} already stored (bytes kept)`);
+  const invFile = join(outDir, `direct-${id}-${opts.grantId}.inventory.json`);
+  if (existsSync(invFile)) throw new DiscoveryRefused(`this direct run already has an inventory (${invFile}); never overwritten`);
+  const budget = RequestBudget.open(opts.budgetFile ?? P2D_BUDGET_FILE, { grantId: opts.grantId, owner: opts.owner, package: P2D_PACKAGE,
+    requested: { total: 1, perType: { [t.type]: 1 } } }, opts.now);
+  const url = `${API}v2/publications/${id}`;
+  let outcome: Record<string, unknown>;
+  try {
+    mkdirSync(outDir, { recursive: true });
+    const capture = oneShot(url, budget.fetcher(t.type, 'capture', doFetch) as unknown as FetchLike);
+    const m: ManifestAct = { id, source: 'DOE-SP', act: item.title.slice(0, 120), url, urlStatus: 'candidate', reason: `E9 P2-d direct diagnostic (${t.type}, grant ${opts.grantId})` };
+    const r = await consultOfficial(m, OFFICIAL_HOSTS['DOE-SP'], capture, undefined, ['DOE-SP'])
+      .catch((e: Error) => ({ ok: false as const, failure: { code: e instanceof BudgetRefused ? 'budget' : 'error', detail: e.message } }));
+    if (!r.ok) outcome = { result: 'failed', detail: `${r.failure.code} ${'detail' in r.failure ? r.failure.detail : ''}` };
+    else {
+      const root = JSON.parse(r.body.toString('utf8')) as { title?: unknown };
+      let p; try { p = prepareDoeSpRepresentation({ resourceId: `doe-sp:${id}`, bytes: new Uint8Array(r.body) }, id); } catch (e) { p = null; outcome = { result: 'refused', detail: `not preparable: ${(e as Error).message.slice(0, 160)}` }; }
+      if (p) {
+        const problems = [typeof root.title !== 'string' || root.title.trim() !== item.title.trim() ? `returned title ${JSON.stringify(root.title)} differs from the listed one` : null,
+          !beforeMargin(p.metadata?.date) ? `returned date ${String(p.metadata?.date)} is not a valid date before 2026` : null].filter(Boolean);
+        if (problems.length) outcome = { result: 'refused', detail: problems.join('; ') };
+        else {
+          const chars = analyzeAnatomy({ publicationVersionId: `doe-sp:${id}`, referenceDate: '2026-11-09', ruleSet: { id: 'p2d-direct', version: '1' },
+            input: { source: 'DOE-SP', representationId: `doe-sp:${id}`, html: p.html }, catalog: { edition: 'none', codes: [] } }).canonicalText.length;
+          writeFileSync(join(outDir, `${id}.json`), r.body, { flag: 'wx' });
+          writeFileSync(join(outDir, `${id}.meta.json`), `${JSON.stringify({ ...r.meta, origin: `automated fetch via consultOfficial (E9 P2-d DIRECT diagnostic, grant ${opts.grantId})`, promoted: false,
+            p2d: { type: t.type, actKey: key, listFile: opts.listFile.split('/').pop(), grantId: opts.grantId, mode: 'direct-one', measuredChars: chars, size: sizeOf(chars) } }, null, 2)}\n`, { flag: 'wx' });
+          outcome = { result: 'kept', chars, size: sizeOf(chars), sha256: r.meta.sha256, bytes: r.meta.bytes };
+        }
+      }
+    }
+  } finally { budget.close(); }
+  const inventory = { grantId: opts.grantId, owner: opts.owner, mode: 'direct-one', discovery: 'skipped (preserved list)', id, title: item.title, type: t.type, actKey: key,
+    listedDate: item.date, url, outcome: outcome!, remainingForType: budget.remaining(t.type), remainingTotal: budget.remaining(),
+    note: 'at most one request sent and debited (one-shot fetch); per-attempt record = budget-state.json' };
+  writeFileSync(invFile, `${JSON.stringify(inventory, null, 2)}\n`, { flag: 'wx' });
+  return inventory;
+}
+
+/**
  * R4 (COORD E9-ACERVO-01 R4): the command line is the DIAGNOSTIC collection — it REQUIRES `--stop-after 1` (the first
  * suitable sample for the JSON × Acervo comparison) and passes it to run(). A missing or invalid limit (absent, 0, 2,
  * non-integer) is refused before the budget is opened and before any request. Exported for tests (simulated transport).
  */
 export const DIAGNOSTIC_STOP_AFTER = 1;
 export async function cli(argv: readonly string[], doFetch: typeof fetch, extra: { budgetFile?: string; outDir?: string; now?: () => Date } = {}):
-  Promise<{ code: 0 | 2; error?: string; inventory?: Awaited<ReturnType<typeof run>> }> {
+  Promise<{ code: 0 | 2; error?: string; inventory?: Awaited<ReturnType<typeof run>>; direct?: Awaited<ReturnType<typeof runDirectOne>> }> {
   const arg = (k: string) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const grantId = arg('--grant'); const owner = arg('--owner'); const date = arg('--date'); const stop = arg('--stop-after');
   const usage = 'usage: collect-p2d.ts --grant <grantId> --owner <owner> --date <YYYY-MM-DD before 2026> --stop-after 1  (refused without an active grant)';
+  const directId = arg('--id'); const listFile = arg('--list');
+  if (directId !== undefined || listFile !== undefined) {
+    const usageDirect = 'usage: collect-p2d.ts --grant <grantId> --owner <owner> --id <guid> --list <preserved list json> --stop-after 1  (direct: no discovery, at most 1 request)';
+    if (!grantId || !owner || !directId || !listFile || date !== undefined) return { code: 2, error: usageDirect };
+    if (stop === undefined || !/^\d+$/u.test(stop) || Number(stop) !== DIAGNOSTIC_STOP_AFTER) return { code: 2, error: `--stop-after must be exactly ${DIAGNOSTIC_STOP_AFTER}; nothing was sent. ${usageDirect}` };
+    return { code: 0, direct: await runDirectOne(doFetch, { grantId, owner, id: directId, listFile, ...extra }) };
+  }
   if (!grantId || !owner || !date) return { code: 2, error: usage };
   if (stop === undefined || !/^\d+$/u.test(stop) || Number(stop) !== DIAGNOSTIC_STOP_AFTER)
     return { code: 2, error: `--stop-after must be exactly ${DIAGNOSTIC_STOP_AFTER} for the diagnostic collection (got ${stop === undefined ? 'nothing' : JSON.stringify(stop)}); nothing was sent. ${usage}` };
@@ -175,6 +252,7 @@ export async function cli(argv: readonly string[], doFetch: typeof fetch, extra:
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const r = await cli(process.argv, fetch);
   if (r.code !== 0) { console.error(r.error); process.exit(r.code); }
+  if (r.direct) { console.log(JSON.stringify(r.direct, null, 1)); process.exit(0); }
   const inv = r.inventory!;
   console.log(JSON.stringify(inv.discovery)); for (const d of inv.decisions) console.log(JSON.stringify(d));
   console.log(`acts kept ${inv.actsKept} (stopAfter ${inv.stopAfter}); remaining ${inv.remainingTotal}`);

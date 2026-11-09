@@ -150,3 +150,67 @@ test('R4 CLI: --stop-after 1 reaches run() — one capture, the run stops, every
   await assert.rejects(cli(['node', 'x', '--grant', 'G-D', '--owner', 'exec-304', '--date', '2027-01-10', '--stop-after', '1'], spy, { budgetFile: budgetFile(), outDir: mkdtempSync(join(tmpdir(), 'p2d-cli-')), now: NOW }), /before 2026/u);
   assert.equal(calls, 0);
 });
+
+// R5.1 (COORD E9-ACERVO-01 R5.1): direct diagnostic capture of ONE act from the PRESERVED list — no discovery, at most
+// one request sent and debited (success, error or redirect). Simulated transport only.
+const PRESERVED = 'ops/anatomy/official-identification/doesp-p2d/list-2025-12-19-E9-P2d-G1.json';
+const T70226 = 'fdb81d5f-3876-468a-70bc-08de3f1ee1ea';
+const directArgs = (out: string, id = T70226, list = PRESERVED, extra: string[] = ['--stop-after', '1']) =>
+  ['node', 'collect-p2d.ts', '--grant', 'G-D', '--owner', 'exec-304', '--id', id, '--list', list, ...extra];
+const prior = (out: string) => { for (const f of ['list-2025-12-19-E9-P2d-G1.json', 'inventory-E9-P2d-G1.json', 'diagnostic-json-vs-acervo-c8e20388.json']) writeFileSync(join(out, f), `{"prior":"${f}"}`); };
+const priorUntouched = (out: string) => { for (const f of ['list-2025-12-19-E9-P2d-G1.json', 'inventory-E9-P2d-G1.json', 'diagnostic-json-vs-acervo-c8e20388.json']) assert.equal(readFileSync(join(out, f), 'utf8'), `{"prior":"${f}"}`, f); };
+const pub70226 = (over: Record<string, unknown> = {}) => ({ id: T70226, title: 'DECRETO Nº 70.226, DE 19 DE DEZEMBRO DE 2025', slug: 's', date: '2025-12-19', journal: 'Executivo',
+  content: `<p>Artigo 1º ${'texto '.repeat(30)}</p>`, ...over });
+const decretoOnly = () => budgetFile({ Decreto: 1, Resolução: 5, 'Portaria CAT': 5 });
+
+test('R5.1 direct: the preserved list identifies Decreto 70.226/2025 (date before 2026, not reserved); success = 1 request, 1 debit, own output files', async () => {
+  const f = decretoOnly(); const out = mkdtempSync(join(tmpdir(), 'p2d-direct-')); prior(out);
+  const urls: string[] = []; const t = (async (u: string | URL) => { urls.push(String(u)); return json(pub70226()); }) as unknown as typeof fetch;
+  const r = await cli(directArgs(out), t, { budgetFile: f, outDir: out, now: NOW });
+  assert.equal(r.code, 0); const d = r.direct!;
+  assert.deepEqual([d.title, d.type, d.actKey, d.discovery], ['DECRETO Nº 70.226, DE 19 DE DEZEMBRO DE 2025', 'Decreto', 'decreto 70226/25', 'skipped (preserved list)']);
+  assert.deepEqual(urls, [`${HOST}v2/publications/${T70226}`], 'no discovery, one request');
+  const s = JSON.parse(readFileSync(f, 'utf8')) as BudgetState; assert.equal(s.used.total, 1); assert.equal(s.used.perType.Decreto, 1);
+  assert.equal(d.outcome.result, 'kept'); assert.equal(d.remainingForType, 0);
+  assert.ok(existsSync(join(out, `${T70226}.json`)) && existsSync(join(out, `direct-${T70226}-G-D.inventory.json`)));
+  priorUntouched(out);
+});
+
+test('R5.1 direct: HTTP error or redirect — still exactly 1 request sent and debited; the redirect hop is never sent; nothing stored', async () => {
+  for (const [label, res] of [['500', () => json({ status: 500, error: 'x' }, 500)], ['302', () => new Response(null, { status: 302, headers: { location: `${HOST}v2/publications/${G(77)}` } })],
+    ['302 same', () => new Response(null, { status: 302, headers: { location: `${HOST}v2/publications/${T70226}` } })], ['network', () => { throw new TypeError('fetch failed'); }]] as const) {
+    const f = decretoOnly(); const out = mkdtempSync(join(tmpdir(), 'p2d-direct-')); prior(out);
+    let calls = 0; const t = (async () => { calls++; return (res as () => Response)(); }) as unknown as typeof fetch;
+    const r = await cli(directArgs(out), t, { budgetFile: f, outDir: out, now: NOW });
+    assert.equal(r.code, 0, label); assert.equal(calls, 1, `${label}: one request sent`);
+    assert.equal((JSON.parse(readFileSync(f, 'utf8')) as BudgetState).used.total, 1, `${label}: one debit`);
+    assert.equal(r.direct!.outcome.result, 'failed', label); assert.equal(existsSync(join(out, `${T70226}.json`)), false, label);
+    priorUntouched(out);
+  }
+});
+
+test('R5.1 direct: refused before any request — not in the list, reserved/2026 listing, already stored, invalid id, missing --stop-after 1, --date mixed in', async () => {
+  let calls = 0; const spy = (async () => { calls++; throw new Error('must not be called'); }) as unknown as typeof fetch;
+  const out = mkdtempSync(join(tmpdir(), 'p2d-direct-'));
+  const f = decretoOnly(); const before = readFileSync(f, 'utf8');
+  const fake = join(out, 'list.json');
+  writeFileSync(fake, JSON.stringify({ items: [item(1, 'DECRETO Nº 70.843, DE 1º DE JANEIRO DE 2026', 'x', '2026-01-02T00:00:00'), item(2, 'DECRETO Nº 69.500, DE 10 DE MARÇO DE 2025', 'x', '2025-03-10T00:00:00')] }));
+  writeFileSync(join(out, `${G(2)}.json`), '{"stored":1}');
+  for (const [args, re] of [[directArgs(out, G(9)), /not in the preserved list/u], [directArgs(out, G(1), fake), /not a valid date before 2026|reserved/u],
+    [directArgs(out, G(2), fake), /already stored/u], [directArgs(out, 'not-a-guid'), /not a GUID/u]] as const)
+    await assert.rejects(cli(args as string[], spy, { budgetFile: f, outDir: out, now: NOW }), re as RegExp);
+  for (const args of [directArgs(out, T70226, PRESERVED, []), directArgs(out, T70226, PRESERVED, ['--stop-after', '2']), [...directArgs(out), '--date', '2025-12-19']]) {
+    const r = await cli(args, spy, { budgetFile: f, outDir: out, now: NOW }); assert.equal(r.code, 2, JSON.stringify(args.slice(-3)));
+  }
+  assert.equal(calls, 0); assert.equal(readFileSync(f, 'utf8'), before, 'budget untouched');
+});
+
+test('R5.1 direct: a returned act whose title or date diverges is refused after the single debited request; nothing stored', async () => {
+  for (const over of [{ title: 'DECRETO Nº 70.227, DE 19 DE DEZEMBRO DE 2025' }, { date: '2027-01-02' }]) {
+    const f = decretoOnly(); const out = mkdtempSync(join(tmpdir(), 'p2d-direct-'));
+    let calls = 0; const t = (async () => { calls++; return json(pub70226(over)); }) as unknown as typeof fetch;
+    const r = await cli(directArgs(out), t, { budgetFile: f, outDir: out, now: NOW });
+    assert.equal(calls, 1); assert.equal(r.direct!.outcome.result, 'refused', JSON.stringify(over));
+    assert.equal((JSON.parse(readFileSync(f, 'utf8')) as BudgetState).used.total, 1); assert.equal(existsSync(join(out, `${T70226}.json`)), false);
+  }
+});
