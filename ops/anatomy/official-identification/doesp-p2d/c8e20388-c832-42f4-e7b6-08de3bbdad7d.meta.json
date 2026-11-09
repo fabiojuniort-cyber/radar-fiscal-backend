@@ -1,0 +1,30 @@
+{
+  "id": "c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+  "act": "DECRETO Nº 70.225, DE 19 DE DEZEMBRO DE 2025",
+  "url": "https://do-api-web-search.doe.sp.gov.br/v2/publications/c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+  "finalUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+  "hops": [
+    "https://do-api-web-search.doe.sp.gov.br/v2/publications/c8e20388-c832-42f4-e7b6-08de3bbdad7d"
+  ],
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "lastModified": null,
+  "sha256": "e617b6a2ef837299b5b1c9c327ea76c3b91c5cc8f8b908fbfce1d78f8dbcacf3",
+  "bytes": 3563245,
+  "consultedAt": "2026-11-09T13:06:53.486Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-d (Decreto, grant E9-P2d-G1)",
+  "origin": "automated fetch via consultOfficial (E9 P2-d, grant E9-P2d-G1)",
+  "promoted": false,
+  "p2d": {
+    "type": "Decreto",
+    "actKey": "decreto 70225/25",
+    "listDate": "2025-12-19",
+    "grantId": "E9-P2d-G1",
+    "measuredChars": 3532766,
+    "size": "grande"
+  }
+}

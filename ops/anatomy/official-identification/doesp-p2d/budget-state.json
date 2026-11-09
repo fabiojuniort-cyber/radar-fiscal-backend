@@ -5,7 +5,7 @@
     "owner": "EXEC #304 (claude/anat-doesp-gate)",
     "package": "E9-P2-d",
     "approvedBy": "tribusca-control#116 c.6708512598 §5 e c.6710109715 §3 (P2-d: orçamento ANTERIOR de 15, 5 por tipo Decreto/Resolução/Portaria CAT, até 9 atos, 1 por porte) + #304 c.6710099357 (gate) + #303 c.6710098997 (barreira). A descoberta (journals, sections, lista do dia) é debitada no tipo Decreto, com kind 'discovery'",
-    "status": "active",
+    "status": "suspended",
     "expiresAt": "2026-11-21T23:59:59Z",
     "total": 15,
     "perType": {
@@ -15,9 +15,52 @@
     }
   },
   "used": {
-    "total": 0,
-    "perType": {}
+    "total": 4,
+    "perType": {
+      "Decreto": 4
+    }
   },
-  "attempts": [],
-  "note": "ACTIVATED 2026-11-09 by the owner after the COORD recheck PASS of #304 @ 159b821 (E9-ACERVO-01 R4 closed; R5 authorizes the DIAGNOSTIC collection: list date before 2026, --stop-after 1, stop after the first suitable sample). Same caps; no new budget. Single owner; one run. Earlier: SUSPENDED until the recheck of collect-p2d.ts (nothing had been sent)."
+  "attempts": [
+    {
+      "n": 1,
+      "type": "Decreto",
+      "kind": "discovery",
+      "url": "https://do-api-web-search.doe.sp.gov.br/v2/journals",
+      "debitedAt": "2026-11-09T13:06:51.376Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-09T13:06:52.138Z"
+    },
+    {
+      "n": 2,
+      "type": "Decreto",
+      "kind": "discovery",
+      "url": "https://do-api-web-search.doe.sp.gov.br/v2/sections?JournalId=ca96256b-6ca1-407f-866e-567ef9430123",
+      "debitedAt": "2026-11-09T13:06:52.141Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-09T13:06:52.334Z"
+    },
+    {
+      "n": 3,
+      "type": "Decreto",
+      "kind": "discovery",
+      "url": "https://do-api-web-search.doe.sp.gov.br/v2/summary/list?Date=2025-12-19&JournalId=ca96256b-6ca1-407f-866e-567ef9430123&SectionId=257b103f-1eb2-4f24-a170-4e553c7e4aac",
+      "debitedAt": "2026-11-09T13:06:52.335Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-09T13:06:52.833Z"
+    },
+    {
+      "n": 4,
+      "type": "Decreto",
+      "kind": "capture",
+      "url": "https://do-api-web-search.doe.sp.gov.br/v2/publications/c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+      "debitedAt": "2026-11-09T13:06:53.107Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-09T13:06:53.413Z"
+    }
+  ],
+  "note": "SUSPENDED again 2026-11-09 after the single diagnostic run (stopAfter 1): 4 requests sent and debited (3 discovery + 1 capture, all Decreto); remaining 11 (Decreto 1, Resolução 5, Portaria CAT 5). The sample (Decreto 70.225/2025, 3.5 MB) is NOT adequate for the JSON x Acervo comparison (reader input_size_limit; Acervo keeps no presentation above 2 MiB). Any further run needs a COORD decision. ACTIVATED 2026-11-09 by the owner after the COORD recheck PASS of #304 @ 159b821 (E9-ACERVO-01 R4 closed; R5 authorizes the DIAGNOSTIC collection: list date before 2026, --stop-after 1, stop after the first suitable sample). Same caps; no new budget. Single owner; one run. Earlier: SUSPENDED until the recheck of collect-p2d.ts (nothing had been sent)."
 }
