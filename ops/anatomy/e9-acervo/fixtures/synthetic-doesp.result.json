@@ -1,0 +1,75 @@
+{
+ "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
+ "input": {
+  "file": "/home/user/radar-fiscal-backend/ops/anatomy/e9-acervo/fixtures/synthetic-doesp-detail.json",
+  "sha256": "c7f348e603ca38ec6bc4662866d05ad0e7ac059dee2a22881844bc5cb26fdc4d",
+  "bytes": 878,
+  "expectedId": "00000000-0000-4000-8000-000000000e91"
+ },
+ "preparationVersion": "doe-sp-json/0.1.0-provisional",
+ "provisional": true,
+ "rawMarkup": {
+  "img": 1,
+  "strikeTags": 1,
+  "lineThroughStyle": 1,
+  "classAttributes": 2,
+  "styleAttributes": 2,
+  "svg": 0,
+  "scriptOrStyle": 1,
+  "tables": 1,
+  "spans": 1,
+  "bytes": 664
+ },
+ "officialJson": {
+  "status": "partial",
+  "chars": 346,
+  "textSha256": "b2efad5c233ea4134a3f32e43ffef159009a92e49c76a7a7a466470b631660af",
+  "partTypes": {
+   "article": 5,
+   "caput": 5,
+   "cell": 3,
+   "document": 1,
+   "row": 2,
+   "table": 1,
+   "unidentified": 2
+  },
+  "contexts": {
+   "operative_candidate": 17,
+   "unknown": 2
+  },
+  "limitations": {
+   "excluded_executable_content": 1,
+   "image_without_ocr": 1,
+   "unidentified_content": 1
+  },
+  "unidentifiedChars": 108,
+  "invariantBreaks": []
+ },
+ "acervoEquivalent": {
+  "status": "partial",
+  "chars": 346,
+  "textSha256": "b2efad5c233ea4134a3f32e43ffef159009a92e49c76a7a7a466470b631660af",
+  "partTypes": {
+   "article": 5,
+   "caput": 5,
+   "cell": 3,
+   "document": 1,
+   "row": 2,
+   "table": 1,
+   "unidentified": 2
+  },
+  "contexts": {
+   "operative_candidate": 17,
+   "unknown": 2
+  },
+  "limitations": {
+   "unidentified_content": 1
+  },
+  "unidentifiedChars": 108,
+  "invariantBreaks": []
+ },
+ "differences": [
+  "limitations"
+ ],
+ "verdict": "the Acervo representation loses what the reader uses for this sample"
+}

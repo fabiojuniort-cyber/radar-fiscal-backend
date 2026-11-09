@@ -57,10 +57,69 @@ Motor `9235a810` (código do #305 @ `d6d991ef`), Node 22. Resultado completo em 
 
 **Antes de qualquer captura**, cada candidato precisa passar pela lista de reservados (`RESERVED_ACT_KEYS` e `RESERVED_SOURCE_IDS` da cadeia #303). A captura continua sendo da representação oficial (JSON multivigente RFB; JSON v2 DOE-SP), dentro dos tetos já aprovados, com o mesmo ledger e o mesmo dono.
 
-## 5. Reprodução
+## 5. RFB — plano mínimo de captura direta da multivigente (preparado; nada executado)
+
+`plan-rfb-captures.mts` lê o CSV da consulta B do SQL e um checkout do #303. Ele aplica os filtros abaixo e devolve **um candidato por célula pendente**, as alternativas e o saldo previsto. Não envia requisição, não altera o grant e não grava ledger. Para cada candidato, recusa:
+- o que não é `rfb-normas` ou não tem `idAto` numérico (no Acervo, `external_id` é o `idAto`);
+- o `idAto` já capturado (os 10 snapshots do repositório);
+- os `RESERVED_SOURCE_IDS`;
+- o que foi publicado em 2026 ou não tem data;
+- o que não tem chave de ato legível (falha fechada, como a guarda do #303), ou cuja chave está em `RESERVED_ACT_KEYS`;
+- um "pequeno" perto de 10.000 caracteres: o Acervo guarda a visão original, e a multivigente é maior ou igual.
+
+Conferido com `fixtures/synthetic-candidates.csv` (dados sintéticos) contra o #303 @ `5a8337bc`: recusou o já capturado (142967), o id reservado (153743), 2026 e o pequeno perto da fronteira. "Não encontrado no Acervo" é diferente de "inexistente".
+
+**Saldo previsto** (grant `E9-P2c-G1`: 16, tetos por tipo, `used` 0, suspenso):
+
+| Tipo | Células pendentes | Capturas planejadas (sem busca) | Teto | Folga para alternativa |
+|---|---|---|---|---|
+| Portaria | médio, grande | 2 | 3 | 1 |
+| ADI | médio, grande | 2 | 2 | 0 |
+| Resolução | médio, grande | 2 | 3 | 1 |
+| ADE | pequeno, médio, grande | 3 | 4 | 1 |
+| Solução de Consulta | pequeno, médio, grande | 3 | 4 | 1 |
+| **Total** | **12** | **no máximo 12, 0 buscas** | **16** | **4** |
+
+**Decisão pronta para o COORD:**
+- **D1 (método):** trocar a busca (opção b) pela seleção no Acervo. A captura passa a ser só da visão multivigente, por `idAto`, uma por célula. Os débitos (captura, redirect, retry, falha) continuam no mesmo ledger, com dono único.
+- **D2 (limites):** **não é preciso redistribuir.** O plano cabe nos tetos de cada tipo. Única alternativa: mover 1 de ADE ou SC para ADI, dando a ADI uma alternativa; recomendo manter os tetos.
+- **D3 (porte):** se a multivigente cair noutro porte, a captura conta para a célula onde cair, nunca para a planejada. A célula planejada só usa a alternativa dentro da folga do tipo.
+- **Execução** (fora desta rodada): Fábio roda o SQL, o EXEC roda o plano, o COORD decide D1 e D2, e só então vem o recheck do #303 e a ativação do G1. O coletor do #303 precisa aceitar uma lista de `idAto` em vez das buscas; é um delta pequeno, a revisar antes de qualquer rede.
+
+## 6. DOE-SP — teste mínimo com uma amostra real (preparado)
+
+`doesp-acervo-equivalence.mts` recebe **um** JSON de detalhe da API v2 (bytes como recebidos) e compara a leitura `DOE-SP` de (A) `prepareDoeSpRepresentation` (o `content` sem alteração) com a de (B) `parseDoeSpDetail` + sanitizador de produção (o que o Acervo guarda). Ele conta, no `content` bruto, a marcação que o sanitizador descarta e lista as diferenças de status, texto, tipos, contextos, limitações e não identificados.
+
+**Comprovado pelo código (sem amostra):**
+- O sanitizador descarta `class` e `style` (exceto as classes CONFAZ), `img`, `s`/`strike`/`del`, `svg`, `script` e `style`. Mantém tabelas com `colspan`/`rowspan`, links seguros e o texto. HTML acima de 2 MiB não é guardado.
+- O perfil DOE-SP não usa classes (as listas estão vazias); a perda de `class` não muda a leitura atual.
+- O Acervo perde os sinais `image_without_ocr` e `excluded_executable_content`, que o leitor emite a partir de `img` e `script`.
+- A preparação DOE-SP é provisória; não existe perfil DOE-SP validado.
+
+**Conferido só com fixture sintética** (`fixtures/synthetic-doesp-detail.json`, texto escrito para o teste) nos motores `9235a810` (#305) e `b6ccf583` (main):
+- texto e partes iguais;
+- diferença só nas limitações (a imagem e o script somem em B).
+- Achado do próprio leitor, independente do Acervo: texto com `line-through` ou `<s>` é lido como `operative_candidate` **mesmo no JSON oficial**.
+
+**Depende da amostra real:**
+1. Se o DOE-SP real usa tachado ou `style` para a redação anterior. Se usar, é lacuna do leitor DOE-SP, não só do Acervo.
+2. Se há imagem ou anexo no corpo.
+3. Se o `content` passa de 2 MiB.
+4. Se o texto canônico de A e B é idêntico.
+
+**Amostra mínima:** 1 detalhe DOE-SP da API v2, anterior a 2026 e fora dos reservados. O ideal é um Decreto médio com tabela ou redação alterada. Pode ser a 1ª captura do P2-d (#304), já dentro do teto; não pede requisição a mais.
+
+## 7. Reprodução
 
 ```bash
 npx tsx ops/anatomy/e9-acervo/rfb-acervo-equivalence.mts "$PWD"
 ```
 
 Rodar numa cópia do #305 @ `d6d991ef` (com `ops/anatomy/official-identification/`). Os insumos são os 10 snapshots RFB versionados; o script recusa bytes com SHA divergente.
+
+```bash
+# Plano RFB (CSV exportado da consulta B; checkout do #303)
+npx tsx ops/anatomy/e9-acervo/plan-rfb-captures.mts <candidates.csv> <checkout-303>
+# Teste DOE-SP (1 detalhe da API v2; GUID esperado; SHA-256 opcional)
+npx tsx ops/anatomy/e9-acervo/doesp-acervo-equivalence.mts "$PWD" <detail.json> <guid> [sha256]
+```
