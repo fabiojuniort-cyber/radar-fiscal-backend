@@ -5,7 +5,7 @@
     "owner": "EXEC #304 (claude/anat-doesp-gate)",
     "package": "E9-P2-d",
     "approvedBy": "tribusca-control#116 c.6708512598 §5 e c.6710109715 §3 (P2-d: orçamento ANTERIOR de 15, 5 por tipo Decreto/Resolução/Portaria CAT, até 9 atos, 1 por porte) + #304 c.6710099357 (gate) + #303 c.6710098997 (barreira). A descoberta (journals, sections, lista do dia) é debitada no tipo Decreto, com kind 'discovery'",
-    "status": "suspended",
+    "status": "active",
     "expiresAt": "2026-11-21T23:59:59Z",
     "total": 15,
     "perType": {
@@ -62,5 +62,5 @@
       "settledAt": "2026-11-09T13:06:53.413Z"
     }
   ],
-  "note": "SUSPENDED again 2026-11-09 after the single diagnostic run (stopAfter 1): 4 requests sent and debited (3 discovery + 1 capture, all Decreto); remaining 11 (Decreto 1, Resolução 5, Portaria CAT 5). The sample (Decreto 70.225/2025, 3.5 MB) is NOT adequate for the JSON x Acervo comparison (reader input_size_limit; Acervo keeps no presentation above 2 MiB). Any further run needs a COORD decision. ACTIVATED 2026-11-09 by the owner after the COORD recheck PASS of #304 @ 159b821 (E9-ACERVO-01 R4 closed; R5 authorizes the DIAGNOSTIC collection: list date before 2026, --stop-after 1, stop after the first suitable sample). Same caps; no new budget. Single owner; one run. Earlier: SUSPENDED until the recheck of collect-p2d.ts (nothing had been sent)."
+  "note": "ACTIVATED 2026-11-09 for ONE direct diagnostic attempt (COORD R5.1 PASS on #304 @ c314078): Decreto 70.226/2025, id fdb81d5f-3876-468a-70bc-08de3f1ee1ea, preserved list 2025-12-19, --stop-after 1, no discovery, no retry; uses the last Decreto request. SUSPENDED again 2026-11-09 after the single diagnostic run (stopAfter 1): 4 requests sent and debited (3 discovery + 1 capture, all Decreto); remaining 11 (Decreto 1, Resolução 5, Portaria CAT 5). The sample (Decreto 70.225/2025, 3.5 MB) is NOT adequate for the JSON x Acervo comparison (reader input_size_limit; Acervo keeps no presentation above 2 MiB). Any further run needs a COORD decision. ACTIVATED 2026-11-09 by the owner after the COORD recheck PASS of #304 @ 159b821 (E9-ACERVO-01 R4 closed; R5 authorizes the DIAGNOSTIC collection: list date before 2026, --stop-after 1, stop after the first suitable sample). Same caps; no new budget. Single owner; one run. Earlier: SUSPENDED until the recheck of collect-p2d.ts (nothing had been sent)."
 }
