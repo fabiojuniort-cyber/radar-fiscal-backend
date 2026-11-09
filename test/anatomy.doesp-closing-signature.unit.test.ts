@@ -53,22 +53,49 @@ test('R5.3 real sample, Acervo equivalent: same structure; positions = official 
 
 // Counter-cases (synthetic DOE-SP-shaped HTML written for this test; not official text).
 const H = (...ps: string[]) => ps.map((p) => `<p>${p}</p>`).join('');
+const BOX = (...ps: string[]) => `<div>${H(...ps)}</div>`;
 const sigIds = (r: ReturnType<typeof read>) => r.parts.filter((p) => p.type === 'signature').map((p) => text(r, p).trim());
-test('R5.3 counter-case: a proper name / uppercase line INSIDE an article (more text or a device follows) never closes it', () => {
-  const r = read('DOE-SP', H('Artigo 1º - Fica nomeado:', 'JOÃO DA SILVA', 'para exercer o cargo de Diretor.', 'Artigo 2º - Este decreto entra em vigor na data de sua publicação.', 'FULANO DE TAL'));
+const lastArticleText = (r: ReturnType<typeof read>) => { const arts = r.parts.filter((p) => p.type === 'article'); return text(r, arts[arts.length - 1]!); };
+const stillOperative = (r: ReturnType<typeof read>, line: string) => {
+  const p = r.parts.find((x) => x.type !== "document" && x.type !== "article" && x.type !== "caput" && r.canonicalText.slice(x.span.start, x.span.end).trim() === line)!;
+  assert.ok(p, line); assert.notEqual(p.type, 'signature', line);
+  const art = r.parts.filter((x) => x.type === 'article').at(-1)!;
+  assert.ok(art.span.start <= p.span.start && p.span.end <= art.span.end, `${line} stays inside the last article`);
+  assert.ok(candidates(r).some((e) => e.span.start <= p.span.start && p.span.end <= e.span.end), `${line} stays inside the article's candidate selection`);
+};
+
+test('R5.4 COORD case A: "…a servidora identificada abaixo." + "MARIA DE SOUZA" keeps the name in the article (plain or in its own div)', () => {
+  const art = 'Artigo 1º - Fica designada para a função a servidora identificada abaixo.';
+  for (const html of [H(art, 'MARIA DE SOUZA'), H(art) + BOX('MARIA DE SOUZA')]) {
+    const r = read('DOE-SP', html); assert.deepEqual(sigIds(r), [], html);
+    assert.match(lastArticleText(r), /MARIA DE SOUZA/u, html);
+    if (!html.includes('<div>')) stillOperative(r, 'MARIA DE SOUZA');
+  }
+});
+test('R5.4 COORD case B: "…com a denominação indicada abaixo." + "PROGRAMA ESTADUAL DE SAÚDE" keeps the line in the article (plain or in its own div)', () => {
+  const art = 'Artigo 1º - Fica instituído o programa com a denominação indicada abaixo.';
+  for (const html of [H(art, 'PROGRAMA ESTADUAL DE SAÚDE'), H(art) + BOX('PROGRAMA ESTADUAL DE SAÚDE')]) {
+    const r = read('DOE-SP', html); assert.deepEqual(sigIds(r), [], html);
+    assert.match(lastArticleText(r), /PROGRAMA ESTADUAL DE SAÚDE/u, html);
+    if (!html.includes('<div>')) stillOperative(r, 'PROGRAMA ESTADUAL DE SAÚDE');
+  }
+});
+test('R5.4: position + period + name look are NOT enough — without a dedicated container nothing is closed', () => {
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor na data de sua publicação.', 'TARCÍSIO DE FREITAS', 'Arthur Luis Pinho de Lima'))), []);
+});
+test('R5.3/R5.4 counter-cases: name/uppercase line inside an article; container holding a device; ":"; digits; >4 lines; single word', () => {
+  const r = read('DOE-SP', H('Artigo 1º - Fica nomeado:', 'JOÃO DA SILVA', 'para exercer o cargo de Diretor.', 'Artigo 2º - Este decreto entra em vigor na data de sua publicação.') + BOX('FULANO DE TAL'));
   assert.deepEqual(sigIds(r), ['FULANO DE TAL']);
-  const a1 = r.parts.find((p) => p.type === 'article')!; assert.match(text(r, a1), /JOÃO DA SILVA[\s\S]*para exercer o cargo de Diretor\./u, 'the name stays inside Art. 1');
-  const r2 = read('DOE-SP', H('Artigo 1º - Fica designada a COMISSÃO ESPECIAL DE LICITAÇÃO.', 'MARIA DE SOUZA', 'Artigo 2º - Este decreto entra em vigor na data de sua publicação.'));
-  assert.deepEqual(sigIds(r2), [], 'a name line followed by a device is not a closing block');
+  assert.match(text(r, r.parts.find((p) => p.type === 'article')!), /JOÃO DA SILVA[\s\S]*para exercer o cargo de Diretor\./u, 'the name stays inside Art. 1');
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica designada a COMISSÃO ESPECIAL.', 'MARIA DE SOUZA', 'Artigo 2º - Este decreto entra em vigor.'))), []);
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criada a comissão.') + `<div>${H('Artigo 2º - Este decreto entra em vigor.', 'ANA LIMA')}</div>`)), [], 'container holding a device');
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Ficam designados os seguintes servidores:') + BOX('JOÃO DA SILVA', 'MARIA DE SOUZA'))), [], "':'");
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor.') + BOX('COMISSÃO DE 2025, COMPOSTA POR'))), [], 'digits/punctuation');
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor.') + BOX('Ana Lima', 'Bia Lima', 'Caio Lima', 'Davi Lima', 'Eva Lima'))), [], '>4 lines');
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor.') + BOX('SILVA'))), [], 'single word');
 });
-test('R5.3 counter-case: no closing when the last device ends with ":" or a tail line is not a name, or the tail is too long', () => {
-  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Ficam designados os seguintes servidores:', 'JOÃO DA SILVA', 'MARIA DE SOUZA'))), [], "':' introduces content");
-  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor.', 'COMISSÃO DE 2025, COMPOSTA POR'))), [], 'digits/punctuation are not a name');
-  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor.', 'Ana Lima', 'Bia Lima', 'Caio Lima', 'Davi Lima', 'Eva Lima'))), [], 'more than 4 tail lines');
-  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Este decreto entra em vigor.', 'SILVA'))), [], 'a single word is not a signature');
-});
-test('R5.3 scope: the rule is DOE-SP only — the same HTML read as DOU keeps the previous reading', () => {
-  const html = H('Artigo 1º - Este decreto entra em vigor na data de sua publicação.', 'TARCÍSIO DE FREITAS', 'Arthur Luis Pinho de Lima');
+test('R5.4 positive case and scope: own container after a closed last device => signatures (DOE-SP only; DOU unchanged)', () => {
+  const html = H('Artigo 1º - Este decreto entra em vigor na data de sua publicação.') + BOX('TARCÍSIO DE FREITAS', 'Arthur Luis Pinho de Lima');
   assert.deepEqual(sigIds(read('DOE-SP', html)), ['TARCÍSIO DE FREITAS', 'Arthur Luis Pinho de Lima']);
   assert.deepEqual(sigIds(read('DOU', html)), []);
 });

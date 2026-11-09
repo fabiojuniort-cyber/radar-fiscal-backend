@@ -585,13 +585,15 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   }
   // Logical containers extend until their next sibling marker; all open containers end with the document.
   for (const open of logical) open.part.span.end = length;
-  // E9-ACERVO-01 R5.3 (DOE-SP only, structural, no class evidence — the Acervo copy has none): the CLOSING SIGNATURE
-  // block ("fecho"). When the document ENDS with 1–4 unidentified blocks that are each a personal-name line, and the
-  // block right before them closes the last device with a period, those blocks are signatures, not a continuation of
-  // the last caput. They become `signature`/`prohibited` children of the document; the last article and its caput end
-  // before them. Text, spans of the signature blocks and the source map are unchanged. Anything that does not match
-  // EVERY condition (a device after them, a non-name line, digits, punctuation, ':' before them) keeps the previous
-  // reading — no device is closed early.
+  // E9-ACERVO-01 R5.3/R5.4 (DOE-SP only): the CLOSING SIGNATURE block ("fecho"). Position, a period before and the
+  // look of a name are NOT enough (R5.4: "…a servidora identificada abaixo." + "MARIA DE SOUZA" must stay in the
+  // article). The rule needs POSITIVE STRUCTURAL EVIDENCE, kept by both the official JSON and the sanitized Acervo copy
+  // (div survives sanitization; classes do not): the 1–4 final blocks sit together in their OWN container (div/section)
+  // that holds no other block, comes after the last device, and does not contain it. On top of that, conservative
+  // guards: each block is a personal-name line, the last device line ends with a period, and it does not announce
+  // content that follows ("abaixo", "a seguir", "seguinte", "indicad…/identificad… abaixo", ':'). Any doubt keeps the
+  // previous reading: the line stays bound to the device. Text, spans of the signature blocks and the source map are
+  // unchanged.
   if (input.source === 'DOE-SP') closingSignatures();
   function closingSignatures(): void {
     const containers = new Set(['document', 'article', 'clause', 'caput']);
@@ -612,6 +614,16 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const NAME = /^(?=(?:.*\p{Lu}){2})[\p{L}][\p{L}.'’\- ]{1,78}[\p{L}.]$/u;
     const isName = (t: string) => NAME.test(t) && !/[.;:,]$/u.test(t.replace(/(?:\b\p{Lu}\.)$/u, '')) && t.split(/\s+/u).length >= 2 && t.split(/\s+/u).length <= 8;
     if (!tail.every((x) => isName(result.canonicalText.slice(x.span.start, x.span.end).trim()))) return;
+    // Positive structural evidence: one dedicated container for exactly the tail blocks.
+    const locOf = (x: AnatomyPart) => x.sourcePointers[0]?.locator ?? '';
+    const parentOf = (loc: string) => loc.slice(0, loc.lastIndexOf('/'));
+    const box = parentOf(locOf(tail[0]!));
+    if (!/\/(?:div|section)\[\d+\]$/u.test(box) || !tail.every((x) => parentOf(locOf(x)) === box)) return;
+    const blockParts = result.parts.filter((x) => x.type !== 'document' && x.type !== 'caput' && x.sourcePointers.some((q) => q.locator.startsWith(`${box}/`)));
+    if (!blockParts.every((x) => tail.includes(x))) return; // the container holds a device or any other block
+    // The caput is excluded: its source pointers include the continuation blocks that are exactly the tail.
+    const devices = result.parts.filter((x) => x.type !== 'document' && x.type !== 'caput' && !tail.includes(x) && x.type !== 'unidentified');
+    if (devices.some((x) => x.sourcePointers.some((q) => q.locator === box || q.locator.startsWith(`${box}/`)))) return;
     const caput = result.parts.find((x) => x.type === 'caput' && tail[0]!.parentId === x.id);
     const owner = caput ?? result.parts.find((x) => x.id === tail[0]!.parentId);
     if (!owner || owner.context !== 'operative_candidate') return;
@@ -619,6 +631,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const before = result.canonicalText.slice(owner.span.start, tail[0]!.span.start);
     const lines = before.split(/[\r\n]+/u).map((l) => l.trim()).filter(Boolean);
     if (!lines.length || !/\.$/u.test(lines[lines.length - 1]!)) return;
+    // A device that announces what follows keeps it (ambiguous => preserve the bond).
+    if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;
     const firstSig = tail[0]!.span.start;
     // The device ends where its last owned block ends (a block span includes its own separator), never inside a block.
     const cut = Math.max(owner.span.start, ...ownership.filter((o) => !tail.includes(o.part) && o.end <= firstSig).map((o) => o.end));
