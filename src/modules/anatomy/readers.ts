@@ -640,6 +640,71 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   }
   // Logical containers extend until their next sibling marker; all open containers end with the document.
   for (const open of logical) open.part.span.end = length;
+  // E9-ACERVO-01 R5.3/R5.4 (DOE-SP only): the CLOSING SIGNATURE block ("fecho"). Position, a period before and the
+  // look of a name are NOT enough (R5.4: "…a servidora identificada abaixo." + "MARIA DE SOUZA" must stay in the
+  // article). The rule needs POSITIVE STRUCTURAL EVIDENCE, kept by both the official JSON and the sanitized Acervo copy
+  // (div survives sanitization; classes do not): the 1–4 final blocks sit together in their OWN container (div/section)
+  // that holds no other block, comes after the last device, and does not contain it. On top of that, conservative
+  // guards: each block is a personal-name line, the last device line ends with a period, and it does not announce
+  // content that follows ("abaixo", "a seguir", "seguinte", "indicad…/identificad… abaixo", ':'). Any doubt keeps the
+  // previous reading: the line stays bound to the device. Text, spans of the signature blocks and the source map are
+  // unchanged.
+  if (input.source === 'DOE-SP') closingSignatures();
+  function closingSignatures(): void {
+    const containers = new Set(['document', 'article', 'clause', 'caput']);
+    const leaves = result.parts.filter((x) => !containers.has(x.type)).sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end);
+    const lastText = result.canonicalText.trimEnd().length;
+    // The tail never crosses a device boundary: it lies entirely after the start of the last device (article, caput,
+    // paragraph, inciso…), so a continuation of an EARLIER device can never be taken as part of the closing block.
+    const deviceStarts = result.parts.filter((x) => x.type !== 'document' && x.type !== 'unidentified').map((x) => x.span.start);
+    const lastDeviceStart = deviceStarts.length ? Math.max(...deviceStarts) : 0;
+    const tail: AnatomyPart[] = [];
+    for (let i = leaves.length - 1; i >= 0; i--) {
+      const x = leaves[i]!;
+      if (x.type !== 'unidentified' || x.context !== 'unknown' || x.span.start < lastDeviceStart) break;
+      tail.unshift(x);
+    }
+    if (tail.length < 1 || tail.length > 4) return;
+    if (tail[tail.length - 1]!.span.end < lastText) return; // text after the tail: not a closing block
+    const NAME = /^(?=(?:.*\p{Lu}){2})[\p{L}][\p{L}.'’\- ]{1,78}[\p{L}.]$/u;
+    const isName = (t: string) => NAME.test(t) && !/[.;:,]$/u.test(t.replace(/(?:\b\p{Lu}\.)$/u, '')) && t.split(/\s+/u).length >= 2 && t.split(/\s+/u).length <= 8;
+    if (!tail.every((x) => isName(result.canonicalText.slice(x.span.start, x.span.end).trim()))) return;
+    // Positive structural evidence: one dedicated container for exactly the tail blocks.
+    const locOf = (x: AnatomyPart) => x.sourcePointers[0]?.locator ?? '';
+    const parentOf = (loc: string) => loc.slice(0, loc.lastIndexOf('/'));
+    const box = parentOf(locOf(tail[0]!));
+    if (!/\/(?:div|section)\[\d+\]$/u.test(box) || !tail.every((x) => parentOf(locOf(x)) === box)) return;
+    const blockParts = result.parts.filter((x) => x.type !== 'document' && x.type !== 'caput' && x.sourcePointers.some((q) => q.locator.startsWith(`${box}/`)));
+    if (!blockParts.every((x) => tail.includes(x))) return; // the container holds a device or any other block
+    // The caput is excluded: its source pointers include the continuation blocks that are exactly the tail.
+    const devices = result.parts.filter((x) => x.type !== 'document' && x.type !== 'caput' && !tail.includes(x) && x.type !== 'unidentified');
+    if (devices.some((x) => x.sourcePointers.some((q) => q.locator === box || q.locator.startsWith(`${box}/`)))) return;
+    const caput = result.parts.find((x) => x.type === 'caput' && tail[0]!.parentId === x.id);
+    const owner = caput ?? result.parts.find((x) => x.id === tail[0]!.parentId);
+    if (!owner || owner.context !== 'operative_candidate') return;
+    // The device text before the signatures must close with a period (a ':' would introduce more content).
+    const before = result.canonicalText.slice(owner.span.start, tail[0]!.span.start);
+    const lines = before.split(/[\r\n]+/u).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length || !/\.$/u.test(lines[lines.length - 1]!)) return;
+    // A device that announces what follows keeps it (ambiguous => preserve the bond).
+    if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;
+    const firstSig = tail[0]!.span.start;
+    // The device ends where its last owned block ends (a block span includes its own separator), never inside a block.
+    const cut = Math.max(owner.span.start, ...ownership.filter((o) => !tail.includes(o.part) && o.end <= firstSig).map((o) => o.end));
+    for (const x of result.parts) {
+      if (x.type === 'document' || tail.includes(x)) continue;
+      if (x.span.start < firstSig && x.span.end > cut) x.span.end = cut;
+    }
+    if (caput) {
+      caput.sourcePointers = caput.sourcePointers.filter((ptr) => !tail.some((t) => t.sourcePointers.some((q) => q.locator === ptr.locator && q.sourceSpan?.start === ptr.sourceSpan?.start)));
+      if (!result.parts.some((x) => x.parentId === caput.id && !tail.includes(x))) caput.contextReasons = caput.contextReasons.filter((r) => r !== 'caput_continuation');
+    }
+    for (const x of tail) {
+      x.type = 'signature'; x.context = 'prohibited'; x.coverage = 'complete'; x.parentId = root.id;
+      x.order = childOrders.get(root.id) ?? 0; childOrders.set(root.id, x.order + 1);
+      x.contextReasons = ['doe_sp_closing_signature']; x.ruleId = 'reader/v1/doe_sp_closing_signature'; x.recognition = 'inferred'; x.confidence = 1;
+    }
+  }
   // Exclusive ownership uses the smallest structural span; uncovered raw text stays explicitly unknown.
   const boundaries = [...new Set([0, length, ...ownership.flatMap((item) => [item.start, item.end])])].sort((a, b) => a - b);
   const starts = new Map<number, typeof ownership>(); const ends = new Map<number, typeof ownership>();

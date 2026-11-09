@@ -19,6 +19,30 @@ export const OFFICIAL_HOSTS: Readonly<Record<SampleInput['source'], readonly str
   RFB: ['normas.receita.fazenda.gov.br', 'normasinternet2.receita.fazenda.gov.br'],
 });
 
+/**
+ * P2-d gate (#116 c.6708512598 §5): the DOE-SP search API is admitted EXACTLY — one host, HTTPS, no userinfo/port, only
+ * the paths the versioned connector uses (src/modules/collection/doe-sp.connector.ts), and only for JSON. It is kept
+ * apart from OFFICIAL_HOSTS so that no HTML/PDF fetch, no wildcard/subdomain and no other API (e.g. the PDF API) is
+ * admitted by association.
+ */
+export const OFFICIAL_API_ENDPOINTS = Object.freeze({
+  'DOE-SP': Object.freeze({ host: 'do-api-web-search.doe.sp.gov.br', paths: Object.freeze([
+    /^\/v2\/publications\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu,
+    /^\/v2\/summary\/(?:list|structured|filters)$/u, /^\/v2\/journals$/u, /^\/v2\/sections$/u,
+  ]) }),
+});
+export type OfficialApiSource = keyof typeof OFFICIAL_API_ENDPOINTS;
+/** The API endpoint a URL is, or null. Exact host, https, default port, no credentials, allowed path. */
+export function officialApiEndpoint(url: URL): { source: OfficialApiSource; publicationId: string | null } | null {
+  for (const [source, ep] of Object.entries(OFFICIAL_API_ENDPOINTS) as [OfficialApiSource, (typeof OFFICIAL_API_ENDPOINTS)[OfficialApiSource]][]) {
+    if (url.protocol !== 'https:' || url.hostname !== ep.host || url.port !== '' || url.username !== '' || url.password !== '') continue;
+    if (!ep.paths.some((re) => re.test(url.pathname))) continue;
+    const m = /^\/v2\/publications\/([0-9a-f-]{36})$/iu.exec(url.pathname);
+    return { source, publicationId: m ? m[1]!.toLowerCase() : null };
+  }
+  return null;
+}
+
 export interface ProvenanceIssue { id: string; message: string }
 export interface ReservedInventory { actKeys: readonly string[]; sourceIds: readonly string[] }
 const INVENTORY: ReservedInventory = { actKeys: RESERVED_ACT_KEYS, sourceIds: RESERVED_SOURCE_IDS };

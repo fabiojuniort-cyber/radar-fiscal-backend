@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { ANATOMY_ENGINE_BUILD_HASH } from '../src/modules/anatomy/build-identity.js';
 import { crc32 } from 'node:zlib';
 import { ACCEPTANCES_FILE, buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, NORMAS_LEG_BASELINE, normasLegEntrySha256, type Acceptance, normasLegBaseline, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type NormasLegEntry, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
 import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
@@ -19,19 +20,20 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 11 cells covered, E9 incomplete; only the two normas.leg.br atualizada samples are accepted (offline, pinned record); identity kept', () => {
+test('E9 current state (COMPOSE #305 + #304): 12 cells covered incl. normas.leg.br grande and DOE-SP × Decreto × pequeno; acceptance void until revalidated on the new engine', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
-    'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'normas-leg-br--lei--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+    'rfb--ato-declaratorio-interpretativo--pequeno', 'doe-sp--decreto--pequeno', 'rfb--instrucao-normativa--medio', 'normas-leg-br--lei--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(!m.requiredPending.includes('normas-leg-br--lei--grande'), '#305 c.6710099648: the grande cell closes through the NORMAS-LEG baseline');
   assert.ok(['normas-leg-br--lei--pequeno', 'normas-leg-br--lei--medio'].every((c) => !m.cells.find((x) => x.id === c) || m.requiredPending.includes(c)), 'pequeno/médio stay pending');
-  // E9-ACERVO-01 R3: the first formal acceptance — normas.leg.br × Lei × HTML × grande, offline scope only.
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['lei-10637-2002-atualizada', 'lei-10833-2003-atualizada']);
-  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id), ['normas-leg-br--lei--grande'], 'acceptance changes neither coverage nor score');
+  // E9-ACERVO-01 R5.4 composition: the R3 acceptance is pinned to engine 9235a810; on the composed engine it is VOID by
+  // design (derived, never carried silently) until the COORD revalidates it on the new hash. Validation is unchanged.
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), [], 'acceptance void on a new engine');
+  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id), []);
   const leg = real.filter((s) => s.id.startsWith('lei-'));
-  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && s.stages.accepted === s.id.endsWith('-atualizada')));
+  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.accepted));
   assert.deepEqual(leg.map((s) => [s.id, s.stages.validated]).sort(), [['lei-10637-2002-atualizada', true], ['lei-10637-2002-original', false], ['lei-10833-2003-atualizada', true], ['lei-10833-2003-original', false]]);
   // #305 c.6709334910: only the two "atualizada" versions are read, by NORMAS-LEG through the preparation; originals are not.
   for (const s of leg) {
@@ -227,11 +229,25 @@ test('E9-ACERVO-01 R3: acceptance is DERIVED from a pinned record — no record,
   assert.deepEqual(recs.map((r) => [r.sampleId, r.entrySha256]), base.map((e) => [e.id, normasLegEntrySha256(e)]), 'records pin the committed lock');
   assert.ok(recs.every((r) => r.scope === 'offline' && r.cellId === 'normas-leg-br--lei--grande' && /#116/u.test(r.ref) && r.limits.some((l) => /R7/u.test(l))));
   const accepted = (a: Acceptance[], b: NormasLegEntry[] = base) => collectSamples(undefined, b, a).filter((s) => s.id.endsWith('-atualizada')).map((s) => s.stages.accepted);
-  assert.deepEqual(accepted(recs), [true, true]);
+  // Composition: the records pin 9235a810, so on this engine they are void; the lock digests are UNCHANGED, so a record
+  // re-pinned to the current engine (the COORD revalidation) would hold. Nothing is re-pinned here.
+  assert.deepEqual(accepted(recs), [false, false], 'pinned to another engine => void');
+  assert.ok(recs.every((r) => r.engineBuildHash.startsWith('9235a810')));
+  const repinned = recs.map((r) => ({ ...r, engineBuildHash: ANATOMY_ENGINE_BUILD_HASH }));
+  assert.deepEqual(accepted(repinned), [true, true], 'same lock digests: a revalidation on the new hash would hold');
   assert.deepEqual(accepted([]), [false, false], 'no record ⇒ not accepted (no hard-coded accepted=true)');
-  assert.deepEqual(accepted(recs.map((r, i) => (i === 0 ? { ...r, entrySha256: '0'.repeat(64) } : r))), [false, true], 'another digest voids it');
-  assert.deepEqual(accepted(recs.map((r, i) => (i === 1 ? { ...r, engineBuildHash: '0'.repeat(64) } : r))), [true, false], 'another engine voids it');
-  assert.deepEqual(accepted(recs.map((r) => ({ ...r, scope: 'production' as unknown as 'offline' }))), [false, false], 'only the offline scope is recorded');
+  assert.deepEqual(accepted(repinned.map((r, i) => (i === 0 ? { ...r, entrySha256: '0'.repeat(64) } : r))), [false, true], 'another digest voids it');
+  assert.deepEqual(accepted(repinned.map((r) => ({ ...r, scope: 'production' as unknown as 'offline' }))), [false, false], 'only the offline scope is recorded');
   const drift = base.map((e, i) => (i === 0 ? { ...e, textSha256: `${e.textSha256}x` } : e));
-  assert.deepEqual(accepted(recs, drift), [false, true], 'a sample that stops being validated stops being accepted');
+  assert.deepEqual(accepted(repinned, drift), [false, true], 'a sample that stops being validated stops being accepted');
+});
+
+test('E9-ACERVO-01 R5.3: DOE-SP sample — validated is DERIVED (baseline + DOE-SP invariants); drift, missing baseline or a fallback un-validate', () => {
+  const base = JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: { id: string; outputHash: string }[] };
+  const doesp = (b: typeof base.samples) => collectSamples(b as never).filter((s) => s.source === 'DOE-SP').map((s) => [s.id, s.stages.read, s.stages.validated]);
+  assert.deepEqual(doesp(base.samples), [['doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d', false, false], ['doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea', true, true]]);
+  assert.deepEqual(doesp(base.samples.filter((x) => !x.id.startsWith('doesp:'))).map((x) => x[2]), [false, false], 'no baseline => not validated');
+  assert.deepEqual(doesp(base.samples.map((x) => (x.id.startsWith('doesp:') ? { ...x, outputHash: '0'.repeat(64) } : x))).map((x) => x[2]), [false, false], 'output drift => not validated');
+  const big = collectSamples().find((s) => s.id === 'doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d')!;
+  assert.deepEqual([big.size, big.profile, big.notes], ['grande', null, ['reader fallback (input_size_limit): the act was not read']], 'a reader fallback is not a read');
 });
