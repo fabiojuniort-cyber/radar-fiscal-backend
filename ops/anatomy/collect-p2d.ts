@@ -11,7 +11,8 @@
  *   'discovery', against ONE declared type (`discoveryType`, default Decreto), which then has fewer captures left.
  * - CAPTURE goes through consultOfficial with apiSources ['DOE-SP']: publication by id only, identity pinned across
  *   redirects, publication JSON validated against the URL id. Every hop is debited.
- * - Before any capture: reserved acts (corpus/gold/reserve, by act key and by publication id), acts of 2026 (margin)
+ * - Before any capture: reserved acts (corpus/gold/reserve, by act key and by publication id), acts not dated before 2026
+ *   (real-date check on the listing AND on the returned act; 2026, 2027+, invalid or missing dates are refused)
  *   and acts already stored are skipped. At most 1 act per size per type, at most 9 acts. A size not found, a failure
  *   or a type absent from the day list is recorded, never read as "does not exist". Nothing promoted; no production write.
  */
@@ -61,12 +62,29 @@ export const actKey = (key: string, title: RegExp, item: Pick<DoeSpListItem, 'ti
   const m = title.exec(item.title.trim()); if (!m) return null;
   return `${key} ${Number(m[1]!.replace(/\D/gu, ''))}/${item.date.slice(2, 4)}`;
 };
+/**
+ * 2026 margin (#116 c.6708512598 §5, recheck R3): a date is accepted only if it is a REAL calendar date strictly before
+ * 2026-01-01. Not a prefix test: 2027, 2099, an invalid date or a missing date are all refused (fail closed). The listing
+ * and the API publication carry `YYYY-MM-DD` optionally followed by a time; only the date part is read.
+ */
+export const MARGIN = '2026-01-01';
+export function beforeMargin(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/u.exec(value); if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (d.getUTCFullYear() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1 || d.getUTCDate() !== Number(m[3])) return false;
+  return `${m[1]}-${m[2]}-${m[3]}` < MARGIN;
+}
 export const isReservedDoeSp = (k: string, item: Pick<DoeSpListItem, 'id' | 'date'>) =>
-  RESERVED_ACT_KEYS.includes(k) || RESERVED_SOURCE_IDS.includes(item.id.toLowerCase()) || item.date.startsWith('2026');
+  RESERVED_ACT_KEYS.includes(k) || RESERVED_SOURCE_IDS.includes(item.id.toLowerCase()) || !beforeMargin(item.date);
 
 export async function run(doFetch: typeof fetch, opts: { grantId: string; owner: string; date: string; budgetFile?: string; outDir?: string;
-  plan?: Record<string, number>; discoveryType?: string; now?: () => Date }) {
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(opts.date) || opts.date.startsWith('2026')) throw new DiscoveryRefused('the day list date must be YYYY-MM-DD before 2026 (margin)');
+  plan?: Record<string, number>; discoveryType?: string; now?: () => Date;
+  /** E9-ACERVO-01 R3: stop the WHOLE run after this many acts kept (1 = the first suitable sample, for the JSON × Acervo test). */
+  stopAfter?: number }) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(opts.date) || !beforeMargin(opts.date)) throw new DiscoveryRefused('the day list date must be a valid YYYY-MM-DD before 2026 (margin)');
+  const actLimit = Math.min(P2D_LIMITS.acts, opts.stopAfter ?? P2D_LIMITS.acts);
+  if (!Number.isInteger(actLimit) || actLimit < 1) throw new DiscoveryRefused('stopAfter must be a positive integer');
   const perType = opts.plan ?? { Decreto: 5, Resolução: 5, 'Portaria CAT': 5 };
   const discoveryType = opts.discoveryType ?? 'Decreto';
   if (!(discoveryType in perType)) throw new DiscoveryRefused(`discovery type ${discoveryType} is not in the plan`);
@@ -92,6 +110,7 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
       return finish();
     }
     for (const t of P2D_TYPES) {
+      if (acts >= actLimit) { decisions.push({ type: t.type, outcome: `not attempted: run stopped after ${actLimit} act(s) kept (stopAfter)` }); continue; }
       const capture = budget.fetcher(t.type, 'capture', doFetch) as unknown as FetchLike;
       const ofType = items.filter((i) => actKey(t.key, t.title, i) !== null);
       const reserved = ofType.filter((i) => isReservedDoeSp(actKey(t.key, t.title, i)!, i)).map((i) => i.id);
@@ -101,7 +120,7 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
       const order = [byLen[0], byLen[Math.floor(byLen.length / 2)], byLen[byLen.length - 1], byLen[1], byLen[byLen.length - 2]].filter((x, i, arr): x is DoeSpListItem => !!x && arr.findIndex((y) => y?.id === x.id) === i);
       const kept = new Map<Size, string>(); const tried: Record<string, unknown>[] = [];
       for (const i of order) {
-        if (budget.remaining(t.type) === 0 || acts >= P2D_LIMITS.acts || kept.size === 3) break;
+        if (budget.remaining(t.type) === 0 || acts >= actLimit || kept.size === 3) break;
         const m: ManifestAct = { id: i.id, source: 'DOE-SP', act: i.title.slice(0, 120), url: `${API}v2/publications/${i.id}`, urlStatus: 'candidate', reason: `E9 P2-d (${t.type}, grant ${opts.grantId})` };
         const r = await consultOfficial(m, OFFICIAL_HOSTS['DOE-SP'], capture, undefined, ['DOE-SP'])
           .catch((e: Error) => ({ ok: false as const, failure: { code: e instanceof BudgetRefused ? 'budget' : 'error', detail: e.message } }));
@@ -109,6 +128,8 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
         let chars: number;
         try {
           const p = prepareDoeSpRepresentation({ resourceId: `doe-sp:${i.id}`, bytes: new Uint8Array(r.body) }, i.id);
+          // The act RETURNED by the API must also be before 2026 (the listing date alone is not trusted).
+          if (!beforeMargin(p.metadata?.date)) { tried.push({ id: i.id, outcome: `captured but refused: returned act date ${String(p.metadata?.date)} is not a valid date before 2026 (bytes not stored)` }); continue; }
           chars = analyzeAnatomy({ publicationVersionId: `doe-sp:${i.id}`, referenceDate: '2026-11-07', ruleSet: { id: 'p2d', version: '1' },
             input: { source: 'DOE-SP', representationId: `doe-sp:${i.id}`, html: p.html }, catalog: { edition: 'none', codes: [] } }).canonicalText.length;
         } catch (e) { tried.push({ id: i.id, outcome: `captured but not preparable/readable: ${(e as Error).message.slice(0, 160)} (bytes not stored)` }); continue; }
@@ -126,7 +147,7 @@ export async function run(doFetch: typeof fetch, opts: { grantId: string; owner:
     return finish();
   } finally { budget.close(); }
   function finish() {
-    const inventory = { grantId: opts.grantId, owner: opts.owner, discovery, actsKept: acts, decisions, remainingTotal: budget.remaining(),
+    const inventory = { grantId: opts.grantId, owner: opts.owner, discovery, stopAfter: actLimit, actsKept: acts, decisions, remainingTotal: budget.remaining(),
       note: 'per-attempt debit record = budget-state.json; a type or size not found in the day list is never read as nonexistent' };
     writeFileSync(join(outDir, `inventory-${opts.grantId}.json`), `${JSON.stringify(inventory, null, 2)}\n`, { flag: 'wx' });
     return inventory;

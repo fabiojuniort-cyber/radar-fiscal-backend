@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DISCOVERY, DiscoveryRefused, discoverOfficial, JOURNAL, P2D_BUDGET_FILE, P2D_PACKAGE, SECTION, actKey, P2D_TYPES, run } from '../ops/anatomy/collect-p2d.js';
+import { DISCOVERY, DiscoveryRefused, discoverOfficial, JOURNAL, P2D_BUDGET_FILE, P2D_PACKAGE, SECTION, actKey, P2D_TYPES, run, beforeMargin, isReservedDoeSp } from '../ops/anatomy/collect-p2d.js';
 import { DOE_SP_JOURNAL, DOE_SP_SECTION } from '../src/modules/collection/doe-sp.connector.js';
 import type { BudgetState } from '../ops/anatomy/request-budget.js';
 
@@ -17,7 +17,7 @@ const budgetFile = (perType: Record<string, number> = { Decreto: 5, Resolução:
     total: Object.values(perType).reduce((a, b) => a + b, 0), perType }, used: { total: 0, perType: {} }, attempts: [] })); return f; };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const item = (n: number, title: string, excerpt = 'x', date = '2025-03-10T00:00:00') => ({ id: G(n), title, slug: `s-${n}`, hierarchy: 'Executivo > Atos Normativos', date, excerpt });
-const pub = (n: number, title: string, words: number) => ({ id: G(n), title, slug: `s-${n}`, date: '2025-03-10', journal: 'Executivo', content: `<p>Artigo 1º ${'texto '.repeat(words)}</p>` });
+const pub = (n: number, title: string, words: number, date = '2025-03-10') => ({ id: G(n), title, slug: `s-${n}`, date, journal: 'Executivo', content: `<p>Artigo 1º ${'texto '.repeat(words)}</p>` });
 function transport(list: unknown[], pubs: Record<string, unknown>) {
   const urls: string[] = [];
   const f = (async (u: string | URL) => { const url = String(u); urls.push(url);
@@ -74,4 +74,51 @@ test('P2-d: a discovery failure is debited and recorded, never read as absence; 
   const inv = await run(t, { grantId: 'G-D', owner: 'exec-304', date: '2025-03-10', budgetFile: f, outDir: out, now: NOW });
   assert.match(String(inv.discovery.outcome), /discovery failed: discovery HTTP 500 — debited, not read as absence/u);
   assert.equal(inv.actsKept, 0); assert.equal((JSON.parse(readFileSync(f, 'utf8')) as BudgetState).used.total, 1);
+});
+
+// E9-ACERVO-01 R3 (#116, recheck do #304 @ 1984bd94): the 2026 margin is a REAL-DATE check, not a "2026" prefix.
+test('R3 margin: only real dates strictly before 2026 pass — 2025 yes; 2026, 2027, invalid and missing no', () => {
+  for (const ok of ['2025-12-31', '2025-03-10T00:00:00', '1999-01-01', '2024-02-29']) assert.equal(beforeMargin(ok), true, ok);
+  for (const no of ['2026-01-01', '2026-06-30T00:00:00', '2027-01-01', '2027-03-10T00:00:00', '2099-12-31', '2025-02-29', '2025-13-01', '2025-00-10',
+    '2025-3-10', '10/03/2025', '', 'x', undefined, null, 20250310]) assert.equal(beforeMargin(no), false, String(no));
+  const key = 'decreto 1/25';
+  assert.equal(isReservedDoeSp(key, { id: G(1), date: '2025-03-10T00:00:00' }), false);
+  for (const d of ['2026-01-02T00:00:00', '2027-01-02T00:00:00', '2025-02-30T00:00:00', '']) assert.equal(isReservedDoeSp(key, { id: G(1), date: d }), true, d);
+});
+
+test('R3 margin on the INPUT: a 2027 or invalid list date is refused before any request', async () => {
+  let calls = 0; const spy = (async () => { calls++; throw new Error('must not be called'); }) as unknown as typeof fetch;
+  for (const date of ['2027-01-10', '2026-01-10', '2025-02-30', '2025-3-10'])
+    await assert.rejects(run(spy, { grantId: 'G-D', owner: 'exec-304', date, budgetFile: budgetFile(), outDir: mkdtempSync(join(tmpdir(), 'p2d-out-')), now: NOW }), /before 2026/u, date);
+  assert.equal(calls, 0);
+});
+
+test('R3 margin on the RETURNED items: 2027/invalid listing dates never requested; a returned act dated 2027 is refused and not stored', async () => {
+  const f = budgetFile(); const out = mkdtempSync(join(tmpdir(), 'p2d-out-'));
+  const list = [item(1, 'DECRETO Nº 69.100, DE 10 DE MARÇO DE 2027', 'a', '2027-03-10T00:00:00'), item(2, 'DECRETO Nº 69.101, DE 30 DE FEVEREIRO DE 2025', 'b', '2025-02-30T00:00:00'),
+    item(3, 'DECRETO Nº 69.102, DE 10 DE MARÇO DE 2025', 'c'), item(4, 'DECRETO Nº 69.103, DE 10 DE MARÇO DE 2025', 'dd')];
+  // The listing says 2025, but the API publication of G(4) says 2027: the returned date wins and the act is refused.
+  const pubs = { [G(3)]: pub(3, 'DECRETO Nº 69.102', 3), [G(4)]: pub(4, 'DECRETO Nº 69.103', 4000, '2027-03-10') };
+  const t = transport(list, pubs);
+  const inv = await run(t.f, { grantId: 'G-D', owner: 'exec-304', date: '2025-03-10', budgetFile: f, outDir: out, now: NOW });
+  assert.ok(!t.urls.some((u) => u.includes(`publications/${G(1)}`)), '2027 listing never requested');
+  assert.ok(!t.urls.some((u) => u.includes(`publications/${G(2)}`)), 'invalid listing date never requested');
+  const dec = inv.decisions.find((d) => d.type === 'Decreto') as { reserved: string[]; tried: { id: string; outcome: string }[] };
+  assert.ok(dec.reserved.includes(G(1)) && dec.reserved.includes(G(2)));
+  assert.match(dec.tried.find((x) => x.id === G(4))!.outcome, /returned act date 2027-03-10 is not a valid date before 2026/u);
+  assert.equal(existsSync(join(out, `${G(4)}.json`)), false, 'refused act not stored');
+  assert.equal(existsSync(join(out, `${G(3)}.json`)), true);
+  const s = JSON.parse(readFileSync(f, 'utf8')) as BudgetState; assert.equal(s.used.total, t.urls.length, 'the refused capture was still debited');
+});
+
+test('R3 stopAfter: 1 stops the WHOLE run after the first suitable sample (for the JSON × Acervo test)', async () => {
+  const f = budgetFile(); const out = mkdtempSync(join(tmpdir(), 'p2d-out-'));
+  const list = [item(1, 'DECRETO Nº 69.200, DE 10 DE MARÇO DE 2025', 'a'), item(2, 'PORTARIA CAT Nº 20, DE 10 DE MARÇO DE 2025'), item(3, 'RESOLUÇÃO SFP Nº 8, DE 10 DE MARÇO DE 2025')];
+  const pubs = { [G(1)]: pub(1, 'DECRETO Nº 69.200', 3), [G(2)]: pub(2, 'PORTARIA CAT Nº 20', 3), [G(3)]: pub(3, 'RESOLUÇÃO SFP Nº 8', 3) };
+  const t = transport(list, pubs);
+  const inv = await run(t.f, { grantId: 'G-D', owner: 'exec-304', date: '2025-03-10', budgetFile: f, outDir: out, now: NOW, stopAfter: 1 });
+  assert.equal(inv.actsKept, 1); assert.equal(inv.stopAfter, 1);
+  assert.equal(t.urls.filter((u) => u.includes('/publications/')).length, 1, 'exactly one capture request');
+  assert.match(JSON.stringify(inv.decisions), /not attempted: run stopped after 1 act/u);
+  await assert.rejects(run(t.f, { grantId: 'G-D', owner: 'exec-304', date: '2025-03-10', budgetFile: budgetFile(), outDir: mkdtempSync(join(tmpdir(), 'p2d-out-')), now: NOW, stopAfter: 0 }), /positive integer/u);
 });
