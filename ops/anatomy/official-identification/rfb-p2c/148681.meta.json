@@ -1,0 +1,74 @@
+{
+  "id": "148681",
+  "act": "Solução de Consulta 258/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148681/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148681/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148681/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+  "bytes": 8185,
+  "consultedAt": "2026-11-10T15:19:37.688Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Solução de Consulta, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 148681,
+    "epigrafe": "Solução de Consulta Cosit nº 258, de 26 de dezembro de 2025",
+    "numeroAto": "258",
+    "dataAto": "2025-12-26",
+    "dataPublicacao": "2025-12-31",
+    "dadosPublicacao": "Publicado(a) no DOU de 31/12/2025, seção 1, página 312",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "b39e1dd26b7a960149a678a309fb2e18589c0f996b910d87f68ef4e49461d668",
+    "htmlSha256": "06db6d8aa008e3f9aacdcc5d7a7660260a9b537d6edaf7dbe5ce7b39ac38b116",
+    "pieces": 4,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/ementas/0",
+        "order": 1,
+        "chars": 1068
+      },
+      {
+        "pointer": "/outrosSegmentos/0",
+        "order": 3,
+        "chars": 0
+      }
+    ],
+    "attachments": [
+      {
+        "id": "82416",
+        "name": "SC Cosit nº 258-2025.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "83325",
+        "name": "SC Cosit nº 258-2025.pdf",
+        "status": "missing"
+      }
+    ],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Solução de Consulta",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "pequeno",
+    "measuredChars": 2182,
+    "size": "pequeno"
+  }
+}

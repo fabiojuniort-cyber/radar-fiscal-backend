@@ -5,7 +5,7 @@
     "owner": "EXEC #303 (claude/anat-e9-coverage)",
     "package": "E9-P2-c",
     "approvedBy": "tribusca-control#116 c.6708512598 §3 — orçamento NOVO de até 16, condicionado ao PASS independente da guarda (#303 c.6708499687)",
-    "status": "active",
+    "status": "suspended",
     "expiresAt": "2026-11-21T23:59:59Z",
     "total": 16,
     "perType": {
@@ -17,9 +17,54 @@
     }
   },
   "used": {
-    "total": 0,
-    "perType": {}
+    "total": 4,
+    "perType": {
+      "Portaria": 1,
+      "Ato Declaratório Executivo": 2,
+      "Solução de Consulta": 1
+    }
   },
-  "attempts": [],
-  "note": "ACTIVATED 2026-11-10 by the owner: COORD R5 authorized P2-c from the CSV B plan (#303 @ ca9e39b direct mode); Fábio approved the 4 targets of p2c-plan-2026-11-10.json (#308 22c3e3e): Portaria 148693, ADE 148629 and 148516, SC 148681. Direct mode only (--targets), 0 searches, 4 requests at most; same caps, no new budget; single owner, one run, suspended right after. Earlier: SUSPENDED until the independent PASS of the budget barrier; the owner switches status to active only after that PASS is recorded. The historical record 28/25 (ledger-combined.json) is immutable and is not this budget."
+  "attempts": [
+    {
+      "n": 1,
+      "type": "Portaria",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148693/visao/multivigente",
+      "debitedAt": "2026-11-10T15:19:34.978Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-10T15:19:35.856Z"
+    },
+    {
+      "n": 2,
+      "type": "Ato Declaratório Executivo",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148629/visao/multivigente",
+      "debitedAt": "2026-11-10T15:19:36.265Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-10T15:19:37.139Z"
+    },
+    {
+      "n": 3,
+      "type": "Ato Declaratório Executivo",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148516/visao/multivigente",
+      "debitedAt": "2026-11-10T15:19:37.153Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-10T15:19:37.330Z"
+    },
+    {
+      "n": 4,
+      "type": "Solução de Consulta",
+      "kind": "capture",
+      "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148681/visao/multivigente",
+      "debitedAt": "2026-11-10T15:19:37.499Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-10T15:19:37.686Z"
+    }
+  ],
+  "note": "SUSPENDED 2026-11-10 by the owner right after the single direct run: 4 requests sent and debited (HTTP 200 each), 4 acts kept (148693, 148629, 148516, 148681); balance 12. Earlier: ACTIVATED 2026-11-10 by the owner: COORD R5 authorized P2-c from the CSV B plan (#303 @ ca9e39b direct mode); Fábio approved the 4 targets of p2c-plan-2026-11-10.json (#308 22c3e3e): Portaria 148693, ADE 148629 and 148516, SC 148681. Direct mode only (--targets), 0 searches, 4 requests at most; same caps, no new budget; single owner, one run, suspended right after. Earlier: SUSPENDED until the independent PASS of the budget barrier; the owner switches status to active only after that PASS is recorded. The historical record 28/25 (ledger-combined.json) is immutable and is not this budget."
 }
