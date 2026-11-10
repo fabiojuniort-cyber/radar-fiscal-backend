@@ -28,12 +28,14 @@ test('E9 current state (COMPOSE #305 + #304): 12 cells covered incl. normas.leg.
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(!m.requiredPending.includes('normas-leg-br--lei--grande'), '#305 c.6710099648: the grande cell closes through the NORMAS-LEG baseline');
   assert.ok(['normas-leg-br--lei--pequeno', 'normas-leg-br--lei--medio'].every((c) => !m.cells.find((x) => x.id === c) || m.requiredPending.includes(c)), 'pequeno/médio stay pending');
-  // E9-ACERVO-01 R5.4 composition: the R3 acceptance is pinned to engine 9235a810; on the composed engine it is VOID by
-  // design (derived, never carried silently) until the COORD revalidates it on the new hash. Validation is unchanged.
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), [], 'acceptance void on a new engine');
-  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id), []);
+  // E9-ACERVO-01 R5.6: acceptance = any record pinning the current lock digest AND the current engine. On this HEAD the
+  // COORD revalidation record (693ba416) matches, so the cell is accepted; the original 9235a810 records stay as history.
+  const accNow = real.filter((s) => s.stages.accepted).map((s) => s.id).sort();
+  const pinned = (JSON.parse(readFileSync(ACCEPTANCES_FILE, 'utf8')) as { acceptances: Acceptance[] }).acceptances.some((r) => r.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH);
+  assert.deepEqual(accNow, pinned ? ['lei-10637-2002-atualizada', 'lei-10833-2003-atualizada'] : [], 'accepted iff a record pins the current engine');
+  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id), pinned ? ['normas-leg-br--lei--grande'] : []);
   const leg = real.filter((s) => s.id.startsWith('lei-'));
-  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.accepted));
+  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && (!s.id.endsWith('-original') || !s.stages.accepted)));
   assert.deepEqual(leg.map((s) => [s.id, s.stages.validated]).sort(), [['lei-10637-2002-atualizada', true], ['lei-10637-2002-original', false], ['lei-10833-2003-atualizada', true], ['lei-10833-2003-original', false]]);
   // #305 c.6709334910: only the two "atualizada" versions are read, by NORMAS-LEG through the preparation; originals are not.
   for (const s of leg) {
@@ -226,14 +228,14 @@ test('#305 c.6710099648: the NORMAS-LEG lock — validated is derived; any drift
 test('E9-ACERVO-01 R3: acceptance is DERIVED from a pinned record — no record, another digest, another engine or a non-validated sample ⇒ not accepted', () => {
   const recs = (JSON.parse(readFileSync(ACCEPTANCES_FILE, 'utf8')) as { acceptances: Acceptance[] }).acceptances;
   const base = (JSON.parse(readFileSync(NORMAS_LEG_BASELINE, 'utf8')) as { samples: NormasLegEntry[] }).samples;
-  assert.deepEqual(recs.map((r) => [r.sampleId, r.entrySha256]), base.map((e) => [e.id, normasLegEntrySha256(e)]), 'records pin the committed lock');
+  for (const e of base) assert.ok(recs.filter((r) => r.sampleId === e.id).every((r) => r.entrySha256 === normasLegEntrySha256(e)), `${e.id}: every record pins the committed lock`);
   assert.ok(recs.every((r) => r.scope === 'offline' && r.cellId === 'normas-leg-br--lei--grande' && /#116/u.test(r.ref) && r.limits.some((l) => /R7/u.test(l))));
   const accepted = (a: Acceptance[], b: NormasLegEntry[] = base) => collectSamples(undefined, b, a).filter((s) => s.id.endsWith('-atualizada')).map((s) => s.stages.accepted);
-  // Composition: the records pin 9235a810, so on this engine they are void; the lock digests are UNCHANGED, so a record
-  // re-pinned to the current engine (the COORD revalidation) would hold. Nothing is re-pinned here.
-  assert.deepEqual(accepted(recs), [false, false], 'pinned to another engine => void');
-  assert.ok(recs.every((r) => r.engineBuildHash.startsWith('9235a810')));
-  const repinned = recs.map((r) => ({ ...r, engineBuildHash: ANATOMY_ENGINE_BUILD_HASH }));
+  // History is append-only: the original 9235a810 records are kept; a record on another engine never counts here.
+  const original = recs.filter((r) => r.engineBuildHash.startsWith('9235a810'));
+  assert.equal(original.length, 2, 'original records preserved');
+  assert.deepEqual(accepted(original), [false, false], 'pinned to another engine => void');
+  const repinned = original.map((r) => ({ ...r, engineBuildHash: ANATOMY_ENGINE_BUILD_HASH }));
   assert.deepEqual(accepted(repinned), [true, true], 'same lock digests: a revalidation on the new hash would hold');
   assert.deepEqual(accepted([]), [false, false], 'no record ⇒ not accepted (no hard-coded accepted=true)');
   assert.deepEqual(accepted(repinned.map((r, i) => (i === 0 ? { ...r, entrySha256: '0'.repeat(64) } : r))), [false, true], 'another digest voids it');

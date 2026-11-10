@@ -221,8 +221,10 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), norma
       const rd = readNormasLeg(m, bytes);
       const b = normasLegBaseline.find((x) => x.id === m.id);
       const ok = rd.invariants.length === 0 && !!b && canonJson(b) === canonJson(rd.entry);
-      const acc = acceptances.find((a) => a.sampleId === m.id);
-      const accepted = ok && !!acc && acc.scope === 'offline' && acc.entrySha256 === normasLegEntrySha256(rd.entry) && acc.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH;
+      // R5.6: records are an append-only history (one per engine the COORD accepted on); the sample is accepted when
+      // ANY record pins its current lock digest AND the current engine. Older records stay as history, never rewritten.
+      const digest = normasLegEntrySha256(rd.entry);
+      const accepted = ok && acceptances.some((a) => a.sampleId === m.id && a.scope === 'offline' && a.entrySha256 === digest && a.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH);
       out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: rd.entry.chars, size: sizeOf(rd.entry.chars), sha256: m.sha256, bytes: m.bytes,
         stages: { captured: true, identified: m.titleCheck.found, read: true, validated: ok, accepted }, profile: 'NORMAS-LEG', diagnostic: null, outputHash: rd.outputHash,
         evidence: ok ? ['docs/anatomy/normas-leg-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts', 'test/anatomy.normas-leg.unit.test.ts', ...(accepted ? ['docs/anatomy/e9-acceptances.json'] : [])] : ['test/anatomy.normas-leg.unit.test.ts'],

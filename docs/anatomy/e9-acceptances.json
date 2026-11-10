@@ -1,6 +1,6 @@
 {
   "schema": "e9-acceptances/1",
-  "note": "Aceites formais E9. 'accepted' é derivado: vale só enquanto entrySha256 e engineBuildHash conferem com a amostra atual (ops/anatomy/official-coverage-matrix.ts).",
+  "note": "Aceites formais E9, histórico append-only (um registro por motor revalidado). 'accepted' é derivado: vale enquanto ALGUM registro fixa o entrySha256 atual e o motor atual (ops/anatomy/official-coverage-matrix.ts).",
   "acceptances": [
     {
       "sampleId": "lei-10637-2002-atualizada",
@@ -35,6 +35,42 @@
         "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
         "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
       ]
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
+      "decidedBy": "COORD (revalidação independente)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R5.6: revalidação offline no motor da composição; evidência radar-fiscal-backend#309 @ 775fa2d (docs/anatomy/compose-e9-laws-equivalence.json)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810 (registro original preservado)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
+      "decidedBy": "COORD (revalidação independente)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R5.6: revalidação offline no motor da composição; evidência radar-fiscal-backend#309 @ 775fa2d (docs/anatomy/compose-e9-laws-equivalence.json)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810 (registro original preservado)"
     }
   ]
 }
