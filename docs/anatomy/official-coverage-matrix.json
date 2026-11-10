@@ -1,0 +1,1850 @@
+{
+  "criterion": {
+    "approval": "tribusca-control#116 c.6514510003; E9: STATUS-MATRIX-02 §9 (sem fração); R2 #303 c.6701945748",
+    "size": "pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor",
+    "stages": "captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)"
+  },
+  "grid": {
+    "status": "aprovada (tribusca-control#116 c.6708512598 §2) — não aceita células, não fecha E9",
+    "approved": true,
+    "approval": {
+      "approved": true,
+      "ref": "tribusca-control#116 c.6708512598 §2",
+      "version": "v1",
+      "scope": "grade de planejamento e demonstração fonte × tipo × layout × porte; 61 células aplicáveis; N/A só com justificativa e decisão registrada"
+    },
+    "cells": 61,
+    "required": 61
+  },
+  "samples": [
+    {
+      "id": "rfb:108391",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 2003,
+      "size": "pequeno",
+      "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4",
+      "bytes": 7914,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "c5870230db4acc66b1e5c413402a265241b9333e31463407190750ec80f52ea9",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:115131",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 57179,
+      "size": "grande",
+      "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2",
+      "bytes": 234565,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "8a80732a487c6a6b0da10b28561838571dd9c2fdecd8e77c65e918ebb82503f1",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:127905",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 1009001,
+      "size": "grande",
+      "sha256": "9672e74829990edc5246b03eca3e65999499edd9d334cc988293133dbf66490b",
+      "bytes": 3530584,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "ac470468444e6b14ba6dc26453c42e8923396600aa064b66fc56867825ef7b81",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:133898",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 4540,
+      "size": "pequeno",
+      "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+      "bytes": 31143,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "c4ce8a66c6ba5d78671360ff85f55264800b2018b8516c91fb0f67f1b094276e",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:141910",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 31389,
+      "size": "médio",
+      "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+      "bytes": 144575,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "3a59678b95f02c0b89b52629c4b9eca6e9b18b42627b516e7b9a55c064afadca",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:104314",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 809136,
+      "size": "grande",
+      "sha256": "9005fddbc2df67e39127db7d34d2feb53ef8dfdc42bc59056862e97b9bb200b5",
+      "bytes": 2285257,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "9eedf20ca00262fe2d5de90c62cb576c9ee60fd7d4b9a799f0fe034c0ec20ed4",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:116968",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 151963,
+      "size": "grande",
+      "sha256": "4ca8d1d3179f32301ebaa34cc7f6eaa9936a0d20df7b44e1ead5d0b828664e78",
+      "bytes": 787461,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "f6d81c5c678430d67b4d3cc317c44b7f3d8f5d65f40bff52a1113271a9488740",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:122645",
+      "source": "RFB",
+      "type": "Resolução",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 2167,
+      "size": "pequeno",
+      "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+      "bytes": 11110,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "2c5e433c69485df7605a9e37872f29818e60d16902972ae4047ec9e3d1a7e514",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:142967",
+      "source": "RFB",
+      "type": "Portaria",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 4699,
+      "size": "pequeno",
+      "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+      "bytes": 24241,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "f6b043bd64c64bec55c5181cceb28bc0ea0e71ef9f08a87c25f07eeda8b1547b",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:37103",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 3106,
+      "size": "pequeno",
+      "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+      "bytes": 11168,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "cc49002f4ff113939f453ac6eb551fe992c795e4cda321c21b8e72887734f96b",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "ricms-an1art041",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "chars": 33383,
+      "size": "médio",
+      "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+      "bytes": 199138,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "SEFAZ-SP-PORTAL",
+      "diagnostic": null,
+      "outputHash": "c269acc2b9a8ed8678674918191b94b94d65c7300062f144806d225670315d6d",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "ricms-an2art003",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "chars": 20457,
+      "size": "médio",
+      "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+      "bytes": 176447,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "SEFAZ-SP-PORTAL",
+      "diagnostic": null,
+      "outputHash": "e15aea926a4f9455a19e30ad8008ad1a19bf0fb4080ca0032b62a3eff58ce7fd",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "ricms-an2art039",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "chars": 12616,
+      "size": "médio",
+      "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+      "bytes": 168294,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "SEFAZ-SP-PORTAL",
+      "diagnostic": null,
+      "outputHash": "6e3e657a6dd1b5e599459a3c363f0fc3b725db3bc685d583029abdbf42dd84a0",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "ricms-art007",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "chars": 11628,
+      "size": "médio",
+      "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+      "bytes": 165355,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "SEFAZ-SP-PORTAL",
+      "diagnostic": null,
+      "outputHash": "481ed031f8ec8c920ffc8dde07c1b8c4f0c4d1d4cc6f05587621ed2fbeeb9088",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "ricms-art008",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "chars": 3219,
+      "size": "pequeno",
+      "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+      "bytes": 156994,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "SEFAZ-SP-PORTAL",
+      "diagnostic": null,
+      "outputHash": "9a08136fcd45b15463a224478346a180374157ecbbad59d6502bd4b271e70ec5",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "ricms-art009",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "chars": 3340,
+      "size": "pequeno",
+      "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+      "bytes": 154921,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "SEFAZ-SP-PORTAL",
+      "diagnostic": null,
+      "outputHash": "492cc6260005dc3d582732fdf73d62cec9b8cd93c86cd547eb7842f887bf8cda",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "lei-10637-2002-atualizada",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "chars": 74715,
+      "size": "grande",
+      "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
+      "bytes": 180179,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": true
+      },
+      "profile": "NORMAS-LEG",
+      "diagnostic": null,
+      "outputHash": "bef2dfdf46668e790fa37ac09050bfe9633be1d841485acafb85f1fb6fe30d20",
+      "evidence": [
+        "docs/anatomy/normas-leg-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts",
+        "test/anatomy.normas-leg.unit.test.ts",
+        "docs/anatomy/e9-acceptances.json"
+      ],
+      "notes": [
+        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
+      ]
+    },
+    {
+      "id": "lei-10637-2002-original",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "chars": null,
+      "size": null,
+      "sha256": "bb863c51cf4cabeed3ee34826137d6bf812e9b4fe05f8bfc9c4b45028efc71cc",
+      "bytes": 102382,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "diagnostic": {
+        "profile": "DOU (diagnóstico)",
+        "chars": 60421
+      },
+      "outputHash": null,
+      "evidence": [],
+      "notes": [
+        "texto original: sem plano NORMAS-LEG (só a versão atualizada); porte não atribuído sem leitura própria"
+      ]
+    },
+    {
+      "id": "lei-10833-2003-atualizada",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "chars": 167570,
+      "size": "grande",
+      "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
+      "bytes": 388543,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": true
+      },
+      "profile": "NORMAS-LEG",
+      "diagnostic": null,
+      "outputHash": "d4e585a764e922641c8328478934ecc4e3a79f9b9946a675bdfef4e8eac75187",
+      "evidence": [
+        "docs/anatomy/normas-leg-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts",
+        "test/anatomy.normas-leg.unit.test.ts",
+        "docs/anatomy/e9-acceptances.json"
+      ],
+      "notes": [
+        "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
+      ]
+    },
+    {
+      "id": "lei-10833-2003-original",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "chars": null,
+      "size": null,
+      "sha256": "60044e683ac4078fb90888db9986431fb96bc7b5316f0740ba638b43fd24f0d1",
+      "bytes": 308155,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "diagnostic": {
+        "profile": "DOU (diagnóstico)",
+        "chars": 110417
+      },
+      "outputHash": null,
+      "evidence": [],
+      "notes": [
+        "texto original: sem plano NORMAS-LEG (só a versão atualizada); porte não atribuído sem leitura própria"
+      ]
+    },
+    {
+      "id": "M5",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 119687,
+      "size": "grande",
+      "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+      "bytes": 205981,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "diagnostic": null,
+      "outputHash": "48345c821c8b5a8d74271095e1508e9a0a156f51cddcf5db1c5b85a72344cf36",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "notes": []
+    },
+    {
+      "id": "http:M1",
+      "source": "Planalto",
+      "type": "Lei",
+      "sha256": "fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36",
+      "bytes": 238160,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado"
+      ],
+      "decoding": {
+        "encoding": "windows-1252",
+        "encodingSource": "approved_local_fallback",
+        "confidence": "tentative",
+        "declaredCharset": null,
+        "independentCheck": [
+          {
+            "passage": "A Contribuição para o PIS/Pasep, com a incidência não cumulativa, incide sobre o total das receitas auferidas no mês pela pessoa jurídica",
+            "sentenceEqual": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "http:M2",
+      "source": "Planalto",
+      "type": "Lei",
+      "sha256": "25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9",
+      "bytes": 533449,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado"
+      ],
+      "decoding": {
+        "encoding": "windows-1252",
+        "encodingSource": "approved_local_fallback",
+        "confidence": "tentative",
+        "declaredCharset": null,
+        "independentCheck": [
+          {
+            "passage": "A Contribuição para o Financiamento da Seguridade Social - Cofins, com a incidência não cumulativa, incide sobre o total das receitas auferidas no mês pela pessoa jurídica",
+            "sentenceEqual": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "http:M3",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+      "bytes": 931597,
+      "diagnostic": null,
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 922008,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "outputHash": "8c644197ec53dbba85c99519306d389c784fd2b7d01b772069df361be8ddb4c8",
+      "notes": []
+    },
+    {
+      "id": "http:M4",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+      "bytes": 234041,
+      "diagnostic": null,
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 82809,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "outputHash": "788e318acf28c596ab5636f684149046c64acacb090e039d380974c4eab0294c",
+      "notes": []
+    },
+    {
+      "id": "http:M5",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+      "bytes": 193059,
+      "diagnostic": null,
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts"
+      ],
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "chars": 119682,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "CONFAZ",
+      "outputHash": "913dc36337aeb0de5ab5c7a8b0ac30e13f689394f255f3281c19d5aca1438a23",
+      "notes": []
+    },
+    {
+      "id": "http:M9-p58",
+      "source": "DOU",
+      "type": "Página do jornal (cabeçalho e rodapé)",
+      "sha256": "abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29",
+      "bytes": 188132,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "PDF da página do jornal (INPDFViewer)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "página 58: continua o art. 8º (inciso XV) e vai ao art. 19 e à assinatura; depois da assinatura só o rodapé. Com a página 57: epígrafe → arts. 1–19 → assinatura, sem anexo mencionado. NÃO se presume ato completo: anexos publicados em outro lugar, ordem visual (colunas misturadas na extração) e assinatura criptográfica não foram verificados"
+      ]
+    },
+    {
+      "id": "http:M9",
+      "source": "DOU",
+      "type": "Página do jornal (cabeçalho e rodapé)",
+      "sha256": "09726ebc6e21652ffde6023fb906ba5ecbb3c7fa49b164271c4c629efd49e3ee",
+      "bytes": 192477,
+      "diagnostic": null,
+      "evidence": [],
+      "layout": "PDF da página do jornal (INPDFViewer)",
+      "chars": null,
+      "size": null,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "notes": [
+        "uma página (57) do DOU: cabeçalho e rodapé identificados; o ato começa nesta página e CONTINUA nas seguintes (não é o ato completo); o topo da página traz o fim de outra publicação; a extração mistura colunas na mesma linha, então a leitura da anatomia não é validada"
+      ]
+    },
+    {
+      "id": "doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "sha256": "e617b6a2ef837299b5b1c9c327ea76c3b91c5cc8f8b908fbfce1d78f8dbcacf3",
+      "bytes": 3563245,
+      "diagnostic": null,
+      "chars": 3532766,
+      "size": "grande",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "outputHash": null,
+      "evidence": [],
+      "notes": [
+        "reader fallback (input_size_limit): the act was not read"
+      ]
+    },
+    {
+      "id": "doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+      "bytes": 15000,
+      "diagnostic": null,
+      "chars": 1527,
+      "size": "pequeno",
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "DOE-SP",
+      "outputHash": "79adc9d5a09e955d4d90d1419140c464da3f549a43669464d7d1152c36dc1089",
+      "evidence": [
+        "docs/anatomy/official-samples-baseline.json",
+        "test/anatomy.official-coverage.unit.test.ts",
+        "test/anatomy.doesp-closing-signature.unit.test.ts",
+        "preparation doe-sp-json/0.1.0-provisional (provisional)"
+      ],
+      "notes": []
+    }
+  ],
+  "cells": [
+    {
+      "id": "rfb--instrucao-normativa--pequeno",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB (coletado)",
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:108391",
+        "rfb:133898"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--instrucao-normativa--medio",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB (coletado)",
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:141910"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--instrucao-normativa--grande",
+      "source": "RFB",
+      "type": "Instrução Normativa",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB (coletado)",
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:115131",
+        "rfb:127905",
+        "rfb:104314",
+        "rfb:116968"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--portaria--pequeno",
+      "source": "RFB",
+      "type": "Portaria",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:142967"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--portaria--medio",
+      "source": "RFB",
+      "type": "Portaria",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--portaria--grande",
+      "source": "RFB",
+      "type": "Portaria",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:37103"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--ato-declaratorio-interpretativo--medio",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--ato-declaratorio-interpretativo--grande",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--ato-declaratorio-executivo--pequeno",
+      "source": "RFB",
+      "type": "Ato Declaratório Executivo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--ato-declaratorio-executivo--medio",
+      "source": "RFB",
+      "type": "Ato Declaratório Executivo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--ato-declaratorio-executivo--grande",
+      "source": "RFB",
+      "type": "Ato Declaratório Executivo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--solucao-de-consulta--pequeno",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--solucao-de-consulta--medio",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--solucao-de-consulta--grande",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--resolucao--pequeno",
+      "source": "RFB",
+      "type": "Resolução",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:122645"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--resolucao--medio",
+      "source": "RFB",
+      "type": "Resolução",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "rfb--resolucao--grande",
+      "source": "RFB",
+      "type": "Resolução",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "planalto--lei--pequeno",
+      "source": "Planalto",
+      "type": "Lei",
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "planalto--lei--medio",
+      "source": "Planalto",
+      "type": "Lei",
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "planalto--lei--grande",
+      "source": "Planalto",
+      "type": "Lei",
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "manualItems": [
+        "M1",
+        "M2"
+      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "normas-leg-br--lei--pequeno",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "normas-leg-br--lei--medio",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "normas-leg-br--lei--grande",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "layout": "HTML do normas.leg.br (exportado do Word)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "normas.leg.br (versão atualizada lida pela fonte NORMAS-LEG, L-LEG-01; estado por amostra: ver validatedSamples/accepted)",
+      "status": "covered",
+      "validatedSamples": [
+        "lei-10637-2002-atualizada",
+        "lei-10833-2003-atualizada"
+      ],
+      "accepted": true,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--convenio-icms--pequeno",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M3, M4)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--convenio-icms--medio",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M3, M4)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--convenio-icms--grande",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M3, M4)",
+      "status": "covered",
+      "validatedSamples": [
+        "http:M3",
+        "http:M4"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--ajuste-sinief--pequeno",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--ajuste-sinief--medio",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--ajuste-sinief--grande",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
+      "status": "covered",
+      "validatedSamples": [
+        "M5",
+        "http:M5"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--protocolo-icms--pequeno",
+      "source": "CONFAZ",
+      "type": "Protocolo ICMS",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--protocolo-icms--medio",
+      "source": "CONFAZ",
+      "type": "Protocolo ICMS",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "confaz--protocolo-icms--grande",
+      "source": "CONFAZ",
+      "type": "Protocolo ICMS",
+      "layout": "HTML da página do CONFAZ (Plone)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--instrucao-normativa--pequeno",
+      "source": "DOU",
+      "type": "Instrução Normativa",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M9 em HTML)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--instrucao-normativa--medio",
+      "source": "DOU",
+      "type": "Instrução Normativa",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M9 em HTML)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--instrucao-normativa--grande",
+      "source": "DOU",
+      "type": "Instrução Normativa",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (M9 em HTML)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--decreto--pequeno",
+      "source": "DOU",
+      "type": "Decreto",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--decreto--medio",
+      "source": "DOU",
+      "type": "Decreto",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--decreto--grande",
+      "source": "DOU",
+      "type": "Decreto",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--portaria--pequeno",
+      "source": "DOU",
+      "type": "Portaria",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--portaria--medio",
+      "source": "DOU",
+      "type": "Portaria",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--portaria--grande",
+      "source": "DOU",
+      "type": "Portaria",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--resolucao--pequeno",
+      "source": "DOU",
+      "type": "Resolução",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--resolucao--medio",
+      "source": "DOU",
+      "type": "Resolução",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--resolucao--grande",
+      "source": "DOU",
+      "type": "Resolução",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--despacho--pequeno",
+      "source": "DOU",
+      "type": "Despacho",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--despacho--medio",
+      "source": "DOU",
+      "type": "Despacho",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--despacho--grande",
+      "source": "DOU",
+      "type": "Despacho",
+      "layout": "HTML da página do ato no in.gov.br",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "arquivo manual (a selecionar)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "dou--pagina-do-jornal--na",
+      "source": "DOU",
+      "type": "Página do jornal (cabeçalho e rodapé)",
+      "layout": "PDF da página do jornal (INPDFViewer)",
+      "size": "n/a",
+      "applicability": {
+        "required": true
+      },
+      "sizeJustification": "uma página do jornal não tem porte de ato; a célula prova cabeçalho/rodapé e não a completude do ato",
+      "route": "M9: páginas 57 e 58 em PDF recebidas e identificadas; leitura da página não validada (ordem de colunas exige preparação própria)",
+      "manualItems": [
+        "M9"
+      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": [
+        {
+          "id": "http:M9-p58",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": false,
+            "validated": false,
+            "accepted": false
+          }
+        },
+        {
+          "id": "http:M9",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": false,
+            "validated": false,
+            "accepted": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "coletor oficial (coletado)",
+      "status": "covered",
+      "validatedSamples": [
+        "ricms-art008",
+        "ricms-art009"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "coletor oficial (coletado)",
+      "status": "covered",
+      "validatedSamples": [
+        "ricms-an1art041",
+        "ricms-an2art003",
+        "ricms-an2art039",
+        "ricms-art007"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--grande",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "layout": "HTML SharePoint, região \"Conteúdo da Página\"",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "coletor oficial (coletado)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--decreto--pequeno",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "covered",
+      "validatedSamples": [
+        "doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea"
+      ],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--decreto--medio",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--decreto--grande",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": [
+        {
+          "id": "doesp:c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+          "stages": {
+            "captured": true,
+            "identified": true,
+            "read": false,
+            "validated": false,
+            "accepted": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "doe-sp--resolucao--pequeno",
+      "source": "DOE-SP",
+      "type": "Resolução",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--resolucao--medio",
+      "source": "DOE-SP",
+      "type": "Resolução",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--resolucao--grande",
+      "source": "DOE-SP",
+      "type": "Resolução",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--portaria-cat--pequeno",
+      "source": "DOE-SP",
+      "type": "Portaria CAT",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "pequeno",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--portaria-cat--medio",
+      "source": "DOE-SP",
+      "type": "Portaria CAT",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "médio",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    },
+    {
+      "id": "doe-sp--portaria-cat--grande",
+      "source": "DOE-SP",
+      "type": "Portaria CAT",
+      "layout": "JSON API v2 (HTML em content)",
+      "size": "grande",
+      "applicability": {
+        "required": true
+      },
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "status": "pending",
+      "validatedSamples": [],
+      "accepted": false,
+      "unvalidatedSamples": []
+    }
+  ],
+  "requiredPending": [
+    "rfb--portaria--medio",
+    "rfb--portaria--grande",
+    "rfb--ato-declaratorio-interpretativo--medio",
+    "rfb--ato-declaratorio-interpretativo--grande",
+    "rfb--ato-declaratorio-executivo--pequeno",
+    "rfb--ato-declaratorio-executivo--medio",
+    "rfb--ato-declaratorio-executivo--grande",
+    "rfb--solucao-de-consulta--pequeno",
+    "rfb--solucao-de-consulta--medio",
+    "rfb--solucao-de-consulta--grande",
+    "rfb--resolucao--medio",
+    "rfb--resolucao--grande",
+    "planalto--lei--pequeno",
+    "planalto--lei--medio",
+    "planalto--lei--grande",
+    "normas-leg-br--lei--pequeno",
+    "normas-leg-br--lei--medio",
+    "confaz--convenio-icms--pequeno",
+    "confaz--convenio-icms--medio",
+    "confaz--ajuste-sinief--pequeno",
+    "confaz--ajuste-sinief--medio",
+    "confaz--protocolo-icms--pequeno",
+    "confaz--protocolo-icms--medio",
+    "confaz--protocolo-icms--grande",
+    "dou--instrucao-normativa--pequeno",
+    "dou--instrucao-normativa--medio",
+    "dou--instrucao-normativa--grande",
+    "dou--decreto--pequeno",
+    "dou--decreto--medio",
+    "dou--decreto--grande",
+    "dou--portaria--pequeno",
+    "dou--portaria--medio",
+    "dou--portaria--grande",
+    "dou--resolucao--pequeno",
+    "dou--resolucao--medio",
+    "dou--resolucao--grande",
+    "dou--despacho--pequeno",
+    "dou--despacho--medio",
+    "dou--despacho--grande",
+    "dou--pagina-do-jornal--na",
+    "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--grande",
+    "doe-sp--decreto--medio",
+    "doe-sp--decreto--grande",
+    "doe-sp--resolucao--pequeno",
+    "doe-sp--resolucao--medio",
+    "doe-sp--resolucao--grande",
+    "doe-sp--portaria-cat--pequeno",
+    "doe-sp--portaria-cat--medio",
+    "doe-sp--portaria-cat--grande"
+  ],
+  "coveredRequired": 12,
+  "samplesOutsideGrid": [],
+  "e9MatrixComplete": false
+}

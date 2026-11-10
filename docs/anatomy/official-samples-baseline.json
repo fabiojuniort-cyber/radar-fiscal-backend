@@ -1,0 +1,81 @@
+{
+  "samples": [
+    {
+      "id": "ricms-an1art041",
+      "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "c269acc2b9a8ed8678674918191b94b94d65c7300062f144806d225670315d6d",
+      "chars": 33383
+    },
+    {
+      "id": "ricms-an2art003",
+      "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "e15aea926a4f9455a19e30ad8008ad1a19bf0fb4080ca0032b62a3eff58ce7fd",
+      "chars": 20457
+    },
+    {
+      "id": "ricms-an2art039",
+      "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "6e3e657a6dd1b5e599459a3c363f0fc3b725db3bc685d583029abdbf42dd84a0",
+      "chars": 12616
+    },
+    {
+      "id": "ricms-art007",
+      "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "481ed031f8ec8c920ffc8dde07c1b8c4f0c4d1d4cc6f05587621ed2fbeeb9088",
+      "chars": 11628
+    },
+    {
+      "id": "ricms-art008",
+      "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "9a08136fcd45b15463a224478346a180374157ecbbad59d6502bd4b271e70ec5",
+      "chars": 3219
+    },
+    {
+      "id": "ricms-art009",
+      "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "492cc6260005dc3d582732fdf73d62cec9b8cd93c86cd547eb7842f887bf8cda",
+      "chars": 3340
+    },
+    {
+      "id": "M5",
+      "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+      "profile": "CONFAZ",
+      "outputHash": "48345c821c8b5a8d74271095e1508e9a0a156f51cddcf5db1c5b85a72344cf36",
+      "chars": 119687
+    },
+    {
+      "id": "http:M3",
+      "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+      "profile": "CONFAZ",
+      "outputHash": "8c644197ec53dbba85c99519306d389c784fd2b7d01b772069df361be8ddb4c8",
+      "chars": 922008
+    },
+    {
+      "id": "http:M4",
+      "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+      "profile": "CONFAZ",
+      "outputHash": "788e318acf28c596ab5636f684149046c64acacb090e039d380974c4eab0294c",
+      "chars": 82809
+    },
+    {
+      "id": "http:M5",
+      "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+      "profile": "CONFAZ",
+      "outputHash": "913dc36337aeb0de5ab5c7a8b0ac30e13f689394f255f3281c19d5aca1438a23",
+      "chars": 119682
+    },
+    {
+      "id": "doesp:fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+      "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+      "profile": "DOE-SP",
+      "outputHash": "79adc9d5a09e955d4d90d1419140c464da3f549a43669464d7d1152c36dc1089",
+      "chars": 1527
+    }
+  ]
+}
