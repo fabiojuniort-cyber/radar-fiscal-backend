@@ -59,8 +59,8 @@ const envSchema = z.object({
   // AUTH-RESET-01: sem habilitacao implicita; somente a API recebe estes segredos.
   AUTH_PASSWORD_RESET_ENABLED: z.enum(['true', 'false']).default('false'),
   AUTH_PASSWORD_RESET_PUBLIC_URL: z.string().url().optional(),
-  ZOHO_CPAAAS_API_KEY: z.string().min(1).optional(),
-  ZOHO_CPAAAS_FROM_ADDRESS: z.string().email().optional(),
+  ZOHO_CPAAS_API_KEY: z.string().min(1).optional(),
+  ZOHO_CPAAS_FROM_ADDRESS: z.string().email().optional(),
 
   JWT_ACCESS_SECRET: z.string().min(32),
 
