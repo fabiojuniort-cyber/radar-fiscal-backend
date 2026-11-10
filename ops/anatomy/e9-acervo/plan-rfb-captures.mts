@@ -28,15 +28,28 @@ export function cellType(actType: string): CellType | null {
   if (t.startsWith('resolucao')) return 'Resolução';
   return null;
 }
+/**
+ * The act number as the Acervo keeps it: "33" or "33/2025" (number/year of the ACT). Returns the digits and the act year,
+ * taken from the number when present (authoritative) and otherwise from the publication date (may be the year before).
+ */
+export function actIdentity(r: Pick<Row, 'act_number' | 'published_on'>): { numeroAto: string; anoAto: string; yearFrom: 'number' | 'date' } | null {
+  const m = /^([1-9]\d{0,8}|0)(?:\/(\d{4}))?$/u.exec(r.act_number.trim());
+  if (!m) return null;
+  if (m[2]) return { numeroAto: String(Number(m[1])), anoAto: m[2], yearFrom: 'number' };
+  return /^\d{4}-\d{2}-\d{2}$/u.test(r.published_on) ? { numeroAto: String(Number(m[1])), anoAto: r.published_on.slice(0, 4), yearFrom: 'date' } : null;
+}
 /** Why a candidate cannot be captured, or null. Fail closed: no readable act key ⇒ refused (as the #303 guard). */
 export function refusal(r: Row, rules: Rules): string | null {
   if (r.source_code !== 'rfb-normas') return 'not RFB';
   if (!/^[1-9]\d{0,9}$/u.test(r.external_id)) return 'external_id is not a canonical idAto';
-  if (!/^\d{1,9}$/u.test(r.act_number)) return 'act_number is not digits (identity check would be impossible)';
+  // A joint act (Portaria Conjunta, ADE Conjunto) is another act type: the collector checks number and date, not the type.
+  if (/\bconjunt[oa]s?\b/iu.test(r.act_type)) return 'joint act (Conjunta/Conjunto) is another act type, not this cell';
+  const id = actIdentity(r);
+  if (!id) return 'act_number is neither digits nor digits/year (identity check would be impossible)';
   if (rules.alreadyCaptured.has(r.external_id)) return 'already captured (bytes kept by an earlier session)';
   if (rules.reservedSourceIds.has(r.external_id)) return 'reserved source id';
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(r.published_on) || r.published_on >= '2026-01-01') return '2026 margin / no date';
-  const key = rules.actKey(`${r.act_type} ${r.act_number}/${r.published_on.slice(0, 4)}`);
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(r.published_on) || r.published_on >= '2026-01-01' || id.anoAto >= '2026') return '2026 margin / no date';
+  const key = rules.actKey(`${r.act_type} ${id.numeroAto}/${id.anoAto}`);
   if (!key) return 'no readable act key';
   if (rules.reservedActKeys.has(key)) return `reserved act key ${key}`;
   // The Acervo keeps the ORIGINAL vision; the multivigente one is >= in size. A small cell needs margin below 10,000.
@@ -50,7 +63,9 @@ export function plan(rows: readonly Row[], rules: Rules) {
     const refused = mine.map((r) => ({ external_id: r.external_id, reason: refusal(r, rules) })).filter((x): x is { external_id: string; reason: string } => !!x.reason);
     const ok = mine.filter((r) => !refusal(r, rules));
     // Acts published 01–15 January may be dated the previous year: kept, but after every unambiguous candidate.
-    ok.sort((x, y) => Number(x.ambiguous_year) - Number(y.ambiguous_year));
+    // The year is ambiguous only when it comes from the publication date (no /year in the act number).
+    const amb = (r: Row) => Number(r.ambiguous_year && actIdentity(r)?.yearFrom === 'date');
+    ok.sort((x, y) => amb(x) - amb(y));
     return { type, size, pick: ok[0] ?? null, fallbacks: ok.slice(1), refused,
       state: ok[0] ? 'candidate' : mine.length ? 'only refused candidates in the Acervo' : 'not found in the Acervo (≠ nonexistent)' };
   });
@@ -63,8 +78,8 @@ export function plan(rows: readonly Row[], rules: Rules) {
   const overCap = (Object.keys(perType) as CellType[]).filter((t) => perType[t].planned > perType[t].cap);
   // Input for collect-p2c.ts --targets (runDirect, #303): one target per cell, in cell order; fallbacks are NOT included
   // (each fallback is a separate COORD-visible decision inside the type's spare).
-  const targets = cells.filter((c) => c.pick).map((c) => ({ type: c.type, idAto: c.pick!.external_id, numeroAto: c.pick!.act_number,
-    anoAto: c.pick!.published_on.slice(0, 4), acervoSize: c.size }));
+  const targets = cells.filter((c) => c.pick).map((c) => { const id = actIdentity(c.pick!)!;
+    return { type: c.type, idAto: c.pick!.external_id, numeroAto: id.numeroAto, anoAto: id.anoAto, acervoSize: c.size }; });
   return { requestsPlanned: planned, total: rules.total, remainingAfterPlan: rules.total - planned, searches: 0, perType, overCap, cells, targets };
 }
 

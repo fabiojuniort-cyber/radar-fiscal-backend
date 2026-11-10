@@ -133,3 +133,23 @@ npx tsx ops/anatomy/e9-acervo/plan-rfb-captures.mts <candidates.csv> <checkout-3
 # Teste DOE-SP (1 detalhe da API v2; GUID esperado; SHA-256 opcional)
 npx tsx ops/anatomy/e9-acervo/doesp-acervo-equivalence.mts "$PWD" <detail.json> <guid> [sha256]
 ```
+
+## 6. CSV B real e plano P2-c (2026-11-10; nada executado)
+
+- **Entrada:** `02_candidates_rfb_dashboard.sql`, variante da consulta B para o editor do Dashboard (só RFB, só os 5 tipos do P2-c, saída em CSV numa coluna e linha `FIM,<n>`). Executada por Fábio e gravada em `candidates-b-rfb-2026-11-10.csv`: 33 linhas, `FIM,33` conferido.
+- **Correção do seletor:** o Acervo guarda `act_number` como `33/2025` (número/ano do ato), e o seletor recusava tudo que não fosse só dígitos.
+  - `actIdentity` aceita `N` e `N/AAAA`. O ano vem do número quando existe (autoritativo); senão, da data de publicação, e então conta como ambíguo de 01 a 15/01.
+  - O alvo leva `numeroAto` só com dígitos e esse `anoAto`, que é o que `directTargetProblem` e a conferência de identidade do #303 exigem.
+  - Ato **conjunto** (Portaria Conjunta, ADE Conjunto) é recusado: é outro tipo de ato, e o coletor confere número e data, não o tipo.
+- **Plano** (`p2c-plan-2026-11-10.json`, contra o #303 @ `ca9e39b`, grant `E9-P2c-G1` suspenso, `used` 0): **4 capturas** em 4 das 12 células, 0 buscas, saldo previsto 16 → 12, nenhum tipo acima do teto.
+
+| Célula | Alvo (idAto) | Ato | Acervo (chars) | Alternativas |
+|---|---|---|---|---|
+| Portaria × médio | 148693 | Portaria 635/2025 (31/12/2025) | 20.102 | 147426, 144970, 142966 |
+| ADE × pequeno | 148629 | ADE 30/2025 (29/12/2025) | 1.139 | 148616, 148437, 148393, 148386 |
+| ADE × médio | 148516 | ADE 33/2025 (24/12/2025) | 10.619 | 147934, 147344 |
+| Solução de Consulta × pequeno | 148681 | SC 258/2025 (31/12/2025) | 1.086 | 148446, 148319, 148324, 148279 |
+
+- **Não encontrado no Acervo** (≠ inexistente): Portaria × grande, ADI × médio/grande, Resolução × médio/grande, ADE × grande, SC × médio/grande. Essas 8 células exigem busca/descoberta, fora deste plano.
+- Os 4 alvos passam por `directTargetProblem` e `isReserved` do #303 (offline).
+- O porte final é o **medido** na multivigente (D3). O ADE 33/2025 tem 10.619 no original, e a multivigente é maior ou igual.
