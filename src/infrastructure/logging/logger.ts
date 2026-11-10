@@ -19,7 +19,7 @@ export const loggerOptions: NonNullable<
       'refreshToken',
       'token',
       'resetToken',
-      'ZOHO_CPAAAS_API_KEY',
+      'ZOHO_CPAAS_API_KEY',
       '*.token',
       '*.resetToken',
       'req.body.token',
