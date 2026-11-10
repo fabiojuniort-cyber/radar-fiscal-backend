@@ -630,14 +630,17 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     if (!owner || owner.context !== 'operative_candidate') return;
     // The device text before the signatures must close with a period (a ':' would introduce more content).
     const before = result.canonicalText.slice(owner.span.start, tail[0]!.span.start);
+    // R5.10: the WHOLE device text is evaluated — every line of it (a <br> or a continuation block inside the device is
+    // part of the device), never only its last line.
     const lines = before.split(/[\r\n]+/u).map((l) => l.trim()).filter(Boolean);
-    if (!lines.length || !/\.$/u.test(lines[lines.length - 1]!)) return;
+    const deviceText = lines.join(' ');
+    if (!lines.length || !/\.$/u.test(deviceText)) return;
     // R5.5: the last device must be the act's CLOSING CLAUSE — vigência or revogação (LC 95/98 arts. 3º III, 8º, 9º):
     // nothing normative follows it, so what follows in its own container is the signature block. After any other device
     // (e.g. "…o programa de atenção primária." + div "PROGRAMA ESTADUAL DE SAÚDE") the line may be normative: keep it.
     // Matching view only: invisible format characters (e.g. U+00AD soft hyphen in "vi\u00adgor") are ignored; the
     // canonical text keeps every character.
-    const closingLine = lines[lines.length - 1]!.replace(/\p{Cf}/gu, '');
+    const closingLine = deviceText.replace(/\p{Cf}/gu, '');
     // R5.6: the clause must be the device's FUNCTION, not a phrase inside it ("O programa que entra em vigor em janeiro…"
     // is not a vigência clause). After the device label, the text must OPEN with the act itself as subject of the
     // vigência/efeitos predicate, or with the revocation formula.
@@ -663,7 +666,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const closingWhole = VIG_WHOLE.test(body) || REV_WHOLE.test(body);
     if (!closingWhole) return;
     // A device that announces what follows keeps it (ambiguous => preserve the bond).
-    if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;
+    if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(deviceText)) return;
     const firstSig = tail[0]!.span.start;
     // The device ends where its last owned block ends (a block span includes its own separator), never inside a block.
     const cut = Math.max(owner.span.start, ...ownership.filter((o) => !tail.includes(o.part) && o.end <= firstSig).map((o) => o.end));

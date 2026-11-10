@@ -106,6 +106,20 @@ A causa de fundo era a abordagem: as regras anteriores listavam o que **não** �
 
 Identidade `c1b0a56d → 398c8620`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
 
+## R5.10 — o dispositivo inteiro, inclusive linhas separadas por `<br>`
+
+**BLOCK do revisor na R5.9:** "Artigo 1º - Fica denominado o programa … conforme este artigo.`<br>`Este decreto entra em vigor…" + `div` "PROGRAMA ESTADUAL DE SAÚDE" fechava como assinatura. A gramática era aplicada só à **última linha** do dispositivo. Reproduzido em `c5e3057` com `<br>`, `<br/>` e `<br><br>`, e com vigência e com revogação.
+
+**Correção:** a gramática, a exigência de ponto final e a guarda de anúncio passam a valer sobre o **texto inteiro** do dispositivo: todas as linhas, inclusive as separadas por `<br>`, e os blocos de continuação. Se o dispositivo tiver qualquer conteúdo além da cláusula, vínculo e seleção ficam.
+
+**Testes R5.10:**
+- 10 cláusulas válidas × 3 formas de `<br>`, mais 10 com parágrafo de continuação: **40 combinações**, todas vinculadas e selecionáveis;
+- uma cláusula inteira com `<br>` final ainda fecha;
+- os testes anteriores, incluindo as 50 combinações do R5.9, ficam mantidos;
+- Decreto 70.226 inalterado nas duas representações.
+
+Identidade `398c8620 → 3e575191`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
+
 ## Regra (R5.3; condições estruturais acima, a partir do R5.4)
 A regra é estrutural e não usa classes, porque a cópia do Acervo não as tem. Ela só se aplica quando **todas** as condições valem:
 1. O documento **termina** com 1 a 4 blocos `unidentified/unknown`, todos depois do início do último dispositivo (a cauda nunca atravessa a fronteira de um dispositivo).

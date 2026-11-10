@@ -195,3 +195,20 @@ test('R5.9 grammar: every whole closing clause closes; the same clause plus ANY 
     }
   }
 });
+
+// R5.10 (reviewer BLOCK on R5.9): the WHOLE device is evaluated, including its <br>-separated lines and continuation blocks.
+test('R5.10: a disposition before a <br> and a closing clause after it is a mixed device — the div line stays bound and selectable', () => {
+  const lead = 'Artigo 1º - Fica denominado o programa de atenção primária conforme este artigo.';
+  for (const c of CLOSINGS) {
+    const clause = c.replace(/^Artigo 2º - /u, '');
+    for (const sep of ['<br>', '<br/>', '<br><br>']) {
+      const html = `<p>${lead}${sep}${clause}</p>` + BOX('PROGRAMA ESTADUAL DE SAÚDE');
+      assert.deepEqual(lineChecks(read('DOE-SP', html), 'PROGRAMA ESTADUAL DE SAÚDE'), { bound: true, selectable: true, signature: false }, `${sep} ${clause}`);
+    }
+    // A continuation paragraph of the same device before the clause line is part of the device too.
+    const cont = H('Artigo 1º - Fica criado o programa de atenção primária.', 'Seu nome será definido conforme este artigo.', clause) + BOX('PROGRAMA ESTADUAL DE SAÚDE');
+    assert.deepEqual(lineChecks(read('DOE-SP', cont), 'PROGRAMA ESTADUAL DE SAÚDE'), { bound: true, selectable: true, signature: false }, `continuation + ${clause}`);
+  }
+  // A whole closing device with a trailing <br> still closes.
+  assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.') + '<p>Artigo 2º - Este decreto entra em vigor na data de sua publicação.<br></p>' + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS']);
+});
