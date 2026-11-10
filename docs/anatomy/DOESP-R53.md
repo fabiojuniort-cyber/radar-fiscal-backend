@@ -40,6 +40,22 @@ Identidade `dff55ce1 → 5087b949`. Regressão em 78 leituras com a saída sem i
 
 Identidade `5087b949 → 9f45b30f`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
 
+## R5.6 — a vigência ou a revogação precisa ser a função do dispositivo
+
+**Recheck do COORD:** a expressão do R5.5 também casava com "O programa que entra em vigor em janeiro terá a denominação aprovada neste artigo.". Reproduzido no leitor completo (`dec748d`): o `div` "PROGRAMA ESTADUAL DE SAÚDE" virava assinatura.
+
+**Correção:** depois do rótulo do dispositivo, o texto precisa **começar** pela cláusula, por uma de duas formas:
+- vigência com o próprio ato como sujeito ("Este decreto / Esta resolução / O presente … entra em vigor / produz(irá) efeitos / vigorará");
+- fórmula de revogação ("Revogam-se…", "Fica(m) revogado(s)…").
+
+**Testes R5.6:**
+- o caso do COORD fica vinculado e selecionável;
+- 3 frases com a expressão no meio não fecham;
+- vigência (decreto ou resolução, "entra em vigor" ou "produzirá efeitos") e revogação ("Revogam-se", "Fica revogado") fecham;
+- o Decreto 70.226 fica inalterado nas duas representações.
+
+Identidade `9f45b30f → 87c46320`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
+
 ## Regra (R5.3; condições estruturais acima, a partir do R5.4)
 A regra é estrutural e não usa classes, porque a cópia do Acervo não as tem. Ela só se aplica quando **todas** as condições valem:
 1. O documento **termina** com 1 a 4 blocos `unidentified/unknown`, todos depois do início do último dispositivo (a cauda nunca atravessa a fronteira de um dispositivo).
