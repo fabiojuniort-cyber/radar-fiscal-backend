@@ -1,0 +1,69 @@
+name: AUTH-RESET-01 isolated PG18
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/auth-reset-pg18.yml'
+      - 'migrations/083_auth_password_reset.sql'
+      - 'src/api/routes/password-reset.route.ts'
+      - 'src/modules/auth/password-reset.service.ts'
+      - 'src/modules/auth/auth.service.ts'
+      - 'src/app.ts'
+      - 'src/config/env.ts'
+      - 'src/infrastructure/logging/logger.ts'
+      - 'test/password-reset.unit.test.ts'
+      - 'test/password-reset.integration.test.ts'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reset-pg18:
+    name: Contract and simulated inbox on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      AUTH_PASSWORD_RESET_ENABLED: 'false'
+      DB_POOL_MAX: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies (no Zoho credentials)
+        run: npm ci
+      - name: Typecheck and build
+        run: npm run typecheck && npm run build
+      - name: Apply migrations to disposable PostgreSQL 18
+        run: npm run db:prepare
+      - name: Fully simulated Zoho request (no network)
+        run: npx tsx --test test/password-reset.unit.test.ts
+      - name: Password reset roundtrip, captured link and revoked sessions
+        run: npx tsx --test test/password-reset.integration.test.ts
