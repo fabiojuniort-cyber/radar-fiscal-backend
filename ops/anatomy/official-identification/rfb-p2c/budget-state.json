@@ -5,12 +5,21 @@
     "owner": "EXEC #303 (claude/anat-e9-coverage)",
     "package": "E9-P2-c",
     "approvedBy": "tribusca-control#116 c.6708512598 §3 — orçamento NOVO de até 16, condicionado ao PASS independente da guarda (#303 c.6708499687)",
-    "status": "suspended",
+    "status": "active",
     "expiresAt": "2026-11-21T23:59:59Z",
     "total": 16,
-    "perType": { "Resolução": 3, "Portaria": 3, "Ato Declaratório Interpretativo": 2, "Ato Declaratório Executivo": 4, "Solução de Consulta": 4 }
+    "perType": {
+      "Resolução": 3,
+      "Portaria": 3,
+      "Ato Declaratório Interpretativo": 2,
+      "Ato Declaratório Executivo": 4,
+      "Solução de Consulta": 4
+    }
   },
-  "used": { "total": 0, "perType": {} },
+  "used": {
+    "total": 0,
+    "perType": {}
+  },
   "attempts": [],
-  "note": "SUSPENDED until the independent PASS of the budget barrier; the owner switches status to active only after that PASS is recorded. The historical record 28/25 (ledger-combined.json) is immutable and is not this budget."
+  "note": "ACTIVATED 2026-11-10 by the owner: COORD R5 authorized P2-c from the CSV B plan (#303 @ ca9e39b direct mode); Fábio approved the 4 targets of p2c-plan-2026-11-10.json (#308 22c3e3e): Portaria 148693, ADE 148629 and 148516, SC 148681. Direct mode only (--targets), 0 searches, 4 requests at most; same caps, no new budget; single owner, one run, suspended right after. Earlier: SUSPENDED until the independent PASS of the budget barrier; the owner switches status to active only after that PASS is recorded. The historical record 28/25 (ledger-combined.json) is immutable and is not this budget."
 }

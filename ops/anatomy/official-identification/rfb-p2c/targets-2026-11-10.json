@@ -1,0 +1,30 @@
+[
+ {
+  "type": "Portaria",
+  "idAto": "148693",
+  "numeroAto": "635",
+  "anoAto": "2025",
+  "acervoSize": "medio"
+ },
+ {
+  "type": "Ato Declaratório Executivo",
+  "idAto": "148629",
+  "numeroAto": "30",
+  "anoAto": "2025",
+  "acervoSize": "pequeno"
+ },
+ {
+  "type": "Ato Declaratório Executivo",
+  "idAto": "148516",
+  "numeroAto": "33",
+  "anoAto": "2025",
+  "acervoSize": "medio"
+ },
+ {
+  "type": "Solução de Consulta",
+  "idAto": "148681",
+  "numeroAto": "258",
+  "anoAto": "2025",
+  "acervoSize": "pequeno"
+ }
+]
