@@ -65,6 +65,112 @@ $$;
 REVOKE ALL ON FUNCTION auth_password_reset_issue(TEXT, TEXT, INTEGER) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION auth_password_reset_issue(TEXT, TEXT, INTEGER) TO radar_app;
 
+-- Consulta barata antes do Argon2. O redeem continua fazendo a checagem
+-- definitiva com bloqueio de linha, evitando TOCTOU no uso unico.
+CREATE FUNCTION auth_password_reset_token_active(
+    p_token_hash TEXT
+) RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $
+DECLARE
+    v_active BOOLEAN;
+BEGIN
+    IF p_token_hash IS NULL OR p_token_hash !~ '^[0-9a-f]{64}
+-- senha, todos os tokens pendentes e todas as sessoes/refresh do usuario.
+CREATE FUNCTION auth_password_reset_redeem(
+    p_token_hash TEXT,
+    p_password_hash TEXT
+) RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_expiry TIMESTAMPTZ;
+    v_used_at TIMESTAMPTZ;
+    v_now TIMESTAMPTZ := clock_timestamp();
+BEGIN
+    IF p_token_hash IS NULL OR p_token_hash !~ '^[0-9a-f]{64}$'
+       OR p_password_hash IS NULL OR p_password_hash NOT LIKE '$argon2id$%' THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Serializa tokens concorrentes do mesmo usuario antes de bloquear o token.
+    SELECT u.id INTO v_user_id
+      FROM auth_password_reset_tokens r
+      JOIN app_users u ON u.id = r.user_id
+     WHERE r.token_hash = p_token_hash AND u.status = 'ACTIVE'
+     FOR UPDATE OF u;
+
+    IF v_user_id IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    SELECT expires_at, used_at INTO v_expiry, v_used_at
+      FROM auth_password_reset_tokens
+     WHERE token_hash = p_token_hash AND user_id = v_user_id
+     FOR UPDATE;
+
+    -- Reavaliar relogio depois de esperar por locks concorrentes.
+    v_now := clock_timestamp();
+
+    IF NOT FOUND OR v_used_at IS NOT NULL OR v_expiry <= v_now THEN
+        RETURN FALSE;
+    END IF;
+
+    UPDATE user_credentials
+       SET password_hash = p_password_hash, password_algorithm = 'argon2id',
+           password_updated_at = v_now, failed_login_attempts = 0,
+           locked_until = NULL
+     WHERE user_id = v_user_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'password_reset_credentials_missing';
+    END IF;
+
+    UPDATE auth_refresh_tokens
+       SET revoked_at = v_now
+     WHERE session_id IN (SELECT id FROM auth_sessions WHERE user_id = v_user_id)
+       AND revoked_at IS NULL;
+
+    UPDATE auth_sessions
+       SET revoked_at = v_now, revoke_reason = 'PASSWORD_RESET'
+     WHERE user_id = v_user_id AND revoked_at IS NULL;
+
+    UPDATE auth_password_reset_tokens
+       SET used_at = v_now
+     WHERE user_id = v_user_id AND used_at IS NULL;
+
+    RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION auth_password_reset_redeem(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION auth_password_reset_redeem(TEXT, TEXT) TO radar_app;
+ THEN
+        RETURN FALSE;
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM auth_password_reset_tokens r
+        JOIN app_users u ON u.id = r.user_id
+        WHERE r.token_hash = p_token_hash
+          AND r.used_at IS NULL
+          AND r.expires_at > clock_timestamp()
+          AND u.status = 'ACTIVE'
+    ) INTO v_active;
+
+    RETURN v_active;
+END;
+$;
+
+REVOKE ALL ON FUNCTION auth_password_reset_token_active(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION auth_password_reset_token_active(TEXT) TO radar_app;
+
 -- Uma transacao indivisivel protege contra reuso/concorrrencia:
 -- senha, todos os tokens pendentes e todas as sessoes/refresh do usuario.
 CREATE FUNCTION auth_password_reset_redeem(
