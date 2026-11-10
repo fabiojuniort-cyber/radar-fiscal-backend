@@ -56,6 +56,12 @@ const envSchema = z.object({
   // When on, it replaces the double-approval flow above: the legacy anatomy-rules routes are not registered.
   ANAT_CONFIG_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // AUTH-RESET-01: sem habilitacao implicita; somente a API recebe estes segredos.
+  AUTH_PASSWORD_RESET_ENABLED: z.enum(['true', 'false']).default('false'),
+  AUTH_PASSWORD_RESET_PUBLIC_URL: z.string().url().optional(),
+  ZOHO_CPAAAS_API_KEY: z.string().min(1).optional(),
+  ZOHO_CPAAAS_FROM_ADDRESS: z.string().email().optional(),
+
   JWT_ACCESS_SECRET: z.string().min(32),
 
   AUTH_REFRESH_COOKIE_NAME: z
