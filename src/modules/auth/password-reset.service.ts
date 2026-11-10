@@ -51,6 +51,13 @@ async function rateLimit(
   };
 }
 
+export class PasswordResetDeliveryError extends Error {
+  constructor() {
+    super('password_reset_delivery_failed');
+    this.name = 'PasswordResetDeliveryError';
+  }
+}
+
 export class PasswordResetRateLimitedError extends Error {
   constructor(readonly retryAfterSeconds: number) {
     super('password_reset_rate_limited');
@@ -96,7 +103,12 @@ export async function requestPasswordReset(
   if (!result.rows[0]?.issued) return;
 
   const link = passwordResetLink(input.publicUrl, token);
-  await input.send({ to: email, link });
+  try {
+    await input.send({ to: email, link });
+  } catch {
+    // Sanitiza falhas, que podem conter mensagens do transporte com PII.
+    throw new PasswordResetDeliveryError();
+  }
 }
 
 export async function completePasswordReset(
