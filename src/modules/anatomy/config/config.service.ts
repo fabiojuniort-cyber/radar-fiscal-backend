@@ -4,6 +4,7 @@ import { ANATOMY_ENGINE_BUILD_HASH } from '../build-identity.js';
 import { canonicalJson, sha256, type AnatomyResult } from '../contract.js';
 import type { ProfileScope } from '../profile.js';
 import { ExecutorError, type SimulationExecutor } from '../simulation-executor.js';
+import { assertOfficialSamples } from './official-provenance.js';
 import { SAMPLE_ANNOTATIONS, type Nature } from './sample-annotations.js';
 import { SYNTHETIC_SAMPLES, type SampleInput } from './sample-inputs.js';
 import { applyChanges, ConfigValidationError, FIELD_CATALOG, scopePt, SHIPPED_PROFILES, suggestRules, validateConfiguration, type Change, type Scope } from './rules.js';
@@ -14,7 +15,7 @@ import { describeResult, diffDescribed, documentHash, NATURE_PT, type Correction
  * applies in ONE administrative action (COORD decision 28/10/2026, replaces the 079 double approval for this flow).
  * Writes go only through the audited SQL entry points of 082; reads use RLS (platform admins only).
  */
-export const OFFICIAL_SAMPLES: readonly SampleInput[] = Object.freeze([]); // pending: official sources not reachable (docs/anatomy/CONFIG-01.md)
+export const OFFICIAL_SAMPLES: readonly SampleInput[] = assertOfficialSamples(Object.freeze([])); // pending: official sources not reachable (docs/anatomy/OFFICIAL-01.md)
 export const ALL_SAMPLES: readonly SampleInput[] = Object.freeze([...OFFICIAL_SAMPLES, ...SYNTHETIC_SAMPLES]);
 const SAMPLE = new Map(ALL_SAMPLES.map((s) => [s.id, s]));
 

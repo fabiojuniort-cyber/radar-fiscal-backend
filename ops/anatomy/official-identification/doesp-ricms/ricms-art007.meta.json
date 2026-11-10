@@ -1,0 +1,21 @@
+{
+  "id": "ricms-art007",
+  "act": "RICMS/2000 (Decreto 45.490/2000), art. 7º",
+  "url": "https://legislacao.fazenda.sp.gov.br/Paginas/art007.aspx",
+  "finalUrl": "https://legislacao.fazenda.sp.gov.br/Paginas/art007.aspx",
+  "hops": [
+    "https://legislacao.fazenda.sp.gov.br/Paginas/art007.aspx"
+  ],
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "lastModified": "Thu, 05 Nov 2026 01:50:00 GMT",
+  "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+  "bytes": 165355,
+  "consultedAt": "2026-11-05T01:50:01.212Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "html",
+  "verified": false,
+  "reason": "coleta de amostra DOE-SP (Sefaz-SP), artigo com redações posteriores",
+  "promoted": false
+}
