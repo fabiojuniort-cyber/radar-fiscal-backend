@@ -56,6 +56,19 @@ Identidade `5087b949 → 9f45b30f`. Regressão em 78 leituras contra `fc04aae`: 
 
 Identidade `9f45b30f → 87c46320`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
 
+## R5.7 — o ato é imediatamente o sujeito da vigência
+
+**BLOCK do revisor:** "Este decreto que entra em vigor em janeiro aprova a denominação do programa." e "Este decreto cujo programa entra em vigor…", seguidos de `div` "PROGRAMA ESTADUAL DE SAÚDE", fechavam como assinatura no motor `87c46320`. O intervalo de até 3 palavras entre o ato e o verbo aceitava "que" e "cujo programa".
+
+**Correção:** entre o ato e o predicado só cabe o **número do próprio ato** ("Este Decreto nº 70.226 entra em vigor…"). Qualquer outra palavra, como uma oração relativa ou um adjunto, significa que o predicado pertence a outra coisa, e o vínculo ao artigo fica.
+
+**Testes R5.7:**
+- 3 variantes (com "que", "cujo programa" sem vírgula e "cujo programa" com vírgulas) ficam vinculadas e selecionáveis;
+- positivos preservados: "Este decreto entra em vigor", "Este Decreto nº 70.226 entra em vigor" e "A presente resolução produzirá efeitos";
+- Decreto 70.226 inalterado nas duas representações.
+
+Identidade `87c46320 → e0074a7d`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
+
 ## Regra (R5.3; condições estruturais acima, a partir do R5.4)
 A regra é estrutural e não usa classes, porque a cópia do Acervo não as tem. Ela só se aplica quando **todas** as condições valem:
 1. O documento **termina** com 1 a 4 blocos `unidentified/unknown`, todos depois do início do último dispositivo (a cauda nunca atravessa a fronteira de um dispositivo).

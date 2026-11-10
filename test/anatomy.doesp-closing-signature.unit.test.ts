@@ -142,3 +142,16 @@ test('R5.6: "O programa que entra em vigor em janeiro…" is not a closing claus
     'Art. 2º - Revogam-se as disposições em contrário.', 'Artigo 2º - Fica revogado o Decreto nº 1, de 2020.'])
     assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
 });
+
+// R5.7 (COORD E9 R5.7): the act must be IMMEDIATELY the subject of the vigência predicate.
+test('R5.7: "Este decreto que entra em vigor…" and "…cujo programa entra em vigor…" are not closing clauses — the div line stays bound and selectable', () => {
+  for (const art of ['Artigo 1º - Este decreto que entra em vigor em janeiro aprova a denominação do programa.',
+    'Artigo 1º - Este decreto cujo programa entra em vigor em janeiro aprova a denominação do programa.',
+    'Artigo 1º - Este decreto, cujo programa entra em vigor em janeiro, aprova a denominação do programa.']) {
+    assert.deepEqual(lineChecks(read('DOE-SP', H(art) + BOX('PROGRAMA ESTADUAL DE SAÚDE')), 'PROGRAMA ESTADUAL DE SAÚDE'), { bound: true, selectable: true, signature: false }, art);
+  }
+  // Positives preserved, including the act's own number between subject and predicate.
+  for (const clause of ['Artigo 2º - Este decreto entra em vigor na data de sua publicação.', 'Artigo 2º - Este Decreto nº 70.226 entra em vigor na data de sua publicação.',
+    'Artigo 2º - A presente resolução produzirá efeitos a partir de 1º de janeiro.'])
+    assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
+});

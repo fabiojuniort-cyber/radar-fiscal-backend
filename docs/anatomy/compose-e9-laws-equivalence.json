@@ -1,6 +1,6 @@
 {
   "schema": "e9-compose-laws-equivalence/1",
-  "purpose": "COORD E9-ACERVO-01 R5.5 §3: the two accepted laws read on the composed engine vs the accepted reference; R5.6: repeated on the final composed engine after #304 R5.6",
+  "purpose": "COORD E9-ACERVO-01 R5.5 §3: the two accepted laws read on the composed engine vs the accepted reference; R5.6: repeated on the final composed engine after #304 R5.6; R5.7: repeated on the final engine after #304 R5.7",
   "reference": {
     "ref": "#305 @ b58bfeb",
     "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3"
@@ -52,22 +52,57 @@
   },
   "verdict": "equivalent: same lock digests, same identity-stripped output, no invariant broken; the acceptance record (pinned to the reference engine) is void on the composed engine until the COORD revalidates it on the composed hash",
   "finalComposed": {
-    "engineBuildHash": "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296",
+    "engineBuildHash": "689644428089f69de3c06e3db9a0ddd26a05907925f3f78f3c0bd78e1f6980fc",
+    "comparedWith": [
+      "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
+      "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
+      "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296"
+    ],
     "laws": {
       "lei-10637-2002-atualizada": {
         "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
         "identityStrippedOutputSha256": "6601eb3b936c92786aae09a4355a891c871cb49d8674df0cdfbf68f68ff9d6aa",
         "invariants": [],
-        "outputHash": "f10e0182bb75d6dce8b1fc89462694cb46b4b6e5113c5a831172f17ecb492513",
-        "equalToReference": true
+        "outputHash": "96b2757b728751c71c14447af84d41faea7a839472bbe12d6d1d269ac347e3ec",
+        "equalTo": {
+          "9235a810": true,
+          "693ba416": true,
+          "e5c03993": true
+        }
       },
       "lei-10833-2003-atualizada": {
         "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
         "identityStrippedOutputSha256": "af03d5a2c067b0789ed2d3e5913f636e620ca57d54ba94f7cf251ca0ff3ad1e7",
         "invariants": [],
-        "outputHash": "6928f0bab1a9298a6f7221add066af1fe34bffb9661c25e961dcdfb9af0fa489",
-        "equalToReference": true
+        "outputHash": "eda2f1cf81f427a8ad1577e172c2081dee40b25d83e607301e1551a6f0efabbe",
+        "equalTo": {
+          "9235a810": true,
+          "693ba416": true,
+          "e5c03993": true
+        }
       }
     }
-  }
+  },
+  "history": [
+    {
+      "engineBuildHash": "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296",
+      "head": "2edfd3c",
+      "laws": {
+        "lei-10637-2002-atualizada": {
+          "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+          "identityStrippedOutputSha256": "6601eb3b936c92786aae09a4355a891c871cb49d8674df0cdfbf68f68ff9d6aa",
+          "invariants": [],
+          "outputHash": "f10e0182bb75d6dce8b1fc89462694cb46b4b6e5113c5a831172f17ecb492513",
+          "equalToReference": true
+        },
+        "lei-10833-2003-atualizada": {
+          "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+          "identityStrippedOutputSha256": "af03d5a2c067b0789ed2d3e5913f636e620ca57d54ba94f7cf251ca0ff3ad1e7",
+          "invariants": [],
+          "outputHash": "6928f0bab1a9298a6f7221add066af1fe34bffb9661c25e961dcdfb9af0fa489",
+          "equalToReference": true
+        }
+      }
+    }
+  ]
 }
