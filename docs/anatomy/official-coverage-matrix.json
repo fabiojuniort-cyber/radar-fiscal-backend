@@ -243,6 +243,106 @@
       "notes": []
     },
     {
+      "id": "rfb:148516",
+      "source": "RFB",
+      "type": "Ato Declaratório Executivo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 10620,
+      "size": "médio",
+      "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c",
+      "bytes": 32477,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "b1055aeab69f02597229700c054976dbe4daf4b704e77662a9098db1656468de",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:148629",
+      "source": "RFB",
+      "type": "Ato Declaratório Executivo",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 1140,
+      "size": "pequeno",
+      "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f",
+      "bytes": 11638,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "03981c4d4a59af2b61338928d1af28e35d91606bb4ac1fd14ae20e2def80470f",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:148681",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 2182,
+      "size": "pequeno",
+      "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+      "bytes": 8185,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "5bdd6991a4fcf19a9951242045c6c4fd2c0555b9edb23d218ddb0d8d7c6f4f94",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
+      "id": "rfb:148693",
+      "source": "RFB",
+      "type": "Portaria",
+      "layout": "JSON multivigente (API normasinternet2)",
+      "chars": 20829,
+      "size": "médio",
+      "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+      "bytes": 73686,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": true,
+        "validated": true,
+        "accepted": false
+      },
+      "profile": "RFB",
+      "diagnostic": null,
+      "outputHash": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99",
+      "evidence": [
+        "docs/anatomy/official-lot-rfb.json",
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+      ],
+      "notes": []
+    },
+    {
       "id": "rfb:37103",
       "source": "RFB",
       "type": "Ato Declaratório Interpretativo",
@@ -829,8 +929,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:148693"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -906,8 +1008,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:148629"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -921,8 +1025,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:148516"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -951,8 +1057,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "pending",
-      "validatedSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "rfb:148681"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1723,14 +1831,10 @@
     }
   ],
   "requiredPending": [
-    "rfb--portaria--medio",
     "rfb--portaria--grande",
     "rfb--ato-declaratorio-interpretativo--medio",
     "rfb--ato-declaratorio-interpretativo--grande",
-    "rfb--ato-declaratorio-executivo--pequeno",
-    "rfb--ato-declaratorio-executivo--medio",
     "rfb--ato-declaratorio-executivo--grande",
-    "rfb--solucao-de-consulta--pequeno",
     "rfb--solucao-de-consulta--medio",
     "rfb--solucao-de-consulta--grande",
     "rfb--resolucao--medio",
@@ -1775,7 +1879,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 10,
+  "coveredRequired": 14,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }

@@ -14,7 +14,7 @@ test('OFFICIAL-LOT-RFB: re-analysis of the official RFB lot matches the committe
 
 test('OFFICIAL-LOT-RFB: invariants — never promoted, legalStatus unknown (checked in the run), text fully accounted', () => {
   const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as { acts: { promoted: boolean; unidentifiedChars: number; canonicalChars: number; idAto: number }[] };
-  assert.equal(baseline.acts.length, 10, 'LOTE-RFB+: 5 original INs + IN 1.911 and IN 2.021 (#295) + 3 acts of E9 P2-c (Portaria, ADI, Resolução)');
+  assert.equal(baseline.acts.length, 14, 'LOTE-RFB+: 5 original INs + IN 1.911 and IN 2.021 (#295) + 3 acts of E9 P2-c (Portaria, ADI, Resolução) + 4 P2-c direct captures (Portaria, 2 ADE, SC; 2026-11-10)');
   for (const a of baseline.acts) { assert.equal(a.promoted, false, `${a.idAto} not promoted`); assert.ok(a.unidentifiedChars <= a.canonicalChars); }
 });
 

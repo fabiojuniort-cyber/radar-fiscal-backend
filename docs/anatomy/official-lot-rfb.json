@@ -399,6 +399,153 @@
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
       "outputHash": "fe2549edf073388484a3ab951cdbcfcf1b15950598537dcd9910eff840cdaed8"
+    },
+    {
+      "idAto": 148516,
+      "epigrafe": "Ato Declaratório Executivo Corat nº 33, de 23 de dezembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 24/12/2025, seção 1, página 838",
+      "bytes": 32477,
+      "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
+        "pieces": 51
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
+      "status": "partial",
+      "canonicalChars": 10620,
+      "unidentifiedChars": 262,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "unidentified": 2,
+        "article": 18,
+        "caput": 18,
+        "paragraph": 12,
+        "inciso": 17,
+        "signature": 1
+      },
+      "limitations": {
+        "rfb_segment_type_unidentified_by_source": 2,
+        "unidentified_content": 1
+      },
+      "historicalByTachado": 0,
+      "historicalContextParts": 0,
+      "struckSegments": 0,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "b1055aeab69f02597229700c054976dbe4daf4b704e77662a9098db1656468de"
+    },
+    {
+      "idAto": 148629,
+      "epigrafe": "Ato Declaratório Executivo Cofis nº 30, de 18 de dezembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 29/12/2025, seção 1, página 106",
+      "bytes": 11638,
+      "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
+        "pieces": 6
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
+      "status": "partial",
+      "canonicalChars": 1140,
+      "unidentifiedChars": 415,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "unidentified": 1,
+        "article": 3,
+        "caput": 3,
+        "signature": 1
+      },
+      "limitations": {
+        "rfb_segment_type_unidentified_by_source": 1,
+        "unidentified_content": 1
+      },
+      "historicalByTachado": 0,
+      "historicalContextParts": 0,
+      "struckSegments": 0,
+      "attachmentsWithoutContent": 1,
+      "missingSegments": 0,
+      "outputHash": "03981c4d4a59af2b61338928d1af28e35d91606bb4ac1fd14ae20e2def80470f"
+    },
+    {
+      "idAto": 148681,
+      "epigrafe": "Solução de Consulta Cosit nº 258, de 26 de dezembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 31/12/2025, seção 1, página 312",
+      "bytes": 8185,
+      "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "06db6d8aa008e3f9aacdcc5d7a7660260a9b537d6edaf7dbe5ce7b39ac38b116",
+        "pieces": 4
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "06db6d8aa008e3f9aacdcc5d7a7660260a9b537d6edaf7dbe5ce7b39ac38b116",
+      "status": "complete",
+      "canonicalChars": 2182,
+      "unidentifiedChars": 0,
+      "partTypes": {
+        "document": 1,
+        "summary": 2,
+        "annex": 1,
+        "signature": 1
+      },
+      "limitations": {},
+      "historicalByTachado": 1,
+      "historicalContextParts": 0,
+      "struckSegments": 2,
+      "attachmentsWithoutContent": 2,
+      "missingSegments": 0,
+      "outputHash": "5bdd6991a4fcf19a9951242045c6c4fd2c0555b9edb23d218ddb0d8d7c6f4f94"
+    },
+    {
+      "idAto": 148693,
+      "epigrafe": "Portaria RFB nº 635, de 31 de dezembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 31/12/2025, seção 1-A, página 3",
+      "bytes": 73686,
+      "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+        "pieces": 122
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+      "status": "complete",
+      "canonicalChars": 20829,
+      "unidentifiedChars": 0,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "preamble": 1,
+        "group": 7,
+        "article": 13,
+        "caput": 13,
+        "paragraph": 20,
+        "inciso": 46,
+        "alinea": 21,
+        "item": 12,
+        "signature": 1
+      },
+      "limitations": {},
+      "historicalByTachado": 2,
+      "historicalContextParts": 2,
+      "struckSegments": 2,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99"
     }
   ]
 }
