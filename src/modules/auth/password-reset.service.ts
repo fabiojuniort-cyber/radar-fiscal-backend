@@ -126,8 +126,16 @@ export async function completePasswordReset(
 
   if (!/^[A-Za-z0-9_-]{43}$/.test(input.token)) return 'invalid';
 
-  const passwordHash = await hashPassword(input.password);
   const tokenHash = hashSecret(input.token);
+
+  // Token aleatorio invalido nao deve consumir CPU executando Argon2.
+  // O redeem valida novamente sob lock, sem confiar neste preflight.
+  const active = await sql<{ active: boolean }>`
+    SELECT public.auth_password_reset_token_active(${tokenHash}) AS active
+  `.execute(db);
+  if (!active.rows[0]?.active) return 'invalid';
+
+  const passwordHash = await hashPassword(input.password);
 
   const redeemed = await sql<{ redeemed: boolean }>`
     SELECT public.auth_password_reset_redeem(
