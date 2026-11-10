@@ -130,3 +130,15 @@ test('R5.5 structural evidence: the signature block follows the closing clause (
   }
   assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', 'Artigo 2º - Compete à Secretaria executar o programa.') + BOX('TARCÍSIO DE FREITAS'))), [], 'no closing clause => no closing block');
 });
+
+// R5.6 (COORD E9-ACERVO-01 R5.6): vigência/revogação must be the device's FUNCTION, not a phrase inside it.
+test('R5.6: "O programa que entra em vigor em janeiro…" is not a closing clause — the div line stays bound and selectable', () => {
+  const html = H('Artigo 1º - O programa que entra em vigor em janeiro terá a denominação aprovada neste artigo.') + BOX('PROGRAMA ESTADUAL DE SAÚDE');
+  assert.deepEqual(lineChecks(read('DOE-SP', html), 'PROGRAMA ESTADUAL DE SAÚDE'), { bound: true, selectable: true, signature: false });
+  for (const notClause of ['Artigo 1º - Fica instituído o programa, que entra em vigor em janeiro.', 'Artigo 1º - A norma que produz efeitos desde 2025 será revista.',
+    'Artigo 1º - O regulamento ficam revogados quando aprovado o novo texto.'])
+    assert.deepEqual(sigIds(read('DOE-SP', H(notClause) + BOX('TARCÍSIO DE FREITAS'))), [], notClause);
+  for (const clause of ['Artigo 2º - Esta resolução entra em vigor na data de sua publicação.', 'Artigo 2º - Este decreto produzirá efeitos a partir de 1º de janeiro.',
+    'Art. 2º - Revogam-se as disposições em contrário.', 'Artigo 2º - Fica revogado o Decreto nº 1, de 2020.'])
+    assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
+});

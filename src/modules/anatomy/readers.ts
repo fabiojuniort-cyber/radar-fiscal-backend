@@ -693,7 +693,14 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     // Matching view only: invisible format characters (e.g. U+00AD soft hyphen in "vi\u00adgor") are ignored; the
     // canonical text keeps every character.
     const closingLine = lines[lines.length - 1]!.replace(/\p{Cf}/gu, '');
-    if (!/\b(?:entra(?:m|rá|rão)? em vigor|produz(?:irá|irão|em)? (?:seus )?efeitos|vigorará|revogam-se|ficam revogad[oa]s?|fica revogad[oa])\b/iu.test(closingLine)) return;
+    // R5.6: the clause must be the device's FUNCTION, not a phrase inside it ("O programa que entra em vigor em janeiro…"
+    // is not a vigência clause). After the device label, the text must OPEN with the act itself as subject of the
+    // vigência/efeitos predicate, or with the revocation formula.
+    const body = closingLine.replace(/^(?:Artigo|Art\.?|Cl[áa]usula)\s*[\dº°ªo.]*\s*(?:[-–—.:]\s*)?/iu, '');
+    const ACT = '(?:decreto|lei|resolu[çc][ãa]o|portaria|delibera[çc][ãa]o|instru[çc][ãa]o normativa|comunicado|ato|despacho)';
+    const VIG = new RegExp(`^(?:Est[ea]|O presente|A presente)\\s+${ACT}(?:\\s+[\\p{L}º°ª\\d./-]+){0,3}?\\s+(?:entra(?:rá)? em vigor|produz(?:irá)? (?:seus )?efeitos|vigorará)\\b`, 'iu');
+    const REV = /^(?:Revoga(?:m)?-se|Fica(?:m)? revogad[oa]s?)\b/iu;
+    if (!VIG.test(body) && !REV.test(body)) return;
     // A device that announces what follows keeps it (ambiguous => preserve the bond).
     if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;
     const firstSig = tail[0]!.span.start;
