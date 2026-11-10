@@ -35,7 +35,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "c1ee515bd7d1cf63cc494d9ed014127c650793a9140ec21860011e06acdf0f6b",
+      "outputHash": "c5870230db4acc66b1e5c413402a265241b9333e31463407190750ec80f52ea9",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -60,7 +60,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "d1c30514ec09a841c5baf3b2a9671dd7408bcf29b7b17322be31311ac7aad40a",
+      "outputHash": "8a80732a487c6a6b0da10b28561838571dd9c2fdecd8e77c65e918ebb82503f1",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -85,7 +85,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "5d335d62b2cbd24cab354edc5976a099cc5ba71765888abd99db9124efee0e34",
+      "outputHash": "ac470468444e6b14ba6dc26453c42e8923396600aa064b66fc56867825ef7b81",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -110,7 +110,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "939db3d882955269a5c63e3a6717cefa918871031509d9e331ada3e3daf34361",
+      "outputHash": "c4ce8a66c6ba5d78671360ff85f55264800b2018b8516c91fb0f67f1b094276e",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -135,7 +135,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "9d3932bb3b94a14fbf6573d159c87d0cdff03e18c5bfe40e7bf0b0a65d27ede3",
+      "outputHash": "3a59678b95f02c0b89b52629c4b9eca6e9b18b42627b516e7b9a55c064afadca",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -160,7 +160,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "dd622aec98c70939635b721784cefedd872950f623cff39f4c2b3d64e35a4e69",
+      "outputHash": "9eedf20ca00262fe2d5de90c62cb576c9ee60fd7d4b9a799f0fe034c0ec20ed4",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -185,7 +185,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "4e60ab619aa28c2d063a6ea90a9c0f0294c60d79a9a946071b23e38af0853549",
+      "outputHash": "f6d81c5c678430d67b4d3cc317c44b7f3d8f5d65f40bff52a1113271a9488740",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -210,7 +210,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "34d70cc4365dc4a583a5281e121212a6e3efb7fa1a2a19ba0683773538f47fba",
+      "outputHash": "2c5e433c69485df7605a9e37872f29818e60d16902972ae4047ec9e3d1a7e514",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -235,7 +235,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "0ffc770b001ba8dd563c5e081f4c3348353e8f83d90aa6c8e740f20627c91686",
+      "outputHash": "f6b043bd64c64bec55c5181cceb28bc0ea0e71ef9f08a87c25f07eeda8b1547b",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -260,7 +260,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "707645189fc25c54331c0d9a4d4ee6f9fd3d983d92fd63ccc5508eba538f1930",
+      "outputHash": "cc49002f4ff113939f453ac6eb551fe992c795e4cda321c21b8e72887734f96b",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -285,7 +285,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "0a56e57448616153f11910cddcc4009a6e850e454ab21e28c6ee3d393b2faf05",
+      "outputHash": "c269acc2b9a8ed8678674918191b94b94d65c7300062f144806d225670315d6d",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -310,7 +310,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "ec77a7265e2f236868e6c50138e65f32aa216c4793372518ace92380ee4d2c3e",
+      "outputHash": "e15aea926a4f9455a19e30ad8008ad1a19bf0fb4080ca0032b62a3eff58ce7fd",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -335,7 +335,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "91a5f5af58fdaf55f604ca41c96bab579237369f2d1f08d846b2f3071e58fef3",
+      "outputHash": "6e3e657a6dd1b5e599459a3c363f0fc3b725db3bc685d583029abdbf42dd84a0",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -360,7 +360,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "77d76041a6b6edd1b895c7543c22660deb6e64e425dcbc78b0d096592159df2d",
+      "outputHash": "481ed031f8ec8c920ffc8dde07c1b8c4f0c4d1d4cc6f05587621ed2fbeeb9088",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -385,7 +385,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "5f66ca3448a0660dc8f5153e5174938f83486ea7434e5c02768e899515097c63",
+      "outputHash": "9a08136fcd45b15463a224478346a180374157ecbbad59d6502bd4b271e70ec5",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -410,7 +410,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "29a74fd47e32a903ce8c0a7bc12a3678119da61d9b6a78f40bad9f43f46fb22f",
+      "outputHash": "492cc6260005dc3d582732fdf73d62cec9b8cd93c86cd547eb7842f887bf8cda",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -431,16 +431,15 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": true
+        "accepted": false
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
-      "outputHash": "66fa261943e888aaf4eb2b7639f1212d52f310e4cbc4929ed1854063323e0d1f",
+      "outputHash": "bef2dfdf46668e790fa37ac09050bfe9633be1d841485acafb85f1fb6fe30d20",
       "evidence": [
         "docs/anatomy/normas-leg-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
-        "test/anatomy.normas-leg.unit.test.ts",
-        "docs/anatomy/e9-acceptances.json"
+        "test/anatomy.normas-leg.unit.test.ts"
       ],
       "notes": [
         "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
@@ -487,16 +486,15 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": true
+        "accepted": false
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
-      "outputHash": "8a32f9e627be9578faa5a211decc750333d6be3c409774c001fabadc3e225d3d",
+      "outputHash": "d4e585a764e922641c8328478934ecc4e3a79f9b9946a675bdfef4e8eac75187",
       "evidence": [
         "docs/anatomy/normas-leg-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
-        "test/anatomy.normas-leg.unit.test.ts",
-        "docs/anatomy/e9-acceptances.json"
+        "test/anatomy.normas-leg.unit.test.ts"
       ],
       "notes": [
         "lida pela fonte NORMAS-LEG (prova local de preparação, não prova de coleta oficial)"
@@ -547,7 +545,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "e577d1800d3e4b6097ed99d2c7b2d1a0d7cb618af4c282c6880b87ff998e7c43",
+      "outputHash": "48345c821c8b5a8d74271095e1508e9a0a156f51cddcf5db1c5b85a72344cf36",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -648,7 +646,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "cebca09c3d1fefb3c6628928028be732c910dccb8e6ef61b481916e346f5ae4e",
+      "outputHash": "8c644197ec53dbba85c99519306d389c784fd2b7d01b772069df361be8ddb4c8",
       "notes": []
     },
     {
@@ -673,7 +671,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "6420582584d904ad45eacd58e113e617cfd7487b0c94f67e32fcf2fd4806e9a2",
+      "outputHash": "788e318acf28c596ab5636f684149046c64acacb090e039d380974c4eab0294c",
       "notes": []
     },
     {
@@ -698,7 +696,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "bb8cfbb68cdc4fc4eb74c075d5f51a37e31779255a5b9f955b23167c3f8daffd",
+      "outputHash": "913dc36337aeb0de5ab5c7a8b0ac30e13f689394f255f3281c19d5aca1438a23",
       "notes": []
     },
     {
@@ -791,7 +789,7 @@
         "accepted": false
       },
       "profile": "DOE-SP",
-      "outputHash": "c6681c983125aea6804bfe95205c097eff8768e98a726cba8f0bb94b1f72ca11",
+      "outputHash": "79adc9d5a09e955d4d90d1419140c464da3f549a43669464d7d1152c36dc1089",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1182,7 +1180,7 @@
         "lei-10637-2002-atualizada",
         "lei-10833-2003-atualizada"
       ],
-      "accepted": true,
+      "accepted": false,
       "unvalidatedSamples": []
     },
     {
