@@ -76,11 +76,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const resetPublicUrl = options.passwordReset?.publicUrl ??
     env.AUTH_PASSWORD_RESET_PUBLIC_URL;
   const resetSender = options.passwordReset?.send ??
-    (resetEnabled && env.ZOHO_CPAAAS_API_KEY && env.ZOHO_CPAAAS_FROM_ADDRESS
+    (resetEnabled && env.ZOHO_CPAAS_API_KEY && env.ZOHO_CPAAS_FROM_ADDRESS
       ? (message: Parameters<PasswordResetSender>[0]) =>
         sendZohoPasswordResetMail(message, {
-          apiKey: env.ZOHO_CPAAAS_API_KEY!,
-          fromAddress: env.ZOHO_CPAAAS_FROM_ADDRESS!,
+          apiKey: env.ZOHO_CPAAS_API_KEY!,
+          fromAddress: env.ZOHO_CPAAS_FROM_ADDRESS!,
         })
       : undefined);
   await app.register(passwordResetRoutes, {
