@@ -642,27 +642,25 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     // is not a vigência clause). After the device label, the text must OPEN with the act itself as subject of the
     // vigência/efeitos predicate, or with the revocation formula.
     const body = closingLine.replace(/^(?:Artigo|Art\.?|Cl[áa]usula)\s*[\dº°ªo.]*\s*(?:[-–—.:]\s*)?/iu, '');
-    const ACT = '(?:decreto|lei|resolu[çc][ãa]o|portaria|delibera[çc][ãa]o|instru[çc][ãa]o normativa|comunicado|ato|despacho)';
-    // R5.7: the act is IMMEDIATELY the subject of the predicate — only its own number may sit between ("Este decreto
-    // nº 70.226 entra em vigor"). Any other word ("que", "cujo programa", a relative or adjective clause) means the
-    // predicate belongs to something else, so it is not the device's function.
-    const VIG = new RegExp(`^(?:Est[ea]|O presente|A presente)\\s+${ACT}(?:\\s+n[º°o.]*\\s*[\\d.]+(?:\\/\\d{2,4})?)?,?\\s+(?:entra(?:rá)? em vigor|produz(?:irá)? (?:seus )?efeitos|vigorará)\\b`, 'iu');
-    const REV = /^(?:Revoga(?:m)?-se|Fica(?:m)? revogad[oa]s?)\b/iu;
-    // R5.8: the WHOLE device must be the closing clause. After the vigência predicate only a time complement may follow
-    // (no "e", ";" or comma inside it), optionally followed by an attached revocation (", ficando revogad…"); a
-    // revocation device must hold no second disposition (no ";" and no "e"/", " + another operative verb). Anything
-    // else ("…entra em vigor na data de sua publicação e dá ao programa… a denominação…") keeps the bond and selection.
-    const OTHER_VERB = /(?:^|\s|,)(?:e|bem como)\s+(?:d[áa]|fica(?:m)?(?!\s+revogad)|altera|cria|institui|aprova|passa(?:m)?|determina|autoriza|estabelece|disp[õo]e|denomina|designa|atribui|concede|transfere|regulamenta|acrescenta|substitui)\b/iu;
-    const vig = VIG.exec(body);
-    const closingWhole = (() => {
-      if (/;/u.test(body)) return false;
-      if (vig) {
-        const rest = body.slice(vig[0].length).replace(/\.\s*$/u, '');
-        const COMPLEMENT = /^(?:\s+(?:(?!\se\s|,|;)[^])+)?(?:,\s*ficando\s+revogad[oa]s?\s+[^;]+)?$/iu;
-        return COMPLEMENT.test(rest) && !OTHER_VERB.test(rest);
-      }
-      return REV.test(body) && !OTHER_VERB.test(body);
-    })();
+    // R5.9 (reviewer BLOCK on R5.8): POSITIVE GRAMMAR of the closing clause. Nothing is inferred from what the text is
+    // not; the WHOLE device must match one of the two forms below, as a single sentence, and anything else ("…entra em
+    // vigor na data de sua publicação. O programa passa a…", "Fica revogado o Decreto nº 1, de 2020, passando o
+    // programa a…") keeps the bond and the selection.
+    //  · vigência:  <ato> [nº N] (entra em vigor|produz(irá) [seus] efeitos|vigorará) <TEMPO>
+    //               [, ficando revogad… (as disposições em contrário | <lista de atos>)] .
+    //  · revogação: (Revogam-se | Fica(m) revogad…) (as disposições em contrário | <lista de atos>) [, <TEMPO>] .
+    const ACT = '(?:decreto|lei(?: complementar)?|resolu[çc][ãa]o|portaria|delibera[çc][ãa]o|instru[çc][ãa]o normativa|comunicado|ato|despacho)';
+    const NUM = '(?:n[ºo°.]*s?\\s*[\\d.]+(?:\\/\\d{2,4})?)';
+    const MONTH = '(?:janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)';
+    const DATE = `(?:\\d{1,2}º?(?:\\s+de\\s+${MONTH}(?:\\s+de\\s+\\d{4})?|\\/\\d{1,2}\\/\\d{2,4}))`;
+    const TIME = `(?:na data de (?:sua )?publica[çc][ãa]o|a partir de (?:${DATE}|(?:sua|da data de sua) publica[çc][ãa]o)|em ${DATE}|(?:\\d+|trinta|sessenta|noventa|cento e oitenta) \\(?[\\p{L} ]*\\)?\\s*dias (?:ap[óo]s|depois de|contados de) (?:a data de )?(?:sua )?publica[çc][ãa]o)`;
+    const REF = `(?:(?:o|a|os|as)\\s+)?${ACT}s?\\s+${NUM}(?:,\\s+de\\s+(?:${DATE}|\\d{4}))?`;
+    const REFS = `${REF}(?:(?:,\\s*|,?\\s+e\\s+)(?:${REF}|${NUM}(?:,\\s+de\\s+(?:${DATE}|\\d{4}))?))*`;
+    const OBJ = `(?:as disposi[çc][õo]es em contr[áa]rio|${REFS})`;
+    const SUBJ = `(?:Est[ea]|O presente|A presente)\\s+${ACT}(?:\\s+${NUM})?`;
+    const VIG_WHOLE = new RegExp(`^${SUBJ},?\\s+(?:entra(?:rá)? em vigor|produz(?:irá)? (?:seus )?efeitos|vigorará)\\s+${TIME}(?:,\\s*ficando\\s+revogad[oa]s?\\s+${OBJ})?\\.?$`, 'iu');
+    const REV_WHOLE = new RegExp(`^(?:Revoga(?:m)?-se|Fica(?:m)?\\s+revogad[oa]s?)\\s+${OBJ}(?:,\\s+${TIME})?\\.?$`, 'iu');
+    const closingWhole = VIG_WHOLE.test(body) || REV_WHOLE.test(body);
     if (!closingWhole) return;
     // A device that announces what follows keeps it (ambiguous => preserve the bond).
     if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;

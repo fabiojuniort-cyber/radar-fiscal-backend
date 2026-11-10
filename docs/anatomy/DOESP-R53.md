@@ -86,6 +86,26 @@ Identidade `87c46320 → e0074a7d`. Regressão em 78 leituras contra `fc04aae`: 
 
 Identidade `e0074a7d → c1b0a56d`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
 
+## R5.9 — gramática positiva da cláusula de encerramento (substitui as listas de exceção do R5.5 ao R5.8)
+
+**BLOCK do revisor na R5.8:** dois casos continuavam fechando no leitor completo.
+- "Este decreto entra em vigor na data de sua publicação. O programa … passa a denominar-se…": vigência seguida de uma segunda frase.
+- "Fica revogado o Decreto nº 1, de 2020, passando o programa a denominar-se…": revogação seguida de uma disposição no gerúndio.
+
+A causa de fundo era a abordagem: as regras anteriores listavam o que **não** é encerramento, e essas listas são sempre incompletas.
+
+**Correção:** o dispositivo **inteiro**, como uma única frase, precisa casar com uma das duas formas abaixo. Fora delas, vínculo e seleção ficam.
+- **Vigência:** "Este/Esta/O presente/A presente <ato> [nº N]" + "entra em vigor" / "produz(irá) [seus] efeitos" / "vigorará" + um **tempo** de lista fechada ("na data de sua publicação", "a partir de <data | publicação>", "em <data>", "N (extenso) dias após a data de sua publicação"). Opcionalmente, ", ficando revogad… (as disposições em contrário | <lista de atos>)". Ponto final.
+- **Revogação:** "Revogam-se / Fica(m) revogad…" + ("as disposições em contrário" | <lista de atos com nº e data>), opcionalmente com tempo. Ponto final.
+
+**Testes R5.9:**
+- os 4 casos do revisor e suas variantes ficam vinculados e selecionáveis;
+- **teste sistemático:** 10 cláusulas de encerramento válidas fecham, e cada uma acrescida de 5 disposições extras (frase seguinte, gerúndio, "e dá…", ";", ", devendo…"), ou seja, **50 combinações**, preserva vínculo e seleção;
+- todos os contracasos anteriores (A/B, R5.5 a R5.8) mantidos;
+- Decreto 70.226 inalterado nas duas representações.
+
+Identidade `c1b0a56d → 398c8620`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
+
 ## Regra (R5.3; condições estruturais acima, a partir do R5.4)
 A regra é estrutural e não usa classes, porque a cópia do Acervo não as tem. Ela só se aplica quando **todas** as condições valem:
 1. O documento **termina** com 1 a 4 blocos `unidentified/unknown`, todos depois do início do último dispositivo (a cauda nunca atravessa a fronteira de um dispositivo).
