@@ -643,7 +643,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     // vigência/efeitos predicate, or with the revocation formula.
     const body = closingLine.replace(/^(?:Artigo|Art\.?|Cl[áa]usula)\s*[\dº°ªo.]*\s*(?:[-–—.:]\s*)?/iu, '');
     const ACT = '(?:decreto|lei|resolu[çc][ãa]o|portaria|delibera[çc][ãa]o|instru[çc][ãa]o normativa|comunicado|ato|despacho)';
-    const VIG = new RegExp(`^(?:Est[ea]|O presente|A presente)\\s+${ACT}(?:\\s+[\\p{L}º°ª\\d./-]+){0,3}?\\s+(?:entra(?:rá)? em vigor|produz(?:irá)? (?:seus )?efeitos|vigorará)\\b`, 'iu');
+    // R5.7: the act is IMMEDIATELY the subject of the predicate — only its own number may sit between ("Este decreto
+    // nº 70.226 entra em vigor"). Any other word ("que", "cujo programa", a relative or adjective clause) means the
+    // predicate belongs to something else, so it is not the device's function.
+    const VIG = new RegExp(`^(?:Est[ea]|O presente|A presente)\\s+${ACT}(?:\\s+n[º°o.]*\\s*[\\d.]+(?:\\/\\d{2,4})?)?,?\\s+(?:entra(?:rá)? em vigor|produz(?:irá)? (?:seus )?efeitos|vigorará)\\b`, 'iu');
     const REV = /^(?:Revoga(?:m)?-se|Fica(?:m)? revogad[oa]s?)\b/iu;
     if (!VIG.test(body) && !REV.test(body)) return;
     // A device that announces what follows keeps it (ambiguous => preserve the bond).
