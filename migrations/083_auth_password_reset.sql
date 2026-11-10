@@ -102,6 +102,9 @@ BEGIN
      WHERE token_hash = p_token_hash AND user_id = v_user_id
      FOR UPDATE;
 
+    -- Reavaliar relogio depois de esperar por locks concorrentes.
+    v_now := clock_timestamp();
+
     IF NOT FOUND OR v_used_at IS NOT NULL OR v_expiry <= v_now THEN
         RETURN FALSE;
     END IF;
