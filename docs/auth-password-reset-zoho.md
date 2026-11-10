@@ -20,8 +20,8 @@ Documentacao oficial: https://www.zoho.com/cpaas/help/api/email-sending.html e h
 | --- | --- | --- |
 | AUTH_PASSWORD_RESET_ENABLED | Chave de ativacao; 'false' por padrao; rota devolve 503 enquanto inativa | 'true' apenas apos autorizacao R3 |
 | AUTH_PASSWORD_RESET_PUBLIC_URL | URL HTTPS da tela web proposta, ex.: https://trifaros.com.br/nova-senha | Sim antes da ativacao |
-| ZOHO_CPAAAS_API_KEY | **Segredo** de envio do agent mail_agent_1 (na aba SMTP/API) | Sim; Railway secret de runtime, nunca compartilhar pelo chat |
-| ZOHO_CPAAAS_FROM_ADDRESS | Endereco remetente realmente aprovado/associado ao dominio verificado | Sim; confirmar endereco exato no Zoho |
+| ZOHO_CPAAS_API_KEY | **Segredo** de envio do agent mail_agent_1 (na aba SMTP/API) | Sim; Railway secret de runtime, nunca compartilhar pelo chat |
+| ZOHO_CPAAS_FROM_ADDRESS | Endereco remetente realmente aprovado/associado ao dominio verificado | Sim; confirmar endereco exato no Zoho |
 | DATABASE_URL | Runtime PostgreSQL existente da API; migration 083 previamente aprovada/aplicada | Ja existente |
 | DATABASE_ADMIN_URL | Aplicar migrations e executar testes em banco descartavel | **Nao passar a API operacional por chat** |
 
