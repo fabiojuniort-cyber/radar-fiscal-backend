@@ -169,3 +169,29 @@ test('R5.8: a mixed device (vigência + another disposition) is not a closing cl
     'Artigo 2º - Este decreto entra em vigor a partir de 1º de janeiro de 2026.', 'Artigo 2º - Ficam revogados os Decretos nº 1, de 2020, e nº 2, de 2021.'])
     assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
 });
+
+// R5.9 (reviewer BLOCK on R5.8): positive grammar — the whole device must be the closing clause, or the bond stays.
+const CLOSINGS = ['Artigo 2º - Este decreto entra em vigor na data de sua publicação.', 'Artigo 2º - Este Decreto nº 70.226 entra em vigor na data de sua publicação.',
+  'Artigo 2º - Esta lei complementar entra em vigor na data de sua publicação.', 'Artigo 2º - Este decreto entra em vigor a partir de 1º de janeiro de 2026.',
+  'Artigo 2º - Este decreto entra em vigor 90 (noventa) dias após a data de sua publicação.', 'Artigo 2º - A presente resolução produzirá efeitos a partir de 1º de janeiro.',
+  'Artigo 2º - Este decreto entra em vigor na data de sua publicação, ficando revogadas as disposições em contrário.',
+  'Artigo 2º - Revogam-se as disposições em contrário.', 'Artigo 2º - Fica revogado o Decreto nº 1, de 2020.', 'Artigo 2º - Ficam revogados os Decretos nº 1, de 2020, e nº 2, de 2021.'];
+test('R5.9 reviewer cases: vigência + a second sentence, and revocation + a gerund disposition, keep the bond and the selection', () => {
+  for (const art of ['Artigo 1º - Este decreto entra em vigor na data de sua publicação. O programa de atenção primária passa a denominar-se conforme este artigo.',
+    'Artigo 1º - Fica revogado o Decreto nº 1, de 2020, passando o programa a denominar-se conforme este artigo.',
+    'Artigo 1º - Fica revogado o Decreto nº 1, de 2020, devendo o programa chamar-se conforme este artigo.',
+    'Artigo 1º - Revoga-se o Decreto nº 1, de 2020, e o programa passa a chamar-se conforme este artigo.'])
+    assert.deepEqual(lineChecks(read('DOE-SP', H(art) + BOX('PROGRAMA ESTADUAL DE SAÚDE')), 'PROGRAMA ESTADUAL DE SAÚDE'), { bound: true, selectable: true, signature: false }, art);
+});
+test('R5.9 grammar: every whole closing clause closes; the same clause plus ANY extra disposition does not', () => {
+  const extras = [' O programa passa a denominar-se conforme este artigo.', ', passando o programa a denominar-se conforme este artigo.', ' e dá ao programa a denominação deste artigo.',
+    '; o programa passa a chamar-se conforme este artigo.', ', devendo a Secretaria publicar o nome do programa.'];
+  for (const c of CLOSINGS) {
+    assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', c) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], c);
+    for (const x of extras) {
+      const mixed = c.replace(/\.$/u, '') + x;
+      assert.deepEqual(lineChecks(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', mixed) + BOX('PROGRAMA ESTADUAL DE SAÚDE')), 'PROGRAMA ESTADUAL DE SAÚDE'),
+        { bound: true, selectable: true, signature: false }, mixed);
+    }
+  }
+});
