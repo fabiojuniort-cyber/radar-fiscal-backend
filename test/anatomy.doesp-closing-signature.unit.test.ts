@@ -155,3 +155,17 @@ test('R5.7: "Este decreto que entra em vigor…" and "…cujo programa entra em 
     'Artigo 2º - A presente resolução produzirá efeitos a partir de 1º de janeiro.'])
     assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
 });
+
+// R5.8 (COORD E9 R5.8): the WHOLE device must be the closing clause; a mixed device keeps the bond and the selection.
+test('R5.8: a mixed device (vigência + another disposition) is not a closing clause — the div line stays bound and selectable', () => {
+  for (const art of ['Artigo 1º - Este decreto entra em vigor na data de sua publicação e dá ao programa de atenção primária a denominação constante deste artigo.',
+    'Artigo 1º - Este decreto entra em vigor na data de sua publicação; o programa passa a denominar-se conforme este artigo.',
+    'Artigo 1º - Este decreto entra em vigor na data de sua publicação, e fica denominado o programa conforme este artigo.',
+    'Artigo 1º - Fica revogado o Decreto nº 1, de 2020, e fica denominado o programa conforme este artigo.']) {
+    assert.deepEqual(lineChecks(read('DOE-SP', H(art) + BOX('PROGRAMA ESTADUAL DE SAÚDE')), 'PROGRAMA ESTADUAL DE SAÚDE'), { bound: true, selectable: true, signature: false }, art);
+  }
+  // Whole closing clauses still close: vigência with a time complement, with an attached revocation, and revocation lists.
+  for (const clause of ['Artigo 2º - Este decreto entra em vigor na data de sua publicação, ficando revogadas as disposições em contrário.',
+    'Artigo 2º - Este decreto entra em vigor a partir de 1º de janeiro de 2026.', 'Artigo 2º - Ficam revogados os Decretos nº 1, de 2020, e nº 2, de 2021.'])
+    assert.deepEqual(sigIds(read('DOE-SP', H('Artigo 1º - Fica criado o programa.', clause) + BOX('TARCÍSIO DE FREITAS'))), ['TARCÍSIO DE FREITAS'], clause);
+});
