@@ -69,6 +69,23 @@ Identidade `9f45b30f → 87c46320`. Regressão em 78 leituras contra `fc04aae`: 
 
 Identidade `87c46320 → e0074a7d`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
 
+## R5.8 — o dispositivo inteiro precisa ser a cláusula de encerramento
+
+**Caso do COORD:** "Este decreto entra em vigor na data de sua publicação e dá ao programa de atenção primária a denominação constante deste artigo." + `div` "PROGRAMA ESTADUAL DE SAÚDE". Reproduzido em `c18247e`: vínculo não, seleção não, vira `signature`.
+
+**Correção:** o dispositivo **inteiro** precisa ser a cláusula de encerramento.
+- **Vigência:** depois do predicado, só pode vir um complemento de tempo (sem "e", ";" ou vírgula interna), opcionalmente com uma revogação anexa (", ficando revogad…").
+- **Revogação:** sem ";" e sem "e" / "bem como" seguido de outro verbo dispositivo.
+- Qualquer outra disposição ou ambiguidade preserva o vínculo e a seleção.
+
+**Testes R5.8:**
+- 4 dispositivos mistos ficam vinculados e selecionáveis: "e dá…", ";", ", e fica denominado…" e revogação "… e fica denominado…";
+- positivos preservados: vigência com "na data de sua publicação, ficando revogadas…", vigência "a partir de 1º de janeiro de 2026" e revogação em lista ("Decretos nº 1… e nº 2…");
+- contracasos anteriores mantidos;
+- Decreto 70.226 inalterado nas duas representações.
+
+Identidade `e0074a7d → c1b0a56d`. Regressão em 78 leituras contra `fc04aae`: só o 70.226 muda.
+
 ## Regra (R5.3; condições estruturais acima, a partir do R5.4)
 A regra é estrutural e não usa classes, porque a cópia do Acervo não as tem. Ela só se aplica quando **todas** as condições valem:
 1. O documento **termina** com 1 a 4 blocos `unidentified/unknown`, todos depois do início do último dispositivo (a cauda nunca atravessa a fronteira de um dispositivo).

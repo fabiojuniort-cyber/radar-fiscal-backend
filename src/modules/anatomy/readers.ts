@@ -648,7 +648,22 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     // predicate belongs to something else, so it is not the device's function.
     const VIG = new RegExp(`^(?:Est[ea]|O presente|A presente)\\s+${ACT}(?:\\s+n[º°o.]*\\s*[\\d.]+(?:\\/\\d{2,4})?)?,?\\s+(?:entra(?:rá)? em vigor|produz(?:irá)? (?:seus )?efeitos|vigorará)\\b`, 'iu');
     const REV = /^(?:Revoga(?:m)?-se|Fica(?:m)? revogad[oa]s?)\b/iu;
-    if (!VIG.test(body) && !REV.test(body)) return;
+    // R5.8: the WHOLE device must be the closing clause. After the vigência predicate only a time complement may follow
+    // (no "e", ";" or comma inside it), optionally followed by an attached revocation (", ficando revogad…"); a
+    // revocation device must hold no second disposition (no ";" and no "e"/", " + another operative verb). Anything
+    // else ("…entra em vigor na data de sua publicação e dá ao programa… a denominação…") keeps the bond and selection.
+    const OTHER_VERB = /(?:^|\s|,)(?:e|bem como)\s+(?:d[áa]|fica(?:m)?(?!\s+revogad)|altera|cria|institui|aprova|passa(?:m)?|determina|autoriza|estabelece|disp[õo]e|denomina|designa|atribui|concede|transfere|regulamenta|acrescenta|substitui)\b/iu;
+    const vig = VIG.exec(body);
+    const closingWhole = (() => {
+      if (/;/u.test(body)) return false;
+      if (vig) {
+        const rest = body.slice(vig[0].length).replace(/\.\s*$/u, '');
+        const COMPLEMENT = /^(?:\s+(?:(?!\se\s|,|;)[^])+)?(?:,\s*ficando\s+revogad[oa]s?\s+[^;]+)?$/iu;
+        return COMPLEMENT.test(rest) && !OTHER_VERB.test(rest);
+      }
+      return REV.test(body) && !OTHER_VERB.test(body);
+    })();
+    if (!closingWhole) return;
     // A device that announces what follows keeps it (ambiguous => preserve the bond).
     if (/\b(?:abaixo|a seguir|seguintes?|em anexo|relacionad[oa]s? abaixo)\b/iu.test(lines[lines.length - 1]!)) return;
     const firstSig = tail[0]!.span.start;
