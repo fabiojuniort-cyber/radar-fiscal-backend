@@ -107,6 +107,42 @@
         "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
       ],
       "revalidates": "lei-10833-2003-atualizada @ 9235a810 e 693ba416 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "1676b562c3980790a77591e19ed21f40274f7b40b6e1029ea543015099ef0a74",
+      "decidedBy": "COORD (PASS do revisor independente, R5.8)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — revisão independente R5.8: PASS no #309 @ 0fc4882 (compose-e9-laws-equivalence.json, finalComposed, cinco motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416 e e5c03993 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "1676b562c3980790a77591e19ed21f40274f7b40b6e1029ea543015099ef0a74",
+      "decidedBy": "COORD (PASS do revisor independente, R5.8)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — revisão independente R5.8: PASS no #309 @ 0fc4882 (compose-e9-laws-equivalence.json, finalComposed, cinco motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416 e e5c03993 (registros anteriores preservados)"
     }
   ]
 }
