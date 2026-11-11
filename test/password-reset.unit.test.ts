@@ -6,6 +6,10 @@ import {
   passwordResetLink,
   encryptResetToken,
   decryptResetToken,
+  encryptResetRecipient,
+  decryptResetRecipient,
+  passwordResetRecipientDigest,
+  passwordResetKeyFingerprint,
   sendZohoPasswordResetMail,
 } from '../src/modules/auth/password-reset.service.js';
 
@@ -120,4 +124,17 @@ test('E-2: email HTML escapes untrusted URL and disables tracking', async()=>{
   assert.ok(!sent.htmlbody.includes('onmouseover="evil'));
   assert.equal(sent.track_clicks,false);
   assert.equal(sent.track_opens,false);
+});
+
+test('AUTH-RESET-03: encrypted recipient stays opaque and authenticated by request',()=>{
+  const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const key='e'.repeat(64);
+  const email='alice@example.test';
+  const encrypted=encryptResetRecipient(email,id,key);
+  assert.ok(!encrypted.ciphertext.includes('alice'));
+  assert.equal(decryptResetRecipient(encrypted,id,key),email);
+  assert.notEqual(passwordResetRecipientDigest(email,key),email);
+  assert.notEqual(passwordResetKeyFingerprint(key),passwordResetKeyFingerprint('f'.repeat(64)));
+  assert.throws(()=>decryptResetRecipient(encrypted,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',key));
+  assert.throws(()=>decryptResetRecipient(encrypted,id,'f'.repeat(64)));
 });
