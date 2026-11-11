@@ -22,7 +22,7 @@ import {
   createStandaloneDatabase,
 } from './infrastructure/database/standalone-client.js';
 import { processLogger } from './infrastructure/logging/process-logger.js';
-import { runPasswordResetOutboxWorker } from './modules/auth/password-reset.worker.js';
+import { runPasswordResetOutboxWorker, passwordResetQueueWarningCodes } from './modules/auth/password-reset.worker.js';
 
 let stopping = false;
 
@@ -261,6 +261,8 @@ async function run(): Promise<void> {
         processLogger.warn({ component:'AUTH_RESET', enabled:false },
           'Auth reset outbox worker blocked: incomplete secure runtime config');
       } else {
+        let neutralClaimedSnapshots = 0;
+        let deliveryClaimedSnapshots = 0;
         resetLoop = runPasswordResetOutboxWorker(db, {
           tokenKey: resetKey, publicUrl: resetUrl,
           fromAddress: resetFrom, apiKey: resetApiKey,
@@ -270,14 +272,28 @@ async function run(): Promise<void> {
               'Auth reset outbox worker result');
           },
           onHealth: (health) => {
-            processLogger.info({ component:'AUTH_RESET', ...health },
-              'Auth reset queue aggregate health');
-            if (health.failed > 0 || health.oldestPendingSeconds > 120) {
-              processLogger.warn({ component:'AUTH_RESET',
-                event:'backlog_or_failed_jobs',
-                pending: health.pending, failed: health.failed,
-                oldestPendingSeconds: health.oldestPendingSeconds },
-              'Password reset queue requires operational attention');
+            // Two consecutive 30s snapshots with CLAIMED jobs exceed the
+            // normal 20s lease; this is a local heuristic, not external paging.
+            neutralClaimedSnapshots = health.neutral.claimed > 0
+              ? neutralClaimedSnapshots + 1 : 0;
+            deliveryClaimedSnapshots = health.delivery.claimed > 0
+              ? deliveryClaimedSnapshots + 1 : 0;
+            const warningCodes = passwordResetQueueWarningCodes(
+              health, neutralClaimedSnapshots, deliveryClaimedSnapshots,
+            );
+            processLogger.info({
+              component: 'AUTH_RESET',
+              neutral: health.neutral,
+              delivery: health.delivery,
+            }, 'Auth reset two-stage queue aggregate health');
+            if (warningCodes.length > 0) {
+              processLogger.warn({
+                component: 'AUTH_RESET',
+                event: 'queue_attention_required',
+                warningCodes,
+                neutral: health.neutral,
+                delivery: health.delivery,
+              }, 'Auth reset queue requires operational attention');
             }
           },
         });
