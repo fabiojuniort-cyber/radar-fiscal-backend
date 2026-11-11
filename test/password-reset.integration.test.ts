@@ -1,196 +1,235 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
-
 import { Pool } from 'pg';
-
 import { buildApp } from '../src/app.js';
-import type { PasswordResetMessage } from '../src/modules/auth/password-reset.service.js';
+import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
+import {
+  requestPasswordReset,
+  type PasswordResetMessage,
+} from '../src/modules/auth/password-reset.service.js';
+import { processPasswordResetOutboxOnce } from '../src/modules/auth/password-reset.worker.js';
 
-const OLD_PASSWORD = 'Senha-Antiga-2026!';
-const NEW_PASSWORD = 'Senha-Nova-2026!';
-const THIRD_PASSWORD = 'Senha-Final-2026!';
+const OLD = 'Senha-Antiga-2026!';
+const NEW = 'Senha-Nova-2026!';
+const NEXT = 'Senha-Final-2026!';
+const KEY = 'b'.repeat(64);
+const URL = 'https://trifaros.com.br/nova-senha';
+const hash = (s: string) => createHash('sha256').update(s).digest('hex');
+const tokenFromLink = (m: PasswordResetMessage) => {
+  const u = new URL(m.link);
+  assert.equal(u.origin, 'https://trifaros.com.br');
+  assert.equal(u.search, '');
+  const t = new URLSearchParams(u.hash.substring(1)).get('token');
+  assert.match(t,/^[A-Za-z0-9_-]{43}$/);
+  return t!;
+};
 
-function hash(input: string): string {
-  return createHash('sha256').update(input, 'utf8').digest('hex');
-}
-
-function tokenFromSimulatedInbox(message: PasswordResetMessage): string {
-  const url = new URL(message.link);
-  assert.equal(url.origin, 'https://trifaros.com.br');
-  assert.equal(url.pathname, '/nova-senha');
-  assert.equal(url.search, '');
-  const token = new URLSearchParams(url.hash.slice(1)).get('token');
-  assert.match(token, /^[A-Za-z0-9_-]{43}$/);
-  return token!;
-}
-
-test('AUTH-RESET isolated complete contract: request, inbox, link, password, revoke, replay, limits', async () => {
-  const adminUrl = process.env.DATABASE_ADMIN_URL;
-  assert.ok(adminUrl, 'DATABASE_ADMIN_URL required (disposable PostgreSQL only).');
-  assert.equal(process.env.NODE_ENV, 'test', 'Do not run against production.');
-  assert.ok(/radar_fiscal_test/.test(adminUrl), 'Isolated test database required.');
-
-  const inbox: PasswordResetMessage[] = [];
-  const app = await buildApp({
-    passwordReset: {
-      enabled: true,
-      publicUrl: 'https://trifaros.com.br/nova-senha',
-      send: async (message) => { inbox.push(message); },
-    },
+test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurrency', async () => {
+  assert.equal(process.env.NODE_ENV,'test');
+  const adminUrl = process.env.DATABASE_ADMIN_URL ?? '';
+  assert.match(adminUrl,/radar_fiscal_test/);
+  const runtimeUrl = new URL(process.env.DATABASE_URL!);
+  const workerUrl = new URL(runtimeUrl);
+  workerUrl.username = 'radar_worker_runtime';
+  const dbArgs = {
+    connectionString: workerUrl.toString(),
+    poolMax: 2, idleTimeoutMs: 10_000, connectionTimeoutMs: 5_000,
+  };
+  const admin = new Pool({connectionString:adminUrl,max:2});
+  const worker = createStandaloneDatabase(dbArgs);
+  const worker2 = createStandaloneDatabase(dbArgs);
+  const runtime = new Pool({connectionString:runtimeUrl.toString(),max:1});
+  const settings = {tokenKey:KEY,publicUrl:URL};
+  let app = await buildApp({passwordReset:{enabled:true,tokenKey:KEY,publicUrl:URL}});
+  const inbox:PasswordResetMessage[] = [];
+  const sender = async (m:PasswordResetMessage) => {inbox.push(m);};
+  const unique=randomUUID();
+  const email='reset02-'+unique+'@example.test';
+  const unknown='missing02-'+unique+'@example.test';
+  let userId='',tenantId='';
+  const tracked:string[]=[];
+  const track=(addr:string) => tracked.push(hash('auth-reset-v1:request-email:'+addr));
+  const forgot=async (addr:string) => app.inject({
+    method:'POST',url:'/auth/password/forgot',payload:{email:addr},
   });
-  const admin = new Pool({ connectionString: adminUrl, max: 1 });
-
-  const unique = randomUUID();
-  const email = 'reset-' + unique + '@example.test';
-  const absentEmail = 'absent-' + unique + '@example.test';
-  const limitedEmail = 'limited-' + unique + '@example.test';
-  let userId = '';
-  let tenantId = '';
-
-  const request = async (address: string) => app.inject({
-    method: 'POST',
-    url: '/auth/password/forgot',
-    payload: { email: address },
+  const reset=async (token:string,password=NEW) => app.inject({
+    method:'POST',url:'/auth/password/reset',
+    payload:{token,password,confirmPassword:password},
   });
-  const reset = async (token: string, password = NEW_PASSWORD) => app.inject({
-    method: 'POST',
-    url: '/auth/password/reset',
-    payload: { token, password, confirmPassword: password },
+  const login=async (password:string) => app.inject({
+    method:'POST',url:'/auth/login',payload:{email,password},
   });
-  const login = async (password: string) => app.inject({
-    method: 'POST',
-    url: '/auth/login',
-    payload: { email, password },
-  });
-
-  try {
-    await app.ready();
-
-    const created = await app.inject({
-      method: 'POST',
-      url: '/auth/register',
-      payload: {
-        name: 'Usuário de Teste Reset',
-        email,
-        password: OLD_PASSWORD,
-        confirmPassword: OLD_PASSWORD,
-        acceptedTerms: true,
-      },
-    });
-    assert.equal(created.statusCode, 201, created.body);
-    const registration = created.json<{
-      user: { id: string };
-      tenant: { id: string };
-    }>();
-    userId = registration.user.id;
-    tenantId = registration.tenant.id;
-
-    const oldSession = await login(OLD_PASSWORD);
-    assert.equal(oldSession.statusCode, 200, oldSession.body);
-    const oldJwt = oldSession.json<{ accessToken: string }>().accessToken;
-    const refreshHeader = oldSession.headers['set-cookie'];
-    assert.ok(refreshHeader);
-    const cookiePair = (Array.isArray(refreshHeader) ?
-      refreshHeader[0] : refreshHeader).split(';')[0];
-    assert.equal((await app.inject({
-      method: 'GET', url: '/auth/me',
-      headers: { authorization: 'Bearer ' + oldJwt },
-    })).statusCode, 200);
-
-    const known = await request(email);
-    const unknown = await request(absentEmail);
-    assert.equal(known.statusCode, 202);
-    assert.equal(unknown.statusCode, 202);
-    assert.deepEqual(known.json(), unknown.json());
-    assert.equal(inbox.length, 1, 'Unknown email must not send any message.');
-    assert.equal(inbox[0]?.to, email);
-    const token1 = tokenFromSimulatedInbox(inbox[0]!);
-
-    const second = await request(email);
-    assert.equal(second.statusCode, 202);
-    assert.equal(inbox.length, 2);
-    assert.equal((await reset(token1)).statusCode, 400,
-      'New request must invalidate older link.');
-
-    const token2 = tokenFromSimulatedInbox(inbox[1]!);
-    const tokenHash2 = hash(token2);
-    await admin.query(
-      "UPDATE auth_password_reset_tokens " +
-      "SET created_at = clock_timestamp() - interval '2 hours', " +
-      "expires_at = clock_timestamp() - interval '1 hour' " +
-      "WHERE token_hash = $1",
-      [tokenHash2],
-    );
-    assert.equal((await reset(token2)).statusCode, 400,
-      'Expired link must fail.');
-    assert.equal((await login(OLD_PASSWORD)).statusCode, 200,
-      'Invalid link must not change password.');
-
-    const third = await request(email);
-    assert.equal(third.statusCode, 202);
-    const token3 = tokenFromSimulatedInbox(inbox[2]!);
-
-    const applied = await reset(token3);
-    assert.equal(applied.statusCode, 204, applied.body);
-    assert.equal((await reset(token3)).statusCode, 400,
-      'Token must be single use.');
-    assert.equal((await login(OLD_PASSWORD)).statusCode, 401);
-    assert.equal((await login(NEW_PASSWORD)).statusCode, 200);
-
-    const after = await app.inject({
-      method: 'GET', url: '/auth/me',
-      headers: { authorization: 'Bearer ' + oldJwt },
-    });
-    assert.equal(after.statusCode, 401, 'Old access token must fail.');
-
-    const refresh = await app.inject({
-      method: 'POST', url: '/auth/refresh',
-      headers: { cookie: cookiePair, 'x-csrf-protection': '1' },
-    });
-    assert.equal(refresh.statusCode, 401, 'Old refresh cookie must fail.');
-
-    const revoked = await admin.query<{ total: string }>(
-      "SELECT count(*)::text AS total FROM auth_sessions " +
-      "WHERE user_id=$1 AND revoked_at IS NULL",
+  const finish = async () => processPasswordResetOutboxOnce(worker,{...settings,send:sender});
+  const latest = async () => {
+    const result=await admin.query<{id:string;status:string;encrypted_token:string|null;nonce:string|null;auth_tag:string|null;token_hash:string;used_at:Date|null}>(
+      'SELECT o.id,o.status,o.encrypted_token,o.nonce,o.auth_tag,o.token_hash,t.used_at '+
+      'FROM auth_password_reset_outbox o JOIN auth_password_reset_tokens t '+
+      'ON t.token_hash=o.token_hash WHERE t.user_id=$1 ORDER BY o.created_at DESC LIMIT 1',
       [userId],
     );
-    assert.equal(revoked.rows[0]?.total, '1',
-      'Only new login session should remain valid.');
+    assert.equal(result.rowCount,1);
+    return result.rows[0]!;
+  };
+  try {
+    await app.ready();
+    const created=await app.inject({method:'POST',url:'/auth/register',payload:{
+      name:'Persona Sintetica',email,password:OLD,confirmPassword:OLD,acceptedTerms:true,
+    }});
+    assert.equal(created.statusCode,201,created.body);
+    const data=created.json<{user:{id:string};tenant:{id:string}}>();
+    userId=data.user.id;tenantId=data.tenant.id;
+    const logged=await login(OLD);
+    assert.equal(logged.statusCode,200);
+    const oldJwt=logged.json<{accessToken:string}>().accessToken;
+    const cookies=logged.headers['set-cookie'];
+    const cookie=(Array.isArray(cookies)?cookies[0]:cookies)?.split(';')[0];
+    assert.ok(cookie);
 
-    const fourth = await request(email);
-    assert.equal(fourth.statusCode, 202);
-    const token4 = tokenFromSimulatedInbox(inbox[3]!);
-    const race = await Promise.all([
-      reset(token4, THIRD_PASSWORD),
-      reset(token4, THIRD_PASSWORD),
+    const a=await forgot(email),b=await forgot(unknown);
+    track(email);track(unknown);
+    assert.equal(a.statusCode,202);assert.equal(b.statusCode,202);
+    assert.deepEqual(a.json(),b.json());
+    assert.equal(inbox.length,0,'HTTP does not call sender');
+    const persisted=await latest();
+    assert.equal(persisted.status,'PENDING');
+    assert.ok(persisted.encrypted_token);
+    assert.ok(!persisted.encrypted_token!.includes('token='));
+    assert.equal((await admin.query(
+      "SELECT count(*)::text AS total FROM auth_password_reset_outbox WHERE status='PENDING'"
+    )).rows.length,1);
+
+    // Restart API before delivery: durable job survives process restart.
+    await app.close();
+    app=await buildApp({passwordReset:{enabled:true,tokenKey:KEY,publicUrl:URL}});
+    await app.ready();
+    assert.equal(await finish(),'ACCEPTED');
+    assert.equal(inbox.length,1);
+    const token1=tokenFromLink(inbox[0]!);
+    const done=await latest();
+    assert.equal(done.status,'ACCEPTED');
+    assert.equal(done.encrypted_token,null,'Ciphertext destroyed after provider acceptance');
+
+    const second=await forgot(email);
+    assert.equal(second.statusCode,202);
+    const oldReset=await reset(token1);
+    assert.equal(oldReset.statusCode,400,'Superseded token cannot be redeemed');
+    const t2=await latest();
+    assert.equal(t2.status,'PENDING');
+    // Transient failure and retry; no plaintext in DB.
+    const retry=await processPasswordResetOutboxOnce(worker,{
+      ...settings,send:async()=>{throw new Error('SIMULATED_SECRET_OR_ADDRESS');},
+    });
+    assert.equal(retry,'RETRY');
+    assert.equal((await latest()).status,'PENDING');
+    await admin.query(
+      "UPDATE auth_password_reset_outbox SET available_at=clock_timestamp()-interval '1 sec' WHERE id=$1",
+      [t2.id],
+    );
+    assert.equal(await finish(),'ACCEPTED');
+    assert.equal(inbox.length,2);
+    const token2=tokenFromLink(inbox[1]!);
+    assert.equal((await reset(token2)).statusCode,204);
+    assert.equal((await reset(token2)).statusCode,400);
+    assert.equal((await login(OLD)).statusCode,401);
+    assert.equal((await login(NEW)).statusCode,200);
+    assert.equal((await app.inject({method:'GET',url:'/auth/me',headers:{
+      authorization:'Bearer '+oldJwt,
+    }})).statusCode,401);
+    assert.equal((await app.inject({method:'POST',url:'/auth/refresh',headers:{
+      cookie:cookie!, 'x-csrf-protection':'1',
+    }})).statusCode,401);
+
+    // Two replicas attempt same eligible job; exactly one claim/send.
+    assert.equal((await forgot(email)).statusCode,202);
+    const before=inbox.length;
+    const contenders=await Promise.all([
+      processPasswordResetOutboxOnce(worker,{...settings,send:sender}),
+      processPasswordResetOutboxOnce(worker2,{...settings,send:sender}),
     ]);
-    assert.deepEqual(race.map((x) => x.statusCode).sort(), [204, 400],
-      'Only one concurrent redeemer may succeed.');
-    assert.equal((await login(NEW_PASSWORD)).statusCode, 401);
-    assert.equal((await login(THIRD_PASSWORD)).statusCode, 200);
+    assert.equal(inbox.length,before+1);
+    assert.equal(contenders.filter(x=>x==='ACCEPTED').length,1);
+    const token3=tokenFromLink(inbox[inbox.length-1]!);
+    assert.equal((await reset(token3,NEXT)).statusCode,204);
+    assert.equal((await login(NEW)).statusCode,401);
+    assert.equal((await login(NEXT)).statusCode,200);
 
-    for (let attempt = 0; attempt < 5; attempt++) {
-      assert.equal((await request(limitedEmail)).statusCode, 202);
+    // Expiration before dispatch must not send.
+    assert.equal((await forgot(email)).statusCode,202);
+    const expired=await latest();
+    await admin.query(
+      "UPDATE auth_password_reset_tokens SET created_at=clock_timestamp()-interval '2 hour', "+
+      "expires_at=clock_timestamp()-interval '1 hour' WHERE token_hash=$1",
+      [expired.token_hash],
+    );
+    const prev=inbox.length;
+    assert.equal(await finish(),'EMPTY');
+    assert.equal(inbox.length,prev);
+    assert.equal((await latest()).status,'EXPIRED');
+
+    // Three failures => terminal failure, only its token invalidated.
+    assert.equal((await forgot(email)).statusCode,202);
+    const fatal=await latest();
+    for(let i=0;i<3;i++){
+      const state=await processPasswordResetOutboxOnce(worker,{
+        ...settings,send:async()=>{throw new Error('MOCK_ZOHO_REJECT');},
+      });
+      assert.equal(state,i===2?'FAILED':'RETRY');
+      if(i<2) await admin.query(
+        "UPDATE auth_password_reset_outbox SET available_at=clock_timestamp()-interval '1 sec' WHERE id=$1",
+        [fatal.id],
+      );
     }
-    const limited = await request(limitedEmail);
-    assert.equal(limited.statusCode, 429);
-    assert.deepEqual(limited.json(), { error: 'too_many_requests' });
-    assert.ok(Number(limited.headers['retry-after']) >= 1);
+    assert.equal((await latest()).status,'FAILED');
+    assert.ok((await latest()).used_at);
+    assert.equal(inbox.length,prev);
+
+    // Email quota exhaustion does NOT return 429 to victim at other IP.
+    const abused='abused-'+randomUUID()+'@example.test';
+    track(abused);
+    for(let i=0;i<6;i++){
+      await requestPasswordReset(app.db,{
+        email:abused,ip:'192.0.2.'+(i+20),publicUrl:URL,tokenKey:KEY,
+      });
+    }
+    const neutral=await forgot(abused);
+    assert.equal(neutral.statusCode,202);
+    const total=(await admin.query<{total:string}>(
+      'SELECT count(*)::text AS total FROM auth_password_reset_outbox o '+
+      'JOIN auth_password_reset_tokens t ON t.token_hash=o.token_hash '+
+      'JOIN app_users u ON u.id=t.user_id WHERE u.email=$1',[abused],
+    )).rows[0]?.total;
+    assert.equal(total,'0','Unknown email never queued');
+
+    // Real role with TEMP must not shadow official app_users in SECURITY DEFINER.
+    const client=await runtime.connect();
+    try{
+      await client.query('CREATE TEMP TABLE app_users(id UUID,email TEXT,status TEXT)');
+      await client.query(
+        "INSERT INTO app_users VALUES ($1,$2,'ACTIVE')",
+        [userId,'shadow-'+unique+'@example.test'],
+      );
+      const forged=await client.query<{issued:boolean}>(
+        'SELECT public.auth_password_reset_issue($1,$2,$3,$4,$5,$6) AS issued',
+        ['shadow-'+unique+'@example.test',hash('malicious'),1800,'fakeciphertext-xx-xx-xx-xx-xx-xx','fakefakefakefake','fakefakefakefakefakefake'],
+      );
+      assert.equal(forged.rows[0]?.issued,false);
+      await assert.rejects(client.query('SELECT * FROM public.auth_password_reset_tokens'));
+      await assert.rejects(client.query('SELECT * FROM public.auth_password_reset_outbox'));
+    } finally {client.release();}
   } finally {
     await app.close();
-    if (userId) await admin.query('DELETE FROM app_users WHERE id = $1', [userId]);
-    if (tenantId) await admin.query('DELETE FROM tenants WHERE id = $1', [tenantId]);
-    const rateKeys = [email, absentEmail, limitedEmail].map((address) =>
-      hash('auth-reset-v1:request-email:' + address),
-    );
-    rateKeys.push(hash('auth-reset-v1:request-ip:127.0.0.1'));
-    rateKeys.push(hash('auth-reset-v1:confirm-ip:127.0.0.1'));
-    rateKeys.push(hash(email));
-    await admin.query(
-      'DELETE FROM public_signup_rate_limits WHERE key_hash = ANY($1::text[])',
-      [rateKeys],
-    );
+    await worker.destroy();await worker2.destroy();await runtime.end();
+    if(userId)await admin.query('DELETE FROM app_users WHERE id=$1',[userId]);
+    if(tenantId)await admin.query('DELETE FROM tenants WHERE id=$1',[tenantId]);
+    const rate=[
+      ...tracked,
+      hash('auth-reset-v1:request-ip:127.0.0.1'),
+      hash('auth-reset-v1:confirm-ip:127.0.0.1'),
+      ...Array.from({length:6},(_,i)=>hash('auth-reset-v1:request-ip:192.0.2.'+(i+20))),
+      hash(email),
+    ];
+    await admin.query('DELETE FROM public_signup_rate_limits WHERE key_hash=ANY($1::text[])',[rate]);
     await admin.end();
   }
 });
