@@ -125,6 +125,9 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
    if(tenant)await admin.query('DELETE FROM tenants WHERE id=$1',[tenant]);
    if(faultTenant)await admin.query('DELETE FROM tenants WHERE id=$1',[faultTenant]);
    await admin.query('DELETE FROM public_signup_rate_limits WHERE key_hash=ANY($1::text[])',[keys]);
+   await admin.query('DELETE FROM public.auth_password_reset_requests');
+   await admin.query('DELETE FROM public.auth_password_reset_worker_heartbeats');
+   await admin.query('DELETE FROM public.auth_password_reset_key_state');
    await admin.end();
  }
 });
