@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   completePasswordReset,
   PasswordResetRateLimitedError,
+  PasswordResetUnavailableError,
   requestPasswordReset,
 } from '../../modules/auth/password-reset.service.js';
 
@@ -52,6 +53,9 @@ export async function passwordResetRoutes(
         tokenKey: options.tokenKey,
       });
     } catch (error) {
+      if (error instanceof PasswordResetUnavailableError) {
+        return reply.status(503).send({ error: 'password_reset_unavailable' });
+      }
       if (error instanceof PasswordResetRateLimitedError) {
         reply.header('Retry-After', String(error.retryAfterSeconds));
         return reply.status(429).send({ error: 'too_many_requests' });
