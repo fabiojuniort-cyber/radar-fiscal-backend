@@ -13,7 +13,11 @@ de janeiro de 2026. Nenhuma requisição foi feita. O corpo do ato (`rfb:148516`
 
 ## Escopo da rota (sem acesso genérico ao gov.br)
 - **Host:** exatamente `www.gov.br`, HTTPS, porta padrão, sem credenciais, sem query e sem fragmento.
-- **Prefixo de caminho:** `/receitafederal/pt-br/assuntos/agenda-tributaria/`.
+- **Forma canônica única** (correção COORD: URL inicial × prefixo, barra final):
+  - índice = `https://www.gov.br/receitafederal/pt-br/assuntos/agenda-tributaria`, **sem** barra final; a forma com barra é normalizada para ele;
+  - filhos = índice + `/` + 1 a 3 segmentos `[a-z0-9-]`.
+  - Guarda implementada **só como função pura** e testada offline: `ops/anatomy/corat-annex-route.ts` (#303 @ `b168c994`, `test/anatomy.corat-annex-route.unit.test.ts`, 28 rotas recusadas). Não há coletor.
+- **Prefixo de caminho:** `/receitafederal/pt-br/assuntos/agenda-tributaria/` (filhos).
   - É uma **hipótese a confirmar** no 1º passo, não verificada offline.
   - Qualquer URL fora dele é recusada **antes** do envio, inclusive o restante do gov.br.
 - **Redirect:** só dentro do mesmo host e prefixo, e cada salto é uma requisição debitada. Fora disso: registrado, não seguido, fim.

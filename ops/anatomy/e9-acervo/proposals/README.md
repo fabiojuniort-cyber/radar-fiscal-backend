@@ -119,3 +119,32 @@ O #300 (`22e8cc48`, motor `04af1bfd`, PASS técnico offline 06–07/11) foi test
 ## E. CI
 
 O #310 (`ef7a0795`, draft) fixa o `postgresql-client-16` no `verify`, só na regressão completa. Isso cobre a causa da falha do #303 (`pg_dump` PG 17+ na imagem `ubuntu-26.04`). Nada foi duplicado aqui.
+
+## Correção final antes da revisão (COORD, 2026-11-11)
+
+### Roteiro de revisão do patch A (`proposal-300-type5-express-ref.patch`, base #300 @ `22e8cc48`)
+1. **Atributos e HTML malformado:** atributos com `<`/`>`, aspas desbalanceadas, `on*=`, `style` com `expression`, entidades
+   e tags em caixa mista dentro de `<table>`. O validador só admite as tags de `FRAGMENT_TAGS`. Os atributos não são
+   interpretados pelo validador e passam ao leitor como no #300. Conferir que nenhum atributo vira texto do ato.
+2. **Referência expressa × proximidade:** a regra exige as duas coisas, a referência que **termina** o segmento anterior
+   (`EXPRESS_REF`) e a adjacência de ordem (`order - 1`). Testar proximidade sem referência, referência no meio da frase,
+   referência no segmento seguinte (não vale), dois anexos seguidos (só o primeiro é adjacente) e ordem com lacuna.
+3. **Citação, tachado e histórico:** a R3 vem antes da regra nova. Citação aberta, vizinho citado, segmento tachado e
+   vizinho `historical`/`unknown` nunca dão `operative_candidate` (E9-A4).
+4. **Bytes, hashes e ponteiros:** SHA do payload igual ao decodificado; 26/26 ponteiros no ADE Cofis real; os testes R2
+   (BOM, fora do BMP, windows-1252) continuam verdes.
+5. **Regressão:** anexo da IN 2.121 (id 67992) igual; lote com delta só de `outputHash`; motor `04af1bfd → 8879065a`;
+   base-migration 12/12.
+
+### Patch B r3 (`proposal-303-rfb-acceptance-r3.patch`, base #303 @ `b168c994`)
+- **Anexo do próprio ato × citação de outra norma:**
+  - `annexMentions` classifica cada menção como `own` ("deste/desta/ao presente…", "em anexo"), `other` ("Anexo I da
+    Instrução Normativa…", "Anexo XV, inciso II, do Decreto…") ou `ambiguous`;
+  - só `own` + `ambiguous` geram lacuna (conservador);
+  - ADE Corat: 2 menções próprias, continua bloqueado.
+- **Testes:** B5 cobre 9 casos adversariais; `test:anatomy` 357/357; motor `0e009431` inalterado.
+- **Mantido:** a união append-only com os 12 registros do #309; a SC Cosit com porte indeterminado (13/61 cobertas, 1 aceita, só no patch). Nada incorporado.
+- **Para a revisão adversarial:**
+  - menções no plural ("Anexos I e II desta Portaria" → `ambiguous`);
+  - normas citadas por sigla ("Anexo da IN 2.121");
+  - "Anexo" como verbo ou substantivo comum ("anexo ao processo").
