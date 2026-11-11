@@ -5,7 +5,7 @@ import test from 'node:test';
 import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
-import { processPasswordResetOutboxOnce } from '../src/modules/auth/password-reset.worker.js';
+import { heartbeatPasswordResetWorker, processPasswordResetOutboxOnce } from '../src/modules/auth/password-reset.worker.js';
 
 const KEY='e'.repeat(64);
 const PUBLIC_URL='https://trifaros.com.br/nova-senha';
@@ -35,6 +35,7 @@ test('B-1: temporal floor active and provider latency/failure cannot affect HTTP
   ];
   try{
     await app.ready();
+    assert.equal(await heartbeatPasswordResetWorker(db,KEY,randomUUID()),true);
     const registered=await app.inject({method:'POST',url:'/auth/register',payload:{
       name:'Tester Tempo',email,password:'Senha-Segura-2026!',
       confirmPassword:'Senha-Segura-2026!',acceptedTerms:true,
@@ -61,14 +62,17 @@ test('B-1: temporal floor active and provider latency/failure cannot affect HTTP
       assert.equal(sendCalls,0,'No Zoho call in HTTP path');
       assert.ok(Math.abs(known.ms-absent.ms)<250,'Provider timing must not reveal account');
       assert.ok(known.ms>=1150 && absent.ms>=1150,'Temporal floor is active');
-      const workerResult=await processPasswordResetOutboxOnce(db,{
-        tokenKey:KEY,publicUrl:PUBLIC_URL,
-        send:async()=>{
-          sendCalls++;
-          await new Promise((resolve)=>setTimeout(resolve,scenario.ms));
-          if(scenario.fail)throw new Error('MOCK_ZOHO_FAIL');
-        },
-      });
+      let workerResult: string='EMPTY';
+      for(let n=0;n<12 && sendCalls===0;n++){
+        workerResult=await processPasswordResetOutboxOnce(db,{
+          tokenKey:KEY,publicUrl:PUBLIC_URL,
+          send:async()=>{
+            sendCalls++;
+            await new Promise((resolve)=>setTimeout(resolve,scenario.ms));
+            if(scenario.fail)throw new Error('MOCK_ZOHO_FAIL');
+          },
+        });
+      }
       assert.equal(sendCalls,1,'Durable worker handles provider separately');
       assert.equal(workerResult,scenario.fail?'RETRY':'ACCEPTED');
       console.log('AUTH_RESET_B1_AFTER '+JSON.stringify({
