@@ -247,7 +247,12 @@ async function run(): Promise<void> {
     const resetUrl = process.env.AUTH_PASSWORD_RESET_PUBLIC_URL ?? '';
     const resetFrom = process.env.ZOHO_CPAAS_FROM_ADDRESS ?? '';
     const resetApiKey = process.env.ZOHO_CPAAS_API_KEY ?? '';
-    const resetProxyKnown = Boolean(process.env.AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS?.trim());
+    const trustedProxyCidrs=(process.env.AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS ?? '')
+      .split(',').map((x)=>x.trim()).filter(Boolean);
+    const resetProxyKnown = trustedProxyCidrs.length>0 && trustedProxyCidrs.every(
+      (cidr)=>/^(?:\d{1,3}\.){3}\d{1,3}(?:\/(?:\d|[12]\d|3[0-2]))?$/.test(cidr) &&
+        cidr!=='0.0.0.0/0' && cidr!=='127.0.0.1/8',
+    );
     if (resetEnabled) {
       if (!/^[0-9a-f]{64}$/i.test(resetKey) ||
           !resetUrl.startsWith('https://') ||
