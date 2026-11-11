@@ -89,6 +89,37 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
      medianDeltaMs:median(known)-median(unknown),
      lockedRow:true,pisoTemporarioAtivo:true,
    }));
+   // R4 no-floor countercase under the SAME real PostgreSQL row lock.
+   // Clear synthetic email counters only between test phases.
+   await admin.query(
+     'DELETE FROM public_signup_rate_limits WHERE key_hash=ANY($1::text[])',
+     [keys.slice(0,2)],
+   );
+   const noFloorKnown:number[]=[],noFloorMissing:number[]=[];
+   for(let i=0;i<4;i++){
+     const a0=performance.now();
+     const ra=await app.inject({
+       method:'POST',url:'/auth/password/forgot',payload:{email},
+     });
+     const dtA=Math.round(performance.now()-a0);
+     const b0=performance.now();
+     const rb=await app.inject({
+       method:'POST',url:'/auth/password/forgot',payload:{email:absent},
+     });
+     const dtB=Math.round(performance.now()-b0);
+     assert.equal(ra.statusCode,202);
+     assert.equal(rb.statusCode,202);
+     assert.equal(ra.body,rb.body);
+     assert.equal(ra.headers['cache-control'],rb.headers['cache-control']);
+     assert.equal(ra.headers['referrer-policy'],rb.headers['referrer-policy']);
+     noFloorKnown.push(dtA);noFloorMissing.push(dtB);
+   }
+   assert.ok(Math.abs(median(noFloorKnown)-median(noFloorMissing))<150);
+   console.log('R4_REAL_PG_LOCK_NO_FLOOR '+JSON.stringify({
+     existingMs:noFloorKnown,missingMs:noFloorMissing,
+     medianDeltaMs:median(noFloorKnown)-median(noFloorMissing),
+     lockedRow:true,temporalFloorDisabled:true,
+   }));
    await holding.query('COMMIT');holding.release();holding=null;
 
    // Register a distinct KNOWN account that has not consumed its quota.
