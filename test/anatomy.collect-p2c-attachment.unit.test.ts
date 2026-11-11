@@ -90,7 +90,7 @@ test('C5: the CLI requires --stop-after 1 and refuses before opening the budget;
   const t = never(); await assert.rejects(runAttachment(t.f, opts(f)), /remaining|exceeds|exhausted|more than/u, 'the single request is spent');
   assert.equal(t.urls.length, 0);
   assert.equal(pdfIdentityProblem([{ text: 'Solução de Consulta nº 258 - Cosit' }, { text: 'Data 26/12/2025' }]), null);
-  assert.match(pdfIdentityProblem([{ text: 'Solução de Consulta Cosit nº 258' }])!, /0 Solução de Consulta heading/u, 'a mention without the heading form is not the act');
+  assert.match(pdfIdentityProblem([{ text: 'Solução de Consulta Cosit nº 258' }])!, /first title line is not a Solução de Consulta Cosit heading/u, 'a mention without the heading form is not the act');
 });
 
 // ---- COORD correction before review (tribusca-control#116): hardening of the PDF route. These fail on 440bf24b. ----
@@ -158,4 +158,59 @@ test('H5: a failure between the PDF and the meta writes leaves NO resource that 
   const t2 = never(); const again = await runAttachment(t2.f, { ...o, budgetFile: budget() });
   assert.equal(t2.urls.length, 0); assert.doesNotMatch(again.outcome, /already stored/u, 'an incomplete write is never "already stored"');
   assert.match(again.outcome, /incomplete|inconsistent/u);
+});
+
+// ---- R2 (independent review c.6784793278, findings C-1…C-5). These reproduce the reviewer's counter-cases. ----
+const mkPdf = (lines: string[]) => buildSyntheticPdf([lines.map((text, i) => ({ text, y: 760 - i * 20 }))]);
+const runWith = async (lines: string[]) => runAttachment(transport(() => pdfResp(mkPdf(lines))).f, opts(budget()));
+
+test('R2 C-1 (reviewer counter-cases): a document that is NOT the SC — but mentions it in its head — is refused', async () => {
+  const cases: [string, string[]][] = [
+    ['Solução de Divergência citing the SC', ['SOLUÇÃO DE DIVERGÊNCIA Nº 7 - COSIT', 'Data 26 de dezembro de 2025', 'Solução de Consulta nº 258 - Cosit, reformada por esta.']],
+    ['Despacho citing the SC', ['DESPACHO', 'Data 26 de dezembro de 2025', 'Solução de Consulta nº 258 - Cosit']],
+    ['SC heading, date only inside a publication note', ['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Publicada no DOU de 26/12/2025 a SC nº 1']],
+    ['Parecer first', ['PARECER NORMATIVO Nº 3', 'Solução de Consulta nº 258 - Cosit', 'Data 26 de dezembro de 2025']],
+    ['unknown first line', ['NOTA EXPLICATIVA', 'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['correct title quoted as a reference', ['Conforme SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['year in title differs', ['SOLUÇÃO DE CONSULTA COSIT Nº 258, DE 26 DE DEZEMBRO DE 2024']],
+  ];
+  for (const [why, lines] of cases) { const r = await runWith(lines); assert.equal(r.stored, false, why); assert.match(r.outcome, /does not name the act/u, why); }
+});
+
+test('R2 C-2: legitimate, tested heading variants are accepted (the single request is not wasted)', async () => {
+  const ok: [string, string[]][] = [
+    ['date in title', ['SOLUÇÃO DE CONSULTA COSIT Nº 258, DE 26 DE DEZEMBRO DE 2025', 'Assunto: IRRF']],
+    ['N.º', ['SOLUÇÃO DE CONSULTA N.º 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['institutional lines before the title', ['Receita Federal', 'Coordenação-Geral de Tributação', 'Solução de Consulta nº 258 - Cosit', 'Data 26 de dezembro de 2025']],
+    ['Data: 26/12/2025', ['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data: 26/12/2025']],
+  ];
+  for (const [why, lines] of ok) { const r = await runWith(lines); assert.equal(r.stored, true, `${why}: ${r.outcome}`); }
+});
+
+test('R2 C-3: a final Response.url different from the pinned URL is refused even without redirected=true', async () => {
+  const t = transport(() => { const r = pdfResp(PDF_OK); Object.defineProperty(r, 'url', { value: 'https://evil.example/x.pdf' }); return r; });
+  const o = opts(budget()); const r = await runAttachment(t.f, o);
+  assert.equal(r.stored, false); assert.match(r.outcome, /final URL .* differs from the pinned route/u);
+  assert.equal(existsSync(join(o.outDir, '148681-83325.meta.json')), false);
+});
+
+test('R2 C-4: a stream error mid-body is an operational outcome (debited, nothing stored), never an unhandled rejection', async () => {
+  const broken = new ReadableStream<Uint8Array>({ pull(c) { c.enqueue(new TextEncoder().encode('%PDF-1.7\n')); c.error(new Error('reset')); } });
+  const f = budget(); const o = opts(f);
+  const r = await runAttachment(transport(() => new Response(broken, { status: 200, headers: { 'content-type': 'application/pdf' } })).f, o);
+  assert.equal(r.stored, false); assert.match(r.outcome, /stream error.*reset/u); assert.equal(read(f).used.total, 1);
+});
+
+test('R2 C-5: single-owner preflight — the local ledger must equal the pushed one, with no attempts, before the budget opens', async () => {
+  const { ledgerPreflight } = await import('../ops/anatomy/collect-p2c-attachment.js');
+  const clean = readFileSync(budget('active'), 'utf8');
+  assert.equal(ledgerPreflight(clean, clean), null);
+  assert.match(ledgerPreflight(clean, null)!, /cannot verify/u, 'no pushed copy → refuse');
+  const used = JSON.stringify({ ...JSON.parse(clean), used: { total: 1, perType: { 'Solução de Consulta': 1 } } });
+  assert.match(ledgerPreflight(clean, used)!, /differs from the pushed ledger/u, 'another copy consumed and pushed → refuse');
+  assert.match(ledgerPreflight(used, used)!, /already has attempts|already used/u, 'a consumed grant is never reused');
+  // the CLI runs the preflight BEFORE the budget opens (0 requests on refusal)
+  const t = never();
+  assert.equal(await cli(['--grant', 'G-PDF', '--owner', 'exec-303', '--stop-after', '1'], t.f, { preflight: () => 'ledger differs from the pushed ledger (test)' }), 3);
+  assert.equal(t.urls.length, 0);
 });

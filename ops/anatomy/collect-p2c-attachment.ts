@@ -17,6 +17,7 @@
  * Usage (only after review + activation): npx tsx ops/anatomy/collect-p2c-attachment.ts --grant E9-P2c-PDF83325-G1
  *   --owner 'EXEC #303 (claude/anat-e9-coverage)' --stop-after 1
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -58,23 +59,73 @@ export function targetProblem(actBytes: Buffer, idArquivoBinario: number = TARGE
 }
 
 /**
- * The PDF must BE the act, not merely mention it (COORD correction): within the first lines of page 1 there must be
- * exactly one SC heading and it must be "SOLUÇÃO DE CONSULTA Nº 258" issued by COSIT (same line, or COSIT on the next
- * heading line), and the act date 26/12/2025 ("26 de dezembro de 2025" or "26/12/2025") must appear in that head.
- * Another SC number in the head, another unit, a missing date, or "258" only in the body → refused.
+ * R2 (review C-1/C-2): the identity is shown by the STRUCTURE of the document, not by isolated words.
+ * - The head is page 1. Before the title, only institutional lines are allowed (Ministério…, Secretaria…, Receita
+ *   Federal…, Coordenação…, Subsecretaria…). The FIRST non-institutional line must be the title; anything else
+ *   (Solução de Divergência, Despacho, Parecer, Nota, a sentence quoting the SC…) refuses.
+ * - Accepted title forms (and only these, each tested):
+ *     "SOLUÇÃO DE CONSULTA Nº 258 - COSIT"            (nº | n.º | n° | no; "-" | "–" | "—")
+ *     "SOLUÇÃO DE CONSULTA COSIT Nº 258, DE 26 DE DEZEMBRO DE 2025"
+ *     "SOLUÇÃO DE CONSULTA Nº 258" + next line exactly "COSIT"
+ * - Number 258, unit COSIT, year 2025 and date 26/12/2025 must all match: the date either inside the title (form 2) or
+ *   on a DATE LINE ("Data 26 de dezembro de 2025" / "Data: 26/12/2025") right after the title (after the COSIT line in
+ *   form 3). A date only inside other text ("Publicada no DOU de 26/12/2025…") does not count.
+ * Unknown layouts refuse (fail closed).
  */
 const HEAD_LINES = 12;
+const INSTITUTIONAL = /^(MINIST[ÉE]RIO\b|SECRETARIA\b|SECRETARIA ESPECIAL\b|RECEITA FEDERAL\b|SUBSECRETARIA\b|COORDENA[ÇC][ÃA]O(-GERAL)?\b)/iu;
+const NUM = String.raw`N\s*(?:\.\s*)?[º°o]\.?\s*`;
+const DASH = String.raw`\s*[-–—]\s*`;
+const DATE_WORDS = String.raw`26\s+DE\s+DEZEMBRO\s+DE\s+(\d{4})`;
+const TITLE_A = new RegExp(String.raw`^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+${NUM}(\d+)${DASH}COSIT$`, 'iu');
+const TITLE_B = new RegExp(String.raw`^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+COSIT\s+${NUM}(\d+)\s*,\s*DE\s+${DATE_WORDS}$`, 'iu');
+const TITLE_C = new RegExp(String.raw`^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+${NUM}(\d+)$`, 'iu');
+const DATE_LINE = /^DATA\s*:?\s*(?:26\s+DE\s+DEZEMBRO\s+DE\s+(\d{4})|26\/12\/(\d{4}))$/iu;
 export function pdfIdentityProblem(lines: { text: string; page?: number }[]): string | null {
-  const head = lines.filter((l) => (l.page ?? 1) === 1).slice(0, HEAD_LINES).map((l) => l.text.normalize('NFC').replace(/\s+/gu, ' ').trim());
-  const sc = head.map((t, i) => ({ i, t, m: /^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+N\s*[º°o.]?\s*(\d+)\b(.*)$/iu.exec(t) })).filter((x) => x.m);
   const why = (w: string) => `the PDF text does not name the act (${w})`;
-  if (sc.length !== 1) return why(`${sc.length} Solução de Consulta heading(s) in the first ${HEAD_LINES} lines`);
-  const [{ i, m }] = sc as [{ i: number; t: string; m: RegExpExecArray }];
-  if (m[1] !== '258') return why(`heading is nº ${m[1]}, not nº 258`);
-  const unit = `${m[2]} ${head[i + 1] ?? ''}`;
-  if (!/(^|[^A-Za-z])COSIT\b/iu.test(unit) || /\b(SRRF|DISIT|DIT)\d*/iu.test(m[2]!)) return why('heading is not issued by COSIT');
-  if (!head.some((t) => /\b26\s+de\s+dezembro\s+de\s+2025\b|\b26\/12\/2025\b/iu.test(t))) return why('act date 26/12/2025 not in the head');
+  const head = lines.filter((l) => (l.page ?? 1) === 1).map((l) => l.text.normalize('NFC').replace(/\s+/gu, ' ').trim()).filter(Boolean).slice(0, HEAD_LINES);
+  let t = 0; while (t < head.length && INSTITUTIONAL.test(head[t]!)) t++;
+  const title = head[t];
+  if (!title) return why('no title line on page 1');
+  let num: string | undefined; let year: string | undefined; let next = t + 1;
+  const a = TITLE_A.exec(title); const b = TITLE_B.exec(title); const c = TITLE_C.exec(title);
+  if (a) num = a[1];
+  else if (b) { num = b[1]; year = b[2]; }
+  else if (c && /^COSIT$/iu.test(head[t + 1] ?? '')) { num = c[1]; next = t + 2; }
+  else return why(`first title line is not a Solução de Consulta Cosit heading ("${title.slice(0, 60)}")`);
+  if (num !== '258') return why(`heading is nº ${num}, not nº 258`);
+  if (!year) {
+    const d = DATE_LINE.exec(head[next] ?? '');
+    if (!d) return why('no date line (Data 26/12/2025) right after the heading');
+    year = d[1] ?? d[2];
+  }
+  if (year !== '2025') return why(`act year ${year}, not 2025`);
+  if (head.slice(t + 1).some((x) => /^SOLU[ÇC][ÃA]O\s+DE\s+(CONSULTA|DIVERG[ÊE]NCIA)\s+/iu.test(x))) return why('a second Solução heading in the head');
   return null;
+}
+
+/**
+ * R2 (review C-5): single owner, single ledger. The lease only coordinates ONE ledger file, so two independent copies
+ * could each spend the grant. Activation protocol: (1) the owner commits the activation of the ledger and PUSHES it;
+ * (2) right before the run, the CLI fetches the branch and compares the local ledger with the pushed one; (3) after the
+ * run the owner commits and pushes the consumed ledger. The preflight refuses when the pushed copy cannot be read, when
+ * it differs from the local one (another copy consumed it, or an unpushed local change), or when the grant already has
+ * attempts. No distributed lock is introduced (none is authorized).
+ */
+export function ledgerPreflight(local: string, pushed: string | null): string | null {
+  if (pushed === null) return 'cannot verify the pushed ledger (fetch it first): refused';
+  if (local !== pushed) return 'local ledger differs from the pushed ledger (another copy may have consumed it, or a change is unpushed): refused';
+  const s = JSON.parse(local) as { used?: { total?: number }; attempts?: unknown[] };
+  if ((s.used?.total ?? 0) > 0 || (s.attempts ?? []).length > 0) return 'the grant already has attempts / was already used: refused';
+  return null;
+}
+export function gitPushedLedger(file: string): string | null {
+  try {
+    const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim();
+    execFileSync('git', ['fetch', '-q', 'origin', branch], { stdio: 'ignore' });
+    const rel = execFileSync('git', ['ls-files', '--full-name', file], { encoding: 'utf8' }).trim();
+    return rel ? execFileSync('git', ['show', `origin/${branch}:${rel}`], { encoding: 'utf8' }) : null;
+  } catch { return null; }
 }
 
 /** Valid stored resource = final PDF + final meta whose sha256/bytes match the PDF. Anything else is not stored. */
@@ -137,8 +188,11 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
     // Never trust the transport: a response that was itself the result of a followed redirect is refused.
     if (r.redirected || r.type === 'opaqueredirect') return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): the transport followed a redirect (${r.url || 'unknown URL'})` };
     if (r.status >= 300 && r.status < 400) return { requests: sent, stored: false, outcome: `redirect ${r.status} → ${String(r.headers.get('location'))}: not followed (fail closed), nothing stored` };
+    if (r.url && r.url !== TARGET.url) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): final URL ${r.url} differs from the pinned route` };
     if (r.status !== 200) return { requests: sent, stored: false, outcome: `HTTP ${r.status}: nothing stored` };
-    const capped = await readCapped(r, MAX_PDF_BYTES);
+    let capped: Awaited<ReturnType<typeof readCapped>>;
+    try { capped = await readCapped(r, MAX_PDF_BYTES); }
+    catch (e) { return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): stream error while reading (${(e as Error).message.slice(0, 120)})` }; }
     if ('over' in capped) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): body exceeds ${MAX_PDF_BYTES} bytes while reading (stopped at ${capped.over})` };
     const body = capped.body;
     if (Buffer.from(body.subarray(0, 5)).toString('latin1') !== '%PDF-') return { requests: sent, stored: false, outcome: 'refused after capture (debited, not stored): not a PDF (no %PDF- header)' };
@@ -172,12 +226,14 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
 }
 
 /** CLI: refuses anything but `--stop-after 1` (code 2) before opening the budget. */
-export async function cli(argv: string[], doFetch: typeof fetch): Promise<number> {
+export async function cli(argv: string[], doFetch: typeof fetch, deps: { preflight?: () => string | null } = {}): Promise<number> {
   const arg = (k: string) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const grantId = arg('--grant'); const owner = arg('--owner');
   if (!grantId || !owner || arg('--stop-after') !== '1') {
     console.error('usage: collect-p2c-attachment.ts --grant <grantId> --owner <owner> --stop-after 1  (refused without an active grant)'); return 2;
   }
+  const pre = (deps.preflight ?? (() => ledgerPreflight(readFileSync(ATT_BUDGET, 'utf8'), gitPushedLedger(ATT_BUDGET))))();
+  if (pre) { console.error(`preflight: ${pre}`); return 3; }
   const out = await runAttachment(doFetch, { grantId, owner });
   console.log(JSON.stringify(out)); return out.stored ? 0 : 1;
 }
