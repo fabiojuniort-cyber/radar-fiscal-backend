@@ -229,8 +229,25 @@ BEGIN
    WHERE o.token_hash=t.token_hash AND o.status IN ('PENDING','CLAIMED')
      AND (t.used_at IS NOT NULL OR t.expires_at<=clock_timestamp());
   GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  -- Um worker morto na terceira tentativa nao deixa claim abandonado.
+  -- Falha terminal invalida EXCLUSIVAMENTE o digest deste job.
+  UPDATE public.auth_password_reset_tokens t
+     SET used_at=clock_timestamp()
+   WHERE t.token_hash IN (
+       SELECT o.token_hash FROM public.auth_password_reset_outbox o
+        WHERE o.status='CLAIMED' AND o.attempt_count>=3
+          AND o.claimed_until<clock_timestamp()
+   ) AND t.used_at IS NULL;
+
+  UPDATE public.auth_password_reset_outbox o
+     SET status='FAILED',encrypted_token=NULL,nonce=NULL,auth_tag=NULL,
+         claimed_until=NULL,claim_id=NULL,updated_at=clock_timestamp(),
+         error_code='LEASE_EXHAUSTED'
+   WHERE o.status='CLAIMED' AND o.attempt_count>=3
+     AND o.claimed_until<clock_timestamp();
   RETURN v_count;
-END; $$;
+END; $;
 REVOKE ALL ON FUNCTION public.auth_password_reset_reap() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.auth_password_reset_reap() TO radar_worker;
 
