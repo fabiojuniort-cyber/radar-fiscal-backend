@@ -43,7 +43,14 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
      const response=await app.inject({
        method:'POST',url:'/auth/password/forgot',payload:{email:address},
      });
-     return {status:response.statusCode,ms:Math.round(performance.now()-start)};
+     return {
+       status:response.statusCode,
+       ms:Math.round(performance.now()-start),
+       body:response.body,
+       cacheControl:response.headers['cache-control'],
+       referrer:response.headers['referrer-policy'],
+       contentType:response.headers['content-type'],
+     };
    }finally{process.env.NODE_ENV=was;}
  };
  try{
@@ -107,6 +114,19 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
    const b=await measure(faultUnknown);
    assert.equal(a.status,500);
    assert.equal(b.status,500);
+   assert.deepEqual({
+     status:a.status,body:a.body,cacheControl:a.cacheControl,
+     referrer:a.referrer,contentType:a.contentType,
+   },{
+     status:b.status,body:b.body,cacheControl:b.cacheControl,
+     referrer:b.referrer,contentType:b.contentType,
+   },'HTTP status, body and security headers are identical');
+   assert.deepEqual(JSON.parse(a.body),{error:'password_reset_unavailable'});
+   for(const forbidden of ['P0001','synthetic-intake-unavailable',
+     'auth_password_reset_requests',faultKnown,faultUnknown]){
+     assert.ok(!a.body.includes(forbidden) && !b.body.includes(forbidden),
+       'Public error must not expose PostgreSQL information');
+   }
    assert.ok(Math.abs(a.ms-b.ms)<200,
      'Partial outbox failure cannot be conditional on account existence');
    console.log('R3_REAL_PG_ERROR '+JSON.stringify({
