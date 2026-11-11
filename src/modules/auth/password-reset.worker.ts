@@ -46,11 +46,32 @@ export type PasswordResetWorkerOutcome =
   'EMPTY' | 'ACCEPTED' | 'RETRY' | 'FAILED' | 'EXPIRED' | 'IGNORED' |
   'PREPARED' | 'UNKNOWN' | 'SUPERSEDED' | 'UNAVAILABLE';
 
-export interface PasswordResetQueueHealth {
+export interface PasswordResetStageHealth {
   pending: number;
   claimed: number;
   failed: number;
   oldestPendingSeconds: number;
+}
+
+export interface PasswordResetQueueHealth {
+  delivery: PasswordResetStageHealth;
+  neutral: PasswordResetStageHealth;
+}
+
+// Stage-specific reason codes only: never recipient, HMAC, token, or ciphertext.
+export function passwordResetQueueWarningCodes(
+  health: PasswordResetQueueHealth,
+  neutralClaimedConsecutive: number,
+  deliveryClaimedConsecutive: number,
+): string[] {
+  const reasons: string[] = [];
+  if (health.neutral.failed > 0) reasons.push('NEUTRAL_FAILED');
+  if (health.neutral.oldestPendingSeconds > 120) reasons.push('NEUTRAL_PENDING_AGED');
+  if (neutralClaimedConsecutive >= 2) reasons.push('NEUTRAL_CLAIM_PERSISTENT');
+  if (health.delivery.failed > 0) reasons.push('DELIVERY_FAILED');
+  if (health.delivery.oldestPendingSeconds > 120) reasons.push('DELIVERY_PENDING_AGED');
+  if (deliveryClaimedConsecutive >= 2) reasons.push('DELIVERY_CLAIM_PERSISTENT');
+  return reasons;
 }
 
 export async function heartbeatPasswordResetWorker(
@@ -72,12 +93,30 @@ export async function readPasswordResetQueueHealth(
     pending: string; claimed: string; failed: string;
     oldest_pending_seconds: string;
   }>`SELECT * FROM public.auth_password_reset_queue_health()`.execute(db);
-  const row = result.rows[0];
+  // The existing SQL function retains its 4-column signature/grants:
+  // ORDER BY stage_order guarantees row 0 delivery, row 1 neutral.
+  // Missing a stage is a hard observability failure, never silent zeros.
+  if (result.rows.length !== 2) {
+    throw new Error('reset_queue_health_stage_mismatch');
+  }
+  const decode = (index: number): PasswordResetStageHealth => {
+    const row = result.rows[index]!;
+    const stage = {
+      pending: Number(row.pending),
+      claimed: Number(row.claimed),
+      failed: Number(row.failed),
+      oldestPendingSeconds: Number(row.oldest_pending_seconds),
+    };
+    if (Object.values(stage).some((value) =>
+      !Number.isSafeInteger(value) || value < 0
+    )) {
+      throw new Error('reset_queue_health_invalid_metric');
+    }
+    return stage;
+  };
   return {
-    pending: Number(row?.pending ?? 0),
-    claimed: Number(row?.claimed ?? 0),
-    failed: Number(row?.failed ?? 0),
-    oldestPendingSeconds: Number(row?.oldest_pending_seconds ?? 0),
+    delivery: decode(0),
+    neutral: decode(1),
   };
 }
 
