@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 import { sql, type Kysely } from 'kysely';
 
@@ -109,6 +109,67 @@ function escapeHtml(text: string): string {
   })[character] ?? character);
 }
 
+export interface EncryptedResetRecipient {
+  ciphertext: string;
+  nonce: string;
+  authTag: string;
+}
+
+export function passwordResetKeyFingerprint(keyHex: string): string {
+  return createHash('sha256')
+    .update('tri-auth-reset-worker-key:v1:')
+    .update(parseKey(keyHex))
+    .digest('hex');
+}
+
+export function passwordResetRecipientDigest(email: string, keyHex: string): string {
+  return createHmac('sha256', parseKey(keyHex))
+    .update('tri-auth-reset-email:v1:' + normalizeEmail(email), 'utf8')
+    .digest('hex');
+}
+
+export function encryptResetRecipient(
+  email: string, requestId: string, keyHex: string,
+): EncryptedResetRecipient {
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', parseKey(keyHex), nonce);
+  cipher.setAAD(Buffer.from('tri-auth-reset-request:v1:' + requestId, 'utf8'));
+  const ciphertext = Buffer.concat([
+    cipher.update(normalizeEmail(email), 'utf8'), cipher.final(),
+  ]);
+  return {
+    ciphertext: ciphertext.toString('base64'),
+    nonce: nonce.toString('base64'),
+    authTag: cipher.getAuthTag().toString('base64'),
+  };
+}
+
+export function decryptResetRecipient(
+  value: EncryptedResetRecipient, requestId: string, keyHex: string,
+): string {
+  const decipher = createDecipheriv(
+    'aes-256-gcm', parseKey(keyHex), Buffer.from(value.nonce, 'base64'),
+  );
+  decipher.setAAD(Buffer.from('tri-auth-reset-request:v1:' + requestId, 'utf8'));
+  decipher.setAuthTag(Buffer.from(value.authTag, 'base64'));
+  const email = Buffer.concat([
+    decipher.update(Buffer.from(value.ciphertext, 'base64')),
+    decipher.final(),
+  ]).toString('utf8');
+  if (email !== normalizeEmail(email) || email.length > 320 ||
+      !/^[^\s@]+@[^\s@]+$/.test(email)) {
+    throw new Error('invalid_reset_request_recipient');
+  }
+  return email;
+}
+
+export class PasswordResetUnavailableError extends Error {
+  constructor() {
+    super('password_reset_unavailable');
+    this.name = 'PasswordResetUnavailableError';
+  }
+}
+
 export class PasswordResetRateLimitedError extends Error {
   constructor(readonly retryAfterSeconds: number) {
     super('password_reset_rate_limited');
@@ -131,13 +192,16 @@ export async function requestPasswordReset(
   input: { email: string; ip: string; publicUrl: string; tokenKey: string },
 ): Promise<void> {
   const email = normalizeEmail(input.email);
-
-  // Validar configuracao antes da emissao; nao armazenar link ou token aberto.
+  // Validation and readiness are identical for existing and unknown accounts.
   passwordResetLink(input.publicUrl, 'validation');
   parseKey(input.tokenKey);
+  const fingerprint = passwordResetKeyFingerprint(input.tokenKey);
+  const ready = await sql<{ ready: boolean }>`
+    SELECT public.auth_password_reset_worker_ready(${fingerprint}) AS ready
+  `.execute(db);
+  if (!ready.rows[0]?.ready) throw new PasswordResetUnavailableError();
 
-  // O limite IP e o unico que pode responder 429. Ambos sao persistidos
-  // atomicamente no banco e recebem prefixos independentes do signup.
+  // Rate-limit state depends on the submitted address, never on its existence.
   const ipRate = await rateLimit(
     db, rateKey('request-ip', input.ip), PASSWORD_RESET_REQUESTS_PER_IP,
   );
@@ -147,19 +211,19 @@ export async function requestPasswordReset(
   const emailRate = await rateLimit(
     db, rateKey('request-email', email), PASSWORD_RESET_REQUESTS_PER_EMAIL,
   );
-  if (!emailRate.allowed) return;
+  if (!emailRate.allowed) return; // Always public HTTP 202.
 
-  const token = randomBytes(32).toString('base64url');
-  const digest = hashSecret(token);
-  const secret = encryptResetToken(token, digest, input.tokenKey);
-
-  // Emissao e intencao de entrega na mesma transacao SQL.
-  // NUNCA chamar Zoho na requisicao HTTP.
-  await sql<{ issued: boolean }>`
-    SELECT public.auth_password_reset_issue(
-      ${email}, ${digest}, ${PASSWORD_RESET_TTL_SECONDS},
-      ${secret.ciphertext}, ${secret.nonce}, ${secret.authTag}
-    ) AS issued
+  // IMPORTANT: this code never SELECTs or locks app_users, and never creates
+  // a recovery token. A completely neutral, encrypted request is committed
+  // for EVERY valid e-mail. Account resolution happens later, on the worker.
+  const requestId = randomUUID();
+  const recipient = encryptResetRecipient(email, requestId, input.tokenKey);
+  const digest = passwordResetRecipientDigest(email, input.tokenKey);
+  await sql`
+    SELECT public.auth_password_reset_enqueue(
+      ${requestId}::uuid, ${digest}, ${recipient.ciphertext},
+      ${recipient.nonce}, ${recipient.authTag}, 1800
+    )
   `.execute(db);
 }
 
