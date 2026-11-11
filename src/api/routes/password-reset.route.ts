@@ -60,7 +60,13 @@ export async function passwordResetRoutes(
         reply.header('Retry-After', String(error.retryAfterSeconds));
         return reply.status(429).send({ error: 'too_many_requests' });
       }
-      throw error;
+      // Public response is identical for every account under DB failure.
+      // Do not log PostgreSQL message/SQLSTATE, email, token, or SQL text.
+      app.log.warn({
+        component: 'AUTH_RESET',
+        event: 'neutral_intake_failed',
+      }, 'Password reset intake unavailable');
+      return reply.status(500).send({ error: 'password_reset_unavailable' });
     } finally {
       // Reduz diferenciais basicos de tempo entre enderecos existentes e ausentes.
       // A API nao deve depender disso como unica protecao anti-enumeracao.
