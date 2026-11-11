@@ -247,7 +247,7 @@ BEGIN
    WHERE o.status='CLAIMED' AND o.attempt_count>=3
      AND o.claimed_until<clock_timestamp();
   RETURN v_count;
-END; $;
+END; $$;
 REVOKE ALL ON FUNCTION public.auth_password_reset_reap() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.auth_password_reset_reap() TO radar_worker;
 
