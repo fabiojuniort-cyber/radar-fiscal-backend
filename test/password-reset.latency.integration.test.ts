@@ -91,6 +91,11 @@ test('B-1: temporal floor active and provider latency/failure cannot affect HTTP
       hash('auth-reset-v1:request-ip:127.0.0.1'),
     ];
     await admin.query('DELETE FROM public_signup_rate_limits WHERE key_hash=ANY($1::text[])',[keys]);
+    // Synthetic disposable database only: isolate AEAD fingerprint and
+    // neutral inbox between successive suites with distinct fake test keys.
+    await admin.query('DELETE FROM public.auth_password_reset_requests');
+    await admin.query('DELETE FROM public.auth_password_reset_worker_heartbeats');
+    await admin.query('DELETE FROM public.auth_password_reset_key_state');
     await admin.end();
   }
 });
