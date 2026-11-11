@@ -30,6 +30,7 @@ import { loggerOptions } from './infrastructure/logging/logger.js';
 import { registerAnatomyRulesAdmin } from './modules/anatomy/admin/rules-admin.wiring.js';
 import { registerAnatomyConfig } from './modules/anatomy/config/config.wiring.js';
 import { registerAuthSupport } from './modules/auth/auth.plugin.js';
+import { sql } from 'kysely';
 import { env } from './config/env.js';
 
 export interface BuildAppOptions {
@@ -88,6 +89,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     ...(resetPublicUrl ? { publicUrl: resetPublicUrl } : {}),
     ...(tokenKey ? { tokenKey } : {}),
   });
+  // R3 janitor: can remain enabled if delivery is intentionally disabled.
+  // It runs with the API's limited EXECUTE grant and never logs PII.
+  if (env.AUTH_PASSWORD_RESET_JANITOR_ENABLED === 'true') {
+    const cleanup = async (): Promise<void> => {
+      try {
+        await sql`SELECT public.auth_password_reset_reap()`.execute(db);
+      } catch {
+        app.log.warn({ component: 'AUTH_RESET', event: 'cleanup_failed' },
+          'Password reset expiry cleanup unavailable');
+      }
+    };
+    const janitor = setInterval(() => { void cleanup(); }, 60_000);
+    janitor.unref();
+    app.addHook('onClose', async () => { clearInterval(janitor); });
+    app.addHook('onReady', async () => { await cleanup(); });
+  }
   await app.register(productRoutes);
   await app.register(onboardingRoutes);
   await app.register(onboardingPhraseRoutes);
