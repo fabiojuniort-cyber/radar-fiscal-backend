@@ -15,7 +15,7 @@ import {
 } from '../src/modules/auth/password-reset.worker.js';
 
 const KEY='a'.repeat(64);
-const URL='https://trifaros.com.br/nova-senha';
+const PUBLIC_URL='https://trifaros.com.br/nova-senha';
 const sha=(v:string)=>createHash('sha256').update(v).digest('hex');
 const day=86400_000;
 const minute=60_000;
@@ -135,7 +135,7 @@ test('AUTH-RESET-04 R4: two-stage health, failure, pause, reaper, recovery and r
 
     // Preparation recovery for a synthetic nonexistent account (no send).
     const state=await processPasswordResetRequestOnce(worker,{
-      tokenKey:KEY,publicUrl:URL,
+      tokenKey:KEY,publicUrl:PUBLIC_URL,
       send:async()=>{throw Error('NEVER_SEND_R4_FIXTURE');},
     });
     assert.equal(state,'UNKNOWN');
