@@ -227,3 +227,85 @@ O #310 (`ef7a0795`, draft) fixa o `postgresql-client-16` no `verify`, só na reg
   - **Veredito: EQUIVALENT.**
   - **Registro proposto, NÃO registrado:** `rfb:148693`, `rfb--portaria--medio`, `entrySha256` `97fab32e…`, motor `c9edb4fe…`, `revalidates: rfb:148693 @ 0e009431`.
   - O motor final da integração pode diferir do `c9edb4fe`. Qualquer delta repete a prova. Os 4 testes continuam falhando na composição, como devem, até o registro autorizado.
+
+## R6 (2026-11-11): A r6 — A5-1 e A5-2 (nada integrado, nada registrado)
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r6.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `ec19e5c6d257335e39553cc17684678f3a12c6ef010ab207ec006c012754e1b5`
+- **O que muda:** só `referenceObject`/`expressReference`; o restante é o mesmo A r5.
+- **Sem novidades de saída:** nenhum campo novo, nenhuma mudança de contrato; `legalStatus` continua `unknown`.
+
+### Regra
+
+1. **Escopo:** somente a sentença da referência.
+   - Fim de sentença: `.` seguido de maiúscula, `;` ou `:`. As abreviações `Art.`, `arts.`, `nº.` e `inc.` não encerram sentença.
+   - O rótulo de dispositivo é removido antes da análise.
+   - Nada é herdado de sentença anterior nem de outro dispositivo.
+2. **Remissão** (conector ou elíptica): percorre a cadeia de orações para trás até a oração **governante**, que é a primeira com núcleo nominal e que não começa por modificador nem por conector.
+   - **Atravessadas e mantidas na cadeia:** modificadoras (particípio, gerúndio ou advérbio no início) e conectores intermediários.
+   - **Puladas:** orações acessórias.
+   - **Bloqueio:** uma norma em qualquer ponto da cadeia bloqueia (**A5-1**).
+3. **Sem oração governante na sentença:** não promove (**A5-2**).
+4. **Elíptica com oração acessória vizinha:** não promove, por ambiguidade.
+
+### Contraprova
+
+`r6-evidence/r6-cases.mts` roda 31 casos dirigidos:
+
+| Motor | Resultado |
+|---|---|
+| A r5 | 21 FAIL (todos negativos promovidos indevidamente), 10 OK |
+| A r6 | 31 OK |
+
+Os testes `R6 A5-1` e `R6 A5-2` falham antes da correção e passam depois.
+
+### A r6 isolado
+
+- `tsc` limpo; `test:anatomy` 286/286; PG16 base-migration 12/12.
+- Motor: `637872fb → fff69e074f6ea53c4187ea286cbf2f7f9379e678f8642e3f26a73c80c8592a16`.
+- Lote oficial (7 atos, com a IN 2.121): `outputHash` neutralizado idêntico ao do r5 em 7/7, e `inlineAttachments` idêntico (`r6-evidence/lot-neutral-r5-vs-r6.txt`).
+
+### Composição descartável
+
+- **Montagem:** #303 `46afdaf1` + merge do #300 `22e8cc48`.
+- **Conflitos:**
+  - `build-identity.mjs` por união (`rfb-quote-resume.ts` e `rfb-inline-attachments.ts`);
+  - `official-lot-rfb.ts` por união dos dois imports;
+  - os 4 arquivos gerados ou de pin vêm de `--ours`.
+- **Patches:**
+  - A r6 só `src` e `test`, com `test:anatomy` acrescido do teste de anexos;
+  - B r7 com `--3way`.
+- **Regeneração, nesta ordem e antes dos testes:** `build-identity.mjs --write` → `official-lot-rfb.ts --write` → `official-coverage-matrix.ts --write`.
+- **Motor:** `85a1406cff8c3578c0a9e429b31965b2fd38b4e2a67e6803e79f1a05b2d120a7`.
+- **`tsc`:** limpo.
+- **`test:anatomy`:** 403, sendo 399 pass e 4 fail. As 4 falhas são de identidade (#153, #167, #170, #174): esperam `rfb:148693` aceito em `0e009431`.
+- **PG16:** 7/12.
+  - O teste 5 falha no pin `0e009431`, e os testes 6–8 caem em cascata.
+  - **Cascata provada:** uma cópia descartável do teste com o pin `85a1406c` dá 12/12. A cópia foi apagada e o pin real não foi alterado.
+- **ADE Cofis real** (`r6-evidence/ade-cofis-composition-r6.json`): `read`, 9 linhas, 16 células, 26/26 ponteiros, SHA `f857a997…`, `operative_candidate`, `legalStatus` `unknown`.
+- **`e9-acceptances.json`:** 13 registros, byte-idêntico à base B r7.
+
+### Portaria 635
+
+Arquivo: `portaria635-equivalence-r6.json`, SHA-256 `8b66384997f09cc02aab71d00e3308acc8eff585eb8998cff4d6c9a27ec30341`. Script inalterado, `c179c65b…`.
+
+**Comparação:** base `0e009431` × candidata `85a1406c`.
+
+**Iguais:**
+- bytes `a98ade77…` e HTML `196830e1…`;
+- 136 partes, com hash canônico `6193225c…`;
+- `differingFields` vazio.
+
+**Diferenças:**
+- identidade: só `engineHash`;
+- `outputHash` `450b2d12…` × `0f0ab6ad…`; neutralizado, `60285e2c…` nos dois;
+- lote: `outputHash` e `inlineAttachments`.
+
+**`entrySha256` candidato:** `5c5ee765347d8d36ef6ebd1d14db095878ec6dc01665d8a0fa35fe05115a1980`.
+
+**Veredito:** **EQUIVALENT** para `85a1406c`.
+
+A prova da R5 (`c9edb4fe`) está **superada** para a identidade candidata. **Nada foi registrado.**

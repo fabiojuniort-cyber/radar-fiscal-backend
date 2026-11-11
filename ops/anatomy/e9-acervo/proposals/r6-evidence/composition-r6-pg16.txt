@@ -1,0 +1,18 @@
+ok 1 - 077 disposable guard refuses external configuration before connection
+ok 2 - family CHECK mirrors the ANAT-PROFILE/1 literal (pure vectors)
+    ok 1 - the real runner applies the chain, then 077 on top; nothing else in the catalog changes
+    ok 2 - structure equals the CI schema except the reviewed changes
+    ok 3 - privileges: worker writes, app reads in-scope analyses only, nobody deletes or updates analyses
+    ok 4 - family/source CHECK equals the profile contract on the same vectors
+    not ok 5 - the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented
+        + '85a1406c'
+        - '0e009431'
+      expected: '0e009431'
+    not ok 6 - analyses are immutable: refused to the worker (grant) and to the owner (trigger); no DELETE for runtime roles
+    not ok 7 - reads: the app sees only analyses of in-scope publications, whatever the tenant; nothing of runs or rule sets
+    not ok 8 - ON DELETE RESTRICT: a version (or publication) with analyses or run items cannot be deleted
+    ok 9 - recovery: the documented drop order is valid (rolled back)
+not ok 3 - 077_anat_base through the real migration runner (fresh disposable database)
+# tests 12
+# pass 7
+# fail 5
