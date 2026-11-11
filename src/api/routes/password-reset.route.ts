@@ -3,10 +3,8 @@ import { z } from 'zod';
 
 import {
   completePasswordReset,
-  PasswordResetDeliveryError,
   PasswordResetRateLimitedError,
   requestPasswordReset,
-  type PasswordResetSender,
 } from '../../modules/auth/password-reset.service.js';
 
 const requestBody = z.object({
@@ -26,7 +24,7 @@ const resetBody = z.object({
 export interface PasswordResetRoutesOptions {
   enabled: boolean;
   publicUrl?: string | undefined;
-  send?: PasswordResetSender | undefined;
+  tokenKey?: string | undefined;
 }
 
 export async function passwordResetRoutes(
@@ -37,7 +35,7 @@ export async function passwordResetRoutes(
     reply.header('Cache-Control', 'no-store');
     reply.header('Referrer-Policy', 'no-referrer');
 
-    if (!options.enabled || !options.publicUrl || !options.send) {
+    if (!options.enabled || !options.publicUrl || !options.tokenKey) {
       return reply.status(503).send({ error: 'password_reset_unavailable' });
     }
     const body = requestBody.safeParse(request.body);
@@ -51,20 +49,14 @@ export async function passwordResetRoutes(
         email: body.data.email,
         ip: request.ip,
         publicUrl: options.publicUrl,
-        send: options.send,
+        tokenKey: options.tokenKey,
       });
     } catch (error) {
       if (error instanceof PasswordResetRateLimitedError) {
         reply.header('Retry-After', String(error.retryAfterSeconds));
         return reply.status(429).send({ error: 'too_many_requests' });
       }
-      if (error instanceof PasswordResetDeliveryError) {
-        // Nao expor conta existente, enderecos, token ou detalhes do provedor.
-        request.log.error({ event: 'password_reset_delivery_failed' },
-          'Password reset delivery unavailable');
-      } else {
-        throw error;
-      }
+      throw error;
     } finally {
       // Reduz diferenciais basicos de tempo entre enderecos existentes e ausentes.
       // A API nao deve depender disso como unica protecao anti-enumeracao.
