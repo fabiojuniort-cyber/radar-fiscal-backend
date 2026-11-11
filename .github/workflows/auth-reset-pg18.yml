@@ -69,7 +69,7 @@ jobs:
         run: npm ci
       - name: Typecheck and build
         run: npm run typecheck && npm run build
-      - name: Apply migrations to disposable PostgreSQL 18
+      - name: Apply migrations to disposable PostgreSQL (matrix major)
         run: npm run db:prepare
       - name: Fully simulated Zoho request (no network)
         run: npx tsx --test test/password-reset.unit.test.ts
@@ -77,3 +77,5 @@ jobs:
         run: npx tsx --test test/password-reset.integration.test.ts
       - name: B-1 temporal proof with protected production-like request floor
         run: npx tsx --test test/password-reset.latency.integration.test.ts
+      - name: Authentication, session rotation, tenant isolation and public signup RLS
+        run: npx tsx --test test/auth.integration.test.ts && npx tsx --test test/public-signup.integration.test.ts
