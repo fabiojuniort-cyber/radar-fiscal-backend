@@ -59,6 +59,9 @@ const envSchema = z.object({
   // AUTH-RESET-01: sem habilitacao implicita; somente a API recebe estes segredos.
   AUTH_PASSWORD_RESET_ENABLED: z.enum(['true', 'false']).default('false'),
   AUTH_PASSWORD_RESET_PUBLIC_URL: z.string().url().optional(),
+  AUTH_PASSWORD_RESET_TOKEN_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
+  // FALHA FECHADA: sem cadeia Railway comprovada permanece vazio.
+  AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS: z.string().default(''),
   ZOHO_CPAAS_API_KEY: z.string().min(1).optional(),
   ZOHO_CPAAS_FROM_ADDRESS: z.string().email().optional(),
 
