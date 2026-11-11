@@ -14,7 +14,7 @@ const OLD = 'Senha-Antiga-2026!';
 const NEW = 'Senha-Nova-2026!';
 const NEXT = 'Senha-Final-2026!';
 const KEY = 'b'.repeat(64);
-const URL = 'https://trifaros.com.br/nova-senha';
+const RESET_URL = 'https://trifaros.com.br/nova-senha';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const tokenFromLink = (m: PasswordResetMessage) => {
   const u = new URL(m.link);
@@ -40,8 +40,8 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
   const worker = createStandaloneDatabase(dbArgs);
   const worker2 = createStandaloneDatabase(dbArgs);
   const runtime = new Pool({connectionString:runtimeUrl.toString(),max:1});
-  const settings = {tokenKey:KEY,publicUrl:URL};
-  let app = await buildApp({passwordReset:{enabled:true,tokenKey:KEY,publicUrl:URL}});
+  const settings = {tokenKey:KEY,publicUrl:RESET_URL};
+  let app = await buildApp({passwordReset:{enabled:true,tokenKey:KEY,publicUrl:RESET_URL}});
   const inbox:PasswordResetMessage[] = [];
   const sender = async (m:PasswordResetMessage) => {inbox.push(m);};
   const unique=randomUUID();
@@ -101,7 +101,7 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
 
     // Restart API before delivery: durable job survives process restart.
     await app.close();
-    app=await buildApp({passwordReset:{enabled:true,tokenKey:KEY,publicUrl:URL}});
+    app=await buildApp({passwordReset:{enabled:true,tokenKey:KEY,publicUrl:RESET_URL}});
     await app.ready();
     assert.equal(await finish(),'ACCEPTED');
     assert.equal(inbox.length,1);
@@ -189,7 +189,7 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
     track(abused);
     for(let i=0;i<6;i++){
       await requestPasswordReset(app.db,{
-        email:abused,ip:'192.0.2.'+(i+20),publicUrl:URL,tokenKey:KEY,
+        email:abused,ip:'192.0.2.'+(i+20),publicUrl:RESET_URL,tokenKey:KEY,
       });
     }
     const neutral=await forgot(abused);
