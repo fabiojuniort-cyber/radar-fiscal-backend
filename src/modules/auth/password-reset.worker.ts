@@ -81,7 +81,7 @@ export async function readPasswordResetQueueHealth(
   };
 }
 
-async function processNeutralRequest(
+export async function processPasswordResetRequestOnce(
   db: Kysely<DB>, settings: PasswordResetWorkerOptions,
 ): Promise<PasswordResetWorkerOutcome | null> {
   const claimed = await sql<ClaimedRequest>`
@@ -129,7 +129,7 @@ export async function processPasswordResetOutboxOnce(
   await sql`SELECT public.auth_password_reset_reap()`.execute(db);
 
   // Neutral request is prepared on the worker, NEVER while HTTP 202 waits.
-  const requestOutcome = await processNeutralRequest(db, config);
+  const requestOutcome = await processPasswordResetRequestOnce(db, config);
 
   const claimed = await sql<ClaimedJob>`
     SELECT * FROM public.auth_password_reset_claim(${LEASE_SECONDS})
