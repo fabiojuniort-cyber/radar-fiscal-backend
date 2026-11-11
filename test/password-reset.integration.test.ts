@@ -233,6 +233,23 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
       tracked.push(hash('auth-reset-v1:request-ip:192.0.2.'+octet));
     }
 
+    // B-3: sem proxy confiavel declarado, X-Forwarded-For do cliente
+    // nunca muda a quota por request.ip.
+    const forgedIp='198.51.100.244';
+    const spoofed=await app.inject({
+      method:'POST',url:'/auth/password/forgot',
+      headers:{'x-forwarded-for':forgedIp},
+      payload:{email:unknown},
+    });
+    assert.equal(spoofed.statusCode,202);
+    const forgedKey=hash('auth-reset-v1:request-ip:'+forgedIp);
+    const spoofRow=await admin.query<{total:string}>(
+      'SELECT count(*)::text AS total FROM public_signup_rate_limits WHERE key_hash=$1',
+      [forgedKey],
+    );
+    assert.equal(spoofRow.rows[0]?.total,'0',
+      'Untrusted forwarded IP must not bypass raw socket quota');
+
     // Real role with TEMP must not shadow official app_users in SECURITY DEFINER.
     const client=await runtime.connect();
     try{
