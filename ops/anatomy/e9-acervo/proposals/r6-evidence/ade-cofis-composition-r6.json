@@ -1,0 +1,24 @@
+{
+ "engine": "85a1406c",
+ "bytesSha256": "cc3c7a1f",
+ "attachments": [
+  {
+   "id": 82381,
+   "state": "read",
+   "referenceContext": "operative_candidate",
+   "evidence": "express reference: segment 2 ends \"descritas abaixo.\" and the attachment segment 3 follows it immediately; neighbours operative",
+   "sha256": "f857a997c886da99da254977ecee181cd299ae85163ec961bc0854d57e2b6db8",
+   "tables": 1,
+   "rows": 9,
+   "cells": 16,
+   "pointers": "26/26",
+   "partsSha256": "cfcbad2e9740",
+   "contexts": [
+    "operative_candidate"
+   ],
+   "legalStatus": [
+    "unknown"
+   ]
+  }
+ ]
+}

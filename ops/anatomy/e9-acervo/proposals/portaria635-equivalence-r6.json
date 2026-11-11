@@ -1,0 +1,94 @@
+{
+  "schema": "e9-portaria635-equivalence/1",
+  "sample": "rfb:148693",
+  "cellId": "rfb--portaria--medio",
+  "engines": {
+    "base": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
+    "candidate": "85a1406cff8c3578c0a9e429b31965b2fd38b4e2a67e6803e79f1a05b2d120a7"
+  },
+  "bytes": {
+    "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+    "pinned": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+    "equal": true
+  },
+  "preparedHtml": {
+    "base": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+    "candidate": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+    "equal": true
+  },
+  "parts": {
+    "count": [
+      136,
+      136
+    ],
+    "canonicalSha256WithContextLegalStatusSpanPointers": [
+      "6193225c56d21eb385b61a2960d4946c190ea437e68c8743c6c737aac221ead1",
+      "6193225c56d21eb385b61a2960d4946c190ea437e68c8743c6c737aac221ead1"
+    ],
+    "equal": true
+  },
+  "result": {
+    "fieldSha256": {
+      "base": {
+        "canonicalText": "3f950e43b674ad8da1ec2abe4ead6e578d1976129d704a9268973171e7d77aee",
+        "parts": "3cb0e446d75285fce5d574cd596580305250dc9217832dddbb487008a3e40d6a",
+        "sourceMap": "22498acaf59a64ee2abf55e2dd413be9e9dc2325760b40bc6b05b224c7c2b192",
+        "limitations": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "status": "575951db5c63b1e721c1f8f9aefb547ca834245433e7561dc8204a3a18427aae",
+        "entities": "030d277e7ed98a9d786626ca5f7a5e8d9ee2e70515e93414c1db4eef0cd77d37",
+        "evidence": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "eligibility": "8588157c85c6c4a6490c709bdd47c29f008dea032936240fae0b49dd12341b6c",
+        "contractVersion": "055e739f79a6c888e5ebcd97034e0fe0055cd7af12e06e15618119b1b43a7e85",
+        "referenceDate": "5fcb572b528519139e2387488eb3b6ebaf08e890f45e59c93ac2161bba96e0e4"
+      },
+      "candidate": {
+        "canonicalText": "3f950e43b674ad8da1ec2abe4ead6e578d1976129d704a9268973171e7d77aee",
+        "parts": "3cb0e446d75285fce5d574cd596580305250dc9217832dddbb487008a3e40d6a",
+        "sourceMap": "22498acaf59a64ee2abf55e2dd413be9e9dc2325760b40bc6b05b224c7c2b192",
+        "limitations": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "status": "575951db5c63b1e721c1f8f9aefb547ca834245433e7561dc8204a3a18427aae",
+        "entities": "030d277e7ed98a9d786626ca5f7a5e8d9ee2e70515e93414c1db4eef0cd77d37",
+        "evidence": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "eligibility": "8588157c85c6c4a6490c709bdd47c29f008dea032936240fae0b49dd12341b6c",
+        "contractVersion": "055e739f79a6c888e5ebcd97034e0fe0055cd7af12e06e15618119b1b43a7e85",
+        "referenceDate": "5fcb572b528519139e2387488eb3b6ebaf08e890f45e59c93ac2161bba96e0e4"
+      }
+    },
+    "differingFields": []
+  },
+  "identity": {
+    "differingKeys": [
+      "engineHash"
+    ],
+    "onlyEngineIdentity": true
+  },
+  "outputHash": {
+    "base": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99",
+    "candidate": "0f0ab6ad899617034efeba4c9b64d754931c468f15e129cfd216d8508a359768",
+    "neutralized": [
+      "60285e2c563b14ddb2abb2972e6922b474aa51519be61c8e9b012bef4c4bcc25",
+      "60285e2c563b14ddb2abb2972e6922b474aa51519be61c8e9b012bef4c4bcc25"
+    ],
+    "explainedByEngineIdentityOnly": true
+  },
+  "lotEntry": {
+    "differingKeys": [
+      "outputHash",
+      "inlineAttachments"
+    ],
+    "entrySha256": {
+      "base": "7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae",
+      "candidate": "5c5ee765347d8d36ef6ebd1d14db095878ec6dc01665d8a0fa35fe05115a1980"
+    }
+  },
+  "verdict": "EQUIVALENT (reading identical; outputHash differs only by engine identity)",
+  "proposedRecordNotRegistered": {
+    "sampleId": "rfb:148693",
+    "cellId": "rfb--portaria--medio",
+    "scope": "offline",
+    "entrySha256": "5c5ee765347d8d36ef6ebd1d14db095878ec6dc01665d8a0fa35fe05115a1980",
+    "engineBuildHash": "85a1406cff8c3578c0a9e429b31965b2fd38b4e2a67e6803e79f1a05b2d120a7",
+    "revalidates": "rfb:148693 @ 0e009431",
+    "note": "NOT REGISTERED: only after A and B are final and the COORD authorizes; any further engine delta repeats this proof"
+  }
+}

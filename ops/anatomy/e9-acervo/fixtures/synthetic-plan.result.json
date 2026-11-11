@@ -1,0 +1,228 @@
+{
+ "grant": "E9-P2c-G1",
+ "status": "suspended",
+ "requestsPlanned": 4,
+ "total": 16,
+ "remainingAfterPlan": 12,
+ "searches": 0,
+ "perType": {
+  "Resolução": {
+   "planned": 1,
+   "cap": 3,
+   "spareForFallback": 2
+  },
+  "Portaria": {
+   "planned": 2,
+   "cap": 3,
+   "spareForFallback": 1
+  },
+  "Ato Declaratório Interpretativo": {
+   "planned": 0,
+   "cap": 2,
+   "spareForFallback": 2
+  },
+  "Ato Declaratório Executivo": {
+   "planned": 1,
+   "cap": 4,
+   "spareForFallback": 3
+  },
+  "Solução de Consulta": {
+   "planned": 0,
+   "cap": 4,
+   "spareForFallback": 4
+  }
+ },
+ "overCap": [],
+ "cells": [
+  {
+   "type": "Portaria",
+   "size": "medio",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "Portaria",
+    "size": "medio",
+    "external_id": "900001",
+    "act_number": "9001",
+    "published_on": "2025-03-01",
+    "official_url": "https://synthetic.invalid/900001",
+    "chars": 15000,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [],
+   "refused": [
+    {
+     "external_id": "142967",
+     "reason": "already captured (bytes kept by an earlier session)"
+    }
+   ],
+   "state": "candidate"
+  },
+  {
+   "type": "Portaria",
+   "size": "grande",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "Portaria",
+    "size": "grande",
+    "external_id": "900003",
+    "act_number": "9003",
+    "published_on": "2025-03-03",
+    "official_url": "https://synthetic.invalid/900003",
+    "chars": 90000,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [],
+   "refused": [
+    {
+     "external_id": "153743",
+     "reason": "reserved source id"
+    }
+   ],
+   "state": "candidate"
+  },
+  {
+   "type": "Ato Declaratório Interpretativo",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Ato Declaratório Interpretativo",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Resolução",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Resolução",
+   "size": "grande",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "Resolução CGSN",
+    "size": "grande",
+    "external_id": "900007",
+    "act_number": "140",
+    "published_on": "2018-11-22",
+    "official_url": "https://synthetic.invalid/900007",
+    "chars": 300000,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [],
+   "refused": [],
+   "state": "candidate"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "size": "pequeno",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "Ato Declaratório Executivo",
+    "size": "pequeno",
+    "external_id": "900005",
+    "act_number": "9005",
+    "published_on": "2025-04-02",
+    "official_url": "https://synthetic.invalid/900005",
+    "chars": 3000,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [],
+   "refused": [
+    {
+     "external_id": "900004",
+     "reason": "pequeno too close to 10,000 (multivigente may be médio)"
+    }
+   ],
+   "state": "candidate"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Solução de Consulta",
+   "size": "pequeno",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Solução de Consulta",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [
+    {
+     "external_id": "900006",
+     "reason": "2026 margin / no date"
+    }
+   ],
+   "state": "only refused candidates in the Acervo"
+  },
+  {
+   "type": "Solução de Consulta",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  }
+ ],
+ "targets": [
+  {
+   "type": "Portaria",
+   "idAto": "900001",
+   "numeroAto": "9001",
+   "anoAto": "2025",
+   "acervoSize": "medio"
+  },
+  {
+   "type": "Portaria",
+   "idAto": "900003",
+   "numeroAto": "9003",
+   "anoAto": "2025",
+   "acervoSize": "grande"
+  },
+  {
+   "type": "Resolução",
+   "idAto": "900007",
+   "numeroAto": "140",
+   "anoAto": "2018",
+   "acervoSize": "grande"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "idAto": "900005",
+   "numeroAto": "9005",
+   "anoAto": "2025",
+   "acervoSize": "pequeno"
+  }
+ ]
+}
