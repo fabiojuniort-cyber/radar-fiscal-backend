@@ -148,3 +148,33 @@ O #310 (`ef7a0795`, draft) fixa o `postgresql-client-16` no `verify`, só na reg
   - menções no plural ("Anexos I e II desta Portaria" → `ambiguous`);
   - normas citadas por sigla ("Anexo da IN 2.121");
   - "Anexo" como verbo ou substantivo comum ("anexo ao processo").
+
+## R3 (2026-11-11): B2-2, origem da evidência de leitura (composição descartável, nada integrado)
+
+- **Contrato:**
+  - **Produtor:** #300, `ops/anatomy/official-lot-rfb.ts` → `inline()` → `readRfbInlineAttachments` grava no lote `inlineAttachments.read[] = { id, sha256, charset, bytes, chars, unidentifiedChars, referenceContext }`. O `sha256` é o SHA dos bytes decodificados do base64 oficial, e só os anexos com estado `read` entram.
+  - **Consumidor:** patch B, `collectSamples` → `AnnexReadEvidence` (`id` → `sha256`) → `annexAudit`. Um segmento só fica `read` se o SHA dos seus próprios bytes decodificados for igual ao da evidência daquele `id`.
+- **Composição descartável:** #303 @ `6b12ac64` + merge do #300 @ `22e8cc48` (6 conflitos: 4 gerados ou de identidade, 2 de código resolvidos por união) + A r3 + B r5.
+  - Motor composto: `37ee5a6b…`.
+  - **Evidência real, produtor → consumidor: PROVEN.**
+    - ADE Cofis 148629: `read[]` = [82381, `f857a997…`], e o consumidor marca 82381 como `read`.
+    - IN 2.121 127905: [67992, `e07a161b…`], e 67992 fica `read`.
+  - Portaria 635: sem anexos, `readingComplete` true. **O aceite derivado cai** no motor composto (o registro fixa `0e009431`): é o comportamento correto até a revalidação append-only depois da equivalência.
+- **NOT_PROVEN, para a etapa de composição:**
+  1. **Caminho positivo de aceite** de uma norma com anexo próprio rotulado e lido: não há amostra real no lote. Precisa de um teste de composição com uma amostra real assim, ou de decisão do COORD.
+  2. **`attachmentsWithoutContent`** da preparação principal conta o anexo embutido mesmo depois de lido (ADE Cofis: 1). Na composição, `incompleteness()` precisa descontar os anexos com evidência `read` do mesmo `id` e SHA; sem isso, o ADE Cofis nunca fica completo.
+  3. **Contexto de referência:** a evidência traz `referenceContext`. O aceite de completude não deveria exigir `operative_candidate`, mas a decisão é do COORD.
+  4. **Ponteiros:** o lote não grava os ponteiros, que são recalculáveis de forma determinística a partir dos bytes (26/26 conferidos no ADE Cofis). Se o COORD quiser no lote, é campo novo.
+
+## R3: patch A r3 (`proposal-300-type5-express-ref-r3.patch`, base #300 @ `22e8cc48`)
+- **A2-1:**
+  - varredura de tags com profundidade de tachado: tachado aninhado, sem fechamento, fechamento solto ou autofechado → indeterminado → não promove;
+  - qualquer `line-through` → não promove;
+  - qualquer conteúdo tachado no dispositivo → não promove.
+- **A2-2:**
+  - entidades decodificadas (nomeadas e numéricas); entidade desconhecida → não promove;
+  - negação ou exclusão em **qualquer** ponto do dispositivo;
+  - citação de **qualquer** norma identificada (tipo + nº, número com milhar, `n/aaaa` ou ", de aaaa"), sem janela de caracteres.
+- **Consequência registrada:** o Art. 1º real do ADE Cofis cita a IN RFB nº 1.155 ("texto misto"). Pelo critério "na dúvida, não promover", a tabela passa a `prohibited`. A leitura continua íntegra: `read`, 9 linhas, 16 células, 26/26 ponteiros, SHA `f857a997…`.
+- **IN 2.121:** sem regressão (o anexo 67992 continua `read` e `operative_candidate`).
+- **Testes:** suíte do #300 278/278; `tsc` limpo; base-migration PG16 12/12; motor `30482bfd → 62a81cc9`.
