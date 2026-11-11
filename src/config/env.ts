@@ -62,6 +62,7 @@ const envSchema = z.object({
   AUTH_PASSWORD_RESET_TOKEN_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
   // FALHA FECHADA: sem cadeia Railway comprovada permanece vazio.
   AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS: z.string().default(''),
+  AUTH_PASSWORD_RESET_JANITOR_ENABLED: z.enum(['true','false']).default('false'),
   ZOHO_CPAAS_API_KEY: z.string().min(1).optional(),
   ZOHO_CPAAS_FROM_ADDRESS: z.string().email().optional(),
 
