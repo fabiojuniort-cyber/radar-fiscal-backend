@@ -1,4 +1,4 @@
-# AUTH-RESET-03 R3 — recuperação de senha segura via Zoho CPaaS (#9)
+# AUTH-RESET-04 R4 — recuperação de senha segura via Zoho CPaaS (#9)
 
 Status: **PR #311 em desenvolvimento/revisão, sem autorização para merge ou produção**.
 O cadastro inicial existente, a política Argon2id e a decisão D-058 não mudam.
@@ -184,3 +184,127 @@ O Web não altera a regra de trial D-058; reset de senha não verifica e-mail.
   Web integrado, aceite COORD e reconciliação #9/#124.
 
 **Frente 2: 28% (14/50), delta +0,0 p.p. Até aceite formal da #9.**
+
+## AUTH-RESET-04 — hardening R4 delimitado
+
+### W4-R3a — Health separado por estágio, sem nova infraestrutura
+
+**AS IS R3:** \`auth_password_reset_queue_health()\` retornava apenas a outbox
+de envio; a fila neutra \`auth_password_reset_requests\` podia ter \`PENDING\`
+antigos ou \`FAILED\` sem aparecer no health/alarme, ainda que o HTTP
+continuasse devolvendo 202. A reprodução anterior à mudança foi feita em
+PG16 e PG18 descartáveis: **3 PENDING + 1 FAILED + idade 600s** na fila neutra
+e **0/0/0** expostos pelo health R3.
+
+**TO BE R4:** a MESMA função PostgreSQL mantém sua assinatura de quatro
+colunas e os EXECUTE grants anteriores, mas retorna **exatamente duas linhas**
+ordenadas explicitamente por \`stage_order\`: primeira = \`delivery\`
+(\`auth_password_reset_outbox\`, contrato legado), segunda = \`neutral\`
+(\`auth_password_reset_requests\`). A aplicação exige as duas linhas,
+falhando explicitamente se o contrato estiver incompleto. Cada estágio
+expõe \`pending\`, \`claimed\`, \`failed\` e
+\`oldestPendingSeconds\` (zero quando não há pendentes). Estados da fila
+neutra existentes: \`PENDING\`, \`CLAIMED\`, \`PREPARED\`, \`UNKNOWN\`,
+\`SUPERSEDED\`, \`EXPIRED\`, \`FAILED\`; outros são terminais e não são
+inventados como estados de produto. Estados da outbox existentes:
+\`PENDING\`, \`CLAIMED\`, \`ACCEPTED\`, \`FAILED\`, \`EXPIRED\`,
+\`CANCELLED\`.
+
+O worker registra em log estruturado **somente agregados por estágio**
+e motivos enumerados, nunca destinatário, HMAC, token, link ou ciphertext.
+O alarme **local** abrange falha (\`failed>0\`), fila pendente envelhecida
+(\`oldestPendingSeconds>120\`), ou \`claimed>0\` por duas amostras
+consecutivas do mesmo estágio (amostragem ~30s contra lease ~20s).
+Esta última é **heurística de possível preparação travada**, não prova
+de falha nem monitoramento externo. Se todas as instâncias pararem, o
+alarme local também para: monitor externo de heartbeat/backlog é
+dependência operacional futura, não foi criado nesta R4.
+
+### R3-500 — Resposta pública uniforme e sanitizada
+
+O \`POST /auth/password/forgot\` responde **HTTP 500** e o JSON fixo
+\`{"error":"password_reset_unavailable"}\` para falhas inesperadas do
+ingresso neutro. A mesma estrutura, \`Cache-Control: no-store\` e
+\`Referrer-Policy: no-referrer\` valem para conta conhecida ou
+desconhecida; SQLSTATE, mensagens do PostgreSQL, nomes de tabelas e
+destinatários **não** são refletidos. Somente um evento interno estático
+\`neutral_intake_failed\` é registrado, sem serializar a exceção.
+O 503 de feature desligada/worker indisponível, 202 neutro, 429 por IP
+e demais rotas mantêm seus contratos anteriores.
+
+### RET-P3 — Política candidata, NÃO aprovada e sem execução produtiva
+
+A migration **085** inclui \`auth_password_reset_purge_terminal(days,dry_run)\`,
+**administrativa**, com \`dry_run=TRUE\` por padrão, sem EXECUTE para
+\`radar_app\` nem \`radar_worker\`, e **sem cron, trigger ou integração
+ao reaper/janitor**. A remoção efetiva (se \`dry_run=FALSE\`) é limitada
+a lotes de 5.000, \`FOR UPDATE SKIP LOCKED\`, e só considera os estados
+terminais **\`PREPARED\`, \`UNKNOWN\`, \`SUPERSEDED\`, \`EXPIRED\`, \`FAILED\`**
+cujo \`updated_at\` seja anterior ao prazo fornecido. Jamais remove
+\`PENDING\`/\`CLAIMED\`, linhas com payload cifrado ou com token de
+senha ainda válido ligado ao mesmo HMAC.
+
+**30 dias foi usado exclusivamente como hipótese nos testes**, com
+comparação de terminais antigos/recentes, pendências ativas e
+referência a token válido. **Não é prazo de retenção aprovado**.
+Antes de qualquer execução operacional, COORD + jurídico/LGPD
+devem ratificar prazo, necessidade de trilha de auditoria,
+responsável, observabilidade, limite de lote e estratégia de rollback.
+O janitor/reaper atual só expira/cancela payload e não invoca essa
+purga. Dados históricos reais não foram manipulados.
+
+### CRY-P3 — endurecimento compatível, HKDF separado por gate
+
+**Implementado sem mudança de formato ou chave raiz:** AES-256-GCM
+passa \`authTagLength:16\` explicitamente e exige **tag canônica de
+exatamente 16 bytes** ao decifrar destinatário e token. As gravações
+R3 sempre geravam tag de 16 bytes, portanto os ciphertexts
+sintéticos **pré-R4** continuam descriptografáveis. A versão nova
+continua legível por consumidor legado R3. HMAC-SHA256 do
+destinatário permanece **byte a byte compatível**; fingerprint
+da chave e função de hash permanecem iguais.
+
+**HKDF de subchaves foi avaliado, mas NÃO ativado.** Trocar a chave
+AES e/ou HMAC hoje quebraria a decriptação de payload em
+\`PENDING/CLAIMED\` e alteraria \`email_digest\`, com implicações para
+supersessão e checagem de token. O teste sintético deriva subchave
+HKDF e demonstra que o HMAC resultante difere do legado.
+Adoção exige decisão do COORD e gate separado: versionar envelopes
+(\`crypto_version\`), implementar leitura dupla de versões e
+lookup compatível para HMAC enquanto há linhas antigas, coordenar
+troca de fingerprint e só depois migrar quando a fila estiver drenada.
+**Nenhum backfill, mudança de segredo ou migração criptográfica
+produtiva nesta R4.**
+
+### Riscos P3 registrados, fora do escopo de regra de negócio
+
+- **SUP:** dentro da cota, pedido de terceiro pode invalidar link
+  anterior; não é tomada de conta. Requer decisão futura UX/negócio.
+- **W3-ST:** desativação após \`begin_send\` pode resultar em
+  \`CANCELLED\` mesmo se o provedor já tiver recebido o e-mail.
+  Sem introduzir novo estado nesta R4.
+- **KEY:** primeiro heartbeat pode fixar fingerprint incompatível,
+  causando indisponibilidade fail-closed. Exigir procedimento operacional
+  de ativação/rotação, não alterar chave real aqui.
+
+### Provas R4 e gates
+
+- \`test/password-reset.r4.before.integration.test.ts\`: prova
+  pré-correção (executada e retida como evidência histórica, NÃO rodar
+  contra o health corrigido).
+- \`test/password-reset.r4.health-retention.integration.test.ts\`: duas
+  filas separadas, PENDING/CLAIMED/FAILED, alarme local, worker
+  pausado/reconectado, reaper, preparação de pedido e expurgo
+  candidato apenas no banco descartável PG16/18.
+- \`test/password-reset.r3.adversarial.integration.test.ts\` agora
+  verifica uniformidade de corpo, status, headers e ausência de SQLSTATE
+  em falha de banco injetada.
+- \`test/password-reset.unit.test.ts\` inclui compatibilidade de AES-GCM
+  legado/nova versão, HMAC do R3 e contraprova HKDF não compatível.
+- Matriz do CI de reset continua PG16+PG18 descartáveis e regressões
+  de autenticação/RLS/cadastro. **CI isolado PASS não implica aceite
+  técnico integral**, nem supera CI geral #310.
+- B-3 proxy Railway **NOT_PROVEN**, Zoho real e Web/e2e **NOT_PROVEN**,
+  feature \`AUTH_PASSWORD_RESET_ENABLED=false\`; sem autorização de
+  merge, deploy, migração produtiva ou uso de segredos.
+
