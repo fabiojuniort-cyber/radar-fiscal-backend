@@ -49,6 +49,7 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
   const unknown='missing02-'+unique+'@example.test';
   let userId='',tenantId='';
   let victimUserId='',victimTenantId='';
+  let parallelUserId='',parallelTenantId='';
   const tracked:string[]=[];
   const track=(addr:string) => tracked.push(hash('auth-reset-v1:request-email:'+addr));
   const forgot=async (addr:string) => app.inject({
@@ -275,6 +276,45 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
     assert.equal(spoofRow.rows[0]?.total,'0',
       'Untrusted forwarded IP must not bypass raw socket quota');
 
+    // B-2 concorrencia: 15 pedidos em duas instancias/pools nao podem
+    // superar o limite persistido de cinco emissoes por email.
+    const concurrentEmail='simultaneous-'+randomUUID()+'@example.test';
+    const concurrentSignup=await app.inject({
+      method:'POST',url:'/auth/register',
+      payload:{name:'Concorrente Sintetico',email:concurrentEmail,
+        password:OLD,confirmPassword:OLD,acceptedTerms:true},
+    });
+    assert.equal(concurrentSignup.statusCode,201);
+    const concurrentIdentity=concurrentSignup.json<{
+      user:{id:string};tenant:{id:string};
+    }>();
+    parallelUserId=concurrentIdentity.user.id;
+    parallelTenantId=concurrentIdentity.tenant.id;
+    track(concurrentEmail);
+    const secondApp=await buildApp({passwordReset:{
+      enabled:true,tokenKey:KEY,publicUrl:RESET_URL,
+    }});
+    try{
+      await secondApp.ready();
+      await Promise.all(Array.from({length:15},(_,i)=>
+        requestPasswordReset(i%2===0?app.db:secondApp.db,{
+          email:concurrentEmail,ip:'192.0.2.'+(100+i),
+          publicUrl:RESET_URL,tokenKey:KEY,
+        }),
+      ));
+    }finally{await secondApp.close();}
+    for(let i=0;i<15;i++){
+      tracked.push(hash('auth-reset-v1:request-ip:192.0.2.'+(100+i)));
+    }
+    const parallelCounts=await admin.query<{emitted:string;active:string}>(
+      "SELECT count(*)::text AS emitted,"+
+      "count(*) FILTER (WHERE t.used_at IS NULL)::text AS active "+
+      "FROM auth_password_reset_tokens t WHERE t.user_id=$1",
+      [parallelUserId],
+    );
+    assert.equal(parallelCounts.rows[0]?.emitted,'5');
+    assert.equal(parallelCounts.rows[0]?.active,'1');
+
     // C-1 ownership/ACL: worker recebe apenas EXECUTE do claim;
     // runtime nao recebe SELECT na outbox nem acesso ao claim.
     const grants=await admin.query<{
@@ -329,8 +369,10 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
     await worker.destroy();await worker2.destroy();await runtime.end();
     if(userId)await admin.query('DELETE FROM app_users WHERE id=$1',[userId]);
     if(victimUserId)await admin.query('DELETE FROM app_users WHERE id=$1',[victimUserId]);
+    if(parallelUserId)await admin.query('DELETE FROM app_users WHERE id=$1',[parallelUserId]);
     if(tenantId)await admin.query('DELETE FROM tenants WHERE id=$1',[tenantId]);
     if(victimTenantId)await admin.query('DELETE FROM tenants WHERE id=$1',[victimTenantId]);
+    if(parallelTenantId)await admin.query('DELETE FROM tenants WHERE id=$1',[parallelTenantId]);
     const rate=[
       ...tracked,
       hash('auth-reset-v1:request-ip:127.0.0.1'),
