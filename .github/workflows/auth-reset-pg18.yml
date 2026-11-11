@@ -1,4 +1,4 @@
-name: AUTH-RESET-02 isolated PG16 PG18
+name: AUTH-RESET-03 isolated PG16 PG18
 
 on:
   pull_request:
@@ -15,6 +15,8 @@ on:
       - 'test/password-reset.unit.test.ts'
       - 'test/password-reset.integration.test.ts'
       - 'test/password-reset.latency.integration.test.ts'
+      - 'test/password-reset.r3.adversarial.integration.test.ts'
+      - 'migrations/084_auth_password_reset_r3.sql'
       - 'src/modules/auth/password-reset.worker.ts'
       - 'src/worker.ts'
       - 'test/password-reset.worker.unit.test.ts'
@@ -77,5 +79,7 @@ jobs:
         run: npx tsx --test test/password-reset.integration.test.ts
       - name: B-1 temporal proof with protected production-like request floor
         run: npx tsx --test test/password-reset.latency.integration.test.ts
+      - name: R3 real PostgreSQL lock and partial failure non-enumeration
+        run: npx tsx --test test/password-reset.r3.adversarial.integration.test.ts
       - name: Authentication, session rotation, tenant isolation and public signup RLS
         run: npx tsx --test test/auth.integration.test.ts && npx tsx --test test/public-signup.integration.test.ts
