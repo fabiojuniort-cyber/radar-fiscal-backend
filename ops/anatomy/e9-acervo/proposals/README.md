@@ -1,0 +1,121 @@
+# E9 P2-c: continuidade (2026-11-11). Propostas offline, nada integrado
+
+COORD → EXEC, continuidade P2-c (tribusca-control#116). Tudo aqui é **offline**: nenhuma requisição foi feita, nenhum grant
+foi ativado e não houve merge. Os patches são propostas para revisão independente; nenhum foi aplicado num PR de Anatomia.
+
+Bytes usados: os preservados no #303 @ `719352f`, em `ops/anatomy/official-identification/rfb-p2c/`:
+
+| idAto | ato | SHA-256 |
+|---|---|---|
+| 148693 | Portaria RFB 635/2025 | `a98ade77b2ba…` |
+| 148629 | ADE Cofis 30/2025 | `cc3c7a1f3e77…` |
+| 148516 | ADE Corat 33/2025 | `0c8788185864…` |
+| 148681 | SC Cosit 258/2025 | `d74c8f46b782…` |
+
+## A. ADE Cofis 30/2025 × #300 (anexo HTML embutido)
+
+O #300 (`22e8cc48`, motor `04af1bfd`, PASS técnico offline 06–07/11) foi testado sobre os bytes preservados.
+
+- **Estado no #300 sem alteração:** `not_html`.
+  - O anexo (id 82381, `idTipoArquivo` 5, 3.308 bytes, SHA `f857a997c886da99…`) é um **fragmento** `<table …>`, sem `<html>`/doctype e sem declaração de charset.
+  - Depois do `not_html`, cairia em `charset_undeclared`.
+  - O payload é UTF-8 estrito e válido.
+- **Contexto do segmento de referência:** `prohibited`. O segmento #3 (`Anexo`) não tem texto nem tachado, e a regra R3 do #300 o trata como indeterminado. Ele fica entre o Art. 1º, que termina em "de acordo com as especificações descritas abaixo.", e o Art. 2º.
+- **Protótipo** (`prototype-300-fragment.patch`, +6/−4):
+  - aceita um fragmento `<table>` quando o tipo é 5;
+  - com charset ausente, decodifica UTF-8 estrito e marca o caso no `reason`.
+  - **Resultado:**
+    - `read`, com 803 caracteres;
+    - 1 tabela, 9 linhas e 16 células;
+    - 0 limitações;
+    - **26/26 ponteiros de origem** decodificam exatamente dos bytes base64 originais;
+    - SHA do payload igual.
+  - O teste do #300 continua 10/10.
+  - **Mesmo lida, a tabela fica `prohibited`** pela regra R3.
+- **Conclusão:** não falta só integrar. Há três decisões:
+  1. aceitar fragmento tabular (`idTipoArquivo` 5) como anexo HTML;
+  2. charset não declarado com UTF-8 estrito: a evidência é inferida e precisa de decisão explícita;
+  3. a regra R3 dá `prohibited` a um anexo sem texto entre dispositivos operativos. Mudar isso altera um contrato já aprovado no #300 (decisão do COORD).
+- **Preâmbulo:** continua `unidentified`. A fonte o classifica como `Não Identificado` (D04); a preparação principal não muda no #300.
+- **Integração no #303 (merge de teste local, sem push):**
+  - **Dependência:** o #300 é base comum (`3f7564e4`) mais 4 commits; o #303 tem 30 commits além dessa base.
+  - **Conflitos:** 6. Quatro são gerados ou de identidade e se resolvem regenerando: `engine-build.json`, `official-lot-rfb.json`, `build-identity.ts` e o pin do teste base-migration. Dois são de código e se resolvem por união: imports em `official-lot-rfb.ts` e a lista de `build-identity.mjs`.
+  - **Resultado:** `tsc` limpo; `test:anatomy` 340/340; teste do #300 10/10. Esse teste **não** está na lista `test:anatomy` e precisa entrar nela.
+  - **Motor:** `0e009431 → a06a8e17`.
+  - **Lote:** muda só `inlineAttachments` e o `outputHash`; status e caracteres são iguais nos 4 atos.
+  - **Consequência:** o aceite da Portaria fixado em `0e009431` precisaria de novo registro append-only no motor composto, como foi feito com as leis no #309.
+
+## B. ADE Corat 33/2025: Anexo Único externo
+
+- **Corpo lido:** 18 artigos, 12 parágrafos e 17 incisos. Não identificado: preâmbulo (segmentos #2 e #3, `Não Identificado` pela fonte, 262 caracteres).
+- **0 anexos** no JSON. O ato remete para fora:
+  - Art. 17: "O Anexo Único deste Ato Declaratório Executivo será publicado na Internet, no endereço eletrônico da RFB <( https://www.gov.br/receitafederal )>."
+  - Art. 1º, § 3º (segmento #10): "A Agenda Tributária será disponibilizada na página da RFB na Internet…".
+- **Completude:** o corpo normativo está completo; o Anexo Único (calendário de janeiro de 2026) **não** está na representação oficial do ato. A norma integral não é aceita.
+- **Plano de obtenção (não executado):**
+  1. **URL:** o ato só dá a raiz `https://www.gov.br/receitafederal`. É preciso 1 descoberta para a página exata da "Agenda Tributária — janeiro de 2026", mais 1 captura e os redirecionamentos.
+  2. **Host:** `www.gov.br` está fora de `OFFICIAL_HOSTS.RFB`; exige autorização própria e uma rota presa ao caminho achado.
+  3. **Orçamento:** máximo de 3 requisições (descoberta, captura e 1 redirect), num grant próprio. Não é o saldo ADE do G1, porque é outro host e outro recurso.
+  4. **Proveniência:** URL inicial e final, Content-Type, SHA-256, data da captura, e o vínculo `rfb:148516:anexo:externo` com o Art. 17 como evidência de remissão.
+  5. **Validação:** a página precisa dizer "janeiro de 2026" e "Agenda Tributária"; recusar mês ou ano divergente; ler como recurso separado (como no #300), nunca dentro do ato.
+
+## C. SC Cosit 258/2025: corpo em PDF ausente
+
+- **O que o JSON traz:**
+  - duas ementas: a #1 **tachada** cita o "inciso XI" do art. 6º da Lei 7.713/1988; a vigente cita o "inciso XV";
+  - o rótulo "SC Cosit nº 258-2025";
+  - o fecho.
+- **O que falta:** o texto principal está no **PDF id 83325** (`idTipoArquivo` 6, `SC Cosit nº 258-2025.pdf`, `arquivoBinario` null). O id 82416 é a versão anterior tachada do PDF. URL que o conector monta: `https://normas.receita.fazenda.gov.br/sijut2consulta/anexoOutros.action?idArquivoBinario=83325`.
+- **No #300:** os dois anexos ficam `missing_no_content`.
+- **Ementas no #303:** as duas são `summary`/`prohibited`, **sem distinção de versão**. A tachada precisa sair como histórica.
+- **Preparação de PDF reutilizável:** **existe**, ANAT-PDF-01 `readPdfInput` (`src/modules/anatomy/pdf-reader.ts`, já na identidade do motor).
+  - Oferece camada de texto, linhas na ordem de leitura e ponteiro `pdf:sha256=…;page=;line=`.
+  - Tem cobertura por página: `text`, `text_with_visual`, `no_text_layer` e `empty`. Não faz OCR.
+  - Aceita `source: 'RFB'`.
+- **Teste com PDF sintético** no formato de uma SC, com fonte RFB: extração e ponteiros ok, mas a gramática estrutural não conhece o layout da SC. Saíram 11 trechos `unidentified` (cabeçalho, Assunto, Relatório, Fundamentos, Conclusão, assinatura) e 5 parágrafos numerados como `item`.
+- **Desenho mínimo:**
+  1. **Recurso separado** `rfb:148681:anexo:83325`, representação `attachment`, lido por `readPdfInput`.
+  2. **Perfil SC (camada fina sobre a gramática):**
+     - cabeçalho e Assunto como `summary`/`prohibited`;
+     - "Relatório", "Fundamentos" e "Conclusão" como `group`;
+     - parágrafos numerados como unidades;
+     - "Dispositivos Legais" como referência;
+     - assinatura como `signature`.
+     - O contexto da Conclusão é decisão do COORD.
+  3. **Identidade do PDF:** o texto precisa conter "SOLUÇÃO DE CONSULTA", "COSIT", o nº 258 e a data de 26/12/2025, iguais à epígrafe; se divergir, recusa.
+  4. **Versões:** a ementa tachada sai `historical` e a vigente `prohibited` (resumo). O PDF 82416 (tachado) nunca é lido como vigente.
+  5. **Porte:** medido no texto do PDF, nunca no JSON. Até lá fica **indeterminado**.
+- **Testes necessários:**
+  - SC sintética completa;
+  - identidade divergente;
+  - PDF digitalizado (`pdf_without_text_layer`);
+  - página com imagem (`pdf_page_visual_not_read`);
+  - ementa tachada × vigente;
+  - anexo tachado nunca lido como vigente;
+  - ponteiros página/linha;
+  - porte medido no PDF.
+- **Menor evidência adicional:** 1 requisição ao PDF 83325, com rota própria e débito SC (saldo SC 3). **Não autorizada nesta etapa.**
+
+## D. Matriz E9: aceite da Portaria (`proposal-303-rfb-acceptance.patch`)
+
+- **Hoje no #303:** `accepted: false` fixo. O mecanismo de dados (`docs/anatomy/e9-acceptances.json`, digest da entrada + motor) existe só na linhagem #305/#309, e só para NORMAS-LEG.
+- **Proposta:**
+  - mesmo formato de registro;
+  - para amostras RFB, conta só se o registro fixar `sha256(canonJson(entrada do lote))` **e** o motor atual;
+  - **e** só para leitura **completa**: status `complete`, 0 caracteres não identificados, 0 anexos sem conteúdo, 0 limitações.
+  - Leitura parcial nunca é aceita e ganha nota "partial reading".
+- **Registro incluído:** `rfb:148693`, digest `7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae`, motor `0e009431…`.
+- **Completude dos outros três:**
+  - 148629: parcial (415 não identificados, 1 anexo, 2 limitações);
+  - 148516: parcial (262, 2 limitações);
+  - 148681: 2 anexos sem conteúdo.
+- **Resultado local:**
+  - `test:anatomy` 341/341 (+1 teste: pins exatos, deriva de digest, outro motor, outra amostra e parciais nunca aceitas); `tsc` limpo;
+  - **identidade do motor inalterada** (`0e009431`);
+  - matriz: 14 cobertas e **1 célula aceita** (`rfb--portaria--medio`).
+- **Composição com o #305/#309:** mesmo caminho de arquivo; a resolução é a união dos registros.
+- **Limite da matriz:** `validated` continua significando "no lote reprodutível + invariantes". Três das quatro células novas se apoiam em leituras parciais: ADE pequeno, ADE médio e SC pequeno (esta sem corpo). Essas notas as distinguem, mas a contagem de cobertura não muda sem decisão do COORD.
+
+## E. CI
+
+O #310 (`ef7a0795`, draft) fixa o `postgresql-client-16` no `verify`, só na regressão completa. Isso cobre a causa da falha do #303 (`pg_dump` PG 17+ na imagem `ubuntu-26.04`). Nada foi duplicado aqui.

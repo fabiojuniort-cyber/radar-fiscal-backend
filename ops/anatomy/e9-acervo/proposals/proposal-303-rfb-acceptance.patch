@@ -1,0 +1,278 @@
+diff --git a/docs/anatomy/e9-acceptances.json b/docs/anatomy/e9-acceptances.json
+new file mode 100644
+index 0000000..68dae15
+--- /dev/null
++++ b/docs/anatomy/e9-acceptances.json
+@@ -0,0 +1,22 @@
++{
++  "schema": "e9-acceptances/1",
++  "note": "Append-only. A record counts only while it pins the sample's current lock digest (sha256 of the canonical baseline/lot entry) AND the engine identity it was reviewed on, and (RFB) only for a COMPLETE reading. Same shape as #305 docs/anatomy/e9-acceptances.json; composition is a union of records.",
++  "acceptances": [
++    {
++      "sampleId": "rfb:148693",
++      "cellId": "rfb--portaria--medio",
++      "scope": "offline",
++      "entrySha256": "7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae",
++      "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
++      "decidedBy": "COORD (Frente 1, continuidade P2-c)",
++      "decidedOn": "2026-11-11",
++      "ref": "tribusca-control#116 c.6776402307 (registro) — Portaria RFB nº 635/2025, multivigente SHA-256 a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8, #303 @ 719352f",
++      "limits": [
++        "escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva",
++        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout",
++        "sem merge: #303 herda o #285 (NÃO MERGEAR)",
++        "CI verify do HEAD vermelho por compatibilidade pg_dump/PG16 (#310), não pela anatomia"
++      ]
++    }
++  ]
++}
+diff --git a/docs/anatomy/official-coverage-matrix.json b/docs/anatomy/official-coverage-matrix.json
+index 95f1359..6ff8943 100644
+--- a/docs/anatomy/official-coverage-matrix.json
++++ b/docs/anatomy/official-coverage-matrix.json
+@@ -90,7 +90,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 14 unidentified chars; 31 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:133898",
+@@ -140,7 +142,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 11279 unidentified chars; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:104314",
+@@ -165,7 +169,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 1819 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:116968",
+@@ -190,7 +196,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 103 unidentified chars; 35 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:122645",
+@@ -215,7 +223,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 272 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:142967",
+@@ -265,7 +275,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 262 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:148629",
+@@ -290,7 +302,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 415 unidentified chars; 1 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:148681",
+@@ -315,7 +329,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: 2 attachment(s) without content"
++      ]
+     },
+     {
+       "id": "rfb:148693",
+@@ -331,14 +347,15 @@
+         "identified": true,
+         "read": true,
+         "validated": true,
+-        "accepted": false
++        "accepted": true
+       },
+       "profile": "RFB",
+       "diagnostic": null,
+       "outputHash": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99",
+       "evidence": [
+         "docs/anatomy/official-lot-rfb.json",
+-        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
++        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
++        "docs/anatomy/e9-acceptances.json"
+       ],
+       "notes": []
+     },
+@@ -365,7 +382,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 31 unidentified chars; limitations rfb_segment_type_unmapped, unidentified_content"
++      ]
+     },
+     {
+       "id": "ricms-an1art041",
+@@ -933,7 +952,7 @@
+       "validatedSamples": [
+         "rfb:148693"
+       ],
+-      "accepted": false,
++      "accepted": true,
+       "unvalidatedSamples": []
+     },
+     {
+diff --git a/ops/anatomy/official-coverage-matrix.ts b/ops/anatomy/official-coverage-matrix.ts
+index 17ec018..92fc910 100644
+--- a/ops/anatomy/official-coverage-matrix.ts
++++ b/ops/anatomy/official-coverage-matrix.ts
+@@ -19,6 +19,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+ import { join } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
++import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
+ import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
+ import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
+ import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
+@@ -32,6 +33,25 @@ export type Size = 'pequeno' | 'médio' | 'grande';
+ export const sizeOf = (chars: number): Size => (chars < 10_000 ? 'pequeno' : chars < 50_000 ? 'médio' : 'grande');
+ const SIZES: readonly Size[] = ['pequeno', 'médio', 'grande'];
+ const sha = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
++/** Canonical JSON (sorted keys) so a digest does not depend on key order. */
++const canonJson = (v: unknown): string => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, (x as Record<string, unknown>)[k]])) : x));
++/**
++ * E9 (tribusca-control#116): formal acceptances are DATA (docs/anatomy/e9-acceptances.json), never a hard-coded `accepted: true`.
++ * Same record shape as the NORMAS-LEG branch (#305). For an RFB sample a record counts only while it pins the sha256 of the
++ * sample's canonical lot entry AND the current engine identity, and only when the reading is COMPLETE: status complete,
++ * 0 unidentified characters, 0 attachments without content, 0 limitations. A partial reading is never accepted.
++ */
++export const ACCEPTANCES_FILE = fileURLToPath(new URL('../../docs/anatomy/e9-acceptances.json', import.meta.url));
++export interface Acceptance { sampleId: string; cellId: string; scope: 'offline'; entrySha256: string; engineBuildHash: string; decidedBy: string; decidedOn: string; ref: string; limits: string[] }
++export const loadAcceptances = (): Acceptance[] => (existsSync(ACCEPTANCES_FILE) ? (JSON.parse(readFileSync(ACCEPTANCES_FILE, 'utf8')) as { acceptances: Acceptance[] }).acceptances : []);
++export const lotEntrySha256 = (e: unknown) => sha(canonJson(e));
++type LotAct = { idAto: number; epigrafe: string; canonicalChars: number; sha256: string; bytes: number; promoted: boolean; outputHash: string; status?: string;
++  unidentifiedChars?: number; attachmentsWithoutContent?: number; limitations?: Record<string, number> };
++/** Why an RFB lot reading is not complete (empty = complete). */
++export const incompleteness = (a: LotAct): string[] => [
++  ...(a.status !== 'complete' ? [`status ${String(a.status)}`] : []), ...((a.unidentifiedChars ?? 0) > 0 ? [`${a.unidentifiedChars} unidentified chars`] : []),
++  ...((a.attachmentsWithoutContent ?? 0) > 0 ? [`${a.attachmentsWithoutContent} attachment(s) without content`] : []),
++  ...(Object.keys(a.limitations ?? {}).length ? [`limitations ${Object.keys(a.limitations ?? {}).join(', ')}`] : [])];
+ 
+ // ---------------------------------------------------------------------------------------------------------------------
+ // The single grid. Layout names are exact strings; a sample must carry the same string to match.
+@@ -108,14 +128,14 @@ function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html
+ type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
+ const loadBaseline = (): BaselineEntry[] => (existsSync(SAMPLES_BASELINE) ? (JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: BaselineEntry[] }).samples : []);
+ 
+-export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Sample[] {
++export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), acceptances: Acceptance[] = loadAcceptances()): Sample[] {
+   const out: Sample[] = [];
+   const locked = (id: string, s: string, profile: string, rd: Read) => {
+     const b = baseline.find((x) => x.id === id);
+     return rd.invariants.length === 0 && !!b && b.sha256 === s && b.profile === profile && b.outputHash === rd.outputHash;
+   };
+   // RFB — the reproducible lot: bytes checked against the snapshot meta AND the lot baseline; the lot test re-runs it.
+-  const lot = JSON.parse(readFileSync(LOT_BASELINE, 'utf8')) as { acts: { idAto: number; epigrafe: string; canonicalChars: number; sha256: string; bytes: number; promoted: boolean; outputHash: string }[] };
++  const lot = JSON.parse(readFileSync(LOT_BASELINE, 'utf8')) as { acts: LotAct[] };
+   for (const dir of ['rfb-normasinternet2', 'rfb-normasinternet2-coleta02', 'rfb-p2c']) {
+     const d = join(ROOT, dir); if (!existsSync(d)) continue;
+     for (const f of readdirSync(d).filter((x) => /^\d+\.meta\.json$/u.test(x)).sort()) {
+@@ -126,9 +146,13 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
+       const epi = m.identification?.epigrafe ?? a?.epigrafe ?? '';
+       const type = m.p2c?.type ?? (/^Instru[çc][ãa]o Normativa/iu.test(epi) ? 'Instrução Normativa' : epi);
+       const inLot = !!a && a.sha256 === m.sha256;
++      const gaps = a ? incompleteness(a) : [];
++      const accepted = inLot && gaps.length === 0 && acceptances.some((x) => x.sampleId === `rfb:${m.id}` && x.scope === 'offline'
++        && x.entrySha256 === lotEntrySha256(a) && x.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH);
+       out.push({ id: `rfb:${m.id}`, source: 'RFB', type, layout: LAYOUT.RFB_JSON, chars: a?.canonicalChars ?? null, size: a ? sizeOf(a.canonicalChars) : null, sha256: m.sha256, bytes: m.bytes,
+-        stages: { captured: true, identified: !!epi, read: inLot, validated: inLot, accepted: false }, profile: inLot ? 'RFB' : null, diagnostic: null, outputHash: a?.outputHash ?? null,
+-        evidence: inLot ? ['docs/anatomy/official-lot-rfb.json', 'test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)'] : [], notes: inLot ? [] : ['not yet in the reproducible lot'] });
++        stages: { captured: true, identified: !!epi, read: inLot, validated: inLot, accepted }, profile: inLot ? 'RFB' : null, diagnostic: null, outputHash: a?.outputHash ?? null,
++        evidence: inLot ? ['docs/anatomy/official-lot-rfb.json', 'test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)', ...(accepted ? ['docs/anatomy/e9-acceptances.json'] : [])] : [],
++        notes: inLot ? (gaps.length ? [`partial reading — never accepted as complete: ${gaps.join('; ')}`] : []) : ['not yet in the reproducible lot'] });
+     }
+   }
+   // Sefaz-SP consolidated legislation portal: read only through its proven preparation (typed source).
+diff --git a/test/anatomy.official-coverage.unit.test.ts b/test/anatomy.official-coverage.unit.test.ts
+index aca3ced..f27e12c 100644
+--- a/test/anatomy.official-coverage.unit.test.ts
++++ b/test/anatomy.official-coverage.unit.test.ts
+@@ -18,7 +18,7 @@ test('E9 matrix and samples baseline are regenerated identical to the committed
+   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
+ });
+ 
+-test('E9 current state: 14 cells covered (10 + 4 P2-c direct captures, 2026-11-10), E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
++test('E9 current state: 14 cells covered (10 + 4 P2-c direct captures, 2026-11-10), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated', () => {
+   const m = buildMatrix(real);
+   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
+     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
+@@ -26,7 +26,7 @@ test('E9 current state: 14 cells covered (10 + 4 P2-c direct captures, 2026-11-1
+   assert.equal(m.e9MatrixComplete, false);
+   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
+   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
+-  assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
++  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], 'only the COORD-accepted Portaria 635/2025 (e9-acceptances.json); collection acceptance is not anatomy acceptance');
+   const leg = real.filter((s) => s.id.startsWith('lei-'));
+   assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
+   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
+@@ -189,3 +189,26 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
+   assert.equal(decodeWithPolicy(new TextEncoder().encode('<meta charset="utf-8"><p>é</p>'), { httpCharset: null }).encodingSource, 'declared');
+   assert.equal(decodeWithPolicy(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { httpCharset: null }).encodingSource, 'bom');
+ });
++
++// E9 (tribusca-control#116, continuidade P2-c): RFB acceptance is DATA pinned to the lot entry digest and the engine.
++test('E9 RFB acceptance: only a COMPLETE reading with a record pinning its lot digest AND the current engine is accepted', async () => {
++  const { collectSamples, lotEntrySha256, incompleteness } = await import('../ops/anatomy/official-coverage-matrix.js');
++  const { ANATOMY_ENGINE_BUILD_HASH } = await import('../src/modules/anatomy/build-identity.js');
++  const { readFileSync } = await import('node:fs');
++  const lot = JSON.parse(readFileSync(new URL('../docs/anatomy/official-lot-rfb.json', import.meta.url), 'utf8')) as { acts: { idAto: number }[] };
++  const entry = (id: number) => lot.acts.find((x) => x.idAto === id)!;
++  const rec = (id: number, over: Record<string, string> = {}) => ({ sampleId: `rfb:${id}`, cellId: 'x', scope: 'offline' as const, entrySha256: lotEntrySha256(entry(id)),
++    engineBuildHash: ANATOMY_ENGINE_BUILD_HASH, decidedBy: 't', decidedOn: '2026-11-11', ref: 't', limits: [], ...over });
++  const acc = (recs: ReturnType<typeof rec>[], id: number) => collectSamples(undefined, recs).find((s) => s.id === `rfb:${id}`)!.stages.accepted;
++  assert.equal(acc([rec(148693)], 148693), true, 'complete reading + exact pins → accepted');
++  assert.equal(acc([rec(148693, { entrySha256: '0'.repeat(64) })], 148693), false, 'lot digest drift voids it');
++  assert.equal(acc([rec(148693, { engineBuildHash: '0'.repeat(64) })], 148693), false, 'another engine voids it');
++  assert.equal(acc([rec(148693, { sampleId: 'rfb:142967' })], 148693), false, 'a record for another sample never counts');
++  for (const id of [148629, 148516, 148681]) {
++    assert.ok(incompleteness(entry(id) as never).length > 0, `${id} is a partial reading`);
++    assert.equal(acc([rec(id)], id), false, `${id}: a partial reading is never accepted, even with exact pins`);
++  }
++  const real = collectSamples();
++  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], 'the committed records accept only the Portaria');
++  assert.match(real.find((s) => s.id === 'rfb:148681')!.notes[0]!, /partial reading .*2 attachment\(s\) without content/u);
++});

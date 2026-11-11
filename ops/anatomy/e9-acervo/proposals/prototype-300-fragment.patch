@@ -1,0 +1,28 @@
+diff --git a/src/modules/anatomy/rfb-inline-attachments.ts b/src/modules/anatomy/rfb-inline-attachments.ts
+index c4099ea..4f671b1 100644
+--- a/src/modules/anatomy/rfb-inline-attachments.ts
++++ b/src/modules/anatomy/rfb-inline-attachments.ts
+@@ -164,8 +164,10 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
+       if (decoded.byteLength > RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAttachment) return done('attachment_too_large', `> ${RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAttachment} bytes`, meta);
+       if (actBytes + decoded.byteLength > RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAct) return done('act_attachments_too_large', `> ${RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAct} bytes in this act`, meta);
+       const head = Buffer.from(decoded.subarray(0, 512)).toString('latin1').replace(/^﻿|^\xEF\xBB\xBF/u, '').trimStart();
+-      if (!/^<(!doctype\s+html|html)[\s>]/iu.test(head)) return done('not_html', 'content is not an HTML document', meta);
+-      const label = declaredCharset(decoded);
++      // PROTOTYPE (E9 P2-c, ADE Cofis 30/2025): a bare table fragment (idTipoArquivo 5) is an HTML attachment too.
++      const fragment = !/^<(!doctype\s+html|html)[\s>]/iu.test(head) && file.idTipoArquivo === 5 && /^<table[\s>]/iu.test(head);
++      if (!fragment && !/^<(!doctype\s+html|html)[\s>]/iu.test(head)) return done('not_html', 'content is not an HTML document', meta);
++      const label = declaredCharset(decoded) ?? (fragment ? 'utf-8' : null);
+       if (!label) return done('charset_undeclared', 'the attachment declares no charset', meta);
+       const charset = charsetOf(label);
+       if (!charset) return done('charset_unsupported', `charset ${label} is not supported`, meta);
+@@ -181,8 +183,8 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
+       if (base.referenceContext !== 'operative_candidate') for (const x of reading.parts) {
+         if (RESTRICT[x.context] < RESTRICT[base.referenceContext] && x.type !== 'unidentified') { x.context = base.referenceContext; x.contextReasons.push('rfb_inline_attachment_reference_context'); }
+       }
+-      done('read', null as unknown as string, { ...meta, charset, html, reading });
++      done('read', (fragment && !declaredCharset(decoded) ? 'PROTOTYPE: table fragment, charset undeclared, strict utf-8 decode' : null) as unknown as string, { ...meta, charset, html, reading });
+     });
+   }
+-  return out.map((a) => (a.state === 'read' ? Object.freeze({ ...a, reason: null }) : a));
++  return out;
+ }
