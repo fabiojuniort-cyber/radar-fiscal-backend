@@ -22,6 +22,7 @@ import {
   createStandaloneDatabase,
 } from './infrastructure/database/standalone-client.js';
 import { processLogger } from './infrastructure/logging/process-logger.js';
+import { runPasswordResetOutboxWorker } from './modules/auth/password-reset.worker.js';
 
 let stopping = false;
 
@@ -234,9 +235,38 @@ async function run(): Promise<void> {
     },
   });
 
+  let resetLoop: Promise<void> | undefined;
   try {
     await assertStandaloneDatabaseConnection(db);
     await assertWorkerRuntimeConnection(db);
+
+    // AUTH-RESET-02: entrega duravel usa PostgreSQL e as replicas existentes,
+    // sem alterar agendamento/conectores da coleta e sem rede quando desabilitada.
+    const resetEnabled = process.env.AUTH_PASSWORD_RESET_ENABLED === 'true';
+    const resetKey = process.env.AUTH_PASSWORD_RESET_TOKEN_KEY ?? '';
+    const resetUrl = process.env.AUTH_PASSWORD_RESET_PUBLIC_URL ?? '';
+    const resetFrom = process.env.ZOHO_CPAAS_FROM_ADDRESS ?? '';
+    const resetApiKey = process.env.ZOHO_CPAAS_API_KEY ?? '';
+    const resetProxyKnown = Boolean(process.env.AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS?.trim());
+    if (resetEnabled) {
+      if (!/^[0-9a-f]{64}$/i.test(resetKey) ||
+          !resetUrl.startsWith('https://') ||
+          !/^[^\s@]+@[^\s@]+$/.test(resetFrom) ||
+          !resetApiKey || !resetProxyKnown) {
+        processLogger.warn({ component:'AUTH_RESET', enabled:false },
+          'Auth reset outbox worker blocked: incomplete secure runtime config');
+      } else {
+        resetLoop = runPasswordResetOutboxWorker(db, {
+          tokenKey: resetKey, publicUrl: resetUrl,
+          fromAddress: resetFrom, apiKey: resetApiKey,
+          isStopping: () => stopping,
+          onResult: (result) => {
+            processLogger.info({ component:'AUTH_RESET', result },
+              'Auth reset outbox worker result');
+          },
+        });
+      }
+    }
 
     const registry = buildConnectorRegistry({
       includeSimulated:
@@ -342,6 +372,8 @@ async function run(): Promise<void> {
       }
     }
   } finally {
+    stopping = true;
+    await resetLoop;
     await db.destroy();
 
     processLogger.info(
