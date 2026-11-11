@@ -178,3 +178,25 @@ O #310 (`ef7a0795`, draft) fixa o `postgresql-client-16` no `verify`, só na reg
 - **Consequência registrada:** o Art. 1º real do ADE Cofis cita a IN RFB nº 1.155 ("texto misto"). Pelo critério "na dúvida, não promover", a tabela passa a `prohibited`. A leitura continua íntegra: `read`, 9 linhas, 16 células, 26/26 ponteiros, SHA `f857a997…`.
 - **IN 2.121:** sem regressão (o anexo 67992 continua `read` e `operative_candidate`).
 - **Testes:** suíte do #300 278/278; `tsc` limpo; base-migration PG16 12/12; motor `30482bfd → 62a81cc9`.
+
+## R4 (2026-11-11): A r4, B r6 e provas de composição (nada integrado)
+
+- **B r6** (`proposal-303-rfb-acceptance-r6.patch`, base #303 @ `6b12ac64`):
+  - **B3-1:** uma normalização única para menção e cabeçalho: `–`, `—`, hífen com espaços e sufixo minúsculo viram `X-A`. "Rótulo + separador + letras" não modelado → lacuna.
+  - **B3-2:** letra isolada ("Anexo I, A e B", "Anexo C", "Anexo L") → rótulo não suportado → lacuna. "V" e "X" continuam romanos.
+  - **B2-2:** `rfbReadingAssessment` é a avaliação única por amostra.
+    1. caminho positivo de ponta a ponta numa fixture **sintética**; com amostra real, NOT_PROVEN, por falta de fonte;
+    2. `attachmentsWithoutContent` é descontado só pelos anexos **comprovadamente lidos** (mesmo id + SHA);
+    3. a completude é **independente** do `referenceContext`;
+    4. os ponteiros são recalculados dos bytes.
+  - `test:anatomy` 374/374; motor `0e009431`.
+- **A r4** (`proposal-300-type5-express-ref-r4.patch`, base #300 @ `22e8cc48`):
+  - **A3-1:** classe CSS explícita de tachado (`tachado`, `riscado`, `strike…`, `line-through`) → não promove.
+  - **A3-2 (decisão do COORD):** a citação **acessória** (fundamento, dispensa) não bloqueia. Bloqueia a norma no **objeto** da referência: a oração que contém a referência ou, se a referência for elíptica (", descritas abaixo."), a oração a que ela se liga. Caudas de citação (", de 2011") não fecham oração. Referência elíptica apoiada numa citação = ambígua → não promove.
+  - **ADE Cofis real:** volta a `operative_candidate` **pela regra**. A IN 1.155 está em oração acessória ("dispensadas as exigências…"), e o objeto ("as especificações descritas abaixo") é do próprio ato. Leitura íntegra, 26/26 ponteiros.
+  - **Limite mantido:** "É vedada a aplicação das condições descritas abaixo." continua sem promover, porque a negação ou vedação é avaliada na frase inteira. Reclassificar a vedação como operativa depende de decisão do COORD.
+  - Testes: 280/280; PG16 12/12; motor `62a81cc9 → 01fd87e5`.
+- **Composição descartável** #303 `46afdaf1` + #300 + A r4 + B r6 (motor `61d506cd`):
+  - produtor → consumidor: PROVEN (82381, 67992);
+  - **desconto real:** no ADE Cofis, o anexo lido zera o "attachment without content"; continua incompleto só pelo preâmbulo `Não Identificado` da fonte;
+  - `test:anatomy` 392/396. As 4 falhas são **exatamente** as asserções "só a Portaria aceita": no motor composto, o registro fixado em `0e009431` deixa de valer. A integração precisa de um novo registro append-only depois da equivalência; **não feito, nenhum aceite novo**.
