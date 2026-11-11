@@ -7,7 +7,7 @@
  * - INDEX (canonical, no trailing slash): https://www.gov.br/receitafederal/pt-br/assuntos/agenda-tributaria
  *   ("…/agenda-tributaria/" is normalized to INDEX; it is the same resource).
  * - CHILD: INDEX + "/" + 1 to 3 segments of [a-z0-9-] (e.g. …/agenda-tributaria/2026/janeiro).
- * Refused (fail closed, before any request): other scheme/host, port, credentials, query, fragment, encoded or literal
+ * Refused (fail closed, before any request): C0/NUL/DEL controls and non-canonical scheme forms (R2 D-1/D-2), other scheme/host, port, credentials, query, fragment, encoded or literal
  * dot segments, encoded slash/backslash, empty segments ("//"), uppercase or other characters in the path, siblings
  * that only share the prefix text ("…/agenda-tributaria-2025"), and anything else on gov.br.
  */
@@ -16,6 +16,10 @@ const INDEX_PATH = new URL(CORAT_INDEX).pathname;
 export type CoratRoute = { kind: 'index' | 'child'; href: string };
 
 export function coratRoute(raw: string): CoratRoute | { refused: string } {
+  // R2 D-1: control characters are refused on the RAW input (URL() would silently strip C0 controls such as NUL).
+  if (/[\u0000-\u001f\u007f]/u.test(raw)) return { refused: 'control character (C0/NUL/DEL) in the URL' };
+  // R2 D-2: only the canonical scheme form "https://" + host (lowercase scheme, exactly two slashes) is accepted.
+  if (!/^https:\/\/[^/\\]/u.test(raw)) return { refused: 'non-canonical scheme form (must start with "https://host")' };
   if (/[\\\s]/u.test(raw)) return { refused: 'backslash or whitespace in the URL' };
   if (/%(2e|2f|5c|00)/iu.test(raw)) return { refused: 'percent-encoded dot, slash, backslash or NUL' };
   let u: URL; try { u = new URL(raw); } catch { return { refused: 'not a URL' }; }
