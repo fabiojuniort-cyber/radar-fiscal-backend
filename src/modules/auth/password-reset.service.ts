@@ -65,6 +65,14 @@ function parseKey(hex: string): Buffer {
   return Buffer.from(hex, 'hex');
 }
 
+function strictGcmAuthTag(encoded: string): Buffer {
+  const tag=Buffer.from(encoded, 'base64');
+  if (tag.length !== 16 || tag.toString('base64') !== encoded) {
+    throw new Error('password_reset_invalid_gcm_tag');
+  }
+  return tag;
+}
+
 export interface EncryptedResetToken {
   ciphertext: string;
   nonce: string;
@@ -75,7 +83,7 @@ export function encryptResetToken(
   token: string, digest: string, keyHex: string,
 ): EncryptedResetToken {
   const nonce = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', parseKey(keyHex), nonce);
+  const cipher = createCipheriv('aes-256-gcm', parseKey(keyHex), nonce, { authTagLength: 16 });
   cipher.setAAD(Buffer.from(digest, 'ascii'));
   const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
   return {
@@ -90,9 +98,10 @@ export function decryptResetToken(
 ): string {
   const decipher = createDecipheriv(
     'aes-256-gcm', parseKey(keyHex), Buffer.from(encrypted.nonce, 'base64'),
+    { authTagLength: 16 },
   );
   decipher.setAAD(Buffer.from(digest, 'ascii'));
-  decipher.setAuthTag(Buffer.from(encrypted.authTag, 'base64'));
+  decipher.setAuthTag(strictGcmAuthTag(encrypted.authTag));
   const token = Buffer.concat([
     decipher.update(Buffer.from(encrypted.ciphertext, 'base64')),
     decipher.final(),
@@ -132,7 +141,7 @@ export function encryptResetRecipient(
   email: string, requestId: string, keyHex: string,
 ): EncryptedResetRecipient {
   const nonce = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', parseKey(keyHex), nonce);
+  const cipher = createCipheriv('aes-256-gcm', parseKey(keyHex), nonce, { authTagLength: 16 });
   cipher.setAAD(Buffer.from('tri-auth-reset-request:v1:' + requestId, 'utf8'));
   const ciphertext = Buffer.concat([
     cipher.update(normalizeEmail(email), 'utf8'), cipher.final(),
@@ -149,9 +158,10 @@ export function decryptResetRecipient(
 ): string {
   const decipher = createDecipheriv(
     'aes-256-gcm', parseKey(keyHex), Buffer.from(value.nonce, 'base64'),
+    { authTagLength: 16 },
   );
   decipher.setAAD(Buffer.from('tri-auth-reset-request:v1:' + requestId, 'utf8'));
-  decipher.setAuthTag(Buffer.from(value.authTag, 'base64'));
+  decipher.setAuthTag(strictGcmAuthTag(value.authTag));
   const email = Buffer.concat([
     decipher.update(Buffer.from(value.ciphertext, 'base64')),
     decipher.final(),
