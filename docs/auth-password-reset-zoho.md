@@ -1,147 +1,186 @@
-# AUTH-RESET-02 — Recuperar senha / Nova senha (#9): outbox durável
+# AUTH-RESET-03 R3 — recuperação de senha segura via Zoho CPaaS (#9)
 
-Status: PR isolado; **nao ativar em producao sem CI integral + revisao independente R3 + aceite do COORD/Fabio**. Cadastro inicial ONB-01 nao muda. Trial/validacao de e-mail ficam fora do escopo.
+Status: **PR #311 em desenvolvimento/revisão, sem autorização para merge ou produção**.
+O cadastro inicial existente, a política Argon2id e a decisão D-058 não mudam.
+A regra de trial permanece: **7 dias sem cartão, iniciados apenas após verificação
+do e-mail E primeiro cadastro de empresa**. Recuperar senha não verifica e-mail.
 
-## Protocolo de envio oficial (Zoho CPaaS)
+## AS IS → TO BE — explicação para o COORD
 
-Documentacao oficial: https://www.zoho.com/cpaas/help/api/email-sending.html e https://www.zoho.com/cpaas/help/api/api-authentication.html.
+**AS IS R2 (bloqueado):** a API parou de aguardar a rede Zoho, mas ainda procurava
+a conta dentro do pedido HTTP. Se a linha do usuário fosse bloqueada no banco
+por mais de 1,2 segundo, uma conta existente podia demorar mais que uma
+inexistente. Se a inserção da outbox falhasse somente para conta existente,
+poderia diferenciar HTTP 500 de HTTP 202. Claims antigos podiam aceitar ACK
+fora do prazo e uma conta desativada ainda podia receber e-mail.
 
-- Operacao: POST https://cpaas.zoho.com/v1.1/email.
-- Cabecalho: Authorization: Zoho-enczapikey <segredo do mail agent>.
-- Corpo: from { address, name }, to [{ email_address: { address } }], subject, textbody/htmlbody.
-- Resposta aceita como submissao: HTTP 200, message OK e codigo EM_104 no array data. Isso **nao equivale a entrega na caixa de entrada**.
-- Rastreamento de abertura/clique desativado, pois redirecionadores podem vazar o token.
-- A chave pertence ao Agent mail_agent_1 associado ao dominio trifaros.com.br; o identificador do agente nao e campo do POST /email.
-- Nenhuma chave em commit, chat, logs ou variaveis de build do frontend.
+**TO BE R3:** toda solicitação de e-mail bem formado é gravada de forma
+**idêntica**, com destinatário criptografado por AES-256-GCM em uma fila neutra
+no PostgreSQL. **Nenhuma consulta a usuários, token ou envio Zoho acontece
+durante o HTTP 202.** O worker já existente lê a solicitação cifrada, verifica
+a conta, e numa única transação prepara token + intenção de entrega. Se o
+e-mail não existir/estiver inativo, descarta apenas a solicitação neutra.
+Depois envia o link pelo Zoho separadamente, com controles de concorrência
+e número de tentativas. O token fica guardado em SHA-256, com uma cópia
+cifrada autenticadamente apenas enquanto precisa ser entregue.
 
-## Variaveis de ambiente — somente backend API
+São duas filas internas do **mesmo PostgreSQL** — intenção neutra de pedido
+e envio criptografado — não há nova fila externa nem novo serviço Railway.
 
-| Variavel | Papel | Configurar em producao? |
-| --- | --- | --- |
-| AUTH_PASSWORD_RESET_ENABLED | Chave de ativação, **false por padrão** | API e worker, apenas após R3 + B-3 PROVEN |
-| AUTH_PASSWORD_RESET_PUBLIC_URL | URL HTTPS da rota Web, ex.: https://trifaros.com.br/nova-senha | API e worker, depois do Web |
-| ZOHO_CPAAS_API_KEY | **Segredo** de envio do agent mail_agent_1 | Somente serviço worker; secret Railway, nunca compartilhar via chat |
-| ZOHO_CPAAS_FROM_ADDRESS | Remetente autorizado pelo Zoho | Worker; conferir com Zoho, não inferir valor |
-| AUTH_PASSWORD_RESET_TOKEN_KEY | Chave AES-256-GCM em hex (64 caracteres), criada no secret manager, nunca no chat | API e worker; usar o MESMO segredo por ambiente |
-| AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS | CIDRs exatos de proxies verificados | Vazio/NOT_PROVEN até aprovação formal B-3; API fica bloqueada |
-| DATABASE_URL | Runtime PostgreSQL existente da API; migration 083 previamente aprovada/aplicada | Ja existente |
-| DATABASE_ADMIN_URL | Aplicar migrations e executar testes em banco descartavel | **Nao passar a API operacional por chat** |
-
-A API utiliza ambiente/endpoint oficial da regiao documentada (cpaas.zoho.com). Antes de habilitar, confirmar se a conta Zoho usa esse mesmo data center; caso nao, parametrizar e validar o dominio permitido em alteracao especifica, sem abrir URL arbitraria para SSRF.
-
-## Arquitetura AS IS → TO BE
-
-**AS IS (bloqueado):** a API aguardava resposta da rede Zoho dentro do HTTP
-`/forgot`. Acima de 1,2s de latência, a resposta do e-mail existente era
-mais lenta que a de inexistente (vazamento P1); uma falha deixava token válido
-sem entrega. A cota por endereço retornava 429 para um terceiro. Não existia
-fila durável.
-
-**TO BE (PR #311):** ao solicitar recuperação, a API gera token aleatório,
-guarda seu hash e uma cópia **cifrada com AES-256-GCM** na outbox do próprio
-PostgreSQL, na MESMA transação. Retorna 202 depois do COMMIT, sem chamar a
-rede. Um laço de envio **no worker Railway já existente** (duas réplicas)
-busca jobs persistidos com `SKIP LOCKED`, confere validade do token, decifra
-em memória e chama Zoho. Estado de envio: PENDING/CLAIMED/ACCEPTED/RETRY
-(internamente PENDING com prazo)/FAILED/EXPIRED/CANCELLED. ACCEPTED significa
-**submissão aceita pela API do Zoho, não entrega na caixa de entrada**.
-No aceite ou falha terminal, a cópia cifrada do token é destruída.
-Falha transitória tenta novamente (até 3 vezes), sem perder pendências
-após reinício do processo. O processamento não cria serviço externo adicional
-nem altera conectores fiscais.
-
-**Limite técnico residual:** se o processo cair DEPOIS de o Zoho receber
-um e-mail, mas ANTES de persistir o ACK, uma tentativa posterior pode gerar
-segunda entrega do mesmo link. A outbox garante ao menos uma tentativa
-com retries limitados, não exatamente uma entrega na rede. O link permanece
-de uso único. Há uma pequena janela entre a checagem de validade e
-a aceitação pela rede em que uma solicitação concorrente pode substituí-lo;
-o conteúdo do link antigo não passa a ser utilizável. Não declarar eliminação
-matemática desses riscos sem suporte a idempotência externa.
-
-### Confiabilidade, proteção e configuração
-
-- Token em claro nunca em tabela/log; AES-256-GCM, nonce de 96 bits, tag de 128 bits, AAD SHA-256 do token; chave `AUTH_PASSWORD_RESET_TOKEN_KEY` (64 hex) em SEGREDO do runtime API e Worker.
-- Na falha definitiva, invalidar SOMENTE o hash correspondente ao job; falha antiga não invalida nova solicitação.
-- Correlacionar filas somente por UUID e código/estado sanitizado, nunca token/link/e-mail em logs ou métricas.
-- A API e o worker têm credenciais de DB com privilégios distintos; o worker só recebe EXECUTE em funções específicas e jamais SELECT direto nos tokens.
-- A outbox é durável antes do 202, portanto queda/redeploy não perde trabalhos; jobs com token expirado não são enviados.
-- `AUTH_PASSWORD_RESET_ENABLED=false` por padrão em API e Worker; qualquer configuração incompleta impede envio.
-
-### B-3 — proxy/IP Railway: NOT_PROVEN e gate de ativação
-
-Inspeção **somente leitura** do Railway: projeto "efficient-imagination", ambiente
-production; o backend tem uma réplica e domínio `radar-fiscal-backend-production.up.railway.app`;
-o worker existente tem duas réplicas. A conexão entre cliente, edge Railway
-e Fastify não apresenta nessa consulta a cadeia completa, números de saltos
-nem faixas de IP confiáveis. Por isso, B-3 permanece **NOT_PROVEN**.
-
-Enquanto não existir evidência e revisão dos endereços exatos:
-`AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS` fica vazio;
-Fastify não confia em `X-Forwarded-For` arbitrário; e em produção
-`AUTH_PASSWORD_RESET_ENABLED=true` sem CIDRs aprovados **não habilita**
-as rotas, que respondem 503. **NÃO configurar `trustProxy: true` genérico**.
-O worker também exige configuração de confiança declarada para iniciar.
-
-## Contratos novos — propostos para aceite
+## Rotas e retorno público
 
 ### POST /auth/password/forgot
 
-Body: { "email": "usuario@empresa.com.br" }.
-
-- 202 { "status": "if_account_exists" } tanto para e-mail existente quanto desconhecido/inativo; sem indicacao de envio ou validacao de conta.
-- 400 invalid_request se payload invalido.
-- 429 too_many_requests + Retry-After SOMENTE ao exceder cota por IP; cota de e-mail retorna 202 neutro, sem emissão nem e-mail.
-- 503 password_reset_unavailable quando nao habilitado/configurado.
-- Sem autenticacao, sem cookie, sem fake JWT.
-
-O backend gera 32 bytes aleatorios, token opaco base64url, guarda somente SHA-256, validade 30 minutos. Uma nova solicitacao invalida tokens anteriores daquele usuario. O link de uso unico e enviado em fragmento **#token=...** a URL fixa; o fragmento nao acompanha requisicoes HTTP ao host da pagina, evitando o token em logs do reverse proxy e Referer.
-
-Antiabuso: persistente PostgreSQL usando a funcao de rate limit existente com hashes isolados por prefixo:
-- 5 solicitacoes a cada 15 minutos por e-mail normalizado;
-- 60 solicitacoes a cada 15 minutos por IP;
-- tabela guarda somente hash, nunca e-mail nem IP em texto claro.
-
-**Anti-enumeração B-1:** o Zoho só é chamado pelo worker APÓS o 202. O piso de 1,2 s no HTTP fica como defesa adicional contra diferenças internas do banco e é verificado nos testes de temporização com a proteção habilitada. Confirmar resultados antes de declarar CORRIGIDO.
+JSON: `{"email":"pessoa@empresa.com.br"}`.
+- HTTP 202 com `{"status":"if_account_exists"}` para e-mail existente, desconhecido,
+  inativo, e-mail cuja cota própria de 5/15min esteja excedida.
+- HTTP 429 + Retry-After somente para cota do IP (60/15min).
+- HTTP 400 para payload malformado, 503 quando desligado/sem worker pronto,
+  e 5xx uniforme em indisponibilidade da fila neutra — **nunca consultar
+  existência do usuário no erro**.
+- O piso temporal de 1,2s fica ativo fora de `NODE_ENV=test` como defesa adicional,
+  mas a segurança NÃO depende do piso: o trabalho HTTP é uniforme.
+- O frontend jamais afirma que determinada conta existe, foi identificada ou recebeu e-mail.
+- Depois do commit do pedido neutro, processo/redeploy não o apaga.
 
 ### POST /auth/password/reset
 
-Body: { "token": "<token do link>", "password": "<senha forte>", "confirmPassword": "<igual>" }.
+JSON: `{"token":"<fragmento>","password":"Senha-Nova!123","confirmPassword":"Senha-Nova!123"}`.
+- 204 senha alterada, 400 token inválido/expirado/usado e 429 quota por IP.
+- Token aleatório 256 bits, validade de 30 minutos após preparação no worker,
+  único uso, emissão/substituição transacional, hash Argon2id e revogação de
+  **todas** sessões/refresh. JWT antigo falha na checagem do SID.
+- Um novo pedido neutro também invalida imediatamente um token anterior via
+  consulta na confirmação do reset; o HTTP não consulta contas para isso.
 
-- 204 sem corpo se trocou senha.
-- 400 invalid_password_reset_data para body/senha/confirmacao invalidos.
-- 400 invalid_or_expired_reset_token para token desconhecido, invalido, expirado ou ja utilizado.
-- 429 too_many_requests + Retry-After; 503 quando desabilitado.
-- Senha com o mesmo criterio do cadastro ONB-01: minimo 8, maiuscula, minuscula, numero e especial.
-- Token validado e consumido atomicamente com atualizacao Argon2id e reset do lock de login.
-- Todos os tokens de reset anteriores, **todas** as sessoes do usuario e **todos** os refresh tokens associados sao revogados na mesma transacao PostgreSQL. Como a autenticacao revalida o sid, JWT antigos tambem deixam de funcionar. O usuario deve autenticar-se novamente pelo POST /auth/login.
-- Ate 60 tentativas de confirmacao por IP/15 minutos; token aleatorio com 256 bits.
+## Implementação de criptografia, privilégio e concorrência
 
-Migration proposta: migrations/083_auth_password_reset.sql, aditiva, sem reescrita de usuarios legados. Funcoes SECURITY DEFINER com search_path fixo e EXECUTE apenas para radar_app, sem permissao direta do runtime na tabela de tokens. Validar a migration em PostgreSQL 18 isolado; **nao aplicar ao banco produtivo sem gate R3**.
+- `AUTH_PASSWORD_RESET_TOKEN_KEY`: **segredo AES-256 (64 hex), mesmo valor
+  somente nos runtimes Backend API e Worker**. Não enviar pelo chat, web,
+  logs, PR ou variáveis públicas. AES-GCM, nonce aleatório de 96 bits,
+  autenticação via tag, AAD vinculada ao UUID da solicitação ou digest do token.
+- A fila neutra contém apenas destinatário **cifrado**, HMAC-SHA256 da
+  normalização do e-mail, estados e UUID. O texto puro só existe em memória
+  temporariamente no worker. HMAC não usa SHA sem chave como identificador de
+  correspondência da fila.
+- Tabelas de tokens e filas sem SELECT/UPDATE/DELETE diretos para
+  `radar_app` ou `radar_worker`. SECURITY DEFINER com
+  `pg_catalog,public,pg_temp`, tabelas `public.` qualificadas, EXECUTE
+  mínimo por role. Função de emissão direta não é autorizada ao runtime API.
+- PostgreSQL mantém os estados `PENDING` / `CLAIMED` e terminais. O worker
+  usa `SKIP LOCKED` e lease de 20 segundos. **Claim não conta como envio**;
+  `begin_send` eleva o contador imediatamente antes de chamar a API Zoho.
+  O ACK só vale para lease vigente, claim correspondente e envio iniciado.
+  Após crash antes de `begin_send`, job fica recuperável com o mesmo número
+  de tentativas. Envio iniciado pode consumir tentativa se houver crash
+  imediatamente antes da rede: janela residual inerente, monitorada, não
+  garantia de exatamente uma entrega.
+- Falha transitória: retry limitado; falha terminal: invalida somente o token
+  associado. Usuário desativado, token usado, substituído ou expirado:
+  não enviar, limpar ciphertext, encerrar o trabalho. ACK antigo nunca
+  revoga um token novo.
+- `ACCEPTED` = submissão **aceita pelo Zoho**, não entrega na caixa postal.
+  Falha depois do aceite Zoho e antes do ACK pode produzir e-mail duplicado
+  (semântica `at-least-once`), documentado como risco operacional.
+- Jobs criptografados são limpos em estados terminais; worker chama
+  `auth_password_reset_reap` em cada ciclo. Para cobrir paralisações do
+  worker, habilitar `AUTH_PASSWORD_RESET_JANITOR_ENABLED=true` no Backend
+  com a migration vigente — o janitor da própria API limpa a cada minuto,
+  mesmo com o envio desabilitado. Se **todos** os processos estiverem
+  indisponíveis, cleanup espera retomada; exigir alerta operacional do ambiente.
 
-## Validacao simulada e ambiente isolado
+## Prontidão, rotação de segredo e observabilidade
 
-1. Teste de transporte sem HTTP real: test/password-reset.unit.test.ts injeta fetch fake, verifica URL, header Authorization, payload, remetente/destinatario e ausencia de tracking. Nao requer segredo Zoho.
-2. Contrato completo com PostgreSQL **descartavel radar_fiscal_test**: test/password-reset.integration.test.ts injeta um emissor de e-mails em memoria e recupera o token do link capturado; valida solicitacao, resposta neutra para usuario desconhecido, chegada simulada, segunda solicitacao, expiracao por alteracao de dados sintéticos, nova senha, uso unico, concurrencia, bloqueio por limite, invalidez de JWT antigo, rejeicao do refresh antigo e login com senha nova.
-3. CI: testes incluídos em npm test/integration; workflow dedicado `.github/workflows/auth-reset-pg18.yml`, matriz PostgreSQL 16 e 18, com testes de latência (piso temporal ativo), outbox, falha e concorrência. O CI geral continua condicionado a #310. **Nao sao testes de envio para caixa de e-mail real** e nao usam contas/segredos produtivos.
-4. Validacao Zoho real futura, apos conexao segura via secrets e autorizacao: ambiente de homologacao isolado, destinatario de teste consentido, conferir recebimento/link, abrir app homologado, redefinir senha sintética, comprovar revogacao e auditar se mail/links nao vazam em logs. Nenhum envio automatico autorizado por este PR.
+- Worker envia heartbeat no PostgreSQL, com fingerprint derivado da chave
+  (nunca a chave) e atualizado a cada iteração. A API só aceita solicitação
+  quando há ao menos um heartbeat **compatível nos últimos 30s**; caso
+  contrário retorna 503 neutro, não aceita silenciosamente filas sem worker.
+- Banco mantém fingerprint de configuração única; worker com chave diferente
+  não pode reivindicar nova entrega. Heartbeats expirados são descartados.
+- Rotação autorizada **somente com ambas as filas drenadas**. Interromper
+  novas solicitações, acompanhar PENDING/CLAIMED até 0, alterar fingerprint
+  via função restrita `auth_password_reset_rotate_key`, provisionar nova
+  chave API+Worker no secret manager, reiniciar workers, verificar
+  heartbeat e somente depois reabilitar solicitações. Nunca sobrescrever a
+  chave enquanto houver ciphertext pendente. A rotação não muda hashes de
+  senha nem tokens já aceitos (cópia cifrada destruída).
+- Logar apenas componentes, estados, contagem pendente/falha e idade máxima.
+  Nunca e-mail, token, fragmento, texto de erro Zoho, ciphertext ou segredo.
+  Alertar se `failed>0` ou `oldestPendingSeconds>120`.
+- Limitação: os testes isolados NÃO verificam alarmes externos de observabilidade,
+  envio real, cadeia do Railway ou prova operacional de rotação em produção.
 
-## Handoff preciso ao radar-fiscal-web
+## Variáveis — somente infraestrutura backend
 
-Implementar em PR Web **separado**, depois de aprovado o contrato:
-1. Na tela Entrar, oferecer link acessivel "Esqueci minha senha" para abrir formulario de e-mail.
-2. Ao confirmar, POST /auth/password/forgot, sem credentials/cookies; 202 deve sempre mostrar "Se houver uma conta vinculada a este e-mail, enviaremos instrucoes". Tratar 429 (espera) e 503 (indisponivel). Nunca mostrar se conta existe.
-3. **F-1**: carregar `/nova-senha` **NUNCA valida, consome ou envia automaticamente o token**. Somente o envio voluntário do formulário chama `POST /auth/password/reset`. Scanners de links podem carregar/executar JS.
-4. **F-2**: página `/nova-senha` deve enviar `Referrer-Policy: no-referrer`, CSP estrita compatível com a SPA, **sem analytics/scripts de terceiros**, pixels, telemetria ou error tracker de terceiros. Remover fragmento `#token` imediatamente antes de qualquer telemetria. Sanitizar explicitamente (ex. Sentry `beforeSend`) URL e erros, nunca transmitir token via analytics, histórico, console ou log. 
-5. **F-3**: gate de autenticação é `.github/workflows/auth-reset-pg18.yml`, não o job histórico `onb01-pg18`.
-6. Criar rota publica de SPA **/nova-senha** (nao existe no Web atual). Ler **somente** location.hash "#token=...", extrair token, apaga-lo do historico com history.replaceState imediatamente e nao envia-lo a analiticos/Sentry/logs.
-7. Validar senha e confirmacao em tempo real como no cadastro; POST /auth/password/reset {token,password,confirmPassword}, com 'Content-Type: application/json', sem cookies; sucesso HTTP 204 retorna a "Entrar", descartando estado de sessao anterior. Erro de token invalido/expirado/ja usado pede nova solicitacao; nunca ecoar token no erro.
-8. Testes Web mockados: fluxo de 202 existente/desconhecido, rate limit, falta de conexao, link expirado/usado, senha fraca/confirmacao, 204 com limpeza de URL e navegacao ao login; Playwright desktop/mobile. Same-origin proxy /auth deve rotear para backend.
-9. Nao modificar a regra D-058: trial de 7 dias sem cartao inicia somente apos verificacao do e-mail e primeira empresa cadastrada; reset de senha nao confirma e-mail nem inicia trial.
+| Nome | API | Worker | Observação |
+|---|---|---|---|
+| `AUTH_PASSWORD_RESET_ENABLED` | Sim | Sim | `false` por padrão; ativar só após gates COORD |
+| `AUTH_PASSWORD_RESET_PUBLIC_URL` | Sim | Sim | URL HTTPS da rota Web `/nova-senha` |
+| `AUTH_PASSWORD_RESET_TOKEN_KEY` | Segredo | Mesmo segredo | 64 hex; secret manager Railway, nunca chat |
+| `AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS` | Sim | Sim | CIDRs exatos **após prova**; sem configuração = BLOCK |
+| `AUTH_PASSWORD_RESET_JANITOR_ENABLED` | Sim | Não | `false` por padrão, exigir `true` antes de ativação |
+| `ZOHO_CPAAS_API_KEY` | Não | Segredo | Chave de envio agent `mail_agent_1` |
+| `ZOHO_CPAAS_FROM_ADDRESS` | Não | Sim | Remetente verificado em `trifaros.com.br` |
+| `DATABASE_URL` | Sim | Sim | Roles existentes distintos; sem acesso direto às filas |
+| `DATABASE_ADMIN_URL` | Não | Não | Apenas migrations/testes em banco descartável |
 
-## Gates pendentes
+### B-3 — proxy Railway: **NOT_PROVEN**
 
-- Revisao independente R2/R3: SQL SECURITY DEFINER/privilegios, concorrencia, expiracao, anti-enumeracao (incluindo tempo), origem e-mail/entrega real, session fixation, token em fragmento, observabilidade sem segredos, seguranca de deploy/migration.
-- Confirmar CI integral no SHA final. Revisar possivel drift de main antes do merge.
-- Validar API Zoho em ambiente isolado com segredo em Railway; nenhuma chave no chat/PR. Confirmar SPF/DKIM/remetente, quotas e dominio.
-- Aceite da #9 somente depois de fluxo Web+Backend integrado comprovado; baseline Frente 2 permanece 28% (14/50) ate decisao do COORD.
+O inventário somente leitura mostrou API e réplicas do worker, mas **não**
+CIDRs/saltos completos da cadeia ingress. Não presumir número de proxies.
+`trustProxy:true` indiscriminado é proibido. Fastify confia apenas nos
+CIDRs explicitamente configurados e aceitos após comprovação. Até lá
+`AUTH_PASSWORD_RESET_ENABLED=false` e rotas retornam 503.
+
+## Zoho CPaaS
+
+Envio do worker: `POST https://cpaas.zoho.com/v1.1/email`,
+cabeçalho `Authorization: Zoho-enczapikey <segredo>`, conteúdo HTML
+escapado; `track_clicks=false`, `track_opens=false`, timeout 5s e
+redirecionamentos recusados. A API exige resposta de aceite
+`message=OK` / código `EM_104`. **Host/data center e entrega real
+ainda dependem de homologação isolada com o TriFaros.**
+Documentação: https://www.zoho.com/cpaas/help/api/email-sending.html
+
+## Contrato para o Web — F-1 / F-2 / F-3
+
+**F-1:** carregar `/nova-senha` nunca consome o token. Só o envio
+voluntário do formulário chama `POST /auth/password/reset`.
+Scanners de link podem abrir páginas automaticamente.
+
+**F-2:** `/nova-senha` requer `Referrer-Policy: no-referrer`,
+CSP restritiva compatível com SPA, sem analytics/pixels/scripts de terceiros
+ou telemetria na rota. Ler `location.hash`, guardar token só em memória e
+remover imediatamente o fragmento por `history.replaceState` antes de
+qualquer telemetria. Nunca ecoar token em logs, URL de erro, analytics,
+Sentry ou console.
+
+**F-3:** workflow backend correto `.github/workflows/auth-reset-pg18.yml`
+(nome histórico, matriz PG16 e PG18). Integrar Web por PR separado,
+com testes de 202 neutro, 429/503, token vencido/usado, política de senha,
+204→login e JWT/refresh inválidos.
+
+O Web não altera a regra de trial D-058; reset de senha não verifica e-mail.
+
+## Provas e gates
+
+- `test/password-reset.unit.test.ts`: Zoho `fetch` mock, AEAD,
+  HTML escapado, chave incorreta, sem rede nem credenciais reais.
+- `test/password-reset.integration.test.ts`: PG descartável, neutral
+  ingress, heartbeat, reinício, retry, dois workers, leases,
+  revogação e privilégios mínimos.
+- `test/password-reset.latency.integration.test.ts`: 0/800/2500/4900ms,
+  erro de envio, piso ativo sem esperar Zoho.
+- `test/password-reset.r3.adversarial.integration.test.ts`: **row lock real
+  no PostgreSQL** e falha injetada no insert neutro, comparando respostas
+  de usuário existente e ausente com piso de 1,2s ativo.
+- **CI:** `.github/workflows/auth-reset-pg18.yml`, matriz PG16/PG18.
+  Resultados devem ser apresentados por SHA, sem considerar testes
+  verdes como aprovação independente R3.
+- **Não autorizado:** merge, deploy, migration produtiva, envio Zoho real,
+  ativação de flag, secrets via chat, Web nesta tarefa, #310 ou coletores.
+- **Antes de produção:** nova R3 adversarial, CI integral, B-3 PROVEN,
+  worker pronto e janitor ativado, E-1 Zoho real em homologação autorizada,
+  Web integrado, aceite COORD e reconciliação #9/#124.
+
+**Frente 2: 28% (14/50), delta +0,0 p.p. Até aceite formal da #9.**
