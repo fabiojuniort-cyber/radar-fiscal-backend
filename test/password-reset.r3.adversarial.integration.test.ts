@@ -84,6 +84,18 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
    }));
    await holding.query('COMMIT');holding.release();holding=null;
 
+   // Register a distinct KNOWN account that has not consumed its quota.
+   const faultKnown='r3-fault-known-'+randomUUID()+'@example.test';
+   const faultUnknown='r3-fault-unknown-'+randomUUID()+'@example.test';
+   const createdFault=await app.inject({method:'POST',url:'/auth/register',payload:{
+     name:'Fault Test',email:faultKnown,password:'Senha-Exemplo-2026!',
+     confirmPassword:'Senha-Exemplo-2026!',acceptedTerms:true,
+   }});
+   assert.equal(createdFault.statusCode,201,createdFault.body);
+   const ids=createdFault.json<{user:{id:string};tenant:{id:string}}>();
+   faultUid=ids.user.id;faultTenant=ids.tenant.id;
+   keys.push(hash('auth-reset-v1:request-email:'+faultKnown),
+     hash('auth-reset-v1:request-email:'+faultUnknown));
    // Isolated fault injection: both known and unknown must fail identically.
    await admin.query("CREATE FUNCTION public.r3_fail_neutral_insert() RETURNS trigger "+
      "LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic-intake-unavailable'; END $$");
@@ -91,8 +103,8 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
      "ON public.auth_password_reset_requests FOR EACH ROW EXECUTE FUNCTION "+
      "public.r3_fail_neutral_insert()");
    // Distinct emails avoid the rate-limit quota exhausted above.
-   const a=await measure('r3-known-fault-'+randomUUID()+'@example.test');
-   const b=await measure('r3-missing-fault-'+randomUUID()+'@example.test');
+   const a=await measure(faultKnown);
+   const b=await measure(faultUnknown);
    assert.equal(a.status,500);
    assert.equal(b.status,500);
    assert.ok(Math.abs(a.ms-b.ms)<200,
@@ -109,7 +121,9 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
    await admin.query('DROP FUNCTION IF EXISTS public.r3_fail_neutral_insert()');
    await app.close();await worker.destroy();
    if(uid)await admin.query('DELETE FROM app_users WHERE id=$1',[uid]);
+   if(faultUid)await admin.query('DELETE FROM app_users WHERE id=$1',[faultUid]);
    if(tenant)await admin.query('DELETE FROM tenants WHERE id=$1',[tenant]);
+   if(faultTenant)await admin.query('DELETE FROM tenants WHERE id=$1',[faultTenant]);
    await admin.query('DELETE FROM public_signup_rate_limits WHERE key_hash=ANY($1::text[])',[keys]);
    await admin.end();
  }
