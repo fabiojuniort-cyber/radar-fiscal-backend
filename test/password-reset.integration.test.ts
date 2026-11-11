@@ -204,6 +204,13 @@ test('R3: persistent neutral ingress, worker concurrency, leases, revocation and
     assert.equal(ack.rows[0]?.state,'IGNORED');
     await deliverOne();
 
+    // Synthetically advance the 15-minute e-mail quota window; do not
+    // weaken the actual anti-abuse limit for the application.
+    await admin.query(
+      'DELETE FROM public_signup_rate_limits WHERE key_hash=$1',
+      [hash('auth-reset-v1:request-email:'+known)],
+    );
+
     // Expired token must not be sent; ciphertext should be destroyed by reaper.
     assert.equal((await issue(known)).statusCode,202);
     await requestOnly();
