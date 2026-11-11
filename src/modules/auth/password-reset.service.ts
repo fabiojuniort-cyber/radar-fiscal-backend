@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 import { sql, type Kysely } from 'kysely';
 
@@ -58,6 +58,57 @@ export class PasswordResetDeliveryError extends Error {
   }
 }
 
+function parseKey(hex: string): Buffer {
+  if (!/^[0-9a-f]{64}$/i.test(hex)) {
+    throw new Error('password_reset_encryption_key_invalid');
+  }
+  return Buffer.from(hex, 'hex');
+}
+
+export interface EncryptedResetToken {
+  ciphertext: string;
+  nonce: string;
+  authTag: string;
+}
+
+export function encryptResetToken(
+  token: string, digest: string, keyHex: string,
+): EncryptedResetToken {
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', parseKey(keyHex), nonce);
+  cipher.setAAD(Buffer.from(digest, 'ascii'));
+  const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+  return {
+    ciphertext: encrypted.toString('base64'),
+    nonce: nonce.toString('base64'),
+    authTag: cipher.getAuthTag().toString('base64'),
+  };
+}
+
+export function decryptResetToken(
+  encrypted: EncryptedResetToken, digest: string, keyHex: string,
+): string {
+  const decipher = createDecipheriv(
+    'aes-256-gcm', parseKey(keyHex), Buffer.from(encrypted.nonce, 'base64'),
+  );
+  decipher.setAAD(Buffer.from(digest, 'ascii'));
+  decipher.setAuthTag(Buffer.from(encrypted.authTag, 'base64'));
+  const token = Buffer.concat([
+    decipher.update(Buffer.from(encrypted.ciphertext, 'base64')),
+    decipher.final(),
+  ]).toString('utf8');
+  if (hashSecret(token) !== digest || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    throw new Error('password_reset_ciphertext_invalid');
+  }
+  return token;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character] ?? character);
+}
+
 export class PasswordResetRateLimitedError extends Error {
   constructor(readonly retryAfterSeconds: number) {
     super('password_reset_rate_limited');
@@ -77,38 +128,39 @@ export function passwordResetLink(publicUrl: string, token: string): string {
 
 export async function requestPasswordReset(
   db: Kysely<DB>,
-  input: { email: string; ip: string; publicUrl: string; send: PasswordResetSender },
+  input: { email: string; ip: string; publicUrl: string; tokenKey: string },
 ): Promise<void> {
   const email = normalizeEmail(input.email);
-  const [emailRate, ipRate] = await Promise.all([
-    rateLimit(db, rateKey('request-email', email), PASSWORD_RESET_REQUESTS_PER_EMAIL),
-    rateLimit(db, rateKey('request-ip', input.ip), PASSWORD_RESET_REQUESTS_PER_IP),
-  ]);
 
-  if (!emailRate.allowed || !ipRate.allowed) {
-    throw new PasswordResetRateLimitedError(
-      Math.max(emailRate.retryAfterSeconds, ipRate.retryAfterSeconds),
-    );
+  // Validar configuracao antes da emissao; nao armazenar link ou token aberto.
+  passwordResetLink(input.publicUrl, 'validation');
+  parseKey(input.tokenKey);
+
+  // O limite IP e o unico que pode responder 429. Ambos sao persistidos
+  // atomicamente no banco e recebem prefixos independentes do signup.
+  const ipRate = await rateLimit(
+    db, rateKey('request-ip', input.ip), PASSWORD_RESET_REQUESTS_PER_IP,
+  );
+  if (!ipRate.allowed) {
+    throw new PasswordResetRateLimitedError(ipRate.retryAfterSeconds);
   }
+  const emailRate = await rateLimit(
+    db, rateKey('request-email', email), PASSWORD_RESET_REQUESTS_PER_EMAIL,
+  );
+  if (!emailRate.allowed) return;
 
   const token = randomBytes(32).toString('base64url');
-  const tokenHash = hashSecret(token);
-  const result = await sql<{ issued: boolean }>`
+  const digest = hashSecret(token);
+  const secret = encryptResetToken(token, digest, input.tokenKey);
+
+  // Emissao e intencao de entrega na mesma transacao SQL.
+  // NUNCA chamar Zoho na requisicao HTTP.
+  await sql<{ issued: boolean }>`
     SELECT public.auth_password_reset_issue(
-      ${email}, ${tokenHash}, ${PASSWORD_RESET_TTL_SECONDS}
+      ${email}, ${digest}, ${PASSWORD_RESET_TTL_SECONDS},
+      ${secret.ciphertext}, ${secret.nonce}, ${secret.authTag}
     ) AS issued
   `.execute(db);
-
-  // Mesma resposta publica para e-mail cadastrado ou desconhecido.
-  if (!result.rows[0]?.issued) return;
-
-  const link = passwordResetLink(input.publicUrl, token);
-  try {
-    await input.send({ to: email, link });
-  } catch {
-    // Sanitiza falhas, que podem conter mensagens do transporte com PII.
-    throw new PasswordResetDeliveryError();
-  }
 }
 
 export async function completePasswordReset(
@@ -168,7 +220,7 @@ export async function sendZohoPasswordResetMail(
       'Use este link uma única vez, em até 30 minutos:\n' + message.link +
       '\n\nSe não solicitou, ignore esta mensagem.',
     htmlbody: '<p>Você solicitou a recuperação de senha da TriFaros.</p>' +
-      '<p><a href="' + message.link + '">Definir nova senha</a></p>' +
+      '<p><a href="' + escapeHtml(message.link) + '">Definir nova senha</a></p>' +
       '<p>O link vale por 30 minutos e pode ser usado uma única vez.</p>' +
       '<p>Se não solicitou, ignore esta mensagem.</p>',
     // Nunca entregar links de reset a redirecionadores de tracking.
