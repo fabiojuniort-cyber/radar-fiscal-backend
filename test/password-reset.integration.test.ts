@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 
 import { buildApp } from '../src/app.js';
 import { createStandaloneDatabase } from '../src/infrastructure/database/standalone-client.js';
-import { requestPasswordReset, type PasswordResetMessage } from '../src/modules/auth/password-reset.service.js';
+import { requestPasswordReset, passwordResetRecipientDigest, type PasswordResetMessage } from '../src/modules/auth/password-reset.service.js';
 import {
   heartbeatPasswordResetWorker,
   processPasswordResetRequestOnce,
@@ -257,10 +257,38 @@ test('R3: persistent neutral ingress, worker concurrency, leases, revocation and
     const countVictim=await admin.query<{total:string}>(
       "SELECT count(*)::text AS total FROM auth_password_reset_requests "+
       "WHERE email_digest=$1",
-      [createHash('sha256').update('unused').digest('hex')],
+      [passwordResetRecipientDigest(victim,KEY)],
     );
-    // Count by request email digest using service HMAC in the stronger assertion.
-    assert.equal(countVictim.rows[0]?.total,'0');
+    assert.equal(countVictim.rows[0]?.total,'5',
+      'Email quota admits exactly five neutral rows, irrespective of account');
+    // Role boundaries: no direct table access or unrestricted token issuance.
+    const grants=await admin.query<{
+      appRead:boolean;workerRead:boolean;appIssue:boolean;workerIssue:boolean;
+      appEnqueue:boolean;workerPrepare:boolean;
+    }>(
+      "SELECT "+
+      "has_table_privilege('radar_app_runtime','public.auth_password_reset_outbox','SELECT') AS \"appRead\","+
+      "has_table_privilege('radar_worker_runtime','public.auth_password_reset_outbox','SELECT') AS \"workerRead\","+
+      "has_function_privilege('radar_app_runtime','public.auth_password_reset_issue(text,text,integer,text,text,text)','EXECUTE') AS \"appIssue\","+
+      "has_function_privilege('radar_worker_runtime','public.auth_password_reset_issue(text,text,integer,text,text,text)','EXECUTE') AS \"workerIssue\","+
+      "has_function_privilege('radar_app_runtime','public.auth_password_reset_enqueue(uuid,text,text,text,text,integer)','EXECUTE') AS \"appEnqueue\","+
+      "has_function_privilege('radar_worker_runtime','public.auth_password_reset_prepare_request(uuid,uuid,text,text,text,text,text,integer)','EXECUTE') AS \"workerPrepare\""
+    );
+    assert.deepEqual(grants.rows[0],{
+      appRead:false,workerRead:false,appIssue:false,workerIssue:false,
+      appEnqueue:true,workerPrepare:true,
+    });
+    const client=await runtime.connect();
+    try{
+      await client.query('CREATE TEMP TABLE app_users(id UUID,email TEXT,status TEXT)');
+      await assert.rejects(client.query(
+        'SELECT * FROM public.auth_password_reset_requests'
+      ));
+      await assert.rejects(client.query(
+        'SELECT * FROM public.auth_password_reset_outbox'
+      ));
+    }finally{client.release();}
+
   } finally {
     await app.close();await worker.destroy();await worker2.destroy();await runtime.end();
     for(const a of accounts){
