@@ -269,6 +269,17 @@ async function run(): Promise<void> {
             processLogger.info({ component:'AUTH_RESET', result },
               'Auth reset outbox worker result');
           },
+          onHealth: (health) => {
+            processLogger.info({ component:'AUTH_RESET', ...health },
+              'Auth reset queue aggregate health');
+            if (health.failed > 0 || health.oldestPendingSeconds > 120) {
+              processLogger.warn({ component:'AUTH_RESET',
+                event:'backlog_or_failed_jobs',
+                pending: health.pending, failed: health.failed,
+                oldestPendingSeconds: health.oldestPendingSeconds },
+              'Password reset queue requires operational attention');
+            }
+          },
         });
       }
     }
