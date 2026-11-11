@@ -48,6 +48,7 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
   const email='reset02-'+unique+'@example.test';
   const unknown='missing02-'+unique+'@example.test';
   let userId='',tenantId='';
+  let victimUserId='',victimTenantId='';
   const tracked:string[]=[];
   const track=(addr:string) => tracked.push(hash('auth-reset-v1:request-email:'+addr));
   const forgot=async (addr:string) => app.inject({
