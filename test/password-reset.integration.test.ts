@@ -233,6 +233,30 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
       tracked.push(hash('auth-reset-v1:request-ip:192.0.2.'+octet));
     }
 
+    // C-1: falha no INSERT ao duplicar o hash precisa reverter
+    // cancelamento de token/outbox anterior na MESMA transacao.
+    const activeDigest=await admin.query<{token_hash:string}>(
+      'SELECT token_hash FROM auth_password_reset_tokens '+
+      'WHERE user_id=$1 AND used_at IS NULL',[victimUserId],
+    );
+    assert.equal(activeDigest.rowCount,1);
+    await assert.rejects(admin.query(
+      'SELECT public.auth_password_reset_issue($1,$2,$3,$4,$5,$6)',
+      [victimEmail,activeDigest.rows[0]?.token_hash,1800,
+        'fakeciphertext-xxxxxxxxxxxxxxxxxxxxxxxx','nonce-synthetic-xx',
+        'tag-synthetic-xxxxxxxxxxxxxxx'],
+    ));
+    const rolledBack=await admin.query<{active:string;pending:string}>(
+      "SELECT (SELECT count(*)::text FROM auth_password_reset_tokens "+
+      "WHERE user_id=$1 AND used_at IS NULL) AS active, "+
+      "(SELECT count(*)::text FROM auth_password_reset_outbox o "+
+      "JOIN auth_password_reset_tokens t ON t.token_hash=o.token_hash "+
+      "WHERE t.user_id=$1 AND o.status='PENDING') AS pending",
+      [victimUserId],
+    );
+    assert.equal(rolledBack.rows[0]?.active,'1');
+    assert.equal(rolledBack.rows[0]?.pending,'1');
+
     // B-3: sem proxy confiavel declarado, X-Forwarded-For do cliente
     // nunca muda a quota por request.ip.
     const forgedIp='198.51.100.244';
