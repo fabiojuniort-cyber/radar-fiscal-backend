@@ -7,6 +7,8 @@ import { ATT_BUDGET, ATT_PACKAGE, cli, pdfIdentityProblem, routeProblem, runAtta
 import type { BudgetState } from '../ops/anatomy/request-budget.js';
 import { buildSyntheticPdf } from './support/synthetic-pdf.js';
 
+// R4 C3-1: the injected preflight is a test seam honoured only under NODE_ENV=test (set here for this file's process).
+process.env.NODE_ENV = 'test';
 // E9 P2-c, COORD decision C (tribusca-control#116): exact one-shot route for the PDF 83325 of SC Cosit 258/2025.
 // Simulated transport only: no request leaves this test.
 const NOW = () => new Date('2026-11-11T12:00:00Z');
@@ -255,4 +257,21 @@ test('R3 C-5: runAttachment called DIRECTLY applies the single-owner preflight b
   const r = await runAttachment(t.f, noStub as Parameters<typeof runAttachment>[1]);
   assert.equal(t.urls.length, 0, 'nothing sent'); assert.equal(r.stored, false); assert.match(r.outcome, /preflight/u);
   assert.equal(read(f).used.total, 0, 'budget never opened');
+});
+
+// ---- R4 (review R3 C3-1): an injected preflight is honoured ONLY under NODE_ENV=test; elsewhere the default runs ----
+test('R4 C3-1: outside NODE_ENV=test an injected preflight is ignored — the default single-owner preflight refuses with 0 requests', async () => {
+  const prev = process.env.NODE_ENV;
+  try {
+    for (const env of ['production', 'development', undefined]) {
+      if (env === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = env;
+      const f = budget(); const t = never();
+      const r = await runAttachment(t.f, opts(f, { preflight: () => null }));
+      assert.equal(t.urls.length, 0, `${String(env)}: nothing sent`); assert.match(r.outcome, /preflight/u, String(env));
+      assert.equal(read(f).used.total, 0, `${String(env)}: budget never opened`);
+    }
+    process.env.NODE_ENV = 'test';
+    const ok = await runAttachment(transport(() => pdfResp(PDF_OK)).f, opts(budget(), { preflight: () => null }));
+    assert.equal(ok.stored, true, 'under NODE_ENV=test the test seam works');
+  } finally { if (prev === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = prev; }
 });

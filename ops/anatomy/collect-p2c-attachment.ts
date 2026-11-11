@@ -183,7 +183,9 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
   const base = `${TARGET.idAto}-${TARGET.idArquivoBinario}`;
   // Offline screening: nothing below sends a request.
   const ledger = opts.budgetFile ?? ATT_BUDGET;
-  const pre = (opts.preflight ?? (() => { try { return ledgerPreflight(readFileSync(ledger, 'utf8'), gitPushedLedger(ledger)); } catch (e) { return `ledger unreadable (${(e as Error).message.slice(0, 80)})`; } }))();
+  // R4 C3-1: an injected preflight is a TEST SEAM only — honoured under NODE_ENV=test, ignored anywhere else.
+  const injected = process.env.NODE_ENV === 'test' ? opts.preflight : undefined;
+  const pre = (injected ?? (() => { try { return ledgerPreflight(readFileSync(ledger, 'utf8'), gitPushedLedger(ledger)); } catch (e) { return `ledger unreadable (${(e as Error).message.slice(0, 80)})`; } }))();
   if (pre) return { requests: 0, stored: false, outcome: `refused before request: preflight — ${pre}` };
   const act = opts.actJson ?? readFileSync(TARGET.actJson);
   const tp = targetProblem(act); if (tp) return { requests: 0, stored: false, outcome: `refused before request: ${tp}` };

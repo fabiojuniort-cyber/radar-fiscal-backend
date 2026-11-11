@@ -8,7 +8,7 @@
   - um disparo;
   - redirect nunca seguido; URL final fixada;
   - identidade estrutural do PDF; limite de tamanho durante a leitura; escrita em dois tempos.
-- **Garante (preflight, em todo caminho):** `runAttachment` aplica o preflight **também quando chamado direto**, não só pela CLI (R3; teste `R3 C-5`). O preflight exige que o ledger local seja **byte a byte igual ao publicado** em `origin/<branch>` e que não tenha tentativas.
+- **Garante (preflight, em todo caminho):** `runAttachment` aplica o preflight **também quando chamado direto**, não só pela CLI (R3; teste `R3 C-5`). Um preflight injetado só vale sob `NODE_ENV=test` (R4 C3-1; teste `R4 C3-1`): fora disso o padrão roda sempre. O preflight exige que o ledger local seja **byte a byte igual ao publicado** em `origin/<branch>` e que não tenha tentativas.
 - **NÃO garante:** exclusividade entre checkouts **antes** de qualquer push.
   - Duas cópias com o mesmo ledger publicado (ativado e ainda não consumido) passam ambas no preflight.
   - O lease (`budget-state.json.lock`) só coordena **um** arquivo, num **único** checkout.
