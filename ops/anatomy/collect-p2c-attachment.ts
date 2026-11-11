@@ -18,7 +18,7 @@
  *   --owner 'EXEC #303 (claude/anat-e9-coverage)' --stop-after 1
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BudgetRefused, RequestBudget } from './request-budget.js';
@@ -57,12 +57,54 @@ export function targetProblem(actBytes: Buffer, idArquivoBinario: number = TARGE
   return idArquivoBinario === TARGET.idArquivoBinario ? null : 'only the pinned attachment may be requested';
 }
 
-/** The PDF must name the act in its text layer. */
-export function pdfIdentityProblem(lines: { text: string }[]): string | null {
-  const t = lines.map((l) => l.text).join('\n').normalize('NFC');
-  const miss = [[/SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA/iu, 'SOLUÇÃO DE CONSULTA'], [/\bCOSIT\b/iu, 'COSIT'], [/\b258\b/u, 'nº 258']]
-    .filter(([re]) => !(re as RegExp).test(t)).map(([, w]) => w);
-  return miss.length ? `the PDF text does not name the act (${miss.join(', ')} not found)` : null;
+/**
+ * The PDF must BE the act, not merely mention it (COORD correction): within the first lines of page 1 there must be
+ * exactly one SC heading and it must be "SOLUÇÃO DE CONSULTA Nº 258" issued by COSIT (same line, or COSIT on the next
+ * heading line), and the act date 26/12/2025 ("26 de dezembro de 2025" or "26/12/2025") must appear in that head.
+ * Another SC number in the head, another unit, a missing date, or "258" only in the body → refused.
+ */
+const HEAD_LINES = 12;
+export function pdfIdentityProblem(lines: { text: string; page?: number }[]): string | null {
+  const head = lines.filter((l) => (l.page ?? 1) === 1).slice(0, HEAD_LINES).map((l) => l.text.normalize('NFC').replace(/\s+/gu, ' ').trim());
+  const sc = head.map((t, i) => ({ i, t, m: /^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+N\s*[º°o.]?\s*(\d+)\b(.*)$/iu.exec(t) })).filter((x) => x.m);
+  const why = (w: string) => `the PDF text does not name the act (${w})`;
+  if (sc.length !== 1) return why(`${sc.length} Solução de Consulta heading(s) in the first ${HEAD_LINES} lines`);
+  const [{ i, m }] = sc as [{ i: number; t: string; m: RegExpExecArray }];
+  if (m[1] !== '258') return why(`heading is nº ${m[1]}, not nº 258`);
+  const unit = `${m[2]} ${head[i + 1] ?? ''}`;
+  if (!/(^|[^A-Za-z])COSIT\b/iu.test(unit) || /\b(SRRF|DISIT|DIT)\d*/iu.test(m[2]!)) return why('heading is not issued by COSIT');
+  if (!head.some((t) => /\b26\s+de\s+dezembro\s+de\s+2025\b|\b26\/12\/2025\b/iu.test(t))) return why('act date 26/12/2025 not in the head');
+  return null;
+}
+
+/** Valid stored resource = final PDF + final meta whose sha256/bytes match the PDF. Anything else is not stored. */
+export function storedResource(outDir: string): { sha256: string } | null {
+  const base = `${TARGET.idAto}-${TARGET.idArquivoBinario}`;
+  const pdf = join(outDir, `${base}.pdf`); const meta = join(outDir, `${base}.meta.json`);
+  if (!existsSync(pdf) || !existsSync(meta)) return null;
+  try {
+    const m = JSON.parse(readFileSync(meta, 'utf8')) as { sha256?: string; bytes?: number }; const b = readFileSync(pdf);
+    return m.sha256 === sha(b) && m.bytes === b.byteLength ? { sha256: m.sha256 } : null;
+  } catch { return null; }
+}
+const leftovers = (outDir: string) => {
+  const base = `${TARGET.idAto}-${TARGET.idArquivoBinario}`;
+  return [`${base}.pdf`, `${base}.meta.json`, `${base}.pdf.partial`, `${base}.meta.json.partial`].filter((f) => existsSync(join(outDir, f)));
+};
+
+/** Reads the body with the size cap enforced WHILE reading; never buffers more than max + one chunk. */
+async function readCapped(r: Response, max: number): Promise<{ body: Uint8Array } | { over: number }> {
+  if (!r.body) return { body: new Uint8Array(0) };
+  const reader = r.body.getReader(); const parts: Uint8Array[] = []; let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.byteLength;
+    if (n > max) { await reader.cancel().catch(() => undefined); return { over: n }; }
+    parts.push(value);
+  }
+  const body = new Uint8Array(n); let o = 0; for (const p of parts) { body.set(p, o); o += p.byteLength; }
+  return { body };
 }
 
 export interface AttachmentRun { requests: number; stored: boolean; outcome: string; sha256?: string; bytes?: number; pages?: number }
@@ -74,7 +116,9 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
   const act = opts.actJson ?? readFileSync(TARGET.actJson);
   const tp = targetProblem(act); if (tp) return { requests: 0, stored: false, outcome: `refused before request: ${tp}` };
   const rp = routeProblem(TARGET.url); if (rp) return { requests: 0, stored: false, outcome: `refused before request: ${rp}` };
-  if (existsSync(join(outDir, `${base}.pdf`))) return { requests: 0, stored: false, outcome: 'refused before request: already stored (bytes kept by an earlier run)' };
+  if (storedResource(outDir)) return { requests: 0, stored: false, outcome: 'refused before request: already stored (bytes kept by an earlier run)' };
+  const left = existsSync(outDir) ? leftovers(outDir) : [];
+  if (left.length) return { requests: 0, stored: false, outcome: `refused before request: incomplete or inconsistent earlier write (${left.join(', ')}): inspect before any new request` };
   const budget = RequestBudget.open(opts.budgetFile ?? ATT_BUDGET, { grantId: opts.grantId, owner: opts.owner, package: ATT_PACKAGE,
     requested: { total: 1, perType: { [TARGET.type]: 1 } } }, opts.now);
   let sent = 0;
@@ -88,12 +132,15 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
       sent++; return debited(input, init);
     }) as typeof fetch;
     let r: Response;
-    try { r = await oneShot(TARGET.url, { signal: AbortSignal.timeout(60_000) }); }
+    try { r = await oneShot(TARGET.url, { redirect: 'manual', signal: AbortSignal.timeout(60_000) }); }
     catch (e) { return { requests: sent, stored: false, outcome: `failed (debited if sent): ${(e as Error).message}` }; }
+    // Never trust the transport: a response that was itself the result of a followed redirect is refused.
+    if (r.redirected || r.type === 'opaqueredirect') return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): the transport followed a redirect (${r.url || 'unknown URL'})` };
     if (r.status >= 300 && r.status < 400) return { requests: sent, stored: false, outcome: `redirect ${r.status} → ${String(r.headers.get('location'))}: not followed (fail closed), nothing stored` };
     if (r.status !== 200) return { requests: sent, stored: false, outcome: `HTTP ${r.status}: nothing stored` };
-    const body = new Uint8Array(await r.arrayBuffer());
-    if (body.byteLength > MAX_PDF_BYTES) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): ${body.byteLength} bytes > ${MAX_PDF_BYTES}` };
+    const capped = await readCapped(r, MAX_PDF_BYTES);
+    if ('over' in capped) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): body exceeds ${MAX_PDF_BYTES} bytes while reading (stopped at ${capped.over})` };
+    const body = capped.body;
     if (Buffer.from(body.subarray(0, 5)).toString('latin1') !== '%PDF-') return { requests: sent, stored: false, outcome: 'refused after capture (debited, not stored): not a PDF (no %PDF- header)' };
     let ex: Awaited<ReturnType<typeof extractPdfLines>>;
     try { ex = await extractPdfLines(body); } catch (e) { return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): unreadable PDF (${(e as Error).message.slice(0, 120)})` }; }
@@ -101,12 +148,25 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
     if (ip) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): ${ip}` };
     mkdirSync(outDir, { recursive: true });
     const digest = sha(body);
-    writeFileSync(join(outDir, `${base}.pdf`), body, { flag: 'wx' });
-    writeFileSync(join(outDir, `${base}.meta.json`), `${JSON.stringify({ id: base, idAto: TARGET.idAto, idArquivoBinario: TARGET.idArquivoBinario,
+    const meta = `${JSON.stringify({ id: base, idAto: TARGET.idAto, idArquivoBinario: TARGET.idArquivoBinario,
       resourceId: `rfb:${TARGET.idAto}:anexo:${TARGET.idArquivoBinario}`, url: TARGET.url, finalUrl: r.url || TARGET.url, contentType: r.headers.get('content-type'),
       sha256: digest, bytes: body.byteLength, pages: ex.pages, pageCoverage: ex.pageCoverage, capturedAt: (opts.now ?? (() => new Date()))().toISOString(),
       grantId: opts.grantId, promoted: false, historicalAttachment: { idArquivoBinario: TARGET.historicalId, note: 'struck earlier version: preserved as history, never requested' },
-      origin: 'automated fetch via collect-p2c-attachment (E9 P2-c, pinned route, one shot)' }, null, 2)}\n`, { flag: 'wx' });
+      origin: 'automated fetch via collect-p2c-attachment (E9 P2-c, pinned route, one shot)' }, null, 2)}\n`;
+    // Two-phase commit: both files are written as .partial (exclusive), then the PDF and finally the META (the commit
+    // marker) are renamed. Any failure removes what this run created, so no PDF without its matching meta survives.
+    const P = (f: string) => join(outDir, f); const pdfF = `${base}.pdf`; const metaF = `${base}.meta.json`;
+    const created: string[] = [];
+    try {
+      writeFileSync(P(`${pdfF}.partial`), body, { flag: 'wx' }); created.push(`${pdfF}.partial`);
+      writeFileSync(P(`${metaF}.partial`), meta, { flag: 'wx' }); created.push(`${metaF}.partial`);
+      if (existsSync(P(pdfF)) || existsSync(P(metaF))) throw new Error('final file already present');
+      renameSync(P(`${pdfF}.partial`), P(pdfF)); created.push(pdfF);
+      renameSync(P(`${metaF}.partial`), P(metaF));
+    } catch (e) {
+      for (const f of created) rmSync(P(f), { force: true });
+      return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): write failed, nothing kept (${(e as Error).message.slice(0, 120)})` };
+    }
     return { requests: sent, stored: true, outcome: 'stored', sha256: digest, bytes: body.byteLength, pages: ex.pages };
   } finally { budget.close(); }
 }

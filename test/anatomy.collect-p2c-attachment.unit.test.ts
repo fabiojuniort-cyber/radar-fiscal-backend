@@ -69,7 +69,7 @@ test('C4: fail closed — redirect never followed, non-PDF, wrong identity, HTTP
     ['302 to the same id', () => new Response(null, { status: 302, headers: { location: TARGET.url } }), /redirect 302 .* not followed/u],
     ['302 elsewhere', () => new Response(null, { status: 302, headers: { location: 'https://evil.example/x.pdf' } }), /redirect 302/u],
     ['HTML error page', () => new Response('<html>erro</html>', { status: 200, headers: { 'content-type': 'text/html' } }), /not a PDF/u],
-    ['another act', () => pdfResp(buildSyntheticPdf([[{ text: 'SOLUÇÃO DE CONSULTA Nº 259 - COSIT', y: 760 }]])), /does not name the act \(nº 258/u],
+    ['another act', () => pdfResp(buildSyntheticPdf([[{ text: 'SOLUÇÃO DE CONSULTA Nº 259 - COSIT', y: 760 }]])), /does not name the act \(heading is nº 259, not nº 258\)/u],
     ['HTTP 500', () => new Response('x', { status: 500 }), /HTTP 500/u],
     ['network error', () => { throw new TypeError('fetch failed'); }, /failed/u],
   ];
@@ -89,5 +89,73 @@ test('C5: the CLI requires --stop-after 1 and refuses before opening the budget;
   const f = budget('active', 1); await runAttachment(transport(() => new Response('x', { status: 500 })).f, opts(f));
   const t = never(); await assert.rejects(runAttachment(t.f, opts(f)), /remaining|exceeds|exhausted|more than/u, 'the single request is spent');
   assert.equal(t.urls.length, 0);
-  assert.equal(pdfIdentityProblem([{ text: 'Solução de Consulta Cosit nº 258' }]), null);
+  assert.equal(pdfIdentityProblem([{ text: 'Solução de Consulta nº 258 - Cosit' }, { text: 'Data 26/12/2025' }]), null);
+  assert.match(pdfIdentityProblem([{ text: 'Solução de Consulta Cosit nº 258' }])!, /0 Solução de Consulta heading/u, 'a mention without the heading form is not the act');
+});
+
+// ---- COORD correction before review (tribusca-control#116): hardening of the PDF route. These fail on 440bf24b. ----
+import { createServer, type Server } from 'node:http';
+import { mkdirSync } from 'node:fs';
+const listen = (h: Parameters<typeof createServer>[1]) => new Promise<{ srv: Server; url: string; hits: () => number }>((ok) => {
+  let n = 0; const srv = createServer((q, s) => { n++; h!(q, s); }); srv.listen(0, '127.0.0.1', () => ok({ srv, url: `http://127.0.0.1:${(srv.address() as { port: number }).port}/`, hits: () => n }));
+});
+const close = (s: Server) => new Promise<void>((ok) => s.close(() => ok()));
+
+test('H1 (real transport, isolated): a 3xx to ANOTHER host is never followed — exactly 1 request, the other host gets 0, nothing stored', async () => {
+  const other = await listen((_q, s) => { s.writeHead(200, { 'content-type': 'application/pdf' }); s.end(Buffer.from(PDF_OK)); });
+  const first = await listen((_q, s) => { s.writeHead(302, { location: `${other.url}x.pdf` }); s.end(); });
+  try {
+    // the real (native) fetch, pointed at the local server instead of the Receita: no external contact
+    const realToLocal = ((_u: string | URL, init?: RequestInit) => fetch(first.url, init)) as typeof fetch;
+    const f = budget(); const o = opts(f);
+    const r = await runAttachment(realToLocal, o);
+    assert.deepEqual([first.hits(), other.hits(), r.requests, r.stored], [1, 0, 1, false]);
+    assert.match(r.outcome, /redirect 302 .* not followed/u); assert.equal(read(f).used.total, 1);
+    assert.equal(existsSync(join(o.outDir, '148681-83325.pdf')), false);
+  } finally { await close(first.srv); await close(other.srv); }
+});
+
+test('H2: a transport that FOLLOWED a redirect by itself (response.redirected) is refused — the collector does not trust the transport', async () => {
+  const f = budget(); const o = opts(f);
+  const followed = transport(() => { const r = pdfResp(PDF_OK); Object.defineProperty(r, 'redirected', { value: true }); Object.defineProperty(r, 'url', { value: 'https://evil.example/x.pdf' }); return r; });
+  const r = await runAttachment(followed.f, o);
+  assert.equal(r.stored, false); assert.match(r.outcome, /followed a redirect/u);
+  assert.equal(existsSync(join(o.outDir, '148681-83325.pdf')), false);
+});
+
+test('H3: the size limit is enforced WHILE reading — an endless body is cut just above the limit, never loaded whole', async () => {
+  let pulled = 0; const MiB = 1024 * 1024; const chunk = new Uint8Array(MiB); chunk.set(Buffer.from('%PDF-1.7\n'));
+  const endless = new ReadableStream<Uint8Array>({ pull(c) { pulled += MiB; if (pulled > 200 * MiB) { c.close(); return; } c.enqueue(chunk); } });
+  const f = budget(); const t = transport(() => new Response(endless, { status: 200, headers: { 'content-type': 'application/pdf' } }));
+  const r = await runAttachment(t.f, opts(f));
+  assert.equal(r.stored, false); assert.match(r.outcome, /exceeds .* bytes while reading/u);
+  assert.ok(pulled <= 20 * MiB + 2 * MiB, `pulled ${pulled / MiB} MiB (must stop near the 20 MiB limit)`);
+});
+
+test('H4: identity — another act that merely MENTIONS "Cosit" and "258" is refused; the heading must be SC nº 258 Cosit dated 26/12/2025', async () => {
+  const mk = (lines: string[]) => buildSyntheticPdf([lines.map((text, i) => ({ text, y: 760 - i * 20 }))]);
+  const bad: [string, string[]][] = [
+    ['another SC citing 258', ['SOLUÇÃO DE CONSULTA Nº 259 - COSIT', 'Data 26 de dezembro de 2025', 'Conforme a Solução de Consulta Cosit nº 258, de 2025.']],
+    ['right number, wrong date', ['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 2 de maio de 2024']],
+    ['258 only in the body', ['PARECER NORMATIVO COSIT Nº 1', 'Data 26 de dezembro de 2025', 'Solução de Consulta 258 é citada aqui.']],
+    ['another unit', ['SOLUÇÃO DE CONSULTA Nº 258 - SRRF08/DISIT', 'Data 26 de dezembro de 2025', 'COSIT mencionada']],
+  ];
+  for (const [why, lines] of bad) {
+    const f = budget(); const t = transport(() => pdfResp(mk(lines))); const o = opts(f);
+    const r = await runAttachment(t.f, o);
+    assert.equal(r.stored, false, why); assert.match(r.outcome, /does not name the act/u, why);
+  }
+  const ok = await runAttachment(transport(() => pdfResp(mk(['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025', 'Assunto: IRRF']))).f, opts(budget()));
+  assert.equal(ok.stored, true);
+});
+
+test('H5: a failure between the PDF and the meta writes leaves NO resource that looks valid; the next run refuses to treat it as stored', async () => {
+  const f = budget(); const o = opts(f);
+  mkdirSync(join(o.outDir, '148681-83325.meta.json')); // the meta write will fail (EISDIR) after the PDF write
+  const r = await runAttachment(transport(() => pdfResp(PDF_OK)).f, o).catch((e: Error) => ({ requests: 1, stored: false, outcome: `threw: ${e.message}` }));
+  assert.equal(r.stored, false);
+  assert.equal(existsSync(join(o.outDir, '148681-83325.pdf')), false, 'no final PDF without its meta');
+  const t2 = never(); const again = await runAttachment(t2.f, { ...o, budgetFile: budget() });
+  assert.equal(t2.urls.length, 0); assert.doesNotMatch(again.outcome, /already stored/u, 'an incomplete write is never "already stored"');
+  assert.match(again.outcome, /incomplete|inconsistent/u);
 });
