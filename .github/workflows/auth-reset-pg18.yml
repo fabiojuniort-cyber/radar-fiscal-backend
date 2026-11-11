@@ -73,7 +73,7 @@ jobs:
         run: npm run typecheck && npm run build
       - name: Apply migrations to disposable PostgreSQL (matrix major)
         run: npm run db:prepare
-      - name: W4-R3a baseline: neutral backlog invisible (before remediation)
+      - name: W4-R3a baseline before remediation on neutral backlog
         run: npx tsx --test test/password-reset.r4.before.integration.test.ts
       - name: Fully simulated Zoho request (no network)
         run: npx tsx --test test/password-reset.unit.test.ts
