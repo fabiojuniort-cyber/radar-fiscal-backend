@@ -30,10 +30,6 @@ import { loggerOptions } from './infrastructure/logging/logger.js';
 import { registerAnatomyRulesAdmin } from './modules/anatomy/admin/rules-admin.wiring.js';
 import { registerAnatomyConfig } from './modules/anatomy/config/config.wiring.js';
 import { registerAuthSupport } from './modules/auth/auth.plugin.js';
-import {
-  sendZohoPasswordResetMail,
-  type PasswordResetSender,
-} from './modules/auth/password-reset.service.js';
 import { env } from './config/env.js';
 
 export interface BuildAppOptions {
@@ -41,13 +37,23 @@ export interface BuildAppOptions {
     enabled?: boolean;
     publicUrl?: string;
     // Apenas injecao de um emissor simulado em testes isolados.
-    send?: PasswordResetSender;
+    tokenKey?: string;
   };
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
+  // Proxy Railway: NAO PROVADO ate CIDRs exatos serem ratificados.
+  // Nao confiar em X-Forwarded-For fora da origem verificada.
+  const rawProxyList = env.AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS
+    .split(',').map((part) => part.trim()).filter(Boolean);
+  const validProxyList = rawProxyList.length > 0 && rawProxyList.every(
+    (value) => /^(?:\d{1,3}\.){3}\d{1,3}(?:\/(?:\d|[12]\d|3[0-2]))?$/.test(value) &&
+      value !== '0.0.0.0/0' && value !== '127.0.0.1/8',
+  );
+  const trustedProxies = validProxyList ? rawProxyList : [];
   const app = Fastify({
     logger: loggerOptions,
+    trustProxy: trustedProxies.length > 0 ? trustedProxies : false,
   });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -71,22 +77,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(healthRoutes);
   await app.register(publicRoutes);
   await app.register(authRoutes);
-  const resetEnabled =
-    options.passwordReset?.enabled ?? env.AUTH_PASSWORD_RESET_ENABLED === 'true';
+  const resetEnabled = options.passwordReset?.enabled ??
+    (env.AUTH_PASSWORD_RESET_ENABLED === 'true' && trustedProxies.length > 0);
   const resetPublicUrl = options.passwordReset?.publicUrl ??
     env.AUTH_PASSWORD_RESET_PUBLIC_URL;
-  const resetSender = options.passwordReset?.send ??
-    (resetEnabled && env.ZOHO_CPAAS_API_KEY && env.ZOHO_CPAAS_FROM_ADDRESS
-      ? (message: Parameters<PasswordResetSender>[0]) =>
-        sendZohoPasswordResetMail(message, {
-          apiKey: env.ZOHO_CPAAS_API_KEY!,
-          fromAddress: env.ZOHO_CPAAS_FROM_ADDRESS!,
-        })
-      : undefined);
+  const tokenKey = options.passwordReset?.tokenKey ??
+    env.AUTH_PASSWORD_RESET_TOKEN_KEY;
   await app.register(passwordResetRoutes, {
-    enabled: resetEnabled,
+    enabled: resetEnabled && Boolean(tokenKey) && Boolean(resetPublicUrl),
     ...(resetPublicUrl ? { publicUrl: resetPublicUrl } : {}),
-    ...(resetSender ? { send: resetSender } : {}),
+    ...(tokenKey ? { tokenKey } : {}),
   });
   await app.register(productRoutes);
   await app.register(onboardingRoutes);
