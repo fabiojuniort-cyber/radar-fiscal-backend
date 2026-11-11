@@ -14,6 +14,9 @@ on:
       - 'src/infrastructure/logging/logger.ts'
       - 'test/password-reset.unit.test.ts'
       - 'test/password-reset.integration.test.ts'
+      - 'test/password-reset.latency.integration.test.ts'
+      - 'src/modules/auth/password-reset.worker.ts'
+      - 'src/worker.ts'
       - 'test/password-reset.worker.unit.test.ts'
       - 'package.json'
       - 'package-lock.json'
@@ -72,3 +75,5 @@ jobs:
         run: npx tsx --test test/password-reset.unit.test.ts
       - name: Password reset roundtrip, captured link and revoked sessions
         run: npx tsx --test test/password-reset.integration.test.ts
+      - name: B-1 temporal proof with protected production-like request floor
+        run: npx tsx --test test/password-reset.latency.integration.test.ts
