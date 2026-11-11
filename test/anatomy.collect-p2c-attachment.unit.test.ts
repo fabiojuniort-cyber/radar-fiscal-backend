@@ -24,14 +24,14 @@ const transport = (handler: (url: string, n: number) => Response) => {
 const never = () => transport(() => { throw new Error('must not be called'); });
 const PDF_OK = buildSyntheticPdf([[{ text: 'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', y: 760 }, { text: 'Data 26 de dezembro de 2025', y: 740 }, { text: 'Relatório', y: 720 }]]);
 const pdfResp = (b: Uint8Array, status = 200) => new Response(b, { status, headers: { 'content-type': 'application/pdf' } });
-const opts = (f: string, extra: Record<string, unknown> = {}) => ({ grantId: 'G-PDF', owner: 'exec-303', budgetFile: f, outDir: mkdtempSync(join(tmpdir(), 'p2c-att-out-')), now: NOW, ...extra });
+const opts = (f: string, extra: Record<string, unknown> = {}) => ({ grantId: 'G-PDF', owner: 'exec-303', budgetFile: f, outDir: mkdtempSync(join(tmpdir(), 'p2c-att-out-')), now: NOW, preflight: () => null, ...extra });
 
 test('C1: the committed grant is SUSPENDED with its own ledger (1 request, SC 1) — the real run is refused before any request', async () => {
   const s = read(ATT_BUDGET);
   assert.deepEqual([s.grant!.grantId, s.grant!.status, s.grant!.total, s.grant!.perType, s.used.total, s.attempts.length, s.grant!.package],
     ['E9-P2c-PDF83325-G1', 'suspended', 1, { 'Solução de Consulta': 1 }, 0, 0, ATT_PACKAGE]);
   const t = never();
-  await assert.rejects(runAttachment(t.f, { grantId: s.grant!.grantId, owner: s.grant!.owner, outDir: mkdtempSync(join(tmpdir(), 'x-')) }), /suspended|not active/u);
+  await assert.rejects(runAttachment(t.f, { grantId: s.grant!.grantId, owner: s.grant!.owner, outDir: mkdtempSync(join(tmpdir(), 'x-')), preflight: () => null } as Parameters<typeof runAttachment>[1]), /suspended|not active/u);
   assert.equal(t.urls.length, 0);
 });
 
@@ -213,4 +213,46 @@ test('R2 C-5: single-owner preflight — the local ledger must equal the pushed 
   const t = never();
   assert.equal(await cli(['--grant', 'G-PDF', '--owner', 'exec-303', '--stop-after', '1'], t.f, { preflight: () => 'ledger differs from the pushed ledger (test)' }), 3);
   assert.equal(t.urls.length, 0);
+});
+
+// ---- R3 (independent review R2 c.6785660153): C2-1 institutional lines, C2-2 split layouts, C-5 direct-call bypass ----
+test('R3 C2-1: an institutional PREFIX mixed with another act title never precedes the SC title', async () => {
+  const bad: [string, string[]][] = [
+    ['Ministério + Despacho Decisório', ['MINISTÉRIO DA FAZENDA - DESPACHO DECISÓRIO Nº 1', 'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['Coordenação + Solução de Divergência', ['Coordenação-Geral de Tributação — Solução de Divergência nº 7, que reforma a', 'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['Secretaria + Parecer', ['Secretaria Especial da Receita Federal do Brasil - Parecer nº 3', 'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['Receita Federal + número', ['Receita Federal Nº 9', 'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+  ];
+  for (const [why, lines] of bad) { const r = await runWith(lines); assert.equal(r.stored, false, why); assert.match(r.outcome, /does not name the act/u, why); }
+  // legitimate institutional head preserved
+  const ok = await runWith(['MINISTÉRIO DA FAZENDA', 'Secretaria Especial da Receita Federal do Brasil', 'Subsecretaria de Tributação e Contencioso', 'Coordenação-Geral de Tributação',
+    'SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data 26 de dezembro de 2025']);
+  assert.equal(ok.stored, true, ok.outcome);
+});
+
+test('R3 C2-2: split title ("SOLUÇÃO DE CONSULTA" / "Nº 258 - COSIT") and split date ("Data" / "26 de dezembro de 2025") are accepted strictly', async () => {
+  const ok: [string, string[]][] = [
+    ['split title', ['SOLUÇÃO DE CONSULTA', 'Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['split date', ['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data', '26 de dezembro de 2025']],
+    ['split title and date', ['SOLUÇÃO DE CONSULTA', 'N.º 258 - COSIT', 'Data:', '26/12/2025']],
+  ];
+  for (const [why, lines] of ok) { const r = await runWith(lines); assert.equal(r.stored, true, `${why}: ${r.outcome}`); }
+  // the multi-line tolerance never reopens the attacks
+  const bad: [string, string[]][] = [
+    ['split title of a Divergência', ['SOLUÇÃO DE DIVERGÊNCIA', 'Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['split title, other number', ['SOLUÇÃO DE CONSULTA', 'Nº 259 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['split title, number line carries more', ['SOLUÇÃO DE CONSULTA', 'Nº 258 - COSIT, citada no Despacho nº 1', 'Data 26 de dezembro de 2025']],
+    ['Despacho then split SC title', ['DESPACHO', 'SOLUÇÃO DE CONSULTA', 'Nº 258 - COSIT', 'Data 26 de dezembro de 2025']],
+    ['split date, value is a sentence', ['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data', 'Publicada em 26 de dezembro de 2025']],
+    ['split date, other year', ['SOLUÇÃO DE CONSULTA Nº 258 - COSIT', 'Data', '26 de dezembro de 2024']],
+  ];
+  for (const [why, lines] of bad) { const r = await runWith(lines); assert.equal(r.stored, false, why); }
+});
+
+test('R3 C-5: runAttachment called DIRECTLY applies the single-owner preflight by default (no bypass of the CLI check)', async () => {
+  const f = budget(); const t = never();
+  const { preflight: _skip, ...noStub } = opts(f) as Record<string, unknown>;
+  const r = await runAttachment(t.f, noStub as Parameters<typeof runAttachment>[1]);
+  assert.equal(t.urls.length, 0, 'nothing sent'); assert.equal(r.stored, false); assert.match(r.outcome, /preflight/u);
+  assert.equal(read(f).used.total, 0, 'budget never opened');
 });

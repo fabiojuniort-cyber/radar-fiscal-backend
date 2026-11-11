@@ -73,18 +73,32 @@ export function targetProblem(actBytes: Buffer, idArquivoBinario: number = TARGE
  * Unknown layouts refuse (fail closed).
  */
 const HEAD_LINES = 12;
-const INSTITUTIONAL = /^(MINIST[ÉE]RIO\b|SECRETARIA\b|SECRETARIA ESPECIAL\b|RECEITA FEDERAL\b|SUBSECRETARIA\b|COORDENA[ÇC][ÃA]O(-GERAL)?\b)/iu;
+/**
+ * R3 (review C2-1): an institutional line must match a KNOWN form in full (accents, case and dash variants folded) —
+ * a prefix such as "MINISTÉRIO DA FAZENDA - DESPACHO DECISÓRIO Nº 1" is NOT institutional.
+ */
+const INSTITUTIONAL_FORMS = new Set(['MINISTERIO DA FAZENDA', 'MINISTERIO DA ECONOMIA', 'SECRETARIA ESPECIAL DA RECEITA FEDERAL DO BRASIL',
+  'SECRETARIA DA RECEITA FEDERAL DO BRASIL', 'RECEITA FEDERAL', 'RECEITA FEDERAL DO BRASIL', 'SUBSECRETARIA DE TRIBUTACAO E CONTENCIOSO',
+  'COORDENACAO-GERAL DE TRIBUTACAO']);
+const foldLine = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/\s*[-–—]\s*/gu, '-').replace(/\s+/gu, ' ').trim();
+const isInstitutional = (t: string) => INSTITUTIONAL_FORMS.has(foldLine(t));
 const NUM = String.raw`N\s*(?:\.\s*)?[º°o]\.?\s*`;
 const DASH = String.raw`\s*[-–—]\s*`;
 const DATE_WORDS = String.raw`26\s+DE\s+DEZEMBRO\s+DE\s+(\d{4})`;
 const TITLE_A = new RegExp(String.raw`^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+${NUM}(\d+)${DASH}COSIT$`, 'iu');
 const TITLE_B = new RegExp(String.raw`^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+COSIT\s+${NUM}(\d+)\s*,\s*DE\s+${DATE_WORDS}$`, 'iu');
 const TITLE_C = new RegExp(String.raw`^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA\s+${NUM}(\d+)$`, 'iu');
+// R3 C2-2: strictly split layouts — "SOLUÇÃO DE CONSULTA" alone, then a line that is EXACTLY "Nº 258 - COSIT";
+// "Data" alone, then a line that is EXACTLY the date.
+const TITLE_ONLY = /^SOLU[ÇC][ÃA]O\s+DE\s+CONSULTA$/iu;
+const NUM_LINE = new RegExp(String.raw`^${NUM}(\d+)${DASH}COSIT$`, 'iu');
+const DATE_LABEL = /^DATA\s*:?$/iu;
+const DATE_VALUE = /^(?:26\s+DE\s+DEZEMBRO\s+DE\s+(\d{4})|26\/12\/(\d{4}))$/iu;
 const DATE_LINE = /^DATA\s*:?\s*(?:26\s+DE\s+DEZEMBRO\s+DE\s+(\d{4})|26\/12\/(\d{4}))$/iu;
 export function pdfIdentityProblem(lines: { text: string; page?: number }[]): string | null {
   const why = (w: string) => `the PDF text does not name the act (${w})`;
   const head = lines.filter((l) => (l.page ?? 1) === 1).map((l) => l.text.normalize('NFC').replace(/\s+/gu, ' ').trim()).filter(Boolean).slice(0, HEAD_LINES);
-  let t = 0; while (t < head.length && INSTITUTIONAL.test(head[t]!)) t++;
+  let t = 0; while (t < head.length && isInstitutional(head[t]!)) t++;
   const title = head[t];
   if (!title) return why('no title line on page 1');
   let num: string | undefined; let year: string | undefined; let next = t + 1;
@@ -92,12 +106,14 @@ export function pdfIdentityProblem(lines: { text: string; page?: number }[]): st
   if (a) num = a[1];
   else if (b) { num = b[1]; year = b[2]; }
   else if (c && /^COSIT$/iu.test(head[t + 1] ?? '')) { num = c[1]; next = t + 2; }
+  else if (TITLE_ONLY.test(title) && NUM_LINE.test(head[t + 1] ?? '')) { num = NUM_LINE.exec(head[t + 1]!)![1]; next = t + 2; }
   else return why(`first title line is not a Solução de Consulta Cosit heading ("${title.slice(0, 60)}")`);
   if (num !== '258') return why(`heading is nº ${num}, not nº 258`);
   if (!year) {
     const d = DATE_LINE.exec(head[next] ?? '');
-    if (!d) return why('no date line (Data 26/12/2025) right after the heading');
-    year = d[1] ?? d[2];
+    const split = !d && DATE_LABEL.test(head[next] ?? '') ? DATE_VALUE.exec(head[next + 1] ?? '') : null;
+    if (!d && !split) return why('no date line (Data 26/12/2025) right after the heading');
+    year = d ? (d[1] ?? d[2]) : (split![1] ?? split![2]);
   }
   if (year !== '2025') return why(`act year ${year}, not 2025`);
   if (head.slice(t + 1).some((x) => /^SOLU[ÇC][ÃA]O\s+DE\s+(CONSULTA|DIVERG[ÊE]NCIA)\s+/iu.test(x))) return why('a second Solução heading in the head');
@@ -160,10 +176,15 @@ async function readCapped(r: Response, max: number): Promise<{ body: Uint8Array 
 
 export interface AttachmentRun { requests: number; stored: boolean; outcome: string; sha256?: string; bytes?: number; pages?: number }
 
-export async function runAttachment(doFetch: typeof fetch, opts: { grantId: string; owner: string; budgetFile?: string; outDir?: string; actJson?: Buffer; now?: () => Date }): Promise<AttachmentRun> {
+export async function runAttachment(doFetch: typeof fetch, opts: { grantId: string; owner: string; budgetFile?: string; outDir?: string; actJson?: Buffer; now?: () => Date;
+  /** R3 C-5: single-owner preflight, applied on EVERY path (CLI or direct call). Default: local ledger = pushed ledger, unused. */
+  preflight?: () => string | null }): Promise<AttachmentRun> {
   const outDir = opts.outDir ?? ATT_DIR;
   const base = `${TARGET.idAto}-${TARGET.idArquivoBinario}`;
   // Offline screening: nothing below sends a request.
+  const ledger = opts.budgetFile ?? ATT_BUDGET;
+  const pre = (opts.preflight ?? (() => { try { return ledgerPreflight(readFileSync(ledger, 'utf8'), gitPushedLedger(ledger)); } catch (e) { return `ledger unreadable (${(e as Error).message.slice(0, 80)})`; } }))();
+  if (pre) return { requests: 0, stored: false, outcome: `refused before request: preflight — ${pre}` };
   const act = opts.actJson ?? readFileSync(TARGET.actJson);
   const tp = targetProblem(act); if (tp) return { requests: 0, stored: false, outcome: `refused before request: ${tp}` };
   const rp = routeProblem(TARGET.url); if (rp) return { requests: 0, stored: false, outcome: `refused before request: ${rp}` };
@@ -234,7 +255,7 @@ export async function cli(argv: string[], doFetch: typeof fetch, deps: { preflig
   }
   const pre = (deps.preflight ?? (() => ledgerPreflight(readFileSync(ATT_BUDGET, 'utf8'), gitPushedLedger(ATT_BUDGET))))();
   if (pre) { console.error(`preflight: ${pre}`); return 3; }
-  const out = await runAttachment(doFetch, { grantId, owner });
+  const out = await runAttachment(doFetch, { grantId, owner, preflight: () => pre });
   console.log(JSON.stringify(out)); return out.stored ? 0 : 1;
 }
 
