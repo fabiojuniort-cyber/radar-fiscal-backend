@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 
 import {
   passwordResetLink,
+  encryptResetToken,
+  decryptResetToken,
   sendZohoPasswordResetMail,
 } from '../src/modules/auth/password-reset.service.js';
 
@@ -81,4 +84,40 @@ test('AUTH-RESET: Zoho rejection and malformed success cannot be accepted', asyn
     sendZohoPasswordResetMail(message, { ...options, fetchImpl: unconfirmedFetch }),
     /zoho_password_reset_delivery_unconfirmed/,
   );
+});
+
+test('AUTH-RESET-02: AES-GCM never stores token in plaintext and rejects corruption', () => {
+  const token='A'.repeat(43);
+  const digest=createHash('sha256').update(token).digest('hex');
+  const key='1'.repeat(64);
+  const encrypted=encryptResetToken(token,digest,key);
+  assert.ok(!encrypted.ciphertext.includes(token));
+  assert.equal(decryptResetToken(encrypted,digest,key),token);
+  assert.throws(()=>decryptResetToken({
+    ...encrypted,authTag:Buffer.from('0'.repeat(16)).toString('base64'),
+  },digest,key));
+  assert.throws(()=>decryptResetToken(encrypted,digest,'2'.repeat(64)));
+});
+
+test('E-2: email HTML escapes untrusted URL and disables tracking', async()=>{
+  let body='';
+  const fakeFetch:typeof fetch=async (_input,init)=>{
+    body=String(init?.body);
+    return new Response(JSON.stringify({
+      message:'OK',data:[{code:'EM_104',message:'OK'}],
+    }),{status:200});
+  };
+  const malicious='https://trifaros.com.br/nova-senha?x=" onmouseover="evil&y=<tag>#token=synthetic';
+  await sendZohoPasswordResetMail({to:'recipient@example.test',link:malicious},{
+    apiKey:'MOCK_ONLY',fromAddress:'sender@trifaros.com.br',fetchImpl:fakeFetch,
+  });
+  const sent=JSON.parse(body) as {
+    htmlbody:string;track_clicks:boolean;track_opens:boolean;
+  };
+  assert.ok(sent.htmlbody.includes('&quot;'));
+  assert.ok(sent.htmlbody.includes('&amp;'));
+  assert.ok(sent.htmlbody.includes('&lt;tag&gt;'));
+  assert.ok(!sent.htmlbody.includes('onmouseover="evil'));
+  assert.equal(sent.track_clicks,false);
+  assert.equal(sent.track_opens,false);
 });
