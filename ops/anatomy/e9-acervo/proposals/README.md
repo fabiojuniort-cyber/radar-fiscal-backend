@@ -200,3 +200,30 @@ O #310 (`ef7a0795`, draft) fixa o `postgresql-client-16` no `verify`, só na reg
   - produtor → consumidor: PROVEN (82381, 67992);
   - **desconto real:** no ADE Cofis, o anexo lido zera o "attachment without content"; continua incompleto só pelo preâmbulo `Não Identificado` da fonte;
   - `test:anatomy` 392/396. As 4 falhas são **exatamente** as asserções "só a Portaria aceita": no motor composto, o registro fixado em `0e009431` deixa de valer. A integração precisa de um novo registro append-only depois da equivalência; **não feito, nenhum aceite novo**.
+
+## R5 (2026-11-11): A r5, B r7 e prova formal de equivalência da Portaria 635 (nada integrado, nada registrado)
+
+- **B r7** (`proposal-303-rfb-acceptance-r7.patch`, base #303 @ `6b12ac64`):
+  - **B4-1:** `\p{Cf}` removido antes da leitura; separadores = `\p{Pd}`, U+2212, U+FE63, U+FF0D, `/` e `(A)`. `I−A`, `I﹣A`, `I－A`, `I/A`, `I(A)` e `I​-A` exigem I-A, com simetria entre menção e cabeçalho.
+  - **B4-2:** `I-`, `I –` e `I/` → não suportado → lacuna.
+  - `test:anatomy` 375/375; motor `0e009431`.
+- **A r5** (`proposal-300-type5-express-ref-r5.patch`, base #300 @ `22e8cc48`):
+  - **A4-1:** uma oração aberta por conector de remissão (`conforme`, `nos termos`, `na forma`, `segundo`, `de acordo com`, `cujo/a/s`) herda a oração antecedente. Uma norma nela bloqueia, inclusive o tipo sem número ("as regras da IN"), **salvo** quando o antecedente é acessório (`dispensad…`, `com fundamento em`, `observad…`). O caso ADE Cofis é preservado.
+  - **A4-2:** classe sem aspas e camelCase (`textoTachado`, `TextoRiscado`, `itemTachadoAntigo`) → tachado.
+  - **Proibição (decisão do COORD):**
+    - `vedad*`, `proibid*` e `impedid*` não bloqueiam quando governam a referência na **mesma oração**, sem elipse, sem conector e sem norma no objeto ("Fica vedada a exportação das mercadorias relacionadas abaixo." → promove);
+    - a negação de aplicabilidade, a exclusão, a proibição elíptica, a proibição com norma no objeto, a proibição em outra oração e a proibição tachada continuam sem promover.
+  - **Polaridade:** `referencePolarity` (prohibition / permission / obligation) é **só interna**, exportada para testes. Não existe campo persistente nem mudança de contrato, e `legalStatus` continua `unknown`.
+  - Testes: 283/283; PG16 12/12; motor `01fd87e5 → 637872fb`.
+- **Prova de equivalência** (`portaria635-equivalence.mts` → `portaria635-equivalence-r5.json`):
+  - **Base:** #303 + B r7 (motor `0e009431`). **Candidata:** composição descartável #303 `46afdaf1` + #300 + A r5 + B r7 (motor `c9edb4fe`).
+  - **Iguais nos dois motores:**
+    - bytes (`a98ade77…`) e HTML preparado (`196830e1…`);
+    - 136 partes com hash canônico (com `context`, `legalStatus`, `span`, `sourcePointers`, `contextReasons` e `parentId`) `6193225c…`;
+    - `canonicalText`, `sourceMap`, `limitations`, `status`, `entities`, `evidence` e `eligibility`.
+  - **Identidade:** só `engineHash` difere.
+  - **`outputHash`:** `450b2d12…` (base) e `6a318b26…` (candidata); com a identidade do motor neutralizada (`identity.engineHash` constante e `analysisId` recalculado pelo próprio contrato), os dois dão **`60285e2c…`**. A diferença vem **só** da identidade do motor.
+  - **Entrada do lote:** diferem `outputHash` e `inlineAttachments` (campo novo do #300). `entrySha256` candidato: `97fab32e…`.
+  - **Veredito: EQUIVALENT.**
+  - **Registro proposto, NÃO registrado:** `rfb:148693`, `rfb--portaria--medio`, `entrySha256` `97fab32e…`, motor `c9edb4fe…`, `revalidates: rfb:148693 @ 0e009431`.
+  - O motor final da integração pode diferir do `c9edb4fe`. Qualquer delta repete a prova. Os 4 testes continuam falhando na composição, como devem, até o registro autorizado.
