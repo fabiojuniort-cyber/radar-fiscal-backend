@@ -1,0 +1,31 @@
+{
+  "item": "M4",
+  "act": "Convênio ICMS 190/17",
+  "source": "CONFAZ",
+  "type": "Convênio ICMS",
+  "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2017/CV190_17",
+  "retrievedAt": "2026-11-07T03:52:05.3899783Z",
+  "fileName": "M4.html",
+  "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+  "bytes": 234041,
+  "origin": "resposta HTTP da origem oficial, capturada em outra sessão e entregue por git",
+  "package": {
+    "repo": "fabiojuniort-cyber/tribusca-control",
+    "commit": "fe60728db2929c84519df32f7bf6152260652874",
+    "branch": "evidence/e9-official-inputs-20261107",
+    "path": "docs/investigations/e9-inputs/E9-official-access-20261107.zip",
+    "zipSha256": "cce00c19cc68b2b8e9007d632e620bedfb1da6e51afd5f6cfb0114c62f8aed5f"
+  },
+  "manifestOrigin": "HTTP response bytes from official origin",
+  "manifestCoverage": "HTML capture; ingestion and completeness tests pending",
+  "declaredCharset": "utf-8",
+  "readable": true,
+  "readableNote": null,
+  "representation": "html",
+  "identification": {
+    "method": "título no texto decodificado com o charset declarado (utf-8)",
+    "matched": "CONVÊNIO ICMS 190/17"
+  },
+  "reach": "HTML capture; ingestion and completeness tests pending",
+  "promoted": false
+}
