@@ -67,3 +67,5 @@ jobs:
         run: npx tsx --test test/password-reset.unit.test.ts
       - name: Password reset roundtrip, captured link and revoked sessions
         run: npx tsx --test test/password-reset.integration.test.ts
+      - name: Reproduce B1 B2 in original code with temporal floor enabled
+        run: npx tsx --test test/password-reset.baseline.integration.test.ts
