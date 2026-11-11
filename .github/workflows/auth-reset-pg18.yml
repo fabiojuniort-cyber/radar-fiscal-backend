@@ -1,4 +1,4 @@
-name: AUTH-RESET-03 isolated PG16 PG18
+name: AUTH-RESET-04 isolated PG16 PG18
 
 on:
   pull_request:
@@ -17,6 +17,9 @@ on:
       - 'test/password-reset.latency.integration.test.ts'
       - 'test/password-reset.r3.adversarial.integration.test.ts'
       - 'migrations/084_auth_password_reset_r3.sql'
+      - 'migrations/085_auth_reset_health_retention_r4.sql'
+      - 'test/password-reset.r4.before.integration.test.ts'
+      - 'test/password-reset.r4.health-retention.integration.test.ts'
       - 'src/modules/auth/password-reset.worker.ts'
       - 'src/worker.ts'
       - 'test/password-reset.worker.unit.test.ts'
@@ -73,14 +76,14 @@ jobs:
         run: npm run typecheck && npm run build
       - name: Apply migrations to disposable PostgreSQL (matrix major)
         run: npm run db:prepare
-      - name: W4-R3a baseline before remediation on neutral backlog
-        run: npx tsx --test test/password-reset.r4.before.integration.test.ts
       - name: Fully simulated Zoho request (no network)
         run: npx tsx --test test/password-reset.unit.test.ts
       - name: Password reset roundtrip, captured link and revoked sessions
         run: npx tsx --test test/password-reset.integration.test.ts
       - name: B-1 temporal proof with protected production-like request floor
         run: npx tsx --test test/password-reset.latency.integration.test.ts
+      - name: R4 dual queue health, recovery and retention in disposable PostgreSQL
+        run: npx tsx --test test/password-reset.r4.health-retention.integration.test.ts
       - name: R3 real PostgreSQL lock and partial failure non-enumeration
         run: npx tsx --test test/password-reset.r3.adversarial.integration.test.ts
       - name: Authentication, session rotation, tenant isolation and public signup RLS
