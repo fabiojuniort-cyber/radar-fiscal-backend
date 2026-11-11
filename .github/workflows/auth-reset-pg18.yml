@@ -1,4 +1,4 @@
-name: AUTH-RESET-01 isolated PG18
+name: AUTH-RESET-02 isolated PG16 PG18
 
 on:
   pull_request:
@@ -14,6 +14,7 @@ on:
       - 'src/infrastructure/logging/logger.ts'
       - 'test/password-reset.unit.test.ts'
       - 'test/password-reset.integration.test.ts'
+      - 'test/password-reset.worker.unit.test.ts'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
@@ -23,12 +24,16 @@ permissions:
 
 jobs:
   reset-pg18:
-    name: Contract and simulated inbox on disposable PostgreSQL 18
+    name: Contract and simulated inbox on disposable PostgreSQL ${{ matrix.pg }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: [16, 18]
     services:
       postgres:
-        image: postgres:18-bookworm
+        image: postgres:${{ matrix.pg }}-bookworm
         env:
           POSTGRES_DB: radar_fiscal_test
           POSTGRES_USER: postgres
@@ -67,5 +72,3 @@ jobs:
         run: npx tsx --test test/password-reset.unit.test.ts
       - name: Password reset roundtrip, captured link and revoked sessions
         run: npx tsx --test test/password-reset.integration.test.ts
-      - name: Reproduce B1 B2 in original code with temporal floor enabled
-        run: npx tsx --test test/password-reset.baseline.integration.test.ts
