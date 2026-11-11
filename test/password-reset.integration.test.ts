@@ -275,6 +275,39 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
     assert.equal(spoofRow.rows[0]?.total,'0',
       'Untrusted forwarded IP must not bypass raw socket quota');
 
+    // C-1 ownership/ACL: worker recebe apenas EXECUTE do claim;
+    // runtime nao recebe SELECT na outbox nem acesso ao claim.
+    const grants=await admin.query<{
+      app_read:boolean;worker_read:boolean;app_claim:boolean;
+      worker_claim:boolean;worker_issue:boolean;
+    }>(
+      "SELECT "+
+      "has_table_privilege('radar_app_runtime','public.auth_password_reset_outbox','SELECT') AS app_read,"+
+      "has_table_privilege('radar_worker_runtime','public.auth_password_reset_outbox','SELECT') AS worker_read,"+
+      "has_function_privilege('radar_app_runtime','public.auth_password_reset_claim(integer)','EXECUTE') AS app_claim,"+
+      "has_function_privilege('radar_worker_runtime','public.auth_password_reset_claim(integer)','EXECUTE') AS worker_claim,"+
+      "has_function_privilege('radar_worker_runtime','public.auth_password_reset_issue(text,text,integer,text,text,text)','EXECUTE') AS worker_issue"
+    );
+    assert.deepEqual(grants.rows[0],{
+      app_read:false,worker_read:false,app_claim:false,
+      worker_claim:true,worker_issue:false,
+    });
+    const proc=await admin.query<{
+      proname:string;owner_name:string;is_definer:boolean;settings:string|null;
+    }>(
+      "SELECT p.proname,pg_get_userbyid(p.proowner) AS owner_name,"+
+      "p.prosecdef AS is_definer,array_to_string(p.proconfig,',') AS settings "+
+      "FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "+
+      "WHERE n.nspname='public' AND p.proname LIKE 'auth_password_reset_%'"
+    );
+    assert.ok(proc.rowCount && proc.rowCount>=7);
+    for(const row of proc.rows){
+      assert.equal(row.owner_name,'postgres');
+      assert.equal(row.is_definer,true);
+      assert.ok(row.settings?.includes('pg_temp'),
+        'Temporary schema must be last in SECURITY DEFINER search_path');
+    }
+
     // Real role with TEMP must not shadow official app_users in SECURITY DEFINER.
     const client=await runtime.connect();
     try{
