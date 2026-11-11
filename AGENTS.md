@@ -91,3 +91,16 @@ autorização própria, além do deploy. Políticas de recuperação seguem ACCE
 Durante implementação, trabalhe em PR **draft** e envie blocos coerentes de commits. O draft roda checks rápidos e termina com `DRAFT_FAST_ONLY`: aviso intencional de regressão completa pendente, não uma falha do produto. **Não rerodar esse CI nem criar commits só para eliminar o aviso.**
 
 Quando estiver pronto, marque **Ready for review** para disparar todos os gates completos; cada atualização posterior do head também roda a regressão completa. Só faça merge com CI completo verde no head atual e revisão exigida pela governança. Main mantém a regressão completa. Procedimento, seleção PG18 e rollback: `docs/ci-cost-02.md`.
+
+## Orquestração de modelos e sub-agentes (Claude e GPT)
+
+Política canônica: https://github.com/fabiojuniort-cyber/tribusca-control/blob/main/docs/ORQUESTRACAO_MODELOS.md (complementa a Governança Flexível v2; não flexibiliza gates). Você tem autorização permanente para criar sub-agentes neste projeto, sem perguntar a cada vez.
+
+- **Orquestrador (modelo principal):** classifica o risco R0–R3, planeja em 3–7 passos, delega, **revisa o retorno** e resume (feito / verificado / pendente / delegações usadas).
+- **Camada leve (Haiku / GPT mini):** buscar, mapear usos, listar rotas, ler e resumir logs. Somente leitura.
+- **Camada intermediária (Sonnet / GPT intermediário):** implementar com especificação clara, testes, refactor repetitivo, bug localizado, documentação.
+- **Camada principal (Opus / GPT de raciocínio):** arquitetura, regra fiscal/de negócio, migrations, segurança/RLS/tenant, bug sem causa clara, revisão final. **R3 fica 100% com a camada principal**; sub-agentes só leem.
+- Prompt de delegação (o sub-agente não tem contexto): objetivo, repositório/arquivos, restrições, critério de pronto, resposta curta.
+- Não delegar tarefa pequena (1–2 arquivos), decisão fiscal/de segurança ou o que depende de muito contexto.
+- Sub-agente **não** é revisor independente, **não** faz commit/push/merge/deploy e **não** usa o Railway AI Agent (proibido).
+- Sem suporte a sub-agentes ou escolha de modelo na ferramenta: trabalhar em sessão única mantendo as demais regras.
