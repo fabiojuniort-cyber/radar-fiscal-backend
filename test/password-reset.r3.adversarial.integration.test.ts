@@ -31,7 +31,7 @@ test('R3 adversarial B1: real PostgreSQL row locks and partial intake failures',
  }});
  const email='r3-lock-'+randomUUID()+'@example.test';
  const absent='r3-absent-'+randomUUID()+'@example.test';
- let uid='',tenant='';
+ let uid='',tenant='',faultUid='',faultTenant='';
  let holding:import('pg').PoolClient|null=null;
  const keys=[email,absent].map(x=>hash('auth-reset-v1:request-email:'+x));
  keys.push(hash('auth-reset-v1:request-ip:127.0.0.1'));
