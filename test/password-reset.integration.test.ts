@@ -184,22 +184,54 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
     assert.ok((await latest()).used_at);
     assert.equal(inbox.length,prev);
 
-    // Email quota exhaustion does NOT return 429 to victim at other IP.
-    const abused='abused-'+randomUUID()+'@example.test';
-    track(abused);
-    for(let i=0;i<6;i++){
+    // B-2: attacker uses six different IPs against a REAL known e-mail.
+    // The sixth attempt is silently discarded; victim HTTP stays 202.
+    const victimEmail='abused-'+randomUUID()+'@example.test';
+    const victimSignup=await app.inject({method:'POST',url:'/auth/register',payload:{
+      name:'Vitima Sintetica',email:victimEmail,password:OLD,
+      confirmPassword:OLD,acceptedTerms:true,
+    }});
+    assert.equal(victimSignup.statusCode,201);
+    const victimData=victimSignup.json<{user:{id:string};tenant:{id:string}}>();
+    victimUserId=victimData.user.id;victimTenantId=victimData.tenant.id;
+    track(victimEmail);
+
+    await requestPasswordReset(app.db,{
+      email:victimEmail,ip:'192.0.2.20',publicUrl:RESET_URL,tokenKey:KEY,
+    });
+    // Um worker já reivindicou o primeiro envio; nova solicitação o cancela.
+    const staleClaim=await admin.query<{job_id:string;lease_id:string}>(
+      'SELECT job_id,lease_id FROM public.auth_password_reset_claim(20)',
+    );
+    assert.equal(staleClaim.rowCount,1);
+    for(const octet of [21,22,23,24,25]){
       await requestPasswordReset(app.db,{
-        email:abused,ip:'192.0.2.'+(i+20),publicUrl:RESET_URL,tokenKey:KEY,
+        email:victimEmail,ip:'192.0.2.'+octet,publicUrl:RESET_URL,tokenKey:KEY,
       });
     }
-    const neutral=await forgot(abused);
-    assert.equal(neutral.statusCode,202);
-    const total=(await admin.query<{total:string}>(
+    const queued=await admin.query<{total:string}>(
       'SELECT count(*)::text AS total FROM auth_password_reset_outbox o '+
       'JOIN auth_password_reset_tokens t ON t.token_hash=o.token_hash '+
-      'JOIN app_users u ON u.id=t.user_id WHERE u.email=$1',[abused],
-    )).rows[0]?.total;
-    assert.equal(total,'0','Unknown email never queued');
+      'WHERE t.user_id=$1',[victimUserId],
+    );
+    assert.equal(queued.rows[0]?.total,'5','Sixth IP must not enqueue sixth token');
+    const staleFinish=await admin.query<{result:string}>(
+      "SELECT public.auth_password_reset_finish($1::uuid,$2::uuid,false,'MOCK',0) AS result",
+      [staleClaim.rows[0]?.job_id,staleClaim.rows[0]?.lease_id],
+    );
+    assert.equal(staleFinish.rows[0]?.result,'IGNORED',
+      'Old failure must never invalidate newer token');
+    const activeNew=await admin.query<{total:string}>(
+      'SELECT count(*)::text AS total FROM auth_password_reset_tokens '+
+      'WHERE user_id=$1 AND used_at IS NULL',[victimUserId],
+    );
+    assert.equal(activeNew.rows[0]?.total,'1');
+    const victimResponse=await forgot(victimEmail);
+    assert.equal(victimResponse.statusCode,202,
+      'Victim cannot be forced to see 429 by third-party e-mail quota');
+    for(const octet of [20,21,22,23,24,25]){
+      tracked.push(hash('auth-reset-v1:request-ip:192.0.2.'+octet));
+    }
 
     // Real role with TEMP must not shadow official app_users in SECURITY DEFINER.
     const client=await runtime.connect();
@@ -221,7 +253,9 @@ test('AUTH-RESET-02 PG: outbox, restart, retry, revocation, privilege, concurren
     await app.close();
     await worker.destroy();await worker2.destroy();await runtime.end();
     if(userId)await admin.query('DELETE FROM app_users WHERE id=$1',[userId]);
+    if(victimUserId)await admin.query('DELETE FROM app_users WHERE id=$1',[victimUserId]);
     if(tenantId)await admin.query('DELETE FROM tenants WHERE id=$1',[tenantId]);
+    if(victimTenantId)await admin.query('DELETE FROM tenants WHERE id=$1',[victimTenantId]);
     const rate=[
       ...tracked,
       hash('auth-reset-v1:request-ip:127.0.0.1'),
