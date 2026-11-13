@@ -1,0 +1,91 @@
+name: ONB02-PG18-PERF-01 isolated diagnostic
+on:
+  push:
+    branches:
+      - diag/onb02-pg18-perf-01-20261113
+    paths:
+      - '.github/workflows/onb02-pg18-perf-01.yml'
+      - 'scripts/diagnostics/onb02-pg18-perf-01.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: perf01-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pg18-ab:
+    name: 'PG18 isolated scenario ${{ matrix.scenario }}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [A, B]
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      DB_POOL_MAX: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+      - name: Ensure immutable source and diagnostic-only files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor ef7a079591579bd95984ff0c84cbe505f1dcb1d4 HEAD
+          git diff --name-only ef7a079591579bd95984ff0c84cbe505f1dcb1d4..HEAD | sort > /tmp/perf-files
+          printf '%s\n' .github/workflows/onb02-pg18-perf-01.yml scripts/diagnostics/onb02-pg18-perf-01.mjs | sort > /tmp/perf-expected
+          diff -u /tmp/perf-expected /tmp/perf-files
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Prepare migrations 001-074 and all later historical originals on disposable PostgreSQL 18
+        run: npm run db:prepare
+      - name: Run exactly one diagnostic round per scenario with unchanged SQL timeouts
+        shell: bash
+        run: |
+          timeout --signal=TERM --kill-after=10s 600s node scripts/diagnostics/onb02-pg18-perf-01.mjs "${{ matrix.scenario }}"
+      - name: Print outcome (not a product/CI gate)
+        if: always()
+        run: |
+          node --input-type=module -e '
+            import {readFileSync,existsSync} from "node:fs";
+            const f="perf-results/scenario-${{ matrix.scenario }}.json";
+            if(existsSync(f)){
+              const d=JSON.parse(readFileSync(f,"utf8"));
+              console.log(JSON.stringify({scenario:d.scenario,outcome:d.outcome,
+                batches:d.batches.length,last:d.batches.at(-1),
+                errors:d.errors,postgres:d.postgres}));
+            }else console.log("DIAGNOSTIC_REPORT_MISSING");
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: onb02-pg18-perf01-${{ matrix.scenario }}
+          path: perf-results/scenario-${{ matrix.scenario }}.json
+          if-no-files-found: warn
+          retention-days: 7
