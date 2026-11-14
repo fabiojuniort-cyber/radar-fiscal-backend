@@ -1,0 +1,161 @@
+TAP version 13
+# Subtest: 077 disposable guard refuses external configuration before connection
+ok 1 - 077 disposable guard refuses external configuration before connection
+  ---
+  duration_ms: 4.517746
+  type: 'test'
+  ...
+# Subtest: family CHECK mirrors the ANAT-PROFILE/1 literal (pure vectors)
+ok 2 - family CHECK mirrors the ANAT-PROFILE/1 literal (pure vectors)
+  ---
+  duration_ms: 56.795138
+  type: 'test'
+  ...
+# Subtest: 077_anat_base through the real migration runner (fresh disposable database)
+    # Subtest: the real runner applies the chain, then 077 on top; nothing else in the catalog changes
+    ok 1 - the real runner applies the chain, then 077 on top; nothing else in the catalog changes
+      ---
+      duration_ms: 1644.396222
+      type: 'test'
+      ...
+    # Subtest: structure equals the CI schema except the reviewed changes
+    ok 2 - structure equals the CI schema except the reviewed changes
+      ---
+      duration_ms: 36.524554
+      type: 'test'
+      ...
+    # Subtest: privileges: worker writes, app reads in-scope analyses only, nobody deletes or updates analyses
+    ok 3 - privileges: worker writes, app reads in-scope analyses only, nobody deletes or updates analyses
+      ---
+      duration_ms: 51.490043
+      type: 'test'
+      ...
+    # Subtest: family/source CHECK equals the profile contract on the same vectors
+    ok 4 - family/source CHECK equals the profile contract on the same vectors
+      ---
+      duration_ms: 6.119695
+      type: 'test'
+      ...
+    # Subtest: the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented
+    not ok 5 - the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented
+      ---
+      duration_ms: 0.629886
+      type: 'test'
+      location: '<comp>/test/anatomy.base-migration.integration.test.ts:24:283'
+      failureType: 'testCodeFailure'
+      error: |-
+        engine identity is the current build
+        + actual - expected
+        
+        + '8061ac82'
+        - '0e009431'
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: '0e009431'
+      actual: '8061ac82'
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:190:14)
+        Test.runInAsyncScope (node:async_hooks:214:14)
+        Test.run (node:internal/test_runner/test:1047:25)
+        Test.start (node:internal/test_runner/test:944:17)
+        TestContext.test (node:internal/test_runner/test:373:20)
+        TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:188:13)
+        process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: analyses are immutable: refused to the worker (grant) and to the owner (trigger); no DELETE for runtime roles
+    not ok 6 - analyses are immutable: refused to the worker (grant) and to the owner (trigger); no DELETE for runtime roles
+      ---
+      duration_ms: 8.14127
+      type: 'test'
+      location: '<comp>/test/anatomy.base-migration.integration.test.ts:27:702'
+      failureType: 'testCodeFailure'
+      error: 'Missing expected rejection: immutable'
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      stack: |-
+        process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        async refused (<comp>/test/anatomy.base-migration.integration.test.ts:89:64)
+        async TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:216:7)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:212:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: reads: the app sees only analyses of in-scope publications, whatever the tenant; nothing of runs or rule sets
+    not ok 7 - reads: the app sees only analyses of in-scope publications, whatever the tenant; nothing of runs or rule sets
+      ---
+      duration_ms: 2.166103
+      type: 'test'
+      location: '<comp>/test/anatomy.base-migration.integration.test.ts:27:1620'
+      failureType: 'testCodeFailure'
+      error: |-
+        tenant null
+        + actual - expected
+        
+        + []
+        - [
+        -   'f55ff16f66f43360266b95db6f8fec01d76031054306ae4a4b380598f6cfd114'
+        - ]
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'f55ff16f66f43360266b95db6f8fec01d76031054306ae4a4b380598f6cfd114'
+      actual:
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:224:16)
+        process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:221:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: ON DELETE RESTRICT: a version (or publication) with analyses or run items cannot be deleted
+    not ok 8 - ON DELETE RESTRICT: a version (or publication) with analyses or run items cannot be deleted
+      ---
+      duration_ms: 2.767533
+      type: 'test'
+      location: '<comp>/test/anatomy.base-migration.integration.test.ts:27:2515'
+      failureType: 'testCodeFailure'
+      error: 'Missing expected rejection: violates (RESTRICT setting of )?foreign key constraint'
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      stack: |-
+        process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        async refused (<comp>/test/anatomy.base-migration.integration.test.ts:89:64)
+        async TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:235:7)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async TestContext.<anonymous> (<comp>/test/anatomy.base-migration.integration.test.ts:233:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: recovery: the documented drop order is valid (rolled back)
+    ok 9 - recovery: the documented drop order is valid (rolled back)
+      ---
+      duration_ms: 14.385749
+      type: 'test'
+      ...
+    1..9
+not ok 3 - 077_anat_base through the real migration runner (fresh disposable database)
+  ---
+  duration_ms: 1818.198992
+  type: 'test'
+  location: '<comp>/test/anatomy.base-migration.integration.test.ts:15:1324'
+  failureType: 'subtestsFailed'
+  error: '4 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..3
+# tests 12
+# suites 0
+# pass 7
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2212.65129

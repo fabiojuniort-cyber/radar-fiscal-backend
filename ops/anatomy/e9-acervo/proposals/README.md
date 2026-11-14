@@ -522,3 +522,86 @@ Os testes R9 passam de 0/3 para 3/3.
   - `outputHash` neutralizado: `60285e2c…` nos dois.
 - **`entrySha256` candidato:** `c844c6cb1044ddfec4023f6998dacc4f50d96ab3450f2b6ef218ba8be37301e0` (0 ocorrências no arquivo de aceites).
 - **Veredito:** **EQUIVALENT**. Substitui as provas da R5 à R8. **Nada foi registrado.**
+
+## A r10 (2026-11-14): R9-RES e R9-ANA (nada integrado, nada registrado)
+
+Executado por sessão que foi revisora das rodadas R6–R9; a revisão independente do A r10 deve vir de **outra sessão**.
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r10.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `86e47e749bc05e0f0dc73711687a9f5965cb38c001bd391b2e09e108c0c34137`
+
+### Regras
+
+**R9-RES (origem do objeto aprovado).** A lista fechada de retomadas da R9 deu lugar a uma regra aberta. Sob verbo constitutivo, com o verbo removido, o objeto **retoma a norma citada** quando traz:
+- particípio de previsão: `previst-`, `estabelecid-`, `fixad-`, `definid-`, `disciplinad-`, `regulad-`, `contid-`, `relacionad-`, `especificad-`, `enumerad-`, `listad-`, `indicad-`, `determinad-`, `aprovad-`, `institu-`, `constante(s)`;
+- ou marcador locativo, anafórico ou possessivo: `seu/sua`, `ali`, `lá`, `acima`, `supra-`, `retro-`, `precitad-`, `aludid-`, `em referência`, `referid-`, `mencionad-`, `citad-`, `mesm-`, `tal/tais`, `nel-/del-/naquel-/daquel-/ness-/dess-`.
+
+Nesse caso a citação acessória ou de fundamento conta, e a tabela não é promovida. Na dúvida, não promove.
+
+**Autorreferência expressa.** `nest-/dest-/n- presente` + tipo de ato, `ato`, `norma` ou `Anexo` identifica o próprio ato. Também vale com o particípio que a antecede ("previstas nesta Portaria", "previstas no Anexo desta Portaria", "fixadas pela presente Portaria"). A autorreferência:
+- neutraliza o marcador;
+- deixa de contar como tipo de norma "nu" no antecedente e no `prior`;
+- não neutraliza outra citação na mesma frase ("nesta e na IN nº 1.155" bloqueia).
+
+**R9-ANA (retomada entre frases).** Uma frase que **abre** com "Os/As mesmos/referidos/mencionados/citados/aludidos…", "Tais", "Tal", "Esses/Essas", "Aqueles/Aquelas" fica sem resolução, salvo autorreferência expressa na própria frase. O limite de frase é preservado e nada é herdado.
+
+**Sigla antes do ponto.** Só um token curto em caixa de título ("Conj.", "Norm.") deixa de encerrar a frase. Uma sigla toda em maiúsculas ("RFB.") encerra a frase. As abreviações da lista continuam comparadas sem caixa.
+
+### Contraprova
+
+**Casos dirigidos.** `r7-evidence/r7-cases.mts` roda 210 casos: os 131 anteriores mais 79 novos da seção R10.
+
+| Motor | Resultado |
+|---|---|
+| A r9 | 163 OK / 47 FAIL |
+| A r10 | 210/210 |
+
+Os 131 anteriores ficam idênticos (131/131). Os testes R10 passam de 0/2 para 2/2.
+
+**Adversarial.** `r10-evidence/r10-adversarial.mts` roda 85 casos:
+- 13 retomadas do parecer, cada uma no início e no meio;
+- 12 variantes novas;
+- 5 controles próprios novos, mais os de autorização e modelos;
+- casos entre frases.
+
+| Motor | Divergências |
+|---|---|
+| A r9 | 45/85 |
+| A r10 | 0/85 |
+
+**Fechados:**
+- o P3 "nesta Portaria";
+- o P3 "…da RFB. Fica…".
+
+### A r10 isolado
+
+- **Motor:** `ff8e444f1c5b74b49c9c4eb8dd84e7f3010518816cf9656e137e085adf131180`
+- **Checagens:** `tsc` limpo; `test:anatomy` 296/296
+- **Trava do próprio patch:** `ff8e444f`, com **PG16 versionado 12/12**
+- **Lote oficial:** r9 × r10, 7 atos, 0 diferenças semânticas
+
+### Composição descartável
+
+- **Montagem:** #303 `46afdaf1` + #300 + A r10 + B r7, com a receita da R6.
+- **Motor:** `8061ac8257daa5447f1a615e7a1e2c804cc48cd66f9670b161a5f5f01b7862bc`
+- **`tsc`:** limpo.
+- **`test:anatomy`:** 413 testes, **409 pass e 4 fail**. As 4 falhas são de identidade, as mesmas da R9: #153, #167, #170 e #174. **Nenhuma regressão nova.**
+- **PG16 com a trava versionada do #303:** 7/12. O teste 3 falha pela trava `0e009431`, nos subtestes 5–8.
+- **PG16 diagnóstico:** 12/12.
+- **ADE Cofis real:** `read`, 9 linhas, 16 células, 26/26 ponteiros, `f857a997…`, `operative_candidate`, `legalStatus` `unknown`.
+- **`e9-acceptances.json`:** byte-idêntico à base, com 13 registros.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r10.json`, SHA-256 `f2131d651162017794f5af1311ec51d7f06af16859aeea630b7d631e54145b03`
+- **Comparação:** `0e009431` × `8061ac82`
+- **Partes:** 136/136, hash `6193225c…`; `differingFields` vazio.
+- **Diferenças:**
+  - `identity.differingKeys` = `["engineHash"]`;
+  - `lotEntry.differingKeys` = `["outputHash","inlineAttachments"]`;
+  - `outputHash` neutralizado: `60285e2c…` nos dois.
+- **`entrySha256` candidato:** `6c22d5a1b711f46c900b6010970cfa3c1830c193372ec69fc4c2494893061cde` (0 ocorrências no arquivo de aceites).
+- **Veredito:** **EQUIVALENT**. Substitui a prova da R9. **Nada foi registrado.**

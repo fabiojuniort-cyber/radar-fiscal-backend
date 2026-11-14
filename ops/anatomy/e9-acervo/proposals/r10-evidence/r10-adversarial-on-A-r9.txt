@@ -1,0 +1,86 @@
+XX P/N EXT início: previstas no ato acima citado
+XX P/N EXT meio: previstas no ato acima citado
+XX P/N EXT início: previstas no supracitado ato
+XX P/N EXT meio: previstas no supracitado ato
+XX P/N EXT início: previstas no aludido diploma
+XX P/N EXT meio: previstas no aludido diploma
+ok N/N EXT início: previstas naquele diploma
+ok N/N EXT meio: previstas naquele diploma
+XX P/N EXT início: previstas no diploma referido
+XX P/N EXT meio: previstas no diploma referido
+XX P/N EXT início: ali previstas
+XX P/N EXT meio: ali previstas
+XX P/N EXT início: lá estabelecidas
+XX P/N EXT meio: lá estabelecidas
+XX P/N EXT início: previstas na norma em referência
+XX P/N EXT meio: previstas na norma em referência
+ok N/N EXT início: previstas no mencionado diploma
+ok N/N EXT meio: previstas no mencionado diploma
+XX P/N EXT início: previstas no ato mencionado
+XX P/N EXT meio: previstas no ato mencionado
+XX P/N EXT início: constantes de seu Anexo
+XX P/N EXT meio: constantes de seu Anexo
+ok N/N EXT início: fixadas pela IN acima
+ok N/N EXT meio: fixadas pela IN acima
+ok N/N EXT início: previstas no citado ato
+ok N/N EXT meio: previstas no citado ato
+ok P/P OWN início: alíquotas próprias
+ok P/P OWN meio: alíquotas próprias
+XX N/P OWN "nesta Portaria" (próprio)
+ok N/N LOW port. conj.
+ok N/N LOW PORT. CONJ. maiúsc.
+ok N/N LOW ato decl. interpr.
+ok N/N LOW "sol. cons."
+ok N/N LOW "decr. leg."
+ok N/N LOW "res. cmn"
+ok N/N MRG frase real + "Conforme" sem antecedente
+ok P/P MRG minúsc.: fim real após "port." + frase própria
+XX P/N MRG abrev. minúsc. funde e herda norma (externo)
+XX N/P MRG fim real com sigla + frase própria
+ok P/P CTL Cofis-like
+ok N/N NOV início: nela fixadas
+ok N/N NOV meio: nela fixadas
+XX P/N NOV início: constantes do ato supra
+XX P/N NOV meio: constantes do ato supra
+XX P/N NOV início: definidas no precitado diploma
+XX P/N NOV meio: definidas no precitado diploma
+XX P/N NOV início: estabelecidas pelo retrocitado ato
+XX P/N NOV meio: estabelecidas pelo retrocitado ato
+XX P/N NOV início: previstas nos seus anexos
+XX P/N NOV meio: previstas nos seus anexos
+ok N/N NOV início: dele constantes
+ok N/N NOV meio: dele constantes
+XX P/N NOV início: previstas
+XX P/N NOV meio: previstas
+ok N/N NOV início: fixadas na mesma norma
+ok N/N NOV meio: fixadas na mesma norma
+XX P/N NOV início: previstas em tal ato
+XX P/N NOV meio: previstas em tal ato
+XX P/N NOV início: previstas nessa norma
+XX P/N NOV meio: previstas nessa norma
+ok N/N NOV início: contidas no Anexo daquela Instrução
+ok N/N NOV meio: contidas no Anexo daquela Instrução
+ok N/N NOV início: previstas nesta e na Instrução Normativa RFB nº 1.155
+ok N/N NOV meio: previstas nesta e na Instrução Normativa RFB nº 1.155
+XX N/P NOVOWN início: previstas no Anexo desta Portaria
+XX N/P NOVOWN meio: previstas no Anexo desta Portaria
+ok P/P NOVOWN início: previstas neste ato
+ok P/P NOVOWN meio: previstas neste ato
+XX N/P NOVOWN início: fixadas pela presente Portaria
+XX N/P NOVOWN meio: fixadas pela presente Portaria
+ok P/P NOVOWN início: de referência para 2023
+ok P/P NOVOWN meio: de referência para 2023
+ok P/P NOVOWN início: aplicáveis aos cigarros
+ok P/P NOVOWN meio: aplicáveis aos cigarros
+XX P/N ANA Tais valores
+XX P/N ANA Esses produtos
+XX P/N ANA Os referidos itens
+XX P/N ANA Aqueles
+XX P/N ANA As mesmas alíquotas
+XX N/P ANA Os mesmos + nesta Portaria
+ok P/P CTL sem retomada: Os valores
+ok P/P CTL sem retomada: Ficam aprovados
+ok P/P CTL modelos início
+ok P/P CTL modelos meio
+ok P/P CTL fundamento + autorizada
+divergências 45 / 85
