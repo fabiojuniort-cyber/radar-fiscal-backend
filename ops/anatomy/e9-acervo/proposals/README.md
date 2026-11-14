@@ -309,3 +309,76 @@ Arquivo: `portaria635-equivalence-r6.json`, SHA-256 `8b66384997f09cc02aab71d00e3
 **Veredito:** **EQUIVALENT** para `85a1406c`.
 
 A prova da R5 (`c9edb4fe`) está **superada** para a identidade candidata. **Nada foi registrado.**
+
+## A r7 (2026-11-14): A6-1 e abreviações normativas (nada integrado, nada registrado)
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r7.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `870521a2105385ae625b5b791addea58d5236954581e51545f18ee9704bf855d`
+- **Alcance:** só `rfb-inline-attachments.ts`, o teste correspondente e os arquivos gerados.
+- **Pin versionado do #300:** **não alterado**, conforme o mandato; continua `fff69e07`.
+
+### Regra
+
+- **A6-1.** Numa remissão (conector ou elíptica), todas as orações anteriores da mesma sentença entram na verificação, com as caudas de citação unidas.
+  - Bloqueiam a promoção: citação de norma, anexo de outra norma e tipo de norma sem número.
+  - São excluídos da verificação:
+    - orações acessórias;
+    - um fundamento anteposto que abre a sentença ("Nos termos da Lei nº …, ficam …", "Com base em …").
+  - A mesma expressão inserida depois do verbo continua bloqueando.
+  - Os limites de sentença, dispositivo, `;` e `:` não mudaram.
+- **Abreviações.**
+  - Um ponto só encerra sentença quando o token anterior não é uma abreviação conhecida. Entram na lista `Dec.`, `Decr.`, `Instr.`, `Inst.`, `Port.`, `Res.`, `Resol.`, `Conv.`, `Prot.`, `Compl.`, `Normat.` e `Fed.`, além das anteriores.
+  - As formas abreviadas valem como as formas por extenso em `NORM_CITATION`, `NORM_KIND_BARE` e `OTHER_NORM_ANNEX`.
+
+### Contraprova
+
+`r7-evidence/r7-cases.mts` roda 53 casos:
+- os 31 da R6;
+- 11 de A6-1 (os 5 do revisor, 1 de anexo e 5 positivos);
+- 4 pares de abreviação (8 entradas);
+- 3 controles de fim real de sentença.
+
+| Motor | Resultado |
+|---|---|
+| A r6 | 43 OK / 10 FAIL (6 de A6-1 e 4 formas abreviadas) |
+| A r7 | 53/53 |
+
+Os testes `R7 A6-1` e `R7 abbreviations` passam de 0/2 para 2/2.
+
+### A r7 isolado
+
+- **Motor:** `1988ba1f0e5a8915d272d29628f1573680f19fa62f9c3b082a352af3f07760d6`.
+- **`tsc`:** limpo. **`test:anatomy`:** 288/288.
+- **Lote oficial:** 7/7 atos com `outputHash` neutralizado e `inlineAttachments` idênticos ao r6.
+- **PG16 com o pin versionado:** 7/12. O teste 5 falha no pin `fff69e07`, e os testes 6–8 caem em cascata.
+- **PG16 diagnóstico** (cópia descartável com pin `1988ba1f`): 12/12.
+
+### Composição descartável
+
+- **Montagem:** #303 `46afdaf1` + #300 + A r7 + B r7, com a mesma receita da R6.
+- **Motor:** `40f13f413d768ec965225f3540785283a0dd3aefc7a346ac17ca3206206f7675`.
+- **`tsc`:** limpo.
+- **`test:anatomy`:** 405 testes, 401 pass e 4 fail. As 4 falhas são de identidade:
+  - #153, #170 e #174 esperam `['rfb:148693']` aceito;
+  - #167 espera o registro com `engineBuildHash` `0e009431`.
+- **PG16 com o pin versionado:** 7/12, pelo pin `0e009431` (teste 5) e em cascata (testes 6–8).
+- **PG16 diagnóstico:** 12/12.
+- **ADE Cofis real:** `read`, 9 linhas, 16 células, 26/26 ponteiros, SHA `f857a997…`, `operative_candidate`, `legalStatus` `unknown`.
+- **`e9-acceptances.json`:** 13 registros, byte-idêntico à base B r7.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r7.json`, SHA-256 `5d58c003637da53e00ae11652bc7a89d925aa9be73abd31a0e0ccc8427dd39e9`.
+- **Motores comparados:** base `0e009431` × candidata `40f13f41`.
+- **Iguais nos dois motores:**
+  - bytes e HTML preparado;
+  - 136 partes, com hash canônico `6193225c…`;
+  - `differingFields` vazio.
+- **O que difere:**
+  - identidade: só `engineHash`;
+  - `outputHash`: `450b2d12…` × `2a0abf93…`. Com a identidade do motor neutralizada, os dois dão `60285e2c…`.
+- **`entrySha256` candidato:** `e835f3ea45177e26e8de1125d3f4418ac26001cb999f7c23c92c4c689e8cbf1b`.
+- **Veredito:** **EQUIVALENT**. Substitui as provas da R5 e da R6. **Nada foi registrado.**
