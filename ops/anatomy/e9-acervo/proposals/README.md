@@ -453,3 +453,72 @@ Os testes R8 passam de 0/3 para 3/3.
   - `outputHash` neutralizado `60285e2c…` nos dois.
 - **`entrySha256` candidato:** `486fb648fa05b6565b4af50fef17ffc15f47a9a702757d8667b72e109ae8396d`.
 - **Veredito:** **EQUIVALENT**. Esta prova substitui as das versões R5 a R7. **Nada foi registrado.**
+
+## A r9 (2026-11-14): R8-CST, R8-LOW e R8-MRG (nada integrado, nada registrado)
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r9.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `daa2a47c8cd12aaf80eb0f16baa9ed072d951135e1eb23f789af6a445bfd2efe`
+
+### Regras
+
+**R8-CST.** Se o resto da frase **retoma** uma norma citada numa oração acessória ou de fundamento, essa citação passa a contar, mesmo com verbo constitutivo. Vale com a citação no início ou no meio da frase.
+- **Retomada pronominal:** "nela", "nele", "nelas", "neles", "dela", "dele", "delas", "deles", "naquela", "daquela".
+- **Retomada explícita:** "na/da/pela referida", "mencionada", "citada", "mesma".
+- **Não é retomada:** "deste ato", que designa o próprio ato.
+
+**Tipos de norma no plural.** "Leis", "Decretos", "Portarias", "Instruções Normativas" e "Resoluções" passam a citar como o singular.
+
+**R8-LOW.**
+- `conj`, `interm`, `norm`, `leg`, `decl`, `interpr`, `exec`, `cons`, `sol` e `parec` entram na lista de abreviações, comparada sem caixa.
+- Os tipos abreviados são reconhecidos em qualquer caixa.
+
+**R8-MRG.** Uma frase que **abre** com conector de remissão nunca é fundida à anterior: fica sem resolução e não promove.
+
+**Agravamento do R8-MRG por R8-LOW.** Uma frase real que termina num dos novos tokens minúsculos, seguida de frase sem remissão no início, passa a ser fundida à seguinte. O efeito é conservador: a fusão só acrescenta citações a verificar.
+
+### Contraprova
+
+`r7-evidence/r7-cases.mts` roda 131 casos: os 93 anteriores mais 38 novos.
+
+| Motor | Resultado |
+|---|---|
+| A r8 | 114 OK / 17 FAIL |
+| A r9 | 131/131 |
+
+Os testes R9 passam de 0/3 para 3/3.
+
+### A r9 isolado
+
+- **Motor:** `c313abf0ced515aa5d73768fc8da6b2f4224ce058d34605d42839ecc5b0c828a`
+- **Checagens:** `tsc` limpo; `test:anatomy` 294/294
+- **Trava do próprio patch:** `c313abf0`, com **PG16 versionado 12/12**
+- **Lote oficial:** os 7 atos idênticos ao r8
+
+### Composição descartável
+
+- **Montagem:** #303 `46afdaf1` + #300 + A r9 + B r7, com a receita da R6.
+- **Motor:** `3ea4c774126231347280b8c35e87c931b33a3506c58733c1e5f389188ab76318`
+- **`tsc`:** limpo.
+- **`test:anatomy`:** 411 testes, **407 pass e 4 fail**. As 4 falhas são de identidade:
+  - #153, #170 e #174 esperam `rfb:148693` aceito;
+  - #167 espera o registro com `engineBuildHash` `0e009431`.
+  - **Nenhuma falha nova.**
+- **PG16 com a trava versionada do #303:** 7/12. O teste 5 falha pela trava `0e009431`, e os testes 6–8 falham em cascata.
+- **PG16 diagnóstico:** 12/12.
+- **ADE Cofis real:** `read`, 9 linhas, 16 células, 26/26 ponteiros, `f857a997…`, `operative_candidate`, `legalStatus` `unknown`.
+- **`e9-acceptances.json`:** byte-idêntico à base, com 13 registros.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r9.json`, SHA-256 `4321639a5d19ecad32a9f00a0dd8384fb0dda33ff0922bdd77e92fb802b28319`
+- **Comparação:** `0e009431` × `3ea4c774`
+- **Partes:** 136/136, hash `6193225c…`; `differingFields` vazio.
+- **Diferenças:**
+  - `identity.differingKeys` = `["engineHash"]`;
+  - `lotEntry.differingKeys` = `["outputHash","inlineAttachments"]`;
+  - `outputHash` neutralizado: `60285e2c…` nos dois.
+- **`entrySha256` candidato:** `c844c6cb1044ddfec4023f6998dacc4f50d96ab3450f2b6ef218ba8be37301e0` (0 ocorrências no arquivo de aceites).
+- **Veredito:** **EQUIVALENT**. Substitui as provas da R5 à R8. **Nada foi registrado.**
