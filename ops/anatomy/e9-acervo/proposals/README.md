@@ -382,3 +382,74 @@ Os testes `R7 A6-1` e `R7 abbreviations` passam de 0/2 para 2/2.
   - `outputHash`: `450b2d12…` × `2a0abf93…`. Com a identidade do motor neutralizada, os dois dão `60285e2c…`.
 - **`entrySha256` candidato:** `e835f3ea45177e26e8de1125d3f4418ac26001cb999f7c23c92c4c689e8cbf1b`.
 - **Veredito:** **EQUIVALENT**. Substitui as provas da R5 e da R6. **Nada foi registrado.**
+
+## A r8 (2026-11-14): R7-ACC, R7-FRONT, R7-ABBR e R7-PIN (nada integrado, nada registrado)
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r8.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `99d07eee94e626757887afe7b0fefd4469cbdcf6bc2abd712be7de7125b88191`
+
+### Regras
+
+**R7-ACC.** `dispensad…`, `observad…` e `nos termos do art.` contam como acessórios **só quando abrem a oração**.
+
+**R7-FRONT.** Expressões de fundamento que abrem uma oração (`nos termos d…`, `com base em`, `com fundamento em`, `por força d…`) são avaliadas **pela função**, no início ou no meio da frase.
+- Elas só são acessórias quando a oração principal é **constitutiva**: `fica(m)/é/são/será` + `autorizad`, `aprovad`, `instituíd`, `estabelecid`, `criad`, `habilitad`, `credenciad`, `concedid`, `deferid`, `reconhecid` ou `homologad`.
+- A oração principal é a primeira que não é acessória, nem de fundamento, nem remissão.
+- Em qualquer outro caso (a oração aplica, mantém, observa, ou não tem verbo constitutivo), a citação **conta**.
+- Uma oração de fundamento nunca é tomada como a governante.
+
+**R7-ABBR.**
+- O ponto não encerra a frase quando o token anterior é uma abreviação conhecida **ou** um token capitalizado com até 8 letras. É conservador: unir frases só acrescenta citações a verificar.
+- Passam a ser reconhecidas como norma:
+  - `Ato Decl. (Interpr.|Exec.)`, `Sol. de Consulta`, `Sol. Cons.`, `Sol.` e `Parec.`;
+  - compostas com `Conj.`, `Interm.`, `Norm.` e `Leg.`.
+- A cauda da citação pode atravessar o ponto de abreviação.
+
+**R7-PIN.** A trava do próprio patch passa para `2246181e`, com PG16 versionado 12/12. Os pins dos PRs #300/#303 e o aceite da Portaria 635 não foram tocados.
+
+### Contraprova
+
+`r7-evidence/r7-cases.mts` roda 93 casos: os 53 anteriores mais 40 novos (ACC 5, FRONT 13, 9 pares de abreviação com 4 fora do parecer, 4 controles de fim real de frase).
+
+| Motor | Resultado |
+|---|---|
+| A r7 | 74 OK / 19 FAIL |
+| A r8 | 93/93 |
+
+Os testes R8 passam de 0/3 para 3/3.
+
+### A r8 isolado
+
+- **Motor:** `2246181e0c8272dfc9436c03f489084f994d0779311aaa4583058a1dcc23ca09`
+- **`tsc`:** limpo
+- **`test:anatomy`:** 291/291
+- **PG16 com o pin versionado do próprio patch:** **12/12**
+- **Lote oficial:** 7/7 atos idênticos ao r7 (`outputHash` neutralizado e `inlineAttachments`)
+
+### Composição descartável
+
+- **Montagem:** #303 `46afdaf1` + #300 + A r8 + B r7, com a receita da R6.
+- **Motor:** `ac868e41468db44f4152d9a6bd07b8550eebc1ef0203e4fb8ccad5de613decb1`
+- **`tsc`:** limpo
+- **`test:anatomy`:** 408 testes, **404 pass e 4 fail**. As 4 falhas são de identidade:
+  - #153, #170 e #174 esperam `rfb:148693` aceito;
+  - #167 espera o registro com `engineBuildHash` `0e009431`.
+- **PG16 com o pin versionado do #303:** 7/12. Falha o teste 5, pelo pin `0e009431`, e os testes 6–8 em cascata.
+- **PG16 diagnóstico (pin trocado temporariamente):** 12/12.
+- **ADE Cofis real:** `read`, 9 linhas, 16 células, 26/26 ponteiros, `f857a997…`, `operative_candidate`, `legalStatus` `unknown`.
+- **`e9-acceptances.json`:** byte-idêntico à base, com 13 registros.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r8.json`, SHA-256 `9bb27b9ef34670cd4147b48948b05ed4b6f13b9b720ae4b2004a5ca2114c9934`.
+- **Comparação:** `0e009431` × `ac868e41`.
+- **Resultado:**
+  - 136/136 partes, hash `6193225c…`;
+  - `differingFields` vazio;
+  - identidade difere só em `engineHash`;
+  - `outputHash` neutralizado `60285e2c…` nos dois.
+- **`entrySha256` candidato:** `486fb648fa05b6565b4af50fef17ffc15f47a9a702757d8667b72e109ae8396d`.
+- **Veredito:** **EQUIVALENT**. Esta prova substitui as das versões R5 a R7. **Nada foi registrado.**
