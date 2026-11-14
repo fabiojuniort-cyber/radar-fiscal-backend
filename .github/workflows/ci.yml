@@ -353,6 +353,8 @@ jobs:
           " | grep -qx PASS
       - name: Signup consent and authentication/RLS on PG18
         run: npx tsx --test test/public-signup.integration.test.ts
+      - name: AUTH-RESET isolated inbox, token one-use and global session revocation on PG18
+        run: npx tsx --test test/password-reset.integration.test.ts
       - name: Adversarial CNAE/branch/isolation on PG18
         run: npx tsx --test test/onboarding-integrity.integration.test.ts
       - name: ONB-02 R3 hard-delete full graph on PG18
