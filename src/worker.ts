@@ -22,6 +22,7 @@ import {
   createStandaloneDatabase,
 } from './infrastructure/database/standalone-client.js';
 import { processLogger } from './infrastructure/logging/process-logger.js';
+import { runPasswordResetOutboxWorker, passwordResetQueueWarningCodes } from './modules/auth/password-reset.worker.js';
 
 let stopping = false;
 
@@ -234,9 +235,70 @@ async function run(): Promise<void> {
     },
   });
 
+  let resetLoop: Promise<void> | undefined;
   try {
     await assertStandaloneDatabaseConnection(db);
     await assertWorkerRuntimeConnection(db);
+
+    // AUTH-RESET-02: entrega duravel usa PostgreSQL e as replicas existentes,
+    // sem alterar agendamento/conectores da coleta e sem rede quando desabilitada.
+    const resetEnabled = process.env.AUTH_PASSWORD_RESET_ENABLED === 'true';
+    const resetKey = process.env.AUTH_PASSWORD_RESET_TOKEN_KEY ?? '';
+    const resetUrl = process.env.AUTH_PASSWORD_RESET_PUBLIC_URL ?? '';
+    const resetFrom = process.env.ZOHO_CPAAS_FROM_ADDRESS ?? '';
+    const resetApiKey = process.env.ZOHO_CPAAS_API_KEY ?? '';
+    const trustedProxyCidrs=(process.env.AUTH_PASSWORD_RESET_TRUSTED_PROXY_CIDRS ?? '')
+      .split(',').map((x)=>x.trim()).filter(Boolean);
+    const resetProxyKnown = trustedProxyCidrs.length>0 && trustedProxyCidrs.every(
+      (cidr)=>/^(?:\d{1,3}\.){3}\d{1,3}(?:\/(?:\d|[12]\d|3[0-2]))?$/.test(cidr) &&
+        cidr!=='0.0.0.0/0' && cidr!=='127.0.0.1/8',
+    );
+    if (resetEnabled) {
+      if (!/^[0-9a-f]{64}$/i.test(resetKey) ||
+          !resetUrl.startsWith('https://') ||
+          !/^[^\s@]+@[^\s@]+$/.test(resetFrom) ||
+          !resetApiKey || !resetProxyKnown) {
+        processLogger.warn({ component:'AUTH_RESET', enabled:false },
+          'Auth reset outbox worker blocked: incomplete secure runtime config');
+      } else {
+        let neutralClaimedSnapshots = 0;
+        let deliveryClaimedSnapshots = 0;
+        resetLoop = runPasswordResetOutboxWorker(db, {
+          tokenKey: resetKey, publicUrl: resetUrl,
+          fromAddress: resetFrom, apiKey: resetApiKey,
+          isStopping: () => stopping,
+          onResult: (result) => {
+            processLogger.info({ component:'AUTH_RESET', result },
+              'Auth reset outbox worker result');
+          },
+          onHealth: (health) => {
+            // Two consecutive 30s snapshots with CLAIMED jobs exceed the
+            // normal 20s lease; this is a local heuristic, not external paging.
+            neutralClaimedSnapshots = health.neutral.claimed > 0
+              ? neutralClaimedSnapshots + 1 : 0;
+            deliveryClaimedSnapshots = health.delivery.claimed > 0
+              ? deliveryClaimedSnapshots + 1 : 0;
+            const warningCodes = passwordResetQueueWarningCodes(
+              health, neutralClaimedSnapshots, deliveryClaimedSnapshots,
+            );
+            processLogger.info({
+              component: 'AUTH_RESET',
+              neutral: health.neutral,
+              delivery: health.delivery,
+            }, 'Auth reset two-stage queue aggregate health');
+            if (warningCodes.length > 0) {
+              processLogger.warn({
+                component: 'AUTH_RESET',
+                event: 'queue_attention_required',
+                warningCodes,
+                neutral: health.neutral,
+                delivery: health.delivery,
+              }, 'Auth reset queue requires operational attention');
+            }
+          },
+        });
+      }
+    }
 
     const registry = buildConnectorRegistry({
       includeSimulated:
@@ -342,6 +404,8 @@ async function run(): Promise<void> {
       }
     }
   } finally {
+    stopping = true;
+    await resetLoop;
     await db.destroy();
 
     processLogger.info(
