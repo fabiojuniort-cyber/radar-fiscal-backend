@@ -1,0 +1,35 @@
+ok N/N ANA Estes
+ok N/N ANA Os demais
+ok N/N ANA Referidas (sem artigo)
+ok N/N ANA Essas
+ok N/N ANA Tais
+ok N/N ANA Aquelas
+ok N/N ANA Estas
+ok N/N ANA Ditas
+ok P/P ANA Tais + self-ref
+ok N/N RES "do aludido"
+ok N/N RES "dela constantes"
+ok N/N RES "naquela IN"
+ok N/N RES "descritas" (particípio fora da lista)
+ok N/N RES "dispostas" + "no mesmo"
+ok N/N RES "estipuladas na IN retro"
+ok N/N RES "dessa IN"
+ok N/N RES "na sobredita norma"
+ok N/N RES "anteriormente citada"
+ok P/P SELF "neste ato normativo"
+ok P/P SELF "desta IN"
+ok P/P SELF "da presente Instrução Normativa"
+ok P/P SELF "deste diploma"
+ok N/N SELF ambíguo "nesta" + outra IN
+ok N/N SELF falso "nesta data"
+ok N/N SELF falso "nesta Portaria" sobre outra
+ok N/N ABBR "SRF." oculta citação
+ok N/N ABBR "inc." minúsculo
+ok N/N ABBR "IN" sozinha antes do ponto
+ok P/P ABBR "RFB." fim real (próprio)
+ok N/N ABBR "Est." Title (merge)
+ok N/N ABBR "ICMS." fim + ANA "Os mesmos"
+ok N/N ABBR "D.O.U." pontos
+ok P/P CTL próprio sem citação
+ok P/P CTL fundamento sem marcador
+divergências 0 / 34

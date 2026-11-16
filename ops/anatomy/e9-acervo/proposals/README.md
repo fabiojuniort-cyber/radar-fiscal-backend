@@ -681,3 +681,63 @@ Os testes R11 rodados no motor A r10 dão 3 falhas, só nos 3 testes novos.
 - 13 dos 34 casos do revisor: a fixture não foi publicada.
 - PG18.
 - CI integral.
+
+## A r12 (2026-11-16): vocabulário único de marcas de retomada (nada integrado, nada registrado)
+
+**Escrita:** só a sessão EXEC `session_01DdUtZuqDfYz8XXwX5uLtJe`.
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r12.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `0d40bd06dfc389aeee9dc2f1b2afcd549ad8d6b4cb63a0dc86bfd2c0ae9d7090`
+
+### Regra
+
+As regras `FOREIGN_ORIGIN` (frase cita norma) e `RESUMPTION` (frase sem citação) passam a usar **uma só lista** de marcas (`RESUMPTION_MARKERS`).
+
+Marcas acrescentadas:
+- `sobredit-`, que faltava em `FOREIGN_ORIGIN`;
+- `susodit-`, também nas aberturas de frase;
+- `em tela`;
+- `em comento`;
+- "anterior(es)" quando qualifica ato, norma ou diploma (ato, norma, diploma, Portaria, IN, Lei, Decreto, Resolução etc.). "Exercício anterior" e "mês anterior" não contam.
+
+### Fixtures
+
+- **Os 34 casos do revisor:** copiados literalmente da c.6930068067.
+- **Regra geral:** 160 casos, reconstruídos a partir da descrição publicada. O `g.mts` com os 153 casos originais não foi publicado, então a equivalência com ele é **NOT_PROVEN**.
+
+### Resultados
+
+| Verificação | A r11 | A r12 |
+|---|---|---|
+| 34 casos do revisor | 1 | **0** |
+| 160 casos da regra geral | 45 | **0** |
+| Casos dirigidos | 253/285 | **285/285** |
+| Adversariais | 0/85 | 0/85 |
+
+**A r12 isolado:**
+- motor `4aea8f946772794f05511b0338792b39f1d7a5c8f7bce45110041432d7d5ab3d`;
+- `tsc` limpo; `test:anatomy` 302/302;
+- PG16 com a trava versionada do próprio patch (`4aea8f94`): **12/12**;
+- lote oficial: 7/7 atos idênticos.
+
+**Composição:**
+- motor `22c6d1f08024cbe65c0a74613ef0bac97481aa1f55c55503f703d8d146d42c22`;
+- testes: 419 rodados, 415 pass e 4 fail (#153, #167, #170, #174), só por identidade;
+- PG16: 7/12 com a trava do #303; 12/12 com trava diagnóstica descartável;
+- ADE Cofis: 26/26 ponteiros, `legalStatus` `unknown`;
+- aceites byte-idênticos à base independente, 13 registros.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r12.json`, SHA-256 `38f7276af515c21f06fb1d5b5a7bf1312cd1731b455419fb5c23b4bcfa585886`
+- **Resultado:** **EQUIVALENT** entre `0e009431` e `22c6d1f0`, 136/136 partes.
+- **`entrySha256` candidato:** `1f1e593c0a1cbbdfa92756bdefe68d01ad1ddcc0987a12ce66b45fc42697058e`, só no relatório, **não registrado**.
+
+### Falsos negativos conservadores
+
+Casos que deixam de promover conteúdo próprio, todos P3:
+- R11-1 e R11-2, já registrados;
+- R12-1, novo: "em tela única".

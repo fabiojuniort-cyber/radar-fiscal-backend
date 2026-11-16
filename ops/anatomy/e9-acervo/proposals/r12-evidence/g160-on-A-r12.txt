@@ -1,0 +1,161 @@
+ok N/N SRF. | ali | início
+ok N/N SRF. | ali | meio
+ok N/N SRF. | nela | início
+ok N/N SRF. | nela | meio
+ok N/N SRF. | lá | início
+ok N/N SRF. | lá | meio
+ok N/N SRF. | supracitado | início
+ok N/N SRF. | supracitado | meio
+ok N/N SRF. | referido | início
+ok N/N SRF. | referido | meio
+ok N/N SRF. | seu Anexo | início
+ok N/N SRF. | seu Anexo | meio
+ok N/N SRF. | precitada | início
+ok N/N SRF. | precitada | meio
+ok N/N SRF. | retrocitada | início
+ok N/N SRF. | retrocitada | meio
+ok N/N SRF. | sobredita | início
+ok N/N SRF. | sobredita | meio
+ok N/N SRF. | em tela | início
+ok N/N SRF. | em tela | meio
+ok N/N SRF. | em comento | início
+ok N/N SRF. | em comento | meio
+ok N/N SRF. | susodito | início
+ok N/N SRF. | susodito | meio
+ok N/N SRF. | ato anterior | início
+ok N/N SRF. | ato anterior | meio
+ok N/N RFB. | ali | início
+ok N/N RFB. | ali | meio
+ok N/N RFB. | nela | início
+ok N/N RFB. | nela | meio
+ok N/N RFB. | lá | início
+ok N/N RFB. | lá | meio
+ok N/N RFB. | supracitado | início
+ok N/N RFB. | supracitado | meio
+ok N/N RFB. | referido | início
+ok N/N RFB. | referido | meio
+ok N/N RFB. | seu Anexo | início
+ok N/N RFB. | seu Anexo | meio
+ok N/N RFB. | precitada | início
+ok N/N RFB. | precitada | meio
+ok N/N RFB. | retrocitada | início
+ok N/N RFB. | retrocitada | meio
+ok N/N RFB. | sobredita | início
+ok N/N RFB. | sobredita | meio
+ok N/N RFB. | em tela | início
+ok N/N RFB. | em tela | meio
+ok N/N RFB. | em comento | início
+ok N/N RFB. | em comento | meio
+ok N/N RFB. | susodito | início
+ok N/N RFB. | susodito | meio
+ok N/N RFB. | ato anterior | início
+ok N/N RFB. | ato anterior | meio
+ok N/N IN. | ali | início
+ok N/N IN. | ali | meio
+ok N/N IN. | nela | início
+ok N/N IN. | nela | meio
+ok N/N IN. | lá | início
+ok N/N IN. | lá | meio
+ok N/N IN. | supracitado | início
+ok N/N IN. | supracitado | meio
+ok N/N IN. | referido | início
+ok N/N IN. | referido | meio
+ok N/N IN. | seu Anexo | início
+ok N/N IN. | seu Anexo | meio
+ok N/N IN. | precitada | início
+ok N/N IN. | precitada | meio
+ok N/N IN. | retrocitada | início
+ok N/N IN. | retrocitada | meio
+ok N/N IN. | sobredita | início
+ok N/N IN. | sobredita | meio
+ok N/N IN. | em tela | início
+ok N/N IN. | em tela | meio
+ok N/N IN. | em comento | início
+ok N/N IN. | em comento | meio
+ok N/N IN. | susodito | início
+ok N/N IN. | susodito | meio
+ok N/N IN. | ato anterior | início
+ok N/N IN. | ato anterior | meio
+ok N/N ponto comum | ali | início
+ok N/N ponto comum | ali | meio
+ok N/N ponto comum | nela | início
+ok N/N ponto comum | nela | meio
+ok N/N ponto comum | lá | início
+ok N/N ponto comum | lá | meio
+ok N/N ponto comum | supracitado | início
+ok N/N ponto comum | supracitado | meio
+ok N/N ponto comum | referido | início
+ok N/N ponto comum | referido | meio
+ok N/N ponto comum | seu Anexo | início
+ok N/N ponto comum | seu Anexo | meio
+ok N/N ponto comum | precitada | início
+ok N/N ponto comum | precitada | meio
+ok N/N ponto comum | retrocitada | início
+ok N/N ponto comum | retrocitada | meio
+ok N/N ponto comum | sobredita | início
+ok N/N ponto comum | sobredita | meio
+ok N/N ponto comum | em tela | início
+ok N/N ponto comum | em tela | meio
+ok N/N ponto comum | em comento | início
+ok N/N ponto comum | em comento | meio
+ok N/N ponto comum | susodito | início
+ok N/N ponto comum | susodito | meio
+ok N/N ponto comum | ato anterior | início
+ok N/N ponto comum | ato anterior | meio
+ok N/N PGFN. | ali | início
+ok N/N PGFN. | ali | meio
+ok N/N PGFN. | nela | início
+ok N/N PGFN. | nela | meio
+ok N/N PGFN. | lá | início
+ok N/N PGFN. | lá | meio
+ok N/N PGFN. | supracitado | início
+ok N/N PGFN. | supracitado | meio
+ok N/N PGFN. | referido | início
+ok N/N PGFN. | referido | meio
+ok N/N PGFN. | seu Anexo | início
+ok N/N PGFN. | seu Anexo | meio
+ok N/N PGFN. | precitada | início
+ok N/N PGFN. | precitada | meio
+ok N/N PGFN. | retrocitada | início
+ok N/N PGFN. | retrocitada | meio
+ok N/N PGFN. | sobredita | início
+ok N/N PGFN. | sobredita | meio
+ok N/N PGFN. | em tela | início
+ok N/N PGFN. | em tela | meio
+ok N/N PGFN. | em comento | início
+ok N/N PGFN. | em comento | meio
+ok N/N PGFN. | susodito | início
+ok N/N PGFN. | susodito | meio
+ok N/N PGFN. | ato anterior | início
+ok N/N PGFN. | ato anterior | meio
+ok N/N mesma frase | ali
+ok N/N mesma frase | nela
+ok N/N mesma frase | lá
+ok N/N mesma frase | supracitado
+ok N/N mesma frase | referido
+ok N/N mesma frase | seu Anexo
+ok N/N mesma frase | precitada
+ok N/N mesma frase | retrocitada
+ok N/N mesma frase | sobredita
+ok N/N mesma frase | em tela
+ok N/N mesma frase | em comento
+ok N/N mesma frase | susodito
+ok N/N mesma frase | ato anterior
+ok P/P SRF. | CTL próprio
+ok P/P SRF. | CTL nesta Portaria
+ok P/P SRF. | CTL neste diploma
+ok P/P RFB. | CTL próprio
+ok P/P RFB. | CTL nesta Portaria
+ok P/P RFB. | CTL neste diploma
+ok P/P IN. | CTL próprio
+ok P/P IN. | CTL nesta Portaria
+ok P/P IN. | CTL neste diploma
+ok P/P ponto comum | CTL próprio
+ok P/P ponto comum | CTL nesta Portaria
+ok P/P ponto comum | CTL neste diploma
+ok P/P PGFN. | CTL próprio
+ok P/P PGFN. | CTL nesta Portaria
+ok P/P PGFN. | CTL neste diploma
+ok P/P CTL "anterior" sem ato/norma (data)
+ok P/P CTL "em tela" ausente
+divergências 0 / 160
