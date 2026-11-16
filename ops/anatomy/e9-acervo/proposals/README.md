@@ -605,3 +605,79 @@ Os 131 anteriores ficam idênticos (131/131). Os testes R10 passam de 0/2 para 2
   - `outputHash` neutralizado: `60285e2c…` nos dois.
 - **`entrySha256` candidato:** `6c22d5a1b711f46c900b6010970cfa3c1830c193372ec69fc4c2494893061cde` (0 ocorrências no arquivo de aceites).
 - **Veredito:** **EQUIVALENT**. Substitui a prova da R9. **Nada foi registrado.**
+
+## A r11 (2026-11-16): R10-RES — retomada sem antecedente próprio (nada integrado, nada registrado)
+
+**Escrita:** só a sessão EXEC `session_01DdUtZuqDfYz8XXwX5uLtJe`. A autoria do A r10 continua `NOT_PROVEN` (#116 c.6923275288).
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r11.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `30db425b0bd35299c0f3d87b573e8a3902942f474d95f8ea8d6b4e303ce45436`
+
+### Regras
+
+**Retomada sem antecedente próprio.** Quando a frase não cita norma própria e contém uma retomada (anafórica, locativa, possessiva ou explícita), a referência fica **não resolvida**. A regra vale em qualquer posição da frase e também depois de verbo constitutivo, analisada sem esse verbo e sem as autorreferências.
+- São retomadas: `ali`, `lá`, `acima`, `supra-`, `retro-`, `precitad-`, `aludid-`, `sobredit-`, `dito/dita` como determinante, `em referência`, `referid-`, `mencionad-`, `citad-`, `nel-/del-`, `naquel-/daquel-`, `ness-/dess-`, `seu/sua`, `tal/tais` e `mesm-`.
+- Particípios sozinhos ("previstas", "fixadas") não contam como retomada nesta regra.
+- Quando a frase cita uma norma, vale a lógica R9/R10.
+
+**Aberturas de frase.** Passam a contar `Estes`, `Estas`, `Os/As demais`, `Ditos`, `Ditas`, `As ditas` e `Sobredit-`.
+
+**Autorreferência.** `diploma` vira autorreferência: "neste/deste/do presente diploma" designa o próprio ato.
+
+**Fronteiras de frase.** "SRF.", "RFB." e "IN." continuam sendo fronteiras reais. Esses casos são resolvidos pela regra da retomada.
+
+**Exceção mantida.** Uma frase que **abre** com retomada e traz autorreferência expressa ("Os mesmos valores previstos nesta Portaria") mantém o resultado da R10.
+
+### Contraprova
+
+| Conjunto | A r10 | A r11 |
+|---|---|---|
+| Casos dirigidos | 222/243 (as 21 falhas são todas casos R11) | 243/243 |
+| Adversariais do EXEC | 0/85 | 0/85 |
+| Reconstrução do revisor | 11/21 divergentes | 0/21 |
+
+Os testes R11 rodados no motor A r10 dão 3 falhas, só nos 3 testes novos.
+
+### A r11 isolado
+
+- **Motor:** `66bf03913894097ba54230578efcc25ad2421edd45220a139a8b3f9e51e79711`
+- **Checagens:** `tsc` limpo; `test:anatomy` 299/299.
+- **PG16 com a trava versionada do próprio patch** (`66bf0391`): **12/12**.
+- **Lote oficial:** 7 atos, 0 diferenças.
+
+### Composição
+
+- **Montagem:** #303 + #300 + A r11 + B r7.
+- **Motor:** `2ce68110b0499d8ec2da72e430a60857cf65a27c74cc499f9f0b139af1a68a85`
+- **`test:anatomy`:** 416 testes, 412 pass e 4 fail. As 4 falhas (#153, #167, #170, #174) vêm só da identidade.
+- **PG16:**
+  - com a trava versionada do #303: 7/12;
+  - com uma trava diagnóstica descartável `2ce68110`: 12/12.
+- **ADE Cofis:** 26/26 ponteiros, `operative_candidate`, `legalStatus` `unknown`.
+- **`e9-acceptances.json`:** byte-idêntico à base independente #303 `6b12ac64` + B r7, com 13 registros.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r11.json`, SHA-256 `7054c32c07bf4e168cbe63fb427f767f43a47158d706b3ccce0ab8944a670843`.
+- **Comparação:** `0e009431` × `2ce68110`.
+- **Resultado:**
+  - 136/136 partes iguais;
+  - `differingFields` vazio;
+  - `identity.differingKeys` = `["engineHash"]`;
+  - `outputHash` neutralizado `60285e2c…` nos dois.
+- **Veredito:** EQUIVALENT.
+- **`entrySha256` candidato:** `7cbbd94b99c12b25b048a73ed3705c15aee39aad0692a7995493dc1a35d5192c`. Aparece 0 vezes nos aceites; **não registrado**.
+
+### Riscos novos (P3, conservadores)
+
+- **R11-1:** "mencionadas nesta Portaria", depois de outra frase, não promove (falso negativo).
+- **R11-2:** um possessivo que remete ao próprio objeto ("seus campos") não promove.
+
+### NOT_PROVEN
+
+- 13 dos 34 casos do revisor: a fixture não foi publicada.
+- PG18.
+- CI integral.

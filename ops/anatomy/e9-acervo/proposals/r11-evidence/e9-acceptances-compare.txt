@@ -1,0 +1,7 @@
+cmp: identical
+4e0fccfca463f0c4c9a8732d024795613b65d284937f45b31c01543d6984dbb7  w303b/docs/anatomy/e9-acceptances.json
+4e0fccfca463f0c4c9a8732d024795613b65d284937f45b31c01543d6984dbb7  wcomp11/docs/anatomy/e9-acceptances.json
+13
+13
+grep -c candidate in w303b/docs/anatomy/e9-acceptances.json: 0
+grep -c candidate in wcomp11/docs/anatomy/e9-acceptances.json: 0
