@@ -741,3 +741,70 @@ Marcas acrescentadas:
 Casos que deixam de promover conteúdo próprio, todos P3:
 - R11-1 e R11-2, já registrados;
 - R12-1, novo: "em tela única".
+
+## A r13 (2026-11-17): fechar a origem externa — multicitado, em epígrafe, em questão, em causa (nada integrado, nada registrado)
+
+### Patch
+
+- **Arquivo:** `proposal-300-type5-express-ref-r13.patch`
+- **Base:** #300 @ `22e8cc48`
+- **SHA-256:** `31c035044838ac2c8959df9aa9b840bb9087445bea4e445a10339749696dfe5f`
+
+### Mudança
+
+O vocabulário único `RESUMPTION_MARKERS` passa a incluir:
+
+- `multicitad-`
+- `em epígrafe`
+- `em questão`
+- `em causa`
+
+Os acentos `í` e `ã` são opcionais e a comparação ignora maiúsculas e minúsculas. As palavras soltas "epígrafe", "questão" e "causa", sem o "em", continuam fora da lista.
+
+### Resultados
+
+| Verificação | A r12 | A r13 |
+|---|---|---|
+| Sinônimos (46 casos) | 40 | 0 |
+| `g.mts` original | 11 | 11 |
+| 34 casos originais | 0 | 0 |
+| r12 reconstruído | 6 | 2 |
+| Casos dirigidos | 290/306 | 306/306 |
+| Adversariais | 0/85 | 0/85 |
+
+- No `g.mts`, as 11 divergências restantes são só falsos negativos (FN) conservadores.
+- No r12 reconstruído, as 2 restantes são o R12-1, também FN conservador.
+
+**A r13 isolado**
+
+- **Motor:** `8debb5781156c772f4481e86ed5214283ddf1baa9dda98ed9ff74490e322174f`
+- **Checagens:** `tsc` limpo; `test:anatomy` 303/303.
+- **PG16 com o pin versionado do próprio patch:** 12/12.
+- **Lote oficial:** 7/7 atos idênticos.
+
+**Composição**
+
+- **Motor:** `4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a`
+- **Testes:** 420 testes, 416 passam e 4 falham. As falhas (#153, #167, #170, #174) são só de identidade.
+- **PG16 com a trava do #303:** 7/12. Com uma trava diagnóstica descartável, 12/12.
+- **ADE Cofis:** 26/26 ponteiros, `legalStatus` `unknown`.
+- **Aceites:** byte-idênticos à base independente, 13 registros.
+
+### Portaria 635
+
+- **Arquivo:** `portaria635-equivalence-r13.json`, SHA-256 `dda4a66ce6529d951f6c7af3c77f23eaf5909d296e4014896458ee62e8cc2658`.
+- **Resultado:** EQUIVALENT em 136/136 partes.
+- **`entrySha256` candidato:** `2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996`. Fica só no relatório; **não foi registrado**.
+
+### Riscos
+
+**FN novo (P3, conservador)**
+
+- **R13-1:** "em questão" e "em causa" usados em sentido próprio ("matéria em questão", "bens em causa") deixam de promover.
+
+**NOT_PROVEN**
+
+- `rev.mts`: byte-identidade do arquivo.
+- `r12.mts`: original de 73 casos.
+- PG18.
+- CI integral.

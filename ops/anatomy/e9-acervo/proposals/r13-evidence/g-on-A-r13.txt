@@ -1,0 +1,154 @@
+ok N/N SRF. meio ali
+ok N/N SRF. início ali
+ok N/N SRF. meio nela
+ok N/N SRF. início nela
+ok N/N SRF. meio lá
+ok N/N SRF. início lá
+ok N/N SRF. meio supracitado
+ok N/N SRF. início supracitado
+ok N/N SRF. meio referido
+ok N/N SRF. início referido
+ok N/N SRF. meio seu Anexo
+ok N/N SRF. início seu Anexo
+ok N/N SRF. meio sobredita
+ok N/N SRF. início sobredita
+ok N/N SRF. meio precitada
+ok N/N SRF. início precitada
+ok N/N SRF. meio retrocitada
+ok N/N SRF. início retrocitada
+ok N/N SRF. meio em tela
+ok N/N SRF. início em tela
+ok N/N SRF. meio em comento
+ok N/N SRF. início em comento
+ok N/N SRF. meio susodito
+ok N/N SRF. início susodito
+ok N/N SRF. meio anterior
+ok N/N SRF. início anterior
+ok N/N RFB. meio ali
+ok N/N RFB. início ali
+ok N/N RFB. meio nela
+ok N/N RFB. início nela
+ok N/N RFB. meio lá
+ok N/N RFB. início lá
+ok N/N RFB. meio supracitado
+ok N/N RFB. início supracitado
+ok N/N RFB. meio referido
+ok N/N RFB. início referido
+ok N/N RFB. meio seu Anexo
+ok N/N RFB. início seu Anexo
+ok N/N RFB. meio sobredita
+ok N/N RFB. início sobredita
+ok N/N RFB. meio precitada
+ok N/N RFB. início precitada
+ok N/N RFB. meio retrocitada
+ok N/N RFB. início retrocitada
+ok N/N RFB. meio em tela
+ok N/N RFB. início em tela
+ok N/N RFB. meio em comento
+ok N/N RFB. início em comento
+ok N/N RFB. meio susodito
+ok N/N RFB. início susodito
+ok N/N RFB. meio anterior
+ok N/N RFB. início anterior
+ok N/N IN. meio ali
+ok N/N IN. início ali
+ok N/N IN. meio nela
+ok N/N IN. início nela
+ok N/N IN. meio lá
+ok N/N IN. início lá
+ok N/N IN. meio supracitado
+ok N/N IN. início supracitado
+ok N/N IN. meio referido
+ok N/N IN. início referido
+ok N/N IN. meio seu Anexo
+ok N/N IN. início seu Anexo
+ok N/N IN. meio sobredita
+ok N/N IN. início sobredita
+ok N/N IN. meio precitada
+ok N/N IN. início precitada
+ok N/N IN. meio retrocitada
+ok N/N IN. início retrocitada
+ok N/N IN. meio em tela
+ok N/N IN. início em tela
+ok N/N IN. meio em comento
+ok N/N IN. início em comento
+ok N/N IN. meio susodito
+ok N/N IN. início susodito
+ok N/N IN. meio anterior
+ok N/N IN. início anterior
+ok N/N ponto meio ali
+ok N/N ponto início ali
+ok N/N ponto meio nela
+ok N/N ponto início nela
+ok N/N ponto meio lá
+ok N/N ponto início lá
+ok N/N ponto meio supracitado
+ok N/N ponto início supracitado
+ok N/N ponto meio referido
+ok N/N ponto início referido
+ok N/N ponto meio seu Anexo
+ok N/N ponto início seu Anexo
+ok N/N ponto meio sobredita
+ok N/N ponto início sobredita
+ok N/N ponto meio precitada
+ok N/N ponto início precitada
+ok N/N ponto meio retrocitada
+ok N/N ponto início retrocitada
+ok N/N ponto meio em tela
+ok N/N ponto início em tela
+ok N/N ponto meio em comento
+ok N/N ponto início em comento
+ok N/N ponto meio susodito
+ok N/N ponto início susodito
+ok N/N ponto meio anterior
+ok N/N ponto início anterior
+ok N/N PGFN. meio ali
+ok N/N PGFN. início ali
+ok N/N PGFN. meio nela
+ok N/N PGFN. início nela
+ok N/N PGFN. meio lá
+ok N/N PGFN. início lá
+ok N/N PGFN. meio supracitado
+ok N/N PGFN. início supracitado
+ok N/N PGFN. meio referido
+ok N/N PGFN. início referido
+ok N/N PGFN. meio seu Anexo
+ok N/N PGFN. início seu Anexo
+ok N/N PGFN. meio sobredita
+ok N/N PGFN. início sobredita
+ok N/N PGFN. meio precitada
+ok N/N PGFN. início precitada
+ok N/N PGFN. meio retrocitada
+ok N/N PGFN. início retrocitada
+ok N/N PGFN. meio em tela
+ok N/N PGFN. início em tela
+ok N/N PGFN. meio em comento
+ok N/N PGFN. início em comento
+ok N/N PGFN. meio susodito
+ok N/N PGFN. início susodito
+ok N/N PGFN. meio anterior
+ok N/N PGFN. início anterior
+ok P/P SRF. CTL próprio
+ok P/P SRF. CTL nesta Portaria
+DIV P/N SRF. R11-1 mencionadas nesta Portaria
+DIV P/N SRF. R11-2 seus campos
+ok P/P RFB. CTL próprio
+ok P/P RFB. CTL nesta Portaria
+DIV P/N RFB. R11-1 mencionadas nesta Portaria
+DIV P/N RFB. R11-2 seus campos
+ok P/P IN. CTL próprio
+ok P/P IN. CTL nesta Portaria
+DIV P/N IN. R11-1 mencionadas nesta Portaria
+DIV P/N IN. R11-2 seus campos
+ok P/P ponto CTL próprio
+ok P/P ponto CTL nesta Portaria
+DIV P/N ponto R11-1 mencionadas nesta Portaria
+DIV P/N ponto R11-2 seus campos
+ok P/P PGFN. CTL próprio
+ok P/P PGFN. CTL nesta Portaria
+DIV P/N PGFN. R11-1 mencionadas nesta Portaria
+DIV P/N PGFN. R11-2 seus campos
+DIV P/N CTL sem frase anterior, seus campos
+ok P/P CTL "ficam aprovadas, nesta data, as alíquotas de referência"
+ok P/P ANA Os demais + self
+divergências 11 / 153; legalStatus unknown
