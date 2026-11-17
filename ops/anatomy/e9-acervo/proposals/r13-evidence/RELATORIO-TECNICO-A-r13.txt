@@ -1,0 +1,177 @@
+RELATÓRIO TÉCNICO — FRENTE 1 | ANAT/E9 P2-c | A r13 — fechar a origem externa
+================================================================================
+
+Data: 2026-11-17
+Responsável pela escrita no #308: sessão EXEC session_01DdUtZuqDfYz8XXwX5uLtJe (único escritor)
+Governança: tribusca-control#116
+Mandato: COORD → EXEC "A r13 | Fechar origem externa"
+Parecer de partida: c.6933422896 (A r12 PASS, com lacuna lexical P3)
+Fixtures de partida: c.6933415580 e c.6930068067
+
+1. IDENTIDADE
+-------------
+PR: fabiojuniort-cyber/radar-fiscal-backend#308 (draft; DRAFT_FAST_ONLY preservado)
+Baseline (A r12): 55ba1781fbc4b8a78146ac60b07f0cf9929f9068
+Commit de evidências do A r13: b07275ea45aa9b4c53ce20941efd03de49257cb4
+HEAD final: o commit seguinte, que só acrescenta este relatório e o prompt de retorno.
+  O SHA dele está na conclusão publicada na Issue #116.
+Patch: ops/anatomy/e9-acervo/proposals/proposal-300-type5-express-ref-r13.patch
+  base #300 @ 22e8cc480181bc11bd6e71c38647dad12aa73af0
+  SHA-256 31c035044838ac2c8959df9aa9b840bb9087445bea4e445a10339749696dfe5f
+Motor A r13 isolado: 8debb5781156c772f4481e86ed5214283ddf1baa9dda98ed9ff74490e322174f
+Motor da composição: 4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a
+Evidências: ops/anatomy/e9-acervo/proposals/r13-evidence/ (README.txt descreve cada arquivo)
+
+2. OBJETIVO E DIAGNÓSTICO
+-------------------------
+Problema: o A r12 promovia a operative_candidate o conteúdo de outra norma quando a retomada
+usava "multicitado", "em epígrafe", "em questão" ou "em causa". Esses termos não estavam no
+vocabulário de retomada.
+Efeito: conteúdo externo atribuído ao próprio ato. O legalStatus permaneceu unknown em todos
+os casos.
+
+Reprodução no A r12 (fixture nova r13-synonyms-46.mts):
+- 8 formas: multicitado, multicitada, em epígrafe, "em epigrafe", em questão, "em questao",
+  em causa, "Em Epígrafe";
+- cada forma em 5 posições: citação no meio da frase, citação no início, sem citação após
+  ponto comum, sem citação após "SRF.", sem nenhuma citação;
+- resultado: 40 de 40 promoções indevidas;
+- os 6 controles de conteúdo próprio passaram.
+
+3. CORREÇÃO
+-----------
+Mudança: o vocabulário único RESUMPTION_MARKERS (R12) ganhou quatro termos:
+    multicitad[oa]s?
+    em\s+ep[íi]grafe
+    em\s+quest[ãa]o
+    em\s+causa
+A comparação ignora caixa (flag iu). Os acentos í e ã são opcionais.
+
+O vocabulário é compartilhado por duas regras:
+- FOREIGN_ORIGIN, quando a frase cita uma norma;
+- RESUMPTION, quando a frase não cita norma: a referência fica sem resolução e não promove.
+
+Não foram incluídas as palavras soltas "epígrafe", "questão" e "causa".
+Não mudaram: fronteiras de frase e de dispositivo, SELF_*, CONSTITUTIVE e demais regras.
+
+Teste de regressão: "R13 synonyms of the resumption vocabulary".
+- 16 negativos: 4 termos × citação no meio, citação no início, após ponto comum, sem citação.
+- 5 positivos: conteúdo próprio, fundamento próprio, "epígrafe desta Portaria",
+  "questão tarifária" e "por causa da".
+Nenhum teste anterior foi alterado.
+
+4. RESULTADOS — A r13 ISOLADO (#300 @ 22e8cc48 + patch)
+-------------------------------------------------------
+Fixture                                    A r12       A r13
+r13-synonyms (46, nova)                    40/46       0/46
+g.mts original (153; SHA bafb3153… = original)
+                                           11/153      11/153  (só FN conservadores já
+                                                                declarados: R11-1 ×5, R11-2 ×6)
+34 casos originais do revisor              0/34        0/34
+r12 reconstruída (65)                      6/65        2/65    (só o R12-1, FN conservador)
+Casos dirigidos (r7-cases)                 290/306     306/306
+Adversariais do EXEC                       0/85        0/85
+Teste R13 no motor A r12                   falha (1 de 44)   —
+tsc                                        —           limpo
+test:anatomy                               —           303/303
+PG16 :5432, pin versionado do próprio patch (8debb578)
+                                           —           12/12
+Lote oficial (7 atos)                      —           0 diferenças semânticas
+
+Valores lidos como divergências.
+
+5. RESULTADOS — COMPOSIÇÃO DESCARTÁVEL (#303 46afdaf1 + #300 + A r13 + B r7)
+----------------------------------------------------------------------------
+Receita: proposals/README.md, seção R6.
+Ordem de regeneração: identidade → lote → matriz.
+O src da composição é byte-idêntico ao do A r13 isolado.
+
+Testes
+- tsc: limpo.
+- test:anatomy: 420 testes, 416 pass e 4 fail.
+- As 4 falhas são as já conhecidas de identidade:
+  - #153, #170 e #174 recebem [] e esperam ['rfb:148693'];
+  - #167 tem no registro engineBuildHash 0e009431; o motor é 4b96f977.
+- Nenhuma falha nova.
+
+PG16
+- Pin versionado do #303 (0e009431): 7/12. O subteste 5 falha pela trava; os subtestes 6–8
+  falham em cascata; o teste-pai 3 falha por agregação.
+- Cópia descartável com pin 4b96f977: 12/12. Vale apenas como diagnóstico.
+
+Corpus
+- Lote: os 7 atos oficiais estão presentes.
+- ADE Cofis (rfb:148629): read, 9 linhas, 16 células, 26/26 ponteiros, f857a997…,
+  operative_candidate, legalStatus unknown.
+
+Aceites
+- Base independente: #303 6b12ac64 + B r7, motor 0e009431.
+- cmp com a composição: IDÊNTICO. SHA-256 4e0fccfc… nos dois. 13 = 13 registros.
+
+Portaria 635 (portaria635-equivalence-r13.json,
+SHA-256 dda4a66ce6529d951f6c7af3c77f23eaf5909d296e4014896458ee62e8cc2658)
+- Motores comparados: 0e009431 × 4b96f977.
+- Bytes e HTML iguais; 136/136 partes (6193225c…); differingFields vazio.
+- identity: só engineHash difere.
+- outputHash neutralizado 60285e2c… nos dois.
+- Veredito: EQUIVALENT.
+- entrySha256 proposto: 2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996.
+  Aparece só no relatório (0 ocorrências nos aceites). NÃO REGISTRADO.
+
+6. RISCOS RESIDUAIS
+-------------------
+R13-1 (P3, novo, conservador)
+  "em questão" e "em causa" usados em sentido próprio, como "matéria em questão" ou
+  "bens em causa", deixam de promover. É falso negativo. No A r12 esses casos davam P.
+R12-1 (P3, conservador)
+  "em tela" no sentido de interface ("tela única", "exibidos em tela").
+R11-1 e R11-2 (P3, conservadores)
+  "mencionadas nesta Portaria" após outra frase; possessivo "seus campos".
+Lista fechada (P3)
+  Sinônimos ainda não listados podem promover. A lista é por natureza não exaustiva.
+
+7. NOT_PROVEN
+-------------
+- rev.mts do revisor (b2aec2b2…): o laço de saída não foi publicado. Os 34 casos são
+  literais; o arquivo não é byte-idêntico.
+- r12.mts do revisor (73 casos, 4523a4f1…): não publicado. Uma reconstrução de 65 casos foi
+  usada no lugar.
+- PG18: não executado.
+- CI integral: draft em DRAFT_FAST_ONLY; o CI não foi rerodado.
+- Regressão completa do repositório: não executada.
+
+8. LIMITES RESPEITADOS
+----------------------
+- Pins da composição: intactos (#303 continua 0e009431).
+- Portaria 635: nenhum registro de aceite.
+- Draft mantido; nenhum rerun; nenhum merge ou deploy.
+- PRs #300, #303 e #310: intocados.
+- PG16 só em diretórios /var/tmp exclusivos, removidos ao fim.
+
+9. EXECUÇÃO E DELEGAÇÕES
+------------------------
+Sub-agentes (Sonnet, esforço médio):
+- 1: implementação e teste, sob especificação do EXEC;
+- 1: validação isolada;
+- 1: composição e corpus.
+EXEC:
+- especificação jurídica;
+- reconstrução das fixtures (o g.mts byte-idêntico; r12 e r13 novas);
+- os dois PG16 na porta 5432;
+- conferência direta do diff, dos números e dos aceites;
+- escrita no #308 e na #116.
+
+10. PROGRESSO
+-------------
+Mandato: 0% → 20% → 40% → 100%, por atividades concluídas:
+  1. reprodução;
+  2. correção e testes;
+  3. reexecução das fixtures e suítes;
+  4. composição;
+  5. entrega.
+F1 oficial: 50,2% → 50,2% (+0,0 p.p.).
+
+11. PRÓXIMO GATE
+----------------
+Revisão independente do HEAD final, focada no delta do A r13.
+A revisão deve ser feita por uma sessão que não participou das revisões A r5–A r13.
