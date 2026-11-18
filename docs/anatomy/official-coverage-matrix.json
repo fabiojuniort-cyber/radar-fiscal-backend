@@ -35,12 +35,13 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "7335c6f901b1e4abb6a947ea157a8e9c4de8fb943c03617a72f4a98867db9985",
+      "outputHash": "6a89b040df113d0ba55dca792fdd6159131fe4dda63903b1a9f13df4050168a4",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "rfb:115131",
@@ -60,12 +61,13 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "e2dd7b3649e6bc41fdaabe44c2ae23affac579842268f32cc368c4e2f8f5cfce",
+      "outputHash": "eafc0e6099a5297089bf872a48f5484e2567e75723f50cb15032c797581d3f19",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "rfb:127905",
@@ -85,12 +87,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "7b5a0988230bba234e67a5402fd89ea4db37a8661ed336d5efe7a33b80e98b92",
+      "outputHash": "072df832520c424baff8b36c27706897e9fad2a226790927748749e2dcf329d7",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 14 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content; own annex completeness: Anexo I: present, not read; Anexo II: present, not read; ambiguous annex mention without a label: association not provable; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VI: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VIII: present, not read; Anexo XXVI: present, not read; Anexo XXVII: present, not read; Anexo IX: present, not read; Anexo XXVIII: present, not read; Anexo XXIX: present, not read; ambiguous annex mention without a label: association not provable; Anexo X: present, not read; Anexo XII: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XIII: present, not read; Anexo XIV: present, not read; Anexo XV: present, not read; ambiguous annex mention without a label: association not provable; own annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XVI: present, not read; Anexo XVII: present, not read; Anexo XVIII: present, not read; Anexo XIX: present, not read; Anexo XX: present, not read; Anexo XXI: present, not read; Anexo XXIII: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXIV: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXV: present, not read; Anexo VII: present, not read; Anexo XI: present, not read; Anexo XXII: present, not read"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:133898",
@@ -110,12 +115,13 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "7a3d884e35e6c3538491075a8af6e198033d91455fc2af2b8298882ce3c7f378",
+      "outputHash": "6a09eb3e6a607c98de566da588dc44d3171ac96e6bca011319eba8487137214c",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "rfb:141910",
@@ -135,12 +141,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "81f16e2616d58b072fea9049a9a38798f7116a94fceafeb8e21a14beaace278b",
+      "outputHash": "fb822c6494cb018dfec5dfe8c328c5a5f5bf7005fce0d8e53a4dc76377c6f63b",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 11279 unidentified chars; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:104314",
@@ -160,12 +169,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "6db51507ec0976ca46f3190c232e0deeb557bcb1f9ed5f55659f75792d255c21",
+      "outputHash": "79ecd0a80d370a8abb01e5e4fedfd90b0a2693971c7b58b749fbd068bbb741fb",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 1819 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:116968",
@@ -185,12 +197,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "5e91eb5520b4de05ffddd5262cef636b05885c30d4989f82981695df2313ac0a",
+      "outputHash": "4da0129345ab36d1fddbe7ebb13614bd6e738771acadd90d59d451e882ee9172",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 103 unidentified chars; 35 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content; own annex completeness: ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo I: present, not read; Anexo II: present, not read; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; Anexo IX: present, not read; Anexo X: present, not read; Anexo XI: present, not read; Anexo XII (ambiguous) absent from the representation; Anexo VI: present, not read; Anexo VII: present, not read; Anexo VIII: present, not read; Anexo XIII (ambiguous) absent from the representation; Anexo XIV (ambiguous) absent from the representation; Anexo XV: present, not read; Anexo XVI (ambiguous) absent from the representation; Anexo XVII (ambiguous) absent from the representation; Anexo XVIII (ambiguous) absent from the representation; Anexo XIX (ambiguous) absent from the representation"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:122645",
@@ -210,12 +225,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "57d45f3914ec4e25654ed2f650158fa6a4d3c4f434bd37bffd3c526400a753a2",
+      "outputHash": "682cd98a357e730c27da5e59a8b327a69145b5dc1a037c39acffffb98382cc42",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 272 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:142967",
@@ -235,12 +253,13 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "fe2549edf073388484a3ab951cdbcfcf1b15950598537dcd9910eff840cdaed8",
+      "outputHash": "ad5fbe2b65a7307746330626b2e705ee8612d8b79499fc33d6ac59f57aa21433",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "rfb:148516",
@@ -260,12 +279,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "b1055aeab69f02597229700c054976dbe4daf4b704e77662a9098db1656468de",
+      "outputHash": "904e9567c56bd85cf99096d70ac45559b9045f57577a7f1fc815485d8a6416bc",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 262 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content; own annex completeness: Anexo Único (own) absent from the representation"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:148629",
@@ -285,37 +307,44 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "03981c4d4a59af2b61338928d1af28e35d91606bb4ac1fd14ae20e2def80470f",
+      "outputHash": "4e986af6cb55e1485216729d0b4dc6c99f325e93629fd87a7ae652e829d242a9",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 415 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:148681",
       "source": "RFB",
       "type": "Solução de Consulta",
       "layout": "JSON multivigente (API normasinternet2)",
-      "chars": 2182,
-      "size": "pequeno",
+      "chars": null,
+      "size": null,
       "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
       "bytes": 8185,
       "stages": {
         "captured": true,
         "identified": true,
         "read": true,
-        "validated": true,
+        "validated": false,
         "accepted": false
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "5bdd6991a4fcf19a9951242045c6c4fd2c0555b9edb23d218ddb0d8d7c6f4f94",
+      "outputHash": "de08121b3053dbd45da2d55bc78458cb94366788db3f0b17cfa3ad8ba5e702c3",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "body in an attachment absent from the representation: size UNDETERMINED, never covers a size cell",
+        "partial reading — never accepted as complete: 2 attachment(s) without content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "rfb:148693",
@@ -335,12 +364,13 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99",
+      "outputHash": "fce0294f4abc8963d1a88e7000d7bddb81d42d5ca32b1573a366f77b005187bb",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "rfb:37103",
@@ -360,12 +390,15 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "42ce7bbabf3378f4b2b9f263e6adabcd4e7ee3a577b02838e8d8ac08a3abcd10",
+      "outputHash": "16178793cc25b02306c51121556053049b2c4d3521ffaa90a790361c7567beee",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 31 unidentified chars; limitations rfb_segment_type_unmapped, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "ricms-an1art041",
@@ -385,7 +418,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "4573054c5d797c21467caf6a0323bf05c6c29de5b9df2821a45e5c3fc73fc067",
+      "outputHash": "a57e5360147e0b2fcf36221e96b0327fb58ed405022d1ab028d9fa15cacef4b8",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -410,7 +443,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "7a0be23deea5c7970d2f8b1923af759154caf19e13f1acd5ab1c93a2c9667d81",
+      "outputHash": "8bb61d2e29e4faa8be47c69b517647abad1afd20b75b3386e478560275afcc44",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -435,7 +468,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "46bd68cd34eeb877dae4c7fcb0b370cb6ffe1aa38ed174e020873288cc1fe77c",
+      "outputHash": "ecdeb3ccd41921f86faa04b1fc96c34d443a1a16f848431d1be52891bfde21fa",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -460,7 +493,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "e38b17934a429f37471a67aa97cbc4e8603fec74f4ef0db3737b2fd599ac5f56",
+      "outputHash": "4371746b7d0da505c1daba1c658cc77a17b99038b82e6b7432ee1c155687f95e",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -485,7 +518,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "7ec44bad10f8e276164c1f41958d914d0533252c31cd33b294881ba6ca666048",
+      "outputHash": "ff9bc4650f06698cab454d7a299044de13c6623fc0f028c8819a218f0c4badab",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -510,7 +543,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "a56d81d6675e4289656b5f178c783b965f9372e382639d4323ae7ea1a8fac661",
+      "outputHash": "19a6719af5301edf9f2e7a0b883c3eaa4b0c464e23725d65cd3d704fa31074af",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -643,7 +676,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "07753ae881c7450e18ef65f873a29abdbecc6890b1a6648b86b13cbf9e4df0a6",
+      "outputHash": "bc3c95de928672dabb980bb9dcbc3bc09f4d46558e34df6f00d12db5c5d4e5c8",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -744,7 +777,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "47acecb8f7d5f0b7889321f7186627c4016eda022a0aa95842d9416eaff32f68",
+      "outputHash": "ed891bec4e28575c4b75aaf1e8940cae5b28d2b06564c13406c3f1dca253dccd",
       "notes": []
     },
     {
@@ -769,7 +802,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "147d6e19e726c9152a20ed539bbf34d1b71850caa7ca15d5872df8449ad66b1d",
+      "outputHash": "b0938ef774ff8bc8d3e4837e5bfa56abb167569e249fd826487e64c74c1199f7",
       "notes": []
     },
     {
@@ -794,7 +827,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "55c17c61628ca053333c6a8f08390127cac31610f255052c52255736e913b926",
+      "outputHash": "44420fa75f7312807742bf5bc06045bc84e4ef763c83b943b594718033927979",
       "notes": []
     },
     {
@@ -862,6 +895,8 @@
         "rfb:108391",
         "rfb:133898"
       ],
+      "complete": true,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -877,6 +912,10 @@
       "route": "API RFB (coletado)",
       "status": "covered",
       "validatedSamples": [
+        "rfb:141910"
+      ],
+      "complete": false,
+      "partialSamples": [
         "rfb:141910"
       ],
       "accepted": false,
@@ -899,6 +938,12 @@
         "rfb:104314",
         "rfb:116968"
       ],
+      "complete": true,
+      "partialSamples": [
+        "rfb:127905",
+        "rfb:104314",
+        "rfb:116968"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -916,6 +961,8 @@
       "validatedSamples": [
         "rfb:142967"
       ],
+      "complete": true,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -933,6 +980,8 @@
       "validatedSamples": [
         "rfb:148693"
       ],
+      "complete": true,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -948,6 +997,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -965,6 +1016,10 @@
       "validatedSamples": [
         "rfb:37103"
       ],
+      "complete": false,
+      "partialSamples": [
+        "rfb:37103"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -980,6 +1035,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -995,6 +1052,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1010,6 +1069,10 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "covered",
       "validatedSamples": [
+        "rfb:148629"
+      ],
+      "complete": false,
+      "partialSamples": [
         "rfb:148629"
       ],
       "accepted": false,
@@ -1029,6 +1092,10 @@
       "validatedSamples": [
         "rfb:148516"
       ],
+      "complete": false,
+      "partialSamples": [
+        "rfb:148516"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1044,6 +1111,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1057,10 +1126,10 @@
         "required": true
       },
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
-      "status": "covered",
-      "validatedSamples": [
-        "rfb:148681"
-      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1076,6 +1145,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1091,6 +1162,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1108,6 +1181,10 @@
       "validatedSamples": [
         "rfb:122645"
       ],
+      "complete": false,
+      "partialSamples": [
+        "rfb:122645"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1123,6 +1200,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1138,6 +1217,8 @@
       "route": "API RFB — P2-c (autorizada, c.6701950134)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1153,6 +1234,8 @@
       "route": "arquivo manual (a origem recusa este ambiente)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1168,6 +1251,8 @@
       "route": "arquivo manual (a origem recusa este ambiente)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1187,6 +1272,8 @@
       ],
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1202,6 +1289,8 @@
       "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1217,6 +1306,8 @@
       "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1232,6 +1323,8 @@
       "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1247,6 +1340,8 @@
       "route": "arquivo manual (M3, M4)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1262,6 +1357,8 @@
       "route": "arquivo manual (M3, M4)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1280,6 +1377,8 @@
         "http:M3",
         "http:M4"
       ],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1295,6 +1394,8 @@
       "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1310,6 +1411,8 @@
       "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1328,6 +1431,8 @@
         "M5",
         "http:M5"
       ],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1343,6 +1448,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1358,6 +1465,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1373,6 +1482,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1388,6 +1499,8 @@
       "route": "arquivo manual (M9 em HTML)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1403,6 +1516,8 @@
       "route": "arquivo manual (M9 em HTML)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1418,6 +1533,8 @@
       "route": "arquivo manual (M9 em HTML)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1433,6 +1550,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1448,6 +1567,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1463,6 +1584,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1478,6 +1601,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1493,6 +1618,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1508,6 +1635,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1523,6 +1652,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1538,6 +1669,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1553,6 +1686,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1568,6 +1703,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1583,6 +1720,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1598,6 +1737,8 @@
       "route": "arquivo manual (a selecionar)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1617,6 +1758,8 @@
       ],
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": [
         {
@@ -1656,6 +1799,8 @@
         "ricms-art008",
         "ricms-art009"
       ],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1676,6 +1821,8 @@
         "ricms-an2art039",
         "ricms-art007"
       ],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1691,6 +1838,8 @@
       "route": "coletor oficial (coletado)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1706,6 +1855,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1721,6 +1872,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1736,6 +1889,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1751,6 +1906,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1766,6 +1923,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1781,6 +1940,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1796,6 +1957,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1811,6 +1974,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1826,6 +1991,8 @@
       "route": "P2-d (autorizada só depois da validação de M9)",
       "status": "pending",
       "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     }
@@ -1835,6 +2002,7 @@
     "rfb--ato-declaratorio-interpretativo--medio",
     "rfb--ato-declaratorio-interpretativo--grande",
     "rfb--ato-declaratorio-executivo--grande",
+    "rfb--solucao-de-consulta--pequeno",
     "rfb--solucao-de-consulta--medio",
     "rfb--solucao-de-consulta--grande",
     "rfb--resolucao--medio",
@@ -1879,7 +2047,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 14,
+  "coveredRequired": 13,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }

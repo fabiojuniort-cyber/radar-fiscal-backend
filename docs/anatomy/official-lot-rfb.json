@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
+  "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
   "acts": [
     {
       "idAto": 37103,
@@ -38,7 +38,12 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "42ce7bbabf3378f4b2b9f263e6adabcd4e7ee3a577b02838e8d8ac08a3abcd10"
+      "outputHash": "16178793cc25b02306c51121556053049b2c4d3521ffaa90a790361c7567beee",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 104314,
@@ -83,7 +88,14 @@
       "struckSegments": 4002,
       "attachmentsWithoutContent": 30,
       "missingSegments": 0,
-      "outputHash": "6db51507ec0976ca46f3190c232e0deeb557bcb1f9ed5f55659f75792d255c21"
+      "outputHash": "79ecd0a80d370a8abb01e5e4fedfd90b0a2693971c7b58b749fbd068bbb741fb",
+      "inlineAttachments": {
+        "total": 30,
+        "states": {
+          "missing_no_content": 30
+        },
+        "read": []
+      }
     },
     {
       "idAto": 108391,
@@ -118,7 +130,12 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "7335c6f901b1e4abb6a947ea157a8e9c4de8fb943c03617a72f4a98867db9985"
+      "outputHash": "6a89b040df113d0ba55dca792fdd6159131fe4dda63903b1a9f13df4050168a4",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 115131,
@@ -156,7 +173,12 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "e2dd7b3649e6bc41fdaabe44c2ae23affac579842268f32cc368c4e2f8f5cfce"
+      "outputHash": "eafc0e6099a5297089bf872a48f5484e2567e75723f50cb15032c797581d3f19",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 116968,
@@ -202,7 +224,14 @@
       "struckSegments": 136,
       "attachmentsWithoutContent": 35,
       "missingSegments": 0,
-      "outputHash": "5e91eb5520b4de05ffddd5262cef636b05885c30d4989f82981695df2313ac0a"
+      "outputHash": "4da0129345ab36d1fddbe7ebb13614bd6e738771acadd90d59d451e882ee9172",
+      "inlineAttachments": {
+        "total": 35,
+        "states": {
+          "missing_no_content": 35
+        },
+        "read": []
+      }
     },
     {
       "idAto": 122645,
@@ -240,7 +269,12 @@
       "struckSegments": 1,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "57d45f3914ec4e25654ed2f650158fa6a4d3c4f434bd37bffd3c526400a753a2"
+      "outputHash": "682cd98a357e730c27da5e59a8b327a69145b5dc1a037c39acffffb98382cc42",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 127905,
@@ -284,7 +318,25 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "7b5a0988230bba234e67a5402fd89ea4db37a8661ed336d5efe7a33b80e98b92"
+      "outputHash": "072df832520c424baff8b36c27706897e9fad2a226790927748749e2dcf329d7",
+      "inlineAttachments": {
+        "total": 31,
+        "states": {
+          "read": 1,
+          "missing_no_content": 30
+        },
+        "read": [
+          {
+            "id": 67992,
+            "sha256": "e07a161b7f744675c0ab64397d3c042aa7ef8b4dce7fd85ed7c5734d265af877",
+            "charset": "windows-1252",
+            "bytes": 5643,
+            "chars": 516,
+            "unidentifiedChars": 5,
+            "referenceContext": "operative_candidate"
+          }
+        ]
+      }
     },
     {
       "idAto": 133898,
@@ -319,7 +371,12 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "7a3d884e35e6c3538491075a8af6e198033d91455fc2af2b8298882ce3c7f378"
+      "outputHash": "6a09eb3e6a607c98de566da588dc44d3171ac96e6bca011319eba8487137214c",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 141910,
@@ -363,7 +420,12 @@
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "81f16e2616d58b072fea9049a9a38798f7116a94fceafeb8e21a14beaace278b"
+      "outputHash": "fb822c6494cb018dfec5dfe8c328c5a5f5bf7005fce0d8e53a4dc76377c6f63b",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 142967,
@@ -398,7 +460,12 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "fe2549edf073388484a3ab951cdbcfcf1b15950598537dcd9910eff840cdaed8"
+      "outputHash": "ad5fbe2b65a7307746330626b2e705ee8612d8b79499fc33d6ac59f57aa21433",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 148516,
@@ -437,7 +504,12 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "b1055aeab69f02597229700c054976dbe4daf4b704e77662a9098db1656468de"
+      "outputHash": "904e9567c56bd85cf99096d70ac45559b9045f57577a7f1fc815485d8a6416bc",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     },
     {
       "idAto": 148629,
@@ -474,7 +546,24 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 1,
       "missingSegments": 0,
-      "outputHash": "03981c4d4a59af2b61338928d1af28e35d91606bb4ac1fd14ae20e2def80470f"
+      "outputHash": "4e986af6cb55e1485216729d0b4dc6c99f325e93629fd87a7ae652e829d242a9",
+      "inlineAttachments": {
+        "total": 1,
+        "states": {
+          "read": 1
+        },
+        "read": [
+          {
+            "id": 82381,
+            "sha256": "f857a997c886da99da254977ecee181cd299ae85163ec961bc0854d57e2b6db8",
+            "charset": "utf-8",
+            "bytes": 3308,
+            "chars": 803,
+            "unidentifiedChars": 0,
+            "referenceContext": "operative_candidate"
+          }
+        ]
+      }
     },
     {
       "idAto": 148681,
@@ -506,7 +595,14 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 2,
       "missingSegments": 0,
-      "outputHash": "5bdd6991a4fcf19a9951242045c6c4fd2c0555b9edb23d218ddb0d8d7c6f4f94"
+      "outputHash": "de08121b3053dbd45da2d55bc78458cb94366788db3f0b17cfa3ad8ba5e702c3",
+      "inlineAttachments": {
+        "total": 2,
+        "states": {
+          "missing_no_content": 2
+        },
+        "read": []
+      }
     },
     {
       "idAto": 148693,
@@ -545,7 +641,12 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99"
+      "outputHash": "fce0294f4abc8963d1a88e7000d7bddb81d42d5ca32b1573a366f77b005187bb",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
     }
   ]
 }

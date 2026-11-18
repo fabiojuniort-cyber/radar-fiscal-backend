@@ -18,15 +18,15 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 14 cells covered (10 + 4 P2-c direct captures, 2026-11-10), E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
-    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'rfb--solucao-de-consulta--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
-  assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], 'only the COORD-accepted Portaria 635/2025 (e9-acceptances.json); collection acceptance is not anatomy acceptance');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
   assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
@@ -188,4 +188,234 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
   assert.throws(() => decodeWithPolicy(m1, { httpCharset: 'iso-8859-1' }), CharsetRefused, 'an HTTP charset is used as declared, not the fallback');
   assert.equal(decodeWithPolicy(new TextEncoder().encode('<meta charset="utf-8"><p>é</p>'), { httpCharset: null }).encodingSource, 'declared');
   assert.equal(decodeWithPolicy(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { httpCharset: null }).encodingSource, 'bom');
+});
+
+// E9 (tribusca-control#116, COORD decision B on c.6783692588): RFB acceptance is DATA, strictly validated, pinned to the
+// sample, its REAL grid cell, its lot digest and the engine; only complete readings that carry every material annex.
+const accTest = async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  const { ANATOMY_ENGINE_BUILD_HASH: E } = await import('../src/modules/anatomy/build-identity.js');
+  const { readFileSync } = await import('node:fs');
+  const lot = JSON.parse(readFileSync(new URL('../docs/anatomy/official-lot-rfb.json', import.meta.url), 'utf8')) as { acts: { idAto: number }[] };
+  const entry = (id: number) => lot.acts.find((x) => x.idAto === id)!;
+  const ids = new Set(m.GRID.map((c) => c.id));
+  const rec = (id: number, cellId: string, over: Record<string, unknown> = {}) => ({ sampleId: `rfb:${id}`, cellId, scope: 'offline', entrySha256: m.lotEntrySha256(entry(id)),
+    engineBuildHash: E, decidedBy: 't', decidedOn: '2026-11-11', ref: 't', limits: ['t'], ...over });
+  const accepted = (recs: unknown[], id: number) => m.collectSamples(undefined, m.validateAcceptances({ acceptances: recs }, ids)).find((s) => s.id === `rfb:${id}`)!.stages.accepted;
+  return { m, E, ids, rec, accepted, readFileSync };
+};
+
+test('E9 acceptance B1: the record must name the REAL grid cell; pins on digest, engine and sample are all required', async () => {
+  const { rec, accepted } = await accTest();
+  assert.equal(accepted([rec(148693, 'rfb--portaria--medio')], 148693), true, 'exact sample + real cell + digest + engine → accepted');
+  assert.equal(accepted([rec(148693, 'rfb--portaria--pequeno')], 148693), false, 'another (valid) grid cell never counts');
+  assert.equal(accepted([rec(148693, 'rfb--portaria--medio', { entrySha256: '0'.repeat(64) })], 148693), false, 'lot digest drift voids it');
+  assert.equal(accepted([rec(148693, 'rfb--portaria--medio', { engineBuildHash: 'f'.repeat(64) })], 148693), false, 'another engine voids it');
+  assert.equal(accepted([rec(148693, 'rfb--portaria--medio', { sampleId: 'rfb:142967' })], 148693), false, 'a record for another sample never counts');
+});
+
+test('E9 acceptance B2: strict validation rejects the whole file (fail closed): unknown cell, shapes, duplicates, conflicts', async () => {
+  const { m, rec, ids } = await accTest();
+  const ok = rec(148693, 'rfb--portaria--medio');
+  const bad: [string, unknown, RegExp][] = [
+    ['cellId x (not a grid cell)', { acceptances: [{ ...ok, cellId: 'x' }] }, /not a grid cell/u],
+    ['no acceptances array', {}, /missing "acceptances"/u],
+    ['unknown field', { acceptances: [{ ...ok, accepted: true }] }, /unknown field/u],
+    ['scope', { acceptances: [{ ...ok, scope: 'online' }] }, /scope/u],
+    ['digest not hex', { acceptances: [{ ...ok, entrySha256: 'XYZ' }] }, /entrySha256/u],
+    ['engine short', { acceptances: [{ ...ok, engineBuildHash: '0e009431' }] }, /engineBuildHash/u],
+    ['date', { acceptances: [{ ...ok, decidedOn: '11/11/2026' }] }, /decidedOn/u],
+    ['empty limits', { acceptances: [{ ...ok, limits: [] }] }, /limits/u],
+    ['empty decidedBy', { acceptances: [{ ...ok, decidedBy: ' ' }] }, /decidedBy/u],
+    ['exact duplicate', { acceptances: [ok, { ...ok }] }, /duplicate/u],
+    ['two digests, same sample and engine', { acceptances: [ok, { ...ok, entrySha256: '1'.repeat(64) }] }, /conflicts/u],
+    ['two cells, same sample and engine', { acceptances: [ok, { ...ok, cellId: 'rfb--portaria--grande' }] }, /conflicts/u],
+  ];
+  for (const [why, raw, re] of bad) assert.throws(() => m.validateAcceptances(raw, ids), re, why);
+  // the same sample on ANOTHER engine is history (append-only), not a conflict
+  assert.equal(m.validateAcceptances({ acceptances: [ok, { ...ok, engineBuildHash: 'a'.repeat(64), entrySha256: '2'.repeat(64) }] }, ids).length, 2);
+});
+
+test('E9 acceptance B3: partial readings, absent material annexes and a body in an absent attachment are never accepted', async () => {
+  const { m, rec, accepted, readFileSync } = await accTest();
+  const p2c = (id: number) => readFileSync(new URL(`../ops/anatomy/official-identification/rfb-p2c/${id}.json`, import.meta.url));
+  assert.equal(accepted([rec(148629, 'rfb--ato-declaratorio-executivo--pequeno')], 148629), false, 'ADE Cofis: partial reading + table annex not read');
+  assert.equal(accepted([rec(148516, 'rfb--ato-declaratorio-executivo--medio')], 148516), false, 'ADE Corat: partial reading + external Anexo Único');
+  assert.match(m.annexGap(p2c(148516)) ?? '', /Anexo Único \(own\) absent from the representation/u, 'Art. 17 "Anexo Único deste Ato…"; the JSON has none');
+  assert.equal(m.annexGap(p2c(148693)), null, 'the Portaria cites no annex');
+  // SC Cosit: the body is the PDF 83325 (absent) → size undetermined, never validated, never covers SC × pequeno
+  const sc = m.collectSamples().find((s) => s.id === 'rfb:148681')!;
+  assert.deepEqual([sc.size, sc.chars, sc.stages.read, sc.stages.validated, sc.stages.accepted], [null, null, true, false, false]);
+  assert.match(sc.notes.join(' '), /size UNDETERMINED/u);
+  assert.equal(accepted([rec(148681, 'rfb--solucao-de-consulta--pequeno')], 148681), false, 'even with exact pins');
+  assert.equal(m.buildMatrix().cells.find((c) => c.id === 'rfb--solucao-de-consulta--pequeno')!.status, 'pending', 'SC × pequeno is NOT covered by an ementa-only reading');
+});
+
+test('E9 acceptance B4: the committed file is the append-only union with #305/#309 and accepts only the Portaria here', async () => {
+  const { m, E, readFileSync } = await accTest();
+  const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string }[] };
+  assert.equal(file.acceptances.length, 13, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + 1 Portaria');
+  assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
+  assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: E });
+  const real = m.collectSamples();
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693']);
+  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id), ['rfb--portaria--medio']);
+});
+
+// ---- R2 (independent review c.6784793278): B-1 per-annex completeness, B-2 self-citation, B-3 completeness flag, B-4 dates ----
+const mkAct = (texts: string[], annexes: Record<string, unknown>[] = [], epi = { tipoAto: { nomeTipoAto: 'Portaria' }, numeroAto: '635', dataAto: '2025-12-31' }) =>
+  Buffer.from(JSON.stringify({ idAto: 1, epigrafe: epi, tiposSegmento: [{ idTipoSegmento: 1, nomeTipoSegmento: 'Ementa' }, { idTipoSegmento: 3, nomeTipoSegmento: 'Artigo' }, { idTipoSegmento: 9, nomeTipoSegmento: 'Anexo' }],
+    ementas: [{ idTipoSegmento: 1, textoIntegra: 'Aprova os Anexos I a IX desta Portaria.' }],
+    outrosSegmentos: [...texts.map((t) => ({ idTipoSegmento: 3, textoIntegra: `<p>${t}</p>` })), ...annexes] }));
+const b64 = (s: string) => Buffer.from(s).toString('base64');
+const shaOf = (s: string) => createHash('sha256').update(Buffer.from(s)).digest('hex');
+const anx = (id: number, head: string, body: string, file = `${id}.html`) => ({ idTipoSegmento: 9, textoIntegra: `<p>${head}</p>`, arquivoBinario: { idArquivoBinario: id, nomeArquivoBinario: file, arquivoBinario: b64(body) } });
+const T1 = '<table><tr><td>Anexo I</td></tr></table>'; const T2 = '<table><tr><td>Anexo II</td></tr></table>';
+const BOTH = ['Art. 1º Ficam aprovados o Anexo I e o Anexo II desta Portaria.'];
+const readAll = new Map([[11, shaOf(T1)], [12, shaOf(T2)]]);
+
+test('R2 B-1 (1–4): own annexes are checked ONE BY ONE — present, decoded and READ are distinct; duplicates and bad payloads never satisfy', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  // reviewer counter-case: two required, one embedded → gap (before R2: null)
+  assert.match(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1)]), readAll) ?? '', /Anexo II \(own\) absent/u, '1. I and II required, only I present');
+  assert.match(m.annexGap(mkAct(BOTH, [anx(12, 'ANEXO II', T2)]), readAll) ?? '', /Anexo I \(own\) absent/u, '2. I and II required, only II present');
+  assert.match(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1), anx(12, 'ANEXO II', T1)]), new Map([[11, shaOf(T1)], [12, shaOf(T1)]])) ?? '', /content duplicated/u, '3. two required, one content duplicated');
+  assert.match(m.annexGap(mkAct(BOTH, [{ ...anx(11, 'ANEXO I', T1), arquivoBinario: { idArquivoBinario: 11, arquivoBinario: 'eA==' } }, anx(12, 'ANEXO II', T2)]), readAll) ?? '', /Anexo I: decoded, not read/u, "4a. reviewer 'eA==' (decodes, never read)");
+  assert.match(m.annexGap(mkAct(BOTH, [{ ...anx(11, 'ANEXO I', T1), arquivoBinario: { idArquivoBinario: 11, arquivoBinario: '%%%' } }, anx(12, 'ANEXO II', T2)]), readAll) ?? '', /Anexo I: present, not read/u, '4b. invalid base64');
+  assert.match(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1), anx(12, 'ANEXO II', T2)])) ?? '', /Anexo I: decoded, not read; Anexo II: decoded, not read/u, '4c. decoded but no read evidence');
+  assert.match(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1), anx(12, 'ANEXO II', T2)]), new Map([[11, shaOf('other bytes')], [12, shaOf(T2)]])) ?? '', /Anexo I: decoded, not read/u, '4d. read evidence for different bytes');
+  // a count match is not an association: two segments, but labelled I and III
+  assert.match(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1), anx(13, 'ANEXO III', T2)]), new Map([[11, shaOf(T1)], [13, shaOf(T2)]])) ?? '', /Anexo II \(own\) absent/u, 'count equal, labels differ');
+  // label from file name; heading and file name disagree → ambiguous (no label)
+  assert.equal(m.annexGap(mkAct(BOTH, [anx(11, '', T1, 'Anexo_I.html'), anx(12, '', T2, 'anexo-II.html')]), readAll), null, 'labels from file names');
+  assert.match(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1, 'Anexo_II.html'), anx(12, 'ANEXO II', T2)]), readAll) ?? '', /Anexo I \(own\) absent/u, 'heading/file disagree → unusable');
+  // complete: both individually present AND read
+  assert.equal(m.annexGap(mkAct(BOTH, [anx(11, 'ANEXO I', T1), anx(12, 'ANEXO II', T2)]), readAll), null, 'I and II both read');
+  // lists and ranges
+  assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I a III desta Portaria.'])).required.map((q) => q.label), ['1', '2', '3']);
+  assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I, II e IV desta Portaria.'])).required.map((q) => q.label), ['1', '2', '4']);
+});
+
+test('R2 B-1/B-2 (5–8): other-norm citation, self-citation, ambiguity and the external ADE Corat annex', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  const { readFileSync } = await import('node:fs');
+  assert.equal(m.annexGap(mkAct(['Art. 1º Conforme o Anexo I da Instrução Normativa RFB nº 2.121, de 2022.'])), null, '5. annex of another norm: not this act');
+  assert.match(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo I da Portaria RFB nº 635, de 2025.'])) ?? '', /Anexo I \(own\) absent/u, '6. self-citation (same kind, number, year) is OWN');
+  assert.equal(m.annexGap(mkAct(['Art. 1º Conforme o Anexo I da Portaria RFB nº 636, de 2025.'])), null, '6b. another Portaria number is other');
+  assert.match(m.annexGap(mkAct(['Art. 1º Conforme o Anexo Único da referida Portaria.'])) ?? '', /Anexo Único \(ambiguous\) absent/u, '7. "referida Portaria": ambiguous → gap');
+  assert.match(m.annexGap(mkAct(['Art. 1º Na forma do anexo.'])) ?? '', /without a label/u, '7b. unlabeled mention → association not provable');
+  const corat = readFileSync(new URL('../ops/anatomy/official-identification/rfb-p2c/148516.json', import.meta.url));
+  assert.match(m.annexGap(corat) ?? '', /Anexo Único \(own\) absent from the representation/u, '8. ADE Corat: external Anexo Único');
+});
+
+test('R2 (9) + B-3: the Portaria 635 stays the only eligible sample; partial readings are flagged complete:false without changing coverage', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  const real = m.collectSamples(); const mx = m.buildMatrix(real);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], '9. Portaria 635: complete, digest + engine pinned');
+  const by = (id: string) => real.find((s) => s.id === id)!;
+  assert.deepEqual([by('rfb:148693').readingComplete, by('rfb:148629').readingComplete, by('rfb:148516').readingComplete, by('rfb:148681').readingComplete], [true, false, false, false]);
+  const cell = (id: string) => mx.cells.find((c) => c.id === id)!;
+  assert.deepEqual([cell('rfb--portaria--medio').status, cell('rfb--portaria--medio').complete], ['covered', true]);
+  assert.deepEqual([cell('rfb--ato-declaratorio-executivo--pequeno').status, cell('rfb--ato-declaratorio-executivo--pequeno').complete, cell('rfb--ato-declaratorio-executivo--pequeno').partialSamples],
+    ['covered', false, ['rfb:148629']], 'covered (layout) but complete:false, explicit');
+  assert.equal(mx.coveredRequired, 13, 'coverage count unchanged by the completeness flag');
+});
+
+test('R2 B-4: decidedOn must be a REAL date', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  for (const bad of ['2026-13-45', '2025-02-30', '2026-00-10', '2026-11-31']) assert.equal(m.realDate(bad), false, bad);
+  for (const ok of ['2026-11-11', '2024-02-29']) assert.equal(m.realDate(ok), true, ok);
+  const { ANATOMY_ENGINE_BUILD_HASH: E } = await import('../src/modules/anatomy/build-identity.js');
+  const rec = { sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', scope: 'offline', entrySha256: '0'.repeat(64), engineBuildHash: E, decidedBy: 't', decidedOn: '2026-13-45', ref: 't', limits: ['t'] };
+  assert.throws(() => m.validateAcceptances({ acceptances: [rec] }, new Set(m.GRID.map((c) => c.id))), /real YYYY-MM-DD/u);
+});
+
+// ---- R3 (independent review R2 c.6785660153, B2-1): the annex label is a COMPLETE identity (I ≠ I-A, III ≠ III-B). ----
+test('R3 B2-1: suffixed labels — no truncation, no presumption; unsupported or conflicting labels are gaps', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  const A = (id: number, head: string, body: string, file?: string) => anx(id, head, body, file ?? `${id}.html`);
+  const TA = '<table><tr><td>I-A</td></tr></table>'; const TB = '<table><tr><td>I-B</td></tr></table>'; const T3 = '<table><tr><td>III</td></tr></table>';
+  const rd = (pairs: [number, string][]) => new Map(pairs.map(([id, b]) => [id, shaOf(b)]));
+  const gap = (texts: string[], segs: Record<string, unknown>[], read: Map<number, string>) => m.annexGap(mkAct(texts, segs), read);
+  // reviewer reproduction: I-A required, only I read → must be a gap (r4: null)
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo I-A desta Portaria.'], [A(11, 'ANEXO I', T1)], rd([[11, T1]])) ?? '', /Anexo I-A \(own\) absent/u, 'I-A required, only I present');
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo I desta Portaria.'], [A(21, 'ANEXO I-A', TA)], rd([[21, TA]])) ?? '', /Anexo I \(own\) absent/u, 'I required, only I-A present');
+  assert.equal(gap(['Art. 1º Fica aprovado o Anexo I-A desta Portaria.'], [A(21, 'ANEXO I-A', TA)], rd([[21, TA]])), null, 'I-A required and I-A read → complete');
+  assert.match(gap(['Art. 1º Ficam aprovados os Anexos I-A e I-B desta Portaria.'], [A(21, 'ANEXO I-A', TA)], rd([[21, TA]])) ?? '', /Anexo I-B \(own\) absent/u, 'I-A and I-B required, only I-A');
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo III-B desta Portaria.'], [A(31, 'ANEXO III', T3)], rd([[31, T3]])) ?? '', /Anexo III-B \(own\) absent/u, 'III-B required, only III');
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo I-AB desta Portaria.'], [A(11, 'ANEXO I', T1)], rd([[11, T1]])) ?? '', /label "I-AB" not supported/u, 'unknown suffix → gap, never truncated to I');
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo I.1 desta Portaria.'], [A(11, 'ANEXO I', T1)], rd([[11, T1]])) ?? '', /not supported/u, 'dotted sub-label → gap');
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo I-A desta Portaria.'], [A(21, 'ANEXO I-A', TA, 'Anexo_I-B.html')], rd([[21, TA]])) ?? '', /Anexo I-A \(own\) absent/u, 'heading I-A vs file I-B → unusable');
+  assert.match(gap(['Art. 1º Fica aprovado o Anexo I-A desta Portaria.'], [A(21, 'ANEXO I-AB', TA)], rd([[21, TA]])) ?? '', /Anexo I-A \(own\) absent/u, 'unsupported segment heading never satisfies');
+  assert.equal(gap(['Art. 1º Fica aprovado o Anexo I-A desta Portaria.'], [A(21, '', TA, 'Anexo_I-A.html')], rd([[21, TA]])), null, 'label from the file name with suffix');
+  // earlier forms unchanged
+  assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I a III desta Portaria.'])).required.map((q) => q.label), ['1', '2', '3']);
+  assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I, II e IV desta Portaria.'])).required.map((q) => q.label), ['1', '2', '4']);
+  assert.match(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I-A a I-C desta Portaria.'])).gaps.join(';'), /range .* not supported/u, 'suffixed range → gap');
+  assert.equal(gap(['Art. 1º O Anexo Único deste Ato.'], [A(41, 'ANEXO ÚNICO', T1)], rd([[41, T1]])), null, 'Anexo Único still works');
+});
+
+// ---- R4 (independent review R3 c.6795489308): B3-1 separator/case variants, B3-2 stray letters ----
+test('R4 B3-1/B3-2: every suffix spelling is a suffix (never truncated to I); stray letters and lone L/C are gaps', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  const onlyI = [anx(11, 'ANEXO I', T1)]; const readI = new Map([[11, shaOf(T1)]]);
+  for (const v of ['I–A', 'I—A', 'I - A', 'I -A', 'I- A', 'I-a', 'I – a']) {
+    const g = m.annexGap(mkAct([`Art. 1º Fica aprovado o Anexo ${v} desta Portaria.`], onlyI), readI);
+    assert.match(g ?? '', /Anexo I-A \(own\) absent/u, `"${v}" must require I-A`);
+  }
+  // segment heading variants map to the same identity; mention and heading symmetrical
+  const TA = '<table><tr><td>IA</td></tr></table>';
+  for (const h of ['ANEXO I–A', 'ANEXO I - A', 'ANEXO I-a'])
+    assert.equal(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo I-A desta Portaria.'], [anx(21, h, TA)]), new Map([[21, shaOf(TA)]])), null, `heading "${h}" is I-A`);
+  // unknown "label + separator + letters" → gap, never I
+  for (const v of ['I-AB', 'I – AB', 'I-1', 'I.A'])
+    assert.match(m.annexGap(mkAct([`Art. 1º Fica aprovado o Anexo ${v} desta Portaria.`], onlyI), readI) ?? '', /not supported|absent/u, v);
+  // B3-2: stray letters in a list and lone L/C are ambiguous gaps
+  assert.match(m.annexGap(mkAct(['Art. 1º Ficam aprovados o Anexo I, A e B desta Portaria.'], onlyI), readI) ?? '', /not supported/u, 'I, A e B');
+  assert.match(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo C desta Portaria.'], [anx(31, 'ANEXO C', T1)]), new Map([[31, shaOf(T1)]])) ?? '', /not supported/u, 'Anexo C is a letter label, not roman 100');
+  assert.match(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo L desta Portaria.'], [])) ?? '', /not supported/u, 'Anexo L');
+  // unchanged: V and X are still roman (5, 10)
+  assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos V e X desta Portaria.'])).required.map((q) => q.label), ['5', '10']);
+});
+
+test('R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; netting only by proven reads; completeness ≠ operative context', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  // synthetic act: "Anexo I desta Portaria" + one embedded "ANEXO I"; main preparation reports 1 attachment without content
+  const json = mkAct(['Art. 1º Fica aprovado o Anexo I desta Portaria.'], [anx(11, 'ANEXO I', T1)]);
+  const lotEntry = (read: { id: number; sha256: string; referenceContext?: string }[]) => ({ idAto: 1, epigrafe: 'x', canonicalChars: 100, sha256: 's', bytes: 1, promoted: false, outputHash: 'h',
+    status: 'complete', unidentifiedChars: 0, attachmentsWithoutContent: 1, limitations: {}, partTypes: { article: 1, caput: 1 }, inlineAttachments: { read } });
+  // 1. positive path: the annex is required, present, decoded and READ (same id + sha) → complete, attachment netted
+  const ok = m.rfbReadingAssessment(lotEntry([{ id: 11, sha256: shaOf(T1), referenceContext: 'operative_candidate' }]) as never, json);
+  assert.deepEqual([ok.complete, ok.readAttachments, ok.gaps], [true, 1, []]);
+  // 2. netting is per proven read, never per evidence count: evidence for another id or other bytes nets nothing
+  for (const ev of [[{ id: 99, sha256: shaOf(T1) }], [{ id: 11, sha256: shaOf('other') }], []]) {
+    const r = m.rfbReadingAssessment(lotEntry(ev) as never, json);
+    assert.equal(r.complete, false); assert.match(r.gaps.join(';'), /1 attachment\(s\) without content/u);
+  }
+  // 3. completeness is independent of the operative context: a fully read annex that is prohibited still completes the READING
+  const proh = m.rfbReadingAssessment(lotEntry([{ id: 11, sha256: shaOf(T1), referenceContext: 'prohibited' }]) as never, json);
+  assert.equal(proh.complete, true, 'reading complete; force/function decided elsewhere (no acceptance implied)');
+  // the real lot of this branch has no producer: every real sample keeps its earlier assessment (fail closed)
+  const real = m.collectSamples();
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693']);
+  assert.equal(real.find((s) => s.id === 'rfb:148629')!.readingComplete, false);
+});
+
+// ---- R5 (independent review R4 c.6796232552): B4-1 Unicode / slash / parenthesis separators and format chars; B4-2 dangling dash ----
+test('R5 B4-1/B4-2: no spelling of a suffix truncates to I; a dangling separator is ambiguous', async () => {
+  const m = await import('../ops/anatomy/official-coverage-matrix.js');
+  const onlyI = [anx(11, 'ANEXO I', T1)]; const readI = new Map([[11, shaOf(T1)]]);
+  const req = (v: string) => m.annexGap(mkAct([`Art. 1º Fica aprovado o Anexo ${v} desta Portaria.`], onlyI), readI) ?? '';
+  for (const v of ['I−A', 'I﹣A', 'I－A', 'I/A', 'I(A)', 'I​-A', 'I-​A', 'I‑A', 'I‐A', 'I‒A', 'I⸺A'])
+    assert.match(req(v), /Anexo I-A \(own\) absent|not supported/u, `${JSON.stringify(v)} must never be satisfied by Anexo I`);
+  // the normalized forms are the same identity on both sides (mention and heading)
+  const TA = '<table><tr><td>IA</td></tr></table>';
+  for (const [mention, head] of [['I−A', 'ANEXO I-A'], ['I-A', 'ANEXO I－A'], ['I​-A', 'ANEXO I-A']] as const)
+    assert.equal(m.annexGap(mkAct([`Art. 1º Fica aprovado o Anexo ${mention} desta Portaria.`], [anx(21, head, TA)]), new Map([[21, shaOf(TA)]])), null, `${JSON.stringify(mention)} × ${JSON.stringify(head)}`);
+  // B4-2: a dangling separator is not "I"
+  for (const v of ['I-', 'I –', 'I/'])
+    assert.match(req(v), /not supported/u, `${JSON.stringify(v)} is ambiguous`);
+  // unchanged positives
+  assert.equal(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo I desta Portaria.'], onlyI), readI), null, 'plain I still complete');
+  assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I a III desta Portaria.'])).required.map((q) => q.label), ['1', '2', '3']);
 });
