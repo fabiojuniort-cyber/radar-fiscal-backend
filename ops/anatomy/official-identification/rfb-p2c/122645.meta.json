@@ -1,0 +1,57 @@
+{
+  "id": "122645",
+  "act": "Resolução 164/2022",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/122645/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/122645/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/122645/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+  "bytes": 11110,
+  "consultedAt": "2026-11-07T04:06:53.876Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c (Resolução)",
+  "identification": {
+    "idAto": 122645,
+    "epigrafe": "Resolução CGSN nº 164, de 21 de janeiro de 2022",
+    "numeroAto": "164",
+    "dataAto": "2022-01-21",
+    "dataPublicacao": "2022-01-24",
+    "dadosPublicacao": "Publicado(a) no DOU de 24/01/2022, seção 1, página 65",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "e4bca376ca9320901c6df5b11a5b05ab65940ebe1c27fcbbaa3e5e41fe6cc612",
+    "htmlSha256": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
+    "pieces": 10,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/6",
+        "order": 8,
+        "chars": 526
+      }
+    ],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c)",
+  "promoted": false,
+  "p2c": {
+    "type": "Resolução",
+    "termo": "Resolução CGSN",
+    "searchFile": "search-resolucao.json",
+    "measuredChars": 2167,
+    "size": "pequeno"
+  }
+}

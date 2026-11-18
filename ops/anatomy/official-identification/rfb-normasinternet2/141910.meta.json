@@ -1,0 +1,141 @@
+{
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/141910/visao/multivigente",
+  "consultedAt": "2026-11-04T21:00:11Z",
+  "http": "200|application/json",
+  "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+  "bytes": 144575,
+  "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+  "promoted": false,
+  "representation": "json",
+  "contentType": "application/json",
+  "identification": {
+    "idAto": 141910,
+    "epigrafe": "Instrução Normativa RFB nº 2237, de 4 de dezembro de 2024",
+    "numeroAto": "2237",
+    "dataAto": "2024-12-04",
+    "dataPublicacao": "2024-12-05",
+    "dadosPublicacao": "Publicado(a) no DOU de 05/12/2024, seção 1, página 57",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "e943f81dd5508fa8ad50d7c2975cf3755ceb1f2276f2e4a00874acc4e1001ce6",
+    "htmlSha256": "96fa2cdc42cfea85a5bc65f06d5cece9304713f7b091218d1e31bc351624fa6f",
+    "pieces": 223,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/29",
+        "order": 31,
+        "chars": 121
+      },
+      {
+        "pointer": "/outrosSegmentos/72",
+        "order": 74,
+        "chars": 114
+      },
+      {
+        "pointer": "/outrosSegmentos/74",
+        "order": 76,
+        "chars": 166
+      },
+      {
+        "pointer": "/outrosSegmentos/93",
+        "order": 95,
+        "chars": 49
+      },
+      {
+        "pointer": "/outrosSegmentos/183",
+        "order": 185,
+        "chars": 460
+      },
+      {
+        "pointer": "/outrosSegmentos/188",
+        "order": 190,
+        "chars": 52
+      },
+      {
+        "pointer": "/outrosSegmentos/190",
+        "order": 192,
+        "chars": 199
+      },
+      {
+        "pointer": "/outrosSegmentos/194",
+        "order": 196,
+        "chars": 125
+      },
+      {
+        "pointer": "/outrosSegmentos/196",
+        "order": 198,
+        "chars": 165
+      },
+      {
+        "pointer": "/outrosSegmentos/197",
+        "order": 199,
+        "chars": 41
+      }
+    ],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "anatomyBeforeD04": {
+    "readerBase": "pre-STRUCT (claude/inspiring-cerf-cttb6e)",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "unidentified": 104,
+      "preamble": 1,
+      "article": 22,
+      "paragraph": 66,
+      "alinea": 27,
+      "inciso": 3
+    },
+    "canonicalChars": 31389,
+    "accountedChars": 31389,
+    "unidentifiedChars": 12271,
+    "unidentifiedCauses": {
+      "incisoWithoutDashInPortalText": 11279,
+      "other": 992
+    },
+    "struckSegments": 10,
+    "struckRawHtmlChars": 1492,
+    "struckMarkedHistoricalByReader": false,
+    "missingSegments": [],
+    "attachmentsWithoutContent": 0
+  },
+  "anatomyD04": {
+    "readerBase": "ANAT-D04 + R1 + D05 (claude/anat-d04-rfb-types), full engine",
+    "status": "partial",
+    "partTypes": {
+      "document": 1,
+      "summary": 1,
+      "preamble": 1,
+      "group": 15,
+      "article": 22,
+      "caput": 22,
+      "paragraph": 66,
+      "unidentified": 85,
+      "alinea": 27,
+      "inciso": 3,
+      "item": 2,
+      "signature": 1
+    },
+    "canonicalChars": 31389,
+    "accountedChars": 31389,
+    "unidentifiedChars": 11279,
+    "historicalByTachado": 10,
+    "limitations": {
+      "rfb_segment_type_unidentified_by_source": 85,
+      "rfb_tachado_evidence": 4,
+      "unidentified_content": 1
+    },
+    "legalStatusValues": [
+      "unknown"
+    ],
+    "unidentifiedHistoricalWithEvidence": 4,
+    "engineAccepted": true
+  }
+}

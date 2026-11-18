@@ -1,5 +1,5 @@
 {
- "note": "Engine output on synthetic documents without identity fields; generated on the pre-integration engine (P1.A HEAD 585f5a49).",
+ "note": "Engine output on synthetic documents without identity fields; generated on the pre-integration engine (P1.A HEAD 585f5a49); regenerated for ANAT-STRUCT-01, whose only delta is CONSIDERANDO typed as consideration instead of preamble (same context); regenerated for ANAT-STRUCT-02: caput parts added under articles/clauses (19, entities and eligibility unchanged), sibling orders shifted by them (11), one Parágrafo único reason paragraph_sole.",
  "documents": [
   {
    "id": "confaz-classes",
@@ -202,9 +202,41 @@
       "table": null
      },
      {
-      "id": "part-6",
+      "id": "part-5-caput",
       "parentId": "part-5",
       "order": 0,
+      "type": "caput",
+      "label": "Cláusula primeira Fica reduzida a base NCM 8471.30.12 e 8471.41.00.",
+      "span": {
+       "start": 117,
+       "end": 185
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://confaz-classes",
+        "representation": "html",
+        "locator": "/p[5]",
+        "sourceSpan": {
+         "start": 218,
+         "end": 312
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-6",
+      "parentId": "part-5",
+      "order": 1,
       "type": "editorial_note",
       "label": "Nova redação dada pelo Conv. ICMS 2/26.",
       "span": {
@@ -268,9 +300,41 @@
       "table": null
      },
      {
-      "id": "part-8",
+      "id": "part-7-caput",
       "parentId": "part-7",
       "order": 0,
+      "type": "caput",
+      "label": "Cláusula segunda Redação anterior NCM 8450.11.00.",
+      "span": {
+       "start": 225,
+       "end": 275
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://confaz-classes",
+        "representation": "html",
+        "locator": "/p[7]",
+        "sourceSpan": {
+         "start": 374,
+         "end": 447
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "historical",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-8",
+      "parentId": "part-7",
+      "order": 1,
       "type": "editorial_note",
       "label": "Redação anterior dada pelo Conv. ICMS 3/26.",
       "span": {
@@ -329,6 +393,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "clause_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-9-caput",
+      "parentId": "part-9",
+      "order": 0,
+      "type": "caput",
+      "label": "Clausula terceira Texto NCM 0101.21.00.",
+      "span": {
+       "start": 319,
+       "end": 359
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://confaz-classes",
+        "representation": "html",
+        "locator": "/p[9]",
+        "sourceSpan": {
+         "start": 516,
+         "end": 586
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -1075,6 +1171,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "clause_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Cláusula primeira Ver anexo.",
+      "span": {
+       "start": 0,
+       "end": 29
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://confaz-annex-table",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 55
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -4457,9 +4585,41 @@
       "table": null
      },
      {
-      "id": "part-5",
+      "id": "part-4-caput",
       "parentId": "part-4",
       "order": 0,
+      "type": "caput",
+      "label": "Art. 1º Fica incluído o NCM 8471.30.12.",
+      "span": {
+       "start": 63,
+       "end": 103
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://dou-classes",
+        "representation": "html",
+        "locator": "/p[4]",
+        "sourceSpan": {
+         "start": 115,
+         "end": 161
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-5",
+      "parentId": "part-4",
+      "order": 1,
       "type": "paragraph",
       "label": "Parágrafo único. Texto.",
       "span": {
@@ -4478,12 +4638,12 @@
        }
       ],
       "recognition": "explicit",
-      "ruleId": "reader/v1/paragraph_marker",
+      "ruleId": "reader/v1/paragraph_sole",
       "confidence": 1,
       "coverage": "complete",
       "context": "operative_candidate",
       "contextReasons": [
-       "paragraph_marker"
+       "paragraph_sole"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -4491,7 +4651,7 @@
      {
       "id": "part-6",
       "parentId": "part-4",
-      "order": 1,
+      "order": 2,
       "type": "paragraph",
       "label": "§ 1º Outro texto.",
       "span": {
@@ -5920,9 +6080,41 @@
       "table": null
      },
      {
-      "id": "part-2",
+      "id": "part-1-caput",
       "parentId": "part-1",
       "order": 0,
+      "type": "caput",
+      "label": "Art. 1º A Instrução Normativa passa a vigorar com:",
+      "span": {
+       "start": 0,
+       "end": 51
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://quotes",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 57
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-2",
+      "parentId": "part-1",
+      "order": 1,
       "type": "quoted_text",
       "label": "\"Art. 5º Texto citado NCM 8471.30.12.",
       "span": {
@@ -5954,7 +6146,7 @@
      {
       "id": "part-3",
       "parentId": "part-1",
-      "order": 1,
+      "order": 2,
       "type": "quoted_text",
       "label": "§ 1º Continua citado.\" (NR)",
       "span": {
@@ -6016,9 +6208,41 @@
       "table": null
      },
      {
-      "id": "part-5",
+      "id": "part-4-caput",
       "parentId": "part-4",
       "order": 0,
+      "type": "caput",
+      "label": "Art. 2º Texto próprio NCM 8471.41.00.",
+      "span": {
+       "start": 117,
+       "end": 155
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://quotes",
+        "representation": "html",
+        "locator": "/p[4]",
+        "sourceSpan": {
+         "start": 135,
+         "end": 179
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-5",
+      "parentId": "part-4",
+      "order": 1,
       "type": "quoted_text",
       "label": "“Art. 6º Outro citado.”",
       "span": {
@@ -6050,7 +6274,7 @@
      {
       "id": "part-6",
       "parentId": "part-4",
-      "order": 1,
+      "order": 2,
       "type": "quoted_text",
       "label": "\"",
       "span": {
@@ -6082,7 +6306,7 @@
      {
       "id": "part-7",
       "parentId": "part-4",
-      "order": 2,
+      "order": 3,
       "type": "quoted_text",
       "label": "Art. 3º Depois.",
       "span": {
@@ -6810,7 +7034,7 @@
       "id": "part-5",
       "parentId": "part-0",
       "order": 4,
-      "type": "preamble",
+      "type": "consideration",
       "label": "CONSIDERANDO que algo;",
       "span": {
        "start": 114,
@@ -6828,12 +7052,12 @@
        }
       ],
       "recognition": "explicit",
-      "ruleId": "reader/v1/preamble_marker",
+      "ruleId": "reader/v1/consideration_marker",
       "confidence": 1,
       "coverage": "complete",
       "context": "prohibited",
       "contextReasons": [
-       "preamble_marker"
+       "consideration_marker"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -6962,6 +7186,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "article_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-9-caput",
+      "parentId": "part-9",
+      "order": 0,
+      "type": "caput",
+      "label": "Artigo 1º Texto.",
+      "span": {
+       "start": 201,
+       "end": 218
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://preamble-variants",
+        "representation": "html",
+        "locator": "/p[9]",
+        "sourceSpan": {
+         "start": 249,
+         "end": 272
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -7706,6 +7962,38 @@
       "table": null
      },
      {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 1º Aplica-se aos NCM 8471.30.12, 8471.41.00 e 8471.49.00, ou 8471.50.00.",
+      "span": {
+       "start": 0,
+       "end": 78
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://lists-tokens",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 84
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
       "id": "part-2",
       "parentId": "part-0",
       "order": 1,
@@ -7733,6 +8021,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "article_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-2-caput",
+      "parentId": "part-2",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 2º NCM códigos: 8471.30.12 até 8471.49.00 inclusive.",
+      "span": {
+       "start": 78,
+       "end": 136
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://lists-tokens",
+        "representation": "html",
+        "locator": "/p[2]",
+        "sourceSpan": {
+         "start": 84,
+         "end": 148
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -7770,6 +8090,38 @@
       "table": null
      },
      {
+      "id": "part-3-caput",
+      "parentId": "part-3",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 3º NCM nº 8471.30.12 ate 8471.41.00 de 2026.",
+      "span": {
+       "start": 136,
+       "end": 186
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://lists-tokens",
+        "representation": "html",
+        "locator": "/p[3]",
+        "sourceSpan": {
+         "start": 148,
+         "end": 204
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
       "id": "part-4",
       "parentId": "part-0",
       "order": 3,
@@ -7802,6 +8154,38 @@
       "table": null
      },
      {
+      "id": "part-4-caput",
+      "parentId": "part-4",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 4º NCM 8471.30.12 - 8471.41.00 – 8471.49.00.",
+      "span": {
+       "start": 186,
+       "end": 236
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://lists-tokens",
+        "representation": "html",
+        "locator": "/p[4]",
+        "sourceSpan": {
+         "start": 204,
+         "end": 260
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
       "id": "part-5",
       "parentId": "part-0",
       "order": 4,
@@ -7829,6 +8213,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "article_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-5-caput",
+      "parentId": "part-5",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 5º NCM 8471.30.12 exceto 8471.41.00.",
+      "span": {
+       "start": 236,
+       "end": 278
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://lists-tokens",
+        "representation": "html",
+        "locator": "/p[5]",
+        "sourceSpan": {
+         "start": 260,
+         "end": 308
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -9056,6 +9472,38 @@
       "table": null
      },
      {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Cláusula primeira NCM 8471.30.12, 8471.41.00, excetuados 8471.41.00 e 8471.49.00.",
+      "span": {
+       "start": 0,
+       "end": 82
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://exceptions",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 108
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
       "id": "part-2",
       "parentId": "part-0",
       "order": 1,
@@ -9083,6 +9531,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "clause_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-2-caput",
+      "parentId": "part-2",
+      "order": 0,
+      "type": "caput",
+      "label": "Cláusula segunda NCM 8471.30.12, salvo os de uso doméstico.",
+      "span": {
+       "start": 82,
+       "end": 142
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://exceptions",
+        "representation": "html",
+        "locator": "/p[2]",
+        "sourceSpan": {
+         "start": 108,
+         "end": 194
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -9120,6 +9600,38 @@
       "table": null
      },
      {
+      "id": "part-3-caput",
+      "parentId": "part-3",
+      "order": 0,
+      "type": "caput",
+      "label": "Cláusula terceira NCM 8471.30.12 exclusive 8471.50.00.",
+      "span": {
+       "start": 142,
+       "end": 197
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://exceptions",
+        "representation": "html",
+        "locator": "/p[3]",
+        "sourceSpan": {
+         "start": 194,
+         "end": 275
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
       "id": "part-4",
       "parentId": "part-0",
       "order": 3,
@@ -9147,6 +9659,38 @@
       "context": "operative_candidate",
       "contextReasons": [
        "clause_marker"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-4-caput",
+      "parentId": "part-4",
+      "order": 0,
+      "type": "caput",
+      "label": "Cláusula quarta NCM 8471.30.12, excluídos 8471.41.00, excluidas as demais.",
+      "span": {
+       "start": 197,
+       "end": 272
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://exceptions",
+        "representation": "html",
+        "locator": "/p[4]",
+        "sourceSpan": {
+         "start": 275,
+         "end": 376
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
       ],
       "legalStatus": "unknown",
       "table": null
@@ -10094,6 +10638,38 @@
       ],
       "legalStatus": "unknown",
       "table": null
+     },
+     {
+      "id": "part-1-caput",
+      "parentId": "part-1",
+      "order": 0,
+      "type": "caput",
+      "label": "Art. 1º Processo SEI nº 12345.678901/2026-12, CNPJ 12.345.678/0001-90, CEP 01234-567, Lei nº 8.137, de 27 de dezembro de 1990, art. 3º, NCM 8471.30.12, NBM 8471.30.1200, CFOP 5102, CEST 01.001.00.",
+      "span": {
+       "start": 0,
+       "end": 197
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://protections",
+        "representation": "html",
+        "locator": "/p[1]",
+        "sourceSpan": {
+         "start": 0,
+         "end": 203
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "operative_candidate",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
      }
     ],
     "entities": [
@@ -10471,9 +11047,41 @@
       "table": null
      },
      {
-      "id": "part-2",
+      "id": "part-1-caput",
       "parentId": "part-1",
       "order": 0,
+      "type": "caput",
+      "label": "Cláusula primeira NCM 8471.30.12.",
+      "span": {
+       "start": 0,
+       "end": 34
+      },
+      "sourcePointers": [
+       {
+        "resourceId": "synthetic://historical-ancestor",
+        "representation": "html",
+        "locator": "/div[1]/p[1]",
+        "sourceSpan": {
+         "start": 22,
+         "end": 62
+        }
+       }
+      ],
+      "recognition": "explicit",
+      "ruleId": "reader/v1/caput_block",
+      "confidence": 1,
+      "coverage": "complete",
+      "context": "historical",
+      "contextReasons": [
+       "caput_block"
+      ],
+      "legalStatus": "unknown",
+      "table": null
+     },
+     {
+      "id": "part-2",
+      "parentId": "part-1",
+      "order": 1,
       "type": "table",
       "label": "",
       "span": {
@@ -10650,7 +11258,7 @@
      {
       "id": "part-7",
       "parentId": "part-1",
-      "order": 1,
+      "order": 2,
       "type": "quoted_text",
       "label": "Cláusula segunda NCM 8471.49.00.",
       "span": {

@@ -1,0 +1,43 @@
+{
+  "item": "M9",
+  "act": "IN RFB nº 2.237/2024 na página do DOU",
+  "source": "DOU",
+  "type": "Página do jornal (cabeçalho e rodapé)",
+  "url": "https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?captchafield=firstAccess&data=05%2F12%2F2024&jornal=515&pagina=57",
+  "retrievedAt": "2026-11-07T03:52:39.8027150Z",
+  "fileName": "M9.pdf",
+  "sha256": "09726ebc6e21652ffde6023fb906ba5ecbb3c7fa49b164271c4c629efd49e3ee",
+  "bytes": 192477,
+  "origin": "resposta HTTP da origem oficial, capturada em outra sessão e entregue por git",
+  "package": {
+    "repo": "fabiojuniort-cyber/tribusca-control",
+    "commit": "fe60728db2929c84519df32f7bf6152260652874",
+    "branch": "evidence/e9-official-inputs-20261107",
+    "path": "docs/investigations/e9-inputs/E9-official-access-20261107.zip",
+    "zipSha256": "cce00c19cc68b2b8e9007d632e620bedfb1da6e51afd5f6cfb0114c62f8aed5f"
+  },
+  "manifestOrigin": "HTTP response bytes from official origin",
+  "manifestCoverage": "Single DOU page57; not a complete-act attestation",
+  "declaredCharset": null,
+  "readable": false,
+  "readableNote": null,
+  "representation": "pdf",
+  "identification": {
+    "pages": 1,
+    "header": "Seção 1 ISSN 1677-7042 Nº 234, quinta-feira, 5 de dezembro de 2024",
+    "footer": "http://www.in.gov.br/autenticidade.html, pelo código 05152024120500057 que institui a Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil.",
+    "footerCode": "05152024120500057",
+    "epigraphLine": 20,
+    "epigraph": "INSTRUÇÃO NORMATIVA RFB Nº 2.237, DE 4 DE DEZEMBRO DE 2024",
+    "articlesOnPage": [
+      "5",
+      "1",
+      "2",
+      "3",
+      "6",
+      "4"
+    ]
+  },
+  "reach": "uma página (57) do DOU: cabeçalho e rodapé identificados; o ato começa nesta página e CONTINUA nas seguintes (não é o ato completo); o topo da página traz o fim de outra publicação; a extração mistura colunas na mesma linha, então a leitura da anatomia não é validada",
+  "promoted": false
+}
