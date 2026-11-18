@@ -1,0 +1,7 @@
+cmp: identical
+4e0fccfca463f0c4c9a8732d024795613b65d284937f45b31c01543d6984dbb7  wcomp12/docs/anatomy/e9-acceptances.json
+4e0fccfca463f0c4c9a8732d024795613b65d284937f45b31c01543d6984dbb7  w303c/docs/anatomy/e9-acceptances.json
+wcomp12/docs/anatomy/e9-acceptances.json acceptances 13
+w303c/docs/anatomy/e9-acceptances.json acceptances 13
+wcomp12/docs/anatomy/e9-acceptances.json occurrences(1f1e593c0a1cbbdfa92756bdefe68d01ad1ddcc0987a12ce66b45fc42697058e): 0
+w303c/docs/anatomy/e9-acceptances.json occurrences(1f1e593c0a1cbbdfa92756bdefe68d01ad1ddcc0987a12ce66b45fc42697058e): 0

@@ -1,0 +1,47 @@
+ok N/N multicitado | citação meio
+ok N/N multicitado | citação início
+ok N/N multicitado | sem citação após frase comum
+ok N/N multicitado | sem citação após SRF.
+ok N/N multicitado | sem nenhuma citação
+ok N/N multicitada | citação meio
+ok N/N multicitada | citação início
+ok N/N multicitada | sem citação após frase comum
+ok N/N multicitada | sem citação após SRF.
+ok N/N multicitada | sem nenhuma citação
+ok N/N em epígrafe | citação meio
+ok N/N em epígrafe | citação início
+ok N/N em epígrafe | sem citação após frase comum
+ok N/N em epígrafe | sem citação após SRF.
+ok N/N em epígrafe | sem nenhuma citação
+ok N/N em epigrafe (sem acento) | citação meio
+ok N/N em epigrafe (sem acento) | citação início
+ok N/N em epigrafe (sem acento) | sem citação após frase comum
+ok N/N em epigrafe (sem acento) | sem citação após SRF.
+ok N/N em epigrafe (sem acento) | sem nenhuma citação
+ok N/N em questão | citação meio
+ok N/N em questão | citação início
+ok N/N em questão | sem citação após frase comum
+ok N/N em questão | sem citação após SRF.
+ok N/N em questão | sem nenhuma citação
+ok N/N em questao (sem acento) | citação meio
+ok N/N em questao (sem acento) | citação início
+ok N/N em questao (sem acento) | sem citação após frase comum
+ok N/N em questao (sem acento) | sem citação após SRF.
+ok N/N em questao (sem acento) | sem nenhuma citação
+ok N/N em causa | citação meio
+ok N/N em causa | citação início
+ok N/N em causa | sem citação após frase comum
+ok N/N em causa | sem citação após SRF.
+ok N/N em causa | sem nenhuma citação
+ok N/N Em Epígrafe (caixa) | citação meio
+ok N/N Em Epígrafe (caixa) | citação início
+ok N/N Em Epígrafe (caixa) | sem citação após frase comum
+ok N/N Em Epígrafe (caixa) | sem citação após SRF.
+ok N/N Em Epígrafe (caixa) | sem nenhuma citação
+ok P/P CTL próprio
+ok P/P CTL fundamento próprio
+ok P/P CTL nesta Portaria
+ok P/P CTL epígrafe do próprio ato (palavra isolada)
+ok P/P CTL questão (sem "em")
+ok P/P CTL causa (sem "em")
+divergências 0 / 46; legalStatus unknown

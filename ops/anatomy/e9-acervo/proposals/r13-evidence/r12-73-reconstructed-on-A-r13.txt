@@ -1,0 +1,66 @@
+ok N/N sobredita | citação meio
+ok N/N sobredita | citação início
+ok N/N sobredita | sem citação após frase comum
+ok N/N sobredita | sem citação após RFB.
+ok N/N sobredita | sem nenhuma citação
+ok N/N sobredito | citação meio
+ok N/N sobredito | citação início
+ok N/N sobredito | sem citação após frase comum
+ok N/N sobredito | sem citação após RFB.
+ok N/N sobredito | sem nenhuma citação
+ok N/N susodita | citação meio
+ok N/N susodita | citação início
+ok N/N susodita | sem citação após frase comum
+ok N/N susodita | sem citação após RFB.
+ok N/N susodita | sem nenhuma citação
+ok N/N susodito | citação meio
+ok N/N susodito | citação início
+ok N/N susodito | sem citação após frase comum
+ok N/N susodito | sem citação após RFB.
+ok N/N susodito | sem nenhuma citação
+ok N/N em tela | citação meio
+ok N/N em tela | citação início
+ok N/N em tela | sem citação após frase comum
+ok N/N em tela | sem citação após RFB.
+ok N/N em tela | sem nenhuma citação
+ok N/N em comento | citação meio
+ok N/N em comento | citação início
+ok N/N em comento | sem citação após frase comum
+ok N/N em comento | sem citação após RFB.
+ok N/N em comento | sem nenhuma citação
+ok N/N ato anterior | citação meio
+ok N/N ato anterior | citação início
+ok N/N ato anterior | sem citação após frase comum
+ok N/N ato anterior | sem citação após RFB.
+ok N/N ato anterior | sem nenhuma citação
+ok N/N Portaria anterior | citação meio
+ok N/N Portaria anterior | citação início
+ok N/N Portaria anterior | sem citação após frase comum
+ok N/N Portaria anterior | sem citação após RFB.
+ok N/N Portaria anterior | sem nenhuma citação
+ok N/N norma anterior | citação meio
+ok N/N norma anterior | citação início
+ok N/N norma anterior | sem citação após frase comum
+ok N/N norma anterior | sem citação após RFB.
+ok N/N norma anterior | sem nenhuma citação
+ok P/P CTL exercício anterior
+ok P/P CTL exercício anterior + fundamento
+ok P/P CTL mês anterior
+ok P/P CTL mês anterior + fundamento
+ok P/P CTL ano anterior
+ok P/P CTL ano anterior + fundamento
+ok P/P CTL trimestre anterior
+ok P/P CTL trimestre anterior + fundamento
+ok P/P CTL período anterior
+ok P/P CTL período anterior + fundamento
+ok P/P CTL artigo anterior (interno)
+ok P/P CTL parágrafo anterior (interno)
+DIV P/N R12-1 tela única (FN conhecido)
+DIV P/N R12-1 exibidos em tela (FN conhecido)
+ok N/N SIN multicitado | citação meio
+ok N/N SIN em epígrafe | citação meio
+ok N/N SIN em questão | citação meio
+ok N/N SIN em causa | citação meio
+ok N/N Em Tela maiúsculo
+ok N/N sobre-dita hifenizado
+divergências 2 / 65; legalStatus unknown

@@ -1,0 +1,10 @@
+source_code,act_type,size,rn,external_id,act_number,agency,published_on,official_url,publication_id,version_id,content_hash,chars,near_boundary,presentation_format,presentation_html_bytes
+rfb-normas,Portaria,medio,1,142967,514,RFB,2025-02-24,https://synthetic.invalid/142967,p1,v1,h1,12000,f,SANITIZED_HTML,100
+rfb-normas,Portaria,medio,2,900001,9001,RFB,2025-03-01,https://synthetic.invalid/900001,p2,v2,h2,15000,f,SANITIZED_HTML,100
+rfb-normas,Portaria,grande,1,153743,9002,RFB,2025-03-02,https://synthetic.invalid/153743,p3,v3,h3,80000,f,SANITIZED_HTML,100
+rfb-normas,Portaria,grande,2,900003,9003,RFB,2025-03-03,https://synthetic.invalid/900003,p4,v4,h4,90000,f,SANITIZED_HTML,100
+rfb-normas,Ato Declaratório Executivo,pequeno,1,900004,9004,RFB,2025-04-01,https://synthetic.invalid/900004,p5,v5,h5,9950,t,SANITIZED_HTML,100
+rfb-normas,Ato Declaratório Executivo,pequeno,2,900005,9005,RFB,2025-04-02,https://synthetic.invalid/900005,p6,v6,h6,3000,f,SANITIZED_HTML,100
+rfb-normas,Solução de Consulta,medio,1,900006,187,RFB,2026-01-10,https://synthetic.invalid/900006,p7,v7,h7,20000,f,SANITIZED_HTML,100
+rfb-normas,"Resolução CGSN",grande,1,900007,140,CGSN,2018-11-22,https://synthetic.invalid/900007,p8,v8,h8,300000,f,SANITIZED_HTML,100
+doe-sp,Decreto,medio,1,900008,1,SP,2025-01-01,https://synthetic.invalid/900008,p9,v9,h9,20000,f,SANITIZED_HTML,100

@@ -1,0 +1,382 @@
+{
+ "grant": "E9-P2c-G1",
+ "status": "suspended",
+ "requestsPlanned": 4,
+ "total": 16,
+ "remainingAfterPlan": 12,
+ "searches": 0,
+ "perType": {
+  "Resolução": {
+   "planned": 0,
+   "cap": 3,
+   "spareForFallback": 3
+  },
+  "Portaria": {
+   "planned": 1,
+   "cap": 3,
+   "spareForFallback": 2
+  },
+  "Ato Declaratório Interpretativo": {
+   "planned": 0,
+   "cap": 2,
+   "spareForFallback": 2
+  },
+  "Ato Declaratório Executivo": {
+   "planned": 2,
+   "cap": 4,
+   "spareForFallback": 2
+  },
+  "Solução de Consulta": {
+   "planned": 1,
+   "cap": 4,
+   "spareForFallback": 3
+  }
+ },
+ "overCap": [],
+ "cells": [
+  {
+   "type": "Portaria",
+   "size": "medio",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "PORTARIA",
+    "size": "medio",
+    "external_id": "148693",
+    "act_number": "635/2025",
+    "published_on": "2025-12-31",
+    "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148693/visao/original",
+    "chars": 20102,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [
+    {
+     "source_code": "rfb-normas",
+     "act_type": "PORTARIA",
+     "size": "medio",
+     "external_id": "147426",
+     "act_number": "599/2025",
+     "published_on": "2025-11-03",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/147426/visao/original",
+     "chars": 43632,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "PORTARIA",
+     "size": "medio",
+     "external_id": "144970",
+     "act_number": "555/2025",
+     "published_on": "2025-07-07",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/144970/visao/original",
+     "chars": 37169,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "PORTARIA",
+     "size": "medio",
+     "external_id": "142966",
+     "act_number": "511/2025",
+     "published_on": "2025-02-24",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/142966/visao/original",
+     "chars": 23482,
+     "near_boundary": false,
+     "ambiguous_year": false
+    }
+   ],
+   "refused": [
+    {
+     "external_id": "146749",
+     "reason": "joint act (Conjunta/Conjunto) is another act type, not this cell"
+    },
+    {
+     "external_id": "144779",
+     "reason": "joint act (Conjunta/Conjunto) is another act type, not this cell"
+    }
+   ],
+   "state": "candidate"
+  },
+  {
+   "type": "Portaria",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Ato Declaratório Interpretativo",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Ato Declaratório Interpretativo",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Resolução",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Resolução",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "size": "pequeno",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+    "size": "pequeno",
+    "external_id": "148629",
+    "act_number": "30/2025",
+    "published_on": "2025-12-29",
+    "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148629/visao/original",
+    "chars": 1139,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [
+    {
+     "source_code": "rfb-normas",
+     "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+     "size": "pequeno",
+     "external_id": "148616",
+     "act_number": "31/2025",
+     "published_on": "2025-12-29",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148616/visao/original",
+     "chars": 1094,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+     "size": "pequeno",
+     "external_id": "148437",
+     "act_number": "28/2025",
+     "published_on": "2025-12-22",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148437/visao/original",
+     "chars": 636,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+     "size": "pequeno",
+     "external_id": "148393",
+     "act_number": "26/2025",
+     "published_on": "2025-12-18",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148393/visao/original",
+     "chars": 1557,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+     "size": "pequeno",
+     "external_id": "148386",
+     "act_number": "87/2025",
+     "published_on": "2025-12-18",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148386/visao/original",
+     "chars": 2573,
+     "near_boundary": false,
+     "ambiguous_year": false
+    }
+   ],
+   "refused": [
+    {
+     "external_id": "147509",
+     "reason": "joint act (Conjunta/Conjunto) is another act type, not this cell"
+    }
+   ],
+   "state": "candidate"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "size": "medio",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+    "size": "medio",
+    "external_id": "148516",
+    "act_number": "33/2025",
+    "published_on": "2025-12-24",
+    "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148516/visao/original",
+    "chars": 10619,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [
+    {
+     "source_code": "rfb-normas",
+     "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+     "size": "medio",
+     "external_id": "147934",
+     "act_number": "28/2025",
+     "published_on": "2025-11-27",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/147934/visao/original",
+     "chars": 10597,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "ATO DECLARATÓRIO EXECUTIVO",
+     "size": "medio",
+     "external_id": "147344",
+     "act_number": "26/2025",
+     "published_on": "2025-10-29",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/147344/visao/original",
+     "chars": 10594,
+     "near_boundary": false,
+     "ambiguous_year": false
+    }
+   ],
+   "refused": [],
+   "state": "candidate"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Solução de Consulta",
+   "size": "pequeno",
+   "pick": {
+    "source_code": "rfb-normas",
+    "act_type": "SOLUÇÃO DE CONSULTA",
+    "size": "pequeno",
+    "external_id": "148681",
+    "act_number": "258/2025",
+    "published_on": "2025-12-31",
+    "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148681/visao/original",
+    "chars": 1086,
+    "near_boundary": false,
+    "ambiguous_year": false
+   },
+   "fallbacks": [
+    {
+     "source_code": "rfb-normas",
+     "act_type": "SOLUÇÃO DE CONSULTA",
+     "size": "pequeno",
+     "external_id": "148446",
+     "act_number": "257/2025",
+     "published_on": "2025-12-22",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148446/visao/original",
+     "chars": 4476,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "SOLUÇÃO DE CONSULTA",
+     "size": "pequeno",
+     "external_id": "148319",
+     "act_number": "254/2025",
+     "published_on": "2025-12-15",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148319/visao/original",
+     "chars": 1965,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "SOLUÇÃO DE CONSULTA",
+     "size": "pequeno",
+     "external_id": "148324",
+     "act_number": "5/2025",
+     "published_on": "2025-12-15",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148324/visao/original",
+     "chars": 2697,
+     "near_boundary": false,
+     "ambiguous_year": false
+    },
+    {
+     "source_code": "rfb-normas",
+     "act_type": "SOLUÇÃO DE CONSULTA",
+     "size": "pequeno",
+     "external_id": "148279",
+     "act_number": "256/2025",
+     "published_on": "2025-12-12",
+     "official_url": "https://normasinternet2.receita.fazenda.gov.br/#/consulta/externa/148279/visao/original",
+     "chars": 645,
+     "near_boundary": false,
+     "ambiguous_year": false
+    }
+   ],
+   "refused": [],
+   "state": "candidate"
+  },
+  {
+   "type": "Solução de Consulta",
+   "size": "medio",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  },
+  {
+   "type": "Solução de Consulta",
+   "size": "grande",
+   "pick": null,
+   "fallbacks": [],
+   "refused": [],
+   "state": "not found in the Acervo (≠ nonexistent)"
+  }
+ ],
+ "targets": [
+  {
+   "type": "Portaria",
+   "idAto": "148693",
+   "numeroAto": "635",
+   "anoAto": "2025",
+   "acervoSize": "medio"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "idAto": "148629",
+   "numeroAto": "30",
+   "anoAto": "2025",
+   "acervoSize": "pequeno"
+  },
+  {
+   "type": "Ato Declaratório Executivo",
+   "idAto": "148516",
+   "numeroAto": "33",
+   "anoAto": "2025",
+   "acervoSize": "medio"
+  },
+  {
+   "type": "Solução de Consulta",
+   "idAto": "148681",
+   "numeroAto": "258",
+   "anoAto": "2025",
+   "acervoSize": "pequeno"
+  }
+ ]
+}

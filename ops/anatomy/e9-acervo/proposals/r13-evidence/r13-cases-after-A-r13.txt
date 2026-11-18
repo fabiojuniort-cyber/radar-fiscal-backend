@@ -1,0 +1,306 @@
+OK   want=block   got=block   | reviewer A5-1 (norm two clauses before "conforme")
+OK   want=block   got=block   | three modifier clauses
+OK   want=block   got=block   | an intermediate connector clause is not a governing clause
+OK   want=block   got=block   | na forma, two clauses back
+OK   want=block   got=block   | segundo, two clauses back
+OK   want=block   got=block   | de acordo com, two clauses back
+OK   want=block   got=block   | cujos, two clauses back
+OK   want=block   got=block   | bare norm kind two clauses back
+OK   want=block   got=block   | "nº." and "arts." abbreviations never end the sentence
+OK   want=block   got=block   | modifier clause holding a noun phrase is traversed
+OK   want=block   got=block   | elliptical reference right after an ACCESSORY clause (nearest noun is the other norm's)
+OK   want=promote got=promote | governing clause of the act itself, modifiers between
+OK   want=promote got=promote | B: accessory foundation before the governing clause is not a block
+OK   want=promote got=promote | B: accessory clause skipped, governing clause clean
+OK   want=promote got=promote | ADE Cofis real shape
+OK   want=promote got=promote | E: a norm in an EARLIER sentence of the device is not inherited
+OK   want=block   got=block   | reviewer A5-2
+OK   want=block   got=block   | bare participle
+OK   want=block   got=block   | nos termos, nothing before
+OK   want=block   got=block   | connector + own noun, no governing clause
+OK   want=block   got=block   | de acordo com, nothing before
+OK   want=block   got=block   | only modifiers before
+OK   want=block   got=block   | E: antecedent only in an EARLIER sentence
+OK   want=block   got=block   | E: antecedent only before a semicolon
+OK   want=block   got=block   | paragraph label then elliptical
+OK   want=block   got=block   | inciso label then elliptical
+OK   want=promote got=promote | elliptical with a clean nominal antecedent
+OK   want=promote got=promote | connector with a clean nominal antecedent
+OK   want=promote got=promote | own clause with its own object (no remission)
+OK   want=promote got=promote | paragraph with own object
+OK   want=promote got=promote | inciso with own object
+OK   want=block   got=block   | reviewer 1 (nominal clause between)
+OK   want=block   got=block   | reviewer 2
+OK   want=block   got=block   | reviewer 3 (two nominal clauses between)
+OK   want=block   got=block   | reviewer 4 (embedded "por força da")
+OK   want=block   got=block   | reviewer 5 (embedded "nos termos do")
+OK   want=block   got=block   | annex of another norm two clauses back
+OK   want=promote got=promote | ADE Cofis real shape (accessory "dispensadas … IN 1.155" skipped)
+OK   want=promote got=promote | accessory "com fundamento na" between
+OK   want=promote got=promote | fronted foundation "Nos termos da Lei …" opening the sentence
+OK   want=promote got=promote | no norm anywhere, nominal clauses between
+OK   want=promote got=promote | norm only in an earlier SENTENCE
+OK   want=block   got=block   | abbreviation pair Decreto (full)
+OK   want=block   got=block   | abbreviation pair Decreto (abbr)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (full)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (abbr)
+OK   want=block   got=block   | abbreviation pair Portaria (full)
+OK   want=block   got=block   | abbreviation pair Portaria (abbr)
+OK   want=block   got=block   | abbreviation pair Resolução (full)
+OK   want=block   got=block   | abbreviation pair Resolução (abbr)
+OK   want=promote got=promote | real sentence end: ends after the act number
+OK   want=promote got=promote | real sentence end: ends after a year
+OK   want=promote got=promote | real sentence end: ends after a plain word
+OK   want=block   got=block   | reviewer ACC-1 (internal "observados na Portaria")
+OK   want=block   got=block   | reviewer ACC-2 (internal "dispensados pela IN")
+OK   want=block   got=block   | internal "observadas" with a Decreto
+OK   want=promote got=promote | control: "observada a Lei" opening its clause
+OK   want=promote got=promote | control: ADE Cofis real shape ("dispensadas" opening its clause)
+OK   want=block   got=block   | reviewer FRONT-1 (start, applies)
+OK   want=block   got=block   | reviewer FRONT-2 (start, applies)
+OK   want=block   got=block   | pair: applies, middle
+OK   want=block   got=block   | pair: maintains, start
+OK   want=block   got=block   | pair: maintains, middle
+OK   want=block   got=block   | pair: "observar-se-ão", start
+OK   want=block   got=block   | pair: "observar-se-ão", middle
+OK   want=block   got=block   | ambiguous main clause (no constitutive verb) → no promotion
+OK   want=promote got=promote | pair: authorizes, start
+OK   want=promote got=promote | pair: authorizes, middle
+OK   want=promote got=promote | pair: approves, start
+OK   want=promote got=promote | pair: approves, middle
+OK   want=promote got=promote | pair: institutes, start
+OK   want=block   got=block   | abbreviation pair Portaria Conjunta (full)
+OK   want=block   got=block   | abbreviation pair Portaria Conjunta (abbr)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Interpretativo (full)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Interpretativo (abbr)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Executivo (full)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Executivo (abbr)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (full)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (abbr)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (Instr. Norm.) (full)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (Instr. Norm.) (abbr)
+OK   want=block   got=block   | abbreviation pair Resolução Conjunta (full)
+OK   want=block   got=block   | abbreviation pair Resolução Conjunta (abbr)
+OK   want=block   got=block   | abbreviation pair Decreto Legislativo (full)
+OK   want=block   got=block   | abbreviation pair Decreto Legislativo (abbr)
+OK   want=block   got=block   | abbreviation pair Portaria Interministerial (full)
+OK   want=block   got=block   | abbreviation pair Portaria Interministerial (abbr)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (Sol. Cons.) (full)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (Sol. Cons.) (abbr)
+OK   want=promote got=promote | real sentence end: ends after a number
+OK   want=promote got=promote | real sentence end: ends after a year
+OK   want=promote got=promote | real sentence end: ends after a lowercase word
+OK   want=promote got=promote | real sentence end: ";" still a boundary
+OK   want=block   got=block   | reviewer CST-1 (start, "nela previstas")
+OK   want=block   got=block   | reviewer CST-2 (middle, "nela previstas")
+OK   want=block   got=block   | reviewer CST-3 (middle, "dela constantes")
+OK   want=block   got=block   | start, "dela constantes"
+OK   want=block   got=block   | start, explicit "previstos na referida"
+OK   want=block   got=block   | middle, explicit "constantes da mesma"
+OK   want=block   got=block   | start, "neles previstos"
+OK   want=block   got=block   | accessory "observada" + resumption
+OK   want=promote got=promote | own content, start
+OK   want=promote got=promote | own content, middle
+OK   want=promote got=promote | own content, authorization
+OK   want=promote got=promote | "deste ato" is the act itself
+OK   want=promote got=promote | ADE Cofis real shape
+OK   want=block   got=block   | abbreviation pair port. conj. (lower) (full)
+OK   want=block   got=block   | abbreviation pair port. conj. (lower) (abbr)
+OK   want=block   got=block   | abbreviation pair instr. norm. (lower) (full)
+OK   want=block   got=block   | abbreviation pair instr. norm. (lower) (abbr)
+OK   want=block   got=block   | abbreviation pair ato decl. interpr. (lower) (full)
+OK   want=block   got=block   | abbreviation pair ato decl. interpr. (lower) (abbr)
+OK   want=block   got=block   | abbreviation pair PORT. CONJ. (upper) (full)
+OK   want=block   got=block   | abbreviation pair PORT. CONJ. (upper) (abbr)
+OK   want=block   got=block   | abbreviation pair INSTR. NORM. (upper) (full)
+OK   want=block   got=block   | abbreviation pair INSTR. NORM. (upper) (abbr)
+OK   want=block   got=block   | abbreviation pair ATO DECL. INTERPR. (upper) (full)
+OK   want=block   got=block   | abbreviation pair ATO DECL. INTERPR. (upper) (abbr)
+OK   want=block   got=block   | abbreviation pair Port. conj. (mixed) (full)
+OK   want=block   got=block   | abbreviation pair Port. conj. (mixed) (abbr)
+OK   want=block   got=block   | abbreviation pair Instr. norm. (mixed) (full)
+OK   want=block   got=block   | abbreviation pair Instr. norm. (mixed) (abbr)
+OK   want=block   got=block   | abbreviation pair Ato decl. Interpr. (mixed) (full)
+OK   want=block   got=block   | abbreviation pair Ato decl. Interpr. (mixed) (abbr)
+OK   want=promote got=promote | real sentence end: lower abbreviation, sentence ends after the number
+OK   want=promote got=promote | real sentence end: lower abbreviation, sentence ends after the year
+OK   want=promote got=promote | real sentence end: lower abbreviation, ";"
+OK   want=promote got=promote | real sentence end: lower abbreviation, ":"
+OK   want=block   got=block   | reviewer MRG-1 (after "RFB.")
+OK   want=block   got=block   | after a lower abbreviation
+OK   want=block   got=block   | "Nos termos" after "Cosit."
+OK   want=block   got=block   | R9 case start: previstas no ato acima citado
+OK   want=block   got=block   | R9 case middle: previstas no ato acima citado
+OK   want=block   got=block   | R9 case start: previstas no supracitado ato
+OK   want=block   got=block   | R9 case middle: previstas no supracitado ato
+OK   want=block   got=block   | R9 case start: previstas no aludido diploma
+OK   want=block   got=block   | R9 case middle: previstas no aludido diploma
+OK   want=block   got=block   | R9 case start: previstas naquele diploma
+OK   want=block   got=block   | R9 case middle: previstas naquele diploma
+OK   want=block   got=block   | R9 case start: previstas no diploma referido
+OK   want=block   got=block   | R9 case middle: previstas no diploma referido
+OK   want=block   got=block   | R9 case start: ali previstas
+OK   want=block   got=block   | R9 case middle: ali previstas
+OK   want=block   got=block   | R9 case start: lá estabelecidas
+OK   want=block   got=block   | R9 case middle: lá estabelecidas
+OK   want=block   got=block   | R9 case start: previstas na norma em referência
+OK   want=block   got=block   | R9 case middle: previstas na norma em referência
+OK   want=block   got=block   | R9 case start: previstas no mencionado diploma
+OK   want=block   got=block   | R9 case middle: previstas no mencionado diploma
+OK   want=block   got=block   | R9 case start: previstas no ato mencionado
+OK   want=block   got=block   | R9 case middle: previstas no ato mencionado
+OK   want=block   got=block   | R9 case start: constantes de seu Anexo
+OK   want=block   got=block   | R9 case middle: constantes de seu Anexo
+OK   want=block   got=block   | R9 case start: fixadas pela IN acima
+OK   want=block   got=block   | R9 case middle: fixadas pela IN acima
+OK   want=block   got=block   | R9 case start: previstas no citado ato
+OK   want=block   got=block   | R9 case middle: previstas no citado ato
+OK   want=block   got=block   | novel start: nela fixadas
+OK   want=block   got=block   | novel middle: nela fixadas
+OK   want=block   got=block   | novel start: constantes do ato supra
+OK   want=block   got=block   | novel middle: constantes do ato supra
+OK   want=block   got=block   | novel start: definidas no precitado diploma
+OK   want=block   got=block   | novel middle: definidas no precitado diploma
+OK   want=block   got=block   | novel start: estabelecidas pelo retrocitado ato
+OK   want=block   got=block   | novel middle: estabelecidas pelo retrocitado ato
+OK   want=block   got=block   | novel start: previstas nos seus anexos
+OK   want=block   got=block   | novel middle: previstas nos seus anexos
+OK   want=block   got=block   | novel start: dele constantes
+OK   want=block   got=block   | novel middle: dele constantes
+OK   want=block   got=block   | novel start: previstas
+OK   want=block   got=block   | novel middle: previstas
+OK   want=block   got=block   | novel start: fixadas na mesma norma
+OK   want=block   got=block   | novel middle: fixadas na mesma norma
+OK   want=block   got=block   | novel start: previstas em tal ato
+OK   want=block   got=block   | novel middle: previstas em tal ato
+OK   want=block   got=block   | novel start: previstas nessa norma
+OK   want=block   got=block   | novel middle: previstas nessa norma
+OK   want=block   got=block   | novel start: contidas no Anexo daquela Instrução
+OK   want=block   got=block   | novel middle: contidas no Anexo daquela Instrução
+OK   want=block   got=block   | novel start: previstas nesta e na Instrução Normativa RFB nº 1.155
+OK   want=block   got=block   | novel middle: previstas nesta e na Instrução Normativa RFB nº 1.155
+OK   want=promote got=promote | own start: previstas nesta Portaria
+OK   want=promote got=promote | own middle: previstas nesta Portaria
+OK   want=promote got=promote | own start: previstas no Anexo desta Portaria
+OK   want=promote got=promote | own middle: previstas no Anexo desta Portaria
+OK   want=promote got=promote | own start: previstas neste ato
+OK   want=promote got=promote | own middle: previstas neste ato
+OK   want=promote got=promote | own start: fixadas pela presente Portaria
+OK   want=promote got=promote | own middle: fixadas pela presente Portaria
+OK   want=promote got=promote | own start: de referência
+OK   want=promote got=promote | own middle: de referência
+OK   want=promote got=promote | own start: de referência para 2023
+OK   want=promote got=promote | own middle: de referência para 2023
+OK   want=promote got=promote | own start: aplicáveis aos cigarros
+OK   want=promote got=promote | own middle: aplicáveis aos cigarros
+OK   want=promote got=promote | own, foundation at the start, Lei, "nesta Portaria"
+OK   want=promote got=promote | own, Cofis-like accessory dispensation
+OK   want=promote got=promote | own, foundation + authorization
+OK   want=promote got=promote | own, models, start
+OK   want=promote got=promote | own, models, middle
+OK   want=block   got=block   | reviewer P2 (abbreviated norm, "Os mesmos")
+OK   want=block   got=block   | "Tais"
+OK   want=block   got=block   | "Esses"
+OK   want=block   got=block   | "Os referidos"
+OK   want=block   got=block   | "Aqueles"
+OK   want=block   got=block   | "As mesmas"
+OK   want=promote got=promote | resumption with its own express self-reference
+OK   want=promote got=promote | no resumption: "Os valores"
+OK   want=promote got=promote | no resumption: "Ficam aprovados"
+OK   want=promote got=promote | real end after an acronym ("da RFB.")
+OK   want=block   got=block   | reviewer: IN da SRF. + ali previstas
+OK   want=block   got=block   | reviewer: art. da IN. + lá previstas
+OK   want=block   got=block   | reviewer: Anexo da IN da RFB. + nela previstas
+OK   want=block   got=block   | reviewer: IN SRF nº 52, de 2000. + ali previstas
+OK   want=block   got=block   | reviewer: Lei nº 9.532. + nela previstas
+OK   want=block   got=block   | reviewer: da sobredita norma
+OK   want=block   got=block   | novel: daquele ato
+OK   want=block   got=block   | novel: acima referidas
+OK   want=block   got=block   | novel: no ato retrocitado
+OK   want=block   got=block   | novel: Portaria. + nela fixados
+OK   want=block   got=block   | novel: Portaria. + dessa norma
+OK   want=block   got=block   | novel: em referência
+OK   want=promote got=promote | own: "de referência" is not "em referência"
+OK   want=promote got=promote | own: models
+OK   want=promote got=promote | own: foundation Lei + "neste diploma"
+OK   want=promote got=promote | own: "previstas deste diploma"
+OK   want=promote got=promote | own: "nesta data"
+OK   want=promote got=promote | own: model published in the D.O.U.
+OK   want=promote got=promote | ADE Cofis real shape
+OK   want=block   got=block   | "Estes valores"
+OK   want=block   got=block   | "Estas alíquotas"
+OK   want=block   got=block   | "Os demais valores"
+OK   want=block   got=block   | "As demais alíquotas"
+OK   want=block   got=block   | "Ditas alíquotas"
+OK   want=block   got=block   | "Ditos valores"
+OK   want=block   got=block   | "As ditas alíquotas"
+OK   want=block   got=block   | "Sobreditas alíquotas"
+OK   want=promote got=promote | self-reference in the same sentence: "por esta Portaria"
+OK   want=promote got=promote | opening "Estes" with its own self-reference
+OK   want=block   got=block   | start: previstas naquele diploma
+OK   want=block   got=block   | middle: previstas no aludido diploma
+OK   want=promote got=promote | start: fixadas neste diploma
+OK   want=promote got=promote | middle: fixadas neste diploma
+OK   want=block   got=block   | start: da sobredita norma
+OK   want=block   got=block   | middle: da sobredita norma
+OK   want=block   got=block   | start: do susodito ato
+OK   want=block   got=block   | middle: do susodito ato
+OK   want=block   got=block   | start: da norma em tela
+OK   want=block   got=block   | middle: da norma em tela
+OK   want=block   got=block   | start: do ato em comento
+OK   want=block   got=block   | middle: do ato em comento
+OK   want=block   got=block   | start: do ato anterior
+OK   want=block   got=block   | middle: do ato anterior
+OK   want=block   got=block   | start: da Portaria anterior
+OK   want=block   got=block   | middle: da Portaria anterior
+OK   want=promote got=promote | middle: own, no marker
+OK   want=promote got=promote | start: temporal "exercício anterior" is not a marker
+OK   want=promote got=promote | middle: "previstas nesta Portaria" is the act itself
+OK   want=block   got=block   | Fica revogada a Instrução No… + da norma em tela
+OK   want=block   got=block   | Fica revogada a Instrução No… + do ato em comento
+OK   want=block   got=block   | Fica revogada a Instrução No… + do susodito ato
+OK   want=block   got=block   | Fica revogada a Instrução No… + do ato anterior
+OK   want=block   got=block   | Fica revogado o Anexo III da… + da norma em tela
+OK   want=block   got=block   | Fica revogado o Anexo III da… + do ato em comento
+OK   want=block   got=block   | Fica revogado o Anexo III da… + do susodito ato
+OK   want=block   got=block   | Fica revogado o Anexo III da… + do ato anterior
+OK   want=block   got=block   | Fica revogado o art. 3º da I… + da norma em tela
+OK   want=block   got=block   | Fica revogado o art. 3º da I… + do ato em comento
+OK   want=block   got=block   | Fica revogado o art. 3º da I… + do susodito ato
+OK   want=block   got=block   | Fica revogado o art. 3º da I… + do ato anterior
+OK   want=block   got=block   | Aplica-se a Lei nº 9.532, de… + da norma em tela
+OK   want=block   got=block   | Aplica-se a Lei nº 9.532, de… + do ato em comento
+OK   want=block   got=block   | Aplica-se a Lei nº 9.532, de… + do susodito ato
+OK   want=block   got=block   | Aplica-se a Lei nº 9.532, de… + do ato anterior
+OK   want=block   got=block   | Fica revogada a Portaria Con… + da norma em tela
+OK   want=block   got=block   | Fica revogada a Portaria Con… + do ato em comento
+OK   want=block   got=block   | Fica revogada a Portaria Con… + do susodito ato
+OK   want=block   got=block   | Fica revogada a Portaria Con… + do ato anterior
+OK   want=promote got=promote | Fica revogada a Instrução No… + de referência
+OK   want=promote got=promote | Fica revogado o Anexo III da… + de referência
+OK   want=promote got=promote | Fica revogado o art. 3º da I… + de referência
+OK   want=promote got=promote | Aplica-se a Lei nº 9.532, de… + de referência
+OK   want=promote got=promote | Fica revogada a Portaria Con… + de referência
+OK   want=block   got=block   | "Susoditas alíquotas"
+OK   want=block   got=block   | "As susoditas alíquotas"
+OK   want=block   got=block   | do multicitado ato — citation middle
+OK   want=block   got=block   | do multicitado ato — citation start
+OK   want=block   got=block   | do multicitado ato — no citation, after sentence end
+OK   want=block   got=block   | do multicitado ato — no citation at all
+OK   want=block   got=block   | da norma em epígrafe — citation middle
+OK   want=block   got=block   | da norma em epígrafe — citation start
+OK   want=block   got=block   | da norma em epígrafe — no citation, after sentence end
+OK   want=block   got=block   | da norma em epígrafe — no citation at all
+OK   want=block   got=block   | do ato em questão — citation middle
+OK   want=block   got=block   | do ato em questão — citation start
+OK   want=block   got=block   | do ato em questão — no citation, after sentence end
+OK   want=block   got=block   | do ato em questão — no citation at all
+OK   want=block   got=block   | da norma em causa — citation middle
+OK   want=block   got=block   | da norma em causa — citation start
+OK   want=block   got=block   | da norma em causa — no citation, after sentence end
+OK   want=block   got=block   | da norma em causa — no citation at all
+OK   want=promote got=promote | plain
+OK   want=promote got=promote | Lei citation
+OK   want=promote got=promote | bare epígrafe
+OK   want=promote got=promote | bare questão
+OK   want=promote got=promote | bare causa

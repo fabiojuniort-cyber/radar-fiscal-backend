@@ -1,0 +1,7 @@
+not ok 153 - E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated
+not ok 167 - E9 acceptance B4: the committed file is the append-only union with \#305/\#309 and accepts only the Portaria here
+not ok 170 - R2 (9) + B-3: the Portaria 635 stays the only eligible sample; partial readings are flagged complete:false without changing coverage
+not ok 174 - R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; netting only by proven reads; completeness ≠ operative context
+# tests 403
+# pass 399
+# fail 4

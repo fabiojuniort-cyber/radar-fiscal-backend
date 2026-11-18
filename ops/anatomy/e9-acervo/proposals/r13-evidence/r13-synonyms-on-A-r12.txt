@@ -1,0 +1,47 @@
+DIV N/P multicitado | citação meio
+DIV N/P multicitado | citação início
+DIV N/P multicitado | sem citação após frase comum
+DIV N/P multicitado | sem citação após SRF.
+DIV N/P multicitado | sem nenhuma citação
+DIV N/P multicitada | citação meio
+DIV N/P multicitada | citação início
+DIV N/P multicitada | sem citação após frase comum
+DIV N/P multicitada | sem citação após SRF.
+DIV N/P multicitada | sem nenhuma citação
+DIV N/P em epígrafe | citação meio
+DIV N/P em epígrafe | citação início
+DIV N/P em epígrafe | sem citação após frase comum
+DIV N/P em epígrafe | sem citação após SRF.
+DIV N/P em epígrafe | sem nenhuma citação
+DIV N/P em epigrafe (sem acento) | citação meio
+DIV N/P em epigrafe (sem acento) | citação início
+DIV N/P em epigrafe (sem acento) | sem citação após frase comum
+DIV N/P em epigrafe (sem acento) | sem citação após SRF.
+DIV N/P em epigrafe (sem acento) | sem nenhuma citação
+DIV N/P em questão | citação meio
+DIV N/P em questão | citação início
+DIV N/P em questão | sem citação após frase comum
+DIV N/P em questão | sem citação após SRF.
+DIV N/P em questão | sem nenhuma citação
+DIV N/P em questao (sem acento) | citação meio
+DIV N/P em questao (sem acento) | citação início
+DIV N/P em questao (sem acento) | sem citação após frase comum
+DIV N/P em questao (sem acento) | sem citação após SRF.
+DIV N/P em questao (sem acento) | sem nenhuma citação
+DIV N/P em causa | citação meio
+DIV N/P em causa | citação início
+DIV N/P em causa | sem citação após frase comum
+DIV N/P em causa | sem citação após SRF.
+DIV N/P em causa | sem nenhuma citação
+DIV N/P Em Epígrafe (caixa) | citação meio
+DIV N/P Em Epígrafe (caixa) | citação início
+DIV N/P Em Epígrafe (caixa) | sem citação após frase comum
+DIV N/P Em Epígrafe (caixa) | sem citação após SRF.
+DIV N/P Em Epígrafe (caixa) | sem nenhuma citação
+ok P/P CTL próprio
+ok P/P CTL fundamento próprio
+ok P/P CTL nesta Portaria
+ok P/P CTL epígrafe do próprio ato (palavra isolada)
+ok P/P CTL questão (sem "em")
+ok P/P CTL causa (sem "em")
+divergências 40 / 46; legalStatus unknown

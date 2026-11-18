@@ -1,0 +1,693 @@
+diff --git a/docs/anatomy/e9-acceptances.json b/docs/anatomy/e9-acceptances.json
+new file mode 100644
+index 00000000..82815b2f
+--- /dev/null
++++ b/docs/anatomy/e9-acceptances.json
+@@ -0,0 +1,236 @@
++{
++  "schema": "e9-acceptances/1",
++  "note": "Aceites formais E9, histórico append-only (um registro por motor revalidado). 'accepted' é derivado: vale enquanto ALGUM registro fixa o entrySha256 atual e o motor atual (ops/anatomy/official-coverage-matrix.ts).",
++  "acceptances": [
++    {
++      "sampleId": "lei-10637-2002-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
++      "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
++      "decidedBy": "COORD (revisão independente)",
++      "decidedOn": "2026-11-09",
++      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R3; evidência radar-fiscal-backend#305 @ d6d991ef",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ]
++    },
++    {
++      "sampleId": "lei-10833-2003-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
++      "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
++      "decidedBy": "COORD (revisão independente)",
++      "decidedOn": "2026-11-09",
++      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R3; evidência radar-fiscal-backend#305 @ d6d991ef",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ]
++    },
++    {
++      "sampleId": "lei-10637-2002-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
++      "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
++      "decidedBy": "COORD (revalidação independente)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R5.6: revalidação offline no motor da composição; evidência radar-fiscal-backend#309 @ 775fa2d (docs/anatomy/compose-e9-laws-equivalence.json)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10637-2002-atualizada @ 9235a810 (registro original preservado)"
++    },
++    {
++      "sampleId": "lei-10833-2003-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
++      "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
++      "decidedBy": "COORD (revalidação independente)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R5.6: revalidação offline no motor da composição; evidência radar-fiscal-backend#309 @ 775fa2d (docs/anatomy/compose-e9-laws-equivalence.json)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10833-2003-atualizada @ 9235a810 (registro original preservado)"
++    },
++    {
++      "sampleId": "lei-10637-2002-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
++      "engineBuildHash": "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296",
++      "decidedBy": "COORD (PASS do revisor independente, R5.6)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — COORD E9 R5.7: aceite offline no hash final da composição; evidência radar-fiscal-backend#309 @ 2edfd3c (docs/anatomy/compose-e9-laws-equivalence.json, finalComposed)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10637-2002-atualizada @ 9235a810 e 693ba416 (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10833-2003-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
++      "engineBuildHash": "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296",
++      "decidedBy": "COORD (PASS do revisor independente, R5.6)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — COORD E9 R5.7: aceite offline no hash final da composição; evidência radar-fiscal-backend#309 @ 2edfd3c (docs/anatomy/compose-e9-laws-equivalence.json, finalComposed)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10833-2003-atualizada @ 9235a810 e 693ba416 (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10637-2002-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
++      "engineBuildHash": "1676b562c3980790a77591e19ed21f40274f7b40b6e1029ea543015099ef0a74",
++      "decidedBy": "COORD (PASS do revisor independente, R5.8)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — revisão independente R5.8: PASS no #309 @ 0fc4882 (compose-e9-laws-equivalence.json, finalComposed, cinco motores)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416 e e5c03993 (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10833-2003-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
++      "engineBuildHash": "1676b562c3980790a77591e19ed21f40274f7b40b6e1029ea543015099ef0a74",
++      "decidedBy": "COORD (PASS do revisor independente, R5.8)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — revisão independente R5.8: PASS no #309 @ 0fc4882 (compose-e9-laws-equivalence.json, finalComposed, cinco motores)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416 e e5c03993 (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10637-2002-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
++      "engineBuildHash": "a80793bbc8cbb1f7cec66e1746c56fba0a1222f12e60de37fb832b0ed457c2e6",
++      "decidedBy": "COORD (PASS do revisor independente, R5.9)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — revisão independente R5.9: PASS no #309 @ d4d9585 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416, e5c03993 e 1676b562 (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10833-2003-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
++      "engineBuildHash": "a80793bbc8cbb1f7cec66e1746c56fba0a1222f12e60de37fb832b0ed457c2e6",
++      "decidedBy": "COORD (PASS do revisor independente, R5.9)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — revisão independente R5.9: PASS no #309 @ d4d9585 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416, e5c03993 e 1676b562 (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10637-2002-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
++      "engineBuildHash": "a687624eb114c3208d0b271a584fa33adb12b2268a616d9815708f13a9957090",
++      "decidedBy": "COORD (fechamento R5.10; PASS do revisor independente sobre a composição)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — COORD fechamento R5.10: registrar no #309 @ 1867e52 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416, e5c03993, 1676b562, a80793bb (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "lei-10833-2003-atualizada",
++      "cellId": "normas-leg-br--lei--grande",
++      "scope": "offline",
++      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
++      "engineBuildHash": "a687624eb114c3208d0b271a584fa33adb12b2268a616d9815708f13a9957090",
++      "decidedBy": "COORD (fechamento R5.10; PASS do revisor independente sobre a composição)",
++      "decidedOn": "2026-11-10",
++      "ref": "tribusca-control#116 — COORD fechamento R5.10: registrar no #309 @ 1867e52 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
++      "limits": [
++        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
++        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
++        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
++        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
++        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
++      ],
++      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416, e5c03993, 1676b562, a80793bb (registros anteriores preservados)"
++    },
++    {
++      "sampleId": "rfb:148693",
++      "cellId": "rfb--portaria--medio",
++      "scope": "offline",
++      "entrySha256": "7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae",
++      "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
++      "decidedBy": "COORD (Frente 1, continuidade P2-c)",
++      "decidedOn": "2026-11-11",
++      "ref": "tribusca-control#116 c.6776402307 (registro) — Portaria RFB nº 635/2025, multivigente SHA-256 a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8, #303 @ 719352f",
++      "limits": [
++        "escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva",
++        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout",
++        "sem merge: #303 herda o #285 (NÃO MERGEAR)",
++        "CI verify do HEAD vermelho por compatibilidade pg_dump/PG16 (#310), não pela anatomia"
++      ]
++    }
++  ]
++}
+diff --git a/docs/anatomy/official-coverage-matrix.json b/docs/anatomy/official-coverage-matrix.json
+index 95f1359f..60b266ec 100644
+--- a/docs/anatomy/official-coverage-matrix.json
++++ b/docs/anatomy/official-coverage-matrix.json
+@@ -90,7 +90,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 14 unidentified chars; 31 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:133898",
+@@ -140,7 +142,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 11279 unidentified chars; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:104314",
+@@ -165,7 +169,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 1819 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:116968",
+@@ -190,7 +196,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 103 unidentified chars; 35 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content; the text refers to its OWN annex 0× (+37 ambiguous) and the representation carries none"
++      ]
+     },
+     {
+       "id": "rfb:122645",
+@@ -215,7 +223,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 272 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:142967",
+@@ -265,7 +275,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 262 unidentified chars; limitations rfb_segment_type_unidentified_by_source, unidentified_content; the text refers to its OWN annex 2× (+0 ambiguous) and the representation carries none"
++      ]
+     },
+     {
+       "id": "rfb:148629",
+@@ -290,22 +302,24 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 415 unidentified chars; 1 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, unidentified_content"
++      ]
+     },
+     {
+       "id": "rfb:148681",
+       "source": "RFB",
+       "type": "Solução de Consulta",
+       "layout": "JSON multivigente (API normasinternet2)",
+-      "chars": 2182,
+-      "size": "pequeno",
++      "chars": null,
++      "size": null,
+       "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+       "bytes": 8185,
+       "stages": {
+         "captured": true,
+         "identified": true,
+         "read": true,
+-        "validated": true,
++        "validated": false,
+         "accepted": false
+       },
+       "profile": "RFB",
+@@ -315,7 +329,10 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "body in an attachment absent from the representation: size UNDETERMINED, never covers a size cell",
++        "partial reading — never accepted as complete: 2 attachment(s) without content"
++      ]
+     },
+     {
+       "id": "rfb:148693",
+@@ -331,14 +348,15 @@
+         "identified": true,
+         "read": true,
+         "validated": true,
+-        "accepted": false
++        "accepted": true
+       },
+       "profile": "RFB",
+       "diagnostic": null,
+       "outputHash": "450b2d12310098474a87548eedbd50fb8b6e73d8bd172532e10d268fb6c81a99",
+       "evidence": [
+         "docs/anatomy/official-lot-rfb.json",
+-        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
++        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
++        "docs/anatomy/e9-acceptances.json"
+       ],
+       "notes": []
+     },
+@@ -365,7 +383,9 @@
+         "docs/anatomy/official-lot-rfb.json",
+         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+       ],
+-      "notes": []
++      "notes": [
++        "partial reading — never accepted as complete: status partial; 31 unidentified chars; limitations rfb_segment_type_unmapped, unidentified_content"
++      ]
+     },
+     {
+       "id": "ricms-an1art041",
+@@ -933,7 +953,7 @@
+       "validatedSamples": [
+         "rfb:148693"
+       ],
+-      "accepted": false,
++      "accepted": true,
+       "unvalidatedSamples": []
+     },
+     {
+@@ -1057,10 +1077,8 @@
+         "required": true
+       },
+       "route": "API RFB — P2-c (autorizada, c.6701950134)",
+-      "status": "covered",
+-      "validatedSamples": [
+-        "rfb:148681"
+-      ],
++      "status": "pending",
++      "validatedSamples": [],
+       "accepted": false,
+       "unvalidatedSamples": []
+     },
+@@ -1835,6 +1853,7 @@
+     "rfb--ato-declaratorio-interpretativo--medio",
+     "rfb--ato-declaratorio-interpretativo--grande",
+     "rfb--ato-declaratorio-executivo--grande",
++    "rfb--solucao-de-consulta--pequeno",
+     "rfb--solucao-de-consulta--medio",
+     "rfb--solucao-de-consulta--grande",
+     "rfb--resolucao--medio",
+@@ -1879,7 +1898,7 @@
+     "doe-sp--portaria-cat--medio",
+     "doe-sp--portaria-cat--grande"
+   ],
+-  "coveredRequired": 14,
++  "coveredRequired": 13,
+   "samplesOutsideGrid": [],
+   "e9MatrixComplete": false
+ }
+diff --git a/ops/anatomy/official-coverage-matrix.ts b/ops/anatomy/official-coverage-matrix.ts
+index 17ec0184..dfa74888 100644
+--- a/ops/anatomy/official-coverage-matrix.ts
++++ b/ops/anatomy/official-coverage-matrix.ts
+@@ -19,6 +19,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+ import { join } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
++import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
+ import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
+ import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
+ import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
+@@ -32,6 +33,93 @@ export type Size = 'pequeno' | 'médio' | 'grande';
+ export const sizeOf = (chars: number): Size => (chars < 10_000 ? 'pequeno' : chars < 50_000 ? 'médio' : 'grande');
+ const SIZES: readonly Size[] = ['pequeno', 'médio', 'grande'];
+ const sha = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
++/** Canonical JSON (sorted keys) so a digest does not depend on key order. */
++const canonJson = (v: unknown): string => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, (x as Record<string, unknown>)[k]])) : x));
++/**
++ * E9 (tribusca-control#116): formal acceptances are DATA (docs/anatomy/e9-acceptances.json), never a hard-coded `accepted: true`.
++ * Same record shape as the NORMAS-LEG branch (#305). For an RFB sample a record counts only while it pins the sha256 of the
++ * sample's canonical lot entry AND the current engine identity, and only when the reading is COMPLETE: status complete,
++ * 0 unidentified characters, 0 attachments without content, 0 limitations. A partial reading is never accepted.
++ */
++export const ACCEPTANCES_FILE = fileURLToPath(new URL('../../docs/anatomy/e9-acceptances.json', import.meta.url));
++export interface Acceptance { sampleId: string; cellId: string; scope: 'offline'; entrySha256: string; engineBuildHash: string; decidedBy: string; decidedOn: string; ref: string; limits: string[] }
++const ACCEPTANCE_KEYS = ['sampleId', 'cellId', 'scope', 'entrySha256', 'engineBuildHash', 'decidedBy', 'decidedOn', 'ref', 'limits'] as const;
++/**
++ * Strict validation (fail closed): unknown or missing fields, wrong types, a non-hex digest/engine, a non-ISO date, an
++ * empty limits list, a cellId outside the grid, an exact duplicate, or two different digests for the same sample on the
++ * same engine all REJECT the whole file. Records of samples that are not on this branch (e.g. the NORMAS-LEG history of
++ * #305/#309) are kept and simply never match: the file is append-only and composed by union.
++ */
++export function validateAcceptances(raw: unknown, gridIds: ReadonlySet<string>): Acceptance[] {
++  const fail = (m: string): never => { throw new Error(`e9-acceptances.json: ${m}`); };
++  const root = raw as { acceptances?: unknown };
++  if (!root || typeof root !== 'object' || !Array.isArray(root.acceptances)) fail('missing "acceptances" array');
++  const seen = new Map<string, string>(); const exact = new Set<string>();
++  return (root.acceptances as unknown[]).map((r, i) => {
++    if (!r || typeof r !== 'object' || Array.isArray(r)) fail(`record ${i} is not an object`);
++    const o = r as Record<string, unknown>;
++    const extra = Object.keys(o).filter((k) => !(ACCEPTANCE_KEYS as readonly string[]).includes(k) && k !== 'revalidates');
++    if (extra.length) fail(`record ${i} has unknown field(s) ${extra.join(', ')}`);
++    for (const k of ['sampleId', 'cellId', 'decidedBy', 'ref'] as const) if (typeof o[k] !== 'string' || !(o[k] as string).trim()) fail(`record ${i}: ${k} must be a non-empty string`);
++    if (o.scope !== 'offline') fail(`record ${i}: scope must be "offline"`);
++    for (const k of ['entrySha256', 'engineBuildHash'] as const) if (typeof o[k] !== 'string' || !/^[0-9a-f]{64}$/u.test(o[k] as string)) fail(`record ${i}: ${k} must be 64 lowercase hex`);
++    if (typeof o.decidedOn !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(o.decidedOn)) fail(`record ${i}: decidedOn must be YYYY-MM-DD`);
++    if (!Array.isArray(o.limits) || !o.limits.length || o.limits.some((x) => typeof x !== 'string' || !x.trim())) fail(`record ${i}: limits must be a non-empty list of strings`);
++    if (o.revalidates !== undefined && typeof o.revalidates !== 'string') fail(`record ${i}: revalidates must be a string`);
++    if (!gridIds.has(o.cellId as string)) fail(`record ${i}: cellId "${String(o.cellId)}" is not a grid cell`);
++    const key = `${String(o.sampleId)}|${String(o.engineBuildHash)}`; const full = `${key}|${String(o.cellId)}|${String(o.entrySha256)}`;
++    if (exact.has(full)) fail(`record ${i}: duplicate of an earlier record (${String(o.sampleId)} on ${String(o.engineBuildHash).slice(0, 8)})`);
++    if (seen.has(key) && seen.get(key) !== `${String(o.cellId)}|${String(o.entrySha256)}`) fail(`record ${i}: conflicts with an earlier record for ${String(o.sampleId)} on the same engine`);
++    seen.set(key, `${String(o.cellId)}|${String(o.entrySha256)}`); exact.add(full);
++    return o as unknown as Acceptance;
++  });
++}
++export const loadAcceptances = (gridIds: ReadonlySet<string>): Acceptance[] =>
++  (existsSync(ACCEPTANCES_FILE) ? validateAcceptances(JSON.parse(readFileSync(ACCEPTANCES_FILE, 'utf8')), gridIds) : []);
++/**
++ * Material content the RFB representation does NOT carry: the text (non-struck, outside the ementa) mentions an annex
++ * ("Anexo", "anexos") and no live Anexo segment brings embedded content. Such a norm is never accepted as complete.
++ */
++export function annexGap(json: Buffer): string | null {
++  const r = JSON.parse(json.toString('utf8')) as { tiposSegmento?: { idTipoSegmento: number; nomeTipoSegmento: string }[]; ementas?: Seg[]; outrosSegmentos?: Seg[] };
++  type Seg = { idTipoSegmento: number; tachado?: boolean; textoIntegra?: string | null; arquivoBinario?: { arquivoBinario?: unknown } | null };
++  const name = new Map((r.tiposSegmento ?? []).map((t) => [t.idTipoSegmento, t.nomeTipoSegmento]));
++  const live = [...(r.ementas ?? []), ...(r.outrosSegmentos ?? [])].filter((x) => x.tachado !== true);
++  const text = live.filter((x) => name.get(x.idTipoSegmento) !== 'Ementa').map((x) => (x.textoIntegra ?? '').replace(/<[^>]+>/gu, ' ')).join(' ');
++  const kinds = annexMentions(text);
++  const own = kinds.own + kinds.ambiguous;
++  const embedded = live.some((x) => name.get(x.idTipoSegmento) === 'Anexo' && typeof x.arquivoBinario?.arquivoBinario === 'string' && x.arquivoBinario.arquivoBinario.length > 0);
++  return own > 0 && !embedded ? `the text refers to its OWN annex ${kinds.own}× (+${kinds.ambiguous} ambiguous) and the representation carries none` : null;
++}
++/**
++ * COORD (review of B): an annex that is PART OF THIS ACT is not the same as a mere citation of ANOTHER norm's annex.
++ * - other: "Anexo [I|Único|3] [, inciso/item/tabela …] da/do/ao <norm kind>" (e.g. "Anexo I da Instrução Normativa
++ *   RFB nº 2.121") — not this act's content, never a gap;
++ * - own: "Anexo [Único|I…] deste/desta/a este/ao presente …", "em anexo", "anexo a este/a esta";
++ * - ambiguous: anything else ("conforme o Anexo II") — counted as OWN (conservative: never accept on a guess).
++ */
++const NORM_KIND = '(?:Lei(?:\\s+Complementar)?|Decreto(?:-Lei)?|Instru[çc][ãa]o\\s+Normativa|IN|Portaria|Resolu[çc][ãa]o|Conv[êe]nio|Ajuste|Ato\\s+Declarat[óo]rio|Solu[çc][ãa]o\\s+de\\s+Consulta|Medida\\s+Provis[óo]ria|Regulamento|Parecer|Norma|Tabela|NCM|TIPI|RIR|RIPI|RICMS|Protocolo|Emenda)';
++const OTHER_RE = new RegExp(`^(?:\\s+(?:[ÚU]nico|[IVXLC]+|\\d+|[A-Z])\\b)?(?:,?\\s*(?:inciso|item|tabela|quadro|parte)\\b[^,;.]{0,40})?,?\\s+(?:d[ao]s?|à|ao)\\s+(?:referid[ao]\\s+|citad[ao]\\s+|mencionad[ao]\\s+)?${NORM_KIND}\\b`, 'iu');
++const OWN_AFTER = /^(?:\s+(?:[ÚU]nico|[IVXLC]+|\d+))?\s+(?:deste|desta|a\s+este|a\s+esta|ao\s+presente|à\s+presente|do\s+presente|da\s+presente)\b/iu;
++export function annexMentions(text: string): { own: number; other: number; ambiguous: number } {
++  const out = { own: 0, other: 0, ambiguous: 0 };
++  for (const m of text.matchAll(/\banexos?\b/giu)) {
++    const before = text.slice(Math.max(0, m.index! - 12), m.index!); const after = text.slice(m.index! + m[0].length, m.index! + m[0].length + 160);
++    if (OWN_AFTER.test(after) || /\bem\s+$/iu.test(before)) out.own++;
++    else if (OTHER_RE.test(after)) out.other++;
++    else out.ambiguous++;
++  }
++  return out;
++}
++const BODY_PARTS = ['article', 'caput', 'paragraph', 'inciso', 'alinea', 'item', 'group'];
++export const lotEntrySha256 = (e: unknown) => sha(canonJson(e));
++type LotAct = { idAto: number; epigrafe: string; canonicalChars: number; sha256: string; bytes: number; promoted: boolean; outputHash: string; status?: string; partTypes?: Record<string, number>;
++  unidentifiedChars?: number; attachmentsWithoutContent?: number; limitations?: Record<string, number> };
++/** Why an RFB lot reading is not complete (empty = complete). */
++export const incompleteness = (a: LotAct): string[] => [
++  ...(a.status !== 'complete' ? [`status ${String(a.status)}`] : []), ...((a.unidentifiedChars ?? 0) > 0 ? [`${a.unidentifiedChars} unidentified chars`] : []),
++  ...((a.attachmentsWithoutContent ?? 0) > 0 ? [`${a.attachmentsWithoutContent} attachment(s) without content`] : []),
++  ...(Object.keys(a.limitations ?? {}).length ? [`limitations ${Object.keys(a.limitations ?? {}).join(', ')}`] : [])];
+ 
+ // ---------------------------------------------------------------------------------------------------------------------
+ // The single grid. Layout names are exact strings; a sample must carry the same string to match.
+@@ -108,14 +196,14 @@ function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html
+ type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
+ const loadBaseline = (): BaselineEntry[] => (existsSync(SAMPLES_BASELINE) ? (JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: BaselineEntry[] }).samples : []);
+ 
+-export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Sample[] {
++export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), acceptances: Acceptance[] = loadAcceptances(new Set(GRID.map((c) => c.id)))): Sample[] {
+   const out: Sample[] = [];
+   const locked = (id: string, s: string, profile: string, rd: Read) => {
+     const b = baseline.find((x) => x.id === id);
+     return rd.invariants.length === 0 && !!b && b.sha256 === s && b.profile === profile && b.outputHash === rd.outputHash;
+   };
+   // RFB — the reproducible lot: bytes checked against the snapshot meta AND the lot baseline; the lot test re-runs it.
+-  const lot = JSON.parse(readFileSync(LOT_BASELINE, 'utf8')) as { acts: { idAto: number; epigrafe: string; canonicalChars: number; sha256: string; bytes: number; promoted: boolean; outputHash: string }[] };
++  const lot = JSON.parse(readFileSync(LOT_BASELINE, 'utf8')) as { acts: LotAct[] };
+   for (const dir of ['rfb-normasinternet2', 'rfb-normasinternet2-coleta02', 'rfb-p2c']) {
+     const d = join(ROOT, dir); if (!existsSync(d)) continue;
+     for (const f of readdirSync(d).filter((x) => /^\d+\.meta\.json$/u.test(x)).sort()) {
+@@ -126,9 +214,24 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline()): Samp
+       const epi = m.identification?.epigrafe ?? a?.epigrafe ?? '';
+       const type = m.p2c?.type ?? (/^Instru[çc][ãa]o Normativa/iu.test(epi) ? 'Instrução Normativa' : epi);
+       const inLot = !!a && a.sha256 === m.sha256;
+-      out.push({ id: `rfb:${m.id}`, source: 'RFB', type, layout: LAYOUT.RFB_JSON, chars: a?.canonicalChars ?? null, size: a ? sizeOf(a.canonicalChars) : null, sha256: m.sha256, bytes: m.bytes,
+-        stages: { captured: true, identified: !!epi, read: inLot, validated: inLot, accepted: false }, profile: inLot ? 'RFB' : null, diagnostic: null, outputHash: a?.outputHash ?? null,
+-        evidence: inLot ? ['docs/anatomy/official-lot-rfb.json', 'test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)'] : [], notes: inLot ? [] : ['not yet in the reproducible lot'] });
++      // The body lives in an attachment the representation does not carry (e.g. a Solução de Consulta PDF): the measured
++      // text is not the act, so its size is UNDETERMINED and the sample never covers a size cell.
++      const bodyAbsent = !!a && (a.attachmentsWithoutContent ?? 0) > 0 && !Object.keys(a.partTypes ?? {}).some((t) => BODY_PARTS.includes(t));
++      const gaps = a ? [...incompleteness(a), ...[annexGap(readFileSync(join(d, `${m.id}.json`)))].filter((x): x is string => !!x)] : [];
++      const size = a && !bodyAbsent ? sizeOf(a.canonicalChars) : null;
++      const sample: Sample = { id: `rfb:${m.id}`, source: 'RFB', type, layout: LAYOUT.RFB_JSON, chars: a && !bodyAbsent ? a.canonicalChars : null, size, sha256: m.sha256, bytes: m.bytes,
++        stages: { captured: true, identified: !!epi, read: inLot, validated: inLot && !bodyAbsent, accepted: false }, profile: inLot ? 'RFB' : null, diagnostic: null, outputHash: a?.outputHash ?? null,
++        evidence: inLot ? ['docs/anatomy/official-lot-rfb.json', 'test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)'] : [],
++        notes: !inLot ? ['not yet in the reproducible lot']
++          : [...(bodyAbsent ? ['body in an attachment absent from the representation: size UNDETERMINED, never covers a size cell'] : []),
++            ...(gaps.length ? [`partial reading — never accepted as complete: ${gaps.join('; ')}`] : [])] };
++      // Acceptance: a record must name THIS sample, the grid cell it really falls in, its current lot digest and the
++      // current engine; the reading must be complete and carry every material annex.
++      const cell = GRID.find((c) => matches(c, sample))?.id;
++      sample.stages.accepted = inLot && !bodyAbsent && gaps.length === 0 && !!cell && acceptances.some((x) => x.sampleId === sample.id && x.cellId === cell
++        && x.scope === 'offline' && x.entrySha256 === lotEntrySha256(a) && x.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH);
++      if (sample.stages.accepted) sample.evidence.push('docs/anatomy/e9-acceptances.json');
++      out.push(sample);
+     }
+   }
+   // Sefaz-SP consolidated legislation portal: read only through its proven preparation (typed source).
+diff --git a/test/anatomy.official-coverage.unit.test.ts b/test/anatomy.official-coverage.unit.test.ts
+index aca3cedb..89f22fc3 100644
+--- a/test/anatomy.official-coverage.unit.test.ts
++++ b/test/anatomy.official-coverage.unit.test.ts
+@@ -18,15 +18,15 @@ test('E9 matrix and samples baseline are regenerated identical to the committed
+   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
+ });
+ 
+-test('E9 current state: 14 cells covered (10 + 4 P2-c direct captures, 2026-11-10), E9 incomplete; nothing promoted or accepted; normas.leg.br keeps its own identity and is not validated', () => {
++test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated', () => {
+   const m = buildMatrix(real);
+   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
+     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
+-    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'rfb--solucao-de-consulta--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
++    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+   assert.equal(m.e9MatrixComplete, false);
+   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
+   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
+-  assert.ok(real.every((s) => !s.stages.accepted), 'collection acceptance is not anatomy acceptance');
++  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], 'only the COORD-accepted Portaria 635/2025 (e9-acceptances.json); collection acceptance is not anatomy acceptance');
+   const leg = real.filter((s) => s.id.startsWith('lei-'));
+   assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
+   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
+@@ -189,3 +189,97 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
+   assert.equal(decodeWithPolicy(new TextEncoder().encode('<meta charset="utf-8"><p>é</p>'), { httpCharset: null }).encodingSource, 'declared');
+   assert.equal(decodeWithPolicy(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), { httpCharset: null }).encodingSource, 'bom');
+ });
++
++// E9 (tribusca-control#116, COORD decision B on c.6783692588): RFB acceptance is DATA, strictly validated, pinned to the
++// sample, its REAL grid cell, its lot digest and the engine; only complete readings that carry every material annex.
++const accTest = async () => {
++  const m = await import('../ops/anatomy/official-coverage-matrix.js');
++  const { ANATOMY_ENGINE_BUILD_HASH: E } = await import('../src/modules/anatomy/build-identity.js');
++  const { readFileSync } = await import('node:fs');
++  const lot = JSON.parse(readFileSync(new URL('../docs/anatomy/official-lot-rfb.json', import.meta.url), 'utf8')) as { acts: { idAto: number }[] };
++  const entry = (id: number) => lot.acts.find((x) => x.idAto === id)!;
++  const ids = new Set(m.GRID.map((c) => c.id));
++  const rec = (id: number, cellId: string, over: Record<string, unknown> = {}) => ({ sampleId: `rfb:${id}`, cellId, scope: 'offline', entrySha256: m.lotEntrySha256(entry(id)),
++    engineBuildHash: E, decidedBy: 't', decidedOn: '2026-11-11', ref: 't', limits: ['t'], ...over });
++  const accepted = (recs: unknown[], id: number) => m.collectSamples(undefined, m.validateAcceptances({ acceptances: recs }, ids)).find((s) => s.id === `rfb:${id}`)!.stages.accepted;
++  return { m, E, ids, rec, accepted, readFileSync };
++};
++
++test('E9 acceptance B1: the record must name the REAL grid cell; pins on digest, engine and sample are all required', async () => {
++  const { rec, accepted } = await accTest();
++  assert.equal(accepted([rec(148693, 'rfb--portaria--medio')], 148693), true, 'exact sample + real cell + digest + engine → accepted');
++  assert.equal(accepted([rec(148693, 'rfb--portaria--pequeno')], 148693), false, 'another (valid) grid cell never counts');
++  assert.equal(accepted([rec(148693, 'rfb--portaria--medio', { entrySha256: '0'.repeat(64) })], 148693), false, 'lot digest drift voids it');
++  assert.equal(accepted([rec(148693, 'rfb--portaria--medio', { engineBuildHash: 'f'.repeat(64) })], 148693), false, 'another engine voids it');
++  assert.equal(accepted([rec(148693, 'rfb--portaria--medio', { sampleId: 'rfb:142967' })], 148693), false, 'a record for another sample never counts');
++});
++
++test('E9 acceptance B2: strict validation rejects the whole file (fail closed): unknown cell, shapes, duplicates, conflicts', async () => {
++  const { m, rec, ids } = await accTest();
++  const ok = rec(148693, 'rfb--portaria--medio');
++  const bad: [string, unknown, RegExp][] = [
++    ['cellId x (not a grid cell)', { acceptances: [{ ...ok, cellId: 'x' }] }, /not a grid cell/u],
++    ['no acceptances array', {}, /missing "acceptances"/u],
++    ['unknown field', { acceptances: [{ ...ok, accepted: true }] }, /unknown field/u],
++    ['scope', { acceptances: [{ ...ok, scope: 'online' }] }, /scope/u],
++    ['digest not hex', { acceptances: [{ ...ok, entrySha256: 'XYZ' }] }, /entrySha256/u],
++    ['engine short', { acceptances: [{ ...ok, engineBuildHash: '0e009431' }] }, /engineBuildHash/u],
++    ['date', { acceptances: [{ ...ok, decidedOn: '11/11/2026' }] }, /decidedOn/u],
++    ['empty limits', { acceptances: [{ ...ok, limits: [] }] }, /limits/u],
++    ['empty decidedBy', { acceptances: [{ ...ok, decidedBy: ' ' }] }, /decidedBy/u],
++    ['exact duplicate', { acceptances: [ok, { ...ok }] }, /duplicate/u],
++    ['two digests, same sample and engine', { acceptances: [ok, { ...ok, entrySha256: '1'.repeat(64) }] }, /conflicts/u],
++    ['two cells, same sample and engine', { acceptances: [ok, { ...ok, cellId: 'rfb--portaria--grande' }] }, /conflicts/u],
++  ];
++  for (const [why, raw, re] of bad) assert.throws(() => m.validateAcceptances(raw, ids), re, why);
++  // the same sample on ANOTHER engine is history (append-only), not a conflict
++  assert.equal(m.validateAcceptances({ acceptances: [ok, { ...ok, engineBuildHash: 'a'.repeat(64), entrySha256: '2'.repeat(64) }] }, ids).length, 2);
++});
++
++test('E9 acceptance B3: partial readings, absent material annexes and a body in an absent attachment are never accepted', async () => {
++  const { m, rec, accepted, readFileSync } = await accTest();
++  const p2c = (id: number) => readFileSync(new URL(`../ops/anatomy/official-identification/rfb-p2c/${id}.json`, import.meta.url));
++  assert.equal(accepted([rec(148629, 'rfb--ato-declaratorio-executivo--pequeno')], 148629), false, 'ADE Cofis: partial reading + table annex not read');
++  assert.equal(accepted([rec(148516, 'rfb--ato-declaratorio-executivo--medio')], 148516), false, 'ADE Corat: partial reading + external Anexo Único');
++  assert.match(m.annexGap(p2c(148516)) ?? '', /refers to its OWN annex 2× \(\+0 ambiguous\) and the representation carries none/u, 'Art. 17 "Anexo Único deste Ato…"; the JSON has none');
++  assert.equal(m.annexGap(p2c(148693)), null, 'the Portaria cites no annex');
++  // SC Cosit: the body is the PDF 83325 (absent) → size undetermined, never validated, never covers SC × pequeno
++  const sc = m.collectSamples().find((s) => s.id === 'rfb:148681')!;
++  assert.deepEqual([sc.size, sc.chars, sc.stages.read, sc.stages.validated, sc.stages.accepted], [null, null, true, false, false]);
++  assert.match(sc.notes.join(' '), /size UNDETERMINED/u);
++  assert.equal(accepted([rec(148681, 'rfb--solucao-de-consulta--pequeno')], 148681), false, 'even with exact pins');
++  assert.equal(m.buildMatrix().cells.find((c) => c.id === 'rfb--solucao-de-consulta--pequeno')!.status, 'pending', 'SC × pequeno is NOT covered by an ementa-only reading');
++});
++
++test('E9 acceptance B4: the committed file is the append-only union with #305/#309 and accepts only the Portaria here', async () => {
++  const { m, E, readFileSync } = await accTest();
++  const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string }[] };
++  assert.equal(file.acceptances.length, 13, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + 1 Portaria');
++  assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
++  assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: E });
++  const real = m.collectSamples();
++  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693']);
++  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id), ['rfb--portaria--medio']);
++});
++
++test('E9 acceptance B5 (adversarial): an annex PART OF THIS ACT blocks; a mere citation of ANOTHER norm\'s annex does not; ambiguity blocks', async () => {
++  const m = await import('../ops/anatomy/official-coverage-matrix.js');
++  const act = (texts: string[], embedded = false) => Buffer.from(JSON.stringify({ idAto: 1, tiposSegmento: [{ idTipoSegmento: 1, nomeTipoSegmento: 'Ementa' }, { idTipoSegmento: 3, nomeTipoSegmento: 'Artigo' }, { idTipoSegmento: 9, nomeTipoSegmento: 'Anexo' }],
++    ementas: [{ idTipoSegmento: 1, textoIntegra: 'Ementa que cita o Anexo Único deste Ato.' }],
++    outrosSegmentos: [...texts.map((t) => ({ idTipoSegmento: 3, textoIntegra: `<p>${t}</p>` })), ...(embedded ? [{ idTipoSegmento: 9, textoIntegra: '', arquivoBinario: { arquivoBinario: 'PHRhYmxlPjwvdGFibGU+' } }] : [])] }));
++  const cases: [string, string[], boolean][] = [
++    ['own: Anexo Único deste Ato (the Corat form)', ['Art. 17. O Anexo Único deste Ato Declaratório Executivo será publicado na Internet.'], true],
++    ['own: em anexo', ['Art. 1º Ficam aprovados os modelos em anexo.'], true],
++    ['own: anexos ao presente ato', ['Art. 1º Os anexos ao presente ato integram-no.'], true],
++    ['ambiguous → blocks: na forma do Anexo II', ['Art. 1º Observar-se-á a forma do Anexo II.'], true],
++    ['other: Anexo I da Instrução Normativa', ['Art. 1º Conforme o Anexo I da Instrução Normativa RFB nº 2.121, de 2022.'], false],
++    ['other: Anexo XV, inciso II, do Decreto', ['Art. 1º Previstos no Anexo XV, inciso II, do Decreto nº 1.000.'], false],
++    ['other: anexo da Lei', ['Art. 1º Na tabela do anexo da Lei nº 10.833, de 2003.'], false],
++    ['own wins over other in the same act', ['Art. 1º Conforme o Anexo I da Lei nº 1.', 'Art. 2º O Anexo Único desta Portaria.'], true],
++    ['struck segment ignored', [], false],
++  ];
++  for (const [why, texts, gap] of cases) assert.equal(m.annexGap(act(texts)) !== null, gap, why);
++  assert.equal(m.annexGap(act(['Art. 1º O Anexo Único deste Ato.'], true)), null, 'own annex carried embedded → no gap');
++  // the ementa alone never creates a gap (it only describes the act)
++  assert.equal(m.annexGap(act([])), null);
++});

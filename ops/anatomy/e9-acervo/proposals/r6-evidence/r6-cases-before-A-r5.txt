@@ -1,0 +1,31 @@
+FAIL want=block   got=promote | reviewer A5-1 (norm two clauses before "conforme")
+FAIL want=block   got=promote | three modifier clauses
+FAIL want=block   got=promote | an intermediate connector clause is not a governing clause
+FAIL want=block   got=promote | na forma, two clauses back
+FAIL want=block   got=promote | segundo, two clauses back
+FAIL want=block   got=promote | de acordo com, two clauses back
+FAIL want=block   got=promote | cujos, two clauses back
+FAIL want=block   got=promote | bare norm kind two clauses back
+FAIL want=block   got=promote | "nº." and "arts." abbreviations never end the sentence
+FAIL want=block   got=promote | modifier clause holding a noun phrase is traversed
+FAIL want=block   got=promote | elliptical reference right after an ACCESSORY clause (nearest noun is the other norm's)
+OK   want=promote got=promote | governing clause of the act itself, modifiers between
+OK   want=promote got=promote | B: accessory foundation before the governing clause is not a block
+OK   want=promote got=promote | B: accessory clause skipped, governing clause clean
+OK   want=promote got=promote | ADE Cofis real shape
+OK   want=promote got=promote | E: a norm in an EARLIER sentence of the device is not inherited
+FAIL want=block   got=promote | reviewer A5-2
+FAIL want=block   got=promote | bare participle
+FAIL want=block   got=promote | nos termos, nothing before
+FAIL want=block   got=promote | connector + own noun, no governing clause
+FAIL want=block   got=promote | de acordo com, nothing before
+FAIL want=block   got=promote | only modifiers before
+FAIL want=block   got=promote | E: antecedent only in an EARLIER sentence
+FAIL want=block   got=promote | E: antecedent only before a semicolon
+FAIL want=block   got=promote | paragraph label then elliptical
+FAIL want=block   got=promote | inciso label then elliptical
+OK   want=promote got=promote | elliptical with a clean nominal antecedent
+OK   want=promote got=promote | connector with a clean nominal antecedent
+OK   want=promote got=promote | own clause with its own object (no remission)
+OK   want=promote got=promote | paragraph with own object
+OK   want=promote got=promote | inciso with own object

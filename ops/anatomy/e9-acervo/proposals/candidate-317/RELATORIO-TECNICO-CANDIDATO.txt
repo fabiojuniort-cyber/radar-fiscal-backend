@@ -1,0 +1,186 @@
+RELATÓRIO TÉCNICO — FRENTE 1 | ANAT/E9 — Candidato final de composição
+========================================================================
+
+Data: 2026-11-18
+Responsável pela escrita: sessão EXEC session_01DdUtZuqDfYz8XXwX5uLtJe (único escritor)
+Governança: tribusca-control#116
+Mandato: COORD → EXEC "Candidato final de composição", após o parecer c.6965245285
+         (A r13 PASS)
+
+1. CANDIDATO
+------------
+PR:          fabiojuniort-cyber/radar-fiscal-backend#317 (Ready for review; base main)
+Branch:      claude/anat-e9-composition-candidate
+HEAD final:  ec51d215551b45f7c652ad198d04825075f79d4f
+Motor:       4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a
+             Igual ao esperado 4b96f977…; não houve delta.
+#308:        preservado como evidência (draft; DRAFT_FAST_ONLY intacto), HEAD 66a9fd85…
+
+2. COMPONENTES (SHAs completos)
+-------------------------------
+#303           46afdaf14d122f7bcd7aee0f413643e551162afd
+#300           22e8cc480181bc11bd6e71c38647dad12aa73af0
+A r13 (patch)  31c035044838ac2c8959df9aa9b840bb9087445bea4e445a10339749696dfe5f
+B r7  (patch)  0042c62984e8366eb0279ceb157ecc99be1c0ec4bacea3d79a3a8fc8f046e328
+main           e4514436346ffd52161078c5115f6ab46cbbc731
+               (inclui o #310 mergeado: pg_dump/psql fixados no PG16 do serviço)
+
+Commits do candidato:
+  ff595ea6  merge do #300 no #303 (receita R6)
+  f6de4a48  A r13 (src + teste) e B r7 (--3way); regeneração: identidade → lote → matriz
+  a0557191  merge de origin/main. Muda só CI e docs; identidade do motor inalterada.
+  ec51d215  reconciliação de pin e aceite (seção 3)
+
+3. PIN E ACEITE DA PORTARIA 635
+-------------------------------
+Equivalência reconfirmada sobre o próprio candidato.
+Base independente: #303 6b12ac64 + B r7, motor 0e009431.
+  - bytes a98ade77… e HTML iguais
+  - 136/136 partes iguais (6193225c…)
+  - differingFields vazio
+  - identidade difere só em engineHash
+  - outputHash neutralizado igual (60285e2c…)
+  - EQUIVALENT
+entrySha256 = 2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996,
+igual ao esperado.
+
+Relatório da equivalência:
+  docs/anatomy/e9-evidence/portaria635-equivalence-0e009431-to-4b96f977.json
+  sha256 dda4a66c… — byte-idêntico à prova do A r13 já revisada.
+
+docs/anatomy/e9-acceptances.json
+  - Recebe um registro de revalidação append-only:
+      rfb:148693 @ 4b96f977, entry 2958bdb0…,
+      revalidates "rfb:148693 @ 0e009431…"
+  - O registro de 2026-11-11 e os 12 registros NORMAS-LEG ficam preservados;
+    nenhuma linha foi removida.
+  - Total: 13 → 14 registros.
+  - A matriz agora deriva accepted:true para rfb--portaria--medio.
+
+Pin PG16 (test/anatomy.base-migration.integration.test.ts): 0e009431 → 4b96f977.
+
+Teste B4: espera 14 registros. Confere que o registro original continua intacto
+e que a revalidação aponta para o motor atual.
+
+#153, #167, #170 e #174: verdes (anatomy.official-coverage 24/24).
+
+4. VALIDAÇÃO LOCAL (HEAD ec51d215)
+----------------------------------
+tsc                                  limpo
+test:anatomy                         420/420
+PG16 local :5432, pin versionado     12/12
+Fixtures revisadas:
+  34 originais                       0/34
+  g.mts (153, byte-idêntico)         11/153  (só FN conservadores: R11-1 ×5, R11-2 ×6)
+  r12 (65)                           2/65    (só o R12-1)
+  sinônimos (46)                     0/46
+  adversariais                       0/85
+  casos dirigidos                    306/306
+ADE Cofis                            read, 9 linhas, 16 células, 26/26 ponteiros,
+                                     operative_candidate, legalStatus unknown
+Lote e matriz                        regeneração estável (sem deriva)
+
+npm test local: 681/687, com 2 falhas e 3 cancelamentos (collection.memory,
+public.route, taxonomy.curation). Os mesmos resultados aparecem em origin/main
+neste ambiente local, então a causa é o ambiente, não o candidato.
+
+5. CI INTEGRAL (evento normal de PR Ready; HEAD ec51d215)
+--------------------------------------------------------
+31 jobs: 30 sucesso, 1 falha.
+
+Arquivo da lista completa: ops/anatomy/e9-acervo/proposals/candidate-317/ci-jobs-ec51d215.txt
+
+Verdes:
+- verify (inclui a regressão completa)
+- anatomy-base-migration 16 e 18
+- anatomy-admin-* em 16 e 18 (api, schema, migrations, main-chain)
+- anatomy-audit-benchmark 16 e 18
+- anatomy-doesp-compat 16 e 18
+- anatomy-disposable-schema, anatomy-synthetic
+- LOTE2 PG18, DOU-CLEAN-02 PG18, ONB-03 PG18
+
+Falha: "ONB-01 migrations 042-043 and identity/RLS on PostgreSQL 18"
+  Teste:   test/onb02-r7-audit.integration.test.ts:47 (backfill R7 sobre 150k auditorias)
+  Erro:    57014 statement timeout. Um statement de applyAuditBackfill passa do
+           statement_timeout=45000 que o próprio teste define.
+  Ocorrências: execução original (50,4 s) e a única reexecução (51,5 s).
+  Em main (2026-11-14) o mesmo job passou, com o teste em 37,6 s.
+
+  Por que não é causado por este PR:
+  - o diff contra main não toca migrations, SQL, src/modules/audit, src/modules/company
+    nem ci.yml;
+  - a imagem do PostgreSQL é a mesma (postgres:18-bookworm, digest ece55f7868da…).
+
+  Ressalva: não dá para rodar de novo o CI de main, porque não há workflow_dispatch.
+  A comparação usa a execução de 14/11.
+
+  Tratamento: registrado no PR (#317 issuecomment-6965618967) e proposto um PR
+  separado na frente ONB-02/R7, com autorização própria, para:
+  - dar margem ao timeout do teste; ou
+  - reduzir o batchSize.
+  Nenhum teste foi pulado ou alterado.
+
+6. CONSUMIDORES DE operative_candidate E OS 3 CASOS RESIDUAIS
+-------------------------------------------------------------
+Fonte: proposals/candidate-317/consumers-operative-candidate.md
+       (sub-agente Sonnet, esforço alto, somente leitura; ponto central conferido
+       pelo EXEC: nenhum importador do módulo em src/)
+Casos: "norma em apreço", "ato epigrafado", "norma em foco"
+
+Categoria                  Situação           Por quê
+(a) Exibição               não afetada        nenhuma rota, API, contrato ou web lê o valor
+(b) Persistência           não afetada        só docs/anatomy/official-lot-rfb.json (arquivo
+                                              do repositório); nada vai para anatomy_parts
+                                              no banco
+(c) Classificação          não afetada        ato principal, cobertura, NCM, taxonomia e
+                                              Sonar iguais; só muda o context das partes
+                                              do próprio anexo
+(d) Aceite                 não afetado        o B r7 usa só id e sha256; nenhum aceite é
+                                              automático
+(e) Decisões posteriores   não afetadas       legalStatus continua unknown; a seleção segura
+                                              exige legalStatus 'current'
+
+Risco futuro: se um gate ligar o anexo ao resultado do motor, as partes do anexo
+passariam a alimentar evaluation.ts, engine.ts e config/view.ts.
+
+7. RISCOS E NOT_PROVEN
+----------------------
+Riscos (P3, conservadores):
+- R13-1
+- R12-1
+- R11-1 / R11-2
+- lista fechada de marcadores (inclui os 3 casos residuais)
+
+NOT_PROVEN:
+- execução atual do job ONB-01 PG18 em main
+- deploy/outras branches do web
+- caminhos de runtime com PG para o módulo de anexos
+
+8. PROGRESSO
+------------
+0%   identidades confirmadas                         c.6965386378
+25%  composição reproduzida                          c.6965387909
+50%  pin e aceite reconciliados, testes verdes       c.6965390622
+75%  validação local e PR publicado                  c.6965429089
+100% CI encerrado (30/31; 1 falha fora do escopo documentada), entregas
+
+F1 oficial: 50,2% → 50,2% (+0,0 p.p.).
+
+9. DELEGAÇÕES
+-------------
+1 sub-agente Sonnet, esforço alto: rastreamento de consumidores, somente leitura.
+
+O EXEC fez:
+- composição, reconciliação, PG16 e validação;
+- PR e acompanhamento do CI;
+- escrita no #308, no #317 e na #116.
+
+Incidente corrigido:
+- arquivos idênticos ao head do #300 apareceram staged no checkout do #308;
+- foram descartados sem commit; o conteúdo segue íntegro em 22e8cc48.
+
+10. PRÓXIMO GATE
+----------------
+- Revisão independente do HEAD ec51d215 (#317).
+- Decisão do COORD sobre a falha ONB-01/R7 PG18 (PR separado, fora deste escopo).
+- Merge e produção dependem de mandato próprio.

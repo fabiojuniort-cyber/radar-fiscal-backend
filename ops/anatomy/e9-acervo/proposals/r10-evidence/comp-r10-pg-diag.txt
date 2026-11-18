@@ -1,0 +1,83 @@
+TAP version 13
+# Subtest: 077 disposable guard refuses external configuration before connection
+ok 1 - 077 disposable guard refuses external configuration before connection
+  ---
+  duration_ms: 5.106721
+  type: 'test'
+  ...
+# Subtest: family CHECK mirrors the ANAT-PROFILE/1 literal (pure vectors)
+ok 2 - family CHECK mirrors the ANAT-PROFILE/1 literal (pure vectors)
+  ---
+  duration_ms: 57.414466
+  type: 'test'
+  ...
+# Subtest: 077_anat_base through the real migration runner (fresh disposable database)
+    # Subtest: the real runner applies the chain, then 077 on top; nothing else in the catalog changes
+    ok 1 - the real runner applies the chain, then 077 on top; nothing else in the catalog changes
+      ---
+      duration_ms: 1562.705641
+      type: 'test'
+      ...
+    # Subtest: structure equals the CI schema except the reviewed changes
+    ok 2 - structure equals the CI schema except the reviewed changes
+      ---
+      duration_ms: 40.546435
+      type: 'test'
+      ...
+    # Subtest: privileges: worker writes, app reads in-scope analyses only, nobody deletes or updates analyses
+    ok 3 - privileges: worker writes, app reads in-scope analyses only, nobody deletes or updates analyses
+      ---
+      duration_ms: 48.047089
+      type: 'test'
+      ...
+    # Subtest: family/source CHECK equals the profile contract on the same vectors
+    ok 4 - family/source CHECK equals the profile contract on the same vectors
+      ---
+      duration_ms: 4.463332
+      type: 'test'
+      ...
+    # Subtest: the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented
+    ok 5 - the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented
+      ---
+      duration_ms: 14.378072
+      type: 'test'
+      ...
+    # Subtest: analyses are immutable: refused to the worker (grant) and to the owner (trigger); no DELETE for runtime roles
+    ok 6 - analyses are immutable: refused to the worker (grant) and to the owner (trigger); no DELETE for runtime roles
+      ---
+      duration_ms: 3.092663
+      type: 'test'
+      ...
+    # Subtest: reads: the app sees only analyses of in-scope publications, whatever the tenant; nothing of runs or rule sets
+    ok 7 - reads: the app sees only analyses of in-scope publications, whatever the tenant; nothing of runs or rule sets
+      ---
+      duration_ms: 5.701973
+      type: 'test'
+      ...
+    # Subtest: ON DELETE RESTRICT: a version (or publication) with analyses or run items cannot be deleted
+    ok 8 - ON DELETE RESTRICT: a version (or publication) with analyses or run items cannot be deleted
+      ---
+      duration_ms: 6.642063
+      type: 'test'
+      ...
+    # Subtest: recovery: the documented drop order is valid (rolled back)
+    ok 9 - recovery: the documented drop order is valid (rolled back)
+      ---
+      duration_ms: 8.948156
+      type: 'test'
+      ...
+    1..9
+ok 3 - 077_anat_base through the real migration runner (fresh disposable database)
+  ---
+  duration_ms: 1745.481035
+  type: 'test'
+  ...
+1..3
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2127.341744

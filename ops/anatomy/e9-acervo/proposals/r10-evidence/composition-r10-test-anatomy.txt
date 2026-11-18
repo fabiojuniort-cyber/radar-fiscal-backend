@@ -1,0 +1,2617 @@
+TAP version 13
+# usage: collect-p2c-attachment.ts --grant <grantId> --owner <owner> --stop-after 1  (refused without an active grant)
+# usage: collect-p2c-attachment.ts --grant <grantId> --owner <owner> --stop-after 1  (refused without an active grant)
+# usage: collect-p2c-attachment.ts --grant <grantId> --owner <owner> --stop-after 1  (refused without an active grant)
+# usage: collect-p2c-attachment.ts --grant <grantId> --owner <owner> --stop-after 1  (refused without an active grant)
+# Subtest: C1: the committed grant is SUSPENDED with its own ledger (1 request, SC 1) — the real run is refused before any request
+ok 1 - C1: the committed grant is SUSPENDED with its own ledger (1 request, SC 1) — the real run is refused before any request
+  ---
+  duration_ms: 3.527919
+  type: 'test'
+  ...
+# Subtest: C2: route guard — only the pinned URL; target identity from the preserved act; the struck PDF 82416 is never requested
+ok 2 - C2: route guard — only the pinned URL; target identity from the preserved act; the struck PDF 82416 is never requested
+  ---
+  duration_ms: 0.509142
+  type: 'test'
+  ...
+# Subtest: C3: success — exactly 1 request, debited BEFORE the send, PDF named in its text layer, stored once with provenance
+ok 3 - C3: success — exactly 1 request, debited BEFORE the send, PDF named in its text layer, stored once with provenance
+  ---
+  duration_ms: 1423.692159
+  type: 'test'
+  ...
+# Subtest: C4: fail closed — redirect never followed, non-PDF, wrong identity, HTTP error and network error: 1 debited, nothing stored
+ok 4 - C4: fail closed — redirect never followed, non-PDF, wrong identity, HTTP error and network error: 1 debited, nothing stored
+  ---
+  duration_ms: 18.026046
+  type: 'test'
+  ...
+# Subtest: C5: the CLI requires --stop-after 1 and refuses before opening the budget; the grant total caps a second attempt
+ok 5 - C5: the CLI requires --stop-after 1 and refuses before opening the budget; the grant total caps a second attempt
+  ---
+  duration_ms: 4.486563
+  type: 'test'
+  ...
+# preflight: ledger differs from the pushed ledger (test)
+# fatal: /tmp/p2c-att-v7h8Hm/budget-state.json: '/tmp/p2c-att-v7h8Hm/budget-state.json' is outside repository at '<comp>'
+# fatal: /tmp/p2c-att-7TQOGV/budget-state.json: '/tmp/p2c-att-7TQOGV/budget-state.json' is outside repository at '<comp>'
+# fatal: /tmp/p2c-att-DXieSk/budget-state.json: '/tmp/p2c-att-DXieSk/budget-state.json' is outside repository at '<comp>'
+# fatal: /tmp/p2c-att-2ZLyR8/budget-state.json: '/tmp/p2c-att-2ZLyR8/budget-state.json' is outside repository at '<comp>'
+# Subtest: H1 (real transport, isolated): a 3xx to ANOTHER host is never followed — exactly 1 request, the other host gets 0, nothing stored
+ok 6 - H1 (real transport, isolated): a 3xx to ANOTHER host is never followed — exactly 1 request, the other host gets 0, nothing stored
+  ---
+  duration_ms: 55.227042
+  type: 'test'
+  ...
+# Subtest: H2: a transport that FOLLOWED a redirect by itself (response.redirected) is refused — the collector does not trust the transport
+ok 7 - H2: a transport that FOLLOWED a redirect by itself (response.redirected) is refused — the collector does not trust the transport
+  ---
+  duration_ms: 1.568015
+  type: 'test'
+  ...
+# Subtest: H3: the size limit is enforced WHILE reading — an endless body is cut just above the limit, never loaded whole
+ok 8 - H3: the size limit is enforced WHILE reading — an endless body is cut just above the limit, never loaded whole
+  ---
+  duration_ms: 2.201566
+  type: 'test'
+  ...
+# Subtest: H4: identity — another act that merely MENTIONS "Cosit" and "258" is refused; the heading must be SC nº 258 Cosit dated 26/12/2025
+ok 9 - H4: identity — another act that merely MENTIONS "Cosit" and "258" is refused; the heading must be SC nº 258 Cosit dated 26/12/2025
+  ---
+  duration_ms: 32.332586
+  type: 'test'
+  ...
+# Subtest: H5: a failure between the PDF and the meta writes leaves NO resource that looks valid; the next run refuses to treat it as stored
+ok 10 - H5: a failure between the PDF and the meta writes leaves NO resource that looks valid; the next run refuses to treat it as stored
+  ---
+  duration_ms: 1.284531
+  type: 'test'
+  ...
+# Subtest: R2 C-1 (reviewer counter-cases): a document that is NOT the SC — but mentions it in its head — is refused
+ok 11 - R2 C-1 (reviewer counter-cases): a document that is NOT the SC — but mentions it in its head — is refused
+  ---
+  duration_ms: 34.497866
+  type: 'test'
+  ...
+# Subtest: R2 C-2: legitimate, tested heading variants are accepted (the single request is not wasted)
+ok 12 - R2 C-2: legitimate, tested heading variants are accepted (the single request is not wasted)
+  ---
+  duration_ms: 15.250553
+  type: 'test'
+  ...
+# Subtest: R2 C-3: a final Response.url different from the pinned URL is refused even without redirected=true
+ok 13 - R2 C-3: a final Response.url different from the pinned URL is refused even without redirected=true
+  ---
+  duration_ms: 1.133987
+  type: 'test'
+  ...
+# Subtest: R2 C-4: a stream error mid-body is an operational outcome (debited, nothing stored), never an unhandled rejection
+ok 14 - R2 C-4: a stream error mid-body is an operational outcome (debited, nothing stored), never an unhandled rejection
+  ---
+  duration_ms: 9.716495
+  type: 'test'
+  ...
+# Subtest: R2 C-5: single-owner preflight — the local ledger must equal the pushed one, with no attempts, before the budget opens
+ok 15 - R2 C-5: single-owner preflight — the local ledger must equal the pushed one, with no attempts, before the budget opens
+  ---
+  duration_ms: 0.716735
+  type: 'test'
+  ...
+# Subtest: R3 C2-1: an institutional PREFIX mixed with another act title never precedes the SC title
+ok 16 - R3 C2-1: an institutional PREFIX mixed with another act title never precedes the SC title
+  ---
+  duration_ms: 17.193818
+  type: 'test'
+  ...
+# Subtest: R3 C2-2: split title ("SOLUÇÃO DE CONSULTA" / "Nº 258 - COSIT") and split date ("Data" / "26 de dezembro de 2025") are accepted strictly
+ok 17 - R3 C2-2: split title ("SOLUÇÃO DE CONSULTA" / "Nº 258 - COSIT") and split date ("Data" / "26 de dezembro de 2025") are accepted strictly
+  ---
+  duration_ms: 25.572321
+  type: 'test'
+  ...
+# Subtest: R3 C-5: runAttachment called DIRECTLY applies the single-owner preflight by default (no bypass of the CLI check)
+ok 18 - R3 C-5: runAttachment called DIRECTLY applies the single-owner preflight by default (no bypass of the CLI check)
+  ---
+  duration_ms: 540.573747
+  type: 'test'
+  ...
+# Subtest: R4 C3-1: outside NODE_ENV=test an injected preflight is ignored — the default single-owner preflight refuses with 0 requests
+ok 19 - R4 C3-1: outside NODE_ENV=test an injected preflight is ignored — the default single-owner preflight refuses with 0 requests
+  ---
+  duration_ms: 1105.389097
+  type: 'test'
+  ...
+# Subtest: direct: the URL is BUILT from a validated idAto; malformed targets are refused before any request
+ok 20 - direct: the URL is BUILT from a validated idAto; malformed targets are refused before any request
+  ---
+  duration_ms: 2.901167
+  type: 'test'
+  ...
+# Subtest: direct: an act already stored (in any RFB lot) and a reserved act are skipped BEFORE any request; the budget is not even opened
+ok 21 - direct: an act already stored (in any RFB lot) and a reserved act are skipped BEFORE any request; the budget is not even opened
+  ---
+  duration_ms: 0.905934
+  type: 'test'
+  ...
+# Subtest: direct: identity divergence (number, type, act date) is refused after the capture — debited, bytes NOT stored
+ok 22 - direct: identity divergence (number, type, act date) is refused after the capture — debited, bytes NOT stored
+  ---
+  duration_ms: 50.164389
+  type: 'test'
+  ...
+# Subtest: direct: every attempt is debited — redirect hop, HTTP failure and success; the size is the MEASURED multivigente one (D3)
+ok 23 - direct: every attempt is debited — redirect hop, HTTP failure and success; the size is the MEASURED multivigente one (D3)
+  ---
+  duration_ms: 75.927207
+  type: 'test'
+  ...
+# Subtest: direct: per-type caps hold (no transfer); duplicates are skipped; the repository grant is SUSPENDED and refuses with zero requests
+ok 24 - direct: per-type caps hold (no transfer); duplicates are skipped; the repository grant is SUSPENDED and refuses with zero requests
+  ---
+  duration_ms: 25.729383
+  type: 'test'
+  ...
+# Subtest: R4: a redirect to /visao/original of the SAME idAto is refused before the next request — 1 sent, 1 debited, nothing stored
+ok 25 - R4: a redirect to /visao/original of the SAME idAto is refused before the next request — 1 sent, 1 debited, nothing stored
+  ---
+  duration_ms: 1.642002
+  type: 'test'
+  ...
+# Subtest: R4: every other route change is refused before sending — other idAto, query, port, host, http
+ok 26 - R4: every other route change is refused before sending — other idAto, query, port, host, http
+  ---
+  duration_ms: 5.137731
+  type: 'test'
+  ...
+# Subtest: R4: a response dated 2025-02-30, or a non-multivigente vision, is refused before storing — debited, nothing written
+ok 27 - R4: a response dated 2025-02-30, or a non-multivigente vision, is refused before storing — debited, nothing written
+  ---
+  duration_ms: 5.185885
+  type: 'test'
+  ...
+# Subtest: catalog covers every editable list of ANAT-PROFILE/1, in Portuguese, with an example
+ok 28 - catalog covers every editable list of ANAT-PROFILE/1, in Portuguese, with an example
+  ---
+  duration_ms: 1.760101
+  type: 'test'
+  ...
+# Subtest: guided change: adding at a scope keeps the inherited literals and does not touch other scopes or the input
+ok 29 - guided change: adding at a scope keeps the inherited literals and does not touch other scopes or the input
+  ---
+  duration_ms: 86.616528
+  type: 'test'
+  ...
+# Subtest: specific messages in Portuguese for incomplete or invalid input
+ok 30 - specific messages in Portuguese for incomplete or invalid input
+  ---
+  duration_ms: 82.476926
+  type: 'test'
+  ...
+# Subtest: describeResult: structure, nature and validity are separate; a note never sets validity; review list explains
+ok 31 - describeResult: structure, nature and validity are separate; a note never sets validity; review list explains
+  ---
+  duration_ms: 100.303602
+  type: 'test'
+  ...
+# Subtest: corrections: applied on top of the engine result to the exact document version and passage only
+ok 32 - corrections: applied on top of the engine result to the exact document version and passage only
+  ---
+  duration_ms: 28.7469
+  type: 'test'
+  ...
+# Subtest: CONFIG-R2-01: repeated identical passages get distinct identities; a correction hits only the intended occurrence
+ok 33 - CONFIG-R2-01: repeated identical passages get distinct identities; a correction hits only the intended occurrence
+  ---
+  duration_ms: 7.082524
+  type: 'test'
+  ...
+# Subtest: suggestions come from the passage itself and only use supported mechanisms
+ok 34 - suggestions come from the passage itself and only use supported mechanisms
+  ---
+  duration_ms: 0.758849
+  type: 'test'
+  ...
+# Subtest: samples are synthetic, annotated with evidence and a second check, and never use reserved corpus IDs
+ok 35 - samples are synthetic, annotated with evidence and a second check, and never use reserved corpus IDs
+  ---
+  duration_ms: 49.685271
+  type: 'test'
+  ...
+# Subtest: exception remains thematic text, never a positive NCM inferred from it
+ok 36 - exception remains thematic text, never a positive NCM inferred from it
+  ---
+  duration_ms: 20.010257
+  type: 'test'
+  ...
+# Subtest: consumer rejects unapproved selection and forged output
+ok 37 - consumer rejects unapproved selection and forged output
+  ---
+  duration_ms: 2.656736
+  type: 'test'
+  ...
+# Subtest: thematic blocks retain separate boundaries without concatenation
+ok 38 - thematic blocks retain separate boundaries without concatenation
+  ---
+  duration_ms: 1.311663
+  type: 'test'
+  ...
+# Subtest: missing resources produce an explicitly partial empty selection, not no-topic certainty
+ok 39 - missing resources produce an explicitly partial empty selection, not no-topic certainty
+  ---
+  duration_ms: 2.265076
+  type: 'test'
+  ...
+# Subtest: contract exports strict JSON Schema and accepts a deterministic positive fixture
+ok 40 - contract exports strict JSON Schema and accepts a deterministic positive fixture
+  ---
+  duration_ms: 22.788997
+  type: 'test'
+  ...
+# Subtest: UTF-16 preserves combining marks, emoji and literal without normalization
+ok 41 - UTF-16 preserves combining marks, emoji and literal without normalization
+  ---
+  duration_ms: 7.123122
+  type: 'test'
+  ...
+# Subtest: approval of an NCM prefix cannot authorize the entire occurrence
+ok 42 - approval of an NCM prefix cannot authorize the entire occurrence
+  ---
+  duration_ms: 4.447071
+  type: 'test'
+  ...
+# Subtest: a separate exception relation constrains a base code even outside its own span
+ok 43 - a separate exception relation constrains a base code even outside its own span
+  ---
+  duration_ms: 2.256536
+  type: 'test'
+  ...
+# Subtest: coverage is a partition, container spans are not counted twice
+ok 44 - coverage is a partition, container spans are not counted twice
+  ---
+  duration_ms: 1.043292
+  type: 'test'
+  ...
+# Subtest: invalid parent, cycles and sibling overlap are rejected
+ok 45 - invalid parent, cycles and sibling overlap are rejected
+  ---
+  duration_ms: 4.532676
+  type: 'test'
+  ...
+# Subtest: input, presentation, attachment and rule identities invalidate snapshot evidence
+ok 46 - input, presentation, attachment and rule identities invalidate snapshot evidence
+  ---
+  duration_ms: 9.745799
+  type: 'test'
+  ...
+# Subtest: positive selection requires approved evidence, current context and dependencies
+ok 47 - positive selection requires approved evidence, current context and dependencies
+  ---
+  duration_ms: 29.170545
+  type: 'test'
+  ...
+# Subtest: unknown retains full coverage, never counts as recognized, and is partial
+ok 48 - unknown retains full coverage, never counts as recognized, and is partial
+  ---
+  duration_ms: 0.976923
+  type: 'test'
+  ...
+# Subtest: NCM allows 4–8 digits including 5/7 and keeps leading zeros; two is informative only
+ok 49 - NCM allows 4–8 digits including 5/7 and keeps leading zeros; two is informative only
+  ---
+  duration_ms: 8.455813
+  type: 'test'
+  ...
+# Subtest: range and exception members cannot become independent positive selections
+ok 50 - range and exception members cannot become independent positive selections
+  ---
+  duration_ms: 1.252586
+  type: 'test'
+  ...
+# Subtest: a container cannot include a forbidden, historical or unknown descendant
+ok 51 - a container cannot include a forbidden, historical or unknown descendant
+  ---
+  duration_ms: 5.801609
+  type: 'test'
+  ...
+# Subtest: NCM selections cannot bypass range, exception or protected-domain exclusions through a null target
+ok 52 - NCM selections cannot bypass range, exception or protected-domain exclusions through a null target
+  ---
+  duration_ms: 1.719374
+  type: 'test'
+  ...
+# Subtest: thematic text with exceptions remains usable without exporting an NCM selection
+ok 53 - thematic text with exceptions remains usable without exporting an NCM selection
+  ---
+  duration_ms: 3.125311
+  type: 'test'
+  ...
+# Subtest: a separate overlapping citation or compound cannot be bypassed using a clean NCM entity
+ok 54 - a separate overlapping citation or compound cannot be bypassed using a clean NCM entity
+  ---
+  duration_ms: 2.579927
+  type: 'test'
+  ...
+# Subtest: conflicting approved evidence blocks positive selection even when it was not cited
+ok 55 - conflicting approved evidence blocks positive selection even when it was not cited
+  ---
+  duration_ms: 0.681487
+  type: 'test'
+  ...
+# Subtest: source pointers reject inverted offsets and NCM rejects arbitrary dots but preserves legacy 4.4
+ok 56 - source pointers reject inverted offsets and NCM rejects arbitrary dots but preserves legacy 4.4
+  ---
+  duration_ms: 1.829938
+  type: 'test'
+  ...
+# Subtest: unidentified type or coverage segment can never claim complete, regardless of other flags
+ok 57 - unidentified type or coverage segment can never claim complete, regardless of other flags
+  ---
+  duration_ms: 0.827755
+  type: 'test'
+  ...
+# Subtest: unknown fields, false calendar dates, partial/failed positives and missing resources fail closed
+ok 58 - unknown fields, false calendar dates, partial/failed positives and missing resources fail closed
+  ---
+  duration_ms: 2.158015
+  type: 'test'
+  ...
+# Subtest: D1: the initial URL and the allowed prefix agree — index with or without the trailing slash is the same canonical resource
+ok 59 - D1: the initial URL and the allowed prefix agree — index with or without the trailing slash is the same canonical resource
+  ---
+  duration_ms: 1.963121
+  type: 'test'
+  ...
+# Subtest: D2: unexpected routes are refused before any request (no generic gov.br access)
+ok 60 - D2: unexpected routes are refused before any request (no generic gov.br access)
+  ---
+  duration_ms: 0.451768
+  type: 'test'
+  ...
+# Subtest: R2 D-1: C0 controls / NUL / DEL in the raw input are refused before URL normalization
+ok 61 - R2 D-1: C0 controls / NUL / DEL in the raw input are refused before URL normalization
+  ---
+  duration_ms: 0.274108
+  type: 'test'
+  ...
+# Subtest: R2 D-2: non-canonical scheme forms are refused (https:www…, https:/www…, HTTPS://…, https:///…)
+ok 62 - R2 D-2: non-canonical scheme forms are refused (https:www…, https:/www…, HTTPS://…, https:///…)
+  ---
+  duration_ms: 0.145446
+  type: 'test'
+  ...
+# Subtest: R2 D: the reviewer's 45 adversarial categories stay refused; the two normalizations stay accepted
+ok 63 - R2 D: the reviewer's 45 adversarial categories stay refused; the two normalizations stay accepted
+  ---
+  duration_ms: 0.585934
+  type: 'test'
+  ...
+# Subtest: corpus inventory contains 30 unique publications and the fixed ten reserved IDs
+ok 64 - corpus inventory contains 30 unique publications and the fixed ten reserved IDs
+  ---
+  duration_ms: 1.418137
+  type: 'test'
+  ...
+# Subtest: every frozen input matches its byte count and SHA-256 without text normalization
+ok 65 - every frozen input matches its byte count and SHA-256 without text normalization
+  ---
+  duration_ms: 1.843279
+  type: 'test'
+  ...
+# Subtest: missing original bodies are explicit and are never assigned a verified hash
+ok 66 - missing original bodies are explicit and are never assigned a verified hash
+  ---
+  duration_ms: 0.425024
+  type: 'test'
+  ...
+# Subtest: inventory cannot be mistaken for reviewed gold or measured acceptance
+ok 67 - inventory cannot be mistaken for reviewed gold or measured acceptance
+  ---
+  duration_ms: 0.23197
+  type: 'test'
+  ...
+# Subtest: frozen development canonical text matches the versioned preparation and reader
+ok 68 - frozen development canonical text matches the versioned preparation and reader
+  ---
+  duration_ms: 333.549856
+  type: 'test'
+  ...
+# Subtest: frozen canonical file never contains reserved entries or text bodies
+ok 69 - frozen canonical file never contains reserved entries or text bodies
+  ---
+  duration_ms: 0.817659
+  type: 'test'
+  ...
+# Subtest: single resource: CDATA copied verbatim, BOM removed, spans map back to the XML
+ok 70 - single resource: CDATA copied verbatim, BOM removed, spans map back to the XML
+  ---
+  duration_ms: 3.378715
+  type: 'test'
+  ...
+# Subtest: artNotes and metadata duplicates are excluded by hash only, never copied into the text
+ok 71 - artNotes and metadata duplicates are excluded by hash only, never copied into the text
+  ---
+  duration_ms: 0.679879
+  type: 'test'
+  ...
+# Subtest: multi-file matter is consolidated in _NNN order into one representation
+ok 72 - multi-file matter is consolidated in _NNN order into one representation
+  ---
+  duration_ms: 59.007438
+  type: 'test'
+  ...
+# Subtest: ambiguous inputs fail closed
+ok 73 - ambiguous inputs fail closed
+  ---
+  duration_ms: 1.535015
+  type: 'test'
+  ...
+# Subtest: DOU official classes and rectification wording are recognized only as prohibited positions
+ok 74 - DOU official classes and rectification wording are recognized only as prohibited positions
+  ---
+  duration_ms: 22.277081
+  type: 'test'
+  ...
+# Subtest: same supplied snapshot and rules reproduce the complete output and hash
+ok 75 - same supplied snapshot and rules reproduce the complete output and hash
+  ---
+  duration_ms: 62.064128
+  type: 'test'
+  ...
+# Subtest: presentation-only, catalog, attachments and rule versions change identity without pretending approval
+ok 76 - presentation-only, catalog, attachments and rule versions change identity without pretending approval
+  ---
+  duration_ms: 41.779539
+  type: 'test'
+  ...
+# Subtest: two synthetic historical 8450.11.00 occurrences remain separate and outside selection
+ok 77 - two synthetic historical 8450.11.00 occurrences remain separate and outside selection
+  ---
+  duration_ms: 6.386412
+  type: 'test'
+  ...
+# Subtest: NCM column gives domain context, generic code or NBM columns do not
+ok 78 - NCM column gives domain context, generic code or NBM columns do not
+  ---
+  duration_ms: 20.447862
+  type: 'test'
+  ...
+# Subtest: unknown source profile and missing content stay explicit, never a complete negative finding
+ok 79 - unknown source profile and missing content stay explicit, never a complete negative finding
+  ---
+  duration_ms: 21.005936
+  type: 'test'
+  ...
+# Subtest: ambiguous representations and untrusted evidence fields are rejected before analysis
+ok 80 - ambiguous representations and untrusted evidence fields are rejected before analysis
+  ---
+  duration_ms: 0.977316
+  type: 'test'
+  ...
+# Subtest: single-block ownership prefers the deepest part over an equally sized document root
+ok 81 - single-block ownership prefers the deepest part over an equally sized document root
+  ---
+  duration_ms: 13.912979
+  type: 'test'
+  ...
+# Subtest: range relations never cross part boundaries or a later line in a chained expression
+ok 82 - range relations never cross part boundaries or a later line in a chained expression
+  ---
+  duration_ms: 30.081172
+  type: 'test'
+  ...
+# Subtest: explicit citations need no href and remain unresolved, preserving literals
+ok 83 - explicit citations need no href and remain unresolved, preserving literals
+  ---
+  duration_ms: 0.645182
+  type: 'test'
+  ...
+# Subtest: formal citation abbreviations and act families preserve their complete literal without links
+ok 84 - formal citation abbreviations and act families preserve their complete literal without links
+  ---
+  duration_ms: 0.86564
+  type: 'test'
+  ...
+# Subtest: citation number prefixes n.º, n°, nº and optional agency do not expose numeric false NCMs
+ok 85 - citation number prefixes n.º, n°, nº and optional agency do not expose numeric false NCMs
+  ---
+  duration_ms: 0.251881
+  type: 'test'
+  ...
+# Subtest: device identifiers remain protected and ordinary dotted numbers are not inferred as citations
+ok 86 - device identifiers remain protected and ordinary dotted numbers are not inferred as citations
+  ---
+  duration_ms: 1.720039
+  type: 'test'
+  ...
+# Subtest: protected domains take precedence over an NCM column or nearby NCM marker
+ok 87 - protected domains take precedence over an NCM column or nearby NCM marker
+  ---
+  duration_ms: 1.29933
+  type: 'test'
+  ...
+# Subtest: NCM accepts 2 informative and 4–8 exact digits, legacy punctuation, without padding
+ok 88 - NCM accepts 2 informative and 4–8 exact digits, legacy punctuation, without padding
+  ---
+  duration_ms: 2.94569
+  type: 'test'
+  ...
+# Subtest: numeric NCM context stops before unrelated prose and never infers unmarked codes
+ok 89 - numeric NCM context stops before unrelated prose and never infers unmarked codes
+  ---
+  duration_ms: 0.44197
+  type: 'test'
+  ...
+# Subtest: exact controlled catalog validates occurrences without prefix equivalence
+ok 90 - exact controlled catalog validates occurrences without prefix equivalence
+  ---
+  duration_ms: 0.49564
+  type: 'test'
+  ...
+# Subtest: M01 range is compound, endpoints linked, never expanded from a shared prefix
+ok 91 - M01 range is compound, endpoints linked, never expanded from a shared prefix
+  ---
+  duration_ms: 0.606285
+  type: 'test'
+  ...
+# Subtest: M02 exception scopes every explicit list member and preserves thematic literal
+ok 92 - M02 exception scopes every explicit list member and preserves thematic literal
+  ---
+  duration_ms: 0.559825
+  type: 'test'
+  ...
+# Subtest: an exception around a range preserves both restrictions
+ok 93 - an exception around a range preserves both restrictions
+  ---
+  duration_ms: 0.271817
+  type: 'test'
+  ...
+# Subtest: ambiguous chained ranges and prose exception scopes cannot release standalone endpoints
+ok 94 - ambiguous chained ranges and prose exception scopes cannot release standalone endpoints
+  ---
+  duration_ms: 0.240883
+  type: 'test'
+  ...
+# Subtest: all excluded inflections mask both the base prefix and excluded targets
+ok 95 - all excluded inflections mask both the base prefix and excluded targets
+  ---
+  duration_ms: 0.477473
+  type: 'test'
+  ...
+# Subtest: sentence punctuation closes lexical NCM context without confusing internal code dots
+ok 96 - sentence punctuation closes lexical NCM context without confusing internal code dots
+  ---
+  duration_ms: 0.276715
+  type: 'test'
+  ...
+# Subtest: forbidden structural zones emit zero NCM entities, including misleading NCM column input
+ok 97 - forbidden structural zones emit zero NCM entities, including misleading NCM column input
+  ---
+  duration_ms: 0.519506
+  type: 'test'
+  ...
+# Subtest: forbidden ancestors suppress NCM while historical body occurrences remain distinct
+ok 98 - forbidden ancestors suppress NCM while historical body occurrences remain distinct
+  ---
+  duration_ms: 0.257649
+  type: 'test'
+  ...
+# Subtest: UTF-16 spans preserve combining accents and emoji, and historical occurrence is only recognized
+ok 99 - UTF-16 spans preserve combining accents and emoji, and historical occurrence is only recognized
+  ---
+  duration_ms: 2.668894
+  type: 'test'
+  ...
+# Subtest: same input is reproducible, malformed catalog/unknown cells fail explicitly
+ok 100 - same input is reproducible, malformed catalog/unknown cells fail explicitly
+  ---
+  duration_ms: 0.612063
+  type: 'test'
+  ...
+# Subtest: selections must be explicit: nothing is derived from eligibility, and the opt-in mapping is one to one
+ok 101 - selections must be explicit: nothing is derived from eligibility, and the opt-in mapping is one to one
+  ---
+  duration_ms: 71.265717
+  type: 'test'
+  ...
+# Subtest: parts, entity spans and domains are preserved; compound carriers become relations, not occurrences
+ok 102 - parts, entity spans and domains are preserved; compound carriers become relations, not occurrences
+  ---
+  duration_ms: 11.900759
+  type: 'test'
+  ...
+# Subtest: pending items are preserved: status, missing resources, limitations, unknown geometry, unlocatable operators
+ok 103 - pending items are preserved: status, missing resources, limitations, unknown geometry, unlocatable operators
+  ---
+  duration_ms: 22.583183
+  type: 'test'
+  ...
+# Subtest: the adapter validates the contract (fail closed) and never mutates its input
+ok 104 - the adapter validates the contract (fail closed) and never mutates its input
+  ---
+  duration_ms: 8.215231
+  type: 'test'
+  ...
+# Subtest: finding 1: a compound without a relation of its own kind is reported with id and reason, never dropped
+ok 105 - finding 1: a compound without a relation of its own kind is reported with id and reason, never dropped
+  ---
+  duration_ms: 10.435708
+  type: 'test'
+  ...
+# Subtest: finding 2: a range keeps the condition it was given
+ok 106 - finding 2: a range keeps the condition it was given
+  ---
+  duration_ms: 11.7869
+  type: 'test'
+  ...
+# Subtest: finding 3: pending items reach evaluateEntry and the aggregation, and unknown fields never earn credit
+ok 107 - finding 3: pending items reach evaluateEntry and the aggregation, and unknown fields never earn credit
+  ---
+  duration_ms: 25.611046
+  type: 'test'
+  ...
+# Subtest: residual 1: unknown geometry on the GOLD side never earns E5 credit
+ok 108 - residual 1: unknown geometry on the GOLD side never earns E5 credit
+  ---
+  duration_ms: 10.682266
+  type: 'test'
+  ...
+# Subtest: residual 2: a relation target that is a compound (removed from the prediction) is diagnosed and earns nothing
+ok 109 - residual 2: a relation target that is a compound (removed from the prediction) is diagnosed and earns nothing
+  ---
+  duration_ms: 8.859466
+  type: 'test'
+  ...
+# Subtest: residual 3: the aggregation keeps per-entry pending detail (resources, reasons, references, spans) next to the counts
+ok 110 - residual 3: the aggregation keeps per-entry pending detail (resources, reasons, references, spans) next to the counts
+  ---
+  duration_ms: 18.853433
+  type: 'test'
+  ...
+# Subtest: end to end in memory: adapted prediction without coverage keeps an invented positive pending, and with an explicit selection on a code it is proven
+ok 111 - end to end in memory: adapted prediction without coverage keeps an invented positive pending, and with an explicit selection on a code it is proven
+  ---
+  duration_ms: 5.927215
+  type: 'test'
+  ...
+# Subtest: decision table for P/R/F1 and N/A ratios
+ok 112 - decision table for P/R/F1 and N/A ratios
+  ---
+  duration_ms: 1.519922
+  type: 'test'
+  ...
+# Subtest: one-to-one matching: a duplicated prediction never yields a second hit
+ok 113 - one-to-one matching: a duplicated prediction never yields a second hit
+  ---
+  duration_ms: 1.991827
+  type: 'test'
+  ...
+# Subtest: perfect structural prediction scores 1 where defined and keeps N/A where it must
+ok 114 - perfect structural prediction scores 1 where defined and keeps N/A where it must
+  ---
+  duration_ms: 0.525918
+  type: 'test'
+  ...
+# Subtest: hierarchy, order, context and table geometry errors are counted separately
+ok 115 - hierarchy, order, context and table geometry errors are counted separately
+  ---
+  duration_ms: 0.575807
+  type: 'test'
+  ...
+# Subtest: domains: NCM×NBM swap, chapter class, and false NCM over other domains
+ok 116 - domains: NCM×NBM swap, chapter class, and false NCM over other domains
+  ---
+  duration_ms: 0.521037
+  type: 'test'
+  ...
+# Subtest: ranges need both ends in order; exceptions need the target set; scope widening is not full credit; M2c/M2 N/A
+ok 117 - ranges need both ends in order; exceptions need the target set; scope widening is not full credit; M2c/M2 N/A
+  ---
+  duration_ms: 0.413386
+  type: 'test'
+  ...
+# Subtest: S1: denominator from the gold; each hit span once in S1a; raw emissions and invented positives in S1b
+ok 118 - S1: denominator from the gold; each hit span once in S1a; raw emissions and invented positives in S1b
+  ---
+  duration_ms: 0.613896
+  type: 'test'
+  ...
+# Subtest: S1b flags invented positives in a document without codes, where S1a is N/A
+ok 119 - S1b flags invented positives in a document without codes, where S1a is N/A
+  ---
+  duration_ms: 0.252743
+  type: 'test'
+  ...
+# Subtest: aggregation sums counts per source and overall; ratios are not averaged; N/A survives
+ok 120 - aggregation sums counts per source and overall; ratios are not averaged; N/A survives
+  ---
+  duration_ms: 1.228287
+  type: 'test'
+  ...
+# Subtest: finding 1: a relation whose ends carry the wrong nomenclature (NCM↔NBM) is not a hit
+ok 121 - finding 1: a relation whose ends carry the wrong nomenclature (NCM↔NBM) is not a hit
+  ---
+  duration_ms: 0.673535
+  type: 'test'
+  ...
+# Subtest: finding 2: every positive ncm emission is classified; inexact and unlocated spans never disappear
+ok 122 - finding 2: every positive ncm emission is classified; inexact and unlocated spans never disappear
+  ---
+  duration_ms: 0.407907
+  type: 'test'
+  ...
+# Subtest: finding 3: emissions in declared gaps or unidentified parts are unverifiable, not proven violations
+ok 123 - finding 3: emissions in declared gaps or unidentified parts are unverifiable, not proven violations
+  ---
+  duration_ms: 0.342095
+  type: 'test'
+  ...
+# Subtest: finding 4: an omitted sibling cannot hide an inversion between its neighbours (E3)
+ok 124 - finding 4: an omitted sibling cannot hide an inversion between its neighbours (E3)
+  ---
+  duration_ms: 2.1388
+  type: 'test'
+  ...
+# Subtest: aggregation keeps the S1b classes and the exhaustive sum
+ok 125 - aggregation keeps the S1b classes and the exhaustive sum
+  ---
+  duration_ms: 0.501
+  type: 'test'
+  ...
+# Subtest: E3 counts every pair of matched siblings: [2,0,1] → 1/3, perfect → 3/3, reversed → 0/3
+ok 126 - E3 counts every pair of matched siblings: [2,0,1] → 1/3, perfect → 3/3, reversed → 0/3
+  ---
+  duration_ms: 0.492246
+  type: 'test'
+  ...
+# Subtest: S1: without proven annotation coverage an emission over text with no gold code is pending, never a violation
+ok 127 - S1: without proven annotation coverage an emission over text with no gold code is pending, never a violation
+  ---
+  duration_ms: 0.961975
+  type: 'test'
+  ...
+# Subtest: M2a: repeated targets collapse to a set; a duplicated whole relation is still a false positive
+ok 128 - M2a: repeated targets collapse to a set; a duplicated whole relation is still a false positive
+  ---
+  duration_ms: 0.540805
+  type: 'test'
+  ...
+# Subtest: static gold roles agree with the approved 01 matrix counts (no engine, no measurement)
+ok 129 - static gold roles agree with the approved 01 matrix counts (no engine, no measurement)
+  ---
+  duration_ms: 21.831124
+  type: 'test'
+  ...
+# Subtest: inline annexes become manifest entries with exact span hash and descendant count
+ok 130 - inline annexes become manifest entries with exact span hash and descendant count
+  ---
+  duration_ms: 45.464518
+  type: 'test'
+  ...
+# Subtest: separate annex files link by declared designation only; unmatched or repeated ones are reported
+ok 131 - separate annex files link by declared designation only; unmatched or repeated ones are reported
+  ---
+  duration_ms: 2.249443
+  type: 'test'
+  ...
+# Subtest: a prose reference to an annex is not an annex
+ok 132 - a prose reference to an annex is not an annex
+  ---
+  duration_ms: 0.22638
+  type: 'test'
+  ...
+# Subtest: extensive document: 3000 articles in 20 annexes, no loss, duplication or reordering, within a time budget
+ok 133 - extensive document: 3000 articles in 20 annexes, no loss, duplication or reordering, within a time budget
+  ---
+  duration_ms: 92.195131
+  type: 'test'
+  ...
+# Subtest: beyond the size limit the reader degrades explicitly, never truncates silently
+ok 134 - beyond the size limit the reader degrades explicitly, never truncates silently
+  ---
+  duration_ms: 11.611978
+  type: 'test'
+  ...
+# Subtest: deep nesting beyond the depth limit is reported, not dropped silently
+ok 135 - deep nesting beyond the depth limit is reported, not dropped silently
+  ---
+  duration_ms: 0.425259
+  type: 'test'
+  ...
+# Subtest: R2-06: two separate files declared ANEXO I give the same result in either order; none is preferred
+ok 136 - R2-06: two separate files declared ANEXO I give the same result in either order; none is preferred
+  ---
+  duration_ms: 0.984313
+  type: 'test'
+  ...
+# Subtest: synthetic gold validates against its exact canonical text
+ok 137 - synthetic gold validates against its exact canonical text
+  ---
+  duration_ms: 6.151085
+  type: 'test'
+  ...
+# Subtest: gold invariants fail closed
+ok 138 - gold invariants fail closed
+  ---
+  duration_ms: 4.856313
+  type: 'test'
+  ...
+# Subtest: approval is bound to the reviewed content hash; any later annotation change needs a new review
+ok 139 - approval is bound to the reviewed content hash; any later annotation change needs a new review
+  ---
+  duration_ms: 0.750421
+  type: 'test'
+  ...
+# Subtest: rebuilding from a spec keeps a valid approval and rejects it after any content change
+ok 140 - rebuilding from a spec keeps a valid approval and rejects it after any content change
+  ---
+  duration_ms: 55.359445
+  type: 'test'
+  ...
+# Subtest: review packs are current: chunks reassemble the complete gold and the exact frozen canonical text
+ok 141 - review packs are current: chunks reassemble the complete gold and the exact frozen canonical text
+  ---
+  duration_ms: 689.788179
+  type: 'test'
+  ...
+# Subtest: committed development gold is reproducible from its human-written specs
+ok 142 - committed development gold is reproducible from its human-written specs
+  ---
+  duration_ms: 679.797689
+  type: 'test'
+  ...
+# Subtest: all seven development golds carry the documented independent approval of their exact content
+ok 143 - all seven development golds carry the documented independent approval of their exact content
+  ---
+  duration_ms: 361.440253
+  type: 'test'
+  ...
+# Subtest: measurement matrix counts match the approved gold (recognition is not positive selection)
+ok 144 - measurement matrix counts match the approved gold (recognition is not positive selection)
+  ---
+  duration_ms: 21.033909
+  type: 'test'
+  ...
+# Subtest: R1 correction: 02 keeps 3507.90.4 as NBM and annotates every convention number of a list
+ok 145 - R1 correction: 02 keeps 3507.90.4 as NBM and annotates every convention number of a list
+  ---
+  duration_ms: 3.835627
+  type: 'test'
+  ...
+# Subtest: R2 correction: 01 annotates dotted positions, the 84.56 A 84.65 range and its exclusion with both ends
+ok 146 - R2 correction: 01 annotates dotted positions, the 84.56 A 84.65 range and its exclusion with both ends
+  ---
+  duration_ms: 14.82656
+  type: 'test'
+  ...
+# Subtest: DOE-SP: content copied verbatim with provenance, BOM recorded, title excluded by hash only
+ok 147 - DOE-SP: content copied verbatim with provenance, BOM recorded, title excluded by hash only
+  ---
+  duration_ms: 34.827089
+  type: 'test'
+  ...
+# Subtest: DOE-SP: JSON escapes decode to the same text as literal characters
+ok 148 - DOE-SP: JSON escapes decode to the same text as literal characters
+  ---
+  duration_ms: 0.66861
+  type: 'test'
+  ...
+# Subtest: DOE-SP: missing fields and invalid responses fail closed
+ok 149 - DOE-SP: missing fields and invalid responses fail closed
+  ---
+  duration_ms: 0.845813
+  type: 'test'
+  ...
+# Subtest: RFB: segments in ascending order with per-segment provenance; omitted and attachment-only segments declared
+ok 150 - RFB: segments in ascending order with per-segment provenance; omitted and attachment-only segments declared
+  ---
+  duration_ms: 21.125997
+  type: 'test'
+  ...
+# Subtest: RFB: missing fields and invalid responses fail closed
+ok 151 - RFB: missing fields and invalid responses fail closed
+  ---
+  duration_ms: 0.601876
+  type: 'test'
+  ...
+# Subtest: E9 matrix and samples baseline are regenerated identical to the committed files
+ok 152 - E9 matrix and samples baseline are regenerated identical to the committed files
+  ---
+  duration_ms: 1793.23564
+  type: 'test'
+  ...
+# Subtest: E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated
+not ok 153 - E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated
+  ---
+  duration_ms: 1.76354
+  type: 'test'
+  location: '<comp>/test/anatomy.official-coverage.unit.test.ts:21:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    only the COORD-accepted Portaria 635/2025 (e9-acceptances.json); collection acceptance is not anatomy acceptance
+    + actual - expected
+    
+    + []
+    - [
+    -   'rfb:148693'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'rfb:148693'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (<comp>/test/anatomy.official-coverage.unit.test.ts:29:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: E9 single grid: complete only when the grid is approved AND every required cell has a validated sample; one absent category blocks it
+ok 154 - E9 single grid: complete only when the grid is approved AND every required cell has a validated sample; one absent category blocks it
+  ---
+  duration_ms: 3.676184
+  type: 'test'
+  ...
+# Subtest: E9 predicates: a sample valid on every axis but ONE never covers the cell (source, type, layout, size, validation)
+ok 155 - E9 predicates: a sample valid on every axis but ONE never covers the cell (source, type, layout, size, validation)
+  ---
+  duration_ms: 0.340694
+  type: 'test'
+  ...
+# Subtest: E9 M3/M4: each Convênio is one sample; it covers only the cell of its own measured size, and one never stands for the other
+ok 156 - E9 M3/M4: each Convênio is one sample; it covers only the cell of its own measured size, and one never stands for the other
+  ---
+  duration_ms: 0.170625
+  type: 'test'
+  ...
+# Subtest: E9 integrity: bytes that differ from the recorded provenance are refused before any use
+ok 157 - E9 integrity: bytes that differ from the recorded provenance are refused before any use
+  ---
+  duration_ms: 0.898446
+  type: 'test'
+  ...
+# Subtest: E9 encoding: the declared encoding is respected; unsupported or invalid encodings are refused, never guessed
+ok 158 - E9 encoding: the declared encoding is respected; unsupported or invalid encodings are refused, never guessed
+  ---
+  duration_ms: 0.352914
+  type: 'test'
+  ...
+# Subtest: E9 P2 ingest: stored byte for byte as a browser reproduction; unknown save time recorded as an upper bound; exclusive; no overwrite, no orphan
+ok 159 - E9 P2 ingest: stored byte for byte as a browser reproduction; unknown save time recorded as an upper bound; exclusive; no overwrite, no orphan
+  ---
+  duration_ms: 2.322064
+  type: 'test'
+  ...
+# Subtest: E9 P2 ingest refusals: title, host, saved-from-url mismatch, encoding, reserved act, unknown item, PDF, missing file — all recorded
+ok 160 - E9 P2 ingest refusals: title, host, saved-from-url mismatch, encoding, reserved act, unknown item, PDF, missing file — all recorded
+  ---
+  duration_ms: 1.439773
+  type: 'test'
+  ...
+# Subtest: E9 HTTP package ingest: the ZIP FILE is hashed, entries are read from it (CRC), each matches the manifest; foreign host refused; charset never inferred; no overwrite
+ok 161 - E9 HTTP package ingest: the ZIP FILE is hashed, entries are read from it (CRC), each matches the manifest; foreign host refused; charset never inferred; no overwrite
+  ---
+  duration_ms: 4.044543
+  type: 'test'
+  ...
+# Subtest: E9 P2-c historical ledger stays a record: 25 / 19 / 9 / 28 / 3 / 0 (never read as a budget)
+ok 162 - E9 P2-c historical ledger stays a record: 25 / 19 / 9 / 28 / 3 / 0 (never read as a budget)
+  ---
+  duration_ms: 0.504388
+  type: 'test'
+  ...
+# Subtest: charset policy (\#116 c.6708512598 §6): BOM and declared charset first; windows-1252 fallback ONLY for the two approved Planalto SHAs; tentative; never declared
+ok 163 - charset policy (\#116 c.6708512598 §6): BOM and declared charset first; windows-1252 fallback ONLY for the two approved Planalto SHAs; tentative; never declared
+  ---
+  duration_ms: 1673.702702
+  type: 'test'
+  ...
+# Subtest: E9 acceptance B1: the record must name the REAL grid cell; pins on digest, engine and sample are all required
+ok 164 - E9 acceptance B1: the record must name the REAL grid cell; pins on digest, engine and sample are all required
+  ---
+  duration_ms: 8288.340679
+  type: 'test'
+  ...
+# Subtest: E9 acceptance B2: strict validation rejects the whole file (fail closed): unknown cell, shapes, duplicates, conflicts
+ok 165 - E9 acceptance B2: strict validation rejects the whole file (fail closed): unknown cell, shapes, duplicates, conflicts
+  ---
+  duration_ms: 1.584136
+  type: 'test'
+  ...
+# Subtest: E9 acceptance B3: partial readings, absent material annexes and a body in an absent attachment are never accepted
+ok 166 - E9 acceptance B3: partial readings, absent material annexes and a body in an absent attachment are never accepted
+  ---
+  duration_ms: 7717.190118
+  type: 'test'
+  ...
+# Subtest: E9 acceptance B4: the committed file is the append-only union with \#305/\#309 and accepts only the Portaria here
+not ok 167 - E9 acceptance B4: the committed file is the append-only union with \#305/\#309 and accepts only the Portaria here
+  ---
+  duration_ms: 4.091257
+  type: 'test'
+  location: '<comp>/test/anatomy.official-coverage.unit.test.ts:254:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+        cellId: 'rfb--portaria--medio',
+        decidedBy: 'COORD (Frente 1, continuidade P2-c)',
+        decidedOn: '2026-11-11',
+    +   engineBuildHash: '0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194',
+    -   engineBuildHash: '8061ac8257daa5447f1a615e7a1e2c804cc48cd66f9670b161a5f5f01b7862bc',
+        entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae',
+        limits: [
+          'escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva',
+          'preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout',
+          'sem merge: #303 herda o #285 (NÃO MERGEAR)',
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    sampleId: 'rfb:148693'
+    cellId: 'rfb--portaria--medio'
+    scope: 'offline'
+    entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae'
+    engineBuildHash: '8061ac8257daa5447f1a615e7a1e2c804cc48cd66f9670b161a5f5f01b7862bc'
+    decidedBy: 'COORD (Frente 1, continuidade P2-c)'
+    decidedOn: '2026-11-11'
+    ref: 'tribusca-control#116 c.6776402307 (registro) — Portaria RFB nº 635/2025, multivigente SHA-256 a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8, #303 @ 719352f'
+    limits:
+      0: 'escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva'
+      1: 'preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout'
+      2: 'sem merge: #303 herda o #285 (NÃO MERGEAR)'
+      3: 'CI verify do HEAD vermelho por compatibilidade pg_dump/PG16 (#310), não pela anatomia'
+  actual:
+    sampleId: 'rfb:148693'
+    cellId: 'rfb--portaria--medio'
+    scope: 'offline'
+    entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae'
+    engineBuildHash: '0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194'
+    decidedBy: 'COORD (Frente 1, continuidade P2-c)'
+    decidedOn: '2026-11-11'
+    ref: 'tribusca-control#116 c.6776402307 (registro) — Portaria RFB nº 635/2025, multivigente SHA-256 a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8, #303 @ 719352f'
+    limits:
+      0: 'escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva'
+      1: 'preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout'
+      2: 'sem merge: #303 herda o #285 (NÃO MERGEAR)'
+      3: 'CI verify do HEAD vermelho por compatibilidade pg_dump/PG16 (#310), não pela anatomia'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (<comp>/test/anatomy.official-coverage.unit.test.ts:259:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R2 B-1 (1–4): own annexes are checked ONE BY ONE — present, decoded and READ are distinct; duplicates and bad payloads never satisfy
+ok 168 - R2 B-1 (1–4): own annexes are checked ONE BY ONE — present, decoded and READ are distinct; duplicates and bad payloads never satisfy
+  ---
+  duration_ms: 1.781689
+  type: 'test'
+  ...
+# Subtest: R2 B-1/B-2 (5–8): other-norm citation, self-citation, ambiguity and the external ADE Corat annex
+ok 169 - R2 B-1/B-2 (5–8): other-norm citation, self-citation, ambiguity and the external ADE Corat annex
+  ---
+  duration_ms: 1.508711
+  type: 'test'
+  ...
+# Subtest: R2 (9) + B-3: the Portaria 635 stays the only eligible sample; partial readings are flagged complete:false without changing coverage
+not ok 170 - R2 (9) + B-3: the Portaria 635 stays the only eligible sample; partial readings are flagged complete:false without changing coverage
+  ---
+  duration_ms: 1694.048758
+  type: 'test'
+  location: '<comp>/test/anatomy.official-coverage.unit.test.ts:311:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    9. Portaria 635: complete, digest + engine pinned
+    + actual - expected
+    
+    + []
+    - [
+    -   'rfb:148693'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'rfb:148693'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (<comp>/test/anatomy.official-coverage.unit.test.ts:314:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R2 B-4: decidedOn must be a REAL date
+ok 171 - R2 B-4: decidedOn must be a REAL date
+  ---
+  duration_ms: 0.868433
+  type: 'test'
+  ...
+# Subtest: R3 B2-1: suffixed labels — no truncation, no presumption; unsupported or conflicting labels are gaps
+ok 172 - R3 B2-1: suffixed labels — no truncation, no presumption; unsupported or conflicting labels are gaps
+  ---
+  duration_ms: 1.64201
+  type: 'test'
+  ...
+# Subtest: R4 B3-1/B3-2: every suffix spelling is a suffix (never truncated to I); stray letters and lone L/C are gaps
+ok 173 - R4 B3-1/B3-2: every suffix spelling is a suffix (never truncated to I); stray letters and lone L/C are gaps
+  ---
+  duration_ms: 1.639839
+  type: 'test'
+  ...
+# Subtest: R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; netting only by proven reads; completeness ≠ operative context
+not ok 174 - R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; netting only by proven reads; completeness ≠ operative context
+  ---
+  duration_ms: 1536.188815
+  type: 'test'
+  location: '<comp>/test/anatomy.official-coverage.unit.test.ts:381:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'rfb:148693'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'rfb:148693'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (<comp>/test/anatomy.official-coverage.unit.test.ts:400:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R5 B4-1/B4-2: no spelling of a suffix truncates to I; a dangling separator is ambiguous
+ok 175 - R5 B4-1/B4-2: no spelling of a suffix truncates to I; a dangling separator is ambiguous
+  ---
+  duration_ms: 2.201541
+  type: 'test'
+  ...
+# Subtest: R1-2: a redirect to an external host is refused BEFORE requesting it
+ok 176 - R1-2: a redirect to an external host is refused BEFORE requesting it
+  ---
+  duration_ms: 1.967975
+  type: 'test'
+  ...
+# Subtest: R1-2: http downgrade and too many redirects are refused; same-host relative redirects are followed
+ok 177 - R1-2: http downgrade and too many redirects are refused; same-host relative redirects are followed
+  ---
+  duration_ms: 1.216915
+  type: 'test'
+  ...
+# Subtest: R1-3: 404/500 and non-HTML/PDF answers never become snapshots (no body kept)
+ok 178 - R1-3: 404/500 and non-HTML/PDF answers never become snapshots (no body kept)
+  ---
+  duration_ms: 0.537041
+  type: 'test'
+  ...
+# Subtest: R1-5: a candidate URL is fetched only as unverified evidence and can never be promoted
+ok 179 - R1-5: a candidate URL is fetched only as unverified evidence and can never be promoted
+  ---
+  duration_ms: 0.396912
+  type: 'test'
+  ...
+# Subtest: R1-4: promotion requires a verified manifest URL, matching snapshot metadata, intact bytes and an exact excerpt
+ok 180 - R1-4: promotion requires a verified manifest URL, matching snapshot metadata, intact bytes and an exact excerpt
+  ---
+  duration_ms: 1.54441
+  type: 'test'
+  ...
+# Subtest: R1-4: the shipped OFFICIAL_SAMPLES pass the binding check against the committed snapshots
+ok 181 - R1-4: the shipped OFFICIAL_SAMPLES pass the binding check against the committed snapshots
+  ---
+  duration_ms: 0.255729
+  type: 'test'
+  ...
+# Subtest: R2-03: a verified URL answering 200 with an invalid body never becomes a verifiable snapshot
+ok 182 - R2-03: a verified URL answering 200 with an invalid body never becomes a verifiable snapshot
+  ---
+  duration_ms: 1.10655
+  type: 'test'
+  ...
+# Subtest: R2-04: a PDF sample binds through traceable extraction, never through UTF-8 decoding of the PDF bytes
+ok 183 - R2-04: a PDF sample binds through traceable extraction, never through UTF-8 decoding of the PDF bytes
+  ---
+  duration_ms: 1348.567818
+  type: 'test'
+  ...
+# Subtest: D03: a valid RFB JSON becomes a json snapshot with identification and preparation (traceable)
+ok 184 - D03: a valid RFB JSON becomes a json snapshot with identification and preparation (traceable)
+  ---
+  duration_ms: 30.439806
+  type: 'test'
+  ...
+# Subtest: D03 (R2-03 equivalents): error payloads, empty, non-JSON, wrong act and incompatible structure never become snapshots
+ok 185 - D03 (R2-03 equivalents): error payloads, empty, non-JSON, wrong act and incompatible structure never become snapshots
+  ---
+  duration_ms: 1.282314
+  type: 'test'
+  ...
+# Subtest: D03: binding of an RFB JSON sample goes through the prepared text, never the raw bytes
+ok 186 - D03: binding of an RFB JSON sample goes through the prepared text, never the raw bytes
+  ---
+  duration_ms: 2.771814
+  type: 'test'
+  ...
+# Subtest: D03: the four collected RFB JSON snapshots validate, match their recorded hashes and stay not promoted
+ok 187 - D03: the four collected RFB JSON snapshots validate, match their recorded hashes and stay not promoted
+  ---
+  duration_ms: 8.619107
+  type: 'test'
+  ...
+# Subtest: D03: struck-through (tachado) segments are recorded and a sample drawing on them is refused
+ok 188 - D03: struck-through (tachado) segments are recorded and a sample drawing on them is refused
+  ---
+  duration_ms: 1.085508
+  type: 'test'
+  ...
+# Subtest: D03-R1-01: the struck set is re-derived from the original JSON; tampered metadata never hides a tachado excerpt
+ok 189 - D03-R1-01: the struck set is re-derived from the original JSON; tampered metadata never hides a tachado excerpt
+  ---
+  duration_ms: 3.162311
+  type: 'test'
+  ...
+# Subtest: OFFICIAL-LOT-RFB: re-analysis of the official RFB lot matches the committed baseline (no silent regression)
+ok 190 - OFFICIAL-LOT-RFB: re-analysis of the official RFB lot matches the committed baseline (no silent regression)
+  ---
+  duration_ms: 5051.830573
+  type: 'test'
+  ...
+# Subtest: OFFICIAL-LOT-RFB: invariants — never promoted, legalStatus unknown (checked in the run), text fully accounted
+ok 191 - OFFICIAL-LOT-RFB: invariants — never promoted, legalStatus unknown (checked in the run), text fully accounted
+  ---
+  duration_ms: 0.371742
+  type: 'test'
+  ...
+# Subtest: R2-LOT-01: each act records the captured preparation untouched and a proven reconciliation
+ok 192 - R2-LOT-01: each act records the captured preparation untouched and a proven reconciliation
+  ---
+  duration_ms: 4898.091934
+  type: 'test'
+  ...
+# Subtest: R2-LOT-01 negative: a captured hash that the re-execution cannot reproduce fails (old analyzeLot accepted it)
+ok 193 - R2-LOT-01 negative: a captured hash that the re-execution cannot reproduce fails (old analyzeLot accepted it)
+  ---
+  duration_ms: 711.494557
+  type: 'test'
+  ...
+# Subtest: R1-LOT-02: entry-point detection uses resolved paths; CLI runs and --write honours --baseline
+ok 194 - R1-LOT-02: entry-point detection uses resolved paths; CLI runs and --write honours --baseline
+  ---
+  duration_ms: 5488.47186
+  type: 'test'
+  ...
+# Subtest: R1-LOT-02: historicalByTachado counts the source reason; historical context is counted separately
+ok 195 - R1-LOT-02: historicalByTachado counts the source reason; historical context is counted separately
+  ---
+  duration_ms: 3618.813368
+  type: 'test'
+  ...
+# Subtest: the official selection does not reuse any corpus entry (inventory comparison only)
+ok 196 - the official selection does not reuse any corpus entry (inventory comparison only)
+  ---
+  duration_ms: 3.041543
+  type: 'test'
+  ...
+# Subtest: the comparison key recognises the known corpus conflicts (52/91, 100/97)
+ok 197 - the comparison key recognises the known corpus conflicts (52/91, 100/97)
+  ---
+  duration_ms: 0.293081
+  type: 'test'
+  ...
+# Subtest: R1-1: the gate reserved keys are exactly those derived from the inventory (no drift)
+ok 198 - R1-1: the gate reserved keys are exactly those derived from the inventory (no drift)
+  ---
+  duration_ms: 0.806442
+  type: 'test'
+  ...
+# Subtest: complete provenance on an official host passes; synthetic samples are ignored
+ok 199 - complete provenance on an official host passes; synthetic samples are ignored
+  ---
+  duration_ms: 2.497405
+  type: 'test'
+  ...
+# Subtest: each missing or wrong provenance field is reported in Portuguese
+ok 200 - each missing or wrong provenance field is reported in Portuguese
+  ---
+  duration_ms: 1.093508
+  type: 'test'
+  ...
+# Subtest: ids: official prefix, no reserved corpus ids, no ANAT-03 base acts, no duplicates
+ok 201 - ids: official prefix, no reserved corpus ids, no ANAT-03 base acts, no duplicates
+  ---
+  duration_ms: 0.263553
+  type: 'test'
+  ...
+# Subtest: the gate fails closed and the shipped OFFICIAL_SAMPLES pass it
+ok 202 - the gate fails closed and the shipped OFFICIAL_SAMPLES pass it
+  ---
+  duration_ms: 0.523649
+  type: 'test'
+  ...
+# Subtest: R1-1: reserved acts are refused under any alias (inventory keys), and unreadable identities fail closed
+ok 203 - R1-1: reserved acts are refused under any alias (inventory keys), and unreadable identities fail closed
+  ---
+  duration_ms: 0.377841
+  type: 'test'
+  ...
+# Subtest: R1-1: an official URL naming a corpus portal id is refused even when the act name differs
+ok 204 - R1-1: an official URL naming a corpus portal id is refused even when the act name differs
+  ---
+  duration_ms: 0.125448
+  type: 'test'
+  ...
+# Subtest: R1-4: the snapshot SHA-256 is mandatory and well-formed
+ok 205 - R1-4: the snapshot SHA-256 is mandatory and well-formed
+  ---
+  duration_ms: 0.243032
+  type: 'test'
+  ...
+# Subtest: extraction keeps text unchanged, in reading order, with page and line numbers, even when drawn out of order
+ok 206 - extraction keeps text unchanged, in reading order, with page and line numbers, even when drawn out of order
+  ---
+  duration_ms: 1239.0215
+  type: 'test'
+  ...
+# Subtest: the anatomy of a PDF reuses the reader: groups, articles, sole paragraph and incisos are recognised
+ok 207 - the anatomy of a PDF reuses the reader: groups, articles, sole paragraph and incisos are recognised
+  ---
+  duration_ms: 48.893071
+  type: 'test'
+  ...
+# Subtest: traceability: every pointer names the PDF hash, page and line of its passage
+ok 208 - traceability: every pointer names the PDF hash, page and line of its passage
+  ---
+  duration_ms: 7.938427
+  type: 'test'
+  ...
+# Subtest: Portuguese accents and symbols survive extraction (º, ª, ç, ã, é, §)
+ok 209 - Portuguese accents and symbols survive extraction (º, ª, ç, ã, é, §)
+  ---
+  duration_ms: 3.385839
+  type: 'test'
+  ...
+# Subtest: a PDF without a text layer yields no invented text and an explicit limitation
+ok 210 - a PDF without a text layer yields no invented text and an explicit limitation
+  ---
+  duration_ms: 2.386342
+  type: 'test'
+  ...
+# Subtest: a long multi-page PDF keeps every line in order (extensive document)
+ok 211 - a long multi-page PDF keeps every line in order (extensive document)
+  ---
+  duration_ms: 125.829172
+  type: 'test'
+  ...
+# Subtest: characters special to HTML (&, <, >) are preserved verbatim, never interpreted as markup
+ok 212 - characters special to HTML (&, <, >) are preserved verbatim, never interpreted as markup
+  ---
+  duration_ms: 5.350985
+  type: 'test'
+  ...
+# Subtest: R2-05: a mixed PDF (text page + image-only page) is partial and names the unread page; no OCR, no invented text
+ok 213 - R2-05: a mixed PDF (text page + image-only page) is partial and names the unread page; no OCR, no invented text
+  ---
+  duration_ms: 5.957958
+  type: 'test'
+  ...
+# Subtest: R2-05: all-text PDF stays complete; an image-only PDF is without text layer; a blank page is "empty", not a loss
+ok 214 - R2-05: all-text PDF stays complete; an image-only PDF is without text layer; a blank page is "empty", not a loss
+  ---
+  duration_ms: 10.09559
+  type: 'test'
+  ...
+# Subtest: R2 fidelity (documented limit): repeated spaces come out as ONE space, from the pdfjs text layer; nothing else is edited or added
+ok 215 - R2 fidelity (documented limit): repeated spaces come out as ONE space, from the pdfjs text layer; nothing else is edited or added
+  ---
+  duration_ms: 7.13085
+  type: 'test'
+  ...
+# Subtest: R3 R2-05: a page with text AND an image is not complete; the unread visual content is named by page
+ok 216 - R3 R2-05: a page with text AND an image is not complete; the unread visual content is named by page
+  ---
+  duration_ms: 2.41278
+  type: 'test'
+  ...
+# Subtest: R3 R2-05: a vector drawing is visual content, never "empty"; a clip-only path does not count as painted
+ok 217 - R3 R2-05: a vector drawing is visual content, never "empty"; a clip-only path does not count as painted
+  ---
+  duration_ms: 20.726663
+  type: 'test'
+  ...
+# Subtest: equivalence: the default profile reproduces the pre-integration engine output on every synthetic document
+ok 218 - equivalence: the default profile reproduces the pre-integration engine output on every synthetic document
+  ---
+  duration_ms: 183.630472
+  type: 'test'
+  ...
+# Subtest: oracle: compiled default matchers equal the original rules, preamble included (no differences)
+ok 219 - oracle: compiled default matchers equal the original rules, preamble included (no differences)
+  ---
+  duration_ms: 18.887449
+  type: 'test'
+  ...
+# Subtest: configuration effects: each editable field changes the engine as configured (synthetic)
+ok 220 - configuration effects: each editable field changes the engine as configured (synthetic)
+  ---
+  duration_ms: 80.098695
+  type: 'test'
+  ...
+# Subtest: identity: ruleSetHash follows the effective profile; engineHash is the regenerated build hash
+ok 221 - identity: ruleSetHash follows the effective profile; engineHash is the regenerated build hash
+  ---
+  duration_ms: 18.542007
+  type: 'test'
+  ...
+# Subtest: fixed protections cannot be configured away (synthetic)
+ok 222 - fixed protections cannot be configured away (synthetic)
+  ---
+  duration_ms: 19.091552
+  type: 'test'
+  ...
+# Subtest: fail closed: invalid profiles, wrong-source rules, and conflicting effective profiles are rejected
+ok 223 - fail closed: invalid profiles, wrong-source rules, and conflicting effective profiles are rejected
+  ---
+  duration_ms: 2.533314
+  type: 'test'
+  ...
+# Subtest: \#249 finding 1: shipped context protections cannot be removed by configuration
+ok 224 - \#249 finding 1: shipped context protections cannot be removed by configuration
+  ---
+  duration_ms: 499.807528
+  type: 'test'
+  ...
+# Subtest: \#249 finding 2: one normalisation — non-canonical literals are rejected, so validation and compiler agree
+ok 225 - \#249 finding 2: one normalisation — non-canonical literals are rejected, so validation and compiler agree
+  ---
+  duration_ms: 6.480272
+  type: 'test'
+  ...
+# Subtest: \#249 finding 3: a header and a blocker that the reader treats alike cannot coexist
+ok 226 - \#249 finding 3: a header and a blocker that the reader treats alike cannot coexist
+  ---
+  duration_ms: 12.16051
+  type: 'test'
+  ...
+# Subtest: \#249 R2 / A: removing any protected marker is refused through analyzeAnatomy, at source and family level
+ok 227 - \#249 R2 / A: removing any protected marker is refused through analyzeAnatomy, at source and family level
+  ---
+  duration_ms: 156.444107
+  type: 'test'
+  ...
+# Subtest: \#249 R2 / B: document text is never normalised; matchers equal the pre-integration rules on decomposed text
+ok 228 - \#249 R2 / B: document text is never normalised; matchers equal the pre-integration rules on decomposed text
+  ---
+  duration_ms: 10.2384
+  type: 'test'
+  ...
+# Subtest: \#249 R2 / C: header/blocker conflicts across inheritance, case and spacing; CÓDIGO NCM vs CÓDIGO stays valid
+ok 229 - \#249 R2 / C: header/blocker conflicts across inheritance, case and spacing; CÓDIGO NCM vs CÓDIGO stays valid
+  ---
+  duration_ms: 15.872147
+  type: 'test'
+  ...
+# Subtest: \#249 R2: restored preamble — engine output equals the pre-integration engine on adversarial synthetic documents
+ok 230 - \#249 R2: restored preamble — engine output equals the pre-integration engine on adversarial synthetic documents
+  ---
+  duration_ms: 16.822248
+  type: 'test'
+  ...
+# Subtest: default profiles validate and resolve for every source
+ok 231 - default profiles validate and resolve for every source
+  ---
+  duration_ms: 77.387978
+  type: 'test'
+  ...
+# Subtest: inheritance default → source → family replaces per field and inherits omitted ones
+ok 232 - inheritance default → source → family replaces per field and inherits omitted ones
+  ---
+  duration_ms: 34.3437
+  type: 'test'
+  ...
+# Subtest: deterministic hashes: order and formatting do not matter; content does; behaviour hash ignores provenance
+ok 233 - deterministic hashes: order and formatting do not matter; content does; behaviour hash ignores provenance
+  ---
+  duration_ms: 42.773689
+  type: 'test'
+  ...
+# Subtest: limits: 64 items per field, 64 UTF-16 units per literal, 64 KiB per profile
+ok 234 - limits: 64 items per field, 64 UTF-16 units per literal, 64 KiB per profile
+  ---
+  duration_ms: 14.675813
+  type: 'test'
+  ...
+# Subtest: fail closed on malformed literals, structure, versions and the mandatory table policy
+ok 235 - fail closed on malformed literals, structure, versions and the mandatory table policy
+  ---
+  duration_ms: 4.88032
+  type: 'test'
+  ...
+# Subtest: resolution errors: one default, one profile per scope, valid target
+ok 236 - resolution errors: one default, one profile per scope, valid target
+  ---
+  duration_ms: 6.104326
+  type: 'test'
+  ...
+# Subtest: semantic duplicates are rejected under the matching semantics of each field
+ok 237 - semantic duplicates are rejected under the matching semantics of each field
+  ---
+  duration_ms: 2.148035
+  type: 'test'
+  ...
+# Subtest: a header cannot be allowed and blocked at once — inside one profile or after inheritance
+ok 238 - a header cannot be allowed and blocked at once — inside one profile or after inheritance
+  ---
+  duration_ms: 45.143135
+  type: 'test'
+  ...
+# Subtest: fidelity: CONFAZ and DOU class lists equal the original reader constants exactly
+ok 239 - fidelity: CONFAZ and DOU class lists equal the original reader constants exactly
+  ---
+  duration_ms: 9.578097
+  type: 'test'
+  ...
+# Subtest: fidelity: every default literal is accepted by the original rule it was extracted from
+ok 240 - fidelity: every default literal is accepted by the original rule it was extracted from
+  ---
+  duration_ms: 14.666605
+  type: 'test'
+  ...
+# Subtest: decoded entities, accents, combining characters and emoji retain UTF-16 origin spans
+ok 241 - decoded entities, accents, combining characters and emoji retain UTF-16 origin spans
+  ---
+  duration_ms: 58.695903
+  type: 'test'
+  ...
+# Subtest: CONFAZ classes distinguish prohibited headings, editorial notes and proposed clauses
+ok 242 - CONFAZ classes distinguish prohibited headings, editorial notes and proposed clauses
+  ---
+  duration_ms: 5.916473
+  type: 'test'
+  ...
+# Subtest: historical annex context reaches unmarked cells and resets at a new annex
+ok 243 - historical annex context reaches unmarked cells and resets at a new annex
+  ---
+  duration_ms: 44.269254
+  type: 'test'
+  ...
+# Subtest: table geometry preserves rowspans/colspans and original cell associations
+ok 244 - table geometry preserves rowspans/colspans and original cell associations
+  ---
+  duration_ms: 3.332711
+  type: 'test'
+  ...
+# Subtest: ambiguous table geometry is partial and does not guess NCM columns
+ok 245 - ambiguous table geometry is partial and does not guess NCM columns
+  ---
+  duration_ms: 1.893755
+  type: 'test'
+  ...
+# Subtest: generic code/NBM/TIPI/SH headings never authorize NCM extraction
+ok 246 - generic code/NBM/TIPI/SH headings never authorize NCM extraction
+  ---
+  duration_ms: 15.472146
+  type: 'test'
+  ...
+# Subtest: nested tables stay children of their original cells
+ok 247 - nested tables stay children of their original cells
+  ---
+  duration_ms: 0.93501
+  type: 'test'
+  ...
+# Subtest: recognized preamble remains prohibited even with an operative text class
+ok 248 - recognized preamble remains prohibited even with an operative text class
+  ---
+  duration_ms: 1.06396
+  type: 'test'
+  ...
+# Subtest: DOU/DOE-SP/RFB preserve unknown text and recognize only explicit article markers
+ok 249 - DOU/DOE-SP/RFB preserve unknown text and recognize only explicit article markers
+  ---
+  duration_ms: 24.652771
+  type: 'test'
+  ...
+# Subtest: article citations inside prose do not become article boundaries
+ok 250 - article citations inside prose do not become article boundaries
+  ---
+  duration_ms: 1.372868
+  type: 'test'
+  ...
+# Subtest: markup quotations and multi-paragraph quotation text remain prohibited
+ok 251 - markup quotations and multi-paragraph quotation text remain prohibited
+  ---
+  duration_ms: 2.44929
+  type: 'test'
+  ...
+# Subtest: missing attachment, image and executable content are declared without fetching
+ok 252 - missing attachment, image and executable content are declared without fetching
+  ---
+  duration_ms: 0.955724
+  type: 'test'
+  ...
+# Subtest: plain text, missing body and hostile HTML limits fail closed while accounting for all units
+ok 253 - plain text, missing body and hostile HTML limits fail closed while accounting for all units
+  ---
+  duration_ms: 43.993688
+  type: 'test'
+  ...
+# Subtest: same snapshot returns identical parts, source maps and coverage
+ok 254 - same snapshot returns identical parts, source maps and coverage
+  ---
+  duration_ms: 0.898729
+  type: 'test'
+  ...
+# Subtest: historical DOM wrapper protects an otherwise unmarked article
+ok 255 - historical DOM wrapper protects an otherwise unmarked article
+  ---
+  duration_ms: 0.640019
+  type: 'test'
+  ...
+# Subtest: historical class on table protects its rows and unmarked cells
+ok 256 - historical class on table protects its rows and unmarked cells
+  ---
+  duration_ms: 0.769044
+  type: 'test'
+  ...
+# Subtest: historical class on one row protects its cells without marking another row historical
+ok 257 - historical class on one row protects its cells without marking another row historical
+  ---
+  duration_ms: 0.899383
+  type: 'test'
+  ...
+# Subtest: blockquote context protects entire nested table and all its cells
+ok 258 - blockquote context protects entire nested table and all its cells
+  ---
+  duration_ms: 0.730912
+  type: 'test'
+  ...
+# Subtest: inline q excludes entire containing paragraph with an explicit conservative limitation
+ok 259 - inline q excludes entire containing paragraph with an explicit conservative limitation
+  ---
+  duration_ms: 0.527563
+  type: 'test'
+  ...
+# Subtest: budget refuses (fail closed) when the state is missing, not JSON or schema-invalid
+ok 260 - budget refuses (fail closed) when the state is missing, not JSON or schema-invalid
+  ---
+  duration_ms: 3.32921
+  type: 'test'
+  ...
+# Subtest: budget refuses without an exact active grant: none, suspended, closed, expired, other owner/grant/package
+ok 261 - budget refuses without an exact active grant: none, suspended, closed, expired, other owner/grant/package
+  ---
+  duration_ms: 1.772461
+  type: 'test'
+  ...
+# Subtest: budget refuses a request larger than the remaining balance (25 requested on a grant of 3 / per-type cap)
+ok 262 - budget refuses a request larger than the remaining balance (25 requested on a grant of 3 / per-type cap)
+  ---
+  duration_ms: 0.689829
+  type: 'test'
+  ...
+# Subtest: every attempt is debited and persisted BEFORE it is sent; a failing fetch stays debited with its outcome
+ok 263 - every attempt is debited and persisted BEFORE it is sent; a failing fetch stays debited with its outcome
+  ---
+  duration_ms: 33.158897
+  type: 'test'
+  ...
+# Subtest: a second run never reuses balance; counters are monotonic; the per-type cap holds inside a run
+ok 264 - a second run never reuses balance; counters are monotonic; the per-type cap holds inside a run
+  ---
+  duration_ms: 4.053629
+  type: 'test'
+  ...
+# Subtest: redirects are counted hop by hop and never followed implicitly
+ok 265 - redirects are counted hop by hop and never followed implicitly
+  ---
+  duration_ms: 4.38869
+  type: 'test'
+  ...
+# Subtest: lease: a concurrent/re-entrant open is refused; a crash leaves the lock and the debited attempt until a person inspects
+ok 266 - lease: a concurrent/re-entrant open is refused; a crash leaves the lock and the debited attempt until a person inspects
+  ---
+  duration_ms: 1.095892
+  type: 'test'
+  ...
+# Subtest: the P2-c collector, with the repository budget (grant G1 of 16, SUSPENDED until the independent PASS), refuses before any request — the 28/25 ledger is not a budget
+ok 267 - the P2-c collector, with the repository budget (grant G1 of 16, SUSPENDED until the independent PASS), refuses before any request — the 28/25 ledger is not a budget
+  ---
+  duration_ms: 1.145488
+  type: 'test'
+  ...
+# Subtest: year filter (option b): if the API still returns 2026 acts the type stops without another attempt
+ok 268 - year filter (option b): if the API still returns 2026 acts the type stops without another attempt
+  ---
+  duration_ms: 1.846982
+  type: 'test'
+  ...
+# Subtest: R3: the lease is taken BEFORE the state is read — a concurrent open is refused and the run decides on the fresh state
+ok 269 - R3: the lease is taken BEFORE the state is read — a concurrent open is refused and the run decides on the fresh state
+  ---
+  duration_ms: 1.102395
+  type: 'test'
+  ...
+# Subtest: R3: a refused open releases the lease it took, and never removes a lease it did not take
+ok 270 - R3: a refused open releases the lease it took, and never removes a lease it did not take
+  ---
+  duration_ms: 0.860392
+  type: 'test'
+  ...
+# Subtest: R3: a closed budget refuses every later debit, settle and send — zero network, ledger preserved
+ok 271 - R3: a closed budget refuses every later debit, settle and send — zero network, ledger preserved
+  ---
+  duration_ms: 1.2119
+  type: 'test'
+  ...
+# Subtest: R3: before every send the grant is re-validated on disk — suspended, expired or externally changed state refuses with zero network
+ok 272 - R3: before every send the grant is re-validated on disk — suspended, expired or externally changed state refuses with zero network
+  ---
+  duration_ms: 1.14421
+  type: 'test'
+  ...
+# Subtest: R4: acts already stored by an earlier session are skipped BEFORE any capture (no wasted request, no failed exclusive write)
+ok 273 - R4: acts already stored by an earlier session are skipped BEFORE any capture (no wasted request, no failed exclusive write)
+  ---
+  duration_ms: 3.199281
+  type: 'test'
+  ...
+# Subtest: L22: declared anexo fills a block the grammar left unidentified (e.g. file name before the heading)
+ok 274 - L22: declared anexo fills a block the grammar left unidentified (e.g. file name before the heading)
+  ---
+  duration_ms: 47.195426
+  type: 'test'
+  ...
+# Subtest: L22: grammar precedence — a heading the grammar recognises keeps the grammar reason; a contradicting declaration is a conflict
+ok 275 - L22: grammar precedence — a heading the grammar recognises keeps the grammar reason; a contradicting declaration is a conflict
+  ---
+  duration_ms: 3.330429
+  type: 'test'
+  ...
+# Subtest: L22 negative: absent, unknown or conflicting type, type 999 and other sources never become annex
+ok 276 - L22 negative: absent, unknown or conflicting type, type 999 and other sources never become annex
+  ---
+  duration_ms: 19.183919
+  type: 'test'
+  ...
+# Subtest: L22: tachado declared anexo is historical with source evidence; quotation keeps precedence
+ok 277 - L22: tachado declared anexo is historical with source evidence; quotation keeps precedence
+  ---
+  duration_ms: 1.276996
+  type: 'test'
+  ...
+# Subtest: L2/L12: malformed attachment HTML never alters the main body, its pieces or its source map
+ok 278 - L2/L12: malformed attachment HTML never alters the main body, its pieces or its source map
+  ---
+  duration_ms: 43.309974
+  type: 'test'
+  ...
+# Subtest: L2/L12: byte offsets map back exactly in each accepted charset
+ok 279 - L2/L12: byte offsets map back exactly in each accepted charset
+  ---
+  duration_ms: 2.668525
+  type: 'test'
+  ...
+# Subtest: L2/L12: failure states — no content, invalid base64, not HTML, charset undeclared/unsupported/invalid bytes
+ok 280 - L2/L12: failure states — no content, invalid base64, not HTML, charset undeclared/unsupported/invalid bytes
+  ---
+  duration_ms: 2.149899
+  type: 'test'
+  ...
+# Subtest: L2/L12: size limits per attachment and per act
+ok 281 - L2/L12: size limits per attachment and per act
+  ---
+  duration_ms: 63.498661
+  type: 'test'
+  ...
+# Subtest: L2/L12 official IN 2.121 (127905, promoted:false): 1 embedded HTML read separately, 30 PDFs missing; main preparation and its reconciliation since 0.1.0 unchanged
+ok 282 - L2/L12 official IN 2.121 (127905, promoted:false): 1 embedded HTML read separately, 30 PDFs missing; main preparation and its reconciliation since 0.1.0 unchanged
+  ---
+  duration_ms: 407.921038
+  type: 'test'
+  ...
+# Subtest: R2: UTF-8 with BOM — BOM kept in the body, the reader's real pointers map to the original bytes
+ok 283 - R2: UTF-8 with BOM — BOM kept in the body, the reader's real pointers map to the original bytes
+  ---
+  duration_ms: 2.962428
+  type: 'test'
+  ...
+# Subtest: R2: characters outside the BMP — pointers map exactly; an offset inside a surrogate pair is refused
+ok 284 - R2: characters outside the BMP — pointers map exactly; an offset inside a surrogate pair is refused
+  ---
+  duration_ms: 2.495153
+  type: 'test'
+  ...
+# Subtest: R2: the attachment inherits the protected context of the referencing segment (quotation, tachado), never becoming more permissive
+ok 285 - R2: the attachment inherits the protected context of the referencing segment (quotation, tachado), never becoming more permissive
+  ---
+  duration_ms: 3.483087
+  type: 'test'
+  ...
+# Subtest: R2 official IN 2.121: the real attachment pointers map to its original bytes; referencing segment 702 (art. 137) is operative
+ok 286 - R2 official IN 2.121: the real attachment pointers map to its original bytes; referencing segment 702 (art. 137) is operative
+  ---
+  duration_ms: 285.271333
+  type: 'test'
+  ...
+# Subtest: R3: text-less tachado segment referencing the attachment — inside an open quotation → prohibited; outside → historical; undetermined → prohibited
+ok 287 - R3: text-less tachado segment referencing the attachment — inside an open quotation → prohibited; outside → historical; undetermined → prohibited
+  ---
+  duration_ms: 3.204346
+  type: 'test'
+  ...
+# Subtest: E9-A1: a validated type-5 table fragment is read as a separate resource; charset evidence in its own field; reason stays null
+ok 288 - E9-A1: a validated type-5 table fragment is read as a separate resource; charset evidence in its own field; reason stays null
+  ---
+  duration_ms: 20.080088
+  type: 'test'
+  ...
+# Subtest: E9-A2: fragment validation and the delimited fallback fail closed
+ok 289 - E9-A2: fragment validation and the delimited fallback fail closed
+  ---
+  duration_ms: 7.396749
+  type: 'test'
+  ...
+# Subtest: E9-A3: express reference — the Art. 1 "descritas abaixo." immediately before links the table as operative; nothing else does
+ok 290 - E9-A3: express reference — the Art. 1 "descritas abaixo." immediately before links the table as operative; nothing else does
+  ---
+  duration_ms: 2.200252
+  type: 'test'
+  ...
+# Subtest: E9-A4: adversarial — R3 prevails for quoted, struck, ambiguous or unlinked content even with an express reference
+ok 291 - E9-A4: adversarial — R3 prevails for quoted, struck, ambiguous or unlinked content even with an express reference
+  ---
+  duration_ms: 1.697665
+  type: 'test'
+  ...
+# Subtest: R2 A-1: an inline-struck reference (<strike>/<s>/<del>) in a non-tachado segment never promotes
+ok 292 - R2 A-1: an inline-struck reference (<strike>/<s>/<del>) in a non-tachado segment never promotes
+  ---
+  duration_ms: 0.820187
+  type: 'test'
+  ...
+# Subtest: R2 A-2: lexical reference alone never promotes — another norm's annex, negation/exclusion, ementa text, no device
+ok 293 - R2 A-2: lexical reference alone never promotes — another norm's annex, negation/exclusion, ementa text, no device
+  ---
+  duration_ms: 2.105947
+  type: 'test'
+  ...
+# Subtest: R2 A-4: attachment HTML is untrusted — attributes never reach the reading (no text, no pointer target)
+ok 294 - R2 A-4: attachment HTML is untrusted — attributes never reach the reading (no text, no pointer target)
+  ---
+  duration_ms: 0.437882
+  type: 'test'
+  ...
+# Subtest: R3 A2-1: nested, unclosed or malformed strike and line-through never leave historical text live (no promotion)
+ok 295 - R3 A2-1: nested, unclosed or malformed strike and line-through never leave historical text live (no promotion)
+  ---
+  duration_ms: 1.743926
+  type: 'test'
+  ...
+# Subtest: R3 A2-2: entities decoded; negation/exclusion anywhere in the sentence; any identified norm in the device; mixed text → no promotion
+ok 296 - R3 A2-2: entities decoded; negation/exclusion anywhere in the sentence; any identified norm in the device; mixed text → no promotion
+  ---
+  duration_ms: 2.503415
+  type: 'test'
+  ...
+# Subtest: R4 A3-1: an explicit strike CSS class (tachado, riscado, strike, line-through…) is struck text → no promotion
+ok 297 - R4 A3-1: an explicit strike CSS class (tachado, riscado, strike, line-through…) is struck text → no promotion
+  ---
+  duration_ms: 1.851443
+  type: 'test'
+  ...
+# Subtest: R4 A3-2: an ACCESSORY citation (foundation, dispensation) does not block; a norm tied to the OBJECT of the reference does
+ok 298 - R4 A3-2: an ACCESSORY citation (foundation, dispensation) does not block; a norm tied to the OBJECT of the reference does
+  ---
+  duration_ms: 4.862508
+  type: 'test'
+  ...
+# Subtest: R5 A4-1: a remission connector ties the reference to the ANTECEDENT clause; a norm there blocks unless that clause is accessory
+ok 299 - R5 A4-1: a remission connector ties the reference to the ANTECEDENT clause; a norm there blocks unless that clause is accessory
+  ---
+  duration_ms: 2.361706
+  type: 'test'
+  ...
+# Subtest: R5 A4-2: unquoted and camelCase strike classes are struck
+ok 300 - R5 A4-2: unquoted and camelCase strike classes are struck
+  ---
+  duration_ms: 1.676321
+  type: 'test'
+  ...
+# Subtest: R5 prohibition (COORD): an operative PROHIBITION whose object is the referenced content links the table; polarity is internal only
+ok 301 - R5 prohibition (COORD): an operative PROHIBITION whose object is the referenced content links the table; polarity is internal only
+  ---
+  duration_ms: 4.117215
+  type: 'test'
+  ...
+# Subtest: R6 A5-1: a remission follows the clause chain back to the GOVERNING clause; a norm there blocks however far back (same sentence)
+ok 302 - R6 A5-1: a remission follows the clause chain back to the GOVERNING clause; a norm there blocks however far back (same sentence)
+  ---
+  duration_ms: 4.861887
+  type: 'test'
+  ...
+# Subtest: R6 A5-2: an elliptical remission without a provable nominal antecedent never promotes; a real antecedent still does
+ok 303 - R6 A5-2: an elliptical remission without a provable nominal antecedent never promotes; a real antecedent still does
+  ---
+  duration_ms: 4.24005
+  type: 'test'
+  ...
+# Subtest: R6 G/H/I: negation, exclusion, prohibitions and strike classes keep their R5 outcome through the clause chain
+ok 304 - R6 G/H/I: negation, exclusion, prohibitions and strike classes keep their R5 outcome through the clause chain
+  ---
+  duration_ms: 1.707072
+  type: 'test'
+  ...
+# Subtest: R7 A6-1: a non-accessory norm citation in ANY earlier clause of the same sentence blocks a remission
+ok 305 - R7 A6-1: a non-accessory norm citation in ANY earlier clause of the same sentence blocks a remission
+  ---
+  duration_ms: 2.715998
+  type: 'test'
+  ...
+# Subtest: R7 abbreviations: Dec., Instr., Port. and Res. never end a sentence and cite a norm like the full forms; real sentence ends hold
+ok 306 - R7 abbreviations: Dec., Instr., Port. and Res. never end a sentence and cite a norm like the full forms; real sentence ends hold
+  ---
+  duration_ms: 2.886303
+  type: 'test'
+  ...
+# Subtest: R8 R7-ACC: "observados"/"dispensados" inside a clause never make it accessory; the citation counts
+ok 307 - R8 R7-ACC: "observados"/"dispensados" inside a clause never make it accessory; the citation counts
+  ---
+  duration_ms: 1.415406
+  type: 'test'
+  ...
+# Subtest: R8 R7-FRONT: a foundation citation is judged by function — same result at the start and in the middle
+ok 308 - R8 R7-FRONT: a foundation citation is judged by function — same result at the start and in the middle
+  ---
+  duration_ms: 2.969742
+  type: 'test'
+  ...
+# Subtest: R8 R7-ABBR: composite abbreviations cite like the full forms; a capitalized short token before "." never ends the sentence; real ends hold
+ok 309 - R8 R7-ABBR: composite abbreviations cite like the full forms; a capitalized short token before "." never ends the sentence; real ends hold
+  ---
+  duration_ms: 5.535583
+  type: 'test'
+  ...
+# Subtest: R9 R8-CST: resumption of the cited norm makes it governing under a constitutive verb — start and middle; own content still promotes
+ok 310 - R9 R8-CST: resumption of the cited norm makes it governing under a constitutive verb — start and middle; own content still promotes
+  ---
+  duration_ms: 3.563896
+  type: 'test'
+  ...
+# Subtest: R9 R8-LOW: abbreviated norms are recognized in lower, upper and mixed case; real boundaries hold
+ok 311 - R9 R8-LOW: abbreviated norms are recognized in lower, upper and mixed case; real boundaries hold
+  ---
+  duration_ms: 10.195607
+  type: 'test'
+  ...
+# Subtest: R9 R8-MRG: a sentence that opens with a remission is never merged into the previous one (unresolved → no promotion)
+ok 312 - R9 R8-MRG: a sentence that opens with a remission is never merged into the previous one (unresolved → no promotion)
+  ---
+  duration_ms: 0.909847
+  type: 'test'
+  ...
+# Subtest: R10 R9-RES: an object that resumes the cited norm never promotes — reviewer cases and novel variants, start and middle; own content promotes
+ok 313 - R10 R9-RES: an object that resumes the cited norm never promotes — reviewer cases and novel variants, start and middle; own content promotes
+  ---
+  duration_ms: 16.578933
+  type: 'test'
+  ...
+# Subtest: R10 R9-ANA: a sentence opening with a resumption never inherits across the sentence boundary; controls without resumption promote
+ok 314 - R10 R9-ANA: a sentence opening with a resumption never inherits across the sentence boundary; controls without resumption promote
+  ---
+  duration_ms: 2.263773
+  type: 'test'
+  ...
+# Subtest: L11: declared parte is a group (part) — Parte → Capítulo → Seção → Artigo → Inciso; text and traceability kept
+ok 315 - L11: declared parte is a group (part) — Parte → Capítulo → Seção → Artigo → Inciso; text and traceability kept
+  ---
+  duration_ms: 32.745171
+  type: 'test'
+  ...
+# Subtest: L11 negative: free text "PARTE I" without a declared type is not inferred; the source "não identificado" (999) stays unidentified
+ok 316 - L11 negative: free text "PARTE I" without a declared type is not inferred; the source "não identificado" (999) stays unidentified
+  ---
+  duration_ms: 1.330714
+  type: 'test'
+  ...
+# Subtest: L11 negative: parte absent from / conflicting in the document table is never guessed
+ok 317 - L11 negative: parte absent from / conflicting in the document table is never guessed
+  ---
+  duration_ms: 0.97704
+  type: 'test'
+  ...
+# Subtest: L11 negative: declared parte contradicting the text grammar keeps the grammar result and records the conflict
+ok 318 - L11 negative: declared parte contradicting the text grammar keeps the grammar result and records the conflict
+  ---
+  duration_ms: 0.497567
+  type: 'test'
+  ...
+# Subtest: L11 negative: tachado parte is historical with source evidence; legalStatus unknown; other sources ignore data-rfb-*
+ok 319 - L11 negative: tachado parte is historical with source evidence; legalStatus unknown; other sources ignore data-rfb-*
+  ---
+  duration_ms: 26.408449
+  type: 'test'
+  ...
+# Subtest: L11 engine: result with parte groups validates in the contract; quoted parte keeps prohibited precedence
+ok 320 - L11 engine: result with parte groups validates in the contract; quoted parte keeps prohibited precedence
+  ---
+  duration_ms: 38.3596
+  type: 'test'
+  ...
+# Subtest: L11 official IN RFB 2.121/2022 (127905, promoted:false): 5 partes become groups, PARTE VI stays inside the open quotation, 999 untouched
+ok 321 - L11 official IN RFB 2.121/2022 (127905, promoted:false): 5 partes become groups, PARTE VI stays inside the open quotation, 999 untouched
+  ---
+  duration_ms: 232.00496
+  type: 'test'
+  ...
+# Subtest: L20: the real-like case (struck 706, unclosed "Art. 706, struck+current pairs, declared Seção III, Art. 707) gets the signal and nothing else changes
+ok 322 - L20: the real-like case (struck 706, unclosed "Art. 706, struck+current pairs, declared Seção III, Art. 707) gets the signal and nothing else changes
+  ---
+  duration_ms: 104.064022
+  type: 'test'
+  ...
+# Subtest: L20: the successor preceded by its own struck pair satisfies E7 too
+ok 323 - L20: the successor preceded by its own struck pair satisfies E7 too
+  ---
+  duration_ms: 0.764392
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §16-1: §§ without struck pairs and Art. 707 right after (no grouping): prohibited preserved, no signal (E7)
+ok 324 - L20 counter-case — §16-1: §§ without struck pairs and Art. 707 right after (no grouping): prohibited preserved, no signal (E7)
+  ---
+  duration_ms: 28.436395
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §16-2: declared grouping but §§ without pairs: prohibited preserved, no signal (E6)
+ok 325 - L20 counter-case — §16-2: declared grouping but §§ without pairs: prohibited preserved, no signal (E6)
+  ---
+  duration_ms: 16.025596
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §16-3: pairs but no grouping and no struck successor pair: prohibited preserved, no signal (E7)
+ok 326 - L20 counter-case — §16-3: pairs but no grouping and no struck successor pair: prohibited preserved, no signal (E7)
+  ---
+  duration_ms: 15.831994
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §15-1: introduced by an amending formula (quotation of another act): prohibited preserved, no signal (E2)
+ok 327 - L20 counter-case — §15-1: introduced by an amending formula (quotation of another act): prohibited preserved, no signal (E2)
+  ---
+  duration_ms: 18.001901
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §15-2: no struck article N right before the opening: prohibited preserved, no signal (E1)
+ok 328 - L20 counter-case — §15-2: no struck article N right before the opening: prohibited preserved, no signal (E1)
+  ---
+  duration_ms: 14.174943
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §14.1: successor is not N+1: prohibited preserved, no signal (E0)
+ok 329 - L20 counter-case — §14.1: successor is not N+1: prohibited preserved, no signal (E0)
+  ---
+  duration_ms: 13.462641
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — §14.1: opening without an article label: prohibited preserved, no signal (E0)
+ok 330 - L20 counter-case — §14.1: opening without an article label: prohibited preserved, no signal (E0)
+  ---
+  duration_ms: 14.947319
+  type: 'test'
+  ...
+# Subtest: L20 counter-case — IN 2.021 model: quotation closed later (678 → 682): prohibited preserved, no signal (no_unclosed_quotation)
+ok 331 - L20 counter-case — IN 2.021 model: quotation closed later (678 → 682): prohibited preserved, no signal (no_unclosed_quotation)
+  ---
+  duration_ms: 10.754886
+  type: 'test'
+  ...
+# Subtest: L20 E4: forged, copied, other-HTML, other-id and HTML-attribute plans give no signal; the engine refuses the plan for other sources
+ok 332 - L20 E4: forged, copied, other-HTML, other-id and HTML-attribute plans give no signal; the engine refuses the plan for other sources
+  ---
+  duration_ms: 37.19133
+  type: 'test'
+  ...
+# Subtest: L20 official lot: only IN 2.121 gets the signal (4008/706 → 4014/707; E1 4007; E6 4009/4010, 4011/4012; E7 Seção III 4013); reader output identical for the 7 acts
+ok 333 - L20 official lot: only IN 2.121 gets the signal (4008/706 → 4014/707; E1 4007; E6 4009/4010, 4011/4012; E7 Seção III 4013); reader output identical for the 7 acts
+  ---
+  duration_ms: 8822.030858
+  type: 'test'
+  ...
+# Subtest: D04: declared types fill gaps the text grammar left — group (capítulo/seção), inciso without dash, ementa and fecho; text unchanged
+ok 334 - D04: declared types fill gaps the text grammar left — group (capítulo/seção), inciso without dash, ementa and fecho; text unchanged
+  ---
+  duration_ms: 37.843849
+  type: 'test'
+  ...
+# Subtest: D04: the source's own "não identificado" type is a limitation, never guessed (even if it looks like an inciso)
+ok 335 - D04: the source's own "não identificado" type is a limitation, never guessed (even if it looks like an inciso)
+  ---
+  duration_ms: 1.845531
+  type: 'test'
+  ...
+# Subtest: D04: tachado → context historical with rfb_tachado_source; legalStatus stays unknown; children inherit
+ok 336 - D04: tachado → context historical with rfb_tachado_source; legalStatus stays unknown; children inherit
+  ---
+  duration_ms: 1.241407
+  type: 'test'
+  ...
+# Subtest: D04: missing, unknown and conflicting types become explicit limitations; grammar conflicts keep the grammar result
+ok 337 - D04: missing, unknown and conflicting types become explicit limitations; grammar conflicts keep the grammar result
+  ---
+  duration_ms: 2.382644
+  type: 'test'
+  ...
+# Subtest: D04: data-rfb-* attributes are honoured only for source RFB (other sources unaffected)
+ok 338 - D04: data-rfb-* attributes are honoured only for source RFB (other sources unaffected)
+  ---
+  duration_ms: 29.824668
+  type: 'test'
+  ...
+# Subtest: D04-R1-01: a table inside a tachado segment is historical (table, rows, cells), equivalent non-struck table stays operative, DOU control unaffected
+ok 339 - D04-R1-01: a table inside a tachado segment is historical (table, rows, cells), equivalent non-struck table stays operative, DOU control unaffected
+  ---
+  duration_ms: 2.076439
+  type: 'test'
+  ...
+# Subtest: D05: a tachado unidentified block is unidentified/historical with matching evidence; the engine accepts it; quoted stays prohibited
+ok 340 - D05: a tachado unidentified block is unidentified/historical with matching evidence; the engine accepts it; quoted stays prohibited
+  ---
+  duration_ms: 24.267398
+  type: 'test'
+  ...
+# Subtest: D05 contract: reason without evidence, mismatched evidence, operative unidentified and evidence without reason are all refused
+ok 341 - D05 contract: reason without evidence, mismatched evidence, operative unidentified and evidence without reason are all refused
+  ---
+  duration_ms: 21.513568
+  type: 'test'
+  ...
+# Subtest: D05: no source evidence → no historical: DOU with the same attributes and RFB without tachado stay unknown
+ok 342 - D05: no source evidence → no historical: DOU with the same attributes and RFB without tachado stay unknown
+  ---
+  duration_ms: 23.025782
+  type: 'test'
+  ...
+# Subtest: D04-R1-01 (selection): cells of a tachado table carry exclusion context_historical; the same cells in a non-struck table do not
+ok 343 - D04-R1-01 (selection): cells of a tachado table carry exclusion context_historical; the same cells in a non-struck table do not
+  ---
+  duration_ms: 19.270259
+  type: 'test'
+  ...
+# Subtest: D05 consumer: the configuration view shows an evidenced tachado unidentified part as historical and labels the evidence in Portuguese
+ok 344 - D05 consumer: the configuration view shows an evidenced tachado unidentified part as historical and labels the evidence in Portuguese
+  ---
+  duration_ms: 8.705123
+  type: 'test'
+  ...
+# Subtest: P2 simulation: positive and negative examples against a candidate profile, with engine and profile hashes
+ok 345 - P2 simulation: positive and negative examples against a candidate profile, with engine and profile hashes
+  ---
+  duration_ms: 159.166197
+  type: 'test'
+  ...
+# Subtest: P2 simulation: deterministic and isolated (no state shared between runs or examples; inputs not mutated)
+ok 346 - P2 simulation: deterministic and isolated (no state shared between runs or examples; inputs not mutated)
+  ---
+  duration_ms: 181.413491
+  type: 'test'
+  ...
+# Subtest: P2 simulation: invalid profiles and inputs are rejected fail-closed
+ok 347 - P2 simulation: invalid profiles and inputs are rejected fail-closed
+  ---
+  duration_ms: 8.781808
+  type: 'test'
+  ...
+# Subtest: P2 simulation: time budget marks an example partial (2 s per example)
+ok 348 - P2 simulation: time budget marks an example partial (2 s per example)
+  ---
+  duration_ms: 23.645788
+  type: 'test'
+  ...
+# Subtest: P2 comparison: parts, entities, relations, limitations and eligibility, identified by hashes
+ok 349 - P2 comparison: parts, entities, relations, limitations and eligibility, identified by hashes
+  ---
+  duration_ms: 62.145262
+  type: 'test'
+  ...
+# Subtest: P2 review: explicit classification; counts never decide; unknown ids and tampered comparisons refused
+ok 350 - P2 review: explicit classification; counts never decide; unknown ids and tampered comparisons refused
+  ---
+  duration_ms: 11.198484
+  type: 'test'
+  ...
+# Subtest: P2-R1-01: every exposed provenance hash is inside the comparison id; tampering any of them is refused
+ok 351 - P2-R1-01: every exposed provenance hash is inside the comparison id; tampering any of them is refused
+  ---
+  duration_ms: 17.169287
+  type: 'test'
+  ...
+# Subtest: P2-R1-02: occurrences sharing a content key are never collapsed (duplicates, different attributes, order)
+ok 352 - P2-R1-02: occurrences sharing a content key are never collapsed (duplicates, different attributes, order)
+  ---
+  duration_ms: 7.552617
+  type: 'test'
+  ...
+# Subtest: P2-R1-03: compareResults validates both inputs (contract, outputHash, analysisId)
+ok 353 - P2-R1-03: compareResults validates both inputs (contract, outputHash, analysisId)
+  ---
+  duration_ms: 8.54701
+  type: 'test'
+  ...
+# Subtest: L17 full engine path: preparation → proof → read → analysis; notes and earlier wordings with proof; nothing eligible
+ok 354 - L17 full engine path: preparation → proof → read → analysis; notes and earlier wordings with proof; nothing eligible
+  ---
+  duration_ms: 60.636347
+  type: 'test'
+  ...
+# Subtest: L17 fail-closed: declared source without proof, serialized/copied proof, other HTML, altered HTML
+ok 355 - L17 fail-closed: declared source without proof, serialized/copied proof, other HTML, altered HTML
+  ---
+  duration_ms: 53.549493
+  type: 'test'
+  ...
+# Subtest: R1-SP-03 negative: a representationId different from the prepared resource is refused
+ok 356 - R1-SP-03 negative: a representationId different from the prepared resource is refused
+  ---
+  duration_ms: 17.438212
+  type: 'test'
+  ...
+# Subtest: R1-SP-03: nested preparation metadata is frozen (region, spans, resource, provenance)
+ok 357 - R1-SP-03: nested preparation metadata is frozen (region, spans, resource, provenance)
+  ---
+  duration_ms: 0.634406
+  type: 'test'
+  ...
+# Subtest: L17: proof only for its typed source; DOE-SP keeps its previous behaviour; invalid URLs never yield a proof
+ok 358 - L17: proof only for its typed source; DOE-SP keeps its previous behaviour; invalid URLs never yield a proof
+  ---
+  duration_ms: 14.43445
+  type: 'test'
+  ...
+# Subtest: L17 profiles: the portal uses the default-level profile only; DOE-SP overrides and family scopes never apply
+ok 359 - L17 profiles: the portal uses the default-level profile only; DOE-SP overrides and family scopes never apply
+  ---
+  duration_ms: 10.727291
+  type: 'test'
+  ...
+# Subtest: L21: leading U+200B no longer hides the marker; text, span and hash keep the character
+ok 360 - L21: leading U+200B no longer hides the marker; text, span and hash keep the character
+  ---
+  duration_ms: 45.502557
+  type: 'test'
+  ...
+# Subtest: L21 negative: U+200B in the middle, other invisible characters and other sources are unchanged
+ok 361 - L21 negative: U+200B in the middle, other invisible characters and other sources are unchanged
+  ---
+  duration_ms: 63.783995
+  type: 'test'
+  ...
+# Subtest: L21 official RICMS art. 7º (\#279, promoted:false): inciso XV recognized; canonical text byte-identical
+ok 362 - L21 official RICMS art. 7º (\#279, promoted:false): inciso XV recognized; canonical text byte-identical
+  ---
+  duration_ms: 42.965457
+  type: 'test'
+  ...
+# Subtest: L14: only the labelled content region is prepared; raw span maps back verbatim; menus/scripts/footer out
+ok 363 - L14: only the labelled content region is prepared; raw span maps back verbatim; menus/scripts/footer out
+  ---
+  duration_ms: 4.022875
+  type: 'test'
+  ...
+# Subtest: L14 fail-closed: wrong host (DOE-SP gazette), missing, duplicated, unlabelled, outside area, empty region
+ok 364 - L14 fail-closed: wrong host (DOE-SP gazette), missing, duplicated, unlabelled, outside area, empty region
+  ---
+  duration_ms: 1.893141
+  type: 'test'
+  ...
+# Subtest: L15: p.nota and "NOTA - V." are editorial notes (prohibited), links kept, never operative
+ok 365 - L15: p.nota and "NOTA - V." are editorial notes (prohibited), links kept, never operative
+  ---
+  duration_ms: 47.926573
+  type: 'test'
+  ...
+# Subtest: L16: p.revogado → historical with portal evidence; current wording stays operative candidate; legalStatus unknown
+ok 366 - L16: p.revogado → historical with portal evidence; current wording stays operative candidate; legalStatus unknown
+  ---
+  duration_ms: 1.272234
+  type: 'test'
+  ...
+# Subtest: L16 negative: quotation keeps precedence; unidentified revogado stays unknown with a limitation; no evidence → no historical
+ok 367 - L16 negative: quotation keeps precedence; unidentified revogado stays unknown with a limitation; no evidence → no historical
+  ---
+  duration_ms: 24.836576
+  type: 'test'
+  ...
+# Subtest: L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 0 chars (103 before L21); 12 notes; 1 earlier wording historical
+ok 368 - L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 0 chars (103 before L21); 12 notes; 1 earlier wording historical
+  ---
+  duration_ms: 226.263378
+  type: 'test'
+  ...
+# Subtest: L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operative + two earlier wordings historical
+ok 369 - L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operative + two earlier wordings historical
+  ---
+  duration_ms: 146.404433
+  type: 'test'
+  ...
+# Subtest: R2-SP-01 adversarial (L17): forged wrapper / declared source / look-alike or altered proof never enable portal classes
+ok 370 - R2-SP-01 adversarial (L17): forged wrapper / declared source / look-alike or altered proof never enable portal classes
+  ---
+  duration_ms: 1.443777
+  type: 'test'
+  ...
+# Subtest: Livro > Título > Capítulo > Seção > Subseção nest above articles, with the level in the reason
+ok 371 - Livro > Título > Capítulo > Seção > Subseção nest above articles, with the level in the reason
+  ---
+  duration_ms: 62.002948
+  type: 'test'
+  ...
+# Subtest: headings without accents and in title case are recognised; prose mentioning a chapter is not
+ok 372 - headings without accents and in title case are recognised; prose mentioning a chapter is not
+  ---
+  duration_ms: 2.189355
+  type: 'test'
+  ...
+# Subtest: considerandos are preamble-like, kept out of positive selection, and do not open structure
+ok 373 - considerandos are preamble-like, kept out of positive selection, and do not open structure
+  ---
+  duration_ms: 2.240052
+  type: 'test'
+  ...
+# Subtest: items numbered under an alínea nest under it; an alínea closes items and a new article closes all
+ok 374 - items numbered under an alínea nest under it; an alínea closes items and a new article closes all
+  ---
+  duration_ms: 2.012424
+  type: 'test'
+  ...
+# Subtest: a numbered date or value inside prose is not an item, and legal status stays unknown for every new type
+ok 375 - a numbered date or value inside prose is not an item, and legal status stays unknown for every new type
+  ---
+  duration_ms: 1.889061
+  type: 'test'
+  ...
+# Subtest: R2-01: a heading at the body top level inside a flat annex is NOT moved out on level alone; the ambiguity is recorded
+ok 376 - R2-01: a heading at the body top level inside a flat annex is NOT moved out on level alone; the ambiguity is recorded
+  ---
+  duration_ms: 1.577603
+  type: 'test'
+  ...
+# Subtest: R2-01: same flat case with LIVRO/TÍTULO levels also stays inside the annex (formerly closed by level)
+ok 377 - R2-01: same flat case with LIVRO/TÍTULO levels also stays inside the annex (formerly closed by level)
+  ---
+  duration_ms: 1.443818
+  type: 'test'
+  ...
+# Subtest: R2-01: structural evidence (annex in its own container, heading outside it) returns to the body
+ok 378 - R2-01: structural evidence (annex in its own container, heading outside it) returns to the body
+  ---
+  duration_ms: 2.262746
+  type: 'test'
+  ...
+# Subtest: R2-01: inside the annex container, a body-level heading stays in the annex even when levels match
+ok 379 - R2-01: inside the annex container, a body-level heading stays in the annex even when levels match
+  ---
+  duration_ms: 1.617641
+  type: 'test'
+  ...
+# Subtest: R1-A: a historical annex never passes its historical context to body provisions after it
+ok 380 - R1-A: a historical annex never passes its historical context to body provisions after it
+  ---
+  duration_ms: 18.570292
+  type: 'test'
+  ...
+# Subtest: R1-A: groups before, inside and with no body grouping (annex keeps them); a second annex closes the first
+ok 381 - R1-A: groups before, inside and with no body grouping (annex keeps them); a second annex closes the first
+  ---
+  duration_ms: 1.420263
+  type: 'test'
+  ...
+# Subtest: R1-B: 1. > 1.1. > 1.1.1. nest by depth; a shallower level closes the deeper ones
+ok 382 - R1-B: 1. > 1.1. > 1.1.1. nest by depth; a shallower level closes the deeper ones
+  ---
+  duration_ms: 1.594692
+  type: 'test'
+  ...
+# Subtest: R1-B: items inside an alínea, and numbers that are not items (prose, dates, values, table cells)
+ok 383 - R1-B: items inside an alínea, and numbers that are not items (prose, dates, values, table cells)
+  ---
+  duration_ms: 2.499438
+  type: 'test'
+  ...
+# Subtest: R1-C: exact fidelity — canonical text, UTF-16 spans, sourceMap continuity, source pointers and hashes (non-BMP, NFC, mixed annex)
+ok 384 - R1-C: exact fidelity — canonical text, UTF-16 spans, sourceMap continuity, source pointers and hashes (non-BMP, NFC, mixed annex)
+  ---
+  duration_ms: 3.897894
+  type: 'test'
+  ...
+# Subtest: R1-C: decomposed (NFD) text is kept as supplied and flagged, never silently normalised
+ok 385 - R1-C: decomposed (NFD) text is kept as supplied and flagged, never silently normalised
+  ---
+  duration_ms: 1.235449
+  type: 'test'
+  ...
+# Subtest: R2-02: a sub-item never takes a parent with an incompatible number; missing parent is recorded
+ok 386 - R2-02: a sub-item never takes a parent with an incompatible number; missing parent is recorded
+  ---
+  duration_ms: 1.622727
+  type: 'test'
+  ...
+# Subtest: R2-02: valid sequences 1 / 1.1 / 1.1.1 and sibling changes nest by exact prefix, with no limitation
+ok 387 - R2-02: valid sequences 1 / 1.1 / 1.1.1 and sibling changes nest by exact prefix, with no limitation
+  ---
+  duration_ms: 1.510063
+  type: 'test'
+  ...
+# Subtest: R2-02: a deeper sub-item under the wrong branch (1.1 open, then 2.1.1) is not grafted onto 1.1
+ok 388 - R2-02: a deeper sub-item under the wrong branch (1.1 open, then 2.1.1) is not grafted onto 1.1
+  ---
+  duration_ms: 2.382403
+  type: 'test'
+  ...
+# Subtest: R2-01: container evidence also works for a fragment without <html>/<body>
+ok 389 - R2-01: container evidence also works for a fragment without <html>/<body>
+  ---
+  duration_ms: 6.439728
+  type: 'test'
+  ...
+# Subtest: caput: one structural child per article/clause over exactly its opening block, first in sibling order
+ok 390 - caput: one structural child per article/clause over exactly its opening block, first in sibling order
+  ---
+  duration_ms: 53.884525
+  type: 'test'
+  ...
+# Subtest: caput never takes ownership: entities and eligibility keep the article, and no part is renumbered
+ok 391 - caput never takes ownership: entities and eligibility keep the article, and no part is renumbered
+  ---
+  duration_ms: 28.451935
+  type: 'test'
+  ...
+# Subtest: clauses get a caput too; historical context is inherited
+ok 392 - clauses get a caput too; historical context is inherited
+  ---
+  duration_ms: 16.627273
+  type: 'test'
+  ...
+# Subtest: Parágrafo único keeps the paragraph type with reason paragraph_sole; "§ 1º" keeps paragraph_marker; prose is not
+ok 393 - Parágrafo único keeps the paragraph type with reason paragraph_sole; "§ 1º" keeps paragraph_marker; prose is not
+  ---
+  duration_ms: 20.379314
+  type: 'test'
+  ...
+# Subtest: fidelity: canonical text, coverage and spans unchanged by caput; validated by the contract
+ok 394 - fidelity: canonical text, coverage and spans unchanged by caput; validated by the contract
+  ---
+  duration_ms: 16.502314
+  type: 'test'
+  ...
+# Subtest: with STRUCT-01 R1: caput coexists with nested items and with the annex return (R2-01: annex in its own container); ids not renumbered
+ok 395 - with STRUCT-01 R1: caput coexists with nested items and with the annex return (R2-01: annex in its own container); ids not renumbered
+  ---
+  duration_ms: 9.176193
+  type: 'test'
+  ...
+# Subtest: ANAT-D02: unmarked continuation blocks extend the caput until the next marker
+ok 396 - ANAT-D02: unmarked continuation blocks extend the caput until the next marker
+  ---
+  duration_ms: 0.70201
+  type: 'test'
+  ...
+# Subtest: R2-08: a table (or any other new child) closes the caput continuation
+ok 397 - R2-08: a table (or any other new child) closes the caput continuation
+  ---
+  duration_ms: 1.255038
+  type: 'test'
+  ...
+# Subtest: B2: recovery of clause, preamble, rectification, citation, revenue code, NCM header, range and exception
+ok 398 - B2: recovery of clause, preamble, rectification, citation, revenue code, NCM header, range and exception
+  ---
+  duration_ms: 179.700652
+  type: 'test'
+  ...
+# Subtest: B2: original sourceMap, spans, literals and hashes; entities after emoji and reordering are exact
+ok 399 - B2: original sourceMap, spans, literals and hashes; entities after emoji and reordering are exact
+  ---
+  duration_ms: 17.349368
+  type: 'test'
+  ...
+# Subtest: B2: whole-document quarantine for unsafe boundaries, attributes, widening and late failures
+ok 400 - B2: whole-document quarantine for unsafe boundaries, attributes, widening and late failures
+  ---
+  duration_ms: 61.225591
+  type: 'test'
+  ...
+# Subtest: B2: incompatible runtime keeps the quarantine (fail closed), NFC documents are unaffected
+ok 401 - B2: incompatible runtime keeps the quarantine (fail closed), NFC documents are unaffected
+  ---
+  duration_ms: 16.907945
+  type: 'test'
+  ...
+# Subtest: B2: NFC path never uses the shadow and reproduces the pre-B2 engine (q\\u0301, lone surrogate + mark, emoji ZWJ)
+ok 402 - B2: NFC path never uses the shadow and reproduces the pre-B2 engine (q\\u0301, lone surrogate + mark, emoji ZWJ)
+  ---
+  duration_ms: 18.481752
+  type: 'test'
+  ...
+# Subtest: B2: no bypass — direct extraction refuses non-NFC, forged or copied reader results carry no context
+ok 403 - B2: no bypass — direct extraction refuses non-NFC, forged or copied reader results carry no context
+  ---
+  duration_ms: 10.013411
+  type: 'test'
+  ...
+# Subtest: B2: adapter and evaluator keep partial + diagnostics; an NFC operator absent from the NFD literal stays unresolved
+ok 404 - B2: adapter and evaluator keep partial + diagnostics; an NFC operator absent from the NFD literal stays unresolved
+  ---
+  duration_ms: 5.542658
+  type: 'test'
+  ...
+# Subtest: B2-R1-01: no exported way to attach a recovery context to a result the reader refused
+ok 405 - B2-R1-01: no exported way to attach a recovery context to a result the reader refused
+  ---
+  duration_ms: 5.017789
+  type: 'test'
+  ...
+# Subtest: B2-R1-02: a recovered span that crosses an incompatible part quarantines the whole document
+ok 406 - B2-R1-02: a recovered span that crosses an incompatible part quarantines the whole document
+  ---
+  duration_ms: 28.891929
+  type: 'test'
+  ...
+# Subtest: UNICODE-01a → 01b/B2: the NFD exception (complete before 01a) is now recovered with its exclusion relation, partial
+ok 407 - UNICODE-01a → 01b/B2: the NFD exception (complete before 01a) is now recovered with its exclusion relation, partial
+  ---
+  duration_ms: 73.917593
+  type: 'test'
+  ...
+# Subtest: UNICODE-01b/B2: a mixed NFC/NFD document is recovered as a whole (it was a whole-document quarantine in 01a)
+ok 408 - UNICODE-01b/B2: a mixed NFC/NFD document is recovered as a whole (it was a whole-document quarantine in 01a)
+  ---
+  duration_ms: 33.456276
+  type: 'test'
+  ...
+# Subtest: UNICODE-01a: detection uses the NFC comparison (not a search for \\p{M}) across edge cases
+ok 409 - UNICODE-01a: detection uses the NFC comparison (not a search for \\p{M}) across edge cases
+  ---
+  duration_ms: 81.958501
+  type: 'test'
+  ...
+# Subtest: UNICODE-01a: text, hashes and positions are the supplied ones; other diagnostics are kept
+ok 410 - UNICODE-01a: text, hashes and positions are the supplied ones; other diagnostics are kept
+  ---
+  duration_ms: 26.234881
+  type: 'test'
+  ...
+# Subtest: UNICODE-01a: layer responsibilities — reader flags, engine skips, direct extraction refuses
+ok 411 - UNICODE-01a: layer responsibilities — reader flags, engine skips, direct extraction refuses
+  ---
+  duration_ms: 12.948529
+  type: 'test'
+  ...
+# Subtest: UNICODE-01a: adapter and evaluator carry non_nfc_text as pending, never as completeness
+ok 412 - UNICODE-01a: adapter and evaluator carry non_nfc_text as pending, never as completeness
+  ---
+  duration_ms: 12.889445
+  type: 'test'
+  ...
+# Subtest: UNICODE-01a R1-01: decoded non-NFC attributes (character references) are detected and quarantined
+ok 413 - UNICODE-01a R1-01: decoded non-NFC attributes (character references) are detected and quarantined
+  ---
+  duration_ms: 102.505231
+  type: 'test'
+  ...
+1..413
+# tests 413
+# suites 0
+# pass 409
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 29308.002403

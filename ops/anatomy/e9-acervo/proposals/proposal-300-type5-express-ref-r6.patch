@@ -1,0 +1,708 @@
+diff --git a/docs/anatomy/engine-build.json b/docs/anatomy/engine-build.json
+index 62a26955..899d88c6 100644
+--- a/docs/anatomy/engine-build.json
++++ b/docs/anatomy/engine-build.json
+@@ -1,5 +1,5 @@
+ {
+-  "engineHash": "04af1bfd2769c90c12afb8a1e67a070b1f755cd7df262b7bc2f442c4099abaab",
++  "engineHash": "fff69e074f6ea53c4187ea286cbf2f7f9379e678f8642e3f26a73c80c8592a16",
+   "normalization": "UTF-8 source with LF line endings",
+   "sourceHashes": {
+     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
+@@ -19,7 +19,7 @@
+     "src/modules/anatomy/profile-rules.ts": "721778b256bb07e87afd2b9045246b6bd8cb393a749091f6e2a5f93aa7f0b272",
+     "src/modules/anatomy/profile.ts": "db505e9d46e35110b16094478d02e6b4d5c1ce475561d08f458cf3f2991b455c",
+     "src/modules/anatomy/readers.ts": "18ac50ee6e8e94afd0a45ad43d66af587e9409ff2f7dacb5e47e025dab3b8370",
+-    "src/modules/anatomy/rfb-inline-attachments.ts": "c6d00211a273f64079c2836700a12ee56651f3c046979d8a9db1bd50fd6d9b78",
++    "src/modules/anatomy/rfb-inline-attachments.ts": "6593a4dd0f083a0e06430a74d40044630df7700276e22321a506246a06426dad",
+     "src/modules/anatomy/sefaz-sp-preparation.ts": "e5c24a28d4ac1e630eaca1cb31fd8d9e26e6270b42e69f37b3e7e099358b3d35"
+   }
+ }
+diff --git a/docs/anatomy/official-lot-rfb.json b/docs/anatomy/official-lot-rfb.json
+index 92c31c9d..74a26eaa 100644
+--- a/docs/anatomy/official-lot-rfb.json
++++ b/docs/anatomy/official-lot-rfb.json
+@@ -1,5 +1,5 @@
+ {
+-  "engineBuildHash": "04af1bfd2769c90c12afb8a1e67a070b1f755cd7df262b7bc2f442c4099abaab",
++  "engineBuildHash": "fff69e074f6ea53c4187ea286cbf2f7f9379e678f8642e3f26a73c80c8592a16",
+   "acts": [
+     {
+       "idAto": 104314,
+@@ -45,7 +45,7 @@
+       "struckSegments": 4002,
+       "attachmentsWithoutContent": 30,
+       "missingSegments": 0,
+-      "outputHash": "66ae68cf79ff8ee263e4ae73b1c8f9ae840da66b2d0d29b1dbfaab0d2e5d2eca",
++      "outputHash": "12f5b8c0be2940f5f6e65397dfbbf2ab1b15f544c4fd9d12d80dae22dab90835",
+       "inlineAttachments": {
+         "total": 30,
+         "states": {
+@@ -87,7 +87,7 @@
+       "struckSegments": 0,
+       "attachmentsWithoutContent": 0,
+       "missingSegments": 0,
+-      "outputHash": "d4a90648e0277ad031c2b741d745a9e8b0f7c673a87af66358bf41c11e6aad0f",
++      "outputHash": "8b29d0ec0af3c1b7223762d2158e386198e0fdbb126e15c6631f8f2df7b4453d",
+       "inlineAttachments": {
+         "total": 0,
+         "states": {},
+@@ -130,7 +130,7 @@
+       "struckSegments": 343,
+       "attachmentsWithoutContent": 0,
+       "missingSegments": 1,
+-      "outputHash": "86e6e67411b53db354e14d89c6ae5b98221cb1dea69619e5a4d70f0c887b32e1",
++      "outputHash": "04b9d68006ac86fef79baf3950d9d161c3659f27a08591fcc5cd36309e46bb3a",
+       "inlineAttachments": {
+         "total": 0,
+         "states": {},
+@@ -182,7 +182,7 @@
+       "struckSegments": 136,
+       "attachmentsWithoutContent": 35,
+       "missingSegments": 0,
+-      "outputHash": "b30f6951ee4aa9119d823ff0c849bee1e628dd73309428d7a854da6330767647",
++      "outputHash": "75abc7c72db5cb079fafac757df7dfde385a2a2e325c172cf74fece8112ec30a",
+       "inlineAttachments": {
+         "total": 35,
+         "states": {
+@@ -231,7 +231,7 @@
+       "struckSegments": 608,
+       "attachmentsWithoutContent": 31,
+       "missingSegments": 0,
+-      "outputHash": "7056f218bb7f6cb1489f27b01a51a9ecb6510f9f4a39b033ef04fc8dac4a46dc",
++      "outputHash": "40a96b80e323be9c0a18cb035f27bf3d1a715920ccc015c74c265b57b890789d",
+       "inlineAttachments": {
+         "total": 31,
+         "states": {
+@@ -284,7 +284,7 @@
+       "struckSegments": 19,
+       "attachmentsWithoutContent": 0,
+       "missingSegments": 0,
+-      "outputHash": "33e771ca079b4062e746ac04d06a0c9d7f67af6db442438b00a37d3c066a3ccb",
++      "outputHash": "da39f8549a1c18ea425e9275e3cf4240f955239759d13ae0266da680bf1204cc",
+       "inlineAttachments": {
+         "total": 0,
+         "states": {},
+@@ -333,7 +333,7 @@
+       "struckSegments": 10,
+       "attachmentsWithoutContent": 0,
+       "missingSegments": 0,
+-      "outputHash": "69e2b845394dcc31dbb9ab72451ee01214ca251c0d1183deb5c8e0f7790e10bf",
++      "outputHash": "02095757a19d6bfa8b56807d70de0ca3e7d74741c40f23b0cfa3002ad50c54cd",
+       "inlineAttachments": {
+         "total": 0,
+         "states": {},
+diff --git a/package.json b/package.json
+index 713a5125..8bebacac 100644
+--- a/package.json
++++ b/package.json
+@@ -8,7 +8,7 @@
+   },
+   "scripts": {
+     "anatomy:verify-build": "node ops/anatomy/build-identity.mjs",
+-    "test:anatomy": "tsx --test test/anatomy.contract.unit.test.ts test/anatomy.corpus-integrity.unit.test.ts test/anatomy.consumer.unit.test.ts test/anatomy.engine.unit.test.ts test/anatomy.entities.unit.test.ts test/anatomy.readers.unit.test.ts test/anatomy.dou-preparation.unit.test.ts test/anatomy.dev-canonical.unit.test.ts test/anatomy.gold.unit.test.ts test/anatomy.json-preparation.unit.test.ts test/anatomy.evaluation.unit.test.ts test/anatomy.evaluation-adapter.unit.test.ts test/anatomy.profile.unit.test.ts test/anatomy.profile-engine.unit.test.ts test/anatomy.unicode.unit.test.ts test/anatomy.unicode-recovery.unit.test.ts test/anatomy.rules-simulation.unit.test.ts test/anatomy.config.unit.test.ts test/anatomy.struct.unit.test.ts test/anatomy.struct2.unit.test.ts test/anatomy.pdf.unit.test.ts test/anatomy.official-provenance.unit.test.ts test/anatomy.official-overlap.unit.test.ts test/anatomy.official-fetch.unit.test.ts test/anatomy.rfb-types.unit.test.ts test/anatomy.official-lot-rfb.unit.test.ts",
++    "test:anatomy": "tsx --test test/anatomy.rfb-inline-attachments.unit.test.ts test/anatomy.contract.unit.test.ts test/anatomy.corpus-integrity.unit.test.ts test/anatomy.consumer.unit.test.ts test/anatomy.engine.unit.test.ts test/anatomy.entities.unit.test.ts test/anatomy.readers.unit.test.ts test/anatomy.dou-preparation.unit.test.ts test/anatomy.dev-canonical.unit.test.ts test/anatomy.gold.unit.test.ts test/anatomy.json-preparation.unit.test.ts test/anatomy.evaluation.unit.test.ts test/anatomy.evaluation-adapter.unit.test.ts test/anatomy.profile.unit.test.ts test/anatomy.profile-engine.unit.test.ts test/anatomy.unicode.unit.test.ts test/anatomy.unicode-recovery.unit.test.ts test/anatomy.rules-simulation.unit.test.ts test/anatomy.config.unit.test.ts test/anatomy.struct.unit.test.ts test/anatomy.struct2.unit.test.ts test/anatomy.pdf.unit.test.ts test/anatomy.official-provenance.unit.test.ts test/anatomy.official-overlap.unit.test.ts test/anatomy.official-fetch.unit.test.ts test/anatomy.rfb-types.unit.test.ts test/anatomy.official-lot-rfb.unit.test.ts",
+     "test:anatomy-corpus-integrity": "tsx --test test/anatomy.corpus-integrity.unit.test.ts",
+     "test:anatomy-nfc-shadow": "tsx --test test/anatomy.nfc-shadow.unit.test.ts",
+     "test:anatomy-contract": "tsx --test test/anatomy.contract.unit.test.ts",
+diff --git a/src/modules/anatomy/build-identity.ts b/src/modules/anatomy/build-identity.ts
+index d0bf27c1..18d922d1 100644
+--- a/src/modules/anatomy/build-identity.ts
++++ b/src/modules/anatomy/build-identity.ts
+@@ -1,2 +1,2 @@
+ // Generated by ops/anatomy/build-identity.mjs --write; do not edit.
+-export const ANATOMY_ENGINE_BUILD_HASH = '04af1bfd2769c90c12afb8a1e67a070b1f755cd7df262b7bc2f442c4099abaab' as const;
++export const ANATOMY_ENGINE_BUILD_HASH = 'fff69e074f6ea53c4187ea286cbf2f7f9379e678f8642e3f26a73c80c8592a16' as const;
+diff --git a/src/modules/anatomy/rfb-inline-attachments.ts b/src/modules/anatomy/rfb-inline-attachments.ts
+index c4099ea2..725a4ed8 100644
+--- a/src/modules/anatomy/rfb-inline-attachments.ts
++++ b/src/modules/anatomy/rfb-inline-attachments.ts
+@@ -23,7 +23,7 @@ import { readAnatomyInput, type AnatomyReaderResult } from './readers.js';
+  * character) is refused; (3) the attachment inherits the protected context of the segment that references it in the
+  * act: quotation/prohibited → prohibited, tachado/historical → historical, undetermined → prohibited (conservative).
+  */
+-export const RFB_INLINE_ATTACHMENT_VERSION = 'rfb-inline-attachment/0.1.0-provisional' as const;
++export const RFB_INLINE_ATTACHMENT_VERSION = 'rfb-inline-attachment/0.2.0-provisional' as const;
+ export const RFB_INLINE_ATTACHMENT_LIMITS = Object.freeze({ maxBytesPerAttachment: 512 * 1024, maxBytesPerAct: 1024 * 1024 });
+ 
+ export type InlineAttachmentState = 'read' | 'unreadable' | 'missing_no_content' | 'invalid_base64' | 'not_html'
+@@ -47,13 +47,24 @@ export interface InlineAttachment {
+   byteLength: number | null;
+   sha256: string | null;
+   charset: Charset | null;
+-  /** The decoded HTML (state 'read' only), verbatim. */
++  /**
++   * The decoded HTML (state 'read' only), verbatim, for provenance. UNTRUSTED (R2 A-4): its attributes (on*, style,
++   * javascript: URLs…) are never interpreted here; any rendering must sanitize it first.
++   */
+   html: string | null;
+   /** The separate reader pass (state 'read' only), with the referencing segment's protected context applied. */
+   reading: AnatomyReaderResult | null;
+   /** Context of the segment that references the attachment in the act (R2). */
+   referenceContext: AnatomyPart['context'];
+   referenceContextEvidence: string;
++  /**
++   * E9 P2-c (COORD A, tribusca-control#116): where the decoding charset came from. 'declared' = <meta charset> of the
++   * attachment; 'inferred_strict_utf8' = no declaration, accepted ONLY for a validated table fragment of idTipoArquivo 5
++   * whose bytes decode as strict (fatal) UTF-8. null when nothing was decoded. `reason` stays null for state 'read'.
++   */
++  charsetEvidence: 'declared' | 'inferred_strict_utf8' | null;
++  /** 'document' (<html>/doctype) or 'table_fragment' (validated bare <table> of idTipoArquivo 5); null if not HTML. */
++  htmlForm: 'document' | 'table_fragment' | null;
+ }
+ 
+ const sha = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
+@@ -84,9 +95,28 @@ export function attachmentByteOffset(att: Pick<InlineAttachment, 'charset' | 'ht
+   return Buffer.byteLength(att.html.slice(0, utf16Offset), 'utf8');
+ }
+ 
++/**
++ * COORD A: a bare table fragment (idTipoArquivo 5) is accepted only when it is structurally a single table: it starts
++ * with <table and ends with </table>, every tag is a table/inline-text tag, and it has at least one row with a cell.
++ * Returns null when valid, else why not. Bytes are never edited (validation reads a latin1 view of the bytes).
++ */
++const FRAGMENT_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col', 'p', 'span', 'br', 'b', 'strong', 'i', 'em', 'u', 'sub', 'sup']);
++export function tableFragmentProblem(bytes: Uint8Array): string | null {
++  const t = Buffer.from(bytes).toString('latin1').replace(/^\xEF\xBB\xBF/u, '').trim();
++  if (!/^<table[\s>]/iu.test(t)) return 'does not start with <table>';
++  if (!/<\/table>$/iu.test(t)) return 'does not end with </table>';
++  const tags = [...t.matchAll(/<\/?([a-z][a-z0-9]*)\b[^>]*>/giu)].map((m) => m[1]!.toLowerCase());
++  const bad = tags.filter((x) => !FRAGMENT_TAGS.has(x));
++  if (bad.length) return `non-table tag(s) ${[...new Set(bad)].join(', ')}`;
++  if (/<!--|<!\[CDATA\[|<\?/u.test(t)) return 'comment or processing instruction';
++  const opens = (t.match(/<table[\s>]/giu) ?? []).length; const closes = (t.match(/<\/table>/giu) ?? []).length;
++  if (opens !== 1 || closes !== 1) return `${opens} <table> / ${closes} </table> (exactly one table required)`;
++  if (!/<tr[\s>][\s\S]*?<t[dh][\s>]/iu.test(t)) return 'no row with a cell';
++  return null;
++}
+ const RESTRICT: Record<AnatomyPart['context'], number> = { operative_candidate: 0, unknown: 1, historical: 2, prohibited: 3 };
+ /** Most restrictive context of the act's parts that cover the referencing segment's text (R2). */
+-type MainAct = { prep: Pick<JsonPreparation, 'pieces'>; parts: readonly AnatomyPart[] };
++type MainAct = { prep: Pick<JsonPreparation, 'pieces' | 'html'>; parts: readonly AnatomyPart[] };
+ type Piece = JsonPreparation['pieces'][number];
+ const coveringOf = (main: MainAct, piece: Piece) => main.parts.filter((x) => x.type !== 'document' && x.type !== 'caput'
+   && x.sourcePointers.some((sp) => sp.sourceSpan && sp.sourceSpan.start < piece.htmlSpan.end && sp.sourceSpan.end > piece.htmlSpan.start));
+@@ -102,6 +132,145 @@ const strictest = (parts: readonly AnatomyPart[]): AnatomyPart['context'] => {
+  *   quotation (prohibited) on either side prevails over tachado; a missing or undetermined neighbour → prohibited;
+  *   only with both neighbours determined and not prohibited does tachado give historical (else prohibited).
+  */
++/** Express reference at the very END of a segment's text, pointing to what follows. Returns the matched words or null. */
++const EXPRESS_REF = /\b((?:descrit|constante|relacionad|especificad|indicad|discriminad|listad|apresentad)[oa]?s?\s+(?:abaixo|a\s+seguir)|(?:tabela|quadro|rela[çc][ãa]o)\s+(?:abaixo|a\s+seguir))\s*[.:]$/iu;
++/**
++ * R3 (review R2 A2-1/A2-2): an express reference only counts when it is LIVE normative text of a device that is not
++ * negated and does not involve ANOTHER norm. In doubt about the link between the table and the device: no promotion.
++ * - A2-1: the segment HTML is walked tag by tag with a DEPTH counter for <strike>/<s>/<del>; struck text is dropped.
++ *   A stray close, an unclosed or self-closing struck tag, or any element styled `line-through` makes the struck scope
++ *   undeterminable → null (conservative).
++ * - Entities are decoded first (named Portuguese letters + numeric); an unknown entity → null.
++ * - The segment must start with a normative device and END with the express reference.
++ * - A2-2: negation/exclusion ANYWHERE in the device text (não, nem, exceto, salvo, ressalvad…, exclu…, vedad…), or a
++ *   citation of ANY identified norm anywhere in it (kind + nº/number/year, e.g. "Instrução Normativa RFB nº 2.121"), or
++ *   an annex/table/quadro of another norm → null. This also covers mixed text (another norm + device + reference).
++ */
++const STRUCK_TAGS = new Set(['strike', 's', 'del']);
++const NAMED: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", ordm: 'º', ordf: 'ª', sect: '§', deg: '°', ndash: '–', mdash: '—',
++  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú', atilde: 'ã', otilde: 'õ', Atilde: 'Ã', Otilde: 'Õ',
++  acirc: 'â', ecirc: 'ê', ocirc: 'ô', Acirc: 'Â', Ecirc: 'Ê', Ocirc: 'Ô', agrave: 'à', Agrave: 'À', ccedil: 'ç', Ccedil: 'Ç', uuml: 'ü', Uuml: 'Ü' };
++function decodeEntities(t: string): string | null {
++  let bad = false;
++  const out = t.replace(/&(#x[0-9a-fA-F]{1,6}|#\d{1,7}|[A-Za-z][A-Za-z0-9]{0,31});/gu, (_m, e: string) => {
++    if (e.startsWith('#x')) return String.fromCodePoint(parseInt(e.slice(2), 16));
++    if (e.startsWith('#')) return String.fromCodePoint(Number(e.slice(1)));
++    const v = NAMED[e]; if (v === undefined) bad = true; return v ?? '';
++  });
++  return bad ? null : out;
++}
++/** Live (non-struck) text of a segment, or null when the struck scope cannot be determined. `struck` tells whether any struck content existed. */
++export function liveSegmentText(html: string): { text: string; struck: boolean } | null {
++  let depth = 0; let text = ''; let struck = false;
++  for (const m of html.matchAll(/<!--[\s\S]*?-->|<(\/?)([A-Za-z][A-Za-z0-9]*)\b([^>]*?)(\/?)>|<|[^<]+/gu)) {
++    const tok = m[0];
++    if (tok.startsWith('<!--')) continue;
++    if (m[2]) {
++      const name = m[2].toLowerCase(); const closing = m[1] === '/'; const selfClosing = m[4] === '/'; const attrs = m[3] ?? '';
++      if (/line-through/iu.test(attrs)) return null;
++      // R4 A3-1: an EXPLICIT strike class is struck text whose scope we do not model → conservative
++      // R5 A4-2: quoted or unquoted class values; camelCase ("textoTachado") matches too (no leading \b)
++      const cls = /\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/iu.exec(attrs);
++      if (cls && /(?:tachad|riscad|strike|line-through)/iu.test(cls[1] ?? cls[2] ?? cls[3] ?? '')) return null;
++      if (STRUCK_TAGS.has(name)) {
++        if (selfClosing) return null;
++        if (closing) { if (depth === 0) return null; depth--; } else { depth++; struck = true; }
++      }
++      text += ' '; continue;
++    }
++    if (tok === '<') return null; // a bare "<" that is not a tag: structure undeterminable
++    if (depth === 0) text += tok;
++  }
++  if (depth !== 0) return null;
++  const decoded = decodeEntities(text);
++  return decoded === null ? null : { text: decoded.replace(/\s+/gu, ' ').trim(), struck };
++}
++const DEVICE = /^(?:Art\.?\s*\d+|§\s*\d+|Par[áa]grafo\s+[úu]nico|[IVXLC]+\s*[-–—]|[a-z]\))/iu;
++/** R5 (COORD): negation OF APPLICABILITY still blocks anywhere in the device; a PROHIBITION is an operative command. */
++const NEGATION = /\b(?:n[ãa]o|nem|exceto|salvo|ressalvad[oa]s?|exclu[íi]d[oa]s?|excluindo|exclus[ãa]o)\b/iu;
++const PROHIBITION = /\b(?:vedad[oa]s?|proibid[oa]s?|impedid[oa]s?)\b/iu;
++const PERMISSION = /\b(?:autorizad[oa]s?|permitid[oa]s?|poder(?:[áa]|[ãa]o)|pode(?:m)?|facultad[oa]s?)\b/iu;
++const OBLIGATION = /\b(?:dever(?:[áa]|[ãa]o)|deve(?:m)?|obrigad[oa]s?|obrigat[óo]ri[oa]s?)\b/iu;
++const NORM_KIND_BARE = /\b(?:Lei(?:\s+Complementar)?|Decreto(?:-Lei)?|Instru[çc][ãa]o\s+Normativa|IN|Portaria|Resolu[çc][ãa]o|Conv[êe]nio|Ajuste|Protocolo|Ato\s+Declarat[óo]rio|ADE|ADI|Medida\s+Provis[óo]ria|Parecer|Solu[çc][ãa]o\s+de\s+(?:Consulta|Diverg[êe]ncia)|Regulamento|RIR|RIPI|TIPI)\b/u;
++const CONNECTOR = /^\s*(?:conforme|nos\s+termos|na\s+forma|segundo|de\s+acordo\s+com|cuj[oa]s?)\b/iu;
++const ACCESSORY = /\b(?:dispensad[oa]s?|com\s+fundamento\s+(?:em|n[oa]s?)|observad[oa]s?|nos\s+termos\s+d[oa]s?\s+(?:art\.|artigo))/iu;
++/**
++ * Internal polarity of the command that governs the referenced content (R5, tests only; NOT persisted, NOT in the
++ * contract): 'prohibition' | 'permission' | 'obligation' | null. operative_candidate never means "permitted".
++ */
++export function referencePolarity(text: string): 'prohibition' | 'permission' | 'obligation' | null {
++  const m = EXPRESS_REF.exec(text); if (!m) return null;
++  const clause = referenceObject(text.slice(0, m.index)).text;
++  return PROHIBITION.test(clause) ? 'prohibition' : OBLIGATION.test(clause) ? 'obligation' : PERMISSION.test(clause) ? 'permission' : null;
++}
++const NORM_CITATION = /\b(?:Lei(?:\s+Complementar)?|Decreto(?:-Lei)?|Instru[çc][ãa]o\s+Normativa|IN|Portaria|Resolu[çc][ãa]o|Conv[êe]nio|Ajuste|Protocolo|Ato\s+Declarat[óo]rio|ADE|ADI|Medida\s+Provis[óo]ria|Parecer|Solu[çc][ãa]o\s+de\s+(?:Consulta|Diverg[êe]ncia)|Decis[ãa]o|Regulamento|RIR|RIPI|TIPI)\b[^.;:]{0,40}?(?:\bn\s*[º°o.]|\b\d{1,3}(?:\.\d{3})+\b|\b\d+\s*\/\s*\d{2,4}\b|,\s*de\s+\d{4})/iu;
++const OTHER_NORM_ANNEX = /\b(?:anexos?|tabelas?|quadros?)\b[^;]{0,60}?\bd[ao]s?\s+(?:Lei|Decreto|Instru[çc][ãa]o\s+Normativa|IN|Portaria|Resolu[çc][ãa]o|Conv[êe]nio|Ajuste|Ato\s+Declarat[óo]rio|Medida\s+Provis[óo]ria|Regulamento|Parecer|Solu[çc][ãa]o\s+de\s+Consulta|TIPI|NCM)\b/iu;
++function expressReference(main: MainAct, piece: Piece): string | null {
++  if (piece.pointer.startsWith('/ementas/')) return null;
++  const live = liveSegmentText(main.prep.html.slice(piece.htmlSpan.start, piece.htmlSpan.end));
++  // A2-1: any struck content in the referencing device mixes historical and live text → in doubt, no promotion.
++  if (live === null || live.struck) return null;
++  const text = live.text;
++  const m = EXPRESS_REF.exec(text);
++  if (!m || !DEVICE.test(text)) return null;
++  if (NEGATION.test(text)) return null;
++  // R5 (COORD): a prohibition links the table only when it governs the reference in the SAME (non-elliptical) clause
++  if (PROHIBITION.test(text)) { const o = referenceObject(text.slice(0, m.index)); if (o.elliptical || o.viaConnector || !PROHIBITION.test(o.text)) return null; }
++  // R4 A3-2 (COORD): an ACCESSORY citation (foundation, dispensation: "dispensadas as exigências … da IN 1.155,") does
++  // not block. What blocks is another norm in the OBJECT of the reference: the clause that holds the reference, or —
++  // when the reference is elliptical (", descritas abaixo.") — the clause it attaches to. Citation tails (", de 2011")
++  // never close a clause. An elliptical reference that leans on a citation is ambiguous → conservative (no promotion).
++  const object = referenceObject(text.slice(0, m.index));
++  // R6 A5-2: a remission with no provable governing clause in its own sentence is ambiguous → no promotion
++  if (object.unresolved) return null;
++  if (NORM_CITATION.test(object.text) || OTHER_NORM_ANNEX.test(object.text)) return null;
++  // R5 A4-1: through a remission connector, even a bare norm kind ("as regras da IN") in the antecedent blocks
++  if (object.viaConnector && NORM_KIND_BARE.test(object.antecedent)) return null;
++  return m[0];
++}
++const CITATION_TAIL = /^\s*(?:de\s+\d{4}|de\s+\d{1,2}\s+de\s+\p{L}+\s+de\s+\d{4}|(?:RFB\s+)?n\s*[º°o.]\s*[\d.]+)\s*$/iu;
++// R6: the governing clause chain never crosses a sentence ("." + capital; abbreviations such as "Art." or "nº." do not
++// end one), a ";" or a ":" — what lies beyond belongs to another proposition or device and is never inherited (E).
++const SENTENCE_END = /(?<!\b(?:[Aa]rts?|[Nn]|[Nn][º°o]|[Ii]ncs?|[Aa]l|[Pp]|[Ff]ls?|[Ss]r|[Dd]r))\.\s+(?=[\p{Lu}§“"])|[;:]/gu;
++const DEVICE_LABEL = /^\s*(?:Art\.?\s*\d+[º°o]?\.?|§\s*\d+[º°o]?\.?|Par[áa]grafo\s+[úu]nico\.?|[IVXLC]+\s*[-–—]|[a-z]\))\s*/iu;
++const STOPWORDS = /\b(?:e|ou|de|do|da|dos|das|com|em|no|na|nos|nas|as|os|a|o|que)\b/giu;
++// a clause holds a NOMINAL nucleus when a determiner/contracted preposition introduces a word ("os valores", "da IN",
++// "a exportar", "no CNPJ"); bare participles/adverbs ("atualizados mensalmente") do not
++const NOMINAL = /(?:^|[^\p{L}])(?:o|a|os|as|um|uma|uns|umas|est[ea]s?|ess[ea]s?|aquel[ea]s?|tais|seus?|suas?|d[oa]s?|n[oa]s?|pel[oa]s?|aos?|à|às)\s+(?!(?:que|qual|quais)\b)\p{L}{3,}/iu;
++// a MODIFIER clause (participle, gerund or adverb at its head: "atualizados mensalmente", "contados da ciência",
++// "revistos") qualifies the noun before it and never governs the reference, even when it holds a noun phrase
++const MODIFIER_HEAD = /^\s*(?:(?:e|ou)\s+)?(?:\p{L}+(?:ad|id|ot|it|ist|eit|ert|ost)[oa]s?|\p{L}+mente|\p{L}+ndo)(?![\p{L}-])/iu;
++/**
++ * The object region of an express reference (text before it), inside its own sentence only: its own clause; or — when
++ * the reference is elliptical (", descritas abaixo.") or the clause opens with a REMISSION CONNECTOR (conforme, nos
++ * termos, na forma, segundo, de acordo com, cujo/a/s) — the CHAIN of clauses back to the GOVERNING clause (R6 A5-1):
++ * modifier clauses ("atualizados mensalmente", "contados da ciência") and intermediate remissions ("conforme o caso") are traversed and kept;
++ * ACCESSORY clauses (dispensad…, com fundamento em, observad…) are skipped as foundations, not the content referenced
++ * (R4/R5; ADE Cofis preserved); the first clause with a nominal nucleus ends the chain. `unresolved` (R6 A5-2): a
++ * remission whose sentence offers no governing clause, or an elliptical reference whose nearest noun is in an accessory
++ * clause (it would describe the other norm's content) — ambiguous, never promoted.
++ */
++export function referenceObject(before: string): { text: string; elliptical: boolean; viaConnector: boolean; antecedent: string; unresolved: boolean } {
++  const cut = [...before.matchAll(SENTENCE_END)].pop();
++  const sentence = (cut ? before.slice(cut.index! + cut[0].length) : before).replace(DEVICE_LABEL, '');
++  const chunks = sentence.split(',');
++  let k = chunks.length - 1; let own = chunks[k] ?? '';
++  while (k > 0 && CITATION_TAIL.test(own)) { k--; own = `${chunks[k]},${own}`; }
++  const viaConnector = CONNECTOR.test(own);
++  const elliptical = !/\p{L}{3,}/u.test(own.replace(CONNECTOR, '').replace(STOPWORDS, ''));
++  if (!elliptical && !viaConnector) return { text: own, elliptical, viaConnector, antecedent: '', unresolved: false };
++  const chain: string[] = []; let resolved = false; let nearest = true;
++  while (k > 0) {
++    k--; let c = chunks[k] ?? '';
++    while (k > 0 && CITATION_TAIL.test(c)) { k--; c = `${chunks[k]},${c}`; }
++    if (ACCESSORY.test(c)) { if (elliptical && nearest) break; nearest = false; continue; }
++    nearest = false; chain.unshift(c);
++    if (!CONNECTOR.test(c) && !MODIFIER_HEAD.test(c) && NOMINAL.test(c)) { resolved = true; break; }
++  }
++  const antecedent = chain.join(',');
++  return { text: antecedent ? `${antecedent},${own}` : own, elliptical, viaConnector, antecedent, unresolved: !resolved };
++}
++
+ function referenceContextOf(main: MainAct, pointer: string, tachado: boolean, order: number, pieceOrder: Map<string, number>):
+   { context: AnatomyPart['context']; evidence: string } {
+   const piece = main.prep.pieces.find((x) => x.pointer === `${pointer}/textoIntegra`);
+@@ -125,11 +294,18 @@ function referenceContextOf(main: MainAct, pointer: string, tachado: boolean, or
+   }
+   if (prevPart.context === 'unknown' || nextPart.context === 'unknown') return { context: 'prohibited', evidence: 'segment has no text; a neighbour is undetermined: prohibited' };
+   if (tachado) return { context: 'historical', evidence: `segment has no text; source marks it tachado; neighbours ${before.o}/${after.o} are not quoted` };
++  // COORD A (E9 P2-c): association by EXPRESS normative reference. Only for a text-less, non-struck segment placed
++  // IMMEDIATELY after an operative segment whose text ENDS by pointing to what follows ("… descritas abaixo.", "… na
++  // tabela a seguir:"), with an operative (non-quoted, non-historical) next neighbour. Anything else keeps R3.
++  const ref = expressReference(main, before.x);
++  if (ref && before.o === order - 1 && prevPart.context === 'operative_candidate' && nextPart.context === 'operative_candidate') {
++    return { context: 'operative_candidate', evidence: `express reference: segment ${before.o} ends ${JSON.stringify(ref)} and the attachment segment ${order} follows it immediately; neighbours operative` };
++  }
+   return { context: 'prohibited', evidence: 'segment has no text and is not tachado: context undetermined, prohibited' };
+ }
+ 
+ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: number,
+-  main?: { prep: Pick<JsonPreparation, 'pieces'>; parts: readonly AnatomyPart[] }): InlineAttachment[] {
++  main?: { prep: Pick<JsonPreparation, 'pieces' | 'html'>; parts: readonly AnatomyPart[] }): InlineAttachment[] {
+   // R2: the referencing segment's context comes from the act itself; without a supplied reading it is computed here.
+   const act = main ?? (() => { const prep = prepareRfbRepresentation({ resourceId: `rfb:${expectedIdAto}`, bytes }, expectedIdAto);
+     return { prep, parts: readAnatomyInput({ source: 'RFB', representationId: `rfb:${expectedIdAto}`, html: prep.html }).parts }; })();
+@@ -151,7 +327,8 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
+         idTipoArquivo: typeof file.idTipoArquivo === 'number' ? file.idTipoArquivo : null,
+         pointer: `/${key}/${i}/arquivoBinario/arquivoBinario`, segmentOrder: typeof seg.ordemSegmentoAto === 'number' ? seg.ordemSegmentoAto : -1,
+         resourceId: `rfb:${expectedIdAto}:anexo:${id}`, state: 'missing_no_content', reason: 'no embedded content in the official JSON',
+-        byteLength: null, sha256: null, charset: null, html: null, reading: null, referenceContext: 'operative_candidate', referenceContextEvidence: '' };
++        byteLength: null, sha256: null, charset: null, html: null, reading: null, referenceContext: 'operative_candidate', referenceContextEvidence: '',
++        charsetEvidence: null, htmlForm: null };
+       const rc = referenceContextOf(act, `/${key}/${i}`, seg.tachado === true, typeof seg.ordemSegmentoAto === 'number' ? seg.ordemSegmentoAto : -1, pieceOrder);
+       base.referenceContext = rc.context; base.referenceContextEvidence = rc.evidence;
+       const done = (state: InlineAttachmentState, reason: string, extra: Partial<InlineAttachment> = {}) => { out.push(Object.freeze({ ...base, ...extra, state, reason })); };
+@@ -164,24 +341,33 @@ export function readRfbInlineAttachments(bytes: Uint8Array, expectedIdAto: numbe
+       if (decoded.byteLength > RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAttachment) return done('attachment_too_large', `> ${RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAttachment} bytes`, meta);
+       if (actBytes + decoded.byteLength > RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAct) return done('act_attachments_too_large', `> ${RFB_INLINE_ATTACHMENT_LIMITS.maxBytesPerAct} bytes in this act`, meta);
+       const head = Buffer.from(decoded.subarray(0, 512)).toString('latin1').replace(/^﻿|^\xEF\xBB\xBF/u, '').trimStart();
+-      if (!/^<(!doctype\s+html|html)[\s>]/iu.test(head)) return done('not_html', 'content is not an HTML document', meta);
++      const isDocument = /^<(!doctype\s+html|html)[\s>]/iu.test(head);
++      const fragment = !isDocument && base.idTipoArquivo === 5 ? tableFragmentProblem(decoded) : 'not a type-5 table fragment';
++      if (!isDocument && fragment !== null) return done('not_html', `content is not an HTML document (${fragment})`, meta);
++      const htmlForm = isDocument ? 'document' as const : 'table_fragment' as const;
+       const label = declaredCharset(decoded);
+-      if (!label) return done('charset_undeclared', 'the attachment declares no charset', meta);
+-      const charset = charsetOf(label);
+-      if (!charset) return done('charset_unsupported', `charset ${label} is not supported`, meta);
++      let charsetEvidence: InlineAttachment['charsetEvidence'] = 'declared';
++      let charset: Charset | null;
++      if (label) charset = charsetOf(label);
++      else if (htmlForm === 'table_fragment') {
++        // COORD A: delimited fallback — undeclared charset of a validated table fragment, strict UTF-8 only.
++        try { new TextDecoder('utf-8', { fatal: true }).decode(decoded); charset = 'utf-8'; charsetEvidence = 'inferred_strict_utf8'; }
++        catch { return done('charset_undeclared', 'table fragment declares no charset and is not strict UTF-8', { ...meta, htmlForm }); }
++      } else return done('charset_undeclared', 'the attachment declares no charset', { ...meta, htmlForm });
++      if (!charset) return done('charset_unsupported', `charset ${label} is not supported`, { ...meta, htmlForm });
+       let html: string;
+       // R2: ignoreBOM keeps a UTF-8 BOM as U+FEFF in `html`, so offsets stay aligned with the original bytes.
+       try { html = new TextDecoder(charset, { fatal: charset === 'utf-8', ignoreBOM: true }).decode(decoded); }
+-      catch { return done('charset_unsupported', `bytes are not valid ${charset}`, { ...meta, charset }); }
++      catch { return done('charset_unsupported', `bytes are not valid ${charset}`, { ...meta, charset, htmlForm }); }
+       actBytes += decoded.byteLength;
+       let reading: AnatomyReaderResult;
+       try { reading = readAnatomyInput({ source: 'RFB', representationId: base.resourceId, html }); }
+-      catch (e) { return done('unreadable', `reader refused the attachment: ${(e as Error).message}`, { ...meta, charset }); }
++      catch (e) { return done('unreadable', `reader refused the attachment: ${(e as Error).message}`, { ...meta, charset, htmlForm, charsetEvidence }); }
+       // R2: the attachment never becomes more permissive than the segment that references it.
+       if (base.referenceContext !== 'operative_candidate') for (const x of reading.parts) {
+         if (RESTRICT[x.context] < RESTRICT[base.referenceContext] && x.type !== 'unidentified') { x.context = base.referenceContext; x.contextReasons.push('rfb_inline_attachment_reference_context'); }
+       }
+-      done('read', null as unknown as string, { ...meta, charset, html, reading });
++      done('read', null as unknown as string, { ...meta, charset, html, reading, charsetEvidence, htmlForm });
+     });
+   }
+   return out.map((a) => (a.state === 'read' ? Object.freeze({ ...a, reason: null }) : a));
+diff --git a/test/anatomy.base-migration.integration.test.ts b/test/anatomy.base-migration.integration.test.ts
+index 3f97483a..f9db005e 100644
+--- a/test/anatomy.base-migration.integration.test.ts
++++ b/test/anatomy.base-migration.integration.test.ts
+@@ -185,8 +185,8 @@ test('077_anat_base through the real migration runner (fresh disposable database
+     const A1 = sha('a1'); const A2 = sha('a2');
+ 
+     await t.test('the worker writes analyses and runs; effective_profile_hash and family round-trip; nothing is invented', async () => {
+-      // ANAT-STRUCT-01 (groups, considerandos, items) b6ccf583… → 0481229a…; R1 fixes → 9bab0682…; ANAT-STRUCT-02 (caput, parágrafo único) on top → 4f3256e6…; ANAT-PDF-01 (pdf-reader in the identity) → c00a7dd1…; ANAT-D02 caput continuation merged → 3bb569f9…; R2-08 merged → adbfc3c9…; R2-01/R2-02 merged → 5167e02a…; R2-01 fragment fix merged → 50807eac…; R2-05 page coverage → b84baddb…; R3 R2-05 visual coverage → 512073f7…; ANAT-D04 RFB declared types → e7afa9f0…; D04-R1-01 → ae26c438…; ANAT-D05 contract → 5a432043…; ANAT-L14/L15/L16 Sefaz-SP portal → dba9fc5e…; R2-SP-01/R1-SP-02 → adebe95c…; ANAT-L17 SEFAZ-SP-PORTAL typed source → 7a7c5fab…; parallel branch ANAT-L11 RFB parte (from 5a432043) → 525e9466…; COMPOSE-01 merge of L11 (#290) into L17 (#292) → afb275ec…; ANAT-L2/L12 inline RFB attachments module (separate resource) → 85fd1426…; L2/L12 R2 (BOM, non-BMP, reference context) → d6ada5f6…; L2/L12 R3 (text-less reference: quotation prevails) → 04af1bfd…, regenerated with --write.
+-      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), '04af1bfd', 'engine identity is the current build');
++      // ANAT-STRUCT-01 (groups, considerandos, items) b6ccf583… → 0481229a…; R1 fixes → 9bab0682…; ANAT-STRUCT-02 (caput, parágrafo único) on top → 4f3256e6…; ANAT-PDF-01 (pdf-reader in the identity) → c00a7dd1…; ANAT-D02 caput continuation merged → 3bb569f9…; R2-08 merged → adbfc3c9…; R2-01/R2-02 merged → 5167e02a…; R2-01 fragment fix merged → 50807eac…; R2-05 page coverage → b84baddb…; R3 R2-05 visual coverage → 512073f7…; ANAT-D04 RFB declared types → e7afa9f0…; D04-R1-01 → ae26c438…; ANAT-D05 contract → 5a432043…; ANAT-L14/L15/L16 Sefaz-SP portal → dba9fc5e…; R2-SP-01/R1-SP-02 → adebe95c…; ANAT-L17 SEFAZ-SP-PORTAL typed source → 7a7c5fab…; parallel branch ANAT-L11 RFB parte (from 5a432043) → 525e9466…; COMPOSE-01 merge of L11 (#290) into L17 (#292) → afb275ec…; ANAT-L2/L12 inline RFB attachments module (separate resource) → 85fd1426…; L2/L12 R2 (BOM, non-BMP, reference context) → d6ada5f6…; L2/L12 R3 (text-less reference: quotation prevails) → 04af1bfd…; E9 P2-c A (type-5 table fragment, strict UTF-8 fallback evidence, express reference) → 8879065a…; R2 A-1/A-2/A-4 (struck, negation, other-norm annex, device, untrusted HTML) → 30482bfd…; R3 A2-1/A2-2 (struck depth, line-through, entities, sentence-wide negation, any norm citation) → 62a81cc9…; R4 A3-1/A3-2 (strike CSS class, accessory citation vs object of the reference) → 01fd87e5…; R5 A4-1/A4-2 + prohibition (remission connectors, class forms, operative prohibition) → 637872fb…; R6 A5-1/A5-2 (governing clause chain, elliptical remission needs a nominal antecedent) → fff69e07…, regenerated with --write.
++      assert.equal(ANATOMY_ENGINE_BUILD_HASH.slice(0, 8), 'fff69e07', 'engine identity is the current build');
+       await asRole('radar_worker', ...analysis(A1, v1, { effective_profile_hash: effectiveHash, family: 'Instrução Normativa' }));
+       await asRole('radar_worker', ...analysis(A2, v2));
+       await asRole('radar_worker', `INSERT INTO anatomy_parts (anatomy_id, id, parent_id, sibling_order, type, label, start_utf16, end_utf16,
+diff --git a/test/anatomy.rfb-inline-attachments.unit.test.ts b/test/anatomy.rfb-inline-attachments.unit.test.ts
+index 984af3cb..d96716a9 100644
+--- a/test/anatomy.rfb-inline-attachments.unit.test.ts
++++ b/test/anatomy.rfb-inline-attachments.unit.test.ts
+@@ -186,3 +186,287 @@ test('R3: text-less tachado segment referencing the attachment — inside an ope
+   assert.equal(notStruck.referenceContext, 'prohibited');
+   for (const a of [inQuote, quoteAfter, outside, atEnd, atStart, notStruck]) assert.ok(a.reading!.parts.every((x) => x.legalStatus === 'unknown'));
+ });
++
++// ---- E9 P2-c (COORD decision A on tribusca-control#116 c.6783692588): type-5 table fragment, strict UTF-8 fallback,
++// association by EXPRESS normative reference; R3 kept for quoted, struck, ambiguous or unlinked content ----
++const TABLE = '<table class="t"><tr><td>1) Importador</td><td>Empresa Sintética S.A.</td></tr><tr><td>2) País de destino</td><td>México</td></tr></table>';
++const frag = (body: string, tipo = 5) => ({ idArquivoBinario: 88, idTipoArquivo: tipo, nomeArquivoBinario: '1.html', arquivoBinario: b64(enc8(body)) });
++const runA = (segs: Record<string, unknown>[]) => readRfbInlineAttachments(bytesOf({ idAto: 900004, tiposSegmento: [{ idTipoSegmento: 3, siglaTipoSegmento: 'artigo' }], outrosSegmentos: segs }), 900004)[0]!;
++const tx = (o: number, t: string) => ({ ordemSegmentoAto: o, idTipoSegmento: 3, textoIntegra: t });
++const an = (o: number, att: Record<string, unknown> = frag(TABLE), extra: Record<string, unknown> = {}) => ({ ordemSegmentoAto: o, idTipoSegmento: 3, arquivoBinario: att, ...extra });
++const ART1 = '<p>Art. 1º Fica a empresa autorizada a exportar, de acordo com as especificações descritas abaixo.</p>';
++const ART2 = '<p>Art. 2º A autorização fica condicionada à comprovação.</p>';
++
++test('E9-A1: a validated type-5 table fragment is read as a separate resource; charset evidence in its own field; reason stays null', () => {
++  const a = runA([tx(1, ART1), an(2), tx(3, ART2)]);
++  assert.deepEqual([a.state, a.reason, a.htmlForm, a.charset, a.charsetEvidence], ['read', null, 'table_fragment', 'utf-8', 'inferred_strict_utf8']);
++  assert.equal(a.sha256, sha(enc8(TABLE)), 'bytes preserved verbatim'); assert.equal(a.html, TABLE);
++  assert.ok(a.reading!.parts.some((x) => x.type === 'table') && a.reading!.parts.filter((x) => x.type === 'cell').length === 4);
++  assertPointersMatchBytes(a, enc8(TABLE));
++  for (const p of a.reading!.parts) for (const ptr of p.sourcePointers) assert.equal(ptr.resourceId, 'rfb:900004:anexo:88', 'never part of the act');
++  // a declared document keeps 'declared'
++  const d = runA([tx(1, ART1), an(2, frag(html(TABLE))), tx(3, ART2)]);
++  assert.deepEqual([d.state, d.htmlForm, d.charsetEvidence], ['read', 'document', 'declared']);
++});
++
++test('E9-A2: fragment validation and the delimited fallback fail closed', () => {
++  const st = (body: string | Uint8Array, tipo = 5) => runA([tx(1, ART1), an(2, typeof body === 'string' ? frag(body, tipo) : { ...frag('', tipo), arquivoBinario: b64(body) }), tx(3, ART2)]);
++  const cases: [string, string | Uint8Array, number, string][] = [
++    ['type 6 (PDF id) with a table', TABLE, 6, 'not_html'],
++    ['script inside', '<table><tr><td>x</td></tr><script>alert(1)</script></table>', 5, 'not_html'],
++    ['div wrapper', '<div><table><tr><td>x</td></tr></table></div>', 5, 'not_html'],
++    ['two tables', '<table><tr><td>a</td></tr></table><table><tr><td>b</td></tr></table>', 5, 'not_html'],
++    ['nested table', '<table><tr><td><table><tr><td>x</td></tr></table></td></tr></table>', 5, 'not_html'],
++    ['trailing text', `${TABLE} Art. 99 injetado`, 5, 'not_html'],
++    ['no cell', '<table><tr></tr></table>', 5, 'not_html'],
++    ['comment', '<table><!-- x --><tr><td>x</td></tr></table>', 5, 'not_html'],
++    ['unclosed', '<table><tr><td>x</td></tr>', 5, 'not_html'],
++    ['windows-1252 bytes, undeclared', latin('<table><tr><td>Exportação</td></tr></table>'), 5, 'charset_undeclared'],
++  ];
++  for (const [why, body, tipo, want] of cases) { const a = st(body, tipo); assert.equal(a.state, want, why); assert.equal(a.reading, null, why); }
++  // an <html> document without a declaration keeps the original refusal (the fallback is ONLY for fragments)
++  assert.equal(st('<!DOCTYPE html><html><body><table><tr><td>x</td></tr></table></body></html>').state, 'charset_undeclared');
++});
++
++test('E9-A3: express reference — the Art. 1 "descritas abaixo." immediately before links the table as operative; nothing else does', () => {
++  const op = runA([tx(1, ART1), an(2), tx(3, ART2)]);
++  assert.equal(op.referenceContext, 'operative_candidate'); assert.match(op.referenceContextEvidence, /express reference: segment 1 ends "descritas abaixo\."/u);
++  assert.ok(op.reading!.parts.filter((x) => x.type !== 'document').every((x) => x.context === 'operative_candidate'));
++  for (const [ref, ok] of [['conforme a tabela a seguir:', true], ['nos termos relacionados abaixo:', true], ['descritas abaixo, exceto as do art. 3º.', false],
++    ['observadas as regras do Anexo I.', false], ['abaixo assinado.', false], ['descritas acima.', false]] as const) {
++    const a = runA([tx(1, `<p>Art. 1º Fica autorizada a exportação ${ref}</p>`), an(2), tx(3, ART2)]);
++    assert.equal(a.referenceContext, ok ? 'operative_candidate' : 'prohibited', ref);
++  }
++});
++
++test('E9-A4: adversarial — R3 prevails for quoted, struck, ambiguous or unlinked content even with an express reference', () => {
++  const expectCtx = (segs: Record<string, unknown>[], ctx: string, why: string) => {
++    const a = runA(segs); assert.equal(a.referenceContext, ctx, why);
++    assert.ok(a.reading!.parts.filter((x) => x.type !== 'document').every((x) => x.context === ctx), `${why}: parts follow`);
++    assert.ok(a.reading!.parts.every((x) => x.legalStatus === 'unknown'), `${why}: legalStatus unknown`);
++  };
++  // quotation: the reference sits inside a quoted (amending) text
++  expectCtx([tx(1, '<p>Art. 1º O art. 5º passa a vigorar com a seguinte redação:</p><p>“Art. 5º Ficam autorizadas as operações descritas abaixo.</p>'),
++    an(2), tx(3, '<p>Parágrafo único. Texto citado.”</p>')], 'prohibited', 'reference inside a quotation');
++  // quotation opening right after the attachment
++  expectCtx([tx(1, ART1), an(2), tx(3, '<p>“Art. 10. Citado”</p>')], 'prohibited', 'next neighbour quoted');
++  // struck attachment segment: R3 historical, never operative
++  expectCtx([tx(1, ART1), an(2, frag(TABLE), { tachado: true }), tx(3, ART2)], 'historical', 'struck attachment segment');
++  // unlinked: another text segment between the reference and the attachment
++  expectCtx([tx(1, ART1), tx(2, '<p>Art. 2º Outro dispositivo.</p>'), an(3), tx(4, '<p>Art. 3º Fim.</p>')], 'prohibited', 'reference not immediately before');
++  // ambiguous: no text neighbour after the attachment
++  expectCtx([tx(1, ART1), an(2)], 'prohibited', 'no next neighbour');
++  // no reference at all: R3 unchanged
++  expectCtx([tx(1, '<p>Art. 1º Texto operativo.</p>'), an(2), tx(3, ART2)], 'prohibited', 'no express reference');
++  // gap in segment order (2 → 4) is not "immediately after"
++  expectCtx([tx(2, ART1), an(4), tx(5, ART2)], 'prohibited', 'non-adjacent order');
++});
++
++// ---- R2 (independent review c.6784793278, A-1/A-2/A-4): no promotion on struck text, on another norm's annex, on a
++// negation/exclusion, on ementa text or without a demonstrable normative device. Real ADE Cofis must stay operative. ----
++test('R2 A-1: an inline-struck reference (<strike>/<s>/<del>) in a non-tachado segment never promotes', () => {
++  for (const tag of ['strike', 's', 'del']) {
++    const a = runA([tx(1, `<p>Art. 1º Fica autorizada a exportação, <${tag}>de acordo com as especificações descritas abaixo.</${tag}></p>`), an(2), tx(3, ART2)]);
++    assert.notEqual(a.referenceContext, 'operative_candidate', tag);
++  }
++});
++
++test('R2 A-2: lexical reference alone never promotes — another norm\'s annex, negation/exclusion, ementa text, no device', () => {
++  const cases: [string, Record<string, unknown>[]][] = [
++    ['annex of another norm', [tx(1, '<p>Art. 1º Aplicam-se as alíquotas constantes do Anexo da IN RFB 2.121, descritas abaixo.</p>'), an(2), tx(3, ART2)]],
++    ['table of another norm', [tx(1, '<p>Art. 1º Observar-se-ão os valores da tabela da Lei nº 10.833, de 2003, relacionados abaixo.</p>'), an(2), tx(3, ART2)]],
++    ['negation', [tx(1, '<p>Art. 1º Fica autorizada a exportação, não se aplicando as condições descritas abaixo.</p>'), an(2), tx(3, ART2)]],
++    ['exclusion', [tx(1, '<p>Art. 1º Fica autorizada a exportação, exceto quanto aos produtos relacionados abaixo.</p>'), an(2), tx(3, ART2)]],
++    ['ementa text in an article-typed segment', [tx(1, '<p>Dispõe sobre as operações descritas abaixo.</p>'), an(2), tx(3, ART2)]],
++    ['no normative device', [tx(1, '<p>Seguem as especificações descritas abaixo.</p>'), an(2), tx(3, ART2)]],
++  ];
++  for (const [why, segs] of cases) assert.notEqual(runA(segs).referenceContext, 'operative_candidate', why);
++  // the reference in an EMENTA segment (source type), right before the attachment, never promotes
++  const viaEmenta = readRfbInlineAttachments(bytesOf({ idAto: 900004, tiposSegmento: [{ idTipoSegmento: 1, siglaTipoSegmento: 'ementa' }, { idTipoSegmento: 3, siglaTipoSegmento: 'artigo' }],
++    ementas: [{ ordemSegmentoAto: 1, idTipoSegmento: 1, textoIntegra: '<p>Autoriza a exportação de acordo com as especificações descritas abaixo.</p>' }],
++    outrosSegmentos: [an(2), tx(3, ART2)] }), 900004)[0]!;
++  assert.notEqual(viaEmenta.referenceContext, 'operative_candidate', 'ementa segment');
++  // the real-shape positive case stays operative (device + clause pointing to what follows)
++  // R4 (COORD decision on A3-2, supersedes R3): the citation of IN 1.155 is ACCESSORY (a dispensation clause), not the
++  // object of the reference → the real ADE Cofis shape is promoted again by the fine rule (not by the old lexical one)
++  assert.equal(runA([tx(1, '<p>Art. 1º Fica a empresa autorizada a exportar, dispensadas as exigências de que tratam os arts. 3º e 4º da Instrução Normativa RFB nº 1.155, de 2011, de acordo com as especificações descritas abaixo.</p>'), an(2), tx(3, ART2)]).referenceContext, 'operative_candidate');
++});
++
++test('R2 A-4: attachment HTML is untrusted — attributes never reach the reading (no text, no pointer target)', () => {
++  const evil = '<table onclick="alert(1)" style="background:url(javascript:alert(2))"><tr onmouseover="x()"><td title="EVIL">Cell</td></tr></table>';
++  const a = runA([tx(1, ART1), an(2, frag(evil)), tx(3, ART2)]);
++  assert.equal(a.state, 'read'); assert.equal(a.html, evil, 'kept verbatim (provenance), never rendered here');
++  for (const w of ['alert', 'javascript', 'onclick', 'onmouseover', 'EVIL']) assert.ok(!a.reading!.canonicalText.includes(w), w);
++  assert.equal(a.reading!.canonicalText.trim(), 'Cell');
++});
++
++// ---- R3 (independent review R2 c.6785660153): A2-1 struck structure, A2-2 entities / negation / other norms ----
++const promotes = (art: string) => runA([tx(1, `<p>${art}</p>`), an(2), tx(3, ART2)]).referenceContext === 'operative_candidate';
++
++test('R3 A2-1: nested, unclosed or malformed strike and line-through never leave historical text live (no promotion)', () => {
++  const cases: [string, string][] = [
++    ['nested strike', 'Art. 1º Fica autorizada <strike>a <strike>x</strike> exportação de acordo com as especificações descritas abaixo.</strike>'],
++    ['unclosed strike', 'Art. 1º Fica autorizada a exportação <strike>de acordo com as especificações descritas abaixo.'],
++    ['nested s in del', 'Art. 1º Fica autorizada <del>a <s>x</s> exportação conforme os itens relacionados abaixo.</del>'],
++    ['malformed s (stray close)', 'Art. 1º Fica autorizada a exportação</s> de acordo com as especificações descritas abaixo.'],
++    ['span line-through', 'Art. 1º Fica autorizada <span style="text-decoration: line-through">a exportação de acordo com as especificações descritas abaixo.</span>'],
++    ['span line-through on part, reference live', 'Art. 1º <span style="text-decoration:line-through">Antigo texto.</span> Fica autorizada a exportação de acordo com as especificações descritas abaixo.'],
++    ['self-closing strike', 'Art. 1º Fica autorizada a exportação<strike/> de acordo com as especificações descritas abaixo.'],
++    ['struck operative text + live final reference', 'Art. 1º <strike>Fica autorizada a exportação</strike> de acordo com as especificações descritas abaixo.'],
++  ];
++  for (const [why, art] of cases) assert.equal(promotes(art), false, why);
++});
++
++test('R3 A2-2: entities decoded; negation/exclusion anywhere in the sentence; any identified norm in the device; mixed text → no promotion', () => {
++  const cases: [string, string][] = [
++    ['entity N&atilde;o', 'Art. 1º N&atilde;o fica autorizada a exportação, de acordo com as especificações descritas abaixo.'],
++    ['numeric entity n&#227;o', 'Art. 1º Fica autorizada, n&#227;o se aplicando as condições, de acordo com as especificações descritas abaixo.'],
++    ['negation before the last comma', 'Art. 1º Não ficam autorizadas as operações, nos termos do processo, descritas abaixo.'],
++    ['exclusion early in the sentence', 'Art. 1º Ressalvadas as hipóteses legais, fica autorizada a exportação, conforme os itens relacionados abaixo.'],
++    ['IN 2.121 without "anexo"', 'Art. 1º Aplicam-se as regras da Instrução Normativa RFB nº 2.121, de 2022, descritas abaixo.'],
++    // R4: "other norm > 200 chars before" and the mixed ADE Cofis shape are ACCESSORY citations now (see R4 A3-2);
++    // the distant-norm case that still blocks is a norm in the OBJECT of the reference:
++    ['other norm > 200 chars before, in the object', `Art. 1º ${'Observadas as demais condições aplicáveis, '.repeat(6)}aplicam-se as regras da Lei nº 10.833, de 2003, relacionadas abaixo.`],
++    ['unknown entity', 'Art. 1º Fica autorizada a exporta&ccedil;&atildx; de acordo com as especificações descritas abaixo.'],
++  ];
++  for (const [why, art] of cases) assert.equal(promotes(art), false, why);
++  // clean device + clean reference still promotes
++  assert.equal(promotes('Art. 1º Fica a empresa autoriza&ccedil;&atilde;o a exportar, de acordo com as especifica&ccedil;&otilde;es descritas abaixo.'), true, 'decoded entities, no negation, no norm');
++  assert.equal(promotes('Art. 1º Fica a empresa autorizada a exportar, de acordo com as especificações descritas abaixo.'), true);
++});
++
++// ---- R4 (review R3 A3-1/A3-2, COORD decision): struck by explicit CSS class; accessory foundation ≠ the norm that
++// defines the content referenced. Ambiguity keeps the conservative result. ----
++test('R4 A3-1: an explicit strike CSS class (tachado, riscado, strike, line-through…) is struck text → no promotion', () => {
++  for (const cls of ['tachado', 'texto-tachado', 'riscado', 'strike', 'strikethrough', 'line-through', 'Tachado'])
++    assert.equal(promotes(`Art. 1º Fica autorizada <span class="${cls}">a exportação de acordo com as especificações descritas abaixo.</span>`), false, cls);
++  assert.equal(promotes('Art. 1º Fica a empresa autorizada a exportar, <span class="destaque">de acordo com as especificações descritas abaixo.</span>'), true, 'a non-strike class changes nothing');
++});
++
++test('R4 A3-2: an ACCESSORY citation (foundation, dispensation) does not block; a norm tied to the OBJECT of the reference does', () => {
++  const pos: [string, string][] = [
++    ['ADE Cofis real shape (accessory "dispensadas … da IN 1.155")', 'Art. 1º Fica o estabelecimento da empresa X, inscrito no CNPJ nº 04.041.933/0013-11, autorizado a exportar cigarros, dispensadas as exigências de que tratam os arts. 3º e 4º da Instrução Normativa RFB nº 1.155, de 2011, de acordo com as especificações descritas abaixo.'],
++    ['COORD example 1 (dispensation, then own conditions)', 'Art. 1º Dispensadas as exigências previstas na Instrução Normativa RFB nº 1.155, de 2011, ficam estabelecidas as condições descritas abaixo.'],
++    ['foundation "nos termos da Lei nº …" then own object', 'Art. 1º Nos termos da Lei nº 9.532, de 1997, ficam aprovadas as especificações descritas abaixo.'],
++    ['&nbsp; inside the reference', 'Art. 1º Fica autorizada a exportação de acordo com as especificações descritas&nbsp;abaixo.'],
++  ];
++  for (const [why, art] of pos) assert.equal(promotes(art), true, why);
++  const neg: [string, string][] = [
++    ['annex of another norm is the object', 'Art. 1º Aplicam-se as alíquotas constantes do Anexo da IN RFB 2.121, descritas abaixo.'],
++    ['rules of another norm are the object (elliptical reference)', 'Art. 1º Aplicam-se as regras da Instrução Normativa RFB nº 2.121, de 2022, descritas abaixo.'],
++    ['another norm inside the referenced noun phrase', 'Art. 1º Fica autorizada a exportação das mercadorias da Instrução Normativa RFB nº 2.121, de 2022 relacionadas abaixo.'],
++    ['COORD example 2 (content of another act, no own reference)', 'Art. 1º Aplicam-se as condições constantes do Anexo I da Instrução Normativa RFB nº 1.155, de 2011.'],
++    ['elliptical reference right after an accessory citation (ambiguous)', 'Art. 1º Fica autorizada a exportação, nos termos da Instrução Normativa RFB nº 1.155, de 2011, descritas abaixo.'],
++    ['negation still sentence-wide', 'Art. 1º Não ficam autorizadas, nos termos da Instrução Normativa RFB nº 1.155, de 2011, as operações descritas abaixo.'],
++  ];
++  for (const [why, art] of neg) assert.equal(promotes(art), false, why);
++});
++
++// ---- R5 (review R4 c.6796232552 + COORD decision): A4-1 remission connectors, A4-2 class forms, operative prohibition ----
++test('R5 A4-1: a remission connector ties the reference to the ANTECEDENT clause; a norm there blocks unless that clause is accessory', () => {
++  const neg: [string, string][] = [
++    ['conforme + norm in antecedent', 'Art. 1º Aplicam-se as alíquotas previstas na IN RFB nº 2.121, de 2022, conforme especificações descritas abaixo.'],
++    ['nos termos + annex of another norm', 'Art. 1º Ficam reproduzidos os valores do Anexo da IN RFB nº 2.121, nos termos indicados abaixo.'],
++    ['cujos + norm in antecedent', 'Art. 1º Ficam mantidos os limites da Portaria RFB nº 10, de 2020, cujos valores atualizados estão descritos abaixo.'],
++    ['norm kind without number in antecedent', 'Art. 1º Aplicam-se as regras da IN, conforme especificações descritas abaixo.'],
++    ['na forma + norm', 'Art. 1º Observar-se-ão os prazos do Decreto nº 7.212, de 2010, na forma descrita abaixo.'],
++    ['segundo + norm', 'Art. 1º Valem os coeficientes da Lei nº 10.833, de 2003, segundo os valores relacionados abaixo.'],
++  ];
++  for (const [why, art] of neg) assert.equal(promotes(art), false, why);
++  const pos: [string, string][] = [
++    ['ADE Cofis shape: antecedent is accessory ("dispensadas …")', 'Art. 1º Fica a empresa autorizada a exportar, dispensadas as exigências de que tratam os arts. 3º e 4º da Instrução Normativa RFB nº 1.155, de 2011, de acordo com as especificações descritas abaixo.'],
++    ['accessory "com fundamento em"', 'Art. 1º Fica aprovado o modelo, com fundamento na Lei nº 9.532, de 1997, conforme especificações descritas abaixo.'],
++    ['accessory "observado"', 'Art. 1º Fica autorizada a operação, observado o Decreto nº 7.212, de 2010, de acordo com as condições descritas abaixo.'],
++    ['connector without any norm', 'Art. 1º Fica autorizada a exportação, conforme as especificações descritas abaixo.'],
++  ];
++  for (const [why, art] of pos) assert.equal(promotes(art), true, why);
++});
++
++test('R5 A4-2: unquoted and camelCase strike classes are struck', () => {
++  for (const attr of ['class=tachado', 'class=textoTachado', "class='TextoRiscado'", 'class="itemTachadoAntigo"', 'class=riscado'])
++    assert.equal(promotes(`Art. 1º Fica autorizada <span ${attr}>a exportação de acordo com as especificações descritas abaixo.</span>`), false, attr);
++});
++
++test('R5 prohibition (COORD): an operative PROHIBITION whose object is the referenced content links the table; polarity is internal only', async () => {
++  const { referencePolarity } = await import('../src/modules/anatomy/rfb-inline-attachments.js');
++  const pos = ['Art. 1º Fica vedada a exportação das mercadorias relacionadas abaixo.', 'Art. 1º É vedada a aplicação das condições descritas abaixo.',
++    'Art. 1º Fica proibida a importação dos produtos relacionados abaixo.'];
++  for (const art of pos) { assert.equal(promotes(art), true, art); assert.equal(referencePolarity(art), 'prohibition', art); }
++  // operative_candidate is NOT "permitted": permission / obligation are told apart, internally
++  assert.equal(referencePolarity('Art. 1º Fica autorizada a exportação das mercadorias relacionadas abaixo.'), 'permission');
++  assert.equal(referencePolarity('Art. 1º Os contribuintes deverão observar as condições descritas abaixo.'), 'obligation');
++  // the polarity never becomes a persisted field or changes legalStatus
++  const a = runA([tx(1, `<p>${pos[0]}</p>`), an(2), tx(3, ART2)]);
++  assert.equal(a.referenceContext, 'operative_candidate'); assert.ok(!('referencePolarity' in a), 'no new field on the attachment');
++  assert.ok(a.reading!.parts.every((x) => x.legalStatus === 'unknown'));
++  const neg: [string, string][] = [
++    ['negation of applicability', 'Art. 1º Não se aplicam as condições descritas abaixo.'],
++    ['exclusion', 'Art. 1º Fica vedada a exportação, exceto das mercadorias relacionadas abaixo.'],
++    ['prohibition not in the reference clause (elliptical)', 'Art. 1º Fica vedada a exportação, descritas abaixo.'],
++    ['prohibition + another norm in the object', 'Art. 1º Fica vedada a aplicação das condições da IN RFB nº 2.121, de 2022 descritas abaixo.'],
++    ['prohibition in an earlier clause, reference elsewhere', 'Art. 1º É vedado o uso do regime anterior; ficam estabelecidas as condições, conforme a IN RFB nº 2.121, de 2022, descritas abaixo.'],
++    ['struck prohibition', 'Art. 1º <strike>Fica vedada</strike> a exportação das mercadorias relacionadas abaixo.'],
++  ];
++  for (const [why, art] of neg) assert.equal(promotes(art), false, why);
++});
++
++// ---- R6 (review R5 c.6796999886 + COORD): A5-1 the governing clause CHAIN of a remission; A5-2 an elliptical
++// remission needs a provable nominal antecedent. Ambiguity never promotes; nothing crosses a sentence/device. ----
++test('R6 A5-1: a remission follows the clause chain back to the GOVERNING clause; a norm there blocks however far back (same sentence)', () => {
++  const neg: [string, string][] = [
++    ['reviewer A5-1 (norm two clauses before "conforme")', 'Aplicam-se os valores da Instrução Normativa RFB nº 2.121, de 2022, atualizados mensalmente, conforme especificações descritas abaixo.'],
++    ['three modifier clauses', 'Aplicam-se os valores da Lei nº 10.833, de 2003, atualizados mensalmente, corrigidos anualmente, nos termos indicados abaixo.'],
++    ['an intermediate connector clause is not a governing clause', 'Aplicam-se os valores da IN RFB nº 2.121, de 2022, conforme o caso, atualizados, conforme especificações descritas abaixo.'],
++    ['na forma, two clauses back', 'Observar-se-ão os prazos do Decreto nº 7.212, de 2010, contados da ciência, na forma descrita abaixo.'],
++    ['segundo, two clauses back', 'Valem os coeficientes da Lei nº 10.833, de 2003, revistos, segundo os valores relacionados abaixo.'],
++    ['de acordo com, two clauses back', 'Aplicam-se as alíquotas do Anexo da IN RFB nº 2.121, vigentes, de acordo com as especificações descritas abaixo.'],
++    ['cujos, two clauses back', 'Ficam mantidos os limites da Portaria RFB nº 10, de 2020, revisados, cujos valores estão descritos abaixo.'],
++    ['bare norm kind two clauses back', 'Aplicam-se as regras da IN, atualizadas, conforme especificações descritas abaixo.'],
++    ['"nº." and "arts." abbreviations never end the sentence', 'Aplicam-se os valores dos arts. 2º e 3º da IN RFB nº. 2.121, de 2022, atualizados, conforme especificações descritas abaixo.'],
++    ['modifier clause holding a noun phrase is traversed', 'Aplicam-se os valores da Lei nº 10.833, de 2003, publicados no Diário Oficial, conforme especificações descritas abaixo.'],
++    ['elliptical reference right after an ACCESSORY clause (nearest noun is the other norm\'s)', 'Fica autorizada a exportação, dispensadas as exigências da Instrução Normativa RFB nº 1.155, de 2011, descritas abaixo.'],
++  ];
++  for (const [why, art] of neg) assert.equal(promotes(`Art. 1º ${art}`), false, why);
++  const pos: [string, string][] = [
++    ['governing clause of the act itself, modifiers between', 'Ficam aprovados os modelos de declaração, atualizados anualmente, conforme especificações descritas abaixo.'],
++    ['B: accessory foundation before the governing clause is not a block', 'Nos termos da Lei nº 9.532, de 1997, ficam aprovados os modelos, revisados, conforme especificações descritas abaixo.'],
++    ['B: accessory clause skipped, governing clause clean', 'Fica aprovado o modelo, com fundamento na Lei nº 9.532, de 1997, conforme especificações descritas abaixo.'],
++    ['ADE Cofis real shape', 'Fica o estabelecimento da empresa X, inscrito no CNPJ nº 04.041.933/0013-11, autorizado a exportar cigarros, dispensadas as exigências de que tratam os arts. 3º e 4º da Instrução Normativa RFB nº 1.155, de 2011, de acordo com as especificações descritas abaixo.'],
++    ['E: a norm in an EARLIER sentence of the device is not inherited', 'Revoga-se a Lei nº 10.833, de 2003. Ficam aprovados os modelos, atualizados, conforme especificações descritas abaixo.'],
++  ];
++  for (const [why, art] of pos) assert.equal(promotes(`Art. 1º ${art}`), true, why);
++});
++
++test('R6 A5-2: an elliptical remission without a provable nominal antecedent never promotes; a real antecedent still does', () => {
++  const neg: [string, string][] = [
++    ['reviewer A5-2', 'Art. 1º Conforme descritas abaixo.'],
++    ['bare participle', 'Art. 1º Descritas abaixo.'],
++    ['nos termos, nothing before', 'Art. 1º Nos termos relacionados abaixo.'],
++    ['connector + own noun, no governing clause', 'Art. 1º Conforme especificações descritas abaixo.'],
++    ['de acordo com, nothing before', 'Art. 1º De acordo com as especificações descritas abaixo.'],
++    ['only modifiers before', 'Art. 1º Atualizados mensalmente, conforme especificações descritas abaixo.'],
++    ['E: antecedent only in an EARLIER sentence', 'Art. 1º Ficam aprovados os modelos. Conforme descritos abaixo.'],
++    ['E: antecedent only before a semicolon', 'Art. 1º Ficam aprovados os modelos; conforme descritos abaixo.'],
++    ['paragraph label then elliptical', '§ 1º Conforme descritas abaixo.'],
++    ['inciso label then elliptical', 'I - conforme relacionados abaixo.'],
++  ];
++  for (const [why, art] of neg) assert.equal(promotes(art), false, why);
++  const pos: [string, string][] = [
++    ['elliptical with a clean nominal antecedent', 'Art. 1º Ficam aprovados os modelos de declaração, descritos abaixo.'],
++    ['connector with a clean nominal antecedent', 'Art. 1º Fica autorizada a exportação, conforme as especificações descritas abaixo.'],
++    ['own clause with its own object (no remission)', 'Art. 1º Ficam aprovadas as tabelas descritas abaixo.'],
++    ['paragraph with own object', '§ 1º Ficam aprovadas as tabelas descritas abaixo.'],
++    ['inciso with own object', 'I - os modelos relacionados abaixo.'],
++  ];
++  for (const [why, art] of pos) assert.equal(promotes(art), true, why);
++});
++
++test('R6 G/H/I: negation, exclusion, prohibitions and strike classes keep their R5 outcome through the clause chain', async () => {
++  const { referencePolarity } = await import('../src/modules/anatomy/rfb-inline-attachments.js');
++  assert.equal(promotes('Art. 1º Fica vedada a exportação das mercadorias, conforme as especificações descritas abaixo.'), false, 'prohibition reached only via connector');
++  assert.equal(promotes('Art. 1º Fica vedada a exportação das mercadorias relacionadas abaixo.'), true, 'prohibition in the same clause');
++  assert.equal(referencePolarity('Art. 1º Fica vedada a exportação das mercadorias relacionadas abaixo.'), 'prohibition');
++  assert.equal(promotes('Art. 1º Aplicam-se os valores, atualizados, exceto os relacionados abaixo.'), false, 'exclusion');
++  assert.equal(promotes('Art. 1º Não se aplicam os valores, atualizados, conforme descritos abaixo.'), false, 'negation');
++  assert.equal(promotes('Art. 1º Ficam aprovados os modelos, <span class=textoTachado>conforme especificações descritas abaixo.</span>'), false, 'strike class');
++});

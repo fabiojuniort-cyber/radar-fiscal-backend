@@ -1,0 +1,88 @@
+EXEC → COORD — FRENTE 1 | ANAT/E9 P2-c — A r13 CONCLUSÃO
+==========================================================
+
+1. Situação e decisão solicitada
+--------------------------------
+O A r13 está entregue no PR #308, apenas como proposta. Ele fecha a origem externa:
+"multicitado", "em epígrafe", "em questão" e "em causa" não promovem mais o conteúdo de
+outra norma.
+
+Nada foi integrado e nada foi registrado.
+
+Decisão solicitada: encaminhar o HEAD final para revisão independente, focada no delta
+A r13.
+
+2. Identidade
+-------------
+- PR: fabiojuniort-cyber/radar-fiscal-backend#308
+- Baseline: 55ba1781fbc4b8a78146ac60b07f0cf9929f9068
+- Commit de evidências: b07275ea45aa9b4c53ce20941efd03de49257cb4
+- HEAD final: SHA publicado na conclusão da Issue #116. É o commit que adiciona este TXT.
+- Patch A r13: proposal-300-type5-express-ref-r13.patch, sobre #300 @ 22e8cc48
+  SHA-256 31c035044838ac2c8959df9aa9b840bb9087445bea4e445a10339749696dfe5f
+- Motores:
+  - isolado: 8debb5781156c772f4481e86ed5214283ddf1baa9dda98ed9ff74490e322174f
+  - composição: 4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a
+
+3. Resultado por atividade
+--------------------------
+1. Reprodução no A r12
+   - Fixture nova de sinônimos: 40 de 46 casos com promoção indevida, cobrindo citação no
+     início, citação no meio e casos sem citação.
+2. Correção
+   - Os 4 termos entram em RESUMPTION_MARKERS, com acento opcional e sem diferenciar caixa.
+   - O teste de regressão R13 tem 16 casos negativos e 5 positivos.
+3. Reexecução no A r13
+   - Sinônimos: 0/46.
+   - g.mts original (153 casos, SHA bafb3153… idêntico): 11/153. As 11 divergências são
+     só falsos negativos conservadores já declarados.
+   - 34 casos originais: 0/34.
+   - r12 reconstruída: 2/65. As 2 são só o R12-1.
+   - Casos dirigidos: 306/306. Adversariais: 0/85.
+   - tsc limpo; test:anatomy 303/303.
+   - PG16 com o pin versionado do próprio patch (8debb578): 12/12.
+   - Lote oficial: 7 atos, 0 diferenças.
+4. Composição
+   - test:anatomy: 416/420. As 4 falhas são as de identidade (#153, #167, #170, #174).
+     Nenhuma falha nova.
+   - PG16 com o pin versionado do #303: 7/12. O subteste 5 falha pela trava e os
+     subtestes 6–8 caem em cascata. Com pin diagnóstico: 12/12.
+   - ADE Cofis: 26/26 ponteiros, legalStatus unknown.
+   - Aceites: byte-idênticos à base independente, 13 registros.
+   - Portaria 635: EQUIVALENT em 136/136 partes.
+   - entrySha256 proposto: 2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996,
+     só no relatório.
+5. Entrega
+   - Relatório técnico e este prompt, em TXT UTF-8, publicados no #308.
+   - Resumo publicado na Issue #116.
+
+4. Riscos
+---------
+Todos P3 e conservadores.
+- R13-1, novo: "matéria em questão" e "bens em causa" deixam de promover.
+- R12-1, R11-1 e R11-2: mantidos.
+- Lista fechada: sinônimos ainda não listados podem promover.
+
+5. NOT_PROVEN
+-------------
+- Byte-identidade do arquivo rev.mts do revisor.
+- r12.mts original (73 casos), não publicado.
+- PG18.
+- CI integral.
+- Regressão completa do repositório.
+
+6. Progresso
+------------
+- Mandato: 0% → 20% → 40% → 100%.
+- F1 oficial: 50,2% → 50,2% (+0,0 p.p.).
+
+7. Próximo gate
+---------------
+- Revisão independente do HEAD final, focada no delta A r13.
+- Fora deste mandato: pins da composição, registro da Portaria 635 (entrySha256 2958bdb0…),
+  passagem a Ready, CI integral e PG18, merge e deploy.
+
+Delegações:
+- 3 sub-agentes Sonnet, esforço médio: implementação, validação isolada e composição.
+- O EXEC fez a especificação, as fixtures e os PG16, conferiu os resultados e escreveu os
+  registros.

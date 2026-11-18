@@ -1,0 +1,328 @@
+TAP version 13
+# Subtest: L2/L12: malformed attachment HTML never alters the main body, its pieces or its source map
+ok 1 - L2/L12: malformed attachment HTML never alters the main body, its pieces or its source map
+  ---
+  duration_ms: 38.679693
+  type: 'test'
+  ...
+# Subtest: L2/L12: byte offsets map back exactly in each accepted charset
+ok 2 - L2/L12: byte offsets map back exactly in each accepted charset
+  ---
+  duration_ms: 3.560031
+  type: 'test'
+  ...
+# Subtest: L2/L12: failure states — no content, invalid base64, not HTML, charset undeclared/unsupported/invalid bytes
+ok 3 - L2/L12: failure states — no content, invalid base64, not HTML, charset undeclared/unsupported/invalid bytes
+  ---
+  duration_ms: 3.636542
+  type: 'test'
+  ...
+# Subtest: L2/L12: size limits per attachment and per act
+ok 4 - L2/L12: size limits per attachment and per act
+  ---
+  duration_ms: 61.548395
+  type: 'test'
+  ...
+# Subtest: L2/L12 official IN 2.121 (127905, promoted:false): 1 embedded HTML read separately, 30 PDFs missing; main preparation and its reconciliation since 0.1.0 unchanged
+ok 5 - L2/L12 official IN 2.121 (127905, promoted:false): 1 embedded HTML read separately, 30 PDFs missing; main preparation and its reconciliation since 0.1.0 unchanged
+  ---
+  duration_ms: 310.2114
+  type: 'test'
+  ...
+# Subtest: R2: UTF-8 with BOM — BOM kept in the body, the reader's real pointers map to the original bytes
+ok 6 - R2: UTF-8 with BOM — BOM kept in the body, the reader's real pointers map to the original bytes
+  ---
+  duration_ms: 2.035384
+  type: 'test'
+  ...
+# Subtest: R2: characters outside the BMP — pointers map exactly; an offset inside a surrogate pair is refused
+ok 7 - R2: characters outside the BMP — pointers map exactly; an offset inside a surrogate pair is refused
+  ---
+  duration_ms: 1.573596
+  type: 'test'
+  ...
+# Subtest: R2: the attachment inherits the protected context of the referencing segment (quotation, tachado), never becoming more permissive
+ok 8 - R2: the attachment inherits the protected context of the referencing segment (quotation, tachado), never becoming more permissive
+  ---
+  duration_ms: 1.977407
+  type: 'test'
+  ...
+# Subtest: R2 official IN 2.121: the real attachment pointers map to its original bytes; referencing segment 702 (art. 137) is operative
+ok 9 - R2 official IN 2.121: the real attachment pointers map to its original bytes; referencing segment 702 (art. 137) is operative
+  ---
+  duration_ms: 193.071649
+  type: 'test'
+  ...
+# Subtest: R3: text-less tachado segment referencing the attachment — inside an open quotation → prohibited; outside → historical; undetermined → prohibited
+ok 10 - R3: text-less tachado segment referencing the attachment — inside an open quotation → prohibited; outside → historical; undetermined → prohibited
+  ---
+  duration_ms: 3.235927
+  type: 'test'
+  ...
+# Subtest: E9-A1: a validated type-5 table fragment is read as a separate resource; charset evidence in its own field; reason stays null
+ok 11 - E9-A1: a validated type-5 table fragment is read as a separate resource; charset evidence in its own field; reason stays null
+  ---
+  duration_ms: 20.105528
+  type: 'test'
+  ...
+# Subtest: E9-A2: fragment validation and the delimited fallback fail closed
+ok 12 - E9-A2: fragment validation and the delimited fallback fail closed
+  ---
+  duration_ms: 3.345104
+  type: 'test'
+  ...
+# Subtest: E9-A3: express reference — the Art. 1 "descritas abaixo." immediately before links the table as operative; nothing else does
+ok 13 - E9-A3: express reference — the Art. 1 "descritas abaixo." immediately before links the table as operative; nothing else does
+  ---
+  duration_ms: 2.395436
+  type: 'test'
+  ...
+# Subtest: E9-A4: adversarial — R3 prevails for quoted, struck, ambiguous or unlinked content even with an express reference
+ok 14 - E9-A4: adversarial — R3 prevails for quoted, struck, ambiguous or unlinked content even with an express reference
+  ---
+  duration_ms: 4.439595
+  type: 'test'
+  ...
+# Subtest: R2 A-1: an inline-struck reference (<strike>/<s>/<del>) in a non-tachado segment never promotes
+ok 15 - R2 A-1: an inline-struck reference (<strike>/<s>/<del>) in a non-tachado segment never promotes
+  ---
+  duration_ms: 1.044406
+  type: 'test'
+  ...
+# Subtest: R2 A-2: lexical reference alone never promotes — another norm's annex, negation/exclusion, ementa text, no device
+ok 16 - R2 A-2: lexical reference alone never promotes — another norm's annex, negation/exclusion, ementa text, no device
+  ---
+  duration_ms: 2.390128
+  type: 'test'
+  ...
+# Subtest: R2 A-4: attachment HTML is untrusted — attributes never reach the reading (no text, no pointer target)
+ok 17 - R2 A-4: attachment HTML is untrusted — attributes never reach the reading (no text, no pointer target)
+  ---
+  duration_ms: 0.797421
+  type: 'test'
+  ...
+# Subtest: R3 A2-1: nested, unclosed or malformed strike and line-through never leave historical text live (no promotion)
+ok 18 - R3 A2-1: nested, unclosed or malformed strike and line-through never leave historical text live (no promotion)
+  ---
+  duration_ms: 1.664706
+  type: 'test'
+  ...
+# Subtest: R3 A2-2: entities decoded; negation/exclusion anywhere in the sentence; any identified norm in the device; mixed text → no promotion
+ok 19 - R3 A2-2: entities decoded; negation/exclusion anywhere in the sentence; any identified norm in the device; mixed text → no promotion
+  ---
+  duration_ms: 3.232687
+  type: 'test'
+  ...
+# Subtest: R4 A3-1: an explicit strike CSS class (tachado, riscado, strike, line-through…) is struck text → no promotion
+ok 20 - R4 A3-1: an explicit strike CSS class (tachado, riscado, strike, line-through…) is struck text → no promotion
+  ---
+  duration_ms: 2.212223
+  type: 'test'
+  ...
+# Subtest: R4 A3-2: an ACCESSORY citation (foundation, dispensation) does not block; a norm tied to the OBJECT of the reference does
+ok 21 - R4 A3-2: an ACCESSORY citation (foundation, dispensation) does not block; a norm tied to the OBJECT of the reference does
+  ---
+  duration_ms: 2.600731
+  type: 'test'
+  ...
+# Subtest: R5 A4-1: a remission connector ties the reference to the ANTECEDENT clause; a norm there blocks unless that clause is accessory
+ok 22 - R5 A4-1: a remission connector ties the reference to the ANTECEDENT clause; a norm there blocks unless that clause is accessory
+  ---
+  duration_ms: 2.507423
+  type: 'test'
+  ...
+# Subtest: R5 A4-2: unquoted and camelCase strike classes are struck
+ok 23 - R5 A4-2: unquoted and camelCase strike classes are struck
+  ---
+  duration_ms: 1.705762
+  type: 'test'
+  ...
+# Subtest: R5 prohibition (COORD): an operative PROHIBITION whose object is the referenced content links the table; polarity is internal only
+ok 24 - R5 prohibition (COORD): an operative PROHIBITION whose object is the referenced content links the table; polarity is internal only
+  ---
+  duration_ms: 4.781565
+  type: 'test'
+  ...
+# Subtest: R6 A5-1: a remission follows the clause chain back to the GOVERNING clause; a norm there blocks however far back (same sentence)
+ok 25 - R6 A5-1: a remission follows the clause chain back to the GOVERNING clause; a norm there blocks however far back (same sentence)
+  ---
+  duration_ms: 6.116509
+  type: 'test'
+  ...
+# Subtest: R6 A5-2: an elliptical remission without a provable nominal antecedent never promotes; a real antecedent still does
+ok 26 - R6 A5-2: an elliptical remission without a provable nominal antecedent never promotes; a real antecedent still does
+  ---
+  duration_ms: 4.206282
+  type: 'test'
+  ...
+# Subtest: R6 G/H/I: negation, exclusion, prohibitions and strike classes keep their R5 outcome through the clause chain
+ok 27 - R6 G/H/I: negation, exclusion, prohibitions and strike classes keep their R5 outcome through the clause chain
+  ---
+  duration_ms: 1.72259
+  type: 'test'
+  ...
+# Subtest: R7 A6-1: a non-accessory norm citation in ANY earlier clause of the same sentence blocks a remission
+ok 28 - R7 A6-1: a non-accessory norm citation in ANY earlier clause of the same sentence blocks a remission
+  ---
+  duration_ms: 3.243074
+  type: 'test'
+  ...
+# Subtest: R7 abbreviations: Dec., Instr., Port. and Res. never end a sentence and cite a norm like the full forms; real sentence ends hold
+ok 29 - R7 abbreviations: Dec., Instr., Port. and Res. never end a sentence and cite a norm like the full forms; real sentence ends hold
+  ---
+  duration_ms: 2.812081
+  type: 'test'
+  ...
+# Subtest: R8 R7-ACC: "observados"/"dispensados" inside a clause never make it accessory; the citation counts
+ok 30 - R8 R7-ACC: "observados"/"dispensados" inside a clause never make it accessory; the citation counts
+  ---
+  duration_ms: 1.637412
+  type: 'test'
+  ...
+# Subtest: R8 R7-FRONT: a foundation citation is judged by function — same result at the start and in the middle
+ok 31 - R8 R7-FRONT: a foundation citation is judged by function — same result at the start and in the middle
+  ---
+  duration_ms: 6.822327
+  type: 'test'
+  ...
+# Subtest: R8 R7-ABBR: composite abbreviations cite like the full forms; a capitalized short token before "." never ends the sentence; real ends hold
+ok 32 - R8 R7-ABBR: composite abbreviations cite like the full forms; a capitalized short token before "." never ends the sentence; real ends hold
+  ---
+  duration_ms: 6.396707
+  type: 'test'
+  ...
+# Subtest: R9 R8-CST: resumption of the cited norm makes it governing under a constitutive verb — start and middle; own content still promotes
+ok 33 - R9 R8-CST: resumption of the cited norm makes it governing under a constitutive verb — start and middle; own content still promotes
+  ---
+  duration_ms: 3.51042
+  type: 'test'
+  ...
+# Subtest: R9 R8-LOW: abbreviated norms are recognized in lower, upper and mixed case; real boundaries hold
+ok 34 - R9 R8-LOW: abbreviated norms are recognized in lower, upper and mixed case; real boundaries hold
+  ---
+  duration_ms: 5.172083
+  type: 'test'
+  ...
+# Subtest: R9 R8-MRG: a sentence that opens with a remission is never merged into the previous one (unresolved → no promotion)
+ok 35 - R9 R8-MRG: a sentence that opens with a remission is never merged into the previous one (unresolved → no promotion)
+  ---
+  duration_ms: 0.955797
+  type: 'test'
+  ...
+# Subtest: R10 R9-RES: an object that resumes the cited norm never promotes — reviewer cases and novel variants, start and middle; own content promotes
+ok 36 - R10 R9-RES: an object that resumes the cited norm never promotes — reviewer cases and novel variants, start and middle; own content promotes
+  ---
+  duration_ms: 21.264042
+  type: 'test'
+  ...
+# Subtest: R10 R9-ANA: a sentence opening with a resumption never inherits across the sentence boundary; controls without resumption promote
+ok 37 - R10 R9-ANA: a sentence opening with a resumption never inherits across the sentence boundary; controls without resumption promote
+  ---
+  duration_ms: 6.499563
+  type: 'test'
+  ...
+# Subtest: R11 resumption without own antecedent: a marker in a sentence with no norm citation never promotes; own content still does
+ok 38 - R11 resumption without own antecedent: a marker in a sentence with no norm citation never promotes; own content still does
+  ---
+  duration_ms: 6.266898
+  type: 'test'
+  ...
+# Subtest: R11 opening resumption: Estes/Estas, demais, ditos/ditas, sobreditas open a sentence without own origin
+ok 39 - R11 opening resumption: Estes/Estas, demais, ditos/ditas, sobreditas open a sentence without own origin
+  ---
+  duration_ms: 3.586874
+  type: 'test'
+  ...
+# Subtest: R11 self-reference diploma and foreign diploma: "neste/deste diploma" is the act itself; "naquele/aludido diploma" is another norm
+ok 40 - R11 self-reference diploma and foreign diploma: "neste/deste diploma" is the act itself; "naquele/aludido diploma" is another norm
+  ---
+  duration_ms: 2.275532
+  type: 'test'
+  ...
+# Subtest: R12 marker families in the SAME sentence as the citation: a marker after a cited norm means the table is another norm's, never promoted
+not ok 41 - R12 marker families in the SAME sentence as the citation: a marker after a cited norm means the table is another norm's, never promoted
+  ---
+  duration_ms: 8.727746
+  type: 'test'
+  location: 'w300r11/test/anatomy.rfb-inline-attachments.unit.test.ts:1:78883'
+  failureType: 'testCodeFailure'
+  error: |-
+    start: da sobredita norma
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (w300r11/test/anatomy.rfb-inline-attachments.unit.test.ts:825:40)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R12 marker families after a real sentence boundary: no own citation + marker → unresolved, never promoted; own content still promotes
+not ok 42 - R12 marker families after a real sentence boundary: no own citation + marker → unresolved, never promoted; own content still promotes
+  ---
+  duration_ms: 1.004414
+  type: 'test'
+  location: 'w300r11/test/anatomy.rfb-inline-attachments.unit.test.ts:1:81869'
+  failureType: 'testCodeFailure'
+  error: |-
+    Fica revogada a Instrução No… + da norma em tela
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (w300r11/test/anatomy.rfb-inline-attachments.unit.test.ts:857:40)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R12 opening susodito: "Susoditas/As susoditas" open a sentence without own origin
+not ok 43 - R12 opening susodito: "Susoditas/As susoditas" open a sentence without own origin
+  ---
+  duration_ms: 0.672547
+  type: 'test'
+  location: 'w300r11/test/anatomy.rfb-inline-attachments.unit.test.ts:1:86938'
+  failureType: 'testCodeFailure'
+  error: |-
+    "Susoditas alíquotas"
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (w300r11/test/anatomy.rfb-inline-attachments.unit.test.ts:873:40)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..43
+# tests 43
+# suites 0
+# pass 40
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1267.968794

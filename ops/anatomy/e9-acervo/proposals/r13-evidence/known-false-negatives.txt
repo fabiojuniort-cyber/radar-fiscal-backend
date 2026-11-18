@@ -1,0 +1,16 @@
+== A r12
+N | Art. 1º Fica revogada a Portaria nº 10. Ficam aprovadas as alíquotas mencionadas nesta Portaria, conforme tabela a seguir:
+N | Art. 1º Ficam aprovados os modelos de declaração e seus campos, conforme tabela a seguir:
+N | Art. 1º Fica aprovada a tabela de valores, com seus campos, conforme tabela a seguir:
+N | Art. 1º Fica aprovado o modelo, em tela única, conforme tabela a seguir:
+N | Art. 1º Ficam aprovados os campos exibidos em tela, conforme tabela a seguir:
+P | Art. 1º Ficam aprovados os modelos da matéria em questão, conforme tabela a seguir:
+P | Art. 1º Ficam aprovados os valores dos bens em causa, conforme tabela a seguir:
+== A r13
+N | Art. 1º Fica revogada a Portaria nº 10. Ficam aprovadas as alíquotas mencionadas nesta Portaria, conforme tabela a seguir:
+N | Art. 1º Ficam aprovados os modelos de declaração e seus campos, conforme tabela a seguir:
+N | Art. 1º Fica aprovada a tabela de valores, com seus campos, conforme tabela a seguir:
+N | Art. 1º Fica aprovado o modelo, em tela única, conforme tabela a seguir:
+N | Art. 1º Ficam aprovados os campos exibidos em tela, conforme tabela a seguir:
+N | Art. 1º Ficam aprovados os modelos da matéria em questão, conforme tabela a seguir:
+N | Art. 1º Ficam aprovados os valores dos bens em causa, conforme tabela a seguir:

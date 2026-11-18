@@ -1,0 +1,131 @@
+OK   want=block   got=block   | reviewer A5-1 (norm two clauses before "conforme")
+OK   want=block   got=block   | three modifier clauses
+OK   want=block   got=block   | an intermediate connector clause is not a governing clause
+OK   want=block   got=block   | na forma, two clauses back
+OK   want=block   got=block   | segundo, two clauses back
+OK   want=block   got=block   | de acordo com, two clauses back
+OK   want=block   got=block   | cujos, two clauses back
+OK   want=block   got=block   | bare norm kind two clauses back
+OK   want=block   got=block   | "nº." and "arts." abbreviations never end the sentence
+OK   want=block   got=block   | modifier clause holding a noun phrase is traversed
+OK   want=block   got=block   | elliptical reference right after an ACCESSORY clause (nearest noun is the other norm's)
+OK   want=promote got=promote | governing clause of the act itself, modifiers between
+OK   want=promote got=promote | B: accessory foundation before the governing clause is not a block
+OK   want=promote got=promote | B: accessory clause skipped, governing clause clean
+OK   want=promote got=promote | ADE Cofis real shape
+OK   want=promote got=promote | E: a norm in an EARLIER sentence of the device is not inherited
+OK   want=block   got=block   | reviewer A5-2
+OK   want=block   got=block   | bare participle
+OK   want=block   got=block   | nos termos, nothing before
+OK   want=block   got=block   | connector + own noun, no governing clause
+OK   want=block   got=block   | de acordo com, nothing before
+OK   want=block   got=block   | only modifiers before
+OK   want=block   got=block   | E: antecedent only in an EARLIER sentence
+OK   want=block   got=block   | E: antecedent only before a semicolon
+OK   want=block   got=block   | paragraph label then elliptical
+OK   want=block   got=block   | inciso label then elliptical
+OK   want=promote got=promote | elliptical with a clean nominal antecedent
+OK   want=promote got=promote | connector with a clean nominal antecedent
+OK   want=promote got=promote | own clause with its own object (no remission)
+OK   want=promote got=promote | paragraph with own object
+OK   want=promote got=promote | inciso with own object
+OK   want=block   got=block   | reviewer 1 (nominal clause between)
+OK   want=block   got=block   | reviewer 2
+OK   want=block   got=block   | reviewer 3 (two nominal clauses between)
+OK   want=block   got=block   | reviewer 4 (embedded "por força da")
+OK   want=block   got=block   | reviewer 5 (embedded "nos termos do")
+OK   want=block   got=block   | annex of another norm two clauses back
+OK   want=promote got=promote | ADE Cofis real shape (accessory "dispensadas … IN 1.155" skipped)
+OK   want=promote got=promote | accessory "com fundamento na" between
+OK   want=promote got=promote | fronted foundation "Nos termos da Lei …" opening the sentence
+OK   want=promote got=promote | no norm anywhere, nominal clauses between
+OK   want=promote got=promote | norm only in an earlier SENTENCE
+OK   want=block   got=block   | abbreviation pair Decreto (full)
+OK   want=block   got=block   | abbreviation pair Decreto (abbr)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (full)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (abbr)
+OK   want=block   got=block   | abbreviation pair Portaria (full)
+OK   want=block   got=block   | abbreviation pair Portaria (abbr)
+OK   want=block   got=block   | abbreviation pair Resolução (full)
+OK   want=block   got=block   | abbreviation pair Resolução (abbr)
+OK   want=promote got=promote | real sentence end: ends after the act number
+OK   want=promote got=promote | real sentence end: ends after a year
+OK   want=promote got=promote | real sentence end: ends after a plain word
+OK   want=block   got=block   | reviewer ACC-1 (internal "observados na Portaria")
+OK   want=block   got=block   | reviewer ACC-2 (internal "dispensados pela IN")
+OK   want=block   got=block   | internal "observadas" with a Decreto
+OK   want=promote got=promote | control: "observada a Lei" opening its clause
+OK   want=promote got=promote | control: ADE Cofis real shape ("dispensadas" opening its clause)
+OK   want=block   got=block   | reviewer FRONT-1 (start, applies)
+OK   want=block   got=block   | reviewer FRONT-2 (start, applies)
+OK   want=block   got=block   | pair: applies, middle
+OK   want=block   got=block   | pair: maintains, start
+OK   want=block   got=block   | pair: maintains, middle
+OK   want=block   got=block   | pair: "observar-se-ão", start
+OK   want=block   got=block   | pair: "observar-se-ão", middle
+OK   want=block   got=block   | ambiguous main clause (no constitutive verb) → no promotion
+OK   want=promote got=promote | pair: authorizes, start
+OK   want=promote got=promote | pair: authorizes, middle
+OK   want=promote got=promote | pair: approves, start
+OK   want=promote got=promote | pair: approves, middle
+OK   want=promote got=promote | pair: institutes, start
+OK   want=block   got=block   | abbreviation pair Portaria Conjunta (full)
+OK   want=block   got=block   | abbreviation pair Portaria Conjunta (abbr)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Interpretativo (full)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Interpretativo (abbr)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Executivo (full)
+OK   want=block   got=block   | abbreviation pair Ato Declaratório Executivo (abbr)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (full)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (abbr)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (Instr. Norm.) (full)
+OK   want=block   got=block   | abbreviation pair Instrução Normativa (Instr. Norm.) (abbr)
+OK   want=block   got=block   | abbreviation pair Resolução Conjunta (full)
+OK   want=block   got=block   | abbreviation pair Resolução Conjunta (abbr)
+OK   want=block   got=block   | abbreviation pair Decreto Legislativo (full)
+OK   want=block   got=block   | abbreviation pair Decreto Legislativo (abbr)
+OK   want=block   got=block   | abbreviation pair Portaria Interministerial (full)
+OK   want=block   got=block   | abbreviation pair Portaria Interministerial (abbr)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (Sol. Cons.) (full)
+OK   want=block   got=block   | abbreviation pair Solução de Consulta (Sol. Cons.) (abbr)
+OK   want=promote got=promote | real sentence end: ends after a number
+OK   want=promote got=promote | real sentence end: ends after a year
+OK   want=promote got=promote | real sentence end: ends after a lowercase word
+OK   want=promote got=promote | real sentence end: ";" still a boundary
+FAIL want=block   got=promote | reviewer CST-1 (start, "nela previstas")
+FAIL want=block   got=promote | reviewer CST-2 (middle, "nela previstas")
+FAIL want=block   got=promote | reviewer CST-3 (middle, "dela constantes")
+FAIL want=block   got=promote | start, "dela constantes"
+FAIL want=block   got=promote | start, explicit "previstos na referida"
+FAIL want=block   got=promote | middle, explicit "constantes da mesma"
+FAIL want=block   got=promote | start, "neles previstos"
+FAIL want=block   got=promote | accessory "observada" + resumption
+OK   want=promote got=promote | own content, start
+OK   want=promote got=promote | own content, middle
+OK   want=promote got=promote | own content, authorization
+OK   want=promote got=promote | "deste ato" is the act itself
+OK   want=promote got=promote | ADE Cofis real shape
+OK   want=block   got=block   | abbreviation pair port. conj. (lower) (full)
+FAIL want=block   got=promote | abbreviation pair port. conj. (lower) (abbr)
+OK   want=block   got=block   | abbreviation pair instr. norm. (lower) (full)
+FAIL want=block   got=promote | abbreviation pair instr. norm. (lower) (abbr)
+OK   want=block   got=block   | abbreviation pair ato decl. interpr. (lower) (full)
+FAIL want=block   got=promote | abbreviation pair ato decl. interpr. (lower) (abbr)
+OK   want=block   got=block   | abbreviation pair PORT. CONJ. (upper) (full)
+OK   want=block   got=block   | abbreviation pair PORT. CONJ. (upper) (abbr)
+OK   want=block   got=block   | abbreviation pair INSTR. NORM. (upper) (full)
+OK   want=block   got=block   | abbreviation pair INSTR. NORM. (upper) (abbr)
+OK   want=block   got=block   | abbreviation pair ATO DECL. INTERPR. (upper) (full)
+OK   want=block   got=block   | abbreviation pair ATO DECL. INTERPR. (upper) (abbr)
+OK   want=block   got=block   | abbreviation pair Port. conj. (mixed) (full)
+FAIL want=block   got=promote | abbreviation pair Port. conj. (mixed) (abbr)
+OK   want=block   got=block   | abbreviation pair Instr. norm. (mixed) (full)
+FAIL want=block   got=promote | abbreviation pair Instr. norm. (mixed) (abbr)
+OK   want=block   got=block   | abbreviation pair Ato decl. Interpr. (mixed) (full)
+FAIL want=block   got=promote | abbreviation pair Ato decl. Interpr. (mixed) (abbr)
+OK   want=promote got=promote | real sentence end: lower abbreviation, sentence ends after the number
+OK   want=promote got=promote | real sentence end: lower abbreviation, sentence ends after the year
+OK   want=promote got=promote | real sentence end: lower abbreviation, ";"
+OK   want=promote got=promote | real sentence end: lower abbreviation, ":"
+FAIL want=block   got=promote | reviewer MRG-1 (after "RFB.")
+FAIL want=block   got=promote | after a lower abbreviation
+FAIL want=block   got=promote | "Nos termos" after "Cosit."

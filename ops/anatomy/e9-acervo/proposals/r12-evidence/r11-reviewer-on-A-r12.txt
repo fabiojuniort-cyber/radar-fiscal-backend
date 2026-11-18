@@ -1,0 +1,22 @@
+ok N/N DIV-1 sigla SRF. + ali previstas
+ok N/N DIV-2 sigla IN. + lá previstas
+ok N/N DIV-3 nº 2.121 da RFB. + nela previstas
+ok N/N DIV-4 abertura Estes
+ok N/N DIV-5 abertura Estas
+ok N/N DIV-6 abertura Os demais
+ok N/N DIV-7 abertura Ditas
+ok N/N DIV-8 sobredita norma
+ok P/P DIV-9 neste diploma (próprio, falso negativo)
+ok N/N PONTO de 2000. + ali previstas
+ok N/N PONTO de 1997. + nela previstas
+ok N/N FIX Referidas (abertura)
+ok N/N FIX Essas (abertura)
+ok N/N FIX Tais (abertura)
+ok N/N FIX Aquelas (abertura)
+ok N/N FIX aludido
+ok N/N FIX anteriormente indicada
+ok P/P FIX desta IN (próprio)
+ok P/P FIX da presente IN (próprio)
+ok P/P FIX nesta data (próprio)
+ok P/P FIX D.O.U. (fronteira)
+divergências 0 / 21
