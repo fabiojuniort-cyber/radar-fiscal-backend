@@ -1,0 +1,63 @@
+{
+  "id": "148693",
+  "act": "Portaria 635/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148693/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148693/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148693/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+  "bytes": 73686,
+  "consultedAt": "2026-11-10T15:19:36.122Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Portaria, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 148693,
+    "epigrafe": "Portaria RFB nº 635, de 31 de dezembro de 2025",
+    "numeroAto": "635",
+    "dataAto": "2025-12-31",
+    "dataPublicacao": "2025-12-31",
+    "dadosPublicacao": "Publicado(a) no DOU de 31/12/2025, seção 1-A, página 3",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "6d119f8ac43e8b68db10b9b0cc3563a5f578ed98c4e5c26a8c1a21380ce4c113",
+    "htmlSha256": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+    "pieces": 122,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/55",
+        "order": 57,
+        "chars": 347
+      },
+      {
+        "pointer": "/outrosSegmentos/72",
+        "order": 74,
+        "chars": 58
+      }
+    ],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Portaria",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "medio",
+    "measuredChars": 20829,
+    "size": "médio"
+  }
+}

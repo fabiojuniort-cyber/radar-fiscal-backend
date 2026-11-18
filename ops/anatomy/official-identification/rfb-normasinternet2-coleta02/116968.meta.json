@@ -1,0 +1,901 @@
+{
+  "id": "116968",
+  "act": "IN RFB 2.021/2021 (contribuições previdenciárias)",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/116968/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/116968/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/116968/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "4ca8d1d3179f32301ebaa34cc7f6eaa9936a0d20df7b44e1ead5d0b828664e78",
+  "bytes": 787461,
+  "consultedAt": "2026-11-05T18:21:59.274Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "COLETA-02 item 2 (L20): 20 segmentos tipo 999 que começam com aspas",
+  "identification": {
+    "idAto": 116968,
+    "epigrafe": "Instrução Normativa RFB nº 2021, de 16 de abril de 2021",
+    "numeroAto": "2021",
+    "dataAto": "2021-04-16",
+    "dataPublicacao": "2021-04-20",
+    "dadosPublicacao": "Publicado(a) no DOU de 20/04/2021, seção 1, página 31",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "6a7ac16387f10d9fa10cc9d58b4d9e9600d9b8539bf5e8894ad7c1667a16a45f",
+    "htmlSha256": "527306ca00e6b6e3da77e96cf0b9f3479499376ccf44a26a7218adb28d0979d3",
+    "pieces": 824,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/0",
+        "order": 2,
+        "chars": 1425
+      },
+      {
+        "pointer": "/outrosSegmentos/17",
+        "order": 19,
+        "chars": 318
+      },
+      {
+        "pointer": "/outrosSegmentos/74",
+        "order": 76,
+        "chars": 343
+      },
+      {
+        "pointer": "/outrosSegmentos/77",
+        "order": 79,
+        "chars": 697
+      },
+      {
+        "pointer": "/outrosSegmentos/81",
+        "order": 83,
+        "chars": 262
+      },
+      {
+        "pointer": "/outrosSegmentos/113",
+        "order": 115,
+        "chars": 531
+      },
+      {
+        "pointer": "/outrosSegmentos/116",
+        "order": 118,
+        "chars": 265
+      },
+      {
+        "pointer": "/outrosSegmentos/119",
+        "order": 121,
+        "chars": 608
+      },
+      {
+        "pointer": "/outrosSegmentos/122",
+        "order": 124,
+        "chars": 474
+      },
+      {
+        "pointer": "/outrosSegmentos/143",
+        "order": 145,
+        "chars": 450
+      },
+      {
+        "pointer": "/outrosSegmentos/146",
+        "order": 148,
+        "chars": 408
+      },
+      {
+        "pointer": "/outrosSegmentos/148",
+        "order": 150,
+        "chars": 492
+      },
+      {
+        "pointer": "/outrosSegmentos/151",
+        "order": 153,
+        "chars": 483
+      },
+      {
+        "pointer": "/outrosSegmentos/153",
+        "order": 155,
+        "chars": 392
+      },
+      {
+        "pointer": "/outrosSegmentos/166",
+        "order": 168,
+        "chars": 400
+      },
+      {
+        "pointer": "/outrosSegmentos/169",
+        "order": 171,
+        "chars": 739
+      },
+      {
+        "pointer": "/outrosSegmentos/172",
+        "order": 174,
+        "chars": 719
+      },
+      {
+        "pointer": "/outrosSegmentos/215",
+        "order": 217,
+        "chars": 216
+      },
+      {
+        "pointer": "/outrosSegmentos/217",
+        "order": 219,
+        "chars": 210
+      },
+      {
+        "pointer": "/outrosSegmentos/222",
+        "order": 224,
+        "chars": 467
+      },
+      {
+        "pointer": "/outrosSegmentos/290",
+        "order": 292,
+        "chars": 447
+      },
+      {
+        "pointer": "/outrosSegmentos/393",
+        "order": 395,
+        "chars": 220
+      },
+      {
+        "pointer": "/outrosSegmentos/447",
+        "order": 449,
+        "chars": 227
+      },
+      {
+        "pointer": "/outrosSegmentos/488",
+        "order": 490,
+        "chars": 511
+      },
+      {
+        "pointer": "/outrosSegmentos/569",
+        "order": 571,
+        "chars": 248
+      },
+      {
+        "pointer": "/outrosSegmentos/581",
+        "order": 583,
+        "chars": 553
+      },
+      {
+        "pointer": "/outrosSegmentos/636",
+        "order": 638,
+        "chars": 376
+      },
+      {
+        "pointer": "/outrosSegmentos/647",
+        "order": 649,
+        "chars": 403
+      },
+      {
+        "pointer": "/outrosSegmentos/653",
+        "order": 655,
+        "chars": 263
+      },
+      {
+        "pointer": "/outrosSegmentos/659",
+        "order": 661,
+        "chars": 281
+      },
+      {
+        "pointer": "/outrosSegmentos/666",
+        "order": 668,
+        "chars": 317
+      },
+      {
+        "pointer": "/outrosSegmentos/675",
+        "order": 677,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/676",
+        "order": 678,
+        "chars": 95
+      },
+      {
+        "pointer": "/outrosSegmentos/677",
+        "order": 679,
+        "chars": 194
+      },
+      {
+        "pointer": "/outrosSegmentos/678",
+        "order": 680,
+        "chars": 175
+      },
+      {
+        "pointer": "/outrosSegmentos/679",
+        "order": 681,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/680",
+        "order": 682,
+        "chars": 145
+      },
+      {
+        "pointer": "/outrosSegmentos/681",
+        "order": 683,
+        "chars": 94
+      },
+      {
+        "pointer": "/outrosSegmentos/682",
+        "order": 684,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/683",
+        "order": 685,
+        "chars": 330
+      },
+      {
+        "pointer": "/outrosSegmentos/684",
+        "order": 686,
+        "chars": 95
+      },
+      {
+        "pointer": "/outrosSegmentos/685",
+        "order": 687,
+        "chars": 94
+      },
+      {
+        "pointer": "/outrosSegmentos/686",
+        "order": 688,
+        "chars": 403
+      },
+      {
+        "pointer": "/outrosSegmentos/687",
+        "order": 689,
+        "chars": 366
+      },
+      {
+        "pointer": "/outrosSegmentos/688",
+        "order": 690,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/689",
+        "order": 691,
+        "chars": 504
+      },
+      {
+        "pointer": "/outrosSegmentos/690",
+        "order": 692,
+        "chars": 480
+      },
+      {
+        "pointer": "/outrosSegmentos/691",
+        "order": 693,
+        "chars": 297
+      },
+      {
+        "pointer": "/outrosSegmentos/692",
+        "order": 694,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/693",
+        "order": 695,
+        "chars": 838
+      },
+      {
+        "pointer": "/outrosSegmentos/694",
+        "order": 696,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/695",
+        "order": 697,
+        "chars": 97
+      },
+      {
+        "pointer": "/outrosSegmentos/696",
+        "order": 698,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/697",
+        "order": 699,
+        "chars": 319
+      },
+      {
+        "pointer": "/outrosSegmentos/698",
+        "order": 700,
+        "chars": 98
+      },
+      {
+        "pointer": "/outrosSegmentos/699",
+        "order": 701,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/700",
+        "order": 702,
+        "chars": 423
+      },
+      {
+        "pointer": "/outrosSegmentos/701",
+        "order": 703,
+        "chars": 361
+      },
+      {
+        "pointer": "/outrosSegmentos/702",
+        "order": 704,
+        "chars": 97
+      },
+      {
+        "pointer": "/outrosSegmentos/703",
+        "order": 705,
+        "chars": 319
+      },
+      {
+        "pointer": "/outrosSegmentos/704",
+        "order": 706,
+        "chars": 95
+      },
+      {
+        "pointer": "/outrosSegmentos/705",
+        "order": 707,
+        "chars": 101
+      },
+      {
+        "pointer": "/outrosSegmentos/706",
+        "order": 708,
+        "chars": 51
+      },
+      {
+        "pointer": "/outrosSegmentos/707",
+        "order": 709,
+        "chars": 97
+      },
+      {
+        "pointer": "/outrosSegmentos/708",
+        "order": 710,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/709",
+        "order": 711,
+        "chars": 101
+      },
+      {
+        "pointer": "/outrosSegmentos/710",
+        "order": 712,
+        "chars": 230
+      },
+      {
+        "pointer": "/outrosSegmentos/711",
+        "order": 713,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/712",
+        "order": 714,
+        "chars": 101
+      },
+      {
+        "pointer": "/outrosSegmentos/713",
+        "order": 715,
+        "chars": 484
+      },
+      {
+        "pointer": "/outrosSegmentos/714",
+        "order": 716,
+        "chars": 468
+      },
+      {
+        "pointer": "/outrosSegmentos/715",
+        "order": 717,
+        "chars": 116
+      },
+      {
+        "pointer": "/outrosSegmentos/716",
+        "order": 718,
+        "chars": 47
+      },
+      {
+        "pointer": "/outrosSegmentos/717",
+        "order": 719,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/718",
+        "order": 720,
+        "chars": 142
+      },
+      {
+        "pointer": "/outrosSegmentos/719",
+        "order": 721,
+        "chars": 137
+      },
+      {
+        "pointer": "/outrosSegmentos/720",
+        "order": 722,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/721",
+        "order": 723,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/722",
+        "order": 724,
+        "chars": 254
+      },
+      {
+        "pointer": "/outrosSegmentos/723",
+        "order": 725,
+        "chars": 97
+      },
+      {
+        "pointer": "/outrosSegmentos/724",
+        "order": 726,
+        "chars": 97
+      },
+      {
+        "pointer": "/outrosSegmentos/725",
+        "order": 727,
+        "chars": 101
+      },
+      {
+        "pointer": "/outrosSegmentos/726",
+        "order": 728,
+        "chars": 128
+      },
+      {
+        "pointer": "/outrosSegmentos/727",
+        "order": 729,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/728",
+        "order": 730,
+        "chars": 100
+      },
+      {
+        "pointer": "/outrosSegmentos/729",
+        "order": 731,
+        "chars": 191
+      },
+      {
+        "pointer": "/outrosSegmentos/730",
+        "order": 732,
+        "chars": 395
+      },
+      {
+        "pointer": "/outrosSegmentos/731",
+        "order": 733,
+        "chars": 350
+      },
+      {
+        "pointer": "/outrosSegmentos/732",
+        "order": 734,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/733",
+        "order": 735,
+        "chars": 103
+      },
+      {
+        "pointer": "/outrosSegmentos/734",
+        "order": 736,
+        "chars": 81
+      },
+      {
+        "pointer": "/outrosSegmentos/735",
+        "order": 737,
+        "chars": 115
+      },
+      {
+        "pointer": "/outrosSegmentos/736",
+        "order": 738,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/737",
+        "order": 739,
+        "chars": 103
+      },
+      {
+        "pointer": "/outrosSegmentos/738",
+        "order": 740,
+        "chars": 148
+      },
+      {
+        "pointer": "/outrosSegmentos/739",
+        "order": 741,
+        "chars": 99
+      },
+      {
+        "pointer": "/outrosSegmentos/740",
+        "order": 742,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/741",
+        "order": 743,
+        "chars": 321
+      },
+      {
+        "pointer": "/outrosSegmentos/742",
+        "order": 744,
+        "chars": 98
+      },
+      {
+        "pointer": "/outrosSegmentos/743",
+        "order": 745,
+        "chars": 159
+      },
+      {
+        "pointer": "/outrosSegmentos/744",
+        "order": 746,
+        "chars": 314
+      },
+      {
+        "pointer": "/outrosSegmentos/745",
+        "order": 747,
+        "chars": 173
+      },
+      {
+        "pointer": "/outrosSegmentos/746",
+        "order": 748,
+        "chars": 102
+      },
+      {
+        "pointer": "/outrosSegmentos/747",
+        "order": 749,
+        "chars": 134
+      },
+      {
+        "pointer": "/outrosSegmentos/748",
+        "order": 750,
+        "chars": 132
+      },
+      {
+        "pointer": "/outrosSegmentos/749",
+        "order": 751,
+        "chars": 73
+      },
+      {
+        "pointer": "/outrosSegmentos/765",
+        "order": 767,
+        "chars": 95
+      },
+      {
+        "pointer": "/outrosSegmentos/767",
+        "order": 771,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/768",
+        "order": 772,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/770",
+        "order": 776,
+        "chars": 120
+      },
+      {
+        "pointer": "/outrosSegmentos/772",
+        "order": 779,
+        "chars": 9
+      },
+      {
+        "pointer": "/outrosSegmentos/773",
+        "order": 780,
+        "chars": 9
+      },
+      {
+        "pointer": "/outrosSegmentos/775",
+        "order": 784,
+        "chars": 119
+      },
+      {
+        "pointer": "/outrosSegmentos/777",
+        "order": 787,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/778",
+        "order": 788,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/780",
+        "order": 792,
+        "chars": 118
+      },
+      {
+        "pointer": "/outrosSegmentos/782",
+        "order": 795,
+        "chars": 7
+      },
+      {
+        "pointer": "/outrosSegmentos/783",
+        "order": 796,
+        "chars": 7
+      },
+      {
+        "pointer": "/outrosSegmentos/785",
+        "order": 800,
+        "chars": 95
+      },
+      {
+        "pointer": "/outrosSegmentos/787",
+        "order": 803,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/788",
+        "order": 804,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/790",
+        "order": 808,
+        "chars": 96
+      },
+      {
+        "pointer": "/outrosSegmentos/792",
+        "order": 811,
+        "chars": 9
+      },
+      {
+        "pointer": "/outrosSegmentos/793",
+        "order": 812,
+        "chars": 9
+      },
+      {
+        "pointer": "/outrosSegmentos/795",
+        "order": 816,
+        "chars": 121
+      },
+      {
+        "pointer": "/outrosSegmentos/797",
+        "order": 819,
+        "chars": 10
+      },
+      {
+        "pointer": "/outrosSegmentos/798",
+        "order": 820,
+        "chars": 10
+      },
+      {
+        "pointer": "/outrosSegmentos/800",
+        "order": 824,
+        "chars": 119
+      },
+      {
+        "pointer": "/outrosSegmentos/802",
+        "order": 827,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/803",
+        "order": 828,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/805",
+        "order": 832,
+        "chars": 118
+      },
+      {
+        "pointer": "/outrosSegmentos/807",
+        "order": 835,
+        "chars": 7
+      },
+      {
+        "pointer": "/outrosSegmentos/808",
+        "order": 836,
+        "chars": 7
+      },
+      {
+        "pointer": "/outrosSegmentos/810",
+        "order": 840,
+        "chars": 95
+      },
+      {
+        "pointer": "/outrosSegmentos/812",
+        "order": 843,
+        "chars": 8
+      },
+      {
+        "pointer": "/outrosSegmentos/813",
+        "order": 844,
+        "chars": 8
+      }
+    ],
+    "attachments": [
+      {
+        "id": "60568",
+        "name": "Anexo I.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60589",
+        "name": "Anexo II.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84657",
+        "name": "Anexo II.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84658",
+        "name": "Anexo II .pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60590",
+        "name": "Anexo III.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84659",
+        "name": "Anexo III.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84660",
+        "name": "Anexo III.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60591",
+        "name": "Anexo IV.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84661",
+        "name": "Anexo IV.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84662",
+        "name": "Anexo IV.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60592",
+        "name": "Anexo V.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84663",
+        "name": "Anexo V.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84664",
+        "name": "Anexo V.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60622",
+        "name": "Anexo VI.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84665",
+        "name": "Anexo VI.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84666",
+        "name": "Anexo VI.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60594",
+        "name": "Anexo VII.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84667",
+        "name": "Anexo VII.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84668",
+        "name": "Anexo VII .pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60595",
+        "name": "Anexo VIII.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84669",
+        "name": "Anexo VIII.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84670",
+        "name": "Anexo VIII .pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60596",
+        "name": "Anexo IX.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84671",
+        "name": "Anexo IX.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84672",
+        "name": "Anexo IX.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60597",
+        "name": "Anexo X.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84673",
+        "name": "Anexo X.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84674",
+        "name": "Anexo X.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "60598",
+        "name": "Anexo XI.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84675",
+        "name": "Anexo XI.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "84676",
+        "name": "Anexo XI.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "61174",
+        "name": "Anexo XII.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "61175",
+        "name": "Anexo XIII.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "61177",
+        "name": "Anexo XIV.pdf",
+        "status": "missing"
+      },
+      {
+        "id": "61178",
+        "name": "Anexo XV.pdf",
+        "status": "missing"
+      }
+    ],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (COLETA-02)",
+  "promoted": false
+}

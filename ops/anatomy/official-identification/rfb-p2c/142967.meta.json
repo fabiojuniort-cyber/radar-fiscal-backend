@@ -1,0 +1,51 @@
+{
+  "id": "142967",
+  "act": "Portaria 514/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+  "bytes": 24241,
+  "consultedAt": "2026-11-07T04:06:47.935Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c (Portaria)",
+  "identification": {
+    "idAto": 142967,
+    "epigrafe": "Portaria RFB nº 514, de 21 de fevereiro de 2025",
+    "numeroAto": "514",
+    "dataAto": "2025-02-21",
+    "dataPublicacao": "2025-02-24",
+    "dadosPublicacao": "Publicado(a) no DOU de 24/02/2025, seção 1, página 24",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "1711b9d95bcb8a8d531bdc421a2a43069f6c6c88bafa8adff4eab32ee1eff24a",
+    "htmlSha256": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
+    "pieces": 25,
+    "missingSegments": [],
+    "struckSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c)",
+  "promoted": false,
+  "p2c": {
+    "type": "Portaria",
+    "termo": "Portaria RFB",
+    "searchFile": "search-portaria.json",
+    "measuredChars": 4699,
+    "size": "pequeno"
+  }
+}

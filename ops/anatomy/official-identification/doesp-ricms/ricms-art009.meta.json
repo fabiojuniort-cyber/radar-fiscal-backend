@@ -1,0 +1,22 @@
+{
+  "id": "ricms-art009",
+  "act": "RICMS/2000 (Decreto 45.490/2000), art. 9º",
+  "url": "https://legislacao.fazenda.sp.gov.br/Paginas/art009.aspx",
+  "finalUrl": "https://legislacao.fazenda.sp.gov.br/Paginas/art009.aspx",
+  "hops": [
+    "https://legislacao.fazenda.sp.gov.br/Paginas/art009.aspx"
+  ],
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "lastModified": "Thu, 05 Nov 2026 18:22:00 GMT",
+  "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+  "bytes": 154921,
+  "consultedAt": "2026-11-05T18:22:01.884Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "html",
+  "verified": false,
+  "reason": "COLETA-02 item 6 (L21/regressão L14–L17): artigo sem escolha dirigida",
+  "origin": "automated fetch via consultOfficial (COLETA-02)",
+  "promoted": false
+}
