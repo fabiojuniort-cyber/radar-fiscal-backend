@@ -249,6 +249,74 @@
         "sem merge nem produção: dependem do gate posterior do COORD"
       ],
       "revalidates": "rfb:148693 @ 0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194 (registro de 2026-11-11, preservado)"
+    },
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula IN pequeno",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula IN pequeno",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas (o preparo omite /outrosSegmentos/104, segmento tachado com textoIntegra vazio: sem conteúdo perdido)",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula IN grande",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula Portaria pequeno",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
     }
   ]
 }
