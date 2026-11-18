@@ -360,14 +360,15 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "RFB",
       "diagnostic": null,
       "outputHash": "fce0294f4abc8963d1a88e7000d7bddb81d42d5ca32b1573a366f77b005187bb",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
-        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
+        "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
+        "docs/anatomy/e9-acceptances.json"
       ],
       "notes": [],
       "readingComplete": true
@@ -982,7 +983,7 @@
       ],
       "complete": true,
       "partialSamples": [],
-      "accepted": false,
+      "accepted": true,
       "unvalidatedSamples": []
     },
     {

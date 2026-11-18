@@ -231,6 +231,24 @@
         "sem merge: #303 herda o #285 (NÃO MERGEAR)",
         "CI verify do HEAD vermelho por compatibilidade pg_dump/PG16 (#310), não pela anatomia"
       ]
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, gate de composição)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'Candidato final de composição' após o parecer independente c.6965245285 (A r13 PASS); revalidação append-only do registro de 2026-11-11 no motor da composição #303 + #300 + A r13 + B r7; equivalência formal docs/anatomy/e9-evidence/portaria635-equivalence-0e009431-to-4b96f977.json (sha256 dda4a66ce6529d951f6c7af3c77f23eaf5909d296e4014896458ee62e8cc2658): bytes a98ade77… e HTML iguais, 136/136 partes, differingFields vazio, identidade difere só em engineHash, outputHash neutralizado igual",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "sem merge nem produção: dependem do gate posterior do COORD"
+      ],
+      "revalidates": "rfb:148693 @ 0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194 (registro de 2026-11-11, preservado)"
     }
   ]
 }

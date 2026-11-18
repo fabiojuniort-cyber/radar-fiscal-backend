@@ -253,10 +253,15 @@ test('E9 acceptance B3: partial readings, absent material annexes and a body in 
 
 test('E9 acceptance B4: the committed file is the append-only union with #305/#309 and accepts only the Portaria here', async () => {
   const { m, E, readFileSync } = await accTest();
-  const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string }[] };
-  assert.equal(file.acceptances.length, 13, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + 1 Portaria');
+  const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
+  // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
+  // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
+  assert.equal(file.acceptances.length, 14, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + Portaria @ 0e009431 preserved + Portaria revalidated');
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
-  assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: E });
+  assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio',
+    entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae', engineBuildHash: '0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194' }, 'the original record is untouched');
+  assert.deepEqual(file.acceptances[13], { ...file.acceptances[13], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: E }, 'the revalidation pins the current engine');
+  assert.match(file.acceptances[13].revalidates ?? '', /^rfb:148693 @ 0e009431/u);
   const real = m.collectSamples();
   assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693']);
   assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id), ['rfb--portaria--medio']);
