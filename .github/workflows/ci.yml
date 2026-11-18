@@ -130,6 +130,27 @@ jobs:
       - name: Publication NCM detector unit tests
         run: npx tsx --test test/publication-ncm.detector.unit.test.ts
 
+      # The DOE-SP rebuild tests pipe `pg_dump --schema-only` into `psql -v ON_ERROR_STOP=1`.
+      # The runner's default client can be newer than the service (ubuntu-26.04 ships PG 17+,
+      # whose dumps emit `SET transaction_timeout`, unknown to PG16), so use the client of
+      # the service major. Keep PG_MAJOR in sync with the `postgres:` service image above.
+      - name: PostgreSQL client matching the service major (pg_dump/psql)
+        if: steps.ci-plan.outputs.full_regression == 'true'
+        env:
+          PG_MAJOR: '16'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}"
+          echo "/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_PATH"
+          server=$(PGPASSWORD=postgres "/usr/lib/postgresql/${PG_MAJOR}/bin/psql" -h localhost -U postgres -d radar_fiscal_test -XAtc 'SHOW server_version_num')
+          client=$("/usr/lib/postgresql/${PG_MAJOR}/bin/pg_dump" --version)
+          echo "server_version_num=${server} client=${client}"
+          test "${server:0:2}" = "${PG_MAJOR}"
+          case "$client" in *" ${PG_MAJOR}."*) ;; *) echo "pg_dump major is not ${PG_MAJOR}" >&2; exit 1;; esac
+
       - name: Prepare PostgreSQL test database
         if: steps.ci-plan.outputs.full_regression == 'true'
         run: npm run db:prepare

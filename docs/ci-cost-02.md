@@ -46,3 +46,7 @@ A lista não relacionada contém arquivos de `src/`, `test/`, `docs/`, README, A
 O diff usa SHAs validados, `git fetch` limitado e `git diff --no-renames --name-only -z base head`. Exclusões e ambos os lados de renames permanecem visíveis. Falha, timeout, diff vazio ou inválido selecionam PG18. Erros capturados de git não expõem URLs/credenciais nos logs.
 
 O job PG18 depende de `verify` verde, evitando gastar um segundo runner quando o gate principal falha. Roteamento fica no runner já existente.
+
+### Cliente PostgreSQL do `verify`
+
+Na regressão completa, o `verify` instala `postgresql-client-16` do PGDG e coloca `/usr/lib/postgresql/16/bin` no PATH antes do `db:prepare`, conferindo que servidor e `pg_dump` têm o mesmo major. Os testes DOE-SP de rebuild passam `pg_dump --schema-only` para `psql -v ON_ERROR_STOP=1`. O cliente padrão do `ubuntu-26.04` é PG 17+ e emite `SET transaction_timeout`, desconhecido pelo PG16. `PG_MAJOR` do passo deve acompanhar a imagem `postgres:` do serviço. Draft não executa o passo e não tem custo adicional.
