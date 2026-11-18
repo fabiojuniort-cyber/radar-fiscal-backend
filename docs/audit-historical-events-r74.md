@@ -10,7 +10,7 @@ Não há merge, deploy, backfill ou correção de dados autorizados por este PR.
 | --- | --- | --- |
 | MERGE_RFB_NORMAS_DOU_HISTORICAL / publication | [PR operacional #60, SHA 672204c](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/blob/672204c284ea408853852db7231649285e69793f/src/infrastructure/database/repair-rfb-normas-cross-source.ts) | before: douPublicationId, rfbPublicationId, douIdentityHash, rfbIdentityHash; after: publicationId, identityHash, rfbExternalId, douExternalId, origins |
 | TAXONOMY_CURATION_SECTOR_ALIASES_CLEARED / taxonomy_curation | [PR operacional #145, SHA 1a36d29](https://github.com/fabiojuniort-cyber/radar-fiscal-backend/blob/1a36d297180439018dce73c9c1e30f567c94bbc6/src/modules/taxonomy/curation/curation.clear-sector-aliases.ts) | after: removedSynonyms, rowsAffected; entity_id da release no cabeçalho |
-| TAXONOMY_DRAFT_ORPHAN_RELATIONS_REMOVED / taxonomy_release | Reparo inline TAX-12: [recibo Issue #90](https://github.com/fabiojuniort-cyber/tribusca-control/issues/90#issuecomment-6050516506) e estrutura real conferida em READ ONLY no PROD-1.1 | before SQL NULL; after: removedCount, removedRelationIds, preservedHistory; entity_id da release no cabeçalho |
+| TAXONOMY_DRAFT_ORPHAN_RELATIONS_REMOVED / taxonomy_release | Reparo inline TAX-12: [recibo Issue #90](https://github.com/fabiojuniort-cyber/tribusca-control/issues/90#issuecomment-6050516506) e estrutura real conferida em READ ONLY no PROD-1.1 | before: representação SQL NULL/JSON null não comprovada no diagnóstico histórico; after: removedCount, removedRelationIds, preservedHistory; entity_id da release no cabeçalho |
 
 Os dois PRs operacionais não foram incorporados à main. Não importar nem reativar
 seus escritores antigos, atores ou comandos. O reparo de relações foi executado
@@ -36,6 +36,49 @@ livre histórico esteja livre de dado privado; eles são tratados como não conf
 e removidos pela política aprovada, inclusive a antiga cópia de recuperação dos
 aliases. Contagens e IDs operacionais tipados permanecem. O backfill não altera
 as tabelas de taxonomia, publicações ou cadastro.
+
+## SQL NULL e JSON null: contrato e limite da evidência histórica
+
+O contrato do projetor `audit_project` distingue os dois valores: SQL NULL
+permanece SQL NULL; o valor JSON `null`, que não é objeto, é projetado para `{}`.
+Essa regra não prova qual representação estava no `before_data` do incidente
+histórico. O diagnóstico limitado descrito acima não comprovou essa distinção.
+
+A suíte `test/onb02-r74-historical-events.integration.test.ts` contém as duas
+fixtures sintéticas para o evento de remoção de relações. A primeira envia um
+parâmetro SQL NULL; a segunda envia o texto `null` convertido para JSONB. Como o
+driver retorna ambos como `null` em JavaScript, a suíte confere `IS NULL` e
+`jsonb_typeof` antes da projeção e no estado persistido após o lote sintético.
+Ela também exige projeção do contexto permitido, remoção dos canários privados,
+preservação dos cabeçalhos e registros de controle, rejeição de campos privados
+em escritas novas e repetição sem novos registros processados. Essa prova de
+contrato em banco descartável não é uma releitura do diagnóstico produtivo.
+
+## Identidade canônica e referência histórica de ator
+
+O inventário [audit-actors-r73.json](audit-actors-r73.json) enumera as identidades
+canônicas de sistema em `systemActors`; `writers` identifica seus escritores e
+os rótulos históricos reconhecidos em `previousIds`. Na migration 074,
+`audit_actor_reference` aceita UUID normalizado ou uma identidade canônica exata
+da lista fechada. Um prefixo de sistema, rótulo livre ou apelido histórico não
+autoriza uma nova escrita. O trigger aplica essa guarda nos INSERTs.
+
+`audit_historical_actor_reference` é uma função separada: reconhece somente o
+mapa fechado de rótulos antigos e o converte para a identidade canônica; também
+preserva as referências já aceitas pela guarda atual. Esse reconhecimento
+histórico não transforma um rótulo antigo em alias permitido para INSERT.
+Uma referência histórica não nula e não reconhecida é reduzida a SQL NULL e
+marcada por `actor_redacted=true` no contexto posterior projetado. O valor
+rejeitado não é copiado para payloads, mensagens, logs ou esta documentação.
+Referência originalmente SQL NULL permanece SQL NULL sem indicar, por si só,
+que houve redação de uma identidade não nula.
+
+O teste `test/onb02-r73-actors.unit.test.mjs` compara o inventário com a lista
+exata da guarda e com o mapa histórico da 074, verifica os blobs históricos
+imutáveis e procura escritores estáticos fora da lista em código, SQL,
+comandos e documentação. Isso não substitui a guarda no banco nem comprova
+escritores externos ou SQL dinâmico arbitrário. As migrations 074 e 075
+permanecem inalteradas neste complemento; não há novo formato de ator aceito.
 
 ## Migration 074: origem e conteúdo revisado
 
