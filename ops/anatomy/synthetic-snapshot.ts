@@ -17,7 +17,7 @@ export function structuralOutput() {
   });
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const body = JSON.stringify({ note: 'Engine output on synthetic documents without identity fields; generated on the pre-integration engine (P1.A HEAD 585f5a49).',
+  const body = JSON.stringify({ note: 'Engine output on synthetic documents without identity fields; generated on the pre-integration engine (P1.A HEAD 585f5a49); regenerated for ANAT-STRUCT-01, whose only delta is CONSIDERANDO typed as consideration instead of preamble (same context); regenerated for ANAT-STRUCT-02: caput parts added under articles/clauses (19, entities and eligibility unchanged), sibling orders shifted by them (11), one Parágrafo único reason paragraph_sole.',
     documents: structuralOutput() }, null, 1) + '\n';
   if (process.argv.includes('--write')) { writeFileSync(SNAPSHOT_PATH, body); console.log('synthetic equivalence snapshot written'); }
   else if (readFileSync(SNAPSHOT_PATH, 'utf8').replace(/\r\n/g, '\n') !== body) throw new Error('synthetic structural output differs from the frozen snapshot');

@@ -1,0 +1,516 @@
+{
+ "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
+ "input": {
+  "file": "ops/anatomy/official-identification/doesp-p2d/fdb81d5f-3876-468a-70bc-08de3f1ee1ea.json",
+  "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+  "bytes": 15000,
+  "expectedId": "fdb81d5f-3876-468a-70bc-08de3f1ee1ea"
+ },
+ "preparationVersion": "doe-sp-json/0.1.0-provisional",
+ "provisional": true,
+ "rawMarkup": {
+  "img": 0,
+  "strikeTags": 0,
+  "lineThroughStyle": 0,
+  "classAttributes": 9,
+  "styleAttributes": 21,
+  "svg": 0,
+  "scriptOrStyle": 1,
+  "tables": 0,
+  "spans": 0,
+  "bytes": 14105
+ },
+ "officialJson": {
+  "status": "partial",
+  "chars": 1527,
+  "textSha256": "355554c00dbb8c7570c18ea6615191c360d3f6cd3215aebf307b00b13f78084f",
+  "partTypes": {
+   "article": 3,
+   "caput": 3,
+   "document": 1,
+   "paragraph": 1,
+   "preamble": 1,
+   "unidentified": 4
+  },
+  "contexts": {
+   "operative_candidate": 8,
+   "prohibited": 1,
+   "unknown": 4
+  },
+  "limitations": {
+   "unidentified_content": 1
+  },
+  "unidentifiedChars": 228,
+  "invariantBreaks": []
+ },
+ "acervoEquivalent": {
+  "status": "partial",
+  "chars": 1515,
+  "textSha256": "fba87d3e87ff5a9b2e3e056f41e6e1d77dcce8ef133fba426d66710296e20180",
+  "partTypes": {
+   "article": 3,
+   "caput": 3,
+   "document": 1,
+   "paragraph": 1,
+   "preamble": 1,
+   "unidentified": 4
+  },
+  "contexts": {
+   "operative_candidate": 8,
+   "prohibited": 1,
+   "unknown": 4
+  },
+  "limitations": {
+   "unidentified_content": 1
+  },
+  "unidentifiedChars": 228,
+  "invariantBreaks": []
+ },
+ "differences": [
+  "chars",
+  "textSha256"
+ ],
+ "alignment": {
+  "contained": true,
+  "offset": 8,
+  "officialOnly": {
+   "before": "\"\\n\\n\\n\\n\\r\\n\\r\\n\"",
+   "beforeChars": 8,
+   "after": "\"\\r\\n\\n\\n\"",
+   "afterChars": 4
+  },
+  "acervoOnly": {
+   "chars": 0
+  },
+  "extrasWhitespaceOnly": true,
+  "unidentified": {
+   "official": [
+    {
+     "start": 8,
+     "end": 181,
+     "chars": 173,
+     "text": "\"Autoriza a outorga de uso do imóvel que especifica à Fundação Hospital Regional do Câncer da Santa Casa de Misericórdia de Presidente Prudente e dá providências correlatas.\\n\""
+    },
+    {
+     "start": 332,
+     "end": 341,
+     "chars": 9,
+     "text": "\"Decreta:\\n\""
+    },
+    {
+     "start": 1470,
+     "end": 1490,
+     "chars": 20,
+     "text": "\"TARCÍSIO DE FREITAS\\n\""
+    },
+    {
+     "start": 1494,
+     "end": 1520,
+     "chars": 26,
+     "text": "\"Arthur Luis Pinho de Lima\\n\""
+    }
+   ],
+   "acervo": [
+    {
+     "start": 0,
+     "end": 173,
+     "chars": 173,
+     "text": "\"Autoriza a outorga de uso do imóvel que especifica à Fundação Hospital Regional do Câncer da Santa Casa de Misericórdia de Presidente Prudente e dá providências correlatas.\\n\""
+    },
+    {
+     "start": 324,
+     "end": 333,
+     "chars": 9,
+     "text": "\"Decreta:\\n\""
+    },
+    {
+     "start": 1462,
+     "end": 1482,
+     "chars": 20,
+     "text": "\"TARCÍSIO DE FREITAS\\n\""
+    },
+    {
+     "start": 1486,
+     "end": 1512,
+     "chars": 26,
+     "text": "\"Arthur Luis Pinho de Lima\\n\""
+    }
+   ]
+  }
+ },
+ "partComparison": [
+  {
+   "index": 0,
+   "type": [
+    "document",
+    "document"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 0,
+    "end": 1527
+   },
+   "acervo": {
+    "start": 0,
+    "end": 1515
+   },
+   "acervoRemapped": {
+    "start": 8,
+    "end": 1523
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "inside after remap (edge whitespace)"
+  },
+  {
+   "index": 1,
+   "type": [
+    "unidentified",
+    "unidentified"
+   ],
+   "context": [
+    "unknown",
+    "unknown"
+   ],
+   "official": {
+    "start": 8,
+    "end": 181
+   },
+   "acervo": {
+    "start": 0,
+    "end": 173
+   },
+   "acervoRemapped": {
+    "start": 8,
+    "end": 181
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap",
+   "unidentifiedText": [
+    "\"Autoriza a outorga de uso do imóvel que especifica à Fundação Hospital Regional do Câncer da Santa Casa de Misericórdia de Presidente Prudente e dá providências correlatas.\\n\"",
+    "\"Autoriza a outorga de uso do imóvel que especifica à Fundação Hospital Regional do Câncer da Santa Casa de Misericórdia de Presidente Prudente e dá providências correlatas.\\n\""
+   ]
+  },
+  {
+   "index": 2,
+   "type": [
+    "preamble",
+    "preamble"
+   ],
+   "context": [
+    "prohibited",
+    "prohibited"
+   ],
+   "official": {
+    "start": 189,
+    "end": 324
+   },
+   "acervo": {
+    "start": 181,
+    "end": 316
+   },
+   "acervoRemapped": {
+    "start": 189,
+    "end": 324
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 3,
+   "type": [
+    "unidentified",
+    "unidentified"
+   ],
+   "context": [
+    "unknown",
+    "unknown"
+   ],
+   "official": {
+    "start": 332,
+    "end": 341
+   },
+   "acervo": {
+    "start": 324,
+    "end": 333
+   },
+   "acervoRemapped": {
+    "start": 332,
+    "end": 341
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap",
+   "unidentifiedText": [
+    "\"Decreta:\\n\"",
+    "\"Decreta:\\n\""
+   ]
+  },
+  {
+   "index": 4,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 349,
+    "end": 1109
+   },
+   "acervo": {
+    "start": 341,
+    "end": 1101
+   },
+   "acervoRemapped": {
+    "start": 349,
+    "end": 1109
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 5,
+   "type": [
+    "caput",
+    "caput"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 349,
+    "end": 967
+   },
+   "acervo": {
+    "start": 341,
+    "end": 959
+   },
+   "acervoRemapped": {
+    "start": 349,
+    "end": 967
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 6,
+   "type": [
+    "paragraph",
+    "paragraph"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 971,
+    "end": 1109
+   },
+   "acervo": {
+    "start": 963,
+    "end": 1101
+   },
+   "acervoRemapped": {
+    "start": 971,
+    "end": 1109
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 7,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 1109,
+    "end": 1384
+   },
+   "acervo": {
+    "start": 1101,
+    "end": 1376
+   },
+   "acervoRemapped": {
+    "start": 1109,
+    "end": 1384
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 8,
+   "type": [
+    "caput",
+    "caput"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 1109,
+    "end": 1376
+   },
+   "acervo": {
+    "start": 1101,
+    "end": 1368
+   },
+   "acervoRemapped": {
+    "start": 1109,
+    "end": 1376
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 9,
+   "type": [
+    "article",
+    "article"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 1384,
+    "end": 1527
+   },
+   "acervo": {
+    "start": 1376,
+    "end": 1515
+   },
+   "acervoRemapped": {
+    "start": 1384,
+    "end": 1523
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "inside after remap (edge whitespace)"
+  },
+  {
+   "index": 10,
+   "type": [
+    "caput",
+    "caput"
+   ],
+   "context": [
+    "operative_candidate",
+    "operative_candidate"
+   ],
+   "official": {
+    "start": 1384,
+    "end": 1520
+   },
+   "acervo": {
+    "start": 1376,
+    "end": 1512
+   },
+   "acervoRemapped": {
+    "start": 1384,
+    "end": 1520
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap"
+  },
+  {
+   "index": 11,
+   "type": [
+    "unidentified",
+    "unidentified"
+   ],
+   "context": [
+    "unknown",
+    "unknown"
+   ],
+   "official": {
+    "start": 1470,
+    "end": 1490
+   },
+   "acervo": {
+    "start": 1462,
+    "end": 1482
+   },
+   "acervoRemapped": {
+    "start": 1470,
+    "end": 1490
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap",
+   "unidentifiedText": [
+    "\"TARCÍSIO DE FREITAS\\n\"",
+    "\"TARCÍSIO DE FREITAS\\n\""
+   ]
+  },
+  {
+   "index": 12,
+   "type": [
+    "unidentified",
+    "unidentified"
+   ],
+   "context": [
+    "unknown",
+    "unknown"
+   ],
+   "official": {
+    "start": 1494,
+    "end": 1520
+   },
+   "acervo": {
+    "start": 1486,
+    "end": 1512
+   },
+   "acervoRemapped": {
+    "start": 1494,
+    "end": 1520
+   },
+   "sameType": true,
+   "sameContext": true,
+   "sameText": true,
+   "position": "equal after remap",
+   "unidentifiedText": [
+    "\"Arthur Luis Pinho de Lima\\n\"",
+    "\"Arthur Luis Pinho de Lima\\n\""
+   ]
+  }
+ ],
+ "verdicts": [
+  "POSITION_ONLY: same parts, types, contexts and text; positions differ only by the edge whitespace the official side has beyond the Acervo text",
+  "COMMON_LIMITATION (both readings): unidentified_content; 4 unidentified part(s), 228 chars official / 228 Acervo",
+  "TACHADO_NOT_TESTED: the official content has no <s>/<strike>/<del>/line-through"
+ ],
+ "verdict": "the Acervo representation loses what the reader uses for this sample"
+}

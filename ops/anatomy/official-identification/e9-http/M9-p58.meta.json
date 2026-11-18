@@ -1,0 +1,50 @@
+{
+  "item": "M9-p58",
+  "act": "IN RFB nº 2.237/2024 na página 58 do DOU",
+  "source": "DOU",
+  "type": "Página do jornal (cabeçalho e rodapé)",
+  "url": "https://pesquisa.in.gov.br/imprensa/servlet/INPDFViewer?captchafield=firstAccess&data=05%2F12%2F2024&jornal=515&pagina=58",
+  "retrievedAt": "2026-11-07T04:18:15.2471111Z",
+  "fileName": "M9-p58.pdf",
+  "sha256": "abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29",
+  "bytes": 188132,
+  "origin": "resposta HTTP da origem oficial, capturada em outra sessão e entregue por git",
+  "package": {
+    "repo": "fabiojuniort-cyber/tribusca-control",
+    "commit": "335160c7ea9f83b3687fb4ce4000448a354fe93e",
+    "branch": "evidence/e9-official-inputs-20261107",
+    "path": "docs/investigations/e9-inputs/20261107-night/official-access/M9-page58.pdf",
+    "zipSha256": "cce00c19cc68b2b8e9007d632e620bedfb1da6e51afd5f6cfb0114c62f8aed5f"
+  },
+  "manifestOrigin": "HTTP 200 application/pdf",
+  "manifestCoverage": "single DOU page 58 (continuation)",
+  "declaredCharset": null,
+  "readable": false,
+  "readableNote": null,
+  "representation": "pdf",
+  "identification": {
+    "pages": 1,
+    "header": "Seção 1 ISSN 1677-7042 Nº 234, quinta-feira, 5 de dezembro de 2024",
+    "footer": "http://www.in.gov.br/autenticidade.html, pelo código 05152024120500058 que institui a Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil.",
+    "footerCode": "05152024120500058",
+    "startsWith": "XV contribuições sociais destinadas, por",
+    "continuesFromPage57": true,
+    "articlesOnPage": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "signatureLine": 178,
+    "contentAfterSignature": 0
+  },
+  "reach": "página 58: continua o art. 8º (inciso XV) e vai ao art. 19 e à assinatura; depois da assinatura só o rodapé. Com a página 57: epígrafe → arts. 1–19 → assinatura, sem anexo mencionado. NÃO se presume ato completo: anexos publicados em outro lugar, ordem visual (colunas misturadas na extração) e assinatura criptográfica não foram verificados",
+  "promoted": false
+}

@@ -1,0 +1,46 @@
+{
+ "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
+ "input": {
+  "file": "ops/anatomy/official-identification/doesp-p2d/c8e20388-c832-42f4-e7b6-08de3bbdad7d.json",
+  "sha256": "e617b6a2ef837299b5b1c9c327ea76c3b91c5cc8f8b908fbfce1d78f8dbcacf3",
+  "bytes": 3563245,
+  "expectedId": "c8e20388-c832-42f4-e7b6-08de3bbdad7d"
+ },
+ "preparationVersion": "doe-sp-json/0.1.0-provisional",
+ "provisional": true,
+ "rawMarkup": {
+  "img": 0,
+  "strikeTags": 0,
+  "lineThroughStyle": 0,
+  "classAttributes": 413,
+  "styleAttributes": 13413,
+  "svg": 0,
+  "scriptOrStyle": 1,
+  "tables": 0,
+  "spans": 0,
+  "bytes": 3532766
+ },
+ "officialJson": {
+  "status": "partial",
+  "chars": 3532766,
+  "textSha256": "87dafe49cb9044f7bf80135d60d2ac9bb87a66ec2dd20e054706f6134f5de896",
+  "partTypes": {
+   "document": 1,
+   "unidentified": 1
+  },
+  "contexts": {
+   "unknown": 2
+  },
+  "limitations": {
+   "entity_extraction_failed": 1,
+   "input_size_limit": 1
+  },
+  "unidentifiedChars": 3532766,
+  "invariantBreaks": []
+ },
+ "acervoEquivalent": null,
+ "differences": [
+  "the Acervo keeps NO presentation for this act (empty or above the 2 MiB ceiling)"
+ ],
+ "verdict": "the Acervo representation loses what the reader uses for this sample"
+}
