@@ -1,0 +1,49 @@
+{
+  "grantId": "E9-P2d-G1",
+  "owner": "EXEC #304 (claude/anat-doesp-gate)",
+  "discovery": {
+    "date": "2025-12-19",
+    "debitedTo": "Decreto",
+    "journal": "ca96256b-6ca1-407f-866e-567ef9430123",
+    "section": "257b103f-1eb2-4f24-a170-4e553c7e4aac",
+    "listed": 702,
+    "malformed": 0
+  },
+  "stopAfter": 1,
+  "actsKept": 1,
+  "decisions": [
+    {
+      "type": "Decreto",
+      "listedOfType": 2,
+      "reserved": [],
+      "alreadyStored": [],
+      "eligible": 2,
+      "tried": [
+        {
+          "id": "c8e20388-c832-42f4-e7b6-08de3bbdad7d",
+          "chars": 3532766,
+          "size": "grande",
+          "outcome": "kept"
+        }
+      ],
+      "kept": {
+        "grande": "c8e20388-c832-42f4-e7b6-08de3bbdad7d"
+      },
+      "sizesNotFound": [
+        "pequeno",
+        "médio"
+      ],
+      "remainingForType": 1
+    },
+    {
+      "type": "Resolução",
+      "outcome": "not attempted: run stopped after 1 act(s) kept (stopAfter)"
+    },
+    {
+      "type": "Portaria CAT",
+      "outcome": "not attempted: run stopped after 1 act(s) kept (stopAfter)"
+    }
+  ],
+  "remainingTotal": 11,
+  "note": "per-attempt debit record = budget-state.json; a type or size not found in the day list is never read as nonexistent"
+}

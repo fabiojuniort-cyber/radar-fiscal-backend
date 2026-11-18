@@ -131,7 +131,8 @@ function extractCore(text: string, input: AnatomyEntityInput, rules: Rules, aux:
     return count;
   };
   const depths = new Map(input.parts.map(part => [part.id, depth(part)]));
-  const parts = [...input.parts].sort((a, b) => (a.span.end - a.span.start) - (b.span.end - b.span.start)
+  // ANAT-STRUCT-02: a caput is a structural view over its article's opening block; entities keep the article as owner.
+  const parts = input.parts.filter((part) => part.type !== 'caput').sort((a, b) => (a.span.end - a.span.start) - (b.span.end - b.span.start)
     || (depths.get(b.id)! - depths.get(a.id)!) || a.span.start - b.span.start || a.id.localeCompare(b.id, 'en'));
   const owner = (span: Span): AnatomyPart => {
     const part = parts.find((candidate) => candidate.span.start <= span.start && candidate.span.end >= span.end);

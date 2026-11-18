@@ -1,0 +1,74 @@
+{
+ "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
+ "input": {
+  "file": "ops/anatomy/official-identification/doesp-p2d/fdb81d5f-3876-468a-70bc-08de3f1ee1ea.json",
+  "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+  "bytes": 15000,
+  "expectedId": "fdb81d5f-3876-468a-70bc-08de3f1ee1ea"
+ },
+ "preparationVersion": "doe-sp-json/0.1.0-provisional",
+ "provisional": true,
+ "rawMarkup": {
+  "img": 0,
+  "strikeTags": 0,
+  "lineThroughStyle": 0,
+  "classAttributes": 9,
+  "styleAttributes": 21,
+  "svg": 0,
+  "scriptOrStyle": 1,
+  "tables": 0,
+  "spans": 0,
+  "bytes": 14105
+ },
+ "officialJson": {
+  "status": "partial",
+  "chars": 1527,
+  "textSha256": "355554c00dbb8c7570c18ea6615191c360d3f6cd3215aebf307b00b13f78084f",
+  "partTypes": {
+   "article": 3,
+   "caput": 3,
+   "document": 1,
+   "paragraph": 1,
+   "preamble": 1,
+   "unidentified": 4
+  },
+  "contexts": {
+   "operative_candidate": 8,
+   "prohibited": 1,
+   "unknown": 4
+  },
+  "limitations": {
+   "unidentified_content": 1
+  },
+  "unidentifiedChars": 228,
+  "invariantBreaks": []
+ },
+ "acervoEquivalent": {
+  "status": "partial",
+  "chars": 1515,
+  "textSha256": "fba87d3e87ff5a9b2e3e056f41e6e1d77dcce8ef133fba426d66710296e20180",
+  "partTypes": {
+   "article": 3,
+   "caput": 3,
+   "document": 1,
+   "paragraph": 1,
+   "preamble": 1,
+   "unidentified": 4
+  },
+  "contexts": {
+   "operative_candidate": 8,
+   "prohibited": 1,
+   "unknown": 4
+  },
+  "limitations": {
+   "unidentified_content": 1
+  },
+  "unidentifiedChars": 228,
+  "invariantBreaks": []
+ },
+ "differences": [
+  "chars",
+  "textSha256"
+ ],
+ "verdict": "the Acervo representation loses what the reader uses for this sample"
+}

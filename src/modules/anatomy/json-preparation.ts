@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
  * originals before any real canonical text is frozen. They never fetch, normalize or repair text.
  */
 export const DOE_SP_PREPARATION_VERSION = 'doe-sp-json/0.1.0-provisional' as const;
-export const RFB_PREPARATION_VERSION = 'rfb-api-original/0.1.0-provisional' as const;
+export const RFB_PREPARATION_VERSION = 'rfb-api-original/0.2.0-provisional' as const;
 
 /** Format hypotheses taken from the connectors, not from original captures. */
 export const JSON_PREPARATION_HYPOTHESES = Object.freeze({
@@ -39,6 +39,9 @@ export interface JsonPreparation {
   metadata: Record<string, string | number | null>;
   pieces: PreparedPiece[];
   missingSegments: { pointer: string; order: number; reason: 'omitted_by_source' | 'no_text' }[];
+  /** ANAT-D04: segment types declared by the source document's own `tiposSegmento` table, with their problems. */
+  segmentTypes?: { pointer: string; order: number; idTipoSegmento: number | null; sigla: string | null; tachado: boolean;
+    issue: 'type_missing' | 'type_unknown_in_document_table' | 'type_table_conflict' | null }[];
   attachments: AttachmentRef[];
   excluded: ExcludedField[];
   html: string;
@@ -120,9 +123,23 @@ export function prepareRfbRepresentation(input: JsonResource, expectedIdAto: num
     orders.add(o);
   }
   raw.sort((a, b) => (a.item.ordemSegmentoAto as number) - (b.item.ordemSegmentoAto as number));
+  // ANAT-D04: the type table comes from THIS document (tiposSegmento); numbers are never assumed universal.
+  const typeTable = new Map<number, string>(); const conflicting = new Set<number>();
+  if (Array.isArray(root.tiposSegmento)) for (const t of root.tiposSegmento) {
+    const tr = record(t); const tid = tr?.idTipoSegmento; const sig = str(tr?.siglaTipoSegmento);
+    if (typeof tid !== 'number' || !sig) continue;
+    if (typeTable.has(tid) && typeTable.get(tid) !== sig) conflicting.add(tid); else typeTable.set(tid, sig);
+  }
+  const segmentTypes: NonNullable<JsonPreparation['segmentTypes']> = [];
+  const escAttr = (v: string) => v.replace(/[&"<>]/gu, (c) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[c]!);
   let html = ''; const pieces: PreparedPiece[] = []; const missingSegments: JsonPreparation['missingSegments'] = []; const attachments: AttachmentRef[] = [];
   for (const { pointer, item } of raw) {
     const order = item.ordemSegmentoAto as number;
+    const tid = typeof item.idTipoSegmento === 'number' ? item.idTipoSegmento : null;
+    const issue = tid === null ? 'type_missing' as const : conflicting.has(tid) ? 'type_table_conflict' as const : !typeTable.has(tid) ? 'type_unknown_in_document_table' as const : null;
+    const sigla = issue ? null : typeTable.get(tid!)!;
+    const tachado = item.tachado === true;
+    segmentTypes.push({ pointer, order, idTipoSegmento: tid, sigla, tachado, issue });
     const file = record(item.arquivoBinario);
     if (file) {
       const fid = file.idArquivoBinario;
@@ -134,14 +151,14 @@ export function prepareRfbRepresentation(input: JsonResource, expectedIdAto: num
     const body = typeof item.textoIntegra === 'string' ? item.textoIntegra : '';
     if (!body.trim()) { if (!file) missingSegments.push({ pointer, order, reason: 'no_text' }); continue; }
     // A neutral wrapper keeps segments from fusing; it adds no characters.
-    html += `<section data-rfb-segment="${order}">`; const start = html.length; html += body; const end = html.length; html += '</section>';
+    html += `<section data-rfb-segment="${order}"${sigla ? ` data-rfb-type="${escAttr(sigla)}"` : ''}${issue ? ` data-rfb-type-issue="${issue}"` : ''}${tachado ? ' data-rfb-tachado="true"' : ''}>`; const start = html.length; html += body; const end = html.length; html += '</section>';
     pieces.push({ pointer: `${pointer}/textoIntegra`, sha256: sha(body), htmlSpan: { start, end } });
   }
   if (!pieces.length) throw new JsonPreparationError('no_readable_segment', 'RFB payload has no readable segment');
   const title = str(root.epigrafeCompleta);
   return finish({ preparationVersion: RFB_PREPARATION_VERSION, provisional: true, source: 'RFB', sourceId: String(idAto),
     resource: { resourceId: input.resourceId, sha256: sha(input.bytes), byteLength: input.bytes.byteLength, bomPresent },
-    metadata: { idAto }, pieces, missingSegments, attachments,
+    metadata: { idAto }, pieces, missingSegments, segmentTypes, attachments,
     excluded: title ? [{ pointer: '/epigrafeCompleta', sha256: sha(title), length: title.length, reason: 'metadata' }] : [], html });
 }
 

@@ -1,0 +1,31 @@
+{
+  "id": "fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+  "act": "DECRETO Nº 70.226, DE 19 DE DEZEMBRO DE 2025",
+  "url": "https://do-api-web-search.doe.sp.gov.br/v2/publications/fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+  "finalUrl": "https://do-api-web-search.doe.sp.gov.br/v2/publications/fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+  "hops": [
+    "https://do-api-web-search.doe.sp.gov.br/v2/publications/fdb81d5f-3876-468a-70bc-08de3f1ee1ea"
+  ],
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "lastModified": null,
+  "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+  "bytes": 15000,
+  "consultedAt": "2026-11-09T18:07:48.410Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-d direct diagnostic (Decreto, grant E9-P2d-G1)",
+  "origin": "automated fetch via consultOfficial (E9 P2-d DIRECT diagnostic, grant E9-P2d-G1)",
+  "promoted": false,
+  "p2d": {
+    "type": "Decreto",
+    "actKey": "decreto 70226/25",
+    "listFile": "list-2025-12-19-E9-P2d-G1.json",
+    "grantId": "E9-P2d-G1",
+    "mode": "direct-one",
+    "measuredChars": 1527,
+    "size": "pequeno"
+  }
+}

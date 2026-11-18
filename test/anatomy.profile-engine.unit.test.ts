@@ -303,7 +303,7 @@ test('#249 R2 / B: document text is never normalised; matchers equal the pre-int
   const nfd = analyzeAnatomy(base('<p>Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.</p>'));
   assert.equal(nfd.canonicalText, 'Cla\u0301usula primeira NCM 8471.30.12, exceto 8471.30.19.\n');
   assert.notEqual(nfd.canonicalText, nfd.canonicalText.normalize('NFC'));
-  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'clause:operative_candidate:0-54']);
+  assert.deepEqual(nfd.parts.map((p) => `${p.type}:${p.context}:${p.span.start}-${p.span.end}`), ['document:operative_candidate:0-54', 'clause:operative_candidate:0-54', 'caput:operative_candidate:0-54']); // ANAT-STRUCT-02: + caput of the clause
   assert.equal(nfd.status, 'partial');
   assert.ok(nfd.limitations.some((l) => l.code === 'nfc_shadow_matching'));
   assert.equal(nfd.eligibility.filter((e) => e.eligible).length, 0);
@@ -348,6 +348,8 @@ test('#249 R2: restored preamble — engine output equals the pre-integration en
     ['preamble-spaces', 'RFB', '<p>A  Receita  Federal informa NCM 8471.30.12.</p><p>A\tReceita\tFederal NCM 8471.30.12</p><p>A\u00a0Receita Federal NCM 8471.30.12</p>'],
     ['considerando', 'DOU', '<p>CONSIDERANDOé x NCM 8471.30.12</p><p>CONSIDERANDO_ x</p><p>CONSIDERANDOS x</p><p>Considerando que NCM 8471.30.12</p>'],
   ];
-  const expected: Record<string, string[]> = {"preamble-glued": ["document:document:operative_candidate", "preamble:preamble_marker:prohibited", "preamble:preamble_marker:prohibited"], "preamble-spaces": ["document:document:operative_candidate", "unidentified:unrecognized_block:unknown", "unidentified:unrecognized_block:unknown", "preamble:preamble_marker:prohibited"], "considerando": ["document:document:operative_candidate", "preamble:preamble_marker:prohibited", "unidentified:unrecognized_block:unknown", "unidentified:unrecognized_block:unknown", "preamble:preamble_marker:prohibited"]};
+  const expected: Record<string, string[]> = {"preamble-glued": ["document:document:operative_candidate", "preamble:preamble_marker:prohibited", "preamble:preamble_marker:prohibited"], "preamble-spaces": ["document:document:operative_candidate", "unidentified:unrecognized_block:unknown", "unidentified:unrecognized_block:unknown", "preamble:preamble_marker:prohibited"], "considerando": ["document:document:operative_candidate", "preamble:preamble_marker:prohibited", "unidentified:unrecognized_block:unknown", "unidentified:unrecognized_block:unknown", "consideration:consideration_marker:prohibited"]};
+  // ANAT-STRUCT-01: the only change from the pre-integration value. "Considerando que" (the whole word) is typed as a
+  // consideration with the same prohibited context; the glued "CONSIDERANDOé/_/S" variants keep their frozen results.
   for (const [id, source, html] of docs) assert.deepEqual(reasons(analyzeAnatomy(base(html, source))), expected[id], id);
 });

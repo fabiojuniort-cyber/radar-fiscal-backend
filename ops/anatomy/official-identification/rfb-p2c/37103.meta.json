@@ -1,0 +1,62 @@
+{
+  "id": "37103",
+  "act": "Ato Declaratório Interpretativo 18/2011",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/37103/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/37103/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/37103/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+  "bytes": 11168,
+  "consultedAt": "2026-11-07T04:06:50.508Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c (Ato Declaratório Interpretativo)",
+  "identification": {
+    "idAto": 37103,
+    "epigrafe": "Ato Declaratório Interpretativo RFB nº 18, de 23 de dezembro de 2011",
+    "numeroAto": "18",
+    "dataAto": "2011-12-23",
+    "dataPublicacao": "2011-12-26",
+    "dadosPublicacao": "Publicado(a) no DOU de 26/12/2011, página 213",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "5b43922b60cd6b058dfb0e0e3c7281fe08dc2e976bc179e2cf5944c77870febf",
+    "htmlSha256": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
+    "pieces": 10,
+    "missingSegments": [],
+    "struckSegments": [
+      {
+        "pointer": "/outrosSegmentos/1",
+        "order": 3,
+        "chars": 398
+      },
+      {
+        "pointer": "/outrosSegmentos/5",
+        "order": 7,
+        "chars": 331
+      }
+    ],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c)",
+  "promoted": false,
+  "p2c": {
+    "type": "Ato Declaratório Interpretativo",
+    "termo": "Ato Declaratório Interpretativo",
+    "searchFile": "search-adi.json",
+    "measuredChars": 3106,
+    "size": "pequeno"
+  }
+}

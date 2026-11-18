@@ -1,0 +1,22 @@
+{
+  "grantId": "E9-P2d-G1",
+  "owner": "EXEC #304 (claude/anat-doesp-gate)",
+  "mode": "direct-one",
+  "discovery": "skipped (preserved list)",
+  "id": "fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+  "title": "DECRETO Nº 70.226, DE 19 DE DEZEMBRO DE 2025",
+  "type": "Decreto",
+  "actKey": "decreto 70226/25",
+  "listedDate": "2025-12-19T15:47:22.0087204",
+  "url": "https://do-api-web-search.doe.sp.gov.br/v2/publications/fdb81d5f-3876-468a-70bc-08de3f1ee1ea",
+  "outcome": {
+    "result": "kept",
+    "chars": 1527,
+    "size": "pequeno",
+    "sha256": "16c7fe4ad683b1f1eb0cdc709d731e55e4d4dcce77562a834a387e801fc5c189",
+    "bytes": 15000
+  },
+  "remainingForType": 0,
+  "remainingTotal": 10,
+  "note": "at most one request sent and debited (one-shot fetch); per-attempt record = budget-state.json"
+}
