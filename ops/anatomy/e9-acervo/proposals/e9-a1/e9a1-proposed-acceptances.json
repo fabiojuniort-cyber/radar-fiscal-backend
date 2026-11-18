@@ -1,0 +1,71 @@
+{
+  "schema": "e9-a1-proposed-acceptances/1",
+  "registered": false,
+  "note": "PROPOSTA — NÃO REGISTRADA. Registro oficial em docs/anatomy/e9-acceptances.json só após revisão independente e decisão do COORD; decidedBy/decidedOn serão preenchidos nesse ato.",
+  "proposed": [
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "PENDENTE — revisão independente + decisão do COORD",
+      "decidedOn": "PENDENTE",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Provar leitura de três células RFB'; prova ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (main 196c6ca9 × main 86518ba0, motor 4b96f977): bytes = meta = lote, HTML preparado igual, partes/campos/outputHash iguais, entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional)",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova e novo registro append-only"
+      ]
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "PENDENTE — revisão independente + decisão do COORD",
+      "decidedOn": "PENDENTE",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Provar leitura de três células RFB'; prova ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (main 196c6ca9 × main 86518ba0, motor 4b96f977): bytes = meta = lote, HTML preparado igual, partes/campos/outputHash iguais, entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional)",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova e novo registro append-only"
+      ]
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "PENDENTE — revisão independente + decisão do COORD",
+      "decidedOn": "PENDENTE",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Provar leitura de três células RFB'; prova ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (main 196c6ca9 × main 86518ba0, motor 4b96f977): bytes = meta = lote, HTML preparado igual, partes/campos/outputHash iguais, entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional)",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova e novo registro append-only"
+      ]
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "PENDENTE — revisão independente + decisão do COORD",
+      "decidedOn": "PENDENTE",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Provar leitura de três células RFB'; prova ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (main 196c6ca9 × main 86518ba0, motor 4b96f977): bytes = meta = lote, HTML preparado igual, partes/campos/outputHash iguais, entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional)",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova e novo registro append-only"
+      ]
+    }
+  ]
+}

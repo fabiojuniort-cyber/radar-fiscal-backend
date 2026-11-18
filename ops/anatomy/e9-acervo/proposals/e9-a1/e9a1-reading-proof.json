@@ -1,0 +1,449 @@
+{
+  "schema": "e9-a1-reading-proof/1",
+  "mandate": "COORD → EXEC F1 | E9-A1",
+  "registersNothing": true,
+  "engines": {
+    "base": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+    "candidate": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+    "expected": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+    "equal": true,
+    "storedLotEngine": [
+      "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a"
+    ]
+  },
+  "acceptancesSha256": [
+    "dd41b5bbe4e014a7f21597d505831005b8ee6ddfe5d15521f997b357ed2cfc3e",
+    "dd41b5bbe4e014a7f21597d505831005b8ee6ddfe5d15521f997b357ed2cfc3e"
+  ],
+  "cells": [
+    {
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "samples": [
+        "rfb:108391",
+        "rfb:133898"
+      ],
+      "aptSamples": [
+        "rfb:108391",
+        "rfb:133898"
+      ],
+      "notApt": [],
+      "aptForReview": true
+    },
+    {
+      "cellId": "rfb--instrucao-normativa--grande",
+      "samples": [
+        "rfb:115131",
+        "rfb:127905",
+        "rfb:104314"
+      ],
+      "aptSamples": [
+        "rfb:115131"
+      ],
+      "notApt": [
+        {
+          "sampleId": "rfb:127905",
+          "why": [
+            "status partial",
+            "14 unidentified chars",
+            "30 attachment(s) without content",
+            "limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content",
+            "own annex completeness: Anexo I: present, not read; Anexo II: present, not read; ambiguous annex mention without a label: association not provable; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VI: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VIII: present, not read; Anexo XXVI: present, not read; Anexo XXVII: present, not read; Anexo IX: present, not read; Anexo XXVIII: present, not read; Anexo XXIX: present, not read; ambiguous annex mention without a label: association not provable; Anexo X: present, not read; Anexo XII: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XIII: present, not read; Anexo XIV: present, not read; Anexo XV: present, not read; ambiguous annex mention without a label: association not provable; own annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XVI: present, not read; Anexo XVII: present, not read; Anexo XVIII: present, not read; Anexo XIX: present, not read; Anexo XX: present, not read; Anexo XXI: present, not read; Anexo XXIII: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXIV: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXV: present, not read; Anexo VII: present, not read; Anexo XI: present, not read; Anexo XXII: present, not read"
+          ]
+        },
+        {
+          "sampleId": "rfb:104314",
+          "why": [
+            "status partial",
+            "1819 unidentified chars",
+            "30 attachment(s) without content",
+            "limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
+          ]
+        }
+      ],
+      "aptForReview": true
+    },
+    {
+      "cellId": "rfb--portaria--pequeno",
+      "samples": [
+        "rfb:142967"
+      ],
+      "aptSamples": [
+        "rfb:142967"
+      ],
+      "notApt": [],
+      "aptForReview": true
+    }
+  ],
+  "samples": [
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "cellDerived": "rfb--instrucao-normativa--pequeno",
+      "epigrafe": "Instrução Normativa RFB nº 1932, de 3 de abril de 2020",
+      "provenance": {
+        "snapshot": "ops/anatomy/official-identification/rfb-normasinternet2/108391.json",
+        "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/108391/visao/multivigente",
+        "consultedAt": "2026-11-04T21:00:12Z",
+        "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+        "bytes": 7914,
+        "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4"
+      },
+      "reading": {
+        "status": "complete",
+        "parts": 10,
+        "canonicalChars": 2003,
+        "outputHash": "6a89b040df113d0ba55dca792fdd6159131fe4dda63903b1a9f13df4050168a4",
+        "preparedHtmlSha256": "666f7a748813c8af26a6c0e9106a0115a89941dc2cce1727fe9d6696290b8504",
+        "partsCanonicalSha256": [
+          "8e87b5a61dd5c288fe238e28acafd0220dbc6a8dd34e49394b2c9556cc4d2c0d",
+          "8e87b5a61dd5c288fe238e28acafd0220dbc6a8dd34e49394b2c9556cc4d2c0d"
+        ],
+        "missingSegments": 0
+      },
+      "completeness": {
+        "complete": true,
+        "bodyAbsent": false,
+        "readAttachments": 0,
+        "gaps": []
+      },
+      "checks": {
+        "bytesEqualMeta": true,
+        "bytesEqualLot": true,
+        "bytesEqualAcrossRoots": true,
+        "preparedHtmlEqual": true,
+        "resultFieldsEqual": true,
+        "identityEqual": true,
+        "outputHashEqualAndLot": true,
+        "freshLotEntryEqualsStored_base": true,
+        "freshLotEntryEqualsStored_candidate": true,
+        "storedLotEntryEqualAcrossRoots": true,
+        "legalStatusUnknown": true,
+        "cellMatchesMandate": true
+      },
+      "equivalent": true,
+      "entrySha256": {
+        "stored": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+        "recomputedBase": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+        "recomputedCandidate": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680"
+      },
+      "alreadyAccepted": false,
+      "aptForReview": true,
+      "proposedRecordNotRegistered": {
+        "sampleId": "rfb:108391",
+        "cellId": "rfb--instrucao-normativa--pequeno",
+        "scope": "offline",
+        "entrySha256": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+        "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+        "note": "NOT REGISTERED: proposal only; registration requires independent review and a later COORD decision"
+      }
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "cellDerived": "rfb--instrucao-normativa--pequeno",
+      "epigrafe": "Instrução Normativa RFB nº 2162, de 4 de outubro de 2023",
+      "provenance": {
+        "snapshot": "ops/anatomy/official-identification/rfb-normasinternet2/133898.json",
+        "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/133898/visao/multivigente",
+        "consultedAt": "2026-11-04T21:00:13Z",
+        "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+        "bytes": 31143,
+        "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408"
+      },
+      "reading": {
+        "status": "complete",
+        "parts": 33,
+        "canonicalChars": 4540,
+        "outputHash": "6a09eb3e6a607c98de566da588dc44d3171ac96e6bca011319eba8487137214c",
+        "preparedHtmlSha256": "fd5532b65f3245f1853636e08e3ee4046594c048443d973e955dfa055ce0383b",
+        "partsCanonicalSha256": [
+          "f83f2857bcf8be9e3a3b6072b702dbffc427f50523bc5d157f02e7d43bd3088e",
+          "f83f2857bcf8be9e3a3b6072b702dbffc427f50523bc5d157f02e7d43bd3088e"
+        ],
+        "missingSegments": 0
+      },
+      "completeness": {
+        "complete": true,
+        "bodyAbsent": false,
+        "readAttachments": 0,
+        "gaps": []
+      },
+      "checks": {
+        "bytesEqualMeta": true,
+        "bytesEqualLot": true,
+        "bytesEqualAcrossRoots": true,
+        "preparedHtmlEqual": true,
+        "resultFieldsEqual": true,
+        "identityEqual": true,
+        "outputHashEqualAndLot": true,
+        "freshLotEntryEqualsStored_base": true,
+        "freshLotEntryEqualsStored_candidate": true,
+        "storedLotEntryEqualAcrossRoots": true,
+        "legalStatusUnknown": true,
+        "cellMatchesMandate": true
+      },
+      "equivalent": true,
+      "entrySha256": {
+        "stored": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+        "recomputedBase": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+        "recomputedCandidate": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7"
+      },
+      "alreadyAccepted": false,
+      "aptForReview": true,
+      "proposedRecordNotRegistered": {
+        "sampleId": "rfb:133898",
+        "cellId": "rfb--instrucao-normativa--pequeno",
+        "scope": "offline",
+        "entrySha256": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+        "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+        "note": "NOT REGISTERED: proposal only; registration requires independent review and a later COORD decision"
+      }
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "cellDerived": "rfb--instrucao-normativa--grande",
+      "epigrafe": "Instrução Normativa RFB nº 2005, de 29 de janeiro de 2021",
+      "provenance": {
+        "snapshot": "ops/anatomy/official-identification/rfb-normasinternet2/115131.json",
+        "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/115131/visao/multivigente",
+        "consultedAt": "2026-11-04T21:00:10Z",
+        "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+        "bytes": 234565,
+        "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2"
+      },
+      "reading": {
+        "status": "complete",
+        "parts": 369,
+        "canonicalChars": 57179,
+        "outputHash": "eafc0e6099a5297089bf872a48f5484e2567e75723f50cb15032c797581d3f19",
+        "preparedHtmlSha256": "cf977ccf18f7397d7c8f823a061bda2ece7e487d5c62fb809303892bc30840ac",
+        "partsCanonicalSha256": [
+          "8f499436281c9fd66371a876cfc240842bdc4f947beb0faecb4367b045898a65",
+          "8f499436281c9fd66371a876cfc240842bdc4f947beb0faecb4367b045898a65"
+        ],
+        "missingSegments": 1
+      },
+      "completeness": {
+        "complete": true,
+        "bodyAbsent": false,
+        "readAttachments": 0,
+        "gaps": []
+      },
+      "checks": {
+        "bytesEqualMeta": true,
+        "bytesEqualLot": true,
+        "bytesEqualAcrossRoots": true,
+        "preparedHtmlEqual": true,
+        "resultFieldsEqual": true,
+        "identityEqual": true,
+        "outputHashEqualAndLot": true,
+        "freshLotEntryEqualsStored_base": true,
+        "freshLotEntryEqualsStored_candidate": true,
+        "storedLotEntryEqualAcrossRoots": true,
+        "legalStatusUnknown": true,
+        "cellMatchesMandate": true
+      },
+      "equivalent": true,
+      "entrySha256": {
+        "stored": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+        "recomputedBase": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+        "recomputedCandidate": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e"
+      },
+      "alreadyAccepted": false,
+      "aptForReview": true,
+      "proposedRecordNotRegistered": {
+        "sampleId": "rfb:115131",
+        "cellId": "rfb--instrucao-normativa--grande",
+        "scope": "offline",
+        "entrySha256": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+        "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+        "note": "NOT REGISTERED: proposal only; registration requires independent review and a later COORD decision"
+      }
+    },
+    {
+      "sampleId": "rfb:127905",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "cellDerived": "rfb--instrucao-normativa--grande",
+      "epigrafe": "Instrução Normativa RFB nº 2121, de 15 de dezembro de 2022",
+      "provenance": {
+        "snapshot": "ops/anatomy/official-identification/rfb-normasinternet2/127905.json",
+        "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/127905/visao/multivigente",
+        "consultedAt": "2026-11-05T01:38:23Z",
+        "origin": "automated fetch, official RFB API (normasinternet2), visao=multivigente",
+        "bytes": 3530584,
+        "sha256": "9672e74829990edc5246b03eca3e65999499edd9d334cc988293133dbf66490b"
+      },
+      "reading": {
+        "status": "partial",
+        "parts": 5492,
+        "canonicalChars": 1009001,
+        "outputHash": "072df832520c424baff8b36c27706897e9fad2a226790927748749e2dcf329d7",
+        "preparedHtmlSha256": "c223c99d03dc08bdcb53ddefbfc5e7624b011aa1c63aa21e93e0656a42455791",
+        "partsCanonicalSha256": [
+          "e51da6257b8a100c6cb397a4ea2bc75bc881612121aa8e710e30d8be70e000dc",
+          "e51da6257b8a100c6cb397a4ea2bc75bc881612121aa8e710e30d8be70e000dc"
+        ],
+        "missingSegments": 0
+      },
+      "completeness": {
+        "complete": false,
+        "bodyAbsent": false,
+        "readAttachments": 1,
+        "gaps": [
+          "status partial",
+          "14 unidentified chars",
+          "30 attachment(s) without content",
+          "limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content",
+          "own annex completeness: Anexo I: present, not read; Anexo II: present, not read; ambiguous annex mention without a label: association not provable; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VI: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VIII: present, not read; Anexo XXVI: present, not read; Anexo XXVII: present, not read; Anexo IX: present, not read; Anexo XXVIII: present, not read; Anexo XXIX: present, not read; ambiguous annex mention without a label: association not provable; Anexo X: present, not read; Anexo XII: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XIII: present, not read; Anexo XIV: present, not read; Anexo XV: present, not read; ambiguous annex mention without a label: association not provable; own annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XVI: present, not read; Anexo XVII: present, not read; Anexo XVIII: present, not read; Anexo XIX: present, not read; Anexo XX: present, not read; Anexo XXI: present, not read; Anexo XXIII: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXIV: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXV: present, not read; Anexo VII: present, not read; Anexo XI: present, not read; Anexo XXII: present, not read"
+        ]
+      },
+      "checks": {
+        "bytesEqualMeta": true,
+        "bytesEqualLot": true,
+        "bytesEqualAcrossRoots": true,
+        "preparedHtmlEqual": true,
+        "resultFieldsEqual": true,
+        "identityEqual": true,
+        "outputHashEqualAndLot": true,
+        "freshLotEntryEqualsStored_base": true,
+        "freshLotEntryEqualsStored_candidate": true,
+        "storedLotEntryEqualAcrossRoots": true,
+        "legalStatusUnknown": true,
+        "cellMatchesMandate": true
+      },
+      "equivalent": true,
+      "entrySha256": {
+        "stored": "562de2d8a28fb9df45e58bdb7ab2b8131082eb536dde656cc6a578c214d29c05",
+        "recomputedBase": "562de2d8a28fb9df45e58bdb7ab2b8131082eb536dde656cc6a578c214d29c05",
+        "recomputedCandidate": "562de2d8a28fb9df45e58bdb7ab2b8131082eb536dde656cc6a578c214d29c05"
+      },
+      "alreadyAccepted": false,
+      "aptForReview": false,
+      "proposedRecordNotRegistered": null
+    },
+    {
+      "sampleId": "rfb:104314",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "cellDerived": "rfb--instrucao-normativa--grande",
+      "epigrafe": "Instrução Normativa RFB nº 1911, de 11 de outubro de 2019",
+      "provenance": {
+        "snapshot": "ops/anatomy/official-identification/rfb-normasinternet2-coleta02/104314.json",
+        "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/104314/visao/multivigente",
+        "consultedAt": "2026-11-05T18:21:58.173Z",
+        "origin": "automated fetch via consultOfficial (COLETA-02)",
+        "bytes": 2285257,
+        "sha256": "9005fddbc2df67e39127db7d34d2feb53ef8dfdc42bc59056862e97b9bb200b5"
+      },
+      "reading": {
+        "status": "partial",
+        "parts": 4740,
+        "canonicalChars": 809136,
+        "outputHash": "79ecd0a80d370a8abb01e5e4fedfd90b0a2693971c7b58b749fbd068bbb741fb",
+        "preparedHtmlSha256": "23146b8a6ecdf5cc35ff7fd09ac9fe08ba0babf5d69e64333b480423769eaaca",
+        "partsCanonicalSha256": [
+          "9abeb5fdf4a638cfcb376b38d69f2191f73cc5c65b7439f4e7bcf2eed1db6357",
+          "9abeb5fdf4a638cfcb376b38d69f2191f73cc5c65b7439f4e7bcf2eed1db6357"
+        ],
+        "missingSegments": 0
+      },
+      "completeness": {
+        "complete": false,
+        "bodyAbsent": false,
+        "readAttachments": 0,
+        "gaps": [
+          "status partial",
+          "1819 unidentified chars",
+          "30 attachment(s) without content",
+          "limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
+        ]
+      },
+      "checks": {
+        "bytesEqualMeta": true,
+        "bytesEqualLot": true,
+        "bytesEqualAcrossRoots": true,
+        "preparedHtmlEqual": true,
+        "resultFieldsEqual": true,
+        "identityEqual": true,
+        "outputHashEqualAndLot": true,
+        "freshLotEntryEqualsStored_base": true,
+        "freshLotEntryEqualsStored_candidate": true,
+        "storedLotEntryEqualAcrossRoots": true,
+        "legalStatusUnknown": true,
+        "cellMatchesMandate": true
+      },
+      "equivalent": true,
+      "entrySha256": {
+        "stored": "99497bc5c041696cedd08221c1e135ec35b4b0fdad6ccd1a4e848c3a8646b9eb",
+        "recomputedBase": "99497bc5c041696cedd08221c1e135ec35b4b0fdad6ccd1a4e848c3a8646b9eb",
+        "recomputedCandidate": "99497bc5c041696cedd08221c1e135ec35b4b0fdad6ccd1a4e848c3a8646b9eb"
+      },
+      "alreadyAccepted": false,
+      "aptForReview": false,
+      "proposedRecordNotRegistered": null
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "cellDerived": "rfb--portaria--pequeno",
+      "epigrafe": "Portaria RFB nº 514, de 21 de fevereiro de 2025",
+      "provenance": {
+        "snapshot": "ops/anatomy/official-identification/rfb-p2c/142967.json",
+        "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/142967/visao/multivigente",
+        "consultedAt": "2026-11-07T04:06:47.935Z",
+        "origin": "automated fetch via consultOfficial (E9 P2-c)",
+        "bytes": 24241,
+        "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c"
+      },
+      "reading": {
+        "status": "complete",
+        "parts": 29,
+        "canonicalChars": 4699,
+        "outputHash": "ad5fbe2b65a7307746330626b2e705ee8612d8b79499fc33d6ac59f57aa21433",
+        "preparedHtmlSha256": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
+        "partsCanonicalSha256": [
+          "7a7bf5b464cc6f4167733ab113338f832ecf97814d89dc8daaef8717b9566027",
+          "7a7bf5b464cc6f4167733ab113338f832ecf97814d89dc8daaef8717b9566027"
+        ],
+        "missingSegments": 0
+      },
+      "completeness": {
+        "complete": true,
+        "bodyAbsent": false,
+        "readAttachments": 0,
+        "gaps": []
+      },
+      "checks": {
+        "bytesEqualMeta": true,
+        "bytesEqualLot": true,
+        "bytesEqualAcrossRoots": true,
+        "preparedHtmlEqual": true,
+        "resultFieldsEqual": true,
+        "identityEqual": true,
+        "outputHashEqualAndLot": true,
+        "freshLotEntryEqualsStored_base": true,
+        "freshLotEntryEqualsStored_candidate": true,
+        "storedLotEntryEqualAcrossRoots": true,
+        "legalStatusUnknown": true,
+        "cellMatchesMandate": true
+      },
+      "equivalent": true,
+      "entrySha256": {
+        "stored": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+        "recomputedBase": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+        "recomputedCandidate": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7"
+      },
+      "alreadyAccepted": false,
+      "aptForReview": true,
+      "proposedRecordNotRegistered": {
+        "sampleId": "rfb:142967",
+        "cellId": "rfb--portaria--pequeno",
+        "scope": "offline",
+        "entrySha256": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+        "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+        "note": "NOT REGISTERED: proposal only; registration requires independent review and a later COORD decision"
+      }
+    }
+  ]
+}
