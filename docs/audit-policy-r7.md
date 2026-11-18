@@ -296,3 +296,28 @@ PROD-1.1 prepara a 075 e os testes; não a aplica em produção, não executa --
 e não autoriza merge. A origem inline do reparo de relações não foi recuperada:
 seu contrato foi conferido por chaves/tipos em leitura produtiva e recibo histórico,
 conforme as limitações explicitadas na evidência. Não atribuir a ele código inventado.
+
+## R7.5 — plano estável do lote com estatísticas defasadas (migration 083)
+
+**Sintoma.** No CI PG18, o job ONB-01 falhou com `57014` no **primeiro** `audit_backfill_batch(5000)` do teste R7 de 150 mil auditorias. Isso ocorreu em fabiojuniort-cyber/radar-fiscal-backend#310 e no #317, enquanto a main passou em 14/11 (primeiro trio de lotes em 3,1 s).
+
+**Mecanismo.** Foi provado em PG 18.7 local de forma determinística. O mecanismo exato do CI não é observável, porque o CI não registra `pg_class`.
+- Uma (auto)análise/vacuum que viu `audit_log` quase vazia deixa `reltuples=1` sobre milhares de páginas.
+- Com isso, o planejador estima 1 linha no CTE `picked`.
+- O `UPDATE … FROM picked` vira um `Nested Loop` com `Join Filter (picked.id = a.id)` sobre todo o índice da PK: cerca de 150 mil × 5.000 comparações.
+- Com as estatísticas atualizadas, o mesmo lote leva cerca de 1 s. Com `reltuples=1`, excede 45 s (2/2).
+- Em 10 execuções completas do fluxo ONB-01, houve 2 falhas, 1 na main e 1 no candidato. Ambas tinham exatamente esse estado, e nenhuma execução aprovada o tinha.
+
+**Correção.** A 083 substitui apenas a seleção do alvo do UPDATE. O lote passa a ser coletado num array de ids (mesma consulta, mesma ordem e mesmo `FOR UPDATE`) e atualizado por `id = ANY(array)`, um índice da PK sem junção. Ficam inalterados:
+- projeções e checkpoint;
+- preflight de eventos desconhecidos;
+- o retorno `processed/remaining`;
+- `SECURITY DEFINER`, `search_path`, dono e ACL.
+
+A 074 permanece byte-idêntica.
+
+**Prova.** `test/onb02-r7-backfill-stale-stats.integration.test.ts` força `reltuples=1` e exige o backfill completo de 150 mil linhas sob os **mesmos** limites (`statement_timeout=45s`, `lock_timeout=5s`, `jit=off`), além de idempotência e projeção exata.
+- Sem a 083: `57014`.
+- Com a 083: os 3 primeiros lotes em cerca de 4 s.
+
+Nenhum timeout foi aumentado, a massa de 150 mil não foi reduzida e nenhum teste foi pulado.
