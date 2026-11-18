@@ -1,0 +1,103 @@
+EXEC → COORD — FRENTE 1 | ANAT/E9 — Candidato final de composição: CONCLUSÃO
+============================================================================
+
+1. Situação
+-----------
+O candidato está publicado, com pin e aceite coerentes:
+  PR:     fabiojuniort-cyber/radar-fiscal-backend#317 (Ready for review)
+  HEAD:   ec51d215551b45f7c652ad198d04825075f79d4f
+  Motor:  4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a
+
+O #308 fica preservado como evidência, em draft.
+
+Decisões pedidas ao COORD:
+  (a) encaminhar o HEAD ec51d215 para revisão independente;
+  (b) decidir o tratamento da falha ONB-01/R7 PG18, que está fora do escopo deste PR.
+
+2. Componentes
+--------------
+  #303   46afdaf14d122f7bcd7aee0f413643e551162afd
+  #300   22e8cc480181bc11bd6e71c38647dad12aa73af0
+  A r13  31c035044838ac2c8959df9aa9b840bb9087445bea4e445a10339749696dfe5f
+  B r7   0042c62984e8366eb0279ceb157ecc99be1c0ec4bacea3d79a3a8fc8f046e328
+  main   e4514436346ffd52161078c5115f6ab46cbbc731 (traz o #310)
+
+3. Pin e aceite
+---------------
+Equivalência da Portaria 635 reconfirmada:
+  - 136/136 partes;
+  - entry 2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996, igual ao esperado.
+
+Registro de revalidação append-only em e9-acceptances.json:
+  - passa de 13 para 14 registros;
+  - o registro anterior continua preservado.
+
+Pin: 0e009431 → 4b96f977.
+Testes #153, #167, #170, #174: verdes.
+PG16 local com o pin versionado: 12/12.
+
+4. Testes locais
+----------------
+  tsc                    limpo
+  test:anatomy           420/420
+  fixtures               0/34 · 11/153 (só falsos negativos conservadores) · 2/65 · 0/46 · 0/85
+  casos dirigidos        306/306
+  ADE Cofis              26/26, legalStatus unknown
+  lote e matriz          estáveis
+
+npm test local: as falhas são do ambiente e aparecem idênticas em main.
+
+5. CI integral
+--------------
+30/31 jobs passaram, em PG16 e PG18. Entre eles:
+  - verify
+  - todos os jobs de anatomia
+  - LOTE2, DOU-CLEAN-02 e ONB-03
+
+Falha: ONB-01 PG18
+  Teste:  test/onb02-r7-audit.integration.test.ts:47
+  Erro:   statement_timeout de 45 s; 2 de 2 execuções falharam (50,4 s e 51,5 s)
+  Em main: passou em 14/11, com 37,6 s
+
+  Por que não é deste PR:
+  - o diff não toca audit, company, migrations nem ci.yml;
+  - a imagem do PostgreSQL é a mesma.
+
+  Registrado em #317 issuecomment-6965618967.
+  Proposta: PR separado na frente ONB-02/R7.
+  Nenhum teste foi pulado.
+
+6. Consumidores de operative_candidate (3 casos residuais)
+-----------------------------------------------------------
+Nenhum dos três casos afeta:
+  - exibição
+  - persistência em banco
+  - classificação
+  - aceite
+  - decisões posteriores
+
+O efeito fica restrito ao resultado offline do módulo e ao arquivo do lote.
+Risco futuro: aparece só se o anexo for ligado ao motor.
+Evidência: proposals/candidate-317/consumers-operative-candidate.md.
+
+7. Riscos e NOT_PROVEN
+----------------------
+Riscos P3, conservadores:
+  - R13-1, R12-1, R11-1 e R11-2
+  - lista fechada de marcadores
+
+NOT_PROVEN:
+  - nova execução do ONB-01 PG18 em main
+  - deploy do web
+  - runtime com PG do módulo de anexos
+
+8. Progresso
+------------
+  Mandato: 0% → 25% → 50% → 75% → 100%
+  F1 oficial: 50,2% → 50,2% (+0,0 p.p.)
+
+9. Próximo gate
+---------------
+  - revisão independente do #317 @ ec51d215;
+  - decisão sobre ONB-01/R7;
+  - merge e produção exigem mandato próprio.

@@ -1,0 +1,31 @@
+failure | ONB-01 migrations 042-043 and identity/RLS on PostgreSQL 18
+success | DOU-CLEAN-02 isolated PG18 contracts
+success | LOTE2 tests and dry-run on isolated PostgreSQL 18
+success | ONB-03 operational links approval-publication-reversal on PostgreSQL 18
+success | anatomy-admin-api (16)
+success | anatomy-admin-api (18)
+success | anatomy-admin-main-chain (16, admin-api)
+success | anatomy-admin-main-chain (16, admin-schema)
+success | anatomy-admin-main-chain (18, admin-api)
+success | anatomy-admin-main-chain (18, admin-schema)
+success | anatomy-admin-migrations (16, admin-api)
+success | anatomy-admin-migrations (16, admin-migrations)
+success | anatomy-admin-migrations (16, admin-schema)
+success | anatomy-admin-migrations (16, admin-wiring)
+success | anatomy-admin-migrations (16, config)
+success | anatomy-admin-migrations (18, admin-api)
+success | anatomy-admin-migrations (18, admin-migrations)
+success | anatomy-admin-migrations (18, admin-schema)
+success | anatomy-admin-migrations (18, admin-wiring)
+success | anatomy-admin-migrations (18, config)
+success | anatomy-admin-schema (16)
+success | anatomy-admin-schema (18)
+success | anatomy-audit-benchmark (16)
+success | anatomy-audit-benchmark (18)
+success | anatomy-base-migration (16)
+success | anatomy-base-migration (18)
+success | anatomy-disposable-schema
+success | anatomy-doesp-compat (16)
+success | anatomy-doesp-compat (18)
+success | anatomy-synthetic
+success | verify
