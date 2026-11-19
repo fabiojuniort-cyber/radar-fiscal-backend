@@ -6,9 +6,10 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
 import { assessNonRfbSample, baselineEntrySha256, lotEntrySha256, nonRfbReadingAssessment, buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
-import { MANUAL_ITEMS, decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
+import { MANUAL_ITEMS, decodeDeclared, decodeManual, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
 import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anatomy/charset-policy.js';
+import { portalActChars } from '../ops/anatomy/official-act-size.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
@@ -18,18 +19,24 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 23 cells covered (10 + 3 P2-c direct captures + 10 by the manual delivery of 2026-11-19, all partial readings; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 25 cells covered (13 previous + 12 provisional by the manual delivery; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
     'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno',
     // manual delivery of 2026-11-19 (M14–M34): covered by layout only — every one of these readings is partial (complete:false)
-    'confaz--convenio-icms--medio', 'confaz--ajuste-sinief--medio', 'confaz--protocolo-icms--medio', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--grande',
-    'dou--decreto--medio', 'dou--decreto--grande', 'dou--portaria--medio', 'dou--resolucao--medio', 'dou--resolucao--grande'].sort());
+    'confaz--convenio-icms--pequeno', 'confaz--ajuste-sinief--pequeno', 'confaz--protocolo-icms--pequeno',
+    'dou--instrucao-normativa--pequeno', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--grande',
+    'dou--decreto--pequeno', 'dou--decreto--grande', 'dou--portaria--pequeno', 'dou--portaria--medio',
+    'dou--resolucao--pequeno', 'dou--resolucao--grande'].sort());
   for (const id of ['M14', 'M16', 'M18', 'M19', 'M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34']) {
     const x = real.find((s) => s.id === id)!; assert.deepEqual([x.stages.validated, x.readingComplete, x.stages.accepted], [true, false, false], `${id}: covered by layout, partial reading, never accepted`);
   }
-  for (const id of ['M10', 'M12']) assert.equal(real.some((s) => s.id === id), false, `${id}: refused at ingestion (no declared charset), never sampled`);
+  for (const id of ['M10', 'M12']) {
+    const x = real.find((s) => s.id === id)!;
+    assert.deepEqual(x.decoding, { encoding: 'windows-1252', encodingSource: 'approved_local_fallback', confidence: 'tentative', declaredCharset: null });
+    assert.deepEqual([x.stages.identified, x.stages.read, x.stages.validated, x.stages.accepted, x.size], [true, false, false, false, null]);
+  }
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
@@ -49,7 +56,40 @@ test('E9 current state: 23 cells covered (10 + 3 P2-c direct captures + 10 by th
   assert.deepEqual([p58.source, p58.layout, p58.stages.identified, p58.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]);
   assert.match(p58.notes[0]!, /NÃO se presume ato completo/u, 'two pages are never presumed to complete the act');
   assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na'), 'the M9 PDF page cell stays pending');
-  assert.deepEqual(m.cells.find((c) => c.id === 'dou--instrucao-normativa--medio')!.validatedSamples.slice().sort(), ['M23', 'M24'], 'the HTML act cell is covered only by HTML samples; the M9 PDF never stands for it');
+  assert.deepEqual(m.cells.find((c) => c.id === 'dou--instrucao-normativa--medio')!.validatedSamples.slice().sort(), ['M24'], 'the HTML act cell is covered only by HTML samples; the M9 PDF never stands for it');
+});
+
+test('E9-M1b uses the real act region for M23 and M28 while preserving reader output evidence', () => {
+  const m = buildMatrix(real);
+  const small = real.find((s) => s.id === 'M23')!;
+  const large = real.find((s) => s.id === 'M28')!;
+  assert.deepEqual([small.chars, small.actChars, small.size], [12_605, 2_054, 'pequeno']);
+  assert.deepEqual([large.chars, large.actChars, large.size], [1_172_888, 1_161_917, 'grande']);
+  for (const [cellId, sampleId] of [['dou--instrucao-normativa--pequeno', 'M23'], ['dou--decreto--grande', 'M28']]) {
+    const cell = m.cells.find((entry) => entry.id === cellId)!;
+    assert.deepEqual([cell.validatedSamples, cell.provisional, cell.complete, cell.accepted], [[sampleId], true, false, false]);
+  }
+});
+
+test('E9-M1b ignores navigation and reports indeterminate without exactly one nonempty act container', () => {
+  const act = '<div class="texto-dou"><p>Ato &amp; conteúdo</p><p>Art. 1º</p><script>omit</script><nav>omit</nav></div>';
+  const article = (body: string) => `<article id="materia"><header>omit</header>${body}<footer>omit</footer></article>`;
+  assert.equal(portalActChars('DOU', article(act)), 'Ato & conteúdo Art. 1º'.length);
+  assert.equal(portalActChars('DOU', '<article id="materia"><div class="texto-dou">sem fechamento'), null);
+  assert.equal(portalActChars('DOU', article(act + act)), null);
+  assert.equal(portalActChars('DOU', article('<div class="texto-dou"><script>omit</script></div>')), null);
+  assert.equal(portalActChars('DOU', act), null);
+  assert.equal(portalActChars('CONFAZ', '<main id="content-core"><div id="parent-fieldname-text"><p>Ato</p><p>Anexo</p></div></main>'), 'Ato Anexo'.length);
+  assert.equal(portalActChars('CONFAZ', '<div id="parent-fieldname-text">Ato sem contexto</div>'), null);
+});
+
+test('E9-M1b manual fallback is pinned both to bytes and to the approved item', () => {
+  for (const [item, other] of [['M10', 'M12'], ['M12', 'M10']] as const) {
+    const bytes = readFileSync(new URL(`../ops/anatomy/official-identification/manual/${item}.html`, import.meta.url));
+    assert.equal(decodeManual(bytes, item, null).decoding?.encodingSource, 'approved_local_fallback');
+    assert.throws(() => decodeManual(bytes, other, null), UnsupportedEncodingError);
+    assert.throws(() => decodeManual(Buffer.concat([bytes, Buffer.from(' ')]), item, null), UnsupportedEncodingError);
+  }
 });
 
 const okStages = { captured: true, identified: true, read: true, validated: true, accepted: false };
@@ -189,10 +229,11 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
   for (const id of ['http:M1', 'http:M2']) {
     const x = real.find((s) => s.id === id)!;
     assert.deepEqual([x.decoding?.encoding, x.decoding?.encodingSource, x.decoding?.confidence, x.decoding?.declaredCharset, x.stages.read], ['windows-1252', 'approved_local_fallback', 'tentative', null, false]);
-    assert.ok(x.decoding!.independentCheck.length > 0 && x.decoding!.independentCheck.every((c) => c.sentenceEqual), `${id}: accented passage equal to the independent official representation`);
+    const independentCheck = x.decoding?.independentCheck ?? [];
+    assert.ok(independentCheck.length > 0 && independentCheck.every((c) => c.sentenceEqual), `${id}: accented passage equal to the independent official representation`);
   }
   const m1 = new Uint8Array(readFileSync(new URL('../ops/anatomy/official-identification/e9-http/M1.html', import.meta.url)));
-  assert.equal(Object.keys(APPROVED_FALLBACK).length, 2);
+  assert.equal(Object.keys(APPROVED_FALLBACK).length, 4);
   const altered = new Uint8Array(m1); altered[600] = altered[600]! ^ 0x01;
   assert.throws(() => decodeWithPolicy(altered, { httpCharset: null }), CharsetRefused, 'one changed byte leaves the policy');
   assert.throws(() => decodeWithPolicy(new TextEncoder().encode('<p>sem charset</p>'), { httpCharset: null }), CharsetRefused);
@@ -341,7 +382,7 @@ test('R2 (9) + B-3: only complete samples are eligible (Portaria 635 + E9-A1); p
   assert.deepEqual([cell('rfb--portaria--medio').status, cell('rfb--portaria--medio').complete], ['covered', true]);
   assert.deepEqual([cell('rfb--ato-declaratorio-executivo--pequeno').status, cell('rfb--ato-declaratorio-executivo--pequeno').complete, cell('rfb--ato-declaratorio-executivo--pequeno').partialSamples],
     ['covered', false, ['rfb:148629']], 'covered (layout) but complete:false, explicit');
-  assert.equal(mx.coveredRequired, 23, 'coverage count (layout) is not changed by the completeness flag: 13 + 10 partial manual samples');
+  assert.equal(mx.coveredRequired, 25, 'coverage count (layout) is not changed by the completeness flag: 13 + 12 provisional cells');
 });
 
 test('R2 B-4: decidedOn must be a REAL date', async () => {

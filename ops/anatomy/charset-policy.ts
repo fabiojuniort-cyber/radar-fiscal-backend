@@ -1,15 +1,24 @@
 /**
  * Local decoding policy authorized by the COORD (#116 c.6708512598 §6), following WHATWG "determining the character
  * encoding": BOM first, then a charset the bytes declare; only when both are absent AND the HTTP response carried no
- * charset, an explicit windows-1252 fallback is admitted — for EXACTLY the two Planalto snapshots below. It is a reader
+ * charset, an explicit windows-1252 fallback is admitted — for only the SHA-256-pinned Planalto snapshots below. It is a reader
  * decision (encodingSource=approved_local_fallback, confidence=tentative), never a charset declared by the origin:
  * declaredCharset stays null and the bytes/hashes stay untouched. Anything else without a charset is refused.
  * This enables reading preparation only; it creates no Planalto profile and closes no cell.
  */
 import { createHash } from 'node:crypto';
-import { decodeDeclared } from './official-manual-ingest.js';
+const SUPPORTED: Record<string, string> = { 'utf-8': 'utf-8', utf8: 'utf-8', 'windows-1252': 'windows-1252', 'iso-8859-1': 'windows-1252', latin1: 'windows-1252' };
+export class UnsupportedEncodingError extends Error {}
+/** Decode with the encoding the file declares (fatal for UTF-8); anything else is refused, never guessed. */
+export function decodeDeclared(bytes: Uint8Array, declared: string | null): string {
+  const label = SUPPORTED[(declared ?? '').toLowerCase()];
+  if (!label) throw new UnsupportedEncodingError(`declared encoding ${declared ?? '(none)'} is not supported`);
+  return new TextDecoder(label, { fatal: label === 'utf-8' }).decode(bytes);
+}
 
-export const APPROVED_FALLBACK: Readonly<Record<string, { encoding: 'windows-1252'; item: string; ref: string }>> = Object.freeze({
+export const APPROVED_FALLBACK: Readonly<Record<string, { encoding: 'windows-1252'; item: string; ref: string; manualItem?: 'M10' | 'M12' }>> = Object.freeze({
+  '1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf': { encoding: 'windows-1252', item: 'M10 (Lei 10.168/2000, Planalto)', manualItem: 'M10', ref: 'tribusca-control#116 c.7007752683 (E9-M1b)' },
+  '5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f': { encoding: 'windows-1252', item: 'M12 (Lei 9.718/1998, Planalto)', manualItem: 'M12', ref: 'tribusca-control#116 c.7007752683 (E9-M1b)' },
   fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36: { encoding: 'windows-1252', item: 'M1 (Lei 10.637/2002, Planalto)', ref: 'tribusca-control#116 c.6708512598 §6' },
   '25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9': { encoding: 'windows-1252', item: 'M2 (Lei 10.833/2003, Planalto)', ref: 'tribusca-control#116 c.6708512598 §6' },
 });

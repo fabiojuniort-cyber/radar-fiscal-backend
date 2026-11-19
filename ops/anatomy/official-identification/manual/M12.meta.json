@@ -1,0 +1,29 @@
+{
+  "item": "M12",
+  "act": "Lei nº 9.718/1998",
+  "source": "Planalto",
+  "type": "Lei",
+  "url": "https://www.planalto.gov.br/ccivil_03/leis/l9718compilada.htm",
+  "savedAt": null,
+  "receivedAt": "2026-11-19T04:04:56.000Z",
+  "savedAtNote": "hora do salvamento não informada; receivedAt é o limite superior (recebimento do arquivo)",
+  "ingestedAt": "2026-11-19T11:32:55.073Z",
+  "fileName": "M12.html",
+  "sha256": "5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f",
+  "bytes": 77417,
+  "declaredCharset": null,
+  "browserSavedFromUrl": null,
+  "decoding": {
+    "encoding": "windows-1252",
+    "encodingSource": "approved_local_fallback",
+    "confidence": "tentative"
+  },
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "LEI\\s+N\\S*\\s*9\\.718\\b[\\s\\S]{0,60}1998",
+    "matched": "LEI Nº 9.718, DE 27 DE NOVEMBRO DE 1998"
+  },
+  "representation": "html",
+  "promoted": false
+}

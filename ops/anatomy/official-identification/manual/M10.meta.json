@@ -1,0 +1,29 @@
+{
+  "item": "M10",
+  "act": "Lei nº 10.168/2000",
+  "source": "Planalto",
+  "type": "Lei",
+  "url": "https://www.planalto.gov.br/ccivil_03/leis/l10168.htm",
+  "savedAt": null,
+  "receivedAt": "2026-11-19T04:04:56.000Z",
+  "savedAtNote": "hora do salvamento não informada; receivedAt é o limite superior (recebimento do arquivo)",
+  "ingestedAt": "2026-11-19T11:32:54.828Z",
+  "fileName": "M10.html",
+  "sha256": "1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf",
+  "bytes": 20282,
+  "declaredCharset": null,
+  "browserSavedFromUrl": null,
+  "decoding": {
+    "encoding": "windows-1252",
+    "encodingSource": "approved_local_fallback",
+    "confidence": "tentative"
+  },
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "LEI\\s+N(?:\\S*|\\s+[oº°])\\s*10\\.168\\s*[,–—-]?\\s*DE\\s+29\\s+DE\\s+DEZEMBRO\\s+DE\\s+2000",
+    "matched": "LEI N o 10.168, DE 29 DE DEZEMBRO DE 2000"
+  },
+  "representation": "html",
+  "promoted": false
+}

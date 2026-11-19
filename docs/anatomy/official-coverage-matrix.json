@@ -1,7 +1,7 @@
 {
   "criterion": {
     "approval": "tribusca-control#116 c.6514510003; E9: STATUS-MATRIX-02 §9 (sem fração); R2 #303 c.6701945748",
-    "size": "pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor",
+    "size": "pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do ato; portais DOU/CONFAZ medidos na região do ato, sem recorte inequívoco o porte é indeterminado",
     "stages": "captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)"
   },
   "grid": {
@@ -682,12 +682,74 @@
       ]
     },
     {
+      "id": "M10",
+      "source": "Planalto",
+      "type": "Lei",
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "chars": null,
+      "size": null,
+      "sha256": "1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf",
+      "bytes": 20282,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "diagnostic": null,
+      "outputHash": null,
+      "evidence": [],
+      "notes": [
+        "sem perfil de leitura próprio; porte indeterminado"
+      ],
+      "decoding": {
+        "encoding": "windows-1252",
+        "encodingSource": "approved_local_fallback",
+        "confidence": "tentative",
+        "declaredCharset": null
+      }
+    },
+    {
+      "id": "M12",
+      "source": "Planalto",
+      "type": "Lei",
+      "layout": "HTML compilado do Planalto (ccivil_03)",
+      "chars": null,
+      "size": null,
+      "sha256": "5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f",
+      "bytes": 77417,
+      "stages": {
+        "captured": true,
+        "identified": true,
+        "read": false,
+        "validated": false,
+        "accepted": false
+      },
+      "profile": null,
+      "diagnostic": null,
+      "outputHash": null,
+      "evidence": [],
+      "notes": [
+        "sem perfil de leitura próprio; porte indeterminado"
+      ],
+      "decoding": {
+        "encoding": "windows-1252",
+        "encodingSource": "approved_local_fallback",
+        "confidence": "tentative",
+        "declaredCharset": null
+      }
+    },
+    {
       "id": "M14",
       "source": "CONFAZ",
       "type": "Convênio ICMS",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 20947,
-      "size": "médio",
+      "actChars": 1647,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "13bdf6fd9bbb466bea42f81cd1017969d5ac02ba5fbd333ed8ce60620afacb93",
       "bytes": 113445,
       "stages": {
@@ -715,7 +777,9 @@
       "type": "Convênio ICMS",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 23871,
-      "size": "médio",
+      "actChars": 1803,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "2732a2e1422a8197d560ee94745a0402ced487ee712cbf7e9d934882347c1188",
       "bytes": 130312,
       "stages": {
@@ -743,7 +807,9 @@
       "type": "Ajuste SINIEF",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 11680,
-      "size": "médio",
+      "actChars": 1306,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "f74457bdd4879560bb17d445eb5110091f356443929839f9d0c4a031c0032862",
       "bytes": 54672,
       "stages": {
@@ -771,6 +837,8 @@
       "type": "Ajuste SINIEF",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 69078,
+      "actChars": 59939,
+      "provisional": true,
       "size": "grande",
       "sha256": "4253e31bedb7582f55fc553b3a887a986f97f49818e747ab04448a18cd32574b",
       "bytes": 124885,
@@ -799,7 +867,9 @@
       "type": "Protocolo ICMS",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 19426,
-      "size": "médio",
+      "actChars": 1235,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "6c09825912e536fd224b41437de777afd3f5eb289ac80d5b501b00fd59929a50",
       "bytes": 99999,
       "stages": {
@@ -827,7 +897,9 @@
       "type": "Protocolo ICMS",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 25573,
-      "size": "médio",
+      "actChars": 7848,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "29ae2cb3dcf233ff62c41cecb8e78a338c60c63c5796624da46809a6a2744d5c",
       "bytes": 83163,
       "stages": {
@@ -855,7 +927,9 @@
       "type": "Instrução Normativa",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 12605,
-      "size": "médio",
+      "actChars": 2054,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "31b1b1f969813af9eba6dbac0f3781d6bbdc59a5b2f3af42ec30db291974d7a8",
       "bytes": 86545,
       "stages": {
@@ -883,6 +957,8 @@
       "type": "Instrução Normativa",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 40005,
+      "actChars": 28772,
+      "provisional": true,
       "size": "médio",
       "sha256": "2196ec600f9a1cff11047da3c467261168a1b79cd577126e3ec3e3280f206a10",
       "bytes": 121219,
@@ -911,6 +987,8 @@
       "type": "Instrução Normativa",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 1764668,
+      "actChars": 889042,
+      "provisional": true,
       "size": "grande",
       "sha256": "f6fd18d1a8ea0926f1329cde48ccec6f9c251f7cee451980312d7fbd59f842c7",
       "bytes": 1800240,
@@ -939,7 +1017,9 @@
       "type": "Decreto",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 18122,
-      "size": "médio",
+      "actChars": 5709,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "92cb1dff9ffc240ec1c715e063a9461d4b703da4da3654fc7fce96318f5b35d4",
       "bytes": 100726,
       "stages": {
@@ -967,6 +1047,8 @@
       "type": "Decreto",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 1172888,
+      "actChars": 1161917,
+      "provisional": true,
       "size": "grande",
       "sha256": "a77a1e4e1d092ef86a3851389e6d2eae29af603b85d5e0099d099716bb5469f4",
       "bytes": 1599964,
@@ -995,7 +1077,9 @@
       "type": "Portaria",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 15357,
-      "size": "médio",
+      "actChars": 4746,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "d2ca1bf2b076f678fd8e1a50554525dada0e19022d2769a8b780c6a8b1527896",
       "bytes": 89970,
       "stages": {
@@ -1023,6 +1107,8 @@
       "type": "Portaria",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 31074,
+      "actChars": 20149,
+      "provisional": true,
       "size": "médio",
       "sha256": "3629a9eb77320633d92d9d12b1d626faef2ac46627dcd3f49e75aef86a1d3a31",
       "bytes": 109003,
@@ -1051,7 +1137,9 @@
       "type": "Resolução",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 12814,
-      "size": "médio",
+      "actChars": 2210,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "866bd1e26cfdbf15bd706f442b5f807cf6e3fb19109efc860f75b9ac957daa0d",
       "bytes": 86811,
       "stages": {
@@ -1079,7 +1167,9 @@
       "type": "Resolução",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 11677,
-      "size": "médio",
+      "actChars": 1013,
+      "provisional": true,
+      "size": "pequeno",
       "sha256": "3d3c25f4310982087e0e95a74923a86701775e0280a300bac396503d2e1156b3",
       "bytes": 86028,
       "stages": {
@@ -1107,6 +1197,8 @@
       "type": "Resolução",
       "layout": "HTML da página do ato no in.gov.br",
       "chars": 349480,
+      "actChars": 334595,
+      "provisional": true,
       "size": "grande",
       "sha256": "1b5b23ccbf7b97d94b020118a4106f06993454f9ea026562bbbb2bb7b1372642",
       "bytes": 610084,
@@ -1135,6 +1227,8 @@
       "type": "Ajuste SINIEF",
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 119687,
+      "actChars": 111115,
+      "provisional": true,
       "size": "grande",
       "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
       "bytes": 205981,
@@ -1242,6 +1336,8 @@
       ],
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 922008,
+      "actChars": 292641,
+      "provisional": true,
       "size": "grande",
       "stages": {
         "captured": true,
@@ -1270,6 +1366,8 @@
       ],
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 82809,
+      "actChars": 53922,
+      "provisional": true,
       "size": "grande",
       "stages": {
         "captured": true,
@@ -1298,6 +1396,8 @@
       ],
       "layout": "HTML da página do CONFAZ (Plone)",
       "chars": 119682,
+      "actChars": 111115,
+      "provisional": true,
       "size": "grande",
       "stages": {
         "captured": true,
@@ -1821,10 +1921,17 @@
         "required": true
       },
       "route": "arquivo manual (M3, M4)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M14",
+        "M16"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M14",
+        "M16"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1838,16 +1945,10 @@
         "required": true
       },
       "route": "arquivo manual (M3, M4)",
-      "status": "covered",
-      "validatedSamples": [
-        "M14",
-        "M16"
-      ],
-      "complete": false,
-      "partialSamples": [
-        "M14",
-        "M16"
-      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1867,6 +1968,7 @@
         "http:M4"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
         "http:M3",
         "http:M4"
@@ -1884,10 +1986,15 @@
         "required": true
       },
       "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M18"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M18"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1901,14 +2008,10 @@
         "required": true
       },
       "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
-      "status": "covered",
-      "validatedSamples": [
-        "M18"
-      ],
-      "complete": false,
-      "partialSamples": [
-        "M18"
-      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1929,6 +2032,7 @@
         "http:M5"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
         "M19",
         "M5",
@@ -1947,10 +2051,17 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M20",
+        "M21"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M20",
+        "M21"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1964,16 +2075,10 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "covered",
-      "validatedSamples": [
-        "M20",
-        "M21"
-      ],
-      "complete": false,
-      "partialSamples": [
-        "M20",
-        "M21"
-      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2004,10 +2109,15 @@
         "required": true
       },
       "route": "arquivo manual (M9 em HTML)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M23"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M23"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2023,12 +2133,11 @@
       "route": "arquivo manual (M9 em HTML)",
       "status": "covered",
       "validatedSamples": [
-        "M23",
         "M24"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
-        "M23",
         "M24"
       ],
       "accepted": false,
@@ -2049,6 +2158,7 @@
         "M25"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
         "M25"
       ],
@@ -2065,10 +2175,15 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M26"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M26"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2082,14 +2197,10 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "covered",
-      "validatedSamples": [
-        "M26"
-      ],
-      "complete": false,
-      "partialSamples": [
-        "M26"
-      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2108,6 +2219,7 @@
         "M28"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
         "M28"
       ],
@@ -2124,10 +2236,15 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M29"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M29"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2143,12 +2260,11 @@
       "route": "arquivo manual (a selecionar)",
       "status": "covered",
       "validatedSamples": [
-        "M29",
         "M30"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
-        "M29",
         "M30"
       ],
       "accepted": false,
@@ -2181,10 +2297,17 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "pending",
-      "validatedSamples": [],
-      "complete": null,
-      "partialSamples": [],
+      "status": "covered",
+      "validatedSamples": [
+        "M32",
+        "M33"
+      ],
+      "complete": false,
+      "provisional": true,
+      "partialSamples": [
+        "M32",
+        "M33"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2198,16 +2321,10 @@
         "required": true
       },
       "route": "arquivo manual (a selecionar)",
-      "status": "covered",
-      "validatedSamples": [
-        "M32",
-        "M33"
-      ],
-      "complete": false,
-      "partialSamples": [
-        "M32",
-        "M33"
-      ],
+      "status": "pending",
+      "validatedSamples": [],
+      "complete": null,
+      "partialSamples": [],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -2226,6 +2343,7 @@
         "M34"
       ],
       "complete": false,
+      "provisional": true,
       "partialSamples": [
         "M34"
       ],
@@ -2562,15 +2680,13 @@
     "normas-leg-br--lei--pequeno",
     "normas-leg-br--lei--medio",
     "normas-leg-br--lei--grande",
-    "confaz--convenio-icms--pequeno",
-    "confaz--ajuste-sinief--pequeno",
-    "confaz--protocolo-icms--pequeno",
+    "confaz--convenio-icms--medio",
+    "confaz--ajuste-sinief--medio",
+    "confaz--protocolo-icms--medio",
     "confaz--protocolo-icms--grande",
-    "dou--instrucao-normativa--pequeno",
-    "dou--decreto--pequeno",
-    "dou--portaria--pequeno",
+    "dou--decreto--medio",
     "dou--portaria--grande",
-    "dou--resolucao--pequeno",
+    "dou--resolucao--medio",
     "dou--despacho--pequeno",
     "dou--despacho--medio",
     "dou--despacho--grande",
@@ -2586,7 +2702,7 @@
     "doe-sp--portaria-cat--medio",
     "doe-sp--portaria-cat--grande"
   ],
-  "coveredRequired": 23,
+  "coveredRequired": 25,
   "samplesOutsideGrid": [],
   "e9MatrixComplete": false
 }

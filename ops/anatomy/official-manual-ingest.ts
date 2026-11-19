@@ -4,7 +4,7 @@
  * ever overwritten and a partial state — bytes without meta — is refused). The meta records the URL, when the file was
  * saved (or, when not informed, when it was received: an upper bound, said so), SHA-256, size, the declared encoding
  * and the origin "reprodução salva pelo navegador" — never "original". The expected title is checked in the file decoded
- * with ITS declared encoding (unsupported encoding → refused); the browser's own "saved from url" note, when present,
+ * with its declared encoding or the COORD-approved SHA-256 fallback for M10/M12; the browser's own "saved from url" note, when present,
  * must name the same URL. Unknown items, foreign hosts and reserved acts (corpus/gold: 52/91, 100/97…) are refused;
  * every refusal is recorded. Nothing is promoted.
  *
@@ -14,6 +14,8 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { APPROVED_FALLBACK, CharsetRefused, decodeDeclared, decodeWithPolicy, UnsupportedEncodingError } from './charset-policy.js';
+export { decodeDeclared, UnsupportedEncodingError } from './charset-policy.js';
 import { RESERVED_ACT_KEYS, RESERVED_SOURCE_IDS } from '../../src/modules/anatomy/config/reserved-act-keys.js';
 
 export const MANUAL_DIR = fileURLToPath(new URL('./official-identification/manual/', import.meta.url));
@@ -56,21 +58,21 @@ export const MANUAL_ITEMS: readonly ManualItem[] = Object.freeze([
 
 export interface ManualMeta {
   item: string; act: string; source: string; type: string; url: string; savedAt: string | null; receivedAt: string; savedAtNote: string | null;
-  ingestedAt: string; fileName: string; sha256: string; bytes: number; declaredCharset: string;
+  ingestedAt: string; fileName: string; sha256: string; bytes: number; declaredCharset: string | null;
+  decoding?: { encoding: 'windows-1252'; encodingSource: 'approved_local_fallback'; confidence: 'tentative' };
   browserSavedFromUrl: string | null; origin: 'obtido manualmente pelo Fábio — reprodução salva pelo navegador';
   original: false; titleCheck: { pattern: string; matched: string }; representation: 'html'; promoted: false;
 }
 export type IngestResult = { status: 'accepted'; meta: ManualMeta } | { status: 'refused'; reason: string };
 
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
-const SUPPORTED: Record<string, string> = { 'utf-8': 'utf-8', utf8: 'utf-8', 'windows-1252': 'windows-1252', 'iso-8859-1': 'windows-1252', latin1: 'windows-1252' };
-export class UnsupportedEncodingError extends Error {}
-/** Decode with the encoding the file declares (fatal for UTF-8); anything else is refused, never guessed. */
-export function decodeDeclared(bytes: Uint8Array, declared: string | null): string {
-  const label = SUPPORTED[(declared ?? '').toLowerCase()];
-  if (!label) throw new UnsupportedEncodingError(`declared encoding ${declared ?? '(none)'} is not supported`);
-  return new TextDecoder(label, { fatal: label === 'utf-8' }).decode(bytes);
+export function decodeManual(bytes: Uint8Array, item: string, declaredCharset: string | null): { text: string; decoding?: NonNullable<ManualMeta['decoding']> } {
+  if (declaredCharset !== null || APPROVED_FALLBACK[sha(bytes)]?.manualItem !== item) return { text: decodeDeclared(bytes, declaredCharset) };
+  const decoded = decodeWithPolicy(bytes, { httpCharset: null });
+  if (decoded.encodingSource !== 'approved_local_fallback') throw new CharsetRefused('manual fallback requires no BOM or declared charset');
+  return { text: decoded.text, decoding: { encoding: 'windows-1252', encodingSource: 'approved_local_fallback', confidence: 'tentative' } };
 }
+
 const visibleText = (html: string): string => html.replace(/<(script|style)[\s\S]*?<\/\1>/giu, ' ').replace(/<[^>]+>/gu, ' ').replace(/&nbsp;/gu, ' ')
   .replace(/&#(\d+);/gu, (_, n) => String.fromCodePoint(Number(n))).replace(/\s+/gu, ' ');
 
@@ -94,11 +96,12 @@ export function ingestManual(input: { item: string; file: string; url: string; s
   if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return refuse('PDF received: a PDF page needs its own path (title read by the PDF reader); not ingested here');
   const head = new TextDecoder('latin1').decode(bytes.slice(0, 4096));
   const declaredCharset = /charset\s*=\s*["']?([\w-]+)/iu.exec(head)?.[1] ?? null;
-  let html: string;
-  try { html = decodeDeclared(bytes, declaredCharset); } catch (e) { return refuse(e instanceof UnsupportedEncodingError ? e.message : `bytes are not valid ${declaredCharset}`); }
+  let decoded: ReturnType<typeof decodeManual>;
+  try { decoded = decodeManual(bytes, spec.item, declaredCharset); }
+  catch (e) { return refuse(e instanceof UnsupportedEncodingError || e instanceof CharsetRefused ? e.message : `bytes are not valid ${declaredCharset}`); }
   const savedFrom = /<!--\s*saved from url=\(\d+\)(\S+?)\s*-->/iu.exec(head)?.[1] ?? null;
   if (savedFrom && savedFrom !== input.url) return refuse(`the browser recorded "saved from url=${savedFrom}", which differs from the URL given`);
-  const found = spec.title.exec(visibleText(html));
+  const found = spec.title.exec(visibleText(decoded.text));
   if (!found) return refuse(`expected title not found in the file (${spec.act})`);
   mkdirSync(dir, { recursive: true });
   const fileName = `${spec.item}.html`; const htmlPath = join(dir, fileName); const metaPath = join(dir, `${spec.item}.meta.json`);
@@ -108,7 +111,8 @@ export function ingestManual(input: { item: string; file: string; url: string; s
   const meta: ManualMeta = { item: spec.item, act: spec.act, source: spec.source, type: spec.type, url: input.url,
     savedAt: input.savedAt ? new Date(input.savedAt).toISOString() : null, receivedAt,
     savedAtNote: input.savedAt ? null : 'hora do salvamento não informada; receivedAt é o limite superior (recebimento do arquivo)',
-    ingestedAt: now(), fileName, sha256: sha(bytes), bytes: bytes.byteLength, declaredCharset: declaredCharset!, browserSavedFromUrl: savedFrom,
+    ingestedAt: now(), fileName, sha256: sha(bytes), bytes: bytes.byteLength, declaredCharset, browserSavedFromUrl: savedFrom,
+    ...(decoded.decoding ? { decoding: decoded.decoding } : {}),
     origin: 'obtido manualmente pelo Fábio — reprodução salva pelo navegador', original: false,
     titleCheck: { pattern: spec.title.source, matched: found[0].replace(/\s+/gu, ' ').slice(0, 200) }, representation: 'html', promoted: false };
   // Exclusive creation of bytes then meta; if the meta cannot be created, the bytes just written are removed (no orphan).

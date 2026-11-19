@@ -11,7 +11,7 @@
  *   validated  — conservative invariants hold and the output is locked by a regression baseline run by a CI test;
  *   accepted   — independent review recorded for that sample (none yet: collection acceptance ≠ anatomy acceptance).
  *
- * Size criterion: canonical characters produced by the engine. pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000.
+ * Size criterion: act-only text. DOU and CONFAZ portal samples require a delimited act region. pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000.
  * `--write` regenerates docs/anatomy/official-coverage-matrix.json and docs/anatomy/official-samples-baseline.json.
  */
 import { createHash } from 'node:crypto';
@@ -21,9 +21,10 @@ import { fileURLToPath } from 'node:url';
 import { analyzeAnatomy } from '../../src/modules/anatomy/engine.js';
 import { ANATOMY_ENGINE_BUILD_HASH } from '../../src/modules/anatomy/build-identity.js';
 import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-preparation.js';
-import { MANUAL_DIR, decodeDeclared, type ManualMeta } from './official-manual-ingest.js';
+import { MANUAL_DIR, decodeManual, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
-import { APPROVED_FALLBACK, compareWithIndependent, decodeWithPolicy, PASSAGES } from './charset-policy.js';
+import { APPROVED_FALLBACK, compareWithIndependent, decodeDeclared, decodeWithPolicy, PASSAGES } from './charset-policy.js';
+import { portalActChars } from './official-act-size.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
@@ -318,11 +319,15 @@ export const GRID: readonly GridCell[] = Object.freeze([
 export interface Sample {
   id: string; source: string; type: string; layout: string; chars: number | null; size: Size | null; sha256: string; bytes: number;
   stages: { captured: boolean; identified: boolean; read: boolean; validated: boolean; accepted: boolean };
+  /** Portal act text only. Null means porte indeterminado; chars still measures the full reader output for its baseline. */
+  actChars?: number | null;
+  /** These portal layouts remain provisional until the next reader cycle. */
+  provisional?: true;
   /** R2 B-3: true = complete reading (no partial status, no unidentified text, every material annex read); false = partial; null = not assessed for this source. Independent of `validated` (invariants + baseline). */
   readingComplete?: boolean | null;
   profile: string | null; diagnostic: { profile: string; chars: number } | null; outputHash: string | null; evidence: string[]; notes: string[];
   /** Only for snapshots decoded under the approved local fallback (charset-policy.ts); never a declared charset. */
-  decoding?: { encoding: string; encodingSource: string; confidence: string; declaredCharset: null; independentCheck: { passage: string; sentenceEqual: boolean }[] };
+  decoding?: { encoding: string; encodingSource: string; confidence: string; declaredCharset: null; independentCheck?: { passage: string; sentenceEqual: boolean }[] };
 }
 export class SampleIntegrityError extends Error {}
 
@@ -436,18 +441,20 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
       stages: { captured: true, identified: m.titleCheck.found, read: false, validated: false, accepted: false }, profile: null,
       diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
   }
-  // Files saved by hand and ingested (official-manual-ingest.ts): bytes and declared encoding are checked first.
+  // Manual provenance and the approved decoding decision must agree with the bytes.
   if (existsSync(MANUAL_DIR)) for (const f of readdirSync(MANUAL_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {
     const m = JSON.parse(readFileSync(join(MANUAL_DIR, f), 'utf8')) as ManualMeta;
     const bytes = verifiedBytes(join(MANUAL_DIR, m.fileName), m, m.item);
-    const html = decodeDeclared(bytes, m.declaredCharset);
+    const { text: html, decoding } = decodeManual(bytes, m.item, m.declaredCharset);
+    if (JSON.stringify(m.decoding) !== JSON.stringify(decoding)) throw new SampleIntegrityError(`${m.item}: decoding provenance differs from the approved policy`);
     const profile = m.source === 'CONFAZ' ? 'CONFAZ' : m.source === 'DOU' ? 'DOU' : null;
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : m.source === 'DOU' ? LAYOUT.DOU_HTML : LAYOUT.PLANALTO_HTML;
     if (!profile) { out.push({ id: m.item, source: m.source, type: m.type, layout, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
-      stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio'] }); continue; }
+      stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio; porte indeterminado'], ...(decoding ? { decoding: { ...decoding, declaredCharset: null } } : {}) }); continue; }
     const rd = readWith(profile, m.item, html);
+    const actChars = portalActChars(profile, html);
     const ok = locked(m.item, m.sha256, profile, rd);
-    const manSample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
+    const manSample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile, diagnostic: null, outputHash: rd.outputHash,
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
     assessNonRfb(manSample, rd); out.push(manSample);
@@ -464,7 +471,7 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : LAYOUT.PLANALTO_HTML;
     if (!m.readable || m.source !== 'CONFAZ') {
       let decoding: Sample['decoding'];
-      if (m.source === 'Planalto' && APPROVED_FALLBACK[m.sha256]) {
+      if (m.source === 'Planalto' && (m.item === 'M1' || m.item === 'M2') && APPROVED_FALLBACK[m.sha256]) {
         const d = decodeWithPolicy(bytes, { httpCharset: null });
         const leg = m.item === 'M1' ? 'lei-10637-2002-atualizada' : 'lei-10833-2003-atualizada';
         const indep = readFileSync(join(ROOT, 'leg-normas', `${leg}.html`), 'utf8');
@@ -474,9 +481,11 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
       out.push({ ...base, layout, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
         profile: null, outputHash: null, notes: [decoding ? 'charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado' : (m.readableNote ?? 'sem perfil de leitura próprio')],
         ...(decoding ? { decoding } : {}) }); continue; }
-    const rd = readWith('CONFAZ', id, decodeDeclared(bytes, m.declaredCharset));
+    const html = decodeDeclared(bytes, m.declaredCharset);
+    const rd = readWith('CONFAZ', id, html);
+    const actChars = portalActChars('CONFAZ', html);
     const ok = locked(id, m.sha256, 'CONFAZ', rd);
-    const cfSample: Sample = { ...base, layout, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',
+    const cfSample: Sample = { ...base, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',
       outputHash: rd.outputHash, evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
     assessNonRfb(cfSample, rd); out.push(cfSample);
   }
@@ -498,6 +507,7 @@ export function buildMatrix(samples = collectSamples(), grid: readonly GridCell[
     // R2 B-3: layout coverage (status) is unchanged; completeness is reported beside it, never folded into the count.
     const complete = !vs.length ? null : vs.some((s) => s.readingComplete === true) ? true : vs.every((s) => s.readingComplete === null || s.readingComplete === undefined) ? null : false;
     return { ...c, status: validated.length ? 'covered' as const : 'pending' as const, validatedSamples: validated, complete,
+      ...(vs.length > 0 && vs.every((s) => s.provisional) ? { provisional: true } : {}),
       partialSamples: vs.filter((s) => s.readingComplete === false).map((s) => s.id), accepted: hits.some((s) => s.stages.accepted),
       unvalidatedSamples: hits.filter((s) => !s.stages.validated).map((s) => ({ id: s.id, stages: s.stages })) };
   });
@@ -505,7 +515,7 @@ export function buildMatrix(samples = collectSamples(), grid: readonly GridCell[
   const pending = required.filter((c) => c.status === 'pending').map((c) => c.id);
   const unmatched = samples.filter((s) => !grid.some((c) => matches(c, s)) && s.size !== null).map((s) => s.id);
   return { criterion: { approval: 'tribusca-control#116 c.6514510003; E9: STATUS-MATRIX-02 §9 (sem fração); R2 #303 c.6701945748',
-    size: 'pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do texto canônico do motor', stages: 'captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)' },
+    size: 'pequeno < 10.000; médio 10.000–49.999; grande ≥ 50.000 caracteres do ato; portais DOU/CONFAZ medidos na região do ato, sem recorte inequívoco o porte é indeterminado', stages: 'captured → identified → read (perfil próprio) → validated (invariantes + baseline em teste de CI) → accepted (revisão)' },
     grid: { status: GRID_STATUS, approved: gridApproved, approval: GRID_APPROVAL, cells: grid.length, required: required.length },
     samples, cells, requiredPending: pending, coveredRequired: required.length - pending.length, samplesOutsideGrid: unmatched,
     e9MatrixComplete: gridApproved && pending.length === 0 };
