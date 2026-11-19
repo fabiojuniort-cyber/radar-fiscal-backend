@@ -176,9 +176,9 @@
       "type": "Convênio ICMS",
       "size": "médio",
       "route": "arquivo manual (M3, M4)",
-      "class": "a?/c",
-      "obstacle": "corpus 02 (CV100/97, 30.591 chars, médio) está no acervo de teste, mas é HTML \"sanitized\" de fixture, não bytes oficiais com meta",
-      "remedy": "decisão de proveniência; senão insumo Fábio"
+      "class": "c",
+      "obstacle": "insumo manual; corpus 02 (CV100/97) é ato reservado do corpus (RESERVED_ACT_KEYS) e não serve",
+      "remedy": "insumo Fábio"
     },
     {
       "cellId": "confaz--ajuste-sinief--pequeno",
@@ -246,9 +246,9 @@
       "type": "Instrução Normativa",
       "size": "médio",
       "route": "arquivo manual (M9 em HTML)",
-      "class": "c (a?)",
-      "obstacle": "corpus 11 (IN RFB 2.342/2026, 17.021 chars) existe como XML INLABS — layout diferente do da grade (HTML in.gov.br)",
-      "remedy": "decisão de layout; senão insumo Fábio"
+      "class": "c",
+      "obstacle": "insumo manual (rota \"M9 em HTML\"); corpus 11 (IN 2.342/26) é ato reservado",
+      "remedy": "insumo Fábio"
     },
     {
       "cellId": "dou--instrucao-normativa--grande",
@@ -306,9 +306,9 @@
       "type": "Portaria",
       "size": "médio",
       "route": "arquivo manual (a selecionar)",
-      "class": "c (a?)",
-      "obstacle": "corpus 10 (Portaria SAES/MS 4.940/2026, 18.877 chars) existe como XML INLABS",
-      "remedy": "decisão de layout; senão insumo Fábio"
+      "class": "c",
+      "obstacle": "insumo manual; corpus 10 (Portaria 4.940/26) é ato reservado",
+      "remedy": "insumo Fábio"
     },
     {
       "cellId": "dou--portaria--grande",
@@ -356,9 +356,9 @@
       "type": "Despacho",
       "size": "pequeno",
       "route": "arquivo manual (a selecionar)",
-      "class": "c (a?)",
-      "obstacle": "corpus 07 (Despacho MF, 1.222 chars) existe como XML INLABS",
-      "remedy": "decisão de layout; senão insumo Fábio"
+      "class": "c",
+      "obstacle": "insumo manual; corpus 07 (fonte 24382325) é ato reservado",
+      "remedy": "insumo Fábio"
     },
     {
       "cellId": "dou--despacho--medio",

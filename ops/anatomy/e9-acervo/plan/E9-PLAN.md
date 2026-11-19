@@ -52,21 +52,21 @@ Por isso a classe (e) aparece sempre junto com outra classe, nunca sozinha.
 | 14 | normas.leg.br Lei médio | b+d | idem | idem |
 | 15 | normas.leg.br Lei grande | d | **4 amostras no acervo** (Leis 10.637 e 10.833, cada uma original e atualizada); o perfil NORMAS-LEG só existe nos ramos do #305 e do #309 | perfil NORMAS-LEG |
 | 16 | CONFAZ Convênio pequeno | c | insumo manual | insumo Fábio |
-| 17 | CONFAZ Convênio médio | a?/c | o corpus 02 (CV100/97, 30.591 caracteres) é HTML "sanitized" de fixture, não bytes oficiais com meta | decisão de proveniência; senão insumo |
+| 17 | CONFAZ Convênio médio | c | insumo manual; o corpus 02 (CV100/97) é **ato reservado do corpus** (chave em `RESERVED_ACT_KEYS`/`RESERVED_SOURCE_IDS`; o ingestor recusa) — não serve como amostra | insumo Fábio |
 | 18 | CONFAZ Ajuste SINIEF pequeno | c | insumo manual | insumo Fábio |
 | 19 | CONFAZ Ajuste SINIEF médio | c | insumo manual | insumo Fábio |
 | 20 | CONFAZ Protocolo pequeno | c | insumo manual | insumo Fábio |
 | 21 | CONFAZ Protocolo médio | c | insumo manual | insumo Fábio |
 | 22 | CONFAZ Protocolo grande | c/e | insumo manual; Protocolo grande é raro | insumo ou N/A |
 | 23 | DOU IN pequeno | c | insumo manual HTML | insumo Fábio |
-| 24 | DOU IN médio | c (a?) | o corpus 11 (IN RFB 2.342/2026, 17.021 caracteres) existe, mas como **XML INLABS**, e a grade exige HTML do in.gov.br | decisão de layout; senão insumo |
+| 24 | DOU IN médio | c | insumo manual (rota da grade: "M9 em HTML"); o corpus 11 (IN 2.342/26) é **ato reservado do corpus** (chave em `RESERVED_ACT_KEYS`/`RESERVED_SOURCE_IDS`; o ingestor recusa) — não serve como amostra | insumo Fábio |
 | 25 | DOU IN grande | c | insumo manual | insumo Fábio |
 | 26–28 | DOU Decreto, 3 portes | c | insumo manual | insumo Fábio |
 | 29 | DOU Portaria pequeno | c | insumo manual | insumo Fábio |
-| 30 | DOU Portaria médio | c (a?) | o corpus 10 (Portaria SAES/MS 4.940/2026, 18.877 caracteres) é XML INLABS | decisão de layout; senão insumo |
+| 30 | DOU Portaria médio | c | insumo manual; o corpus 10 (Portaria 4.940/26) é **ato reservado do corpus** (chave em `RESERVED_ACT_KEYS`/`RESERVED_SOURCE_IDS`; o ingestor recusa) — não serve como amostra | insumo Fábio |
 | 31 | DOU Portaria grande | c | insumo manual | insumo Fábio |
 | 32–34 | DOU Resolução, 3 portes | c | insumo manual | insumo Fábio |
-| 35 | DOU Despacho pequeno | c (a?) | o corpus 07 (Despacho MF, 1.222 caracteres) é XML INLABS | decisão de layout; senão insumo |
+| 35 | DOU Despacho pequeno | c | insumo manual; o corpus 07 (fonte 24382325) é **ato reservado do corpus** (chave em `RESERVED_ACT_KEYS`/`RESERVED_SOURCE_IDS`; o ingestor recusa) — não serve como amostra | insumo Fábio |
 | 36 | DOU Despacho médio | c/e | Despacho médio é raro | insumo ou N/A |
 | 37 | DOU Despacho grande | c/e | Despacho grande é improvável | N/A justificado, ou insumo |
 | 38 | DOU página do jornal (n/a) | d | **M9 (p57 e p58) já está no acervo**; a extração do PDF mistura as colunas | preparação de colunas do PDF DOU |
@@ -77,10 +77,10 @@ Por isso a classe (e) aparece sempre junto com outra classe, nunca sozinha.
 
 | Classe | Células |
 |---|---|
-| c | 39 (inclui as variantes c/e, c+d e c (a?)) |
+| c | 42 (inclui as variantes c/e, c+d e c+d/e) |
 | d | 3 (Planalto grande, normas.leg grande, DOU página) |
 | b | 3 (normas.leg pequeno e médio, Sefaz-SP grande) |
-| a, condicional | 4 (corpus 02, 10, 11 e 07, que dependem de decisão de proveniência ou de layout) |
+| a | 0 (os atos do corpus de teste são reservados e o ingestor os recusa — correção do complemento) |
 
 Nenhuma célula é (a) pura, em que só falte ler.
 
@@ -132,23 +132,23 @@ Com isso o total iria de 4 para até 15 de 61. A F1 não muda enquanto a matriz 
 
 | Etapa | Conteúdo | Células, estimativa | Depende de |
 |---|---|---|---|
-| 0 | Decisões sem custo: N/A das 7 possíveis (e); layout XML INLABS para DOU (corpus 07, 10, 11); proveniência do corpus 02 (CV100/97); se a limitação de proveniência Sefaz-SP bloqueia o aceite | 0 a 7 retiradas da grade, mais 0 a 4 cobertas | COORD |
+| 0 | Decisões sem custo: N/A das 7 possíveis (e); se a limitação de proveniência Sefaz-SP bloqueia o aceite | 0 a 7 retiradas da grade | COORD |
 | 1 | E9-M1, a ferramenta da matriz | 0 (pré-requisito) | mandato |
 | 2 | Ciclo de motor E9-M2/M3, com revalidação dos 5 aceites RFB | até 11 aceitas: 8 já cobertas + 3 novas (Planalto grande, normas.leg grande, DOU página) | mandato e revisão independente |
-| 3 | Corpus já no acervo, se a etapa 0 aprovar | até 4 (DOU IN médio, Portaria médio e Despacho pequeno; CONFAZ Convênio médio) | decisão da etapa 0 |
+| 3 | ~~Corpus já no acervo~~ — **retirada**: os atos do corpus são reservados e o ingestor os recusa | 0 | — |
 | 4 | Insumos manuais | até 24: Planalto 2, CONFAZ 6 a 7, DOU 15 a 18 | **Fábio** (arquivos) |
 | 5 | Reautorização do P2-c | 9 RFB, mais o anexo do ADE Corat 33/2025 | **Fábio/COORD** (grants e orçamento de requisições) |
 | 6 | Coleta acessível | normas.leg pequeno e médio (2); Sefaz-SP grande (1, ou N/A) | mandato de coleta |
 | 7 | DOE-SP P2-d | 9 | frente DOE-SP, depois do M9 (etapa 2, M-DOUPDF) |
 
 **Dependências do Fábio:**
-- arquivos manuais Planalto (pequeno e médio), CONFAZ (Convênio pequeno, e médio se o corpus 02 não servir; Ajuste pequeno e médio; Protocolo nos 3 portes) e DOU (15 atos em HTML);
+- arquivos manuais Planalto (pequeno e médio), CONFAZ (Convênio pequeno e médio; Ajuste pequeno e médio; Protocolo nos 3 portes) e DOU (15 atos em HTML);
 - reautorização e orçamento do P2-c para a RFB.
 
-**Caminho crítico para a E9 completa:** etapas 2, 4, 5 e 7. Sem insumos manuais, grants e P2-d, o teto é de cerca de **19 de 61**: 15 pelo motor e até 4 pelo corpus.
+**Caminho crítico para a E9 completa:** etapas 2, 4, 5 e 7. Sem insumos manuais, grants e P2-d, o teto é de cerca de **15 de 61**, todos pelo motor (o corpus de teste é reservado e não conta).
 
 ## 5. Limites deste plano
 
 - Foi só leitura e medição offline. Usei o motor atual em amostras do acervo, sem coleta e sem tocar em motor, matriz, registros ou flags.
-- As medições de porte do corpus (02, 07, 10, 11) são diagnósticas. Todas deram status `partial` e nenhuma conta como cobertura.
+- As medições de porte do corpus (02, 07, 10, 11) foram só diagnósticas; esses atos são reservados (`RESERVED_ACT_KEYS`) e nunca contam como cobertura.
 - Respeitei a reserva do corpus (04, 06, 08, 09, 12, 14, 16, 18, 24, 28 e as partições `reserved-final`): nenhum desses itens foi lido.
