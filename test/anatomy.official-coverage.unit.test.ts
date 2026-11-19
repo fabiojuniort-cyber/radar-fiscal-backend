@@ -5,10 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
-import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
-import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
+import { assessNonRfbSample, baselineEntrySha256, lotEntrySha256, nonRfbReadingAssessment, buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
+import { MANUAL_ITEMS, decodeDeclared, decodeManual, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
 import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anatomy/charset-policy.js';
+import { portalActChars } from '../ops/anatomy/official-act-size.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
@@ -18,11 +19,24 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 25 cells covered (13 previous + 12 provisional by the manual delivery; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
-    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno',
+    // manual delivery of 2026-11-19 (M14–M34): covered by layout only — every one of these readings is partial (complete:false)
+    'confaz--convenio-icms--pequeno', 'confaz--ajuste-sinief--pequeno', 'confaz--protocolo-icms--pequeno',
+    'dou--instrucao-normativa--pequeno', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--grande',
+    'dou--decreto--pequeno', 'dou--decreto--grande', 'dou--portaria--pequeno', 'dou--portaria--medio',
+    'dou--resolucao--pequeno', 'dou--resolucao--grande'].sort());
+  for (const id of ['M14', 'M16', 'M18', 'M19', 'M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34']) {
+    const x = real.find((s) => s.id === id)!; assert.deepEqual([x.stages.validated, x.readingComplete, x.stages.accepted], [true, false, false], `${id}: covered by layout, partial reading, never accepted`);
+  }
+  for (const id of ['M10', 'M12']) {
+    const x = real.find((s) => s.id === id)!;
+    assert.deepEqual(x.decoding, { encoding: 'windows-1252', encodingSource: 'approved_local_fallback', confidence: 'tentative', declaredCharset: null });
+    assert.deepEqual([x.stages.identified, x.stages.read, x.stages.validated, x.stages.accepted, x.size], [true, false, false, false, null]);
+  }
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
@@ -41,7 +55,41 @@ test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit 
   const p58 = real.find((s) => s.id === 'http:M9-p58')!;
   assert.deepEqual([p58.source, p58.layout, p58.stages.identified, p58.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]);
   assert.match(p58.notes[0]!, /NÃO se presume ato completo/u, 'two pages are never presumed to complete the act');
-  assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na') && m.requiredPending.includes('dou--instrucao-normativa--medio'), 'M9 PDF does not stand for the HTML act cell');
+  assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na'), 'the M9 PDF page cell stays pending');
+  assert.deepEqual(m.cells.find((c) => c.id === 'dou--instrucao-normativa--medio')!.validatedSamples.slice().sort(), ['M24'], 'the HTML act cell is covered only by HTML samples; the M9 PDF never stands for it');
+});
+
+test('E9-M1b uses the real act region for M23 and M28 while preserving reader output evidence', () => {
+  const m = buildMatrix(real);
+  const small = real.find((s) => s.id === 'M23')!;
+  const large = real.find((s) => s.id === 'M28')!;
+  assert.deepEqual([small.chars, small.actChars, small.size], [12_605, 2_054, 'pequeno']);
+  assert.deepEqual([large.chars, large.actChars, large.size], [1_172_888, 1_161_917, 'grande']);
+  for (const [cellId, sampleId] of [['dou--instrucao-normativa--pequeno', 'M23'], ['dou--decreto--grande', 'M28']]) {
+    const cell = m.cells.find((entry) => entry.id === cellId)!;
+    assert.deepEqual([cell.validatedSamples, cell.provisional, cell.complete, cell.accepted], [[sampleId], true, false, false]);
+  }
+});
+
+test('E9-M1b ignores navigation and reports indeterminate without exactly one nonempty act container', () => {
+  const act = '<div class="texto-dou"><p>Ato &amp; conteúdo</p><p>Art. 1º</p><script>omit</script><nav>omit</nav></div>';
+  const article = (body: string) => `<article id="materia"><header>omit</header>${body}<footer>omit</footer></article>`;
+  assert.equal(portalActChars('DOU', article(act)), 'Ato & conteúdo Art. 1º'.length);
+  assert.equal(portalActChars('DOU', '<article id="materia"><div class="texto-dou">sem fechamento'), null);
+  assert.equal(portalActChars('DOU', article(act + act)), null);
+  assert.equal(portalActChars('DOU', article('<div class="texto-dou"><script>omit</script></div>')), null);
+  assert.equal(portalActChars('DOU', act), null);
+  assert.equal(portalActChars('CONFAZ', '<main id="content-core"><div id="parent-fieldname-text"><p>Ato</p><p>Anexo</p></div></main>'), 'Ato Anexo'.length);
+  assert.equal(portalActChars('CONFAZ', '<div id="parent-fieldname-text">Ato sem contexto</div>'), null);
+});
+
+test('E9-M1b manual fallback is pinned both to bytes and to the approved item', () => {
+  for (const [item, other] of [['M10', 'M12'], ['M12', 'M10']] as const) {
+    const bytes = readFileSync(new URL(`../ops/anatomy/official-identification/manual/${item}.html`, import.meta.url));
+    assert.equal(decodeManual(bytes, item, null).decoding?.encodingSource, 'approved_local_fallback');
+    assert.throws(() => decodeManual(bytes, other, null), UnsupportedEncodingError);
+    assert.throws(() => decodeManual(Buffer.concat([bytes, Buffer.from(' ')]), item, null), UnsupportedEncodingError);
+  }
 });
 
 const okStages = { captured: true, identified: true, read: true, validated: true, accepted: false };
@@ -181,10 +229,11 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
   for (const id of ['http:M1', 'http:M2']) {
     const x = real.find((s) => s.id === id)!;
     assert.deepEqual([x.decoding?.encoding, x.decoding?.encodingSource, x.decoding?.confidence, x.decoding?.declaredCharset, x.stages.read], ['windows-1252', 'approved_local_fallback', 'tentative', null, false]);
-    assert.ok(x.decoding!.independentCheck.length > 0 && x.decoding!.independentCheck.every((c) => c.sentenceEqual), `${id}: accented passage equal to the independent official representation`);
+    const independentCheck = x.decoding?.independentCheck ?? [];
+    assert.ok(independentCheck.length > 0 && independentCheck.every((c) => c.sentenceEqual), `${id}: accented passage equal to the independent official representation`);
   }
   const m1 = new Uint8Array(readFileSync(new URL('../ops/anatomy/official-identification/e9-http/M1.html', import.meta.url)));
-  assert.equal(Object.keys(APPROVED_FALLBACK).length, 2);
+  assert.equal(Object.keys(APPROVED_FALLBACK).length, 4);
   const altered = new Uint8Array(m1); altered[600] = altered[600]! ^ 0x01;
   assert.throws(() => decodeWithPolicy(altered, { httpCharset: null }), CharsetRefused, 'one changed byte leaves the policy');
   assert.throws(() => decodeWithPolicy(new TextEncoder().encode('<p>sem charset</p>'), { httpCharset: null }), CharsetRefused);
@@ -333,7 +382,7 @@ test('R2 (9) + B-3: only complete samples are eligible (Portaria 635 + E9-A1); p
   assert.deepEqual([cell('rfb--portaria--medio').status, cell('rfb--portaria--medio').complete], ['covered', true]);
   assert.deepEqual([cell('rfb--ato-declaratorio-executivo--pequeno').status, cell('rfb--ato-declaratorio-executivo--pequeno').complete, cell('rfb--ato-declaratorio-executivo--pequeno').partialSamples],
     ['covered', false, ['rfb:148629']], 'covered (layout) but complete:false, explicit');
-  assert.equal(mx.coveredRequired, 13, 'coverage count unchanged by the completeness flag');
+  assert.equal(mx.coveredRequired, 25, 'coverage count (layout) is not changed by the completeness flag: 13 + 12 provisional cells');
 });
 
 test('R2 B-4: decidedOn must be a REAL date', async () => {
@@ -433,4 +482,90 @@ test('R5 B4-1/B4-2: no spelling of a suffix truncates to I; a dangling separator
   // unchanged positives
   assert.equal(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo I desta Portaria.'], onlyI), readI), null, 'plain I still complete');
   assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I a III desta Portaria.'])).required.map((q) => q.label), ['1', '2', '3']);
+});
+
+// E9-M1: non-RFB reading completeness + acceptance, derived like RFB.
+test('E9-M1 nonRfbReadingAssessment: complete case, each gap kind, allowlisted code ignored', () => {
+  const ok = { status: 'complete', unidentifiedChars: 0, limitationCodes: [] as string[] };
+  assert.deepEqual(nonRfbReadingAssessment(ok), { complete: true, gaps: [] });
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, limitationCodes: ['excluded_executable_content'] }), { complete: true, gaps: [] }, 'script/noscript removal is non-substantive');
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, status: 'partial' }), { complete: false, gaps: ['status partial'] });
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, unidentifiedChars: 7 }), { complete: false, gaps: ['7 unidentified chars'] });
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, limitationCodes: ['excluded_executable_content', 'image_without_ocr', 'a_code'] }), { complete: false, gaps: ['limitations image_without_ocr, a_code'] });
+  assert.deepEqual(nonRfbReadingAssessment({ status: 'partial', unidentifiedChars: 3, limitationCodes: ['x'] }).gaps, ['status partial', '3 unidentified chars', 'limitations x']);
+});
+
+test('E9-M1 baselineEntrySha256 is deterministic and equals the sha of the canonical JSON of the entry', () => {
+  const e = { id: 'M5', sha256: 'a'.repeat(64), profile: 'CONFAZ', outputHash: 'b'.repeat(64), chars: 123 };
+  assert.equal(baselineEntrySha256(e), baselineEntrySha256({ chars: 123, outputHash: 'b'.repeat(64), profile: 'CONFAZ', sha256: 'a'.repeat(64), id: 'M5' }), 'key order does not matter');
+  assert.equal(baselineEntrySha256(e), lotEntrySha256(e));
+  assert.match(baselineEntrySha256(e), /^[0-9a-f]{64}$/u);
+  assert.notEqual(baselineEntrySha256(e), baselineEntrySha256({ ...e, chars: 124 }));
+});
+
+test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading is accepted; wrong digest/engine/cell or a partial reading is not; real non-RFB samples are never accepted today', async () => {
+  const { ANATOMY_ENGINE_BUILD_HASH: E } = await import('../src/modules/anatomy/build-identity.js');
+  const cellId = 'confaz--convenio-icms--grande';
+  const entry = { id: 'synthetic', sha256: '1'.repeat(64), profile: 'CONFAZ', outputHash: '2'.repeat(64), chars: 60_000 };
+  const mk = () => sample({ id: 'synthetic', size: 'grande', chars: 60_000, sha256: entry.sha256, outputHash: entry.outputHash });
+  const rec = (over: object = {}) => ({ sampleId: 'synthetic', cellId, scope: 'offline' as const, entrySha256: baselineEntrySha256(entry), engineBuildHash: E, decidedBy: 't', decidedOn: '2026-11-19', ref: 't', limits: ['t'], ...over });
+  const complete = { status: 'complete', unidentifiedChars: 0, limitationCodes: ['excluded_executable_content'] };
+  const run = (rd: typeof complete, acc: ReturnType<typeof rec>[], base = [entry]) => { const x = mk(); assessNonRfbSample(x, rd, base, acc); return x; };
+  const good = run(complete, [rec()]);
+  assert.deepEqual([good.readingComplete, good.stages.accepted, good.notes], [true, true, []]);
+  assert.ok(good.evidence.includes('docs/anatomy/e9-acceptances.json'));
+  assert.equal(run(complete, []).stages.accepted, false, 'no record');
+  assert.equal(run(complete, [rec({ entrySha256: '0'.repeat(64) })]).stages.accepted, false, 'wrong digest');
+  assert.equal(run(complete, [rec({ engineBuildHash: '0'.repeat(64) })]).stages.accepted, false, 'wrong engine');
+  assert.equal(run(complete, [rec({ cellId: 'confaz--ajuste-sinief--grande' })]).stages.accepted, false, 'wrong cell');
+  assert.equal(run(complete, [rec({ sampleId: 'other' })]).stages.accepted, false, 'other sample');
+  assert.equal(run(complete, [rec()], []).stages.accepted, false, 'no baseline entry');
+  const partial = run({ ...complete, status: 'partial', unidentifiedChars: 5 }, [rec()]);
+  assert.deepEqual([partial.readingComplete, partial.stages.accepted], [false, false]);
+  assert.match(partial.notes.join(' '), /partial reading — never accepted as complete: status partial; 5 unidentified chars/u);
+  const unvalidated = mk(); unvalidated.stages = { ...okStages, validated: false };
+  assessNonRfbSample(unvalidated, complete, [entry], [rec()]);
+  assert.deepEqual([unvalidated.readingComplete, unvalidated.stages.accepted, unvalidated.notes], [null, false, []], 'only validated samples are assessed');
+  // real acervo: every validated non-RFB reading is partial today; none accepted; the baseline is not affected by the partial note
+  const nonRfb = real.filter((s) => s.source !== 'RFB' && s.stages.validated);
+  assert.ok(nonRfb.length > 0 && nonRfb.every((s) => s.readingComplete === false && !s.stages.accepted && /^partial reading/u.test(s.notes[0]!)));
+  assert.equal(samplesBaseline(real).samples.length, nonRfb.length, 'partial notes do not drop samples from the baseline');
+  const mx = buildMatrix(real);
+  for (const id of ['confaz--convenio-icms--grande', 'confaz--ajuste-sinief--grande', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio']) {
+    const c = mx.cells.find((x) => x.id === id)!; assert.deepEqual([c.status, c.complete, c.accepted, c.partialSamples.length > 0], ['covered', false, false, true], id);
+  }
+});
+
+test('E9-M1 manual items M10–M37: official hosts, none reserved, title regex matches a synthetic heading, unknown/pending items still refused', async () => {
+  const { RESERVED_ACT_KEYS } = await import('../src/modules/anatomy/config/reserved-act-keys.js');
+  const heading: Record<string, string> = {
+    M10: 'LEI Nº 10.168, DE 29 DE DEZEMBRO DE 2000', M11: 'LEI Nº 9.779, DE 19 DE JANEIRO DE 1999', M12: 'Lei nº 9.718, de 27 de novembro de 1998', M13: 'LEI Nº 10.147, DE 21 DE DEZEMBRO DE 2000',
+    M14: 'CONVÊNIO ICMS 63/26', M15: 'CONVÊNIO ICMS 88/26', M16: 'CONVENIO ICMS 153/20', M17: 'CONVÊNIO ICMS 236/21', M18: 'AJUSTE SINIEF 01/26', M19: 'AJUSTE SINIEF 19/16',
+    M20: 'PROTOCOLO ICMS 88/26', M21: 'PROTOCOLO ICMS 21/11', M22: 'PROTOCOLO ICMS 41/08',
+    M23: 'INSTRUÇÃO NORMATIVA RFB Nº 1.932, DE 2 DE ABRIL DE 2020', M24: 'INSTRUCAO NORMATIVA RFB N 2.237, DE 3 DE DEZEMBRO DE 2024', M25: 'INSTRUÇÃO NORMATIVA RFB Nº 2.121, DE 15 DE DEZEMBRO DE 2022',
+    M26: 'DECRETO Nº 10.979, DE 25 DE FEVEREIRO DE 2022', M28: 'DECRETO Nº 9.580, DE 22 DE NOVEMBRO DE 2018', M29: 'PORTARIA RFB Nº 514, DE 21 DE FEVEREIRO DE 2025', M30: 'PORTARIA RFB Nº 635, DE 30 DE DEZEMBRO DE 2025',
+    M32: 'RESOLUÇÃO CGSN Nº 164, DE 2022', M33: 'RESOLUÇÃO CGSN Nº 182, DE 2025', M34: 'RESOLUÇÃO CGSN Nº 140, DE 22 DE MAIO DE 2018', M35: 'DESPACHO Nº 174, DE 18 DE DEZEMBRO DE 2017',
+  };
+  const hostOf: Record<string, string> = { Planalto: 'www.planalto.gov.br', CONFAZ: 'www.confaz.fazenda.gov.br', DOU: 'www.in.gov.br' };
+  const types = new Set(GRID.map((c) => c.type));
+  for (const [item, h] of Object.entries(heading)) {
+    const it = MANUAL_ITEMS.find((m) => m.item === item);
+    assert.ok(it, `${item} exists`);
+    assert.deepEqual(it.hosts, [hostOf[it.source]!], `${item} official host`);
+    assert.ok(types.has(it.type), `${item} type ${it.type} is a grid type`);
+    assert.ok(!(RESERVED_ACT_KEYS as readonly string[]).includes(it.actKey), `${item} ${it.actKey} is not reserved`);
+    assert.match(h, it.title, `${item} title regex matches its heading`);
+    assert.doesNotMatch('CONVÊNIO ICMS 1/99 — texto sem relação', it.title, `${item} is not a catch-all`);
+  }
+  for (const pending of ['M27', 'M31', 'M36', 'M37']) assert.equal(MANUAL_ITEMS.some((m) => m.item === pending), false, `${pending} stays pending (no concrete act)`);
+  const keys = MANUAL_ITEMS.filter((m) => m.item !== 'M24').map((m) => m.actKey); assert.equal(new Set(keys).size, keys.length, 'actKeys unique (M24 deliberately repeats M9)');
+  // Real-page variants found in the 2026-11-19 delivery: Planalto renders N<sup>o</sup> (visible text 'N o'); the DOU page of IN 1.932/2020 omits 'RFB'.
+  const items19 = new Map(MANUAL_ITEMS.map((m) => [m.item, m]));
+  assert.match('LEI N o 10.168, DE 29 DE DEZEMBRO DE 2000.', items19.get('M10')!.title);
+  assert.match('INSTRUÇÃO NORMATIVA Nº 1.932, DE 3 DE ABRIL DE 2020', items19.get('M23')!.title);
+  assert.doesNotMatch('INSTRUÇÃO NORMATIVA Nº 1.9321', items19.get('M23')!.title);
+  assert.doesNotMatch('INSTRUÇÃO NORMATIVA RFB Nº 2.237', items19.get('M23')!.title);
+  const dir = mkdtempSync(join(tmpdir(), 'manual-new-')); const f = join(dir, 'a.html'); writeFileSync(f, '<html><meta charset="utf-8"><h1>LEI Nº 10.168, DE 29 DE DEZEMBRO DE 2000</h1></html>');
+  const r = ingestManual({ item: 'M27', file: f, url: 'https://www.in.gov.br/x' }, join(dir, 'out')); assert.equal(r.status, 'refused'); if (r.status === 'refused') assert.match(r.reason, /unknown item/u);
+  const r2 = ingestManual({ item: 'M10', file: f, url: 'https://example.com/l10168.htm' }, join(dir, 'out')); assert.equal(r2.status, 'refused'); if (r2.status === 'refused') assert.match(r2.reason, /not the official host/u);
 });

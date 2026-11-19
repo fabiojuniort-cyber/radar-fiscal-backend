@@ -1,0 +1,25 @@
+{
+  "item": "M28",
+  "act": "Decreto nº 9.580/2018",
+  "source": "DOU",
+  "type": "Decreto",
+  "url": "https://www.in.gov.br/web/dou/-/decreto-n-9-580-de-22-de-novembro-de-2018-51525026",
+  "savedAt": null,
+  "savedAtUpperBound": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.959Z",
+  "savedAtNote": "Hora exata de salvamento desconhecida. savedAtUpperBound é o limite superior documentado no recibo de referência do lote #325.",
+  "ingestedAt": "2026-11-19T04:11:19.959Z",
+  "fileName": "M28.html",
+  "sha256": "a77a1e4e1d092ef86a3851389e6d2eae29af603b85d5e0099d099716bb5469f4",
+  "bytes": 1599964,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "DECRETO\\s+N\\S*\\s*9\\.580",
+    "matched": "DECRETO Nº 9.580"
+  },
+  "representation": "html",
+  "promoted": false
+}

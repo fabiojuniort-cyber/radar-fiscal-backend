@@ -1,0 +1,25 @@
+{
+  "item": "M34",
+  "act": "Resolução CGSN nº 140/2018",
+  "source": "DOU",
+  "type": "Resolução",
+  "url": "https://www.in.gov.br/web/dou/-/resolucao-n-140-de-22-de-maio-de-2018-15742358",
+  "savedAt": null,
+  "savedAtUpperBound": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.977Z",
+  "savedAtNote": "Hora exata de salvamento desconhecida. savedAtUpperBound é o limite superior documentado no recibo de referência do lote #325.",
+  "ingestedAt": "2026-11-19T04:11:19.977Z",
+  "fileName": "M34.html",
+  "sha256": "1b5b23ccbf7b97d94b020118a4106f06993454f9ea026562bbbb2bb7b1372642",
+  "bytes": 610084,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "RESOLU[ÇC][ÃA]O\\s+CGSN\\s+N\\S*\\s*140",
+    "matched": "RESOLUÇÃO CGSN Nº 140"
+  },
+  "representation": "html",
+  "promoted": false
+}

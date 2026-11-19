@@ -1,0 +1,25 @@
+{
+  "item": "M21",
+  "act": "Protocolo ICMS 21/11",
+  "source": "CONFAZ",
+  "type": "Protocolo ICMS",
+  "url": "https://www.confaz.fazenda.gov.br/legislacao/protocolos/2011/pt021_11",
+  "savedAt": null,
+  "savedAtUpperBound": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.839Z",
+  "savedAtNote": "Hora exata de salvamento desconhecida. savedAtUpperBound é o limite superior documentado no recibo de referência do lote #325.",
+  "ingestedAt": "2026-11-19T04:11:19.839Z",
+  "fileName": "M21.html",
+  "sha256": "29ae2cb3dcf233ff62c41cecb8e78a338c60c63c5796624da46809a6a2744d5c",
+  "bytes": 83163,
+  "declaredCharset": "utf-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "PROTOCOLO\\s+ICMS\\s+N?\\S*\\s*21\\s*\\/\\s*(?:20)?11\\b",
+    "matched": "PROTOCOLO ICMS 21/11"
+  },
+  "representation": "html",
+  "promoted": false
+}

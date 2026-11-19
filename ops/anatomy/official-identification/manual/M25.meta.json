@@ -1,0 +1,25 @@
+{
+  "item": "M25",
+  "act": "IN RFB nº 2.121/2022",
+  "source": "DOU",
+  "type": "Instrução Normativa",
+  "url": "https://www.in.gov.br/web/dou/-/instrucao-normativa-rfb-n-2.121-de-15-de-dezembro-de-2022-452045866",
+  "savedAt": null,
+  "savedAtUpperBound": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.895Z",
+  "savedAtNote": "Hora exata de salvamento desconhecida. savedAtUpperBound é o limite superior documentado no recibo de referência do lote #325.",
+  "ingestedAt": "2026-11-19T04:11:19.895Z",
+  "fileName": "M25.html",
+  "sha256": "f6fd18d1a8ea0926f1329cde48ccec6f9c251f7cee451980312d7fbd59f842c7",
+  "bytes": 1800240,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "INSTRU[ÇC][ÃA]O\\s+NORMATIVA\\s+RFB\\s+N\\S*\\s*2\\.121",
+    "matched": "INSTRUÇÃO NORMATIVA RFB Nº 2.121"
+  },
+  "representation": "html",
+  "promoted": false
+}
