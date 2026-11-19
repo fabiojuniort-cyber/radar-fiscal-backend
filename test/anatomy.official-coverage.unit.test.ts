@@ -510,6 +510,12 @@ test('E9-M1 manual items M10–M37: official hosts, none reserved, title regex m
   }
   for (const pending of ['M27', 'M31', 'M36', 'M37']) assert.equal(MANUAL_ITEMS.some((m) => m.item === pending), false, `${pending} stays pending (no concrete act)`);
   const keys = MANUAL_ITEMS.filter((m) => m.item !== 'M24').map((m) => m.actKey); assert.equal(new Set(keys).size, keys.length, 'actKeys unique (M24 deliberately repeats M9)');
+  // Real-page variants found in the 2026-11-19 delivery: Planalto renders N<sup>o</sup> (visible text 'N o'); the DOU page of IN 1.932/2020 omits 'RFB'.
+  const items19 = new Map(MANUAL_ITEMS.map((m) => [m.item, m]));
+  assert.match('LEI N o 10.168, DE 29 DE DEZEMBRO DE 2000.', items19.get('M10')!.title);
+  assert.match('INSTRUÇÃO NORMATIVA Nº 1.932, DE 3 DE ABRIL DE 2020', items19.get('M23')!.title);
+  assert.doesNotMatch('INSTRUÇÃO NORMATIVA Nº 1.9321', items19.get('M23')!.title);
+  assert.doesNotMatch('INSTRUÇÃO NORMATIVA RFB Nº 2.237', items19.get('M23')!.title);
   const dir = mkdtempSync(join(tmpdir(), 'manual-new-')); const f = join(dir, 'a.html'); writeFileSync(f, '<html><meta charset="utf-8"><h1>LEI Nº 10.168, DE 29 DE DEZEMBRO DE 2000</h1></html>');
   const r = ingestManual({ item: 'M27', file: f, url: 'https://www.in.gov.br/x' }, join(dir, 'out')); assert.equal(r.status, 'refused'); if (r.status === 'refused') assert.match(r.reason, /unknown item/u);
   const r2 = ingestManual({ item: 'M10', file: f, url: 'https://example.com/l10168.htm' }, join(dir, 'out')); assert.equal(r2.status, 'refused'); if (r2.status === 'refused') assert.match(r2.reason, /not the official host/u);
