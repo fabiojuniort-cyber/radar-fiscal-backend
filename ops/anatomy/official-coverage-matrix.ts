@@ -332,7 +332,16 @@ export function verifiedBytes(path: string, expected: { sha256: string; bytes: n
   if (b.byteLength !== expected.bytes || sha(b) !== expected.sha256) throw new SampleIntegrityError(`${id}: bytes differ from the recorded provenance (${b.byteLength} bytes, ${sha(b).slice(0, 12)}…)`);
   return b;
 }
-interface Read { chars: number; outputHash: string; invariants: string[] }
+interface Read { chars: number; outputHash: string; invariants: string[]; status: string; unidentifiedChars: number; limitationCodes: string[] }
+/** Limitation codes that do not remove substantive text (script/noscript removal). Everything else keeps a reading partial. */
+const NON_SUBSTANTIVE_LIMITATIONS: readonly string[] = ['excluded_executable_content'];
+/** Why a non-RFB reading is not complete (same conservative spirit as the RFB `incompleteness`). */
+export function nonRfbReadingAssessment(rd: { status: string; unidentifiedChars: number; limitationCodes: readonly string[] }): { complete: boolean; gaps: string[] } {
+  const substantive = rd.limitationCodes.filter((c) => !NON_SUBSTANTIVE_LIMITATIONS.includes(c));
+  const gaps = [...(rd.status !== 'complete' ? [`status ${rd.status}`] : []), ...(rd.unidentifiedChars > 0 ? [`${rd.unidentifiedChars} unidentified chars`] : []),
+    ...(substantive.length ? [`limitations ${substantive.join(', ')}`] : [])];
+  return { complete: gaps.length === 0, gaps };
+}
 /** Conservative invariants every validated sample must keep (protection, not interpretation). */
 function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html: string, extra: object = {}): Read {
   const r = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-07', ruleSet: { id: 'official-coverage-matrix', version: '2' },
@@ -341,10 +350,26 @@ function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html
   if (r.parts.some((p) => p.legalStatus !== 'unknown')) broken.push('legalStatus must stay unknown');
   if (r.parts.some((p) => p.type === 'quoted_text' && p.context === 'operative_candidate')) broken.push('quoted text must never be operative');
   if (r.parts.some((p) => p.type === 'unidentified') && r.status === 'complete') broken.push('unidentified content cannot be complete');
-  return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken };
+  const unidentifiedChars = r.parts.reduce((n, p) => n + (p.type === 'unidentified' ? p.span.end - p.span.start : 0), 0);
+  return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken, status: r.status, unidentifiedChars,
+    limitationCodes: [...new Set(r.limitations.map((l) => l.code))].sort() };
 }
 type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
+/** Canonical digest of a sample's entry in the samples baseline (the non-RFB counterpart of `lotEntrySha256`). */
+export const baselineEntrySha256 = (e: BaselineEntry) => lotEntrySha256({ id: e.id, sha256: e.sha256, profile: e.profile, outputHash: e.outputHash, chars: e.chars });
 const loadBaseline = (): BaselineEntry[] => (existsSync(SAMPLES_BASELINE) ? (JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')) as { samples: BaselineEntry[] }).samples : []);
+
+/** Non-RFB reading completeness + acceptance, derived like RFB: validated + complete + the cell it really falls in + the baseline entry digest + the current engine. Mutates `sample`. */
+export function assessNonRfbSample(sample: Sample, rd: Pick<Read, 'status' | 'unidentifiedChars' | 'limitationCodes'>, baseline: BaselineEntry[], acceptances: Acceptance[]): void {
+  const a = nonRfbReadingAssessment(rd);
+  sample.readingComplete = sample.stages.validated ? a.complete : null;
+  if (sample.stages.validated && !a.complete) sample.notes.push(`partial reading — never accepted as complete: ${a.gaps.join('; ')}`);
+  const cell = GRID.find((c) => matches(c, sample))?.id;
+  const b = baseline.find((x) => x.id === sample.id);
+  sample.stages.accepted = sample.stages.validated && a.complete && !!cell && !!b && acceptances.some((x) => x.sampleId === sample.id && x.cellId === cell
+    && x.scope === 'offline' && x.entrySha256 === baselineEntrySha256(b) && x.engineBuildHash === ANATOMY_ENGINE_BUILD_HASH);
+  if (sample.stages.accepted) sample.evidence.push('docs/anatomy/e9-acceptances.json');
+}
 
 export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), acceptances: Acceptance[] = loadAcceptances(new Set(GRID.map((c) => c.id)))): Sample[] {
   const out: Sample[] = [];
@@ -352,6 +377,7 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const b = baseline.find((x) => x.id === id);
     return rd.invariants.length === 0 && !!b && b.sha256 === s && b.profile === profile && b.outputHash === rd.outputHash;
   };
+  const assessNonRfb = (sample: Sample, rd: Read) => assessNonRfbSample(sample, rd, baseline, acceptances);
   // RFB — the reproducible lot: bytes checked against the snapshot meta AND the lot baseline; the lot test re-runs it.
   const lot = JSON.parse(readFileSync(LOT_BASELINE, 'utf8')) as { acts: LotAct[] };
   for (const dir of ['rfb-normasinternet2', 'rfb-normasinternet2-coleta02', 'rfb-p2c']) {
@@ -394,9 +420,10 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const prep = prepareSefazSpPortalPage({ resourceId: m.id, url: m.url, bytes });
     const rd = readWith('SEFAZ-SP-PORTAL', m.id, prep.html, { sefazSpPortal: prep });
     const ok = locked(m.id, m.sha256, 'SEFAZ-SP-PORTAL', rd);
-    out.push({ id: m.id, source: 'SEFAZ-SP-PORTAL', type: 'Decreto consolidado (RICMS/2000), artigo', layout: LAYOUT.SP_PORTAL_HTML, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
+    const spSample: Sample = { id: m.id, source: 'SEFAZ-SP-PORTAL', type: 'Decreto consolidado (RICMS/2000), artigo', layout: LAYOUT.SP_PORTAL_HTML, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'SEFAZ-SP-PORTAL', diagnostic: null, outputHash: rd.outputHash,
-      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
+      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
+    assessNonRfb(spSample, rd); out.push(spSample);
   }
   // normas.leg.br: captured and identified; NO reader profile of its own → not read, not validated. The DOU-profile
   // reading is kept as a diagnostic only (it never changes the source identity nor closes a cell).
@@ -420,9 +447,10 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
       stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio'] }); continue; }
     const rd = readWith(profile, m.item, html);
     const ok = locked(m.item, m.sha256, profile, rd);
-    out.push({ id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
+    const manSample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile, diagnostic: null, outputHash: rd.outputHash,
-      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
+      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
+    assessNonRfb(manSample, rd); out.push(manSample);
   }
   // HTTP response bytes captured by another session and delivered by git (official-http-ingest.ts): provenance of their
   // own; encoding never inferred; the DOU PDF page is header/footer evidence, not a validated act anatomy.
@@ -448,15 +476,16 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
         ...(decoding ? { decoding } : {}) }); continue; }
     const rd = readWith('CONFAZ', id, decodeDeclared(bytes, m.declaredCharset));
     const ok = locked(id, m.sha256, 'CONFAZ', rd);
-    out.push({ ...base, layout, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',
-      outputHash: rd.outputHash, evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: rd.invariants });
+    const cfSample: Sample = { ...base, layout, chars: rd.chars, size: sizeOf(rd.chars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',
+      outputHash: rd.outputHash, evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
+    assessNonRfb(cfSample, rd); out.push(cfSample);
   }
   return out;
 }
 
 /** The regression lock for non-RFB samples read with their own profile (regenerated only with --write). */
 export function samplesBaseline(samples: Sample[]): { samples: BaselineEntry[] } {
-  return { samples: samples.filter((s) => s.profile && s.outputHash && s.source !== 'RFB' && s.notes.length === 0)
+  return { samples: samples.filter((s) => s.profile && s.outputHash && s.source !== 'RFB' && s.notes.every((n) => n.startsWith('partial reading')))
     .map((s) => ({ id: s.id, sha256: s.sha256, profile: s.profile!, outputHash: s.outputHash!, chars: s.chars! })) };
 }
 

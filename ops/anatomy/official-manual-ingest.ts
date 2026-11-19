@@ -19,7 +19,7 @@ import { RESERVED_ACT_KEYS, RESERVED_SOURCE_IDS } from '../../src/modules/anatom
 export const MANUAL_DIR = fileURLToPath(new URL('./official-identification/manual/', import.meta.url));
 
 export interface ManualItem { item: string; act: string; actKey: string; source: 'Planalto' | 'CONFAZ' | 'DOU'; type: string; hosts: string[]; title: RegExp }
-/** The pending items of the approved manual list (M6–M8 came from the RFB API; M1/M2 were also obtained via normas.leg.br). */
+/** The pending items of the approved manual list (M6–M8 came from the RFB API; M1/M2 were also obtained via normas.leg.br). M10–M37: manual-input sheet; M27/M31/M36/M37 (act to be chosen by Fábio) are intentionally absent. M24 is the same act as M9 (HTML route). */
 export const MANUAL_ITEMS: readonly ManualItem[] = Object.freeze([
   { item: 'M1', act: 'Lei nº 10.637/2002', actKey: 'lei 10637/02', source: 'Planalto', type: 'Lei', hosts: ['www.planalto.gov.br'], title: /LEI\s+N\S*\s*10\.637\s*[,–—-]?\s*DE\s+30\s+DE\s+DEZEMBRO\s+DE\s+2002/iu },
   { item: 'M2', act: 'Lei nº 10.833/2003', actKey: 'lei 10833/03', source: 'Planalto', type: 'Lei', hosts: ['www.planalto.gov.br'], title: /LEI\s+N\S*\s*10\.833\s*[,–—-]?\s*DE\s+29\s+DE\s+DEZEMBRO\s+DE\s+2003/iu },
@@ -28,6 +28,30 @@ export const MANUAL_ITEMS: readonly ManualItem[] = Object.freeze([
   { item: 'M5', act: 'Ajuste SINIEF 07/05', actKey: 'ajuste 7/05', source: 'CONFAZ', type: 'Ajuste SINIEF', hosts: ['www.confaz.fazenda.gov.br'], title: /AJUSTE\s+SINIEF\s+N?\S*\s*0?7\s*\/\s*(?:20)?05\b/iu },
   { item: 'M9', act: 'IN RFB nº 2.237/2024 na página do DOU', actKey: 'in 2237/24', source: 'DOU', type: 'Instrução Normativa', hosts: ['www.in.gov.br'],
     title: /Publicado\s+em:?[\s\S]{0,200}Edi[çc][ãa]o[\s\S]{0,200}Se[çc][ãa]o[\s\S]{0,400}INSTRU[ÇC][ÃA]O\s+NORMATIVA\s+RFB\s+N\S*\s*2\.237/iu },
+  { item: 'M10', act: 'Lei nº 10.168/2000', actKey: 'lei 10168/00', source: 'Planalto', type: 'Lei', hosts: ['www.planalto.gov.br'], title: /LEI\s+N\S*\s*10\.168\s*[,–—-]?\s*DE\s+29\s+DE\s+DEZEMBRO\s+DE\s+2000/iu },
+  { item: 'M11', act: 'Lei nº 9.779/1999', actKey: 'lei 9779/99', source: 'Planalto', type: 'Lei', hosts: ['www.planalto.gov.br'], title: /LEI\s+N\S*\s*9\.779\b[\s\S]{0,60}1999/iu },
+  { item: 'M12', act: 'Lei nº 9.718/1998', actKey: 'lei 9718/98', source: 'Planalto', type: 'Lei', hosts: ['www.planalto.gov.br'], title: /LEI\s+N\S*\s*9\.718\b[\s\S]{0,60}1998/iu },
+  { item: 'M13', act: 'Lei nº 10.147/2000', actKey: 'lei 10147/00', source: 'Planalto', type: 'Lei', hosts: ['www.planalto.gov.br'], title: /LEI\s+N\S*\s*10\.147\b[\s\S]{0,60}2000/iu },
+  { item: 'M14', act: 'Convênio ICMS 63/26', actKey: 'conv 63/26', source: 'CONFAZ', type: 'Convênio ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /CONV[ÊE]NIO\s+ICMS\s+N?\S*\s*63\s*\/\s*(?:20)?26\b/iu },
+  { item: 'M15', act: 'Convênio ICMS 88/26', actKey: 'conv 88/26', source: 'CONFAZ', type: 'Convênio ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /CONV[ÊE]NIO\s+ICMS\s+N?\S*\s*88\s*\/\s*(?:20)?26\b/iu },
+  { item: 'M16', act: 'Convênio ICMS 153/20', actKey: 'conv 153/20', source: 'CONFAZ', type: 'Convênio ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /CONV[ÊE]NIO\s+ICMS\s+N?\S*\s*153\s*\/\s*(?:20)?20\b/iu },
+  { item: 'M17', act: 'Convênio ICMS 236/21', actKey: 'conv 236/21', source: 'CONFAZ', type: 'Convênio ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /CONV[ÊE]NIO\s+ICMS\s+N?\S*\s*236\s*\/\s*(?:20)?21\b/iu },
+  { item: 'M18', act: 'Ajuste SINIEF 01/26', actKey: 'ajuste 1/26', source: 'CONFAZ', type: 'Ajuste SINIEF', hosts: ['www.confaz.fazenda.gov.br'], title: /AJUSTE\s+SINIEF\s+N?\S*\s*0?1\s*\/\s*(?:20)?26\b/iu },
+  { item: 'M19', act: 'Ajuste SINIEF 19/16', actKey: 'ajuste 19/16', source: 'CONFAZ', type: 'Ajuste SINIEF', hosts: ['www.confaz.fazenda.gov.br'], title: /AJUSTE\s+SINIEF\s+N?\S*\s*19\s*\/\s*(?:20)?16\b/iu },
+  { item: 'M20', act: 'Protocolo ICMS 88/26', actKey: 'protocolo 88/26', source: 'CONFAZ', type: 'Protocolo ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /PROTOCOLO\s+ICMS\s+N?\S*\s*88\s*\/\s*(?:20)?26\b/iu },
+  { item: 'M21', act: 'Protocolo ICMS 21/11', actKey: 'protocolo 21/11', source: 'CONFAZ', type: 'Protocolo ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /PROTOCOLO\s+ICMS\s+N?\S*\s*21\s*\/\s*(?:20)?11\b/iu },
+  { item: 'M22', act: 'Protocolo ICMS 41/08', actKey: 'protocolo 41/08', source: 'CONFAZ', type: 'Protocolo ICMS', hosts: ['www.confaz.fazenda.gov.br'], title: /PROTOCOLO\s+ICMS\s+N?\S*\s*41\s*\/\s*(?:20)?08\b/iu },
+  { item: 'M23', act: 'IN RFB nº 1.932/2020', actKey: 'in 1932/20', source: 'DOU', type: 'Instrução Normativa', hosts: ['www.in.gov.br'], title: /INSTRU[ÇC][ÃA]O\s+NORMATIVA\s+RFB\s+N\S*\s*1\.932/iu },
+  { item: 'M24', act: 'IN RFB nº 2.237/2024', actKey: 'in 2237/24', source: 'DOU', type: 'Instrução Normativa', hosts: ['www.in.gov.br'], title: /INSTRU[ÇC][ÃA]O\s+NORMATIVA\s+RFB\s+N\S*\s*2\.237/iu },
+  { item: 'M25', act: 'IN RFB nº 2.121/2022', actKey: 'in 2121/22', source: 'DOU', type: 'Instrução Normativa', hosts: ['www.in.gov.br'], title: /INSTRU[ÇC][ÃA]O\s+NORMATIVA\s+RFB\s+N\S*\s*2\.121/iu },
+  { item: 'M26', act: 'Decreto nº 10.979/2022', actKey: 'decreto 10979/22', source: 'DOU', type: 'Decreto', hosts: ['www.in.gov.br'], title: /DECRETO\s+N\S*\s*10\.979/iu },
+  { item: 'M28', act: 'Decreto nº 9.580/2018', actKey: 'decreto 9580/18', source: 'DOU', type: 'Decreto', hosts: ['www.in.gov.br'], title: /DECRETO\s+N\S*\s*9\.580/iu },
+  { item: 'M29', act: 'Portaria RFB nº 514/2025', actKey: 'portaria 514/25', source: 'DOU', type: 'Portaria', hosts: ['www.in.gov.br'], title: /PORTARIA\s+RFB\s+N\S*\s*514/iu },
+  { item: 'M30', act: 'Portaria RFB nº 635/2025', actKey: 'portaria 635/25', source: 'DOU', type: 'Portaria', hosts: ['www.in.gov.br'], title: /PORTARIA\s+RFB\s+N\S*\s*635/iu },
+  { item: 'M32', act: 'Resolução CGSN nº 164/2022', actKey: 'resolucao 164/22', source: 'DOU', type: 'Resolução', hosts: ['www.in.gov.br'], title: /RESOLU[ÇC][ÃA]O\s+CGSN\s+N\S*\s*164/iu },
+  { item: 'M33', act: 'Resolução CGSN nº 182/2025', actKey: 'resolucao 182/25', source: 'DOU', type: 'Resolução', hosts: ['www.in.gov.br'], title: /RESOLU[ÇC][ÃA]O\s+CGSN\s+N\S*\s*182/iu },
+  { item: 'M34', act: 'Resolução CGSN nº 140/2018', actKey: 'resolucao 140/18', source: 'DOU', type: 'Resolução', hosts: ['www.in.gov.br'], title: /RESOLU[ÇC][ÃA]O\s+CGSN\s+N\S*\s*140/iu },
+  { item: 'M35', act: 'Despacho SE/CONFAZ nº 174/2017', actKey: 'despacho 174/17', source: 'DOU', type: 'Despacho', hosts: ['www.in.gov.br'], title: /DESPACHO\s+(?:SE\s*\/\s*CONFAZ\s+)?N\S*\s*174\b[\s\S]{0,80}2017/iu },
 ]);
 
 export interface ManualMeta {

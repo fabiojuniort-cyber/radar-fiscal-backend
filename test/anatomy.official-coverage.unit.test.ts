@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
-import { buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
-import { decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
+import { assessNonRfbSample, baselineEntrySha256, lotEntrySha256, nonRfbReadingAssessment, buildMatrix, collectSamples, GRID, LAYOUT, MATRIX_FILE, SAMPLES_BASELINE, samplesBaseline, sizeOf, verifiedBytes, SampleIntegrityError, type Sample } from '../ops/anatomy/official-coverage-matrix.js';
+import { MANUAL_ITEMS, decodeDeclared, ingestManual, UnsupportedEncodingError } from '../ops/anatomy/official-manual-ingest.js';
 import { HttpIngestError, ingestHttpPackage, PACKAGE } from '../ops/anatomy/official-http-ingest.js';
 import { APPROVED_FALLBACK, CharsetRefused, decodeWithPolicy } from '../ops/anatomy/charset-policy.js';
 
@@ -433,4 +433,84 @@ test('R5 B4-1/B4-2: no spelling of a suffix truncates to I; a dangling separator
   // unchanged positives
   assert.equal(m.annexGap(mkAct(['Art. 1º Fica aprovado o Anexo I desta Portaria.'], onlyI), readI), null, 'plain I still complete');
   assert.deepEqual(m.annexAudit(mkAct(['Art. 1º Aprovam-se os Anexos I a III desta Portaria.'])).required.map((q) => q.label), ['1', '2', '3']);
+});
+
+// E9-M1: non-RFB reading completeness + acceptance, derived like RFB.
+test('E9-M1 nonRfbReadingAssessment: complete case, each gap kind, allowlisted code ignored', () => {
+  const ok = { status: 'complete', unidentifiedChars: 0, limitationCodes: [] as string[] };
+  assert.deepEqual(nonRfbReadingAssessment(ok), { complete: true, gaps: [] });
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, limitationCodes: ['excluded_executable_content'] }), { complete: true, gaps: [] }, 'script/noscript removal is non-substantive');
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, status: 'partial' }), { complete: false, gaps: ['status partial'] });
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, unidentifiedChars: 7 }), { complete: false, gaps: ['7 unidentified chars'] });
+  assert.deepEqual(nonRfbReadingAssessment({ ...ok, limitationCodes: ['excluded_executable_content', 'image_without_ocr', 'a_code'] }), { complete: false, gaps: ['limitations image_without_ocr, a_code'] });
+  assert.deepEqual(nonRfbReadingAssessment({ status: 'partial', unidentifiedChars: 3, limitationCodes: ['x'] }).gaps, ['status partial', '3 unidentified chars', 'limitations x']);
+});
+
+test('E9-M1 baselineEntrySha256 is deterministic and equals the sha of the canonical JSON of the entry', () => {
+  const e = { id: 'M5', sha256: 'a'.repeat(64), profile: 'CONFAZ', outputHash: 'b'.repeat(64), chars: 123 };
+  assert.equal(baselineEntrySha256(e), baselineEntrySha256({ chars: 123, outputHash: 'b'.repeat(64), profile: 'CONFAZ', sha256: 'a'.repeat(64), id: 'M5' }), 'key order does not matter');
+  assert.equal(baselineEntrySha256(e), lotEntrySha256(e));
+  assert.match(baselineEntrySha256(e), /^[0-9a-f]{64}$/u);
+  assert.notEqual(baselineEntrySha256(e), baselineEntrySha256({ ...e, chars: 124 }));
+});
+
+test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading is accepted; wrong digest/engine/cell or a partial reading is not; real non-RFB samples are never accepted today', async () => {
+  const { ANATOMY_ENGINE_BUILD_HASH: E } = await import('../src/modules/anatomy/build-identity.js');
+  const cellId = 'confaz--convenio-icms--grande';
+  const entry = { id: 'synthetic', sha256: '1'.repeat(64), profile: 'CONFAZ', outputHash: '2'.repeat(64), chars: 60_000 };
+  const mk = () => sample({ id: 'synthetic', size: 'grande', chars: 60_000, sha256: entry.sha256, outputHash: entry.outputHash });
+  const rec = (over: object = {}) => ({ sampleId: 'synthetic', cellId, scope: 'offline' as const, entrySha256: baselineEntrySha256(entry), engineBuildHash: E, decidedBy: 't', decidedOn: '2026-11-19', ref: 't', limits: ['t'], ...over });
+  const complete = { status: 'complete', unidentifiedChars: 0, limitationCodes: ['excluded_executable_content'] };
+  const run = (rd: typeof complete, acc: ReturnType<typeof rec>[], base = [entry]) => { const x = mk(); assessNonRfbSample(x, rd, base, acc); return x; };
+  const good = run(complete, [rec()]);
+  assert.deepEqual([good.readingComplete, good.stages.accepted, good.notes], [true, true, []]);
+  assert.ok(good.evidence.includes('docs/anatomy/e9-acceptances.json'));
+  assert.equal(run(complete, []).stages.accepted, false, 'no record');
+  assert.equal(run(complete, [rec({ entrySha256: '0'.repeat(64) })]).stages.accepted, false, 'wrong digest');
+  assert.equal(run(complete, [rec({ engineBuildHash: '0'.repeat(64) })]).stages.accepted, false, 'wrong engine');
+  assert.equal(run(complete, [rec({ cellId: 'confaz--ajuste-sinief--grande' })]).stages.accepted, false, 'wrong cell');
+  assert.equal(run(complete, [rec({ sampleId: 'other' })]).stages.accepted, false, 'other sample');
+  assert.equal(run(complete, [rec()], []).stages.accepted, false, 'no baseline entry');
+  const partial = run({ ...complete, status: 'partial', unidentifiedChars: 5 }, [rec()]);
+  assert.deepEqual([partial.readingComplete, partial.stages.accepted], [false, false]);
+  assert.match(partial.notes.join(' '), /partial reading — never accepted as complete: status partial; 5 unidentified chars/u);
+  const unvalidated = mk(); unvalidated.stages = { ...okStages, validated: false };
+  assessNonRfbSample(unvalidated, complete, [entry], [rec()]);
+  assert.deepEqual([unvalidated.readingComplete, unvalidated.stages.accepted, unvalidated.notes], [null, false, []], 'only validated samples are assessed');
+  // real acervo: every validated non-RFB reading is partial today; none accepted; the baseline is not affected by the partial note
+  const nonRfb = real.filter((s) => s.source !== 'RFB' && s.stages.validated);
+  assert.ok(nonRfb.length > 0 && nonRfb.every((s) => s.readingComplete === false && !s.stages.accepted && /^partial reading/u.test(s.notes[0]!)));
+  assert.equal(samplesBaseline(real).samples.length, nonRfb.length, 'partial notes do not drop samples from the baseline');
+  const mx = buildMatrix(real);
+  for (const id of ['confaz--convenio-icms--grande', 'confaz--ajuste-sinief--grande', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio']) {
+    const c = mx.cells.find((x) => x.id === id)!; assert.deepEqual([c.status, c.complete, c.accepted, c.partialSamples.length > 0], ['covered', false, false, true], id);
+  }
+});
+
+test('E9-M1 manual items M10–M37: official hosts, none reserved, title regex matches a synthetic heading, unknown/pending items still refused', async () => {
+  const { RESERVED_ACT_KEYS } = await import('../src/modules/anatomy/config/reserved-act-keys.js');
+  const heading: Record<string, string> = {
+    M10: 'LEI Nº 10.168, DE 29 DE DEZEMBRO DE 2000', M11: 'LEI Nº 9.779, DE 19 DE JANEIRO DE 1999', M12: 'Lei nº 9.718, de 27 de novembro de 1998', M13: 'LEI Nº 10.147, DE 21 DE DEZEMBRO DE 2000',
+    M14: 'CONVÊNIO ICMS 63/26', M15: 'CONVÊNIO ICMS 88/26', M16: 'CONVENIO ICMS 153/20', M17: 'CONVÊNIO ICMS 236/21', M18: 'AJUSTE SINIEF 01/26', M19: 'AJUSTE SINIEF 19/16',
+    M20: 'PROTOCOLO ICMS 88/26', M21: 'PROTOCOLO ICMS 21/11', M22: 'PROTOCOLO ICMS 41/08',
+    M23: 'INSTRUÇÃO NORMATIVA RFB Nº 1.932, DE 2 DE ABRIL DE 2020', M24: 'INSTRUCAO NORMATIVA RFB N 2.237, DE 3 DE DEZEMBRO DE 2024', M25: 'INSTRUÇÃO NORMATIVA RFB Nº 2.121, DE 15 DE DEZEMBRO DE 2022',
+    M26: 'DECRETO Nº 10.979, DE 25 DE FEVEREIRO DE 2022', M28: 'DECRETO Nº 9.580, DE 22 DE NOVEMBRO DE 2018', M29: 'PORTARIA RFB Nº 514, DE 21 DE FEVEREIRO DE 2025', M30: 'PORTARIA RFB Nº 635, DE 30 DE DEZEMBRO DE 2025',
+    M32: 'RESOLUÇÃO CGSN Nº 164, DE 2022', M33: 'RESOLUÇÃO CGSN Nº 182, DE 2025', M34: 'RESOLUÇÃO CGSN Nº 140, DE 22 DE MAIO DE 2018', M35: 'DESPACHO Nº 174, DE 18 DE DEZEMBRO DE 2017',
+  };
+  const hostOf: Record<string, string> = { Planalto: 'www.planalto.gov.br', CONFAZ: 'www.confaz.fazenda.gov.br', DOU: 'www.in.gov.br' };
+  const types = new Set(GRID.map((c) => c.type));
+  for (const [item, h] of Object.entries(heading)) {
+    const it = MANUAL_ITEMS.find((m) => m.item === item);
+    assert.ok(it, `${item} exists`);
+    assert.deepEqual(it.hosts, [hostOf[it.source]!], `${item} official host`);
+    assert.ok(types.has(it.type), `${item} type ${it.type} is a grid type`);
+    assert.ok(!(RESERVED_ACT_KEYS as readonly string[]).includes(it.actKey), `${item} ${it.actKey} is not reserved`);
+    assert.match(h, it.title, `${item} title regex matches its heading`);
+    assert.doesNotMatch('CONVÊNIO ICMS 1/99 — texto sem relação', it.title, `${item} is not a catch-all`);
+  }
+  for (const pending of ['M27', 'M31', 'M36', 'M37']) assert.equal(MANUAL_ITEMS.some((m) => m.item === pending), false, `${pending} stays pending (no concrete act)`);
+  const keys = MANUAL_ITEMS.filter((m) => m.item !== 'M24').map((m) => m.actKey); assert.equal(new Set(keys).size, keys.length, 'actKeys unique (M24 deliberately repeats M9)');
+  const dir = mkdtempSync(join(tmpdir(), 'manual-new-')); const f = join(dir, 'a.html'); writeFileSync(f, '<html><meta charset="utf-8"><h1>LEI Nº 10.168, DE 29 DE DEZEMBRO DE 2000</h1></html>');
+  const r = ingestManual({ item: 'M27', file: f, url: 'https://www.in.gov.br/x' }, join(dir, 'out')); assert.equal(r.status, 'refused'); if (r.status === 'refused') assert.match(r.reason, /unknown item/u);
+  const r2 = ingestManual({ item: 'M10', file: f, url: 'https://example.com/l10168.htm' }, join(dir, 'out')); assert.equal(r2.status, 'refused'); if (r2.status === 'refused') assert.match(r2.reason, /not the official host/u);
 });

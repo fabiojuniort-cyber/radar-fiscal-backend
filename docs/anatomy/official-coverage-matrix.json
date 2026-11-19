@@ -428,7 +428,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 70 unidentified chars; limitations sefaz_sp_portal_local_preparation_only, sefaz_sp_revogado_unidentified, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "ricms-an2art003",
@@ -453,7 +456,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 71 unidentified chars; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "ricms-an2art039",
@@ -478,7 +484,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 68 unidentified chars; limitations sefaz_sp_portal_local_preparation_only, sefaz_sp_revogado_unidentified, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "ricms-art007",
@@ -503,7 +512,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "ricms-art008",
@@ -528,7 +540,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 1 unidentified chars; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "ricms-art009",
@@ -553,7 +568,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "lei-10637-2002-atualizada",
@@ -686,7 +704,10 @@
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
       ],
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 6008 unidentified chars; limitations image_without_ocr, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "http:M1",
@@ -783,7 +804,10 @@
       },
       "profile": "CONFAZ",
       "outputHash": "ed891bec4e28575c4b75aaf1e8940cae5b28d2b06564c13406c3f1dca253dccd",
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 922008 unidentified chars; limitations html_complexity_limit"
+      ],
+      "readingComplete": false
     },
     {
       "id": "http:M4",
@@ -808,7 +832,10 @@
       },
       "profile": "CONFAZ",
       "outputHash": "b0938ef774ff8bc8d3e4837e5bfa56abb167569e249fd826487e64c74c1199f7",
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 28454 unidentified chars; limitations image_without_ocr, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "http:M5",
@@ -833,7 +860,10 @@
       },
       "profile": "CONFAZ",
       "outputHash": "44420fa75f7312807742bf5bc06045bc84e4ef763c83b943b594718033927979",
-      "notes": []
+      "notes": [
+        "partial reading — never accepted as complete: status partial; 6002 unidentified chars; limitations image_without_ocr, unidentified_content"
+      ],
+      "readingComplete": false
     },
     {
       "id": "http:M9-p58",
@@ -1382,8 +1412,11 @@
         "http:M3",
         "http:M4"
       ],
-      "complete": null,
-      "partialSamples": [],
+      "complete": false,
+      "partialSamples": [
+        "http:M3",
+        "http:M4"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1436,8 +1469,11 @@
         "M5",
         "http:M5"
       ],
-      "complete": null,
-      "partialSamples": [],
+      "complete": false,
+      "partialSamples": [
+        "M5",
+        "http:M5"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1804,8 +1840,11 @@
         "ricms-art008",
         "ricms-art009"
       ],
-      "complete": null,
-      "partialSamples": [],
+      "complete": false,
+      "partialSamples": [
+        "ricms-art008",
+        "ricms-art009"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
@@ -1826,8 +1865,13 @@
         "ricms-an2art039",
         "ricms-art007"
       ],
-      "complete": null,
-      "partialSamples": [],
+      "complete": false,
+      "partialSamples": [
+        "ricms-an1art041",
+        "ricms-an2art003",
+        "ricms-an2art039",
+        "ricms-art007"
+      ],
       "accepted": false,
       "unvalidatedSamples": []
     },
