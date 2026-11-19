@@ -1,0 +1,821 @@
+{
+  "schema": "e9-a3-partial-rfb-proof/1",
+  "mandate": "COORD → EXEC F1 | E9-A3",
+  "base": "main d53fb3e2b8d34b9fbeda4da6c5fbdf25a24c19e9",
+  "registersNothing": true,
+  "engine": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+  "acervoScanned": {
+    "folders": [
+      "ops/anatomy/official-identification/rfb-normasinternet2/",
+      "ops/anatomy/official-identification/rfb-normasinternet2-coleta02/",
+      "ops/anatomy/official-identification/rfb-p2c/"
+    ],
+    "rfbSamples": [
+      {
+        "id": "rfb:108391",
+        "type": "Instrução Normativa",
+        "size": "pequeno",
+        "cell": "rfb--instrucao-normativa--pequeno",
+        "readingComplete": true
+      },
+      {
+        "id": "rfb:115131",
+        "type": "Instrução Normativa",
+        "size": "grande",
+        "cell": "rfb--instrucao-normativa--grande",
+        "readingComplete": true
+      },
+      {
+        "id": "rfb:127905",
+        "type": "Instrução Normativa",
+        "size": "grande",
+        "cell": "rfb--instrucao-normativa--grande",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:133898",
+        "type": "Instrução Normativa",
+        "size": "pequeno",
+        "cell": "rfb--instrucao-normativa--pequeno",
+        "readingComplete": true
+      },
+      {
+        "id": "rfb:141910",
+        "type": "Instrução Normativa",
+        "size": "médio",
+        "cell": "rfb--instrucao-normativa--medio",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:104314",
+        "type": "Instrução Normativa",
+        "size": "grande",
+        "cell": "rfb--instrucao-normativa--grande",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:116968",
+        "type": "Instrução Normativa",
+        "size": "grande",
+        "cell": "rfb--instrucao-normativa--grande",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:122645",
+        "type": "Resolução",
+        "size": "pequeno",
+        "cell": "rfb--resolucao--pequeno",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:142967",
+        "type": "Portaria",
+        "size": "pequeno",
+        "cell": "rfb--portaria--pequeno",
+        "readingComplete": true
+      },
+      {
+        "id": "rfb:148516",
+        "type": "Ato Declaratório Executivo",
+        "size": "médio",
+        "cell": "rfb--ato-declaratorio-executivo--medio",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:148629",
+        "type": "Ato Declaratório Executivo",
+        "size": "pequeno",
+        "cell": "rfb--ato-declaratorio-executivo--pequeno",
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:148681",
+        "type": "Solução de Consulta",
+        "size": null,
+        "cell": null,
+        "readingComplete": false
+      },
+      {
+        "id": "rfb:148693",
+        "type": "Portaria",
+        "size": "médio",
+        "cell": "rfb--portaria--medio",
+        "readingComplete": true
+      },
+      {
+        "id": "rfb:37103",
+        "type": "Ato Declaratório Interpretativo",
+        "size": "pequeno",
+        "cell": "rfb--ato-declaratorio-interpretativo--pequeno",
+        "readingComplete": false
+      }
+    ]
+  },
+  "cells": [
+    {
+      "cellId": "rfb--instrucao-normativa--medio",
+      "matrix": {
+        "complete": false,
+        "partialSamples": [
+          "rfb:141910"
+        ]
+      },
+      "samples": [
+        {
+          "sampleId": "rfb:141910",
+          "cellId": "rfb--instrucao-normativa--medio",
+          "epigrafe": "Instrução Normativa RFB nº 2237, de 4 de dezembro de 2024",
+          "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/141910/visao/multivigente",
+          "consultedAt": "2026-11-04T21:00:11Z",
+          "snapshot": "ops/anatomy/official-identification/rfb-normasinternet2/141910.json",
+          "provenance": {
+            "bytes": 144575,
+            "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e"
+          },
+          "entrySha256": {
+            "stored": "ef63a84bbd87d3ae8154f9451d212597b73894d4d7324f9d29e403714a6ae4e8",
+            "recomputed": "ef63a84bbd87d3ae8154f9451d212597b73894d4d7324f9d29e403714a6ae4e8"
+          },
+          "reading": {
+            "status": "partial",
+            "outputHash": "fb822c6494cb018dfec5dfe8c328c5a5f5bf7005fce0d8e53a4dc76377c6f63b",
+            "canonicalChars": 31389,
+            "parts": 246,
+            "unidentifiedChars": 11279,
+            "unidentified": [
+              {
+                "chars": 53,
+                "text": "I que ocorrerem a partir de 1º de janeiro de 2025; e"
+              },
+              {
+                "chars": 149,
+                "text": "II que ocorrerem até 31 de dezembro de 2024 e que devam ser prestadas em declaração referente a período posterior à data a que se refere o inciso I."
+              },
+              {
+                "chars": 102,
+                "text": "I as pessoas jurídicas de direito privado em geral, inclusive as equiparadas, as imunes e as isentas;"
+              },
+              {
+                "chars": 110,
+                "text": "II os equiparados a empresa, nos termos do art. 15, parágrafo único, da Lei nº 8.212, de 24 de julho de 1991;"
+              },
+              {
+                "chars": 214,
+                "text": "III as unidades gestoras de orçamento dos órgãos públicos, das autarquias e das fundações de quaisquer dos poderes da União, dos estados, do Distrito Federal e dos municípios, observado o disposto nos § 2º e § 3º;"
+              },
+              {
+                "chars": 157,
+                "text": "IV os consórcios que realizam negócios jurídicos em nome próprio, inclusive a contratação de pessoas físicas, com ou sem vínculo empregatício, ou jurídicas;"
+              },
+              {
+                "chars": 109,
+                "text": "V os fundos de investimento imobiliário a que se refere o art. 2º da Lei nº 9.779, de 19 de janeiro de 1999;"
+              },
+              {
+                "chars": 77,
+                "text": "VI as Sociedades em Conta de Participação SCP, observado o disposto no § 4º;"
+              },
+              {
+                "chars": 128,
+                "text": "VII as entidades federais e regionais de fiscalização do exercício profissional, inclusive a Ordem dos Advogados do Brasil OAB;"
+              },
+              {
+                "chars": 173,
+                "text": "VIII os organismos oficiais internacionais ou estrangeiros em funcionamento no Brasil, quando contratarem trabalhador segurado do Regime Geral de Previdência Social - RGPS;"
+              },
+              {
+                "chars": 51,
+                "text": "IX os microempreendedores individuais MEI, quando:"
+              },
+              {
+                "chars": 48,
+                "text": "X os produtores rurais pessoas físicas, quando:"
+              },
+              {
+                "chars": 160,
+                "text": "XI as pessoas físicas que adquirem produtos rurais de produtor rural pessoa física ou de segurado especial para venda, no varejo, a consumidor pessoa física; e"
+              },
+              {
+                "chars": 122,
+                "text": "XII as demais pessoas jurídicas que são obrigadas pela legislação ao recolhimento dos tributos a que se refere o art. 8º."
+              },
+              {
+                "chars": 204,
+                "text": "I o contribuinte individual do RGPS, inclusive o titular de serviço notarial ou registral, e a pessoa física na condição de proprietária ou dona de obra de construção civil, quando equiparados a empresa;"
+              },
+              {
+                "chars": 88,
+                "text": "II os produtores rurais pessoas físicas nas hipóteses previstas no inciso X do caput; e"
+              },
+              {
+                "chars": 61,
+                "text": "III as pessoas físicas a que se refere o inciso XI do caput."
+              },
+              {
+                "chars": 76,
+                "text": "I o contribuinte individual que não contratar trabalhador segurado do RGPS;"
+              },
+              {
+                "chars": 110,
+                "text": "II o segurado especial a que se refere o art. 12, caput, inciso VII, da Lei nº 8.212, de 24 de julho de 1991;"
+              },
+              {
+                "chars": 36,
+                "text": "III o segurado facultativo do RGPS;"
+              },
+              {
+                "chars": 78,
+                "text": "IV o candidato a cargo político eletivo, nos termos da legislação específica;"
+              },
+              {
+                "chars": 69,
+                "text": "V os consórcios que não realizam negócios jurídicos em nome próprio;"
+              },
+              {
+                "chars": 256,
+                "text": "VI os fundos de investimento imobiliário e os clubes de investimento registrados em Bolsa de Valores, sujeitos às normas fixadas pela Comissão de Valores Mobiliários CVM e pelo Banco Central do Brasil BCB, observado o disposto no art. 3º, c"
+              },
+              {
+                "chars": 203,
+                "text": "VII os fundos especiais de natureza contábil ou financeira, não dotados de personalidade jurídica, criados no âmbito de quaisquer dos poderes da União, dos estados, do Distrito Federal e dos municípios;"
+              },
+              {
+                "chars": 136,
+                "text": "VIII os organismos oficiais internacionais ou estrangeiros em funcionamento no Brasil que não contratarem trabalhador segurado do RGPS;"
+              },
+              {
+                "chars": 78,
+                "text": "IX o MEI não enquadrado nas hipóteses previstas no art. 3º, caput, inciso IX;"
+              },
+              {
+                "chars": 101,
+                "text": "X o produtor rural pessoa física não enquadrado nas hipóteses previstas no art. 3º, caput, inciso X;"
+              },
+              {
+                "chars": 155,
+                "text": "XI as comissões de conciliação prévia a que se refere o art. 625-A do Decreto-Lei nº 5.452, de 1º de maio de 1943 Consolidação das Leis do Trabalho CLT; e"
+              },
+              {
+                "chars": 135,
+                "text": "XII as comissões sem personalidade jurídica criadas por ato internacional celebrado pelo Brasil com outros países, para fins diversos."
+              },
+              {
+                "chars": 263,
+                "text": "I no Sistema de Escrituração Digital das Obrigações Fiscais, Previdenciárias e Trabalhistas eSocial e na Escrituração Fiscal Digital de Retenções e Outras Informações Fiscais EFD-Reinf, ambos módulos integrantes do Sistema Público de Escrit"
+              },
+              {
+                "chars": 81,
+                "text": "II por meio do Módulo de Inclusão de Tributos MIT, na forma prevista no art. 9º."
+              },
+              {
+                "chars": 165,
+                "text": "I assinada digitalmente mediante uso de certificado digital válido, emitido por entidade credenciada pela Infraestrutura de Chaves Públicas Brasileira ICP-Brasil; e"
+              },
+              {
+                "chars": 203,
+                "text": "II transmitida mediante acesso ao Centro Virtual de Atendimento e-CAC no site da Secretaria Especial da Receita Federal do Brasil RFB na Internet, no endereço eletrônico <https://gov.br/receitafederal>."
+              },
+              {
+                "chars": 12,
+                "text": "I ao MEI; e"
+              },
+              {
+                "chars": 239,
+                "text": "II à empresa enquadrada no Regime Especial Unificado de Arrecadação de Tributos e Contribuições devidos pelas Microempresas e Empresas de Pequeno Porte - Simples Nacional que tenha até um empregado no período a que se refere a declaração."
+              },
+              {
+                "chars": 203,
+                "text": "I as pessoas físicas a que se refere o art. 3º, § 5º, ficarão dispensadas da obrigação de apresentar a DCTFWeb mensal a partir do primeiro mês sem movimento, até a ocorrência de novos fatos geradores; e"
+              },
+              {
+                "chars": 204,
+                "text": "II os demais contribuintes deverão apresentar a DCTFWeb mensal relativa ao primeiro mês sem movimento e ficarão dispensados da obrigação nos meses subsequentes, até a ocorrência de novos fatos geradores."
+              },
+              {
+                "chars": 249,
+                "text": "I DCTFWeb anual, para a prestação de informações relativas ao décimo terceiro salário, a qual deverá ser transmitida até o dia 20 de dezembro de cada ano ou, caso este recaia em dia não útil para fins fiscais, até o dia útil imediatamente a"
+              },
+              {
+                "chars": 308,
+                "text": "II DCTFWeb diária, para a prestação de informações relativas à receita de espetáculos desportivos realizados por associação desportiva que mantém clube de futebol profissional, a qual deverá ser transmitida pela entidade promotora do espetá"
+              },
+              {
+                "chars": 192,
+                "text": "III DCTFWeb Aferição de Obras, a qual deverá ser transmitida pelo responsável pela obra de construção civil até o último dia útil do mês em que realizar a aferição da obra por meio do Sero; e"
+              },
+              {
+                "chars": 347,
+                "text": "IV DCTFWeb Reclamatória Trabalhista, para a prestação de informações relativas aos tributos decorrentes de ações judiciais perante a justiça do trabalho ou de acordos firmados perante as Comissões de Conciliação Prévia CCP ou os Núcleos Int"
+              },
+              {
+                "chars": 49,
+                "text": "I Imposto sobre a Renda da Pessoa Jurídica IRPJ;"
+              },
+              {
+                "chars": 47,
+                "text": "II Imposto sobre a Renda Retido na Fonte IRRF;"
+              },
+              {
+                "chars": 49,
+                "text": "III Imposto sobre Produtos Industrializados IPI;"
+              },
+              {
+                "chars": 107,
+                "text": "IV Imposto sobre Operações de Crédito, Câmbio e Seguro, ou relativas a Títulos ou Valores Mobiliários IOF;"
+              },
+              {
+                "chars": 50,
+                "text": "V Contribuição Social sobre o Lucro Líquido CSLL;"
+              },
+              {
+                "chars": 136,
+                "text": "VI Contribuição para os Programas de Integração Social e de Formação do Patrimônio do Servidor Público - Contribuição para o PIS/Pasep;"
+              },
+              {
+                "chars": 69,
+                "text": "VII Contribuição para o Financiamento da Seguridade Social - Cofins;"
+              },
+              {
+                "chars": 268,
+                "text": "VIII Contribuição de Intervenção no Domínio Econômico incidente sobre a importação e a comercialização de petróleo e seus derivados, gás natural e seus derivados e álcool etílico combustível Cide-Combustíveis, instituída pela Lei nº 10.336,"
+              },
+              {
+                "chars": 229,
+                "text": "IX Contribuição de Intervenção no Domínio Econômico destinada a financiar o Programa de Estímulo à Interação Universidade-Empresa para o Apoio à Inovação - Cide-Remessas, instituída pela Lei nº 10.168, de 29 de dezembro de 2000;"
+              },
+              {
+                "chars": 168,
+                "text": "X Contribuição para o Desenvolvimento da Indústria Cinematográfica Nacional Condecine de que trata o art. 32 da Medida Provisória nº 2.228-1, de 6 de setembro de 2001;"
+              },
+              {
+                "chars": 183,
+                "text": "XI contribuição social incidente sobre a modalidade lotérica denominada aposta de quota fixa de que trata o art. 30, § 1º-A, inciso IV-A, da Lei nº 13.756, de 12 de dezembro de 2018;"
+              },
+              {
+                "chars": 122,
+                "text": "XII Contribuição para o Plano de Seguridade Social do Servidor CPSS de que trata a Lei nº 10.887, de 18 de junho de 2004;"
+              },
+              {
+                "chars": 134,
+                "text": "XIII contribuições previdenciárias previstas no art. 11, parágrafo único, alíneas \"a\" e \"c\", da Lei nº 8.212, de 24 de julho de 1991;"
+              },
+              {
+                "chars": 246,
+                "text": "XIV contribuições previdenciárias instituídas em substituição às contribuições incidentes sobre a folha de pagamento, inclusive a Contribuição Previdenciária sobre a Receita Bruta - CPRB de que trata a Lei nº 12.546, de 14 de dezembro de 20"
+              },
+              {
+                "chars": 59,
+                "text": "XV contribuições sociais destinadas, por lei, a terceiros."
+              },
+              {
+                "chars": 130,
+                "text": "I ao IRPJ, à CSLL, à Contribuição para o PIS/Pasep e à Cofins retidos na fonte, os quais deverão ser escriturados na EFD-Reinf; e"
+              },
+              {
+                "chars": 118,
+                "text": "II à Contribuição para o PIS/Pasep incidente sobre a folha de salários, os quais deverão ser escriturados no eSocial."
+              },
+              {
+                "chars": 286,
+                "text": "I de 2% (dois por cento) ao mês-calendário ou fração, incidente sobre o montante dos tributos informados na DCTFWeb, ainda que integralmente pagos, no caso de não apresentação da declaração ou de apresentação em atraso, limitada a 20% (vint"
+              },
+              {
+                "chars": 88,
+                "text": "II de R$ 20,00 (vinte reais) para cada grupo de dez informações incorretas ou omitidas."
+              },
+              {
+                "chars": 131,
+                "text": "I 50% (cinquenta por cento), quando a declaração for apresentada depois do prazo, mas antes de qualquer procedimento de ofício; ou"
+              },
+              {
+                "chars": 100,
+                "text": "II 25% (vinte e cinco por cento), quando a declaração for apresentada no prazo fixado na intimação."
+              },
+              {
+                "chars": 104,
+                "text": "I R$ 200,00 (duzentos reais), no caso de omissão ou de atraso na entrega de declaração sem movimento; e"
+              },
+              {
+                "chars": 51,
+                "text": "II R$ 500,00 (quinhentos reais), nos demais casos."
+              },
+              {
+                "chars": 41,
+                "text": "I 90% (noventa por cento), para o MEI; e"
+              },
+              {
+                "chars": 109,
+                "text": "II 50% (cinquenta por cento), para a microempresa ou empresa de pequeno porte optante pelo Simples Nacional."
+              },
+              {
+                "chars": 155,
+                "text": "I do respectivo ente federativo, no caso de responsabilidade de órgão público da administração direta dos estados, do Distrito Federal e dos municípios; e"
+              },
+              {
+                "chars": 44,
+                "text": "II do próprio declarante, nos demais casos."
+              },
+              {
+                "chars": 56,
+                "text": "I o saldo a pagar dos tributos informados na DCTFWeb; e"
+              },
+              {
+                "chars": 237,
+                "text": "II os saldos devedores apurados no procedimento de auditoria interna previsto no caput, decorrentes de informações indevidas ou não comprovadas sobre pagamento, parcelamento, dedução, compensação, exclusão ou suspensão de exigibilidade."
+              },
+              {
+                "chars": 159,
+                "text": "I do respectivo ente federativo, para débitos sob responsabilidade de órgão público da administração direta dos estados, do Distrito Federal e dos municípios;"
+              },
+              {
+                "chars": 106,
+                "text": "II do estabelecimento contribuinte, para débitos relativos ao IPI, à Cide-Combustíveis e à Cide-Remessas;"
+              },
+              {
+                "chars": 81,
+                "text": "III da incorporação imobiliária, para os débitos de que trata o art. 9º, § 3º; e"
+              },
+              {
+                "chars": 44,
+                "text": "IV do próprio declarante, nos demais casos."
+              },
+              {
+                "chars": 29,
+                "text": "I reduzir o valor de débito:"
+              },
+              {
+                "chars": 136,
+                "text": "II alterar o valor de débito relativo a tributo em relação ao qual o contribuinte tenha sido intimado do início de procedimento fiscal."
+              },
+              {
+                "chars": 93,
+                "text": "I pela liberação do débito retido, quando devidamente justificada a retificação efetuada; ou"
+              },
+              {
+                "chars": 218,
+                "text": "II pela não homologação da retificação, quando constatada sua improcedência ou na hipótese de o contribuinte não atender à intimação no prazo determinado ou não comprovar a ocorrência do erro de fato que a justificou."
+              },
+              {
+                "chars": 293,
+                "text": "I os documentos apresentados e as demais questões de fato alegadas serão apreciados preliminarmente pela autoridade que proferiu a decisão impugnada ou, na impossibilidade, por Auditor-Fiscal da Receita Federal do Brasil da unidade responsá"
+              },
+              {
+                "chars": 226,
+                "text": "II após a apreciação a que se refere o inciso I, será emitido novo despacho decisório, no qual será consignada a decisão de manter na íntegra ou de reformar, total ou parcialmente, a decisão de não homologação da retificação;"
+              },
+              {
+                "chars": 53,
+                "text": "III caso a decisão a que se refere o inciso II seja:"
+              },
+              {
+                "chars": 166,
+                "text": "IV na hipótese prevista na alínea \"a\" do inciso III, a impugnação será encaminhada à DRJ para julgamento, independentemente de eventual manifestação do contribuinte."
+              },
+              {
+                "chars": 80,
+                "text": "I os arts. 50 e 51 da Instrução Normativa RFB nº 2.021, de 16 de abril de 2021;"
+              },
+              {
+                "chars": 84,
+                "text": "II os arts. 1º e 3º da Instrução Normativa RFB nº 2.162, de 4 de outubro de 2023; e"
+              },
+              {
+                "chars": 40,
+                "text": "III as seguintes instruções normativas:"
+              }
+            ],
+            "limitations": {
+              "rfb_segment_type_unidentified_by_source": 85,
+              "rfb_tachado_evidence": 4,
+              "unidentified_content": 1
+            },
+            "missingSegments": [],
+            "attachments": 0,
+            "annexAuditGaps": []
+          },
+          "rfbReadingAssessment": {
+            "complete": false,
+            "bodyAbsent": false,
+            "readAttachments": 0,
+            "gaps": [
+              "status partial",
+              "11279 unidentified chars",
+              "limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, unidentified_content"
+            ]
+          },
+          "checks": {
+            "bytesEqualMeta": true,
+            "bytesEqualLot": true,
+            "freshLotEntryEqualsStored": true,
+            "outputHashEqualLot": true,
+            "preparedHtmlEqualLot": true,
+            "legalStatusUnknown": true,
+            "cellMatches": true,
+            "engineIsCurrent": true
+          },
+          "reproduced": true,
+          "classification": "PARCIAL"
+        }
+      ],
+      "otherAcervoSamplesSameCell": [],
+      "otherCompleteInAcervo": [],
+      "apt": []
+    },
+    {
+      "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "matrix": {
+        "complete": false,
+        "partialSamples": [
+          "rfb:37103"
+        ]
+      },
+      "samples": [
+        {
+          "sampleId": "rfb:37103",
+          "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+          "epigrafe": "Ato Declaratório Interpretativo RFB nº 18, de 23 de dezembro de 2011",
+          "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/37103/visao/multivigente",
+          "consultedAt": "2026-11-07T04:06:50.508Z",
+          "snapshot": "ops/anatomy/official-identification/rfb-p2c/37103.json",
+          "provenance": {
+            "bytes": 11168,
+            "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996"
+          },
+          "entrySha256": {
+            "stored": "2b967c15d88f44500d15f91050d6b3af5d635f0a7d8f94492732f1096de8da0b",
+            "recomputed": "2b967c15d88f44500d15f91050d6b3af5d635f0a7d8f94492732f1096de8da0b"
+          },
+          "reading": {
+            "status": "partial",
+            "outputHash": "16178793cc25b02306c51121556053049b2c4d3521ffaa90a790361c7567beee",
+            "canonicalChars": 3106,
+            "parts": 14,
+            "unidentifiedChars": 31,
+            "unidentified": [
+              {
+                "chars": 31,
+                "text": "CARLOS ALBERTO FREITAS BARRETO"
+              }
+            ],
+            "limitations": {
+              "rfb_segment_type_unmapped": 1,
+              "unidentified_content": 1
+            },
+            "missingSegments": [],
+            "attachments": 0,
+            "annexAuditGaps": []
+          },
+          "rfbReadingAssessment": {
+            "complete": false,
+            "bodyAbsent": false,
+            "readAttachments": 0,
+            "gaps": [
+              "status partial",
+              "31 unidentified chars",
+              "limitations rfb_segment_type_unmapped, unidentified_content"
+            ]
+          },
+          "checks": {
+            "bytesEqualMeta": true,
+            "bytesEqualLot": true,
+            "freshLotEntryEqualsStored": true,
+            "outputHashEqualLot": true,
+            "preparedHtmlEqualLot": true,
+            "legalStatusUnknown": true,
+            "cellMatches": true,
+            "engineIsCurrent": true
+          },
+          "reproduced": true,
+          "classification": "PARCIAL"
+        }
+      ],
+      "otherAcervoSamplesSameCell": [],
+      "otherCompleteInAcervo": [],
+      "apt": []
+    },
+    {
+      "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+      "matrix": {
+        "complete": false,
+        "partialSamples": [
+          "rfb:148629"
+        ]
+      },
+      "samples": [
+        {
+          "sampleId": "rfb:148629",
+          "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+          "epigrafe": "Ato Declaratório Executivo Cofis nº 30, de 18 de dezembro de 2025",
+          "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148629/visao/multivigente",
+          "consultedAt": "2026-11-10T15:19:37.141Z",
+          "snapshot": "ops/anatomy/official-identification/rfb-p2c/148629.json",
+          "provenance": {
+            "bytes": 11638,
+            "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f"
+          },
+          "entrySha256": {
+            "stored": "ec0fbd6d4de0ccfd9696fdcf25f340957aae9bb18b26bba73c1a50ce011a6f41",
+            "recomputed": "ec0fbd6d4de0ccfd9696fdcf25f340957aae9bb18b26bba73c1a50ce011a6f41"
+          },
+          "reading": {
+            "status": "partial",
+            "outputHash": "4e986af6cb55e1485216729d0b4dc6c99f325e93629fd87a7ae652e829d242a9",
+            "canonicalChars": 1140,
+            "parts": 10,
+            "unidentifiedChars": 415,
+            "unidentified": [
+              {
+                "chars": 415,
+                "text": "A COORDENADORA-GERAL DE FISCALIZAÇÃO, no uso da atribuição que lhe confere o inciso III do art. 121 do Regimento Interno da Secretaria Especial da Receita Federal do Brasil, aprovado pela Portaria ME nº 284, de 27 de julho de 2020, tendo em"
+              }
+            ],
+            "limitations": {
+              "rfb_segment_type_unidentified_by_source": 1,
+              "unidentified_content": 1
+            },
+            "missingSegments": [],
+            "attachments": 1,
+            "annexAuditGaps": []
+          },
+          "rfbReadingAssessment": {
+            "complete": false,
+            "bodyAbsent": false,
+            "readAttachments": 1,
+            "gaps": [
+              "status partial",
+              "415 unidentified chars",
+              "limitations rfb_segment_type_unidentified_by_source, unidentified_content"
+            ]
+          },
+          "checks": {
+            "bytesEqualMeta": true,
+            "bytesEqualLot": true,
+            "freshLotEntryEqualsStored": true,
+            "outputHashEqualLot": true,
+            "preparedHtmlEqualLot": true,
+            "legalStatusUnknown": true,
+            "cellMatches": true,
+            "engineIsCurrent": true
+          },
+          "reproduced": true,
+          "classification": "PARCIAL"
+        }
+      ],
+      "otherAcervoSamplesSameCell": [],
+      "otherCompleteInAcervo": [],
+      "apt": []
+    },
+    {
+      "cellId": "rfb--ato-declaratorio-executivo--medio",
+      "matrix": {
+        "complete": false,
+        "partialSamples": [
+          "rfb:148516"
+        ]
+      },
+      "samples": [
+        {
+          "sampleId": "rfb:148516",
+          "cellId": "rfb--ato-declaratorio-executivo--medio",
+          "epigrafe": "Ato Declaratório Executivo Corat nº 33, de 23 de dezembro de 2025",
+          "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148516/visao/multivigente",
+          "consultedAt": "2026-11-10T15:19:37.463Z",
+          "snapshot": "ops/anatomy/official-identification/rfb-p2c/148516.json",
+          "provenance": {
+            "bytes": 32477,
+            "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c"
+          },
+          "entrySha256": {
+            "stored": "f26386018a92f7be0058e879792b79dfff6130e8b2b012205c66e488e0a3a043",
+            "recomputed": "f26386018a92f7be0058e879792b79dfff6130e8b2b012205c66e488e0a3a043"
+          },
+          "reading": {
+            "status": "partial",
+            "outputHash": "904e9567c56bd85cf99096d70ac45559b9045f57577a7f1fc815485d8a6416bc",
+            "canonicalChars": 10620,
+            "parts": 70,
+            "unidentifiedChars": 262,
+            "unidentified": [
+              {
+                "chars": 253,
+                "text": "O COORDENADOR-GERAL DE ADMINISTRAÇÃO DO CRÉDITO TRIBUTÁRIO, no exercício da atribuição prevista no inciso II do art. 358 do Regimento Interno da Secretaria Especial da Receita Federal do Brasil, aprovado pela Portaria MF nº 284, de 27 de ju"
+              },
+              {
+                "chars": 9,
+                "text": "DECLARA:"
+              }
+            ],
+            "limitations": {
+              "rfb_segment_type_unidentified_by_source": 2,
+              "unidentified_content": 1
+            },
+            "missingSegments": [],
+            "attachments": 0,
+            "annexAuditGaps": [
+              "Anexo Único (own) absent from the representation"
+            ]
+          },
+          "rfbReadingAssessment": {
+            "complete": false,
+            "bodyAbsent": false,
+            "readAttachments": 0,
+            "gaps": [
+              "status partial",
+              "262 unidentified chars",
+              "limitations rfb_segment_type_unidentified_by_source, unidentified_content",
+              "own annex completeness: Anexo Único (own) absent from the representation"
+            ]
+          },
+          "checks": {
+            "bytesEqualMeta": true,
+            "bytesEqualLot": true,
+            "freshLotEntryEqualsStored": true,
+            "outputHashEqualLot": true,
+            "preparedHtmlEqualLot": true,
+            "legalStatusUnknown": true,
+            "cellMatches": true,
+            "engineIsCurrent": true
+          },
+          "reproduced": true,
+          "classification": "PARCIAL"
+        }
+      ],
+      "otherAcervoSamplesSameCell": [],
+      "otherCompleteInAcervo": [],
+      "apt": []
+    },
+    {
+      "cellId": "rfb--resolucao--pequeno",
+      "matrix": {
+        "complete": false,
+        "partialSamples": [
+          "rfb:122645"
+        ]
+      },
+      "samples": [
+        {
+          "sampleId": "rfb:122645",
+          "cellId": "rfb--resolucao--pequeno",
+          "epigrafe": "Resolução CGSN nº 164, de 21 de janeiro de 2022",
+          "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/122645/visao/multivigente",
+          "consultedAt": "2026-11-07T04:06:53.876Z",
+          "snapshot": "ops/anatomy/official-identification/rfb-p2c/122645.json",
+          "provenance": {
+            "bytes": 11110,
+            "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d"
+          },
+          "entrySha256": {
+            "stored": "28a2680fc8ae166e31c2fedab90d665ba36584810ff49480a0a9cd48508e4dd7",
+            "recomputed": "28a2680fc8ae166e31c2fedab90d665ba36584810ff49480a0a9cd48508e4dd7"
+          },
+          "reading": {
+            "status": "partial",
+            "outputHash": "682cd98a357e730c27da5e59a8b327a69145b5dc1a037c39acffffb98382cc42",
+            "canonicalChars": 2167,
+            "parts": 14,
+            "unidentifiedChars": 272,
+            "unidentified": [
+              {
+                "chars": 272,
+                "text": "O Comitê Gestor do Simples Nacional, no uso das atribuições que lhe conferem a Lei Complementar nº 123, de 14 de dezembro de 2006, o Decreto nº 6.038, de 7 de fevereiro de 2007, e o Regimento Interno aprovado pela Resolução CGSN nº 163, de "
+              }
+            ],
+            "limitations": {
+              "rfb_segment_type_unidentified_by_source": 1,
+              "unidentified_content": 1
+            },
+            "missingSegments": [],
+            "attachments": 0,
+            "annexAuditGaps": []
+          },
+          "rfbReadingAssessment": {
+            "complete": false,
+            "bodyAbsent": false,
+            "readAttachments": 0,
+            "gaps": [
+              "status partial",
+              "272 unidentified chars",
+              "limitations rfb_segment_type_unidentified_by_source, unidentified_content"
+            ]
+          },
+          "checks": {
+            "bytesEqualMeta": true,
+            "bytesEqualLot": true,
+            "freshLotEntryEqualsStored": true,
+            "outputHashEqualLot": true,
+            "preparedHtmlEqualLot": true,
+            "legalStatusUnknown": true,
+            "cellMatches": true,
+            "engineIsCurrent": true
+          },
+          "reproduced": true,
+          "classification": "PARCIAL"
+        }
+      ],
+      "otherAcervoSamplesSameCell": [],
+      "otherCompleteInAcervo": [],
+      "apt": []
+    }
+  ],
+  "proposedRecords": []
+}

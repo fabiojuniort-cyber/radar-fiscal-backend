@@ -1,0 +1,6 @@
+{
+  "schema": "e9-a3-proposed-acceptances/1",
+  "registered": false,
+  "note": "PROPOSTA VAZIA — as 5 amostras de cobertura (141910, 37103, 148629, 148516, 122645) têm leitura parcial no motor 4b96f977 e não há outra amostra RFB do mesmo tipo e porte no acervo versionado. Ver e9a3-partial-rfb-proof.json e README.md.",
+  "proposed": []
+}
