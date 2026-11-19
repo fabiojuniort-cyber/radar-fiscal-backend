@@ -24,7 +24,7 @@ import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-pre
 import { MANUAL_DIR, decodeManual, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
 import { APPROVED_FALLBACK, compareWithIndependent, decodeDeclared, decodeWithPolicy, PASSAGES } from './charset-policy.js';
-import { portalActChars } from './official-act-size.js';
+import { prepareOfficialAct, portalActChars } from '../../src/modules/anatomy/official-portal-preparation.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
@@ -451,7 +451,8 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : m.source === 'DOU' ? LAYOUT.DOU_HTML : LAYOUT.PLANALTO_HTML;
     if (!profile) { out.push({ id: m.item, source: m.source, type: m.type, layout, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio; porte indeterminado'], ...(decoding ? { decoding: { ...decoding, declaredCharset: null } } : {}) }); continue; }
-    const rd = readWith(profile, m.item, html);
+    const preparation = profile === 'DOU' ? prepareOfficialAct(profile, m.item, html, m.titleCheck.matched) : null;
+    const rd = readWith(profile, m.item, html, preparation ? { officialAct: preparation } : {});
     const actChars = portalActChars(profile, html);
     const ok = locked(m.item, m.sha256, profile, rd);
     const manSample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), sha256: m.sha256, bytes: m.bytes,

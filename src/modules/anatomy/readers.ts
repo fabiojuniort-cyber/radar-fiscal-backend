@@ -1,4 +1,5 @@
 import { Parser } from 'htmlparser2';
+import { PORTAL_MAX_NODES, verifyOfficialAct, type OfficialActPreparation } from './official-portal-preparation.js';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
 import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, type RecoveryDecision, type ShadowContext } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
@@ -16,6 +17,7 @@ export interface AnatomyReaderInput {
   html?: string | undefined;
   text?: string | undefined;
   missingResources?: string[];
+  officialAct?: OfficialActPreparation | undefined;
   /** Compiled effective profile for this source; defaults to the shipped DEFAULT_PROFILES. */
   rules?: CompiledRules;
   /**
@@ -200,11 +202,18 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
     limitations: [], status: 'complete' };
   const representation = input.html !== undefined ? 'html' : 'text';
-  const raw = input.html ?? input.text ?? '';
+  const full = input.html ?? input.text ?? '';
+  const portal = input.officialAct;
+  if (portal && (!input.html || !verifyOfficialAct(portal, input.source, input.representationId, input.html))) {
+    throw new TypeError('Official act preparation must be issued for this source, representation and HTML');
+  }
+  const raw = portal ? full.slice(portal.start, portal.end) : full;
+  const originOffset = portal?.start ?? 0;
+  const maxNodes = portal ? PORTAL_MAX_NODES : ANATOMY_READER_LIMITS.maxNodes;
   const childOrders = new Map<string | null, number>();
   const pointer = (locator: string, start: number | null = null, end: number | null = null): Pointer => ({
     resourceId: input.representationId, representation, locator,
-    sourceSpan: start !== null && end !== null ? { start, end } : null,
+    sourceSpan: start !== null && end !== null ? { start: start + originOffset, end: end + originOffset } : null,
   });
   const limitation = (code: string, message: string, span: { start: number; end: number } | null = null): void => {
     result.limitations.push({ code, message, partId: null, span }); result.status = 'partial';
@@ -251,7 +260,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   };
   const parser = new Parser({
     onopentag(tag, attrs) {
-      if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
+      if (++nodeCount > maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
       // Every decoded attribute name/value is checked (a superset of the class attributes the reader consumes).
       if (!seen.decodedAttributeNonNfc && Object.entries(attrs).some(([k, v]) => isNonNfcText(k) || isNonNfcText(v))) seen.decodedAttributeNonNfc = true;
@@ -262,7 +271,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       parent.children.push(node); stack.push(node);
     },
     ontext(text) {
-      if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes) { exceeded = true; parser.pause(); return; }
+      if (++nodeCount > maxNodes) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
       parent.children.push({ tag: '#text', attrs: {}, path: `${parent.path}/text()[${childIndex(parent, '#text')}]`,
         start: parser.startIndex, end: parser.endIndex + 1, children: [], text, span: { start: 0, end: 0 }, blocked: parent.blocked });
@@ -591,6 +600,19 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         : describe(node, rules, markerText);
       if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span, text);
       const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
+      if (portal?.source === 'DOU' && descriptor.type === 'unidentified' && !wasQuoted && !openQuotation) {
+        if (/^ANEXO\s+(?:ÚNICO|UNICO|[IVXLCDM]+|\d+)(?:\s|$)/iu.test(text) && ownClasses.includes('anexo')) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'dou_portal_annex', rank: 2 };
+        } else if (ownClasses.includes('dou-paragraph') || ownClasses.includes('subtitulo')) {
+          const heading = ownClasses.includes('subtitulo') && /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+[IVXLCDM0-9]+\b/iu.exec(text);
+          if (heading) {
+            const [level, rank] = groupLevel(heading[1]!);
+            descriptor = { type: 'group', context: 'operative_candidate', reason: 'dou_portal_' + level, rank };
+          } else {
+            descriptor = { type: 'body', context: 'unknown', reason: 'dou_portal_text_block', rank: 100 };
+          }
+        }
+      }
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
       const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
