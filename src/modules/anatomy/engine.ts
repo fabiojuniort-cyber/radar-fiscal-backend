@@ -59,6 +59,9 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
     const options = { ncmPartIds: identifyNcmPartIds(read, rules), ...(catalog ? { catalog } : {}), rules };
     entities = recovered ? extractRecoveredEntities(read, options)
       : extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ...options });
+    if (new Set(entities.map((entity) => entity.id)).size !== entities.length) {
+      throw new TypeError('Entity extraction produced conflicting spans');
+    }
   } catch (error) {
     entities = [];
     read.status = 'partial';

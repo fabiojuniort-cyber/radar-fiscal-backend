@@ -52,13 +52,22 @@ export function prepareOfficialAct(source: PortalSource, resourceId: string, htm
     }
   }
   const visible = normalizeText(chunks.join(''));
-  if (!visible || (epigraph && !visible.slice(0, 1600).includes(normalizeText(epigraph)))) return null;
+  if (!visible || (epigraph && !matchesEpigraph(source, visible.slice(0, 1600), epigraph))) return null;
   const result = Object.freeze({ source, resourceId, start: act.startIndex, end: act.endIndex + 1, chars: visible.length });
   if (epigraph) issued.set(result, html);
   return result;
 }
 
 const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/gu, ' ').trim();
+
+function matchesEpigraph(source: PortalSource, visible: string, expected: string): boolean {
+  const wanted = normalizeText(expected);
+  if (visible.toUpperCase().includes(wanted.toUpperCase())) return true;
+  if (source !== 'CONFAZ') return false;
+  const key = /^(.+?)\s+(?:N[º°o.]\s*)?0*(\d+)\s*\/\s*(?:20)?(\d{2})\b/iu.exec(wanted);
+  const title = /^(.+?)\s+(?:N[º°o.]\s*)?0*(\d+),\s+DE\s+\d+\s+DE\s+\p{L}+\s+DE\s+20(\d{2})\b/iu.exec(visible);
+  return !!key && !!title && key.slice(1).every((part, n) => part.toUpperCase() === title[n + 1]?.toUpperCase());
+}
 
 export function verifyOfficialAct(prep: OfficialActPreparation, source: string, resourceId: string, html: string): boolean {
   return prep.source === source && prep.resourceId === resourceId && issued.get(prep) === html;

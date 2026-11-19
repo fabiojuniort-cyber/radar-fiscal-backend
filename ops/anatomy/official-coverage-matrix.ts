@@ -359,6 +359,11 @@ function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html
   return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken, status: r.status, unidentifiedChars,
     limitationCodes: [...new Set(r.limitations.map((l) => l.code))].sort() };
 }
+function readPortal(source: 'DOU' | 'CONFAZ', id: string, html: string, title: string): Read {
+  const prep = title.trim() ? prepareOfficialAct(source, id, html, title) : null;
+  const read = readWith(source, id, html, prep ? { officialAct: prep } : {});
+  return prep ? read : { ...read, status: 'partial', limitationCodes: [...read.limitationCodes, 'act_region_unproven'] };
+}
 type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
 /** Canonical digest of a sample's entry in the samples baseline (the non-RFB counterpart of `lotEntrySha256`). */
 export const baselineEntrySha256 = (e: BaselineEntry) => lotEntrySha256({ id: e.id, sha256: e.sha256, profile: e.profile, outputHash: e.outputHash, chars: e.chars });
@@ -451,8 +456,7 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : m.source === 'DOU' ? LAYOUT.DOU_HTML : LAYOUT.PLANALTO_HTML;
     if (!profile) { out.push({ id: m.item, source: m.source, type: m.type, layout, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio; porte indeterminado'], ...(decoding ? { decoding: { ...decoding, declaredCharset: null } } : {}) }); continue; }
-    const preparation = profile === 'DOU' ? prepareOfficialAct(profile, m.item, html, m.titleCheck.matched) : null;
-    const rd = readWith(profile, m.item, html, preparation ? { officialAct: preparation } : {});
+    const rd = readPortal(profile, m.item, html, m.titleCheck.matched);
     const actChars = portalActChars(profile, html);
     const ok = locked(m.item, m.sha256, profile, rd);
     const manSample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), sha256: m.sha256, bytes: m.bytes,
@@ -483,7 +487,7 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
         profile: null, outputHash: null, notes: [decoding ? 'charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado' : (m.readableNote ?? 'sem perfil de leitura próprio')],
         ...(decoding ? { decoding } : {}) }); continue; }
     const html = decodeDeclared(bytes, m.declaredCharset);
-    const rd = readWith('CONFAZ', id, html);
+    const rd = readPortal('CONFAZ', id, html, m.identification.matched);
     const actChars = portalActChars('CONFAZ', html);
     const ok = locked(id, m.sha256, 'CONFAZ', rd);
     const cfSample: Sample = { ...base, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',

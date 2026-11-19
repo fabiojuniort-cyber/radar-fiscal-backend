@@ -613,6 +613,22 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           }
         }
       }
+      if (portal?.source === 'CONFAZ' && !wasQuoted && !openQuotation) {
+        const classes = classesOf(node);
+        if (classes.includes('A1-1TituloAcordo')) {
+          descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_epigraph', rank: 100 };
+        } else if (classes.includes('A3Ementa')) {
+          descriptor = { type: 'summary', context: 'prohibited', reason: 'confaz_plone_summary', rank: 100 };
+        } else if (classes.includes('A5-2NovaRedacao')) {
+          descriptor = { type: 'quoted_text', context: 'prohibited', reason: 'confaz_plone_cited_wording', rank: 100 };
+        } else if (classes.includes('A4AcordoTipo') && /^(CONVÊNIO|AJUSTE|PROTOCOLO)(?:SINIEF|ICMS)?$/iu.test(text.replace(/\s/gu, ''))) {
+          descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_act_kind', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'confaz_plone_sole_annex', rank: 2 };
+        } else if (descriptor.type === 'unidentified' && classes.some((c) => c === 'A6-1Subtitulo' || c === 'A7-1TabelaSubtitulo' || c === 'A9-1TabelaSubtituloverde')) {
+          descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_subheading', rank: 100 };
+        }
+      }
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
       const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
