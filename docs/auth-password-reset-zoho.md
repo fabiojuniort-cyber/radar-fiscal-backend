@@ -32,12 +32,15 @@ e envio criptografado — não há nova fila externa nem novo serviço Railway.
 ### POST /auth/password/forgot
 
 JSON: `{"email":"pessoa@empresa.com.br"}`.
-- HTTP 202 com `{"status":"if_account_exists"}` para e-mail existente, desconhecido,
-  inativo, e-mail cuja cota própria de 5/15min esteja excedida.
-- HTTP 429 + Retry-After somente para cota do IP (60/15min).
-- HTTP 400 para payload malformado, 503 quando desligado/sem worker pronto,
-  e 5xx uniforme em indisponibilidade da fila neutra — **nunca consultar
-  existência do usuário no erro**.
+
+| HTTP | Resposta e condição |
+|---|---|
+| 202 | `{"status":"if_account_exists"}` para e-mail existente, desconhecido ou inativo, e para e-mail cuja cota de 5/15 min esteja excedida. |
+| 400 | Payload malformado. |
+| 429 | Cota do IP excedida (60/15 min), com `Retry-After`. |
+| 503 | Indisponibilidade prevista, como funcionalidade desligada ou worker indisponível. |
+| 500 | `{"error":"password_reset_unavailable"}` para falha inesperada no ingresso neutro, com resposta uniforme e sem consulta à existência do usuário. |
+
 - O piso temporal de 1,2s fica ativo fora de `NODE_ENV=test` como defesa adicional,
   mas a segurança NÃO depende do piso: o trabalho HTTP é uniforme.
 - O frontend jamais afirma que determinada conta existe, foi identificada ou recebeu e-mail.
