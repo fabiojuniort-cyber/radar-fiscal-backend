@@ -150,14 +150,20 @@ export async function loginWithPassword(
   const sessionId = await db
     .transaction()
     .execute(async (trx) => {
-      await trx
+      // Se um reset alterou o hash enquanto Argon2 verificava a senha,
+      // impedir criar nova sessao usando a credencial anterior.
+      const currentCredential = await trx
         .updateTable('user_credentials')
         .set({
           failed_login_attempts: 0,
           locked_until: null,
         })
         .where('user_id', '=', account.id)
-        .execute();
+        .where('password_hash', '=', account.password_hash)
+        .returning('user_id')
+        .executeTakeFirst();
+
+      if (!currentCredential) return null;
 
       const session = await trx
         .insertInto('auth_sessions')
@@ -183,6 +189,8 @@ export async function loginWithPassword(
 
       return session.id;
     });
+
+  if (!sessionId) return null;
 
   return {
     user: {
