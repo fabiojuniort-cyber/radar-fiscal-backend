@@ -16,7 +16,7 @@ const requestSchema = z.strictObject({
   publicationVersionId: z.string().min(1).max(256),
   referenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   ruleSet: z.strictObject({ id: z.string().min(1).max(256), version: z.string().min(1).max(256) }),
-  input: z.strictObject({ source: z.enum(['CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL']), representationId: z.string().min(1).max(256),
+  input: z.strictObject({ source: z.enum(['PLANALTO', 'CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL']), representationId: z.string().min(1).max(256),
     html: z.string().optional(), text: z.string().optional(), missingResources: z.array(z.string().min(1)).optional(),
     officialAct: z.custom<OfficialActPreparation>((v) => v !== null && typeof v === 'object').optional(),
     // ANAT-L17: out-of-band provenance for SEFAZ-SP-PORTAL. Kept by reference (never cloned or rebuilt from data), so

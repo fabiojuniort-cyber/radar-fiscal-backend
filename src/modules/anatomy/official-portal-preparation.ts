@@ -21,6 +21,26 @@ function hasClass(classes: string | undefined, name: string): boolean {
 export function prepareOfficialAct(source: PortalSource, resourceId: string, html: string, epigraph?: string): OfficialActPreparation | null {
   if (Buffer.byteLength(html, 'utf8') > 2 * 1024 * 1024) return null;
   const doc = parseDocument(html, { withStartIndices: true, withEndIndices: true });
+  if (source === 'PLANALTO') {
+    const bodies = DomUtils.findAll((node) => node.name === 'body', doc.children);
+    if (bodies.length !== 1 || !epigraph) return null;
+    const body = bodies[0]!;
+    const paragraphs = DomUtils.findAll((node) => node.name === 'p', body.children);
+    const headers = paragraphs.filter((p) => /^LEI\s+N/iu.test(normalizeText(DomUtils.textContent(p)))
+      && normalizeText(DomUtils.textContent(p)).replace(/\s+/gu, '').toUpperCase().includes(normalizeText(epigraph).toUpperCase().replace(/\s+/gu, '')));
+    if (headers.length !== 1 || headers[0]!.startIndex === null || body.endIndex === null) return null;
+    const start = headers[0]!.startIndex!;
+    const end = html.lastIndexOf('<', body.endIndex);
+    if (!/^<\/body\s*>$/iu.test(html.slice(end, body.endIndex + 1))
+      || !/Casa\s+Civil/iu.test(html.slice(body.startIndex ?? 0, start))) return null;
+    const visible = measure(parseDocument(html.slice(start, end)).children);
+    const hasFirstArticle = paragraphs.some((p) => p.startIndex !== null && p.startIndex > start
+      && /^Art\.\s*1(?:[º°o])?(?![\p{L}\p{N}])/iu.test(normalizeText(DomUtils.textContent(p))));
+    if (!visible || !hasFirstArticle) return null;
+    const result = Object.freeze({ source, resourceId, start, end, chars: visible.length });
+    issued.set(result, html);
+    return result;
+  }
   const roots = DomUtils.findAll((node) => source === 'DOU'
     ? node.name === 'article' && node.attribs.id === 'materia'
     : node.attribs.id === 'content-core', doc.children);
@@ -35,8 +55,16 @@ export function prepareOfficialAct(source: PortalSource, resourceId: string, htm
   const closingTag = html.slice(html.lastIndexOf('<', act.endIndex), act.endIndex + 1);
   if (!new RegExp(`^</${act.name}\\s*>$`, 'iu').test(closingTag)) return null;
 
+  const visible = measure(act.children);
+  if (!visible || (epigraph && !matchesEpigraph(source, visible.slice(0, 1600), epigraph))) return null;
+  const result = Object.freeze({ source, resourceId, start: act.startIndex, end: act.endIndex + 1, chars: visible.length });
+  if (epigraph) issued.set(result, html);
+  return result;
+}
+
+function measure(nodes: ReturnType<typeof parseDocument>['children']): string {
   const chunks: string[] = [];
-  const stack = [...act.children].reverse().map((node) => ({ node, close: false }));
+  const stack = [...nodes].reverse().map((node) => ({ node, close: false }));
   while (stack.length) {
     const { node, close } = stack.pop()!;
     if (node.type === 'text') {
@@ -51,11 +79,7 @@ export function prepareOfficialAct(source: PortalSource, resourceId: string, htm
       stack.push({ node: node.children[index]!, close: false });
     }
   }
-  const visible = normalizeText(chunks.join(''));
-  if (!visible || (epigraph && !matchesEpigraph(source, visible.slice(0, 1600), epigraph))) return null;
-  const result = Object.freeze({ source, resourceId, start: act.startIndex, end: act.endIndex + 1, chars: visible.length });
-  if (epigraph) issued.set(result, html);
-  return result;
+  return normalizeText(chunks.join(''));
 }
 
 const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/gu, ' ').trim();

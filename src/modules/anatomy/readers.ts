@@ -12,7 +12,7 @@ export class SefazSpProvenanceError extends TypeError {
 }
 
 export interface AnatomyReaderInput {
-  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
+  source: 'PLANALTO' | 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
   representationId: string;
   html?: string | undefined;
   text?: string | undefined;
@@ -207,6 +207,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   if (portal && (!input.html || !verifyOfficialAct(portal, input.source, input.representationId, input.html))) {
     throw new TypeError('Official act preparation must be issued for this source, representation and HTML');
   }
+  if (input.source === 'PLANALTO' && !portal) throw new TypeError('PLANALTO requires issued official act preparation');
   const raw = portal ? full.slice(portal.start, portal.end) : full;
   const originOffset = portal?.start ?? 0;
   const maxNodes = portal ? PORTAL_MAX_NODES : ANATOMY_READER_LIMITS.maxNodes;
@@ -627,6 +628,16 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'confaz_plone_sole_annex', rank: 2 };
         } else if (descriptor.type === 'unidentified' && classes.some((c) => c === 'A6-1Subtitulo' || c === 'A7-1TabelaSubtitulo' || c === 'A9-1TabelaSubtituloverde')) {
           descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_subheading', rank: 100 };
+        }
+      }
+      if (portal?.source === 'PLANALTO' && !wasQuoted && !openQuotation) {
+        if (node.start === 0 && /^LEI\s+N/iu.test(text)) descriptor = { type: 'epigraph', context: 'prohibited', reason: 'planalto_epigraph', rank: 100 };
+        else if (/^(?:Este texto não substitui|Mensagem de Veto|Conversão da MPv|Produção de efeitos?|Vigência|Vide\b|Regulamento\s*$)/iu.test(text)) {
+          descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'planalto_notice', rank: 100 };
+        } else if (descriptor.type !== 'unidentified' && node.tag === 'p' && /<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end))) {
+          descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
+        } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'planalto_sole_annex', rank: 2 };
         }
       }
       if (spPortal && !markerText(node).trim()) return;
