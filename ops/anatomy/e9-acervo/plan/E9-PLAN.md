@@ -120,7 +120,7 @@ Com isso o total iria de 4 para até 15 de 61. A F1 não muda enquanto a matriz 
 
 **Risco de equivalência:**
 - Qualquer mudança no motor invalida os aceites atuais, que valem só para `4b96f977`. São 5 amostras RFB em 4 células.
-- **Todas as 14 amostras RFB do acervo têm segmentos de tipo 999.** As aceitas também: 108391 tem 1, 115131 tem 10, 133898 tem 10, 142967 tem 8 e 148693 tem 1.
+- **12 das 14 amostras RFB do acervo têm segmentos de tipo 999**, inclusive todas as aceitas: 108391 tem 1, 115131 tem 10, 133898 tem 10, 142967 tem 8 e 148693 tem 1.
 - Portanto a frente M-RFB pode mudar as leituras já aceitas. Cada uma precisa de prova formal de equivalência, pela rotina da Portaria 635, e de revalidação append-only.
 - Se alguma leitura mudar de verdade, o aceite cai e precisa de nova revisão.
 - **Mitigação:**
