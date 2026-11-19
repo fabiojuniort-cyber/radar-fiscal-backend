@@ -1,0 +1,494 @@
+{
+  "schema": "e9-plan-inventory/1",
+  "base": "main d53fb3e2b8d34b9fbeda4da6c5fbdf25a24c19e9",
+  "engine": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+  "classes": {
+    "a": "amostra no acervo; falta ler/validar",
+    "b": "falta coleta; fonte acessível",
+    "c": "fonte bloqueada (grants, insumo manual, DOE-SP)",
+    "d": "falta perfil/leitor no motor",
+    "e": "célula possivelmente inexistente na fonte"
+  },
+  "pending": [
+    {
+      "cellId": "rfb--portaria--grande",
+      "source": "RFB",
+      "type": "Portaria",
+      "size": "grande",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c",
+      "obstacle": "P2-c suspenso (grants esgotados: 28/25); busca anterior \"médio e grande não encontrados no limite\"",
+      "remedy": "coleta RFB"
+    },
+    {
+      "cellId": "rfb--ato-declaratorio-interpretativo--medio",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "size": "médio",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c",
+      "obstacle": "P2-c suspenso; nenhum candidato no CSV de 10/11",
+      "remedy": "coleta RFB"
+    },
+    {
+      "cellId": "rfb--ato-declaratorio-interpretativo--grande",
+      "source": "RFB",
+      "type": "Ato Declaratório Interpretativo",
+      "size": "grande",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c/e",
+      "obstacle": "P2-c suspenso; ADI ≥ 50.000 caracteres é improvável (atos interpretativos curtos)",
+      "remedy": "N/A com justificativa (GridCell.applicability) ou coleta"
+    },
+    {
+      "cellId": "rfb--ato-declaratorio-executivo--grande",
+      "source": "RFB",
+      "type": "Ato Declaratório Executivo",
+      "size": "grande",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c/e",
+      "obstacle": "P2-c suspenso; ADE grande só com anexo extenso inline",
+      "remedy": "coleta RFB ou N/A"
+    },
+    {
+      "cellId": "rfb--solucao-de-consulta--pequeno",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "size": "pequeno",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c+d",
+      "obstacle": "P2-c suspenso; corpo da SC vem em anexo PDF (rfb:148681 bodyAbsent, porte indeterminado)",
+      "remedy": "coleta + leitura do anexo PDF"
+    },
+    {
+      "cellId": "rfb--solucao-de-consulta--medio",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "size": "médio",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c+d",
+      "obstacle": "idem",
+      "remedy": "coleta + leitura do anexo PDF"
+    },
+    {
+      "cellId": "rfb--solucao-de-consulta--grande",
+      "source": "RFB",
+      "type": "Solução de Consulta",
+      "size": "grande",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c+d/e",
+      "obstacle": "idem; SC ≥ 50.000 caracteres é rara",
+      "remedy": "coleta + anexo PDF, ou N/A"
+    },
+    {
+      "cellId": "rfb--resolucao--medio",
+      "source": "RFB",
+      "type": "Resolução",
+      "size": "médio",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c",
+      "obstacle": "P2-c suspenso; nenhum candidato",
+      "remedy": "coleta RFB"
+    },
+    {
+      "cellId": "rfb--resolucao--grande",
+      "source": "RFB",
+      "type": "Resolução",
+      "size": "grande",
+      "route": "API RFB — P2-c (autorizada, c.6701950134)",
+      "class": "c",
+      "obstacle": "P2-c suspenso (ex.: Res. CGSN 140/2018 é grande)",
+      "remedy": "coleta RFB"
+    },
+    {
+      "cellId": "planalto--lei--pequeno",
+      "source": "Planalto",
+      "type": "Lei",
+      "size": "pequeno",
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "class": "c+d",
+      "obstacle": "origem recusa este ambiente → insumo manual; sem perfil Planalto",
+      "remedy": "insumo Fábio + perfil Planalto"
+    },
+    {
+      "cellId": "planalto--lei--medio",
+      "source": "Planalto",
+      "type": "Lei",
+      "size": "médio",
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "class": "c+d",
+      "obstacle": "idem",
+      "remedy": "insumo Fábio + perfil Planalto"
+    },
+    {
+      "cellId": "planalto--lei--grande",
+      "source": "Planalto",
+      "type": "Lei",
+      "size": "grande",
+      "route": "arquivo manual (a origem recusa este ambiente)",
+      "class": "d",
+      "obstacle": "M1/M2 já no acervo (http, charset fallback aprovado); sem perfil Planalto",
+      "remedy": "perfil Planalto (motor)"
+    },
+    {
+      "cellId": "normas-leg-br--lei--pequeno",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "size": "pequeno",
+      "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
+      "class": "b+d",
+      "obstacle": "fonte acessível; sem perfil próprio (L-LEG-01); sem amostra deste porte",
+      "remedy": "coleta acessível + perfil NORMAS-LEG"
+    },
+    {
+      "cellId": "normas-leg-br--lei--medio",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "size": "médio",
+      "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
+      "class": "b+d",
+      "obstacle": "idem",
+      "remedy": "coleta acessível + perfil NORMAS-LEG"
+    },
+    {
+      "cellId": "normas-leg-br--lei--grande",
+      "source": "normas.leg.br",
+      "type": "Lei",
+      "size": "grande",
+      "route": "normas.leg.br (acessível; sem perfil de leitura próprio — L-LEG-01)",
+      "class": "d",
+      "obstacle": "4 amostras no acervo (Leis 10.637/2002 e 10.833/2003, original/atualizada; 60–168 mil chars no diagnóstico DOU); perfil NORMAS-LEG só nos ramos #305/#309",
+      "remedy": "perfil NORMAS-LEG (motor) + revalidar aceites #305"
+    },
+    {
+      "cellId": "confaz--convenio-icms--pequeno",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "size": "pequeno",
+      "route": "arquivo manual (M3, M4)",
+      "class": "c",
+      "obstacle": "insumo manual; nenhuma amostra",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "confaz--convenio-icms--medio",
+      "source": "CONFAZ",
+      "type": "Convênio ICMS",
+      "size": "médio",
+      "route": "arquivo manual (M3, M4)",
+      "class": "a?/c",
+      "obstacle": "corpus 02 (CV100/97, 30.591 chars, médio) está no acervo de teste, mas é HTML \"sanitized\" de fixture, não bytes oficiais com meta",
+      "remedy": "decisão de proveniência; senão insumo Fábio"
+    },
+    {
+      "cellId": "confaz--ajuste-sinief--pequeno",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "size": "pequeno",
+      "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual; nenhuma amostra",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "confaz--ajuste-sinief--medio",
+      "source": "CONFAZ",
+      "type": "Ajuste SINIEF",
+      "size": "médio",
+      "route": "arquivo manual (M5 recebido; demais portes a selecionar)",
+      "class": "c",
+      "obstacle": "idem",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "confaz--protocolo-icms--pequeno",
+      "source": "CONFAZ",
+      "type": "Protocolo ICMS",
+      "size": "pequeno",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual (a selecionar)",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "confaz--protocolo-icms--medio",
+      "source": "CONFAZ",
+      "type": "Protocolo ICMS",
+      "size": "médio",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "idem",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "confaz--protocolo-icms--grande",
+      "source": "CONFAZ",
+      "type": "Protocolo ICMS",
+      "size": "grande",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c/e",
+      "obstacle": "idem; Protocolo ≥ 50.000 caracteres é raro",
+      "remedy": "insumo Fábio ou N/A"
+    },
+    {
+      "cellId": "dou--instrucao-normativa--pequeno",
+      "source": "DOU",
+      "type": "Instrução Normativa",
+      "size": "pequeno",
+      "route": "arquivo manual (M9 em HTML)",
+      "class": "c",
+      "obstacle": "insumo manual HTML",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--instrucao-normativa--medio",
+      "source": "DOU",
+      "type": "Instrução Normativa",
+      "size": "médio",
+      "route": "arquivo manual (M9 em HTML)",
+      "class": "c (a?)",
+      "obstacle": "corpus 11 (IN RFB 2.342/2026, 17.021 chars) existe como XML INLABS — layout diferente do da grade (HTML in.gov.br)",
+      "remedy": "decisão de layout; senão insumo Fábio"
+    },
+    {
+      "cellId": "dou--instrucao-normativa--grande",
+      "source": "DOU",
+      "type": "Instrução Normativa",
+      "size": "grande",
+      "route": "arquivo manual (M9 em HTML)",
+      "class": "c",
+      "obstacle": "insumo manual HTML",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--decreto--pequeno",
+      "source": "DOU",
+      "type": "Decreto",
+      "size": "pequeno",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--decreto--medio",
+      "source": "DOU",
+      "type": "Decreto",
+      "size": "médio",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--decreto--grande",
+      "source": "DOU",
+      "type": "Decreto",
+      "size": "grande",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--portaria--pequeno",
+      "source": "DOU",
+      "type": "Portaria",
+      "size": "pequeno",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--portaria--medio",
+      "source": "DOU",
+      "type": "Portaria",
+      "size": "médio",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c (a?)",
+      "obstacle": "corpus 10 (Portaria SAES/MS 4.940/2026, 18.877 chars) existe como XML INLABS",
+      "remedy": "decisão de layout; senão insumo Fábio"
+    },
+    {
+      "cellId": "dou--portaria--grande",
+      "source": "DOU",
+      "type": "Portaria",
+      "size": "grande",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--resolucao--pequeno",
+      "source": "DOU",
+      "type": "Resolução",
+      "size": "pequeno",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--resolucao--medio",
+      "source": "DOU",
+      "type": "Resolução",
+      "size": "médio",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--resolucao--grande",
+      "source": "DOU",
+      "type": "Resolução",
+      "size": "grande",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c",
+      "obstacle": "insumo manual",
+      "remedy": "insumo Fábio"
+    },
+    {
+      "cellId": "dou--despacho--pequeno",
+      "source": "DOU",
+      "type": "Despacho",
+      "size": "pequeno",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c (a?)",
+      "obstacle": "corpus 07 (Despacho MF, 1.222 chars) existe como XML INLABS",
+      "remedy": "decisão de layout; senão insumo Fábio"
+    },
+    {
+      "cellId": "dou--despacho--medio",
+      "source": "DOU",
+      "type": "Despacho",
+      "size": "médio",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c/e",
+      "obstacle": "insumo manual; Despacho médio é raro",
+      "remedy": "insumo Fábio ou N/A"
+    },
+    {
+      "cellId": "dou--despacho--grande",
+      "source": "DOU",
+      "type": "Despacho",
+      "size": "grande",
+      "route": "arquivo manual (a selecionar)",
+      "class": "c/e",
+      "obstacle": "insumo manual; Despacho ≥ 50.000 caracteres é improvável",
+      "remedy": "N/A com justificativa ou insumo"
+    },
+    {
+      "cellId": "dou--pagina-do-jornal--na",
+      "source": "DOU",
+      "type": "Página do jornal (cabeçalho e rodapé)",
+      "size": "n/a",
+      "route": "M9: páginas 57 e 58 em PDF recebidas e identificadas; leitura da página não validada (ordem de colunas exige preparação própria)",
+      "class": "d",
+      "obstacle": "M9 p57/p58 (PDF) no acervo; extração mistura colunas — falta preparação de ordem de colunas",
+      "remedy": "preparação DOU PDF (motor)"
+    },
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--grande",
+      "source": "SEFAZ-SP-PORTAL",
+      "type": "Decreto consolidado (RICMS/2000), artigo",
+      "size": "grande",
+      "route": "coletor oficial (coletado)",
+      "class": "b/e",
+      "obstacle": "coletor oficial acessível; os 6 artigos coletados têm ≤ 33.383 chars; não há prova de artigo ≥ 50.000",
+      "remedy": "coleta acessível de artigo/anexo extenso, ou N/A"
+    },
+    {
+      "cellId": "doe-sp--decreto--pequeno",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "size": "pequeno",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--decreto--medio",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "size": "médio",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--decreto--grande",
+      "source": "DOE-SP",
+      "type": "Decreto",
+      "size": "grande",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--resolucao--pequeno",
+      "source": "DOE-SP",
+      "type": "Resolução",
+      "size": "pequeno",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--resolucao--medio",
+      "source": "DOE-SP",
+      "type": "Resolução",
+      "size": "médio",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--resolucao--grande",
+      "source": "DOE-SP",
+      "type": "Resolução",
+      "size": "grande",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--portaria-cat--pequeno",
+      "source": "DOE-SP",
+      "type": "Portaria CAT",
+      "size": "pequeno",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--portaria-cat--medio",
+      "source": "DOE-SP",
+      "type": "Portaria CAT",
+      "size": "médio",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    },
+    {
+      "cellId": "doe-sp--portaria-cat--grande",
+      "source": "DOE-SP",
+      "type": "Portaria CAT",
+      "size": "grande",
+      "route": "P2-d (autorizada só depois da validação de M9)",
+      "class": "c",
+      "obstacle": "P2-d autorizada só depois da validação de M9 (frente DOE-SP)",
+      "remedy": "frente DOE-SP após M9"
+    }
+  ]
+}
