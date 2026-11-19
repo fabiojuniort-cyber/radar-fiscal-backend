@@ -474,15 +474,63 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // unidentified. A declared type that contradicts the grammar, a missing/unknown/conflicting type, or the source's own
   // "não identificado" type is recorded as a limitation, never guessed. tachado → context historical
   // (rfb_tachado_source); legalStatus is never touched.
-  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null };
+  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null; section: Node };
   const RFB_TYPE: Record<string, Descriptor['type']> = { artigo: 'article', paragrafo: 'paragraph', inciso: 'inciso', alinea: 'alinea',
     item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group', parte: 'group', anexo: 'annex' };
   const RFB_GROUP_WORD: Record<string, string> = { parte: 'PARTE', capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
   const RFB_RANK: Partial<Record<Descriptor['type'], number>> = { article: 3, paragraph: 4, inciso: 5, alinea: 6, item: 7, summary: 100, signature: 100 };
-  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }): Descriptor => {
+  const rfbSibling = (seg: RfbSeg, step: 1 | -1): string => {
+    let index = dom.children.indexOf(seg.section);
+    if (index < 0) return '';
+    for (index += step; index >= 0 && index < dom.children.length; index += step) {
+      const sibling = dom.children[index]!;
+      if (sibling.attrs['data-rfb-segment'] === undefined || sibling.attrs['data-rfb-tachado'] === 'true') return '';
+      const text = matchText(sibling).trim();
+      if (text) return text;
+    }
+    return '';
+  };
+  const roman = (word: string): number => {
+    if (!/^(?=[IVXLCDM]+$)M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})$/u.test(word)) return 0;
+    const values: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+    return [...word].reduce((total, letter, index) => {
+      const value = values[letter]!;
+      return total + (value < (values[word[index + 1] ?? ''] ?? 0) ? -value : value);
+    }, 0);
+  };
+  const rfbContent = (seg: RfbSeg, word: string, text: string): Descriptor | null => {
+    if (seg.tachado) return null;
+    const hasDevice = logical.some(({ part }) => ['article', 'paragraph', 'clause'].includes(part.type));
+    if (word === 'assinatura' && hasDevice && /^(?:[\p{Lu}][\p{Lu}\p{M}.'’-]*\s+){1,12}[\p{Lu}][\p{Lu}\p{M}.'’-]*$/u.test(text)) {
+      const next = rfbSibling(seg, 1);
+      if (!next || /^(?:ANEXO|Este texto não substitui)\b/iu.test(next)) return { type: 'signature', context: 'prohibited', reason: 'rfb_declared_final_signature', rank: 100 };
+    }
+    if (!word.startsWith('nao identific')) return null;
+    if (!hasDevice && /^(?:O|A)\s+(?:(?:COMITÊ|COORDENADOR(?:A)?(?:-GERAL)?|SECRETÁRI[OA]|PRESIDENTE)(?![\p{L}-]))[\s\S]{0,350},\s+(?:no uso d[ae]s?|no exercício d[ae]s?)/iu.test(text)) {
+      return { type: 'preamble', context: 'prohibited', reason: 'rfb_authority_formula', rank: 100 };
+    }
+    if (!hasDevice && /^(?:DECLARA|RESOLVE)\s*:\s*$/u.test(text) && rules.article.test(rfbSibling(seg, 1))) {
+      return { type: 'preamble', context: 'prohibited', reason: 'rfb_promulgation_before_article', rank: 100 };
+    }
+    const position = /^([IVXLCDM]+)\s+\p{Ll}/u.exec(text)?.[1];
+    if (position && hasDevice) {
+      const before = /^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)\p{L}/u.exec(rfbSibling(seg, -1))?.[1];
+      const after = /^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)\p{L}/u.exec(rfbSibling(seg, 1))?.[1];
+      const current = roman(position);
+      if (current > 0 && ((current === 1 && after && roman(after) === 2) || (before && roman(before) === current - 1))) {
+        return { type: 'inciso', context: 'operative_candidate', reason: 'rfb_roman_sequence_under_device', rank: 5 };
+      }
+    }
+    return null;
+  };
+  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }, text: string): Descriptor => {
     if (seg.issue) { limitation(`rfb_segment_${seg.issue}`, `RFB segment ${seg.pointer ?? '?'}: declared type ${seg.issue.replace(/_/gu, ' ')}; no type was guessed.`, span); return current; }
     const sig = (seg.type ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
     if (!sig) return current;
+    if (current.type === 'unidentified') {
+      const corroborated = rfbContent(seg, sig, text);
+      if (corroborated) return corroborated;
+    }
     if (sig.startsWith('nao identific')) { if (current.type === 'unidentified') limitation('rfb_segment_type_unidentified_by_source', `RFB segment ${seg.pointer ?? '?'}: the source itself declares the type as not identified.`, span); return current; }
     const mapped = RFB_TYPE[sig];
     if (!mapped) { if (current.type === 'unidentified') limitation('rfb_segment_type_unmapped', `RFB segment ${seg.pointer ?? '?'}: declared type "${seg.type}" has no structural mapping.`, span); return current; }
@@ -514,7 +562,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     if (node.blocked || node.text !== null) return;
     if (!spPortal && spPortalWrapper(node)) spPortal = true;
     if (input.source === 'RFB' && node.attrs['data-rfb-segment'] !== undefined) rfbSeg = { type: node.attrs['data-rfb-type'] ?? null, issue: node.attrs['data-rfb-type-issue'] ?? null,
-      tachado: node.attrs['data-rfb-tachado'] === 'true', pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
+      tachado: node.attrs['data-rfb-tachado'] === 'true', section: node, pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
     let context = domContext(node, inheritedContext);
     // D04-R1-01: tables of a tachado segment take the historical zone like any block (prohibited stays prohibited).
     if (node.tag === 'table') {
@@ -541,7 +589,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       let descriptor: Descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
         : describe(node, rules, markerText);
-      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
+      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span, text);
       const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
