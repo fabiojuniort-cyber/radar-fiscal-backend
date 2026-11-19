@@ -18,7 +18,7 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; only the Portaria 635/2025 accepted; normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
@@ -26,7 +26,10 @@ test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit 
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], 'only the COORD-accepted Portaria 635/2025 (e9-acceptances.json); collection acceptance is not anatomy acceptance');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693'], 'only the COORD-accepted samples (e9-acceptances.json: Portaria 635/2025 + E9-A1 #116 c.6990971154); collection acceptance is not anatomy acceptance');
+  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id).sort(), ['rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno'], 'E9-A1: 4/61 cells accepted');
+  assert.equal(real.find((s) => s.id === 'rfb:127905')!.stages.accepted, false, 'partial reading: never accepted');
+  assert.equal(real.find((s) => s.id === 'rfb:104314')!.stages.accepted, false, 'partial reading: never accepted');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
   assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
@@ -251,20 +254,27 @@ test('E9 acceptance B3: partial readings, absent material annexes and a body in 
   assert.equal(m.buildMatrix().cells.find((c) => c.id === 'rfb--solucao-de-consulta--pequeno')!.status, 'pending', 'SC × pequeno is NOT covered by an ementa-only reading');
 });
 
-test('E9 acceptance B4: the committed file is the append-only union with #305/#309 and accepts only the Portaria here', async () => {
+test('E9 acceptance B4: the committed file is the append-only union with #305/#309, the Portaria records and the E9-A1 records', async () => {
   const { m, E, readFileSync } = await accTest();
   const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
   // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
   // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
-  assert.equal(file.acceptances.length, 14, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + Portaria @ 0e009431 preserved + Portaria revalidated');
+  assert.equal(file.acceptances.length, 18, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + Portaria @ 0e009431 preserved + Portaria revalidated + 4 E9-A1');
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
   assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio',
     entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae', engineBuildHash: '0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194' }, 'the original record is untouched');
   assert.deepEqual(file.acceptances[13], { ...file.acceptances[13], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: E }, 'the revalidation pins the current engine');
   assert.match(file.acceptances[13].revalidates ?? '', /^rfb:148693 @ 0e009431/u);
+  // E9-A1 (tribusca-control#116, after the independent review c.6990971154): 4 records appended on the current engine
+  const a1: [string, string, string][] = [
+    ['rfb:108391', 'rfb--instrucao-normativa--pequeno', '370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680'],
+    ['rfb:133898', 'rfb--instrucao-normativa--pequeno', 'b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7'],
+    ['rfb:115131', 'rfb--instrucao-normativa--grande', 'e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e'],
+    ['rfb:142967', 'rfb--portaria--pequeno', '9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7']];
+  a1.forEach(([sampleId, cellId, entrySha256], i) => assert.deepEqual(file.acceptances[14 + i], { ...file.acceptances[14 + i], sampleId, cellId, entrySha256, engineBuildHash: E, scope: 'offline' }, `E9-A1 record ${sampleId}`));
   const real = m.collectSamples();
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693']);
-  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id), ['rfb--portaria--medio']);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693']);
+  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id).sort(), ['rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno']);
 });
 
 // ---- R2 (independent review c.6784793278): B-1 per-annex completeness, B-2 self-citation, B-3 completeness flag, B-4 dates ----
@@ -313,10 +323,10 @@ test('R2 B-1/B-2 (5–8): other-norm citation, self-citation, ambiguity and the 
   assert.match(m.annexGap(corat) ?? '', /Anexo Único \(own\) absent from the representation/u, '8. ADE Corat: external Anexo Único');
 });
 
-test('R2 (9) + B-3: the Portaria 635 stays the only eligible sample; partial readings are flagged complete:false without changing coverage', async () => {
+test('R2 (9) + B-3: only complete samples are eligible (Portaria 635 + E9-A1); partial readings are flagged complete:false without changing coverage', async () => {
   const m = await import('../ops/anatomy/official-coverage-matrix.js');
   const real = m.collectSamples(); const mx = m.buildMatrix(real);
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693'], '9. Portaria 635: complete, digest + engine pinned');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693'], '9. Portaria 635 + E9-A1: complete, digest + engine pinned');
   const by = (id: string) => real.find((s) => s.id === id)!;
   assert.deepEqual([by('rfb:148693').readingComplete, by('rfb:148629').readingComplete, by('rfb:148516').readingComplete, by('rfb:148681').readingComplete], [true, false, false, false]);
   const cell = (id: string) => mx.cells.find((c) => c.id === id)!;
@@ -402,7 +412,7 @@ test('R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; nettin
   assert.equal(proh.complete, true, 'reading complete; force/function decided elsewhere (no acceptance implied)');
   // the real lot of this branch has no producer: every real sample keeps its earlier assessment (fail closed)
   const real = m.collectSamples();
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id), ['rfb:148693']);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693']);
   assert.equal(real.find((s) => s.id === 'rfb:148629')!.readingComplete, false);
 });
 
