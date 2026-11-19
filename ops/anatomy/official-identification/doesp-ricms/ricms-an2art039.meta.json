@@ -1,0 +1,21 @@
+{
+  "id": "ricms-an2art039",
+  "act": "RICMS/2000 (Decreto 45.490/2000), Anexo II, art. 39",
+  "url": "https://legislacao.fazenda.sp.gov.br/Paginas/an2art039.aspx",
+  "finalUrl": "https://legislacao.fazenda.sp.gov.br/Paginas/an2art039.aspx",
+  "hops": [
+    "https://legislacao.fazenda.sp.gov.br/Paginas/an2art039.aspx"
+  ],
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "lastModified": "Thu, 05 Nov 2026 01:50:00 GMT",
+  "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+  "bytes": 168294,
+  "consultedAt": "2026-11-05T01:50:01.645Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "html",
+  "verified": false,
+  "reason": "coleta de amostra DOE-SP (Sefaz-SP), artigo com redações posteriores",
+  "promoted": false
+}

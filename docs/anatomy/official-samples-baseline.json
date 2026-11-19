@@ -1,0 +1,74 @@
+{
+  "samples": [
+    {
+      "id": "ricms-an1art041",
+      "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "a57e5360147e0b2fcf36221e96b0327fb58ed405022d1ab028d9fa15cacef4b8",
+      "chars": 33383
+    },
+    {
+      "id": "ricms-an2art003",
+      "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "8bb61d2e29e4faa8be47c69b517647abad1afd20b75b3386e478560275afcc44",
+      "chars": 20457
+    },
+    {
+      "id": "ricms-an2art039",
+      "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "ecdeb3ccd41921f86faa04b1fc96c34d443a1a16f848431d1be52891bfde21fa",
+      "chars": 12616
+    },
+    {
+      "id": "ricms-art007",
+      "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "4371746b7d0da505c1daba1c658cc77a17b99038b82e6b7432ee1c155687f95e",
+      "chars": 11628
+    },
+    {
+      "id": "ricms-art008",
+      "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "ff9bc4650f06698cab454d7a299044de13c6623fc0f028c8819a218f0c4badab",
+      "chars": 3219
+    },
+    {
+      "id": "ricms-art009",
+      "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+      "profile": "SEFAZ-SP-PORTAL",
+      "outputHash": "19a6719af5301edf9f2e7a0b883c3eaa4b0c464e23725d65cd3d704fa31074af",
+      "chars": 3340
+    },
+    {
+      "id": "M5",
+      "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+      "profile": "CONFAZ",
+      "outputHash": "bc3c95de928672dabb980bb9dcbc3bc09f4d46558e34df6f00d12db5c5d4e5c8",
+      "chars": 119687
+    },
+    {
+      "id": "http:M3",
+      "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+      "profile": "CONFAZ",
+      "outputHash": "ed891bec4e28575c4b75aaf1e8940cae5b28d2b06564c13406c3f1dca253dccd",
+      "chars": 922008
+    },
+    {
+      "id": "http:M4",
+      "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+      "profile": "CONFAZ",
+      "outputHash": "b0938ef774ff8bc8d3e4837e5bfa56abb167569e249fd826487e64c74c1199f7",
+      "chars": 82809
+    },
+    {
+      "id": "http:M5",
+      "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+      "profile": "CONFAZ",
+      "outputHash": "44420fa75f7312807742bf5bc06045bc84e4ef763c83b943b594718033927979",
+      "chars": 119682
+    }
+  ]
+}

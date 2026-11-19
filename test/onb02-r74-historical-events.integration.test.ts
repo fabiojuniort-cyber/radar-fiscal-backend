@@ -68,13 +68,23 @@ test('R7.4 migration is additive/idempotent, retains old contracts and never bac
   finally {c.release();await pool.end();}
 });
 
-for(const f of cases)test('R7.4 historical context survives: '+f.action,async()=>{
+const historicalCases=cases.flatMap(f=>{
+  const encodings=f.action==='TAXONOMY_DRAFT_ORPHAN_RELATIONS_REMOVED'
+    ? ['SQL NULL','JSON null'] : ['object'];
+  return encodings.map(beforeEncoding=>({...f,beforeEncoding}));
+});
+for(const f of historicalCases)test('R7.4 historical context survives: '+f.action+' / '+f.beforeEncoding,async()=>{
   const pool=isolated(); let tenant:string|undefined;
   try {
     tenant=(await pool.query("INSERT INTO tenants(name,slug) VALUES('R74 synthetic',$1) RETURNING id",[randomUUID()])).rows[0].id;
     const actor=randomUUID(),id=randomUUID(),control=randomUUID();
     const before=f.before(),after=f.after();
-    const expectedBefore=f.action==='TAXONOMY_CURATION_SECTOR_ALIASES_CLEARED'?{}:before;
+    const expectedBefore=f.beforeEncoding==='JSON null'
+      ||f.action==='TAXONOMY_CURATION_SECTOR_ALIASES_CLEARED'?{}:before;
+    // pg decodes both SQL NULL and JSON null to JavaScript null. Bind the JSON
+    // literal as text and inspect SQL predicates to prove distinct stored inputs.
+    const storedBefore=f.beforeEncoding==='JSON null'?'null':before===null?null:
+      JSON.stringify({...before,cnpj:'synthetic-private',legalName:'Synthetic private'});
     const expectedAfter={...after} as Record<string,unknown>;
     delete expectedAfter.justification;delete expectedAfter.reason;
     const c=await pool.connect();
@@ -84,12 +94,18 @@ for(const f of cases)test('R7.4 historical context survives: '+f.action,async()=
       await c.query(`INSERT INTO audit_log(id,tenant_id,actor_type,actor_id,action,entity_type,
         entity_id,before_data,after_data,audit_policy_version,occurred_at)
         VALUES($1,$2,'SYSTEM',$3,$4,$5,$6,$7::jsonb,$8::jsonb,0,'2026-01-01T00:00:00Z')`,
-        [id,tenant,actor,f.action,f.entity,randomUUID(),before===null?null:JSON.stringify({...before,cnpj:'synthetic-private',legalName:'Synthetic private'}),JSON.stringify({...after,cnpj:'synthetic-private',tradeName:'Synthetic private'})]);
+        [id,tenant,actor,f.action,f.entity,randomUUID(),storedBefore,JSON.stringify({...after,cnpj:'synthetic-private',tradeName:'Synthetic private'})]);
       await c.query('ALTER TABLE audit_log ENABLE TRIGGER audit_allowlist_guard');
       await c.query(`INSERT INTO audit_log(id,tenant_id,actor_type,actor_id,action,entity_type,after_data)
         VALUES($1,$2,'SYSTEM',$3,'COMPANY_UPDATED','company','{"version":2}')`,[control,tenant,actor]);
       await c.query('COMMIT');
     } catch(e){await c.query('ROLLBACK');throw e;} finally {c.release();}
+    if(f.beforeEncoding!=='object') {
+      const input=(await pool.query(`SELECT before_data IS NULL is_sql_null,
+        jsonb_typeof(before_data) json_type FROM audit_log WHERE id=$1`,[id])).rows[0];
+      assert.deepEqual(input,f.beforeEncoding==='SQL NULL'
+        ? {is_sql_null:true,json_type:null} : {is_sql_null:false,json_type:'null'});
+    }
     const headers=(await pool.query(`SELECT action,entity_type,entity_id,actor_type,actor_id,occurred_at
       FROM audit_log WHERE id=$1`,[id])).rows;
     const other=(await pool.query('SELECT to_jsonb(a) row FROM audit_log a WHERE id=$1',[control])).rows;
@@ -102,8 +118,12 @@ for(const f of cases)test('R7.4 historical context survives: '+f.action,async()=
     assert.equal(plan.unregistered,0);
     assert.deepEqual(await fingerprint(pool),planBefore,'plan writes nothing');
     await applyAuditBackfill(pool,{batchSize:1});
-    const row=(await pool.query('SELECT before_data,after_data,audit_policy_version FROM audit_log WHERE id=$1',[id])).rows[0];
+    const row=(await pool.query(`SELECT before_data,after_data,audit_policy_version,
+      before_data IS NULL before_is_sql_null,jsonb_typeof(before_data) before_json_type
+      FROM audit_log WHERE id=$1`,[id])).rows[0];
     assert.deepEqual(row.before_data,expectedBefore);
+    assert.equal(row.before_is_sql_null,f.beforeEncoding==='SQL NULL');
+    assert.equal(row.before_json_type,f.beforeEncoding==='SQL NULL'?null:'object');
     assert.deepEqual(row.after_data,expectedAfter);
     assert.equal(row.audit_policy_version,1);
     assert.deepEqual((await pool.query(`SELECT action,entity_type,entity_id,actor_type,actor_id,occurred_at

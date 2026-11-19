@@ -1,0 +1,58 @@
+{
+  "id": "148629",
+  "act": "Ato Declaratório Executivo 30/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148629/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148629/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148629/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f",
+  "bytes": 11638,
+  "consultedAt": "2026-11-10T15:19:37.141Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Ato Declaratório Executivo, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 148629,
+    "epigrafe": "Ato Declaratório Executivo Cofis nº 30, de 18 de dezembro de 2025",
+    "numeroAto": "30",
+    "dataAto": "2025-12-18",
+    "dataPublicacao": "2025-12-29",
+    "dadosPublicacao": "Publicado(a) no DOU de 29/12/2025, seção 1, página 106",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "29682f62afe25d2709a44301c83ec7837a5651ea22be923967647b7ebf5a64d5",
+    "htmlSha256": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
+    "pieces": 6,
+    "missingSegments": [],
+    "struckSegments": [],
+    "attachments": [
+      {
+        "id": "82381",
+        "name": "139723909588224.html",
+        "status": "missing"
+      }
+    ],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Ato Declaratório Executivo",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "pequeno",
+    "measuredChars": 1140,
+    "size": "pequeno"
+  }
+}

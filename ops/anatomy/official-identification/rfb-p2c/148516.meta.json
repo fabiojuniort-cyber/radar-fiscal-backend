@@ -1,0 +1,52 @@
+{
+  "id": "148516",
+  "act": "Ato Declaratório Executivo 33/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148516/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148516/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148516/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c",
+  "bytes": 32477,
+  "consultedAt": "2026-11-10T15:19:37.463Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Ato Declaratório Executivo, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 148516,
+    "epigrafe": "Ato Declaratório Executivo Corat nº 33, de 23 de dezembro de 2025",
+    "numeroAto": "33",
+    "dataAto": "2025-12-23",
+    "dataPublicacao": "2025-12-24",
+    "dadosPublicacao": "Publicado(a) no DOU de 24/12/2025, seção 1, página 838",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "6d2e92cf118bf8f0e8744584dc44492163c42760e7505b57607e49ca97ee3333",
+    "htmlSha256": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
+    "pieces": 51,
+    "missingSegments": [],
+    "struckSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Ato Declaratório Executivo",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "medio",
+    "measuredChars": 10620,
+    "size": "médio"
+  }
+}

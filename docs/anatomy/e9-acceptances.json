@@ -1,0 +1,322 @@
+{
+  "schema": "e9-acceptances/1",
+  "note": "Aceites formais E9, histórico append-only (um registro por motor revalidado). 'accepted' é derivado: vale enquanto ALGUM registro fixa o entrySha256 atual e o motor atual (ops/anatomy/official-coverage-matrix.ts).",
+  "acceptances": [
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
+      "decidedBy": "COORD (revisão independente)",
+      "decidedOn": "2026-11-09",
+      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R3; evidência radar-fiscal-backend#305 @ d6d991ef",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ]
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "9235a810f6c8c007353c85244dc0b2fa68fced0756268a4f05bb0bfda157aea3",
+      "decidedBy": "COORD (revisão independente)",
+      "decidedOn": "2026-11-09",
+      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R3; evidência radar-fiscal-backend#305 @ d6d991ef",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ]
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
+      "decidedBy": "COORD (revalidação independente)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R5.6: revalidação offline no motor da composição; evidência radar-fiscal-backend#309 @ 775fa2d (docs/anatomy/compose-e9-laws-equivalence.json)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810 (registro original preservado)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "693ba41668e063e9fc06bb2c89fb899a31b2f9d013f8ecf1508f786617452de1",
+      "decidedBy": "COORD (revalidação independente)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD E9-ACERVO-01 R5.6: revalidação offline no motor da composição; evidência radar-fiscal-backend#309 @ 775fa2d (docs/anatomy/compose-e9-laws-equivalence.json)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810 (registro original preservado)"
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296",
+      "decidedBy": "COORD (PASS do revisor independente, R5.6)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD E9 R5.7: aceite offline no hash final da composição; evidência radar-fiscal-backend#309 @ 2edfd3c (docs/anatomy/compose-e9-laws-equivalence.json, finalComposed)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810 e 693ba416 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "e5c0399308850848c8189303e2a193b3d32f7bc72cda0bcbd693f12475a1e296",
+      "decidedBy": "COORD (PASS do revisor independente, R5.6)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD E9 R5.7: aceite offline no hash final da composição; evidência radar-fiscal-backend#309 @ 2edfd3c (docs/anatomy/compose-e9-laws-equivalence.json, finalComposed)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810 e 693ba416 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "1676b562c3980790a77591e19ed21f40274f7b40b6e1029ea543015099ef0a74",
+      "decidedBy": "COORD (PASS do revisor independente, R5.8)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — revisão independente R5.8: PASS no #309 @ 0fc4882 (compose-e9-laws-equivalence.json, finalComposed, cinco motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416 e e5c03993 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "1676b562c3980790a77591e19ed21f40274f7b40b6e1029ea543015099ef0a74",
+      "decidedBy": "COORD (PASS do revisor independente, R5.8)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — revisão independente R5.8: PASS no #309 @ 0fc4882 (compose-e9-laws-equivalence.json, finalComposed, cinco motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416 e e5c03993 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "a80793bbc8cbb1f7cec66e1746c56fba0a1222f12e60de37fb832b0ed457c2e6",
+      "decidedBy": "COORD (PASS do revisor independente, R5.9)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — revisão independente R5.9: PASS no #309 @ d4d9585 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416, e5c03993 e 1676b562 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "a80793bbc8cbb1f7cec66e1746c56fba0a1222f12e60de37fb832b0ed457c2e6",
+      "decidedBy": "COORD (PASS do revisor independente, R5.9)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — revisão independente R5.9: PASS no #309 @ d4d9585 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416, e5c03993 e 1676b562 (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10637-2002-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "432048e4ed6b39b8957ebae72e874f61b8337c02a9d32c43609a8ff617254498",
+      "engineBuildHash": "a687624eb114c3208d0b271a584fa33adb12b2268a616d9815708f13a9957090",
+      "decidedBy": "COORD (fechamento R5.10; PASS do revisor independente sobre a composição)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD fechamento R5.10: registrar no #309 @ 1867e52 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10637-2002-atualizada @ 9235a810, 693ba416, e5c03993, 1676b562, a80793bb (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "lei-10833-2003-atualizada",
+      "cellId": "normas-leg-br--lei--grande",
+      "scope": "offline",
+      "entrySha256": "888b581001015ae600ce0f405942895f7e36725f99cb04563117dc1e4a601ba5",
+      "engineBuildHash": "a687624eb114c3208d0b271a584fa33adb12b2268a616d9815708f13a9957090",
+      "decidedBy": "COORD (fechamento R5.10; PASS do revisor independente sobre a composição)",
+      "decidedOn": "2026-11-10",
+      "ref": "tribusca-control#116 — COORD fechamento R5.10: registrar no #309 @ 1867e52 (compose-e9-laws-equivalence.json, finalComposed, seis motores)",
+      "limits": [
+        "escopo offline: validação local das versões atualizadas lidas pela fonte NORMAS-LEG; não é prova de coleta oficial",
+        "não altera cobertura nem pontuação oficial (a célula já estava entre as 11 cobertas)",
+        "CI integral do #305 vermelho no teste R7 de auditoria em PG18 (ONB-01, run 42393381257); etapa de Anatomia verde",
+        "sem merge: integração bloqueada pela cadeia #285/#303 (NÃO MERGEAR)",
+        "pequeno e médio de normas.leg.br seguem pendentes; versões originais sem plano NORMAS-LEG"
+      ],
+      "revalidates": "lei-10833-2003-atualizada @ 9235a810, 693ba416, e5c03993, 1676b562, a80793bb (registros anteriores preservados)"
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae",
+      "engineBuildHash": "0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194",
+      "decidedBy": "COORD (Frente 1, continuidade P2-c)",
+      "decidedOn": "2026-11-11",
+      "ref": "tribusca-control#116 c.6776402307 (registro) — Portaria RFB nº 635/2025, multivigente SHA-256 a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8, #303 @ 719352f",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout",
+        "sem merge: #303 herda o #285 (NÃO MERGEAR)",
+        "CI verify do HEAD vermelho por compatibilidade pg_dump/PG16 (#310), não pela anatomia"
+      ]
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, gate de composição)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'Candidato final de composição' após o parecer independente c.6965245285 (A r13 PASS); revalidação append-only do registro de 2026-11-11 no motor da composição #303 + #300 + A r13 + B r7; equivalência formal docs/anatomy/e9-evidence/portaria635-equivalence-0e009431-to-4b96f977.json (sha256 dda4a66ce6529d951f6c7af3c77f23eaf5909d296e4014896458ee62e8cc2658): bytes a98ade77… e HTML iguais, 136/136 partes, differingFields vazio, identidade difere só em engineHash, outputHash neutralizado igual",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada (captura direta P2-c G1); não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); uma amostra de um layout",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "sem merge nem produção: dependem do gate posterior do COORD"
+      ],
+      "revalidates": "rfb:148693 @ 0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194 (registro de 2026-11-11, preservado)"
+    },
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula IN pequeno",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula IN pequeno",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas (o preparo omite /outrosSegmentos/104, segmento tachado com textoIntegra vazio: sem conteúdo perdido)",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula IN grande",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+      "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "decidedBy": "COORD (Frente 1, E9-A1 — registro dos aceites)",
+      "decidedOn": "2026-11-18",
+      "ref": "tribusca-control#116 — mandato COORD 'E9-A1 — Preparar PR de registro dos aceites' após o parecer independente c.6990971154 (4 registros APTOS); prova radar-fiscal-backend#308 @ 6735d79771a6a7c6df42bd4fe9836e020527bfb3, ops/anatomy/e9-acervo/proposals/e9-a1/e9a1-reading-proof.json (sha256 c69911bca020674a09a4c162ca0999418fcf296e1c23a91af06c09b5dabfbaaa): bytes = meta = lote, leitura idêntica em main 196c6ca9 × 86518ba0 (motor 4b96f977), entrada do lote recomputada = armazenada, completude por rfbReadingAssessment sem lacunas",
+      "limits": [
+        "escopo offline: leitura local da representação oficial preservada; não é coleta produtiva",
+        "preparação RFB provisória (rfb-api-original/0.2.0-provisional); a amostra comprova apenas o seu layout (JSON multivigente da API normasinternet2) na célula Portaria pequeno",
+        "aceite técnico de leitura: legalStatus permanece unknown; não autoriza operação tributária",
+        "vale só para o motor 4b96f977…; qualquer delta de motor exige nova prova de equivalência e novo registro append-only",
+        "o aceite não autoriza merge nem produção: dependem do gate posterior do COORD"
+      ]
+    }
+  ]
+}

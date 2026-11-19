@@ -371,6 +371,8 @@ jobs:
         run: npx tsx --test test/onb02-r72-backfill.integration.test.ts
       - name: ONB-02 R7 audit allowlist and resumable backfill 150k on PG18
         run: timeout --signal=TERM --kill-after=10s 300s npx tsx --test test/onb02-r7-audit.integration.test.ts
+      - name: ONB-02 R7 backfill 150k with stale audit_log statistics on PG18
+        run: timeout --signal=TERM --kill-after=10s 300s npx tsx --test test/onb02-r7-backfill-stale-stats.integration.test.ts
       - name: ONB-02 R3 semantic SQL evidence on isolated PG18
         shell: bash
         run: bash ops/onb02/ci-evidence-pg18.sh

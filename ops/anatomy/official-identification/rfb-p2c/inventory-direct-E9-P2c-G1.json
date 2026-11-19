@@ -1,0 +1,79 @@
+{
+  "grantId": "E9-P2c-G1",
+  "owner": "EXEC #303 (claude/anat-e9-coverage)",
+  "mode": "direct-by-idAto",
+  "searches": 0,
+  "remainingTotal": 12,
+  "actsKept": 4,
+  "decisions": [
+    {
+      "target": {
+        "type": "Portaria",
+        "idAto": "148693",
+        "numeroAto": "635",
+        "anoAto": "2025",
+        "acervoSize": "medio",
+        "key": "portaria",
+        "id": 148693
+      },
+      "chars": 20829,
+      "size": "médio",
+      "outcome": "kept"
+    },
+    {
+      "target": {
+        "type": "Ato Declaratório Executivo",
+        "idAto": "148629",
+        "numeroAto": "30",
+        "anoAto": "2025",
+        "acervoSize": "pequeno",
+        "key": "ade",
+        "id": 148629
+      },
+      "chars": 1140,
+      "size": "pequeno",
+      "outcome": "kept"
+    },
+    {
+      "target": {
+        "type": "Ato Declaratório Executivo",
+        "idAto": "148516",
+        "numeroAto": "33",
+        "anoAto": "2025",
+        "acervoSize": "medio",
+        "key": "ade",
+        "id": 148516
+      },
+      "chars": 10620,
+      "size": "médio",
+      "outcome": "kept"
+    },
+    {
+      "target": {
+        "type": "Solução de Consulta",
+        "idAto": "148681",
+        "numeroAto": "258",
+        "anoAto": "2025",
+        "acervoSize": "pequeno",
+        "key": "sc",
+        "id": 148681
+      },
+      "chars": 2182,
+      "size": "pequeno",
+      "outcome": "kept"
+    }
+  ],
+  "kept": {
+    "Portaria": {
+      "médio": 148693
+    },
+    "Ato Declaratório Executivo": {
+      "pequeno": 148629,
+      "médio": 148516
+    },
+    "Solução de Consulta": {
+      "pequeno": 148681
+    }
+  },
+  "note": "per-attempt debit record = budget-state.json; a size not found is never read as nonexistent"
+}
