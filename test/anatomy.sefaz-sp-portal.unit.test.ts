@@ -122,7 +122,7 @@ test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 0 chars (1
 test('L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operative + two earlier wordings historical', () => {
   const { after, before, engine, unid } = official('ricms-an2art039');
   assert.equal(unid(engine), 974, 'DOE-SP reading: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
-  assert.equal(unid(before), 18519); assert.equal(unid(after), 68);
+  assert.equal(unid(before), 18519); assert.equal(unid(after), 0, 'the annex context heading is identified');
   const inc2 = after.parts.filter((x) => x.type === 'inciso' && /^II - /u.test(after.canonicalText.slice(x.span.start, x.span.end)));
   assert.equal(inc2.length, 3);
   assert.deepEqual(inc2.map((x) => x.context), ['operative_candidate', 'historical', 'historical']);

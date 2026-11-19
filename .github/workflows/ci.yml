@@ -115,7 +115,16 @@ jobs:
           git diff --exit-code -- docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json
           test -z "$(git status --porcelain -- docs/taxonomy/baseline/TAXONOMY_BASELINE_V1_MANIFEST.json)"
 
+      - name: E9-MOTOR draft checks (offline, reserved corpus isolated)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && github.head_ref == 'feat/anat-e9-motor-r2' && github.event.pull_request.head.repo.full_name == github.repository }}
+        shell: bash
+        run: |
+          npm run anatomy:verify-build
+          npm run test:anatomy:e9-motor
+          bash .github/scripts/e9-motor-draft.sh
+
       - name: ANAT-04 isolated core checks (offline)
+        if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.draft && github.head_ref == 'feat/anat-e9-motor-r2' && github.event.pull_request.head.repo.full_name == github.repository) }}
         run: npm run anatomy:verify-build && npm run test:anatomy
 
       - name: Unit tests

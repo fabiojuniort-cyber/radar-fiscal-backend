@@ -24,6 +24,7 @@ import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-pre
 import { MANUAL_DIR, decodeManual, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
 import { APPROVED_FALLBACK, compareWithIndependent, decodeDeclared, decodeWithPolicy, PASSAGES } from './charset-policy.js';
+import { prepareNormasLegPage } from '../../src/modules/anatomy/normas-leg-preparation.js';
 import { prepareOfficialAct, portalActChars } from '../../src/modules/anatomy/official-portal-preparation.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
@@ -435,10 +436,10 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
     assessNonRfb(spSample, rd); out.push(spSample);
   }
-  const ownProfile = (sample: Sample, profile: 'PLANALTO' | 'NORMAS-LEG', html: string, chars: number, proof: object): Sample => {
+  const ownProfile = (sample: Sample, profile: 'PLANALTO' | 'NORMAS-LEG', html: string, chars: number | null, proof: object): Sample => {
     const rd = readWith(profile, sample.id, html, proof);
     const ok = locked(sample.id, sample.sha256, profile, rd);
-    const result: Sample = { ...sample, profile, chars: rd.chars, actChars: chars, size: sizeOf(chars), outputHash: rd.outputHash, diagnostic: null,
+    const result: Sample = { ...sample, profile, chars: rd.chars, actChars: chars ?? rd.chars, size: sizeOf(chars ?? rd.chars), outputHash: rd.outputHash, diagnostic: null,
       stages: { ...sample.stages, read: true, validated: ok }, notes: [...rd.invariants],
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [] };
     assessNonRfb(result, rd);
@@ -452,12 +453,20 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
   // reading is kept as a diagnostic only (it never changes the source identity nor closes a cell).
   const lg = join(ROOT, 'leg-normas');
   for (const f of readdirSync(lg).filter((x) => /-(original|atualizada)\.meta\.json$/u.test(x)).sort()) {
-    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; bytes: number; titleCheck: { found: boolean } };
+    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; bytes: number; url: string; urn: string; version: string; titleCheck: { found: boolean } };
     const bytes = verifiedBytes(join(lg, `${m.id}.html`), m, m.id);
-    const diag = readWith('DOU', m.id, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-    out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
+    const html = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const sample: Sample = { id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: m.titleCheck.found, read: false, validated: false, accepted: false }, profile: null,
-      diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
+      diagnostic: null, outputHash: null, evidence: [], notes: ['epígrafe não confirmada'] };
+    if (!m.titleCheck.found) { out.push(sample); continue; }
+    if (!m.id.endsWith('-atualizada') || !/^versão atualizada\b/u.test(m.version)) {
+      const diag = readWith('DOU', m.id, html);
+      out.push({ ...sample, diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
+      continue;
+    }
+    const preparation = prepareNormasLegPage({ resourceId: m.id, url: m.url, urn: m.urn, version: 'atualizada', bytes });
+    out.push(ownProfile(sample, 'NORMAS-LEG', html, null, { normasLeg: preparation }));
   }
   // Manual provenance and the approved decoding decision must agree with the bytes.
   if (existsSync(MANUAL_DIR)) for (const f of readdirSync(MANUAL_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {

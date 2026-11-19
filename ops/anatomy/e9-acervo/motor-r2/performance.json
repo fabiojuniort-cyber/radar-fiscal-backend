@@ -1,0 +1,18 @@
+{
+  "runs": [
+    {
+      "baseMilliseconds": 19035,
+      "candidateMilliseconds": 28507,
+      "combinedPeakRssKiB": 775760,
+      "node": "v24.21.0",
+      "platform": "win32"
+    },
+    {
+      "baseMilliseconds": 17215,
+      "candidateMilliseconds": 28934,
+      "combinedPeakRssKiB": 767588,
+      "node": "v24.21.0",
+      "platform": "win32"
+    }
+  ]
+}
