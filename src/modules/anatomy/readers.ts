@@ -629,9 +629,25 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_subheading', rank: 100 };
         }
       }
+      if (spPortal && !markerText(node).trim()) return;
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
       const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
+      if (spPortal && !wasQuoted && !openQuotation && descriptor.type === 'unidentified') {
+        const heading = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+(?:[IVXLCDM]+|\d+|ÚNIC[OA])(?:\s|$)/iu.exec(text.replace(/^[\s\u200B]+/u, ''));
+        if (heading && !spEarlier) {
+          const [level, rank] = groupLevel(heading[1]!);
+          descriptor = { type: 'group', context: 'prohibited', reason: 'sefaz_sp_portal_context_' + level, rank };
+        } else if (spEarlier && /^(?:\(\s*)?revogad[oa]s?\s*[).]?$/iu.test(text)) {
+          descriptor = { type: 'editorial_note', context: 'historical', reason: 'sefaz_sp_portal_revoked_placeholder', rank: 100 };
+        } else if (spEarlier && /^(?:Art\.|§|Parágrafo|NOTA|Redação)\s/iu.test(text)) {
+          descriptor = { type: 'body', context: 'historical', reason: 'sefaz_sp_portal_earlier_wording', rank: 100 };
+        } else if (!spEarlier && logical.at(-1)?.part.type === 'annex'
+          && (ownClasses.includes('centro') && /^\((?:Relação|isenções) a que se refere o artigo \d/iu.test(text)
+          || /^[\p{Lu}\p{M}0-9 ()/,–—-]{4,220}$/u.test(text) && /\p{Lu}{3}/u.test(text))) {
+          descriptor = { type: 'body', context: 'prohibited', reason: 'sefaz_sp_portal_annex_subtitle', rank: 100 };
+        }
+      }
       if (spEarlier && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
       const rfbStruck = rfbSeg?.tachado === true;
       // ANAT-D05: a struck block becomes historical; an unidentified struck block keeps its type (no guess) and becomes
