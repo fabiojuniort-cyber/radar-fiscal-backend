@@ -18,11 +18,18 @@ test('E9 matrix and samples baseline are regenerated identical to the committed 
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 current state: 23 cells covered (10 + 3 P2-c direct captures + 10 by the manual delivery of 2026-11-19, all partial readings; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
-    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno'].sort());
+    'rfb--portaria--medio', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-executivo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno',
+    // manual delivery of 2026-11-19 (M14–M34): covered by layout only — every one of these readings is partial (complete:false)
+    'confaz--convenio-icms--medio', 'confaz--ajuste-sinief--medio', 'confaz--protocolo-icms--medio', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--grande',
+    'dou--decreto--medio', 'dou--decreto--grande', 'dou--portaria--medio', 'dou--resolucao--medio', 'dou--resolucao--grande'].sort());
+  for (const id of ['M14', 'M16', 'M18', 'M19', 'M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34']) {
+    const x = real.find((s) => s.id === id)!; assert.deepEqual([x.stages.validated, x.readingComplete, x.stages.accepted], [true, false, false], `${id}: covered by layout, partial reading, never accepted`);
+  }
+  for (const id of ['M10', 'M12']) assert.equal(real.some((s) => s.id === id), false, `${id}: refused at ingestion (no declared charset), never sampled`);
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
   assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
@@ -41,7 +48,8 @@ test('E9 current state: 13 cells covered (10 + 3 P2-c direct captures; SC Cosit 
   const p58 = real.find((s) => s.id === 'http:M9-p58')!;
   assert.deepEqual([p58.source, p58.layout, p58.stages.identified, p58.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]);
   assert.match(p58.notes[0]!, /NÃO se presume ato completo/u, 'two pages are never presumed to complete the act');
-  assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na') && m.requiredPending.includes('dou--instrucao-normativa--medio'), 'M9 PDF does not stand for the HTML act cell');
+  assert.ok(m.requiredPending.includes('dou--pagina-do-jornal--na'), 'the M9 PDF page cell stays pending');
+  assert.deepEqual(m.cells.find((c) => c.id === 'dou--instrucao-normativa--medio')!.validatedSamples.slice().sort(), ['M23', 'M24'], 'the HTML act cell is covered only by HTML samples; the M9 PDF never stands for it');
 });
 
 const okStages = { captured: true, identified: true, read: true, validated: true, accepted: false };
@@ -333,7 +341,7 @@ test('R2 (9) + B-3: only complete samples are eligible (Portaria 635 + E9-A1); p
   assert.deepEqual([cell('rfb--portaria--medio').status, cell('rfb--portaria--medio').complete], ['covered', true]);
   assert.deepEqual([cell('rfb--ato-declaratorio-executivo--pequeno').status, cell('rfb--ato-declaratorio-executivo--pequeno').complete, cell('rfb--ato-declaratorio-executivo--pequeno').partialSamples],
     ['covered', false, ['rfb:148629']], 'covered (layout) but complete:false, explicit');
-  assert.equal(mx.coveredRequired, 13, 'coverage count unchanged by the completeness flag');
+  assert.equal(mx.coveredRequired, 23, 'coverage count (layout) is not changed by the completeness flag: 13 + 10 partial manual samples');
 });
 
 test('R2 B-4: decidedOn must be a REAL date', async () => {

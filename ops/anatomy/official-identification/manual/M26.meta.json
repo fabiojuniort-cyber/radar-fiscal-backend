@@ -1,0 +1,24 @@
+{
+  "item": "M26",
+  "act": "Decreto nº 10.979/2022",
+  "source": "DOU",
+  "type": "Decreto",
+  "url": "https://www.in.gov.br/web/dou/-/decreto-n-10.979-de-25-de-fevereiro-de-2022-383062604",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.901Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.901Z",
+  "fileName": "M26.html",
+  "sha256": "92cb1dff9ffc240ec1c715e063a9461d4b703da4da3654fc7fce96318f5b35d4",
+  "bytes": 100726,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "DECRETO\\s+N\\S*\\s*10\\.979",
+    "matched": "DECRETO Nº 10.979"
+  },
+  "representation": "html",
+  "promoted": false
+}

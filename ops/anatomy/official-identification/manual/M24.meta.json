@@ -1,0 +1,24 @@
+{
+  "item": "M24",
+  "act": "IN RFB nº 2.237/2024",
+  "source": "DOU",
+  "type": "Instrução Normativa",
+  "url": "https://www.in.gov.br/web/dou/-/instrucao-normativa-rfb-n-2.237-de-4-de-dezembro-de-2024-599911204",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.842Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.842Z",
+  "fileName": "M24.html",
+  "sha256": "2196ec600f9a1cff11047da3c467261168a1b79cd577126e3ec3e3280f206a10",
+  "bytes": 121219,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "INSTRU[ÇC][ÃA]O\\s+NORMATIVA\\s+RFB\\s+N\\S*\\s*2\\.237",
+    "matched": "INSTRUÇÃO NORMATIVA RFB Nº 2.237"
+  },
+  "representation": "html",
+  "promoted": false
+}

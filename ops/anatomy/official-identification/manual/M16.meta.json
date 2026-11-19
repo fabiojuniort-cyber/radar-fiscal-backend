@@ -1,0 +1,24 @@
+{
+  "item": "M16",
+  "act": "Convênio ICMS 153/20",
+  "source": "CONFAZ",
+  "type": "Convênio ICMS",
+  "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2020/CV153_20",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.830Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.830Z",
+  "fileName": "M16.html",
+  "sha256": "2732a2e1422a8197d560ee94745a0402ced487ee712cbf7e9d934882347c1188",
+  "bytes": 130312,
+  "declaredCharset": "utf-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "CONV[ÊE]NIO\\s+ICMS\\s+N?\\S*\\s*153\\s*\\/\\s*(?:20)?20\\b",
+    "matched": "CONVÊNIO ICMS 153/20"
+  },
+  "representation": "html",
+  "promoted": false
+}

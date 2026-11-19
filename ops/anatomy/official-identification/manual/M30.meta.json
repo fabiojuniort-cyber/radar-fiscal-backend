@@ -1,0 +1,24 @@
+{
+  "item": "M30",
+  "act": "Portaria RFB nº 635/2025",
+  "source": "DOU",
+  "type": "Portaria",
+  "url": "https://www.in.gov.br/web/dou/-/portaria-rfb-n-635-de-31-de-dezembro-de-2025-679016256",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.965Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.965Z",
+  "fileName": "M30.html",
+  "sha256": "3629a9eb77320633d92d9d12b1d626faef2ac46627dcd3f49e75aef86a1d3a31",
+  "bytes": 109003,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "PORTARIA\\s+RFB\\s+N\\S*\\s*635",
+    "matched": "portaria RFB Nº 635"
+  },
+  "representation": "html",
+  "promoted": false
+}

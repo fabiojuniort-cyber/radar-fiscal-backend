@@ -1,0 +1,24 @@
+{
+  "item": "M14",
+  "act": "Convênio ICMS 63/26",
+  "source": "CONFAZ",
+  "type": "Convênio ICMS",
+  "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2026/CV063_26",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.827Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.827Z",
+  "fileName": "M14.html",
+  "sha256": "13bdf6fd9bbb466bea42f81cd1017969d5ac02ba5fbd333ed8ce60620afacb93",
+  "bytes": 113445,
+  "declaredCharset": "utf-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "CONV[ÊE]NIO\\s+ICMS\\s+N?\\S*\\s*63\\s*\\/\\s*(?:20)?26\\b",
+    "matched": "CONVÊNIO ICMS 63/26"
+  },
+  "representation": "html",
+  "promoted": false
+}

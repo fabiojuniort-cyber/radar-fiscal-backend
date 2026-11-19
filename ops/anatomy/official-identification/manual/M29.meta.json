@@ -1,0 +1,24 @@
+{
+  "item": "M29",
+  "act": "Portaria RFB nº 514/2025",
+  "source": "DOU",
+  "type": "Portaria",
+  "url": "https://www.in.gov.br/web/dou/-/portaria-rfb-n-514-de-21-de-fevereiro-de-2025-614282253",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.964Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.964Z",
+  "fileName": "M29.html",
+  "sha256": "d2ca1bf2b076f678fd8e1a50554525dada0e19022d2769a8b780c6a8b1527896",
+  "bytes": 89970,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "PORTARIA\\s+RFB\\s+N\\S*\\s*514",
+    "matched": "portaria RFB Nº 514"
+  },
+  "representation": "html",
+  "promoted": false
+}

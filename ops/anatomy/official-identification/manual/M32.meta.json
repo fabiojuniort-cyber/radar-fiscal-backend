@@ -1,0 +1,24 @@
+{
+  "item": "M32",
+  "act": "Resolução CGSN nº 164/2022",
+  "source": "DOU",
+  "type": "Resolução",
+  "url": "https://www.in.gov.br/web/dou/-/resolucao-cgsn-n-164-de-21-de-janeiro-de-2022-375523376",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.966Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.966Z",
+  "fileName": "M32.html",
+  "sha256": "866bd1e26cfdbf15bd706f442b5f807cf6e3fb19109efc860f75b9ac957daa0d",
+  "bytes": 86811,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "RESOLU[ÇC][ÃA]O\\s+CGSN\\s+N\\S*\\s*164",
+    "matched": "RESOLUÇÃO CGSN Nº 164"
+  },
+  "representation": "html",
+  "promoted": false
+}

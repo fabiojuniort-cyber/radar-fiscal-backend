@@ -1,0 +1,24 @@
+{
+  "item": "M23",
+  "act": "IN RFB nº 1.932/2020",
+  "source": "DOU",
+  "type": "Instrução Normativa",
+  "url": "https://www.in.gov.br/en/web/dou/-/instrucao-normativa-n-1.932-de-3-de-abril-de-2020-251138205",
+  "savedAt": "2026-11-19T04:04:56.000Z",
+  "receivedAt": "2026-11-19T04:11:19.840Z",
+  "savedAtNote": null,
+  "ingestedAt": "2026-11-19T04:11:19.840Z",
+  "fileName": "M23.html",
+  "sha256": "31b1b1f969813af9eba6dbac0f3781d6bbdc59a5b2f3af42ec30db291974d7a8",
+  "bytes": 86545,
+  "declaredCharset": "UTF-8",
+  "browserSavedFromUrl": null,
+  "origin": "obtido manualmente pelo Fábio — reprodução salva pelo navegador",
+  "original": false,
+  "titleCheck": {
+    "pattern": "INSTRU[ÇC][ÃA]O\\s+NORMATIVA\\s+(?:RFB\\s+)?N\\S*\\s*1\\.932\\b",
+    "matched": "INSTRUÇÃO NORMATIVA Nº 1.932"
+  },
+  "representation": "html",
+  "promoted": false
+}
